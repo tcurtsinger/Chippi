@@ -1,0 +1,19 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- Windows TFM for the registry (HKCU Run) and named kernel objects, but no WPF:
+         Core stays UI-free so modules and tests never pull in PresentationFramework. -->
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <RootNamespace>Chippi.Core</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Chippi.Core.Tests" />
+  </ItemGroup>
+
+</Project>

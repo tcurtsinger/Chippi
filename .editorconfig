@@ -1,0 +1,31 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = crlf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.{json,props,targets,csproj,slnx,xml,yml,yaml}]
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false
+
+[*.cs]
+# Every C# file starts with the SPDX header. IDE0073 fails the build when it is missing
+# (EnforceCodeStyleInBuild + TreatWarningsAsErrors in Directory.Build.props).
+file_header_template = SPDX-License-Identifier: GPL-3.0-or-later\nCopyright (C) Chippi contributors
+dotnet_diagnostic.IDE0073.severity = error
+
+csharp_style_namespace_declarations = file_scoped:warning
+dotnet_diagnostic.IDE0161.severity = warning
+csharp_style_var_for_built_in_types = true:silent
+csharp_style_var_when_type_is_apparent = true:silent
+dotnet_sort_system_directives_first = true
+
+# Generated code (XAML .g.cs, source generators) is exempt.
+[{obj,bin}/**.cs]
+generated_code = true

@@ -1,0 +1,14 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Keep awake, the Phase 1 reference module. Empty until WS4 lands. -->
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <RootNamespace>Chippi.Features.KeepAwake</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Chippi.Core\Chippi.Core.csproj" />
+  </ItemGroup>
+
+</Project>

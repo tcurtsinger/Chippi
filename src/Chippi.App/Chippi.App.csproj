@@ -1,0 +1,35 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <AssemblyName>Chippi</AssemblyName>
+    <RootNamespace>Chippi.App</RootNamespace>
+    <!-- No PlatformTarget: the RID (win-x64 / win-arm64) decides the architecture. -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Chippi.Core\Chippi.Core.csproj" />
+    <ProjectReference Include="..\Features\Chippi.Features.KeepAwake\Chippi.Features.KeepAwake.csproj" />
+  </ItemGroup>
+
+  <!-- Static Manrope 500/600/700/800 and JetBrains Mono 500/600 (OFL), embedded as WPF resources. -->
+  <ItemGroup>
+    <Resource Include="Themes\Fonts\*.ttf" />
+    <None Include="Themes\Fonts\OFL-*.txt" CopyToOutputDirectory="PreserveNewest" LinkBase="licenses" />
+  </ItemGroup>
+
+  <!-- The control gallery is a development tool: compiled into Debug builds only. -->
+  <ItemGroup Condition="'$(Configuration)' != 'Debug'">
+    <Page Remove="Controls\Gallery\**" />
+    <Compile Remove="Controls\Gallery\**" />
+  </ItemGroup>
+
+</Project>
