@@ -31,7 +31,7 @@ public sealed class RollingFileLog(string directory, string baseName = "chippi",
         var line = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} {Abbreviation(level)} [{category}] {message}";
         if (exception is not null)
             line += Environment.NewLine + exception;
-        line += Environment.NewLine;
+        line = FitToCap(line + Environment.NewLine);
 
         // An antivirus or indexer can hold the file for a moment right after login; retry
         // briefly rather than dropping the entry.
@@ -74,6 +74,24 @@ public sealed class RollingFileLog(string directory, string baseName = "chippi",
             File.Move(CurrentFile, Numbered(1), overwrite: true);
         else
             File.Delete(CurrentFile);
+    }
+
+    /// <summary>An entry larger than one file (a huge exception, say) is cut so no file ever passes the cap.</summary>
+    private string FitToCap(string entry)
+    {
+        var utf8 = System.Text.Encoding.UTF8;
+        if (utf8.GetByteCount(entry) <= MaxFileBytes)
+            return entry;
+        var marker = " [truncated]" + Environment.NewLine;
+        long budget = MaxFileBytes - utf8.GetByteCount(marker);
+        if (budget <= 0)
+            return "";
+        int length = (int)Math.Min(entry.Length, budget); // at most one byte per char
+        while (length > 0 && utf8.GetByteCount(entry.AsSpan(0, length)) > budget)
+            length--;
+        if (length > 0 && char.IsHighSurrogate(entry[length - 1]))
+            length--; // never split a surrogate pair
+        return entry[..length] + marker;
     }
 
     private string Numbered(int i) => Path.Combine(Directory, $"{baseName}.{i}.log");

@@ -24,8 +24,35 @@ public sealed class SingleInstance : IDisposable
         _listener.Start();
     }
 
-    /// <summary>Raised on a background thread each time another launch asks this instance to show itself.</summary>
-    public event EventHandler? ActivationRequested;
+    private readonly Lock _gate = new();
+    private EventHandler? _activationRequested;
+    private bool _pending;
+
+    /// <summary>
+    /// Raised on a background thread each time another launch asks this instance to show itself.
+    /// A request that arrives before anyone subscribes is held and raised on the first subscribe,
+    /// so a second launch during startup is never lost.
+    /// </summary>
+    public event EventHandler? ActivationRequested
+    {
+        add
+        {
+            bool deliver;
+            lock (_gate)
+            {
+                _activationRequested += value;
+                deliver = _pending;
+                _pending = false;
+            }
+            if (deliver)
+                value?.Invoke(this, EventArgs.Empty);
+        }
+        remove
+        {
+            lock (_gate)
+                _activationRequested -= value;
+        }
+    }
 
     /// <summary>
     /// Returns the owner object when this is the first instance. Otherwise signals the running
@@ -71,6 +98,15 @@ public sealed class SingleInstance : IDisposable
     {
         var handles = new WaitHandle[] { _stop, _activate };
         while (WaitHandle.WaitAny(handles) == 1)
-            ActivationRequested?.Invoke(this, EventArgs.Empty);
+        {
+            EventHandler? handler;
+            lock (_gate)
+            {
+                handler = _activationRequested;
+                if (handler is null)
+                    _pending = true;
+            }
+            handler?.Invoke(this, EventArgs.Empty);
+        }
     }
 }

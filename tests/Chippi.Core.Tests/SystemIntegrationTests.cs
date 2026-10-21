@@ -26,6 +26,20 @@ public sealed class SingleInstanceTests
     }
 
     [Fact]
+    public async Task A_request_that_arrives_before_anyone_subscribes_is_delivered_on_subscribe()
+    {
+        var name = "ChippiTest-" + Guid.NewGuid().ToString("N");
+        using var first = SingleInstance.TryAcquire(name);
+        Assert.Null(SingleInstance.TryAcquire(name));
+        await Task.Delay(200); // let the listener consume the signal with no subscriber
+
+        using var signalled = new ManualResetEventSlim();
+        first!.ActivationRequested += (_, _) => signalled.Set();
+
+        Assert.True(signalled.Wait(TimeSpan.FromSeconds(2)));
+    }
+
+    [Fact]
     public void Name_is_free_again_after_dispose()
     {
         var name = "ChippiTest-" + Guid.NewGuid().ToString("N");
@@ -76,6 +90,18 @@ public sealed class RollingFileLogTests : IDisposable
         Assert.Equal(["chippi.1.log", "chippi.2.log", "chippi.log"], files);
         Assert.All(Directory.GetFiles(_dir.Path), f => Assert.True(new FileInfo(f).Length <= 2_000));
         Assert.Contains("line 0499", File.ReadAllText(log.CurrentFile), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void An_entry_larger_than_the_cap_is_truncated_to_fit()
+    {
+        var log = new RollingFileLog(_dir.Path, "chippi", maxFileBytes: 2_000, maxFiles: 3);
+        log.Write(LogLevel.Error, "Test", new string('x', 10_000), new InvalidOperationException(new string('y', 5_000)));
+        log.Write(LogLevel.Information, "Test", "after");
+
+        Assert.All(Directory.GetFiles(_dir.Path), f => Assert.True(new FileInfo(f).Length <= 2_000));
+        Assert.Contains("[truncated]", string.Concat(Directory.GetFiles(_dir.Path).Select(File.ReadAllText)), StringComparison.Ordinal);
+        Assert.Contains("after", File.ReadAllText(log.CurrentFile), StringComparison.Ordinal);
     }
 
     [Fact]

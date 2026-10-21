@@ -176,8 +176,22 @@ public sealed class ModuleRegistry(ConfigStore config, IslandActivityHub island,
         await _gate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
-            foreach (var entry in _entries.Where(e => e.IsRunning).Reverse())
-                await StopModuleAsync(entry, ct).ConfigureAwait(false);
+            // Every module gets stopped even if one stop is cancelled, so exit always releases
+            // execution states and hooks; the cancellation is reported afterwards.
+            OperationCanceledException? cancelled = null;
+            foreach (var entry in _entries.Where(e => e.IsRunning).Reverse().ToList())
+            {
+                try
+                {
+                    await StopModuleAsync(entry, ct).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException ex)
+                {
+                    cancelled ??= ex;
+                }
+            }
+            if (cancelled is not null)
+                throw cancelled;
         }
         finally
         {
@@ -294,16 +308,36 @@ public sealed class ModuleRegistry(ConfigStore config, IslandActivityHub island,
             entry.IsRunning = true;
             entry.LastError = null;
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex)
         {
-            // A broken module must not take the shell down. It stays installed so the user can
-            // see the error in the hub and uninstall it.
-            _logger.LogError(ex, "{Id} failed to start", id);
-            entry.LastError = ex;
-            CleanUpAfterStop(entry);
+            // A start that threw or was cancelled may already hold handles, timers or an execution
+            // state, so the module is always stopped (best effort, uncancellable) and its UI and
+            // island entries removed. A broken module must not take the shell down: it stays
+            // installed so the user can see the error in the hub and uninstall it. Cancellation
+            // still propagates to the caller after the cleanup.
+            if (ex is not OperationCanceledException)
+            {
+                _logger.LogError(ex, "{Id} failed to start", id);
+                entry.LastError = ex;
+            }
+            try
+            {
+                await entry.Module!.StopAsync(CancellationToken.None).ConfigureAwait(false);
+            }
+            catch (Exception stopEx)
+            {
+                _logger.LogError(stopEx, "{Id} failed to stop after a failed start", id);
+            }
+            finally
+            {
+                CleanUpAfterStop(entry);
+            }
+            if (ex is OperationCanceledException)
+                throw;
         }
     }
 
+    /// <summary>Stops one module. UI and island cleanup always runs; cancellation propagates after it.</summary>
     private async Task StopModuleAsync(FeatureEntry entry, CancellationToken ct)
     {
         try
@@ -314,7 +348,10 @@ public sealed class ModuleRegistry(ConfigStore config, IslandActivityHub island,
         {
             _logger.LogError(ex, "{Id} failed to stop cleanly", entry.Id);
         }
-        CleanUpAfterStop(entry);
+        finally
+        {
+            CleanUpAfterStop(entry);
+        }
     }
 
     private void CleanUpAfterStop(FeatureEntry entry)

@@ -28,19 +28,28 @@ internal sealed class FakeModule(FeatureDescriptor descriptor) : IFeatureModule
     /// <summary>Runs inside StartAsync, after the context is captured.</summary>
     public Action<ModuleContext>? OnStart { get; set; }
 
+    /// <summary>Stands in for a handle or execution state: taken at the start of StartAsync, released by StopAsync.</summary>
+    public bool HoldsResource { get; private set; }
+
+    public Exception? FailOnStop { get; set; }
+
     public Task StartAsync(ModuleContext context, CancellationToken ct)
     {
         Starts++;
         Context = context;
+        HoldsResource = true;
+        OnStart?.Invoke(context);
         if (FailOnStart is not null)
             throw FailOnStart;
-        OnStart?.Invoke(context);
         return Task.CompletedTask;
     }
 
     public Task StopAsync(CancellationToken ct)
     {
         Stops++;
+        HoldsResource = false;
+        if (FailOnStop is not null)
+            throw FailOnStop;
         return Task.CompletedTask;
     }
 

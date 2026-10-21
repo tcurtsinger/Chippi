@@ -65,14 +65,25 @@ public sealed class ConfigStore
 
             try
             {
-                _root = Parse(File.ReadAllText(FilePath));
+                var root = Parse(File.ReadAllText(FilePath));
+
+                // A shell section this build cannot read (hand-edited, or a bad value) would make
+                // every reader throw. Keep a copy of the file, drop only that section so it falls
+                // back to defaults, and keep everything else, unknown sections included.
+                for (var bad = FirstInvalidSection(root); bad is not null; bad = FirstInvalidSection(root))
+                {
+                    var copy = AsidePath("invalid");
+                    _logger.LogError("Settings section {Section} is invalid; resetting it (original kept at {Copy})", bad, copy);
+                    TryCopy(FilePath, copy);
+                    root.Remove(bad);
+                }
+
+                _root = root;
                 _logger.LogInformation("Settings loaded from {Path} (version {Version})", FilePath, VersionOf(_root));
             }
             catch (Exception ex) when (ex is JsonException or InvalidDataException)
             {
-                var aside = Path.Combine(
-                    Path.GetDirectoryName(FilePath)!,
-                    $"{Path.GetFileNameWithoutExtension(FilePath)}.corrupt-{DateTime.Now:yyyyMMdd-HHmmss}.json");
+                var aside = AsidePath("corrupt");
                 _logger.LogError(ex, "Settings unreadable; moved to {Aside} and starting on defaults", aside);
                 TryMove(FilePath, aside);
                 _root = NewRoot();
@@ -97,7 +108,7 @@ public sealed class ConfigStore
     public T GetSection<T>(string name) where T : class, new()
     {
         lock (_gate)
-            return Read<T>(_root[name]);
+            return Read<T>(_root[name], name);
     }
 
     /// <summary>Merges <paramref name="value"/> into a top-level section and saves. Unknown properties in the section are kept.</summary>
@@ -119,7 +130,7 @@ public sealed class ConfigStore
     public T GetModuleSettings<T>(string moduleId) where T : class, new()
     {
         lock (_gate)
-            return Read<T>(Modules(create: false)?[moduleId]);
+            return Read<T>(Modules(create: false)?[moduleId], $"{ModulesKey}.{moduleId}");
     }
 
     public void SetModuleSettings<T>(string moduleId, T value) where T : class
@@ -142,7 +153,8 @@ public sealed class ConfigStore
 
     /// <summary>
     /// Replaces the settings with an exported file and saves. Throws <see cref="InvalidDataException"/>
-    /// (and changes nothing) when the file is not a Chippi settings export.
+    /// when the file is not a valid Chippi settings export, and <see cref="IOException"/> when
+    /// settings.json cannot be written; in both cases the current settings are unchanged.
     /// </summary>
     public void Import(string path)
     {
@@ -155,11 +167,14 @@ public sealed class ConfigStore
         {
             throw new InvalidDataException("That file is not valid JSON.", ex);
         }
+        if (FirstInvalidSection(imported) is { } bad)
+            throw new InvalidDataException($"The \"{bad}\" section of that file is not valid Chippi settings.");
 
         lock (_gate)
         {
+            // Commit to disk first: only a successful write replaces the live settings.
+            WriteAtomic(FilePath, imported.ToJsonString(JsonOptions));
             _root = imported;
-            WriteAtomic(FilePath, _root.ToJsonString(JsonOptions));
         }
         _logger.LogInformation("Settings imported from {Path}", path);
         Imported?.Invoke(this, EventArgs.Empty);
@@ -195,8 +210,53 @@ public sealed class ConfigStore
         return root;
     }
 
-    private static T Read<T>(JsonNode? node) where T : class, new() =>
-        node is null ? new T() : node.Deserialize<T>(JsonOptions) ?? new T();
+    /// <summary>The shell sections this build owns, and what makes each readable. Module sections are typed by their module and checked when read.</summary>
+    private static readonly (string Name, Func<JsonNode, bool> IsValid)[] KnownSections =
+    [
+        (AppSettings.SectionName, node => node is JsonObject && node.Deserialize<AppSettings>(JsonOptions) is not null),
+        (Chippi.Core.Modules.FeatureState.SectionName, node => node is JsonObject
+            && node.Deserialize<Chippi.Core.Modules.FeatureState>(JsonOptions) is { Installed: not null, CapabilitiesUsed: not null }),
+        (ModulesKey, node => node is JsonObject),
+    ];
+
+    private static string? FirstInvalidSection(JsonObject root)
+    {
+        foreach (var (name, isValid) in KnownSections)
+        {
+            if (root[name] is not { } node)
+                continue;
+            try
+            {
+                if (!isValid(node))
+                    return name;
+            }
+            catch (Exception ex) when (ex is JsonException or NotSupportedException or InvalidOperationException)
+            {
+                return name;
+            }
+        }
+        return null;
+    }
+
+    /// <summary>A module's section can still hold values its type rejects; it then reads as defaults rather than throwing.</summary>
+    private T Read<T>(JsonNode? node, string section) where T : class, new()
+    {
+        if (node is null)
+            return new T();
+        try
+        {
+            return node.Deserialize<T>(JsonOptions) ?? new T();
+        }
+        catch (Exception ex) when (ex is JsonException or NotSupportedException or InvalidOperationException)
+        {
+            _logger.LogError(ex, "Settings section {Section} is invalid; using defaults", section);
+            return new T();
+        }
+    }
+
+    private string AsidePath(string reason) => Path.Combine(
+        Path.GetDirectoryName(FilePath)!,
+        $"{Path.GetFileNameWithoutExtension(FilePath)}.{reason}-{DateTime.Now:yyyyMMdd-HHmmss}.json");
 
     private static JsonObject ToNode<T>(T value) =>
         JsonSerializer.SerializeToNode(value, JsonOptions) as JsonObject
@@ -240,10 +300,35 @@ public sealed class ConfigStore
                 File.Move(temp, path, overwrite: true);
                 return;
             }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException && attempt < attempts)
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                Thread.Sleep(Math.Min(20 * attempt, 200));
+                if (attempt < attempts)
+                {
+                    Thread.Sleep(Math.Min(20 * attempt, 200));
+                    continue;
+                }
+                try
+                {
+                    File.Delete(temp);
+                }
+                catch (Exception cleanup) when (cleanup is IOException or UnauthorizedAccessException)
+                {
+                    // Leaving the temp file is harmless; the next save overwrites it.
+                }
+                throw new IOException($"Could not save {Path.GetFileName(path)}: another program is using it.", ex);
             }
+        }
+    }
+
+    private void TryCopy(string from, string to)
+    {
+        try
+        {
+            File.Copy(from, to, overwrite: true);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            _logger.LogWarning(ex, "Could not copy {From} aside", from);
         }
     }
 

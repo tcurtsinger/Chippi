@@ -183,6 +183,69 @@ public sealed class ModuleRegistryTests : IDisposable
     }
 
     [Fact]
+    public async Task A_failed_start_is_stopped_so_partial_resources_are_released()
+    {
+        var module = FakeModule.Create("bad");
+        module.OnStart = ctx =>
+        {
+            ctx.Island.Publish(new IslandActivity("on", IslandActivityKind.Timer, "Half started", "bad"));
+            ctx.Ui.AddToolTile(new ToolTileModel("Bad", "Zap", _ => Task.CompletedTask));
+        };
+        module.FailOnStart = new InvalidOperationException("boom");
+        _f.Registry.Register(module);
+        await _f.Registry.StartAsync();
+
+        await _f.Registry.SetInstalledAsync("bad", true);
+
+        Assert.Equal(1, module.Stops);
+        Assert.False(module.HoldsResource);
+        Assert.Empty(_f.Registry.Find("bad")!.ToolTiles);
+        Assert.Null(_f.Island.Current);
+    }
+
+    [Fact]
+    public async Task A_cancelled_start_is_cleaned_up_and_the_cancellation_propagates()
+    {
+        var module = FakeModule.Create("slow");
+        module.OnStart = ctx =>
+        {
+            ctx.Island.Publish(new IslandActivity("on", IslandActivityKind.Timer, "Starting", "slow"));
+            ctx.Ui.AddToolTile(new ToolTileModel("Slow", "Zap", _ => Task.CompletedTask));
+        };
+        module.FailOnStart = new OperationCanceledException();
+        _f.Registry.Register(module);
+        await _f.Registry.StartAsync();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => _f.Registry.SetInstalledAsync("slow", true));
+
+        Assert.Equal(1, module.Stops);
+        Assert.False(module.HoldsResource);
+        Assert.Empty(_f.Registry.Find("slow")!.ToolTiles);
+        Assert.Null(_f.Island.Current);
+        Assert.Null(_f.Registry.Find("slow")!.LastError); // cancelled, not broken
+    }
+
+    [Fact]
+    public async Task StopAll_stops_every_module_even_when_one_stop_is_cancelled()
+    {
+        var first = FakeModule.Create("first", PresetMembership.Essentials);
+        var second = FakeModule.Create("second", PresetMembership.Essentials);
+        second.OnStart = ctx => ctx.Island.Publish(new IslandActivity("on", IslandActivityKind.Timer, "x", "y"));
+        second.FailOnStop = new OperationCanceledException(); // stopped last-registered first
+        _f.Registry.Register(first);
+        _f.Registry.Register(second);
+        await _f.Registry.StartAsync();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => _f.Registry.StopAllAsync());
+
+        Assert.Equal(1, first.Stops);
+        Assert.Equal(1, second.Stops);
+        Assert.False(_f.Registry.Find("first")!.IsRunning);
+        Assert.False(_f.Registry.Find("second")!.IsRunning);
+        Assert.Null(_f.Island.Current);
+    }
+
+    [Fact]
     public async Task Stopping_removes_island_activities_and_ui_contributions()
     {
         var module = FakeModule.Create("m");

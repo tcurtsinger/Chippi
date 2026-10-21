@@ -235,6 +235,82 @@ public sealed class ConfigStoreTests : IDisposable
     }
 
     [Theory]
+    [InlineData("""{ "version": 1, "features": { "installed": null } }""")]
+    [InlineData("""{ "version": 1, "app": { "theme": "banana" } }""")]
+    [InlineData("""{ "version": 1, "app": "light" }""")]
+    [InlineData("""{ "version": 1, "modules": [] }""")]
+    public void Import_rejects_invalid_known_sections_and_changes_nothing(string content)
+    {
+        var path = _dir.File("settings.json");
+        var bad = _dir.File("bad.json");
+        File.WriteAllText(bad, content);
+        var store = new ConfigStore(path);
+        store.SetSection(AppSettings.SectionName, new AppSettings { Theme = ThemePreference.Light });
+        var before = File.ReadAllText(path);
+
+        Assert.Throws<InvalidDataException>(() => store.Import(bad));
+
+        Assert.Equal(ThemePreference.Light, store.GetSection<AppSettings>(AppSettings.SectionName).Theme);
+        Assert.Equal(before, File.ReadAllText(path));
+    }
+
+    [Fact]
+    public void Import_that_cannot_be_written_leaves_live_settings_unchanged()
+    {
+        var path = _dir.File("settings.json");
+        var exportPath = _dir.File("export.json");
+        var store = new ConfigStore(path);
+        store.SetSection(AppSettings.SectionName, new AppSettings { Theme = ThemePreference.Light });
+        store.Export(exportPath);
+        store.SetSection(AppSettings.SectionName, new AppSettings { Theme = ThemePreference.Dark });
+
+        bool raised = false;
+        store.Imported += (_, _) => raised = true;
+        using (new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read)) // blocks the rename
+            Assert.ThrowsAny<IOException>(() => store.Import(exportPath));
+
+        Assert.False(raised);
+        Assert.Equal(ThemePreference.Dark, store.GetSection<AppSettings>(AppSettings.SectionName).Theme);
+        store.Save(); // a later save must not commit the failed import
+        var reloaded = new ConfigStore(path);
+        reloaded.Load();
+        Assert.Equal(ThemePreference.Dark, reloaded.GetSection<AppSettings>(AppSettings.SectionName).Theme);
+    }
+
+    [Fact]
+    public void Load_resets_only_an_invalid_known_section_and_keeps_a_copy()
+    {
+        var path = _dir.File("settings.json");
+        File.WriteAllText(path, """
+            {
+              "version": 1,
+              "app": { "theme": "banana" },
+              "features": { "installed": ["keep-awake"] },
+              "futureFeature": { "x": 1 }
+            }
+            """);
+
+        var store = new ConfigStore(path);
+        store.Load();
+
+        Assert.Equal(ThemePreference.Dark, store.GetSection<AppSettings>(AppSettings.SectionName).Theme);
+        Assert.True(store.HasSection("features"));
+        Assert.True(store.HasSection("futureFeature"));
+        Assert.Single(Directory.GetFiles(_dir.Path, "settings.invalid-*.json"));
+    }
+
+    [Fact]
+    public void A_module_section_its_type_cannot_read_gives_defaults_instead_of_throwing()
+    {
+        var path = _dir.File("settings.json");
+        File.WriteAllText(path, """{ "version": 1, "modules": { "m": { "minutes": "lots" } } }""");
+        var store = new ConfigStore(path);
+        store.Load();
+
+        Assert.Equal(0, store.GetModuleSettings<SampleSettings>("m").Minutes);
+    }
+
+    [Theory]
     [InlineData("not json at all")]
     [InlineData("[1, 2, 3]")]
     [InlineData("""{ "app": { "theme": "light" } }""")]
