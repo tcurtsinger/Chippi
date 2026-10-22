@@ -70,10 +70,10 @@ internal sealed class SettingsSection : UserControl
         bool exists = Directory.Exists(folder.Path);
         var name = Ui.Text(Ui.FolderName(folder.Path), "TitleTextStyle");
         var path = Ui.Text(folder.Path + (folder.Path.StartsWith(@"\\", StringComparison.Ordinal) ? " · network" : "") + (exists ? "" : " · not found"),
-            "CaptionTextStyle", exists ? "TextTertiaryBrush" : "WarningBrush");
+            "CaptionTextStyle", exists ? "TextTertiaryBrush" : "WarningTextBrush");
         path.ToolTip = folder.Path;
 
-        var mode = Ui.Segment($"{Ui.FolderName(folder.Path)} mode", 34, "Silent", "Manual", "Paused");
+        var mode = Ui.Segment($"{Ui.FolderName(folder.Path)} mode", true, "Silent", "Manual", "Paused");
         mode.Width = 228;
         mode.SelectedIndex = folder.Mode switch { FolderMode.Silent => 0, FolderMode.Manual => 1, _ => 2 };
         mode.SelectionChanged += (_, _) => Edit(folder, f => f.Mode = mode.SelectedIndex switch { 0 => FolderMode.Silent, 1 => FolderMode.Manual, _ => FolderMode.Paused });

@@ -139,7 +139,7 @@ internal sealed class RulesSection : UserControl
         card.PreviewKeyDown += (_, e) =>
         {
             // Alt+Up/Down moves the rule from anywhere inside it.
-            if (Keyboard.Modifiers == ModifierKeys.Alt && e.Key == Key.System && e.SystemKey is Key.Up or Key.Down)
+            if (e.Key == Key.System && e.SystemKey is Key.Up or Key.Down) // Alt+arrow arrives as a system key
             {
                 e.Handled = true;
                 Move(index, e.SystemKey == Key.Up ? -1 : 1);
@@ -313,8 +313,8 @@ internal sealed class RulesSection : UserControl
         // Action
         editor.Children.Add(Ui.Eyebrow("Action").Margin(0, 14, 0, 8));
         bool hold = rule.Action == RuleActionKind.Hold;
-        var action = hold ? Ui.Segment("Action", 34, "Move to folder", "Rename", "Hold") : Ui.Segment("Action", 34, "Move to folder", "Rename");
-        action.Width = hold ? 330 : 230;
+        var action = hold ? Ui.Segment("Action", true, "Move to folder", "Rename", "Hold") : Ui.Segment("Action", true, "Move to folder", "Rename");
+        action.Width = hold ? 390 : 270;
         action.HorizontalAlignment = HorizontalAlignment.Left;
         action.SelectedIndex = (int)rule.Action;
         editor.Children.Add(Line("", action));
@@ -360,7 +360,7 @@ internal sealed class RulesSection : UserControl
         var targetBlock = Ui.Stack(template, templateNote.Margin(0, 6, 0, 0), tokens);
         var targetLine = Line("", targetBlock);
         var reasonLine = Line("Reason", reason);
-        targetLine.Children.Add(targetLabel.At(0));
+        targetLine.Children.Add(TopLabel(targetLabel).At(0));
         editor.Children.Add(targetLine);
         editor.Children.Add(reasonLine);
         void ShowAction()
@@ -426,7 +426,7 @@ internal sealed class RulesSection : UserControl
         if (RuleChecks.Template(rule.Template ?? "", rename) is { } problem)
         {
             note.Children.Add(Ui.Glyph(LucideIcons.Info, "WarningBrush", 12));
-            note.Children.Add(Ui.Text(problem, "CaptionTextStyle", "WarningBrush").Margin(5, 0, 0, 0));
+            note.Children.Add(Ui.Text(problem, "CaptionTextStyle", "WarningTextBrush").Margin(5, 0, 0, 0));
             return;
         }
         string folder = SampleFolder();
@@ -451,10 +451,18 @@ internal sealed class RulesSection : UserControl
     {
         var grid = Ui.Columns("164", "*");
         if (label.Length > 0)
-            grid.Children.Add(Ui.Text(label, "BodyTextStyle").At(0));
+            grid.Children.Add(TopLabel(Ui.Text(label, "BodyTextStyle")).At(0));
         grid.Children.Add(((FrameworkElement)field).At(1));
         grid.Margin = new Thickness(0, 0, 0, 10);
         return grid;
+    }
+
+    /// <summary>Labels sit level with the first line of their field, not the middle of a tall block.</summary>
+    private static TextBlock TopLabel(TextBlock label)
+    {
+        label.VerticalAlignment = VerticalAlignment.Top;
+        label.Margin = new Thickness(0, 8, 0, 0);
+        return label;
     }
 
     private static Grid Condition(CheckBox toggle, string label, FrameworkElement fields, Action apply)
@@ -512,7 +520,7 @@ internal sealed class RulesSection : UserControl
                     _testResult.Children.Add(Ui.Text(Ui.Relative(folder, plan.Destination!), "BodyTextStyle"));
                     break;
                 case OperationKind.Hold:
-                    _testResult.Children.Add(Ui.Text($"Held · {plan.HoldReason ?? plan.Warnings.LastOrDefault()?.Detail ?? "held"}", "BodyTextStyle", "WarningBrush"));
+                    _testResult.Children.Add(Ui.Text($"Held · {plan.HoldReason ?? plan.Warnings.LastOrDefault()?.Detail ?? "held"}", "BodyTextStyle", "WarningTextBrush"));
                     break;
                 default:
                     _match = null;
@@ -556,7 +564,8 @@ internal sealed class RulesSection : UserControl
 
     private static IEnumerable<RuleSetting> Valid(IReadOnlyList<RuleSetting> rules)
     {
-        var all = rules.Select(r => r.ToRule()).ToList();
+        // List order is the order: duplicate or missing Order values in settings.json never invalidate a rule here.
+        var all = rules.Select((r, i) => r.ToRule() with { Order = i }).ToList();
         var bad = RuleValidator.Validate(all).Select(e => e.RuleId).ToHashSet(StringComparer.Ordinal);
         return rules.Where(r => !bad.Contains(r.Id) && (r.Action == RuleActionKind.Hold || RuleChecks.Template(r.Template ?? "", r.Action == RuleActionKind.Rename) is null));
     }

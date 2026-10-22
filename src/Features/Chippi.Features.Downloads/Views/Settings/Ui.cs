@@ -38,7 +38,7 @@ internal static class Ui
     /// <summary>An amber line under a field or a name.</summary>
     public static TextBlock Warning(string text)
     {
-        var block = Text(text, "CaptionTextStyle", "WarningBrush");
+        var block = Text(text, "CaptionTextStyle", "WarningTextBrush");
         block.TextWrapping = TextWrapping.Wrap;
         block.TextTrimming = TextTrimming.None;
         return block;
@@ -96,7 +96,7 @@ internal static class Ui
 
     public static TextBox Field(string text = "", bool mono = false, string? name = null, double width = double.NaN)
     {
-        var box = new TextBox { Text = text, Width = width, VerticalContentAlignment = VerticalAlignment.Center };
+        var box = new TextBox { Text = text, Width = width, HorizontalAlignment = HorizontalAlignment.Left, VerticalContentAlignment = VerticalAlignment.Center };
         box.SetResourceReference(FrameworkElement.StyleProperty, "TextFieldStyle");
         if (mono)
             box.SetResourceReference(Control.FontFamilyProperty, "MonoFont");
@@ -107,7 +107,7 @@ internal static class Ui
 
     public static ComboBox Choice(IEnumerable<string> items, int selected, string name, double width = double.NaN, bool mono = false)
     {
-        var combo = new ComboBox { ItemsSource = items.ToList(), SelectedIndex = selected, Width = width, VerticalAlignment = VerticalAlignment.Center };
+        var combo = new ComboBox { ItemsSource = items.ToList(), SelectedIndex = selected, Width = width, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center };
         combo.SetResourceReference(FrameworkElement.StyleProperty, "HopperComboBoxStyle");
         if (mono)
             combo.SetResourceReference(Control.FontFamilyProperty, "MonoFont");
@@ -115,9 +115,17 @@ internal static class Ui
         return combo;
     }
 
-    public static SegmentedControl Segment(string name, double height, params string[] labels)
+    /// <summary>A segmented control. Compact (folder modes, the rule action) uses 28px segments with 12px labels, like the flyout's.</summary>
+    public static SegmentedControl Segment(string name, bool compact, params string[] labels)
     {
-        var segment = new SegmentedControl { Height = height, VerticalAlignment = VerticalAlignment.Center };
+        var segment = new SegmentedControl { HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center };
+        if (compact && Application.Current?.TryFindResource("SegmentItemStyle") is Style item)
+        {
+            var style = new Style(typeof(ListBoxItem), item);
+            style.Setters.Add(new Setter(FrameworkElement.HeightProperty, 28.0));
+            style.Setters.Add(new Setter(Control.FontSizeProperty, 12.0));
+            segment.ItemContainerStyle = style;
+        }
         foreach (string label in labels)
             segment.Items.Add(new SegmentItem { Label = label });
         AutomationProperties.SetName(segment, name);

@@ -26,10 +26,10 @@ public sealed class DownloadsPage : UserControl
     public DownloadsPage(DownloadsModule module, string? section)
     {
         _module = module;
-        _segment = Ui.Segment("Section", 36, "Settings", "Rules", "History");
+        _segment = Ui.Segment("Section", false, "Settings", "Rules", "History");
         _segment.Width = 270;
         _segment.HorizontalAlignment = HorizontalAlignment.Right;
-        _segment.Margin = new Thickness(0, -54, 0, 18); // level with the shell's page title
+        _segment.Margin = new Thickness(0, -56, 0, 14); // level with the shell's page title
         _segment.SelectionChanged += (_, _) =>
         {
             if (!_switching && _segment.SelectedIndex >= 0)

@@ -131,6 +131,28 @@ public sealed class ModuleServicesTests : IDisposable
     }
 
     [Fact]
+    public async Task The_app_switches_silence_a_place_and_keep_each_choice()
+    {
+        var toasts = new RecordingToasts();
+        _services.Toasts = toasts;
+        var module = await StartAsync("downloads", ctx => ctx.Notifier.Declare(Kinds));
+        var notifier = module.Context!.Notifier;
+        notifier.SetPlaces("organized", NoticePlaces.Windows | NoticePlaces.Island);
+
+        _config.SetSection(AppSettings.SectionName, new AppSettings { WindowsNotices = false });
+        notifier.Show(new Notice("organized", "1 file organized"));
+        Assert.Empty(toasts.Shown);
+        Assert.Single(_island.Activities);
+
+        _config.SetSection(AppSettings.SectionName, new AppSettings { IslandNotices = false });
+        notifier.Show(new Notice("organized", "2 files organized"));
+        Assert.Single(toasts.Shown);
+        Assert.Single(_island.Activities);
+
+        Assert.Equal(NoticePlaces.Windows | NoticePlaces.Island, notifier.PlacesFor("organized")); // the choice is kept
+    }
+
+    [Fact]
     public async Task An_island_notice_clears_itself_and_can_celebrate()
     {
         ModuleSucceededEventArgs? celebrated = null;

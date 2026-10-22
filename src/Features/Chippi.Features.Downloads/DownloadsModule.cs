@@ -52,7 +52,7 @@ public sealed class DownloadsModule : IFeatureModule
 
     public DownloadsSettings Settings { get; private set; } = new();
 
-    /// <summary>Raised on the UI thread when a notice click or the Explorer menu asks for a view.</summary>
+    /// <summary>Raised on the UI thread after a notice click, the Explorer menu or the Tidy tab opened a view in Settings.</summary>
     public event Action<DownloadsRequest>? Requested;
 
     /// <summary>Where imports are extracted while they wait for preview.</summary>
@@ -88,6 +88,7 @@ public sealed class DownloadsModule : IFeatureModule
         context.Activation.Register(DownloadsNotices.ReviewVerb, _ => Raise(new DownloadsRequest(DownloadsRequestKind.Review)));
 
         context.Ui.SetSettingsPage(section => new Views.Settings.DownloadsPage(this, section));
+        context.Ui.AddFlyoutTab(FlyoutTab.Tidy, () => new Views.Tidy.TidyView(this, RequestView, () => RequestView(new DownloadsRequest(DownloadsRequestKind.Rules))));
         return Task.CompletedTask;
     }
 
@@ -95,10 +96,12 @@ public sealed class DownloadsModule : IFeatureModule
     /// The Settings deep link for a request, for the shell to open (<c>ShellCommands.OpenSettings</c>):
     /// <c>module:downloads-organizer/preview/C:\Users\…\Downloads</c>, <c>…/history/42</c>, <c>…/rules</c>, <c>…/review</c>.
     /// </summary>
-    public static string SettingsLink(DownloadsRequest request)
+    public static string SettingsLink(DownloadsRequest request) => $"module:downloads-organizer/{Section(request)}";
+
+    private static string Section(DownloadsRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
-        string section = request switch
+        return request switch
         {
             { Kind: DownloadsRequestKind.Organize, Folder: { Length: > 0 } folder } => $"preview/{folder}",
             { Kind: DownloadsRequestKind.Organize or DownloadsRequestKind.Review } => "review",
@@ -106,7 +109,6 @@ public sealed class DownloadsModule : IFeatureModule
             { Kind: DownloadsRequestKind.Run } => "history",
             _ => "rules",
         };
-        return $"module:downloads-organizer/{section}";
     }
 
     /// <summary>
@@ -150,10 +152,10 @@ public sealed class DownloadsModule : IFeatureModule
         _context = null;
     }
 
+    /// <summary>Opens Settings at the request's section, then tells anyone listening.</summary>
     private void Raise(DownloadsRequest request)
     {
-        if (Requested is null)
-            _context?.Logger.LogInformation("No view is listening for {Request}", request);
+        _context?.OpenSettings(Section(request));
         Requested?.Invoke(request);
     }
 

@@ -148,7 +148,13 @@ internal sealed class ModuleNotifier(
 
     private void Deliver(Notice notice)
     {
+        // The app-wide switches (Settings › Notifications) silence a place without touching each event's choice.
+        var app = config.GetSection<AppSettings>(AppSettings.SectionName);
         var places = PlacesFor(notice.Kind);
+        if (!app.WindowsNotices)
+            places &= ~NoticePlaces.Windows;
+        if (!app.IslandNotices)
+            places &= ~NoticePlaces.Island;
 
         if (places.HasFlag(NoticePlaces.Windows))
         {

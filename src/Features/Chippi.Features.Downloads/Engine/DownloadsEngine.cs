@@ -740,7 +740,8 @@ public sealed class DownloadsEngine : IDisposable
 
     private List<Rule> ValidRules(IEnumerable<RuleSetting> settings)
     {
-        var rules = settings.Select(s => s.ToRule()).ToList();
+        // Order by the stored order, then renumber: a duplicate Order in settings.json must not disable every rule.
+        var rules = settings.OrderBy(s => s.Order).Select((s, i) => s.ToRule() with { Order = i }).ToList();
         var bad = RuleValidator.Validate(rules).Select(e => e.RuleId).ToHashSet(StringComparer.Ordinal);
         foreach (var id in bad)
             _logger.LogWarning("Rule {Id} is invalid and is skipped", id);

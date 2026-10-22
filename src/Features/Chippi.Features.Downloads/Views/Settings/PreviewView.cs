@@ -189,7 +189,7 @@ internal sealed class PreviewView : UserControl
         if (failed > 0)
         {
             var count = new System.Windows.Documents.Run($" · {failed} failed");
-            count.SetResourceReference(System.Windows.Documents.TextElement.ForegroundProperty, "WarningBrush");
+            count.SetResourceReference(System.Windows.Documents.TextElement.ForegroundProperty, "WarningTextBrush");
             summary.Inlines.Add(count);
         }
         if (held > 0)
@@ -301,7 +301,7 @@ internal sealed class PreviewView : UserControl
 
     private static StackPanel WarningLine(string text)
     {
-        var line = Ui.Row(Ui.Glyph(LucideIcons.Info, "WarningBrush", 12), Ui.Text(text, "CaptionTextStyle", "WarningBrush").Margin(5, 0, 0, 0));
+        var line = Ui.Row(Ui.Glyph(LucideIcons.Info, "WarningBrush", 12), Ui.Text(text, "CaptionTextStyle", "WarningTextBrush").Margin(5, 0, 0, 0));
         line.Margin = new Thickness(0, 1, 0, 0);
         return line;
     }

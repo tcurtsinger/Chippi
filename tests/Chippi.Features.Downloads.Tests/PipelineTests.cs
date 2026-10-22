@@ -30,6 +30,20 @@ public sealed class PipelineTests
     }
 
     [Fact]
+    public void Duplicate_orders_in_settings_do_not_disable_the_rules()
+    {
+        using var f = new Fixture();
+        f.Settings.Rules.Add(new RuleSetting { Id = "a", Name = "A", Order = 0, Extensions = ["txt"], Action = RuleActionKind.Move, Template = "Text" });
+        f.Settings.Rules.Add(new RuleSetting { Id = "b", Name = "B", Order = 0, Extensions = ["pdf"], Action = RuleActionKind.Move, Template = "Docs" });
+        f.Engine.Apply(f.Settings);
+        f.Write("report.pdf");
+
+        f.Settle();
+
+        Assert.True(File.Exists(f.In("Docs", "report.pdf")));
+    }
+
+    [Fact]
     public void Silent_rename_happens_once_and_not_again_on_rescan_or_restart()
     {
         // The self-trigger guard: a rename that stays in the watched folder must not feed itself.

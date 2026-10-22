@@ -30,6 +30,7 @@ public sealed class ShellContext
                 ? ModuleServices.DefaultDataRoot
                 : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Chippi-dev", devProfile, "data"),
         };
+        Services.OpenSettings = page => Commands.OpenSettings(page);
         Registry = new ModuleRegistry(config, Island, loggerFactory, Services);
         Startup = string.IsNullOrWhiteSpace(devProfile)
             ? new StartupRegistration()

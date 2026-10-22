@@ -198,13 +198,13 @@ internal sealed class HistorySection : UserControl
 
         FrameworkElement status = op switch
         {
-            { State: OperationState.Failed } => Ui.Row(Ui.Glyph(LucideIcons.Info, "WarningBrush", 13), Ui.Text($"Failed · {Lower(op.Error)}", "CaptionTextStyle", "WarningBrush").Margin(5, 0, 0, 0)),
+            { State: OperationState.Failed } => Ui.Row(Ui.Glyph(LucideIcons.Info, "WarningBrush", 13), Ui.Text($"Failed · {Lower(op.Error)}", "CaptionTextStyle", "WarningTextBrush").Margin(5, 0, 0, 0)),
             { State: OperationState.Undone } => Ui.Row(Ui.Glyph(LucideIcons.Undo, "TextTertiaryBrush", 13),
                 Ui.Text("Undone", "CaptionTextStyle", "TextTertiaryBrush").Margin(5, 0, 0, 0),
                 Ui.Mono(restore?.CompletedAt is { } at ? Ui.Time(at) : "", "TextTertiaryBrush").Margin(6, 0, 0, 0)),
             { Kind: HistoryOperationKind.Import } => Ui.Text("Imported", "CaptionTextStyle", "TextSecondaryBrush"),
             { Kind: HistoryOperationKind.Rename } => Ui.Text("Renamed", "CaptionTextStyle", "TextSecondaryBrush"),
-            { Kind: HistoryOperationKind.Restore } => Ui.Text($"Not restored · {Lower(op.Error)}", "CaptionTextStyle", "WarningBrush"),
+            { Kind: HistoryOperationKind.Restore } => Ui.Text($"Not restored · {Lower(op.Error)}", "CaptionTextStyle", "WarningTextBrush"),
             _ => Ui.Text("Moved", "CaptionTextStyle", "TextSecondaryBrush"),
         };
 
