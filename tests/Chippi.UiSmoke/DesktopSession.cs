@@ -22,7 +22,7 @@ internal sealed class DesktopSession : IDisposable
     private readonly nint _foreground = GetForegroundWindow();
     private bool _disposed;
 
-    public DesktopSession(ITestOutputHelper output)
+    public DesktopSession(ITestOutputHelper output, Action<string, string>? initialize = null)
     {
         _output = output;
         Executable = Path.GetFullPath(Environment.GetEnvironmentVariable("CHIPPI_SMOKE_EXE")
@@ -32,10 +32,11 @@ internal sealed class DesktopSession : IDisposable
         _local = ProfileDirectory(Environment.SpecialFolder.LocalApplicationData);
         Directory.CreateDirectory(_roaming);
         // Do not flash an island on the user's desktop except during its explicit toggle test.
-        File.WriteAllText(SettingsPath, """{"version":1,"app":{"islandEnabled":false,"reduceMotion":true}}""");
+        File.WriteAllText(SettingsPath, """{"version":1,"app":{"islandEnabled":false,"reduceMotion":true},"modules":{"downloads-organizer":{"initialized":true,"folders":[],"rules":[]}}}""");
         _output.WriteLine($"Profile: {_profile}; executable: {Executable}");
         try
         {
+            initialize?.Invoke(SettingsPath, FixtureRoot);
             Process = Start();
             Assert.True(Process.WaitForInputIdle(15000), "First instance never became ready");
             Assert.False(Process.HasExited, "First instance exited during startup");
@@ -45,6 +46,11 @@ internal sealed class DesktopSession : IDisposable
 
     public Process Process { get; private set; } = null!;
     public string Executable { get; }
+    public string FixtureRoot => Path.Combine(_local, "fixtures");
+    public JsonElement DownloadsSettings
+    {
+        get { using var json = JsonDocument.Parse(File.ReadAllText(SettingsPath)); return json.RootElement.GetProperty("modules").GetProperty("downloads-organizer").Clone(); }
+    }
     public int LastActivationExitCode { get; private set; }
     private string SettingsPath => Path.Combine(_roaming, "settings.json");
     private string StartupName => "Chippi-dev-" + _profile;

@@ -12,4 +12,7 @@
     <PackageReference Include="xunit.runner.visualstudio" />
     <Using Include="Xunit" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Features\Chippi.Features.Downloads\Chippi.Features.Downloads.csproj" />
+  </ItemGroup>
 </Project>
