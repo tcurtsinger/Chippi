@@ -130,9 +130,6 @@ public partial class App : Application
 
         // [WS2] "Coming soon" placeholders for the PLAN.md features.
 
-        // [WS1] Debug mode only: sample Tools tiles. Registration must precede the registry start.
-        Flyout.DebugSampleModule.RegisterIfDebug(shell);
-
         // Start installed modules before any surface reads the registry.
         _ = StartModulesAsync(shell);
 

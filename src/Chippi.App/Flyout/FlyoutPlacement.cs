@@ -44,7 +44,7 @@ internal readonly record struct TrayDisplay(PixelRect Monitor, PixelRect Work, T
 }
 
 /// <summary>
-/// Where the flyout card goes (DESIGN.md Â§5): 12px off the taskbar and 16px from the screen edge
+/// Where the flyout card goes (DESIGN.md §5): 12px off the taskbar and 16px from the screen edge
 /// at the tray's end of it, on whichever edge the taskbar sits, in the monitor's own DPI.
 /// </summary>
 internal static class FlyoutPlacement
