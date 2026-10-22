@@ -38,6 +38,9 @@ public sealed class ModuleContext(
 
     /// <summary>Verbs this module handles from launches, the Explorer menu and notice clicks.</summary>
     public IModuleActivation Activation { get; init; } = new ActivationRouter.ModuleActivation(new ActivationRouter(), moduleId);
+
+    /// <summary>Opens Settings on this module's page, at <c>section</c> when given (a notice click opening History).</summary>
+    public Action<string?> OpenSettings { get; init; } = _ => { };
 }
 
 /// <summary>Typed access to a module's config section (<c>modules.&lt;id&gt;</c> in settings.json).</summary>

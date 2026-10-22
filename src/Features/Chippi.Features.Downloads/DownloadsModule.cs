@@ -23,9 +23,12 @@ public enum DownloadsRequestKind
 
     /// <summary>Show the pending list.</summary>
     Review,
+
+    /// <summary>Show the rules editor.</summary>
+    Rules,
 }
 
-/// <summary>Something outside the views asked to show part of the organizer (a notice click, the Explorer menu).</summary>
+/// <summary>Something asked to show part of the organizer (a notice click, the Explorer menu, the Tidy tab).</summary>
 public sealed record DownloadsRequest(DownloadsRequestKind Kind, string? Folder = null, long? RunId = null);
 
 /// <summary>
@@ -49,7 +52,7 @@ public sealed class DownloadsModule : IFeatureModule
 
     public DownloadsSettings Settings { get; private set; } = new();
 
-    /// <summary>Raised on the UI thread when a notice click or the Explorer menu asks for a view.</summary>
+    /// <summary>Raised on the UI thread after a notice click, the Explorer menu or the Tidy tab opened a view in Settings.</summary>
     public event Action<DownloadsRequest>? Requested;
 
     /// <summary>Where imports are extracted while they wait for preview.</summary>
@@ -83,7 +86,29 @@ public sealed class DownloadsModule : IFeatureModule
         context.Activation.Register(DownloadsNotices.RunVerb, args =>
             Raise(new DownloadsRequest(DownloadsRequestKind.Run, RunId: long.TryParse(args.FirstOrDefault(), NumberStyles.None, CultureInfo.InvariantCulture, out long id) ? id : null)));
         context.Activation.Register(DownloadsNotices.ReviewVerb, _ => Raise(new DownloadsRequest(DownloadsRequestKind.Review)));
+
+        context.Ui.SetSettingsPage(section => new Views.Settings.DownloadsPage(this, section));
+        context.Ui.AddFlyoutTab(FlyoutTab.Tidy, () => new Views.Tidy.TidyView(this, RequestView, () => RequestView(new DownloadsRequest(DownloadsRequestKind.Rules))));
         return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// The Settings deep link for a request, for the shell to open (<c>ShellCommands.OpenSettings</c>):
+    /// <c>module:downloads-organizer/preview/C:\Users\…\Downloads</c>, <c>…/history/42</c>, <c>…/rules</c>, <c>…/review</c>.
+    /// </summary>
+    public static string SettingsLink(DownloadsRequest request) => $"module:downloads-organizer/{Section(request)}";
+
+    private static string Section(DownloadsRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        return request switch
+        {
+            { Kind: DownloadsRequestKind.Organize, Folder: { Length: > 0 } folder } => $"preview/{folder}",
+            { Kind: DownloadsRequestKind.Organize or DownloadsRequestKind.Review } => "review",
+            { Kind: DownloadsRequestKind.Run, RunId: { } run } => $"history/{run}",
+            { Kind: DownloadsRequestKind.Run } => "history",
+            _ => "rules",
+        };
     }
 
     /// <summary>
@@ -107,26 +132,35 @@ public sealed class DownloadsModule : IFeatureModule
         Engine.Apply(settings);
     }
 
+    /// <summary>Asks the Settings views to show <paramref name="request"/>. Call on the UI thread (the Tidy tab does).</summary>
+    public void RequestView(DownloadsRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        Raise(request);
+    }
+
     public async Task StopAsync(CancellationToken ct)
     {
-        // Not cancellable: history closes only after the file being moved right now is settled.
-        if (Engine is { } engine)
-            await Task.Run(engine.Dispose, CancellationToken.None).ConfigureAwait(false);
+        // Views see null first, so none starts reading history while it closes. Not cancellable:
+        // history closes only after the file being moved right now is settled.
+        var engine = Engine;
         Engine = null;
+        if (engine is not null)
+            await Task.Run(engine.Dispose, CancellationToken.None).ConfigureAwait(false);
         _history?.Dispose();
         _history = null;
         _context = null;
     }
 
+    /// <summary>Opens Settings at the request's section, then tells anyone listening.</summary>
     private void Raise(DownloadsRequest request)
     {
-        if (Requested is null)
-            _context?.Logger.LogInformation("No view is listening for {Request}", request);
+        _context?.OpenSettings(Section(request));
         Requested?.Invoke(request);
     }
 
     /// <summary>The Downloads known folder (it can be moved), else the profile default.</summary>
-    private static string? DownloadsFolder()
+    public static string? DownloadsFolder()
     {
         const string key = @"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders";
         if (Registry.GetValue(key, "{374DE290-123F-4565-9164-39C4925E467B}", null) is string path && path.Length > 0)

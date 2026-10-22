@@ -27,4 +27,7 @@ public sealed class ModuleServices
     public TimeSpan IslandNoticeDuration { get; init; } = TimeSpan.FromSeconds(6);
 
     public TimeProvider Time { get; init; } = TimeProvider.System;
+
+    /// <summary>Opens Settings at a page id (<c>module:&lt;id&gt;/&lt;section&gt;</c>). Set by the shell; null in tests.</summary>
+    public Action<string>? OpenSettings { get; set; }
 }

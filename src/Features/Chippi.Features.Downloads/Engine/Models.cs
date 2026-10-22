@@ -56,7 +56,11 @@ public sealed record PreviewPlan(Guid Id, string Folder, RunTrigger Trigger, Dat
     public string? Staging { get; init; }
 }
 
-public sealed record ItemResult(int ItemId, string Source, string? Destination, bool Succeeded, string? Error);
+public sealed record ItemResult(int ItemId, string Source, string? Destination, bool Succeeded, string? Error)
+{
+    /// <summary>The history row, for undo. Null when nothing was recorded.</summary>
+    public long? OperationId { get; init; }
+}
 
 public sealed record ApplyResult(long RunId, IReadOnlyList<ItemResult> Items)
 {

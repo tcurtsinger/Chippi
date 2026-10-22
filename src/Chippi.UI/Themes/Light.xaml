@@ -67,6 +67,8 @@
     <SolidColorBrush x:Key="DangerBrush" Color="#E23B4E" />
     <SolidColorBrush x:Key="SuccessBrush" Color="#3DDC97" />
     <SolidColorBrush x:Key="WarningBrush" Color="#F5A64B" />
+    <!-- Amber text (held and failed reasons, validation): Signal Amber stays for borders, dots and glyphs (DESIGN.md). -->
+    <SolidColorBrush x:Key="WarningTextBrush" Color="#8A4B00" />
 
     <LinearGradientBrush x:Key="AccentGradientBrush" StartPoint="0,0" EndPoint="1,1">
         <GradientStop Color="#B15CF0" Offset="0" />

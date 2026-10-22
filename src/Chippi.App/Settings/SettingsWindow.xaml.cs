@@ -31,6 +31,7 @@ public partial class SettingsWindow : Window
         new("general", "General", LucideIcons.Settings),
         new("features", "Features", LucideIcons.LayoutGrid),
         new("island", "Island & pet", LucideIcons.Droplet),
+        new("notifications", "Notifications", LucideIcons.Bell),
         new("shortcuts", "Shortcuts", LucideIcons.Keyboard),
         new("permissions", "Permissions", LucideIcons.Shield),
         new("appearance", "Appearance", LucideIcons.Sun),
@@ -108,6 +109,7 @@ public partial class SettingsWindow : Window
         {
             "features" => new FeaturesPage(_shell, ShowModulePage),
             "island" => new IslandPetPage(_shell),
+            "notifications" => new NotificationsPage(_shell),
             "shortcuts" => new ShortcutsPage(),
             "permissions" => new PermissionsPage(_shell),
             "appearance" => new AppearancePage(() => Navigate("general"), () => Navigate("island")),

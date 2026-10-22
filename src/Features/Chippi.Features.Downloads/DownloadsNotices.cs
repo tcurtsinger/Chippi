@@ -27,10 +27,10 @@ public static class DownloadsNotices
     public static IReadOnlyList<NoticeKind> Kinds { get; } =
     [
         new(Organized, "Organized", NoticePlaces.Island),
+        new(ReadyToReview, "Ready to review", NoticePlaces.Island),
         new(Held, "Held", NoticePlaces.Windows | NoticePlaces.Island),
         new(Failed, "Failed", NoticePlaces.Windows | NoticePlaces.Island),
-        new(ArchiveImported, "Archive imported", NoticePlaces.Windows),
-        new(ReadyToReview, "Ready to review", NoticePlaces.Island),
+        new(ArchiveImported, "Archive imported", NoticePlaces.Windows),
     ];
 
     public static string ReviewActivation => $"--{ReviewVerb}";

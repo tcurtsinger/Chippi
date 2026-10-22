@@ -39,6 +39,19 @@ public sealed class SqliteHistoryStore : IHistoryStore
     public void EndRun(long runId) =>
         Execute("UPDATE runs SET ended_at = $at WHERE id = $id", ("$at", Now()), ("$id", runId));
 
+    public RunRecord? GetRun(long runId)
+    {
+        lock (_gate)
+        {
+            using var command = Command("SELECT id, trigger, folder, started_at, ended_at FROM runs WHERE id = $id", null, ("$id", runId));
+            using var r = command.ExecuteReader();
+            return r.Read()
+                ? new RunRecord(r.GetInt64(0), (RunTrigger)r.GetInt64(1), r.GetString(2), DateTimeOffset.FromUnixTimeMilliseconds(r.GetInt64(3)),
+                    r.IsDBNull(4) ? null : DateTimeOffset.FromUnixTimeMilliseconds(r.GetInt64(4)))
+                : null;
+        }
+    }
+
     public long Plan(long runId, HistoryOperationKind kind, string source, string destination, string? ruleId, string? ruleName, long bytes, long? undoOf = null) => Scalar(
         """
         INSERT INTO operations (run_id, kind, source_path, dest_path, rule_id, rule_name, bytes, state, planned_at, undo_of)

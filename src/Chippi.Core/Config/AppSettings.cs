@@ -48,6 +48,12 @@ public sealed class AppSettings
 
     public bool IslandEnabled { get; set; } = true;
 
+    /// <summary>Settings › Notifications master switch: off silences every Windows notification; each event's choice is kept.</summary>
+    public bool WindowsNotices { get; set; } = true;
+
+    /// <summary>Settings › Notifications master switch: off silences island notices only (the island and its live activities stay).</summary>
+    public bool IslandNotices { get; set; } = true;
+
     public PetColor PetColor { get; set; } = PetColor.Synth;
 
     /// <summary>Null follows the Windows "Animation effects" setting; true or false overrides it.</summary>

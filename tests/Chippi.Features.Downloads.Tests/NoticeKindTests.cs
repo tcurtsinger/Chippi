@@ -8,10 +8,10 @@ namespace Chippi.Features.Downloads.Tests;
 public sealed class NoticeKindTests
 {
     [Fact]
-    public void Five_kinds_with_ready_to_review_on_the_island_only()
+    public void Five_kinds_in_the_approved_order_with_ready_to_review_on_the_island_only()
     {
         Assert.Equal(
-            ["organized", "held", "failed", "archive-imported", "ready-to-review"],
+            ["organized", "ready-to-review", "held", "failed", "archive-imported"],
             DownloadsNotices.Kinds.Select(k => k.Id));
         Assert.Equal(NoticePlaces.Island, DownloadsNotices.Kinds.Single(k => k.Id == DownloadsNotices.ReadyToReview).Default);
     }

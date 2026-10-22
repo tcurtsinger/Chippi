@@ -551,10 +551,10 @@ public sealed class DownloadsEngine : IDisposable
             if (!info.Exists)
                 continue;
             var fact = Facts(info) with { FullPath = planned };
-            // Never offered: built-in exclusions, cloud placeholders, empty files, ignored names
-            // and files Chippi itself produced (or a rename would repeat on every run).
-            if (FileSafety.Exclusion(fact) is not null || patterns.Any(p => IgnoreFile.Matches(fact.Name, p))
-                || _guard.IsOwnOutput(path, fact.Bytes, fact.Modified))
+            // Never listed: built-in exclusions, cloud placeholders, empty files and files Chippi
+            // itself produced (or a rename would repeat on every run). Ignored names are listed as
+            // held by the planner, so the person sees why they stay.
+            if (FileSafety.Exclusion(fact) is not null || _guard.IsOwnOutput(path, fact.Bytes, fact.Modified))
                 continue;
             facts.Add(fact);
             real.Add(path);
@@ -577,8 +577,7 @@ public sealed class DownloadsEngine : IDisposable
                 // An imported file no rule wants still has to leave staging: it lands in the folder itself.
                 ? plan with { Kind = OperationKind.Move, Destination = facts[i].FullPath }
                 : plan, Fact: facts[i], Real: real[i]))
-            .Where(p => p.Plan.Kind != OperationKind.NoMatch)
-            .Select((p, i) => new PreviewItem(
+            .Select((p, i) => new PreviewItem( // no-match rows stay: they show where the file stays, unselectable
                 i + 1, p.Real, p.Fact.Name, p.Fact.Bytes, p.Fact.Modified, p.Plan.Kind, p.Plan.Destination, p.Plan.RuleId,
                 p.Plan.RuleId is { } id && names.TryGetValue(id, out var name) ? name : null, p.Plan.Warnings, p.Plan.HoldReason)
             {
@@ -626,7 +625,7 @@ public sealed class DownloadsEngine : IDisposable
             var result = _executor.Execute(runId, new ExecutionRequest(
                 kind, item.Source, item.Destination, item.RuleId, item.RuleName, item.Bytes, item.ModifiedUtc, AllowRenumber: false,
                 ExpectedVersion: item.Version, RecordedSource: item.ImportedAs));
-            results.Add(new ItemResult(item.Id, item.Source, result.Destination, result.Succeeded, result.Error));
+            results.Add(new ItemResult(item.Id, item.Source, result.Destination, result.Succeeded, result.Error) { OperationId = result.OperationId });
             if (result.Succeeded)
             {
                 Drop(item.Source);
@@ -741,7 +740,8 @@ public sealed class DownloadsEngine : IDisposable
 
     private List<Rule> ValidRules(IEnumerable<RuleSetting> settings)
     {
-        var rules = settings.Select(s => s.ToRule()).ToList();
+        // Order by the stored order, then renumber: a duplicate Order in settings.json must not disable every rule.
+        var rules = settings.OrderBy(s => s.Order).Select((s, i) => s.ToRule() with { Order = i }).ToList();
         var bad = RuleValidator.Validate(rules).Select(e => e.RuleId).ToHashSet(StringComparer.Ordinal);
         foreach (var id in bad)
             _logger.LogWarning("Rule {Id} is invalid and is skipped", id);
