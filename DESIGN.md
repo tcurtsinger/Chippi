@@ -274,9 +274,11 @@ Mostly flat, layered tonally, with colored glows for emphasis.
 - **System tab:** a 2×2 grid of stat tiles, a network row with a Speed test button, then the top processes by CPU.
 - **Tidy tab:** the folder card with its mode segment (Silent / Manual / Paused) and mode line, RECENTLY STASHED rows with undo, then Organize now (primary) and Rules (secondary).
 - **Tools tab:** a 3-column grid of tool tiles.
+- **Empty state:** with nothing installed, a chip with an icon, "No features on yet", a Caption line, and one primary "Browse features" button that opens Settings › Features.
+- **Tray menu (right-click):** a small flyout-style card, not the stock Windows menu. 12px radius, 36px items with a 16px icon and a 13 / 600 label, 8px hover radius. Items: Open settings, Quit. Its bottom edge sits at the click point, kept 12px off the taskbar.
 
 ### Island
-- **Placement:** top-center of the display with the active window, floating 8px below the top edge. It is never attached to the edge and never covers a fullscreen app.
+- **Placement:** top-center of the display with the active window, floating 8px below the top of that display's work area (the top edge, unless a taskbar or appbar sits there). It is never attached to the edge and never covers a fullscreen app.
 - **Resting pill:** 84×34, holding Gumdrop at 28px, sleepy.
 - **Live pill:** up to 292×38, with 6px left and 14px right padding. Gumdrop at 30px idle, then a Body-weight-700 title and a tertiary source ("Weekend Mix · Spotify"), then a 5-bar gradient equalizer. It shows one activity at a time in priority order: media, then timer, then download or stash, then agent, then status. **Status** is the lowest kind, for background state such as Keep awake; a timed session shows its countdown in mono.
 - **Expanded:** 328 wide, 24px radius, padding 12 / 14 / 14, 10px gaps. It opens on hover (after a short delay) or click, and contains:
@@ -285,23 +287,29 @@ Mostly flat, layered tonally, with colored glows for emphasis.
   3. Transport: previous and next at 32px (transparent) around a 38px deep-gradient play/pause with icon glow.
   4. A 2-column tile row (Panel color, 12px radius, label eyebrow plus value): FOCUS TIMER in mono, JUST STASHED in title text.
   5. An agent usage row: name, mono "62% of 5h · resets 4:10 PM" and a 5px gradient bar.
+  6. Status rows (Panel color, 12px radius): one per Status activity, such as Keep awake, with the title left and its detail in tertiary right.
+
+  Sections without data are left out. With nothing live at all, the expanded island shows one Body line in tertiary: "Nothing live right now". While Keep awake is on, the header pet is wide awake instead of idle.
 - **Frame:** Island color, 1px `rgba(255,255,255,.08)` hairline, island lift.
 
 ### Settings window
-- **Size and frame:** 1160×720 by default (resizable), 13px radius, window lift, custom titlebar.
+- **Size and frame:** 1160×720 by default (resizable), custom titlebar on the Windows 11 frame. Corners and shadow are the system's (8px), not the 13px radius and window lift, so snap layouts, maximize and resize stay native.
 - **Titlebar:** 44px in Titlebar color. Gumdrop at 22px in its small form, "Chippi Settings" at 13 / 700, and window buttons (32×30, 7px radius, Close hovers to Signal Red).
 - **Sidebar:** 220px wide: General, Features, Island & pet, Shortcuts, Permissions, Appearance, About. Items are 36px tall with a 16px icon and a 13 / 600 label, the active one in the segmented-active style. The version and license sit in mono at the bottom.
-- **Features hub:** a Display title and a Body description. A mono "N of M installed" count sits right. Below them are a preset segment (Essentials · Audio · Power user · Everything · Custom) and a 36px search field. The groups follow, each a Label eyebrow over a 3-column grid of feature cards (12px gap). Toggling any card switches the preset to Custom.
+- **Features hub:** a Display title and a Body description. A mono "N of M installed" count sits right. Below them are a preset segment (Essentials · Audio · Power user · Everything · Custom) and a 36px search field. The groups follow, each a Label eyebrow over a 3-column grid of feature cards (12px gap). Toggling any card switches the preset to Custom. The count includes Coming-soon features in M. Clicking an installed card, or pressing Enter on it, opens that feature's settings page.
+- **General and Appearance:** the theme setting lives in General. Appearance links to General and to Island & pet rather than repeating their controls.
 
 ## 6. Components
 
 All interactive controls are custom-templated with the full state set: default, hover, keyboard focus (a 2px violet ring at 2px offset, which is non-negotiable) and disabled (opacity .45).
 
-- **Primary button:** deep gradient, white Title label, 36px tall, 9px radius. One per view.
+- **Primary button:** deep gradient, white Title label, 36px tall, 9px radius. One per view. Hover drops the fill to 92% opacity.
 - **Secondary button:** Button color, hairline border, Ink Control text, 33–34px tall.
 - **Icon button:** 30–32px square, 7px radius, transparent until hover. Always has an accessible name.
-- **Switch:** 40×23 with a 12px radius. Off is `#262E4A`, on is the gradient, and the 17px white knob slides 17px over 0.18s.
-- **Segmented control:** an Input-colored trough with transparent inactive segments in Ink Tertiary. The active segment gets a soft 22% gradient fill, a 1px violet border at 55% and white text. Used for flyout tabs, folder modes and presets.
+- **Switch:** 40×23 with a 12px radius. Off is `#262E4A`, on is the gradient, and the 17px white knob slides 17px over 0.18s. Hover lays a light wash over the track.
+- **Segmented control:** an Input-colored trough with transparent inactive segments in Ink Tertiary. The active segment gets a soft 22% gradient fill, a 1px violet border at 55% and white text. Used for flyout tabs, folder modes and presets. Outside the flyout (presets, settings rows), segments are 36px tall with 13 / 700 labels.
+- **Slider hover:** the 15px thumb grows to 18px around its center; the layout does not move.
+- **Icon chips** (tool tiles, feature cards, flyout header) use the 10px chip radius.
 - **App volume row:**
   - Grid of `32px | 1fr | 40px | 30px` with 18px and 14px rows. Surface color, 12px radius, 9 8 9 10 padding.
   - A 32px chip-colored monogram or app icon, then the name (Title, 13px) beside the output device (Caption, tertiary).
@@ -310,11 +318,12 @@ All interactive controls are custom-templated with the full state set: default, 
 - **Now-playing card:** gradient `#171F40 → #121831`, 14px radius, 13px padding, card glow. Holds a 38px gradient icon chip with icon glow, device and detail text, and the equalizer.
 - **Stat tile:** Surface color, 12px radius. A Label eyebrow, a mono readout with a mono caption, and a 2px azure sparkline 30px tall.
 - **Stash row:** Surface color, 12px radius. The file name (Body 600, ellipsized) over its destination (Caption, tertiary), then a mono age and an undo icon button. A held file gets an amber 45% border and its reason in Signal Amber.
-- **Tool tile:** 92px tall, 12px radius, 10px padding, with a 30px icon chip over the name and its state or shortcut. When on, the border is violet at 50%, the fill is a 16% gradient wash and the chip is the full gradient.
+- **Tool tile:** 92px tall, 12px radius, 10px padding, with a 30px icon chip over the name and its state or shortcut. When on, the border is violet at 50%, the fill is a 16% gradient wash and the chip is the full gradient. When off, it sits on Surface with a hairline border. Names stay on one line and end in an ellipsis when too long (about 10 characters in three columns); the full name is the tooltip and the accessible name, so keep feature names short.
 - **Feature card:** at least 128px tall, 14px radius, 13px padding.
   - A 34px icon chip (gradient when installed) with the switch top-right.
   - The name (Title) over a description (12px, tertiary), then badges.
   - Installed cards sit on Surface with a violet border at 40%. Uninstalled cards sit on Panel with a 5% hairline.
+  - Coming-soon cards look uninstalled, with a disabled switch and a neutral "Coming soon" badge first in the badge row.
 - **Badges:** 20px tall, 6px radius, 10.5 / 700.
   - **Source** (violet tint), e.g. "From Hopper".
   - **Overlap** (amber tint), e.g. "Overlaps Win+V", for features Windows or PowerToys already cover.

@@ -25,6 +25,7 @@ and [Mouzi](https://github.com/hsr88/mouzi) (Downloads organizer). Absorbs
 | Hopper | Merged in as the Audio routing feature. Its repo is archived once Chippi covers it |
 | Overlap with Windows / PowerToys | Decided feature by feature, flagged when we reach each one |
 | Elevation | Runs as a normal user. Features that need admin (temps, fans) go through an optional elevated helper |
+| Presets | **Essentials** (first run): Keep awake, Downloads organizer, App volume, System monitor, Displays and brightness, Clipboard history, Paste as plain text, Clean URL. **Audio**: the Sound group. **Power user**: almost everything, minus Mic processing, Volume boost and the Everything-only set. **Everything only**: Fan control, Cleaning mode, Focus follows mouse, Click and key debounce, Media tools, Cleaner. Source of truth: `src/Chippi.App/Settings/Features/FeatureCatalog.cs` (approved 2026-10-21) |
 
 ## Architecture
 

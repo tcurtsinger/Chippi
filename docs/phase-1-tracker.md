@@ -24,6 +24,7 @@ Owner of this file: Marge (PM). Brief: [phase-1-handoff.md](phase-1-handoff.md).
 Specs per workstream: [phase-1-workstreams.md](phase-1-workstreams.md). Lead seam on main: 4a1bdf3 (ShellContext/ShellCommands/slots/Gumdrop stub/CsWin32), 8f23b12 (CHIPPI_DEV_PROFILE). Seam review: Kayla, before push.
 
 ## Decisions log
+- 2026-10-21: Travis approved design review items 1-7 (folded into DESIGN.md §5/§6, presets in PLAN.md), the generated Gumdrop .ico as the app icon, and the non-admin Keep awake proof (0x3 on, 0x0 off) in place of powercfg.
 - 2026-10-21: origin = https://github.com/tcurtsinger/Chippi.git. Push main after each reviewed merge (Travis).
 - 2026-10-21: DESIGN.md updated (Travis approved): light badge text Source #7B2DB8 / Overlap #8A4B00, light active segment text #1A2036, new lowest island kind "Status" used by Keep awake.
 - 2026-10-21: Kayla's gap fills (Coming soon card, tool tile off, 36px segments outside flyout, 10px icon chip radius, primary/switch hover, slider hover 15 to 18px) and preset membership stay as drafts; Travis approves from screenshots at the WS2 review.
@@ -36,22 +37,20 @@ Specs per workstream: [phase-1-workstreams.md](phase-1-workstreams.md). Lead sea
 
 ## Follow-ups
 - Kayla: `SingleInstance` calls `AllowSetForegroundWindow` before signalling the owner; then WS1 drops its cross-process focus workaround.
-- Travis, at hub review: tool tiles are about 111px wide in three columns, so names over about 10 characters are cut ("A long samp..."). Wrap to two lines or keep ellipsis?
 - Done: Keep awake recovers after a native failure (ed95ba9). Optional: one retry in ToggleAsync if a timed release fails at the same moment as a toggle (Kayla).
 - WS3 must marshal hub events with BeginInvoke, never Invoke (Keep awake's ReleaseOnExit blocks the UI thread on exit).
 - Kayla: `ConfigStore.SectionChanged(name)` event; then WS3 drops its settings.json file watcher.
 - Phase 3, not now: `IslandActivity` elapsed/duration so the expanded media row can show mono times (DESIGN §5). No real media in Phase 1.
 - Lead at integration: measure CPU of the 30 fps equalizer on the transparent island window; Narrator pass on flyout, settings, island.
-- Travis, at hub review: WS3 additions where DESIGN.md is silent: status rows in the expanded island (needed for the new Status kind), "Nothing live right now" empty line, wide awake overriding the header pet while Keep awake is on.
 - WS3 untested: 150% and 200% scaling, real exclusive-fullscreen game and PowerPoint, F11; system-wide "busy" may hide the island on the other monitor.
 - WS1 untested: 150% and 200% scaling, taskbar on other edges, real Explorer restart, Narrator. Lead covers these at integration.
 
-- Travis, DESIGN.md wording: the island anchors 8px below the monitor's work-area top, not the display's top edge. Identical with a bottom taskbar; with a top taskbar or appbar it avoids covering it (Karl's P2, lead kept it).
 
 - Kayla: Settings › Island & pet preview sits on the island color, so the 112px ground shadow (black 35%) is invisible. DESIGN §7 requires it; put the preview on Panel or Surface.
 
+- Kayla: ToolTile shows its full name as a tooltip (DESIGN §6 now says so; the accessible name already does).
+
 ## Escalations open
-- Final app icon: ship the generated Gumdrop .ico, Travis approves at the end.
 - `powercfg /requests` needs admin. Travis to choose: allow an elevated run, run it himself, or leave the WS4 evidence gap open until sign-off.
 
 ## Risks
