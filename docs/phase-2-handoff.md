@@ -31,6 +31,7 @@ Read first, in order:
 - **Undo** is a new checked operation, verified by SHA-256, never a blind reverse move.
 - **Undo of an imported file** puts it back in the folder it was imported into, never back into the archive. Files that landed directly in that folder have nothing to undo, and their rows hide the Undo button.
 - **History schema:** version 1 is final as of P2-B (`db09ba5`). Any schema change after the module ships needs a versioned migration.
+- **No starter rules** (Travis, 2026-10-22): a fresh install has an empty rule list. The Rules page's empty state offers "Add rule", and with no rules, Organize now's preview shows every file as "No match".
 - **Registration:** `DownloadsModule` stays unregistered (the hub keeps "Coming soon") until P2-C's views land, so nothing ever watches a folder without a screen to approve its moves.
 - **No self-triggering** (P2-B, found in the P2-A review): the executor remembers every file it just produced (path plus fingerprint), including rename-only results that stay in a watched folder and files restored by undo, and the watcher skips them. Without this, a Silent rename rule renames its own output forever (`2026-2026-2026-invoice.pdf`). Covered by a test.
 
