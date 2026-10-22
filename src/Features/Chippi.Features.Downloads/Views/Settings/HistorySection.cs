@@ -125,7 +125,9 @@ internal sealed class HistorySection : UserControl
     {
         long runId = rows[0].RunId;
         bool collapsed = rows.Count > CollapseOver && !_expanded.Contains(runId);
-        var undoable = rows.Where(Undoable).ToList();
+        // Undo run acts on the whole run, so it counts the whole run: never just the rows a search
+        // or the row limit left on screen (Karl's review).
+        int undoable = _module.Engine?.History.RunOperations(runId).Count(Undoable) ?? 0;
 
         string trigger = run?.Trigger switch
         {
@@ -155,7 +157,7 @@ internal sealed class HistorySection : UserControl
         }
         head.Children.Add(Ui.Row(Ui.Text(trigger + where, "TitleTextStyle"), Ui.Mono(Ui.Time(run?.StartedAt ?? rows[0].PlannedAt), "TextTertiaryBrush").Margin(10, 0, 0, 0)).At(1));
         head.Children.Add(Ui.Text(counts, "CaptionTextStyle", "TextTertiaryBrush").Margin(0, 0, 10, 0).At(2));
-        if (undoable.Count > 0)
+        if (undoable > 0)
         {
             var undoRun = Ui.Button("Undo run", icon: LucideIcons.Undo);
             undoRun.Click += (_, _) =>
@@ -169,8 +171,8 @@ internal sealed class HistorySection : UserControl
         head.Margin = new Thickness(8, 4, 4, 6);
 
         var body = Ui.Stack(head);
-        if (_confirming == runId && undoable.Count > 0)
-            body.Children.Add(Confirm(undoable.Count, run?.Folder, () => _ = UndoRunAsync(runId)));
+        if (_confirming == runId && undoable > 0)
+            body.Children.Add(Confirm(undoable, run?.Folder, () => _ = UndoRunAsync(runId)));
         if (!collapsed)
         {
             foreach (var row in rows)

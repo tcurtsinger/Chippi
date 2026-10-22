@@ -24,7 +24,17 @@ internal sealed class RulesSection : UserControl
     private static readonly (string Label, long Bytes)[] Units = [("KB", 1024), ("MB", 1024 * 1024), ("GB", 1024L * 1024 * 1024)];
 
     private readonly DownloadsModule _module;
+    /// <summary>The drafts on screen, in list order.</summary>
     private readonly List<RuleSetting> _rules;
+
+    /// <summary>
+    /// What is saved and runs: each rule's last version with every field valid. A draft with a
+    /// problem never replaces it, so an edit in progress can't broaden or drop a rule (Karl's review).
+    /// </summary>
+    private readonly Dictionary<string, RuleSetting> _committed = new(StringComparer.Ordinal);
+
+    /// <summary>Fields that show a problem right now, per rule id.</summary>
+    private readonly Dictionary<string, HashSet<string>> _fieldErrors = new(StringComparer.Ordinal);
     private readonly StackPanel _list = new();
     private readonly TextBox _test = Ui.Field(name: "Test a file name");
     private readonly StackPanel _testResult = Ui.Row();
@@ -40,6 +50,8 @@ internal sealed class RulesSection : UserControl
     {
         _module = module;
         _rules = [.. module.Settings.Rules.OrderBy(r => r.Order).Select(r => r.Clone())];
+        foreach (var rule in _rules)
+            _committed[rule.Id] = rule.Clone(); // as saved, even a hand-edited invalid one: opening the page never drops it
         _dropLine.SetResourceReference(Border.BackgroundProperty, "AccentGradientBrush");
 
         _test.Width = 300;
@@ -231,7 +243,7 @@ internal sealed class RulesSection : UserControl
         name.TextChanged += (_, _) =>
         {
             rule.Name = name.Text.Trim();
-            Show(nameError, rule.Name.Length == 0 ? "A name is required" : null);
+            Flag(rule, "name", nameError, rule.Name.Length == 0 ? "A name is required" : null);
             Changed();
         };
         editor.Children.Add(Line("Name", Ui.Stack(name, nameError)));
@@ -246,7 +258,7 @@ internal sealed class RulesSection : UserControl
         {
             var list = RuleChecks.SplitExtensions(extensions.Text);
             string? error = extensionsOn.IsChecked == true ? list.Count == 0 ? "Add an extension" : RuleChecks.Extensions(extensions.Text) : null;
-            Show(extensionsError, error);
+            Flag(rule, "extensions", extensionsError, error);
             rule.Extensions = extensionsOn.IsChecked == true ? list : null;
             Changed();
         }
@@ -259,7 +271,7 @@ internal sealed class RulesSection : UserControl
         void ApplyRegex()
         {
             bool on = regexOn.IsChecked == true;
-            Show(regexError, on ? regex.Text.Length == 0 ? "Add a pattern" : RuleChecks.Regex(regex.Text) : null);
+            Flag(rule, "regex", regexError, on ? regex.Text.Length == 0 ? "Add a pattern" : RuleChecks.Regex(regex.Text) : null);
             rule.NameRegex = on && regex.Text.Length > 0 ? regex.Text : null;
             Changed();
         }
@@ -278,7 +290,7 @@ internal sealed class RulesSection : UserControl
             long scale = Units[Math.Max(0, units.SelectedIndex)].Bytes;
             bool okMin = TryAmount(min.Text, scale, out long? low), okMax = TryAmount(max.Text, scale, out long? high);
             string? error = !on ? null : !okMin || !okMax ? "Use a number" : low is null && high is null ? "Add a minimum or maximum" : low > high ? "Min is above max" : null;
-            Show(sizeError, error);
+            Flag(rule, "size", sizeError, error);
             rule.MinBytes = on && error is null ? low : null;
             rule.MaxBytes = on && error is null ? high : null;
             Changed();
@@ -299,7 +311,7 @@ internal sealed class RulesSection : UserControl
             bool on = dateOn.IsChecked == true;
             bool okAfter = TryDate(after.Text, out var from), okBefore = TryDate(before.Text, out var to);
             string? error = !on ? null : !okAfter || !okBefore ? "Use yyyy-mm-dd" : from is null && to is null ? "Add a date" : from > to ? "After is later than before" : null;
-            Show(dateError, error);
+            Flag(rule, "dates", dateError, error);
             rule.ModifiedAfter = on && error is null ? from : null;
             rule.ModifiedBefore = on && error is null ? to : null;
             Changed();
@@ -404,6 +416,8 @@ internal sealed class RulesSection : UserControl
         delete.Click += (_, _) =>
         {
             _rules.Remove(rule);
+            _committed.Remove(rule.Id); // only Delete removes a saved rule
+            _fieldErrors.Remove(rule.Id);
             _open = null;
             Save();
             RunTest();
@@ -500,7 +514,8 @@ internal sealed class RulesSection : UserControl
         else
         {
             string folder = SampleFolder();
-            var rules = Valid(_rules).Select((r, i) => r.ToRule() with { Order = i }).ToList();
+            // What would actually run: the committed rules, not drafts mid-edit.
+            var rules = Valid(Effective()).Select((r, i) => r.ToRule() with { Order = i }).ToList();
             PlannedOperation plan;
             try
             {
@@ -538,20 +553,42 @@ internal sealed class RulesSection : UserControl
 
     // ---- saving
 
+    /// <summary>Commits every fully valid draft, then saves after a short pause.</summary>
     private void Save()
     {
+        Commit();
         _saveTimer.Stop();
         _saveTimer.Start();
     }
 
-    /// <summary>Saves the rules that are valid, in list order. A rule mid-edit with a problem stays here until it is fixed.</summary>
+    private void Commit()
+    {
+        var valid = Valid(_rules).Where(r => !_fieldErrors.TryGetValue(r.Id, out var errors) || errors.Count == 0).ToHashSet();
+        foreach (var draft in _rules)
+        {
+            if (valid.Contains(draft))
+                _committed[draft.Id] = draft.Clone();
+            else if (_committed.TryGetValue(draft.Id, out var saved))
+                saved.Enabled = draft.Enabled; // on/off applies even while another field is being fixed
+        }
+    }
+
+    /// <summary>The committed rules in the on-screen order. A new rule that has never been valid is not in it.</summary>
+    private List<RuleSetting> Effective() =>
+        [.. _rules.Where(r => _committed.ContainsKey(r.Id)).Select((r, i) =>
+        {
+            var rule = _committed[r.Id].Clone();
+            rule.Order = i;
+            return rule;
+        })];
+
+    /// <summary>Saves the committed rules in list order. A draft with a problem leaves its last valid version in place.</summary>
     private void SaveNow()
     {
         _saveTimer.Stop();
-        for (int i = 0; i < _rules.Count; i++)
-            _rules[i].Order = i;
+        Commit();
         var settings = _module.Settings.Clone();
-        settings.Rules = [.. Valid(_rules).Select(r => r.Clone())];
+        settings.Rules = Effective();
         try
         {
             _module.SaveSettings(settings);
@@ -577,6 +614,18 @@ internal sealed class RulesSection : UserControl
         block.Visibility = Visibility.Collapsed;
         block.Margin = new Thickness(0, 4, 0, 0);
         return block;
+    }
+
+    /// <summary>Shows or clears a field's problem and remembers it, so the rule is not committed while it shows.</summary>
+    private void Flag(RuleSetting rule, string field, TextBlock block, string? message)
+    {
+        if (!_fieldErrors.TryGetValue(rule.Id, out var errors))
+            _fieldErrors[rule.Id] = errors = [];
+        if (message is null)
+            errors.Remove(field);
+        else
+            errors.Add(field);
+        Show(block, message);
     }
 
     private static void Show(TextBlock block, string? message)

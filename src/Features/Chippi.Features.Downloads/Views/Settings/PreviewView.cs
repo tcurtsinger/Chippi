@@ -33,6 +33,8 @@ internal sealed class PreviewView : UserControl
     private PreviewPlan? _preview;
     private bool _syncing;
     private bool _applied;
+    private bool _started;
+    private bool _released;
 
     public PreviewView(DownloadsModule module, Func<Task<PreviewPlan>> plan, bool canPreviewAgain, Action close)
     {
@@ -59,7 +61,17 @@ internal sealed class PreviewView : UserControl
         divider.SetResourceReference(Border.BackgroundProperty, "BorderSoftBrush");
         _error.Visibility = Visibility.Collapsed;
         Content = Ui.Stack(header, columns, _rows, divider, _footer, _error.Margin(0, 8, 0, 0));
-        Loaded += async (_, _) => await LoadAsync();
+        Loaded += async (_, _) =>
+        {
+            if (!_started)
+            {
+                _started = true;
+                await LoadAsync();
+            }
+        };
+        // Every way off this view (the shell's Back, the sidebar, closing Settings) releases the
+        // preview, and an import's extracted files with it (Karl's review).
+        Unloaded += (_, _) => Release();
     }
 
     private async Task LoadAsync()
@@ -74,6 +86,12 @@ internal sealed class PreviewView : UserControl
         {
             _rows.Children.Clear();
             ShowError(ex.Message);
+            return;
+        }
+        if (_released)
+        {
+            // Planning finished after the view was left: nobody will approve it.
+            _module.Engine?.Discard(_preview.Id);
             return;
         }
         _applied = false;
@@ -321,10 +339,19 @@ internal sealed class PreviewView : UserControl
 
     private void Leave()
     {
-        // An unapproved preview is dropped now (an import's extracted files with it).
+        Release();
+        _close();
+    }
+
+    /// <summary>
+    /// Drops an unapproved preview (an import's extracted files with it). Safe during an approval:
+    /// approving takes the preview out of the engine first, so Discard then finds nothing to delete.
+    /// </summary>
+    private void Release()
+    {
+        _released = true;
         if (!_applied && _preview is not null)
             _module.Engine?.Discard(_preview.Id);
-        _close();
     }
 
     private void ShowError(string message)
