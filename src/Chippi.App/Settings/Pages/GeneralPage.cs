@@ -65,9 +65,8 @@ internal sealed class GeneralPage : UserControl
         }
 
         var toggle = SettingsUi.Switch(enabled);
-        toggle.Click += (_, _) =>
+        SettingsUi.OnSwitched(toggle, want =>
         {
-            bool want = toggle.IsChecked == true;
             try
             {
                 _shell.Startup.SetEnabled(want);
@@ -79,7 +78,7 @@ internal sealed class GeneralPage : UserControl
                 toggle.IsChecked = !want;
                 SettingsUi.Show(message, "Windows would not let Chippi change its startup entry.", problem: true);
             }
-        };
+        });
         return SettingsUi.Row("Run at startup", "Starts quietly in the tray when you sign in.", toggle, message);
     }
 
