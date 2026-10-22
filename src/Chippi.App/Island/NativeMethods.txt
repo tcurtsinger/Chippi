@@ -1,4 +1,4 @@
-﻿SHQueryUserNotificationState
+SHQueryUserNotificationState
 SetWinEventHook
 UnhookWinEvent
 GetForegroundWindow
@@ -24,3 +24,11 @@ WM_DISPLAYCHANGE
 WM_SETTINGCHANGE
 WM_DPICHANGED
 MA_NOACTIVATE
+GetDisplayConfigBufferSizes
+QueryDisplayConfig
+DisplayConfigGetDeviceInfo
+DISPLAYCONFIG_SOURCE_DEVICE_NAME
+DISPLAYCONFIG_TARGET_DEVICE_NAME
+EnumDisplayMonitors
+MONITORINFOEXW
+MONITORINFOF_PRIMARY

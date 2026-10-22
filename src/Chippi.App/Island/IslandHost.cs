@@ -58,7 +58,7 @@ public sealed class IslandHost : IDisposable
             _window.SetMonitor(_tracker.Monitor);
             _window.SetSuppressed(_tracker.FullscreenInFront);
         };
-        _window.DisplayChanged += (_, _) => _tracker.Evaluate();
+        _window.DisplayChanged += (_, _) => _tracker.OnDisplaysChanged();
 
         _shell.Island.Changed += (_, _) => ScheduleRefresh();
         _shell.Island.Succeeded += (_, _) => _dispatcher.BeginInvoke(() => _window.Celebrate());
@@ -190,6 +190,7 @@ public sealed class IslandHost : IDisposable
         var settings = _shell.Config.GetSection<AppSettings>(AppSettings.SectionName);
         _window.SetPetColor(settings.PetColor);
         _window.SetEnabled(settings.IslandEnabled);
+        _tracker.SetPlacement(settings.IslandDisplay, settings.IslandMonitorId);
     }
 
     private void OnSectionChanged(object? sender, ConfigSectionChangedEventArgs e)

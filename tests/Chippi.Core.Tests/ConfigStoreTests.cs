@@ -388,4 +388,55 @@ public sealed class ConfigStoreTests : IDisposable
 
         Assert.Equal(0, raised);
     }
+
+    [Fact]
+    public void Island_display_defaults_to_the_single_constant()
+    {
+        Assert.Equal(IslandDisplay.MainDisplay, AppSettings.DefaultIslandDisplay); // Travis's choice, 2026-10-22
+        Assert.Equal(AppSettings.DefaultIslandDisplay, new AppSettings().IslandDisplay);
+        Assert.Null(new AppSettings().IslandMonitorId);
+    }
+
+    [Fact]
+    public void Island_display_and_monitor_id_round_trip()
+    {
+        var path = _dir.File("settings.json");
+        const string id = @"\\?\DISPLAY#DEL41A8#5&2b6e1f2c&0&UID4352#{e6f07b5f-ee97-4a90-b076-33f57bf4eaa7}";
+        var store = new ConfigStore(path);
+        store.SetSection(AppSettings.SectionName, new AppSettings { IslandDisplay = IslandDisplay.SpecificMonitor, IslandMonitorId = id });
+
+        var reloaded = new ConfigStore(path);
+        reloaded.Load();
+        var app = reloaded.GetSection<AppSettings>(AppSettings.SectionName);
+
+        Assert.Equal(IslandDisplay.SpecificMonitor, app.IslandDisplay);
+        Assert.Equal(id, app.IslandMonitorId);
+        Assert.Contains("\"islandDisplay\": \"specificMonitor\"", File.ReadAllText(path), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Settings_from_before_the_island_display_setting_get_the_default()
+    {
+        var path = _dir.File("settings.json");
+        File.WriteAllText(path, """{ "version": 1, "app": { "theme": "light", "islandEnabled": true } }""");
+
+        var store = new ConfigStore(path);
+        store.Load();
+        var app = store.GetSection<AppSettings>(AppSettings.SectionName);
+
+        Assert.Equal(AppSettings.DefaultIslandDisplay, app.IslandDisplay);
+        Assert.Equal(ThemePreference.Light, app.Theme); // the rest of the section is untouched
+    }
+
+    [Fact]
+    public void An_unknown_island_display_value_resets_the_app_section_instead_of_crashing()
+    {
+        var path = _dir.File("settings.json");
+        File.WriteAllText(path, """{ "version": 1, "app": { "islandDisplay": "leftmostMonitor" } }""");
+
+        var store = new ConfigStore(path);
+        store.Load();
+
+        Assert.Equal(AppSettings.DefaultIslandDisplay, store.GetSection<AppSettings>(AppSettings.SectionName).IslandDisplay);
+    }
 }

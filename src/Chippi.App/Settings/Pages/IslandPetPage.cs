@@ -2,8 +2,10 @@
 // Copyright (C) Chippi contributors
 
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Threading;
+using Chippi.App.Island;
 using Chippi.App.Pet;
 using Chippi.App.Shell;
 using Chippi.Core.Config;
@@ -35,6 +37,7 @@ internal sealed class IslandPetPage : UserControl
         var island = SettingsUi.Switch(app.IslandEnabled);
         SettingsUi.OnSwitched(island, on => SettingsUi.SaveApp(shell.Config, s => s.IslandEnabled = on));
         page.Children.Add(SettingsUi.Row("Island", "Shows what is live (media, timers, Keep awake) and hides over fullscreen apps.", island));
+        page.Children.Add(DisplayRow(app));
 
         var color = SettingsUi.Segments("Pet color", Enum.GetValues<PetColor>().Select(c => (c.ToString(), c)), app.PetColor);
         color.Width = 480;
@@ -84,6 +87,64 @@ internal sealed class IslandPetPage : UserControl
         };
         Loaded += (_, _) => _timer.Start();
         Unloaded += (_, _) => _timer.Stop();
+    }
+
+    /// <summary>
+    /// Island display: follow the active window, stay on the main display, or stay on one monitor
+    /// picked by name. Saved to AppSettings; the island applies it live through SectionChanged.
+    /// </summary>
+    private Border DisplayRow(AppSettings app)
+    {
+        var monitors = Displays.Connected();
+        var mode = SettingsUi.Segments("Island display",
+            [("Follow active window", IslandDisplay.FollowActiveWindow), ("Main display", IslandDisplay.MainDisplay), ("One monitor", IslandDisplay.SpecificMonitor)],
+            app.IslandDisplay);
+        mode.Width = 480;
+
+        var picker = new ComboBox { Width = 320, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 10, 0, 0), Tag = "Choose a monitor" };
+        picker.SetResourceReference(StyleProperty, "HopperComboBoxStyle");
+        AutomationProperties.SetName(picker, "Island monitor");
+        foreach (var monitor in monitors)
+            picker.Items.Add(new ComboBoxItem { Content = monitor.Name, Tag = monitor.Id });
+        picker.SelectedItem = picker.Items.OfType<ComboBoxItem>()
+            .FirstOrDefault(i => string.Equals((string)i.Tag, app.IslandMonitorId, StringComparison.OrdinalIgnoreCase));
+
+        var note = SettingsUi.Message();
+        void UpdatePicker()
+        {
+            bool one = mode.SelectedItem is SegmentItem { Value: IslandDisplay.SpecificMonitor };
+            picker.Visibility = one ? Visibility.Visible : Visibility.Collapsed;
+            string? saved = SettingsUi.ReadApp(_shell.Config).IslandMonitorId;
+            if (one && !string.IsNullOrEmpty(saved) && picker.SelectedItem is null)
+                SettingsUi.Show(note, "That monitor isn't connected, so the island is on the main display until it is.", problem: true);
+            else if (one && string.IsNullOrEmpty(saved))
+                SettingsUi.Show(note, "Choose a monitor. Until then the island stays on the main display.", problem: false);
+            else
+                note.Visibility = Visibility.Collapsed;
+        }
+
+        mode.SelectionChanged += (_, _) =>
+        {
+            if (mode.SelectedItem is SegmentItem { Value: IslandDisplay choice })
+            {
+                SettingsUi.SaveApp(_shell.Config, s => s.IslandDisplay = choice);
+                UpdatePicker();
+            }
+        };
+        picker.SelectionChanged += (_, _) =>
+        {
+            if (picker.SelectedItem is ComboBoxItem { Tag: string id })
+            {
+                SettingsUi.SaveApp(_shell.Config, s => s.IslandMonitorId = id);
+                UpdatePicker();
+            }
+        };
+        UpdatePicker();
+
+        var below = new StackPanel();
+        below.Children.Add(picker);
+        below.Children.Add(note);
+        return SettingsUi.Row("Island display", "Where the island sits. Following the active window moves it to whichever screen you're working on.", mode, below);
     }
 
     private void ShowMood()
