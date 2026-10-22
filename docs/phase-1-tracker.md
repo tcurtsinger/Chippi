@@ -14,7 +14,7 @@ Owner of this file: Marge (PM). Brief: [phase-1-handoff.md](phase-1-handoff.md).
 | # | Workstream | Owner | Reviewer | Depends on | Status |
 |---|---|---|---|---|---|
 | WS0 | Foundation: solution, Core, config, logging, single instance, themes, fonts, base controls | Kayla | Karl | none | merged be308b1, pushed |
-| WS1 | Tray icon and flyout | Tray agent (subagent, X:\code\chippi-ws1) | Kayla | WS0 | ready for review, head da21678 (icon as resource 9e5a66a, lead-approved csproj edit) |
+| WS1 | Tray icon and flyout | Tray agent (subagent, X:\code\chippi-ws1) | Kayla | WS0 | merged (head 9216b08); Keep awake tile verified in integrated flyout |
 | WS2 | Settings window, Features hub, Permissions | Kayla (X:\code\chippi-ws2) | Karl | WS0 | in progress |
 | WS3 | Island and Gumdrop | Island agent (subagent, X:\code\chippi-ws3) | Karl | WS0 | ready for review, head 2e9435e; drop 3244d95 (debug-only return true) at merge |
 | WS4 | Keep awake module | Karl (X:\code\chippi-ws4), first | Kayla | WS0 | merged 522476c (head 98dfb6f); power state 0x3 on, 0x0 off (non-admin) |
