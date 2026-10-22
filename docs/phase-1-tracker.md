@@ -16,7 +16,7 @@ Owner of this file: Marge (PM). Brief: [phase-1-handoff.md](phase-1-handoff.md).
 | WS0 | Foundation: solution, Core, config, logging, single instance, themes, fonts, base controls | Kayla | Karl | none | merged be308b1, pushed |
 | WS1 | Tray icon and flyout | Tray agent (subagent, X:\code\chippi-ws1) | Kayla | WS0 | merged (head 9216b08); Keep awake tile verified in integrated flyout |
 | WS2 | Settings window, Features hub, Permissions | Kayla (X:\code\chippi-ws2) | Karl | WS0 | in progress |
-| WS3 | Island and Gumdrop | Island agent (subagent, X:\code\chippi-ws3) | Karl | WS0 | ready for review, head 2e9435e; drop 3244d95 (debug-only return true) at merge |
+| WS3 | Island and Gumdrop | Island agent (subagent, X:\code\chippi-ws3) | Karl | WS0 | merged 22e7e26 (not pushed); fixing QUNS_BUSY hiding the island system-wide |
 | WS4 | Keep awake module | Karl (X:\code\chippi-ws4), first | Kayla | WS0 | merged 522476c (head 98dfb6f); power state 0x3 on, 0x0 off (non-admin) |
 | WS5 | Build, CI, Velopack, licensing | Karl (X:\code\chippi-ws5), after WS4 | Kayla | WS0 | merged 53306bc; uninstall hook + own Main in c325359; repack after integration |
 | Lead | Integration (App.xaml*, composition root), DESIGN.md review, final report | Marge | Kayla | all | todo |
@@ -29,6 +29,7 @@ Specs per workstream: [phase-1-workstreams.md](phase-1-workstreams.md). Lead sea
 - 2026-10-21: Kayla's gap fills (Coming soon card, tool tile off, 36px segments outside flyout, 10px icon chip radius, primary/switch hover, slider hover 15 to 18px) and preset membership stay as drafts; Travis approves from screenshots at the WS2 review.
 - 2026-10-21: Themes and controls move to a WPF class library `src/Chippi.UI` (Marge) so feature modules can use the custom controls. WS0 owns it.
 - 2026-10-21: JetBrains Mono upstream static files declare weights 436/472; styles request 472 to hit the SemiBold file. Visual weight is 600 as designed.
+- 2026-10-21: pushed main to 2bf875b (seam + fixes, WS4, WS5, WS1), all reviewed. WS3 held until its fullscreen fix.
 
 - 2026-10-21: WS4 adds `tests/Chippi.Features.KeepAwake.Tests`; Marge adds it to Chippi.slnx in the WS4 merge.
 - 2026-10-21: WS5 approved: repo-local vpk 1.2.161 (rollForward, host has only .NET 10), central Velopack 1.2.161, LICENSE/notices copied next to the exe, `VelopackApp.Build().Run()` in OnStartup after EnsureWindowsDirectoryEnvironment. Lead-owned edits land as one separate commit on ws5-build-ci.
@@ -44,6 +45,8 @@ Specs per workstream: [phase-1-workstreams.md](phase-1-workstreams.md). Lead sea
 - Travis, at hub review: WS3 additions where DESIGN.md is silent: status rows in the expanded island (needed for the new Status kind), "Nothing live right now" empty line, wide awake overriding the header pet while Keep awake is on.
 - WS3 untested: 150% and 200% scaling, real exclusive-fullscreen game and PowerPoint, F11; system-wide "busy" may hide the island on the other monitor.
 - WS1 untested: 150% and 200% scaling, taskbar on other edges, real Explorer restart, Narrator. Lead covers these at integration.
+
+- Travis, DESIGN.md wording: the island anchors 8px below the monitor's work-area top, not the display's top edge. Identical with a bottom taskbar; with a top taskbar or appbar it avoids covering it (Karl's P2, lead kept it).
 
 ## Escalations open
 - Final app icon: ship the generated Gumdrop .ico, Travis approves at the end.
