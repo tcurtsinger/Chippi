@@ -23,6 +23,6 @@ public interface IFeatureModule
     Task StartAsync(ModuleContext context, CancellationToken ct);
 
     Task StopAsync(CancellationToken ct);
-    /// <summary>Remove persistent integration on feature uninstall, not ordinary app exit.</summary>
+    /// <summary>Remove persistent integration on feature uninstall or startup while uninstalled, not ordinary app exit.</summary>
     Task UninstallAsync(CancellationToken ct) => Task.CompletedTask;
 }
