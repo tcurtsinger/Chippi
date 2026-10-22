@@ -52,6 +52,9 @@ colors-light:
   ink-tertiary: "#79839B"
   ink-muted: "#6B7488"
   focus-ring: "#8A3FD0"
+  segment-active-text: "#1A2036"
+  badge-source-text: "#7B2DB8"
+  badge-overlap-text: "#8A4B00"
 pet:
   ink: "#0B0F1F"
   blush: "#FF8FB0"
@@ -212,6 +215,12 @@ Ink `#EEF1F8` for primary text · Ink Strong `#D6DBEC` for readout values · Ink
 ### Light theme
 Every chassis and ink token has a light mirror (see `colors-light` in the front matter, taken from Hopper's `Light.xaml`). The Synth Gradient, signals and pet colors are identical in both themes. The focus ring darkens to `#8A3FD0` in light, and the island stays `#05070F`.
 
+Three text colors change in light because the dark values fail contrast on light surfaces (approved 2026-10-21):
+- **Active segment text** is Ink `#1A2036` (12.7:1), not white.
+- **Source badge text** is `#7B2DB8` (5.5:1 or better on Surface and Panel).
+- **Overlap badge text** is `#8A4B00` (5.7:1 or better).
+Badge tints and borders are unchanged.
+
 ### Named rules
 **The Signal Rule.** The gradient marks what is genuinely live, active or primary: a switch that is on, a playing output, an installed feature's icon chip, the one primary action per view, and meters. It is never decoration, a divider or a background wash. **One exception:** Gumdrop's body, because the pet is the brand.
 
@@ -269,7 +278,7 @@ Mostly flat, layered tonally, with colored glows for emphasis.
 ### Island
 - **Placement:** top-center of the display with the active window, floating 8px below the top edge. It is never attached to the edge and never covers a fullscreen app.
 - **Resting pill:** 84×34, holding Gumdrop at 28px, sleepy.
-- **Live pill:** up to 292×38, with 6px left and 14px right padding. Gumdrop at 30px idle, then a Body-weight-700 title and a tertiary source ("Weekend Mix · Spotify"), then a 5-bar gradient equalizer. It shows one activity at a time in priority order: media, then timer, then download or stash, then agent.
+- **Live pill:** up to 292×38, with 6px left and 14px right padding. Gumdrop at 30px idle, then a Body-weight-700 title and a tertiary source ("Weekend Mix · Spotify"), then a 5-bar gradient equalizer. It shows one activity at a time in priority order: media, then timer, then download or stash, then agent, then status. **Status** is the lowest kind, for background state such as Keep awake; a timed session shows its countdown in mono.
 - **Expanded:** 328 wide, 24px radius, padding 12 / 14 / 14, 10px gaps. It opens on hover (after a short delay) or click, and contains:
   1. A header: Gumdrop at 28px celebrating or idle, "Chippi" at 13 / 800 and a mono clock.
   2. Media: a 46px art tile (11px radius), title and source, a 4px gradient progress bar and mono times.
