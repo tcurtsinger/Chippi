@@ -66,3 +66,40 @@ public sealed class ExplorerLifetimeTests : IDisposable
         foreach (var path in registration.KeyPaths) { using var key = Registry.CurrentUser.OpenSubKey(path); Assert.Equal(present, key is not null); }
     }
 }
+
+[CollectionDefinition("DownloadsProfileEnvironment", DisableParallelization = true)]
+public sealed class DownloadsProfileEnvironmentCollection;
+
+[Collection("DownloadsProfileEnvironment")]
+public sealed class InvalidExplorerProfileTests
+{
+    [Fact]
+    public async Task Invalid_environment_profile_does_not_fail_construction_start_or_uninstall()
+    {
+        string? before = Environment.GetEnvironmentVariable("CHIPPI_DEV_PROFILE");
+        string root = Path.Combine(Path.GetTempPath(), "chippi-explorer-" + Guid.NewGuid().ToString("N"));
+        ModuleRegistry? registry = null;
+        try
+        {
+            Environment.SetEnvironmentVariable("CHIPPI_DEV_PROFILE", "p2.views");
+            var module = new DownloadsModule();
+            var config = new ConfigStore(Path.Combine(root, "settings.json"));
+            config.SetModuleSettings("downloads-organizer", new DownloadsSettings { Initialized = true });
+            registry = new ModuleRegistry(config, new IslandActivityHub(), NullLoggerFactory.Instance,
+                new ModuleServices { DataRoot = Path.Combine(root, "data") });
+            registry.Register(module);
+            await registry.StartAsync();
+            Assert.True(registry.Find("downloads-organizer")!.IsRunning);
+            Assert.NotNull(module.Engine);
+            var off = module.Settings.Clone(); off.OrganizeInExplorer = false; module.SaveSettings(off);
+            await registry.StopAllAsync();
+            await registry.SetInstalledAsync("downloads-organizer", false);
+        }
+        finally
+        {
+            if (registry is not null) await registry.StopAllAsync();
+            Environment.SetEnvironmentVariable("CHIPPI_DEV_PROFILE", before);
+            if (Directory.Exists(root)) Directory.Delete(root, true);
+        }
+    }
+}

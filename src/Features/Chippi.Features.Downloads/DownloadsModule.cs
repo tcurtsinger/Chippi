@@ -39,9 +39,9 @@ public sealed record DownloadsRequest(DownloadsRequestKind Kind, string? Folder 
 /// </summary>
 public sealed class DownloadsModule : IFeatureModule
 {
-    private readonly ExplorerRegistration _explorer;
+    private ExplorerRegistration? _explorer;
 
-    public DownloadsModule() : this(new ExplorerRegistration(Environment.GetEnvironmentVariable("CHIPPI_DEV_PROFILE"))) { }
+    public DownloadsModule() { }
 
     public DownloadsModule(ExplorerRegistration explorer)
     {
@@ -91,7 +91,7 @@ public sealed class DownloadsModule : IFeatureModule
         _history = new SqliteHistoryStore(Path.Combine(context.DataDirectory, "history.db"));
         Engine = new DownloadsEngine(_history, context.Notifier, context.Logger);
         Engine.Start(Settings);
-        try { _explorer.SetEnabled(Settings.OrganizeInExplorer); }
+        try { GetExplorer()?.SetEnabled(Settings.OrganizeInExplorer); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException)
         { context.Logger.LogWarning(ex, "Explorer registration could not be refreshed"); }
 
@@ -143,13 +143,13 @@ public sealed class DownloadsModule : IFeatureModule
                 folder.BaselineUtc = now;
         }
         bool explorerChanged = settings.OrganizeInExplorer != Settings.OrganizeInExplorer;
-        if (explorerChanged) _explorer.SetEnabled(settings.OrganizeInExplorer);
+        if (explorerChanged) _explorer?.SetEnabled(settings.OrganizeInExplorer);
         try { _context.Settings.Save(settings); }
         catch
         {
             if (explorerChanged)
             {
-                try { _explorer.SetEnabled(Settings.OrganizeInExplorer); }
+                try { GetExplorer()?.SetEnabled(Settings.OrganizeInExplorer); }
                 catch (Exception ex) { _context.Logger.LogWarning(ex, "Explorer registration rollback failed"); }
             }
             throw;
@@ -180,8 +180,19 @@ public sealed class DownloadsModule : IFeatureModule
 
     public Task UninstallAsync(CancellationToken ct)
     {
-        _explorer.SetEnabled(false);
+        GetExplorer()?.SetEnabled(false);
         return Task.CompletedTask;
+    }
+
+    private ExplorerRegistration? GetExplorer()
+    {
+        if (_explorer is not null) return _explorer;
+        try { return _explorer = new ExplorerRegistration(Environment.GetEnvironmentVariable("CHIPPI_DEV_PROFILE")); }
+        catch (ArgumentException ex)
+        {
+            _context?.Logger.LogWarning(ex, "Skipping Explorer registration for an invalid dev profile");
+            return null;
+        }
     }
 
     /// <summary>Opens Settings at the request's section, then tells anyone listening.</summary>

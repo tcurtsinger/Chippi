@@ -142,7 +142,7 @@ internal sealed class SettingsSection : UserControl
             toggle.IsChecked = _module.Settings.OrganizeInExplorer;
         };
         var row = Ui.Columns("*", "Auto");
-        row.Children.Add(Ui.Text("Organize in Explorer", "TitleTextStyle").At(0));
+        row.Children.Add(Ui.Stack(Ui.Text("Organize in Explorer", "TitleTextStyle"), Ui.Text("In \"Show more options\"", "CaptionTextStyle", "TextTertiaryBrush")).At(0));
         row.Children.Add(toggle.At(1));
         return Ui.Surface(row, new Thickness(14, 10, 14, 10)).Margin(0, 0, 0, 6);
     }
