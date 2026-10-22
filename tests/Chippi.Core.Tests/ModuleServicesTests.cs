@@ -239,6 +239,113 @@ public sealed class ModuleServicesTests : IDisposable
     }
 }
 
+/// <summary>Review fixes on f040861 (Karl): isolation, notice lifetimes, malformed notice settings.</summary>
+public sealed class ModuleServicesHardeningTests : IDisposable
+{
+    private readonly TempDir _dir = new();
+
+    public void Dispose() => _dir.Dispose();
+
+    /// <summary>Timers fire only when told to.</summary>
+    private sealed class ManualTime : TimeProvider
+    {
+        public List<ManualTimer> Timers { get; } = [];
+
+        public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
+        {
+            var timer = new ManualTimer(callback, state);
+            Timers.Add(timer);
+            return timer;
+        }
+    }
+
+    private sealed class ManualTimer(TimerCallback callback, object? state) : ITimer
+    {
+        public bool Disposed { get; private set; }
+
+        public void Fire() => callback(state);
+
+        public bool Change(TimeSpan dueTime, TimeSpan period) => !Disposed;
+
+        public void Dispose() => Disposed = true;
+
+        public ValueTask DisposeAsync()
+        {
+            Dispose();
+            return ValueTask.CompletedTask;
+        }
+    }
+
+    [Fact]
+    public async Task An_unusable_data_folder_fails_that_module_only()
+    {
+        string root = _dir.File("data");
+        File.WriteAllText(root, "a file where the data root should be");
+        var services = new ModuleServices { DataRoot = root };
+        var registry = new ModuleRegistry(new ConfigStore(_dir.File("settings.json")), new IslandActivityHub(), NullLoggerFactory.Instance, services);
+        var first = FakeModule.Create("first", PresetMembership.Essentials);
+        var second = FakeModule.Create("second", PresetMembership.Essentials);
+        registry.Register(first);
+        registry.Register(second);
+
+        await registry.StartAsync(); // first run installs both; neither can make its folder
+
+        Assert.True(registry.Find("first")!.IsInstalled);
+        Assert.NotNull(registry.Find("first")!.LastError);
+        Assert.NotNull(registry.Find("second")!.LastError); // the loop reached the second module
+        Assert.Equal(0, first.Starts);
+    }
+
+    [Fact]
+    public async Task An_old_lifetimes_expiry_never_clears_a_reinstalled_modules_notice()
+    {
+        var time = new ManualTime();
+        var island = new IslandActivityHub();
+        var services = new ModuleServices { DataRoot = _dir.File("data"), Time = time };
+        var registry = new ModuleRegistry(new ConfigStore(_dir.File("settings.json")), island, NullLoggerFactory.Instance, services);
+        var module = FakeModule.Create("downloads");
+        module.OnStart = ctx => ctx.Notifier.Declare([new NoticeKind("organized", "Organized", NoticePlaces.Island)]);
+        registry.Register(module);
+        await registry.StartAsync();
+        await registry.SetInstalledAsync("downloads", true);
+
+        module.Context!.Notifier.Show(new Notice("organized", "old"));
+        var oldTimer = time.Timers[^1];
+        await registry.SetInstalledAsync("downloads", false); // stop disposes the old lifetime's timers
+        await registry.SetInstalledAsync("downloads", true);
+        module.Context!.Notifier.Show(new Notice("organized", "new"));
+
+        oldTimer.Fire(); // as if it was already running when the module stopped
+        Assert.Equal("new", island.Current!.Title);
+        Assert.True(oldTimer.Disposed);
+
+        time.Timers[^1].Fire(); // the new lifetime's own expiry still works
+        Assert.Null(island.Current);
+    }
+
+    [Fact]
+    public async Task Null_notice_settings_mean_defaults_and_never_break_Show()
+    {
+        var island = new IslandActivityHub();
+        var config = new ConfigStore(_dir.File("settings.json"));
+        File.WriteAllText(config.FilePath, """{ "version": 1, "modules": { "downloads": { "notices": null } } }""");
+        config.Load();
+        var registry = new ModuleRegistry(config, island, NullLoggerFactory.Instance, new ModuleServices { DataRoot = _dir.File("data") });
+        var module = FakeModule.Create("downloads");
+        module.OnStart = ctx => ctx.Notifier.Declare([new NoticeKind("organized", "Organized", NoticePlaces.Island)]);
+        registry.Register(module);
+        await registry.StartAsync();
+        await registry.SetInstalledAsync("downloads", true);
+        var notifier = module.Context!.Notifier;
+
+        Assert.Equal(NoticePlaces.Island, notifier.PlacesFor("organized"));
+        notifier.Show(new Notice("organized", "4 files organized"));
+        Assert.Equal("4 files organized", island.Current!.Title);
+
+        notifier.SetPlaces("organized", NoticePlaces.None);
+        Assert.Equal(NoticePlaces.None, notifier.PlacesFor("organized"));
+    }
+}
 public sealed class SingleInstanceArgumentsTests
 {
     [Fact]

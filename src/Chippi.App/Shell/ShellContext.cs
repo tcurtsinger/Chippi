@@ -58,13 +58,36 @@ public sealed class ShellContext
     /// <summary>
     /// A later launch, an Explorer menu click or a notice click: a registered verb goes to its module
     /// (<c>--organize "C:\Downloads"</c>); anything else, including a plain launch, shows the flyout.
-    /// Call on the UI thread.
+    /// Until <see cref="ModulesStarted"/> runs, requests wait in order, so a verb is never lost to a
+    /// module that hasn't registered it yet. Call on the UI thread.
     /// </summary>
     public void HandleActivation(IReadOnlyList<string> arguments)
     {
+        if (!_modulesStarted)
+        {
+            _waitingActivations.Enqueue(arguments);
+            return;
+        }
         if (!Services.Activation.TryRoute(arguments))
             Commands.ShowFlyout();
     }
+
+    /// <summary>
+    /// Installed modules have started (their verbs are registered): route the first launch's own
+    /// verb, if it has one, then every request that waited. Call once, on the UI thread.
+    /// </summary>
+    public void ModulesStarted(IReadOnlyList<string> launchArguments)
+    {
+        if (_modulesStarted)
+            return;
+        _modulesStarted = true;
+        Services.Activation.TryRoute(launchArguments); // app flags such as --startup are not verbs
+        while (_waitingActivations.TryDequeue(out var waiting))
+            HandleActivation(waiting);
+    }
+
+    private readonly Queue<IReadOnlyList<string>> _waitingActivations = new();
+    private bool _modulesStarted;
 
     /// <summary>
     /// Debug surfaces: placeholder flyout tabs (brief §4.4) and the island's fake-activity menu

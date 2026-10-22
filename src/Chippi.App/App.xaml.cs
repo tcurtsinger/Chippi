@@ -120,12 +120,12 @@ public partial class App : Application
 
     /// <summary>
     /// A first launch can carry a verb too (the Explorer menu when Chippi isn't running). Once the
-    /// modules have started, a registered verb is routed; app flags such as --startup are not verbs.
+    /// modules have started, the shell routes it and anything that arrived meanwhile.
     /// </summary>
     private async Task RouteLaunchAsync(string[] arguments)
     {
         await _modulesStarted;
-        Shell.Services.Activation.TryRoute(arguments);
+        Shell.ModulesStarted(arguments);
     }
 
     public ShellContext Shell { get; private set; } = null!;

@@ -74,9 +74,15 @@ public partial class SettingsWindow : Window
             if (!ReferenceEquals(Nav.SelectedItem, features))
                 Nav.SelectedItem = features; // shows the hub, so Back has somewhere to go
             if (_shell.Registry.Find(id) is { IsInstalled: true, SettingsPage: not null } entry)
+            {
                 ShowModulePage(entry, section);
+            }
             else
+            {
                 Log.Info($"Settings: no page for '{page}'; showing Features");
+                if (_modulePage is not null)
+                    ShowPage(features); // leave whatever module page was showing
+            }
             return;
         }
 

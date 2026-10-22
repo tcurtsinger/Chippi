@@ -42,6 +42,8 @@ public sealed class FeatureEntry
     internal IFeatureModule? Module { get; }
 
     internal ModuleUi? Ui { get; set; }
+
+    internal Notifications.ModuleNotifier? Notifier { get; set; }
 }
 
 /// <summary>The "features" section of settings.json.</summary>
@@ -299,17 +301,20 @@ public sealed class ModuleRegistry(ConfigStore config, IslandActivityHub island,
         var logger = loggerFactory.CreateLogger("Module." + id);
         var publisher = island.CreatePublisher(id);
         string dataDirectory = Path.Combine(_services.DataRoot, id);
-        Directory.CreateDirectory(dataDirectory);
+        var notifier = new Notifications.ModuleNotifier(id, config, publisher, _services, logger);
         var context = new ModuleContext(id, new ModuleSettings(config, id), logger, publisher, ui)
         {
             DataDirectory = dataDirectory,
-            Notifier = new Notifications.ModuleNotifier(id, config, publisher, _services, logger),
+            Notifier = notifier,
             Activation = new ActivationRouter.ModuleActivation(_services.Activation, id),
         };
 
         entry.Ui = ui;
+        entry.Notifier = notifier;
         try
         {
+            // Inside the isolation boundary: an unwritable data folder fails this module only.
+            Directory.CreateDirectory(dataDirectory);
             await entry.Module!.StartAsync(context, ct).ConfigureAwait(false);
             entry.IsRunning = true;
             entry.LastError = null;
@@ -365,6 +370,8 @@ public sealed class ModuleRegistry(ConfigStore config, IslandActivityHub island,
         entry.IsRunning = false;
         entry.Ui?.Clear();
         entry.Ui = null;
+        entry.Notifier?.Dispose(); // pending island expiries belong to this lifetime only
+        entry.Notifier = null;
         island.ClearModule(entry.Id);
         _services.Activation.RemoveModule(entry.Id);
     }
