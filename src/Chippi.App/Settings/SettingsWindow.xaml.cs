@@ -127,10 +127,18 @@ public partial class SettingsWindow : Window
             BackToFeatures();
     });
 
+    /// <summary>
+    /// Back (button or Esc) from a module page to the hub. The sidebar already shows Features there,
+    /// so <see cref="Navigate"/> would see "Features, no module page" and do nothing: show the page
+    /// directly instead. <see cref="ShowPage"/> leaves the module page (and its registry handler).
+    /// </summary>
     private void BackToFeatures()
     {
-        LeaveModulePage();
-        Navigate("features");
+        var features = Pages.First(p => p.Id == "features");
+        if (ReferenceEquals(Nav.SelectedItem, features))
+            ShowPage(features);
+        else
+            Nav.SelectedItem = features; // the selection change shows the page
     }
 
     protected override void OnKeyDown(KeyEventArgs e)
