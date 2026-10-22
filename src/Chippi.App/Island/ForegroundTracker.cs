@@ -2,6 +2,7 @@
 // Copyright (C) Chippi contributors
 
 using System.Windows.Threading;
+using Chippi.Core.Config;
 using Microsoft.Extensions.Logging;
 using Windows.Win32;
 using Windows.Win32.Foundation;
@@ -33,6 +34,11 @@ internal sealed class ForegroundTracker : IDisposable
     private HWND _foreground;
     private bool _pending;
     private bool _disposed;
+    private IslandDisplay _display = AppSettings.DefaultIslandDisplay;
+    private string? _monitorId;
+    private HMONITOR? _chosen; // the chosen monitor's live handle; re-resolved when the setting or the displays change
+    private bool _chosenResolved;
+    private bool _loggedMissingMonitor;
 
     public ForegroundTracker(Dispatcher dispatcher, ILogger logger)
     {
@@ -44,8 +50,31 @@ internal sealed class ForegroundTracker : IDisposable
     /// <summary>Raised on the UI thread when <see cref="Monitor"/> or <see cref="FullscreenInFront"/> may have changed.</summary>
     public event EventHandler? Changed;
 
-    /// <summary>The monitor holding the foreground window (or, for the desktop, the pointer).</summary>
+    /// <summary>
+    /// The monitor the island belongs on: with <see cref="IslandDisplay.FollowActiveWindow"/> the one
+    /// holding the foreground window (or, for the desktop, the pointer); otherwise the main display or
+    /// the chosen monitor, falling back to the main display while that one is disconnected.
+    /// </summary>
     public HMONITOR Monitor { get; private set; }
+
+    /// <summary>Applies the island display setting and re-evaluates. Call on the UI thread.</summary>
+    public void SetPlacement(IslandDisplay display, string? monitorId)
+    {
+        if (display == _display && string.Equals(monitorId, _monitorId, StringComparison.OrdinalIgnoreCase))
+            return;
+        _display = display;
+        _monitorId = monitorId;
+        _chosenResolved = false;
+        _loggedMissingMonitor = false;
+        Evaluate();
+    }
+
+    /// <summary>Monitors were added, removed or rearranged: find the chosen one again, then re-evaluate.</summary>
+    public void OnDisplaysChanged()
+    {
+        _chosenResolved = false;
+        Evaluate();
+    }
 
     /// <summary>A fullscreen app, D3D game or presentation is in front, so the island hides.</summary>
     public bool FullscreenInFront { get; private set; }
@@ -78,16 +107,19 @@ internal sealed class ForegroundTracker : IDisposable
         bool isDesktop = cls is "Progman" or "WorkerW";
         bool isShell = isDesktop || cls is "Shell_TrayWnd" or "Shell_SecondaryTrayWnd";
 
-        var monitor = foreground.IsNull || isDesktop
+        var active = foreground.IsNull || isDesktop
             ? MonitorUnderPointer()
             : PInvoke.MonitorFromWindow(foreground, MONITOR_FROM_FLAGS.MONITOR_DEFAULTTONEAREST);
-        if (monitor == default)
-            monitor = MonitorUnderPointer();
+        if (active == default)
+            active = MonitorUnderPointer();
+        var monitor = IslandMonitor(active);
 
+        // Fullscreen hides the island only on its own monitor. A D3D game counts where it runs (the
+        // foreground's monitor); presentation mode is system-wide, so it hides the island anywhere.
         var state = NotificationState();
         string? reason =
-            !foreground.IsNull && !isShell && CoversMonitor(foreground, monitor) ? $"the foreground window ({cls}) covers its monitor"
-            : state is QUERY_USER_NOTIFICATION_STATE.QUNS_RUNNING_D3D_FULL_SCREEN ? "a D3D fullscreen app is running (QUNS_RUNNING_D3D_FULL_SCREEN)"
+            !foreground.IsNull && !isShell && CoversMonitor(foreground, monitor) ? $"the foreground window ({cls}) covers the island's monitor"
+            : state is QUERY_USER_NOTIFICATION_STATE.QUNS_RUNNING_D3D_FULL_SCREEN && active == monitor ? "a D3D fullscreen app is running on the island's monitor (QUNS_RUNNING_D3D_FULL_SCREEN)"
             : state is QUERY_USER_NOTIFICATION_STATE.QUNS_PRESENTATION_MODE ? "presentation mode is on (QUNS_PRESENTATION_MODE)"
             : null;
 
@@ -129,6 +161,35 @@ internal sealed class ForegroundTracker : IDisposable
             return false;
         var m = info.rcMonitor;
         return rect.left <= m.left && rect.top <= m.top && rect.right >= m.right && rect.bottom >= m.bottom;
+    }
+
+    /// <summary>The island's monitor for the current setting, given the active window's monitor.</summary>
+    private HMONITOR IslandMonitor(HMONITOR active)
+    {
+        switch (_display)
+        {
+            case IslandDisplay.MainDisplay:
+                return Displays.Main;
+            case IslandDisplay.SpecificMonitor:
+                if (!_chosenResolved)
+                {
+                    _chosen = Displays.Find(_monitorId);
+                    _chosenResolved = true;
+                }
+                if (_chosen is HMONITOR chosen)
+                {
+                    _loggedMissingMonitor = false;
+                    return chosen;
+                }
+                if (!_loggedMissingMonitor)
+                {
+                    _logger.LogInformation("Island monitor {Id} is not connected; using the main display", _monitorId ?? "(none chosen)");
+                    _loggedMissingMonitor = true;
+                }
+                return Displays.Main;
+            default:
+                return active;
+        }
     }
 
     private static HMONITOR MonitorUnderPointer() =>

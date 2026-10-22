@@ -61,7 +61,7 @@ set `<UseWPF>true</UseWPF>`. In XAML write `xmlns:c="urn:chippi-ui"`.
 | Type | What it is |
 |---|---|
 | `ConfigStore` | `%APPDATA%\Chippi\settings.json`. `Load()`, `Save()`, `HasSection`, `GetSection<T>` / `SetSection<T>` (merges, saves), `GetModuleSettings<T>` / `SetModuleSettings<T>` / `HasModuleSettings`, `Export(path)`, `Import(path)` (throws `InvalidDataException` and changes nothing on a bad file), events `Imported` and `SectionChanged` (args `Name`: "app", "features" or "modules.<id>"; raised after the file is written, on the saving thread, for writes through this store only). Versioned (`version: 1`), atomic writes, unknown sections and properties survive, a corrupt file is moved aside. |
-| `AppSettings` | Section `app`: `Theme` (`ThemePreference`), `IslandEnabled`, `PetColor`, `ReduceMotion` (null = follow Windows). |
+| `AppSettings` | Section `app`: `Theme` (`ThemePreference`), `IslandEnabled`, `PetColor`, `ReduceMotion` (null = follow Windows), `IslandDisplay` (`FollowActiveWindow`, `MainDisplay`, `SpecificMonitor`; default in `AppSettings.DefaultIslandDisplay`), `IslandMonitorId` (the monitor's stable device path for `SpecificMonitor`). |
 | `ThemePreference` | `Dark, Light, System`. (Not `ThemeMode`: WPF 10 has its own `System.Windows.ThemeMode`.) |
 | `PetColor` | `Synth, Iris, Azure, Signal, Ember, Frost`. |
 
