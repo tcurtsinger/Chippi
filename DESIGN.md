@@ -331,7 +331,21 @@ The approved mockups are `docs/phase-2/design/phase-2-mockups.html`, with one PN
   - Clear history uses a popover with a Signal Red Deep "Clear" button.
 - **Notices:**
   - Event kinds: Organized, Ready to review, Held, Failed, Archive imported.
-  - Which events reach Windows notifications and the island is set on the app-wide **Notifications** settings page, not inside the feature (design pending, Travis 2026-10-22).
+  - Which events reach Windows notifications and the island is set on the app-wide **Notifications** settings page, not inside the feature (see below).
+
+### Notifications page (approved 2026-10-22)
+The approved mockup is `docs/phase-2/design/notifications/`.
+- **Sidebar:** Notifications, with a Lucide bell, sits after Island & pet. The title has no description under it.
+- **Two destination tiles** side by side, Windows then Island. Each is Surface with a 32px Chip-colored icon chip (a monitor for Windows, which is never the Windows logo; a screen with a small top pill for Island), the title and a switch.
+- **Turning a destination off** keeps its choices. The tile caption reads "Off · choices kept", and that column dims to **60%** in every group, so its header stays readable. The checkboxes stay editable.
+- **When the Windows backend is unavailable,** one line sits under the tiles: an amber 7px dot and "Windows notifications unavailable" in amber Caption (`#8A4B00` in light). There's no button, and the page makes no claims about Focus or Do not disturb.
+- **Feature groups** follow the Features hub order. Each is a Label eyebrow, with the "Windows" and "Island" column headers on the same line, over a Surface grid of 44px rows and 120px checkbox columns. A feature with no events gets no group.
+- **Downloads defaults:**
+  - Organized and Ready to review: Island only.
+  - Held and Failed: both.
+  - Archive imported: Windows only.
+- **Accessible names** read "Feature, Event, Destination", for example "Downloads organizer, Held, Windows".
+- **Quiet hours and sound** stay with Windows. Chippi has no setting for them.
   - Notification copy states what happened first: "4 files organized", "1 file held", "1 file not moved", "photos-2025.zip imported".
   - Island stash pill: Gumdrop celebrates, then goes idle, and a folder glyph replaces the equalizer. Held and failed pills use amber source text and an amber dot.
 
