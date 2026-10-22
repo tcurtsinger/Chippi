@@ -4,6 +4,7 @@
 using System.IO;
 using System.Windows;
 using System.Windows.Threading;
+using Chippi.App.Shell;
 using Chippi.UI.Themes;
 using Chippi.Core.Config;
 using Chippi.Core.Diagnostics;
@@ -88,16 +89,75 @@ public partial class App : Application
         }
 #endif
 
-        if (!ComposeShell())
+        bool debugMode = e.Args.Contains("--debug", StringComparer.OrdinalIgnoreCase)
+            || Environment.GetEnvironmentVariable("CHIPPI_DEBUG") == "1";
+        Shell = new ShellContext(Config, LoggerFactory, debugMode);
+        Shell.Commands.QuitRequested += async (_, _) => await QuitAsync();
+        ActivationRequested += (_, _) => Shell.Commands.ShowFlyout();
+
+        if (!ComposeShell(Shell))
         {
             // Nothing visible keeps the app reachable until the tray lands, so do not linger.
-            Log.Info("No shell composed yet (WS0 build); exiting");
+            Log.Info("No tray composed yet; exiting");
             Shutdown();
         }
     }
 
-    /// <summary>Composition root, owned by the lead. Returns false while there is no tray to keep the app reachable.</summary>
-    private static bool ComposeShell() => false;
+    public ShellContext Shell { get; private set; } = null!;
+
+    /// <summary>
+    /// Composition root, owned by the lead. Each workstream adds its wiring in its own slot below
+    /// and nowhere else in this file, so merges stay one-line. Returns false while there is no tray
+    /// to keep the app reachable.
+    /// </summary>
+    private bool ComposeShell(ShellContext shell)
+    {
+        // [WS4] Real modules: shell.Registry.Register(new ...Module());
+
+        // [WS2] "Coming soon" placeholders for the PLAN.md features.
+
+        // Start installed modules before any surface reads the registry.
+        _ = StartModulesAsync(shell);
+
+        // [WS3] Island: create the island host here.
+
+        // [WS2] Settings: create the settings controller and call shell.Commands.RegisterSettings(...).
+
+        // [WS1] Tray and flyout: create them, call shell.Commands.RegisterFlyout(...), then return true.
+
+        return false;
+    }
+
+    private static async Task StartModulesAsync(ShellContext shell)
+    {
+        try
+        {
+            await shell.Registry.StartAsync();
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Starting modules failed", ex);
+        }
+    }
+
+    private bool _quitting;
+
+    /// <summary>Stops every module (releasing what they hold, such as Keep awake's execution state), then exits.</summary>
+    private async Task QuitAsync()
+    {
+        if (_quitting)
+            return;
+        _quitting = true;
+        try
+        {
+            await Shell.Registry.StopAllAsync();
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Stopping modules on quit failed", ex);
+        }
+        Shutdown();
+    }
 
     private static void EnsureWindowsDirectoryEnvironment()
     {
