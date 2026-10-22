@@ -138,8 +138,7 @@ public partial class App : Application
         // [WS2] Settings: create the settings controller and call shell.Commands.RegisterSettings(...).
 
         // [WS1] Tray and flyout: create them, call shell.Commands.RegisterFlyout(...), then return true.
-
-        return false;
+        return Tray.TrayController.Compose(shell);
     }
 
     private static async Task StartModulesAsync(ShellContext shell)
