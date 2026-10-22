@@ -40,7 +40,7 @@ public partial class TrayMenuWindow : Window
         Show();
         Activate();
         if (PInvoke.GetForegroundWindow() != Handle)
-            PInvoke.SetForegroundWindow(Handle);
+            FlyoutWindow.ForceForeground(Handle);
         SettingsItem.Focus();
     }
 

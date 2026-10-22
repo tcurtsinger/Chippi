@@ -13,7 +13,8 @@
         AutomationProperties.Name="Chippi"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         ResizeMode="NoResize" ShowInTaskbar="False" Topmost="True"
-        SizeToContent="WidthAndHeight" WindowStartupLocation="Manual">
+        SizeToContent="WidthAndHeight" WindowStartupLocation="Manual"
+        KeyboardNavigation.TabNavigation="Cycle">
     <Grid x:Name="Frame" Margin="28,20,28,40">
         <!-- The lift sits on its own layer so the card's text is not rendered through an effect. -->
         <Border CornerRadius="16" Background="{DynamicResource WindowBackgroundBrush}" Effect="{DynamicResource WindowShadow}" />

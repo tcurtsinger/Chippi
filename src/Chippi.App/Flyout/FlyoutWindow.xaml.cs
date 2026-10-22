@@ -77,8 +77,34 @@ public partial class FlyoutWindow : Window
 
         Activate();
         if (PInvoke.GetForegroundWindow() != Handle)
-            PInvoke.SetForegroundWindow(Handle);
+            ForceForeground(Handle);
         FocusSelectedTab();
+    }
+
+    /// <summary>
+    /// A tray click lets us take the foreground, but a second launch signals this process from
+    /// outside, and Windows then refuses SetForegroundWindow (the flyout would show without focus,
+    /// so Esc and click-away could not close it). Joining the foreground thread's input queue for
+    /// the call is the usual way through; it is undone straight after.
+    /// </summary>
+    internal static void ForceForeground(HWND window)
+    {
+        var foreground = PInvoke.GetForegroundWindow();
+        uint theirs = foreground.IsNull ? 0 : PInvoke.GetWindowThreadProcessId(foreground, out _);
+        uint ours = PInvoke.GetCurrentThreadId();
+        bool attached = theirs != 0 && theirs != ours && PInvoke.AttachThreadInput(theirs, ours, true);
+        try
+        {
+            PInvoke.BringWindowToTop(window);
+            PInvoke.SetForegroundWindow(window);
+        }
+        finally
+        {
+            if (attached)
+                PInvoke.AttachThreadInput(theirs, ours, false);
+        }
+        if (PInvoke.GetForegroundWindow() != window)
+            Log.Warn("Flyout: Windows refused the foreground; Esc and click-away need a click on the window first");
     }
 
     internal void Dismiss(bool byDeactivation = false)
@@ -183,7 +209,6 @@ public partial class FlyoutWindow : Window
             Tabs.SelectionChanged -= OnTabChanged;
             Tabs.ItemsSource = tabs.Select(t => new SegmentItem { Label = FlyoutPages.TabName(t), Icon = FlyoutPages.TabIcon(t), Value = t }).ToList();
             Tabs.SelectionChanged += OnTabChanged;
-            Tabs.Visibility = tabs.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
             // Keep the user's tab; otherwise open on the first one with real content, so a debug
             // run does not land on a placeholder.
             int index = selected is FlyoutTab keep ? tabs.IndexOf(keep) : -1;
@@ -192,6 +217,7 @@ public partial class FlyoutWindow : Window
             Tabs.SelectedIndex = tabs.Count == 0 ? -1 : Math.Max(index, 0);
         }
 
+        Tabs.Visibility = tabs.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         var tab = (Tabs.SelectedItem as SegmentItem)?.Value as FlyoutTab?;
         Page.Content = tab is FlyoutTab t ? _pages.Build(t, running) : _pages.BuildNothingInstalled();
     }
