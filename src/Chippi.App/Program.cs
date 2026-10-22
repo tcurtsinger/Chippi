@@ -26,6 +26,7 @@ public static class Program
                 // A registry failure must never block the uninstall itself.
                 try { new StartupRegistration().SetEnabled(false); }
                 catch (Exception) { }
+                try { new ExplorerRegistration().SetEnabled(false); } catch (Exception) { }
             })
             .Run();
 
