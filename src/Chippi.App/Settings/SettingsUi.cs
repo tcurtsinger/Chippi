@@ -111,6 +111,32 @@ internal static class SettingsUi
 
     public static ToggleButton Switch(bool on) => Styled(new ToggleButton { IsChecked = on }, "SwitchStyle");
 
+    /// <summary>
+    /// Runs <paramref name="changed"/> whenever the switch's state changes, however it changed:
+    /// mouse, keyboard, or a UI Automation toggle (Narrator, switch access), which raises no Click.
+    /// A change the handler makes itself (reverting after a failure) does not re-enter it.
+    /// </summary>
+    public static void OnSwitched(ToggleButton toggle, Action<bool> changed)
+    {
+        bool busy = false;
+        void Handler(object sender, RoutedEventArgs e)
+        {
+            if (busy)
+                return;
+            busy = true;
+            try
+            {
+                changed(toggle.IsChecked == true);
+            }
+            finally
+            {
+                busy = false;
+            }
+        }
+        toggle.Checked += Handler;
+        toggle.Unchecked += Handler;
+    }
+
     public static Button Button(string text, bool primary = false) =>
         Styled(new Button { Content = text, Margin = new Thickness(8, 0, 0, 0) }, primary ? "PrimaryButtonStyle" : "SecondaryButtonStyle");
 

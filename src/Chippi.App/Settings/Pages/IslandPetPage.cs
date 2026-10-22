@@ -33,7 +33,7 @@ internal sealed class IslandPetPage : UserControl
         page.Children.Add(SettingsUi.Header("Island & pet", "The island floats at the top of your screen. Gumdrop lives in it and reacts when Chippi finishes something for you."));
 
         var island = SettingsUi.Switch(app.IslandEnabled);
-        island.Click += (_, _) => SettingsUi.SaveApp(shell.Config, s => s.IslandEnabled = island.IsChecked == true);
+        SettingsUi.OnSwitched(island, on => SettingsUi.SaveApp(shell.Config, s => s.IslandEnabled = on));
         page.Children.Add(SettingsUi.Row("Island", "Shows what is live (media, timers, Keep awake) and hides over fullscreen apps.", island));
 
         var color = SettingsUi.Segments("Pet color", Enum.GetValues<PetColor>().Select(c => (c.ToString(), c)), app.PetColor);

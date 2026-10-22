@@ -2,6 +2,9 @@
 // Copyright (C) Chippi contributors
 
 using System.Windows;
+using System.Windows.Automation;
+using System.Windows.Automation.Peers;
+using System.Windows.Automation.Provider;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Media;
@@ -14,10 +17,36 @@ namespace Chippi.UI.Controls;
 /// and its state line. On: violet border at 50%, 16% gradient wash, full-gradient chip.
 /// A toggle button, so Space and Enter work and Narrator reads the on/off state.
 /// </summary>
+/// <remarks>
+/// The module owns the on/off state; the tile only shows it (bind <c>IsChecked</c> one way) and
+/// asks for a change through <c>Click</c>. So the tile never flips itself, and a UI Automation
+/// toggle (Narrator, switch access, Voice access) raises <c>Click</c> like a mouse or key would.
+/// Otherwise an automation toggle would flip the look without the module ever hearing about it.
+/// </remarks>
 public class ToolTile : ToggleButton
 {
     static ToolTile() =>
         DefaultStyleKeyProperty.OverrideMetadata(typeof(ToolTile), new FrameworkPropertyMetadata(typeof(ToolTile)));
+
+    /// <summary>Never flips <c>IsChecked</c> itself: the module's state arrives through the binding.</summary>
+    protected override void OnToggle()
+    {
+    }
+
+    protected override AutomationPeer OnCreateAutomationPeer() => new ToolTileAutomationPeer(this);
+
+    /// <summary>The automation toggle: the same <c>Click</c> (and Command) a mouse click raises.</summary>
+    internal void ToggleFromAutomation() => OnClick();
+
+    private sealed class ToolTileAutomationPeer(ToolTile owner) : ToggleButtonAutomationPeer(owner), IToggleProvider
+    {
+        void IToggleProvider.Toggle()
+        {
+            if (!IsEnabled())
+                throw new ElementNotEnabledException();
+            owner.ToggleFromAutomation();
+        }
+    }
 
     public static readonly DependencyProperty TitleProperty = DependencyProperty.Register(
         nameof(Title), typeof(string), typeof(ToolTile), new PropertyMetadata(""));
