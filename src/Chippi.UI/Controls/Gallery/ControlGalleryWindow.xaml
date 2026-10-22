@@ -191,6 +191,32 @@
                     </StackPanel>
                 </Border>
 
+                <!-- Phase 2 controls (provisional) -->
+                <Border Style="{StaticResource Section}">
+                    <StackPanel>
+                        <c:Eyebrow Text="Phase 2 controls (provisional)" Margin="0,0,0,10" />
+                        <WrapPanel VerticalAlignment="Center">
+                            <CheckBox Content="Unchecked" Margin="0,0,18,0" />
+                            <CheckBox Content="Checked" IsChecked="True" Margin="0,0,18,0" />
+                            <CheckBox Content="Mixed" IsChecked="{x:Null}" IsThreeState="True" Margin="0,0,18,0" />
+                            <CheckBox Content="Disabled" IsEnabled="False" Margin="0,0,18,0" />
+                            <CheckBox Content="Disabled checked" IsChecked="True" IsEnabled="False" Margin="0,0,18,0" />
+                            <CheckBox AutomationProperties.Name="Select row" IsChecked="True" />
+                        </WrapPanel>
+                        <WrapPanel Margin="0,14,0,0">
+                            <TextBox Style="{StaticResource TextFieldStyle}" Width="260" Tag="Destination, e.g. Documents\{year}" AutomationProperties.Name="Destination" Margin="0,0,14,0" />
+                            <TextBox Style="{StaticResource TextFieldStyle}" Width="260" Text="Invoices\{year}\{month}" AutomationProperties.Name="Filled" Margin="0,0,14,0" />
+                            <TextBox Style="{StaticResource TextFieldStyle}" Width="200" Text="Read only" IsReadOnly="True" AutomationProperties.Name="Read only" Margin="0,0,14,0" />
+                            <TextBox Style="{StaticResource TextFieldStyle}" Width="200" Text="Disabled" IsEnabled="False" AutomationProperties.Name="Disabled field" />
+                        </WrapPanel>
+                        <WrapPanel Margin="0,14,0,0" VerticalAlignment="Center">
+                            <c:DragHandle Margin="0,0,8,0" />
+                            <TextBlock Text="PDFs to Documents" VerticalAlignment="Center" Margin="0,0,24,0" />
+                            <c:DragHandle IsEnabled="False" Margin="0,0,8,0" />
+                            <TextBlock Text="Disabled" VerticalAlignment="Center" Style="{StaticResource CaptionTextStyle}" />
+                        </WrapPanel>
+                    </StackPanel>
+                </Border>
                 <!-- Island tokens -->
                 <Border Style="{StaticResource Section}">
                     <StackPanel>

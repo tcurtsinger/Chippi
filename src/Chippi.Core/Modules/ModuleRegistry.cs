@@ -1,4 +1,4 @@
-﻿// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
 using Chippi.Core.Config;
@@ -42,6 +42,8 @@ public sealed class FeatureEntry
     internal IFeatureModule? Module { get; }
 
     internal ModuleUi? Ui { get; set; }
+
+    internal Notifications.ModuleNotifier? Notifier { get; set; }
 }
 
 /// <summary>The "features" section of settings.json.</summary>
@@ -61,8 +63,10 @@ internal sealed class FeatureState
 /// Knows every feature, installs and uninstalls them live, applies presets, and persists the
 /// installed set. All mutating calls are serialized; <see cref="Changed"/> fires after each.
 /// </summary>
-public sealed class ModuleRegistry(ConfigStore config, IslandActivityHub island, ILoggerFactory loggerFactory)
+/// <param name="services">Data folders, activation verbs and notices for modules. Defaults suit tests.</param>
+public sealed class ModuleRegistry(ConfigStore config, IslandActivityHub island, ILoggerFactory loggerFactory, ModuleServices? services = null)
 {
+    private readonly ModuleServices _services = services ?? new ModuleServices();
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly List<FeatureEntry> _entries = [];
     private readonly ILogger _logger = loggerFactory.CreateLogger("Modules");
@@ -294,16 +298,23 @@ public sealed class ModuleRegistry(ConfigStore config, IslandActivityHub island,
     {
         var id = entry.Id;
         var ui = new ModuleUi(id, RaiseChanged);
-        var context = new ModuleContext(
-            id,
-            new ModuleSettings(config, id),
-            loggerFactory.CreateLogger("Module." + id),
-            island.CreatePublisher(id),
-            ui);
+        var logger = loggerFactory.CreateLogger("Module." + id);
+        var publisher = island.CreatePublisher(id);
+        string dataDirectory = Path.Combine(_services.DataRoot, id);
+        var notifier = new Notifications.ModuleNotifier(id, config, publisher, _services, logger);
+        var context = new ModuleContext(id, new ModuleSettings(config, id), logger, publisher, ui)
+        {
+            DataDirectory = dataDirectory,
+            Notifier = notifier,
+            Activation = new ActivationRouter.ModuleActivation(_services.Activation, id),
+        };
 
         entry.Ui = ui;
+        entry.Notifier = notifier;
         try
         {
+            // Inside the isolation boundary: an unwritable data folder fails this module only.
+            Directory.CreateDirectory(dataDirectory);
             await entry.Module!.StartAsync(context, ct).ConfigureAwait(false);
             entry.IsRunning = true;
             entry.LastError = null;
@@ -359,7 +370,10 @@ public sealed class ModuleRegistry(ConfigStore config, IslandActivityHub island,
         entry.IsRunning = false;
         entry.Ui?.Clear();
         entry.Ui = null;
+        entry.Notifier?.Dispose(); // pending island expiries belong to this lifetime only
+        entry.Notifier = null;
         island.ClearModule(entry.Id);
+        _services.Activation.RemoveModule(entry.Id);
     }
 
     private void SaveState()

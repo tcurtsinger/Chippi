@@ -33,12 +33,22 @@ public interface IModuleUi
     void AddFlyoutTab(FlyoutTab tab, Func<object> createView);
 
     /// <summary>Supplies the module's page in Settings. <paramref name="createView"/> must return a WPF FrameworkElement.</summary>
-    void SetSettingsPage(Func<object> createView);
+    void SetSettingsPage(Func<object> createView) => SetSettingsPage(_ => createView());
+
+    /// <summary>
+    /// A settings page with sections the shell can open directly: <c>OpenSettings("module:&lt;id&gt;/history")</c>
+    /// passes "history"; the sidebar and the hub pass null (the page's first section).
+    /// </summary>
+    void SetSettingsPage(Func<string?, object> createView);
 }
 
 public sealed record FlyoutTabContribution(string ModuleId, FlyoutTab Tab, Func<object> CreateView);
 
-public sealed record SettingsPageContribution(string ModuleId, Func<object> CreateView);
+public sealed record SettingsPageContribution(string ModuleId, Func<string?, object> CreateSectionView)
+{
+    /// <summary>The page, opened on <paramref name="section"/> when the module knows it.</summary>
+    public object CreateView(string? section = null) => CreateSectionView(section);
+}
 
 /// <summary>
 /// A flyout Tools tile, rendered by the shell (DESIGN.md §6 "Tool tile"). The module owns the
@@ -118,7 +128,7 @@ internal sealed class ModuleUi(string moduleId, Action changed) : IModuleUi
         changed();
     }
 
-    public void SetSettingsPage(Func<object> createView)
+    public void SetSettingsPage(Func<string?, object> createView)
     {
         ArgumentNullException.ThrowIfNull(createView);
         lock (_gate) _settingsPage = new SettingsPageContribution(moduleId, createView);

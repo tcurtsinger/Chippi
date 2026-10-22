@@ -555,4 +555,148 @@
             </Setter.Value>
         </Setter>
     </Style>
+
+    <!-- ===== Phase 2 additions. Provisional: colors and sizes may change after Travis reviews the mockups. ===== -->
+
+    <!-- Checkbox: 18px box, 5px radius, Input fill and hairline; checked is the deep gradient with a white
+         check (the glyph is read, so the Deep Gradient Rule applies). No stock chrome. -->
+    <Style x:Key="CheckBoxStyle" TargetType="{x:Type CheckBox}">
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+        <Setter Property="FontFamily" Value="{StaticResource UiFont}" />
+        <Setter Property="FontSize" Value="12.5" />
+        <Setter Property="FontWeight" Value="Medium" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource FocusRing7}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type CheckBox}">
+                    <Grid Background="Transparent">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Border x:Name="Box" Width="18" Height="18" CornerRadius="5" BorderThickness="1" VerticalAlignment="Center"
+                                Background="{DynamicResource InputBrush}" BorderBrush="{DynamicResource BorderStrongBrush}">
+                            <Grid>
+                                <c:LucideIcon x:Name="Check" Data="{x:Static c:LucideIcons.Check}" Size="13" Thickness="2.6" Brush="White"
+                                              HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed" />
+                                <Border x:Name="Dash" Width="8" Height="2" CornerRadius="1" Background="White" Visibility="Collapsed" />
+                            </Grid>
+                        </Border>
+                        <ContentPresenter x:Name="Label" Grid.Column="1" Margin="9,0,0,0" VerticalAlignment="Center" RecognizesAccessKey="True" />
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Box" Property="BorderBrush" Value="{DynamicResource TextTertiaryBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Box" Property="Background" Value="{DynamicResource AccentGradientDeepBrush}" />
+                            <Setter TargetName="Box" Property="BorderBrush" Value="Transparent" />
+                            <Setter TargetName="Check" Property="Visibility" Value="Visible" />
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="{x:Null}">
+                            <Setter TargetName="Box" Property="Background" Value="{DynamicResource AccentGradientDeepBrush}" />
+                            <Setter TargetName="Box" Property="BorderBrush" Value="Transparent" />
+                            <Setter TargetName="Dash" Property="Visibility" Value="Visible" />
+                        </Trigger>
+                        <Trigger Property="Content" Value="{x:Null}">
+                            <Setter TargetName="Label" Property="Margin" Value="0" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.45" />
+                            <Setter Property="Cursor" Value="Arrow" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+    <!-- Every CheckBox is themed: DESIGN.md bans the stock one. -->
+    <Style TargetType="{x:Type CheckBox}" BasedOn="{StaticResource CheckBoxStyle}" />
+
+    <!-- Text field: a search box without the icon (36px, Input fill, hairline, 9px radius). Tag is the
+         placeholder. The ring shows while it holds keyboard focus; a validation error turns the border red. -->
+    <Style x:Key="TextFieldStyle" TargetType="{x:Type TextBox}">
+        <Setter Property="Height" Value="36" />
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+        <Setter Property="CaretBrush" Value="{DynamicResource TextPrimaryBrush}" />
+        <Setter Property="SelectionBrush" Value="{DynamicResource FocusRingBrush}" />
+        <Setter Property="FontFamily" Value="{StaticResource UiFont}" />
+        <Setter Property="FontSize" Value="12.5" />
+        <Setter Property="FontWeight" Value="Medium" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="Validation.ErrorTemplate" Value="{x:Null}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type TextBox}">
+                    <Grid>
+                        <Border x:Name="Chrome" CornerRadius="9" BorderThickness="1"
+                                Background="{DynamicResource InputBrush}" BorderBrush="{DynamicResource ButtonBorderBrush}">
+                            <Grid Margin="12,0">
+                                <TextBlock x:Name="Placeholder" Text="{TemplateBinding Tag}" Foreground="{DynamicResource TextTertiaryBrush}"
+                                           VerticalAlignment="Center" IsHitTestVisible="False" Visibility="Collapsed" />
+                                <ScrollViewer x:Name="PART_ContentHost" VerticalAlignment="Center" Focusable="False"
+                                              HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Hidden" />
+                            </Grid>
+                        </Border>
+                        <Border x:Name="Ring" Margin="-4" BorderThickness="2" CornerRadius="13" IsHitTestVisible="False"
+                                BorderBrush="{DynamicResource FocusRingBrush}" Visibility="Collapsed" />
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="Text" Value="">
+                            <Setter TargetName="Placeholder" Property="Visibility" Value="Visible" />
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource BorderStrongBrush}" />
+                        </Trigger>
+                        <Trigger Property="Validation.HasError" Value="True">
+                            <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource DangerBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="Ring" Property="Visibility" Value="Visible" />
+                        </Trigger>
+                        <Trigger Property="IsReadOnly" Value="True">
+                            <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource PanelBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.45" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Drag handle: a 2x3 dot grip, 18x24 hit area, Grip color, primary ink on hover. -->
+    <Style TargetType="{x:Type c:DragHandle}">
+        <Setter Property="Width" Value="18" />
+        <Setter Property="Height" Value="24" />
+        <Setter Property="Cursor" Value="SizeAll" />
+        <Setter Property="Foreground" Value="{DynamicResource GripBrush}" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource FocusRing7}" />
+        <Setter Property="AutomationProperties.Name" Value="Reorder" />
+        <Setter Property="AutomationProperties.HelpText" Value="Up or Down arrow moves it" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type c:DragHandle}">
+                    <Border x:Name="Chrome" Background="Transparent" CornerRadius="7">
+                        <Path x:Name="Dots" Fill="{TemplateBinding Foreground}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                              Data="M0,0 a1.5,1.5 0 1 0 3,0 a1.5,1.5 0 1 0 -3,0 M6,0 a1.5,1.5 0 1 0 3,0 a1.5,1.5 0 1 0 -3,0 M0,6 a1.5,1.5 0 1 0 3,0 a1.5,1.5 0 1 0 -3,0 M6,6 a1.5,1.5 0 1 0 3,0 a1.5,1.5 0 1 0 -3,0 M0,12 a1.5,1.5 0 1 0 3,0 a1.5,1.5 0 1 0 -3,0 M6,12 a1.5,1.5 0 1 0 3,0 a1.5,1.5 0 1 0 -3,0" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+                            <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource HoverBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsDragging" Value="True">
+                            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.45" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
 </ResourceDictionary>

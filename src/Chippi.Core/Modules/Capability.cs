@@ -22,6 +22,10 @@ public sealed record Capability(string Id, string Name, string Description)
     public static Capability ScreenCapture { get; } = new(
         "screen-capture", "Screen capture", "Reads what is on screen for screenshots, recording and OCR");
 
+    /// <summary>Per-user Explorer menu entries (HKCU). No admin; removed when the feature is uninstalled.</summary>
+    public static Capability ShellIntegration { get; } = new(
+        "shell-integration", "Explorer menu entry", "Adds an entry to the Explorer right-click menu");
+
     public bool Equals(Capability? other) => other is not null && string.Equals(Id, other.Id, StringComparison.Ordinal);
 
     public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Id);

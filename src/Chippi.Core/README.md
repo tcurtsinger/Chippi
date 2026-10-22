@@ -47,6 +47,18 @@ set `<UseWPF>true</UseWPF>`. In XAML write `xmlns:c="urn:chippi-ui"`.
   `Motion.IsReduced` / `Motion.Changed` / `Motion.Override`.
 - Debug builds only: `ControlGalleryWindow` (`Chippi.exe --gallery [--snapshot <dir>]`).
 
+## Phase 2 additions (`Chippi.Core.Modules`, `Chippi.Core.Notifications`)
+
+| Type | What it is |
+|---|---|
+| `ModuleContext.DataDirectory` | The module's own folder for databases and caches: `%LOCALAPPDATA%\Chippi\data\<id>` (a dev profile's under `Chippi-dev\<profile>\data`). Created before `StartAsync`, kept after uninstall. |
+| `ModuleContext.Notifier` (`INotifier`) | `Declare(kinds)`, then `Show(Notice)`. Each `NoticeKind` goes to the `NoticePlaces` the user set (Windows, Island, both, none; stored in `modules.<id>.notices`), else its default. `PlacesFor` / `SetPlaces` back the settings grid. Never throws for a missing or broken Windows backend. Island notices clear themselves after a few seconds; `Celebrate` makes Gumdrop celebrate. The module's own flyout tab lists every event regardless. |
+| `IToastPresenter` | The Windows backend, set by the shell on `ModuleServices.Toasts` (P2-D). Until then notices reach the island only. |
+| `ModuleContext.Activation` (`IModuleActivation`) | `Register(verb, handler)`: `Chippi.exe --<verb> values...` from a second launch, the Explorer menu or a notice click reaches the handler on the UI thread. One module per verb; removed on stop. Anything unrouted opens the flyout. |
+| `ModuleServices` | Shell-side: `DataRoot`, `Activation` (`ActivationRouter.TryRoute(args)`), `Toasts`, `IslandNoticeDuration`, `Time`. Passed to `ModuleRegistry`'s new optional parameter. |
+| `IModuleUi.SetSettingsPage(Func<string?, object>)` | A page with sections; `OpenSettings("module:<id>/<section>")` opens it there. The Phase 1 `Func<object>` overload still works. |
+| `Capability.ShellIntegration` | "Explorer menu entry", for the Permissions page. |
+| `SingleInstance` | A second launch now sends its arguments over a per-user, per-session named pipe; `ActivationRequested` carries them (`ActivationEventArgs.Arguments`). Requests before the first subscriber are held in order. |
 ## Island (`Chippi.Core.Island`)
 
 | Type | What it is |
