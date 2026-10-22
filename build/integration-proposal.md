@@ -1,6 +1,6 @@
 # WS5 integration proposals
 
-The lead owns these edits. WS5 does not apply them without approval.
+Approved in the tracker on 2026-10-21. WS5 applied the lead-owned package/project/startup edits in a separate commit, as requested.
 
 ## Root tool manifest
 
@@ -29,6 +29,6 @@ Add to Chippi.App.csproj:
 
 ## Startup hook
 
-Put `Velopack.VelopackApp.Build().Run();` as the first statement of `OnStartup`, before environment/bootstrap/base and single-instance acquisition. No update manager, feed URL or network request is added. Official guidance permits App.xaml.cs; a custom Main is recommended to avoid loading WPF during updates but would require more application-definition changes. https://docs.velopack.io/getting-started/csharp
+Put `Velopack.VelopackApp.Build().Run();` in `OnStartup` immediately after `EnsureWindowsDirectoryEnvironment`, before `base.OnStartup` and single-instance acquisition, as approved in the tracker. No update manager, feed URL or network request is added. Official guidance permits App.xaml.cs; a custom Main is recommended to avoid loading WPF during updates but would require more application-definition changes. https://docs.velopack.io/getting-started/csharp
 
 The pack script retains Velopack's builder validation and never uses skipVeloAppCheck. Installer execution is not part of the build script; it would install on the user's machine. Setup and the ARM64 app need appropriate manual launch checks at integration.

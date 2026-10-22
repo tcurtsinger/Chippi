@@ -30,9 +30,11 @@ try {
         $setup = @(Get-ChildItem -LiteralPath $output -Filter '*Setup.exe')
         $portable = @(Get-ChildItem -LiteralPath $output -Filter '*Portable.zip')
         if ($setup.Count -eq 0 -or $portable.Count -eq 0) { throw "Velopack did not produce Setup.exe and portable ZIP for $rid." }
-        Get-ChildItem -LiteralPath $output -File | ForEach-Object {
+        # Materialize before opening the CSV, and exclude a manifest left by a previous run.
+        $artifacts = @(Get-ChildItem -LiteralPath $output -File | Where-Object Name -ne 'artifacts.csv' | ForEach-Object {
             [pscustomobject]@{ Runtime = $rid; Name = $_.Name; Bytes = $_.Length; SHA256 = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash }
-        } | Export-Csv -LiteralPath (Join-Path $output 'artifacts.csv') -NoTypeInformation
+        })
+        $artifacts | Export-Csv -LiteralPath (Join-Path $output 'artifacts.csv') -NoTypeInformation
         Write-Output "Packages: $output"
     }
 }
