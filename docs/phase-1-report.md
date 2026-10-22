@@ -1,6 +1,6 @@
 # Chippi Phase 1 report
 
-Phase 1 is built and on GitHub at `main`: the tray icon and flyout, the settings window with the Features hub, the island with Gumdrop, the module system, packaging, and Keep awake as the reference module. Everything merged went through a second member's review first. Two checks are still open: any run on ARM64 hardware, and a real Setup.exe install and uninstall (Travis will run that on his other PC).
+Phase 1 is built and on GitHub at `main`: the tray icon and flyout, the settings window with the Features hub, the island with Gumdrop, the module system, packaging, and Keep awake as the reference module. Everything merged went through a second member's review first. Two checks are still open: any run on ARM64 hardware, and a real Setup.exe install and uninstall (Travis will run that on their other PC).
 
 Brief: [phase-1-handoff.md](phase-1-handoff.md). Day-by-day decisions and follow-ups: [phase-1-tracker.md](phase-1-tracker.md).
 
