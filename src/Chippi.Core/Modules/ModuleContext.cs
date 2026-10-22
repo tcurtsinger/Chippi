@@ -26,6 +26,18 @@ public sealed class ModuleContext(
 
     /// <summary>Optional flyout tile, flyout tab and settings page.</summary>
     public IModuleUi Ui { get; } = ui;
+
+    /// <summary>
+    /// The module's own folder for databases and caches (<c>%LOCALAPPDATA%\Chippi\data\&lt;id&gt;</c>, or
+    /// the dev profile's). Created before StartAsync and kept after uninstall, like settings.
+    /// </summary>
+    public string DataDirectory { get; init; } = Path.Combine(ModuleServices.DefaultDataRoot, moduleId);
+
+    /// <summary>Windows and island notices, each event kind going to the places the user chose.</summary>
+    public Notifications.INotifier Notifier { get; init; } = Notifications.NullNotifier.Instance;
+
+    /// <summary>Verbs this module handles from launches, the Explorer menu and notice clicks.</summary>
+    public IModuleActivation Activation { get; init; } = new ActivationRouter.ModuleActivation(new ActivationRouter(), moduleId);
 }
 
 /// <summary>Typed access to a module's config section (<c>modules.&lt;id&gt;</c> in settings.json).</summary>

@@ -22,8 +22,10 @@ public partial class App : Application
 {
     private SingleInstance? _instance;
 
-    /// <summary>Another launch asked this instance to show itself (WS1 opens the flyout). Raised on the UI thread.</summary>
-    public event EventHandler? ActivationRequested;
+    /// <summary>Another launch handed this instance its arguments (a verb, or nothing: open the flyout). Raised on the UI thread.</summary>
+    public event EventHandler<ActivationEventArgs>? ActivationRequested;
+
+    private Task _modulesStarted = Task.CompletedTask;
 
     public static new App Current => (App)Application.Current;
 
@@ -65,16 +67,16 @@ public partial class App : Application
                 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Chippi-dev", devProfile, "settings.json");
         }
 
-        // One instance per session. A second launch signals the first (which opens the flyout) and exits.
-        _instance = string.IsNullOrWhiteSpace(devProfile) ? SingleInstance.TryAcquire() : SingleInstance.TryAcquire($"Chippi-{devProfile}");
+        // One instance per session. A second launch hands its arguments to the first and exits.
+        _instance = SingleInstance.TryAcquire(string.IsNullOrWhiteSpace(devProfile) ? "Chippi" : $"Chippi-{devProfile}", e.Args);
         if (_instance is null)
         {
-            Log.Info("Chippi is already running; asked it to open the flyout");
+            Log.Info("Chippi is already running; passed this launch to it");
             Shutdown();
             return;
         }
-        _instance.ActivationRequested += (_, _) =>
-            Dispatcher.BeginInvoke(() => ActivationRequested?.Invoke(this, EventArgs.Empty));
+        _instance.ActivationRequested += (_, args) =>
+            Dispatcher.BeginInvoke(() => ActivationRequested?.Invoke(this, args));
 
         StartedAtLogin = e.Args.Any(a => string.Equals(a, StartupRegistration.StartupArgument, StringComparison.OrdinalIgnoreCase));
         Log.Info($"Starting Chippi {typeof(App).Assembly.GetName().Version} ({System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture})");
@@ -104,14 +106,26 @@ public partial class App : Application
             || Environment.GetEnvironmentVariable("CHIPPI_DEBUG") == "1";
         Shell = new ShellContext(Config, LoggerFactory, debugMode, devProfile);
         Shell.Commands.QuitRequested += async (_, _) => await QuitAsync();
-        ActivationRequested += (_, _) => Shell.Commands.ShowFlyout();
+        ActivationRequested += (_, args) => Shell.HandleActivation(args.Arguments);
 
         if (!ComposeShell(Shell))
         {
             // Nothing visible keeps the app reachable until the tray lands, so do not linger.
             Log.Info("No tray composed yet; exiting");
             Shutdown();
+            return;
         }
+        _ = RouteLaunchAsync(e.Args);
+    }
+
+    /// <summary>
+    /// A first launch can carry a verb too (the Explorer menu when Chippi isn't running). Once the
+    /// modules have started, a registered verb is routed; app flags such as --startup are not verbs.
+    /// </summary>
+    private async Task RouteLaunchAsync(string[] arguments)
+    {
+        await _modulesStarted;
+        Shell.Services.Activation.TryRoute(arguments);
     }
 
     public ShellContext Shell { get; private set; } = null!;
@@ -132,7 +146,7 @@ public partial class App : Application
         Settings.Features.FeatureCatalog.RegisterPlaceholders(shell.Registry);
 
         // Start installed modules before any surface reads the registry.
-        _ = StartModulesAsync(shell);
+        _modulesStarted = StartModulesAsync(shell);
 
         // [WS3] Island: create the island host here.
         new Island.IslandHost(shell).Start();

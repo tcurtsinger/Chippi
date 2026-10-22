@@ -57,8 +57,29 @@ public partial class SettingsWindow : Window
     /// <summary>The sidebar page showing, for reopening at the same place.</summary>
     public string CurrentPage => (Nav.SelectedItem as SettingsPageInfo)?.Id ?? "general";
 
+    /// <summary>
+    /// Shows a sidebar page by id ("features"), or a feature's own page with
+    /// <c>module:&lt;id&gt;[/&lt;section&gt;]</c> (a notice click opening History, say). A feature that is
+    /// not installed or has no page falls back to the Features hub.
+    /// </summary>
     public void Navigate(string page)
     {
+        if (page.StartsWith(ModulePrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            string rest = page[ModulePrefix.Length..];
+            int slash = rest.IndexOf('/');
+            string id = slash < 0 ? rest : rest[..slash];
+            string? section = slash < 0 || slash == rest.Length - 1 ? null : rest[(slash + 1)..];
+            var features = Pages.First(p => p.Id == "features");
+            if (!ReferenceEquals(Nav.SelectedItem, features))
+                Nav.SelectedItem = features; // shows the hub, so Back has somewhere to go
+            if (_shell.Registry.Find(id) is { IsInstalled: true, SettingsPage: not null } entry)
+                ShowModulePage(entry, section);
+            else
+                Log.Info($"Settings: no page for '{page}'; showing Features");
+            return;
+        }
+
         var target = Pages.FirstOrDefault(p => p.Id == page) ?? Pages[0];
         if (ReferenceEquals(Nav.SelectedItem, target) && _modulePage is null)
             return;
@@ -90,15 +111,20 @@ public partial class SettingsWindow : Window
         Scroller.ScrollToTop();
     }
 
+    private const string ModulePrefix = "module:";
+
     /// <summary>A feature's own settings page, reached from its card. Esc or Back returns to Features.</summary>
-    private void ShowModulePage(FeatureEntry entry)
+    private void ShowModulePage(FeatureEntry entry) => ShowModulePage(entry, null);
+
+    /// <summary>A feature's page opened on <paramref name="section"/> (the module decides what sections exist).</summary>
+    private void ShowModulePage(FeatureEntry entry, string? section)
     {
         if (entry.SettingsPage is not { } contribution)
             return;
         FrameworkElement view;
         try
         {
-            view = contribution.CreateView() as FrameworkElement
+            view = contribution.CreateView(section) as FrameworkElement
                 ?? throw new InvalidOperationException("The settings page factory did not return a FrameworkElement.");
         }
         catch (Exception ex)
