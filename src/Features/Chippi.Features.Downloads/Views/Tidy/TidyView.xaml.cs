@@ -3,7 +3,6 @@
 
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Media;
 using System.Windows.Threading;
 using Chippi.Features.Downloads.Engine;
 using Chippi.Features.Downloads.Model;
@@ -73,7 +72,6 @@ public partial class TidyView : UserControl
         _refreshing = true;
         try
         {
-            Resources["TidyWarningTextBrush"] = new SolidColorBrush((Color)ColorConverter.ConvertFromString(ThemeManager.IsLight ? "#8A4B00" : "#F5A64B"));
             var folders = _module.Settings.Folders;
             if (_selected is null || !folders.Any(f => Same(f.Path, _selected)))
                 _selected = folders.FirstOrDefault()?.Path;
@@ -96,7 +94,7 @@ public partial class TidyView : UserControl
                 Modes.SelectedIndex = current.Mode switch { FolderMode.Silent => 0, FolderMode.Manual => 1, _ => 2 };
                 FolderChip.SetResourceReference(Border.BackgroundProperty, current.Mode == FolderMode.Paused ? "ChipBrush" : "AccentGradientBrush");
             }
-            var history = engine?.History.Query(new HistoryQuery { Take = 24 }) ?? [];
+            var history = engine?.History.Query(new HistoryQuery { Take = 24, From = _module.Settings.HistoryClearedUtc }) ?? [];
             var rows = TidyProjection.Rows(pending, history, DateTimeOffset.UtcNow);
             Rows.ItemsSource = rows;
             NoRecent.Visibility = rows.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
@@ -124,7 +122,7 @@ public partial class TidyView : UserControl
     private void OnModeChanged(object sender, SelectionChangedEventArgs e)
     {
         if (_refreshing || _busy || _selected is null || Modes.SelectedIndex < 0) return;
-        var settings = TidyProjection.Copy(_module.Settings);
+        var settings = _module.Settings.Clone();
         var folder = settings.Folders.FirstOrDefault(f => Same(f.Path, _selected));
         if (folder is null) return;
         folder.Mode = Modes.SelectedIndex switch { 0 => FolderMode.Silent, 1 => FolderMode.Manual, _ => FolderMode.Paused };
@@ -185,17 +183,16 @@ public partial class TidyView : UserControl
 
     private void OnAddDownloads(object sender, RoutedEventArgs e)
     {
-        const string key = @"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders";
-        string folder = Registry.GetValue(key, "{374DE290-123F-4565-9164-39C4925E467B}", null) is string path
-            ? Environment.ExpandEnvironmentVariables(path)
-            : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
-        AddFolder(folder);
+        if (DownloadsModule.DownloadsFolder() is { } folder)
+            AddFolder(folder);
+        else
+            ShowError("Folder not found. Choose folder.");
     }
 
     private void AddFolder(string path)
     {
         if (!Directory.Exists(path)) { ShowError("Folder not found. Choose folder."); return; }
-        var settings = TidyProjection.Copy(_module.Settings);
+        var settings = _module.Settings.Clone();
         if (!settings.Folders.Any(f => Same(f.Path, path)))
             settings.Folders.Add(new WatchedFolder { Path = path, Mode = FolderMode.Manual });
         _selected = path;

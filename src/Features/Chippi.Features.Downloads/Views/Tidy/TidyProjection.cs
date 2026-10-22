@@ -1,4 +1,4 @@
-﻿// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
 using Chippi.Features.Downloads.Engine;
@@ -72,11 +72,4 @@ internal static class TidyProjection
 
     private static string Age(TimeSpan age) => age.TotalMinutes < 1 ? "now" : age.TotalHours < 1 ? $"{(int)age.TotalMinutes}m" :
         age.TotalDays < 1 ? $"{(int)age.TotalHours}h" : $"{(int)age.TotalDays}d";
-
-    /// <summary>Copy folders before editing so SaveSettings can compare old and new modes and reset the baseline.</summary>
-    public static DownloadsSettings Copy(DownloadsSettings settings) => new()
-    {
-        Initialized = settings.Initialized, HistoryDays = settings.HistoryDays, Rules = [.. settings.Rules],
-        Folders = [.. settings.Folders.Select(f => new WatchedFolder { Path = f.Path, Mode = f.Mode, GraceSeconds = f.GraceSeconds, BaselineUtc = f.BaselineUtc })],
-    };
 }
