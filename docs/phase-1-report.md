@@ -90,6 +90,7 @@ Every deviation Travis reviewed on 2026-10-21 is now part of DESIGN.md (light ba
 - **Expanded island media** shows no elapsed or total time, because activities don't carry them yet, and the transport buttons do nothing. Both wait for real media in Phase 3.
 - **Tool tile names** longer than about 10 characters end in an ellipsis (approved; the tooltip and the screen-reader name carry the full name).
 - **Unsigned builds** will get a SmartScreen warning until code signing is set up.
+- **Stale install stub:** on the dev PC, `%LOCALAPPDATA%\Chippi` held a Velopack `Update.exe` and an empty `packages\` folder with no app and no uninstall entry. Setup then refused a fresh install ("already installed", offering Repair). Removing the two items cleared it. The cause is unconfirmed; the folder's timestamp only lines up with the packaging session. Don't run Setup.exe as a smoke test on a dev machine, and check that folder before install tests.
 - Optional hardening, not done: one retry in Keep awake's toggle if a timed session's release fails at the same moment, and a log line when Windows refuses to bring the flyout forward.
 - Review notes and helper scripts from this phase sit untracked in the repo root (`*-review.md`, `uia-*.ps1`, `screens/`). They aren't in git; delete or archive them when convenient.
 
