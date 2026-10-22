@@ -133,9 +133,6 @@ public partial class App : Application
 
         // [WS3] Island: create the island host here.
         new Island.IslandHost(shell).Start();
-        // [WS3] TEMP until WS1 lands: with --debug the island alone keeps the app reachable (its debug menu has Quit). Lead: remove at integration.
-        if (shell.DebugMode)
-            return true;
 
         // [WS2] Settings: create the settings controller and call shell.Commands.RegisterSettings(...).
 
