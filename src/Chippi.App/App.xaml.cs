@@ -57,7 +57,18 @@ public partial class App : Application
 
         // Dev isolation: CHIPPI_DEV_PROFILE=ws1 gives a run its own instance, settings and logs, so
         // parallel workstreams can launch Chippi side by side without touching the real profile.
-        string? devProfile = Environment.GetEnvironmentVariable("CHIPPI_DEV_PROFILE");
+        // A dev profile can also arrive as --dev-profile <name> (a dev Explorer entry, which doesn't
+        // inherit the test runner's environment). A malformed value is ignored, never fatal.
+        string? devProfile;
+        try
+        {
+            devProfile = ExplorerRegistration.ResolveDevProfile(e.Args);
+        }
+        catch (ArgumentException ex)
+        {
+            Log.Warn("Ignoring an invalid --dev-profile argument", ex);
+            devProfile = Environment.GetEnvironmentVariable("CHIPPI_DEV_PROFILE");
+        }
         string? devConfigPath = null;
         if (!string.IsNullOrWhiteSpace(devProfile))
         {

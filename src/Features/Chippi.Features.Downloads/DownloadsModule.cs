@@ -3,6 +3,7 @@
 
 using System.Globalization;
 using Chippi.Core.Modules;
+using Chippi.Core.SystemIntegration;
 using Chippi.Features.Downloads.Engine;
 using Chippi.Features.Downloads.Import;
 using Chippi.Features.Downloads.Model;
@@ -38,6 +39,15 @@ public sealed record DownloadsRequest(DownloadsRequestKind Kind, string? Folder 
 /// </summary>
 public sealed class DownloadsModule : IFeatureModule
 {
+    private ExplorerRegistration? _explorer;
+
+    public DownloadsModule() { }
+
+    public DownloadsModule(ExplorerRegistration explorer)
+    {
+        _explorer = explorer;
+    }
+
     private ModuleContext? _context;
     private SqliteHistoryStore? _history;
 
@@ -81,6 +91,9 @@ public sealed class DownloadsModule : IFeatureModule
         _history = new SqliteHistoryStore(Path.Combine(context.DataDirectory, "history.db"));
         Engine = new DownloadsEngine(_history, context.Notifier, context.Logger);
         Engine.Start(Settings);
+        try { GetExplorer()?.SetEnabled(Settings.OrganizeInExplorer); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException)
+        { context.Logger.LogWarning(ex, "Explorer registration could not be refreshed"); }
 
         context.Activation.Register(DownloadsNotices.OrganizeVerb, args =>
             Raise(new DownloadsRequest(DownloadsRequestKind.Organize, Folder: args.FirstOrDefault(), FromExplorer: true)));
@@ -129,7 +142,18 @@ public sealed class DownloadsModule : IFeatureModule
             if (before is null || folder.Mode == FolderMode.Silent && before.Mode != FolderMode.Silent)
                 folder.BaselineUtc = now;
         }
-        _context.Settings.Save(settings);
+        bool explorerChanged = settings.OrganizeInExplorer != Settings.OrganizeInExplorer;
+        if (explorerChanged) _explorer?.SetEnabled(settings.OrganizeInExplorer);
+        try { _context.Settings.Save(settings); }
+        catch
+        {
+            if (explorerChanged)
+            {
+                try { GetExplorer()?.SetEnabled(Settings.OrganizeInExplorer); }
+                catch (Exception ex) { _context.Logger.LogWarning(ex, "Explorer registration rollback failed"); }
+            }
+            throw;
+        }
         Settings = settings;
         Engine.Apply(settings);
     }
@@ -152,6 +176,23 @@ public sealed class DownloadsModule : IFeatureModule
         _history?.Dispose();
         _history = null;
         _context = null;
+    }
+
+    public Task UninstallAsync(CancellationToken ct)
+    {
+        GetExplorer()?.SetEnabled(false);
+        return Task.CompletedTask;
+    }
+
+    private ExplorerRegistration? GetExplorer()
+    {
+        if (_explorer is not null) return _explorer;
+        try { return _explorer = new ExplorerRegistration(Environment.GetEnvironmentVariable("CHIPPI_DEV_PROFILE")); }
+        catch (ArgumentException ex)
+        {
+            _context?.Logger.LogWarning(ex, "Skipping Explorer registration for an invalid dev profile");
+            return null;
+        }
     }
 
     /// <summary>Opens Settings at the request's section, then tells anyone listening.</summary>

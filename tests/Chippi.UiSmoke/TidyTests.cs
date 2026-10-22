@@ -198,6 +198,7 @@ public sealed class TidyTests(ITestOutputHelper output)
         config["modules"]!["downloads-organizer"] = JsonSerializer.SerializeToNode(new
         {
             initialized = true,
+            organizeInExplorer = false,
             folders = new[] { "Downloads", "Inbox" }.Select(n => new { path = Path.Combine(root, n), mode = "manual", graceSeconds = 30, baselineUtc = DateTimeOffset.UtcNow.AddDays(-1) }),
             rules = new[] { new { id = "docs", name = "Documents", enabled = true, order = 0, extensions = new[] { "pdf", "exe" }, action = "move", template = "Sorted" } }
         });
