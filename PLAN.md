@@ -55,6 +55,9 @@ island host with the pet, startup, config, logging, installer. Keep awake is bui
 here too, as the reference module that proves the module system end to end. The
 build brief is [docs/phase-1-handoff.md](docs/phase-1-handoff.md).
 
+### Backlog (requested, not yet scheduled)
+- **Island position:** let the user move the island beyond top-center: a vertical bar on the left or right edge, the bottom edge, or a corner. Needs DESIGN.md layouts for vertical and bottom pills (Travis, 2026-10-22). The display setting (main, follow active, one monitor) shipped in Phase 1.
+
 ### Phase 2: Downloads organizer (Mouzi-style)
 - Watched folders with Silent / Manual / Paused modes
 - Rules: extensions, regex, size and date conditions, first match wins, reorderable
