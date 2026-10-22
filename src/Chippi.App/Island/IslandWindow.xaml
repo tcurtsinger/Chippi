@@ -49,6 +49,11 @@
                             <Rectangle Style="{StaticResource IslandEqualizerBarStyle}"><Rectangle.RenderTransform><ScaleTransform ScaleY="0.62" /></Rectangle.RenderTransform></Rectangle>
                             <Rectangle Style="{StaticResource IslandEqualizerBarStyle}"><Rectangle.RenderTransform><ScaleTransform ScaleY="0.35" /></Rectangle.RenderTransform></Rectangle>
                         </StackPanel>
+                        <!-- Stash: a folder glyph in the equalizer's slot; held or failed swaps it for an amber dot. -->
+                        <Grid x:Name="StashTail" Grid.Column="1" Width="15" Margin="10,0,0,0" VerticalAlignment="Center" Visibility="Collapsed">
+                            <c:LucideIcon x:Name="StashGlyph" Data="{x:Static c:LucideIcons.Folder}" Size="15" Brush="{StaticResource IslandTextTertiaryBrush}" />
+                            <c:StatusDot x:Name="StashDot" Kind="Attention" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed" />
+                        </Grid>
                     </Grid>
 
                     <!-- Expanded: 328 wide, padding 12 / 14 / 14, 10px gaps (inside the 1px hairline). -->

@@ -810,6 +810,7 @@ public sealed class DownloadsEngine : IDisposable
                         Body = Failed.Count == 0 ? body : $"{body} · {Failed.Count} failed",
                         Activation = DownloadsNotices.RunActivation(runId),
                         Celebrate = Failed.Count == 0,
+                        NeedsAttention = Failed.Count > 0,
                     });
                 }
                 return;
@@ -830,6 +831,7 @@ public sealed class DownloadsEngine : IDisposable
                 {
                     Body = Held.Count == 1 ? $"{Held[0].Name} · {Held[0].Reason}" : null,
                     Activation = DownloadsNotices.ReviewActivation,
+                    NeedsAttention = true,
                 });
             }
             if (Failed.Count > 0)
@@ -838,6 +840,7 @@ public sealed class DownloadsEngine : IDisposable
                 {
                     Body = Failed.Count == 1 ? Failed[0].Error : null,
                     Activation = DownloadsNotices.RunActivation(Failed[0].RunId),
+                    NeedsAttention = true,
                 });
             }
             if (Review.Count > 0)

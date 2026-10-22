@@ -105,7 +105,7 @@ public sealed class PipelineTests
 
         Assert.True(File.Exists(f.In("invoice.pdf.exe")));
         Assert.Equal(PendingStatus.Held, Assert.Single(f.Engine.Pending).Status);
-        Assert.Contains(f.Notifier.Shown, n => n.Kind == DownloadsNotices.Held);
+        Assert.Contains(f.Notifier.Shown, n => n.Kind == DownloadsNotices.Held && n.NeedsAttention);
     }
 
     [Fact]

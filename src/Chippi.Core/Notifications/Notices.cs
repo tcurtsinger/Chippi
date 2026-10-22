@@ -44,6 +44,9 @@ public sealed record Notice(string Kind, string Title)
 
     /// <summary>Gumdrop celebrates when the notice reaches the island.</summary>
     public bool Celebrate { get; init; }
+
+    /// <summary>Something was held or failed; the island shows it in amber. Set by the module, never inferred from text.</summary>
+    public bool NeedsAttention { get; init; }
 }
 
 /// <summary>The shell's Windows notification backend. Must not throw for a suppressed or disabled notification.</summary>
@@ -177,7 +180,7 @@ internal sealed class ModuleNotifier(
                     return;
             }
             string key = $"notice-{Interlocked.Increment(ref s_sequence)}";
-            island.Publish(new IslandActivity(key, notice.IslandKind, notice.Title, notice.Body ?? ""));
+            island.Publish(new IslandActivity(key, notice.IslandKind, notice.Title, notice.Body ?? "") { NeedsAttention = notice.NeedsAttention });
             if (notice.Celebrate)
                 island.ReportSuccess(notice.Title);
 
