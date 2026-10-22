@@ -12,6 +12,8 @@
          RID (F5, dotnet run) gets the machine's own, because CsWin32 cannot generate some APIs
          (Shell_NotifyIconGetRect) for AnyCPU. -->
     <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == ''">$(NETCoreSdkRuntimeIdentifier)</RuntimeIdentifier>
+    <!-- Our own Main, so Velopack's hooks run before WPF starts (see Program.cs). -->
+    <StartupObject>Chippi.App.Program</StartupObject>
   </PropertyGroup>
 
   <ItemGroup>

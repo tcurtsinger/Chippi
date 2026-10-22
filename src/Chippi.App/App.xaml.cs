@@ -36,8 +36,6 @@ public partial class App : Application
 
     protected override void OnStartup(StartupEventArgs e)
     {
-        EnsureWindowsDirectoryEnvironment();
-        Velopack.VelopackApp.Build().Run();
         base.OnStartup(e);
 
         // Log any unhandled failure so a silent crash is never a mystery, and keep the tray app
@@ -130,7 +128,6 @@ public partial class App : Application
         shell.Registry.Register(keepAwake);
         Exit += (_, _) => keepAwake.ReleaseOnExit();
 
-
         // [WS2] "Coming soon" placeholders for the PLAN.md features.
 
         // Start installed modules before any surface reads the registry.
@@ -176,7 +173,7 @@ public partial class App : Application
         Shutdown();
     }
 
-    private static void EnsureWindowsDirectoryEnvironment()
+    internal static void EnsureWindowsDirectoryEnvironment()
     {
         // Some launchers (scheduled tasks, a few installers) start processes without %windir%,
         // which breaks WPF's font and theme lookups. Restore it before anything touches them.
