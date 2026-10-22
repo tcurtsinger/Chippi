@@ -29,7 +29,7 @@ public sealed class TrayController : IDisposable
     private readonly TrayMenuWindow _menu;
     private long _deactivatedAt = long.MinValue / 2;
     private bool _deactivatedOverIcon;
-    private System.Drawing.Point _lastClick;
+    private string? _lastFallback;
     private bool _disposed;
 
     private TrayController(ShellContext shell)
@@ -79,15 +79,18 @@ public sealed class TrayController : IDisposable
     private TrayDisplay DescribeDisplay()
     {
         var rect = _icon.GetRect();
-        var fallback = _lastClick;
-        if (rect is null && fallback.X == 0 && fallback.Y == 0)
-            PInvoke.GetCursorPos(out fallback);
-        return FlyoutPlacement.Describe(rect, fallback);
+        var display = FlyoutPlacement.Describe(rect, out bool fallback);
+        string? message = fallback
+            ? $"Flyout: tray anchor fallback; raw icon {(rect is RECT icon ? PixelRect.From(icon).ToString() : "unavailable")}; monitor {display.Monitor}"
+            : null;
+        if (message is not null && message != _lastFallback)
+            Log.Info(message);
+        _lastFallback = message;
+        return display;
     }
 
     private void OnSelected(object? sender, TrayEventArgs e)
     {
-        _lastClick = new System.Drawing.Point { X = e.X, Y = e.Y };
         if (!e.Keyboard && !_flyout.IsVisible && _deactivatedOverIcon
             && Environment.TickCount64 - _deactivatedAt < ReopenGuardMs)
         {
@@ -109,7 +112,6 @@ public sealed class TrayController : IDisposable
 
     private void OnContextMenu(object? sender, TrayEventArgs e)
     {
-        _lastClick = new System.Drawing.Point { X = e.X, Y = e.Y };
         _flyout.Dismiss();
         _menu.ShowAt(e.X, e.Y, DescribeDisplay());
     }
