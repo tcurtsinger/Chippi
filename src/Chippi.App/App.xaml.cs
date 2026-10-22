@@ -134,6 +134,7 @@ public partial class App : Application
         _ = StartModulesAsync(shell);
 
         // [WS3] Island: create the island host here.
+        new Island.IslandHost(shell).Start();
 
         // [WS2] Settings: create the settings controller and call shell.Commands.RegisterSettings(...).
 
