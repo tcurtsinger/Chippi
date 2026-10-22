@@ -129,6 +129,7 @@ public partial class App : Application
         Exit += (_, _) => keepAwake.ReleaseOnExit();
 
         // [WS2] "Coming soon" placeholders for the PLAN.md features.
+        Settings.Features.FeatureCatalog.RegisterPlaceholders(shell.Registry);
 
         // Start installed modules before any surface reads the registry.
         _ = StartModulesAsync(shell);
@@ -137,6 +138,7 @@ public partial class App : Application
         new Island.IslandHost(shell).Start();
 
         // [WS2] Settings: create the settings controller and call shell.Commands.RegisterSettings(...).
+        Settings.SettingsController.Compose(shell);
 
         // [WS1] Tray and flyout: create them, call shell.Commands.RegisterFlyout(...), then return true.
         return Tray.TrayController.Compose(shell);
