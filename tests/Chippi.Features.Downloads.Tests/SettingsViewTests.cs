@@ -53,8 +53,9 @@ public sealed class SettingsViewTests
     [InlineData(DownloadsRequestKind.Review, null, null, "module:downloads-organizer/review")]
     [InlineData(DownloadsRequestKind.Run, null, 42L, "module:downloads-organizer/history/42")]
     [InlineData(DownloadsRequestKind.Rules, null, null, "module:downloads-organizer/rules")]
-    public void Requests_map_to_settings_links(DownloadsRequestKind kind, string? folder, long? run, string link) =>
-        Assert.Equal(link, DownloadsModule.SettingsLink(new DownloadsRequest(kind, folder, run)));
+    [InlineData(DownloadsRequestKind.Organize, @"C:\Users\x\Downloads", null, @"module:downloads-organizer/explorer/C:\Users\x\Downloads", true)]
+    public void Requests_map_to_settings_links(DownloadsRequestKind kind, string? folder, long? run, string link, bool fromExplorer = false) =>
+        Assert.Equal(link, DownloadsModule.SettingsLink(new DownloadsRequest(kind, folder, run, fromExplorer)));
 
     [Fact]
     public void Clone_is_deep()

@@ -13,7 +13,7 @@ namespace Chippi.Features.Downloads.Views.Settings;
 /// The organizer's page in Settings: a Settings · Rules · History segment over the section, and
 /// Preview shown in place of the section with its own back button. The shell draws the title and
 /// the back-to-Features button. Sections are the deep-link targets (<see cref="DownloadsModule.SettingsLink"/>):
-/// <c>settings</c>, <c>rules</c>, <c>history[/runId]</c>, <c>review</c>, <c>preview/&lt;folder&gt;</c>.
+/// <c>settings</c>, <c>rules</c>, <c>history[/runId]</c>, <c>review</c>, <c>preview/&lt;folder&gt;</c>, <c>explorer/&lt;folder&gt;</c>.
 /// </summary>
 public sealed class DownloadsPage : UserControl
 {
@@ -50,6 +50,9 @@ public sealed class DownloadsPage : UserControl
         string? tail = section?.Split('/', 2) is [_, var rest] ? rest : null;
         switch (head)
         {
+            case "explorer" when tail is { Length: > 0 }:
+                Preview(tail, RunTrigger.Explorer);
+                break;
             case "preview" when tail is { Length: > 0 }:
                 Preview(tail);
                 break;
@@ -93,7 +96,7 @@ public sealed class DownloadsPage : UserControl
     }
 
     /// <summary>Preview for a folder (Organize now, the Explorer menu, a held row's Review).</summary>
-    public void Preview(string folder)
+    public void Preview(string folder, RunTrigger trigger = RunTrigger.Preview)
     {
         if (_module.Engine is not { } engine)
         {
@@ -101,7 +104,7 @@ public sealed class DownloadsPage : UserControl
             return;
         }
         string back = CurrentSection();
-        ShowPreview(new PreviewView(_module, () => engine.CreatePreviewAsync(folder), canPreviewAgain: true, () => Show(back)));
+        ShowPreview(new PreviewView(_module, () => engine.CreatePreviewAsync(folder, trigger), canPreviewAgain: true, () => Show(back)));
     }
 
     private void ShowImport(Task<PreviewPlan> plan)

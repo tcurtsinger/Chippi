@@ -43,10 +43,8 @@ internal sealed class PreviewView : UserControl
         _canPreviewAgain = canPreviewAgain;
         _close = close;
 
-        var back = Ui.Icon(LucideIcons.ChevronLeft, "Back");
-        back.Click += (_, _) => Leave();
-        var title = Ui.Stack(Ui.Text("Preview", "HeadlineTextStyle"), _subtitle);
-        var header = Ui.Row(back, title.Margin(10, 0, 0, 0));
+        // One back button: the shell's, above the page. Cancel and Done return to the organizer page.
+        var header = Ui.Stack(Ui.Text("Preview", "HeadlineTextStyle"), _subtitle);
 
         _all.Click += (_, _) => SelectAll(_all.IsChecked == true);
         var columns = Columns();
