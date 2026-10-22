@@ -41,3 +41,7 @@ public sealed record PlannedOperation(OperationKind Kind, string Source, string?
     public string? HoldReason { get; init; }
 }
 public sealed record ValidationError(string RuleId, string Field, string Message);
+
+/// <summary>A one-based physical line number and its unsupported pattern.</summary>
+public sealed record IgnoreParseError(int Line, string Pattern, string Message);
+public sealed record IgnoreParseResult(IReadOnlyList<string> Patterns, IReadOnlyList<IgnoreParseError> Errors);

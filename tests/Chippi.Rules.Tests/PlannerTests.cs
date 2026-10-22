@@ -114,8 +114,8 @@ public sealed class PlannerTests
     [Fact]
     public void Source_folder_and_same_name_rename_are_not_operations()
     {
-        Assert.Equal(OperationKind.Hold, Planner.Plan(File(), [Rule(action: new MoveTo(@"C:\Inbox"))], Context()).Kind);
-        Assert.Equal(OperationKind.Hold, Planner.Plan(File(), [Rule(action: new RenameTo("{filename}"))], Context()).Kind);
+        Assert.Equal(OperationKind.NoMatch, Planner.Plan(File(), [Rule(action: new MoveTo(@"C:\Inbox"))], Context()).Kind);
+        Assert.Equal(OperationKind.NoMatch, Planner.Plan(File(), [Rule(action: new RenameTo("{filename}"))], Context()).Kind);
     }
 
     [Fact]
@@ -144,7 +144,7 @@ public sealed class PlannerTests
     [Fact]
     public void Ignore_and_safety_cannot_be_overridden_by_a_rule()
     {
-        var c = Context() with { IgnorePatterns = IgnoreFile.Parse("*.pdf") };
+        var c = Context() with { IgnorePatterns = IgnoreFile.Parse("*.pdf").Patterns };
         var result = Planner.Plan(File(), [Rule()], c);
         Assert.Equal(WarningKind.IgnoreMatch, Assert.Single(result.Warnings).Kind);
         Assert.Equal(OperationKind.Hold, result.Kind);
@@ -211,5 +211,30 @@ public sealed class PlannerTests
         Assert.Equal(OperationKind.Hold, plan.Kind);
         Assert.Equal(reason, Assert.Single(plan.Warnings).Kind);
         Assert.Null(plan.Destination);
+    }
+    [Fact]
+    public void Already_in_place_is_quiet_and_still_stops_at_first_matching_rule()
+    {
+        var plan = Planner.Plan(File(), [Rule(action: new MoveTo(@"c:\inbox\")), Rule("later", 2)], Context());
+        Assert.Equal(OperationKind.NoMatch, plan.Kind);
+        Assert.Equal("first", plan.RuleId);
+        Assert.Empty(plan.Warnings);
+        Assert.Null(plan.Destination);
+    }
+
+    [Fact]
+    public void Valid_ignore_lines_still_hold_files_when_another_line_is_unsupported()
+    {
+        var parsed = IgnoreFile.Parse("*.iso\nbackup?.zip\n*.vhdx");
+        Assert.Equal(["*.iso", "*.vhdx"], parsed.Patterns);
+        var error = Assert.Single(parsed.Errors);
+        Assert.Equal(2, error.Line);
+        Assert.Equal("backup?.zip", error.Pattern);
+        foreach (string name in new[] { "disk.iso", "disk.vhdx" })
+        {
+            var plan = Planner.Plan(File(name), [Rule()], Context() with { IgnorePatterns = parsed.Patterns });
+            Assert.Equal(OperationKind.Hold, plan.Kind);
+            Assert.Equal(WarningKind.IgnoreMatch, Assert.Single(plan.Warnings).Kind);
+        }
     }
 }

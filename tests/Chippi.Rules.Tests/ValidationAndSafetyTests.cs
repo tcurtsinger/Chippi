@@ -84,6 +84,7 @@ public sealed class ValidationAndSafetyTests
 
     [Theory]
     [InlineData("picture.pdf.exe")]
+    [InlineData("invoice.pdf .exe")]
     [InlineData("picture.PDF.EXE")]
     [InlineData("image.png.lnk")]
     [InlineData("archive.zip.ps1")]
@@ -157,8 +158,9 @@ public sealed class ValidationAndSafetyTests
     public void Ignore_parser_handles_comments_whitespace_and_literal_hashes()
     {
         var patterns = IgnoreFile.Parse("# comment\r\n\r\n *.pdf # explanation\n report\\#final.txt # comment\nexact\n");
-        Assert.Equal(["*.pdf", "report#final.txt", "exact"], patterns);
-        Assert.Contains(patterns, p => IgnoreFile.Matches("report#final.txt", p));
+        Assert.Equal(["*.pdf", "report#final.txt", "exact"], patterns.Patterns);
+        Assert.Empty(patterns.Errors);
+        Assert.Contains(patterns.Patterns, p => IgnoreFile.Matches("report#final.txt", p));
     }
 
     [Theory]
@@ -168,7 +170,12 @@ public sealed class ValidationAndSafetyTests
     [InlineData("name?.txt")]
     [InlineData("folder/")]
     [InlineData(@"folder\item")]
-    public void Unsupported_ignore_syntax_is_rejected(string pattern) => Assert.Throws<ArgumentException>(() => IgnoreFile.Parse(pattern));
+    public void Unsupported_ignore_syntax_is_reported_per_line(string pattern)
+    {
+        var parsed = IgnoreFile.Parse(pattern);
+        Assert.Empty(parsed.Patterns);
+        Assert.Equal(1, Assert.Single(parsed.Errors).Line);
+    }
 
     [Fact]
     public void Library_references_no_core_WPF_or_external_dependency()

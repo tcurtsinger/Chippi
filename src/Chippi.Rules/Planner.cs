@@ -66,12 +66,12 @@ public static class Planner
                 {
                     WindowsPaths.ValidateComponent(rendered);
                     destination = WindowsPaths.Combine(folder, rendered);
-                    if (string.Equals(destination, source, StringComparison.OrdinalIgnoreCase)) throw new ArgumentException("Rename must change the name.");
+                    if (string.Equals(destination, source, StringComparison.OrdinalIgnoreCase)) return new(OperationKind.NoMatch, source, rule.Id, null, warnings.ToArray());
                 }
                 else
                 {
                     string targetFolder = WindowsPaths.IsAbsolute(rendered) ? WindowsPaths.NormalizeAbsolute(rendered) : WindowsPaths.Combine(folder, rendered);
-                    if (string.Equals(targetFolder.TrimEnd('\\'), folder.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase)) throw new ArgumentException("Destination must differ from source folder.");
+                    if (string.Equals(targetFolder.TrimEnd('\\'), folder.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase)) return new(OperationKind.NoMatch, source, rule.Id, null, warnings.ToArray());
                     destination = WindowsPaths.Combine(targetFolder, file.Name);
                 }
                 string leaf = WindowsPaths.Leaf(destination);

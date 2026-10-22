@@ -5,11 +5,14 @@ namespace Chippi.Rules;
 
 public static class IgnoreFile
 {
-    public static IReadOnlyList<string> Parse(string text)
+    public static IgnoreParseResult Parse(string text)
     {
         var result = new List<string>();
+        var errors = new List<IgnoreParseError>();
+        int lineNumber = 0;
         foreach (string line in text.Replace("\r", "", StringComparison.Ordinal).Split('\n'))
         {
+            lineNumber++;
             var pattern = new System.Text.StringBuilder();
             for (int i = 0; i < line.Length; i++)
             {
@@ -20,10 +23,13 @@ public static class IgnoreFile
             string value = pattern.ToString().Trim();
             if (value.Length == 0) continue;
             if (value.StartsWith('!') || value.Contains("**", StringComparison.Ordinal) || value.IndexOfAny(['?', '/', '\\']) >= 0)
-                throw new ArgumentException("Ignore patterns support file names and a single-star wildcard only.", nameof(text));
+            {
+                errors.Add(new(lineNumber, value, "Unsupported pattern"));
+                continue;
+            }
             result.Add(value);
         }
-        return result;
+        return new(result.ToArray(), errors.ToArray());
     }
 
     public static bool Matches(string name, string pattern)
@@ -56,7 +62,7 @@ public static class FileSafety
     {
         var parts = name.Split('.');
         return parts.Length >= 2 && Executables.Contains(parts[^1])
-            && (parts.Length >= 3 && Disguises.Contains(parts[^2]) || name.IndexOfAny(['\u202D', '\u202E']) >= 0 || parts[^2].EndsWith("  ", StringComparison.Ordinal));
+            && (parts.Length >= 3 && Disguises.Contains(parts[^2].Trim()) || name.IndexOfAny(['\u202D', '\u202E']) >= 0 || parts[^2].EndsWith("  ", StringComparison.Ordinal));
     }
 
     public static PlanWarning? Exclusion(FileFacts file)
