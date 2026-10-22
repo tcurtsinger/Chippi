@@ -250,6 +250,8 @@ Badge tints and borders are unchanged.
 
 Copy is sentence case, plain and short. State comes first and detail second: "Pinned · noise suppression on", "Held · remote-access installer", "9 features on · watching Downloads". No exclamation marks, no emoji.
 
+**The Bare Label Rule** (Travis, 2026-10-22). A label names the action and nothing else. Never repeat the app's name where its icon already says it, and never pad a label with explanation. The Explorer entry is "Organize", not "Organize with Chippi". Buttons, menu items, toggles and notices follow the same rule. When a label seems to need a sentence, the design is wrong; fix the design, not the copy.
+
 ## 4. Elevation
 
 Mostly flat, layered tonally, with colored glows for emphasis.
