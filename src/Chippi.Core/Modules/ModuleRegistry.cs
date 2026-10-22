@@ -311,7 +311,7 @@ public sealed class ModuleRegistry(ConfigStore config, IslandActivityHub island,
                 try
                 {
                     await entry.Module!.UninstallAsync(CancellationToken.None).ConfigureAwait(false);
-                    if (!stateChanged) _logger.LogInformation("{Id} persistent integration cleanup completed", entry.Id);
+                    if (!stateChanged) _logger.LogDebug("{Id} persistent integration cleanup completed", entry.Id);
                 }
                 catch (Exception ex) { _logger.LogError(ex, "{Id} failed to remove its persistent integration", entry.Id); }
             }
