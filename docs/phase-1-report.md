@@ -1,6 +1,6 @@
 # Chippi Phase 1 report
 
-Phase 1 is built and on GitHub at `main`: the tray icon and flyout, the settings window with the Features hub, the island with Gumdrop, the module system, packaging, and Keep awake as the reference module. Everything merged went through a second member's review first. Two checks are still open: any run on ARM64 hardware, and a real Setup.exe install and uninstall (Travis will run that on their other PC).
+Phase 1 is built and on GitHub at `main`: the tray icon and flyout, the settings window with the Features hub, the island with Gumdrop, the module system, packaging, and Keep awake as the reference module. Everything merged went through a second member's review first. One check is still open: any run on ARM64 hardware (no ARM64 machine available; accepted for now). The real Setup.exe install and uninstall passed on 2026-10-22.
 
 Brief: [phase-1-handoff.md](phase-1-handoff.md). Day-by-day decisions and follow-ups: [phase-1-tracker.md](phase-1-tracker.md).
 
@@ -71,7 +71,7 @@ At `main` `59ebf8c`:
 | Keep awake prevents sleep and releases on stop, uninstall and exit; island and pet states | Done | System power state `0x3` while on and `0x0` after stop and after uninstall, read without admin (Travis approved this in place of `powercfg /requests`) |
 | Themes, focus rings, keyboard, Narrator reads icon buttons | Done, with one gap | Themes and focus rings checked. Screen-reader names checked through UI Automation (the tree Narrator reads); Narrator itself wasn't run, by Travis's choice. Tab order checked in the flyout; no full keyboard-only walk of every settings page |
 | Run at startup; logs and settings in the documented folders | Done | Toggled through UI Automation in a dev profile, entry written and removed |
-| Velopack Setup.exe and portable package for both platforms | Done | Sizes and SHA-256 in `phase-1-release-artifacts.csv` (repo root, untracked). x64 portable runs; x64 Setup only checked with `--help` (no install); ARM64 not run |
+| Velopack Setup.exe and portable package for both platforms | Done | Sizes and SHA-256 in `phase-1-release-artifacts.csv` (repo root, untracked). x64 portable runs. x64 Setup installed, ran (tray, flyout, Keep awake, Run at startup) and uninstalled cleanly on the dev PC: the Run entry, app folder, uninstall entry and Start menu shortcut were all removed; settings.json stays so a reinstall restores settings. ARM64 not run |
 
 ## Deviations from DESIGN.md
 
@@ -84,12 +84,13 @@ Every deviation Travis reviewed on 2026-10-21 is now part of DESIGN.md (light ba
 
 ## Known issues
 
-- **Not run:** the taskbar on the top or side edges, a real Explorer restart (only the message was simulated), an exclusive-fullscreen game, PowerPoint presentation mode, browser F11, Narrator itself, any ARM64 execution, and a real Setup.exe install and uninstall (so the uninstall hook that removes the run-at-startup entry hasn't run live).
+- **Not run:** the taskbar on the top or side edges, a real Explorer restart (only the message was simulated), an exclusive-fullscreen game, PowerPoint presentation mode, browser F11, Narrator itself, and any ARM64 execution.
 - **Equalizer cost:** about 4.7% of one CPU core while media is live, against 0.5% at rest. Fine for Phase 1. Before real media (Phase 3), it should run from real audio levels at 20 fps or less and stop during silence.
 - **System-wide "busy":** on this PC, Windows sometimes reports a fullscreen app system-wide when none is in front. The island now ignores that flag and relies on the foreground window's bounds plus D3D fullscreen and presentation mode.
 - **Expanded island media** shows no elapsed or total time, because activities don't carry them yet, and the transport buttons do nothing. Both wait for real media in Phase 3.
 - **Tool tile names** longer than about 10 characters end in an ellipsis (approved; the tooltip and the screen-reader name carry the full name).
 - **Unsigned builds** will get a SmartScreen warning until code signing is set up.
+- **Install folder clash (fix pending):** Velopack installs to `%LOCALAPPDATA%\Chippi`, the same folder Chippi writes its logs to. Any run that isn't installed (portable, dev) creates that folder, and Setup then says "already installed" and offers Repair. Repair installs correctly. Fix: install to `%LOCALAPPDATA%\ChippiApp` by changing the package ID; logs stay in `%LOCALAPPDATA%\Chippi\logs`, which an uninstall will then leave behind.
 - **Stale install stub:** on the dev PC, `%LOCALAPPDATA%\Chippi` held a Velopack `Update.exe` and an empty `packages\` folder with no app and no uninstall entry. Setup then refused a fresh install ("already installed", offering Repair). Removing the two items cleared it. The cause is unconfirmed; the folder's timestamp only lines up with the packaging session. Don't run Setup.exe as a smoke test on a dev machine, and check that folder before install tests.
 - Optional hardening, not done: one retry in Keep awake's toggle if a timed session's release fails at the same moment, and a log line when Windows refuses to bring the flyout forward.
 - Review notes and helper scripts from this phase sit untracked in the repo root (`*-review.md`, `uia-*.ps1`, `screens/`). They aren't in git; delete or archive them when convenient.
