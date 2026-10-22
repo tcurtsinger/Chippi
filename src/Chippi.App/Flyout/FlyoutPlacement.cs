@@ -56,36 +56,47 @@ internal static class FlyoutPlacement
     public const double ScreenInset = 16;
 
     /// <summary>
-    /// Finds the monitor, taskbar edge and DPI for the tray icon. <paramref name="iconRect"/> comes
-    /// from <c>Shell_NotifyIconGetRect</c>; when it is unknown (icon in the closed overflow area)
-    /// <paramref name="fallbackPoint"/> (the click or the cursor) picks the monitor.
+    /// Uses the notification area's taskbar monitor, never the pointer's monitor. Closed overflow
+    /// icons can report stale or off-screen rectangles, so only visible shell surfaces are trusted.
     /// </summary>
-    public static TrayDisplay Describe(RECT? iconRect, System.Drawing.Point fallbackPoint)
+    public static TrayDisplay Describe(RECT? iconRect, out bool fallback)
     {
-        HMONITOR monitor;
-        int anchorX, anchorY;
-        if (iconRect is RECT icon)
+        var taskbar = PInvoke.FindWindow("Shell_TrayWnd", null);
+        var monitor = PInvoke.MonitorFromWindow(taskbar, MONITOR_FROM_FLAGS.MONITOR_DEFAULTTOPRIMARY);
+        RECT? barRect = !taskbar.IsNull && PInvoke.GetWindowRect(taskbar, out var bar) ? bar : null;
+        RECT? overflowRect = null;
+        foreach (string className in new[] { "TopLevelWindowForOverflowXamlIsland", "NotifyIconOverflowWindow" })
         {
-            monitor = PInvoke.MonitorFromRect(icon, MONITOR_FROM_FLAGS.MONITOR_DEFAULTTONEAREST);
-            anchorX = (icon.left + icon.right) / 2;
-            anchorY = (icon.top + icon.bottom) / 2;
+            var overflow = PInvoke.FindWindow(className, null);
+            if (!overflow.IsNull && PInvoke.IsWindowVisible(overflow)
+                && PInvoke.MonitorFromWindow(overflow, MONITOR_FROM_FLAGS.MONITOR_DEFAULTTONEAREST) == monitor
+                && PInvoke.GetWindowRect(overflow, out var panel))
+            {
+                overflowRect = panel;
+                break;
+            }
         }
-        else
-        {
-            monitor = PInvoke.MonitorFromPoint(fallbackPoint, MONITOR_FROM_FLAGS.MONITOR_DEFAULTTOPRIMARY);
-            anchorX = fallbackPoint.X;
-            anchorY = fallbackPoint.Y;
-        }
+        fallback = !IsTrustedIcon(iconRect, barRect, overflowRect);
 
         var info = new MONITORINFO { cbSize = (uint)Marshal.SizeOf<MONITORINFO>() };
         PInvoke.GetMonitorInfo(monitor, ref info);
         var bounds = PixelRect.From(info.rcMonitor);
         var work = PixelRect.From(info.rcWork);
 
+        int anchorX = fallback ? bounds.Right - 1 : (iconRect!.Value.left + iconRect.Value.right) / 2;
+        int anchorY = fallback ? bounds.Bottom - 1 : (iconRect!.Value.top + iconRect.Value.bottom) / 2;
         var (edge, inner) = FindTaskbar(bounds, work, anchorX, anchorY);
         int along = edge is TaskbarEdge.Bottom or TaskbarEdge.Top ? anchorX : anchorY;
         return new TrayDisplay(bounds, work, edge, inner, along, MonitorDpi.Of(monitor));
     }
+
+    /// <summary>A nonempty icon must fit entirely inside the taskbar or its visible overflow panel.</summary>
+    internal static bool IsTrustedIcon(RECT? icon, RECT? taskbar, RECT? overflow) =>
+        icon is RECT r && r.right > r.left && r.bottom > r.top
+        && (Contains(taskbar, r) || Contains(overflow, r));
+
+    private static bool Contains(RECT? container, RECT icon) => container is RECT r
+        && icon.left >= r.left && icon.top >= r.top && icon.right <= r.right && icon.bottom <= r.bottom;
 
     /// <summary>
     /// The card's top-left in physical pixels for a card of <paramref name="cardWidth"/> by
