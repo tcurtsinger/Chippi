@@ -287,6 +287,7 @@ public sealed class ModuleRegistry(ConfigStore config, IslandActivityHub island,
 
     private async Task SetInstalledCoreAsync(FeatureEntry entry, bool installed, CancellationToken ct)
     {
+        bool stateChanged = entry.IsInstalled != installed;
         entry.IsInstalled = installed;
         if (installed)
         {
@@ -307,11 +308,15 @@ public sealed class ModuleRegistry(ConfigStore config, IslandActivityHub island,
             }
             finally
             {
-                try { await entry.Module!.UninstallAsync(CancellationToken.None).ConfigureAwait(false); }
+                try
+                {
+                    await entry.Module!.UninstallAsync(CancellationToken.None).ConfigureAwait(false);
+                    if (!stateChanged) _logger.LogInformation("{Id} persistent integration cleanup completed", entry.Id);
+                }
                 catch (Exception ex) { _logger.LogError(ex, "{Id} failed to remove its persistent integration", entry.Id); }
             }
         }
-        _logger.LogInformation("{Id} {Action}", entry.Id, installed ? "installed" : "uninstalled");
+        if (stateChanged) _logger.LogInformation("{Id} {Action}", entry.Id, installed ? "installed" : "uninstalled");
     }
 
     private async Task StartModuleAsync(FeatureEntry entry, CancellationToken ct)
