@@ -68,7 +68,10 @@ public partial class IslandWindow : Window
     private static readonly TimeSpan ContentFadeOut = TimeSpan.FromMilliseconds(90);
     private static readonly TimeSpan HoverDelay = TimeSpan.FromMilliseconds(400);
 
+    private static readonly TimeSpan LeaveCheck = TimeSpan.FromMilliseconds(180);
+
     private readonly DispatcherTimer _hoverTimer;
+    private readonly DispatcherTimer _leaveTimer;
     private readonly DispatcherTimer _clockTimer;
     private IReadOnlyList<IslandActivity> _activities = [];
     private IslandState _state = IslandState.Resting;
@@ -90,7 +93,23 @@ public partial class IslandWindow : Window
         _hoverTimer.Tick += (_, _) =>
         {
             _hoverTimer.Stop();
-            Expand();
+            if (PointerOverIsland())
+                Expand();
+        };
+        // Resizing a layered window under the pointer can produce a spurious mouse-leave before the new
+        // frame is on screen, so a leave only collapses once the pointer is really outside the island.
+        _leaveTimer = new DispatcherTimer { Interval = LeaveCheck };
+        _leaveTimer.Tick += (_, _) =>
+        {
+            if (!_expandRequested || PointerOverIsland() || DebugMenu.IsOpen)
+            {
+                if (!_expandRequested)
+                    _leaveTimer.Stop();
+                return; // keep checking while the pointer is over it (WPF may not report the next leave)
+            }
+            _leaveTimer.Stop();
+            _expandRequested = false;
+            Refresh();
         };
         _clockTimer = new DispatcherTimer();
         _clockTimer.Tick += (_, _) => UpdateClock();
@@ -103,11 +122,8 @@ public partial class IslandWindow : Window
         Island.MouseLeave += (_, _) =>
         {
             _hoverTimer.Stop();
-            if (_expandRequested && !DebugMenu.IsOpen)
-            {
-                _expandRequested = false;
-                Refresh();
-            }
+            if (_expandRequested)
+                _leaveTimer.Start();
         };
         Island.MouseLeftButtonUp += (_, e) =>
         {
@@ -128,11 +144,8 @@ public partial class IslandWindow : Window
         };
         DebugMenu.Closed += (_, _) =>
         {
-            if (_expandRequested && !Island.IsMouseOver)
-            {
-                _expandRequested = false;
-                Refresh();
-            }
+            if (_expandRequested)
+                _leaveTimer.Start();
         };
         Island.SizeChanged += (_, _) => UpdateCornerRadius();
         PlayPauseButton.Click += (_, _) => TogglePlayGlyph();
@@ -237,6 +250,7 @@ public partial class IslandWindow : Window
         else if (!visible && IsVisible)
         {
             _hoverTimer.Stop();
+            _leaveTimer.Stop();
             DebugMenu.IsOpen = false;
             _expandRequested = false;
             Hide();
@@ -297,6 +311,16 @@ public partial class IslandWindow : Window
         : _activities.Count > 0 ? IslandState.Live
         : IslandState.Resting;
 
+    /// <summary>Whether the pointer is inside the island's current bounds, read from the system cursor (physical pixels).</summary>
+    private bool PointerOverIsland()
+    {
+        if (!IsVisible || PresentationSource.FromVisual(Island) is null || !PInvoke.GetCursorPos(out var cursor))
+            return false;
+        var topLeft = Island.PointToScreen(new Point(0, 0));
+        var bottomRight = Island.PointToScreen(new Point(Island.ActualWidth, Island.ActualHeight));
+        return cursor.X >= topLeft.X && cursor.X < bottomRight.X && cursor.Y >= topLeft.Y && cursor.Y < bottomRight.Y;
+    }
+
     private void Expand()
     {
         if (_expandRequested || !IsVisible)
@@ -337,6 +361,11 @@ public partial class IslandWindow : Window
         ExpandedLayer.IsHitTestVisible = target == IslandState.Expanded;
         double liveOpacity = target == IslandState.Live ? 1 : 0;
         double expandedOpacity = target == IslandState.Expanded ? 1 : 0;
+        // Inactive layers end up Hidden (not Collapsed, so they still measure): screen readers skip them.
+        if (liveOpacity > 0)
+            LiveLayer.Visibility = Visibility.Visible;
+        if (expandedOpacity > 0)
+            ExpandedLayer.Visibility = Visibility.Visible;
 
         if (target == IslandState.Expanded)
             StartClock();
@@ -353,6 +382,10 @@ public partial class IslandWindow : Window
             Set(Pet, Gumdrop.SizeProperty, petSize);
             Set(LiveLayer, OpacityProperty, liveOpacity);
             Set(ExpandedLayer, OpacityProperty, expandedOpacity);
+            if (liveOpacity == 0)
+                LiveLayer.Visibility = Visibility.Hidden;
+            if (expandedOpacity == 0)
+                ExpandedLayer.Visibility = Visibility.Hidden;
             UpdateEqualizer();
             return;
         }
@@ -374,17 +407,25 @@ public partial class IslandWindow : Window
         Pet.BeginAnimation(Canvas.LeftProperty, new DoubleAnimation(petLeft, new Duration(Morph)) { EasingFunction = ease }, HandoffBehavior.SnapshotAndReplace);
         Pet.BeginAnimation(Canvas.TopProperty, new DoubleAnimation(petTop, new Duration(Morph)) { EasingFunction = ease }, HandoffBehavior.SnapshotAndReplace);
         Pet.BeginAnimation(Gumdrop.SizeProperty, new DoubleAnimation(petSize, new Duration(Morph)) { EasingFunction = ease }, HandoffBehavior.SnapshotAndReplace);
-        FadeLayer(LiveLayer, liveOpacity);
-        FadeLayer(ExpandedLayer, expandedOpacity);
+        FadeLayer(LiveLayer, liveOpacity, generation);
+        FadeLayer(ExpandedLayer, expandedOpacity, generation);
         UpdateEqualizer();
     }
 
-    /// <summary>Outgoing content fades quickly; incoming content fades in once the surface has mostly reached its size.</summary>
-    private static void FadeLayer(UIElement layer, double to)
+    /// <summary>Outgoing content fades quickly, then hides; incoming content fades in once the surface has mostly reached its size.</summary>
+    private void FadeLayer(UIElement layer, double to, int generation)
     {
         var animation = to > 0
             ? new DoubleAnimation(to, new Duration(ContentFadeIn)) { BeginTime = TimeSpan.FromMilliseconds(Morph.TotalMilliseconds * 0.55) }
             : new DoubleAnimation(to, new Duration(ContentFadeOut));
+        if (to == 0)
+        {
+            animation.Completed += (_, _) =>
+            {
+                if (generation == _morphGeneration)
+                    layer.Visibility = Visibility.Hidden;
+            };
+        }
         layer.BeginAnimation(OpacityProperty, animation, HandoffBehavior.SnapshotAndReplace);
     }
 
@@ -401,7 +442,9 @@ public partial class IslandWindow : Window
         {
             case IslandState.Live:
                 LiveText.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-                double content = LiveTextInset + LiveText.DesiredSize.Width + (Equalizer.Visibility == Visibility.Visible ? EqualizerWidth : 0) + LiveRightInset + 2;
+                // +2: layout rounding can leave the star column a fraction short, and trimming would then cut a word.
+                double text = Math.Ceiling(LiveText.DesiredSize.Width) + 2;
+                double content = LiveTextInset + text + (Equalizer.Visibility == Visibility.Visible ? EqualizerWidth : 0) + LiveRightInset + 2;
                 return new Size(Math.Clamp(Math.Ceiling(content), RestingWidth, LiveMaxWidth), LiveHeight);
             case IslandState.Expanded:
                 ExpandedLayer.Measure(new Size(ExpandedWidth - 2, double.PositiveInfinity));
@@ -615,9 +658,39 @@ public partial class IslandWindow : Window
         UpdateEqualizer();
     });
 
+#if DEBUG
+    /// <summary>Debug builds: hold the island expanded (or release it) without a pointer, for snapshots.</summary>
+    internal void ForceExpanded(bool expanded)
+    {
+        _expandRequested = expanded && IsVisible;
+        Refresh();
+    }
+
+    /// <summary>Debug builds: renders the window's own pixels (island, lift, transparent surround) over a backdrop color, at 1x.</summary>
+    internal void SaveSnapshot(string path, Color backdrop)
+    {
+        double width = Root.ActualWidth, height = Root.ActualHeight;
+        var content = new System.Windows.Media.Imaging.RenderTargetBitmap((int)Math.Ceiling(width), (int)Math.Ceiling(height), 96, 96, PixelFormats.Pbgra32);
+        content.Render(Root);
+        var visual = new DrawingVisual();
+        using (var dc = visual.RenderOpen())
+        {
+            dc.DrawRectangle(new SolidColorBrush(backdrop), null, new Rect(0, 0, content.PixelWidth, content.PixelHeight));
+            dc.DrawImage(content, new Rect(0, 0, content.PixelWidth, content.PixelHeight));
+        }
+        var image = new System.Windows.Media.Imaging.RenderTargetBitmap(content.PixelWidth, content.PixelHeight, 96, 96, PixelFormats.Pbgra32);
+        image.Render(visual);
+        var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
+        encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(image));
+        using var stream = System.IO.File.Create(path);
+        encoder.Save(stream);
+    }
+#endif
+
     protected override void OnClosed(EventArgs e)
     {
         _hoverTimer.Stop();
+        _leaveTimer.Stop();
         _clockTimer.Stop();
         base.OnClosed(e);
     }

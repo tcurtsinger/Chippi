@@ -407,6 +407,11 @@ public class Gumdrop : UserControl
 
     private static TimeSpan NextBlinkInterval() => TimeSpan.FromMilliseconds(Random.Shared.Next(4000, 7001));
 
+#if DEBUG
+    /// <summary>Debug builds: blink now, for the motion sheet.</summary>
+    internal void BlinkNow() => Blink();
+#endif
+
     /// <summary>The eyes scale to 10% height and back within 120ms.</summary>
     private void Blink()
     {

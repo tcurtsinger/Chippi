@@ -87,9 +87,92 @@ public sealed class IslandHost : IDisposable
         int sheet = Array.FindIndex(args, a => string.Equals(a, "--pet-sheet", StringComparison.OrdinalIgnoreCase));
         if (_shell.DebugMode && sheet >= 0 && sheet + 1 < args.Length)
             PetSheet.Save(args[sheet + 1]);
+        int motion = Array.FindIndex(args, a => string.Equals(a, "--pet-motion", StringComparison.OrdinalIgnoreCase));
+        if (_shell.DebugMode && motion >= 0 && motion + 1 < args.Length)
+            _ = SaveMotionAsync(args[motion + 1]);
+        int shots = Array.FindIndex(args, a => string.Equals(a, "--island-shots", StringComparison.OrdinalIgnoreCase));
+        if (_shell.DebugMode && shots >= 0 && shots + 1 < args.Length)
+            _ = SaveIslandShotsAsync(args[shots + 1]);
 #endif
         _logger.LogInformation("Island started");
     }
+
+#if DEBUG
+    private async Task SaveMotionAsync(string directory)
+    {
+        try
+        {
+            await PetSheet.SaveMotionAsync(directory);
+            _logger.LogInformation("Pet motion sheets saved to {Directory}", directory);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Pet motion sheets failed");
+        }
+    }
+
+    /// <summary>
+    /// Debug builds (<c>--island-shots &lt;dir&gt;</c>): steps the island through its states with fake
+    /// activities and saves the window's pixels, once with the app in the dark theme and once in
+    /// light (the island must look the same), over the matching backdrop color.
+    /// </summary>
+    private async Task SaveIslandShotsAsync(string directory)
+    {
+        try
+        {
+            Directory.CreateDirectory(directory);
+            var debug = _shell.Island.CreatePublisher(DebugModuleId);
+            var keepAwake = _shell.Island.CreatePublisher(KeepAwakeModuleId);
+            var original = _shell.Config.GetSection<AppSettings>(AppSettings.SectionName).Theme;
+            var settle = TimeSpan.FromMilliseconds(900);
+            await Task.Delay(1200);
+            foreach (var (theme, backdrop) in new[] { (ThemePreference.Dark, "#0A0D18"), (ThemePreference.Light, "#E9EDF4") })
+            {
+                Chippi.UI.Themes.ThemeManager.Apply(theme);
+                var color = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(backdrop);
+                string suffix = theme.ToString().ToLowerInvariant();
+                void Shot(string name) => _window.SaveSnapshot(Path.Combine(directory, $"ws3-island-{name}-{suffix}.png"), color);
+
+                _shell.Island.ClearModule(DebugModuleId);
+                keepAwake.Clear(DebugWideAwakeKey);
+                await Task.Delay(settle);
+                Shot("resting");
+
+                debug.Publish(new IslandActivity("media", IslandActivityKind.Media, "Weekend Mix", "Spotify") { Progress = 0.38 });
+                await Task.Delay(settle);
+                Shot("live");
+
+                _shell.Island.ClearModule(DebugModuleId);
+                keepAwake.Publish(new IslandActivity(DebugWideAwakeKey, IslandActivityKind.Status, "Keep awake", "Until 6:00 PM"));
+                await Task.Delay(settle);
+                Shot("live-keepawake");
+                keepAwake.Clear(DebugWideAwakeKey);
+
+                debug.Publish(new IslandActivity("media", IslandActivityKind.Media, "Weekend Mix", "Spotify") { Progress = 0.38 });
+                debug.Publish(new IslandActivity("timer", IslandActivityKind.Timer, "Focus timer", "18:42") { Progress = 0.4 });
+                debug.Publish(new IslandActivity("stash", IslandActivityKind.Stash, "invoice-october.pdf", "Documents"));
+                debug.Publish(new IslandActivity("agent", IslandActivityKind.Agent, "Claude Code", "62% of 5h · resets 4:10 PM") { Progress = 0.62 });
+                debug.Publish(new IslandActivity("status", IslandActivityKind.Status, "Cleaning mode", "Keyboard paused"));
+                await Task.Delay(TimeSpan.FromMilliseconds(300));
+                _window.ForceExpanded(true);
+                await Task.Delay(settle);
+                Shot("expanded");
+                debug.ReportSuccess("Snapshot");
+                await Task.Delay(TimeSpan.FromMilliseconds(500));
+                Shot("expanded-celebrating");
+                _window.ForceExpanded(false);
+                _shell.Island.ClearModule(DebugModuleId);
+                await Task.Delay(TimeSpan.FromSeconds(3));
+            }
+            Chippi.UI.Themes.ThemeManager.Apply(original);
+            _logger.LogInformation("Island snapshots saved to {Directory}", directory);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Island snapshots failed");
+        }
+    }
+#endif
 
     private void ScheduleRefresh()
     {
@@ -170,9 +253,36 @@ public sealed class IslandHost : IDisposable
                 _shell.Island.ClearModule(DebugModuleId);
                 keepAwake.Clear(DebugWideAwakeKey);
             }),
+            // Change settings the way Settings › Island & pet does (ConfigStore.SetSection), to exercise the live re-read.
+            ("Next pet color", () => UpdateSettings(s => s.PetColor = (PetColor)(((int)s.PetColor + 1) % Enum.GetValues<PetColor>().Length))),
+            ("Hide island for 3s", () =>
+            {
+                UpdateSettings(s => s.IslandEnabled = false);
+                var restore = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
+                restore.Tick += (_, _) =>
+                {
+                    restore.Stop();
+                    UpdateSettings(s => s.IslandEnabled = true);
+                };
+                restore.Start();
+            }),
             null,
             ("Quit Chippi", () => _shell.Commands.Quit()),
         ];
+    }
+
+    private void UpdateSettings(Action<AppSettings> change)
+    {
+        var settings = _shell.Config.GetSection<AppSettings>(AppSettings.SectionName);
+        change(settings);
+        try
+        {
+            _shell.Config.SetSection(AppSettings.SectionName, settings);
+        }
+        catch (IOException ex)
+        {
+            _logger.LogWarning(ex, "Debug settings change not saved");
+        }
     }
 
     public void Dispose()
