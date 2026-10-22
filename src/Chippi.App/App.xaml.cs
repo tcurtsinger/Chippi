@@ -37,6 +37,7 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         EnsureWindowsDirectoryEnvironment();
+        Velopack.VelopackApp.Build().Run();
         base.OnStartup(e);
 
         // Log any unhandled failure so a silent crash is never a mystery, and keep the tray app
