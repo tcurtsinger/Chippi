@@ -43,7 +43,15 @@ public sealed class FeatureEntry
 
     internal ModuleUi? Ui { get; set; }
 
-    internal Notifications.ModuleNotifier? Notifier { get; set; }
+    /// <summary>
+    /// The running module's notices, for the app-wide Settings › Notifications page: its declared
+    /// <see cref="Notifications.INotifier.Kinds"/>, and <see cref="Notifications.INotifier.PlacesFor"/> /
+    /// <see cref="Notifications.INotifier.SetPlaces"/> for each. Null while the feature is not running.
+    /// Places are saved with the module's settings, so they survive uninstall like the rest.
+    /// </summary>
+    public Notifications.INotifier? Notifier => RunningNotifier;
+
+    internal Notifications.ModuleNotifier? RunningNotifier { get; set; }
 }
 
 /// <summary>The "features" section of settings.json.</summary>
@@ -310,7 +318,7 @@ public sealed class ModuleRegistry(ConfigStore config, IslandActivityHub island,
         };
 
         entry.Ui = ui;
-        entry.Notifier = notifier;
+        entry.RunningNotifier = notifier;
         try
         {
             // Inside the isolation boundary: an unwritable data folder fails this module only.
@@ -370,8 +378,8 @@ public sealed class ModuleRegistry(ConfigStore config, IslandActivityHub island,
         entry.IsRunning = false;
         entry.Ui?.Clear();
         entry.Ui = null;
-        entry.Notifier?.Dispose(); // pending island expiries belong to this lifetime only
-        entry.Notifier = null;
+        entry.RunningNotifier?.Dispose(); // pending island expiries belong to this lifetime only
+        entry.RunningNotifier = null;
         island.ClearModule(entry.Id);
         _services.Activation.RemoveModule(entry.Id);
     }
