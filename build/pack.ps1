@@ -25,7 +25,7 @@ try {
             if (!(Test-Path -LiteralPath (Join-Path $staging $required))) { throw "Missing published file: $required" }
         }
         # Offline packaging: no update feed, framework downloads, signing or upload commands.
-        dotnet tool run vpk -- pack --packId Chippi --packVersion $Version --packDir $staging --mainExe Chippi.exe --runtime $rid --channel $rid --outputDir $output --packAuthors 'Chippi contributors' --packTitle Chippi --skip-updates --yes
+        dotnet tool run vpk -- pack --packId ChippiApp --packVersion $Version --packDir $staging --mainExe Chippi.exe --runtime $rid --channel $rid --outputDir $output --packAuthors 'Chippi contributors' --packTitle Chippi --skip-updates --yes
         if ($LASTEXITCODE -ne 0) { throw "Velopack failed for $rid. Stop and report; do not switch tools." }
         $setup = @(Get-ChildItem -LiteralPath $output -Filter '*Setup.exe')
         $portable = @(Get-ChildItem -LiteralPath $output -Filter '*Portable.zip')

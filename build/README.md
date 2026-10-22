@@ -43,3 +43,7 @@ Artifacts (bytes):
 These artifacts package the WS5 worktree before the other workstreams merge. Repack after integration; this is packaging/startup evidence, not a finished Phase 1 application.
 
 Official references: https://docs.velopack.io/getting-started/csharp and https://docs.velopack.io/reference/cli/content/vpk-windows
+
+## Install directory separation (2026-10-22)
+
+The Velopack package ID is ChippiApp, so the default install directory is %LOCALAPPDATA%\ChippiApp. The Windows display title remains Chippi. Logs remain at %LOCALAPPDATA%\Chippi\logs. New artifacts use the ChippiApp- prefix; older Chippi- artifacts do not contain this fix. Keep the install directory separate from logs because Velopack prompts to repair any nonempty target folder. This package-ID change does not migrate older Chippi installs; uninstall the old package before using the new one.
