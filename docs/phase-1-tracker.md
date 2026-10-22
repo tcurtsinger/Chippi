@@ -35,7 +35,8 @@ Specs per workstream: [phase-1-workstreams.md](phase-1-workstreams.md).
 
 ## Follow-ups
 - Done (558121f, merged): ConfigStore.SectionChanged, SingleInstance foreground handoff, preview ground shadow, tool tile tooltip.
-- Karl: island drops its settings.json watcher for SectionChanged; WS1 drops its cross-process focus workaround and the real second-launch focus is checked.
+- Done (f7bc49d, merged): island listens to SectionChanged; flyout focus workaround removed; real second-launch focus verified by Karl.
+- Optional: log a warning when SetForegroundWindow is refused (FlyoutWindow, TrayMenuWindow), for future focus reports.
 - Optional: one retry in Keep awake's ToggleAsync if a timed release fails at the same moment as a toggle.
 - Karl: repack both RIDs from integrated main; confirm both portable builds and x64 Setup launch.
 - Lead: measure CPU of the 30 fps equalizer on the transparent island window; keyboard and Narrator pass on flyout, settings and island; 150% and 200% scaling.
