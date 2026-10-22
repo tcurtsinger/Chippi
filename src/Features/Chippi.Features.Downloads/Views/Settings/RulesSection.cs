@@ -24,17 +24,11 @@ internal sealed class RulesSection : UserControl
     private static readonly (string Label, long Bytes)[] Units = [("KB", 1024), ("MB", 1024 * 1024), ("GB", 1024L * 1024 * 1024)];
 
     private readonly DownloadsModule _module;
-    /// <summary>The drafts on screen, in list order.</summary>
-    private readonly List<RuleSetting> _rules;
 
-    /// <summary>
-    /// What is saved and runs: each rule's last version with every field valid. A draft with a
-    /// problem never replaces it, so an edit in progress can't broaden or drop a rule (Karl's review).
-    /// </summary>
-    private readonly Dictionary<string, RuleSetting> _committed = new(StringComparer.Ordinal);
+    /// <summary>Drafts on screen and the committed rules that are saved and tested.</summary>
+    private readonly RuleDrafts _drafts;
 
-    /// <summary>Fields that show a problem right now, per rule id.</summary>
-    private readonly Dictionary<string, HashSet<string>> _fieldErrors = new(StringComparer.Ordinal);
+    private List<RuleSetting> _rules => _drafts.Drafts;
     private readonly StackPanel _list = new();
     private readonly TextBox _test = Ui.Field(name: "Test a file name");
     private readonly StackPanel _testResult = Ui.Row();
@@ -49,9 +43,7 @@ internal sealed class RulesSection : UserControl
     public RulesSection(DownloadsModule module)
     {
         _module = module;
-        _rules = [.. module.Settings.Rules.OrderBy(r => r.Order).Select(r => r.Clone())];
-        foreach (var rule in _rules)
-            _committed[rule.Id] = rule.Clone(); // as saved, even a hand-edited invalid one: opening the page never drops it
+        _drafts = new RuleDrafts(module.Settings.Rules);
         _dropLine.SetResourceReference(Border.BackgroundProperty, "AccentGradientBrush");
 
         _test.Width = 300;
@@ -86,6 +78,7 @@ internal sealed class RulesSection : UserControl
 
     private void Render(string? focusHandleOf = null)
     {
+        _drafts.RevertProblems(); // editors are rebuilt from drafts
         _list.Children.Clear();
         _badges.Clear();
         if (_rules.Count == 0)
@@ -213,7 +206,7 @@ internal sealed class RulesSection : UserControl
     {
         var rule = new RuleSetting
         {
-            Id = Guid.NewGuid().ToString("N")[..8],
+            Id = RuleDrafts.NewId(),
             Name = "New rule",
             Extensions = ["pdf"],
             Action = RuleActionKind.Move,
@@ -402,12 +395,11 @@ internal sealed class RulesSection : UserControl
 
         // Duplicate, Delete
         var duplicate = Ui.Button("Duplicate", name: $"Duplicate {rule.Name}");
+        duplicate.IsEnabled = _drafts.IsCommitted(rule.Id); // a rule that has never been valid has nothing to copy
         duplicate.Click += (_, _) =>
         {
-            var copy = rule.Clone();
-            copy.Id = Guid.NewGuid().ToString("N")[..8];
-            copy.Name = $"{rule.Name} copy";
-            _rules.Insert(_rules.IndexOf(rule) + 1, copy);
+            if (_drafts.Duplicate(rule) is not { } copy)
+                return;
             _open = copy.Id;
             Save();
             Render();
@@ -415,9 +407,7 @@ internal sealed class RulesSection : UserControl
         var delete = Ui.Button("Delete", icon: LucideIcons.Trash, name: $"Delete {rule.Name}");
         delete.Click += (_, _) =>
         {
-            _rules.Remove(rule);
-            _committed.Remove(rule.Id); // only Delete removes a saved rule
-            _fieldErrors.Remove(rule.Id);
+            _drafts.Remove(rule);
             _open = null;
             Save();
             RunTest();
@@ -515,7 +505,7 @@ internal sealed class RulesSection : UserControl
         {
             string folder = SampleFolder();
             // What would actually run: the committed rules, not drafts mid-edit.
-            var rules = Valid(Effective()).Select((r, i) => r.ToRule() with { Order = i }).ToList();
+            var rules = RuleDrafts.Valid(_drafts.Effective()).Select((r, i) => r.ToRule() with { Order = i }).ToList();
             PlannedOperation plan;
             try
             {
@@ -556,39 +546,18 @@ internal sealed class RulesSection : UserControl
     /// <summary>Commits every fully valid draft, then saves after a short pause.</summary>
     private void Save()
     {
-        Commit();
+        _drafts.Commit();
         _saveTimer.Stop();
         _saveTimer.Start();
     }
-
-    private void Commit()
-    {
-        var valid = Valid(_rules).Where(r => !_fieldErrors.TryGetValue(r.Id, out var errors) || errors.Count == 0).ToHashSet();
-        foreach (var draft in _rules)
-        {
-            if (valid.Contains(draft))
-                _committed[draft.Id] = draft.Clone();
-            else if (_committed.TryGetValue(draft.Id, out var saved))
-                saved.Enabled = draft.Enabled; // on/off applies even while another field is being fixed
-        }
-    }
-
-    /// <summary>The committed rules in the on-screen order. A new rule that has never been valid is not in it.</summary>
-    private List<RuleSetting> Effective() =>
-        [.. _rules.Where(r => _committed.ContainsKey(r.Id)).Select((r, i) =>
-        {
-            var rule = _committed[r.Id].Clone();
-            rule.Order = i;
-            return rule;
-        })];
 
     /// <summary>Saves the committed rules in list order. A draft with a problem leaves its last valid version in place.</summary>
     private void SaveNow()
     {
         _saveTimer.Stop();
-        Commit();
+        _drafts.Commit();
         var settings = _module.Settings.Clone();
-        settings.Rules = Effective();
+        settings.Rules = _drafts.Effective();
         try
         {
             _module.SaveSettings(settings);
@@ -597,14 +566,6 @@ internal sealed class RulesSection : UserControl
         {
             // The organizer stopped; the page goes with it.
         }
-    }
-
-    private static IEnumerable<RuleSetting> Valid(IReadOnlyList<RuleSetting> rules)
-    {
-        // List order is the order: duplicate or missing Order values in settings.json never invalidate a rule here.
-        var all = rules.Select((r, i) => r.ToRule() with { Order = i }).ToList();
-        var bad = RuleValidator.Validate(all).Select(e => e.RuleId).ToHashSet(StringComparer.Ordinal);
-        return rules.Where(r => !bad.Contains(r.Id) && (r.Action == RuleActionKind.Hold || RuleChecks.Template(r.Template ?? "", r.Action == RuleActionKind.Rename) is null));
     }
 
     // ---- helpers
@@ -619,12 +580,7 @@ internal sealed class RulesSection : UserControl
     /// <summary>Shows or clears a field's problem and remembers it, so the rule is not committed while it shows.</summary>
     private void Flag(RuleSetting rule, string field, TextBlock block, string? message)
     {
-        if (!_fieldErrors.TryGetValue(rule.Id, out var errors))
-            _fieldErrors[rule.Id] = errors = [];
-        if (message is null)
-            errors.Remove(field);
-        else
-            errors.Add(field);
+        _drafts.SetError(rule.Id, field, message is not null);
         Show(block, message);
     }
 
