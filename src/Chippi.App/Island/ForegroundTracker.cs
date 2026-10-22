@@ -2,6 +2,7 @@
 // Copyright (C) Chippi contributors
 
 using System.Windows.Threading;
+using Microsoft.Extensions.Logging;
 using Windows.Win32;
 using Windows.Win32.Foundation;
 using Windows.Win32.Graphics.Gdi;
@@ -24,6 +25,7 @@ internal sealed class ForegroundTracker : IDisposable
     private const int WS_CAPTION = 0x00C00000;
 
     private readonly Dispatcher _dispatcher;
+    private readonly ILogger _logger;
     private readonly WINEVENTPROC _callback; // kept alive for as long as the hooks exist
     private HWINEVENTHOOK _foregroundHook;
     private HWINEVENTHOOK _locationHook;
@@ -32,9 +34,10 @@ internal sealed class ForegroundTracker : IDisposable
     private bool _pending;
     private bool _disposed;
 
-    public ForegroundTracker(Dispatcher dispatcher)
+    public ForegroundTracker(Dispatcher dispatcher, ILogger logger)
     {
         _dispatcher = dispatcher;
+        _logger = logger;
         _callback = OnWinEvent;
     }
 
@@ -81,19 +84,35 @@ internal sealed class ForegroundTracker : IDisposable
         if (monitor == default)
             monitor = MonitorUnderPointer();
 
-        bool fullscreen = NotificationStateSaysFullscreen() || (!foreground.IsNull && !isShell && CoversMonitor(foreground, monitor));
+        var state = NotificationState();
+        string? reason =
+            !foreground.IsNull && !isShell && CoversMonitor(foreground, monitor) ? $"the foreground window ({cls}) covers its monitor"
+            : state is QUERY_USER_NOTIFICATION_STATE.QUNS_RUNNING_D3D_FULL_SCREEN ? "a D3D fullscreen app is running (QUNS_RUNNING_D3D_FULL_SCREEN)"
+            : state is QUERY_USER_NOTIFICATION_STATE.QUNS_PRESENTATION_MODE ? "presentation mode is on (QUNS_PRESENTATION_MODE)"
+            : null;
+
+        bool fullscreen = reason is not null;
+        if (fullscreen != FullscreenInFront)
+        {
+            if (fullscreen)
+                _logger.LogInformation("Island hidden for fullscreen: {Reason}", reason);
+            else
+                _logger.LogInformation("Island shown again: nothing fullscreen in front (foreground {Class}, notification state {State})", cls, state);
+        }
 
         Monitor = monitor;
         FullscreenInFront = fullscreen;
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
-    /// <summary>SHQueryUserNotificationState: busy (fullscreen app), D3D fullscreen, or presentation mode.</summary>
-    internal static bool NotificationStateSaysFullscreen() =>
-        PInvoke.SHQueryUserNotificationState(out var state).Succeeded
-        && state is QUERY_USER_NOTIFICATION_STATE.QUNS_BUSY
-            or QUERY_USER_NOTIFICATION_STATE.QUNS_RUNNING_D3D_FULL_SCREEN
-            or QUERY_USER_NOTIFICATION_STATE.QUNS_PRESENTATION_MODE;
+    /// <summary>
+    /// SHQueryUserNotificationState, or 0 when it fails. Only D3D fullscreen and presentation mode
+    /// hide the island: QUNS_BUSY alone is not trusted, because some systems report it while an
+    /// ordinary maximized window is in front. A borderless fullscreen window is caught by
+    /// <see cref="CoversMonitor"/> instead.
+    /// </summary>
+    internal static QUERY_USER_NOTIFICATION_STATE NotificationState() =>
+        PInvoke.SHQueryUserNotificationState(out var state).Succeeded ? state : 0;
 
     /// <summary>
     /// The window covers its whole monitor and is not merely maximized: a maximized captioned window

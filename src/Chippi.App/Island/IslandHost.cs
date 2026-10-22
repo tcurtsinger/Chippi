@@ -41,7 +41,7 @@ public sealed class IslandHost : IDisposable
         _logger = shell.LoggerFactory.CreateLogger("Island");
         _dispatcher = Dispatcher.CurrentDispatcher;
         _window = new IslandWindow();
-        _tracker = new ForegroundTracker(_dispatcher);
+        _tracker = new ForegroundTracker(_dispatcher, _logger);
         _settingsDebounce = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
         _settingsDebounce.Tick += (_, _) =>
         {
