@@ -124,7 +124,18 @@ public partial class App : Application
     /// </summary>
     private bool ComposeShell(ShellContext shell)
     {
-        // [WS4] Real modules: shell.Registry.Register(new ...Module());
+        // [WS4] Real modules.
+        var keepAwake = new Chippi.Features.KeepAwake.KeepAwakeModule();
+        shell.Registry.Register(keepAwake);
+        Exit += (_, _) => keepAwake.ReleaseOnExit();
+#if DEBUG
+        // Temporary WS4 host: only DebugMode bypasses the absent WS1 tray.
+        if (shell.DebugMode)
+        {
+            Chippi.Features.KeepAwake.KeepAwakeDebugHost.Show(keepAwake, shell.Registry, shell.Commands.Quit);
+            return true;
+        }
+#endif
 
         // [WS2] "Coming soon" placeholders for the PLAN.md features.
 
