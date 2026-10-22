@@ -12,9 +12,23 @@ namespace Chippi.Features.Downloads.Views.Tidy;
 public enum TidyRowAction { None, Review, Retry, Undo, RetryUndo }
 
 /// <summary>A recent row's immutable display state; no file operation is decided by a visual toggle.</summary>
-public sealed record TidyRow(string Name, string Detail, string Folder, string Source,
-    bool IsHeld, bool IsWaiting, bool IsFailed, TidyRowAction Action, long? OperationId = null, string Age = "")
+public sealed class TidyRow(string name, string detail, string folder, string source,
+    bool isHeld, bool isWaiting, bool isFailed, TidyRowAction action, long? operationId = null, string age = "")
 {
+    // UI Automation peers track item identity, so refreshed rows must not compare equal to detached containers.
+    public string Name { get; } = name;
+    public string Detail { get; } = detail;
+    public string Folder { get; } = folder;
+    public string Source { get; } = source;
+    public bool IsHeld { get; } = isHeld;
+    public bool IsWaiting { get; } = isWaiting;
+    public bool IsFailed { get; } = isFailed;
+    public TidyRowAction Action { get; } = action;
+    public long? OperationId { get; } = operationId;
+    public string Age { get; } = age;
+
+    public override string ToString() => $"{Name}. {Detail}";
+
     public string ActionLabel => Action switch
     {
         TidyRowAction.Review => "Review",
@@ -72,11 +86,4 @@ internal static class TidyProjection
 
     private static string Age(TimeSpan age) => age.TotalMinutes < 1 ? "now" : age.TotalHours < 1 ? $"{(int)age.TotalMinutes}m" :
         age.TotalDays < 1 ? $"{(int)age.TotalHours}h" : $"{(int)age.TotalDays}d";
-
-    /// <summary>Copy folders before editing so SaveSettings can compare old and new modes and reset the baseline.</summary>
-    public static DownloadsSettings Copy(DownloadsSettings settings) => new()
-    {
-        Initialized = settings.Initialized, HistoryDays = settings.HistoryDays, Rules = [.. settings.Rules],
-        Folders = [.. settings.Folders.Select(f => new WatchedFolder { Path = f.Path, Mode = f.Mode, GraceSeconds = f.GraceSeconds, BaselineUtc = f.BaselineUtc })],
-    };
 }

@@ -5,7 +5,6 @@
  AutomationProperties.Name="Tidy" Loaded="OnLoaded" Unloaded="OnUnloaded">
  <UserControl.Resources>
   <BooleanToVisibilityConverter x:Key="Visible" />
-  <SolidColorBrush x:Key="TidyWarningTextBrush" Color="#F5A64B" />
   <Style x:Key="ModeItem" TargetType="ListBoxItem" BasedOn="{StaticResource SegmentItemStyle}">
    <Setter Property="Height" Value="28"/><Setter Property="FontSize" Value="12"/>
   </Style>
@@ -74,8 +73,8 @@
       </Grid>
      </Border>
      <DataTemplate.Triggers>
-      <DataTrigger Binding="{Binding IsHeld}" Value="True"><Setter TargetName="Row" Property="BorderBrush" Value="{DynamicResource WarningBorder45Brush}"/><Setter TargetName="Detail" Property="Foreground" Value="{DynamicResource TidyWarningTextBrush}"/></DataTrigger>
-      <DataTrigger Binding="{Binding IsFailed}" Value="True"><Setter TargetName="Detail" Property="Foreground" Value="{DynamicResource TidyWarningTextBrush}"/></DataTrigger>
+      <DataTrigger Binding="{Binding IsHeld}" Value="True"><Setter TargetName="Row" Property="BorderBrush" Value="{DynamicResource WarningBorder45Brush}"/><Setter TargetName="Detail" Property="Foreground" Value="{DynamicResource WarningTextBrush}"/></DataTrigger>
+      <DataTrigger Binding="{Binding IsFailed}" Value="True"><Setter TargetName="Detail" Property="Foreground" Value="{DynamicResource WarningTextBrush}"/></DataTrigger>
       <DataTrigger Binding="{Binding IsWaiting}" Value="True"><Setter TargetName="Waiting" Property="Visibility" Value="Visible"/></DataTrigger>
      </DataTemplate.Triggers>
     </DataTemplate></ItemsControl.ItemTemplate>
@@ -85,6 +84,6 @@
    <Button Content="Organize now" Style="{StaticResource PrimaryButtonStyle}" Click="OnOrganize" AutomationProperties.Name="Organize now"/>
    <Button Grid.Column="1" Style="{StaticResource SecondaryButtonStyle}" Margin="8,0,0,0" Click="OnRules" AutomationProperties.Name="Rules"><StackPanel Orientation="Horizontal"><c:LucideIcon Data="{x:Static c:LucideIcons.Sliders}" Size="14" Brush="{DynamicResource ButtonTextBrush}" VerticalAlignment="Center"/><TextBlock Text="Rules" Margin="6,0,0,0"/></StackPanel></Button>
   </Grid>
-  <TextBlock x:Name="Error" Visibility="Collapsed" TextWrapping="Wrap" Foreground="{DynamicResource TidyWarningTextBrush}" Style="{StaticResource CaptionTextStyle}" Margin="0,8,0,0" AutomationProperties.LiveSetting="Polite"/>
+  <TextBlock x:Name="Error" Visibility="Collapsed" TextWrapping="Wrap" Foreground="{DynamicResource WarningTextBrush}" Style="{StaticResource CaptionTextStyle}" Margin="0,8,0,0" AutomationProperties.LiveSetting="Polite"/>
  </StackPanel>
 </UserControl>
