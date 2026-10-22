@@ -30,8 +30,6 @@ public sealed class IslandHost : IDisposable
     private readonly Dispatcher _dispatcher;
     private readonly IslandWindow _window;
     private readonly ForegroundTracker _tracker;
-    private readonly DispatcherTimer _settingsDebounce;
-    private FileSystemWatcher? _settingsWatcher;
     private bool _refreshPending;
     private bool _disposed;
 
@@ -42,12 +40,7 @@ public sealed class IslandHost : IDisposable
         _dispatcher = Dispatcher.CurrentDispatcher;
         _window = new IslandWindow();
         _tracker = new ForegroundTracker(_dispatcher, _logger);
-        _settingsDebounce = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
-        _settingsDebounce.Tick += (_, _) =>
-        {
-            _settingsDebounce.Stop();
-            LoadSettings();
-        };
+
     }
 
     /// <summary>The pet's mood for the live activities: wide awake while Keep awake holds the PC, idle while anything is live, sleepy at rest.</summary>
@@ -69,8 +62,7 @@ public sealed class IslandHost : IDisposable
 
         _shell.Island.Changed += (_, _) => ScheduleRefresh();
         _shell.Island.Succeeded += (_, _) => _dispatcher.BeginInvoke(() => _window.Celebrate());
-        _shell.Config.Imported += (_, _) => _dispatcher.BeginInvoke(LoadSettings);
-        WatchSettingsFile();
+        _shell.Config.SectionChanged += OnSectionChanged;
 
         if (_shell.DebugMode)
             _window.SetDebugMenu(DebugMenu());
@@ -200,36 +192,15 @@ public sealed class IslandHost : IDisposable
         _window.SetEnabled(settings.IslandEnabled);
     }
 
-    /// <summary>
-    /// ConfigStore raises only <c>Imported</c>, so a settings change made elsewhere (Settings › Island
-    /// &amp; pet) is picked up from the file it writes. Interim until Core has a section-changed event.
-    /// </summary>
-    private void WatchSettingsFile()
+    private void OnSectionChanged(object? sender, ConfigSectionChangedEventArgs e)
     {
-        try
+        if (e.Name != AppSettings.SectionName)
+            return;
+        _dispatcher.BeginInvoke(() =>
         {
-            string? directory = Path.GetDirectoryName(Path.GetFullPath(_shell.Config.FilePath));
-            if (directory is null)
-                return;
-            Directory.CreateDirectory(directory);
-            _settingsWatcher = new FileSystemWatcher(directory, Path.GetFileName(_shell.Config.FilePath))
-            {
-                NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.Size,
-            };
-            FileSystemEventHandler changed = (_, _) => _dispatcher.BeginInvoke(() =>
-            {
-                _settingsDebounce.Stop();
-                _settingsDebounce.Start();
-            });
-            _settingsWatcher.Changed += changed;
-            _settingsWatcher.Created += changed;
-            _settingsWatcher.Renamed += (s, e) => changed(s, e);
-            _settingsWatcher.EnableRaisingEvents = true;
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
-        {
-            _logger.LogWarning(ex, "Cannot watch settings for island changes; they apply after a restart");
-        }
+            if (!_disposed)
+                LoadSettings();
+        });
     }
 
     private IEnumerable<(string Label, Action Action)?> DebugMenu()
@@ -290,7 +261,7 @@ public sealed class IslandHost : IDisposable
         if (_disposed)
             return;
         _disposed = true;
-        _settingsWatcher?.Dispose();
+        _shell.Config.SectionChanged -= OnSectionChanged;
         _tracker.Dispose();
         _window.Close();
     }

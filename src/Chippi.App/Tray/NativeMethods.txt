@@ -28,7 +28,3 @@ ABE_TOP
 ABE_LEFT
 ABE_RIGHT
 GetWindowRect
-GetWindowThreadProcessId
-GetCurrentThreadId
-AttachThreadInput
-BringWindowToTop
