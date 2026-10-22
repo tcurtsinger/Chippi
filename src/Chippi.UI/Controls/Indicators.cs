@@ -3,6 +3,7 @@
 
 using System.Globalization;
 using System.Windows;
+using System.Windows.Automation.Peers;
 using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Media;
@@ -35,6 +36,21 @@ public class Badge : Control
     {
         get => (BadgeKind)GetValue(KindProperty);
         set => SetValue(KindProperty, value);
+    }
+
+    /// <summary>Screen readers read the badge's words ("From Hopper"); its text lives inside the template, where they would not look.</summary>
+    protected override AutomationPeer OnCreateAutomationPeer() => new BadgeAutomationPeer(this);
+
+    private sealed class BadgeAutomationPeer(Badge owner) : FrameworkElementAutomationPeer(owner)
+    {
+        protected override AutomationControlType GetAutomationControlTypeCore() => AutomationControlType.Text;
+
+        protected override string GetClassNameCore() => nameof(Badge);
+
+        protected override string GetNameCore() => owner.Text;
+
+        // The template's TextBlock would repeat the name.
+        protected override List<AutomationPeer>? GetChildrenCore() => null;
     }
 }
 

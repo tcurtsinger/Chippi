@@ -90,6 +90,13 @@ public class FeatureCard : Control
         FocusableProperty.OverrideMetadata(typeof(FeatureCard), new FrameworkPropertyMetadata(false));
     }
 
+    /// <summary>
+    /// A screen reader meets the card as a group named for the feature, with the description as its
+    /// help text, around the install switch and badges. Without a peer the card vanishes from the
+    /// tree and only "Install ‹name›" is left.
+    /// </summary>
+    protected override AutomationPeer OnCreateAutomationPeer() => new FeatureCardAutomationPeer(this);
+
     public static readonly DependencyProperty FeatureNameProperty = DependencyProperty.Register(
         nameof(FeatureName), typeof(string), typeof(FeatureCard), new PropertyMetadata(""));
 
@@ -143,5 +150,29 @@ public class FeatureCard : Control
     {
         get => (bool)GetValue(IsComingSoonProperty);
         set => SetValue(IsComingSoonProperty, value);
+    }
+}
+
+/// <summary>
+/// A <see cref="FeatureCard"/> as a group: named for the feature (unless <c>AutomationProperties.Name</c>
+/// says otherwise) with the description as help text. Subclass it to add patterns (the hub makes
+/// installed cards with a settings page invokable).
+/// </summary>
+public class FeatureCardAutomationPeer(FeatureCard owner) : FrameworkElementAutomationPeer(owner)
+{
+    protected override AutomationControlType GetAutomationControlTypeCore() => AutomationControlType.Group;
+
+    protected override string GetClassNameCore() => nameof(FeatureCard);
+
+    protected override string GetNameCore()
+    {
+        string name = base.GetNameCore(); // AutomationProperties.Name, when set
+        return string.IsNullOrEmpty(name) ? owner.FeatureName : name;
+    }
+
+    protected override string GetHelpTextCore()
+    {
+        string help = base.GetHelpTextCore();
+        return string.IsNullOrEmpty(help) ? owner.Description : help;
     }
 }
