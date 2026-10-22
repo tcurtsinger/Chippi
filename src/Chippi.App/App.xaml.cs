@@ -124,7 +124,11 @@ public partial class App : Application
     /// </summary>
     private bool ComposeShell(ShellContext shell)
     {
-        // [WS4] Real modules: shell.Registry.Register(new ...Module());
+        // [WS4] Real modules.
+        var keepAwake = new Chippi.Features.KeepAwake.KeepAwakeModule();
+        shell.Registry.Register(keepAwake);
+        Exit += (_, _) => keepAwake.ReleaseOnExit();
+
 
         // [WS2] "Coming soon" placeholders for the PLAN.md features.
 

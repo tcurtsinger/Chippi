@@ -1,0 +1,39 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<UserControl x:Class="Chippi.Features.KeepAwake.KeepAwakePage"
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+ xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ xmlns:c="urn:chippi-ui">
+ <ScrollViewer VerticalScrollBarVisibility="Auto">
+  <StackPanel Margin="24" MaxWidth="640" HorizontalAlignment="Left">
+   <TextBlock Text="Keep awake" Style="{DynamicResource DisplayTextStyle}" />
+   <TextBlock Text="Prevent sleep while you are away" Style="{DynamicResource BodyTextStyle}" Margin="0,8,0,20" />
+   <c:Badge Text="Overlaps PowerToys" Kind="Overlap" HorizontalAlignment="Left" Margin="0,0,0,24" />
+   <TextBlock Text="Mode" Style="{DynamicResource TitleTextStyle}" Margin="0,0,0,8" />
+   <c:SegmentedControl x:Name="Mode" SelectionChanged="OnModeChanged" AutomationProperties.Name="Keep awake mode" MinWidth="360">
+    <c:SegmentItem Label="Indefinitely" />
+    <c:SegmentItem Label="For a duration" />
+    <c:SegmentItem Label="Until a time" />
+   </c:SegmentedControl>
+   <StackPanel x:Name="DurationPanel" Margin="0,20,0,0">
+    <TextBlock Text="Duration" Style="{DynamicResource TitleTextStyle}" Margin="0,0,0,8" />
+    <ComboBox x:Name="Duration" Style="{DynamicResource HopperComboBoxStyle}" FontFamily="{DynamicResource MonoFont}" Width="220" HorizontalAlignment="Left" AutomationProperties.Name="Duration in minutes" />
+   </StackPanel>
+   <StackPanel x:Name="UntilPanel" Margin="0,20,0,0">
+    <TextBlock Text="Until" Style="{DynamicResource TitleTextStyle}" Margin="0,0,0,8" />
+    <ComboBox x:Name="Until" Style="{DynamicResource HopperComboBoxStyle}" FontFamily="{DynamicResource MonoFont}" Width="220" HorizontalAlignment="Left" AutomationProperties.Name="End time" />
+    <TextBlock Text="Next occurrence in your local time" Style="{DynamicResource CaptionTextStyle}" Margin="0,8,0,0" />
+   </StackPanel>
+   <DockPanel Margin="0,24,0,24">
+    <ToggleButton x:Name="Display" DockPanel.Dock="Right" Style="{DynamicResource SwitchStyle}" AutomationProperties.Name="Keep display on" Margin="24,0,0,0" />
+    <TextBlock Text="Keep display on" Style="{DynamicResource TitleTextStyle}" VerticalAlignment="Center" />
+   </DockPanel>
+   <TextBlock x:Name="State" Style="{DynamicResource MonoTextStyle}" Margin="0,0,0,12" AutomationProperties.LiveSetting="Polite" />
+   <TextBlock x:Name="Error" Style="{DynamicResource BodyTextStyle}" TextWrapping="Wrap" Margin="0,0,0,12" AutomationProperties.LiveSetting="Assertive" />
+   <StackPanel Orientation="Horizontal">
+    <Button x:Name="Toggle" Content="Start keep awake" Style="{DynamicResource PrimaryButtonStyle}" Click="OnToggle" MinWidth="160" />
+    <Button Content="Save settings" Style="{DynamicResource SecondaryButtonStyle}" Click="OnSave" Margin="12,0,0,0" />
+   </StackPanel>
+   <TextBlock Text="Sessions start off after restarting Chippi" Style="{DynamicResource CaptionTextStyle}" Margin="0,16,0,0" />
+  </StackPanel>
+ </ScrollViewer>
+</UserControl>
