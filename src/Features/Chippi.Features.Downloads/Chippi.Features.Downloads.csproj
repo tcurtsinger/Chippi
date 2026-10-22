@@ -1,0 +1,22 @@
+﻿<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Downloads organizer: watched folders, rules (Chippi.Rules), preview and approve, history with
+     verified undo, archive import. Engine/, Storage/ and Import/ are P2-B; Views/ is P2-C. -->
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>Chippi.Features.Downloads</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Chippi.Core\Chippi.Core.csproj" />
+    <ProjectReference Include="..\..\Chippi.UI\Chippi.UI.csproj" />
+    <ProjectReference Include="..\..\Chippi.Rules\Chippi.Rules.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Chippi.Features.Downloads.Tests" />
+  </ItemGroup>
+
+</Project>
