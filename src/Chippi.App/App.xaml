@@ -7,10 +7,10 @@
         <ResourceDictionary>
             <!-- Order matters: the theme (swapped by ThemeManager), invariant tokens, styles, controls. -->
             <ResourceDictionary.MergedDictionaries>
-                <ResourceDictionary Source="pack://application:,,,/Themes/Dark.xaml" />
-                <ResourceDictionary Source="pack://application:,,,/Themes/Palette.xaml" />
-                <ResourceDictionary Source="pack://application:,,,/Themes/SharedStyles.xaml" />
-                <ResourceDictionary Source="pack://application:,,,/Controls/Controls.xaml" />
+                <ResourceDictionary Source="pack://application:,,,/Chippi.UI;component/Themes/Dark.xaml" />
+                <ResourceDictionary Source="pack://application:,,,/Chippi.UI;component/Themes/Palette.xaml" />
+                <ResourceDictionary Source="pack://application:,,,/Chippi.UI;component/Themes/SharedStyles.xaml" />
+                <ResourceDictionary Source="pack://application:,,,/Chippi.UI;component/Controls/Controls.xaml" />
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </Application.Resources>

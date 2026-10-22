@@ -4,7 +4,7 @@
 using System.IO;
 using System.Windows;
 using System.Windows.Threading;
-using Chippi.App.Themes;
+using Chippi.UI.Themes;
 using Chippi.Core.Config;
 using Chippi.Core.Diagnostics;
 using Chippi.Core.SystemIntegration;
@@ -78,7 +78,7 @@ public partial class App : Application
 #if DEBUG
         if (e.Args.Contains("--gallery", StringComparer.OrdinalIgnoreCase))
         {
-            var gallery = new Controls.Gallery.ControlGalleryWindow();
+            var gallery = new Chippi.UI.Controls.Gallery.ControlGalleryWindow();
             gallery.Closed += (_, _) => Shutdown();
             gallery.Show();
             int snapshot = Array.FindIndex(e.Args, a => string.Equals(a, "--snapshot", StringComparison.OrdinalIgnoreCase));

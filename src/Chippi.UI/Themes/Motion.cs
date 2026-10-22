@@ -4,7 +4,7 @@
 using System.ComponentModel;
 using System.Windows;
 
-namespace Chippi.App.Themes;
+namespace Chippi.UI.Themes;
 
 /// <summary>
 /// Reduced motion for the pet, island and flyout transitions (DESIGN.md §7, §9). Follows the

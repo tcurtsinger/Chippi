@@ -5,7 +5,7 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Data;
 
-namespace Chippi.App.Controls;
+namespace Chippi.UI.Controls;
 
 /// <summary>Ported from Hopper. <see cref="Invert"/> shows the element when the value is false.</summary>
 public sealed class BoolToVisibilityConverter : IValueConverter

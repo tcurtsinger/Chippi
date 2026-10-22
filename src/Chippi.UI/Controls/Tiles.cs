@@ -7,7 +7,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using Chippi.Core.Modules;
 
-namespace Chippi.App.Controls;
+namespace Chippi.UI.Controls;
 
 /// <summary>
 /// Flyout tool tile (DESIGN.md §6): 92px, 12px radius, 10px padding, 30px icon chip over the name

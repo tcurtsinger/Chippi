@@ -25,14 +25,34 @@ Contract changes after WS0 go through Kayla.
 **Why UI contributions look like this.** Core cannot reference WPF. Tiles are uniform, so the
 module hands over a plain model and the shell draws every tile identically per DESIGN.md §6.
 Tabs and settings pages are free-form, so the module passes a factory returning `object` and the
-App casts it to `FrameworkElement`. Only a module that ships its own views references WPF.
+App casts it to `FrameworkElement`. Only a module that ships its own views references WPF, and
+then it references `Chippi.UI` (below), never `Chippi.App`.
+
+## Chippi.UI (the WPF design system, `src/Chippi.UI`)
+
+Not part of Core, listed here so module authors find it. Reference `Chippi.Core` and `Chippi.UI`;
+set `<UseWPF>true</UseWPF>`. In XAML write `xmlns:c="urn:chippi-ui"`.
+
+- Resources (merged by App.xaml, resolve with `DynamicResource`): Hopper's theme keys
+  (`WindowBackgroundBrush`, `SurfaceBrush`, `TextTertiaryBrush`, `AccentGradientBrush`, ...) plus
+  `AccentGradientDeepBrush`, `DangerDeepBrush`, `Island*`, `Pet*`, `Badge*`, type styles
+  (`DisplayTextStyle` ... `MonoReadoutTextStyle`), `FocusRing*`, `ChippiWindowStyle` (every window
+  uses it), and the keyed control styles `PrimaryButtonStyle`, `SecondaryButtonStyle`,
+  `SwitchStyle`, `SegmentButtonStyle`, `HopperSliderStyle`, `HopperComboBoxStyle`,
+  `TabSegmentedControlStyle`.
+- Controls (`Chippi.UI.Controls`): `IconButton`, `IconToggleButton`, `Badge`, `StatusDot`,
+  `Eyebrow`, `SearchBox`, `SegmentedControl` + `SegmentItem`, `AppVolumeRow`, `StatTile`,
+  `StashRow`, `ToolTile`, `FeatureCard`, `LucideIcon` + `LucideIcons`, converters.
+- `Chippi.UI.Themes`: `ThemeManager.Apply(ThemePreference)`, `ThemeManager.ThemeChanged`,
+  `Motion.IsReduced` / `Motion.Changed` / `Motion.Override`.
+- Debug builds only: `ControlGalleryWindow` (`Chippi.exe --gallery [--snapshot <dir>]`).
 
 ## Island (`Chippi.Core.Island`)
 
 | Type | What it is |
 |---|---|
 | `IslandActivity` | Record: `Key`, `Kind`, `Title`, `Source`, `Progress` (0..1 or null), `ModuleId` (set by the hub). |
-| `IslandActivityKind` | `Media, Timer, Download, Stash, Agent`. `Priority()`: media 0, timer 1, download = stash 2, agent 3. |
+| `IslandActivityKind` | `Media, Timer, Download, Stash, Agent, Status`. `Priority()`: media 0, timer 1, download = stash 2, agent 3, status 4. Status is background state such as Keep awake. |
 | `IIslandPublisher` | `Publish(activity)` (upsert by key), `Clear(key)`, `ReportSuccess(message)`. |
 | `IslandActivityHub` | `Current` (highest priority, newest within a priority), `Activities`, `CreatePublisher(moduleId)` (the debug menu uses its own id), `ClearModule(id)`, events `Changed` and `Succeeded` (`ModuleSucceededEventArgs`: Celebrate). Thread-safe; events fire on the publisher's thread. |
 

@@ -17,19 +17,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Chippi.Core\Chippi.Core.csproj" />
+    <ProjectReference Include="..\Chippi.UI\Chippi.UI.csproj" />
     <ProjectReference Include="..\Features\Chippi.Features.KeepAwake\Chippi.Features.KeepAwake.csproj" />
-  </ItemGroup>
-
-  <!-- Static Manrope 500/600/700/800 and JetBrains Mono 500/600 (OFL), embedded as WPF resources. -->
-  <ItemGroup>
-    <Resource Include="Themes\Fonts\*.ttf" />
-    <None Include="Themes\Fonts\OFL-*.txt" CopyToOutputDirectory="PreserveNewest" LinkBase="licenses" />
-  </ItemGroup>
-
-  <!-- The control gallery is a development tool: compiled into Debug builds only. -->
-  <ItemGroup Condition="'$(Configuration)' != 'Debug'">
-    <Page Remove="Controls\Gallery\**" />
-    <Compile Remove="Controls\Gallery\**" />
   </ItemGroup>
 
 </Project>

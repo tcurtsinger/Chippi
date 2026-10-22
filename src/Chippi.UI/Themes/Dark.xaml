@@ -54,6 +54,8 @@
     <SolidColorBrush x:Key="TextControlBrush" Color="{StaticResource TextControlColor}" />
     <SolidColorBrush x:Key="GripBrush" Color="{StaticResource GripColor}" />
     <SolidColorBrush x:Key="SegmentActiveBrush" Color="{StaticResource SegmentActiveColor}" />
+    <SolidColorBrush x:Key="BadgeSourceTextBrush" Color="#D3A6FA" />
+    <SolidColorBrush x:Key="BadgeOverlapTextBrush" Color="#F5B866" />
 
     <!-- Hairlines: white at 5-8%, strong borders up to 16%. -->
     <SolidColorBrush x:Key="BorderSoftBrush" Color="#0DFFFFFF" />

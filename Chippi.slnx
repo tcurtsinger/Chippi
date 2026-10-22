@@ -2,6 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/Chippi.App/Chippi.App.csproj" />
     <Project Path="src/Chippi.Core/Chippi.Core.csproj" />
+    <Project Path="src/Chippi.UI/Chippi.UI.csproj" />
   </Folder>
   <Folder Name="/src/Features/">
     <Project Path="src/Features/Chippi.Features.KeepAwake/Chippi.Features.KeepAwake.csproj" />

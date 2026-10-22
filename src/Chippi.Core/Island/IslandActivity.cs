@@ -11,17 +11,21 @@ public enum IslandActivityKind
     Download,
     Stash,
     Agent,
+
+    /// <summary>Background state such as Keep awake. Lowest priority; a timed session shows its countdown.</summary>
+    Status,
 }
 
 public static class IslandActivityKindExtensions
 {
-    /// <summary>Lower wins: media, then timer, then download or stash (equal), then agent (DESIGN.md §5).</summary>
+    /// <summary>Lower wins: media, then timer, then download or stash (equal), then agent, then status (DESIGN.md §5).</summary>
     public static int Priority(this IslandActivityKind kind) => kind switch
     {
         IslandActivityKind.Media => 0,
         IslandActivityKind.Timer => 1,
         IslandActivityKind.Download or IslandActivityKind.Stash => 2,
         IslandActivityKind.Agent => 3,
+        IslandActivityKind.Status => 4,
         _ => int.MaxValue,
     };
 }

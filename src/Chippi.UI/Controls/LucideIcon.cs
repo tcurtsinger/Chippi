@@ -6,7 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Shapes;
 
-namespace Chippi.App.Controls;
+namespace Chippi.UI.Controls;
 
 /// <summary>
 /// Renders a <see cref="Geometry"/> as a stroke icon. The geometry is authored in a 24x24 box

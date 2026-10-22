@@ -8,7 +8,7 @@ using System.Windows.Documents;
 using System.Windows.Media;
 using Chippi.Core.Modules;
 
-namespace Chippi.App.Controls;
+namespace Chippi.UI.Controls;
 
 /// <summary>20px tall, 6px radius, 10.5/700. Source is violet, Overlap amber, Needs neutral (DESIGN.md §6).</summary>
 public class Badge : Control

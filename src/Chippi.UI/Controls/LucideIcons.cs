@@ -5,7 +5,7 @@ using System.Collections.Frozen;
 using System.Reflection;
 using System.Windows.Media;
 
-namespace Chippi.App.Controls;
+namespace Chippi.UI.Controls;
 
 /// <summary>
 /// Lucide-style stroke icons (Lucide is ISC-licensed) as frozen geometries on a 24x24 grid.

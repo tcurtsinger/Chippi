@@ -35,12 +35,11 @@
     <!-- Thumb glow 0 0 10px rgba(177,92,240,.7). -->
     <DropShadowEffect x:Key="ThumbGlow" Color="#B15CF0" BlurRadius="10" ShadowDepth="0" Opacity="0.7" />
 
-    <!-- Badges, DESIGN.md §6. Source and Overlap tints are fixed; Needs uses themed chip and ink. -->
+    <!-- Badges, DESIGN.md §6. Source and Overlap tints and borders are fixed; their text colors are themed
+         (Dark.xaml / Light.xaml, DESIGN.md §2 "Light theme"). Needs uses themed chip and ink. -->
     <SolidColorBrush x:Key="BadgeSourceBackgroundBrush" Color="#29B15CF0" />
-    <SolidColorBrush x:Key="BadgeSourceTextBrush" Color="#D3A6FA" />
     <SolidColorBrush x:Key="BadgeSourceBorderBrush" Color="#59B15CF0" />
     <SolidColorBrush x:Key="BadgeOverlapBackgroundBrush" Color="#1FF5A64B" />
-    <SolidColorBrush x:Key="BadgeOverlapTextBrush" Color="#F5B866" />
     <SolidColorBrush x:Key="BadgeOverlapBorderBrush" Color="#4DF5A64B" />
 
     <!-- Gumdrop, DESIGN.md §7. -->

@@ -2,10 +2,10 @@
 <!-- Debug-only control gallery (run Chippi.exe with &#45;&#45;gallery in a Debug build). Shows every token
      and control state for review against DESIGN.md. Hover and Tab through it to see hover and
      the focus rings; "Disable all" shows the .45 disabled state. -->
-<Window x:Class="Chippi.App.Controls.Gallery.ControlGalleryWindow"
+<Window x:Class="Chippi.UI.Controls.Gallery.ControlGalleryWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:c="clr-namespace:Chippi.App.Controls"
+        xmlns:c="clr-namespace:Chippi.UI.Controls"
         xmlns:m="clr-namespace:Chippi.Core.Modules;assembly=Chippi.Core"
         Title="Chippi control gallery (debug)" Width="1180" Height="900"
         Style="{StaticResource ChippiWindowStyle}"

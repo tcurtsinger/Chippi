@@ -53,6 +53,9 @@
     <SolidColorBrush x:Key="TextControlBrush" Color="{StaticResource TextControlColor}" />
     <SolidColorBrush x:Key="GripBrush" Color="{StaticResource GripColor}" />
     <SolidColorBrush x:Key="SegmentActiveBrush" Color="{StaticResource SegmentActiveColor}" />
+    <!-- Light-only text colors approved 2026-10-21 (DESIGN.md §2): the dark values fail contrast here. -->
+    <SolidColorBrush x:Key="BadgeSourceTextBrush" Color="#7B2DB8" />
+    <SolidColorBrush x:Key="BadgeOverlapTextBrush" Color="#8A4B00" />
 
     <SolidColorBrush x:Key="BorderSoftBrush" Color="#12000000" />
     <SolidColorBrush x:Key="BorderBrush" Color="#17000000" />

@@ -5,7 +5,7 @@ using System.Windows;
 using Chippi.Core.Config;
 using Microsoft.Win32;
 
-namespace Chippi.App.Themes;
+namespace Chippi.UI.Themes;
 
 /// <summary>
 /// Swaps the Dark/Light dictionary in Application resources (ported from Hopper) and adds
@@ -14,8 +14,8 @@ namespace Chippi.App.Themes;
 /// </summary>
 public static class ThemeManager
 {
-    private const string DarkSource = "pack://application:,,,/Themes/Dark.xaml";
-    private const string LightSource = "pack://application:,,,/Themes/Light.xaml";
+    private const string DarkSource = "pack://application:,,,/Chippi.UI;component/Themes/Dark.xaml";
+    private const string LightSource = "pack://application:,,,/Chippi.UI;component/Themes/Light.xaml";
     private const string PersonalizeKey = @"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize";
 
     private static bool _listening;

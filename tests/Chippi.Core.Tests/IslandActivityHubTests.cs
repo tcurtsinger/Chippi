@@ -31,6 +31,24 @@ public sealed class IslandActivityHubTests
     }
 
     [Fact]
+    public void Status_is_shown_only_when_nothing_else_is_live()
+    {
+        var p = _hub.CreatePublisher("keep-awake");
+        p.Publish(new IslandActivity("awake", IslandActivityKind.Status, "Keeping awake", "Until 6:00 PM"));
+        Assert.Equal("awake", _hub.Current!.Key);
+
+        // Status loses to every other kind, including an agent published before it.
+        var debug = _hub.CreatePublisher("debug");
+        debug.Publish(new IslandActivity("agent", IslandActivityKind.Agent, "Claude", "62% of 5h"));
+        Assert.Equal("agent", _hub.Current!.Key);
+        Assert.Equal(["agent", "awake"], _hub.Activities.Select(a => a.Key));
+        Assert.True(IslandActivityKind.Agent.Priority() < IslandActivityKind.Status.Priority());
+
+        debug.Clear("agent");
+        Assert.Equal("awake", _hub.Current!.Key);
+    }
+
+    [Fact]
     public void Download_and_stash_share_a_priority_and_the_newest_wins()
     {
         var p = _hub.CreatePublisher("debug");

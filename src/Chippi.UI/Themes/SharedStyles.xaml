@@ -6,13 +6,13 @@
      Chippi's own controls are templated in Controls/Controls.xaml. -->
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-                    xmlns:c="clr-namespace:Chippi.App.Controls">
+                    xmlns:c="clr-namespace:Chippi.UI.Controls">
 
     <!-- ===== Fonts (DESIGN.md §3) =====
          Static TTFs, one per weight, so WPF picks the real 500/600/700/800 faces. -->
-    <FontFamily x:Key="UiFont">pack://application:,,,/Themes/Fonts/#Manrope, Segoe UI Variable Text, Segoe UI</FontFamily>
-    <FontFamily x:Key="DisplayFont">pack://application:,,,/Themes/Fonts/#Manrope, Segoe UI Variable Display, Segoe UI</FontFamily>
-    <FontFamily x:Key="MonoFont">pack://application:,,,/Themes/Fonts/#JetBrains Mono, Cascadia Mono, Consolas</FontFamily>
+    <FontFamily x:Key="UiFont">pack://application:,,,/Chippi.UI;component/Themes/Fonts/#Manrope, Segoe UI Variable Text, Segoe UI</FontFamily>
+    <FontFamily x:Key="DisplayFont">pack://application:,,,/Chippi.UI;component/Themes/Fonts/#Manrope, Segoe UI Variable Display, Segoe UI</FontFamily>
+    <FontFamily x:Key="MonoFont">pack://application:,,,/Chippi.UI;component/Themes/Fonts/#JetBrains Mono, Cascadia Mono, Consolas</FontFamily>
     <FontFamily x:Key="IconFont">Segoe MDL2 Assets</FontFamily>
     <!-- JetBrains Mono's upstream static files declare usWeightClass 436 (Medium) and 472 (SemiBold),
          not 500/600. Asking WPF for SemiBold (600) picks the 436 face and synthesizes bold, so the

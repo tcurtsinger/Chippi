@@ -5,11 +5,11 @@ using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
-using Chippi.App.Themes;
+using Chippi.UI.Themes;
 using Chippi.Core.Config;
 using Chippi.Core.Modules;
 
-namespace Chippi.App.Controls.Gallery;
+namespace Chippi.UI.Controls.Gallery;
 
 /// <summary>Debug-only window that shows every token and control state for review against DESIGN.md.</summary>
 public partial class ControlGalleryWindow : Window
