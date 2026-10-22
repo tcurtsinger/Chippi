@@ -87,7 +87,7 @@ Brief §4.5 and DESIGN.md §5 "Settings window", §6.
 - **Sidebar:** 220px, with General, Features, Island & pet, Shortcuts, Permissions, Appearance and About. Items are 36px with a 16px icon, 13/600 text and the segmented-active style. The version and license sit in mono at the bottom.
 - **General:**
   - Theme (Dark, Light, Follow Windows), applied live via `ThemeManager` and saved.
-  - Run at startup via `StartupRegistration`. Test, then restore.
+  - Run at startup via `shell.Startup` (never `new StartupRegistration()`: a dev profile gets its own Run value). Test, then restore.
   - Export and import settings via `ConfigStore.Export/Import` with themed file dialogs. Catch `InvalidDataException` and `IOException`, and show an inline message rather than a stock dialog. Call `Registry.ReloadAsync()` after an import.
 - **Features hub:**
   - Display title, Body description and the mono "N of M installed" count.

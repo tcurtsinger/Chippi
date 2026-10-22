@@ -4,6 +4,7 @@
 using Chippi.Core.Config;
 using Chippi.Core.Island;
 using Chippi.Core.Modules;
+using Chippi.Core.SystemIntegration;
 using Microsoft.Extensions.Logging;
 
 namespace Chippi.App.Shell;
@@ -15,14 +16,21 @@ namespace Chippi.App.Shell;
 /// </summary>
 public sealed class ShellContext
 {
-    public ShellContext(ConfigStore config, ILoggerFactory loggerFactory, bool debugMode)
+    /// <param name="devProfile">CHIPPI_DEV_PROFILE, or null for a normal run.</param>
+    public ShellContext(ConfigStore config, ILoggerFactory loggerFactory, bool debugMode, string? devProfile = null)
     {
         Config = config;
         LoggerFactory = loggerFactory;
         DebugMode = debugMode;
         Island = new IslandActivityHub();
         Registry = new ModuleRegistry(config, Island, loggerFactory);
+        Startup = string.IsNullOrWhiteSpace(devProfile)
+            ? new StartupRegistration()
+            : new StartupRegistration($"Chippi-dev-{devProfile}");
     }
+
+    /// <summary>Run at startup. A dev profile gets its own Run value, so it never overwrites the real one.</summary>
+    public StartupRegistration Startup { get; }
 
     public ConfigStore Config { get; }
 

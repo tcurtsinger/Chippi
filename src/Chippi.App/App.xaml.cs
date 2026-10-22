@@ -103,7 +103,7 @@ public partial class App : Application
 
         bool debugMode = e.Args.Contains("--debug", StringComparer.OrdinalIgnoreCase)
             || Environment.GetEnvironmentVariable("CHIPPI_DEBUG") == "1";
-        Shell = new ShellContext(Config, LoggerFactory, debugMode);
+        Shell = new ShellContext(Config, LoggerFactory, debugMode, devProfile);
         Shell.Commands.QuitRequested += async (_, _) => await QuitAsync();
         ActivationRequested += (_, _) => Shell.Commands.ShowFlyout();
 

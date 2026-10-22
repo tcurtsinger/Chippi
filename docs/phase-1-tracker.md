@@ -14,9 +14,9 @@ Owner of this file: Marge (PM). Brief: [phase-1-handoff.md](phase-1-handoff.md).
 | # | Workstream | Owner | Reviewer | Depends on | Status |
 |---|---|---|---|---|---|
 | WS0 | Foundation: solution, Core, config, logging, single instance, themes, fonts, base controls | Kayla | Karl | none | merged be308b1, pushed |
-| WS1 | Tray icon and flyout | Tray agent (subagent, X:\code\chippi-ws1) | Kayla | WS0 | in progress |
+| WS1 | Tray icon and flyout | Tray agent (subagent, X:\code\chippi-ws1) | Kayla | WS0 | ready for review, head da21678 (icon as resource 9e5a66a, lead-approved csproj edit) |
 | WS2 | Settings window, Features hub, Permissions | Kayla (X:\code\chippi-ws2) | Karl | WS0 | in progress |
-| WS3 | Island and Gumdrop | Island agent (subagent, X:\code\chippi-ws3) | Karl | WS0 | in progress |
+| WS3 | Island and Gumdrop | Island agent (subagent, X:\code\chippi-ws3) | Karl | WS0 | ready for review, head 2e9435e; drop 3244d95 (debug-only return true) at merge |
 | WS4 | Keep awake module | Karl (X:\code\chippi-ws4), first | Kayla | WS0 | in review (Kayla), 0a08755; powercfg evidence pending Travis |
 | WS5 | Build, CI, Velopack, licensing | Karl (X:\code\chippi-ws5), after WS4 | Kayla | WS0 | in progress |
 | Lead | Integration (App.xaml*, composition root), DESIGN.md review, final report | Marge | Kayla | all | todo |
@@ -32,6 +32,16 @@ Specs per workstream: [phase-1-workstreams.md](phase-1-workstreams.md). Lead sea
 
 - 2026-10-21: WS4 adds `tests/Chippi.Features.KeepAwake.Tests`; Marge adds it to Chippi.slnx in the WS4 merge.
 - 2026-10-21: WS5 approved: repo-local vpk 1.2.161 (rollForward, host has only .NET 10), central Velopack 1.2.161, LICENSE/notices copied next to the exe, `VelopackApp.Build().Run()` in OnStartup after EnsureWindowsDirectoryEnvironment. Lead-owned edits land as one separate commit on ws5-build-ci.
+
+## Follow-ups
+- Kayla: `SingleInstance` calls `AllowSetForegroundWindow` before signalling the owner; then WS1 drops its cross-process focus workaround.
+- Travis, at hub review: tool tiles are about 111px wide in three columns, so names over about 10 characters are cut ("A long samp..."). Wrap to two lines or keep ellipsis?
+- Kayla: `ConfigStore.SectionChanged(name)` event; then WS3 drops its settings.json file watcher.
+- Phase 3, not now: `IslandActivity` elapsed/duration so the expanded media row can show mono times (DESIGN §5). No real media in Phase 1.
+- Lead at integration: measure CPU of the 30 fps equalizer on the transparent island window; Narrator pass on flyout, settings, island.
+- Travis, at hub review: WS3 additions where DESIGN.md is silent: status rows in the expanded island (needed for the new Status kind), "Nothing live right now" empty line, wide awake overriding the header pet while Keep awake is on.
+- WS3 untested: 150% and 200% scaling, real exclusive-fullscreen game and PowerPoint, F11; system-wide "busy" may hide the island on the other monitor.
+- WS1 untested: 150% and 200% scaling, taskbar on other edges, real Explorer restart, Narrator. Lead covers these at integration.
 
 ## Escalations open
 - Final app icon: ship the generated Gumdrop .ico, Travis approves at the end.

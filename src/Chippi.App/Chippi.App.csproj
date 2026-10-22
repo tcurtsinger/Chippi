@@ -8,7 +8,10 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AssemblyName>Chippi</AssemblyName>
     <RootNamespace>Chippi.App</RootNamespace>
-    <!-- No PlatformTarget: the RID (win-x64 / win-arm64) decides the architecture. -->
+    <!-- No PlatformTarget: the RID (win-x64 / win-arm64) decides the architecture. A build with no
+         RID (F5, dotnet run) gets the machine's own, because CsWin32 cannot generate some APIs
+         (Shell_NotifyIconGetRect) for AnyCPU. -->
+    <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == ''">$(NETCoreSdkRuntimeIdentifier)</RuntimeIdentifier>
   </PropertyGroup>
 
   <ItemGroup>
