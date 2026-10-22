@@ -295,9 +295,18 @@ public sealed class ModuleRegistry(ConfigStore config, IslandActivityHub island,
             if (!entry.IsRunning)
                 await StartModuleAsync(entry, ct).ConfigureAwait(false);
         }
-        else if (entry.IsRunning)
+        else
         {
-            await StopModuleAsync(entry, ct).ConfigureAwait(false);
+            try
+            {
+                if (entry.IsRunning)
+                    await StopModuleAsync(entry, ct).ConfigureAwait(false);
+            }
+            finally
+            {
+                try { await entry.Module!.UninstallAsync(CancellationToken.None).ConfigureAwait(false); }
+                catch (Exception ex) { _logger.LogError(ex, "{Id} failed to remove its persistent integration", entry.Id); }
+            }
         }
         _logger.LogInformation("{Id} {Action}", entry.Id, installed ? "installed" : "uninstalled");
     }

@@ -6,7 +6,7 @@ namespace Chippi.Core.Modules;
 /// <summary>
 /// A feature the user can install and uninstall. The registry calls <see cref="StartAsync"/>
 /// when the feature is installed (or at launch if it already was) and <see cref="StopAsync"/>
-/// on uninstall and app exit.
+/// on uninstall and app exit. Persistent integrations use UninstallAsync, so normal exit can still be activated.
 /// </summary>
 /// <remarks>
 /// The constructor must not acquire anything: an uninstalled module is constructed so the
@@ -22,4 +22,6 @@ public interface IFeatureModule
     Task StartAsync(ModuleContext context, CancellationToken ct);
 
     Task StopAsync(CancellationToken ct);
+    /// <summary>Remove persistent integration on feature uninstall, not ordinary app exit.</summary>
+    Task UninstallAsync(CancellationToken ct) => Task.CompletedTask;
 }

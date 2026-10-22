@@ -14,7 +14,7 @@ namespace Chippi.Features.Downloads.Views.Settings;
 
 /// <summary>
 /// Settings › the organizer's first section: watched folders (mode, grace, ignore file, remove),
-/// then Keep history and Import archive. Notifications live on the app-wide page.
+/// then Keep history, Explorer integration and Import archive. Notifications live on the app-wide page.
 /// </summary>
 internal sealed class SettingsSection : UserControl
 {
@@ -41,7 +41,7 @@ internal sealed class SettingsSection : UserControl
 
         _error.Visibility = Visibility.Collapsed;
         _importError.Visibility = Visibility.Collapsed;
-        var page = Ui.Stack(header.Margin(0, 0, 0, 12), _folders, _error.Margin(0, 6, 0, 0), Ui.Eyebrow("More").Margin(0, 24, 0, 12), KeepHistoryRow(), ImportRow());
+        var page = Ui.Stack(header.Margin(0, 0, 0, 12), _folders, _error.Margin(0, 6, 0, 0), Ui.Eyebrow("More").Margin(0, 24, 0, 12), KeepHistoryRow(), ExplorerRow(), ImportRow());
         Content = page;
         Render();
     }
@@ -131,6 +131,20 @@ internal sealed class SettingsSection : UserControl
         grid.Children.Add(Ui.Text("Keep history", "TitleTextStyle").At(0));
         grid.Children.Add(keep.At(1));
         return Ui.Surface(grid, new Thickness(14, 10, 14, 10)).Margin(0, 0, 0, 6);
+    }
+
+    private Border ExplorerRow()
+    {
+        var toggle = Ui.Switch("Organize in Explorer", _module.Settings.OrganizeInExplorer);
+        toggle.Click += (_, _) =>
+        {
+            Save(s => s.OrganizeInExplorer = toggle.IsChecked == true);
+            toggle.IsChecked = _module.Settings.OrganizeInExplorer;
+        };
+        var row = Ui.Columns("*", "Auto");
+        row.Children.Add(Ui.Text("Organize in Explorer", "TitleTextStyle").At(0));
+        row.Children.Add(toggle.At(1));
+        return Ui.Surface(row, new Thickness(14, 10, 14, 10)).Margin(0, 0, 0, 6);
     }
 
     private Border ImportRow()
@@ -228,7 +242,7 @@ internal sealed class SettingsSection : UserControl
         {
             _module.SaveSettings(settings);
         }
-        catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException)
+        catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException or System.Security.SecurityException)
         {
             ShowError(ex.Message);
         }

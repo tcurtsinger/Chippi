@@ -110,6 +110,8 @@ public sealed class DownloadsSettings
     /// <summary>History older than this is pruned at start (brief §2: 90 days).</summary>
     public int HistoryDays { get; set; } = 90;
 
+    public bool OrganizeInExplorer { get; set; }
+
     /// <summary>
     /// When the person last cleared history. History shows nothing older; the store keeps the few
     /// rows the self-trigger guard and partial-file cleanup still need.
@@ -128,6 +130,7 @@ public sealed class DownloadsSettings
         Folders = [.. Folders.Select(f => new WatchedFolder { Path = f.Path, Mode = f.Mode, GraceSeconds = f.GraceSeconds, BaselineUtc = f.BaselineUtc })],
         Rules = [.. Rules.Select(r => r.Clone())],
         HistoryDays = HistoryDays,
+        OrganizeInExplorer = OrganizeInExplorer,
         HistoryClearedUtc = HistoryClearedUtc,
         Initialized = Initialized,
     };
