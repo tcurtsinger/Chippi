@@ -166,7 +166,6 @@ internal sealed class DesktopSession : IDisposable
         }
         using (var key = Registry.CurrentUser.OpenSubKey(RunKey, writable: true))
             key?.DeleteValue(StartupName, throwOnMissingValue: false);
-        Assert.Null(StartupCommand);
         if (Directory.Exists(Path.Combine(_local, "logs")))
             foreach (var log in Directory.EnumerateFiles(Path.Combine(_local, "logs")))
                 _output.WriteLine(File.ReadAllText(log));
@@ -174,6 +173,7 @@ internal sealed class DesktopSession : IDisposable
         DeleteProfile(_roaming);
         DeleteProfile(_local);
         if (_foreground != 0) SetForegroundWindow(_foreground);
+        Assert.Null(StartupCommand);
     }
 
     private void DeleteProfile(string path)
