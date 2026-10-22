@@ -1,4 +1,4 @@
-﻿<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
 <!-- Downloads organizer: watched folders, rules (Chippi.Rules), preview and approve, history with
      verified undo, archive import. Engine/, Storage/ and Import/ are P2-B; Views/ is P2-C. -->
 <Project Sdk="Microsoft.NET.Sdk">
@@ -13,6 +13,15 @@
     <ProjectReference Include="..\..\Chippi.Core\Chippi.Core.csproj" />
     <ProjectReference Include="..\..\Chippi.UI\Chippi.UI.csproj" />
     <ProjectReference Include="..\..\Chippi.Rules\Chippi.Rules.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" />
+  </ItemGroup>
+
+  <!-- WPF projects do not get System.IO as an implicit using; the engine is mostly file work. -->
+  <ItemGroup>
+    <Using Include="System.IO" />
   </ItemGroup>
 
   <ItemGroup>
