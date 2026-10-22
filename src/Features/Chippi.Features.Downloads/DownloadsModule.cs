@@ -29,7 +29,8 @@ public enum DownloadsRequestKind
 }
 
 /// <summary>Something asked to show part of the organizer (a notice click, the Explorer menu, the Tidy tab).</summary>
-public sealed record DownloadsRequest(DownloadsRequestKind Kind, string? Folder = null, long? RunId = null);
+/// <param name="FromExplorer">The Explorer menu asked: the run is recorded as Explorer, not Organize now.</param>
+public sealed record DownloadsRequest(DownloadsRequestKind Kind, string? Folder = null, long? RunId = null, bool FromExplorer = false);
 
 /// <summary>
 /// The Downloads organizer. Owns the engine and the history database while installed; the views
@@ -82,7 +83,7 @@ public sealed class DownloadsModule : IFeatureModule
         Engine.Start(Settings);
 
         context.Activation.Register(DownloadsNotices.OrganizeVerb, args =>
-            Raise(new DownloadsRequest(DownloadsRequestKind.Organize, Folder: args.FirstOrDefault())));
+            Raise(new DownloadsRequest(DownloadsRequestKind.Organize, Folder: args.FirstOrDefault(), FromExplorer: true)));
         context.Activation.Register(DownloadsNotices.RunVerb, args =>
             Raise(new DownloadsRequest(DownloadsRequestKind.Run, RunId: long.TryParse(args.FirstOrDefault(), NumberStyles.None, CultureInfo.InvariantCulture, out long id) ? id : null)));
         context.Activation.Register(DownloadsNotices.ReviewVerb, _ => Raise(new DownloadsRequest(DownloadsRequestKind.Review)));
@@ -103,6 +104,7 @@ public sealed class DownloadsModule : IFeatureModule
         ArgumentNullException.ThrowIfNull(request);
         return request switch
         {
+            { Kind: DownloadsRequestKind.Organize, Folder: { Length: > 0 } folder, FromExplorer: true } => $"explorer/{folder}",
             { Kind: DownloadsRequestKind.Organize, Folder: { Length: > 0 } folder } => $"preview/{folder}",
             { Kind: DownloadsRequestKind.Organize or DownloadsRequestKind.Review } => "review",
             { Kind: DownloadsRequestKind.Run, RunId: { } run } => $"history/{run}",
