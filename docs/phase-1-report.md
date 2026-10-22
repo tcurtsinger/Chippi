@@ -1,6 +1,6 @@
 # Chippi Phase 1 report
 
-Phase 1 is built and on GitHub at `main`: the tray icon and flyout, the settings window with the Features hub, the island with Gumdrop, the module system, packaging, and Keep awake as the reference module. Everything merged went through a second member's review first. Two acceptance checks are still open: the flyout at 150% and 200% on the main display (waiting on Travis's OK to change its scaling), and any run on ARM64 hardware.
+Phase 1 is built and on GitHub at `main`: the tray icon and flyout, the settings window with the Features hub, the island with Gumdrop, the module system, packaging, and Keep awake as the reference module. Everything merged went through a second member's review first. Two checks are still open: any run on ARM64 hardware, and a real Setup.exe install and uninstall (Travis will run that on his other PC).
 
 Brief: [phase-1-handoff.md](phase-1-handoff.md). Day-by-day decisions and follow-ups: [phase-1-tracker.md](phase-1-tracker.md).
 
@@ -64,7 +64,7 @@ At `main` `59ebf8c`:
 | Build and test with 0 warnings, both platforms | Done | See Test results |
 | Core tests cover the five listed areas | Done | `tests/Chippi.Core.Tests` |
 | Gumdrop tray icon; a second launch focuses the flyout | Done | Checked live by Karl and Marge |
-| Flyout anchoring at 100% / 150% / 200%, multi-monitor; Esc and click-away; matches §5 | Partly | 100% with the taskbar at the bottom checked live. 150% and 200% not run: the tray only lives on the main display, and changing its scaling needs Travis's OK. Other taskbar edges are handled in code but not run |
+| Flyout anchoring at 100% / 150% / 200%, multi-monitor; Esc and click-away; matches §5 | Done | Checked live on the main display at 100%, 150% and 200% with the pointer on either monitor: right edge on the screen edge, bottom on the taskbar, size scaled exactly. This run found and fixed a bug: with the icon in the overflow area, Windows reported it off-screen and the flyout opened on the secondary monitor (fixed in `509f393`). Other taskbar edges are handled in code but not run |
 | Hub: Keep awake installs and uninstalls live; presets, search, counts, badges; Coming soon not installable | Done | WS2 review plus a UI Automation pass |
 | Island: three states, follows the foreground monitor, hides over fullscreen, never takes focus, not in Alt+Tab | Done | Checked live. Also centered at 150% and 175% on the secondary monitor (Windows' maximum for 1080p) |
 | Gumdrop moods and small form match §7; blink, squish, reduced motion | Done | Frame strips in `gumdrop-celebrate-frames.png`, Karl's geometry review |
@@ -84,7 +84,7 @@ Every deviation Travis reviewed on 2026-10-21 is now part of DESIGN.md (light ba
 
 ## Known issues
 
-- **Not run:** the flyout at 150% and 200% (main display), the taskbar on the top or side edges, a real Explorer restart (only the message was simulated), an exclusive-fullscreen game, PowerPoint presentation mode, browser F11, Narrator itself, any ARM64 execution, and a real Setup.exe install and uninstall (so the uninstall hook that removes the run-at-startup entry hasn't run live).
+- **Not run:** the taskbar on the top or side edges, a real Explorer restart (only the message was simulated), an exclusive-fullscreen game, PowerPoint presentation mode, browser F11, Narrator itself, any ARM64 execution, and a real Setup.exe install and uninstall (so the uninstall hook that removes the run-at-startup entry hasn't run live).
 - **Equalizer cost:** about 4.7% of one CPU core while media is live, against 0.5% at rest. Fine for Phase 1. Before real media (Phase 3), it should run from real audio levels at 20 fps or less and stop during silence.
 - **System-wide "busy":** on this PC, Windows sometimes reports a fullscreen app system-wide when none is in front. The island now ignores that flag and relies on the foreground window's bounds plus D3D fullscreen and presentation mode.
 - **Expanded island media** shows no elapsed or total time, because activities don't carry them yet, and the transport buttons do nothing. Both wait for real media in Phase 3.
