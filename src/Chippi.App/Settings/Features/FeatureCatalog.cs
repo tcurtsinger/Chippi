@@ -20,12 +20,7 @@ public static class FeatureCatalog
 
     public static IReadOnlyList<FeatureDescriptor> Placeholders { get; } =
     [
-        // Phase 2: Files
-        new("downloads-organizer", "Downloads organizer", "Sorts new downloads into folders by your rules, with preview and undo", FeatureGroup.Files)
-        {
-            Icon = "Folder",
-            Presets = Essentials | PowerUser,
-        },
+        // Files (Downloads organizer is a real module since Phase 2: Chippi.Features.Downloads)
         new("shelf", "Shelf", "Holds dragged files and text while you move between apps", FeatureGroup.Files)
         {
             Icon = "Download",

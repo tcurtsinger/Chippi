@@ -141,6 +141,7 @@ public partial class App : Application
         var keepAwake = new Chippi.Features.KeepAwake.KeepAwakeModule();
         shell.Registry.Register(keepAwake);
         Exit += (_, _) => keepAwake.ReleaseOnExit();
+        shell.Registry.Register(new Chippi.Features.Downloads.DownloadsModule());
 
         // [WS2] "Coming soon" placeholders for the PLAN.md features.
         Settings.Features.FeatureCatalog.RegisterPlaceholders(shell.Registry);
