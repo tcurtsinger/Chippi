@@ -76,7 +76,7 @@ public partial class SettingsWindow : Window
 
     private void ShowPage(SettingsPageInfo page)
     {
-        _modulePage = null;
+        LeaveModulePage();
         PageHost.Content = page.Id switch
         {
             "features" => new FeaturesPage(_shell, ShowModulePage),
@@ -106,10 +106,18 @@ public partial class SettingsWindow : Window
             Log.Error($"Settings page for {entry.Id} failed to load", ex);
             return;
         }
+        LeaveModulePage(); // never two subscriptions
         _modulePage = entry;
         PageHost.Content = new ModulePageHost(entry.Descriptor.Name, view, BackToFeatures);
         Scroller.ScrollToTop();
         _shell.Registry.Changed += OnRegistryChangedWhileModulePage;
+    }
+
+    /// <summary>Forgets the module page and its registry handler. Every way off a module page goes through here.</summary>
+    private void LeaveModulePage()
+    {
+        _shell.Registry.Changed -= OnRegistryChangedWhileModulePage;
+        _modulePage = null;
     }
 
     // A module that stops (uninstalled from the flyout, say) takes its page with it.
@@ -121,7 +129,7 @@ public partial class SettingsWindow : Window
 
     private void BackToFeatures()
     {
-        _shell.Registry.Changed -= OnRegistryChangedWhileModulePage;
+        LeaveModulePage();
         Navigate("features");
     }
 
@@ -139,7 +147,7 @@ public partial class SettingsWindow : Window
 
     protected override void OnClosed(EventArgs e)
     {
-        _shell.Registry.Changed -= OnRegistryChangedWhileModulePage;
+        LeaveModulePage();
         PageHost.Content = null; // pages unhook their registry events on Unloaded
         base.OnClosed(e);
     }
