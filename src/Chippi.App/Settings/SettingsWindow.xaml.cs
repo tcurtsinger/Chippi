@@ -2,6 +2,7 @@
 // Copyright (C) Chippi contributors
 
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
@@ -50,15 +51,18 @@ public partial class SettingsWindow : Window
         StateChanged += (_, _) => OnStateChanged();
     }
 
+    /// <summary>The page's own element (inside the scroller), for the debug snapshot.</summary>
+    internal FrameworkElement PageContent => PageHost;
+
     /// <summary>The sidebar page showing, for reopening at the same place.</summary>
     public string CurrentPage => (Nav.SelectedItem as SettingsPageInfo)?.Id ?? "general";
 
     public void Navigate(string page)
     {
         var target = Pages.FirstOrDefault(p => p.Id == page) ?? Pages[0];
-        if (Nav.SelectedItem == target && _modulePage is null)
+        if (ReferenceEquals(Nav.SelectedItem, target) && _modulePage is null)
             return;
-        if (Nav.SelectedItem == target)
+        if (ReferenceEquals(Nav.SelectedItem, target))
             ShowPage(target);
         else
             Nav.SelectedItem = target;
@@ -79,7 +83,7 @@ public partial class SettingsWindow : Window
             "island" => new IslandPetPage(_shell),
             "shortcuts" => new ShortcutsPage(),
             "permissions" => new PermissionsPage(_shell),
-            "appearance" => new AppearancePage(_shell),
+            "appearance" => new AppearancePage(() => Navigate("general"), () => Navigate("island")),
             "about" => new AboutPage(),
             _ => new GeneralPage(_shell),
         };
