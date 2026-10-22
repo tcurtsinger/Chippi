@@ -119,10 +119,12 @@ public sealed class DownloadsModule : IFeatureModule
 
     public async Task StopAsync(CancellationToken ct)
     {
-        // Not cancellable: history closes only after the file being moved right now is settled.
-        if (Engine is { } engine)
-            await Task.Run(engine.Dispose, CancellationToken.None).ConfigureAwait(false);
+        // Views see null first, so none starts reading history while it closes. Not cancellable:
+        // history closes only after the file being moved right now is settled.
+        var engine = Engine;
         Engine = null;
+        if (engine is not null)
+            await Task.Run(engine.Dispose, CancellationToken.None).ConfigureAwait(false);
         _history?.Dispose();
         _history = null;
         _context = null;
@@ -136,7 +138,7 @@ public sealed class DownloadsModule : IFeatureModule
     }
 
     /// <summary>The Downloads known folder (it can be moved), else the profile default.</summary>
-    private static string? DownloadsFolder()
+    public static string? DownloadsFolder()
     {
         const string key = @"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders";
         if (Registry.GetValue(key, "{374DE290-123F-4565-9164-39C4925E467B}", null) is string path && path.Length > 0)
