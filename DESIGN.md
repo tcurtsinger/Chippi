@@ -200,7 +200,7 @@ Chippi still rejects what Hopper rejected: **bloated vendor suites** (busy multi
 - **Deep Synth** `#8E3FD0` → `#2A6AD6` is the same gradient darkened for fills that carry text or a glyph meant to be read: primary buttons and the island's play/pause button. White on it clears 4.5:1. White on the regular gradient only reaches about 3:1, which is why it never carries text.
 
 ### Signals
-- **Signal Green** `#3DDC97`: active, online, routing. Status dots such as "Pinned · noise suppression on", with a soft glow.
+- **Signal Green** `#3DDC97`: active, online, routing, and done (a moved file's check, a valid rule). Status dots such as "Pinned · noise suppression on", with a soft glow.
 - **Signal Amber** `#F5A64B`: attention. Files the organizer held back, "Overlaps Windows/PowerToys" badges and warning rows.
 - **Signal Red** `#E23B4E`: destructive only, such as the close-button hover. Where it fills behind white text (the muted-mic button), use **Signal Red Deep** `#C42B3E`.
 
@@ -218,7 +218,7 @@ Every chassis and ink token has a light mirror (see `colors-light` in the front 
 Three text colors change in light because the dark values fail contrast on light surfaces (approved 2026-10-21):
 - **Active segment text** is Ink `#1A2036` (12.7:1), not white.
 - **Source badge text** is `#7B2DB8` (5.5:1 or better on Surface and Panel).
-- **Overlap badge text** is `#8A4B00` (5.7:1 or better).
+- **Overlap badge text** is `#8A4B00` (5.7:1 or better). The same color is used for any amber **text** in light (held and failed reasons, validation messages); amber borders, dots and glyphs stay Signal Amber.
 Badge tints and borders are unchanged.
 
 ### Named rules
@@ -301,6 +301,40 @@ Mostly flat, layered tonally, with colored glows for emphasis.
 - **Features hub:** a Display title and a Body description. A mono "N of M installed" count sits right. Below them are a preset segment (Essentials · Audio · Power user · Everything · Custom) and a 36px search field. The groups follow, each a Label eyebrow over a 3-column grid of feature cards (12px gap). Toggling any card switches the preset to Custom. The count includes Coming-soon features in M. Clicking an installed card, or pressing Enter on it, opens that feature's settings page.
 - **General and Appearance:** the theme setting lives in General. Appearance links to General and to Island & pet rather than repeating their controls.
 
+### Downloads organizer (approved 2026-10-22)
+The approved mockups are `docs/phase-2/design/phase-2-mockups.html`, with one PNG per screen. They are the reference for every pixel below.
+- **Tidy tab:**
+  - The folder card is Surface, 14px radius and 13px padding. Its 32px chip is the gradient while the folder is watched and Chip color when Paused.
+  - The folder name is a picker listing every folder with its mode, plus Add folder. RECENTLY STASHED shows all folders together.
+  - The mode segment in the flyout is 34px tall with 12 / 700 labels.
+  - Mode lines: "Manual · 3 to review", "Silent · moves after 30s", "Paused · not watching".
+  - Empty state: "No folders yet", with the caption "New folders start in Manual", a primary "Add Downloads" and a secondary "Choose folder…".
+- **Stash rows:**
+  - Held: amber 45% border and a Review button, which opens preview.
+  - Waiting: "Waiting · reason" in tertiary with a clock glyph and no action.
+  - Failed: the reason in amber with a retry button, but no border, so the amber border always means held.
+- **Preview** is a view inside Settings with a back button, not a dialog.
+  - Each row has a checkbox, the file name with its size in mono, the rule and the destination. Warnings are an amber line under the name, and a move to another drive gets a neutral "Other drive" badge.
+  - Held rows start unchecked. Files no rule matches show a disabled checkbox. The header checkbox shows mixed when some rows are selected.
+  - The footer shows the selected count and total size, with Cancel and Approve.
+  - After apply: a green check and Undo on each moved row, an amber failure line on each failed one, then "Preview again" and "Done".
+- **Downloads organizer page:** a Settings · Rules · History segment at the top right. There is no description under the title, because the Features card already says what it does.
+- **Rules editor:**
+  - An accordion with one rule open at a time. Edits save when valid, with no Save button.
+  - Drag handles to reorder, or Alt+Up/Down from the keyboard. The drop target is a 2px gradient line.
+  - Regex and templates are set in mono, with placeholder tokens tinted like the source badge and insertable from chips.
+  - Validation messages are amber, under the field.
+  - A "test a file name" box runs the whole rule set and tags the winning rule with a "Match" badge.
+- **History:**
+  - Grouped by day, one Panel container per run, with runs over 10 files collapsed.
+  - Undo per row and per run goes through an inline confirm bar ("Undo 4").
+  - Clear history uses a popover with a Signal Red Deep "Clear" button.
+- **Notices:**
+  - Event kinds: Organized, Ready to review, Held, Failed, Archive imported.
+  - Which events reach Windows notifications and the island is set on the app-wide **Notifications** settings page, not inside the feature (design pending, Travis 2026-10-22).
+  - Notification copy states what happened first: "4 files organized", "1 file held", "1 file not moved", "photos-2025.zip imported".
+  - Island stash pill: Gumdrop celebrates, then goes idle, and a folder glyph replaces the equalizer. Held and failed pills use amber source text and an amber dot.
+
 ## 6. Components
 
 All interactive controls are custom-templated with the full state set: default, hover, keyboard focus (a 2px violet ring at 2px offset, which is non-negotiable) and disabled (opacity .45).
@@ -330,6 +364,14 @@ All interactive controls are custom-templated with the full state set: default, 
   - **Source** (violet tint), e.g. "From Hopper".
   - **Overlap** (amber tint), e.g. "Overlaps Win+V", for features Windows or PowerToys already cover.
   - **Needs** (neutral), e.g. "Admin for temps" or "Needs VB-CABLE".
+- **Checkbox** (approved 2026-10-22):
+  - An 18px box with a 5px radius.
+  - Off: Input fill with a 1.5px Ink Muted border.
+  - On and mixed: the deep gradient with a white glyph.
+  - Hover: an Ink Control border and Button Hover fill when off, 92% opacity when on. Focus and disabled states follow the rules above.
+  - Use it for multi-select lists and grids. A single setting still uses the switch.
+- **Text field:** the search-box chrome without the icon. Templates and regex use mono.
+- **Drag handle:** Hopper's grip glyph, 16px. Alt+Up/Down moves the row.
 - **Status dot:** 7px with a glow when live. Green for active, amber for attention, Ink Muted for offline.
 - **Icons:** Lucide-style on a 24px grid, 1.8 stroke, round caps and joins, drawn at 15–17px (Hopper already ships `LucideIcons.cs`). Brand logos are never redrawn: an app shows its real icon, or a monogram tile when no icon is available.
 

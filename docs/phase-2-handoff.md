@@ -13,7 +13,9 @@ Read first, in order:
 | Topic | Decision |
 |---|---|
 | History | SQLite through `Microsoft.Data.Sqlite` (MIT), behind `IHistoryStore`. Only `SqliteHistoryStore` touches SQLite |
-| Notices | Two places: Windows notifications and the island. For each event kind (organized, held for review, failed, archive imported) the user picks Windows, island, both or neither. The Tidy tab always lists everything |
+| Notices | Two places: Windows notifications and the island. For each event kind (organized, ready to review, held, failed, archive imported) the user picks Windows, island, both or neither. The Tidy tab always lists everything. The choices live on one **app-wide Settings › Notifications page** covering every feature, not inside each feature (Travis, 2026-10-22; its layout takes vorssaint-utils' settings panel as structural inspiration only, never its look, code or strings) |
+| Designs | Phase 2 mockups approved with Marge's tweak (no repeated description under the page title). Folded into DESIGN.md §5 and §6. The Notifications page design is still pending |
+| Notification route | Decided after the Windows Sandbox test (enabling Sandbox needs a restart of Travis's PC, which is Travis's call). The spike lives in `build/toast-spike/` |
 | Explorer entry | Classic menu ("Show more options"), per user, no admin. The label is exactly **Organize** |
 | First mode | A newly added folder, Downloads included, starts in **Manual** |
 | Copy | The Bare Label Rule (DESIGN.md §3): labels name the action only, never the app |
