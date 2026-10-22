@@ -26,7 +26,7 @@ Specs per workstream: [phase-1-workstreams.md](phase-1-workstreams.md). Lead sea
 ## Decisions log
 - 2026-10-21: origin = https://github.com/tcurtsinger/Chippi.git. Push main after each reviewed merge (Travis).
 - 2026-10-21: DESIGN.md updated (Travis approved): light badge text Source #7B2DB8 / Overlap #8A4B00, light active segment text #1A2036, new lowest island kind "Status" used by Keep awake.
-- 2026-10-21: Kayla's gap fills (Coming soon card, tool tile off, 36px segments outside flyout, 10px icon chip radius, primary/switch hover, slider hover 15â†’18px) and preset membership stay as drafts; Travis approves from screenshots at the WS2 review.
+- 2026-10-21: Kayla's gap fills (Coming soon card, tool tile off, 36px segments outside flyout, 10px icon chip radius, primary/switch hover, slider hover 15 to 18px) and preset membership stay as drafts; Travis approves from screenshots at the WS2 review.
 - 2026-10-21: Themes and controls move to a WPF class library `src/Chippi.UI` (Marge) so feature modules can use the custom controls. WS0 owns it.
 - 2026-10-21: JetBrains Mono upstream static files declare weights 436/472; styles request 472 to hit the SemiBold file. Visual weight is 600 as designed.
 
@@ -35,5 +35,5 @@ Specs per workstream: [phase-1-workstreams.md](phase-1-workstreams.md). Lead sea
 
 ## Risks
 - Shell_NotifyIconGetRect needs the icon's hWnd and uID, which WinForms NotifyIcon (Hopper's tray) hides. Likely fix: own the icon via Shell_NotifyIcon through CsWin32 in WS1.
-- Velopack `vpk` on .NET 10 and ARM64 is unproven here. If it blocks, stop and escalate (brief Â§9).
+- Velopack `vpk` on .NET 10 and ARM64 is unproven here. If it blocks, stop and escalate (brief §9).
 
