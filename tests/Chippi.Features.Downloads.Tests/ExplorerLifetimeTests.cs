@@ -61,6 +61,35 @@ public sealed class ExplorerLifetimeTests : IDisposable
         finally { await registry.StopAllAsync(); registration.SetEnabled(false); }
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Startup_reconciles_stale_keys_without_removing_installed_or_other_profiles(bool installed)
+    {
+        var registration = new ExplorerRegistration("test", _key, @"C:\Tools\Chippi.exe");
+        var neighbor = new ExplorerRegistration("other", _key, @"C:\Tools\Chippi.exe");
+        registration.SetEnabled(true);
+        neighbor.SetEnabled(true);
+        var config = new ConfigStore(Path.Combine(_root, "settings.json"));
+        config.SetModuleSettings("downloads-organizer", new DownloadsSettings { Initialized = true });
+        // Represents the installed list after an offline edit or interrupted uninstall.
+        config.SetSection("features", new { preset = "custom", installed = installed ? new[] { "downloads-organizer" } : Array.Empty<string>() });
+        var registry = new ModuleRegistry(config, new IslandActivityHub(), NullLoggerFactory.Instance,
+            new ModuleServices { DataRoot = Path.Combine(_root, "data") });
+        var module = new DownloadsModule(registration);
+        registry.Register(module);
+        try
+        {
+            await registry.StartAsync();
+            AssertKeys(registration, installed);
+            AssertKeys(neighbor, true);
+            Assert.Equal(installed, registry.Find("downloads-organizer")!.IsRunning);
+            if (!installed) Assert.Null(module.Engine);
+            await registry.StopAllAsync();
+            AssertKeys(registration, installed); // normal exit still preserves installed entries
+        }
+        finally { await registry.StopAllAsync(); }
+    }
     private static void AssertKeys(ExplorerRegistration registration, bool present)
     {
         foreach (var path in registration.KeyPaths) { using var key = Registry.CurrentUser.OpenSubKey(path); Assert.Equal(present, key is not null); }

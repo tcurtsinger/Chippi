@@ -118,6 +118,9 @@ public sealed class ModuleRegistry(ConfigStore config, IslandActivityHub island,
         {
             _started = true;
             await SyncFromConfigAsync(ct).ConfigureAwait(false);
+            // A crash or an offline settings edit can leave persistent integration behind.
+            foreach (var entry in _entries.Where(e => !e.IsComingSoon && !e.IsInstalled))
+                await SetInstalledCoreAsync(entry, false, ct).ConfigureAwait(false);
         }
         finally
         {
