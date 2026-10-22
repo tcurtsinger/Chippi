@@ -59,6 +59,9 @@ public sealed class SqliteHistoryStore : IHistoryStore
         "UPDATE operations SET state = $s, error = $e, completed_at = $at WHERE id = $id",
         ("$s", (long)OperationState.Failed), ("$e", error), ("$at", Now()), ("$id", operationId));
 
+    public void MarkPartial(long operationId, string? partialPath) =>
+        Execute("UPDATE operations SET partial_path = $p WHERE id = $id", ("$p", partialPath), ("$id", operationId));
+
     public void MarkUndone(long operationId) => SetState(operationId, OperationState.Undone);
 
     public OperationRecord? Get(long operationId) =>
@@ -171,7 +174,8 @@ public sealed class SqliteHistoryStore : IHistoryStore
                 planned_at    INTEGER NOT NULL,
                 completed_at  INTEGER,
                 undo_of       INTEGER REFERENCES operations(id),
-                dest_modified INTEGER
+                dest_modified INTEGER,
+                partial_path  TEXT
             );
             CREATE INDEX IF NOT EXISTS ix_operations_dest ON operations(dest_path COLLATE NOCASE, state);
             CREATE INDEX IF NOT EXISTS ix_operations_state ON operations(state);
@@ -248,6 +252,7 @@ public sealed class SqliteHistoryStore : IHistoryStore
             Time(r, "planned_at")!.Value,
             Time(r, "completed_at"),
             r.IsDBNull(r.GetOrdinal("undo_of")) ? null : r.GetInt64(r.GetOrdinal("undo_of")),
-            Time(r, "dest_modified"));
+            Time(r, "dest_modified"),
+            Text(r, "partial_path"));
     }
 }

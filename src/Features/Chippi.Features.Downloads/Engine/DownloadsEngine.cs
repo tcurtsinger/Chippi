@@ -657,8 +657,8 @@ public sealed class DownloadsEngine : IDisposable
         var current = new FileInfo(record.DestinationPath);
         if (!current.Exists)
             return new UndoResult(false, null, "The file is no longer where it was put.");
-        if (record.Sha256 is null || !string.Equals(Fingerprint.Sha256(record.DestinationPath), record.Sha256, StringComparison.Ordinal))
-            return new UndoResult(false, null, "The file changed since it was organized, so it was left alone.");
+        if (record.Sha256 is null)
+            return new UndoResult(false, null, Executor.ChangedSinceOrganized);
         if (File.Exists(record.SourcePath) || Directory.Exists(record.SourcePath))
             return new UndoResult(false, null, "Something already has the original name.");
         string originalFolder = Path.GetDirectoryName(record.SourcePath)!;
@@ -668,7 +668,8 @@ public sealed class DownloadsEngine : IDisposable
         long runId = _history.BeginRun(RunTrigger.Undo, originalFolder);
         var result = _executor.Execute(runId, new ExecutionRequest(
             HistoryOperationKind.Restore, record.DestinationPath, record.SourcePath, record.RuleId, record.RuleName,
-            current.Length, new DateTimeOffset(current.LastWriteTimeUtc, TimeSpan.Zero), AllowRenumber: false, UndoOf: record.Id));
+            current.Length, new DateTimeOffset(current.LastWriteTimeUtc, TimeSpan.Zero), AllowRenumber: false, UndoOf: record.Id,
+            ExpectedSha256: record.Sha256)); // checked on the held handle, the bytes that actually move back
         _history.EndRun(runId);
         if (!result.Succeeded)
             return new UndoResult(false, result.OperationId, result.Error);

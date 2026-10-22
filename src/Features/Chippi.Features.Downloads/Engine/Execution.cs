@@ -104,6 +104,7 @@ internal sealed class SelfTriggerGuard(IHistoryStore history)
 
 /// <summary>One file to move or rename, with what the plan saw so the executor can tell if it changed since.</summary>
 /// <param name="ExpectedVersion">The <see cref="FileVersion"/> the preview saw; null when acting right after the readiness check.</param>
+/// <param name="ExpectedSha256">Undo: the content history recorded. Checked on the bytes actually moved.</param>
 /// <param name="RecordedSource">What history calls the source, when it is not <paramref name="Source"/> (an import's staged file).</param>
 internal sealed record ExecutionRequest(
     HistoryOperationKind Kind,
@@ -116,31 +117,34 @@ internal sealed record ExecutionRequest(
     bool AllowRenumber,
     long? UndoOf = null,
     long? ExpectedVersion = null,
-    string? RecordedSource = null);
+    string? RecordedSource = null,
+    string? ExpectedSha256 = null);
 
 internal sealed record ExecutionResult(bool Succeeded, long OperationId, string Source, string Destination, string? Error);
 
 /// <summary>
 /// Moves and renames files, recording each in history before and after (architecture.md §2, §3):
-/// re-validates the source, never overwrites, uses a verified copy across volumes. Call from one
-/// thread at a time (the engine serializes).
+/// re-validates the source, never overwrites, uses a verified copy across volumes. Every check,
+/// rename and delete goes through one open handle (<see cref="FileHandles"/>), so the file that was
+/// validated is the file that moves. Call from one thread at a time (the engine serializes).
 /// </summary>
 internal sealed class Executor(IHistoryStore history, EngineOptions options)
 {
     internal const string PartialSuffix = ".chippi-partial";
 
-    /// <summary>The copy-in-progress name. It carries the operation id, so it is never a file the user already had.</summary>
+    internal const string ChangedSinceOrganized = "The file changed since it was organized, so it was left alone.";
+
     internal static string PartialPath(string destination, long operationId) => $"{destination}.{operationId}{PartialSuffix}";
 
     public ExecutionResult Execute(long runId, ExecutionRequest request)
     {
         string recorded = request.RecordedSource ?? request.Source;
-        FileStream source;
+        SafeFileHandle source;
         try
         {
-            // Held from validation to the move: no one can write the file in between (readers and
-            // our own rename/delete are still allowed).
-            source = new FileStream(request.Source, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete, 1 << 16, FileOptions.SequentialScan);
+            // Held from validation to the move. Others can read it, but nobody can write, rename,
+            // delete or replace it at this path until it is closed.
+            source = FileHandles.OpenToMove(request.Source);
         }
         catch (FileNotFoundException)
         {
@@ -153,11 +157,15 @@ internal sealed class Executor(IHistoryStore history, EngineOptions options)
 
         using (source)
         {
-            var modified = File.GetLastWriteTimeUtc(request.Source);
-            if (source.Length != request.ExpectedBytes
+            var modified = File.GetLastWriteTimeUtc(source);
+            if (RandomAccess.GetLength(source) != request.ExpectedBytes
                 || new DateTimeOffset(modified, TimeSpan.Zero) != request.ExpectedModifiedUtc
-                || request.ExpectedVersion is { } version && FileVersion.Of(source.SafeFileHandle) != version)
-                return Fail(runId, request, "The file changed after it was planned.");
+                || request.ExpectedVersion is { } version && FileVersion.Of(source) != version)
+                return Fail(runId, request, request.ExpectedSha256 is null ? "The file changed after it was planned." : ChangedSinceOrganized);
+
+            string sha = FileHandles.Sha256(source);
+            if (request.ExpectedSha256 is { } expected && !string.Equals(sha, expected, StringComparison.Ordinal))
+                return Fail(runId, request, ChangedSinceOrganized);
 
             string destination = request.Destination;
             if (Exists(destination))
@@ -168,44 +176,59 @@ internal sealed class Executor(IHistoryStore history, EngineOptions options)
             }
 
             long id = history.Plan(runId, request.Kind, recorded, destination, request.RuleId, request.RuleName, request.ExpectedBytes, request.UndoOf);
-            string? partial = null;
             try
             {
-                string sha = Fingerprint.Sha256(source);
                 history.MarkStarted(id);
                 Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
-
-                if (!options.ForceCopy && SameVolume(request.Source, destination))
-                {
-                    File.Move(request.Source, destination, overwrite: false);
-                }
-                else
-                {
-                    string path = PartialPath(destination, id);
-                    using (var to = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None))
-                    {
-                        partial = path; // created by this operation, so ours to clean up
-                        source.Position = 0;
-                        source.CopyTo(to);
-                        to.Flush(flushToDisk: true);
-                    }
-                    File.SetLastWriteTimeUtc(partial, modified);
-                    if (!string.Equals(Fingerprint.Sha256(partial), sha, StringComparison.Ordinal))
-                        throw new IOException("The copy did not match the original.");
-                    File.Move(partial, destination, overwrite: false);
-                    partial = null;
-                    File.Delete(request.Source); // still under our handle, so it cannot have changed
-                }
-
+                bool moved = !options.ForceCopy && FileHandles.TryRename(source, destination);
+                if (!moved)
+                    CopyAcross(id, source, destination, modified, sha);
                 history.MarkCompleted(id, destination, sha, new DateTimeOffset(File.GetLastWriteTimeUtc(destination), TimeSpan.Zero));
                 return new ExecutionResult(true, id, request.Source, destination, null);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                if (partial is not null)
-                    TryDelete(partial);
                 history.MarkFailed(id, ex.Message);
                 return new ExecutionResult(false, id, request.Source, destination, ex.Message);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Another volume: copy to a new partial file this operation creates and records, verify it,
+    /// rename it into place by its handle, then delete the original by its handle.
+    /// </summary>
+    private void CopyAcross(long id, SafeFileHandle source, string destination, DateTime modified, string sha)
+    {
+        string path = PartialPath(destination, id);
+        using var partial = FileHandles.CreateExclusive(path); // fails if anything is already there
+        history.MarkPartial(id, path); // proof for a restart that this file is ours
+        bool placed = false;
+        try
+        {
+            FileHandles.Copy(source, partial);
+            File.SetLastWriteTimeUtc(partial, modified);
+            if (!string.Equals(FileHandles.Sha256(partial), sha, StringComparison.Ordinal))
+                throw new IOException("The copy did not match the original.");
+            if (!FileHandles.TryRename(partial, destination))
+                throw new IOException("The copy could not be put in place.");
+            placed = true;
+            history.MarkPartial(id, null);
+            FileHandles.DeleteOnClose(source); // the validated original, gone when the handle closes
+        }
+        finally
+        {
+            if (!placed)
+            {
+                try
+                {
+                    FileHandles.DeleteOnClose(partial);
+                    history.MarkPartial(id, null);
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    // Still recorded, so the next reconcile removes it.
+                }
             }
         }
     }
@@ -216,10 +239,12 @@ internal sealed class Executor(IHistoryStore history, EngineOptions options)
         int settled = 0;
         foreach (var record in history.Incomplete())
         {
-            // Only this operation's own copy, never a file that merely ends in the suffix.
-            string partial = PartialPath(record.DestinationPath, record.Id);
-            if (File.Exists(partial))
+            // Only a partial file this operation recorded creating; never inferred from a name.
+            if (record.PartialPath is { } partial)
+            {
                 TryDelete(partial);
+                history.MarkPartial(record.Id, null);
+            }
             bool atDestination = Exists(record.DestinationPath);
             bool atSource = Exists(record.SourcePath);
 
@@ -263,9 +288,6 @@ internal sealed class Executor(IHistoryStore history, EngineOptions options)
     }
 
     private static bool Exists(string path) => File.Exists(path) || Directory.Exists(path);
-
-    private static bool SameVolume(string a, string b) =>
-        string.Equals(Path.GetPathRoot(Path.GetFullPath(a)), Path.GetPathRoot(Path.GetFullPath(b)), StringComparison.OrdinalIgnoreCase);
 
     private static void TryDelete(string path)
     {

@@ -57,7 +57,8 @@ public sealed record OperationRecord(
     DateTimeOffset PlannedAt,
     DateTimeOffset? CompletedAt,
     long? UndoOf,
-    DateTimeOffset? DestinationModifiedUtc);
+    DateTimeOffset? DestinationModifiedUtc,
+    string? PartialPath = null);
 
 /// <summary>History view filters. All optional; newest first.</summary>
 public sealed record HistoryQuery
@@ -96,6 +97,12 @@ public interface IHistoryStore : IDisposable
     void MarkCompleted(long operationId, string destination, string sha256, DateTimeOffset destinationModifiedUtc);
 
     void MarkFailed(long operationId, string error);
+
+    /// <summary>
+    /// Records the copy-in-progress file this operation created (null once it is gone), so a
+    /// restart deletes only a file it has proof of creating.
+    /// </summary>
+    void MarkPartial(long operationId, string? partialPath);
 
     void MarkUndone(long operationId);
 

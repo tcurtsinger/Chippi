@@ -38,17 +38,27 @@ public sealed class ReviewFixTests
         using var f = new Fixture(FolderMode.Manual);
         f.AddRule(MovePdfs());
         f.Write("a.pdf");
-        using var gate = new GatedHistory(f.History);
+        using var entered = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        using var gate = new HookedHistory(f.History)
+        {
+            // Pauses mid-operation, standing in for a long copy.
+            OnStarted = () =>
+            {
+                entered.Set();
+                release.Wait();
+            },
+        };
         using var engine = new DownloadsEngine(gate, f.Notifier, Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance, f.Options, f.Time);
         engine.Start(f.Settings, runLoop: false);
         var plan = await engine.CreatePreviewAsync(f.Folder);
 
         var approval = engine.ApproveAsync(plan.Id, [1]);
-        Assert.True(gate.Entered.Wait(TimeSpan.FromSeconds(10)), "the approval never reached MarkStarted");
+        Assert.True(entered.Wait(TimeSpan.FromSeconds(10)), "the approval never reached MarkStarted");
         var stop = Task.Run(engine.Dispose);
 
         Assert.NotSame(stop, await Task.WhenAny(stop, Task.Delay(300))); // Dispose must not return while a file is being moved
-        gate.Release.Set();
+        release.Set();
         await stop.WaitAsync(TimeSpan.FromSeconds(10));
         // By the time Dispose returned, the move and its history row were finished.
         Assert.True(File.Exists(f.In("Docs", "a.pdf")));
@@ -136,14 +146,118 @@ public sealed class ReviewFixTests
         Assert.True(File.Exists(f.In("notes.txt")));
     }
 
-    /// <summary>Pauses the first MarkStarted until released, standing in for a long copy.</summary>
-    private sealed class GatedHistory(IHistoryStore inner) : IHistoryStore
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Nobody_can_swap_the_source_once_it_is_validated(bool forceCopy)
     {
-        public ManualResetEventSlim Entered { get; } = new();
+        using var f = new Fixture(FolderMode.Manual, options: new EngineOptions { ForceCopy = forceCopy });
+        f.AddRule(MovePdfs());
+        string source = f.Write("a.pdf", "original");
+        bool renamed = false, replaced = false;
+        using var hooked = new HookedHistory(f.History)
+        {
+            // Karl's interleaving: right after validation, move the original away and put another file in its place.
+            OnStarted = () =>
+            {
+                renamed = Attempt(() => File.Move(source, f.In("moved-away.pdf")));
+                replaced = Attempt(() => File.WriteAllText(source, "private replacement"));
+            },
+        };
+        using var engine = new DownloadsEngine(hooked, f.Notifier, Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance, f.Options, f.Time);
+        engine.Start(f.Settings, runLoop: false);
+        var preview = await engine.CreatePreviewAsync(f.Folder);
 
-        public ManualResetEventSlim Release { get; } = new();
+        var result = await engine.ApproveAsync(preview.Id, [1]);
 
-        public long BeginRun(RunTrigger trigger, string folder) => inner.BeginRun(trigger, folder);
+        Assert.False(renamed);
+        Assert.False(replaced);
+        Assert.Equal(1, result.Succeeded);
+        Assert.Equal("original", File.ReadAllText(f.In("Docs", "a.pdf")));
+        Assert.False(File.Exists(source));
+        Assert.False(File.Exists(f.In("moved-away.pdf")));
+    }
+
+    [Fact]
+    public void Reconcile_keeps_a_file_that_already_had_the_numbered_partial_name()
+    {
+        using var f = new Fixture(FolderMode.Paused);
+        f.Write("a.pdf");
+        Directory.CreateDirectory(f.In("Docs"));
+        long run = f.History.BeginRun(RunTrigger.Silent, f.Folder);
+        // The operation id is predictable, so someone's file can have the exact name before Plan.
+        string collision = Executor.PartialPath(f.In("Docs", "a.pdf"), 1);
+        File.WriteAllText(collision, "unrelated data");
+        long id = f.History.Plan(run, HistoryOperationKind.Move, f.In("a.pdf"), f.In("Docs", "a.pdf"), null, null, 5);
+        Assert.Equal(1, id);
+        f.History.MarkStarted(id); // and then the crash, before any copy existed
+
+        f.Restart();
+
+        Assert.Equal("unrelated data", File.ReadAllText(collision));
+        Assert.Equal(OperationState.Failed, f.History.Get(id)!.State);
+    }
+
+    [Fact]
+    public async Task Undo_refuses_an_edit_made_after_its_checks_began()
+    {
+        using var f = new Fixture(FolderMode.Manual);
+        f.AddRule(MovePdfs());
+        f.Write("a.pdf", "aaaaa");
+        var preview = await f.Engine.CreatePreviewAsync(f.Folder);
+        var applied = await f.Engine.ApproveAsync(preview.Id, [1]);
+        long id = f.History.RunOperations(applied.RunId).Single().Id;
+        string organized = f.In("Docs", "a.pdf");
+        var modified = File.GetLastWriteTimeUtc(organized);
+
+        using var hooked = new HookedHistory(f.History)
+        {
+            // Karl's interleaving: a same-size edit with the old timestamp, after undo's own checks.
+            OnBeginRun = trigger =>
+            {
+                if (trigger == RunTrigger.Undo)
+                {
+                    File.WriteAllText(organized, "bbbbb");
+                    File.SetLastWriteTimeUtc(organized, modified);
+                }
+            },
+        };
+        using var engine = new DownloadsEngine(hooked, f.Notifier, Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance, f.Options, f.Time);
+        engine.Start(f.Settings, runLoop: false);
+
+        var undo = await engine.UndoAsync(id);
+
+        Assert.False(undo.Succeeded);
+        Assert.Equal("bbbbb", File.ReadAllText(organized));
+        Assert.False(File.Exists(f.In("a.pdf")));
+        Assert.Equal(OperationState.Completed, f.History.Get(id)!.State);
+    }
+
+    private static bool Attempt(Action action)
+    {
+        try
+        {
+            action();
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>Runs test code at the points where the executor talks to history.</summary>
+    private sealed class HookedHistory(IHistoryStore inner) : IHistoryStore
+    {
+        public Action? OnStarted { get; init; }
+
+        public Action<RunTrigger>? OnBeginRun { get; init; }
+
+        public long BeginRun(RunTrigger trigger, string folder)
+        {
+            OnBeginRun?.Invoke(trigger);
+            return inner.BeginRun(trigger, folder);
+        }
 
         public void EndRun(long runId) => inner.EndRun(runId);
 
@@ -153,14 +267,15 @@ public sealed class ReviewFixTests
         public void MarkStarted(long operationId)
         {
             inner.MarkStarted(operationId);
-            Entered.Set();
-            Release.Wait();
+            OnStarted?.Invoke();
         }
 
         public void MarkCompleted(long operationId, string destination, string sha256, DateTimeOffset destinationModifiedUtc) =>
             inner.MarkCompleted(operationId, destination, sha256, destinationModifiedUtc);
 
         public void MarkFailed(long operationId, string error) => inner.MarkFailed(operationId, error);
+
+        public void MarkPartial(long operationId, string? partialPath) => inner.MarkPartial(operationId, partialPath);
 
         public void MarkUndone(long operationId) => inner.MarkUndone(operationId);
 
@@ -178,8 +293,7 @@ public sealed class ReviewFixTests
 
         public void Dispose()
         {
-            Entered.Dispose();
-            Release.Dispose();
+            // The fixture owns the real store.
         }
     }
 }

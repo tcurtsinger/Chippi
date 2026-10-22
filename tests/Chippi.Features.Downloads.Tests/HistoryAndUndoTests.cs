@@ -122,6 +122,7 @@ public sealed class HistoryAndUndoTests
         f.History.MarkStarted(stayed);
         string ours = Executor.PartialPath(f.In("Docs", "stayed.pdf"), stayed);
         File.WriteAllText(ours, "he");
+        f.History.MarkPartial(stayed, ours);
         string theirs = f.In("Docs", "stayed.pdf.chippi-partial");
         File.WriteAllText(theirs, "not Chippi's");
 
