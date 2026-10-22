@@ -1,4 +1,4 @@
-﻿# Phase 1 tracker
+# Phase 1 tracker
 
 Owner of this file: Marge (PM). Brief: [phase-1-handoff.md](phase-1-handoff.md). DESIGN.md wins over taste.
 
@@ -17,8 +17,8 @@ Owner of this file: Marge (PM). Brief: [phase-1-handoff.md](phase-1-handoff.md).
 | WS1 | Tray icon and flyout | Tray agent (subagent, X:\code\chippi-ws1) | Kayla | WS0 | ready for review, head da21678 (icon as resource 9e5a66a, lead-approved csproj edit) |
 | WS2 | Settings window, Features hub, Permissions | Kayla (X:\code\chippi-ws2) | Karl | WS0 | in progress |
 | WS3 | Island and Gumdrop | Island agent (subagent, X:\code\chippi-ws3) | Karl | WS0 | ready for review, head 2e9435e; drop 3244d95 (debug-only return true) at merge |
-| WS4 | Keep awake module | Karl (X:\code\chippi-ws4), first | Kayla | WS0 | in review (Kayla), 0a08755; powercfg evidence pending Travis |
-| WS5 | Build, CI, Velopack, licensing | Karl (X:\code\chippi-ws5), after WS4 | Kayla | WS0 | in progress |
+| WS4 | Keep awake module | Karl (X:\code\chippi-ws4), first | Kayla | WS0 | merged 522476c (head 98dfb6f); power state 0x3 on, 0x0 off (non-admin) |
+| WS5 | Build, CI, Velopack, licensing | Karl (X:\code\chippi-ws5), after WS4 | Kayla | WS0 | merged 53306bc; uninstall hook + own Main in c325359; repack after integration |
 | Lead | Integration (App.xaml*, composition root), DESIGN.md review, final report | Marge | Kayla | all | todo |
 
 Specs per workstream: [phase-1-workstreams.md](phase-1-workstreams.md). Lead seam on main: 4a1bdf3 (ShellContext/ShellCommands/slots/Gumdrop stub/CsWin32), 8f23b12 (CHIPPI_DEV_PROFILE). Seam review: Kayla, before push.
@@ -36,6 +36,8 @@ Specs per workstream: [phase-1-workstreams.md](phase-1-workstreams.md). Lead sea
 ## Follow-ups
 - Kayla: `SingleInstance` calls `AllowSetForegroundWindow` before signalling the owner; then WS1 drops its cross-process focus workaround.
 - Travis, at hub review: tool tiles are about 111px wide in three columns, so names over about 10 characters are cut ("A long samp..."). Wrap to two lines or keep ellipsis?
+- Karl (optional, P3): Keep awake recreates its session after a native failure instead of needing reinstall.
+- WS3 must marshal hub events with BeginInvoke, never Invoke (Keep awake's ReleaseOnExit blocks the UI thread on exit).
 - Kayla: `ConfigStore.SectionChanged(name)` event; then WS3 drops its settings.json file watcher.
 - Phase 3, not now: `IslandActivity` elapsed/duration so the expanded media row can show mono times (DESIGN §5). No real media in Phase 1.
 - Lead at integration: measure CPU of the 30 fps equalizer on the transparent island window; Narrator pass on flyout, settings, island.
