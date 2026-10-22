@@ -57,6 +57,7 @@ public partial class IslandWindow : Window
     private const double LiveTextInset = 43;
     private const double LiveRightInset = 13;
     private const double EqualizerWidth = 10 + 25;
+    private const double StashTailWidth = 10 + 15;
 
     private const int GWL_EXSTYLE = -20;
     private const int WS_EX_TOOLWINDOW = 0x00000080;
@@ -444,7 +445,8 @@ public partial class IslandWindow : Window
                 LiveText.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
                 // +2: layout rounding can leave the star column a fraction short, and trimming would then cut a word.
                 double text = Math.Ceiling(LiveText.DesiredSize.Width) + 2;
-                double content = LiveTextInset + text + (Equalizer.Visibility == Visibility.Visible ? EqualizerWidth : 0) + LiveRightInset + 2;
+                double tail = Equalizer.Visibility == Visibility.Visible ? EqualizerWidth : StashTail.Visibility == Visibility.Visible ? StashTailWidth : 0;
+                double content = LiveTextInset + text + tail + LiveRightInset + 2;
                 return new Size(Math.Clamp(Math.Ceiling(content), RestingWidth, LiveMaxWidth), LiveHeight);
             case IslandState.Expanded:
                 ExpandedLayer.Measure(new Size(ExpandedWidth - 2, double.PositiveInfinity));
@@ -488,10 +490,17 @@ public partial class IslandWindow : Window
             if (!string.IsNullOrWhiteSpace(current.Source))
             {
                 LiveText.Inlines.Add(new Run(" · ") { Foreground = (Brush)FindResource("IslandTextTertiaryBrush") });
-                LiveText.Inlines.Add(SourceRun(current.Source));
+                var source = SourceRun(current.Source);
+                if (current.NeedsAttention)
+                    source.Foreground = (Brush)FindResource("WarningBrush");
+                LiveText.Inlines.Add(source);
             }
         }
         Equalizer.Visibility = current?.Kind == IslandActivityKind.Media ? Visibility.Visible : Visibility.Collapsed;
+        bool stashed = current?.Kind == IslandActivityKind.Stash;
+        StashTail.Visibility = Shown(stashed);
+        StashGlyph.Visibility = Shown(stashed && !current!.NeedsAttention);
+        StashDot.Visibility = Shown(stashed && current!.NeedsAttention);
 
         // Expanded: only the sections that have data.
         var media = First(IslandActivityKind.Media);

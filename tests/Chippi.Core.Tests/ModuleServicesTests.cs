@@ -147,6 +147,18 @@ public sealed class ModuleServicesTests : IDisposable
     }
 
     [Fact]
+    public async Task An_island_notice_carries_its_attention_flag()
+    {
+        var module = await StartAsync("downloads", ctx => ctx.Notifier.Declare(Kinds));
+
+        module.Context!.Notifier.Show(new Notice("failed", "1 file failed") { NeedsAttention = true });
+        Assert.True(_island.Current!.NeedsAttention);
+
+        module.Context.Notifier.Show(new Notice("failed", "1 file failed"));
+        Assert.Contains(_island.Activities, a => !a.NeedsAttention);
+    }
+
+    [Fact]
     public async Task A_missing_or_broken_Windows_backend_never_fails_the_caller()
     {
         var module = await StartAsync("downloads", ctx => ctx.Notifier.Declare(Kinds));

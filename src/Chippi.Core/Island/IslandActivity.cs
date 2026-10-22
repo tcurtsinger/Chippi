@@ -40,6 +40,9 @@ public sealed record IslandActivity(string Key, IslandActivityKind Kind, string 
     /// <summary>0..1 for the gradient progress bar, or null for none.</summary>
     public double? Progress { get; init; }
 
+    /// <summary>Held or failed: the shell shows the source in amber with an amber dot (DESIGN.md §5).</summary>
+    public bool NeedsAttention { get; init; }
+
     /// <summary>Set by the hub to the publishing module's id.</summary>
     public string ModuleId { get; init; } = "";
 }
