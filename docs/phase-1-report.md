@@ -71,7 +71,7 @@ At `main` `59ebf8c`:
 | Keep awake prevents sleep and releases on stop, uninstall and exit; island and pet states | Done | System power state `0x3` while on and `0x0` after stop and after uninstall, read without admin (Travis approved this in place of `powercfg /requests`) |
 | Themes, focus rings, keyboard, Narrator reads icon buttons | Done, with one gap | Themes and focus rings checked. Screen-reader names checked through UI Automation (the tree Narrator reads); Narrator itself wasn't run, by Travis's choice. Tab order checked in the flyout; no full keyboard-only walk of every settings page |
 | Run at startup; logs and settings in the documented folders | Done | Toggled through UI Automation in a dev profile, entry written and removed |
-| Velopack Setup.exe and portable package for both platforms | Done | Sizes and SHA-256 in `phase-1-release-artifacts.csv` (repo root, untracked). x64 portable runs. x64 Setup installed, ran (tray, flyout, Keep awake, Run at startup) and uninstalled cleanly on the dev PC: the Run entry, app folder, uninstall entry and Start menu shortcut were all removed; settings.json stays so a reinstall restores settings. ARM64 not run |
+| Velopack Setup.exe and portable package for both platforms | Done | Sizes and SHA-256 in `phase-1-release-artifacts.csv` (repo root). x64 portable runs. x64 Setup installed, ran (tray, flyout, Keep awake, Run at startup) and uninstalled cleanly on the dev PC: the Run entry, app folder, uninstall entry and Start menu shortcut were all removed; settings.json stays so a reinstall restores settings. ARM64 not run |
 
 ## Deviations from DESIGN.md
 
@@ -93,7 +93,7 @@ Every deviation Travis reviewed on 2026-10-21 is now part of DESIGN.md (light ba
 - **Install folder clash (fixed in `7ae4f94`, not yet run):** builds before the fix installed to `%LOCALAPPDATA%\Chippi`, the same folder Chippi writes its logs to, so any earlier run that wasn't installed made Setup say "already installed". The package ID is now `ChippiApp`: installers are named `ChippiApp-<platform>-Setup.exe` and `ChippiApp-<platform>-Portable.zip`, Chippi installs to `%LOCALAPPDATA%\ChippiApp`, and Windows still shows "Chippi". Logs stay in `%LOCALAPPDATA%\Chippi\logs`, and an uninstall leaves them behind. The package metadata confirms the new target, but nobody has run the new Setup yet. The old `Chippi-*` installers were deleted from `build\artifacts`.
 - **Stale install stub:** on the dev PC, `%LOCALAPPDATA%\Chippi` held a Velopack `Update.exe` and an empty `packages\` folder with no app and no uninstall entry. Setup then refused a fresh install ("already installed", offering Repair). Removing the two items cleared it. The cause is unconfirmed; the folder's timestamp only lines up with the packaging session. Don't run Setup.exe as a smoke test on a dev machine, and check that folder before install tests.
 - Optional hardening, not done: one retry in Keep awake's toggle if a timed session's release fails at the same moment, and a log line when Windows refuses to bring the flyout forward.
-- Review notes and helper scripts from this phase sit untracked in the repo root (`*-review.md`, `uia-*.ps1`, `screens/`). They aren't in git; delete or archive them when convenient.
+- Review notes, probes and UI Automation scripts from this phase were archived to `X:\code\chippi-archive\phase-1-leftovers-2026-10-22.zip` during the end-of-phase cleanup (see [end-of-phase-checklist.md](end-of-phase-checklist.md)).
 
 ## Suggestions for Phase 2 (Downloads organizer)
 
