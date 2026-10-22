@@ -77,34 +77,8 @@ public partial class FlyoutWindow : Window
 
         Activate();
         if (PInvoke.GetForegroundWindow() != Handle)
-            ForceForeground(Handle);
+            PInvoke.SetForegroundWindow(Handle);
         FocusSelectedTab();
-    }
-
-    /// <summary>
-    /// A tray click lets us take the foreground, but a second launch signals this process from
-    /// outside, and Windows then refuses SetForegroundWindow (the flyout would show without focus,
-    /// so Esc and click-away could not close it). Joining the foreground thread's input queue for
-    /// the call is the usual way through; it is undone straight after.
-    /// </summary>
-    internal static void ForceForeground(HWND window)
-    {
-        var foreground = PInvoke.GetForegroundWindow();
-        uint theirs = foreground.IsNull ? 0 : PInvoke.GetWindowThreadProcessId(foreground, out _);
-        uint ours = PInvoke.GetCurrentThreadId();
-        bool attached = theirs != 0 && theirs != ours && PInvoke.AttachThreadInput(theirs, ours, true);
-        try
-        {
-            PInvoke.BringWindowToTop(window);
-            PInvoke.SetForegroundWindow(window);
-        }
-        finally
-        {
-            if (attached)
-                PInvoke.AttachThreadInput(theirs, ours, false);
-        }
-        if (PInvoke.GetForegroundWindow() != window)
-            Log.Warn("Flyout: Windows refused the foreground; Esc and click-away need a click on the window first");
     }
 
     internal void Dismiss(bool byDeactivation = false)
