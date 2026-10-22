@@ -39,7 +39,8 @@ Specs per workstream: [phase-1-workstreams.md](phase-1-workstreams.md).
 - Optional: log a warning when SetForegroundWindow is refused (FlyoutWindow, TrayMenuWindow), for future focus reports.
 - Optional: one retry in Keep awake's ToggleAsync if a timed release fails at the same moment as a toggle.
 - Karl: repack both RIDs from integrated main; confirm both portable builds and x64 Setup launch.
-- Lead: measure CPU of the 30 fps equalizer on the transparent island window; keyboard and Narrator pass on flyout, settings and island; 150% and 200% scaling.
+- Measured 2026-10-21 (x64 Release): resting island 0.5% of one core; live media with the 30 fps equalizer 4.7% of one core, GPU about 0.15%. Fine for Phase 1 (fake media only). Phase 3: drive the equalizer from real peak levels at 20 fps or less and stop it during silence.
+- Lead: keyboard and Narrator pass on flyout, settings and island; 150% and 200% scaling (needs Travis's OK to change display scale).
 - Phase 3, not now: `IslandActivity` elapsed/duration so the expanded media row can show mono times (DESIGN §5).
 - Untested so far: taskbar on other edges, real Explorer restart, exclusive-fullscreen game, PowerPoint, F11, ARM64 execution (no ARM64 hardware).
 
