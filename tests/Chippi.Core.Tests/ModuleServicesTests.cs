@@ -166,6 +166,23 @@ public sealed class ModuleServicesTests : IDisposable
         Assert.Throws<ArgumentException>(() => notifier.Declare([new("a", "A", NoticePlaces.None), new("A", "A again", NoticePlaces.None)]));
     }
 
+    [Fact]
+    public async Task The_app_wide_page_reads_and_sets_places_through_the_feature_entry()
+    {
+        Assert.Null(_registry.Find("downloads")); // not registered yet
+        var module = await StartAsync("downloads", ctx => ctx.Notifier.Declare(Kinds));
+        var entry = _registry.Find("downloads")!;
+
+        Assert.Equal(["organized", "failed"], entry.Notifier!.Kinds.Select(k => k.Id));
+        entry.Notifier.SetPlaces("organized", NoticePlaces.Windows);
+        Assert.Equal(NoticePlaces.Windows, module.Context!.Notifier.PlacesFor("organized")); // the module sees it
+
+        await _registry.SetInstalledAsync("downloads", false);
+        Assert.Null(entry.Notifier); // not running: nothing to show on the page
+
+        await _registry.SetInstalledAsync("downloads", true);
+        Assert.Equal(NoticePlaces.Windows, entry.Notifier!.PlacesFor("organized")); // kept across reinstall
+    }
     // ---- Activation verbs
 
     [Fact]
