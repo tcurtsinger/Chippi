@@ -90,6 +90,8 @@ public interface IHistoryStore : IDisposable
 
     void EndRun(long runId);
 
+    RunRecord? GetRun(long runId);
+
     long Plan(long runId, HistoryOperationKind kind, string source, string destination, string? ruleId, string? ruleName, long bytes, long? undoOf = null);
 
     void MarkStarted(long operationId);

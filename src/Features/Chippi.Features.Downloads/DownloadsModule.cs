@@ -86,7 +86,27 @@ public sealed class DownloadsModule : IFeatureModule
         context.Activation.Register(DownloadsNotices.RunVerb, args =>
             Raise(new DownloadsRequest(DownloadsRequestKind.Run, RunId: long.TryParse(args.FirstOrDefault(), NumberStyles.None, CultureInfo.InvariantCulture, out long id) ? id : null)));
         context.Activation.Register(DownloadsNotices.ReviewVerb, _ => Raise(new DownloadsRequest(DownloadsRequestKind.Review)));
+
+        context.Ui.SetSettingsPage(section => new Views.Settings.DownloadsPage(this, section));
         return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// The Settings deep link for a request, for the shell to open (<c>ShellCommands.OpenSettings</c>):
+    /// <c>module:downloads-organizer/preview/C:\Users\…\Downloads</c>, <c>…/history/42</c>, <c>…/rules</c>, <c>…/review</c>.
+    /// </summary>
+    public static string SettingsLink(DownloadsRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        string section = request switch
+        {
+            { Kind: DownloadsRequestKind.Organize, Folder: { Length: > 0 } folder } => $"preview/{folder}",
+            { Kind: DownloadsRequestKind.Organize or DownloadsRequestKind.Review } => "review",
+            { Kind: DownloadsRequestKind.Run, RunId: { } run } => $"history/{run}",
+            { Kind: DownloadsRequestKind.Run } => "history",
+            _ => "rules",
+        };
+        return $"module:downloads-organizer/{section}";
     }
 
     /// <summary>

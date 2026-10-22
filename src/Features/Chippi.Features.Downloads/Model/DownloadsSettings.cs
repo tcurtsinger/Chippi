@@ -71,6 +71,13 @@ public sealed class RuleSetting
 
     public string? HoldReason { get; set; }
 
+    public RuleSetting Clone()
+    {
+        var copy = (RuleSetting)MemberwiseClone();
+        copy.Extensions = Extensions is null ? null : [.. Extensions];
+        return copy;
+    }
+
     public Rule ToRule() => new(
         Id,
         Name,
@@ -103,6 +110,25 @@ public sealed class DownloadsSettings
     /// <summary>History older than this is pruned at start (brief §2: 90 days).</summary>
     public int HistoryDays { get; set; } = 90;
 
+    /// <summary>
+    /// When the person last cleared history. History shows nothing older; the store keeps the few
+    /// rows the self-trigger guard and partial-file cleanup still need.
+    /// </summary>
+    public DateTimeOffset? HistoryClearedUtc { get; set; }
+
     /// <summary>False until the first start has added the user's Downloads folder.</summary>
     public bool Initialized { get; set; }
+
+    /// <summary>
+    /// A deep copy to edit and pass to <c>DownloadsModule.SaveSettings</c>, which compares it with
+    /// the current settings (a folder newly set to Silent gets a fresh baseline).
+    /// </summary>
+    public DownloadsSettings Clone() => new()
+    {
+        Folders = [.. Folders.Select(f => new WatchedFolder { Path = f.Path, Mode = f.Mode, GraceSeconds = f.GraceSeconds, BaselineUtc = f.BaselineUtc })],
+        Rules = [.. Rules.Select(r => r.Clone())],
+        HistoryDays = HistoryDays,
+        HistoryClearedUtc = HistoryClearedUtc,
+        Initialized = Initialized,
+    };
 }

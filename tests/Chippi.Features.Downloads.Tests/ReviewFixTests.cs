@@ -289,6 +289,8 @@ public sealed class ReviewFixTests
 
         public void EndRun(long runId) => inner.EndRun(runId);
 
+        public RunRecord? GetRun(long runId) => inner.GetRun(runId);
+
         public long Plan(long runId, HistoryOperationKind kind, string source, string destination, string? ruleId, string? ruleName, long bytes, long? undoOf = null) =>
             inner.Plan(runId, kind, source, destination, ruleId, ruleName, bytes, undoOf);
 

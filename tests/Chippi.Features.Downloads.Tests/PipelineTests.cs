@@ -4,6 +4,7 @@
 using Chippi.Features.Downloads.Engine;
 using Chippi.Features.Downloads.Model;
 using Chippi.Features.Downloads.Storage;
+using Chippi.Rules;
 
 namespace Chippi.Features.Downloads.Tests;
 
@@ -143,11 +144,17 @@ public sealed class PipelineTests
         f.AddRule(MovePdfs());
         f.Write("a.pdf");
         f.Write("b.pdf");
-        f.Write("notes.txt"); // no rule: not in the preview
+        f.Write("notes.txt"); // no rule: listed, never selectable
+        File.WriteAllText(f.In(EngineOptions.IgnoreFileName), "keep*\n");
+        f.Write("keep.pdf"); // ignored: listed as held
 
         var preview = await f.Engine.CreatePreviewAsync(f.Folder);
-        Assert.Equal(2, preview.Items.Count);
-        Assert.All(preview.Items, i => Assert.True(i.Selected));
+        Assert.Equal(4, preview.Items.Count);
+        Assert.Equal(["a.pdf", "b.pdf"], preview.Items.Where(i => i.Selected).Select(i => i.Name).Order());
+        Assert.Equal(OperationKind.NoMatch, preview.Items.Single(i => i.Name == "notes.txt").Kind);
+        var held = preview.Items.Single(i => i.Name == "keep.pdf");
+        Assert.Equal(OperationKind.Hold, held.Kind);
+        Assert.Contains(held.Warnings, w => w.Kind == WarningKind.IgnoreMatch);
 
         var a = preview.Items.Single(i => i.Name == "a.pdf");
         var result = await f.Engine.ApproveAsync(preview.Id, [a.Id]);
