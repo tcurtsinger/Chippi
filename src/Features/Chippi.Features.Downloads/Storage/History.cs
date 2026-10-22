@@ -115,6 +115,9 @@ public interface IHistoryStore : IDisposable
     /// <summary>Started but never finished: reconciled at startup.</summary>
     IReadOnlyList<OperationRecord> Incomplete();
 
+    /// <summary>Rows in any state that still own a partial file waiting to be deleted.</summary>
+    IReadOnlyList<OperationRecord> WithPartial();
+
     /// <summary>The newest completed move, rename or restore that produced <paramref name="destination"/>, if any. Backs the self-trigger guard.</summary>
     OperationRecord? LatestOutputAt(string destination);
 

@@ -233,18 +233,25 @@ internal sealed class Executor(IHistoryStore history, EngineOptions options)
         }
     }
 
-    /// <summary>Settles operations a crash left half-done (architecture.md §3).</summary>
+    /// <summary>
+    /// Settles operations a crash left half-done (architecture.md §3) and removes partial files
+    /// they recorded creating. A partial that cannot be deleted yet (locked) stays recorded, on
+    /// whatever row owns it, and is tried again at the next start. Returns how many rows it touched.
+    /// </summary>
     public int Reconcile()
     {
         int settled = 0;
+        // Only a partial file an operation recorded creating; never inferred from a name.
+        foreach (var record in history.WithPartial())
+        {
+            if (TryDelete(record.PartialPath!))
+            {
+                history.MarkPartial(record.Id, null);
+                settled++;
+            }
+        }
         foreach (var record in history.Incomplete())
         {
-            // Only a partial file this operation recorded creating; never inferred from a name.
-            if (record.PartialPath is { } partial)
-            {
-                TryDelete(partial);
-                history.MarkPartial(record.Id, null);
-            }
             bool atDestination = Exists(record.DestinationPath);
             bool atSource = Exists(record.SourcePath);
 
@@ -289,15 +296,17 @@ internal sealed class Executor(IHistoryStore history, EngineOptions options)
 
     private static bool Exists(string path) => File.Exists(path) || Directory.Exists(path);
 
-    private static void TryDelete(string path)
+    /// <summary>True once the file is gone (including when it already was).</summary>
+    private static bool TryDelete(string path)
     {
         try
         {
             File.Delete(path);
+            return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            // Left for the next reconcile.
+            return false;
         }
     }
 }

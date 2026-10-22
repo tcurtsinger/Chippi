@@ -108,6 +108,9 @@ public sealed class SqliteHistoryStore : IHistoryStore
     public IReadOnlyList<OperationRecord> Incomplete() =>
         Read("SELECT * FROM operations WHERE state IN ($p, $s) ORDER BY id", ("$p", (long)OperationState.Planned), ("$s", (long)OperationState.Started));
 
+    public IReadOnlyList<OperationRecord> WithPartial() =>
+        Read("SELECT * FROM operations WHERE partial_path IS NOT NULL ORDER BY id");
+
     public OperationRecord? LatestOutputAt(string destination) => Read(
         "SELECT * FROM operations WHERE dest_path = $dest COLLATE NOCASE AND state = $s ORDER BY completed_at DESC, id DESC LIMIT 1",
         ("$dest", destination), ("$s", (long)OperationState.Completed)).FirstOrDefault();
@@ -125,6 +128,7 @@ public sealed class SqliteHistoryStore : IHistoryStore
                 WHERE planned_at < $cut AND state IN ($c, $f, $u)
                   AND id NOT IN (SELECT MAX(id) FROM operations WHERE state = $c GROUP BY dest_path COLLATE NOCASE)
                   AND id NOT IN (SELECT undo_of FROM operations WHERE undo_of IS NOT NULL)
+                  AND partial_path IS NULL
                 """,
                 transaction, ("$cut", cutoff.ToUnixTimeMilliseconds()), ("$c", (long)OperationState.Completed),
                 ("$f", (long)OperationState.Failed), ("$u", (long)OperationState.Undone));

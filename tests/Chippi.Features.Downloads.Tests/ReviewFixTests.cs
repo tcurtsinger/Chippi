@@ -199,6 +199,34 @@ public sealed class ReviewFixTests
     }
 
     [Fact]
+    public void A_locked_partial_stays_owned_and_is_deleted_at_a_later_start()
+    {
+        using var f = new Fixture(FolderMode.Paused);
+        f.Write("a.pdf");
+        Directory.CreateDirectory(f.In("Docs"));
+        long run = f.History.BeginRun(RunTrigger.Silent, f.Folder);
+        long id = f.History.Plan(run, HistoryOperationKind.Move, f.In("a.pdf"), f.In("Docs", "a.pdf"), null, null, 5);
+        f.History.MarkStarted(id);
+        string partial = Executor.PartialPath(f.In("Docs", "a.pdf"), id);
+        File.WriteAllText(partial, "hal");
+        f.History.MarkPartial(id, partial);
+
+        using (new FileStream(partial, FileMode.Open, FileAccess.Read, FileShare.None))
+            f.Restart();
+
+        Assert.True(File.Exists(partial));
+        Assert.Equal(OperationState.Failed, f.History.Get(id)!.State); // the row is settled either way
+        Assert.Equal(partial, f.History.Get(id)!.PartialPath); // but still owns its leftover
+        f.History.ClearBefore(f.Time.GetUtcNow().AddDays(1));
+        Assert.NotNull(f.History.Get(id)); // and pruning keeps it until the leftover is gone
+
+        f.Restart();
+
+        Assert.False(File.Exists(partial));
+        Assert.Null(f.History.Get(id)!.PartialPath);
+    }
+
+    [Fact]
     public async Task Undo_refuses_an_edit_made_after_its_checks_began()
     {
         using var f = new Fixture(FolderMode.Manual);
@@ -286,6 +314,8 @@ public sealed class ReviewFixTests
         public IReadOnlyList<OperationRecord> RunOperations(long runId) => inner.RunOperations(runId);
 
         public IReadOnlyList<OperationRecord> Incomplete() => inner.Incomplete();
+
+        public IReadOnlyList<OperationRecord> WithPartial() => inner.WithPartial();
 
         public OperationRecord? LatestOutputAt(string destination) => inner.LatestOutputAt(destination);
 
