@@ -54,8 +54,20 @@ public partial class App : Application
             args.SetObserved();
         };
 
+        // Dev isolation: CHIPPI_DEV_PROFILE=ws1 gives a run its own instance, settings and logs, so
+        // parallel workstreams can launch Chippi side by side without touching the real profile.
+        string? devProfile = Environment.GetEnvironmentVariable("CHIPPI_DEV_PROFILE");
+        string? devConfigPath = null;
+        if (!string.IsNullOrWhiteSpace(devProfile))
+        {
+            Log.Default = new RollingFileLog(Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Chippi-dev", devProfile, "logs"));
+            devConfigPath = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Chippi-dev", devProfile, "settings.json");
+        }
+
         // One instance per session. A second launch signals the first (which opens the flyout) and exits.
-        _instance = SingleInstance.TryAcquire();
+        _instance = string.IsNullOrWhiteSpace(devProfile) ? SingleInstance.TryAcquire() : SingleInstance.TryAcquire($"Chippi-{devProfile}");
         if (_instance is null)
         {
             Log.Info("Chippi is already running; asked it to open the flyout");
@@ -69,7 +81,7 @@ public partial class App : Application
         Log.Info($"Starting Chippi {typeof(App).Assembly.GetName().Version} ({System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture})");
 
         LoggerFactory = Microsoft.Extensions.Logging.LoggerFactory.Create(b => b.AddProvider(new RollingFileLoggerProvider(Log.Default)));
-        Config = new ConfigStore(logger: LoggerFactory.CreateLogger("Config"));
+        Config = new ConfigStore(devConfigPath, LoggerFactory.CreateLogger("Config"));
         Config.Load();
 
         var app = Config.GetSection<AppSettings>(AppSettings.SectionName);
