@@ -27,6 +27,7 @@ Read first, in order:
 - **Archive import** always goes through preview and never applies on its own. Limits: 10,000 entries, 4 GB expanded, and a 100:1 compression-ratio check.
 - **History** is kept 90 days by default, with Clear history in the History view.
 - **Undo** is a new checked operation, verified by SHA-256, never a blind reverse move.
+- **No self-triggering** (P2-B, found in the P2-A review): the executor remembers every file it just produced (path plus fingerprint), including rename-only results that stay in a watched folder and files restored by undo, and the watcher skips them. Without this, a Silent rename rule renames its own output forever (`2026-2026-2026-invoice.pdf`). Covered by a test.
 
 ## 3. Fixed decisions carried from Phase 1
 
