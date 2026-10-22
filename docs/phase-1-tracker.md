@@ -41,7 +41,7 @@ Specs per workstream: [phase-1-workstreams.md](phase-1-workstreams.md).
 - Karl: repack both RIDs from integrated main; confirm both portable builds and x64 Setup launch.
 - Measured 2026-10-21 (x64 Release): resting island 0.5% of one core; live media with the 30 fps equalizer 4.7% of one core, GPU about 0.15%. Fine for Phase 1 (fake media only). Phase 3: drive the equalizer from real peak levels at 20 fps or less and stop it during silence.
 - Verified 2026-10-21: island centered and scaled on the secondary at 100%, 150% and 175% (its max); scaling restored to 100%. Flyout UIA tree: every control named, pet hidden, Keep awake exposes toggle + state; Quit works via UIA.
-- BUG (Kayla): toggles wired to Click ignore UI Automation's Toggle, so Narrator/switch-access users desync state. Confirmed on the Keep awake tool tile (look flips to on, module stays off, power state 0x0). Same pattern: Island switch (IslandPetPage.cs:36), Run at startup (GeneralPage.cs:68).
+- Fixed (425e2a0, merged): UI Automation toggles now drive state for the Keep awake tile, Island switch and Run at startup; verified by Kayla and Karl via UIA (power 0x3 on, 0x0 off).
 - Lead after the fix: UIA pass on the settings window; flyout at 150%/200% needs the primary display (ask Travis); 200% impossible on the 1080p secondary.
 - Phase 3, not now: `IslandActivity` elapsed/duration so the expanded media row can show mono times (DESIGN §5).
 - Untested so far: taskbar on other edges, real Explorer restart, exclusive-fullscreen game, PowerPoint, F11, ARM64 execution (no ARM64 hardware).
