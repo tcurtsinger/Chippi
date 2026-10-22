@@ -37,6 +37,9 @@ public sealed class AwakeSession : IAsyncDisposable
     private bool _active;
     private readonly Lock _gate = new();
     private bool _disposed;
+    private volatile bool _failed;
+
+    internal bool HasFailed => _failed;
 
     public AwakeSession(IExecutionState native, TimeProvider? clock = null)
     {
@@ -106,6 +109,8 @@ public sealed class AwakeSession : IAsyncDisposable
                     try { command.Run(); command.Completion.SetResult(); }
                     catch (Exception ex)
                     {
+                        // Publish before completing the command, so an immediate retry sees failure.
+                        if (ex is not ArgumentException) _failed = true;
                         command.Completion.SetException(ex);
                         if (ex is not ArgumentException) throw;
                     }
@@ -115,13 +120,14 @@ public sealed class AwakeSession : IAsyncDisposable
         }
         catch (Exception ex)
         {
+            _failed = true;
             _active = false;
             Notify(false, ex);
         }
         finally
         {
             try { _native.Set(false, false); }
-            catch (Exception ex) { Notify(false, ex); }
+            catch (Exception ex) { _failed = true; Notify(false, ex); }
             lock (_gate) { _disposed = true; _commands.CompleteAdding(); }
             // Never execute queued starts after a failed worker or after shutdown.
             while (_commands.TryTake(out var pending)) pending.Completion.TrySetException(new ObjectDisposedException(nameof(AwakeSession)));

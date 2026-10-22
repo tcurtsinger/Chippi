@@ -4,7 +4,7 @@ KeepAwakeModule registers the System feature, Essentials/Power user membership, 
 
 Modes are indefinite, duration and next local occurrence of an end time. Duration expiration uses TimeProvider's monotonic timestamp; wall-clock changes cannot extend it. Until-time sessions use local wall time. A nonexistent daylight-saving time is rejected. Ambiguous times use the platform's local offset choice. Settings are retained after uninstall, but sessions always start off after launch or reinstall. Saving changed options during an active session restarts that session.
 
-AwakeSession owns one dedicated thread. Every SetThreadExecutionState call, including release, runs there. Stop, uninstall, process exit and native failure release the request. Native failure ends the worker, so uninstall/reinstall recovers it. The interface IExecutionState and injected TimeProvider allow deterministic tests without Windows power changes.
+AwakeSession owns one dedicated thread. Every SetThreadExecutionState call, including release, runs there. Stop, uninstall, process exit and native failure release the request. Native failure ends the worker. The next user toggle waits for its cleanup and creates a fresh worker without reinstalling or automatically resuming. The interface IExecutionState and injected TimeProvider allow deterministic tests without Windows power changes.
 
 ## Build and run
 

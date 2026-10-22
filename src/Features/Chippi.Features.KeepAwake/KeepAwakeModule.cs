@@ -11,6 +11,7 @@ namespace Chippi.Features.KeepAwake;
 public sealed class KeepAwakeModule : IFeatureModule
 {
     private readonly SemaphoreSlim _gate = new(1);
+    private readonly IExecutionState _native;
     private AwakeSession? _session;
     private ModuleContext? _context;
     public KeepAwakeSettings Settings { get; private set; } = new();
@@ -18,7 +19,13 @@ public sealed class KeepAwakeModule : IFeatureModule
     public string? Error { get; private set; }
     public event Action? Changed;
 
-    public KeepAwakeModule() => Tile = new("Keep awake", nameof(LucideIcons.Coffee), ToggleAsync);
+    public KeepAwakeModule() : this(new WindowsExecutionState()) { }
+
+    public KeepAwakeModule(IExecutionState native)
+    {
+        _native = native;
+        Tile = new("Keep awake", nameof(LucideIcons.Coffee), ToggleAsync);
+    }
 
     public FeatureDescriptor Descriptor { get; } = new("keep-awake", "Keep awake", "Prevent sleep while you are away", FeatureGroup.System)
     {
@@ -37,8 +44,7 @@ public sealed class KeepAwakeModule : IFeatureModule
         Error = null;
         Tile.IsOn = false;
         Tile.StateLine = "Off";
-        _session = new AwakeSession(new WindowsExecutionState());
-        _session.Changed += OnSessionChanged;
+        CreateSession();
         context.Ui.AddToolTile(Tile);
         context.Ui.SetSettingsPage(() => new KeepAwakePage(this));
         return Task.CompletedTask;
@@ -65,11 +71,24 @@ public sealed class KeepAwakeModule : IFeatureModule
         try
         {
             if (_session is null) throw new InvalidOperationException("Keep awake is uninstalled.");
+            if (_session.HasFailed)
+            {
+                // Let the failed worker finish releasing its request before a new one starts.
+                await _session.DisposeAsync();
+                _session.Changed -= OnSessionChanged;
+                CreateSession();
+            }
             Error = null;
             if (Tile.IsOn) await _session.StopAsync();
             else await _session.StartAsync(Settings);
         }
         finally { _gate.Release(); }
+    }
+
+    private void CreateSession()
+    {
+        _session = new AwakeSession(_native);
+        _session.Changed += OnSessionChanged;
     }
 
     private void OnSessionChanged(bool active, DateTimeOffset? deadline, bool timed, Exception? error)
