@@ -392,6 +392,7 @@ public sealed class ConfigStoreTests : IDisposable
     [Fact]
     public void Island_display_defaults_to_the_single_constant()
     {
+        Assert.Equal(IslandDisplay.MainDisplay, AppSettings.DefaultIslandDisplay); // Travis's choice, 2026-10-22
         Assert.Equal(AppSettings.DefaultIslandDisplay, new AppSettings().IslandDisplay);
         Assert.Null(new AppSettings().IslandMonitorId);
     }

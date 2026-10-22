@@ -41,8 +41,8 @@ public sealed class AppSettings
 {
     public const string SectionName = "app";
 
-    /// <summary>The island's display out of the box. The one place to change it.</summary>
-    public const IslandDisplay DefaultIslandDisplay = IslandDisplay.FollowActiveWindow;
+    /// <summary>The island's display out of the box (Travis chose Main display, 2026-10-22). The one place to change it.</summary>
+    public const IslandDisplay DefaultIslandDisplay = IslandDisplay.MainDisplay;
 
     public ThemePreference Theme { get; set; } = ThemePreference.Dark;
 
