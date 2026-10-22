@@ -46,14 +46,20 @@ internal sealed class Presenter(Action<string> activate) : IToastPresenter, IDis
         catch (Exception ex) { Console.Error.WriteLine(ex); }
         try { Registry.CurrentUser.DeleteSubKeyTree($@"Software\Classes\CLSID\{{{ActivatorId}}}", false); }
         catch (Exception ex) { Console.Error.WriteLine(ex); }
-        File.Delete(Shortcut);
+        // Velopack owns this shortcut and removes it during uninstall.
+        // Do not delete it here: registration cleanup can also run independently.
     }
 
     public void Dispose()
     {
         if (_cookie != 0)
         {
-            Marshal.ThrowExceptionForHR(Native.CoRevokeClassObject(_cookie));
+            try
+            {
+                int result = Native.CoRevokeClassObject(_cookie);
+                if (result < 0) Console.Error.WriteLine($"COM revoke failed: 0x{result:X8}");
+            }
+            catch (Exception ex) { Console.Error.WriteLine(ex); }
             _cookie = 0;
         }
         GC.KeepAlive(_factory);
