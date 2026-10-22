@@ -9,6 +9,7 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Chippi.Core.Tests/Chippi.Core.Tests.csproj" />
+    <Project Path="tests/Chippi.Features.KeepAwake.Tests/Chippi.Features.KeepAwake.Tests.csproj" />
   </Folder>
   <Folder Name="/Solution Items/">
     <File Path=".editorconfig" />
