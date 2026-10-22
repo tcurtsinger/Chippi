@@ -20,7 +20,7 @@ Owner of this file: Marge (PM). Brief: [phase-1-handoff.md](phase-1-handoff.md).
 | WS3 | Island and Gumdrop | Island agent (subagent, X:\code\chippi-ws3) | Karl | WS0 | merged and pushed (head 68cd2f8); island verified live: toolwindow, noactivate, topmost, centered |
 | WS4 | Keep awake module | Karl | Kayla | WS0 | merged and pushed (98dfb6f, recovery ed95ba9); power state 0x3 on, 0x0 off (non-admin) |
 | WS5 | Build, CI, Velopack, licensing | Karl | Kayla | WS0 | merged and pushed (53306bc; own Main and uninstall hook c325359); repack after integration |
-| Lead | Integration (App.xaml*, composition root), DESIGN.md review, final report | Marge | Kayla | all | in progress |
+| Lead | Integration (App.xaml*, composition root), DESIGN.md review, final report | Marge | Kayla | all | report written (docs/phase-1-report.md); open: flyout at 150%/200% on main display (Travis OK), ARM64 run, live Setup install |
 
 Specs per workstream: [phase-1-workstreams.md](phase-1-workstreams.md).
 
