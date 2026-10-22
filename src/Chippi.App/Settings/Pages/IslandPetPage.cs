@@ -63,15 +63,15 @@ internal sealed class IslandPetPage : UserControl
         page.Children.Add(SettingsUi.Row("Reduce motion",
             "On stops Gumdrop's blink and squish and swaps moods instantly. Follow Windows uses Animation effects.", motion));
 
-        // The preview sits on the island's own color, where the pet really lives.
+        // On Panel, not the island's near-black: at 112px DESIGN.md §7 draws a ground shadow (black
+        // at 35%), and it only shows on a lighter surface. The caption is the themed tertiary ink.
         _moodLabel = SettingsUi.Styled(new TextBlock { HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 10, 0, 0) }, "CaptionTextStyle");
-        _moodLabel.SetResourceReference(TextBlock.ForegroundProperty, "IslandTextTertiaryBrush");
         var stage = new StackPanel { Margin = new Thickness(0, 22, 0, 18) };
         stage.Children.Add(_preview);
         stage.Children.Add(_moodLabel);
         var card = new Border { CornerRadius = new CornerRadius(14), BorderThickness = new Thickness(1), Child = stage, Margin = new Thickness(0, 4, 0, 0) };
-        card.SetResourceReference(Border.BackgroundProperty, "IslandBrush");
-        card.SetResourceReference(Border.BorderBrushProperty, "IslandBorderBrush");
+        card.SetResourceReference(Border.BackgroundProperty, "PanelBrush");
+        card.SetResourceReference(Border.BorderBrushProperty, "BorderSoftBrush");
         page.Children.Add(SettingsUi.Eyebrow("Preview"));
         page.Children.Add(card);
 

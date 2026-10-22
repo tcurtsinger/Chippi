@@ -325,4 +325,67 @@ public sealed class ConfigStoreTests : IDisposable
         Assert.Throws<InvalidDataException>(() => store.Import(bad));
         Assert.Equal(5, store.GetModuleSettings<SampleSettings>("m").Minutes);
     }
+
+    [Fact]
+    public void SectionChanged_names_the_section_after_it_is_written()
+    {
+        var path = _dir.File("settings.json");
+        var store = new ConfigStore(path);
+        var seen = new List<(string Name, string OnDisk)>();
+        store.SectionChanged += (_, e) => seen.Add((e.Name, File.ReadAllText(path)));
+
+        store.SetSection(AppSettings.SectionName, new AppSettings { Theme = ThemePreference.Light });
+        store.SetModuleSettings("keep-awake", new SampleSettings { Minutes = 5 });
+
+        Assert.Equal(["app", "modules.keep-awake"], seen.Select(s => s.Name));
+        Assert.Contains("\"light\"", seen[0].OnDisk, StringComparison.Ordinal); // raised after the save
+        Assert.Contains("\"minutes\": 5", seen[1].OnDisk, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SectionChanged_on_import_covers_every_section_in_either_document()
+    {
+        var path = _dir.File("settings.json");
+        var exportPath = _dir.File("export.json");
+        File.WriteAllText(exportPath, """{ "version": 1, "app": { "theme": "light" }, "modules": { "a": { "minutes": 1 } } }""");
+        var store = new ConfigStore(path);
+        store.SetModuleSettings("b", new SampleSettings { Minutes = 2 });
+        var seen = new List<string>();
+        store.SectionChanged += (_, e) => seen.Add(e.Name);
+
+        store.Import(exportPath);
+
+        Assert.Equal(["app", "modules.a", "modules.b"], seen.Order());
+    }
+
+    [Fact]
+    public void A_failing_SectionChanged_listener_does_not_stop_others_or_the_save()
+    {
+        var path = _dir.File("settings.json");
+        var store = new ConfigStore(path);
+        bool second = false;
+        store.SectionChanged += (_, _) => throw new InvalidOperationException("listener bug");
+        store.SectionChanged += (_, _) => second = true;
+
+        store.SetSection(AppSettings.SectionName, new AppSettings { Theme = ThemePreference.Light });
+
+        Assert.True(second);
+        var reloaded = new ConfigStore(path);
+        reloaded.Load();
+        Assert.Equal(ThemePreference.Light, reloaded.GetSection<AppSettings>(AppSettings.SectionName).Theme);
+    }
+
+    [Fact]
+    public void Nothing_is_raised_when_an_import_is_rejected()
+    {
+        var store = new ConfigStore(_dir.File("settings.json"));
+        var bad = _dir.File("bad.json");
+        File.WriteAllText(bad, """{ "version": 1, "app": { "theme": "banana" } }""");
+        int raised = 0;
+        store.SectionChanged += (_, _) => raised++;
+
+        Assert.Throws<InvalidDataException>(() => store.Import(bad));
+
+        Assert.Equal(0, raised);
+    }
 }
