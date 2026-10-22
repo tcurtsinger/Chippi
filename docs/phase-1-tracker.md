@@ -34,10 +34,8 @@ Specs per workstream: [phase-1-workstreams.md](phase-1-workstreams.md).
 - 2026-10-21: Travis approved design review items 1-7 (folded into DESIGN.md §5/§6, presets in PLAN.md), the generated Gumdrop .ico as the app icon, and the non-admin Keep awake proof (0x3 on, 0x0 off) in place of powercfg.
 
 ## Follow-ups
-- Kayla: `ConfigStore.SectionChanged(name)` event; then WS3 drops its settings.json file watcher.
-- Kayla: `SingleInstance` calls `AllowSetForegroundWindow` before signalling the owner; then WS1 drops its cross-process focus workaround.
-- Kayla: Settings › Island & pet preview sits on the island color, so the 112px ground shadow (black 35%) is invisible. DESIGN §7 requires it; put the preview on Panel or Surface.
-- Kayla: ToolTile shows its full name as a tooltip (DESIGN §6 now says so; the accessible name already does).
+- Done (558121f, merged): ConfigStore.SectionChanged, SingleInstance foreground handoff, preview ground shadow, tool tile tooltip.
+- Karl: island drops its settings.json watcher for SectionChanged; WS1 drops its cross-process focus workaround and the real second-launch focus is checked.
 - Optional: one retry in Keep awake's ToggleAsync if a timed release fails at the same moment as a toggle.
 - Karl: repack both RIDs from integrated main; confirm both portable builds and x64 Setup launch.
 - Lead: measure CPU of the 30 fps equalizer on the transparent island window; keyboard and Narrator pass on flyout, settings and island; 150% and 200% scaling.
