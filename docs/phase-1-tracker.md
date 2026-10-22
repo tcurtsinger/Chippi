@@ -15,7 +15,7 @@ Owner of this file: Marge (PM). Brief: [phase-1-handoff.md](phase-1-handoff.md).
 |---|---|---|---|---|---|
 | WS0 | Foundation: solution, Core, config, logging, single instance, themes, fonts, base controls | Kayla | Karl | none | merged be308b1, pushed |
 | WS1 | Tray icon and flyout | Tray agent (subagent, X:\code\chippi-ws1) | Kayla | WS0 | merged (head 9216b08); Keep awake tile verified in integrated flyout |
-| WS2 | Settings window, Features hub, Permissions | Kayla (X:\code\chippi-ws2) | Karl | WS0 | in progress |
+| WS2 | Settings window, Features hub, Permissions | Kayla (X:\code\chippi-ws2) | Karl | WS0 | merged and pushed (head 4a835fb) |
 | WS3 | Island and Gumdrop | Island agent (subagent, X:\code\chippi-ws3) | Karl | WS0 | merged and pushed (head 68cd2f8); island verified live: toolwindow, noactivate, topmost, centered |
 | WS4 | Keep awake module | Karl (X:\code\chippi-ws4), first | Kayla | WS0 | merged 522476c (head 98dfb6f); power state 0x3 on, 0x0 off (non-admin) |
 | WS5 | Build, CI, Velopack, licensing | Karl (X:\code\chippi-ws5), after WS4 | Kayla | WS0 | merged 53306bc; uninstall hook + own Main in c325359; repack after integration |
@@ -37,7 +37,7 @@ Specs per workstream: [phase-1-workstreams.md](phase-1-workstreams.md). Lead sea
 ## Follow-ups
 - Kayla: `SingleInstance` calls `AllowSetForegroundWindow` before signalling the owner; then WS1 drops its cross-process focus workaround.
 - Travis, at hub review: tool tiles are about 111px wide in three columns, so names over about 10 characters are cut ("A long samp..."). Wrap to two lines or keep ellipsis?
-- Karl (optional, P3): Keep awake recreates its session after a native failure instead of needing reinstall.
+- Done: Keep awake recovers after a native failure (ed95ba9). Optional: one retry in ToggleAsync if a timed release fails at the same moment as a toggle (Kayla).
 - WS3 must marshal hub events with BeginInvoke, never Invoke (Keep awake's ReleaseOnExit blocks the UI thread on exit).
 - Kayla: `ConfigStore.SectionChanged(name)` event; then WS3 drops its settings.json file watcher.
 - Phase 3, not now: `IslandActivity` elapsed/duration so the expanded media row can show mono times (DESIGN §5). No real media in Phase 1.
@@ -47,6 +47,8 @@ Specs per workstream: [phase-1-workstreams.md](phase-1-workstreams.md). Lead sea
 - WS1 untested: 150% and 200% scaling, taskbar on other edges, real Explorer restart, Narrator. Lead covers these at integration.
 
 - Travis, DESIGN.md wording: the island anchors 8px below the monitor's work-area top, not the display's top edge. Identical with a bottom taskbar; with a top taskbar or appbar it avoids covering it (Karl's P2, lead kept it).
+
+- Kayla: Settings › Island & pet preview sits on the island color, so the 112px ground shadow (black 35%) is invisible. DESIGN §7 requires it; put the preview on Panel or Surface.
 
 ## Escalations open
 - Final app icon: ship the generated Gumdrop .ico, Travis approves at the end.
