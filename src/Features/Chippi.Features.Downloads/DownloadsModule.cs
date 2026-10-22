@@ -23,9 +23,12 @@ public enum DownloadsRequestKind
 
     /// <summary>Show the pending list.</summary>
     Review,
+
+    /// <summary>Show the rules editor.</summary>
+    Rules,
 }
 
-/// <summary>Something outside the views asked to show part of the organizer (a notice click, the Explorer menu).</summary>
+/// <summary>Something asked to show part of the organizer (a notice click, the Explorer menu, the Tidy tab).</summary>
 public sealed record DownloadsRequest(DownloadsRequestKind Kind, string? Folder = null, long? RunId = null);
 
 /// <summary>
@@ -105,6 +108,13 @@ public sealed class DownloadsModule : IFeatureModule
         _context.Settings.Save(settings);
         Settings = settings;
         Engine.Apply(settings);
+    }
+
+    /// <summary>Asks the Settings views to show <paramref name="request"/>. Call on the UI thread (the Tidy tab does).</summary>
+    public void RequestView(DownloadsRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        Raise(request);
     }
 
     public async Task StopAsync(CancellationToken ct)
