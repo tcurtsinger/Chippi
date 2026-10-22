@@ -35,6 +35,12 @@ public sealed record PreviewItem(
     IReadOnlyList<PlanWarning> Warnings,
     string? HoldReason)
 {
+    /// <summary>The file's version when previewed (see FileVersion); approval fails the item if it moved on.</summary>
+    internal long? Version { get; init; }
+
+    /// <summary>Archive import: where the file is planned as being (in the folder), while <see cref="Source"/> is the extracted copy.</summary>
+    public string? ImportedAs { get; init; }
+
     /// <summary>Moves and renames start selected; held items and misleading names start unselected (brief §7).</summary>
     public bool Selected => Kind is OperationKind.Move or OperationKind.Rename
         && !Warnings.Any(w => w.Kind == WarningKind.MisleadingName);

@@ -20,6 +20,14 @@ public enum HistoryOperationKind
 
     /// <summary>A verified undo moving a file back to where it came from.</summary>
     Restore,
+
+    /// <summary>
+    /// An archive's file put straight into the folder because no rule wanted it. There is nothing
+    /// before it to go back to, so it is not undoable. An imported file a rule moved is a
+    /// <see cref="Move"/> or <see cref="Rename"/> whose source is the folder it was imported into,
+    /// so its undo puts it there.
+    /// </summary>
+    Import,
 }
 
 /// <summary>Planned, then Started before the file system changes, then Completed or Failed after. Undone marks a completed row that was restored.</summary>

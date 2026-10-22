@@ -107,14 +107,15 @@ public sealed class DownloadsModule : IFeatureModule
         Engine.Apply(settings);
     }
 
-    public Task StopAsync(CancellationToken ct)
+    public async Task StopAsync(CancellationToken ct)
     {
-        Engine?.Dispose();
+        // Not cancellable: history closes only after the file being moved right now is settled.
+        if (Engine is { } engine)
+            await Task.Run(engine.Dispose, CancellationToken.None).ConfigureAwait(false);
         Engine = null;
         _history?.Dispose();
         _history = null;
         _context = null;
-        return Task.CompletedTask;
     }
 
     private void Raise(DownloadsRequest request)

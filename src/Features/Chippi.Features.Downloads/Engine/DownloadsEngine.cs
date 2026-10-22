@@ -38,6 +38,7 @@ public sealed class DownloadsEngine : IDisposable
     private IReadOnlyList<Rule> _rules = [];
     private Task? _loop;
     private bool _disposed;
+    private volatile bool _closed;
 
     public DownloadsEngine(IHistoryStore history, INotifier notifier, ILogger logger, EngineOptions? options = null, TimeProvider? time = null)
     {
@@ -119,35 +120,17 @@ public sealed class DownloadsEngine : IDisposable
     }
 
     /// <summary>Plans the given files, all directly in <paramref name="folder"/>.</summary>
-    public async Task<PreviewPlan> PreviewFilesAsync(string folder, IReadOnlyList<string> files, RunTrigger trigger, CancellationToken ct = default)
-    {
-        await _work.WaitAsync(ct).ConfigureAwait(false);
-        try
-        {
-            return await Task.Run(() => BuildPreview(folder, [.. files.Select(f => (f, f))], trigger, null), ct).ConfigureAwait(false);
-        }
-        finally
-        {
-            _work.Release();
-        }
-    }
+    public Task<PreviewPlan> PreviewFilesAsync(string folder, IReadOnlyList<string> files, RunTrigger trigger, CancellationToken ct = default) =>
+        ExclusiveAsync(() => BuildPreview(folder, [.. files.Select(f => (f, f))], trigger, null), ct);
 
     /// <summary>
     /// Plans an extracted archive as if its files were in <paramref name="folder"/>: rules apply as
     /// they would there, and a file no rule matches goes to the folder itself. Never applied without approval.
     /// </summary>
-    public async Task<PreviewPlan> PreviewImportAsync(string folder, ExtractedArchive archive, CancellationToken ct = default)
+    public Task<PreviewPlan> PreviewImportAsync(string folder, ExtractedArchive archive, CancellationToken ct = default)
     {
-        await _work.WaitAsync(ct).ConfigureAwait(false);
-        try
-        {
-            var files = archive.Files.Select(f => (f, Path.Combine(folder, Path.GetFileName(f)))).ToList();
-            return await Task.Run(() => BuildPreview(folder, files, RunTrigger.ArchiveImport, archive), ct).ConfigureAwait(false);
-        }
-        finally
-        {
-            _work.Release();
-        }
+        var files = archive.Files.Select(f => (f, Path.Combine(folder, Path.GetFileName(f)))).ToList();
+        return ExclusiveAsync(() => BuildPreview(folder, files, RunTrigger.ArchiveImport, archive), ct);
     }
 
     /// <summary>Drops a preview without applying it (Cancel), deleting an import's extracted files.</summary>
@@ -175,20 +158,12 @@ public sealed class DownloadsEngine : IDisposable
         {
             if (preview.ExpiresAt <= _time.GetUtcNow())
                 throw new InvalidOperationException("That preview expired. Organize again to see a fresh one.");
-
-            await _work.WaitAsync(ct).ConfigureAwait(false);
-            try
-            {
-                return await Task.Run(() => ApplyPreview(preview, selected), ct).ConfigureAwait(false);
-            }
-            finally
-            {
-                _work.Release();
-            }
+            return await ExclusiveAsync(() => ApplyPreview(preview, selected), ct).ConfigureAwait(false);
         }
         finally
         {
-            // Unapproved files of an import go with the preview; it is single use.
+            // Unapproved files of an import go with the preview; it is single use. Undo of an
+            // imported file never needs these: its history source is the folder it was imported into.
             if (preview.Staging is { } staging)
                 ArchiveImporter.DeleteStaging(staging, _logger);
         }
@@ -197,61 +172,52 @@ public sealed class DownloadsEngine : IDisposable
     /// <summary>Verified undo of one completed move or rename (architecture.md §3).</summary>
     public async Task<UndoResult> UndoAsync(long operationId, CancellationToken ct = default)
     {
-        await _work.WaitAsync(ct).ConfigureAwait(false);
-        try
-        {
-            var result = await Task.Run(() => Undo(operationId), ct).ConfigureAwait(false);
-            HistoryChanged?.Invoke(this, EventArgs.Empty);
-            return result;
-        }
-        finally
-        {
-            _work.Release();
-        }
+        var result = await ExclusiveAsync(() => Undo(operationId), ct).ConfigureAwait(false);
+        HistoryChanged?.Invoke(this, EventArgs.Empty);
+        return result;
     }
 
     /// <summary>Undoes every completed operation of a run, newest first. Each is verified on its own.</summary>
     public async Task<IReadOnlyList<UndoResult>> UndoRunAsync(long runId, CancellationToken ct = default)
     {
-        await _work.WaitAsync(ct).ConfigureAwait(false);
-        try
-        {
-            var results = await Task.Run(() => _history.RunOperations(runId)
-                .Where(o => o.State == OperationState.Completed && o.Kind != HistoryOperationKind.Restore)
-                .Reverse()
-                .Select(o => Undo(o.Id))
-                .ToList(), ct).ConfigureAwait(false);
-            HistoryChanged?.Invoke(this, EventArgs.Empty);
-            return results;
-        }
-        finally
-        {
-            _work.Release();
-        }
+        var results = await ExclusiveAsync<IReadOnlyList<UndoResult>>(() => [.. _history.RunOperations(runId)
+            .Where(o => o.State == OperationState.Completed && o.Kind is HistoryOperationKind.Move or HistoryOperationKind.Rename)
+            .Reverse()
+            .TakeWhile(_ => !_stop.IsCancellationRequested)
+            .Select(o => Undo(o.Id))], ct).ConfigureAwait(false);
+        HistoryChanged?.Invoke(this, EventArgs.Empty);
+        return results;
     }
 
+    /// <summary>
+    /// Stops watching and waits for whatever is moving files right now (the loop, an approval, an
+    /// undo) to finish before returning, so the caller can close history safely. Work that has not
+    /// started yet is refused with <see cref="ObjectDisposedException"/>. A batch stops between files.
+    /// </summary>
     public void Dispose()
     {
-        if (_disposed)
-            return;
-        _disposed = true;
+        lock (_gate)
+        {
+            if (_disposed)
+                return;
+            _disposed = true;
+            foreach (var watcher in _watchers.Values)
+                watcher.Dispose();
+            _watchers.Clear();
+        }
         _stop.Cancel();
         try
         {
-            _loop?.Wait(TimeSpan.FromSeconds(5));
+            _loop?.Wait();
         }
         catch (AggregateException)
         {
             // The loop ends with cancellation.
         }
-        lock (_gate)
-        {
-            foreach (var watcher in _watchers.Values)
-                watcher.Dispose();
-            _watchers.Clear();
-        }
+        _work.Wait(); // the current holder finishes its file; later callers see _closed
+        _closed = true;
+        _work.Release();
         _stop.Dispose();
-        _work.Dispose();
     }
 
     /// <summary>Runs one pass of the loop now. Tests drive the engine with this and a fake clock.</summary>
@@ -260,7 +226,23 @@ public sealed class DownloadsEngine : IDisposable
         _work.Wait();
         try
         {
+            ObjectDisposedException.ThrowIf(_closed, this);
             ProcessDue();
+        }
+        finally
+        {
+            _work.Release();
+        }
+    }
+
+    /// <summary>Runs <paramref name="work"/> while holding the one right to move files.</summary>
+    private async Task<T> ExclusiveAsync<T>(Func<T> work, CancellationToken ct)
+    {
+        await _work.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            ObjectDisposedException.ThrowIf(_closed, this);
+            return await Task.Run(work, CancellationToken.None).ConfigureAwait(false);
         }
         finally
         {
@@ -432,7 +414,9 @@ public sealed class DownloadsEngine : IDisposable
             case not null:
                 return (Readiness.Excluded, null, facts); // partial download, system file, cloud placeholder
         }
-        if (IgnorePatterns(tracked.Folder.Path).Any(p => IgnoreFile.Matches(facts.Name, p)))
+        if (IgnorePatterns(tracked.Folder.Path) is not { } patterns)
+            return (Readiness.Waiting, "Ignore file unreadable", facts);
+        if (patterns.Any(p => IgnoreFile.Matches(facts.Name, p)))
             return (Readiness.Excluded, null, facts);
         if (_guard.IsOwnOutput(tracked.Path, facts.Bytes, facts.Modified))
             return (Readiness.Excluded, null, facts); // Chippi made this file: never organize it again
@@ -497,11 +481,18 @@ public sealed class DownloadsEngine : IDisposable
         IReadOnlyList<Rule> rules;
         lock (_gate)
             rules = _rules;
-        var context = new PlanContext(folder.Path, _time.GetUtcNow(), TimeZoneInfo.Local, []) { IgnorePatterns = IgnorePatterns(folder.Path) };
+        if (IgnorePatterns(folder.Path) is not { } patterns)
+        {
+            // It became unreadable since the readiness check: look again later.
+            foreach (var (tracked, _) in files)
+                Track(tracked.Path, tracked.Arrived);
+            return;
+        }
+        var context = new PlanContext(folder.Path, _time.GetUtcNow(), TimeZoneInfo.Local, []) { IgnorePatterns = patterns };
         var plans = Planner.PlanBatch(files.Select(f => f.Facts), rules, context);
         var names = rules.ToDictionary(r => r.Id, r => r.Name);
         long? runId = null;
-        for (int i = 0; i < plans.Count; i++)
+        for (int i = 0; i < plans.Count && !_stop.IsCancellationRequested; i++) // stopping: the rest wait for the next start
         {
             var plan = plans[i];
             var (tracked, file) = files[i];
@@ -550,7 +541,8 @@ public sealed class DownloadsEngine : IDisposable
         IReadOnlyList<Rule> rules;
         lock (_gate)
             rules = _rules;
-        var patterns = IgnorePatterns(folder);
+        var patterns = IgnorePatterns(folder)
+            ?? throw new InvalidOperationException($"{EngineOptions.IgnoreFileName} in this folder can't be read right now. Try again in a moment.");
         var facts = new List<FileFacts>();
         var real = new List<string>();
         foreach (var (path, planned) in files)
@@ -588,7 +580,11 @@ public sealed class DownloadsEngine : IDisposable
             .Where(p => p.Plan.Kind != OperationKind.NoMatch)
             .Select((p, i) => new PreviewItem(
                 i + 1, p.Real, p.Fact.Name, p.Fact.Bytes, p.Fact.Modified, p.Plan.Kind, p.Plan.Destination, p.Plan.RuleId,
-                p.Plan.RuleId is { } id && names.TryGetValue(id, out var name) ? name : null, p.Plan.Warnings, p.Plan.HoldReason))
+                p.Plan.RuleId is { } id && names.TryGetValue(id, out var name) ? name : null, p.Plan.Warnings, p.Plan.HoldReason)
+            {
+                Version = FileVersion.Of(p.Real),
+                ImportedAs = archive is null ? null : p.Fact.FullPath,
+            })
             .ToList();
         var now = _time.GetUtcNow();
         var preview = new PreviewPlan(Guid.NewGuid(), folder, trigger, now, now + _options.PreviewLifetime, items)
@@ -612,14 +608,24 @@ public sealed class DownloadsEngine : IDisposable
         var batch = new NoticeBatch(preview.Trigger) { Archive = preview.Archive };
         foreach (var item in preview.Items.Where(i => selected.Contains(i.Id)))
         {
+            if (_stop.IsCancellationRequested)
+            {
+                results.Add(new ItemResult(item.Id, item.Source, null, false, "Chippi closed before this file."));
+                continue;
+            }
             if (item.Kind is not (OperationKind.Move or OperationKind.Rename) || item.Destination is null)
             {
                 results.Add(new ItemResult(item.Id, item.Source, null, false, "Nothing to do for this file."));
                 continue;
             }
+            // An imported file is recorded as coming from the folder it was imported into, so undo
+            // has somewhere real to put it back. One that lands right there is an Import: no undo.
+            var kind = item.ImportedAs is { } importedAs && string.Equals(item.Destination, importedAs, StringComparison.OrdinalIgnoreCase)
+                ? HistoryOperationKind.Import
+                : item.Kind == OperationKind.Rename ? HistoryOperationKind.Rename : HistoryOperationKind.Move;
             var result = _executor.Execute(runId, new ExecutionRequest(
-                item.Kind == OperationKind.Rename ? HistoryOperationKind.Rename : HistoryOperationKind.Move,
-                item.Source, item.Destination, item.RuleId, item.RuleName, item.Bytes, item.ModifiedUtc, AllowRenumber: false));
+                kind, item.Source, item.Destination, item.RuleId, item.RuleName, item.Bytes, item.ModifiedUtc, AllowRenumber: false,
+                ExpectedVersion: item.Version, RecordedSource: item.ImportedAs));
             results.Add(new ItemResult(item.Id, item.Source, result.Destination, result.Succeeded, result.Error));
             if (result.Succeeded)
             {
@@ -644,6 +650,8 @@ public sealed class DownloadsEngine : IDisposable
         var record = _history.Get(operationId);
         if (record is null || record.Kind == HistoryOperationKind.Restore)
             return new UndoResult(false, null, "Nothing to undo.");
+        if (record.Kind == HistoryOperationKind.Import)
+            return new UndoResult(false, null, "Imported straight into the folder, so there is nothing to undo.");
         if (record.State != OperationState.Completed)
             return new UndoResult(false, null, record.State == OperationState.Undone ? "Already undone." : "Only completed changes can be undone.");
         var current = new FileInfo(record.DestinationPath);
@@ -696,7 +704,11 @@ public sealed class DownloadsEngine : IDisposable
         return parent is null ? null : _settings.Folders.FirstOrDefault(f => Same(f.Path, parent));
     }
 
-    private IReadOnlyList<string> IgnorePatterns(string folder)
+    /// <summary>
+    /// The folder's ignore patterns, or null while its ignore file exists but cannot be read. Then
+    /// nothing in the folder is organized: an unreadable ignore file must not read as "ignore nothing".
+    /// </summary>
+    private IReadOnlyList<string>? IgnorePatterns(string folder)
     {
         string file = Path.Combine(folder, EngineOptions.IgnoreFileName);
         DateTime stamp = File.Exists(file) ? File.GetLastWriteTimeUtc(file) : DateTime.MinValue;
@@ -717,7 +729,8 @@ public sealed class DownloadsEngine : IDisposable
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                _logger.LogWarning(ex, "Could not read {File}", file);
+                _logger.LogWarning(ex, "Could not read {File}; holding the folder until it can be read", file);
+                return null; // not cached: the next look tries again
             }
         }
         lock (_gate)

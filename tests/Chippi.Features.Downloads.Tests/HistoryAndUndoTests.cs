@@ -115,18 +115,23 @@ public sealed class HistoryAndUndoTests
         long moved = f.History.Plan(run, HistoryOperationKind.Move, f.In("moved.pdf"), f.In("Docs", "moved.pdf"), null, null, 1);
         f.History.MarkStarted(moved);
 
-        // Interrupted before it: the file is still at the source, with a half-written copy.
+        // Interrupted before it: the file is still at the source, with a half-written copy, next
+        // to someone else's file that merely ends in the suffix.
         f.Write("stayed.pdf");
-        File.WriteAllText(f.In("Docs", "stayed.pdf.chippi-partial"), "he");
         long stayed = f.History.Plan(run, HistoryOperationKind.Move, f.In("stayed.pdf"), f.In("Docs", "stayed.pdf"), null, null, 5);
         f.History.MarkStarted(stayed);
+        string ours = Executor.PartialPath(f.In("Docs", "stayed.pdf"), stayed);
+        File.WriteAllText(ours, "he");
+        string theirs = f.In("Docs", "stayed.pdf.chippi-partial");
+        File.WriteAllText(theirs, "not Chippi's");
 
         f.Restart();
 
         Assert.Equal(OperationState.Completed, f.History.Get(moved)!.State);
         Assert.NotNull(f.History.Get(moved)!.Sha256);
         Assert.Equal(OperationState.Failed, f.History.Get(stayed)!.State);
-        Assert.False(File.Exists(f.In("Docs", "stayed.pdf.chippi-partial")));
+        Assert.False(File.Exists(ours));
+        Assert.Equal("not Chippi's", File.ReadAllText(theirs));
         Assert.Empty(f.History.Incomplete());
     }
 
