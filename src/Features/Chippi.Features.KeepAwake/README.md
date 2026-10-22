@@ -18,13 +18,7 @@ dotnet test tests\Chippi.Core.Tests -c Release
 dotnet test tests\Chippi.Features.KeepAwake.Tests -c Release
 ```
 
-Before WS1 and WS2 merge, the [WS4] App slot has a temporary host, compiled only in Debug and enabled only by DebugMode. It registers/installs the real module, shows its actual settings page, and returns true from that slot. Release composition still returns false without WS1. The host Close button and Esc use the shell's normal quit path. Remove the temporary early return at shell integration.
-
-```powershell
-dotnet run --project src\Chippi.App -c Debug -r win-x64 -- --debug
-```
-
-Optional CHIPPI_WS4_VERIFY points at a screenshot directory. The debug host starts a one-minute/display-on session, renders dark/light PNGs, attempts powercfg /requests on/stopped/uninstalled, then closes and stops all modules. It changes only the isolated dev profile. Powercfg requires elevation on this machine; the host does not elevate itself or anything it launches.
+The [WS4] slot only registers the module and its exit cleanup. The temporary debug host has been removed following review; --debug does not install, activate, or uninstall Keep awake. Historical screenshots below came from that removed host. Native verification now uses a separate console probe and never runs powercfg or requests elevation.
 
 ## Verification and gaps (2026-10-21)
 
