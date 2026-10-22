@@ -130,6 +130,9 @@ public partial class App : Application
 
         // [WS2] "Coming soon" placeholders for the PLAN.md features.
 
+        // [WS1] Debug mode only: sample Tools tiles. Registration must precede the registry start.
+        Flyout.DebugSampleModule.RegisterIfDebug(shell);
+
         // Start installed modules before any surface reads the registry.
         _ = StartModulesAsync(shell);
 
@@ -138,8 +141,7 @@ public partial class App : Application
         // [WS2] Settings: create the settings controller and call shell.Commands.RegisterSettings(...).
 
         // [WS1] Tray and flyout: create them, call shell.Commands.RegisterFlyout(...), then return true.
-
-        return false;
+        return Tray.TrayController.Compose(shell);
     }
 
     private static async Task StartModulesAsync(ShellContext shell)
