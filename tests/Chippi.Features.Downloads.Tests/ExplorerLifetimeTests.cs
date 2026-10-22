@@ -22,10 +22,18 @@ public sealed class ExplorerLifetimeTests : IDisposable
     }
 
     [Fact]
+    public void Explorer_defaults_on_when_settings_omit_the_switch()
+    {
+        var config = new ConfigStore(Path.Combine(_root, "settings.json"));
+        config.SetModuleSettings("downloads-organizer", new { initialized = true });
+        Assert.True(config.GetModuleSettings<DownloadsSettings>("downloads-organizer").OrganizeInExplorer);
+    }
+
+    [Fact]
     public async Task Switch_stop_start_reapply_and_uninstall_have_distinct_lifetimes()
     {
         var config = new ConfigStore(Path.Combine(_root, "settings.json"));
-        config.SetModuleSettings("downloads-organizer", new DownloadsSettings { Initialized = true });
+        config.SetModuleSettings("downloads-organizer", new DownloadsSettings { Initialized = true, OrganizeInExplorer = false });
         var registration = new ExplorerRegistration("test", _key, @"C:\Tools\Chippi.exe");
         var module = new DownloadsModule(registration);
         var registry = new ModuleRegistry(config, new IslandActivityHub(), NullLoggerFactory.Instance,

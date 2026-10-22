@@ -110,7 +110,7 @@ public sealed class DownloadsSettings
     /// <summary>History older than this is pruned at start (brief §2: 90 days).</summary>
     public int HistoryDays { get; set; } = 90;
 
-    public bool OrganizeInExplorer { get; set; }
+    public bool OrganizeInExplorer { get; set; } = true;
 
     /// <summary>
     /// When the person last cleared history. History shows nothing older; the store keeps the few

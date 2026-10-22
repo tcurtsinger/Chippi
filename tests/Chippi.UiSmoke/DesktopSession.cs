@@ -32,7 +32,7 @@ internal sealed class DesktopSession : IDisposable
         _local = ProfileDirectory(Environment.SpecialFolder.LocalApplicationData);
         Directory.CreateDirectory(_roaming);
         // Do not flash an island on the user's desktop except during its explicit toggle test.
-        File.WriteAllText(SettingsPath, """{"version":1,"app":{"islandEnabled":false,"reduceMotion":true},"modules":{"downloads-organizer":{"initialized":true,"folders":[],"rules":[]}}}""");
+        File.WriteAllText(SettingsPath, """{"version":1,"app":{"islandEnabled":false,"reduceMotion":true},"modules":{"downloads-organizer":{"initialized":true,"organizeInExplorer":false,"folders":[],"rules":[]}}}""");
         _output.WriteLine($"Profile: {_profile}; executable: {Executable}");
         try
         {
