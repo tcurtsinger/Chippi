@@ -503,7 +503,13 @@
                                        Foreground="{DynamicResource TextTertiaryBrush}" TextWrapping="Wrap" Margin="0,3,0,0" />
                             <WrapPanel Grid.Row="4" Margin="0,10,0,-6">
                                 <c:Badge x:Name="ComingSoon" Kind="Needs" Text="Coming soon" Margin="0,0,6,6" Visibility="Collapsed" />
-                                <ItemsControl ItemsSource="{TemplateBinding Badges}" Focusable="False">
+                                <ItemsControl ItemsSource="{TemplateBinding Badges}" Focusable="False" AutomationProperties.Name="Badges">
+                                    <!-- Each item reads as its words, not the FeatureBadge record's ToString(). -->
+                                    <ItemsControl.ItemContainerStyle>
+                                        <Style TargetType="{x:Type ContentPresenter}">
+                                            <Setter Property="AutomationProperties.Name" Value="{Binding Text}" />
+                                        </Style>
+                                    </ItemsControl.ItemContainerStyle>
                                     <ItemsControl.ItemsPanel>
                                         <ItemsPanelTemplate>
                                             <WrapPanel />
@@ -537,6 +543,8 @@
                         </MultiTrigger>
                         <Trigger Property="IsComingSoon" Value="True">
                             <Setter TargetName="Switch" Property="IsEnabled" Value="False" />
+                            <!-- A disabled switch alone does not say why; the reason travels with it. -->
+                            <Setter TargetName="Switch" Property="AutomationProperties.HelpText" Value="Coming soon. Not installable yet." />
                             <Setter TargetName="ComingSoon" Property="Visibility" Value="Visible" />
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">

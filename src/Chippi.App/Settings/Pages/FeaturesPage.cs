@@ -3,6 +3,8 @@
 
 using System.Windows;
 using System.Windows.Automation;
+using System.Windows.Automation.Peers;
+using System.Windows.Automation.Provider;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
@@ -232,6 +234,27 @@ internal sealed class HubCard : FeatureCard
         ToolTip = HasPage ? $"Open {Entry.Descriptor.Name} settings" : null;
         AutomationProperties.SetName(this, HasPage ? $"{Entry.Descriptor.Name} settings" : Entry.Descriptor.Name);
         AutomationProperties.SetHelpText(this, Entry.Descriptor.Description);
+        // Invoke comes and goes with the page; tell clients the patterns changed.
+        UIElementAutomationPeer.FromElement(this)?.InvalidatePeer();
+    }
+
+    /// <summary>Screen readers and switch access open the settings page through Invoke, as a click or Enter does.</summary>
+    protected override AutomationPeer OnCreateAutomationPeer() => new HubCardAutomationPeer(this);
+
+    private sealed class HubCardAutomationPeer(HubCard owner) : FeatureCardAutomationPeer(owner), IInvokeProvider
+    {
+        protected override AutomationControlType GetAutomationControlTypeCore() =>
+            owner.HasPage ? AutomationControlType.Button : AutomationControlType.Group;
+
+        public override object? GetPattern(PatternInterface patternInterface) =>
+            patternInterface == PatternInterface.Invoke && owner.HasPage ? this : base.GetPattern(patternInterface);
+
+        void IInvokeProvider.Invoke()
+        {
+            if (!IsEnabled() || !owner.HasPage)
+                throw new ElementNotEnabledException();
+            owner.OpenRequested?.Invoke(owner, EventArgs.Empty);
+        }
     }
 
     protected override void OnPropertyChanged(DependencyPropertyChangedEventArgs e)
