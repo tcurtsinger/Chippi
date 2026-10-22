@@ -21,7 +21,12 @@ public static class Program
         VelopackApp.Build()
             // Never leave a Run entry pointing at a deleted exe. Installed builds use the real
             // value name; dev profiles never install.
-            .OnBeforeUninstallFastCallback(_ => new StartupRegistration().SetEnabled(false))
+            .OnBeforeUninstallFastCallback(_ =>
+            {
+                // A registry failure must never block the uninstall itself.
+                try { new StartupRegistration().SetEnabled(false); }
+                catch (Exception) { }
+            })
             .Run();
 
         var app = new App();
