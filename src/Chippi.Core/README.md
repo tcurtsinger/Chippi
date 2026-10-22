@@ -60,7 +60,7 @@ set `<UseWPF>true</UseWPF>`. In XAML write `xmlns:c="urn:chippi-ui"`.
 
 | Type | What it is |
 |---|---|
-| `ConfigStore` | `%APPDATA%\Chippi\settings.json`. `Load()`, `Save()`, `HasSection`, `GetSection<T>` / `SetSection<T>` (merges, saves), `GetModuleSettings<T>` / `SetModuleSettings<T>` / `HasModuleSettings`, `Export(path)`, `Import(path)` (throws `InvalidDataException` and changes nothing on a bad file), event `Imported`. Versioned (`version: 1`), atomic writes, unknown sections and properties survive, a corrupt file is moved aside. |
+| `ConfigStore` | `%APPDATA%\Chippi\settings.json`. `Load()`, `Save()`, `HasSection`, `GetSection<T>` / `SetSection<T>` (merges, saves), `GetModuleSettings<T>` / `SetModuleSettings<T>` / `HasModuleSettings`, `Export(path)`, `Import(path)` (throws `InvalidDataException` and changes nothing on a bad file), events `Imported` and `SectionChanged` (args `Name`: "app", "features" or "modules.<id>"; raised after the file is written, on the saving thread, for writes through this store only). Versioned (`version: 1`), atomic writes, unknown sections and properties survive, a corrupt file is moved aside. |
 | `AppSettings` | Section `app`: `Theme` (`ThemePreference`), `IslandEnabled`, `PetColor`, `ReduceMotion` (null = follow Windows). |
 | `ThemePreference` | `Dark, Light, System`. (Not `ThemeMode`: WPF 10 has its own `System.Windows.ThemeMode`.) |
 | `PetColor` | `Synth, Iris, Azure, Signal, Ember, Frost`. |
@@ -79,5 +79,5 @@ restarts). Never-used capabilities are not flagged.
 | `RollingFileLog` | `%LOCALAPPDATA%\Chippi\logs\chippi.log`, rolls at 1 MB to `chippi.1.log` ... keeps 5. Never throws. |
 | `RollingFileLoggerProvider` | `ILoggerProvider` over it. |
 | `Log` | Static `Info/Warn/Error` for startup code before DI exists. |
-| `SingleInstance` | `TryAcquire(name)`: owner or null (after signalling the owner). Event `ActivationRequested` (background thread). |
+| `SingleInstance` | `TryAcquire(name)`: owner or null (after signalling the owner). The second launch calls `AllowSetForegroundWindow` for the owner first, so the owner may take the foreground. Event `ActivationRequested` (background thread; a request before the first subscriber is held). |
 | `StartupRegistration` | HKCU Run, value `Chippi`, command `"<exe>" --startup`. `IsEnabled()`, `SetEnabled(bool, exePath?)`, `GetCommand()`. |

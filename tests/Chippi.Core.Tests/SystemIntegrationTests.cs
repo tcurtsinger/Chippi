@@ -40,6 +40,28 @@ public sealed class SingleInstanceTests
     }
 
     [Fact]
+    public void The_owner_publishes_its_process_id_for_the_foreground_handoff()
+    {
+        var name = "ChippiTest-" + Guid.NewGuid().ToString("N");
+        using var first = SingleInstance.TryAcquire(name);
+        Assert.Equal(Environment.ProcessId, SingleInstance.ReadOwner(name));
+
+        // The second launch grants the foreground and still signals.
+        using var signalled = new ManualResetEventSlim();
+        first!.ActivationRequested += (_, _) => signalled.Set();
+        Assert.Null(SingleInstance.TryAcquire(name));
+        Assert.True(signalled.Wait(TimeSpan.FromSeconds(5)));
+    }
+
+    [Fact]
+    public void The_owner_record_goes_away_with_the_owner()
+    {
+        var name = "ChippiTest-" + Guid.NewGuid().ToString("N");
+        SingleInstance.TryAcquire(name)!.Dispose();
+
+        Assert.Null(SingleInstance.ReadOwner(name));
+    }
+    [Fact]
     public void Name_is_free_again_after_dispose()
     {
         var name = "ChippiTest-" + Guid.NewGuid().ToString("N");

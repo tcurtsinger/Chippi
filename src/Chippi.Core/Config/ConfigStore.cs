@@ -49,6 +49,15 @@ public sealed class ConfigStore
     public event EventHandler? Imported;
 
     /// <summary>
+    /// Raised after a section was saved through this store: <see cref="SetSection{T}"/> (the
+    /// section's name, e.g. "app"), <see cref="SetModuleSettings{T}"/> ("modules.&lt;id&gt;"), and
+    /// <see cref="Import"/> (every section either document has). Raised on the saving thread,
+    /// after the file is written and outside the store's lock, so handlers can read the store; UI
+    /// listeners marshal with BeginInvoke. Edits made to the file by other programs are not seen.
+    /// </summary>
+    public event EventHandler<ConfigSectionChangedEventArgs>? SectionChanged;
+
+    /// <summary>
     /// Reads settings.json. A missing file starts empty. An unreadable one is moved aside to
     /// settings.corrupt-&lt;timestamp&gt;.json and the app starts on defaults instead of crashing.
     /// </summary>
@@ -119,6 +128,7 @@ public sealed class ConfigStore
             _root[name] = Merge(_root[name] as JsonObject, ToNode(value));
             WriteAtomic(FilePath, _root.ToJsonString(JsonOptions));
         }
+        RaiseSectionChanged(name);
     }
 
     public bool HasModuleSettings(string moduleId)
@@ -141,6 +151,7 @@ public sealed class ConfigStore
             modules[moduleId] = Merge(modules[moduleId] as JsonObject, ToNode(value));
             WriteAtomic(FilePath, _root.ToJsonString(JsonOptions));
         }
+        RaiseSectionChanged($"{ModulesKey}.{moduleId}");
     }
 
     /// <summary>Writes the current settings to <paramref name="path"/> as one JSON file.</summary>
@@ -170,14 +181,56 @@ public sealed class ConfigStore
         if (FirstInvalidSection(imported) is { } bad)
             throw new InvalidDataException($"The \"{bad}\" section of that file is not valid Chippi settings.");
 
+        List<string> touched;
         lock (_gate)
         {
             // Commit to disk first: only a successful write replaces the live settings.
             WriteAtomic(FilePath, imported.ToJsonString(JsonOptions));
+            touched = [.. SectionNames(_root).Union(SectionNames(imported))];
             _root = imported;
         }
         _logger.LogInformation("Settings imported from {Path}", path);
         Imported?.Invoke(this, EventArgs.Empty);
+        foreach (var name in touched)
+            RaiseSectionChanged(name);
+    }
+
+    /// <summary>The names <see cref="SectionChanged"/> uses for a document: top-level sections and "modules.&lt;id&gt;".</summary>
+    private static IEnumerable<string> SectionNames(JsonObject root)
+    {
+        foreach (var (key, value) in root)
+        {
+            if (key == VersionKey)
+                continue;
+            if (key == ModulesKey && value is JsonObject modules)
+            {
+                foreach (var (id, _) in modules)
+                    yield return $"{ModulesKey}.{id}";
+            }
+            else
+            {
+                yield return key;
+            }
+        }
+    }
+
+    private void RaiseSectionChanged(string name)
+    {
+        var handlers = SectionChanged;
+        if (handlers is null)
+            return;
+        // One failing listener must not stop the others or fail the save that already happened.
+        foreach (EventHandler<ConfigSectionChangedEventArgs> handler in handlers.GetInvocationList())
+        {
+            try
+            {
+                handler(this, new ConfigSectionChangedEventArgs(name));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "A settings listener failed for section {Section}", name);
+            }
+        }
     }
 
     private JsonObject? Modules(bool create)
@@ -343,4 +396,10 @@ public sealed class ConfigStore
             _logger.LogWarning(ex, "Could not move {From} aside", from);
         }
     }
+}
+
+/// <summary>Which settings section was saved: "app", "features", or "modules.&lt;id&gt;".</summary>
+public sealed class ConfigSectionChangedEventArgs(string name) : EventArgs
+{
+    public string Name { get; } = name;
 }

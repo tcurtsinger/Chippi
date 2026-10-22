@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using System.IO.MemoryMappedFiles;
+using System.Runtime.InteropServices;
+
 namespace Chippi.Core.SystemIntegration;
 
 /// <summary>
@@ -8,18 +11,28 @@ namespace Chippi.Core.SystemIntegration;
 /// event; a later launch sets that event and exits, and the first instance raises
 /// <see cref="ActivationRequested"/> (the shell opens the flyout).
 /// </summary>
+/// <remarks>
+/// Windows only lets the process the user just started take the foreground. So before it signals,
+/// the second launch hands that right to the running instance with <c>AllowSetForegroundWindow</c>
+/// (the owner publishes its process id in a small named memory block for this), and the flyout
+/// can come to the front without any workaround.
+/// </remarks>
 public sealed class SingleInstance : IDisposable
 {
+    private const int AsfwAny = -1;
+
     private readonly Mutex _mutex;
     private readonly EventWaitHandle _activate;
+    private readonly MemoryMappedFile? _owner;
     private readonly ManualResetEvent _stop = new(false);
     private readonly Thread _listener;
     private bool _disposed;
 
-    private SingleInstance(Mutex mutex, EventWaitHandle activate)
+    private SingleInstance(Mutex mutex, EventWaitHandle activate, MemoryMappedFile? owner)
     {
         _mutex = mutex;
         _activate = activate;
+        _owner = owner;
         _listener = new Thread(Listen) { IsBackground = true, Name = "Chippi single-instance listener" };
         _listener.Start();
     }
@@ -66,8 +79,9 @@ public sealed class SingleInstance : IDisposable
         var activate = new EventWaitHandle(false, EventResetMode.AutoReset, $@"Local\{name}.Activate");
         var mutex = new Mutex(initiallyOwned: true, $@"Local\{name}.SingleInstance", out bool createdNew);
         if (createdNew)
-            return new SingleInstance(mutex, activate);
+            return new SingleInstance(mutex, activate, PublishOwner(name));
 
+        AllowOwnerToTakeForeground(name);
         activate.Set();
         activate.Dispose();
         mutex.Dispose();
@@ -91,6 +105,7 @@ public sealed class SingleInstance : IDisposable
         }
         _mutex.Dispose();
         _activate.Dispose();
+        _owner?.Dispose();
         _stop.Dispose();
     }
 
@@ -107,6 +122,49 @@ public sealed class SingleInstance : IDisposable
                     _pending = true;
             }
             handler?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    /// <summary>The owner's process id, readable by later launches. Null if the block cannot be made (the fallback grants any process).</summary>
+    private static MemoryMappedFile? PublishOwner(string name)
+    {
+        try
+        {
+            var block = MemoryMappedFile.CreateOrOpen($@"Local\{name}.Owner", sizeof(int));
+            using var view = block.CreateViewAccessor(0, sizeof(int));
+            view.Write(0, Environment.ProcessId);
+            return block;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Lets the running instance take the foreground when it opens the flyout. Best effort: a refusal only means no focus.</summary>
+    private static void AllowOwnerToTakeForeground(string name)
+    {
+        // Unknown owner (still starting up): let any process take the foreground once instead.
+        int owner = ReadOwner(name) is int id and > 0 ? id : AsfwAny;
+        _ = AllowSetForegroundWindow(owner);
+    }
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool AllowSetForegroundWindow(int processId);
+
+    /// <summary>The process id the running instance published, or null.</summary>
+    internal static int? ReadOwner(string name)
+    {
+        try
+        {
+            using var block = MemoryMappedFile.OpenExisting($@"Local\{name}.Owner", MemoryMappedFileRights.Read);
+            using var view = block.CreateViewAccessor(0, sizeof(int), MemoryMappedFileAccess.Read);
+            return view.ReadInt32(0);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return null;
         }
     }
 }

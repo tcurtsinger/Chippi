@@ -433,6 +433,8 @@
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="FocusVisualStyle" Value="{StaticResource FocusRing12}" />
         <Setter Property="AutomationProperties.Name" Value="{Binding Title, RelativeSource={RelativeSource Self}}" />
+        <!-- The name trims at tile width; the tooltip shows it in full (DESIGN.md §6, Tool tile). -->
+        <Setter Property="ToolTip" Value="{Binding Title, RelativeSource={RelativeSource Self}}" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type c:ToolTile}">
