@@ -54,7 +54,7 @@ public sealed class DownloadsModule : IFeatureModule
     private ModuleContext? _context;
     private SqliteHistoryStore? _history;
 
-    public FeatureDescriptor Descriptor { get; } = new("downloads-organizer", "Downloads organizer", "Sorts new downloads into folders by your rules, with preview and undo", FeatureGroup.Files)
+    public FeatureDescriptor Descriptor { get; } = new("downloads-organizer", "Downloads organizer", "Sorts new downloads into folders by your rules", FeatureGroup.Files)
     {
         Icon = nameof(LucideIcons.Folder),
         Presets = PresetMembership.Essentials | PresetMembership.PowerUser,

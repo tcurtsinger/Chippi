@@ -104,7 +104,7 @@ internal sealed class GeneralPage : UserControl
                 SettingsUi.Show(message, "Windows would not let Chippi change its startup entry.", problem: true);
             }
         });
-        return SettingsUi.Row("Run at startup", "Starts quietly in the tray when you sign in.", toggle, message);
+        return SettingsUi.Row("Run at startup", "Starts quietly in the tray when you sign in", toggle, message);
     }
 
     private Border TransferRow()
@@ -117,7 +117,7 @@ internal sealed class GeneralPage : UserControl
         var buttons = new StackPanel { Orientation = Orientation.Horizontal };
         buttons.Children.Add(export);
         buttons.Children.Add(import);
-        return SettingsUi.Row("Settings file", _shell.Config.FilePath, buttons, message);
+        return SettingsUi.Row("Back up or move your settings", _shell.Config.FilePath, buttons, message);
     }
 
     private void Export(TextBlock message)

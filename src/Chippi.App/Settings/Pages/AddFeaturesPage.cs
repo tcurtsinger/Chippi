@@ -19,7 +19,7 @@ internal sealed class AddFeaturesPage : UserControl
     private readonly TextBlock _count = SettingsUi.Styled(new TextBlock { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(16, 0, 0, 0) }, "NumberTextStyle");
     private readonly TextBlock _message = SettingsUi.Message();
     private readonly TextBlock _empty = SettingsUi.Styled(new TextBlock { Text = "No features match", Visibility = Visibility.Collapsed, Margin = new Thickness(0, 16, 0, 0) }, "CaptionTextStyle");
-    private readonly List<(FeatureEntry Entry, SettingRow Row, IconChip Chip, ToggleButton Switch)> _rows = [];
+    private readonly List<(FeatureEntry Entry, Grid Row, TextBlock Caption, IconChip Chip, ToggleButton Switch)> _rows = [];
     private readonly List<(FeatureEntry Entry, TextBlock Label, FrameworkElement Heading)> _later = [];
     private readonly ExpanderRow _coming;
     private readonly FrameworkElement _availableHeading;
@@ -47,19 +47,26 @@ internal sealed class AddFeaturesPage : UserControl
         {
             var toggle = SettingsUi.Switch(entry.IsInstalled);
             var chip = new IconChip { Icon = LucideIcons.Get(entry.Descriptor.Icon), IsOn = entry.IsInstalled, Margin = new Thickness(0, 0, 14, 0) };
-            var right = new StackPanel { Orientation = Orientation.Horizontal };
+            var heading = new WrapPanel();
+            heading.Children.Add(SettingsUi.Styled(new TextBlock { Text = entry.Descriptor.Name, VerticalAlignment = VerticalAlignment.Center }, "BodyTextStyle"));
             foreach (var badge in entry.Descriptor.Badges.Where(b => b.Kind != BadgeKind.Source))
-                right.Children.Add(new Badge { Text = badge.Text, Kind = badge.Kind, Margin = new Thickness(0, 0, 14, 0), VerticalAlignment = VerticalAlignment.Center });
-            right.Children.Add(toggle);
-            var row = new SettingRow { Header = entry.Descriptor.Name, Description = entry.Descriptor.Description, Content = right };
+                heading.Children.Add(new Badge { Text = badge.Text, Kind = badge.Kind, Margin = new Thickness(8, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center });
+            var caption = SettingsUi.Styled(new TextBlock { Text = entry.Descriptor.Description, TextWrapping = TextWrapping.Wrap }, "CaptionTextStyle");
+            var labels = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 16, 0), Children = { heading, caption } };
+            var row = new Grid { Margin = new Thickness(0, 10, 16, 10) };
+            row.ColumnDefinitions.Add(new ColumnDefinition());
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            Grid.SetColumn(toggle, 1);
+            row.Children.Add(labels);
+            row.Children.Add(toggle);
             AutomationProperties.SetName(toggle, entry.Descriptor.Name);
+            AutomationProperties.SetHelpText(toggle, entry.Descriptor.Description);
             var layout = new DockPanel { Margin = new Thickness(16, 0, 0, 0) };
             DockPanel.SetDock(chip, Dock.Left);
             layout.Children.Add(chip);
-            row.Padding = new Thickness(0, 10, 16, 10);
             layout.Children.Add(row);
             _available.Children.Add(layout);
-            _rows.Add((entry, row, chip, toggle));
+            _rows.Add((entry, row, caption, chip, toggle));
             SettingsUi.OnSwitched(toggle, on => SetInstalled(entry, toggle, on));
         }
         var names = new StackPanel();
@@ -114,12 +121,12 @@ internal sealed class AddFeaturesPage : UserControl
     private void Refresh()
     {
         _syncing = true;
-        foreach (var (entry, row, chip, toggle) in _rows)
+        foreach (var (entry, _, caption, chip, toggle) in _rows)
         {
             toggle.IsChecked = entry.IsInstalled;
             toggle.Content = entry.IsInstalled ? "On" : "Off";
             chip.IsOn = entry.IsInstalled;
-            row.Description = entry.LastError is not null ? "Couldn't start. Turn off and try again." : entry.Descriptor.Description;
+            caption.Text = entry.LastError is not null ? "Couldn't start. Turn off and try again." : entry.Descriptor.Description;
         }
         _count.Text = $"{_shell.Registry.InstalledCount} on";
         _syncing = false;
@@ -144,7 +151,7 @@ internal sealed class AddFeaturesPage : UserControl
     {
         string query = _search.Text.Trim();
         int visible = 0;
-        foreach (var (entry, row, _, _) in _rows)
+        foreach (var (entry, row, _, _, _) in _rows)
         {
             bool match = entry.Descriptor.Name.Contains(query, StringComparison.CurrentCultureIgnoreCase)
                 || entry.Descriptor.Description.Contains(query, StringComparison.CurrentCultureIgnoreCase);

@@ -35,7 +35,7 @@ public sealed class KeepAwakeModule : IFeatureModule
         _native = native;
     }
 
-    public FeatureDescriptor Descriptor { get; } = new("keep-awake", "Keep awake", "Prevent sleep while you are away", FeatureGroup.System)
+    public FeatureDescriptor Descriptor { get; } = new("keep-awake", "Keep awake", "Stops your PC from sleeping", FeatureGroup.System)
     {
         Icon = nameof(LucideIcons.Coffee),
         Presets = PresetMembership.Essentials | PresetMembership.PowerUser,

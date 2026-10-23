@@ -5,7 +5,6 @@ using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
-using System.Windows.Media;
 using Chippi.App.Shell;
 using Chippi.Core.Modules;
 using Chippi.Core.Notifications;
@@ -37,12 +36,12 @@ internal sealed class NotificationsPage : UserControl
         var page = new StackPanel();
         page.Children.Add(SettingsUi.Styled(new TextBlock { Text = "Notifications", Margin = new Thickness(0, 0, 0, 18) }, "PageTitleStyle"));
 
-        var windows = Destination(LucideIcons.Monitor, "Windows notifications", app.WindowsNotices, on =>
+        var windows = Destination("Windows notifications", app.WindowsNotices, on =>
         {
             SettingsUi.SaveApp(shell.Config, s => s.WindowsNotices = on);
             Dim(_windowsColumn, on);
         });
-        var island = Destination(LucideIcons.IslandScreen, "Island", app.IslandNotices, on =>
+        var island = Destination("Island", app.IslandNotices, on =>
         {
             SettingsUi.SaveApp(shell.Config, s => s.IslandNotices = on);
             Dim(_islandColumn, on);
@@ -175,10 +174,10 @@ internal sealed class NotificationsPage : UserControl
         }
     }
 
-    private static SettingRow Destination(Geometry icon, string title, bool on, Action<bool> changed)
+    private static SettingRow Destination(string title, bool on, Action<bool> changed)
     {
         var toggle = SettingsUi.Switch(on);
-        var row = new SettingRow { Header = title, Description = on ? "" : "Off \u00B7 choices kept", Icon = icon, Content = toggle };
+        var row = new SettingRow { Header = title, Description = on ? "" : "Off \u00B7 choices kept", Content = toggle };
         SettingsUi.OnSwitched(toggle, value =>
         {
             row.Description = value ? "" : "Off \u00B7 choices kept";

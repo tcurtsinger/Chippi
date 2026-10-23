@@ -29,11 +29,14 @@ internal sealed class AboutPage : UserControl
     public AboutPage()
     {
         _page.Children.Add(SettingsUi.Header("About", ""));
-        var product = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(16, 10, 16, 10) };
+        var product = new DockPanel { Margin = new Thickness(16, 10, 16, 10) };
+        var version = SettingsUi.Styled(new TextBlock { Text = "Version " + AppInfo.Version, VerticalAlignment = VerticalAlignment.Center }, "BodyTextStyle");
+        DockPanel.SetDock(version, Dock.Right);
+        product.Children.Add(version);
         product.Children.Add(new Gumdrop { Size = 32, Margin = new Thickness(0, 0, 14, 0) });
         var name = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
         name.Children.Add(SettingsUi.Styled(new TextBlock { Text = "Chippi" }, "BodyTextStyle"));
-        name.Children.Add(SettingsUi.Styled(new TextBlock { Text = "Version " + AppInfo.Version }, "CaptionTextStyle"));
+        name.Children.Add(SettingsUi.Styled(new TextBlock { Text = "Everyday Windows utilities" }, "CaptionTextStyle"));
         product.Children.Add(name);
         var license = SettingsUi.Button("View");
         AutomationProperties.SetName(license, "View license");
@@ -44,7 +47,7 @@ internal sealed class AboutPage : UserControl
         _page.Children.Add(SettingsUi.Group(product,
             SettingsUi.Row("License", AppInfo.License, license),
             SettingsUi.Row("Privacy", "No telemetry. Your settings stay on this PC.", new FrameworkElement()),
-            SettingsUi.Row("Third-party notices", "", notices)));
+            SettingsUi.Row("Third-party notices", "Fonts, icons and libraries", notices)));
         Content = _page;
     }
 

@@ -60,10 +60,8 @@
                 </Grid.ColumnDefinitions>
 
                 <!-- Sidebar -->
-                <Border Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="0,0,1,0">
+                <Border Background="{DynamicResource WindowBackgroundBrush}">
                     <DockPanel Margin="12,14,12,0">
-                        <TextBlock x:Name="VersionLine" DockPanel.Dock="Bottom" Style="{StaticResource CaptionTextStyle}"
-                                   Foreground="{DynamicResource TextMutedBrush}" Margin="12,16,12,18" />
                         <c:SearchBox x:Name="SettingsSearch" DockPanel.Dock="Top" Placeholder="Find a setting" Margin="0,0,0,16"
                                      AutomationProperties.Name="Find a setting" TextChanged="OnSearchChanged" />
                         <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False">
