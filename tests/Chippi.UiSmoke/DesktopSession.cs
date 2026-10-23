@@ -134,14 +134,21 @@ internal sealed class DesktopSession : IDisposable
 
     public void PressEscape(AutomationElement settings)
     {
-        // Send a real key only after verifying the foreground belongs to this profile's process.
-        var handle = (nint)settings.Current.NativeWindowHandle;
+        PressKey(settings, Find(settings, "Keep awake", SelectionItemPattern.Pattern), 0x1B);
+    }
+
+    public void PressKey(AutomationElement window, AutomationElement target, byte key)
+    {
+        // Never send a real key unless this session's target has focus in its own foreground window.
+        Assert.Equal(Process.Id, window.Current.ProcessId);
+        Assert.Equal(Process.Id, target.Current.ProcessId);
+        var handle = (nint)window.Current.NativeWindowHandle;
         SetForegroundWindow(handle);
-        Find(settings, "Keep awake", SelectionItemPattern.Pattern).SetFocus();
-        Until(() => GetForegroundWindow() == handle, "test settings foreground for Escape");
-        const byte escape = 0x1B;
-        keybd_event(escape, 0, 0, 0);
-        keybd_event(escape, 0, 2, 0);
+        target.SetFocus();
+        Until(() => GetForegroundWindow() == handle && Automation.Compare(AutomationElement.FocusedElement, target),
+            "test control focused in the profile's foreground window");
+        keybd_event(key, 0, 0, 0);
+        keybd_event(key, 0, 2, 0);
     }
 
     public void Dispose()
