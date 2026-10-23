@@ -32,10 +32,12 @@ internal sealed class HistorySection : UserControl
     private long? _confirming;
     private long? _confirmingRow;
 
-    public HistorySection(DownloadsModule module, long? focusRun)
+    public HistorySection(DownloadsModule module, long? focusRun, bool confirmUndo = false)
     {
         _module = module;
         _focusRun = focusRun;
+        if (confirmUndo)
+            _confirming = focusRun; // the notification's Undo: ask here, never undo on the click itself
         if (focusRun is { } run)
             _expanded.Add(run);
 
