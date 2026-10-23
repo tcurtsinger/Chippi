@@ -24,7 +24,10 @@ namespace Chippi.App.Flyout;
 /// </summary>
 public partial class FlyoutWindow : Window
 {
-    private const double CardMaxHeight = 612;
+    private const double CardMaxHeight = 640;
+
+    /// <summary>Tabs that fit at 380 wide; with more panels the last one becomes More.</summary>
+    private const int MaxTabs = 8;
 
     /// <summary>Room for the window lift (0 10px 26px) around the card, before trimming at the taskbar.</summary>
     private static readonly Thickness ShadowMargin = new(28, 20, 28, 40);
@@ -36,6 +39,8 @@ public partial class FlyoutWindow : Window
     private bool _rebuildQueued;
     private bool _dirty = true;
     private bool _positioning;
+    private IReadOnlyList<FlyoutPanelContribution> _panels = [];
+    private string? _lastTab;
 
     internal FlyoutWindow(ShellContext shell)
     {
@@ -168,25 +173,40 @@ public partial class FlyoutWindow : Window
         var running = _shell.Registry.Features.Where(f => f.IsRunning).ToList();
         UpdateStatusLine(_shell.Registry.Features.Count(f => f.IsInstalled));
 
-        // One tab per panel, in sidebar (registry) order.
+        // One tab per panel, in sidebar (registry) order. Past eight, the rest go under More.
         var panels = running.SelectMany(f => f.FlyoutPanels).ToList();
-        var keys = panels.Select(FlyoutPages.Key).ToList();
-
-        var selected = ((Tabs.SelectedItem as SegmentItem)?.Value as FlyoutPanelContribution) is { } current ? FlyoutPages.Key(current) : null;
-        if (!panels.SequenceEqual(Tabs.Items.OfType<SegmentItem>().Select(i => i.Value)))
+        if (!panels.SequenceEqual(_panels))
         {
+            _panels = panels;
+            var shown = panels.Count > MaxTabs ? panels.Take(MaxTabs - 1).ToList() : panels;
+            var items = shown.Select(p => new SegmentItem { Label = p.Name, Icon = LucideIcons.Get(p.Icon), Value = p }).ToList();
+            if (shown.Count < panels.Count)
+                items.Add(new SegmentItem { Label = "More", Icon = LucideIcons.Ellipsis, Value = panels.Skip(shown.Count).ToList() });
+
             Tabs.SelectionChanged -= OnTabChanged;
-            Tabs.ItemsSource = panels.Select(p => new SegmentItem { Label = p.Name, Icon = LucideIcons.Get(p.Icon), Value = p }).ToList();
+            Tabs.ItemsSource = items;
             Tabs.SelectionChanged += OnTabChanged;
-            // Keep the user's tab across a module restart.
-            int index = selected is null ? -1 : keys.IndexOf(selected);
-            Tabs.SelectedIndex = keys.Count == 0 ? -1 : Math.Max(index, 0);
+            // Reopen on the last tab used, across module restarts too.
+            int index = items.FindIndex(i => i.Value is FlyoutPanelContribution p ? FlyoutPages.Key(p) == _lastTab
+                : ((List<FlyoutPanelContribution>)i.Value!).Any(p => FlyoutPages.Key(p) == _lastTab));
+            Tabs.SelectedIndex = items.Count == 0 ? -1 : Math.Max(index, 0);
         }
 
-        Tabs.Visibility = keys.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
-        Page.Content = (Tabs.SelectedItem as SegmentItem)?.Value is FlyoutPanelContribution panel
-            ? _pages.Build(panel, running)
-            : _pages.BuildNothingInstalled();
+        TabStrip.Visibility = panels.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        Page.Content = (Tabs.SelectedItem as SegmentItem)?.Value switch
+        {
+            FlyoutPanelContribution panel => _pages.Build(panel, running),
+            List<FlyoutPanelContribution> more when more.FirstOrDefault(p => FlyoutPages.Key(p) == _lastTab) is { } picked => _pages.Build(picked, running),
+            List<FlyoutPanelContribution> more => _pages.BuildMore(more, OpenFromMore),
+            _ => _pages.BuildNothingInstalled(),
+        };
+    }
+
+    private void OpenFromMore(FlyoutPanelContribution panel)
+    {
+        _lastTab = FlyoutPages.Key(panel);
+        Rebuild();
+        Scroller.ScrollToTop();
     }
 
     private void UpdateStatusLine(int on)
@@ -204,6 +224,8 @@ public partial class FlyoutWindow : Window
     {
         if (e.AddedItems.Count == 0)
             return;
+        // More opens on its list; a panel picked there is remembered by OpenFromMore.
+        _lastTab = (Tabs.SelectedItem as SegmentItem)?.Value is FlyoutPanelContribution panel ? FlyoutPages.Key(panel) : null;
         Rebuild();
         Scroller.ScrollToTop();
     }
@@ -223,10 +245,10 @@ public partial class FlyoutWindow : Window
     {
         Dispatcher.BeginInvoke(() =>
         {
-            if (Tabs.Visibility == Visibility.Visible && Tabs.ItemContainerGenerator.ContainerFromIndex(Math.Max(Tabs.SelectedIndex, 0)) is ListBoxItem item)
+            if (TabStrip.Visibility == Visibility.Visible && Tabs.ItemContainerGenerator.ContainerFromIndex(Math.Max(Tabs.SelectedIndex, 0)) is ListBoxItem item)
                 item.Focus();
             else
-                HeaderSettings.Focus();
+                FooterSettings.Focus();
         }, DispatcherPriority.Input);
     }
 

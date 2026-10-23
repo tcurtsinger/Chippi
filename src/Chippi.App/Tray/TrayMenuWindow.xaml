@@ -1,7 +1,7 @@
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
-<!-- The tray icon's right-click menu: Open settings and Quit, with no stock chrome. DESIGN.md has
-     no menu component, so it borrows the flyout frame (Window color, hairline, window lift) at the
-     row radius, and items reuse the Settings sidebar metrics (36px, 16px icon, 13/600 label). -->
+<!-- The tray icon's right-click menu (DESIGN.md §5 "Tray menu"): Open settings and Quit in flyout
+     styling (flyout color, stroke and shadow, 8px radius) with 36px items, a 16px glyph and a
+     13 / 400 label. -->
 <Window x:Class="Chippi.App.Tray.TrayMenuWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -17,7 +17,7 @@
             <Setter Property="Height" Value="36" />
             <Setter Property="Padding" Value="10,0,14,0" />
             <Setter Property="Background" Value="Transparent" />
-            <Setter Property="Foreground" Value="{DynamicResource TextControlBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
             <Setter Property="FontSize" Value="13" />
             <Setter Property="HorizontalContentAlignment" Value="Left" />
             <Setter Property="Cursor" Value="Hand" />
@@ -25,7 +25,7 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="{x:Type Button}">
-                        <Border x:Name="Chrome" Background="{TemplateBinding Background}" CornerRadius="8" Padding="{TemplateBinding Padding}">
+                        <Border x:Name="Chrome" Background="{TemplateBinding Background}" CornerRadius="4" Padding="{TemplateBinding Padding}">
                             <ContentPresenter VerticalAlignment="Center" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" />
                         </Border>
                         <ControlTemplate.Triggers>
@@ -47,9 +47,9 @@
     </Window.Resources>
 
     <Grid x:Name="Frame" Margin="28,20,28,40">
-        <Border CornerRadius="12" Background="{DynamicResource WindowBackgroundBrush}" Effect="{DynamicResource WindowShadow}" />
-        <Border x:Name="Card" MinWidth="196" CornerRadius="12" Padding="6" BorderThickness="1"
-                Background="{DynamicResource WindowBackgroundBrush}" BorderBrush="{DynamicResource WindowBorderBrush}">
+        <Border CornerRadius="8" Background="{DynamicResource FlyoutBrush}" Effect="{DynamicResource WindowShadow}" />
+        <Border x:Name="Card" MinWidth="196" CornerRadius="8" Padding="4" BorderThickness="1"
+                Background="{DynamicResource FlyoutBrush}" BorderBrush="{DynamicResource WindowBorderBrush}">
             <StackPanel x:Name="Items" KeyboardNavigation.DirectionalNavigation="Cycle" KeyboardNavigation.TabNavigation="Cycle">
                 <Button x:Name="SettingsItem" Style="{StaticResource TrayMenuItemStyle}" Click="OnSettingsClick">
                     <StackPanel Orientation="Horizontal">

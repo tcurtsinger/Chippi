@@ -63,6 +63,7 @@ public static class LucideIcons
     public static Geometry Clipboard { get; } = G("M9,2 H15 a1,1 0 0 1 1,1 V5 a1,1 0 0 1 -1,1 H9 a1,1 0 0 1 -1,-1 V3 a1,1 0 0 1 1,-1 Z M16,4 h2 a2,2 0 0 1 2,2 v14 a2,2 0 0 1 -2,2 H6 a2,2 0 0 1 -2,-2 V6 a2,2 0 0 1 2,-2 h2");
     public static Geometry Camera { get; } = G("M14.5,4 h-5 L7,7 H4 a2,2 0 0 0 -2,2 v9 a2,2 0 0 0 2,2 h16 a2,2 0 0 0 2,-2 V9 a2,2 0 0 0 -2,-2 h-3 Z M12,10 a3,3 0 1 0 0,6 a3,3 0 1 0 0,-6 Z");
     public static Geometry AppWindow { get; } = G("M4,4 H20 a2,2 0 0 1 2,2 V18 a2,2 0 0 1 -2,2 H4 a2,2 0 0 1 -2,-2 V6 a2,2 0 0 1 2,-2 Z M2,8 H22 M6,4 V8 M10,4 V8");
+    public static Geometry Ellipsis { get; } = G("M5,11 a1,1 0 1 0 0,2 a1,1 0 1 0 0,-2 Z M12,11 a1,1 0 1 0 0,2 a1,1 0 1 0 0,-2 Z M19,11 a1,1 0 1 0 0,2 a1,1 0 1 0 0,-2 Z");
     public static Geometry LayoutGrid { get; } = G("M4,3 H9 a1,1 0 0 1 1,1 V9 a1,1 0 0 1 -1,1 H4 a1,1 0 0 1 -1,-1 V4 a1,1 0 0 1 1,-1 Z M15,3 H20 a1,1 0 0 1 1,1 V9 a1,1 0 0 1 -1,1 H15 a1,1 0 0 1 -1,-1 V4 a1,1 0 0 1 1,-1 Z M15,14 H20 a1,1 0 0 1 1,1 V20 a1,1 0 0 1 -1,1 H15 a1,1 0 0 1 -1,-1 V15 a1,1 0 0 1 1,-1 Z M4,14 H9 a1,1 0 0 1 1,1 V20 a1,1 0 0 1 -1,1 H4 a1,1 0 0 1 -1,-1 V15 a1,1 0 0 1 1,-1 Z");
     public static Geometry Wrench { get; } = G("M14.7,6.3 a1,1 0 0 0 0,1.4 l1.6,1.6 a1,1 0 0 0 1.4,0 l3.77,-3.77 a6,6 0 0 1 -7.94,7.94 l-6.91,6.91 a2.12,2.12 0 0 1 -3,-3 l6.91,-6.91 a6,6 0 0 1 7.94,-7.94 Z");
     public static Geometry Bell { get; } = G("M6,8 a6,6 0 0 1 12,0 c0,7 3,9 3,9 H3 s3,-2 3,-9 M10.3,21 a1.94,1.94 0 0 0 3.4,0");

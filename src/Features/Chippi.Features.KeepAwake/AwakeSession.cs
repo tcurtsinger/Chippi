@@ -64,6 +64,14 @@ public sealed class AwakeSession : IAsyncDisposable
 
     public Task StopAsync() => Enqueue(() => Release(false));
 
+    /// <summary>Changes whether a running session keeps the screen on, keeping its deadline.</summary>
+    public Task SetDisplayAsync(bool display) => Enqueue(() =>
+    {
+        if (!_active || _settings is null) return;
+        _native.Set(true, display);
+        _settings = _settings with { KeepDisplayOn = display };
+    });
+
     // Also lets timing tests advance an injected clock without sleeping.
     public Task CheckAsync() => Enqueue(CheckDeadline);
 

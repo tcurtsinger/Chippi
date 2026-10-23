@@ -41,11 +41,11 @@ set `<UseWPF>true</UseWPF>`. In XAML write `xmlns:c="urn:chippi-ui"`.
   `SwitchStyle`, `SwitchWithLabelStyle`, `HopperSliderStyle`, `HopperComboBoxStyle`,
   `TextFieldStyle`, `FlyoutSegmentedControlStyle`, `SelectorBarStyle`, `FlyoutTabsStyle`,
   `NavItemStyle` + `NavItemTemplate`, `DurationChipStyle`, `SwatchStyle`, `SwatchPillStyle`,
-  `FlyoutCardStyle` and `CardRowsStyle`.
+  `FlyoutCardStyle`, `FlyoutRowButtonStyle` and `CardRowsStyle`.
 - Controls (`Chippi.UI.Controls`): `Card` (a section's rows with dividers), `SettingRow`,
   `ExpanderRow`, `IconButton`, `IconChip`, `Badge`, `StatusDot`, `SearchBox`, `SegmentedControl` +
-  `SegmentItem`, `DragHandle`, `LucideIcon` + `LucideIcons`, converters. `ToolTile` and
-  `FeatureCard` stay until Phase 2.5's flyout and Settings work replaces them.
+  `SegmentItem`, `DragHandle`, `LucideIcon` + `LucideIcons`, converters. `FeatureCard`
+  stays until R6 deletes it.
 - `Chippi.UI.Themes`: `ThemeManager.Apply(ThemePreference)`, `ThemeManager.SetAccent(dark, light)`,
   `ThemeManager.NamedAccent(AccentChoice)`, `ThemeManager.ThemeChanged`,
   `Motion.IsReduced` / `Motion.Changed` / `Motion.Override`.

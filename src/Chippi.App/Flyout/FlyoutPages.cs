@@ -2,6 +2,7 @@
 // Copyright (C) Chippi contributors
 
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Media;
 using Chippi.Core.Diagnostics;
@@ -44,6 +45,34 @@ internal sealed class FlyoutPages(FlyoutWindow owner)
         add.Click += (_, _) => owner.OpenSettings("features");
         state.Children.Add(add);
         return state;
+    }
+
+    /// <summary>The More tab: a row per panel that didn't fit in the tab strip.</summary>
+    public FrameworkElement BuildMore(IReadOnlyList<FlyoutPanelContribution> panels, Action<FlyoutPanelContribution> open)
+    {
+        Detach();
+        var card = new Card();
+        card.SetResourceReference(FrameworkElement.StyleProperty, "FlyoutCardStyle");
+        foreach (var panel in panels)
+        {
+            var glyph = new LucideIcon { Data = LucideIcons.Get(panel.Icon), Size = 16, Margin = new Thickness(0, 0, 12, 0) };
+            glyph.SetResourceReference(LucideIcon.BrushProperty, "TextSecondaryBrush");
+            var chevron = new LucideIcon { Data = LucideIcons.ChevronRight, Size = 16 };
+            chevron.SetResourceReference(LucideIcon.BrushProperty, "TextSecondaryBrush");
+            var row = new DockPanel();
+            DockPanel.SetDock(glyph, Dock.Left);
+            DockPanel.SetDock(chevron, Dock.Right);
+            row.Children.Add(glyph);
+            row.Children.Add(chevron);
+            row.Children.Add(new TextBlock { Text = panel.Name, VerticalAlignment = VerticalAlignment.Center });
+
+            var button = new Button { Content = row };
+            button.SetResourceReference(FrameworkElement.StyleProperty, "FlyoutRowButtonStyle");
+            AutomationProperties.SetName(button, panel.Name);
+            button.Click += (_, _) => open(panel);
+            card.Children.Add(button);
+        }
+        return card;
     }
 
     private FrameworkElement? View(FlyoutPanelContribution panel)
