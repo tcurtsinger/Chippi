@@ -49,8 +49,8 @@ public partial class KeepAwakePage : UserControl
     private void Refresh()
     {
         if (!Dispatcher.CheckAccess()) { Dispatcher.BeginInvoke(Refresh); return; }
-        State.Text = _module.Tile.StateLine;
-        Toggle.Content = _module.Tile.IsOn ? "Stop keep awake" : "Start keep awake";
+        State.Text = _module.StateLine;
+        Toggle.Content = _module.IsOn ? "Stop keep awake" : "Start keep awake";
         Error.Text = _module.Error ?? "";
     }
 
@@ -59,7 +59,7 @@ public partial class KeepAwakePage : UserControl
         Toggle.IsEnabled = false;
         try
         {
-            if (!_module.Tile.IsOn) await _module.ApplyAsync(ReadSettings());
+            if (!_module.IsOn) await _module.ApplyAsync(ReadSettings());
             await _module.ToggleAsync();
             Refresh();
         }

@@ -1,0 +1,12 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- The Keep awake flyout panel (DESIGN.md §5 "Keep awake panel"). -->
+<UserControl x:Class="Chippi.Features.KeepAwake.KeepAwakePanel"
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+ xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ xmlns:c="urn:chippi-ui">
+ <c:Card Style="{DynamicResource FlyoutCardStyle}">
+  <c:SettingRow x:Name="Status" Header="Keep awake">
+   <ToggleButton x:Name="Switch" Style="{DynamicResource SwitchStyle}" Click="OnSwitch" />
+  </c:SettingRow>
+ </c:Card>
+</UserControl>

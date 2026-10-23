@@ -32,10 +32,8 @@ public sealed class FeatureEntry
     /// <summary>Why the last start failed, if it did. The feature stays installed.</summary>
     public Exception? LastError { get; internal set; }
 
-    /// <summary>Tile, tabs and settings page the running module contributed. Empty when not running.</summary>
-    public IReadOnlyList<ToolTileModel> ToolTiles => Ui?.ToolTiles ?? [];
-
-    public IReadOnlyList<FlyoutTabContribution> FlyoutTabs => Ui?.Tabs ?? [];
+    /// <summary>Flyout panels and settings page the running module contributed. Empty when not running.</summary>
+    public IReadOnlyList<FlyoutPanelContribution> FlyoutPanels => Ui?.Panels ?? [];
 
     public SettingsPageContribution? SettingsPage => Ui?.SettingsPage;
 

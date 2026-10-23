@@ -17,10 +17,10 @@ using Windows.Win32.UI.WindowsAndMessaging;
 namespace Chippi.App.Flyout;
 
 /// <summary>
-/// The tray flyout (DESIGN.md §5). Built once and hidden between uses. Shows the tabs installed
-/// modules contribute to (plus every placeholder tab in debug mode), the Tools grid of
-/// <see cref="ToolTileModel"/>s, and re-renders when the registry changes. It hides on Esc and
-/// when it loses activation; <see cref="Dismissed"/> tells the tray controller which.
+/// The tray flyout (DESIGN.md §5). Built once and hidden between uses. Shows a tab for each panel
+/// running modules contribute (<see cref="FlyoutPanelContribution"/>) and re-renders when the
+/// registry changes. It hides on Esc and when it loses activation; <see cref="Dismissed"/> tells
+/// the tray controller which.
 /// </summary>
 public partial class FlyoutWindow : Window
 {
@@ -36,7 +36,6 @@ public partial class FlyoutWindow : Window
     private bool _rebuildQueued;
     private bool _dirty = true;
     private bool _positioning;
-    private IReadOnlyList<FlyoutTab> _tabs = [];
 
     internal FlyoutWindow(ShellContext shell)
     {
@@ -169,30 +168,25 @@ public partial class FlyoutWindow : Window
         var running = _shell.Registry.Features.Where(f => f.IsRunning).ToList();
         UpdateStatusLine(_shell.Registry.Features.Count(f => f.IsInstalled));
 
-        var contributions = running.SelectMany(f => f.FlyoutTabs).ToList();
-        bool anyTiles = running.Any(f => f.ToolTiles.Count > 0);
-        var tabs = Enum.GetValues<FlyoutTab>()
-            .Where(t => _shell.DebugMode || contributions.Any(c => c.Tab == t) || (t == FlyoutTab.Tools && anyTiles))
-            .ToList();
+        // One tab per panel, in sidebar (registry) order.
+        var panels = running.SelectMany(f => f.FlyoutPanels).ToList();
+        var keys = panels.Select(FlyoutPages.Key).ToList();
 
-        var selected = (Tabs.SelectedItem as SegmentItem)?.Value as FlyoutTab?;
-        if (!tabs.SequenceEqual(_tabs))
+        var selected = ((Tabs.SelectedItem as SegmentItem)?.Value as FlyoutPanelContribution) is { } current ? FlyoutPages.Key(current) : null;
+        if (!panels.SequenceEqual(Tabs.Items.OfType<SegmentItem>().Select(i => i.Value)))
         {
-            _tabs = tabs;
             Tabs.SelectionChanged -= OnTabChanged;
-            Tabs.ItemsSource = tabs.Select(t => new SegmentItem { Label = FlyoutPages.TabName(t), Icon = FlyoutPages.TabIcon(t), Value = t }).ToList();
+            Tabs.ItemsSource = panels.Select(p => new SegmentItem { Label = p.Name, Icon = LucideIcons.Get(p.Icon), Value = p }).ToList();
             Tabs.SelectionChanged += OnTabChanged;
-            // Keep the user's tab; otherwise open on the first one with real content, so a debug
-            // run does not land on a placeholder.
-            int index = selected is FlyoutTab keep ? tabs.IndexOf(keep) : -1;
-            if (index < 0)
-                index = tabs.FindIndex(t => contributions.Any(c => c.Tab == t) || (t == FlyoutTab.Tools && anyTiles));
-            Tabs.SelectedIndex = tabs.Count == 0 ? -1 : Math.Max(index, 0);
+            // Keep the user's tab across a module restart.
+            int index = selected is null ? -1 : keys.IndexOf(selected);
+            Tabs.SelectedIndex = keys.Count == 0 ? -1 : Math.Max(index, 0);
         }
 
-        Tabs.Visibility = tabs.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
-        var tab = (Tabs.SelectedItem as SegmentItem)?.Value as FlyoutTab?;
-        Page.Content = tab is FlyoutTab t ? _pages.Build(t, running) : _pages.BuildNothingInstalled();
+        Tabs.Visibility = keys.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        Page.Content = (Tabs.SelectedItem as SegmentItem)?.Value is FlyoutPanelContribution panel
+            ? _pages.Build(panel, running)
+            : _pages.BuildNothingInstalled();
     }
 
     private void UpdateStatusLine(int on)
@@ -214,10 +208,13 @@ public partial class FlyoutWindow : Window
         Scroller.ScrollToTop();
     }
 
-    /// <summary>Selects a tab if it is showing (the debug snapshot uses it).</summary>
-    internal void SelectTab(FlyoutTab tab)
+    /// <summary>The showing tabs' names, in order (the debug snapshot uses them).</summary>
+    internal IReadOnlyList<string> TabNames => Tabs.Items.OfType<SegmentItem>().Select(i => i.Label).ToList();
+
+    /// <summary>Selects a tab by its panel name if it is showing.</summary>
+    internal void SelectTab(string name)
     {
-        int index = _tabs.ToList().IndexOf(tab);
+        int index = TabNames.ToList().IndexOf(name);
         if (index >= 0)
             Tabs.SelectedIndex = index;
     }

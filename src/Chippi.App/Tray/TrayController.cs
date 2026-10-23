@@ -151,12 +151,11 @@ public sealed class TrayController : IDisposable
                 ShowFlyout();
                 await Idle();
                 Render(_flyout, System.IO.Path.Combine(directory, $"ws1-flyout-{name}.png"));
-                if (_shell.DebugMode)
+                foreach (var tab in _flyout.TabNames)
                 {
-                    _flyout.SelectTab(Core.Modules.FlyoutTab.Sound);
+                    _flyout.SelectTab(tab);
                     await Idle();
-                    Render(_flyout, System.IO.Path.Combine(directory, $"ws1-flyout-placeholder-{name}.png"));
-                    _flyout.SelectTab(Core.Modules.FlyoutTab.Tools);
+                    Render(_flyout, System.IO.Path.Combine(directory, $"flyout-{tab.ToLowerInvariant().Replace(' ', '-')}-{name}.png"));
                 }
                 _flyout.Dismiss();
 
