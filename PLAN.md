@@ -17,8 +17,8 @@ and [Mouzi](https://github.com/hsr88/mouzi) (Downloads organizer). Absorbs
 | Target | Windows 11, x64 + ARM64 |
 | License | GPL-3.0-or-later |
 | Audience | Public open-source release (GitHub releases, installer, auto-update) |
-| Look | Direction A "Studio Rack": Hopper's design system grown into a suite. See [DESIGN.md](DESIGN.md) |
-| Island | Top-center floating pill: media, timers, downloads, notifications, AI agent usage |
+| Look | Native Windows 11 (2026-10-23): neutral grays, one flat accent (Follow Windows by default, or Blue, Violet, Green, Pink), Segoe UI Variable, a panel-first flyout. It replaced Direction A "Studio Rack" after the [UI/UX audit](docs/phase-1-2-ui-ux-audit.md). See [DESIGN.md](DESIGN.md) |
+| Island | A movable tab docked on the top (default), left or right screen edge that opens on hover: media, timers, downloads, notifications, AI agent usage, plus each feature's island panel (2026-10-23) |
 | Pet | Gumdrop, a blob with a face in the Synth gradient that lives in the island. See DESIGN.md §7 |
 | Mouzi | Rebuilt from scratch with the same functionality. Its code is reference only |
 | vorssaint | Feature list and behavior are the spec. We do not port its code |
@@ -46,8 +46,9 @@ and [Mouzi](https://github.com/hsr88/mouzi) (Downloads organizer). Absorbs
 ### Phase 0: Design directions (done)
 Three directions were mocked up on a
 [design canvas](https://claude.ai/artifact/CMBT4oFV3oGZRUei1d7K17). Direction A
-"Studio Rack" won, with the Gumdrop blob as the pet. Both are written up in
-[DESIGN.md](DESIGN.md).
+"Studio Rack" won, with the Gumdrop blob as the pet. Studio Rack was replaced on
+2026-10-23 by the native Windows 11 look ([mockup](https://claude.ai/artifact/5M1W8XSCiDPvCpc5Hrd2Bq));
+Gumdrop stays. Both are written up in [DESIGN.md](DESIGN.md).
 
 ### Phase 1: Shell
 Tray icon and flyout, settings window, Features hub with presets, permissions page,
@@ -56,7 +57,7 @@ here too, as the reference module that proves the module system end to end. The
 build brief is [docs/phase-1-handoff.md](docs/phase-1-handoff.md).
 
 ### Backlog (requested, not yet scheduled)
-- **Island position:** let the user move the island beyond top-center: a vertical bar on the left or right edge, the bottom edge, or a corner. Needs DESIGN.md layouts for vertical and bottom pills (Travis, 2026-10-22). The display setting (main, follow active, one monitor) shipped in Phase 1.
+- ~~**Island position**~~ (Travis, 2026-10-22): moved into Phase 2.5 as the movable island (top, left or right edge; designed 2026-10-23). The bottom edge and corners were left out on purpose: the taskbar and window buttons live there.
 
 ### Phase 2: Downloads organizer (Mouzi-style)
 Brief: [docs/phase-2-handoff.md](docs/phase-2-handoff.md). In progress since 2026-10-22.
@@ -69,6 +70,14 @@ Brief: [docs/phase-2-handoff.md](docs/phase-2-handoff.md). In progress since 202
 - History and verified undo (SQLite), toast notifications
 - Explorer context menu entry, archive import (zip / tgz)
 - Misleading executable filename warnings
+
+### Phase 2.5: Native look refresh
+Brief: [docs/ui-refresh-handoff.md](docs/ui-refresh-handoff.md). Moves the shell, Keep awake and the Downloads organizer to the 2026-10-23 design before Phase 3 adds more screens on the old one.
+- New theme tokens in dark and light, the accent setting, Segoe, tabular numbers
+- Restyled controls, grouped cards, no gradients except Gumdrop
+- Panel-first flyout: icon tab strip, Keep awake and Tidy panels
+- Settings sidebar with search and installed features; Add features replaces the Features hub
+- Movable island: a tab the user drags to the top (default), left or right edge, which opens on hover
 
 ### Phase 3: Sound
 - Audio routing from Hopper: output priority switching, mic pinning, mic processing
