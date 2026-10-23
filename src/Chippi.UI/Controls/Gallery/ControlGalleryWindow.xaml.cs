@@ -7,7 +7,6 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using Chippi.UI.Themes;
 using Chippi.Core.Config;
-using Chippi.Core.Modules;
 
 namespace Chippi.UI.Controls.Gallery;
 
@@ -40,7 +39,6 @@ public partial class ControlGalleryWindow : Window
             System.Windows.Automation.AutomationProperties.SetName(swatch, key.Replace("Pet", "", StringComparison.Ordinal).Replace("Brush", "", StringComparison.Ordinal));
             PetSwatches.Children.Add(swatch);
         }
-        KeepAwakeCard.Badges = [FeatureBadge.Overlap("Overlaps PowerToys")];
 
         Loaded += (_, _) => FontReport.Text = DescribeFonts();
     }

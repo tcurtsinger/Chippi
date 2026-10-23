@@ -44,8 +44,7 @@ set `<UseWPF>true</UseWPF>`. In XAML write `xmlns:c="urn:chippi-ui"`.
   `FlyoutCardStyle`, `FlyoutRowButtonStyle` and `CardRowsStyle`.
 - Controls (`Chippi.UI.Controls`): `Card` (a section's rows with dividers), `SettingRow`,
   `ExpanderRow`, `IconButton`, `IconChip`, `Badge`, `StatusDot`, `SearchBox`, `SegmentedControl` +
-  `SegmentItem`, `DragHandle`, `LucideIcon` + `LucideIcons`, converters. `FeatureCard`
-  stays until R6 deletes it.
+  `SegmentItem`, `DragHandle`, `LucideIcon` + `LucideIcons`, converters.
 - `Chippi.UI.Themes`: `ThemeManager.Apply(ThemePreference)`, `ThemeManager.SetAccent(dark, light)`,
   `ThemeManager.NamedAccent(AccentChoice)`, `ThemeManager.ThemeChanged`,
   `Motion.IsReduced` / `Motion.Changed` / `Motion.Override`.

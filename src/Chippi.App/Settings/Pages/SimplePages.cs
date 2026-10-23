@@ -111,7 +111,7 @@ internal sealed class AboutPage : UserControl
         {
             Core.Diagnostics.Log.Warn("Could not read THIRD-PARTY-NOTICES.md", ex);
         }
-        return "The notices file is missing from this build. Chippi bundles Manrope and JetBrains Mono (SIL Open Font License 1.1), "
+        return "The notices file is missing from this build. Chippi uses system-installed fonts, "
             + "Lucide-style icons (ISC) and .NET libraries (MIT); see THIRD-PARTY-NOTICES.md in the source repository.";
     }
 }

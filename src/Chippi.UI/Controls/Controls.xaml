@@ -780,67 +780,6 @@
         </Setter>
     </Style>
 
-    <!-- ===== Feature card: on the new tokens until Add features replaces it (R6 deletes it). ===== -->
-    <Style TargetType="{x:Type c:FeatureCard}">
-        <Setter Property="MinHeight" Value="128" />
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="{x:Type c:FeatureCard}">
-                    <Border x:Name="Chrome" CornerRadius="8" Padding="12" BorderThickness="1"
-                            Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}">
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="*" />
-                                <RowDefinition Height="Auto" />
-                            </Grid.RowDefinitions>
-                            <c:IconChip x:Name="Chip" Icon="{TemplateBinding Icon}" IsOn="{TemplateBinding IsInstalled}" HorizontalAlignment="Left" />
-                            <ToggleButton x:Name="Switch" Style="{StaticResource SwitchStyle}" HorizontalAlignment="Right" VerticalAlignment="Top"
-                                          IsChecked="{Binding IsInstalled, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"
-                                          AutomationProperties.Name="{Binding FeatureName, RelativeSource={RelativeSource TemplatedParent}, StringFormat=Install {0}}" />
-                            <TextBlock Grid.Row="1" Text="{TemplateBinding FeatureName}" Style="{StaticResource BodyTextStyle}" Margin="0,10,0,0" TextTrimming="CharacterEllipsis" />
-                            <TextBlock Grid.Row="2" Text="{TemplateBinding Description}" Style="{StaticResource CaptionTextStyle}" TextWrapping="Wrap" Margin="0,2,0,0" />
-                            <WrapPanel Grid.Row="4" Margin="0,10,0,-6">
-                                <c:Badge x:Name="ComingSoon" Kind="Needs" Text="Coming soon" Margin="0,0,6,6" Visibility="Collapsed" />
-                                <ItemsControl ItemsSource="{TemplateBinding Badges}" Focusable="False" AutomationProperties.Name="Badges">
-                                    <!-- Each item reads as its words, not the FeatureBadge record's ToString(). -->
-                                    <ItemsControl.ItemContainerStyle>
-                                        <Style TargetType="{x:Type ContentPresenter}">
-                                            <Setter Property="AutomationProperties.Name" Value="{Binding Text}" />
-                                        </Style>
-                                    </ItemsControl.ItemContainerStyle>
-                                    <ItemsControl.ItemsPanel>
-                                        <ItemsPanelTemplate>
-                                            <WrapPanel />
-                                        </ItemsPanelTemplate>
-                                    </ItemsControl.ItemsPanel>
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate DataType="{x:Type m:FeatureBadge}">
-                                            <c:Badge Text="{Binding Text}" Kind="{Binding Kind}" Margin="0,0,6,6" />
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                            </WrapPanel>
-                        </Grid>
-                    </Border>
-                    <ControlTemplate.Triggers>
-                        <Trigger Property="IsComingSoon" Value="True">
-                            <Setter TargetName="Switch" Property="IsEnabled" Value="False" />
-                            <!-- A disabled switch alone does not say why; the reason travels with it. -->
-                            <Setter TargetName="Switch" Property="AutomationProperties.HelpText" Value="Coming soon. Not installable yet." />
-                            <Setter TargetName="ComingSoon" Property="Visibility" Value="Visible" />
-                        </Trigger>
-                        <Trigger Property="IsEnabled" Value="False">
-                            <Setter Property="Opacity" Value="0.45" />
-                        </Trigger>
-                    </ControlTemplate.Triggers>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
-    </Style>
-
     <!-- ===== Drag handle: a 16px six-dot grip in Muted; Text on hover ===== -->
     <Style TargetType="{x:Type c:DragHandle}">
         <Setter Property="Width" Value="16" />
