@@ -4,8 +4,6 @@
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
-using System.Windows.Controls.Primitives;
-using System.Windows.Data;
 using System.Windows.Media;
 using Chippi.Core.Diagnostics;
 using Chippi.Core.Modules;
@@ -14,145 +12,103 @@ using Chippi.UI.Controls;
 namespace Chippi.App.Flyout;
 
 /// <summary>
-/// Builds the flyout's pages: the Tools grid from every running module's <see cref="ToolTileModel"/>s,
-/// the views modules contribute to a tab, and the empty states. Tiles and contributed views are
-/// created once and reused across rebuilds, so their state and focus survive a registry change.
+/// Builds the flyout's pages: the panel each running module contributes, and the empty state.
+/// Panels are created once and reused across rebuilds, so their state and focus survive a
+/// registry change.
 /// </summary>
 internal sealed class FlyoutPages(FlyoutWindow owner)
 {
-    private readonly Dictionary<ToolTileModel, ToolTile> _tiles = new(ReferenceEqualityComparer.Instance);
-    private readonly Dictionary<FlyoutTabContribution, FrameworkElement> _views = [];
+    private readonly Dictionary<FlyoutPanelContribution, FrameworkElement> _views = [];
     private readonly List<Panel> _attached = [];
 
-    public static string TabName(FlyoutTab tab) => tab.ToString();
+    /// <summary>Identifies a panel across module restarts, which create a new contribution.</summary>
+    public static string Key(FlyoutPanelContribution panel) => $"{panel.ModuleId}/{panel.Name}";
 
-    public static Geometry TabIcon(FlyoutTab tab) => tab switch
-    {
-        FlyoutTab.Sound => LucideIcons.Volume,
-        FlyoutTab.System => LucideIcons.Cpu,
-        FlyoutTab.Tidy => LucideIcons.Folder,
-        _ => LucideIcons.Wrench,
-    };
-
-    public FrameworkElement Build(FlyoutTab tab, IReadOnlyList<FeatureEntry> running)
+    public FrameworkElement Build(FlyoutPanelContribution panel, IReadOnlyList<FeatureEntry> running)
     {
         Detach();
+        Prune(running);
         var page = new StackPanel();
         _attached.Add(page);
-
-        var models = tab == FlyoutTab.Tools ? running.SelectMany(f => f.ToolTiles).ToList() : [];
-        var contributions = running.SelectMany(f => f.FlyoutTabs).Where(c => c.Tab == tab).ToList();
-        Prune(running);
-
-        if (models.Count > 0)
-            page.Children.Add(TileGrid(models));
-
-        foreach (var contribution in contributions)
-        {
-            var view = View(contribution);
-            if (view is null)
-                continue;
-            var slot = new StackPanel { Margin = new Thickness(0, page.Children.Count > 0 ? 12 : 0, 0, 0) };
-            slot.Children.Add(view);
-            _attached.Add(slot);
-            page.Children.Add(slot);
-        }
-
-        if (page.Children.Count == 0)
-            page.Children.Add(EmptyState(TabIcon(tab), "Nothing here yet", $"{TabName(tab)} features you install show up here."));
+        if (View(panel) is { } view)
+            page.Children.Add(view);
         return page;
     }
 
-    /// <summary>No module contributes anything and debug mode is off.</summary>
+    /// <summary>No module contributes a panel.</summary>
     public FrameworkElement BuildNothingInstalled()
     {
         Detach();
-        var state = EmptyState(LucideIcons.LayoutGrid, "No features on yet", "Pick the ones you want in Settings.");
-        var browse = new Button { Content = "Browse features", Margin = new Thickness(0, 14, 0, 0), HorizontalAlignment = HorizontalAlignment.Center };
-        browse.SetResourceReference(FrameworkElement.StyleProperty, "PrimaryButtonStyle");
-        browse.Click += (_, _) => owner.OpenSettings("features");
-        ((Panel)state).Children.Add(browse);
+        var state = EmptyState(LucideIcons.LayoutGrid, "No features on yet");
+        var add = new Button { Content = "Add features", Margin = new Thickness(0, 14, 0, 0), HorizontalAlignment = HorizontalAlignment.Center };
+        add.SetResourceReference(FrameworkElement.StyleProperty, "PrimaryButtonStyle");
+        add.Click += (_, _) => owner.OpenSettings("features");
+        state.Children.Add(add);
         return state;
     }
 
-    private UniformGrid TileGrid(IReadOnlyList<ToolTileModel> models)
+    /// <summary>The More tab: a row per panel that didn't fit in the tab strip.</summary>
+    public FrameworkElement BuildMore(IReadOnlyList<FlyoutPanelContribution> panels, Action<FlyoutPanelContribution> open)
     {
-        // Three columns with 8px gutters: each tile carries 4px on every side, the grid takes it back.
-        var grid = new UniformGrid { Columns = 3, Margin = new Thickness(-4) };
-        foreach (var model in models)
-            grid.Children.Add(Tile(model));
-        _attached.Add(grid);
-        return grid;
-    }
-
-    private ToolTile Tile(ToolTileModel model)
-    {
-        if (_tiles.TryGetValue(model, out var existing))
-            return existing;
-
-        var tile = new ToolTile { DataContext = model, Margin = new Thickness(4), Icon = LucideIcons.Get(model.Icon) };
-        tile.SetBinding(ToolTile.TitleProperty, nameof(ToolTileModel.Name));
-        tile.SetBinding(ToolTile.StateLineProperty, nameof(ToolTileModel.StateLine));
-        tile.SetBinding(AutomationProperties.HelpTextProperty, nameof(ToolTileModel.StateLine));
-        tile.SetBinding(ToggleButton.IsCheckedProperty, new Binding(nameof(ToolTileModel.IsOn)) { Mode = BindingMode.OneWay });
-        tile.Click += async (_, _) =>
+        Detach();
+        var card = new Card();
+        card.SetResourceReference(FrameworkElement.StyleProperty, "FlyoutCardStyle");
+        foreach (var panel in panels)
         {
-            // The module owns the state: undo the button's own flip and let the model's IsOn decide.
-            tile.SetCurrentValue(ToggleButton.IsCheckedProperty, model.IsOn);
-            try
-            {
-                await model.ToggleAsync();
-            }
-            catch (Exception ex)
-            {
-                Log.Error($"Flyout: toggling '{model.Name}' failed", ex);
-            }
-        };
-        _tiles[model] = tile;
-        return tile;
+            var glyph = new LucideIcon { Data = LucideIcons.Get(panel.Icon), Size = 16, Margin = new Thickness(0, 0, 12, 0) };
+            glyph.SetResourceReference(LucideIcon.BrushProperty, "TextSecondaryBrush");
+            var chevron = new LucideIcon { Data = LucideIcons.ChevronRight, Size = 16 };
+            chevron.SetResourceReference(LucideIcon.BrushProperty, "TextSecondaryBrush");
+            var row = new DockPanel();
+            DockPanel.SetDock(glyph, Dock.Left);
+            DockPanel.SetDock(chevron, Dock.Right);
+            row.Children.Add(glyph);
+            row.Children.Add(chevron);
+            row.Children.Add(new TextBlock { Text = panel.Name, VerticalAlignment = VerticalAlignment.Center });
+
+            var button = new Button { Content = row };
+            button.SetResourceReference(FrameworkElement.StyleProperty, "FlyoutRowButtonStyle");
+            AutomationProperties.SetName(button, panel.Name);
+            button.Click += (_, _) => open(panel);
+            card.Children.Add(button);
+        }
+        return card;
     }
 
-    private FrameworkElement? View(FlyoutTabContribution contribution)
+    private FrameworkElement? View(FlyoutPanelContribution panel)
     {
-        if (_views.TryGetValue(contribution, out var view))
+        if (_views.TryGetValue(panel, out var view))
             return view;
         try
         {
-            if (contribution.CreateView() is FrameworkElement created)
+            if (panel.CreateView() is FrameworkElement created)
             {
-                _views[contribution] = created;
+                _views[panel] = created;
                 return created;
             }
-            Log.Warn($"Flyout: {contribution.ModuleId} returned a {contribution.Tab} view that is not a FrameworkElement");
+            Log.Warn($"Flyout: {panel.ModuleId} returned a {panel.Name} panel that is not a FrameworkElement");
         }
         catch (Exception ex)
         {
-            Log.Error($"Flyout: {contribution.ModuleId} failed to build its {contribution.Tab} view", ex);
+            Log.Error($"Flyout: {panel.ModuleId} failed to build its {panel.Name} panel", ex);
         }
         return null;
     }
 
-    private Panel EmptyState(Geometry icon, string title, string caption)
+    private static StackPanel EmptyState(Geometry icon, string title)
     {
-        var chip = new Border { Width = 40, Height = 40, CornerRadius = new CornerRadius(10), HorizontalAlignment = HorizontalAlignment.Center };
-        chip.SetResourceReference(Border.BackgroundProperty, "ChipBrush");
-        var glyph = new LucideIcon { Data = icon, Size = 18, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+        var glyph = new LucideIcon { Data = icon, Size = 24, HorizontalAlignment = HorizontalAlignment.Center };
         glyph.SetResourceReference(LucideIcon.BrushProperty, "TextTertiaryBrush");
-        chip.Child = glyph;
-
         var heading = new TextBlock { Text = title, Margin = new Thickness(0, 12, 0, 0), HorizontalAlignment = HorizontalAlignment.Center };
-        heading.SetResourceReference(FrameworkElement.StyleProperty, "TitleTextStyle");
-        var line = new TextBlock { Text = caption, Margin = new Thickness(0, 3, 0, 0), TextAlignment = TextAlignment.Center, TextWrapping = TextWrapping.Wrap };
-        line.SetResourceReference(FrameworkElement.StyleProperty, "CaptionTextStyle");
+        heading.SetResourceReference(FrameworkElement.StyleProperty, "BodyTextStyle");
 
-        var panel = new StackPanel { Margin = new Thickness(0, 22, 0, 22), HorizontalAlignment = HorizontalAlignment.Center, MaxWidth = 280 };
-        panel.Children.Add(chip);
+        var panel = new StackPanel { Margin = new Thickness(0, 24, 0, 24), HorizontalAlignment = HorizontalAlignment.Center };
+        panel.Children.Add(glyph);
         panel.Children.Add(heading);
-        panel.Children.Add(line);
         return panel;
     }
 
-    /// <summary>Takes reused tiles and views out of the previous page so the next one can parent them.</summary>
+    /// <summary>Takes reused views out of the previous page so the next one can parent them.</summary>
     private void Detach()
     {
         foreach (var panel in _attached)
@@ -160,14 +116,11 @@ internal sealed class FlyoutPages(FlyoutWindow owner)
         _attached.Clear();
     }
 
-    /// <summary>Forgets tiles and views whose module stopped.</summary>
+    /// <summary>Forgets views whose module stopped.</summary>
     private void Prune(IReadOnlyList<FeatureEntry> running)
     {
-        var liveTiles = running.SelectMany(f => f.ToolTiles).ToHashSet(ReferenceEqualityComparer.Instance);
-        foreach (var model in _tiles.Keys.Where(m => !liveTiles.Contains(m)).ToList())
-            _tiles.Remove(model);
-        var liveViews = running.SelectMany(f => f.FlyoutTabs).ToHashSet();
-        foreach (var contribution in _views.Keys.Where(c => !liveViews.Contains(c)).ToList())
-            _views.Remove(contribution);
+        var live = running.SelectMany(f => f.FlyoutPanels).ToHashSet();
+        foreach (var panel in _views.Keys.Where(p => !live.Contains(p)).ToList())
+            _views.Remove(panel);
     }
 }

@@ -620,6 +620,29 @@
         <Setter Property="BorderBrush" Value="{DynamicResource PanelBorderBrush}" />
         <Setter Property="DividerBrush" Value="{DynamicResource BorderBrush}" />
     </Style>
+
+    <!-- A whole-row button in a flyout card ("More options", the More tab's list): 48px, 16px sides,
+         transparent until hover. Put the label on the left and a chevron on the right. -->
+    <Style x:Key="FlyoutRowButtonStyle" TargetType="{x:Type Button}">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource FocusRing4}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type Button}">
+                    <Border x:Name="Chrome" Background="{TemplateBinding Background}" MinHeight="48" Padding="16,0">
+                        <ContentPresenter VerticalAlignment="Center" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource HoverBrush}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
     <!-- Dividers only: an expander's sub-rows, inside the card that already holds the expander. -->
     <Style x:Key="CardRowsStyle" TargetType="{x:Type c:Card}">
         <Setter Property="Background" Value="{x:Null}" />
@@ -757,50 +780,7 @@
         </Setter>
     </Style>
 
-    <!-- ===== Tool tile and feature card: on the new tokens until R3 and R2 replace them with flyout
-         panels and Add features rows. ===== -->
-    <Style TargetType="{x:Type c:ToolTile}">
-        <Setter Property="Height" Value="92" />
-        <Setter Property="FocusVisualStyle" Value="{StaticResource FocusRing8}" />
-        <Setter Property="AutomationProperties.Name" Value="{Binding Title, RelativeSource={RelativeSource Self}}" />
-        <!-- The name trims at tile width; the tooltip shows it in full. -->
-        <Setter Property="ToolTip" Value="{Binding Title, RelativeSource={RelativeSource Self}}" />
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="{x:Type c:ToolTile}">
-                    <Border x:Name="Chrome" CornerRadius="8" Padding="10" BorderThickness="1"
-                            Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource PanelBorderBrush}">
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="*" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                            </Grid.RowDefinitions>
-                            <Border x:Name="Chip" Width="32" Height="32" CornerRadius="6" HorizontalAlignment="Left" Background="{DynamicResource ChipBrush}">
-                                <c:LucideIcon x:Name="Glyph" Data="{TemplateBinding Icon}" Size="16" Brush="{DynamicResource TextMutedBrush}"
-                                              HorizontalAlignment="Center" VerticalAlignment="Center" />
-                            </Border>
-                            <TextBlock Grid.Row="2" Text="{TemplateBinding Title}" Style="{StaticResource BodyTextStyle}" FontSize="13" TextTrimming="CharacterEllipsis" />
-                            <TextBlock Grid.Row="3" Text="{TemplateBinding StateLine}" Style="{StaticResource CaptionTextStyle}" TextTrimming="CharacterEllipsis" />
-                        </Grid>
-                    </Border>
-                    <ControlTemplate.Triggers>
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource ButtonHoverBrush}" />
-                        </Trigger>
-                        <Trigger Property="IsChecked" Value="True">
-                            <Setter TargetName="Glyph" Property="Brush" Value="{DynamicResource AccentBrush}" />
-                        </Trigger>
-                        <Trigger Property="IsEnabled" Value="False">
-                            <Setter Property="Opacity" Value="0.45" />
-                        </Trigger>
-                    </ControlTemplate.Triggers>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
-    </Style>
-
+    <!-- ===== Feature card: on the new tokens until Add features replaces it (R6 deletes it). ===== -->
     <Style TargetType="{x:Type c:FeatureCard}">
         <Setter Property="MinHeight" Value="128" />
         <Setter Property="Template">

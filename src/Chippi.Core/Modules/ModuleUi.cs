@@ -1,36 +1,23 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
-using System.ComponentModel;
-using System.Runtime.CompilerServices;
-
 namespace Chippi.Core.Modules;
 
-// Why descriptors plus "object" view factories:
-// Core must not reference WPF, so it cannot hand out FrameworkElements. Tiles are simple and
-// uniform (icon, name, state line, on/off), so the shell renders them itself from a plain
-// INotifyPropertyChanged model; that keeps every tile pixel-identical to DESIGN.md §6 and lets
-// a module stay UI-free if a tile is all it needs. Tabs and settings pages are free-form, so the
-// module supplies a factory returning `object`, which the App casts to a FrameworkElement. A
-// module that contributes one of those references WPF in its own project; Core still does not.
-
-/// <summary>The four flyout tabs, in display order.</summary>
-public enum FlyoutTab
-{
-    Sound,
-    System,
-    Tidy,
-    Tools,
-}
+// Why "object" view factories:
+// Core must not reference WPF, so it cannot hand out FrameworkElements. Flyout panels, island
+// views and settings pages are free-form, so the module supplies a factory returning `object`,
+// which the App casts to a FrameworkElement. A module that contributes one references WPF in its
+// own project; Core still does not.
 
 /// <summary>UI a running module contributes. Everything registered here is removed when the module stops.</summary>
 public interface IModuleUi
 {
-    /// <summary>Adds a tile to the flyout's Tools grid.</summary>
-    void AddToolTile(ToolTileModel tile);
-
-    /// <summary>Supplies the content of a flyout tab. The tab appears only while some running module contributes it.</summary>
-    void AddFlyoutTab(FlyoutTab tab, Func<object> createView);
+    /// <summary>
+    /// Adds a flyout panel: a tab named <paramref name="name"/> with the Lucide <paramref name="icon"/>,
+    /// shown in sidebar order. <paramref name="createIslandView"/> is the compact version the island
+    /// shows; a feature without one doesn't appear there. Both must return a WPF FrameworkElement.
+    /// </summary>
+    void AddFlyoutPanel(string name, string icon, Func<object> createView, Func<object>? createIslandView = null);
 
     /// <summary>Supplies the module's page in Settings. <paramref name="createView"/> must return a WPF FrameworkElement.</summary>
     void SetSettingsPage(Func<object> createView) => SetSettingsPage(_ => createView());
@@ -42,7 +29,9 @@ public interface IModuleUi
     void SetSettingsPage(Func<string?, object> createView);
 }
 
-public sealed record FlyoutTabContribution(string ModuleId, FlyoutTab Tab, Func<object> CreateView);
+/// <param name="Icon">Lucide icon key, as in <see cref="FeatureDescriptor.Icon"/>.</param>
+/// <param name="CreateIslandView">The island's compact view, or null to stay out of the island.</param>
+public sealed record FlyoutPanelContribution(string ModuleId, string Name, string Icon, Func<object> CreateView, Func<object>? CreateIslandView);
 
 public sealed record SettingsPageContribution(string ModuleId, Func<string?, object> CreateSectionView)
 {
@@ -50,63 +39,16 @@ public sealed record SettingsPageContribution(string ModuleId, Func<string?, obj
     public object CreateView(string? section = null) => CreateSectionView(section);
 }
 
-/// <summary>
-/// A flyout Tools tile, rendered by the shell (DESIGN.md §6 "Tool tile"). The module owns the
-/// state; the shell binds to it and calls <see cref="ToggleAsync"/> on click.
-/// </summary>
-/// <remarks>Property changes may be raised from any thread; WPF marshals scalar bindings.</remarks>
-public sealed class ToolTileModel(string name, string icon, Func<CancellationToken, Task> toggle) : INotifyPropertyChanged
-{
-    private bool _isOn;
-    private string? _stateLine;
-
-    public string Name { get; } = name;
-
-    /// <summary>Lucide icon key, as in <see cref="FeatureDescriptor.Icon"/>.</summary>
-    public string Icon { get; } = icon;
-
-    public bool IsOn
-    {
-        get => _isOn;
-        set => Set(ref _isOn, value);
-    }
-
-    /// <summary>The line under the name: state or shortcut, e.g. "Until 6:00 PM".</summary>
-    public string? StateLine
-    {
-        get => _stateLine;
-        set => Set(ref _stateLine, value);
-    }
-
-    public event PropertyChangedEventHandler? PropertyChanged;
-
-    public Task ToggleAsync(CancellationToken ct = default) => toggle(ct);
-
-    private void Set<T>(ref T field, T value, [CallerMemberName] string? name = null)
-    {
-        if (EqualityComparer<T>.Default.Equals(field, value))
-            return;
-        field = value;
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
-    }
-}
-
 /// <summary>Collects one module's contributions for the lifetime of a start.</summary>
 internal sealed class ModuleUi(string moduleId, Action changed) : IModuleUi
 {
     private readonly Lock _gate = new();
-    private readonly List<ToolTileModel> _tiles = [];
-    private readonly List<FlyoutTabContribution> _tabs = [];
+    private readonly List<FlyoutPanelContribution> _panels = [];
     private SettingsPageContribution? _settingsPage;
 
-    public IReadOnlyList<ToolTileModel> ToolTiles
+    public IReadOnlyList<FlyoutPanelContribution> Panels
     {
-        get { lock (_gate) return [.. _tiles]; }
-    }
-
-    public IReadOnlyList<FlyoutTabContribution> Tabs
-    {
-        get { lock (_gate) return [.. _tabs]; }
+        get { lock (_gate) return [.. _panels]; }
     }
 
     public SettingsPageContribution? SettingsPage
@@ -114,17 +56,12 @@ internal sealed class ModuleUi(string moduleId, Action changed) : IModuleUi
         get { lock (_gate) return _settingsPage; }
     }
 
-    public void AddToolTile(ToolTileModel tile)
+    public void AddFlyoutPanel(string name, string icon, Func<object> createView, Func<object>? createIslandView = null)
     {
-        ArgumentNullException.ThrowIfNull(tile);
-        lock (_gate) _tiles.Add(tile);
-        changed();
-    }
-
-    public void AddFlyoutTab(FlyoutTab tab, Func<object> createView)
-    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentException.ThrowIfNullOrWhiteSpace(icon);
         ArgumentNullException.ThrowIfNull(createView);
-        lock (_gate) _tabs.Add(new FlyoutTabContribution(moduleId, tab, createView));
+        lock (_gate) _panels.Add(new FlyoutPanelContribution(moduleId, name, icon, createView, createIslandView));
         changed();
     }
 
@@ -139,8 +76,7 @@ internal sealed class ModuleUi(string moduleId, Action changed) : IModuleUi
     {
         lock (_gate)
         {
-            _tiles.Clear();
-            _tabs.Clear();
+            _panels.Clear();
             _settingsPage = null;
         }
         changed();

@@ -37,7 +37,7 @@ public sealed class KeepAwakeRecoveryTests
                 : module.ToggleAsync());
             await native.Released.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
-            Assert.False(module.Tile.IsOn);
+            Assert.False(module.IsOn);
             Assert.Null(island.Current);
             Assert.NotNull(module.Error);
             Assert.True(registry.Find("keep-awake")!.IsRunning);
@@ -45,7 +45,7 @@ public sealed class KeepAwakeRecoveryTests
 
             await module.ToggleAsync();
 
-            Assert.True(module.Tile.IsOn);
+            Assert.True(module.IsOn);
             Assert.Null(module.Error);
             Assert.Equal("keep-awake", island.Current!.ModuleId);
             Assert.Equal(IslandActivityKind.Status, island.Current.Kind);
@@ -54,12 +54,12 @@ public sealed class KeepAwakeRecoveryTests
             Assert.True(recoveredStart.Display);
             Assert.NotEqual(oldWorker, recoveredStart.Thread);
             Assert.Equal(0, celebrations);
-            Assert.Single(registry.Find("keep-awake")!.ToolTiles);
+            Assert.Single(registry.Find("keep-awake")!.FlyoutPanels);
 
             await registry.SetInstalledAsync("keep-awake", false);
             Assert.False(native.Calls.Last().Active);
             Assert.Equal(recoveredStart.Thread, native.Calls.Last().Thread);
-            Assert.False(module.Tile.IsOn);
+            Assert.False(module.IsOn);
             Assert.Null(island.Current);
             Assert.Equal(0, celebrations);
             await Assert.ThrowsAsync<InvalidOperationException>(() => module.ToggleAsync());
@@ -92,7 +92,7 @@ public sealed class KeepAwakeRecoveryTests
             Assert.Single(native.Calls, c => c.Active);
             releaseGate.Set();
             await retry.WaitAsync(TimeSpan.FromSeconds(5));
-            Assert.True(module.Tile.IsOn);
+            Assert.True(module.IsOn);
             Assert.Equal(2, native.Calls.Count(c => c.Active));
             Assert.NotEqual(native.Calls.First().Thread, native.Calls.Last().Thread);
         }

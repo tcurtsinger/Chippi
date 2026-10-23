@@ -15,17 +15,14 @@ Contract changes after WS0 go through Kayla.
 | `FeaturePreset`, `PresetMembership` | Presets `Essentials, Audio, PowerUser, Everything, Custom`; a descriptor opts into the first three with flags. Everything = every installable feature. |
 | `ModuleContext` | `ModuleId`, `Settings` (`IModuleSettings`), `Logger` (`ILogger`), `Island` (`IIslandPublisher`), `Ui` (`IModuleUi`). |
 | `IModuleSettings` | `Get<T>()`, `Save<T>(value)`. Section `modules.<id>` in settings.json, kept after uninstall. |
-| `IModuleUi` | `AddToolTile(ToolTileModel)`, `AddFlyoutTab(FlyoutTab, Func<object>)`, `SetSettingsPage(Func<object>)`. All removed automatically when the module stops. |
-| `ToolTileModel` | INotifyPropertyChanged: `Name`, `Icon`, `IsOn`, `StateLine`, `ToggleAsync()`. The shell renders it. |
-| `FlyoutTab` | `Sound, System, Tidy, Tools`. |
-| `FlyoutTabContribution`, `SettingsPageContribution` | What the shell reads back per feature. |
+| `IModuleUi` | `AddFlyoutPanel(name, icon, createView, createIslandView = null)`, `SetSettingsPage(Func<object>)`. All removed automatically when the module stops. The flyout shows a tab per panel in sidebar order; only panels with an island view appear in the island. |
+| `FlyoutPanelContribution`, `SettingsPageContribution` | What the shell reads back per feature. |
 | `ModuleRegistry` | `Register(module)`, `RegisterComingSoon(descriptor)`, `StartAsync()`, `SetInstalledAsync(id, bool)` (switches preset to Custom), `ApplyPresetAsync(preset)`, `ReloadAsync()` (after import), `StopAllAsync()` (exit), `Features`, `Find(id)`, `Preset`, `InstalledCount`, `PresetMembers(preset)`, `GetPermissions()`, `DismissUnusedCapability(id)`, event `Changed` (any thread). First run applies Essentials. |
-| `FeatureEntry` | `Descriptor`, `Id`, `IsComingSoon`, `IsInstalled`, `IsRunning`, `LastError`, `ToolTiles`, `FlyoutTabs`, `SettingsPage`. |
+| `FeatureEntry` | `Descriptor`, `Id`, `IsComingSoon`, `IsInstalled`, `IsRunning`, `LastError`, `FlyoutPanels`, `SettingsPage`. |
 
-**Why UI contributions look like this.** Core cannot reference WPF. Tiles are uniform, so the
-module hands over a plain model and the shell draws every tile identically per DESIGN.md §6.
-Tabs and settings pages are free-form, so the module passes a factory returning `object` and the
-App casts it to `FrameworkElement`. Only a module that ships its own views references WPF, and
+**Why UI contributions look like this.** Core cannot reference WPF. Panels, island views and
+settings pages are free-form, so the module passes a factory returning `object` and the App casts
+it to `FrameworkElement`. Only a module that ships its own views references WPF, and
 then it references `Chippi.UI` (below), never `Chippi.App`.
 
 ## Chippi.UI (the WPF design system, `src/Chippi.UI`)
@@ -44,11 +41,11 @@ set `<UseWPF>true</UseWPF>`. In XAML write `xmlns:c="urn:chippi-ui"`.
   `SwitchStyle`, `SwitchWithLabelStyle`, `HopperSliderStyle`, `HopperComboBoxStyle`,
   `TextFieldStyle`, `FlyoutSegmentedControlStyle`, `SelectorBarStyle`, `FlyoutTabsStyle`,
   `NavItemStyle` + `NavItemTemplate`, `DurationChipStyle`, `SwatchStyle`, `SwatchPillStyle`,
-  `FlyoutCardStyle` and `CardRowsStyle`.
+  `FlyoutCardStyle`, `FlyoutRowButtonStyle` and `CardRowsStyle`.
 - Controls (`Chippi.UI.Controls`): `Card` (a section's rows with dividers), `SettingRow`,
   `ExpanderRow`, `IconButton`, `IconChip`, `Badge`, `StatusDot`, `SearchBox`, `SegmentedControl` +
-  `SegmentItem`, `DragHandle`, `LucideIcon` + `LucideIcons`, converters. `ToolTile` and
-  `FeatureCard` stay until Phase 2.5's flyout and Settings work replaces them.
+  `SegmentItem`, `DragHandle`, `LucideIcon` + `LucideIcons`, converters. `FeatureCard`
+  stays until R6 deletes it.
 - `Chippi.UI.Themes`: `ThemeManager.Apply(ThemePreference)`, `ThemeManager.SetAccent(dark, light)`,
   `ThemeManager.NamedAccent(AccentChoice)`, `ThemeManager.ThemeChanged`,
   `Motion.IsReduced` / `Motion.Changed` / `Motion.Override`.

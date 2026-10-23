@@ -15,7 +15,16 @@ public sealed class KeepAwakeModule : IFeatureModule
     private AwakeSession? _session;
     private ModuleContext? _context;
     public KeepAwakeSettings Settings { get; private set; } = new();
-    public ToolTileModel Tile { get; }
+    public bool IsOn { get; private set; }
+
+    /// <summary>"Off", "Indefinitely" or "Until 6:00 PM".</summary>
+    public string StateLine { get; private set; } = "Off";
+
+    /// <summary>The running session's mode and length, as started; null while off.</summary>
+    public KeepAwakeSettings? Active { get; private set; }
+
+    /// <summary>When the running session ends; null while off or with no time limit.</summary>
+    public DateTimeOffset? Deadline { get; private set; }
     public string? Error { get; private set; }
     public event Action? Changed;
 
@@ -24,7 +33,6 @@ public sealed class KeepAwakeModule : IFeatureModule
     public KeepAwakeModule(IExecutionState native)
     {
         _native = native;
-        Tile = new("Keep awake", nameof(LucideIcons.Coffee), ToggleAsync);
     }
 
     public FeatureDescriptor Descriptor { get; } = new("keep-awake", "Keep awake", "Prevent sleep while you are away", FeatureGroup.System)
@@ -42,10 +50,12 @@ public sealed class KeepAwakeModule : IFeatureModule
         try { Settings.Validate(); }
         catch (ArgumentException) { Settings = new(); }
         Error = null;
-        Tile.IsOn = false;
-        Tile.StateLine = "Off";
+        IsOn = false;
+        Active = null;
+        Deadline = null;
+        StateLine = "Off";
         CreateSession();
-        context.Ui.AddToolTile(Tile);
+        context.Ui.AddFlyoutPanel(Descriptor.Name, nameof(LucideIcons.Coffee), () => new KeepAwakePanel(this));
         context.Ui.SetSettingsPage(() => new KeepAwakePage(this));
         return Task.CompletedTask;
     }
@@ -59,13 +69,26 @@ public sealed class KeepAwakeModule : IFeatureModule
             if (_context is null || _session is null) throw new InvalidOperationException("Keep awake is uninstalled.");
             _context.Settings.Save(settings);
             Settings = settings;
-            if (Tile.IsOn) await _session.StartAsync(settings);
+            // The default length waits for the next start; only the screen setting reaches a running session.
+            if (IsOn) await _session.SetDisplayAsync(settings.KeepDisplayOn);
             Changed?.Invoke();
         }
         finally { _gate.Release(); }
     }
 
-    public async Task ToggleAsync(CancellationToken ct = default)
+    /// <summary>Starts the default length, or stops.</summary>
+    public Task ToggleAsync(CancellationToken ct = default) => IsOn ? StopSessionAsync(ct) : StartSessionAsync(Settings, ct);
+
+    /// <summary>
+    /// Starts (or restarts) a session of <paramref name="length"/>'s mode and length, without changing
+    /// the default. The screen follows the Keep screen on setting.
+    /// </summary>
+    public Task StartSessionAsync(KeepAwakeSettings length, CancellationToken ct = default) =>
+        RunAsync(session => session.StartAsync(length with { KeepDisplayOn = Settings.KeepDisplayOn }), length, ct);
+
+    public Task StopSessionAsync(CancellationToken ct = default) => RunAsync(session => session.StopAsync(), null, ct);
+
+    private async Task RunAsync(Func<AwakeSession, Task> command, KeepAwakeSettings? active, CancellationToken ct)
     {
         await _gate.WaitAsync(ct);
         try
@@ -79,8 +102,9 @@ public sealed class KeepAwakeModule : IFeatureModule
                 CreateSession();
             }
             Error = null;
-            if (Tile.IsOn) await _session.StopAsync();
-            else await _session.StartAsync(Settings);
+            await command(_session);
+            Active = IsOn ? active : null;
+            Changed?.Invoke();
         }
         finally { _gate.Release(); }
     }
@@ -94,15 +118,20 @@ public sealed class KeepAwakeModule : IFeatureModule
     private void OnSessionChanged(bool active, DateTimeOffset? deadline, bool timed, Exception? error)
     {
         Error = error?.Message;
-        Tile.IsOn = active;
-        Tile.StateLine = active ? deadline is { } end ? $"Until {end.LocalDateTime:t}" : "Indefinitely" : "Off";
+        IsOn = active;
+        Deadline = active ? deadline : null;
+        if (!active) Active = null;
+        StateLine = active ? deadline is { } end ? $"Until {end.LocalDateTime:t}" : "Indefinitely" : "Off";
         if (active)
-            _context?.Island.Publish(new IslandActivity("awake", IslandActivityKind.Status, "Keep awake", Tile.StateLine));
+            _context?.Island.Publish(new IslandActivity("awake", IslandActivityKind.Status, "Keep awake", StateLine));
         else _context?.Island.Clear("awake");
         if (timed) _context?.Island.ReportSuccess("Keep awake finished");
         if (error is not null) _context?.Logger.LogError(error, "Keep awake execution state failed");
         Changed?.Invoke();
     }
+
+    /// <summary>Opens this feature's Settings page.</summary>
+    public void OpenSettings() => _context?.OpenSettings(null);
 
     public void ReleaseOnExit()
     {
@@ -122,8 +151,10 @@ public sealed class KeepAwakeModule : IFeatureModule
                 _session.Changed -= OnSessionChanged;
                 _session = null;
             }
-            Tile.IsOn = false;
-            Tile.StateLine = "Off";
+            IsOn = false;
+            Active = null;
+            Deadline = null;
+            StateLine = "Off";
             _context?.Island.Clear("awake");
             _context = null;
             Changed?.Invoke();

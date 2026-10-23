@@ -107,7 +107,7 @@ public sealed class DownloadsModule : IFeatureModule
             Raise(new DownloadsRequest(DownloadsRequestKind.Undo, RunId: long.TryParse(args.FirstOrDefault(), NumberStyles.None, CultureInfo.InvariantCulture, out long id) ? id : null)));
 
         context.Ui.SetSettingsPage(section => new Views.Settings.DownloadsPage(this, section));
-        context.Ui.AddFlyoutTab(FlyoutTab.Tidy, () => new Views.Tidy.TidyView(this, RequestView, () => RequestView(new DownloadsRequest(DownloadsRequestKind.Rules))));
+        context.Ui.AddFlyoutPanel("Tidy", nameof(LucideIcons.Folder), () => new Views.Tidy.TidyView(this, RequestView, () => RequestView(new DownloadsRequest(DownloadsRequestKind.Rules))));
         return Task.CompletedTask;
     }
 

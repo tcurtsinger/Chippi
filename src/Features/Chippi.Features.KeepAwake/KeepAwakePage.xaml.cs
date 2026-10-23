@@ -3,6 +3,7 @@
 
 using System.Windows;
 using System.Windows.Controls;
+using Chippi.Core.Diagnostics;
 
 namespace Chippi.Features.KeepAwake;
 
@@ -15,61 +16,64 @@ public partial class KeepAwakePage : UserControl
     {
         _module = module;
         InitializeComponent();
-        var settings = module.Settings;
-        foreach (int minutes in new[] { 15, 30, 60, 90, 120, 240, settings.DurationMinutes }.Distinct().Order())
-            Duration.Items.Add(new ComboBoxItem { Content = $"{minutes} min", Tag = minutes });
-        // Minute precision without an unthemed text field or an extra dependency.
-        for (int minute = 0; minute < 1440; minute++)
-            Until.Items.Add(new ComboBoxItem { Content = DateTime.Today.AddMinutes(minute).ToString("t"), Tag = minute });
-        Duration.SelectedItem = Duration.Items.Cast<ComboBoxItem>().First(i => (int)i.Tag == settings.DurationMinutes);
-        Until.SelectedIndex = settings.UntilMinute;
-        Display.IsChecked = settings.KeepDisplayOn;
-        Mode.SelectedIndex = (int)settings.Mode;
+        var saved = module.Settings;
+        var lengths = KeepAwakeText.Lengths.ToList();
+        // A saved length the list doesn't offer (an older setting) stays selectable.
+        if (!lengths.Any(l => KeepAwakeText.SameLength(l.Length, saved)))
+            lengths.Add((saved.Mode == AwakeMode.UntilTime ? $"Until {KeepAwakeText.Until(saved.UntilMinute)}" : KeepAwakeText.Left(TimeSpan.FromMinutes(saved.DurationMinutes)), saved));
+        foreach (var (label, length) in lengths)
+            Length.Items.Add(new ComboBoxItem { Content = label, Tag = length });
+        Length.SelectedItem = Length.Items.Cast<ComboBoxItem>().First(i => KeepAwakeText.SameLength((KeepAwakeSettings)i.Tag, saved));
         _ready = true;
-        OnModeChanged(this, null!);
+        KeepAwakePanel.OnFlip(Switch, OnSwitch);
+        KeepAwakePanel.OnFlip(Screen, OnScreen);
         Loaded += (_, _) => { _module.Changed += Refresh; Refresh(); };
         Unloaded += (_, _) => _module.Changed -= Refresh;
-    }
-
-    private KeepAwakeSettings ReadSettings() => new()
-    {
-        Mode = (AwakeMode)Mode.SelectedIndex,
-        DurationMinutes = (int)((ComboBoxItem)Duration.SelectedItem).Tag,
-        UntilMinute = Until.SelectedIndex,
-        KeepDisplayOn = Display.IsChecked == true,
-    };
-
-    private void OnModeChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (!_ready) return;
-        DurationPanel.Visibility = Mode.SelectedIndex == 1 ? Visibility.Visible : Visibility.Collapsed;
-        UntilPanel.Visibility = Mode.SelectedIndex == 2 ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void Refresh()
     {
         if (!Dispatcher.CheckAccess()) { Dispatcher.BeginInvoke(Refresh); return; }
-        State.Text = _module.Tile.StateLine;
-        Toggle.Content = _module.Tile.IsOn ? "Stop keep awake" : "Start keep awake";
-        Error.Text = _module.Error ?? "";
+        Status.Description = _module.Error ?? KeepAwakeText.Status(_module, DateTimeOffset.Now);
+        Switch.IsChecked = _module.IsOn;
+        Screen.IsChecked = _module.Settings.KeepDisplayOn;
     }
 
-    private async void OnToggle(object sender, RoutedEventArgs e)
+    private void OnSwitch()
     {
-        Toggle.IsEnabled = false;
-        try
+        if (Switch.IsChecked != _module.IsOn)
+            Run(_module.ToggleAsync());
+    }
+
+    private void OnLength(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_ready || Length.SelectedItem is not ComboBoxItem { Tag: KeepAwakeSettings length })
+            return;
+        Run(_module.ApplyAsync(_module.Settings with
         {
-            if (!_module.Tile.IsOn) await _module.ApplyAsync(ReadSettings());
-            await _module.ToggleAsync();
-            Refresh();
-        }
-        catch (Exception ex) { Error.Text = ex.Message; }
-        finally { Toggle.IsEnabled = true; }
+            Mode = length.Mode,
+            DurationMinutes = length.DurationMinutes,
+            UntilMinute = length.UntilMinute,
+        }));
     }
 
-    private async void OnSave(object sender, RoutedEventArgs e)
+    private void OnScreen()
     {
-        try { await _module.ApplyAsync(ReadSettings()); Error.Text = "Settings saved"; }
-        catch (Exception ex) { Error.Text = ex.Message; }
+        bool on = Screen.IsChecked == true;
+        if (on != _module.Settings.KeepDisplayOn)
+            Run(_module.ApplyAsync(_module.Settings with { KeepDisplayOn = on }));
+    }
+
+    private async void Run(Task change)
+    {
+        try { await change; }
+        catch (Exception ex)
+        {
+            Log.Error("Keep awake: a change in Settings failed", ex);
+            Refresh();
+            Status.Description = ex.Message;
+            return;
+        }
+        Refresh();
     }
 }
