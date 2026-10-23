@@ -31,14 +31,13 @@ public static class FeatureCatalog
         new("audio-routing", "Audio routing", "Switches outputs by priority and keeps your mic pinned when devices change", FeatureGroup.Sound)
         {
             Icon = "Headphones",
-            Badges = [FeatureBadge.Source("From Hopper")],
             Presets = Audio | PowerUser,
         },
         new("mic-processing", "Mic processing", "Noise suppression and cleanup on your mic before other apps hear it", FeatureGroup.Sound)
         {
             Icon = "Mic",
             Requires = [Capability.VbCable],
-            Badges = [FeatureBadge.Source("From Hopper"), FeatureBadge.Needs("Needs VB-CABLE")],
+            Badges = [FeatureBadge.Needs("Needs VB-CABLE")],
             Presets = Audio,
         },
         new("app-volume", "App volume", "Volume and output device for each app, right from the tray", FeatureGroup.Sound)

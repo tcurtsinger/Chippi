@@ -3,78 +3,102 @@
 
 using System.IO;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Documents;
+using Chippi.App.Pet;
 using Chippi.UI.Controls;
 
 namespace Chippi.App.Settings.Pages;
 
-/// <summary>Shortcuts: an honest empty state until a feature with shortcuts ships.</summary>
 internal sealed class ShortcutsPage : UserControl
 {
     public ShortcutsPage()
     {
         var page = new StackPanel();
-        page.Children.Add(SettingsUi.Header("Shortcuts", "Keyboard shortcuts for Chippi's features."));
-        page.Children.Add(EmptyState.Create(LucideIcons.Keyboard, "No shortcuts yet",
-            "Features that use keyboard shortcuts list them here, so you can change them in one place."));
+        page.Children.Add(SettingsUi.Header("Shortcuts", ""));
+        page.Children.Add(EmptyState.Create(LucideIcons.Keyboard, "No shortcuts yet", ""));
         Content = page;
     }
 }
 
-/// <summary>Appearance: the theme lives in General (it is one row); this page says so instead of holding a copy.</summary>
-internal sealed class AppearancePage : UserControl
-{
-    public AppearancePage(Action openGeneral, Action openIsland)
-    {
-        var page = new StackPanel();
-        page.Children.Add(SettingsUi.Header("Appearance", "How Chippi looks."));
-        var general = SettingsUi.Button("Open General");
-        general.Click += (_, _) => openGeneral();
-        page.Children.Add(SettingsUi.Row("Theme", "Dark, Light or Follow Windows is set in General.", general));
-        var island = SettingsUi.Button("Open Island & pet");
-        island.Click += (_, _) => openIsland();
-        page.Children.Add(SettingsUi.Row("Pet color and motion", "Gumdrop's color and reduced motion are set in Island & pet.", island));
-        Content = page;
-    }
-}
-
-/// <summary>About: version, license and the third-party notices shipped beside the exe.</summary>
 internal sealed class AboutPage : UserControl
 {
+    private readonly StackPanel _page = new();
+
     public AboutPage()
     {
-        var page = new StackPanel();
-        page.Children.Add(SettingsUi.Header("About", "Everyday Windows utilities behind one tray icon."));
-
-        var version = new TextBlock();
-        version.SetResourceReference(StyleProperty, "CaptionTextStyle");
-        version.Inlines.Add(new Run("Version "));
-        version.Inlines.Add(new Run(AppInfo.Version));
-        page.Children.Add(SettingsUi.Row("Chippi", "", version));
-        page.Children.Add(SettingsUi.Row("License", "Free software: you can share and change it under the GNU General Public License, version 3 or later.",
-            SettingsUi.Styled(new TextBlock { Text = AppInfo.License }, "BodyTextStyle")));
-        page.Children.Add(SettingsUi.Row("Privacy", "No telemetry and no network calls. Your settings stay on this PC.", new FrameworkElement()));
-
-        page.Children.Add(SettingsUi.Eyebrow("Third-party notices"));
-        var notices = new TextBlock { Text = ReadNotices(), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(14, 12, 14, 12) };
-        notices.SetResourceReference(StyleProperty, "CaptionTextStyle");
-        var viewer = new ScrollViewer
-        {
-            Content = notices,
-            MaxHeight = 320,
-            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-            Focusable = true,
-            FocusVisualStyle = (Style)Application.Current.FindResource("FocusRing8"),
-        };
-        System.Windows.Automation.AutomationProperties.SetName(viewer, "Third-party notices");
-        var box = new Border { CornerRadius = new CornerRadius(12), BorderThickness = new Thickness(1), Child = viewer };
-        box.SetResourceReference(Border.BackgroundProperty, "SurfaceBrush");
-        box.SetResourceReference(Border.BorderBrushProperty, "BorderSoftBrush");
-        page.Children.Add(box);
-        Content = page;
+        _page.Children.Add(SettingsUi.Header("About", ""));
+        var product = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(16, 10, 16, 10) };
+        product.Children.Add(new Gumdrop { Size = 32, Margin = new Thickness(0, 0, 14, 0) });
+        var name = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+        name.Children.Add(SettingsUi.Styled(new TextBlock { Text = "Chippi" }, "BodyTextStyle"));
+        name.Children.Add(SettingsUi.Styled(new TextBlock { Text = "Version " + AppInfo.Version }, "CaptionTextStyle"));
+        product.Children.Add(name);
+        var license = SettingsUi.Button("View");
+        AutomationProperties.SetName(license, "View license");
+        license.Click += (_, _) => ShowDocument("License", ReadLicense());
+        var notices = SettingsUi.Button("View");
+        AutomationProperties.SetName(notices, "View third-party notices");
+        notices.Click += (_, _) => ShowDocument("Third-party notices", ReadNotices());
+        _page.Children.Add(SettingsUi.Group(product,
+            SettingsUi.Row("License", AppInfo.License, license),
+            SettingsUi.Row("Privacy", "No telemetry. Your settings stay on this PC.", new FrameworkElement()),
+            SettingsUi.Row("Third-party notices", "", notices)));
+        Content = _page;
     }
 
+    private void ShowDocument(string title, string text)
+    {
+        var back = SettingsUi.Button("Back");
+        back.HorizontalAlignment = HorizontalAlignment.Left;
+        back.Margin = new Thickness(0, 0, 0, 14);
+        back.Click += (_, _) => Content = _page;
+        var page = new StackPanel();
+        page.Children.Add(back);
+        page.Children.Add(SettingsUi.Header(title, ""));
+        var document = new FlowDocument { PagePadding = new Thickness(16), FontFamily = (System.Windows.Media.FontFamily)FindResource("UiFont"), FontSize = 14 };
+        document.SetResourceReference(FlowDocument.ForegroundProperty, "TextPrimaryBrush");
+        foreach (string line in text.Replace("\r", "").Split('\n'))
+        {
+            if (string.IsNullOrWhiteSpace(line))
+                continue;
+            int depth = line.TakeWhile(c => c == '#').Count();
+            string words = depth > 0 ? line[depth..].Trim() : line;
+            var paragraph = new Paragraph { Margin = new Thickness(0, depth > 0 ? 16 : 0, 0, 8) };
+            if (depth > 0)
+            {
+                paragraph.FontWeight = FontWeights.SemiBold;
+                paragraph.FontSize = depth == 1 ? 20 : 14;
+            }
+            // Notices use Markdown headings and bold spans. Render those without showing markup.
+            var pieces = words.Split("**", StringSplitOptions.None);
+            for (int i = 0; i < pieces.Length; i++)
+            {
+                var run = new Run(pieces[i].Replace("`", ""));
+                paragraph.Inlines.Add(i % 2 == 0 ? run : new Bold(run) { FontWeight = FontWeights.SemiBold });
+            }
+            document.Blocks.Add(paragraph);
+        }
+        var viewer = new FlowDocumentScrollViewer { Document = document, IsToolBarVisible = false, MaxHeight = 480, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+        AutomationProperties.SetName(viewer, title);
+        page.Children.Add(viewer);
+        Content = page;
+        back.Focus();
+    }
+
+    private static string ReadLicense()
+    {
+        try
+        {
+            return File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "LICENSE"));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Core.Diagnostics.Log.Warn("Could not read LICENSE", ex);
+            return "GNU General Public License, version 3 or later. The full license is in LICENSE in the source repository.";
+        }
+    }
     private static string ReadNotices()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "THIRD-PARTY-NOTICES.md");
@@ -92,28 +116,16 @@ internal sealed class AboutPage : UserControl
     }
 }
 
-/// <summary>A feature's own settings page, with a Back button to the hub.</summary>
 internal sealed class ModulePageHost : UserControl
 {
-    public ModulePageHost(string title, FrameworkElement view, Action back)
+    public ModulePageHost(string title, FrameworkElement view)
     {
-        var backButton = new IconButton { Icon = LucideIcons.ChevronLeft, VerticalAlignment = VerticalAlignment.Center };
-        System.Windows.Automation.AutomationProperties.SetName(backButton, "Back to Features");
-        backButton.ToolTip = "Back to Features (Esc)";
-        backButton.Click += (_, _) => back();
-        var header = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(-6, 0, 0, 18) };
-        header.Children.Add(backButton);
-        header.Children.Add(SettingsUi.Styled(new TextBlock { Text = title, Margin = new Thickness(8, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center }, "PageTitleStyle"));
-
-        var page = new DockPanel();
-        DockPanel.SetDock(header, Dock.Top);
-        page.Children.Add(header);
+        var page = new StackPanel();
+        page.Children.Add(SettingsUi.Header(title, ""));
         page.Children.Add(view);
         Content = page;
-        Loaded += (_, _) => backButton.Focus();
     }
 }
-
 internal static class EmptyState
 {
     /// <summary>A quiet centered block: chip-colored icon tile, title, one line of explanation.</summary>
