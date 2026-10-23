@@ -13,7 +13,7 @@ namespace Chippi.Features.Downloads.Views.Settings;
 /// The organizer's page in Settings: a Settings · Rules · History segment over the section, and
 /// Preview shown in place of the section with its own back button. The shell draws the title and
 /// the back-to-Features button. Sections are the deep-link targets (<see cref="DownloadsModule.SettingsLink"/>):
-/// <c>settings</c>, <c>rules</c>, <c>history[/runId]</c>, <c>review</c>, <c>preview/&lt;folder&gt;</c>, <c>explorer/&lt;folder&gt;</c>.
+/// <c>settings</c>, <c>rules</c>, <c>history[/runId[/undo]]</c>, <c>review</c>, <c>preview/&lt;folder&gt;</c>, <c>explorer/&lt;folder&gt;</c>.
 /// </summary>
 public sealed class DownloadsPage : UserControl
 {
@@ -68,7 +68,9 @@ public sealed class DownloadsPage : UserControl
                     Preview(folder);
                 break;
             case "history":
-                Show("history", long.TryParse(tail, out long run) ? run : null);
+                // history/<run>/undo opens that run with its Undo confirmation showing; nothing is undone yet.
+                string[] parts = tail?.Split('/') ?? [];
+                Show("history", parts.Length > 0 && long.TryParse(parts[0], out long run) ? run : null, confirmUndo: parts is [_, "undo"]);
                 break;
             default:
                 Show(_sections.Contains(head) ? head : "settings");
@@ -76,7 +78,7 @@ public sealed class DownloadsPage : UserControl
         }
     }
 
-    private void Show(string section, long? runId = null)
+    private void Show(string section, long? runId = null, bool confirmUndo = false)
     {
         _switching = true;
         _segment.SelectedIndex = Array.IndexOf(_sections, section);
@@ -90,7 +92,7 @@ public sealed class DownloadsPage : UserControl
         _host.Content = section switch
         {
             "rules" => new RulesSection(_module),
-            "history" => new HistorySection(_module, runId),
+            "history" => new HistorySection(_module, runId, confirmUndo),
             _ => new SettingsSection(_module, ShowImport),
         };
     }
