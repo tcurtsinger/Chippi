@@ -49,32 +49,31 @@
                     <!-- 2. The live activity card. -->
                     <Border x:Name="LiveCard" Style="{StaticResource IslandCardStyle}" Margin="0,8,0,0">
                         <StackPanel>
-                            <!-- Media: a 40px art tile, title and source; transport; a 4px accent progress bar. -->
-                            <StackPanel x:Name="MediaLayout">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="40" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <Border Width="40" Height="40" CornerRadius="6" Background="{StaticResource IslandTrackBrush}">
-                                        <TextBlock x:Name="MediaMonogram" FontSize="16" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                    </Border>
-                                    <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
-                                        <TextBlock x:Name="MediaTitle" FontSize="13" TextTrimming="CharacterEllipsis" />
-                                        <TextBlock x:Name="MediaSource" Style="{StaticResource CaptionTextStyle}" TextTrimming="CharacterEllipsis"
-                                                   Foreground="{StaticResource IslandTextTertiaryBrush}" />
-                                    </StackPanel>
-                                </Grid>
-                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,8,0,0">
-                                    <c:IconButton Width="32" Height="32" Focusable="False" VerticalAlignment="Center"
+                            <!-- Media: a 40px art tile, title and source, and the transport beside them; the progress bar below. -->
+                            <Grid x:Name="MediaLayout">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="40" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <Border Width="40" Height="40" CornerRadius="6" Background="{StaticResource IslandTrackBrush}">
+                                    <TextBlock x:Name="MediaMonogram" FontSize="16" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
+                                <StackPanel Grid.Column="1" Margin="10,0,8,0" VerticalAlignment="Center">
+                                    <TextBlock x:Name="MediaTitle" FontSize="13" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock x:Name="MediaSource" Style="{StaticResource CaptionTextStyle}" TextTrimming="CharacterEllipsis"
+                                               Foreground="{StaticResource IslandTextTertiaryBrush}" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <c:IconButton Width="28" Height="28" Focusable="False" VerticalAlignment="Center"
                                                   Icon="{x:Static c:LucideIcons.SkipBack}" AutomationProperties.Name="Previous track" />
-                                    <Button x:Name="PlayPauseButton" Style="{StaticResource IslandPlayButtonStyle}" Margin="12,0" AutomationProperties.Name="Pause">
+                                    <Button x:Name="PlayPauseButton" Style="{StaticResource IslandPlayButtonStyle}" Margin="4,0" AutomationProperties.Name="Pause">
                                         <c:LucideIcon x:Name="PlayPauseIcon" Data="{x:Static c:LucideIcons.Pause}" Size="14" Brush="Black" />
                                     </Button>
-                                    <c:IconButton Width="32" Height="32" Focusable="False" VerticalAlignment="Center"
+                                    <c:IconButton Width="28" Height="28" Focusable="False" VerticalAlignment="Center"
                                                   Icon="{x:Static c:LucideIcons.SkipForward}" AutomationProperties.Name="Next track" />
                                 </StackPanel>
-                            </StackPanel>
+                            </Grid>
 
                             <!-- Timer: the caption, the time at 20px. -->
                             <StackPanel x:Name="TimerLayout">

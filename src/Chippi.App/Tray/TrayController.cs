@@ -157,6 +157,20 @@ public sealed class TrayController : IDisposable
                     await Idle();
                     Render(_flyout, System.IO.Path.Combine(directory, $"flyout-{tab.ToLowerInvariant().Replace(' ', '-')}-{name}.png"));
                 }
+                // Keep awake on, as the mockup shows it: the 1 hr chip starts a session in this
+                // process, which stops it again right after the shot.
+                if (_flyout.TabNames.Contains("Keep awake"))
+                    _flyout.SelectTab("Keep awake");
+                await Idle();
+                if (_flyout.TabNames.Contains("Keep awake") && Chip(_flyout, "1 hr") is { } hour)
+                {
+                    hour.IsChecked = true;
+                    await Task.Delay(1000);
+                    await Idle();
+                    Render(_flyout, System.IO.Path.Combine(directory, $"flyout-keep-awake-on-{name}.png"));
+                    hour.IsChecked = false;
+                    await Task.Delay(1000);
+                }
                 _flyout.Dismiss();
 
                 var display = DescribeDisplay();
@@ -175,6 +189,16 @@ public sealed class TrayController : IDisposable
             Log.Error("Flyout snapshot failed", ex);
         }
         _shell.Commands.Quit();
+    }
+
+    private static System.Windows.Controls.Primitives.ToggleButton? Chip(DependencyObject root, string label)
+    {
+        if (root is System.Windows.Controls.Primitives.ToggleButton { Content: string text } chip && text == label)
+            return chip;
+        foreach (var child in LogicalTreeHelper.GetChildren(root).OfType<DependencyObject>())
+            if (Chip(child, label) is { } found)
+                return found;
+        return null;
     }
 
     private static async Task Idle()

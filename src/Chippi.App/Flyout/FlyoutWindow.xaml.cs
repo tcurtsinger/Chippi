@@ -8,6 +8,7 @@ using System.Windows.Interop;
 using System.Windows.Threading;
 using Chippi.App.Shell;
 using Chippi.Core.Diagnostics;
+using Chippi.Core.Island;
 using Chippi.Core.Modules;
 using Chippi.UI.Controls;
 using Windows.Win32;
@@ -52,6 +53,8 @@ public partial class FlyoutWindow : Window
         SizeChanged += (_, _) => Reposition();
         DpiChanged += (_, _) => Dispatcher.BeginInvoke(Reposition, DispatcherPriority.Render);
         shell.Registry.Changed += (_, _) => QueueRebuild();
+        // Keep awake starting or stopping changes the header's status line; the hub raises on any thread.
+        shell.Island.Changed += (_, _) => Dispatcher.BeginInvoke(UpdateStatusLine, DispatcherPriority.Background);
     }
 
     /// <summary>The flyout hid itself. True when it lost activation (a click elsewhere, maybe on the tray icon).</summary>
@@ -171,7 +174,7 @@ public partial class FlyoutWindow : Window
     {
         _dirty = false;
         var running = _shell.Registry.Features.Where(f => f.IsRunning).ToList();
-        UpdateStatusLine(_shell.Registry.Features.Count(f => f.IsInstalled));
+        UpdateStatusLine();
 
         // One tab per panel, in sidebar (registry) order. Past eight, the rest go under More.
         var panels = running.SelectMany(f => f.FlyoutPanels).ToList();
@@ -209,8 +212,15 @@ public partial class FlyoutWindow : Window
         Scroller.ScrollToTop();
     }
 
-    private void UpdateStatusLine(int on)
+    /// <summary>"Keep awake is on" while it runs (DESIGN.md §5 Tray flyout), otherwise how many features are on.</summary>
+    private void UpdateStatusLine()
     {
+        if (_shell.Island.Activities.Any(a => a.Kind == IslandActivityKind.Status && a.ModuleId == Island.IslandHost.KeepAwakeModuleId))
+        {
+            StatusLine.Text = "Keep awake is on";
+            return;
+        }
+        int on = _shell.Registry.Features.Count(f => f.IsInstalled);
         // State first (DESIGN.md §3 copy rules). The window's tabular figures cover the count.
         StatusLine.Text = on switch
         {

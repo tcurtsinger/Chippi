@@ -112,9 +112,10 @@ public sealed class IslandHost : IDisposable
     }
 
     /// <summary>
-    /// Debug builds (<c>--island-shots &lt;dir&gt;</c>): docks the tab on Top, Left and Right with the
-    /// island open over a fake media activity, and saves each scene in both app themes (the island
-    /// must look the same) with Follow Windows and Violet. Then drops the tab on the taskbar's edge
+    /// Debug builds (<c>--island-shots &lt;dir&gt;</c>): the closed tab at rest and with a fake media
+    /// activity live, then the tab docked on Top, Left and Right with the island open, each scene in
+    /// both app themes (the island must look the same) with Follow Windows, Blue (the mockup's
+    /// default) and Violet. Then drops the tab on the taskbar's edge
     /// and in the corners, which must be refused, and once on the top edge, which must be taken
     /// (r5-drop-check.txt). Use a CHIPPI_DEV_PROFILE: it saves the island settings it moves through,
     /// then puts them back.
@@ -128,14 +129,21 @@ public sealed class IslandHost : IDisposable
             var debug = _shell.Island.CreatePublisher(DebugModuleId);
             var settle = TimeSpan.FromMilliseconds(900);
             await Task.Delay(1500); // let the registry start the modules
-            debug.Publish(new IslandActivity("media", IslandActivityKind.Media, "Weekend Mix", "Spotify") { Progress = 0.38 });
-            foreach (var accent in new[] { AccentChoice.FollowWindows, AccentChoice.Violet })
+            var media = new IslandActivity("media", IslandActivityKind.Media, "Weekend Mix", "Spotify") { Progress = 0.38 };
+            foreach (var accent in new[] { AccentChoice.FollowWindows, AccentChoice.Blue, AccentChoice.Violet })
             {
                 UpdateSettings(s => s.Accent = accent);
                 foreach (var (theme, backdrop) in new[] { (ThemePreference.Dark, "#202020"), (ThemePreference.Light, "#F3F3F3") })
                 {
                     Chippi.UI.Themes.ThemeManager.Apply(theme);
                     var color = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(backdrop);
+                    UpdateSettings(s => (s.IslandEdge, s.IslandPlace) = (IslandEdge.Top, 0.5));
+                    _shell.Island.ClearModule(DebugModuleId);
+                    await Task.Delay(settle);
+                    _window.SaveScene(Path.Combine(directory, $"r5-island-rest-{theme}-{accent}".ToLowerInvariant() + ".png"), color);
+                    debug.Publish(media);
+                    await Task.Delay(settle);
+                    _window.SaveScene(Path.Combine(directory, $"r5-island-live-{theme}-{accent}".ToLowerInvariant() + ".png"), color);
                     foreach (var edge in new[] { IslandEdge.Top, IslandEdge.Left, IslandEdge.Right })
                     {
                         UpdateSettings(s => (s.IslandEdge, s.IslandPlace) = (edge, 0.5));

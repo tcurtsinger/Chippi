@@ -21,7 +21,8 @@ public sealed class TidyIslandView : UserControl
     private readonly IconChip _chip = new() { Icon = LucideIcons.Folder, VerticalAlignment = VerticalAlignment.Center };
     private readonly TextBlock _name = new() { TextTrimming = TextTrimming.CharacterEllipsis };
     private readonly TextBlock _mode = new() { TextTrimming = TextTrimming.CharacterEllipsis };
-    private readonly Button _organize = new() { Content = "Organize now", Margin = new Thickness(0, 12, 0, 0) };
+    // Compact, so the mode line keeps its room: 30px tall, 13px text, 10px sides.
+    private readonly Button _organize = new() { Content = "Organize now", Height = 30, FontSize = 13, Padding = new Thickness(10, 0, 10, 0), Margin = new Thickness(8, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
     private DownloadsEngine? _subscribed;
     private string? _folder;
 
@@ -30,14 +31,16 @@ public sealed class TidyIslandView : UserControl
         _module = module;
         _request = request;
         _mode.SetResourceReference(StyleProperty, "CaptionTextStyle");
-        _organize.SetResourceReference(StyleProperty, "PrimaryButtonStyle");
+        _organize.SetResourceReference(StyleProperty, "SecondaryButtonStyle");
         System.Windows.Automation.AutomationProperties.SetName(_organize, "Organize now");
         _organize.Click += (_, _) => Organize();
 
+        // The folder chip, the name over the mode line, and Organize now on the right.
         var text = new StackPanel { Margin = new Thickness(12, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center, Children = { _name, _mode } };
         Grid.SetColumn(text, 1);
-        var row = new Grid { ColumnDefinitions = { new() { Width = GridLength.Auto }, new() }, Children = { _chip, text } };
-        var card = new Border { Child = new StackPanel { Children = { row, _organize } } };
+        Grid.SetColumn(_organize, 2);
+        var row = new Grid { ColumnDefinitions = { new() { Width = GridLength.Auto }, new(), new() { Width = GridLength.Auto } }, Children = { _chip, text, _organize } };
+        var card = new Border { Child = row };
         card.SetResourceReference(StyleProperty, "IslandCardStyle");
         Content = card;
         System.Windows.Automation.AutomationProperties.SetName(this, "Tidy");

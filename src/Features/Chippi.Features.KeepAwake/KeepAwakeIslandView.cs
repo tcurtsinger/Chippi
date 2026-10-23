@@ -30,7 +30,7 @@ public sealed class KeepAwakeIslandView : UserControl
         System.Windows.Automation.AutomationProperties.SetLiveSetting(_detail, System.Windows.Automation.AutomationLiveSetting.Polite);
 
         // Four columns with 8px gaps: each chip carries 8px on its right, the grid takes it back.
-        var chips = new UniformGrid { Columns = Chosen.Length, Margin = new Thickness(0, 12, -8, 0) };
+        var chips = new UniformGrid { Columns = Chosen.Length, Margin = new Thickness(0, 10, -8, 0) };
         foreach (var (label, length) in KeepAwakeText.Lengths.Where(l => Chosen.Contains(l.Label)))
         {
             var chip = new ToggleButton { Content = label, Margin = new Thickness(0, 0, 8, 0) };
@@ -40,7 +40,12 @@ public sealed class KeepAwakeIslandView : UserControl
             chips.Children.Add(chip);
         }
 
-        var card = new Border { Child = new StackPanel { Children = { _status, _detail, chips } } };
+        // The name on the left and the status on the right, the chips under them.
+        _detail.VerticalAlignment = VerticalAlignment.Center;
+        _detail.Margin = new Thickness(12, 0, 0, 0);
+        Grid.SetColumn(_detail, 1);
+        var heading = new Grid { ColumnDefinitions = { new(), new() { Width = GridLength.Auto } }, Children = { _status, _detail } };
+        var card = new Border { Child = new StackPanel { Children = { heading, chips } } };
         card.SetResourceReference(StyleProperty, "IslandCardStyle");
         Content = card;
         System.Windows.Automation.AutomationProperties.SetName(this, "Keep awake");

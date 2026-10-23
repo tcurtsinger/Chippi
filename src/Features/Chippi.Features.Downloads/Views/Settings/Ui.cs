@@ -117,6 +117,38 @@ internal static class Ui
         return box;
     }
 
+    /// <summary>
+    /// A text field with no chrome of its own, for a card that is itself the field (the Rules test
+    /// card): the placeholder in muted text while empty, then the text and caret.
+    /// </summary>
+    public static TextBox BareField(string placeholder, string name)
+    {
+        var hint = new FrameworkElementFactory(typeof(TextBlock), "Placeholder");
+        hint.SetValue(TextBlock.TextProperty, placeholder);
+        hint.SetResourceReference(TextBlock.ForegroundProperty, "TextMutedBrush");
+        hint.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+        hint.SetValue(UIElement.IsHitTestVisibleProperty, false);
+        hint.SetValue(UIElement.VisibilityProperty, Visibility.Collapsed);
+        var host = new FrameworkElementFactory(typeof(ScrollViewer), "PART_ContentHost");
+        host.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+        host.SetValue(UIElement.FocusableProperty, false);
+        host.SetValue(ScrollViewer.HorizontalScrollBarVisibilityProperty, ScrollBarVisibility.Hidden);
+        host.SetValue(ScrollViewer.VerticalScrollBarVisibilityProperty, ScrollBarVisibility.Hidden);
+        var root = new FrameworkElementFactory(typeof(Grid));
+        root.SetValue(Panel.BackgroundProperty, Brushes.Transparent); // the whole field takes the click
+        root.AppendChild(hint);
+        root.AppendChild(host);
+        var template = new ControlTemplate(typeof(TextBox)) { VisualTree = root };
+        template.Triggers.Add(new Trigger { Property = TextBox.TextProperty, Value = "", Setters = { new Setter(UIElement.VisibilityProperty, Visibility.Visible, "Placeholder") } });
+
+        var box = new TextBox { Template = template, Height = 32, FocusVisualStyle = null, VerticalContentAlignment = VerticalAlignment.Center };
+        box.SetResourceReference(Control.ForegroundProperty, "TextPrimaryBrush");
+        box.SetResourceReference(TextBoxBase.CaretBrushProperty, "TextPrimaryBrush");
+        box.SetResourceReference(TextBoxBase.SelectionBrushProperty, "AccentBrush");
+        AutomationProperties.SetName(box, name);
+        return box;
+    }
+
     public static ComboBox Choice(IEnumerable<string> items, int selected, string name, double width = double.NaN, bool code = false)
     {
         var combo = new ComboBox { ItemsSource = items.ToList(), SelectedIndex = selected, Width = width, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center };

@@ -105,12 +105,12 @@ internal static class RuleChecks
         }
     }
 
-    /// <summary>"pdf · name matches · up to 25 MB → Documents\Invoices\{year}\{month}".</summary>
+    /// <summary>".pdf · name matches · up to 25 MB → Documents\Invoices\{year}\{month}", ".png .jpg → Pictures".</summary>
     public static string Summary(RuleSetting rule)
     {
         var parts = new List<string>();
         if (rule.Extensions is { Count: > 0 } extensions)
-            parts.Add(string.Join(", ", extensions.Select(e => e.Length == 0 ? "no extension" : e)));
+            parts.Add(string.Join(" ", extensions.Select(e => e.Length == 0 ? "no extension" : e == "*" ? e : "." + e)));
         if (!string.IsNullOrEmpty(rule.NameRegex))
             parts.Add("name matches");
         if (rule.MinBytes is { } min && rule.MaxBytes is { } max)

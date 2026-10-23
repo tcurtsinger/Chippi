@@ -31,7 +31,7 @@ internal sealed class RulesSection : UserControl
     private List<RuleSetting> _rules => _drafts.Drafts;
     private readonly ContentControl _list = new() { Focusable = false };
     private readonly List<Border> _rows = [];
-    private readonly TextBox _test = Ui.Field(name: "Test a file name");
+    private readonly TextBox _test = Ui.BareField("Test a file name, like notes.txt", "Test a file name");
     private readonly TextBlock _testResult = Ui.Text("");
     private string? _open;
     private string? _match;
@@ -45,13 +45,11 @@ internal sealed class RulesSection : UserControl
         _module = module;
         _drafts = new RuleDrafts(module.Settings.Rules);
 
-        // The test card: a search glyph, the field, and where the file would go on the right.
-        _test.Width = 300;
-        _test.Tag = "Test a file name, like notes.txt";
+        // The test card: a search glyph, the field across the card, and where the file would go on the right.
         _test.TextChanged += (_, _) => RunTest();
         _testResult.Margin = new Thickness(14, 0, 0, 0);
-        _testResult.HorizontalAlignment = HorizontalAlignment.Right;
-        var testGrid = Ui.Columns("Auto", "Auto", "*");
+        _testResult.VerticalAlignment = VerticalAlignment.Center;
+        var testGrid = Ui.Columns("Auto", "*", "Auto");
         testGrid.Children.Add(Ui.Glyph(LucideIcons.Search, "TextSecondaryBrush", 16).Margin(0, 0, 12, 0).At(0));
         testGrid.Children.Add(_test.At(1));
         testGrid.Children.Add(_testResult.At(2));
@@ -112,6 +110,7 @@ internal sealed class RulesSection : UserControl
         var summary = Ui.Text(RuleChecks.Summary(rule), "CaptionTextStyle", "TextTertiaryBrush");
         var title = Ui.Stack(Ui.Text(rule.Name.Length > 0 ? rule.Name : "New rule", "TitleTextStyle"), summary);
         var enabled = Ui.Switch($"{rule.Name} on", rule.Enabled);
+        enabled.SetResourceReference(StyleProperty, "SwitchWithLabelStyle"); // "On" or "Off" left of the switch (DESIGN.md §5 Rows)
         void Enable()
         {
             if (enabled.IsChecked == rule.Enabled)

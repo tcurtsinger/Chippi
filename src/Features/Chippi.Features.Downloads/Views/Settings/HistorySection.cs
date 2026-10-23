@@ -23,7 +23,7 @@ internal sealed class HistorySection : UserControl
 
     private readonly DownloadsModule _module;
     private readonly long? _focusRun;
-    private readonly SearchBox _search = new() { Placeholder = "Search" };
+    private readonly SearchBox _search = new() { Placeholder = "Search history" };
     private readonly ComboBox _folder;
     private readonly StackPanel _runs = new();
     private readonly TextBlock _error = Ui.Warning("");
@@ -57,7 +57,7 @@ internal sealed class HistorySection : UserControl
         _folder = Ui.Choice(folders, 0, "Folder", 170);
         _folder.SelectionChanged += (_, _) => Render();
 
-        var clear = Ui.Button("Clear history", icon: LucideIcons.Trash);
+        var clear = Ui.Button("Clear history");
         clear.HorizontalAlignment = HorizontalAlignment.Right;
         clear.Click += (_, _) => ShowClearPopover(clear);
 
