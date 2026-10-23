@@ -44,7 +44,15 @@ public sealed class SettingsViewTests
     {
         var rule = new RuleSetting { Extensions = ["pdf"], NameRegex = "^inv", MaxBytes = 25L * 1024 * 1024, Action = RuleActionKind.Move, Template = @"Documents\{year}" };
 
-        Assert.Equal(@"pdf · name matches · up to 25 MB → Documents\{year}", RuleChecks.Summary(rule));
+        Assert.Equal(@".pdf · name matches · up to 25 MB → Documents\{year}", RuleChecks.Summary(rule));
+    }
+
+    [Fact]
+    public void Summary_lists_extensions_with_their_dots()
+    {
+        var rule = new RuleSetting { Extensions = ["png", "jpg", "webp"], Action = RuleActionKind.Move, Template = "Pictures" };
+
+        Assert.Equal(".png .jpg .webp → Pictures", RuleChecks.Summary(rule));
     }
 
     [Theory]
