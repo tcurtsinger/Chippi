@@ -72,7 +72,7 @@ public sealed class PipelineTests
         f.Write("a.txt");
         f.Settle();
 
-        File.AppendAllText(f.In("done-a.txt"), " more");
+        f.Write("done-a.txt", "hello more");
         f.Settle();
 
         Assert.True(File.Exists(f.In("done-done-a.txt")));
