@@ -553,8 +553,8 @@ public sealed class DownloadsEngine : IDisposable
             var fact = Facts(info) with { FullPath = planned };
             // Never listed: built-in exclusions, cloud placeholders, empty files and files Chippi
             // itself produced (or a rename would repeat on every run). Ignored names are listed as
-            // held by the planner, so the person sees why they stay.
-            if (FileSafety.Exclusion(fact) is not null || _guard.IsOwnOutput(path, fact.Bytes, fact.Modified))
+            // held by the planner, so the person sees why they stay. Undo restores can be offered again.
+            if (FileSafety.Exclusion(fact) is not null || _guard.IsOwnOutput(path, fact.Bytes, fact.Modified, allowRestores: true))
                 continue;
             facts.Add(fact);
             real.Add(path);
