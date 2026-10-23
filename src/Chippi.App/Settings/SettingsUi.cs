@@ -40,8 +40,8 @@ internal static class SettingsUi
     {
         var text = new StackPanel();
         text.Children.Add(Styled(new TextBlock { Text = title }, "PageTitleStyle"));
-        text.Children.Add(Styled(new TextBlock { Text = description }, "PageDescriptionStyle"));
-        var grid = new Grid { Margin = new Thickness(0, 0, 0, 18) };
+
+        var grid = new Grid { Margin = new Thickness(0, 0, 0, 14) };
         grid.ColumnDefinitions.Add(new ColumnDefinition());
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         grid.Children.Add(text);
@@ -58,35 +58,25 @@ internal static class SettingsUi
     /// <summary>A setting: title and caption on the left, its control on the right, on a Surface row.</summary>
     public static Border Row(string title, string caption, FrameworkElement control, FrameworkElement? below = null)
     {
-        var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
-        text.Children.Add(Styled(new TextBlock { Text = title }, "RowTitleStyle"));
-        if (caption.Length > 0)
-            text.Children.Add(Styled(new TextBlock { Text = caption }, "RowCaptionStyle"));
-
-        var grid = new Grid();
-        grid.ColumnDefinitions.Add(new ColumnDefinition());
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        grid.Children.Add(text);
-        Grid.SetColumn(control, 1);
-        control.VerticalAlignment = VerticalAlignment.Center;
-        control.Margin = new Thickness(24, 0, 0, 0);
-        grid.Children.Add(control);
-        if (below is not null)
-        {
-            Grid.SetRow(below, 1);
-            Grid.SetColumnSpan(below, 2);
-            grid.Children.Add(below);
-        }
-
-        // A row is named by its title, so Narrator reads "Run at startup" for the switch inside it.
-        AutomationProperties.SetName(control, AutomationProperties.GetName(control) is { Length: > 0 } name ? name : title);
-        return Styled(new Border { Child = grid }, "SettingRowStyle");
+        var row = new SettingRow { Header = title, Description = caption, Content = control };
+        if (below is null)
+            return new Border { Child = row };
+        var stack = new StackPanel();
+        stack.Children.Add(row);
+        below.Margin = new Thickness(16, 0, 16, 10);
+        stack.Children.Add(below);
+        return new Border { Child = stack };
     }
 
-    public static FrameworkElement Eyebrow(string text) => Styled(new TextBlock { Text = text }, "SectionEyebrowStyle");
+    public static FrameworkElement Section(string text) => Styled(new TextBlock { Text = text, Margin = new Thickness(0, 24, 0, 8) }, "HeadlineTextStyle");
 
+    public static Card Group(params UIElement[] rows)
+    {
+        var card = new Card();
+        foreach (var row in rows)
+            card.Children.Add(row);
+        return card;
+    }
     /// <summary>A caption line for results and errors ("Settings imported", "That file is not valid JSON").</summary>
     public static TextBlock Message() => Styled(new TextBlock { Visibility = Visibility.Collapsed, Margin = new Thickness(0, 10, 0, 0), TextWrapping = TextWrapping.Wrap }, "CaptionTextStyle");
 
@@ -108,7 +98,7 @@ internal static class SettingsUi
         return control;
     }
 
-    public static ToggleButton Switch(bool on) => Styled(new ToggleButton { IsChecked = on }, "SwitchStyle");
+    public static ToggleButton Switch(bool on) => Styled(new ToggleButton { IsChecked = on, Content = on ? "On" : "Off" }, "SwitchWithLabelStyle");
 
     /// <summary>
     /// Runs <paramref name="changed"/> whenever the switch's state changes, however it changed:
@@ -125,10 +115,12 @@ internal static class SettingsUi
             busy = true;
             try
             {
+                toggle.Content = toggle.IsChecked == true ? "On" : "Off";
                 changed(toggle.IsChecked == true);
             }
             finally
             {
+                toggle.Content = toggle.IsChecked == true ? "On" : "Off";
                 busy = false;
             }
         }

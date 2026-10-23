@@ -18,182 +18,252 @@ using Windows.Win32.Graphics.Dwm;
 
 namespace Chippi.App.Settings;
 
-/// <summary>A sidebar entry. <see cref="Id"/> is what <see cref="ShellCommands.OpenSettings"/> takes.</summary>
-public sealed record SettingsPageInfo(string Id, string Label, Geometry Icon)
-{
-    public override string ToString() => Label;
-}
+public sealed record SettingsPageInfo(string Id, string Label, Geometry Icon);
 
 public partial class SettingsWindow : Window
 {
     public static IReadOnlyList<SettingsPageInfo> Pages { get; } =
     [
+        new("features", "Add features", LucideIcons.Plus),
         new("general", "General", LucideIcons.Settings),
-        new("features", "Features", LucideIcons.LayoutGrid),
         new("island", "Island & pet", LucideIcons.Droplet),
         new("notifications", "Notifications", LucideIcons.Bell),
-        new("shortcuts", "Shortcuts", LucideIcons.Keyboard),
-        new("permissions", "Permissions", LucideIcons.Shield),
-        new("appearance", "Appearance", LucideIcons.Sun),
         new("about", "About", LucideIcons.Info),
     ];
 
     private readonly ShellContext _shell;
-    private FeatureEntry? _modulePage;
+    private readonly Dictionary<string, FrameworkElement> _views = [];
+    private readonly Dictionary<string, SettingsPageContribution> _contributions = [];
+    private List<SettingsPageInfo> _featurePages = [];
+    private bool _selecting;
+    private bool _closed;
+    private string _currentPage = "";
+    private const string ModulePrefix = "module:";
 
     public SettingsWindow(ShellContext shell, string page)
     {
         _shell = shell;
         InitializeComponent();
-        VersionLine.Text = $"v{AppInfo.Version} · GPL-3.0-or-later";
-        Nav.ItemsSource = Pages;
+        VersionLine.Text = $"v{AppInfo.Version} \u00B7 GPL-3.0-or-later";
+        Nav.ItemsSource = Pages.Skip(1).Select(Item).ToList();
+        RefreshFeatures();
         Navigate(page);
+        _shell.Registry.Changed += OnRegistryChanged;
         SourceInitialized += (_, _) => RoundCorners();
         StateChanged += (_, _) => OnStateChanged();
     }
 
-    /// <summary>The page's own element (inside the scroller), for the debug snapshot.</summary>
     internal FrameworkElement PageContent => PageHost;
+    internal IEnumerable<SettingsPageInfo> NavigationPages => _featurePages.Concat(Pages);
+    public string CurrentPage => _currentPage;
 
-    /// <summary>The sidebar page showing, for reopening at the same place.</summary>
-    public string CurrentPage => (Nav.SelectedItem as SettingsPageInfo)?.Id ?? "general";
+    private static SegmentItem Item(SettingsPageInfo page) => new() { Label = page.Label, Icon = page.Icon, Value = page.Id };
 
-    /// <summary>
-    /// Shows a sidebar page by id ("features"), or a feature's own page with
-    /// <c>module:&lt;id&gt;[/&lt;section&gt;]</c> (a notice click opening History, say). A feature that is
-    /// not installed or has no page falls back to the Features hub.
-    /// </summary>
+    private void RefreshFeatures()
+    {
+        var entries = _shell.Registry.Features.Where(f => f.IsInstalled && f.SettingsPage is not null).ToList();
+        foreach (var key in _contributions.Keys.ToList())
+        {
+            var entry = entries.FirstOrDefault(f => ModulePrefix + f.Id == key);
+            if (entry?.SettingsPage == _contributions[key])
+                continue;
+            _contributions.Remove(key);
+            foreach (string cached in _views.Keys.Where(k => k == key || k.StartsWith(key + "/", StringComparison.Ordinal)).ToList())
+                _views.Remove(cached);
+            if (_currentPage == key || _currentPage.StartsWith(key + "/", StringComparison.Ordinal))
+                _currentPage = "";
+        }
+        foreach (var entry in entries)
+            _contributions[ModulePrefix + entry.Id] = entry.SettingsPage!;
+        _featurePages = entries.Select(f => new SettingsPageInfo(ModulePrefix + f.Id, f.Descriptor.Name, LucideIcons.Get(f.Descriptor.Icon))).ToList();
+        _selecting = true;
+        FeatureNav.ItemsSource = _featurePages.Append(Pages[0]).Select(Item).ToList();
+        _selecting = false;
+    }
+
+    private void OnRegistryChanged(object? sender, EventArgs e) => Dispatcher.BeginInvoke(() =>
+    {
+        if (_closed)
+            return;
+        RefreshFeatures();
+        Navigate(_currentPage.Length == 0 ? "features" : _currentPage);
+    });
+
     public void Navigate(string page)
     {
-        if (page.StartsWith(ModulePrefix, StringComparison.OrdinalIgnoreCase))
-        {
-            string rest = page[ModulePrefix.Length..];
-            int slash = rest.IndexOf('/');
-            string id = slash < 0 ? rest : rest[..slash];
-            string? section = slash < 0 || slash == rest.Length - 1 ? null : rest[(slash + 1)..];
-            var features = Pages.First(p => p.Id == "features");
-            if (!ReferenceEquals(Nav.SelectedItem, features))
-                Nav.SelectedItem = features; // shows the hub, so Back has somewhere to go
-            if (_shell.Registry.Find(id) is { IsInstalled: true, SettingsPage: not null } entry)
-            {
-                ShowModulePage(entry, section);
-            }
-            else
-            {
-                Log.Info($"Settings: no page for '{page}'; showing Features");
-                if (_modulePage is not null)
-                    ShowPage(features); // leave whatever module page was showing
-            }
-            return;
-        }
+        string baseId = page.Split('/')[0];
+        var target = NavigationPages.FirstOrDefault(p => p.Id.Equals(baseId, StringComparison.OrdinalIgnoreCase))
+            ?? (page.StartsWith(ModulePrefix, StringComparison.OrdinalIgnoreCase) ? Pages[0] : NavigationPages.First());
+        string id = target.Id;
+        if (id.StartsWith(ModulePrefix, StringComparison.Ordinal) && page.Contains('/'))
+            id += page[page.IndexOf('/')..];
+        _selecting = true;
+        SettingsSearch.Clear();
+        FeatureNav.SelectedItem = FeatureNav.Items.OfType<SegmentItem>().FirstOrDefault(i => Equals(i.Value, target.Id));
+        Nav.SelectedItem = Nav.Items.OfType<SegmentItem>().FirstOrDefault(i => Equals(i.Value, target.Id));
+        _selecting = false;
+        PageHost.Content = View(id);
+        _currentPage = id;
+        Scroller.ScrollToTop();
+    }
 
-        var target = Pages.FirstOrDefault(p => p.Id == page) ?? Pages[0];
-        if (ReferenceEquals(Nav.SelectedItem, target) && _modulePage is null)
-            return;
-        if (ReferenceEquals(Nav.SelectedItem, target))
-            ShowPage(target);
-        else
-            Nav.SelectedItem = target;
+    private void OnFeatureSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_selecting && FeatureNav.SelectedItem is SegmentItem { Value: string id })
+            Navigate(id);
     }
 
     private void OnNavSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (Nav.SelectedItem is SettingsPageInfo page)
-            ShowPage(page);
+        if (!_selecting && Nav.SelectedItem is SegmentItem { Value: string id })
+            Navigate(id);
     }
 
-    private void ShowPage(SettingsPageInfo page)
+    internal void RefreshImportedSettings()
     {
-        LeaveModulePage();
-        PageHost.Content = page.Id switch
-        {
-            "features" => new FeaturesPage(_shell, ShowModulePage),
-            "island" => new IslandPetPage(_shell),
-            "notifications" => new NotificationsPage(_shell),
-            "shortcuts" => new ShortcutsPage(),
-            "permissions" => new PermissionsPage(_shell),
-            "appearance" => new AppearancePage(() => Navigate("general"), () => Navigate("island")),
-            "about" => new AboutPage(),
-            _ => new GeneralPage(_shell),
-        };
-        Scroller.ScrollToTop();
+        foreach (string id in _views.Keys.Where(id => id != _currentPage).ToList())
+            _views.Remove(id);
     }
 
-    private const string ModulePrefix = "module:";
-
-    /// <summary>A feature's own settings page, reached from its card. Esc or Back returns to Features.</summary>
-    private void ShowModulePage(FeatureEntry entry) => ShowModulePage(entry, null);
-
-    /// <summary>A feature's page opened on <paramref name="section"/> (the module decides what sections exist).</summary>
-    private void ShowModulePage(FeatureEntry entry, string? section)
+    private FrameworkElement View(string id)
     {
-        if (entry.SettingsPage is not { } contribution)
-            return;
+        if (_views.TryGetValue(id, out var cached))
+            return cached;
         FrameworkElement view;
         try
         {
-            view = contribution.CreateView(section) as FrameworkElement
-                ?? throw new InvalidOperationException("The settings page factory did not return a FrameworkElement.");
+            if (id.StartsWith(ModulePrefix, StringComparison.Ordinal))
+            {
+                int slash = id.IndexOf('/');
+                string baseId = slash < 0 ? id : id[..slash];
+                string? section = slash < 0 ? null : id[(slash + 1)..];
+                var contribution = _contributions[baseId];
+                var moduleView = contribution.CreateView(section) as FrameworkElement
+                    ?? throw new InvalidOperationException("The settings factory did not return a FrameworkElement.");
+                view = new ModulePageHost(NavigationPages.First(p => p.Id == baseId).Label, moduleView);
+            }
+            else
+                view = id switch
+                {
+                    "features" => new AddFeaturesPage(_shell),
+                    "island" => new IslandPetPage(_shell),
+                    "notifications" => new NotificationsPage(_shell),
+                    "about" => new AboutPage(),
+                    _ => new GeneralPage(_shell),
+                };
         }
         catch (Exception ex)
         {
-            Log.Error($"Settings page for {entry.Id} failed to load", ex);
+            Log.Error($"Settings page '{id}' failed to load", ex);
+            view = new TextBlock { Text = "Couldn't open this page. Close Settings and try again.", TextWrapping = TextWrapping.Wrap };
+        }
+        _views[id] = view;
+        return view;
+    }
+
+    private void OnSearchChanged(object sender, TextChangedEventArgs e)
+    {
+        if (_selecting)
+            return;
+        string query = SettingsSearch.Text.Trim();
+        if (query.Length == 0)
+        {
+            if (_currentPage.Length > 0)
+                PageHost.Content = View(_currentPage);
             return;
         }
-        LeaveModulePage(); // never two subscriptions
-        _modulePage = entry;
-        PageHost.Content = new ModulePageHost(entry.Descriptor.Name, view, BackToFeatures);
+        _selecting = true;
+        FeatureNav.SelectedItem = null;
+        Nav.SelectedItem = null;
+        _selecting = false;
+        var results = new StackPanel();
+        results.Children.Add(SettingsUi.Header("Search results", ""));
+        int count = 0;
+        foreach (var page in NavigationPages)
+        {
+            var labels = Labels(View(page.Id)).Append(page.Label)
+                .Where(label => label.Contains(query, StringComparison.CurrentCultureIgnoreCase))
+                .Distinct().ToList();
+            if (labels.Count == 0)
+                continue;
+            results.Children.Add(SettingsUi.Section(page.Label));
+            var card = new Card();
+            foreach (string label in labels)
+            {
+                var button = SettingsUi.Button(label);
+                button.HorizontalContentAlignment = HorizontalAlignment.Left;
+                button.Margin = new Thickness(0);
+                button.MinHeight = 40;
+                button.SetResourceReference(StyleProperty, "SearchResultButtonStyle");
+                button.Click += (_, _) => Navigate(page.Id);
+                card.Children.Add(button);
+                count++;
+            }
+            results.Children.Add(card);
+        }
+        if (count == 0)
+            results.Children.Add(SettingsUi.Styled(new TextBlock { Text = "No settings match" }, "CaptionTextStyle"));
+        PageHost.Content = results;
         Scroller.ScrollToTop();
-        _shell.Registry.Changed += OnRegistryChangedWhileModulePage;
     }
 
-    /// <summary>Forgets the module page and its registry handler. Every way off a module page goes through here.</summary>
-    private void LeaveModulePage()
+#if DEBUG
+    internal void SearchSnapshot(string query) => SettingsSearch.Text = query;
+
+    internal void InvokeSnapshotAction(string name)
     {
-        _shell.Registry.Changed -= OnRegistryChangedWhileModulePage;
-        _modulePage = null;
+        var button = Descendants(PageHost).OfType<Button>().First(b => AutomationProperties.GetName(b) == name || Equals(b.Content, name));
+        button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
     }
 
-    // A module that stops (uninstalled from the flyout, say) takes its page with it.
-    private void OnRegistryChangedWhileModulePage(object? sender, EventArgs e) => Dispatcher.BeginInvoke(() =>
-    {
-        if (_modulePage is { } entry && entry.SettingsPage is null)
-            BackToFeatures();
-    });
+    internal void VerifyFeatureSearchSnapshot() => Descendants(PageHost).OfType<AddFeaturesPage>().Single().VerifySearchSnapshot();
 
-    /// <summary>
-    /// Back (button or Esc) from a module page to the hub. The sidebar already shows Features there,
-    /// so <see cref="Navigate"/> would see "Features, no module page" and do nothing: show the page
-    /// directly instead. <see cref="ShowPage"/> leaves the module page (and its registry handler).
-    /// </summary>
-    private void BackToFeatures()
+    internal void ExpandSnapshotFeatures(bool expanded) =>
+        Descendants(PageHost).OfType<ExpanderRow>().First().IsExpanded = expanded;
+
+    private static IEnumerable<DependencyObject> Descendants(DependencyObject root)
     {
-        var features = Pages.First(p => p.Id == "features");
-        if (ReferenceEquals(Nav.SelectedItem, features))
-            ShowPage(features);
-        else
-            Nav.SelectedItem = features; // the selection change shows the page
+        yield return root;
+        foreach (var child in LogicalTreeHelper.GetChildren(root).OfType<DependencyObject>())
+            foreach (var item in Descendants(child))
+                yield return item;
+    }
+#endif
+
+    private static IEnumerable<string> Labels(DependencyObject root)
+    {
+        if (root is SettingRow { Header.Length: > 0 } row)
+        {
+            yield return row.Header;
+            yield break;
+        }
+        else if (root is ExpanderRow { Header: string label })
+            yield return label;
+        else if (root is Control control && AutomationProperties.GetName(control) is { Length: > 0 } name)
+            yield return name;
+        foreach (var child in LogicalTreeHelper.GetChildren(root).OfType<DependencyObject>())
+            foreach (string label in Labels(child))
+                yield return label;
     }
 
     protected override void OnKeyDown(KeyEventArgs e)
     {
         base.OnKeyDown(e);
-        if (e.Handled || e.Key != Key.Escape)
-            return;
-        e.Handled = true;
-        if (_modulePage is not null)
-            BackToFeatures();
-        else
+        if (!e.Handled && e.Key == Key.Escape)
+        {
+            e.Handled = true;
             Close();
+        }
     }
 
     protected override void OnClosed(EventArgs e)
     {
-        LeaveModulePage();
-        PageHost.Content = null; // pages unhook their registry events on Unloaded
+        _closed = true;
+        _shell.Registry.Changed -= OnRegistryChanged;
+        PageHost.Content = null;
+        _views.Clear();
         base.OnClosed(e);
     }
-
     private void OnMinimize(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
 
     private void OnMaximize(object sender, RoutedEventArgs e) =>

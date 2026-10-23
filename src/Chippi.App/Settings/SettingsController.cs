@@ -14,7 +14,6 @@ internal sealed class SettingsController
 {
     private readonly ShellContext _shell;
     private SettingsWindow? _window;
-    private string _lastPage = "general";
 
     private SettingsController(ShellContext shell) => _shell = shell;
 
@@ -32,17 +31,16 @@ internal sealed class SettingsController
     {
         if (_window is null)
         {
-            _window = new SettingsWindow(_shell, page ?? _lastPage);
+            _window = new SettingsWindow(_shell, page ?? "");
             _window.Closed += (_, _) =>
             {
-                _lastPage = _window.CurrentPage;
                 _window = null;
             };
             _window.Show();
         }
-        else if (page is not null)
+        else
         {
-            _window.Navigate(page);
+            _window.Navigate(page ?? "");
         }
 
         if (_window.WindowState == WindowState.Minimized)
@@ -69,20 +67,89 @@ internal sealed class SettingsController
         {
             System.IO.Directory.CreateDirectory(directory);
             await Task.Delay(1500); // let the registry start the modules
-            var original = UI.Themes.ThemeManager.Mode;
-            foreach (var (theme, name) in new[] { (Core.Config.ThemePreference.Dark, "dark"), (Core.Config.ThemePreference.Light, "light") })
+            var original = SettingsUi.ReadApp(_shell.Config);
+            try
             {
-                UI.Themes.ThemeManager.Apply(theme);
-                foreach (var page in SettingsWindow.Pages)
+                foreach (var accent in new[] { Core.Config.AccentChoice.FollowWindows, Core.Config.AccentChoice.Violet })
                 {
-                    Open(page.Id);
-                    await Idle();
-                    Render(_window!, System.IO.Path.Combine(directory, $"ws2-{page.Id}-{name}.png"));
-                    if (page.Id == "features")
-                        Render(_window!.PageContent, System.IO.Path.Combine(directory, $"ws2-features-full-{name}.png"), full: true);
+                    SettingsUi.SaveApp(_shell.Config, s => s.Accent = accent);
+                    foreach (var (theme, name) in new[] { (Core.Config.ThemePreference.Dark, "dark"), (Core.Config.ThemePreference.Light, "light") })
+                    {
+                        _window?.Close();
+                        SettingsUi.SaveApp(_shell.Config, s => s.Theme = theme);
+                        UI.Themes.ThemeManager.Apply(theme);
+                        Open(null);
+                        string first = _window!.NavigationPages.First().Id;
+                        if (_window.CurrentPage != first)
+                            throw new InvalidOperationException("Settings did not open on its first sidebar item.");
+                        Open("island");
+                        Open(null);
+                        if (_window.CurrentPage != first)
+                            throw new InvalidOperationException("Settings remembered the previous page.");
+                        foreach (var page in _window.NavigationPages.ToList())
+                        {
+                            Open(page.Id);
+                            await Idle();
+                            string file = page.Id.Replace(':', '-');
+                            Render(_window!, System.IO.Path.Combine(directory, $"r2-{file}-{name}-{accent}.png"));
+                            if (page.Id == "features")
+                            {
+                                _window.VerifyFeatureSearchSnapshot();
+                                _window.ExpandSnapshotFeatures(true);
+                                await Idle();
+                                Render(_window.PageContent, System.IO.Path.Combine(directory, $"r2-features-full-{name}-{accent}.png"), full: true);
+                                _window.ExpandSnapshotFeatures(false);
+                            }
+                            if (page.Id == "about")
+                            {
+                                foreach (string action in new[] { "View license", "View third-party notices" })
+                                {
+                                    _window.InvokeSnapshotAction(action);
+                                    await Idle();
+                                    Render(_window, System.IO.Path.Combine(directory, $"r2-{action.Replace(' ', '-')}-{name}-{accent}.png"));
+                                    _window.InvokeSnapshotAction("Back");
+                                }
+                            }
+                        }
+                        _window.SearchSnapshot("accent");
+                        await Idle();
+                        Render(_window, System.IO.Path.Combine(directory, $"r2-search-{name}-{accent}.png"));
+                        _window.InvokeSnapshotAction("Accent color");
+                        if (_window.CurrentPage != "general")
+                            throw new InvalidOperationException("The search result did not open General.");
+                        foreach (var module in _window.NavigationPages.Where(p => p.Id.StartsWith("module:")).ToList())
+                        {
+                            Open(module.Id + "/history");
+                            if (_window.CurrentPage != module.Id + "/history")
+                                throw new InvalidOperationException("The module deep link was lost.");
+                        }
+                    }
                 }
             }
-            UI.Themes.ThemeManager.Apply(original);
+            finally
+            {
+                SettingsUi.SaveApp(_shell.Config, s => { s.Accent = original.Accent; s.Theme = original.Theme; });
+                UI.Themes.ThemeManager.Apply(original.Theme);
+            }
+            var installed = _shell.Registry.Features.FirstOrDefault(f => f.IsInstalled && f.SettingsPage is not null);
+            if (installed is not null)
+            {
+                try
+                {
+                    await _shell.Registry.SetInstalledAsync(installed.Id, false);
+                    await Idle();
+                    if (_window!.NavigationPages.Any(p => p.Id == "module:" + installed.Id))
+                        throw new InvalidOperationException("An uninstalled module stayed in navigation.");
+                }
+                finally
+                {
+                    await _shell.Registry.SetInstalledAsync(installed.Id, true);
+                    await Idle();
+                }
+                if (!_window!.NavigationPages.Any(p => p.Id == "module:" + installed.Id))
+                    throw new InvalidOperationException("A reinstalled module did not return to navigation.");
+            }
+            Core.Diagnostics.Log.Info("R2 snapshot checks passed: caller/default navigation, label search, deep links, module removal/reinstall, notices and license.");
             _window?.Close();
         }
         catch (Exception ex)
@@ -115,7 +182,10 @@ internal sealed class SettingsController
         using (var dc = backdrop.RenderOpen())
             dc.DrawRectangle((System.Windows.Media.Brush)element.FindResource("WindowBackgroundBrush"), null, new Rect(0, 0, width, height));
         bitmap.Render(backdrop);
-        bitmap.Render(element);
+        var drawing = new System.Windows.Media.DrawingVisual();
+        using (var dc = drawing.RenderOpen())
+            dc.DrawRectangle(new System.Windows.Media.VisualBrush(element), null, new Rect(0, 0, width, height));
+        bitmap.Render(drawing);
         var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
         encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bitmap));
         using var file = System.IO.File.Create(path);

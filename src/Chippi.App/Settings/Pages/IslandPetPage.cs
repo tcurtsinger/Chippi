@@ -4,7 +4,7 @@
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
-using System.Windows.Threading;
+using System.Windows.Media;
 using Chippi.App.Island;
 using Chippi.App.Pet;
 using Chippi.App.Shell;
@@ -14,121 +14,70 @@ using Chippi.UI.Themes;
 
 namespace Chippi.App.Settings.Pages;
 
-/// <summary>Island & pet (brief §4.5): island on/off, pet color, reduce motion, and a 112px Gumdrop cycling its moods.</summary>
 internal sealed class IslandPetPage : UserControl
 {
-    private static readonly PetMood[] Cycle = [PetMood.Idle, PetMood.Celebrating, PetMood.Sleepy, PetMood.WideAwake];
-
     private readonly ShellContext _shell;
-    private readonly Gumdrop _preview;
-    private readonly TextBlock _moodLabel;
-    private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromSeconds(3) };
-    private int _mood;
 
     public IslandPetPage(ShellContext shell)
     {
         _shell = shell;
         var app = SettingsUi.ReadApp(shell.Config);
-        _preview = new Gumdrop { Size = 112, PetColor = app.PetColor, HorizontalAlignment = HorizontalAlignment.Center };
-
         var page = new StackPanel();
-        page.Children.Add(SettingsUi.Header("Island & pet", "The island floats at the top of your screen. Gumdrop lives in it and reacts when Chippi finishes something for you."));
-
+        page.Children.Add(SettingsUi.Header("Island & pet", ""));
         var island = SettingsUi.Switch(app.IslandEnabled);
         SettingsUi.OnSwitched(island, on => SettingsUi.SaveApp(shell.Config, s => s.IslandEnabled = on));
-        page.Children.Add(SettingsUi.Row("Island", "Shows what is live (media, timers, Keep awake) and hides over fullscreen apps.", island));
-        page.Children.Add(DisplayRow(app));
-
-        var color = SettingsUi.Segments("Pet color", Enum.GetValues<PetColor>().Select(c => (c.ToString(), c)), app.PetColor);
-        color.Width = 480;
-        color.SelectionChanged += (_, _) =>
-        {
-            if (color.SelectedItem is SegmentItem { Value: PetColor choice })
-            {
-                _preview.PetColor = choice;
-                SettingsUi.SaveApp(shell.Config, s => s.PetColor = choice);
-            }
-        };
-        page.Children.Add(SettingsUi.Row("Pet color", "Synth is Chippi's gradient. The face stays dark on every color.", color));
-
-        var motion = SettingsUi.Segments("Reduce motion",
-            [("Follow Windows", (bool?)null), ("On", (bool?)true), ("Off", (bool?)false)], app.ReduceMotion);
-        motion.Width = 440;
-        motion.SelectionChanged += (_, _) =>
-        {
-            if (motion.SelectedItem is SegmentItem item)
-            {
-                var choice = (bool?)item.Value;
-                Motion.Override = choice;
-                SettingsUi.SaveApp(shell.Config, s => s.ReduceMotion = choice);
-            }
-        };
-        page.Children.Add(SettingsUi.Row("Reduce motion",
-            "On stops Gumdrop's blink and squish and swaps moods instantly. Follow Windows uses Animation effects.", motion));
-
-        // On Panel, not the island's near-black: at 112px DESIGN.md §7 draws a ground shadow (black
-        // at 35%), and it only shows on a lighter surface. The caption is the themed tertiary ink.
-        _moodLabel = SettingsUi.Styled(new TextBlock { HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 10, 0, 0) }, "CaptionTextStyle");
-        var stage = new StackPanel { Margin = new Thickness(0, 22, 0, 18) };
-        stage.Children.Add(_preview);
-        stage.Children.Add(_moodLabel);
-        var card = new Border { CornerRadius = new CornerRadius(14), BorderThickness = new Thickness(1), Child = stage, Margin = new Thickness(0, 4, 0, 0) };
-        card.SetResourceReference(Border.BackgroundProperty, "PanelBrush");
-        card.SetResourceReference(Border.BorderBrushProperty, "BorderSoftBrush");
-        page.Children.Add(SettingsUi.Eyebrow("Preview"));
-        page.Children.Add(card);
-
+        page.Children.Add(SettingsUi.Group(
+            SettingsUi.Row("Island", "Shows what's live from a screen edge", island),
+            PositionRow(app), DisplayRow(app)));
+        page.Children.Add(SettingsUi.Section("Gumdrop"));
+        page.Children.Add(SettingsUi.Group(ColorRow(app), MotionRow(app)));
         Content = page;
-        ShowMood();
-        _timer.Tick += (_, _) =>
-        {
-            _mood = (_mood + 1) % Cycle.Length;
-            ShowMood();
-        };
-        Loaded += (_, _) => _timer.Start();
-        Unloaded += (_, _) => _timer.Stop();
     }
 
-    /// <summary>
-    /// Island display: follow the active window, stay on the main display, or stay on one monitor
-    /// picked by name. Saved to AppSettings; the island applies it live through SectionChanged.
-    /// </summary>
+    private Border PositionRow(AppSettings app)
+    {
+        var picker = Combo("Position", new[] { ("Top", IslandEdge.Top), ("Left edge", IslandEdge.Left), ("Right edge", IslandEdge.Right) }, app.IslandEdge);
+        picker.SelectionChanged += (_, _) =>
+        {
+            if (picker.SelectedItem is ComboBoxItem { Tag: IslandEdge edge })
+                SettingsUi.SaveApp(_shell.Config, s => s.IslandEdge = edge);
+        };
+        var reset = SettingsUi.Button("Reset");
+        reset.Click += (_, _) =>
+        {
+            picker.SelectedIndex = 0;
+            SettingsUi.SaveApp(_shell.Config, s => { s.IslandEdge = IslandEdge.Top; s.IslandPlace = 0.5; });
+        };
+        var controls = new StackPanel { Orientation = Orientation.Horizontal };
+        controls.Children.Add(picker);
+        controls.Children.Add(reset);
+        return SettingsUi.Row("Position", "Or drag the island to any screen edge", controls);
+    }
+
     private Border DisplayRow(AppSettings app)
     {
-        var monitors = Displays.Connected();
-        var mode = SettingsUi.Segments("Island display",
-            [("Follow active window", IslandDisplay.FollowActiveWindow), ("Main display", IslandDisplay.MainDisplay), ("One monitor", IslandDisplay.SpecificMonitor)],
-            app.IslandDisplay);
-        mode.Width = 480;
-
-        var picker = new ComboBox { Width = 320, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 10, 0, 0), Tag = "Choose a monitor" };
-        picker.SetResourceReference(StyleProperty, "HopperComboBoxStyle");
+        var mode = Combo("Island display", new[] { ("Follow active window", IslandDisplay.FollowActiveWindow), ("Main display", IslandDisplay.MainDisplay), ("One monitor", IslandDisplay.SpecificMonitor) }, app.IslandDisplay);
+        var picker = SettingsUi.Styled(new ComboBox { MinWidth = 180, MaxWidth = 300, Tag = "Choose a monitor", Margin = new Thickness(0, 8, 0, 0) }, "HopperComboBoxStyle");
         AutomationProperties.SetName(picker, "Island monitor");
-        foreach (var monitor in monitors)
+        foreach (var monitor in Displays.Connected())
             picker.Items.Add(new ComboBoxItem { Content = monitor.Name, Tag = monitor.Id });
-        picker.SelectedItem = picker.Items.OfType<ComboBoxItem>()
-            .FirstOrDefault(i => string.Equals((string)i.Tag, app.IslandMonitorId, StringComparison.OrdinalIgnoreCase));
-
+        picker.SelectedItem = picker.Items.OfType<ComboBoxItem>().FirstOrDefault(i => string.Equals((string)i.Tag, app.IslandMonitorId, StringComparison.OrdinalIgnoreCase));
         var note = SettingsUi.Message();
-        void UpdatePicker()
+        void Update()
         {
-            bool one = mode.SelectedItem is SegmentItem { Value: IslandDisplay.SpecificMonitor };
-            picker.Visibility = one ? Visibility.Visible : Visibility.Collapsed;
-            string? saved = SettingsUi.ReadApp(_shell.Config).IslandMonitorId;
-            if (one && !string.IsNullOrEmpty(saved) && picker.SelectedItem is null)
-                SettingsUi.Show(note, "That monitor isn't connected, so the island is on the main display until it is.", problem: true);
-            else if (one && string.IsNullOrEmpty(saved))
-                SettingsUi.Show(note, "Choose a monitor. Until then the island stays on the main display.", problem: false);
+            bool specific = mode.SelectedItem is ComboBoxItem { Tag: IslandDisplay.SpecificMonitor };
+            picker.Visibility = specific ? Visibility.Visible : Visibility.Collapsed;
+            if (specific && picker.SelectedItem is null)
+                SettingsUi.Show(note, "Choose a connected monitor. Using the main display for now.", false);
             else
                 note.Visibility = Visibility.Collapsed;
         }
-
         mode.SelectionChanged += (_, _) =>
         {
-            if (mode.SelectedItem is SegmentItem { Value: IslandDisplay choice })
+            if (mode.SelectedItem is ComboBoxItem { Tag: IslandDisplay value })
             {
-                SettingsUi.SaveApp(_shell.Config, s => s.IslandDisplay = choice);
-                UpdatePicker();
+                SettingsUi.SaveApp(_shell.Config, s => s.IslandDisplay = value);
+                Update();
             }
         };
         picker.SelectionChanged += (_, _) =>
@@ -136,22 +85,62 @@ internal sealed class IslandPetPage : UserControl
             if (picker.SelectedItem is ComboBoxItem { Tag: string id })
             {
                 SettingsUi.SaveApp(_shell.Config, s => s.IslandMonitorId = id);
-                UpdatePicker();
+                Update();
             }
         };
-        UpdatePicker();
-
-        var below = new StackPanel();
-        below.Children.Add(picker);
-        below.Children.Add(note);
-        return SettingsUi.Row("Island display", "Where the island sits. Following the active window moves it to whichever screen you're working on.", mode, below);
+        Update();
+        var controls = new StackPanel();
+        controls.Children.Add(mode);
+        controls.Children.Add(picker);
+        return SettingsUi.Row("Display", "", controls, note);
     }
 
-    private void ShowMood()
+    private SettingRow ColorRow(AppSettings app)
     {
-        var mood = Cycle[_mood];
-        _preview.Mood = mood;
-        string words = Gumdrop.Describe(mood);
-        _moodLabel.Text = char.ToUpperInvariant(words[0]) + words[1..];
+        var preview = new Gumdrop { Size = 48, PetColor = app.PetColor, Margin = new Thickness(0, 0, 20, 0) };
+        var controls = new StackPanel { Orientation = Orientation.Horizontal };
+        controls.Children.Add(preview);
+        var row = new SettingRow { Header = "Color", Description = app.PetColor.ToString(), Content = controls };
+        foreach (var color in Enum.GetValues<PetColor>())
+        {
+            var swatch = SettingsUi.Styled(new RadioButton { GroupName = "PetColor", IsChecked = color == app.PetColor, ToolTip = color.ToString(), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(4, 0, 0, 0) }, "SwatchStyle");
+            AutomationProperties.SetName(swatch, color.ToString());
+            swatch.SetResourceReference(Control.BackgroundProperty, color == PetColor.Synth ? "PetSynthBrush" : "Pet" + color + "Brush");
+            if (color == PetColor.Frost)
+                swatch.SetResourceReference(Control.BorderBrushProperty, "BorderBrush");
+            swatch.Checked += (_, _) =>
+            {
+                preview.PetColor = color;
+                row.Description = color.ToString();
+                SettingsUi.SaveApp(_shell.Config, s => s.PetColor = color);
+            };
+            controls.Children.Add(swatch);
+        }
+        return row;
+    }
+
+    private Border MotionRow(AppSettings app)
+    {
+        var motion = Combo("Reduce motion", new[] { ("Follow Windows", (bool?)null), ("On", (bool?)true), ("Off", (bool?)false) }, app.ReduceMotion);
+        motion.SelectionChanged += (_, _) =>
+        {
+            if (motion.SelectedItem is ComboBoxItem item)
+            {
+                var choice = (bool?)item.Tag;
+                Motion.Override = choice;
+                SettingsUi.SaveApp(_shell.Config, s => s.ReduceMotion = choice);
+            }
+        };
+        return SettingsUi.Row("Reduce motion", "", motion);
+    }
+
+    private static ComboBox Combo<T>(string name, IEnumerable<(string Label, T Value)> choices, T selected)
+    {
+        var combo = SettingsUi.Styled(new ComboBox { MinWidth = 180, HorizontalAlignment = HorizontalAlignment.Left }, "HopperComboBoxStyle");
+        foreach (var (label, value) in choices)
+            combo.Items.Add(new ComboBoxItem { Content = label, Tag = value });
+        combo.SelectedItem = combo.Items.OfType<ComboBoxItem>().FirstOrDefault(i => Equals(i.Tag, selected));
+        AutomationProperties.SetName(combo, name);
+        return combo;
     }
 }

@@ -22,7 +22,7 @@ namespace Chippi.App.Settings.Pages;
 internal sealed class NotificationsPage : UserControl
 {
     private const double DimmedOpacity = 0.6;
-    private const double CheckColumn = 120;
+    private const double CheckColumn = 96;
 
     private readonly ShellContext _shell;
     private readonly StackPanel _groups = new();
@@ -37,24 +37,17 @@ internal sealed class NotificationsPage : UserControl
         var page = new StackPanel();
         page.Children.Add(SettingsUi.Styled(new TextBlock { Text = "Notifications", Margin = new Thickness(0, 0, 0, 18) }, "PageTitleStyle"));
 
-        var windows = Tile(LucideIcons.Monitor, "Windows", app.WindowsNotices, on =>
+        var windows = Destination(LucideIcons.Monitor, "Windows notifications", app.WindowsNotices, on =>
         {
             SettingsUi.SaveApp(shell.Config, s => s.WindowsNotices = on);
             Dim(_windowsColumn, on);
         });
-        var island = Tile(LucideIcons.IslandScreen, "Island", app.IslandNotices, on =>
+        var island = Destination(LucideIcons.IslandScreen, "Island", app.IslandNotices, on =>
         {
             SettingsUi.SaveApp(shell.Config, s => s.IslandNotices = on);
             Dim(_islandColumn, on);
         });
-        var tiles = new Grid();
-        tiles.ColumnDefinitions.Add(new ColumnDefinition());
-        tiles.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(8) });
-        tiles.ColumnDefinitions.Add(new ColumnDefinition());
-        Grid.SetColumn(island, 2);
-        tiles.Children.Add(windows);
-        tiles.Children.Add(island);
-        page.Children.Add(tiles);
+        page.Children.Add(SettingsUi.Group(windows, island));
 
         // The backend is known to be missing: say so once, claim nothing about Focus or Do not disturb.
         if (shell.Services.Toasts is null)
@@ -85,8 +78,7 @@ internal sealed class NotificationsPage : UserControl
         _groups.Children.Clear();
         _windowsColumn.Clear();
         _islandColumn.Clear();
-        var running = Enum.GetValues<FeatureGroup>()
-            .SelectMany(g => _shell.Registry.Features.Where(f => f.Descriptor.Group == g))
+        var running = _shell.Registry.Features
             .Where(f => f.Notifier is { Kinds.Count: > 0 })
             .ToList();
         if (running.Count == 0)
@@ -103,34 +95,30 @@ internal sealed class NotificationsPage : UserControl
         var notifier = feature.Notifier!;
         var header = Columns();
         header.Margin = new Thickness(15, 22, 15, 8);
-        var eyebrow = SettingsUi.Eyebrow(feature.Descriptor.Name);
+        var eyebrow = SettingsUi.Section(feature.Descriptor.Name);
         eyebrow.Margin = new Thickness(0);
         eyebrow.VerticalAlignment = VerticalAlignment.Center;
         header.Children.Add(eyebrow);
         header.Children.Add(Column(ColumnHeader("Windows"), 1, _windowsColumn));
         header.Children.Add(Column(ColumnHeader("Island"), 2, _islandColumn));
 
-        var rows = new StackPanel();
+        var rows = new Card();
         var kinds = notifier.Kinds;
         for (int i = 0; i < kinds.Count; i++)
         {
             var kind = kinds[i];
             var row = Columns();
-            row.Height = 44;
+            row.Height = 48;
             var name = SettingsUi.Styled(new TextBlock { Text = kind.Name, VerticalAlignment = VerticalAlignment.Center }, "RowTitleStyle");
             row.Children.Add(name);
             row.Children.Add(Column(Box(feature, kind, NoticePlaces.Windows, "Windows"), 1, _windowsColumn));
             row.Children.Add(Column(Box(feature, kind, NoticePlaces.Island, "Island"), 2, _islandColumn));
-            var cell = new Border { Child = row, BorderThickness = new Thickness(0, i == 0 ? 0 : 1, 0, 0) };
-            cell.SetResourceReference(Border.BorderBrushProperty, "BorderSoftBrush");
-            rows.Children.Add(cell);
+            row.Margin = new Thickness(16, 0, 16, 0);
+            rows.Children.Add(row);
         }
-        var surface = new Border { Child = rows, CornerRadius = new CornerRadius(14), Padding = new Thickness(15, 0, 15, 0) };
-        surface.SetResourceReference(Border.BackgroundProperty, "SurfaceBrush");
-
         var group = new StackPanel();
         group.Children.Add(header);
-        group.Children.Add(surface);
+        group.Children.Add(rows);
         AutomationProperties.SetName(group, feature.Descriptor.Name);
         return group;
     }
@@ -187,43 +175,17 @@ internal sealed class NotificationsPage : UserControl
         }
     }
 
-    private static Border Tile(Geometry icon, string title, bool on, Action<bool> changed)
+    private static SettingRow Destination(Geometry icon, string title, bool on, Action<bool> changed)
     {
-        var chip = new Border { Width = 32, Height = 32, CornerRadius = new CornerRadius(10), VerticalAlignment = VerticalAlignment.Center };
-        chip.SetResourceReference(Border.BackgroundProperty, "ChipBrush");
-        var glyph = new LucideIcon { Data = icon, Size = 16, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
-        glyph.SetResourceReference(LucideIcon.BrushProperty, "TextControlBrush");
-        chip.Child = glyph;
-
-        var name = SettingsUi.Styled(new TextBlock { Text = title }, "RowTitleStyle");
-        var note = SettingsUi.Styled(new TextBlock { Text = "Off · choices kept", Visibility = on ? Visibility.Collapsed : Visibility.Visible }, "RowCaptionStyle");
-        var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 12, 0) };
-        text.Children.Add(name);
-        text.Children.Add(note);
-
         var toggle = SettingsUi.Switch(on);
-        AutomationProperties.SetName(toggle, title);
+        var row = new SettingRow { Header = title, Description = on ? "" : "Off \u00B7 choices kept", Icon = icon, Content = toggle };
         SettingsUi.OnSwitched(toggle, value =>
         {
-            note.Visibility = value ? Visibility.Collapsed : Visibility.Visible;
+            row.Description = value ? "" : "Off \u00B7 choices kept";
             changed(value);
         });
-
-        var grid = new Grid();
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        grid.ColumnDefinitions.Add(new ColumnDefinition());
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        Grid.SetColumn(text, 1);
-        Grid.SetColumn(toggle, 2);
-        toggle.VerticalAlignment = VerticalAlignment.Center;
-        grid.Children.Add(chip);
-        grid.Children.Add(text);
-        grid.Children.Add(toggle);
-        var tile = new Border { Child = grid, CornerRadius = new CornerRadius(14), Padding = new Thickness(12, 12, 14, 12), MinHeight = 58 };
-        tile.SetResourceReference(Border.BackgroundProperty, "SurfaceBrush");
-        return tile;
+        return row;
     }
-
     private static FrameworkElement Unavailable()
     {
         var dot = new StatusDot { Kind = StatusKind.Attention, VerticalAlignment = VerticalAlignment.Center };

@@ -28,13 +28,12 @@ internal sealed class GeneralPage : UserControl
     private void Build()
     {
         var page = new StackPanel();
-        page.Children.Add(SettingsUi.Header("General", "How Chippi looks and starts, and where its settings live."));
+        page.Children.Add(SettingsUi.Header("General", ""));
 
         // Theme, applied live. Appearance points here rather than holding a second copy.
         var theme = SettingsUi.Segments("Theme",
             [("Dark", ThemePreference.Dark), ("Light", ThemePreference.Light), ("Follow Windows", ThemePreference.System)],
             SettingsUi.ReadApp(_shell.Config).Theme);
-        theme.Width = 440;
         theme.SelectionChanged += (_, _) =>
         {
             if (theme.SelectedItem is SegmentItem { Value: ThemePreference choice })
@@ -43,13 +42,39 @@ internal sealed class GeneralPage : UserControl
                 SettingsUi.SaveApp(_shell.Config, s => s.Theme = choice);
             }
         };
-        page.Children.Add(SettingsUi.Row("Theme", "Dark is the default. The island stays dark in every theme.", theme));
+        page.Children.Add(SettingsUi.Group(SettingsUi.Row("Theme", "", theme), AccentRow(), StartupRow()));
 
-        page.Children.Add(StartupRow());
-        page.Children.Add(TransferRow());
+        page.Children.Add(SettingsUi.Section("Settings file"));
+        page.Children.Add(SettingsUi.Group(TransferRow()));
         Content = page;
     }
 
+    private SettingRow AccentRow()
+    {
+        var selected = SettingsUi.ReadApp(_shell.Config).Accent;
+        var swatches = new StackPanel { Orientation = Orientation.Horizontal };
+        var row = new SettingRow { Header = "Accent color", Description = selected == AccentChoice.FollowWindows ? "Follows your Windows accent" : selected.ToString(), Content = swatches };
+        foreach (var choice in Enum.GetValues<AccentChoice>())
+        {
+            var swatch = SettingsUi.Styled(new RadioButton { GroupName = "Accent", IsChecked = selected == choice, Content = "Windows", Margin = new Thickness(4, 0, 0, 0), ToolTip = choice == AccentChoice.FollowWindows ? "Follow Windows" : choice.ToString() }, choice == AccentChoice.FollowWindows ? "SwatchPillStyle" : "SwatchStyle");
+            System.Windows.Automation.AutomationProperties.SetName(swatch, choice == AccentChoice.FollowWindows ? "Follow Windows accent" : choice.ToString());
+            void UpdateSwatch(object? sender, EventArgs e)
+            {
+                if (ThemeManager.NamedAccent(choice) is { } shades)
+                    swatch.Background = new System.Windows.Media.SolidColorBrush(ThemeManager.IsLight ? shades.Light : shades.Dark);
+            }
+            UpdateSwatch(null, EventArgs.Empty);
+            swatch.Loaded += (_, _) => { ThemeManager.ThemeChanged += UpdateSwatch; UpdateSwatch(null, EventArgs.Empty); };
+            swatch.Unloaded += (_, _) => ThemeManager.ThemeChanged -= UpdateSwatch;
+            swatch.Checked += (_, _) =>
+            {
+                row.Description = choice == AccentChoice.FollowWindows ? "Follows your Windows accent" : choice.ToString();
+                SettingsUi.SaveApp(_shell.Config, s => s.Accent = choice);
+            };
+            swatches.Children.Add(swatch);
+        }
+        return row;
+    }
     private Border StartupRow()
     {
         var message = SettingsUi.Message();
@@ -149,6 +174,7 @@ internal sealed class GeneralPage : UserControl
         Motion.Override = app.ReduceMotion;
         await _shell.Registry.ReloadAsync();
         Build(); // the rows show the imported values
+        (Window.GetWindow(this) as SettingsWindow)?.RefreshImportedSettings();
         SettingsUi.Show(_transferMessage, $"Imported from {dialog.FileName}", problem: false);
     }
 }
