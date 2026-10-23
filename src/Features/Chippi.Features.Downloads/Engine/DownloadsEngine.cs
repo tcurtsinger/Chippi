@@ -314,6 +314,13 @@ public sealed class DownloadsEngine : IDisposable
             PendingChanged?.Invoke(this, EventArgs.Empty);
     }
 
+    /// <summary>Whether readiness checks are running for <paramref name="path"/>; lets tests wait for the watcher.</summary>
+    internal bool IsTracking(string path)
+    {
+        lock (_gate)
+            return _tracked.ContainsKey(path);
+    }
+
     private void Drop(string path)
     {
         bool changed;
