@@ -91,7 +91,7 @@ internal sealed class DesktopSession : IDisposable
 
     public AutomationElement OpenSettings()
     {
-        Invoke(Find(OpenFlyout(), "Open settings", InvokePattern.Pattern));
+        Invoke(Find(OpenFlyout(), "Settings", InvokePattern.Pattern));
         AutomationElement? window = null;
         Until(() => (window = WindowOrNull("Chippi Settings")) is not null, "profile settings opened");
         return window!;
@@ -129,16 +129,6 @@ internal sealed class DesktopSession : IDisposable
     public static TogglePattern Toggle(AutomationElement element) => (TogglePattern)element.GetCurrentPattern(TogglePattern.Pattern);
     public static void Invoke(AutomationElement element) => ((InvokePattern)element.GetCurrentPattern(InvokePattern.Pattern)).Invoke();
     public static void Select(AutomationElement root, string name) => ((SelectionItemPattern)Find(root, name, SelectionItemPattern.Pattern).GetCurrentPattern(SelectionItemPattern.Pattern)).Select();
-    public static void OpenModule(AutomationElement settings)
-    {
-        Invoke(Find(settings, "Keep awake settings", InvokePattern.Pattern));
-        Find(settings, "Back to Features", InvokePattern.Pattern);
-    }
-    public static void ExpectHub(AutomationElement settings)
-    {
-        Find(settings, "Search features", ValuePattern.Pattern);
-        ExpectAbsent(settings, "Back to Features");
-    }
     public static void ExpectAbsent(AutomationElement root, string name) => Until(
         () => root.FindFirst(TreeScope.Descendants, Named(name)) is null, $"'{name}' removed");
 
@@ -147,7 +137,7 @@ internal sealed class DesktopSession : IDisposable
         // Send a real key only after verifying the foreground belongs to this profile's process.
         var handle = (nint)settings.Current.NativeWindowHandle;
         SetForegroundWindow(handle);
-        Find(settings, "Back to Features", InvokePattern.Pattern).SetFocus();
+        Find(settings, "Keep awake", SelectionItemPattern.Pattern).SetFocus();
         Until(() => GetForegroundWindow() == handle, "test settings foreground for Escape");
         const byte escape = 0x1B;
         keybd_event(escape, 0, 0, 0);

@@ -134,7 +134,7 @@ public sealed class TidyTests(ITestOutputHelper output)
         DesktopSession.Invoke(DesktopSession.Find(tidy, "Review invoice.pdf.exe", InvokePattern.Pattern));
         Close(Settings(app));
         tidy = OpenTidy(app);
-        Assert.DoesNotContain(tidy.FindAll(TreeScope.Descendants, Condition.TrueCondition).Cast<AutomationElement>(), e => e.Current.Name.StartsWith("TidyRow {", StringComparison.Ordinal));
+        Assert.DoesNotContain(tidy.FindAll(TreeScope.Descendants, Condition.TrueCondition).Cast<AutomationElement>(), e => e.Current.Name.Contains('{'));
         DesktopSession.Invoke(DesktopSession.Find(tidy, "Retry budget.bin", InvokePattern.Pattern));
         DesktopSession.Find(Settings(app), "Include budget.bin", TogglePattern.Pattern);
     }
@@ -156,6 +156,7 @@ public sealed class TidyTests(ITestOutputHelper output)
             history.EndRun(run);
         });
         var tidy = OpenTidy(app);
+        DesktopSession.Find(tidy, "Recent");
         DesktopSession.Find(tidy, "Undo old.pdf", InvokePattern.Pattern);
         DesktopSession.Invoke(DesktopSession.Find(tidy, "Rules", InvokePattern.Pattern));
         var settings = Settings(app);

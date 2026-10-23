@@ -251,15 +251,6 @@
                     </StackPanel>
                 </WrapPanel>
 
-                <!-- Interim control, until R6 deletes it -->
-                <TextBlock Style="{StaticResource Section}" Text="Interim: feature card" />
-                <StackPanel Orientation="Horizontal">
-                    <c:FeatureCard x:Name="KeepAwakeCard" Width="260" FeatureName="Keep awake" Description="Stops the PC from sleeping, for a while or until you say"
-                                   Icon="{x:Static c:LucideIcons.Coffee}" IsInstalled="True" Margin="0,0,8,0" />
-                    <c:FeatureCard Width="260" FeatureName="Clipboard history" Description="Keeps what you copied, searchable"
-                                   Icon="{x:Static c:LucideIcons.Clipboard}" IsComingSoon="True" />
-                </StackPanel>
-
                 <!-- Island -->
                 <TextBlock Style="{StaticResource Section}" Text="Island (theme-invariant)" />
                 <Border Background="{DynamicResource IslandBrush}" BorderBrush="{DynamicResource IslandBorderBrush}" BorderThickness="1"

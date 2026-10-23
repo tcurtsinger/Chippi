@@ -26,10 +26,12 @@ public sealed class DesktopTests(ITestOutputHelper output)
         using var app = new DesktopSession(output);
         var flyout = app.OpenFlyout();
         Assert.False(flyout.Current.IsOffscreen);
-        DesktopSession.Find(flyout, "Open settings", InvokePattern.Pattern);
+        DesktopSession.Find(flyout, "Settings", InvokePattern.Pattern);
         var quit = DesktopSession.Find(flyout, "Quit Chippi", InvokePattern.Pattern);
         Assert.False(app.Process.HasExited);
         Assert.Equal(0, app.LastActivationExitCode);
+        Assert.DoesNotContain(flyout.FindAll(TreeScope.Descendants, Condition.TrueCondition).Cast<AutomationElement>(),
+            e => e.Current.Name.Contains('{'));
         DesktopSession.Invoke(quit);
         Assert.True(app.Process.WaitForExit(15000), "Quit did not exit the profile process");
         Assert.Equal(0, app.Process.ExitCode);
@@ -40,6 +42,7 @@ public sealed class DesktopTests(ITestOutputHelper output)
     {
         using var app = new DesktopSession(output);
         var settings = app.OpenSettings();
+        DesktopSession.Select(settings, "General");
         var startup = DesktopSession.Find(settings, "Run at startup", TogglePattern.Pattern);
         Assert.Equal(ToggleState.Off, DesktopSession.Toggle(startup).Current.ToggleState);
         DesktopSession.Toggle(startup).Toggle();
@@ -62,54 +65,80 @@ public sealed class DesktopTests(ITestOutputHelper output)
     }
 
     [DesktopFact]
-    public void HubExposesCardBadgeComingSoonAndInvoke()
+    public void AddFeaturesExposesAvailableSwitchesAndComingLaterNames()
     {
         using var app = new DesktopSession(output);
         var settings = app.OpenSettings();
-        DesktopSession.Select(settings, "Features");
-        var audio = DesktopSession.Find(settings, "Audio routing");
-        Assert.Equal(ControlType.Group, audio.Current.ControlType);
-        Assert.False(string.IsNullOrWhiteSpace(audio.Current.HelpText));
-        DesktopSession.Find(audio, "From Hopper");
-        DesktopSession.Find(audio, "Coming soon");
-        var install = DesktopSession.Find(audio, "Install Audio routing");
-        Assert.False(install.Current.IsEnabled);
-        Assert.Contains("Coming soon", install.Current.HelpText);
-        var nodes = settings.FindAll(TreeScope.Descendants, Condition.TrueCondition);
-        Assert.DoesNotContain(nodes.Cast<AutomationElement>(), e => e.Current.Name.Contains("FeatureBadge {", StringComparison.Ordinal));
-        var keepAwake = DesktopSession.Find(settings, "Keep awake settings", InvokePattern.Pattern);
-        Assert.Equal(ControlType.Button, keepAwake.Current.ControlType);
-        DesktopSession.Invoke(keepAwake);
-        DesktopSession.Find(settings, "Back to Features", InvokePattern.Pattern);
+        DesktopSession.Select(settings, "Add features");
+        var search = DesktopSession.Find(settings, "Search features", ValuePattern.Pattern);
+        Assert.Equal(ToggleState.On, DesktopSession.Toggle(DesktopSession.Find(settings, "Keep awake", TogglePattern.Pattern)).Current.ToggleState);
+        Assert.Equal(ToggleState.On, DesktopSession.Toggle(DesktopSession.Find(settings, "Downloads organizer", TogglePattern.Pattern)).Current.ToggleState);
+        DesktopSession.Find(settings, "Overlaps PowerToys");
+        var later = DesktopSession.Find(settings, "Coming later", ExpandCollapsePattern.Pattern);
+        var expand = (ExpandCollapsePattern)later.GetCurrentPattern(ExpandCollapsePattern.Pattern);
+        Assert.Equal(ExpandCollapseState.Collapsed, expand.Current.ExpandCollapseState);
+        expand.Expand();
+        DesktopSession.Until(() => expand.Current.ExpandCollapseState == ExpandCollapseState.Expanded, "Coming later expanded");
+        DesktopSession.Find(settings, "Audio routing");
+        Assert.DoesNotContain(settings.FindAll(TreeScope.Descendants, Condition.TrueCondition).Cast<AutomationElement>(),
+            e => e.Current.Name.Contains("Audio routing", StringComparison.Ordinal) && e.TryGetCurrentPattern(TogglePattern.Pattern, out _));
+        Assert.DoesNotContain(settings.FindAll(TreeScope.Descendants, Condition.TrueCondition).Cast<AutomationElement>(),
+            e => e.Current.Name.Contains('{'));
+        ((ValuePattern)search.GetCurrentPattern(ValuePattern.Pattern)).SetValue("Audio routing");
+        DesktopSession.Find(settings, "Audio routing");
+        DesktopSession.ExpectAbsent(settings, "Overlaps PowerToys");
+        ((ValuePattern)search.GetCurrentPattern(ValuePattern.Pattern)).SetValue("");
+        DesktopSession.Find(settings, "Keep awake", TogglePattern.Pattern);
     }
 
     [DesktopFact]
-    public void BackEscapeSidebarAndCloseLeaveModulePage()
+    public void SidebarAndCloseReopenSettingsOnTheFirstFeature()
     {
         using var app = new DesktopSession(output);
         var settings = app.OpenSettings();
-        DesktopSession.Select(settings, "Features");
-        DesktopSession.OpenModule(settings);
-        DesktopSession.Invoke(DesktopSession.Find(settings, "Back to Features", InvokePattern.Pattern));
-        DesktopSession.ExpectHub(settings);
-
-        DesktopSession.OpenModule(settings);
-        app.PressEscape(settings);
-        DesktopSession.ExpectHub(settings);
-        Assert.False(settings.Current.IsOffscreen);
-
-        DesktopSession.OpenModule(settings);
+        AssertFirstFeature(settings);
         DesktopSession.Select(settings, "General");
         DesktopSession.Find(settings, "Run at startup", TogglePattern.Pattern);
+        DesktopSession.Select(settings, "Keep awake");
+        DesktopSession.Find(settings, "Keep awake", TogglePattern.Pattern);
         DesktopSession.ExpectAbsent(settings, "Back to Features");
-        DesktopSession.Select(settings, "Features");
-        DesktopSession.ExpectHub(settings);
-
-        DesktopSession.OpenModule(settings);
+        app.PressEscape(settings);
+        DesktopSession.Until(() => app.WindowOrNull("Chippi Settings") is null, "Escape closed Settings");
+        settings = app.OpenSettings();
+        AssertFirstFeature(settings);
+        DesktopSession.Select(settings, "Add features");
+        DesktopSession.Find(settings, "Search features", ValuePattern.Pattern);
         ((WindowPattern)settings.GetCurrentPattern(WindowPattern.Pattern)).Close();
         DesktopSession.Until(() => app.WindowOrNull("Chippi Settings") is null, "settings closed");
         settings = app.OpenSettings();
-        DesktopSession.Select(settings, "Features");
-        DesktopSession.ExpectHub(settings);
+        AssertFirstFeature(settings);
+    }
+
+    [DesktopFact]
+    public void FlyoutTabsKeepTheirSelectionAndSettingsOpensTheFirstFeature()
+    {
+        using var app = new DesktopSession(output);
+        var flyout = app.OpenFlyout();
+        var tabs = DesktopSession.Find(flyout, "Flyout sections");
+        DesktopSession.Select(tabs, "Keep awake");
+        DesktopSession.Find(flyout, "Keep awake", TogglePattern.Pattern);
+        DesktopSession.Select(tabs, "Tidy");
+        DesktopSession.Find(flyout, "No folders yet");
+        DesktopSession.Invoke(DesktopSession.Find(flyout, "Settings", InvokePattern.Pattern));
+        AutomationElement? settings = null;
+        DesktopSession.Until(() => (settings = app.WindowOrNull("Chippi Settings")) is not null, "settings opened");
+        AssertFirstFeature(settings!);
+        ((WindowPattern)settings!.GetCurrentPattern(WindowPattern.Pattern)).Close();
+        flyout = app.OpenFlyout();
+        var tidy = DesktopSession.Find(DesktopSession.Find(flyout, "Flyout sections"), "Tidy", SelectionItemPattern.Pattern);
+        Assert.True(((SelectionItemPattern)tidy.GetCurrentPattern(SelectionItemPattern.Pattern)).Current.IsSelected);
+        DesktopSession.Find(flyout, "No folders yet");
+    }
+
+    private static void AssertFirstFeature(AutomationElement settings)
+    {
+        var first = DesktopSession.Find(settings, "Keep awake", SelectionItemPattern.Pattern);
+        Assert.True(((SelectionItemPattern)first.GetCurrentPattern(SelectionItemPattern.Pattern)).Current.IsSelected);
+        DesktopSession.Find(settings, "Keep awake", TogglePattern.Pattern);
     }
 }
