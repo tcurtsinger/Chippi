@@ -12,7 +12,7 @@ using Microsoft.Win32;
 
 namespace Chippi.Features.Downloads.Views.Tidy;
 
-/// <summary>The flyout's Tidy contribution. Navigation is raised through the module's supplied request callbacks.</summary>
+/// <summary>The flyout's Tidy panel. Navigation is raised through the module's supplied request callbacks.</summary>
 public partial class TidyView : UserControl
 {
     private readonly DownloadsModule _module;
@@ -135,6 +135,13 @@ public partial class TidyView : UserControl
         if (_busy || _module.Engine is null || folder is null) return;
         Error.Visibility = Visibility.Collapsed;
         try { _request(new DownloadsRequest(DownloadsRequestKind.Organize, Folder: folder)); }
+        catch (Exception ex) { ShowError(ex.Message); }
+    }
+
+    private void OnHistory(object sender, RoutedEventArgs e)
+    {
+        if (_busy || _module.Engine is null) return;
+        try { _request(new DownloadsRequest(DownloadsRequestKind.Run)); }
         catch (Exception ex) { ShowError(ex.Message); }
     }
 

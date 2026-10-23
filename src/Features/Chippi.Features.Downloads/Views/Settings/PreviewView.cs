@@ -12,10 +12,11 @@ using Chippi.UI.Controls;
 namespace Chippi.Features.Downloads.Views.Settings;
 
 /// <summary>
-/// Preview and approve, inside Settings (DESIGN.md §5). Checkbox rows with size, rule and
-/// destination; held rows start unchecked with an amber border; files no rule matches show a
-/// disabled box. After applying: a check and undo per moved row, an amber line per failed one,
-/// then Preview again and Done. Approval never re-plans: a file that changed fails its row.
+/// Preview and approve, inside Settings (DESIGN.md §5), with its own back button. One card of
+/// checkbox rows with size, rule and destination; held rows start unchecked with a caution line;
+/// files no rule matches show a disabled box. After applying: a check and undo per moved row, a
+/// caution line per failed one, then Preview again and Done. Approval never re-plans: a file that
+/// changed fails its row.
 /// </summary>
 internal sealed class PreviewView : UserControl
 {
@@ -24,7 +25,8 @@ internal sealed class PreviewView : UserControl
     private readonly bool _canPreviewAgain;
     private readonly Action _close;
     private readonly TextBlock _subtitle = Ui.Text("", "CaptionTextStyle", "TextTertiaryBrush");
-    private readonly StackPanel _rows = new();
+    private readonly ContentControl _rows = new() { Focusable = false };
+    private readonly Grid _columns = Columns();
     private readonly Grid _footer = Ui.Columns("*", "Auto", "Auto");
     private readonly TextBlock _summary = Ui.Text("", "CaptionTextStyle", "TextSecondaryBrush");
     private readonly TextBlock _error = Ui.Warning("");
@@ -43,22 +45,26 @@ internal sealed class PreviewView : UserControl
         _canPreviewAgain = canPreviewAgain;
         _close = close;
 
-        // One back button: the shell's, above the page. Cancel and Done return to the organizer page.
-        var header = Ui.Stack(Ui.Text("Preview", "HeadlineTextStyle"), _subtitle);
+        // The shell has no back button, so Preview has its own; Cancel and Done also return.
+        var back = Ui.Icon(LucideIcons.ChevronLeft, "Back");
+        back.Click += (_, _) => Leave();
+        var header = Ui.Columns("Auto", "*");
+        header.Children.Add(back.Margin(-8, 0, 8, 0).At(0));
+        header.Children.Add(Ui.Stack(Ui.Text("Preview", "HeadlineTextStyle"), _subtitle).At(1));
+        header.Margin = new Thickness(0, 16, 0, 16);
 
-        _all.Click += (_, _) => SelectAll(_all.IsChecked == true);
-        var columns = Columns();
-        columns.Children.Add(_all.At(0));
-        columns.Children.Add(Ui.Eyebrow("File").At(1));
-        columns.Children.Add(Right(Ui.Eyebrow("Size")).At(2));
-        columns.Children.Add(Ui.Eyebrow("Rule").Margin(14, 0, 0, 0).At(3));
-        columns.Children.Add(Ui.Eyebrow("Destination").At(4));
-        columns.Margin = new Thickness(15, 18, 12, 8);
+        // Checked, Unchecked and Indeterminate, so a UI Automation toggle selects too.
+        _all.Checked += (_, _) => AllFlipped();
+        _all.Unchecked += (_, _) => AllFlipped();
+        _all.Indeterminate += (_, _) => AllFlipped();
+        _columns.Children.Add(_all.At(0));
+        _columns.Children.Add(Ui.Text("File", "CaptionTextStyle").At(1));
+        _columns.Children.Add(Right(Ui.Text("Size", "CaptionTextStyle")).At(2));
+        _columns.Children.Add(Ui.Text("Rule", "CaptionTextStyle").Margin(14, 0, 0, 0).At(3));
+        _columns.Children.Add(Ui.Text("Destination", "CaptionTextStyle").At(4));
 
-        var divider = new Border { Height = 1, Margin = new Thickness(0, 18, 0, 14) };
-        divider.SetResourceReference(Border.BackgroundProperty, "BorderSoftBrush");
         _error.Visibility = Visibility.Collapsed;
-        Content = Ui.Stack(header, columns, _rows, divider, _footer, _error.Margin(0, 8, 0, 0));
+        Content = Ui.Stack(header, _rows, _footer.Margin(0, 16, 0, 0), _error.Margin(0, 8, 0, 0));
         Loaded += async (_, _) =>
         {
             if (!_started)
@@ -74,15 +80,14 @@ internal sealed class PreviewView : UserControl
 
     private async Task LoadAsync()
     {
-        _rows.Children.Clear();
-        _rows.Children.Add(Ui.Text("Planning…", "CaptionTextStyle", "TextTertiaryBrush").Margin(15, 8, 0, 8));
+        _rows.Content = Ui.Card(Ui.Pad(Ui.Text("Planning…", "BodyTextStyle", "TextTertiaryBrush")));
         try
         {
             _preview = await _plan();
         }
         catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException)
         {
-            _rows.Children.Clear();
+            _rows.Content = null;
             ShowError(ex.Message);
             return;
         }
@@ -100,20 +105,22 @@ internal sealed class PreviewView : UserControl
     private void RenderPlan()
     {
         var preview = _preview!;
-        _rows.Children.Clear();
+        var card = NewCard();
         _checks.Clear();
         _all.Visibility = Visibility.Visible;
         if (preview.Items.Count == 0)
-            _rows.Children.Add(Ui.Text("Nothing to organize", "CaptionTextStyle", "TextTertiaryBrush").Margin(15, 8, 0, 8));
+            card.Children.Add(Ui.Pad(Ui.Text("Nothing to organize", "BodyTextStyle", "TextTertiaryBrush")));
         foreach (var item in preview.Items)
         {
             bool actionable = item.Kind is OperationKind.Move or OperationKind.Rename && item.Destination is not null;
             var check = Ui.Check($"Include {item.Name}", actionable && item.Selected);
             check.IsEnabled = actionable;
-            check.Click += (_, _) => Sync();
+            // Checked/Unchecked, so a UI Automation toggle counts too.
+            check.Checked += (_, _) => Sync();
+            check.Unchecked += (_, _) => Sync();
             if (actionable)
                 _checks[item.Id] = check;
-            _rows.Children.Add(Row(item, check, null).Margin(0, 0, 0, 6));
+            card.Children.Add(Row(item, check, null));
         }
         RenderPlanFooter();
         Sync();
@@ -144,6 +151,22 @@ internal sealed class PreviewView : UserControl
         if (_footer.Children.OfType<Button>().LastOrDefault() is { } approve)
             approve.IsEnabled = chosen.Count > 0;
         _syncing = false;
+    }
+
+    /// <summary>A fresh card for the rows, headed by the column row (which holds Select all).</summary>
+    private Card NewCard()
+    {
+        if (_columns.Parent is Border old)
+            old.Child = null;
+        var card = Ui.Card(Ui.Pad(_columns, 40));
+        _rows.Content = card;
+        return card;
+    }
+
+    private void AllFlipped()
+    {
+        if (!_syncing)
+            SelectAll(_all.IsChecked == true);
     }
 
     private void SelectAll(bool on)
@@ -184,12 +207,12 @@ internal sealed class PreviewView : UserControl
     {
         var preview = _preview!;
         _subtitle.Text = $"{Ui.FolderName(preview.Folder)} · applied {Ui.Time(DateTimeOffset.Now)}";
-        _rows.Children.Clear();
+        var card = NewCard();
         _all.Visibility = Visibility.Hidden;
         foreach (var outcome in result.Items)
         {
             var item = preview.Items.First(i => i.Id == outcome.ItemId);
-            _rows.Children.Add(Row(item with { Destination = outcome.Destination ?? item.Destination }, null, outcome).Margin(0, 0, 0, 6));
+            card.Children.Add(Row(item with { Destination = outcome.Destination ?? item.Destination }, null, outcome));
         }
         int held = preview.Items.Count(i => i.Kind == OperationKind.Hold || i.Warnings.Any(w => w.Kind == WarningKind.MisleadingName) && !result.Items.Any(r => r.ItemId == i.Id));
         RenderDone(held, result.Succeeded, result.Failed);
@@ -227,7 +250,6 @@ internal sealed class PreviewView : UserControl
     {
         var preview = _preview!;
         bool noMatch = item.Kind == OperationKind.NoMatch;
-        bool held = item.Kind == OperationKind.Hold || item.Warnings.Any(w => w.Kind == WarningKind.MisleadingName);
 
         UIElement lead;
         if (outcome is null)
@@ -245,7 +267,7 @@ internal sealed class PreviewView : UserControl
         else if (outcome is null && Note(item) is { } note)
             nameStack.Children.Add(WarningLine(note));
 
-        var size = Right(Ui.Mono(Ui.Size(item.Bytes), "TextTertiaryBrush"));
+        var size = Right(Ui.Number(Ui.Size(item.Bytes), "TextTertiaryBrush"));
         var rule = Ui.Text(noMatch ? "No match" : item.RuleName ?? (preview.Archive is not null && item.RuleId is null ? "Import" : "Held"), "BodyTextStyle", noMatch ? "TextTertiaryBrush" : null).Margin(14, 0, 8, 0);
 
         var destination = Ui.Row(Ui.Text(Destination(preview, item), "CaptionTextStyle", "TextSecondaryBrush"));
@@ -265,10 +287,7 @@ internal sealed class PreviewView : UserControl
             grid.Children.Add(undo.At(5));
         }
 
-        var row = Ui.Surface(grid, new Thickness(14, 9, 12, 9));
-        row.MinHeight = 48;
-        if (outcome is null && held)
-            row.SetResourceReference(Border.BorderBrushProperty, "WarningBorder45Brush");
+        var row = Ui.Pad(grid, 52);
         if (noMatch)
             row.Opacity = 0.75;
         return row;

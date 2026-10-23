@@ -10,9 +10,9 @@ using Chippi.UI.Controls;
 namespace Chippi.Features.Downloads.Views.Settings;
 
 /// <summary>
-/// The organizer's page in Settings: a Settings · Rules · History segment over the section, and
-/// Preview shown in place of the section with its own back button. The shell draws the title and
-/// the back-to-Features button. Sections are the deep-link targets (<see cref="DownloadsModule.SettingsLink"/>):
+/// The organizer's page in Settings: a Settings · Rules · History SelectorBar under the shell's title,
+/// and Preview shown in place of the section with its own back button. The shell draws the title.
+/// Sections are the deep-link targets (<see cref="DownloadsModule.SettingsLink"/>):
 /// <c>settings</c>, <c>rules</c>, <c>history[/runId[/undo]]</c>, <c>review</c>, <c>preview/&lt;folder&gt;</c>, <c>explorer/&lt;folder&gt;</c>.
 /// </summary>
 public sealed class DownloadsPage : UserControl
@@ -26,10 +26,7 @@ public sealed class DownloadsPage : UserControl
     public DownloadsPage(DownloadsModule module, string? section)
     {
         _module = module;
-        _segment = Ui.Segment("Section", false, "Settings", "Rules", "History");
-        _segment.Width = 270;
-        _segment.HorizontalAlignment = HorizontalAlignment.Right;
-        _segment.Margin = new Thickness(0, -56, 0, 14); // level with the shell's page title
+        _segment = Ui.SelectorBar("Section", "Settings", "Rules", "History");
         _segment.SelectionChanged += (_, _) =>
         {
             if (!_switching && _segment.SelectedIndex >= 0)

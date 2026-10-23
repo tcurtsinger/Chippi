@@ -12,7 +12,7 @@ using Chippi.UI.Controls;
 
 namespace Chippi.Features.Downloads.Views.Settings;
 
-/// <summary>Small builders for the organizer's Settings views, all on DESIGN.md tokens.</summary>
+/// <summary>Small builders for the organizer's Settings views, on Chippi.UI's cards and rows (DESIGN.md §5, §6).</summary>
 internal static class Ui
 {
     public static TextBlock Text(string text, string style = "BodyTextStyle", string? brush = null)
@@ -24,10 +24,40 @@ internal static class Ui
         return block;
     }
 
-    public static TextBlock Mono(string text, string brush = "TextSecondaryBrush") => Text(text, "NumberTextStyle", brush);
+    public static TextBlock Number(string text, string brush = "TextSecondaryBrush") => Text(text, "NumberTextStyle", brush);
 
-    /// <summary>A section header: "Watched folders".</summary>
-    public static TextBlock Eyebrow(string text) => Text(text, "HeadlineTextStyle");
+    /// <summary>
+    /// A section header ("Watched folders"), 24px above and 8px below, with an optional element on
+    /// the right (Add folder). The first section under the SelectorBar sits closer.
+    /// </summary>
+    public static FrameworkElement Section(string text, FrameworkElement? right = null, bool first = false)
+    {
+        var grid = Columns("*", "Auto").Margin(0, first ? 16 : 24, 0, 8);
+        grid.Children.Add(Text(text, "HeadlineTextStyle").At(0));
+        if (right is not null)
+        {
+            right.VerticalAlignment = VerticalAlignment.Bottom;
+            grid.Children.Add(right.At(1));
+        }
+        return grid;
+    }
+
+    /// <summary>A card of rows with dividers between them (DESIGN.md §6 "Card").</summary>
+    public static Card Card(params UIElement[] rows)
+    {
+        var card = new Card();
+        foreach (var row in rows)
+            card.Children.Add(row);
+        return card;
+    }
+
+    /// <summary>A Settings row: label over caption on the left, the control on the right.</summary>
+    public static SettingRow Setting(string header, string description, object control, Geometry? icon = null) =>
+        new() { Header = header, Description = description, Content = control, Icon = icon };
+
+    /// <summary>A free-form row inside a card, with the row padding (10 / 16) and at least 48px.</summary>
+    public static Border Pad(UIElement child, double minHeight = 48) =>
+        new() { Child = child, Padding = new Thickness(16, 10, 16, 10), MinHeight = minHeight };
 
     /// <summary>An amber line under a field or a name.</summary>
     public static TextBlock Warning(string text)
@@ -76,55 +106,43 @@ internal static class Ui
         return icon;
     }
 
-    /// <summary>A Surface row container, 12px radius.</summary>
-    public static Border Surface(UIElement child, Thickness? padding = null) => Box("SurfaceBrush", child, 12, padding ?? new Thickness(12, 9, 10, 9));
-
-    /// <summary>A Panel container, 14px radius (history runs, the test box).</summary>
-    public static Border Panel(UIElement child, Thickness? padding = null) => Box("PanelBrush", child, 14, padding ?? new Thickness(8));
-
-    private static Border Box(string background, UIElement child, double radius, Thickness padding)
-    {
-        var border = new Border { CornerRadius = new CornerRadius(radius), Padding = padding, Child = child, BorderThickness = new Thickness(1), BorderBrush = Brushes.Transparent };
-        border.SetResourceReference(Border.BackgroundProperty, background);
-        return border;
-    }
-
-    public static TextBox Field(string text = "", bool mono = false, string? name = null, double width = double.NaN)
+    public static TextBox Field(string text = "", bool code = false, string? name = null, double width = double.NaN)
     {
         var box = new TextBox { Text = text, Width = width, HorizontalAlignment = HorizontalAlignment.Left, VerticalContentAlignment = VerticalAlignment.Center };
         box.SetResourceReference(FrameworkElement.StyleProperty, "TextFieldStyle");
-        if (mono)
+        if (code)
             box.SetResourceReference(Control.FontFamilyProperty, "CodeFont");
         if (name is not null)
             AutomationProperties.SetName(box, name);
         return box;
     }
 
-    public static ComboBox Choice(IEnumerable<string> items, int selected, string name, double width = double.NaN, bool mono = false)
+    public static ComboBox Choice(IEnumerable<string> items, int selected, string name, double width = double.NaN, bool code = false)
     {
         var combo = new ComboBox { ItemsSource = items.ToList(), SelectedIndex = selected, Width = width, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center };
         combo.SetResourceReference(FrameworkElement.StyleProperty, "HopperComboBoxStyle");
-        if (mono)
+        if (code)
             combo.SetResourceReference(Control.FontFamilyProperty, "CodeFont");
         AutomationProperties.SetName(combo, name);
         return combo;
     }
 
-    /// <summary>A segmented control. Compact (folder modes, the rule action) uses 28px segments with 12px labels, like the flyout's.</summary>
-    public static SegmentedControl Segment(string name, bool compact, params string[] labels)
+    /// <summary>A segmented control at the Settings size: items sized to their labels.</summary>
+    public static SegmentedControl Segment(string name, params string[] labels)
     {
         var segment = new SegmentedControl { HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center };
-        if (compact && Application.Current?.TryFindResource("SegmentItemStyle") is Style item)
-        {
-            var style = new Style(typeof(ListBoxItem), item);
-            style.Setters.Add(new Setter(FrameworkElement.HeightProperty, 28.0));
-            style.Setters.Add(new Setter(Control.FontSizeProperty, 12.0));
-            segment.ItemContainerStyle = style;
-        }
         foreach (string label in labels)
             segment.Items.Add(new SegmentItem { Label = label });
         AutomationProperties.SetName(segment, name);
         return segment;
+    }
+
+    /// <summary>The SelectorBar under a page title: text tabs with the accent underline.</summary>
+    public static SegmentedControl SelectorBar(string name, params string[] labels)
+    {
+        var bar = Segment(name, labels);
+        bar.SetResourceReference(FrameworkElement.StyleProperty, "SelectorBarStyle");
+        return bar;
     }
 
     public static Badge Badge(string text, BadgeKind kind) => new() { Text = text, Kind = kind, VerticalAlignment = VerticalAlignment.Center };
@@ -193,7 +211,7 @@ internal static class Ui
         return panel;
     }
 
-    /// <summary>"1.2 MB", for the mono size column.</summary>
+    /// <summary>"1.2 MB", for the size column.</summary>
     public static string Size(long bytes) => bytes switch
     {
         < 1024 => $"{bytes} B",

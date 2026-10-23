@@ -13,7 +13,7 @@ public enum TidyRowAction { None, Review, Retry, Undo, RetryUndo }
 
 /// <summary>A recent row's immutable display state; no file operation is decided by a visual toggle.</summary>
 public sealed class TidyRow(string name, string detail, string folder, string source,
-    bool isHeld, bool isWaiting, bool isFailed, TidyRowAction action, long? operationId = null, string age = "")
+    bool isHeld, bool isWaiting, bool isFailed, TidyRowAction action, long? operationId = null)
 {
     // UI Automation peers track item identity, so refreshed rows must not compare equal to detached containers.
     public string Name { get; } = name;
@@ -25,7 +25,6 @@ public sealed class TidyRow(string name, string detail, string folder, string so
     public bool IsFailed { get; } = isFailed;
     public TidyRowAction Action { get; } = action;
     public long? OperationId { get; } = operationId;
-    public string Age { get; } = age;
 
     public override string ToString() => $"{Name}. {Detail}";
 
@@ -38,6 +37,13 @@ public sealed class TidyRow(string name, string detail, string folder, string so
     };
     public string AccessibleAction => $"{ActionLabel} {Name}";
     public bool HasAction => Action != TidyRowAction.None;
+
+    /// <summary>Held rows get a Review button; other actions are icon buttons.</summary>
+    public bool IsReview => Action == TidyRowAction.Review;
+    public bool HasIconAction => HasAction && !IsReview;
+
+    /// <summary>A caution triangle (held), a clock (waiting), the info glyph (failed) or a file.</summary>
+    public Geometry Lead => IsHeld ? LucideIcons.TriangleAlert : IsWaiting ? LucideIcons.Clock : IsFailed ? LucideIcons.Info : LucideIcons.File;
     public Geometry ActionIcon => Action switch
     {
         TidyRowAction.Review => LucideIcons.Eye,
@@ -55,6 +61,9 @@ public sealed class TidyRow(string name, string detail, string folder, string so
 
 internal static class TidyProjection
 {
+    /// <summary>The Recent card holds this many rows (DESIGN.md §5 Tidy panel).</summary>
+    public const int RecentRows = 4;
+
     public static string FolderName(string path) => Path.GetFileName(Path.TrimEndingDirectorySeparator(path)) is { Length: > 0 } name ? name : path;
 
     public static string ModeLine(WatchedFolder folder, int ready) => folder.Mode switch
@@ -64,24 +73,28 @@ internal static class TidyProjection
         _ => "Paused · not watching",
     };
 
+    /// <summary>Held rows first, then waiting, then the latest moves: "Documents · 23m", "Restored to Downloads".</summary>
     public static IReadOnlyList<TidyRow> Rows(IReadOnlyList<PendingFile> pending, IReadOnlyList<OperationRecord> history, DateTimeOffset now)
     {
-        var rows = pending.Where(p => p.Status is PendingStatus.Held or PendingStatus.Waiting).Select(p => new TidyRow(
-            p.Name, $"{(p.Status == PendingStatus.Held ? "Held" : "Waiting")} · {p.Reason ?? "Not ready"}",
-            p.Folder, p.Path, p.Status == PendingStatus.Held, p.Status == PendingStatus.Waiting, false,
-            p.Status == PendingStatus.Held ? TidyRowAction.Review : TidyRowAction.None));
+        var rows = pending.Where(p => p.Status is PendingStatus.Held or PendingStatus.Waiting)
+            .OrderBy(p => p.Status == PendingStatus.Held ? 0 : 1)
+            .Select(p => new TidyRow(
+                p.Name, $"{(p.Status == PendingStatus.Held ? "Held" : "Waiting")} · {p.Reason ?? "Not ready"}",
+                p.Folder, p.Path, p.Status == PendingStatus.Held, p.Status == PendingStatus.Waiting, false,
+                p.Status == PendingStatus.Held ? TidyRowAction.Review : TidyRowAction.None));
         var recent = history.Where(o => o.State is OperationState.Completed or OperationState.Failed or OperationState.Undone)
             .Where(o => o.Kind != HistoryOperationKind.Restore || o.State == OperationState.Failed)
             .Where(o => !pending.Any(p => string.Equals(p.Path, o.SourcePath, StringComparison.OrdinalIgnoreCase)))
             .Select(o => new TidyRow(
                 Path.GetFileName(o.State == OperationState.Failed ? o.SourcePath : o.DestinationPath),
                 o.State == OperationState.Failed ? $"Failed · {o.Error ?? "Try again"}" :
-                    o.State == OperationState.Undone ? "Restored" : Path.GetDirectoryName(o.DestinationPath) ?? "",
+                    o.State == OperationState.Undone ? $"Restored to {FolderName(Path.GetDirectoryName(o.SourcePath) ?? "")}" :
+                    $"{FolderName(Path.GetDirectoryName(o.DestinationPath) ?? "")} · {Age(now - (o.CompletedAt ?? o.PlannedAt))}",
                 Path.GetDirectoryName(o.SourcePath) ?? "", o.SourcePath, false, false, o.State == OperationState.Failed,
                 o.State == OperationState.Failed ? o.Kind == HistoryOperationKind.Restore ? TidyRowAction.RetryUndo : TidyRowAction.Retry :
                     o.State == OperationState.Completed && o.Kind is HistoryOperationKind.Move or HistoryOperationKind.Rename ? TidyRowAction.Undo : TidyRowAction.None,
-                o.Kind == HistoryOperationKind.Restore ? o.UndoOf : o.Id, Age(now - (o.CompletedAt ?? o.PlannedAt))));
-        return [.. rows.Concat(recent).Take(12)];
+                o.Kind == HistoryOperationKind.Restore ? o.UndoOf : o.Id));
+        return [.. rows.Concat(recent).Take(RecentRows)];
     }
 
     private static string Age(TimeSpan age) => age.TotalMinutes < 1 ? "now" : age.TotalHours < 1 ? $"{(int)age.TotalMinutes}m" :
