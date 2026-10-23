@@ -54,6 +54,14 @@ Sizes are rough, for one builder: **S** is up to about 2 hours, **M** about half
 2. Check `Typography.NumeralAlignment="Tabular"` changes the digits in the chosen family.
 3. Read `UISettings.GetColorValue(AccentLight2 / AccentDark1)` from `Chippi.App`, change the accent in Windows Settings, and confirm `ColorValuesChanged` fires.
 
+**Results (2026-10-23, Windows 11 26300, .NET 10.0.402).** The spike is in `X:\code\chippi-scratch\phase-2.5\r0-spike` (not in the repo).
+- **Weights: pass. Use Segoe UI Variable.** WPF lists the variable font's named instances (300, 350, 400, 600, 700) for "Segoe UI Variable Text" and "Display". Asking for 600 resolves the real "Text Semibold" face in `SEGUIVAR.TTF` with no bold simulation. Measured ink at 600 is 129% of 400, against 127% for static Segoe UI's real Semibold. The Manrope problem doesn't apply, and the static Segoe UI fallback isn't needed.
+- **Tabular figures: needed, and they work.** Segoe UI Variable's default digits are proportional (ten 1s are 53 px wide, ten 0s 75 px, at 14px). `Typography.NumeralAlignment="Tabular"` makes them equal, so R1 must set it on the number style. Static Segoe UI is tabular by default.
+- **Reading the accent: pass.** `UISettings` works in an unpackaged .NET 10 app and matches the registry's `AccentPalette`. Note: Travis's own Windows accent is a gray (`#4C4A48`), so Follow Windows gives him gray shades (dark `#A6A5A1`, light `#413F3D`). They pass contrast but read as quiet; one of the named accents may suit him better.
+- **Live accent changes: pass.** With the listener on a WPF dispatcher, Travis changed the accent 4 times. `ColorValuesChanged` fired once per change, within the same second, with the new shades. It fires on a thread-pool thread (threads 3 and 6, never the UI thread), so R1 must marshal it to the dispatcher. `SystemEvents.UserPreferenceChanged` (General) also fires, but 4–6 times per change, so it isn't the signal to use. If it's ever needed as a fallback, debounce it.
+
+**Decision:** R1 uses Segoe UI Variable (Text and Display) with tabular figures on numbers, reads the accent through `UISettings`, and dispatches `ColorValuesChanged` to the UI thread. No changes to DESIGN.md.
+
 ### R1 · Foundation (L), after R0
 - **Tokens:** rewrite `Dark.xaml`, `Light.xaml` and `Palette.xaml` to DESIGN.md's front matter.
   - Keep the existing key names where the meaning holds, so call sites don't move: WindowBackground, Surface → card, Panel → flyout card, Input, ButtonBackground/Hover → control, Border*, Text*, Success, Warning → caution, Danger → critical.
