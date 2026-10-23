@@ -523,15 +523,15 @@ public class Gumdrop : UserControl
         private static Geometry? _zs;
 
         /// <summary>
-        /// The sleepy z's: "z" in 20px Manrope 800 at (94, 30) and in 13px at (106, 15), the points
-        /// read as SVG text origins (left edge, baseline). Built from the bundled font as outlines.
+        /// The sleepy z's: "z" in 20px Segoe UI Variable Display Bold at (94, 30) and in 13px at (106, 15), the points
+        /// read as SVG text origins (left edge, baseline). Built from the font as outlines.
         /// </summary>
         public static Geometry Zs()
         {
             if (_zs is not null)
                 return _zs;
-            var family = Application.Current?.TryFindResource("UiFont") as FontFamily ?? new FontFamily("Segoe UI");
-            var typeface = new Typeface(family, FontStyles.Normal, FontWeights.ExtraBold, FontStretches.Normal);
+            var family = Application.Current?.TryFindResource("DisplayFont") as FontFamily ?? new FontFamily("Segoe UI");
+            var typeface = new Typeface(family, FontStyles.Normal, FontWeights.Bold, FontStretches.Normal);
             var group = new GeometryGroup();
             foreach (var (size, x, y) in new[] { (20.0, 94.0, 30.0), (13.0, 106.0, 15.0) })
             {

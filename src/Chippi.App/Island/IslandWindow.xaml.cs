@@ -516,11 +516,11 @@ public partial class IslandWindow : Window
     {
         var current = _activities.Count > 0 ? _activities[0] : null;
 
-        // Live pill: title in Body 700, then the tertiary source (mono where it is a number).
+        // Live pill: the title, then the tertiary source.
         LiveText.Inlines.Clear();
         if (current is not null)
         {
-            LiveText.Inlines.Add(new Run(current.Title) { FontWeight = FontWeights.Bold });
+            LiveText.Inlines.Add(new Run(current.Title));
             if (!string.IsNullOrWhiteSpace(current.Source))
             {
                 LiveText.Inlines.Add(new Run(" · ") { Foreground = (Brush)FindResource("IslandTextTertiaryBrush") });
@@ -591,18 +591,7 @@ public partial class IslandWindow : Window
 
     private static bool IsMeasurement(string text) => text.Any(char.IsDigit);
 
-    /// <summary>The Readout Rule: a source that carries a number (a countdown, a time) is set in mono.</summary>
-    private Run SourceRun(string source)
-    {
-        var run = new Run(source) { Foreground = (Brush)FindResource("IslandTextTertiaryBrush") };
-        if (IsMeasurement(source))
-        {
-            run.FontFamily = (FontFamily)FindResource("MonoFont");
-            run.FontWeight = (FontWeight)FindResource("MonoSemiBold");
-            run.FontSize = 11.5;
-        }
-        return run;
-    }
+    private Run SourceRun(string source) => new(source) { Foreground = (Brush)FindResource("IslandTextTertiaryBrush") };
 
     private Border StatusRow(IslandActivity status)
     {
@@ -613,7 +602,6 @@ public partial class IslandWindow : Window
         {
             Text = status.Title,
             Style = (Style)FindResource("BodyTextStyle"),
-            FontWeight = FontWeights.SemiBold,
             Foreground = (Brush)FindResource("IslandTextBrush"),
             TextTrimming = TextTrimming.CharacterEllipsis,
             VerticalAlignment = VerticalAlignment.Center,
@@ -621,7 +609,7 @@ public partial class IslandWindow : Window
         var value = new TextBlock
         {
             Text = status.Source,
-            Style = (Style)FindResource(IsMeasurement(status.Source) ? "MonoTextStyle" : "CaptionTextStyle"),
+            Style = (Style)FindResource(IsMeasurement(status.Source) ? "NumberTextStyle" : "CaptionTextStyle"),
             Foreground = (Brush)FindResource("IslandTextTertiaryBrush"),
             Margin = new Thickness(10, 0, 0, 0),
             VerticalAlignment = VerticalAlignment.Center,

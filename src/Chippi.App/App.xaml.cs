@@ -100,6 +100,7 @@ public partial class App : Application
 
         var app = Config.GetSection<AppSettings>(AppSettings.SectionName);
         ThemeManager.Apply(app.Theme);
+        new AccentSource(Config, Dispatcher).Apply();
         Motion.Override = app.ReduceMotion;
 
 #if DEBUG

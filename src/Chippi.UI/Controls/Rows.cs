@@ -1,249 +1,207 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
-using System.Collections;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
-using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Shapes;
 
 namespace Chippi.UI.Controls;
 
 /// <summary>
-/// App volume row (DESIGN.md §6): monogram or icon, name over output device, mono value and a mute
-/// button spanning both rows, then the gradient slider. Visual only in Phase 1.
+/// A card (DESIGN.md §6): one rounded panel per section, its rows stacked inside with a 1px divider
+/// between visible rows, and the rows clipped to the corners. Never put a card inside a card. The
+/// default style is a Settings card; <c>FlyoutCardStyle</c> is the flyout's, and <c>CardRowsStyle</c>
+/// draws only the dividers (an expander's sub-rows).
 /// </summary>
-public class AppVolumeRow : Control
+public class Card : Panel
 {
-    static AppVolumeRow()
+    private readonly List<double> _dividers = [];
+
+    public static readonly DependencyProperty BorderBrushProperty = DependencyProperty.Register(
+        nameof(BorderBrush), typeof(Brush), typeof(Card), new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender));
+
+    public Brush? BorderBrush
     {
-        DefaultStyleKeyProperty.OverrideMetadata(typeof(AppVolumeRow), new FrameworkPropertyMetadata(typeof(AppVolumeRow)));
-        FocusableProperty.OverrideMetadata(typeof(AppVolumeRow), new FrameworkPropertyMetadata(false));
+        get => (Brush?)GetValue(BorderBrushProperty);
+        set => SetValue(BorderBrushProperty, value);
     }
 
-    public static readonly DependencyProperty AppNameProperty = DependencyProperty.Register(
-        nameof(AppName), typeof(string), typeof(AppVolumeRow), new PropertyMetadata("", (d, _) => ((AppVolumeRow)d).CoerceValue(MonogramProperty)));
+    public static readonly DependencyProperty DividerBrushProperty = DependencyProperty.Register(
+        nameof(DividerBrush), typeof(Brush), typeof(Card), new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender));
 
-    public string AppName
+    public Brush? DividerBrush
     {
-        get => (string)GetValue(AppNameProperty);
-        set => SetValue(AppNameProperty, value);
+        get => (Brush?)GetValue(DividerBrushProperty);
+        set => SetValue(DividerBrushProperty, value);
     }
 
-    public static readonly DependencyProperty DeviceNameProperty = DependencyProperty.Register(
-        nameof(DeviceName), typeof(string), typeof(AppVolumeRow), new PropertyMetadata(""));
+    public static readonly DependencyProperty CornerRadiusProperty = DependencyProperty.Register(
+        nameof(CornerRadius), typeof(double), typeof(Card), new FrameworkPropertyMetadata(8.0, FrameworkPropertyMetadataOptions.AffectsArrange | FrameworkPropertyMetadataOptions.AffectsRender));
 
-    public string DeviceName
+    public double CornerRadius
     {
-        get => (string)GetValue(DeviceNameProperty);
-        set => SetValue(DeviceNameProperty, value);
+        get => (double)GetValue(CornerRadiusProperty);
+        set => SetValue(CornerRadiusProperty, value);
     }
 
-    public static readonly DependencyProperty VolumeProperty = DependencyProperty.Register(
-        nameof(Volume), typeof(double), typeof(AppVolumeRow),
-        new FrameworkPropertyMetadata(100.0, FrameworkPropertyMetadataOptions.BindsTwoWayByDefault));
+    private double Stroke => BorderBrush is null ? 0 : 1;
 
-    /// <summary>0 to 100.</summary>
-    public double Volume
+    protected override Size MeasureOverride(Size availableSize)
     {
-        get => (double)GetValue(VolumeProperty);
-        set => SetValue(VolumeProperty, value);
+        double inset = 2 * Stroke;
+        var inner = new Size(Math.Max(0, availableSize.Width - inset), double.PositiveInfinity);
+        double width = 0, height = 0;
+        bool first = true;
+        foreach (UIElement child in InternalChildren)
+        {
+            child.Measure(inner);
+            if (child.Visibility == Visibility.Collapsed)
+                continue;
+            height += child.DesiredSize.Height + (first ? 0 : 1);
+            width = Math.Max(width, child.DesiredSize.Width);
+            first = false;
+        }
+        return new Size(width + inset, height + inset);
     }
 
-    public static readonly DependencyProperty IsMutedProperty = DependencyProperty.Register(
-        nameof(IsMuted), typeof(bool), typeof(AppVolumeRow),
-        new FrameworkPropertyMetadata(false, FrameworkPropertyMetadataOptions.BindsTwoWayByDefault));
-
-    public bool IsMuted
+    protected override Size ArrangeOverride(Size finalSize)
     {
-        get => (bool)GetValue(IsMutedProperty);
-        set => SetValue(IsMutedProperty, value);
+        double stroke = Stroke, y = stroke, width = Math.Max(0, finalSize.Width - 2 * stroke);
+        _dividers.Clear();
+        bool first = true;
+        foreach (UIElement child in InternalChildren)
+        {
+            if (child.Visibility == Visibility.Collapsed)
+                continue;
+            if (!first)
+            {
+                _dividers.Add(y);
+                y += 1;
+            }
+            child.Arrange(new Rect(stroke, y, width, child.DesiredSize.Height));
+            y += child.DesiredSize.Height;
+            first = false;
+        }
+        Clip = new RectangleGeometry(new Rect(finalSize), CornerRadius, CornerRadius);
+        return finalSize;
     }
 
-    public static readonly DependencyProperty AppIconProperty = DependencyProperty.Register(
-        nameof(AppIcon), typeof(ImageSource), typeof(AppVolumeRow), new PropertyMetadata(null));
-
-    /// <summary>The app's real icon. Without one the row shows a monogram (logos are never redrawn).</summary>
-    public ImageSource? AppIcon
+    protected override void OnRender(DrawingContext dc)
     {
-        get => (ImageSource?)GetValue(AppIconProperty);
-        set => SetValue(AppIconProperty, value);
-    }
-
-    public static readonly DependencyProperty MonogramProperty = DependencyProperty.Register(
-        nameof(Monogram), typeof(string), typeof(AppVolumeRow),
-        new PropertyMetadata(null, null, (d, value) => value is string s && s.Length > 0 ? s : FirstLetter(((AppVolumeRow)d).AppName)));
-
-    public string Monogram
-    {
-        get => (string)GetValue(MonogramProperty);
-        set => SetValue(MonogramProperty, value);
-    }
-
-    private static string FirstLetter(string? name) =>
-        string.IsNullOrWhiteSpace(name) ? "?" : name.Trim()[..1].ToUpperInvariant();
-}
-
-/// <summary>
-/// Stash row (DESIGN.md §6): file name over destination, mono age, undo. A held file gets an amber
-/// 45% border and shows its reason in Signal Amber instead of a destination; it has no undo.
-/// </summary>
-public class StashRow : Control
-{
-    static StashRow()
-    {
-        DefaultStyleKeyProperty.OverrideMetadata(typeof(StashRow), new FrameworkPropertyMetadata(typeof(StashRow)));
-        FocusableProperty.OverrideMetadata(typeof(StashRow), new FrameworkPropertyMetadata(false));
-    }
-
-    public static readonly DependencyProperty FileNameProperty = DependencyProperty.Register(
-        nameof(FileName), typeof(string), typeof(StashRow), new PropertyMetadata(""));
-
-    public string FileName
-    {
-        get => (string)GetValue(FileNameProperty);
-        set => SetValue(FileNameProperty, value);
-    }
-
-    public static readonly DependencyProperty DestinationProperty = DependencyProperty.Register(
-        nameof(Destination), typeof(string), typeof(StashRow), new PropertyMetadata(""));
-
-    public string Destination
-    {
-        get => (string)GetValue(DestinationProperty);
-        set => SetValue(DestinationProperty, value);
-    }
-
-    public static readonly DependencyProperty AgeProperty = DependencyProperty.Register(
-        nameof(Age), typeof(string), typeof(StashRow), new PropertyMetadata(""));
-
-    /// <summary>Preformatted, e.g. "2m".</summary>
-    public string Age
-    {
-        get => (string)GetValue(AgeProperty);
-        set => SetValue(AgeProperty, value);
-    }
-
-    public static readonly DependencyProperty IsHeldProperty = DependencyProperty.Register(
-        nameof(IsHeld), typeof(bool), typeof(StashRow), new PropertyMetadata(false));
-
-    public bool IsHeld
-    {
-        get => (bool)GetValue(IsHeldProperty);
-        set => SetValue(IsHeldProperty, value);
-    }
-
-    public static readonly DependencyProperty HeldReasonProperty = DependencyProperty.Register(
-        nameof(HeldReason), typeof(string), typeof(StashRow), new PropertyMetadata(""));
-
-    /// <summary>State first, detail second: "Held · remote-access installer".</summary>
-    public string HeldReason
-    {
-        get => (string)GetValue(HeldReasonProperty);
-        set => SetValue(HeldReasonProperty, value);
-    }
-
-    public static readonly DependencyProperty UndoCommandProperty = DependencyProperty.Register(
-        nameof(UndoCommand), typeof(ICommand), typeof(StashRow), new PropertyMetadata(null));
-
-    public ICommand? UndoCommand
-    {
-        get => (ICommand?)GetValue(UndoCommandProperty);
-        set => SetValue(UndoCommandProperty, value);
+        double stroke = Stroke;
+        var bounds = new Rect(RenderSize);
+        if (Background is not null || BorderBrush is not null)
+        {
+            var edge = new Rect(stroke / 2, stroke / 2, Math.Max(0, bounds.Width - stroke), Math.Max(0, bounds.Height - stroke));
+            dc.DrawRoundedRectangle(Background, BorderBrush is null ? null : new Pen(BorderBrush, stroke), edge, CornerRadius, CornerRadius);
+        }
+        if (DividerBrush is not null)
+            foreach (double y in _dividers)
+                dc.DrawRectangle(DividerBrush, null, new Rect(stroke, y, Math.Max(0, bounds.Width - 2 * stroke), 1));
     }
 }
 
 /// <summary>
-/// Stat tile (DESIGN.md §6): Label eyebrow, mono readout with a mono caption, and a 2px azure
-/// sparkline 30px tall drawn from <see cref="Samples"/> (any numbers; scaled to their own range).
+/// A Settings row (DESIGN.md §5): an optional 20px lead glyph, the label over an optional caption,
+/// and the control (the content) on the right. At least 60px with a caption, 48px without. The
+/// control is named for the row and described by the caption unless it has a name of its own.
 /// </summary>
-[TemplatePart(Name = SparklinePart, Type = typeof(Polyline))]
-[TemplatePart(Name = SparklineHostPart, Type = typeof(FrameworkElement))]
-public class StatTile : Control
+public class SettingRow : ContentControl
 {
-    private const string SparklinePart = "PART_Sparkline";
-    private const string SparklineHostPart = "PART_SparklineHost";
-    private Polyline? _sparkline;
-    private FrameworkElement? _host;
-
-    static StatTile()
+    static SettingRow()
     {
-        DefaultStyleKeyProperty.OverrideMetadata(typeof(StatTile), new FrameworkPropertyMetadata(typeof(StatTile)));
-        FocusableProperty.OverrideMetadata(typeof(StatTile), new FrameworkPropertyMetadata(false));
+        DefaultStyleKeyProperty.OverrideMetadata(typeof(SettingRow), new FrameworkPropertyMetadata(typeof(SettingRow)));
+        FocusableProperty.OverrideMetadata(typeof(SettingRow), new FrameworkPropertyMetadata(false));
     }
 
-    public static readonly DependencyProperty LabelProperty = DependencyProperty.Register(
-        nameof(Label), typeof(string), typeof(StatTile), new PropertyMetadata(""));
+    public static readonly DependencyProperty HeaderProperty = DependencyProperty.Register(
+        nameof(Header), typeof(string), typeof(SettingRow), new PropertyMetadata("", (d, _) => ((SettingRow)d).NameContent()));
 
-    public string Label
+    public string Header
     {
-        get => (string)GetValue(LabelProperty);
-        set => SetValue(LabelProperty, value);
+        get => (string)GetValue(HeaderProperty);
+        set => SetValue(HeaderProperty, value);
+    }
+
+    public static readonly DependencyProperty DescriptionProperty = DependencyProperty.Register(
+        nameof(Description), typeof(string), typeof(SettingRow), new PropertyMetadata("", (d, _) => ((SettingRow)d).NameContent()));
+
+    /// <summary>One short line under the label.</summary>
+    public string Description
+    {
+        get => (string)GetValue(DescriptionProperty);
+        set => SetValue(DescriptionProperty, value);
+    }
+
+    public static readonly DependencyProperty IconProperty = DependencyProperty.Register(
+        nameof(Icon), typeof(Geometry), typeof(SettingRow), new PropertyMetadata(null));
+
+    /// <summary>The lead glyph, drawn in <c>Foreground</c> (Text by default; set the accent for a feature that is on).</summary>
+    public Geometry? Icon
+    {
+        get => (Geometry?)GetValue(IconProperty);
+        set => SetValue(IconProperty, value);
+    }
+
+    private readonly HashSet<DependencyObject> _named = [];
+
+    protected override void OnContentChanged(object oldContent, object newContent)
+    {
+        base.OnContentChanged(oldContent, newContent);
+        NameContent();
+    }
+
+    private void NameContent()
+    {
+        if (Content is not DependencyObject control)
+            return;
+        // Name a control only if it has no name of its own, or still has the one this row gave it.
+        if (_named.Contains(control) || string.IsNullOrEmpty(AutomationProperties.GetName(control)))
+        {
+            AutomationProperties.SetName(control, Header);
+            AutomationProperties.SetHelpText(control, Description);
+            _named.Add(control);
+        }
+    }
+}
+
+/// <summary>
+/// An expander row (DESIGN.md §6): a row that is a button, with the label over a caption, an
+/// optional value and a chevron down (closed) or up (open). Its content, usually a
+/// <see cref="Card"/> in <c>CardRowsStyle</c> holding <see cref="SettingRow"/>s, opens in the same
+/// card under a divider, with the sub-rows indented 50px.
+/// </summary>
+public class ExpanderRow : Expander
+{
+    static ExpanderRow() =>
+        DefaultStyleKeyProperty.OverrideMetadata(typeof(ExpanderRow), new FrameworkPropertyMetadata(typeof(ExpanderRow)));
+
+    public static readonly DependencyProperty DescriptionProperty = DependencyProperty.Register(
+        nameof(Description), typeof(string), typeof(ExpanderRow), new PropertyMetadata(""));
+
+    public string Description
+    {
+        get => (string)GetValue(DescriptionProperty);
+        set => SetValue(DescriptionProperty, value);
+    }
+
+    public static readonly DependencyProperty IconProperty = DependencyProperty.Register(
+        nameof(Icon), typeof(Geometry), typeof(ExpanderRow), new PropertyMetadata(null));
+
+    public Geometry? Icon
+    {
+        get => (Geometry?)GetValue(IconProperty);
+        set => SetValue(IconProperty, value);
     }
 
     public static readonly DependencyProperty ValueProperty = DependencyProperty.Register(
-        nameof(Value), typeof(string), typeof(StatTile), new PropertyMetadata(""));
+        nameof(Value), typeof(object), typeof(ExpanderRow), new PropertyMetadata(null));
 
-    /// <summary>Preformatted readout, e.g. "23%".</summary>
-    public string Value
+    /// <summary>Shown left of the chevron: a summary string ("Silent") or a control.</summary>
+    public object? Value
     {
-        get => (string)GetValue(ValueProperty);
+        get => GetValue(ValueProperty);
         set => SetValue(ValueProperty, value);
-    }
-
-    public static readonly DependencyProperty CaptionProperty = DependencyProperty.Register(
-        nameof(Caption), typeof(string), typeof(StatTile), new PropertyMetadata(""));
-
-    public string Caption
-    {
-        get => (string)GetValue(CaptionProperty);
-        set => SetValue(CaptionProperty, value);
-    }
-
-    public static readonly DependencyProperty SamplesProperty = DependencyProperty.Register(
-        nameof(Samples), typeof(IEnumerable), typeof(StatTile), new PropertyMetadata(null, (d, _) => ((StatTile)d).UpdateSparkline()));
-
-    public IEnumerable? Samples
-    {
-        get => (IEnumerable?)GetValue(SamplesProperty);
-        set => SetValue(SamplesProperty, value);
-    }
-
-    public override void OnApplyTemplate()
-    {
-        if (_host is not null)
-            _host.SizeChanged -= OnSparklineSizeChanged;
-        base.OnApplyTemplate();
-        _sparkline = GetTemplateChild(SparklinePart) as Polyline;
-        _host = GetTemplateChild(SparklineHostPart) as FrameworkElement;
-        if (_host is not null)
-            _host.SizeChanged += OnSparklineSizeChanged;
-        UpdateSparkline();
-    }
-
-    private void OnSparklineSizeChanged(object sender, SizeChangedEventArgs e) => UpdateSparkline();
-
-    private void UpdateSparkline()
-    {
-        if (_sparkline is null || _host is null)
-            return;
-        var values = Samples?.Cast<object>().Select(v => Convert.ToDouble(v, System.Globalization.CultureInfo.InvariantCulture)).ToList() ?? [];
-        double width = _host.ActualWidth, height = _host.ActualHeight;
-        var points = new PointCollection();
-        if (values.Count >= 2 && width > 0 && height > 0)
-        {
-            double min = values.Min(), max = values.Max();
-            double range = max - min < 1e-9 ? 1 : max - min;
-            const double inset = 1; // keep the 2px stroke inside the box
-            for (int i = 0; i < values.Count; i++)
-            {
-                double x = i * width / (values.Count - 1);
-                double y = inset + (height - 2 * inset) * (1 - (values[i] - min) / range);
-                points.Add(new Point(x, y));
-            }
-        }
-        points.Freeze();
-        _sparkline.Points = points;
     }
 }

@@ -4,13 +4,12 @@
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
-using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 
 namespace Chippi.UI.Controls;
 
 /// <summary>
-/// Icon-only button: 30-32px square, 7px radius, transparent until hover (DESIGN.md §6).
+/// Icon-only button: 32px square, 4px radius, transparent until hover (DESIGN.md §6).
 /// Narrator needs a name, so set <c>AutomationProperties.Name</c>; when it is missing the
 /// tooltip text is used, and a debug build logs the omission.
 /// </summary>
@@ -30,45 +29,6 @@ public class IconButton : Button
 
     public static readonly DependencyProperty IconSizeProperty = DependencyProperty.Register(
         nameof(IconSize), typeof(double), typeof(IconButton), new PropertyMetadata(16.0));
-
-    public double IconSize
-    {
-        get => (double)GetValue(IconSizeProperty);
-        set => SetValue(IconSizeProperty, value);
-    }
-
-    protected override void OnInitialized(EventArgs e)
-    {
-        base.OnInitialized(e);
-        Loaded += (_, _) => AccessibleName.Ensure(this);
-    }
-}
-
-/// <summary>An icon button that toggles (mute, pin). Same look; checked shows the primary ink.</summary>
-public class IconToggleButton : ToggleButton
-{
-    static IconToggleButton() =>
-        DefaultStyleKeyProperty.OverrideMetadata(typeof(IconToggleButton), new FrameworkPropertyMetadata(typeof(IconToggleButton)));
-
-    public static readonly DependencyProperty IconProperty = IconButton.IconProperty.AddOwner(typeof(IconToggleButton));
-
-    public Geometry? Icon
-    {
-        get => (Geometry?)GetValue(IconProperty);
-        set => SetValue(IconProperty, value);
-    }
-
-    public static readonly DependencyProperty CheckedIconProperty = DependencyProperty.Register(
-        nameof(CheckedIcon), typeof(Geometry), typeof(IconToggleButton), new PropertyMetadata(null));
-
-    /// <summary>Icon while checked; falls back to <see cref="Icon"/>.</summary>
-    public Geometry? CheckedIcon
-    {
-        get => (Geometry?)GetValue(CheckedIconProperty);
-        set => SetValue(CheckedIconProperty, value);
-    }
-
-    public static readonly DependencyProperty IconSizeProperty = IconButton.IconSizeProperty.AddOwner(typeof(IconToggleButton));
 
     public double IconSize
     {

@@ -3,7 +3,6 @@
 
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Threading;
@@ -198,20 +197,13 @@ public partial class FlyoutWindow : Window
 
     private void UpdateStatusLine(int on)
     {
-        // State first (DESIGN.md §3 copy rules); the count is a measurement, so it is mono.
-        StatusLine.Inlines.Clear();
-        if (on == 0)
+        // State first (DESIGN.md §3 copy rules). The window's tabular figures cover the count.
+        StatusLine.Text = on switch
         {
-            StatusLine.Inlines.Add(new Run("No features on"));
-            return;
-        }
-        var count = new Run(on.ToString(System.Globalization.CultureInfo.CurrentCulture))
-        {
-            FontWeight = (FontWeight)FindResource("MonoSemiBold"),
+            0 => "No features on",
+            1 => "1 feature on",
+            _ => on.ToString(System.Globalization.CultureInfo.CurrentCulture) + " features on",
         };
-        count.SetResourceReference(TextElement.FontFamilyProperty, "MonoFont");
-        StatusLine.Inlines.Add(count);
-        StatusLine.Inlines.Add(new Run(on == 1 ? " feature on" : " features on"));
     }
 
     private void OnTabChanged(object sender, SelectionChangedEventArgs e)

@@ -61,7 +61,11 @@ public sealed class ConfigStoreTests : IDisposable
         var store = new ConfigStore(_dir.File("nope.json"));
         store.Load();
 
-        Assert.Equal(ThemePreference.Dark, store.GetSection<AppSettings>(AppSettings.SectionName).Theme);
+        var app = store.GetSection<AppSettings>(AppSettings.SectionName);
+        Assert.Equal(ThemePreference.System, app.Theme);
+        Assert.Equal(AccentChoice.FollowWindows, app.Accent);
+        Assert.Equal(IslandEdge.Top, app.IslandEdge);
+        Assert.Equal(0.5, app.IslandPlace);
         Assert.False(store.HasModuleSettings("keep-awake"));
         Assert.Equal(0, store.GetModuleSettings<SampleSettings>("keep-awake").Minutes);
     }
@@ -144,7 +148,7 @@ public sealed class ConfigStoreTests : IDisposable
         var store = new ConfigStore(path);
         store.Load();
 
-        Assert.Equal(ThemePreference.Dark, store.GetSection<AppSettings>(AppSettings.SectionName).Theme);
+        Assert.Equal(ThemePreference.System, store.GetSection<AppSettings>(AppSettings.SectionName).Theme);
         Assert.False(File.Exists(path));
         Assert.Single(Directory.GetFiles(_dir.Path, "settings.corrupt-*.json"));
     }
@@ -293,7 +297,7 @@ public sealed class ConfigStoreTests : IDisposable
         var store = new ConfigStore(path);
         store.Load();
 
-        Assert.Equal(ThemePreference.Dark, store.GetSection<AppSettings>(AppSettings.SectionName).Theme);
+        Assert.Equal(ThemePreference.System, store.GetSection<AppSettings>(AppSettings.SectionName).Theme);
         Assert.True(store.HasSection("features"));
         Assert.True(store.HasSection("futureFeature"));
         Assert.Single(Directory.GetFiles(_dir.Path, "settings.invalid-*.json"));

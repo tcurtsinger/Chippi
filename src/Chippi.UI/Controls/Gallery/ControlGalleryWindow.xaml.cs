@@ -16,18 +16,15 @@ public partial class ControlGalleryWindow : Window
 {
     private static readonly string[] ThemedTokens =
     [
-        "BackdropBrush", "WindowBackgroundBrush", "TitlebarBrush", "PanelBrush", "SurfaceBrush", "SurfaceSelectedBrush",
-        "ChipBrush", "InputBrush", "TrackBrush", "TrackRemainderBrush", "SwitchOffBrush", "ButtonBackgroundBrush",
-        "ButtonHoverBrush", "TextPrimaryBrush", "TextStrongBrush", "TextControlBrush", "TextSecondaryBrush",
-        "TextTertiaryBrush", "TextMutedBrush", "FocusRingBrush", "AccentGradientBrush", "AccentGradientDeepBrush",
-        "SuccessBrush", "WarningBrush", "DangerBrush", "DangerDeepBrush",
+        "WindowBackgroundBrush", "SurfaceBrush", "FlyoutBrush", "FlyoutFooterBrush", "PanelBrush", "ButtonBackgroundBrush",
+        "ButtonHoverBrush", "ButtonPressedBrush", "HoverBrush", "SurfaceSelectedBrush", "SegmentTroughBrush", "InputBrush",
+        "BorderBrush", "TextPrimaryBrush", "TextSecondaryBrush", "TextTertiaryBrush", "TextMutedBrush",
+        "AccentBrush", "OnAccentBrush", "WarningBrush", "SuccessBrush", "DangerBrush",
     ];
 
-    private static readonly string[] PetTokens =
-    [
-        "IslandBrush", "PetSynthBrush", "PetIrisBrush", "PetAzureBrush", "PetSignalBrush", "PetEmberBrush", "PetFrostBrush",
-        "PetInkBrush", "PetShineBrush", "PetBlushBrush", "PetSparkBrush", "PetShadowBrush", "PetZBrush",
-    ];
+    private static readonly AccentChoice[] Accents = [AccentChoice.Blue, AccentChoice.Violet, AccentChoice.Green, AccentChoice.Pink];
+
+    private static readonly string[] PetTokens = ["PetSynthBrush", "PetIrisBrush", "PetAzureBrush", "PetSignalBrush", "PetEmberBrush", "PetFrostBrush"];
 
     public ControlGalleryWindow()
     {
@@ -35,42 +32,50 @@ public partial class ControlGalleryWindow : Window
         InitializeComponent();
 
         ThemePicker.SelectedIndex = ThemeManager.Mode switch { ThemePreference.Light => 1, ThemePreference.System => 2, _ => 0 };
-        AddSwatches(Swatches, ThemedTokens);
-        AddSwatches(PetSwatches, PetTokens);
-
-        CpuTile.Samples = new double[] { 12, 18, 15, 30, 22, 26, 41, 23, 19, 28, 23 };
-        MemTile.Samples = new double[] { 55, 56, 58, 57, 60, 61, 61, 62, 60, 61 };
-        RoutingCard.Badges = [FeatureBadge.Source("From Hopper"), FeatureBadge.Needs("Needs VB-CABLE")];
+        AddTokens();
+        foreach (var key in PetTokens)
+        {
+            var swatch = new RadioButton { Style = (Style)FindResource("SwatchStyle"), GroupName = "Pet", IsChecked = key == PetTokens[0] };
+            swatch.SetResourceReference(BackgroundProperty, key);
+            System.Windows.Automation.AutomationProperties.SetName(swatch, key.Replace("Pet", "", StringComparison.Ordinal).Replace("Brush", "", StringComparison.Ordinal));
+            PetSwatches.Children.Add(swatch);
+        }
         KeepAwakeCard.Badges = [FeatureBadge.Overlap("Overlaps PowerToys")];
-        ClipboardCard.Badges = [FeatureBadge.Overlap("Overlaps Win+V")];
 
         Loaded += (_, _) => FontReport.Text = DescribeFonts();
     }
 
-    /// <summary>Renders the whole gallery to dark and light PNGs in <paramref name="directory"/>, then closes. For reviews and reports.</summary>
+    /// <summary>
+    /// Renders the whole gallery to PNGs in <paramref name="directory"/>, dark and light with the Blue and
+    /// Violet accents, then closes. For reviews and reports.
+    /// </summary>
     public async Task SnapshotAsync(string directory)
     {
         Directory.CreateDirectory(directory);
-        foreach (var (index, name) in new[] { (0, "dark"), (1, "light") })
+        foreach (var (theme, themeName) in new[] { (0, "dark"), (1, "light") })
         {
-            ThemePicker.SelectedIndex = index;
-            await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
-            Root.Measure(new Size(Root.ActualWidth, double.PositiveInfinity));
-            Root.Arrange(new Rect(new Point(0, 0), new Size(Root.ActualWidth, Root.DesiredSize.Height)));
-            await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+            foreach (var (accent, accentName) in new[] { (0, "blue"), (1, "violet") })
+            {
+                ThemePicker.SelectedIndex = theme;
+                AccentPicker.SelectedIndex = accent;
+                await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+                Root.Measure(new Size(Root.ActualWidth, double.PositiveInfinity));
+                Root.Arrange(new Rect(new Point(0, 0), new Size(Root.ActualWidth, Root.DesiredSize.Height)));
+                await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
 
-            double scale = VisualTreeHelper.GetDpi(this).DpiScaleX;
-            var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap(
-                (int)Math.Ceiling(Root.ActualWidth * scale), (int)Math.Ceiling(Root.ActualHeight * scale), 96 * scale, 96 * scale, PixelFormats.Pbgra32);
-            var backdrop = new DrawingVisual();
-            using (var dc = backdrop.RenderOpen())
-                dc.DrawRectangle((Brush)FindResource("BackdropBrush"), null, new Rect(0, 0, Root.ActualWidth, Root.ActualHeight));
-            bitmap.Render(backdrop);
-            bitmap.Render(Root);
-            var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
-            encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bitmap));
-            using var file = File.Create(Path.Combine(directory, $"ws0-gallery-{name}.png"));
-            encoder.Save(file);
+                double scale = VisualTreeHelper.GetDpi(this).DpiScaleX;
+                var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap(
+                    (int)Math.Ceiling(Root.ActualWidth * scale), (int)Math.Ceiling(Root.ActualHeight * scale), 96 * scale, 96 * scale, PixelFormats.Pbgra32);
+                // Through a brush, so the scroll position and layout offset never crop the picture.
+                var page = new DrawingVisual();
+                using (var dc = page.RenderOpen())
+                    dc.DrawRectangle(new VisualBrush(Root), null, new Rect(Root.RenderSize));
+                bitmap.Render(page);
+                var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
+                encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bitmap));
+                using var file = File.Create(Path.Combine(directory, $"r1-gallery-{themeName}-{accentName}.png"));
+                encoder.Save(file);
+            }
         }
         Close();
     }
@@ -78,19 +83,25 @@ public partial class ControlGalleryWindow : Window
     private void OnThemeChanged(object sender, SelectionChangedEventArgs e) =>
         ThemeManager.Apply(ThemePicker.SelectedIndex switch { 1 => ThemePreference.Light, 2 => ThemePreference.System, _ => ThemePreference.Dark });
 
-    private void AddSwatches(Panel panel, IEnumerable<string> keys)
+    private void OnAccentChanged(object sender, SelectionChangedEventArgs e)
     {
-        foreach (var key in keys)
+        if (AccentPicker.SelectedIndex >= 0 && ThemeManager.NamedAccent(Accents[AccentPicker.SelectedIndex]) is { } shades)
+            ThemeManager.SetAccent(shades.Dark, shades.Light);
+    }
+
+    private void AddTokens()
+    {
+        foreach (var key in ThemedTokens)
         {
-            var swatch = new Border { Style = (Style)FindResource("Swatch") };
+            var swatch = new Border { Style = (Style)FindResource("Token") };
             swatch.SetResourceReference(Border.BackgroundProperty, key);
-            var label = new TextBlock { Text = key.Replace("Brush", "", StringComparison.Ordinal), FontSize = 10.5, Margin = new Thickness(2, 0, 0, 0) };
-            label.SetResourceReference(TextBlock.ForegroundProperty, "TextTertiaryBrush");
-            panel.Children.Add(new StackPanel { Children = { swatch, label }, Margin = new Thickness(0, 0, 0, 6) });
+            var label = new TextBlock { Text = key.Replace("Brush", "", StringComparison.Ordinal), Margin = new Thickness(0, 0, 0, 8) };
+            label.SetResourceReference(StyleProperty, "CaptionTextStyle");
+            Swatches.Children.Add(new StackPanel { Children = { swatch, label } });
         }
     }
 
-    /// <summary>Which font file WPF actually resolved for each weight, to prove the static TTFs load.</summary>
+    /// <summary>Which face WPF resolved for each role, to prove the variable font's named weights load without simulation.</summary>
     private string DescribeFonts()
     {
         var lines = new List<string>();
@@ -99,14 +110,14 @@ public partial class ControlGalleryWindow : Window
             var family = (FontFamily)FindResource(resource);
             var typeface = new Typeface(family, FontStyles.Normal, weight, FontStretches.Normal);
             lines.Add(typeface.TryGetGlyphTypeface(out var glyph)
-                ? $"{resource} {weight.ToOpenTypeWeight()} -> {Path.GetFileName(glyph.FontUri.LocalPath)} (sim: {glyph.StyleSimulations})"
-                : $"{resource} {weight.ToOpenTypeWeight()} -> NOT RESOLVED");
+                ? $"{resource} {weight.ToOpenTypeWeight()} → {Path.GetFileName(glyph.FontUri.LocalPath)} {glyph.FaceNames.Values.FirstOrDefault()} (sim: {glyph.StyleSimulations})"
+                : $"{resource} {weight.ToOpenTypeWeight()} → NOT RESOLVED");
         }
-        foreach (var w in new[] { FontWeights.Medium, FontWeights.SemiBold, FontWeights.Bold, FontWeights.ExtraBold })
-            Probe("UiFont", w);
-        foreach (var w in new[] { (FontWeight)FindResource("MonoMedium"), (FontWeight)FindResource("MonoSemiBold") })
-            Probe("MonoFont", w);
-        return string.Join("   ", lines);
+        Probe("UiFont", FontWeights.Normal);
+        Probe("UiFont", FontWeights.SemiBold);
+        Probe("DisplayFont", FontWeights.SemiBold);
+        Probe("CodeFont", FontWeights.Normal);
+        return string.Join("   ·   ", lines);
     }
 
     private sealed class InverseBoolConverter : System.Windows.Data.IValueConverter

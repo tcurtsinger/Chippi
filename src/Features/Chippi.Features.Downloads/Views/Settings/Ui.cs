@@ -24,16 +24,10 @@ internal static class Ui
         return block;
     }
 
-    public static TextBlock Mono(string text, string brush = "TextSecondaryBrush") => Text(text, "MonoTextStyle", brush);
+    public static TextBlock Mono(string text, string brush = "TextSecondaryBrush") => Text(text, "NumberTextStyle", brush);
 
-    /// <summary>A section eyebrow: "WATCHED FOLDERS".</summary>
-    public static TextBlock Eyebrow(string text)
-    {
-        var block = Text(text.ToUpperInvariant(), "CaptionTextStyle", "TextTertiaryBrush");
-        block.FontSize = 10.5;
-        block.FontWeight = FontWeights.Bold;
-        return block;
-    }
+    /// <summary>A section header: "Watched folders".</summary>
+    public static TextBlock Eyebrow(string text) => Text(text, "HeadlineTextStyle");
 
     /// <summary>An amber line under a field or a name.</summary>
     public static TextBlock Warning(string text)
@@ -55,8 +49,9 @@ internal static class Ui
         else
         {
             var content = new StackPanel { Orientation = Orientation.Horizontal };
-            var glyph = new LucideIcon { Data = icon, Size = 14, VerticalAlignment = VerticalAlignment.Center };
-            glyph.SetResourceReference(LucideIcon.BrushProperty, "ButtonTextBrush");
+            var glyph = new LucideIcon { Data = icon, Size = 16, VerticalAlignment = VerticalAlignment.Center };
+            // The button's own label color, so the glyph is on-accent on an accent button.
+            glyph.SetBinding(LucideIcon.BrushProperty, new System.Windows.Data.Binding(nameof(Control.Foreground)) { Source = button });
             content.Children.Add(glyph);
             content.Children.Add(new TextBlock { Text = label, Margin = new Thickness(6, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center });
             button.Content = content;
@@ -99,7 +94,7 @@ internal static class Ui
         var box = new TextBox { Text = text, Width = width, HorizontalAlignment = HorizontalAlignment.Left, VerticalContentAlignment = VerticalAlignment.Center };
         box.SetResourceReference(FrameworkElement.StyleProperty, "TextFieldStyle");
         if (mono)
-            box.SetResourceReference(Control.FontFamilyProperty, "MonoFont");
+            box.SetResourceReference(Control.FontFamilyProperty, "CodeFont");
         if (name is not null)
             AutomationProperties.SetName(box, name);
         return box;
@@ -110,7 +105,7 @@ internal static class Ui
         var combo = new ComboBox { ItemsSource = items.ToList(), SelectedIndex = selected, Width = width, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center };
         combo.SetResourceReference(FrameworkElement.StyleProperty, "HopperComboBoxStyle");
         if (mono)
-            combo.SetResourceReference(Control.FontFamilyProperty, "MonoFont");
+            combo.SetResourceReference(Control.FontFamilyProperty, "CodeFont");
         AutomationProperties.SetName(combo, name);
         return combo;
     }

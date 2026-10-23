@@ -6,7 +6,6 @@ using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
-using System.Windows.Documents;
 using Chippi.Core.Config;
 using Chippi.UI.Controls;
 
@@ -86,7 +85,7 @@ internal static class SettingsUi
         return Styled(new Border { Child = grid }, "SettingRowStyle");
     }
 
-    public static FrameworkElement Eyebrow(string text) => Styled(new Eyebrow { Text = text }, "SectionEyebrowStyle");
+    public static FrameworkElement Eyebrow(string text) => Styled(new TextBlock { Text = text }, "SectionEyebrowStyle");
 
     /// <summary>A caption line for results and errors ("Settings imported", "That file is not valid JSON").</summary>
     public static TextBlock Message() => Styled(new TextBlock { Visibility = Visibility.Collapsed, Margin = new Thickness(0, 10, 0, 0), TextWrapping = TextWrapping.Wrap }, "CaptionTextStyle");
@@ -140,14 +139,6 @@ internal static class SettingsUi
     public static Button Button(string text, bool primary = false) =>
         Styled(new Button { Content = text, Margin = new Thickness(8, 0, 0, 0) }, primary ? "PrimaryButtonStyle" : "SecondaryButtonStyle");
 
-    /// <summary>A mono run inside prose (counts are measurements: the Readout Rule).</summary>
-    public static Run Mono(string text)
-    {
-        var run = new Run(text);
-        run.SetResourceReference(TextElement.FontFamilyProperty, "MonoFont");
-        run.SetResourceReference(TextElement.FontWeightProperty, "MonoSemiBold");
-        return run;
-    }
 
     public static AppSettings ReadApp(Core.Config.ConfigStore config) => config.GetSection<AppSettings>(AppSettings.SectionName);
 

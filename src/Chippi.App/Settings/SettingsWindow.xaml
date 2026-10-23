@@ -28,13 +28,13 @@
             <!-- Titlebar -->
             <Border Background="{DynamicResource TitlebarBrush}" BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="0,0,0,1">
                 <DockPanel>
-                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,7,0">
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
                         <Button x:Name="MinimizeButton" Style="{StaticResource WindowButtonStyle}" Click="OnMinimize"
                                 WindowChrome.IsHitTestVisibleInChrome="True" AutomationProperties.Name="Minimize" ToolTip="Minimize">
                             <c:LucideIcon Data="{x:Static c:LucideIcons.Minus}" Size="14"
                                           Brush="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
                         </Button>
-                        <Button x:Name="MaximizeButton" Style="{StaticResource WindowButtonStyle}" Click="OnMaximize" Margin="2,0"
+                        <Button x:Name="MaximizeButton" Style="{StaticResource WindowButtonStyle}" Click="OnMaximize"
                                 WindowChrome.IsHitTestVisibleInChrome="True" AutomationProperties.Name="Maximize" ToolTip="Maximize">
                             <c:LucideIcon x:Name="MaximizeGlyph" Data="{x:Static c:LucideIcons.Square}" Size="12"
                                           Brush="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
@@ -48,7 +48,7 @@
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="15,0,0,0">
                         <!-- Decorative: the title beside it names the window. -->
                         <pet:Gumdrop Size="22" IsDecorative="True" IsHitTestVisible="False" />
-                        <TextBlock Text="Chippi Settings" FontSize="13" FontWeight="Bold" Margin="10,0,0,0" VerticalAlignment="Center" />
+                        <TextBlock Text="Chippi Settings" FontSize="12" Margin="10,0,0,0" VerticalAlignment="Center" />
                     </StackPanel>
                 </DockPanel>
             </Border>
@@ -62,7 +62,7 @@
                 <!-- Sidebar -->
                 <Border Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource BorderSoftBrush}" BorderThickness="0,0,1,0">
                     <DockPanel>
-                        <TextBlock x:Name="VersionLine" DockPanel.Dock="Bottom" Style="{StaticResource MonoTextStyle}"
+                        <TextBlock x:Name="VersionLine" DockPanel.Dock="Bottom" Style="{StaticResource CaptionTextStyle}"
                                    Foreground="{DynamicResource TextMutedBrush}" Margin="22,0,12,18" TextWrapping="Wrap" />
                         <ListBox x:Name="Nav" Margin="12,14,12,0" Background="Transparent" BorderThickness="0"
                                  ItemContainerStyle="{StaticResource SidebarItemStyle}" SelectionChanged="OnNavSelectionChanged"

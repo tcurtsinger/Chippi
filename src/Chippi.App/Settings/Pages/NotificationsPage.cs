@@ -103,7 +103,7 @@ internal sealed class NotificationsPage : UserControl
         var notifier = feature.Notifier!;
         var header = Columns();
         header.Margin = new Thickness(15, 22, 15, 8);
-        var eyebrow = SettingsUi.Eyebrow(feature.Descriptor.Name.ToUpperInvariant());
+        var eyebrow = SettingsUi.Eyebrow(feature.Descriptor.Name);
         eyebrow.Margin = new Thickness(0);
         eyebrow.VerticalAlignment = VerticalAlignment.Center;
         header.Children.Add(eyebrow);

@@ -62,10 +62,7 @@ internal sealed class SettingsSection : UserControl
     private Border FolderRow(WatchedFolder folder)
     {
         bool paused = folder.Mode == FolderMode.Paused;
-        var chip = new Border { Width = 32, Height = 32, CornerRadius = new CornerRadius(10) };
-        chip.SetResourceReference(Border.BackgroundProperty, paused ? "ChipBrush" : "AccentGradientBrush");
-        chip.Child = Ui.Glyph(LucideIcons.Folder, paused ? "TextTertiaryBrush" : "TextStrongBrush", 16);
-        ((FrameworkElement)chip.Child).HorizontalAlignment = HorizontalAlignment.Center;
+        var chip = new IconChip { Icon = LucideIcons.Folder, IsOn = !paused, VerticalAlignment = VerticalAlignment.Center };
 
         bool exists = Directory.Exists(folder.Path);
         var name = Ui.Text(Ui.FolderName(folder.Path), "TitleTextStyle");

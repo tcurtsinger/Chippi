@@ -1,5 +1,5 @@
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
-<!-- Chippi's design system for WPF: theme dictionaries, fonts and templated controls (DESIGN.md
+<!-- Chippi's design system for WPF: theme dictionaries, type styles and templated controls (DESIGN.md
      §2-§6). The App and any feature with its own views reference this, never Chippi.App. -->
 <Project Sdk="Microsoft.NET.Sdk">
 
@@ -11,12 +11,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Chippi.Core\Chippi.Core.csproj" />
-  </ItemGroup>
-
-  <!-- Static Manrope 500/600/700/800 and JetBrains Mono 500/600 (OFL), embedded as WPF resources. -->
-  <ItemGroup>
-    <Resource Include="Themes\Fonts\*.ttf" />
-    <None Include="Themes\Fonts\OFL-*.txt" CopyToOutputDirectory="PreserveNewest" LinkBase="licenses" />
   </ItemGroup>
 
   <!-- The control gallery is a development tool: compiled into Debug builds only. -->

@@ -33,17 +33,24 @@ then it references `Chippi.UI` (below), never `Chippi.App`.
 Not part of Core, listed here so module authors find it. Reference `Chippi.Core` and `Chippi.UI`;
 set `<UseWPF>true</UseWPF>`. In XAML write `xmlns:c="urn:chippi-ui"`.
 
-- Resources (merged by App.xaml, resolve with `DynamicResource`): Hopper's theme keys
-  (`WindowBackgroundBrush`, `SurfaceBrush`, `TextTertiaryBrush`, `AccentGradientBrush`, ...) plus
-  `AccentGradientDeepBrush`, `DangerDeepBrush`, `Island*`, `Pet*`, `Badge*`, type styles
-  (`DisplayTextStyle` ... `MonoReadoutTextStyle`), `FocusRing*`, `ChippiWindowStyle` (every window
-  uses it), and the keyed control styles `PrimaryButtonStyle`, `SecondaryButtonStyle`,
-  `SwitchStyle`, `SegmentButtonStyle`, `HopperSliderStyle`, `HopperComboBoxStyle`,
-  `TabSegmentedControlStyle`.
-- Controls (`Chippi.UI.Controls`): `IconButton`, `IconToggleButton`, `Badge`, `StatusDot`,
-  `Eyebrow`, `SearchBox`, `SegmentedControl` + `SegmentItem`, `AppVolumeRow`, `StatTile`,
-  `StashRow`, `ToolTile`, `FeatureCard`, `LucideIcon` + `LucideIcons`, converters.
-- `Chippi.UI.Themes`: `ThemeManager.Apply(ThemePreference)`, `ThemeManager.ThemeChanged`,
+- Resources (merged by App.xaml, resolve with `DynamicResource`): the theme keys from DESIGN.md's
+  front matter (`WindowBackgroundBrush`, `SurfaceBrush` is the card, `PanelBrush` the flyout card,
+  `TextTertiaryBrush` the caption, `AccentBrush` / `OnAccentBrush`, ...), `DangerDeepBrush`,
+  `Island*` (the island uses `IslandAccentBrush`), `Pet*`, the fonts `UiFont`, `DisplayFont` and
+  `CodeFont`, type styles (`DisplayTextStyle`, `HeadlineTextStyle`, `BodyTextStyle`,
+  `CaptionTextStyle`, `NavGroupTextStyle`, `NumberTextStyle`), `FocusRing4` / `FocusRing8` /
+  `FocusRingPill`, `ChippiWindowStyle` (every window uses it), and the keyed control styles
+  `PrimaryButtonStyle`, `SecondaryButtonStyle`, `CriticalButtonStyle`, `SubtleButtonStyle`,
+  `SwitchStyle`, `SwitchWithLabelStyle`, `HopperSliderStyle`, `HopperComboBoxStyle`,
+  `TextFieldStyle`, `FlyoutSegmentedControlStyle`, `SelectorBarStyle`, `FlyoutTabsStyle`,
+  `NavItemStyle` + `NavItemTemplate`, `DurationChipStyle`, `SwatchStyle`, `SwatchPillStyle`,
+  `FlyoutCardStyle` and `CardRowsStyle`.
+- Controls (`Chippi.UI.Controls`): `Card` (a section's rows with dividers), `SettingRow`,
+  `ExpanderRow`, `IconButton`, `IconChip`, `Badge`, `StatusDot`, `SearchBox`, `SegmentedControl` +
+  `SegmentItem`, `DragHandle`, `LucideIcon` + `LucideIcons`, converters. `ToolTile` and
+  `FeatureCard` stay until Phase 2.5's flyout and Settings work replaces them.
+- `Chippi.UI.Themes`: `ThemeManager.Apply(ThemePreference)`, `ThemeManager.SetAccent(dark, light)`,
+  `ThemeManager.NamedAccent(AccentChoice)`, `ThemeManager.ThemeChanged`,
   `Motion.IsReduced` / `Motion.Changed` / `Motion.Override`.
 - Debug builds only: `ControlGalleryWindow` (`Chippi.exe --gallery [--snapshot <dir>]`).
 
@@ -74,7 +81,7 @@ set `<UseWPF>true</UseWPF>`. In XAML write `xmlns:c="urn:chippi-ui"`.
 | Type | What it is |
 |---|---|
 | `ConfigStore` | `%APPDATA%\Chippi\settings.json`. `Load()`, `Save()`, `HasSection`, `GetSection<T>` / `SetSection<T>` (merges, saves), `GetModuleSettings<T>` / `SetModuleSettings<T>` / `HasModuleSettings`, `Export(path)`, `Import(path)` (throws `InvalidDataException` and changes nothing on a bad file), events `Imported` and `SectionChanged` (args `Name`: "app", "features" or "modules.<id>"; raised after the file is written, on the saving thread, for writes through this store only). Versioned (`version: 1`), atomic writes, unknown sections and properties survive, a corrupt file is moved aside. |
-| `AppSettings` | Section `app`: `Theme` (`ThemePreference`), `IslandEnabled`, `PetColor`, `ReduceMotion` (null = follow Windows), `IslandDisplay` (`FollowActiveWindow`, `MainDisplay`, `SpecificMonitor`; default in `AppSettings.DefaultIslandDisplay`), `IslandMonitorId` (the monitor's stable device path for `SpecificMonitor`). |
+| `AppSettings` | Section `app`: `Theme` (`ThemePreference`, default `System`), `Accent` (`AccentChoice`: `FollowWindows` (default), `Blue`, `Violet`, `Green`, `Pink`), `IslandEnabled`, `IslandEdge` (`Top` (default), `Left`, `Right`), `IslandPlace` (0 to 1 along the edge, default 0.5), `PetColor`, `ReduceMotion` (null = follow Windows), `IslandDisplay` (`FollowActiveWindow`, `MainDisplay`, `SpecificMonitor`; default in `AppSettings.DefaultIslandDisplay`), `IslandMonitorId` (the monitor's stable device path for `SpecificMonitor`). |
 | `ThemePreference` | `Dark, Light, System`. (Not `ThemeMode`: WPF 10 has its own `System.Windows.ThemeMode`.) |
 | `PetColor` | `Synth, Iris, Azure, Signal, Ember, Frost`. |
 

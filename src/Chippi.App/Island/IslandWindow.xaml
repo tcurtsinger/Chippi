@@ -59,16 +59,16 @@
                 <!-- Expanded: 328 wide, padding 12 / 14 / 14, 10px gaps (inside the 1px hairline). -->
                 <StackPanel x:Name="ExpandedLayer" Opacity="0" IsHitTestVisible="False" Width="300" Canvas.Left="14" Canvas.Top="12">
 
-                    <!-- 1. Header: the pet's slot, "Chippi" 13/800, a mono clock. -->
+                    <!-- 1. Header: the pet's slot, "Chippi" 13/600, a clock. -->
                     <Grid Height="28">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="38" />
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="1" Text="Chippi" FontSize="13" FontWeight="ExtraBold" VerticalAlignment="Center"
+                        <TextBlock Grid.Column="1" Text="Chippi" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"
                                    Foreground="{StaticResource IslandTextBrush}" />
-                        <TextBlock x:Name="Clock" Grid.Column="2" Style="{StaticResource MonoTextStyle}" VerticalAlignment="Center"
+                        <TextBlock x:Name="Clock" Grid.Column="2" Style="{StaticResource NumberTextStyle}" VerticalAlignment="Center"
                                    Foreground="{StaticResource IslandTextTertiaryBrush}" />
                     </Grid>
 
@@ -96,7 +96,7 @@
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
                                 <Border Grid.ColumnSpan="2" CornerRadius="2" Background="{StaticResource IslandTrackBrush}" />
-                                <Border CornerRadius="2" Background="{DynamicResource AccentGradientBrush}" />
+                                <Border CornerRadius="2" Background="{DynamicResource IslandAccentBrush}" />
                             </Grid>
                         </StackPanel>
                     </Grid>
@@ -106,7 +106,7 @@
                         <c:IconButton x:Name="PreviousButton" Width="32" Height="32" Focusable="False" VerticalAlignment="Center"
                                       Icon="{x:Static c:LucideIcons.SkipBack}" AutomationProperties.Name="Previous track" />
                         <Button x:Name="PlayPauseButton" Style="{StaticResource IslandPlayButtonStyle}" Margin="14,0" AutomationProperties.Name="Pause">
-                            <c:LucideIcon x:Name="PlayPauseIcon" Data="{x:Static c:LucideIcons.Pause}" Size="16" Brush="White" />
+                            <c:LucideIcon x:Name="PlayPauseIcon" Data="{x:Static c:LucideIcons.Pause}" Size="16" Brush="Black" />
                         </Button>
                         <c:IconButton x:Name="NextButton" Width="32" Height="32" Focusable="False" VerticalAlignment="Center"
                                       Icon="{x:Static c:LucideIcons.SkipForward}" AutomationProperties.Name="Next track" />
@@ -121,26 +121,26 @@
                         </Grid.ColumnDefinitions>
                         <Border x:Name="TimerTile" Style="{StaticResource IslandTileStyle}">
                             <StackPanel>
-                                <c:Eyebrow x:Name="TimerLabel" Foreground="{StaticResource IslandTextTertiaryBrush}" />
-                                <TextBlock x:Name="TimerValue" Style="{StaticResource MonoTextStyle}" FontSize="13.5" Margin="0,5,0,0"
+                                <TextBlock x:Name="TimerLabel" Style="{StaticResource CaptionTextStyle}" Foreground="{StaticResource IslandTextTertiaryBrush}" />
+                                <TextBlock x:Name="TimerValue" Style="{StaticResource NumberTextStyle}" FontSize="13.5" Margin="0,5,0,0"
                                            TextTrimming="CharacterEllipsis" Foreground="{StaticResource IslandTextBrush}" />
                             </StackPanel>
                         </Border>
                         <Border x:Name="StashTile" Grid.Column="2" Style="{StaticResource IslandTileStyle}">
                             <StackPanel>
-                                <c:Eyebrow x:Name="StashLabel" Foreground="{StaticResource IslandTextTertiaryBrush}" />
+                                <TextBlock x:Name="StashLabel" Style="{StaticResource CaptionTextStyle}" Foreground="{StaticResource IslandTextTertiaryBrush}" />
                                 <TextBlock x:Name="StashValue" Style="{StaticResource TitleTextStyle}" Margin="0,4,0,0"
                                            TextTrimming="CharacterEllipsis" Foreground="{StaticResource IslandTextBrush}" />
                             </StackPanel>
                         </Border>
                     </Grid>
 
-                    <!-- 5. Agent usage: name, mono usage line, 5px gradient bar. -->
+                    <!-- 5. Agent usage: name, usage line, 5px accent bar. -->
                     <Border x:Name="AgentSection" Style="{StaticResource IslandTileStyle}" Margin="0,10,0,0">
                         <StackPanel>
-                            <TextBlock x:Name="AgentName" Style="{StaticResource BodyTextStyle}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
+                            <TextBlock x:Name="AgentName" Style="{StaticResource BodyTextStyle}" TextTrimming="CharacterEllipsis"
                                        Foreground="{StaticResource IslandTextBrush}" />
-                            <TextBlock x:Name="AgentUsage" Style="{StaticResource MonoTextStyle}" Margin="0,3,0,0" TextTrimming="CharacterEllipsis"
+                            <TextBlock x:Name="AgentUsage" Style="{StaticResource NumberTextStyle}" Margin="0,3,0,0" TextTrimming="CharacterEllipsis"
                                        Foreground="{DynamicResource TextStrongBrush}" />
                             <Grid x:Name="AgentProgress" Height="5" Margin="0,8,0,0">
                                 <Grid.ColumnDefinitions>
@@ -148,7 +148,7 @@
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
                                 <Border Grid.ColumnSpan="2" CornerRadius="2.5" Background="{StaticResource IslandTrackBrush}" />
-                                <Border CornerRadius="2.5" Background="{DynamicResource AccentGradientBrush}" />
+                                <Border CornerRadius="2.5" Background="{DynamicResource IslandAccentBrush}" />
                             </Grid>
                         </StackPanel>
                     </Border>
@@ -174,7 +174,7 @@
                    PlacementTarget="{Binding ElementName=Lift}" PopupAnimation="None">
                 <Border Background="{StaticResource IslandPanelBrush}" BorderBrush="{StaticResource IslandBorderBrush}" BorderThickness="1"
                         CornerRadius="12" Padding="6" MinWidth="200">
-                    <StackPanel x:Name="DebugItems" TextElement.FontFamily="{StaticResource UiFont}" TextElement.FontWeight="Medium" />
+                    <StackPanel x:Name="DebugItems" TextElement.FontFamily="{StaticResource UiFont}" />
                 </Border>
             </Popup>
         </Canvas>

@@ -16,18 +16,18 @@
    </c:SegmentedControl>
    <StackPanel x:Name="DurationPanel" Margin="0,20,0,0">
     <TextBlock Text="Duration" Style="{DynamicResource TitleTextStyle}" Margin="0,0,0,8" />
-    <ComboBox x:Name="Duration" Style="{DynamicResource HopperComboBoxStyle}" FontFamily="{DynamicResource MonoFont}" Width="220" HorizontalAlignment="Left" AutomationProperties.Name="Duration in minutes" />
+    <ComboBox x:Name="Duration" Style="{DynamicResource HopperComboBoxStyle}" Width="220" HorizontalAlignment="Left" AutomationProperties.Name="Duration in minutes" />
    </StackPanel>
    <StackPanel x:Name="UntilPanel" Margin="0,20,0,0">
     <TextBlock Text="Until" Style="{DynamicResource TitleTextStyle}" Margin="0,0,0,8" />
-    <ComboBox x:Name="Until" Style="{DynamicResource HopperComboBoxStyle}" FontFamily="{DynamicResource MonoFont}" Width="220" HorizontalAlignment="Left" AutomationProperties.Name="End time" />
+    <ComboBox x:Name="Until" Style="{DynamicResource HopperComboBoxStyle}" Width="220" HorizontalAlignment="Left" AutomationProperties.Name="End time" />
     <TextBlock Text="Next occurrence in your local time" Style="{DynamicResource CaptionTextStyle}" Margin="0,8,0,0" />
    </StackPanel>
    <DockPanel Margin="0,24,0,24">
     <ToggleButton x:Name="Display" DockPanel.Dock="Right" Style="{DynamicResource SwitchStyle}" AutomationProperties.Name="Keep display on" Margin="24,0,0,0" />
     <TextBlock Text="Keep display on" Style="{DynamicResource TitleTextStyle}" VerticalAlignment="Center" />
    </DockPanel>
-   <TextBlock x:Name="State" Style="{DynamicResource MonoTextStyle}" Margin="0,0,0,12" AutomationProperties.LiveSetting="Polite" />
+   <TextBlock x:Name="State" Style="{DynamicResource BodyTextStyle}" Margin="0,0,0,12" AutomationProperties.LiveSetting="Polite" />
    <TextBlock x:Name="Error" Style="{DynamicResource BodyTextStyle}" TextWrapping="Wrap" Margin="0,0,0,12" AutomationProperties.LiveSetting="Assertive" />
    <StackPanel Orientation="Horizontal">
     <Button x:Name="Toggle" Content="Start keep awake" Style="{DynamicResource PrimaryButtonStyle}" Click="OnToggle" MinWidth="160" />

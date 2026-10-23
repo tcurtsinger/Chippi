@@ -29,20 +29,19 @@
         <Setter Property="TextWrapping" Value="Wrap" />
     </Style>
 
-    <Style x:Key="SectionEyebrowStyle" TargetType="{x:Type FrameworkElement}">
-        <Setter Property="Margin" Value="2,22,0,10" />
+    <!-- A section header: 24px above, 8px below. -->
+    <Style x:Key="SectionEyebrowStyle" TargetType="{x:Type TextBlock}" BasedOn="{StaticResource HeadlineTextStyle}">
+        <Setter Property="Margin" Value="0,24,0,8" />
         <Setter Property="HorizontalAlignment" Value="Left" />
     </Style>
 
-    <!-- Sidebar: 36px items, 16px icon, 13/600 label; the active one in the segmented-active style. -->
+    <!-- Sidebar: 36px items, 16px icon, body label; the selected one is subtle-selected and Semibold. -->
     <Style x:Key="SidebarItemStyle" TargetType="{x:Type ListBoxItem}">
         <Setter Property="Height" Value="36" />
         <Setter Property="Margin" Value="0,0,0,2" />
         <Setter Property="Padding" Value="11,0" />
         <Setter Property="Foreground" Value="{DynamicResource TextControlBrush}" />
-        <Setter Property="FontSize" Value="13" />
-        <Setter Property="FontWeight" Value="SemiBold" />
-        <Setter Property="Cursor" Value="Hand" />
+
         <Setter Property="FocusVisualStyle" Value="{StaticResource FocusRing8}" />
         <Setter Property="Template">
             <Setter.Value>
@@ -57,9 +56,9 @@
                             <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
                         </Trigger>
                         <Trigger Property="IsSelected" Value="True">
-                            <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource SegmentActiveBgBrush}" />
-                            <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource SegmentActiveBorderBrush}" />
-                            <Setter Property="Foreground" Value="{DynamicResource SegmentActiveBrush}" />
+                            <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource SurfaceSelectedBrush}" />
+                            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+                            <Setter Property="FontWeight" Value="SemiBold" />
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Opacity" Value="0.45" />

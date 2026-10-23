@@ -1,93 +1,74 @@
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
-<!-- Dark theme (the default). Ported from Hopper's Ui/Themes/Dark.xaml; key names are unchanged
-     so Hopper's views move over as-is. Theme-invariant tokens (deep gradient, island, pet,
-     badge tints, glows) live in Palette.xaml. Values: DESIGN.md §2 and §4. -->
+<!-- Dark theme: DESIGN.md front matter, colors. Light.xaml defines every key here with its light
+     value. Key names are older than the values (Surface is the card, Panel the flyout card), so call
+     sites keep working. AccentBrush and OnAccentBrush are the Blue defaults; ThemeManager.SetAccent
+     overrides them at the application level. Theme-invariant tokens live in Palette.xaml. -->
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <Color x:Key="BackdropColor">#0A0D18</Color>
-    <Color x:Key="WindowBackgroundColor">#0B0F1F</Color>
-    <Color x:Key="TitlebarColor">#0D1224</Color>
-    <Color x:Key="PanelColor">#0F1426</Color>
-    <Color x:Key="SurfaceColor">#131930</Color>
-    <Color x:Key="SurfaceSelectedColor">#1A2240</Color>
-    <Color x:Key="ChipColor">#1B2240</Color>
-    <Color x:Key="InputColor">#11172C</Color>
-    <Color x:Key="TrackColor">#161D38</Color>
-    <Color x:Key="TrackRemainderColor">#22294A</Color>
-    <Color x:Key="SwitchOffColor">#262E4A</Color>
-    <Color x:Key="ButtonBackgroundColor">#151C34</Color>
-    <Color x:Key="ButtonHoverColor">#1C2444</Color>
-    <Color x:Key="SegmentColor">#11172C</Color>
-    <Color x:Key="PillColor">#15FFFFFF</Color>
+    <!-- Surfaces -->
+    <SolidColorBrush x:Key="BackdropBrush" Color="#202020" />
+    <SolidColorBrush x:Key="WindowBackgroundBrush" Color="#202020" />
+    <SolidColorBrush x:Key="TitlebarBrush" Color="#202020" />
+    <SolidColorBrush x:Key="SurfaceBrush" Color="#2B2B2B" />
+    <SolidColorBrush x:Key="FlyoutBrush" Color="#2C2C2C" />
+    <SolidColorBrush x:Key="FlyoutFooterBrush" Color="#202020" />
+    <SolidColorBrush x:Key="PanelBrush" Color="#0BFFFFFF" />
+    <SolidColorBrush x:Key="PanelBorderBrush" Color="#0DFFFFFF" />
 
-    <Color x:Key="TextPrimaryColor">#EEF1F8</Color>
-    <Color x:Key="TextSecondaryColor">#7E879F</Color>
-    <Color x:Key="TextTertiaryColor">#8A93AD</Color>
-    <Color x:Key="TextMutedColor">#7C849C</Color>
-    <Color x:Key="TextStrongColor">#D6DBEC</Color>
-    <Color x:Key="TextControlColor">#C3CAE0</Color>
-    <Color x:Key="GripColor">#3C4660</Color>
-    <Color x:Key="SegmentActiveColor">#FFFFFF</Color>
+    <!-- Controls -->
+    <SolidColorBrush x:Key="ButtonBackgroundBrush" Color="#0FFFFFFF" />
+    <SolidColorBrush x:Key="ButtonHoverBrush" Color="#17FFFFFF" />
+    <SolidColorBrush x:Key="ButtonPressedBrush" Color="#0AFFFFFF" />
+    <SolidColorBrush x:Key="ButtonBorderBrush" Color="#17FFFFFF" />
+    <SolidColorBrush x:Key="ButtonTextBrush" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="ChipBrush" Color="#0FFFFFFF" />
+    <SolidColorBrush x:Key="HoverBrush" Color="#0AFFFFFF" />
+    <SolidColorBrush x:Key="SurfaceSelectedBrush" Color="#0FFFFFFF" />
+    <SolidColorBrush x:Key="SegmentTroughBrush" Color="#38000000" />
+    <SolidColorBrush x:Key="SegmentStrokeBrush" Color="#0FFFFFFF" />
+    <SolidColorBrush x:Key="SegmentActiveBgBrush" Color="#1AFFFFFF" />
+    <SolidColorBrush x:Key="SegmentActiveBrush" Color="#FFFFFF" />
+    <x:Null x:Key="SegmentSelectedShadow" />
+    <SolidColorBrush x:Key="InputBrush" Color="#0FFFFFFF" />
+    <SolidColorBrush x:Key="InputStrokeBottomBrush" Color="#4DFFFFFF" />
+    <SolidColorBrush x:Key="InputFocusBrush" Color="#1C1C1C" />
+    <SolidColorBrush x:Key="SwitchOffStrokeBrush" Color="#99FFFFFF" />
+    <SolidColorBrush x:Key="SwitchOffKnobBrush" Color="#CCFFFFFF" />
+    <SolidColorBrush x:Key="CheckBoxOffBrush" Color="#1A000000" />
+    <!-- Slider remainder and scrollbar thumb (Windows' strong control fill). -->
+    <SolidColorBrush x:Key="TrackRemainderBrush" Color="#8BFFFFFF" />
+    <SolidColorBrush x:Key="ThumbBrush" Color="#454545" />
 
-    <SolidColorBrush x:Key="BackdropBrush" Color="{StaticResource BackdropColor}" />
-    <SolidColorBrush x:Key="WindowBackgroundBrush" Color="{StaticResource WindowBackgroundColor}" />
-    <SolidColorBrush x:Key="TitlebarBrush" Color="{StaticResource TitlebarColor}" />
-    <SolidColorBrush x:Key="PanelBrush" Color="{StaticResource PanelColor}" />
-    <SolidColorBrush x:Key="SurfaceBrush" Color="{StaticResource SurfaceColor}" />
-    <SolidColorBrush x:Key="SurfaceSelectedBrush" Color="{StaticResource SurfaceSelectedColor}" />
-    <SolidColorBrush x:Key="ChipBrush" Color="{StaticResource ChipColor}" />
-    <SolidColorBrush x:Key="InputBrush" Color="{StaticResource InputColor}" />
-    <SolidColorBrush x:Key="TrackBrush" Color="{StaticResource TrackColor}" />
-    <SolidColorBrush x:Key="TrackRemainderBrush" Color="{StaticResource TrackRemainderColor}" />
-    <SolidColorBrush x:Key="SwitchOffBrush" Color="{StaticResource SwitchOffColor}" />
-    <SolidColorBrush x:Key="ButtonBackgroundBrush" Color="{StaticResource ButtonBackgroundColor}" />
-    <SolidColorBrush x:Key="ButtonHoverBrush" Color="{StaticResource ButtonHoverColor}" />
-    <SolidColorBrush x:Key="ButtonTextBrush" Color="{StaticResource TextControlColor}" />
-    <SolidColorBrush x:Key="SegmentBrush" Color="{StaticResource SegmentColor}" />
-    <SolidColorBrush x:Key="PillBrush" Color="{StaticResource PillColor}" />
+    <!-- Strokes and dividers -->
+    <SolidColorBrush x:Key="BorderSoftBrush" Color="#08FFFFFF" />
+    <SolidColorBrush x:Key="CardBorderBrush" Color="#08FFFFFF" />
+    <SolidColorBrush x:Key="BorderBrush" Color="#0FFFFFFF" />
+    <SolidColorBrush x:Key="BorderStrongBrush" Color="#24FFFFFF" />
+    <SolidColorBrush x:Key="WindowBorderBrush" Color="#14FFFFFF" />
 
-    <SolidColorBrush x:Key="TextPrimaryBrush" Color="{StaticResource TextPrimaryColor}" />
-    <SolidColorBrush x:Key="TextSecondaryBrush" Color="{StaticResource TextSecondaryColor}" />
-    <SolidColorBrush x:Key="TextTertiaryBrush" Color="{StaticResource TextTertiaryColor}" />
-    <SolidColorBrush x:Key="TextMutedBrush" Color="{StaticResource TextMutedColor}" />
-    <SolidColorBrush x:Key="TextStrongBrush" Color="{StaticResource TextStrongColor}" />
-    <SolidColorBrush x:Key="TextControlBrush" Color="{StaticResource TextControlColor}" />
-    <SolidColorBrush x:Key="GripBrush" Color="{StaticResource GripColor}" />
-    <SolidColorBrush x:Key="SegmentActiveBrush" Color="{StaticResource SegmentActiveColor}" />
-    <SolidColorBrush x:Key="BadgeSourceTextBrush" Color="#D3A6FA" />
-    <SolidColorBrush x:Key="BadgeOverlapTextBrush" Color="#F5B866" />
+    <!-- Text -->
+    <SolidColorBrush x:Key="TextPrimaryBrush" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="TextStrongBrush" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="TextSecondaryBrush" Color="#C5C5C5" />
+    <SolidColorBrush x:Key="TextControlBrush" Color="#C5C5C5" />
+    <SolidColorBrush x:Key="TextTertiaryBrush" Color="#ABABAB" />
+    <SolidColorBrush x:Key="TextMutedBrush" Color="#9D9D9D" />
+    <SolidColorBrush x:Key="GripBrush" Color="#9D9D9D" />
+    <SolidColorBrush x:Key="FocusRingBrush" Color="#FFFFFF" />
 
-    <!-- Hairlines: white at 5-8%, strong borders up to 16%. -->
-    <SolidColorBrush x:Key="BorderSoftBrush" Color="#0DFFFFFF" />
-    <SolidColorBrush x:Key="BorderBrush" Color="#10FFFFFF" />
-    <SolidColorBrush x:Key="BorderStrongBrush" Color="#29FFFFFF" />
-    <SolidColorBrush x:Key="WindowBorderBrush" Color="#17FFFFFF" />
-    <SolidColorBrush x:Key="ButtonBorderBrush" Color="#14FFFFFF" />
-    <SolidColorBrush x:Key="HoverBrush" Color="#17FFFFFF" />
-    <SolidColorBrush x:Key="FocusRingBrush" Color="#B15CF0" />
-    <SolidColorBrush x:Key="DangerBrush" Color="#E23B4E" />
-    <SolidColorBrush x:Key="SuccessBrush" Color="#3DDC97" />
-    <SolidColorBrush x:Key="WarningBrush" Color="#F5A64B" />
-    <!-- Amber text (held and failed reasons, validation): Signal Amber stays for borders, dots and glyphs (DESIGN.md). -->
-    <SolidColorBrush x:Key="WarningTextBrush" Color="#F5A64B" />
+    <!-- Accent (Blue until ThemeManager.SetAccent runs) -->
+    <SolidColorBrush x:Key="AccentBrush" Color="#4CC2FF" />
+    <SolidColorBrush x:Key="OnAccentBrush" Color="#000000" />
 
-    <LinearGradientBrush x:Key="AccentGradientBrush" StartPoint="0,0" EndPoint="1,1">
-        <GradientStop Color="#B15CF0" Offset="0" />
-        <GradientStop Color="#4D9BFF" Offset="1" />
-    </LinearGradientBrush>
-    <LinearGradientBrush x:Key="AccentVerticalBrush" StartPoint="0,0" EndPoint="0,1">
-        <GradientStop Color="#B15CF0" Offset="0" />
-        <GradientStop Color="#4D9BFF" Offset="1" />
-    </LinearGradientBrush>
-    <!-- Now-playing card, DESIGN.md §6: #171F40 -> #121831. -->
-    <LinearGradientBrush x:Key="CardGradientBrush" StartPoint="0,0" EndPoint="1,1">
-        <GradientStop Color="#171F40" Offset="0" />
-        <GradientStop Color="#121831" Offset="0.62" />
-    </LinearGradientBrush>
-    <SolidColorBrush x:Key="CardBorderBrush" Color="#14FFFFFF" />
+    <!-- Signals -->
+    <SolidColorBrush x:Key="WarningBrush" Color="#FCE100" />
+    <SolidColorBrush x:Key="WarningTextBrush" Color="#FCE100" />
+    <SolidColorBrush x:Key="WarningBorder45Brush" Color="#73FCE100" />
+    <SolidColorBrush x:Key="BadgeOverlapTextBrush" Color="#FCE100" />
+    <SolidColorBrush x:Key="BadgeOverlapBackgroundBrush" Color="#1AFCE100" />
+    <SolidColorBrush x:Key="SuccessBrush" Color="#6CCB5F" />
+    <SolidColorBrush x:Key="DangerBrush" Color="#C42B1C" />
 
-    <!-- Window lift 0 10px 26px rgba(0,0,0,.5); card glow; icon glow. -->
-    <DropShadowEffect x:Key="WindowShadow" Color="#000000" BlurRadius="26" ShadowDepth="10" Direction="270" Opacity="0.5" />
-    <DropShadowEffect x:Key="CardShadow" Color="#4D9BFF" BlurRadius="30" ShadowDepth="0" Opacity="0.35" />
-    <DropShadowEffect x:Key="IconShadow" Color="#B15CF0" BlurRadius="16" ShadowDepth="0" Opacity="0.65" />
+    <!-- Flyout shadow: 0 8px 32px rgba(0,0,0,.28). -->
+    <DropShadowEffect x:Key="WindowShadow" Color="#000000" BlurRadius="32" ShadowDepth="8" Direction="270" Opacity="0.28" />
 </ResourceDictionary>
