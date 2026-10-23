@@ -24,3 +24,10 @@ Run this once a phase's report is written and the last change is merged and push
 - Removed 15 workstream worktrees and 16 merged branches. Only `main` remains.
 - Deleted the `Chippi-dev` test profiles (a11y, karl, lead, toggle, ws1 to ws5). No dev Run entries were present.
 - Deleted 14 `%TEMP%\chippi*` scratch folders (about 15 MB), caught by Kayla after the first pass.
+
+## Phase 2 cleanup (2026-10-23)
+- Run before the Phase 2 report, at Travis's request; the report follows the UI/UX pass.
+- Archived `X:\code\chippi-scratch\phase-2` (1,301 files, 306 MB) to `X:\code\chippi-archive\phase-2-leftovers-2026-10-23.zip` (175 MB), then deleted it. The main checkout had no untracked leftovers.
+- Deleted the toast spike in `build/toast-spike/` (classic COM was chosen; see `docs/phase-2-handoff.md`).
+- Every workstream worktree and branch was already removed at merge. Only `main` remains, locally and on GitHub.
+- Deleted the `Chippi-dev` profiles (lead, p2-core-review, p2-core-review-ui), `%TEMP%\chippi-tests`, and the dev profile's Windows notification entry. No dev Run, Explorer, CLSID or Start Menu entries were present. The installed copy's registrations and running process were left alone.
