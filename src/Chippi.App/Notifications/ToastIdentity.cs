@@ -17,7 +17,7 @@ internal sealed record ToastIdentity(string AppId, Guid Activator, string Execut
             throw new ArgumentException("Invalid notification dev profile", nameof(profile));
         profile = string.IsNullOrWhiteSpace(profile) ? null : profile;
         // Separate namespace from both the production identity and the old spike.
-        byte[] hash = SHA256.HashData(Encoding.UTF8.GetBytes("Chippi.Notifications.v1/" + (profile ?? "production")));
+        byte[] hash = SHA256.HashData(Encoding.UTF8.GetBytes("Chippi.Notifications.v1/" + (profile?.ToLowerInvariant() ?? "production")));
         string suffix = Convert.ToHexString(hash.AsSpan(0, 16)).ToLowerInvariant();
         return new ToastIdentity(profile is null ? "velopack.ChippiApp" : "Chippi.dev." + suffix,
             new Guid(hash.AsSpan(0, 16)), ExplorerRegistration.StableExecutable(executable),
