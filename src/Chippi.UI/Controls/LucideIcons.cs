@@ -71,6 +71,8 @@ public static class LucideIcons
     /// <summary>A screen with a small pill at the top: the island as a notification place (drawn for Chippi, not a Lucide original).</summary>
     public static Geometry IslandScreen { get; } = G("M4,4 H20 A2,2 0 0 1 22,6 V18 A2,2 0 0 1 20,20 H4 A2,2 0 0 1 2,18 V6 A2,2 0 0 1 4,4 Z M9.5,8 H14.5");
 
+    public static Geometry TriangleAlert { get; } = G("M21.73,18 L13.73,4 a2,2 0 0 0 -3.48,0 L2.27,18 A2,2 0 0 0 4,21 H20 a2,2 0 0 0 1.73,-3 Z M12,9 V13 M12,17 h0.01");
+    public static Geometry File { get; } = G("M15,2 H6 a2,2 0 0 0 -2,2 V20 a2,2 0 0 0 2,2 H18 a2,2 0 0 0 2,-2 V7 Z M14,2 V6 a2,2 0 0 0 2,2 H20");
     public static Geometry Clock { get; } = G("M12,2 a10,10 0 1 0 0,20 a10,10 0 1 0 0,-20 Z M12,6 V12 L16,14");
     public static Geometry Keyboard { get; } = G("M4,4 H20 a2,2 0 0 1 2,2 V18 a2,2 0 0 1 -2,2 H4 a2,2 0 0 1 -2,-2 V6 a2,2 0 0 1 2,-2 Z M6,8 h.01 M10,8 h.01 M14,8 h.01 M18,8 h.01 M8,12 h.01 M12,12 h.01 M16,12 h.01 M7,16 h10");
     public static Geometry Shield { get; } = G("M20,13 c0,5 -3.5,7.5 -7.66,8.95 a1,1 0 0 1 -.67,-.01 C7.5,20.5 4,18 4,13 V6 a1,1 0 0 1 1,-1 c2,0 4.5,-1.2 6.24,-2.72 a1.17,1.17 0 0 1 1.52,0 C14.51,3.81 17,5 19,5 a1,1 0 0 1 1,1 Z");

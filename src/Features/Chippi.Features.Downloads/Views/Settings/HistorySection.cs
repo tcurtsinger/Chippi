@@ -12,9 +12,9 @@ using Chippi.UI.Controls;
 namespace Chippi.Features.Downloads.Views.Settings;
 
 /// <summary>
-/// History (DESIGN.md §5): search and a folder filter, then day eyebrows over one Panel per run with
-/// Surface rows. Undo per row and per run goes through an inline confirm bar; Clear history uses a
-/// popover. Import rows have no undo (nothing to go back to).
+/// History (DESIGN.md §5): search, a folder filter and Clear history, then day headers over one card
+/// per run (a header row, then indented file rows). Undo per row and per run goes through an inline
+/// confirm bar; Clear history uses a popover. Import rows have no undo (nothing to go back to).
 /// </summary>
 internal sealed class HistorySection : UserControl
 {
@@ -23,7 +23,7 @@ internal sealed class HistorySection : UserControl
 
     private readonly DownloadsModule _module;
     private readonly long? _focusRun;
-    private readonly SearchBox _search = new() { Placeholder = "Search", Height = 36 };
+    private readonly SearchBox _search = new() { Placeholder = "Search" };
     private readonly ComboBox _folder;
     private readonly StackPanel _runs = new();
     private readonly TextBlock _error = Ui.Warning("");
@@ -55,7 +55,6 @@ internal sealed class HistorySection : UserControl
         var folders = new List<string> { "All folders" };
         folders.AddRange(module.Settings.Folders.Select(f => Ui.FolderName(f.Path)));
         _folder = Ui.Choice(folders, 0, "Folder", 170);
-        _folder.Height = 36;
         _folder.SelectionChanged += (_, _) => Render();
 
         var clear = Ui.Button("Clear history", icon: LucideIcons.Trash);
@@ -68,7 +67,7 @@ internal sealed class HistorySection : UserControl
         bar.Children.Add(clear.Margin(10, 0, 0, 0).At(2));
 
         _error.Visibility = Visibility.Collapsed;
-        Content = Ui.Stack(bar, _error.Margin(0, 8, 0, 0), _runs.Margin(0, 6, 0, 0));
+        Content = Ui.Stack(bar.Margin(0, 16, 0, 0), _error.Margin(0, 8, 0, 0), _runs);
         Loaded += (_, _) =>
         {
             if (_module.Engine is { } engine)
@@ -109,13 +108,13 @@ internal sealed class HistorySection : UserControl
         var shown = operations.Where(o => o.Kind != HistoryOperationKind.Restore || o.State != OperationState.Completed).ToList();
         if (shown.Count == 0)
         {
-            _runs.Children.Add(Ui.Text(_search.Text.Length > 0 ? "No matches" : "Nothing organized yet", "CaptionTextStyle", "TextTertiaryBrush").Margin(0, 14, 0, 0));
+            _runs.Children.Add(Ui.Card(Ui.Pad(Ui.Text(_search.Text.Length > 0 ? "No matches" : "Nothing organized yet", "BodyTextStyle", "TextTertiaryBrush"))).Margin(0, 16, 0, 0));
             return;
         }
 
         foreach (var day in shown.GroupBy(o => o.PlannedAt.ToLocalTime().Date).OrderByDescending(g => g.Key))
         {
-            _runs.Children.Add(Ui.Eyebrow(DayLabel(day.Key)).Margin(0, 14, 0, 8));
+            _runs.Children.Add(Ui.Section(DayLabel(day.Key)));
             foreach (var run in day.GroupBy(o => o.RunId).OrderByDescending(g => g.Max(o => o.PlannedAt)))
                 _runs.Children.Add(Run(engine.History.GetRun(run.Key), [.. run.OrderBy(o => o.Id)], restores).Margin(0, 0, 0, 8));
         }
@@ -123,7 +122,7 @@ internal sealed class HistorySection : UserControl
             Dispatcher.BeginInvoke(() => target.BringIntoView(), DispatcherPriority.Loaded);
     }
 
-    private Border Run(RunRecord? run, IReadOnlyList<OperationRecord> rows, IReadOnlyDictionary<long, OperationRecord> restores)
+    private Card Run(RunRecord? run, IReadOnlyList<OperationRecord> rows, IReadOnlyDictionary<long, OperationRecord> restores)
     {
         long runId = rows[0].RunId;
         bool collapsed = rows.Count > CollapseOver && !_expanded.Contains(runId);
@@ -144,8 +143,10 @@ internal sealed class HistorySection : UserControl
         int failed = rows.Count(o => o.State == OperationState.Failed);
         int undone = rows.Count(o => o.State == OperationState.Undone);
         string counts = string.Join(" · ", new[] { (moved, "moved"), (failed, "failed"), (undone, "undone") }.Where(c => c.Item1 > 0).Select(c => $"{c.Item1} {c.Item2}"));
+        string time = Ui.Time(run?.StartedAt ?? rows[0].PlannedAt);
 
-        var head = Ui.Columns("Auto", "*", "Auto", "Auto");
+        // Header row: "Silent · Downloads" over "10:07 AM · 1 moved", then Undo run.
+        var head = Ui.Columns("Auto", "*", "Auto");
         if (rows.Count > CollapseOver)
         {
             var expand = Ui.Icon(collapsed ? LucideIcons.ChevronRight : LucideIcons.ChevronDown, collapsed ? $"Show {rows.Count} files" : "Hide files");
@@ -155,10 +156,9 @@ internal sealed class HistorySection : UserControl
                     _expanded.Remove(runId);
                 Render();
             };
-            head.Children.Add(expand.Margin(0, 0, 4, 0).At(0));
+            head.Children.Add(expand.Margin(-8, 0, 8, 0).At(0));
         }
-        head.Children.Add(Ui.Row(Ui.Text(trigger + where, "TitleTextStyle"), Ui.Mono(Ui.Time(run?.StartedAt ?? rows[0].PlannedAt), "TextTertiaryBrush").Margin(10, 0, 0, 0)).At(1));
-        head.Children.Add(Ui.Text(counts, "CaptionTextStyle", "TextTertiaryBrush").Margin(0, 0, 10, 0).At(2));
+        head.Children.Add(Ui.Stack(Ui.Text(trigger + where), Ui.Text(counts.Length > 0 ? $"{time} · {counts}" : time, "CaptionTextStyle")).At(1));
         if (undoable > 0)
         {
             var undoRun = Ui.Button("Undo run", icon: LucideIcons.Undo);
@@ -168,54 +168,46 @@ internal sealed class HistorySection : UserControl
                 _confirmingRow = null;
                 Render();
             };
-            head.Children.Add(undoRun.At(3));
+            head.Children.Add(undoRun.Margin(12, 0, 0, 0).At(2));
         }
-        head.Margin = new Thickness(8, 4, 4, 6);
 
-        var body = Ui.Stack(head);
+        var card = Ui.Card(Ui.Pad(head, 60));
+        card.Tag = runId;
         if (_confirming == runId && undoable > 0)
-            body.Children.Add(Confirm(undoable, run?.Folder, () => _ = UndoRunAsync(runId)));
+            card.Children.Add(Confirm(undoable, run?.Folder, () => _ = UndoRunAsync(runId)));
         if (!collapsed)
         {
             foreach (var row in rows)
             {
-                body.Children.Add(Row(row, restores.GetValueOrDefault(row.Id)).Margin(0, 0, 0, 4));
+                card.Children.Add(Row(row, restores.GetValueOrDefault(row.Id)));
                 if (_confirmingRow == row.Id)
-                    body.Children.Add(Confirm(1, Path.GetDirectoryName(row.SourcePath), () => _ = UndoRowAsync(row.Id)).Margin(0, 0, 0, 4));
+                    card.Children.Add(Confirm(1, Path.GetDirectoryName(row.SourcePath), () => _ = UndoRowAsync(row.Id)));
             }
         }
-        var panel = Ui.Panel(body, new Thickness(6, 6, 6, 2));
-        panel.Tag = runId;
-        if (_focusRun == runId)
-            panel.SetResourceReference(Border.BorderBrushProperty, "CardBorderBrush");
-        return panel;
+        return card;
     }
 
+    /// <summary>A file row, indented under its run: name over "Downloads › Documents", the state, and undo.</summary>
     private Border Row(OperationRecord op, OperationRecord? restore)
     {
         string name = Path.GetFileName(op.State == OperationState.Failed ? op.SourcePath : op.DestinationPath);
-        var from = Ui.Text(Ui.FolderName(Path.GetDirectoryName(op.SourcePath) ?? ""), "CaptionTextStyle", "TextTertiaryBrush");
-        var to = Ui.Text(Destination(op), "CaptionTextStyle", "TextTertiaryBrush");
-        var path = Ui.Row(from, Ui.Glyph(LucideIcons.ChevronRight, "TextMutedBrush", 11).Margin(5, 0, 5, 0), to);
-        var nameBlock = Ui.Text(name, "TitleTextStyle");
+        string path = $"{Ui.FolderName(Path.GetDirectoryName(op.SourcePath) ?? "")} › {Destination(op)}";
+        var nameBlock = Ui.Text(name);
         nameBlock.ToolTip = op.DestinationPath;
 
-        FrameworkElement status = op switch
+        TextBlock status = op switch
         {
-            { State: OperationState.Failed } => Ui.Row(Ui.Glyph(LucideIcons.Info, "WarningBrush", 13), Ui.Text($"Failed · {Lower(op.Error)}", "CaptionTextStyle", "WarningTextBrush").Margin(5, 0, 0, 0)),
-            { State: OperationState.Undone } => Ui.Row(Ui.Glyph(LucideIcons.Undo, "TextTertiaryBrush", 13),
-                Ui.Text("Undone", "CaptionTextStyle", "TextTertiaryBrush").Margin(5, 0, 0, 0),
-                Ui.Mono(restore?.CompletedAt is { } at ? Ui.Time(at) : "", "TextTertiaryBrush").Margin(6, 0, 0, 0)),
-            { Kind: HistoryOperationKind.Import } => Ui.Text("Imported", "CaptionTextStyle", "TextSecondaryBrush"),
-            { Kind: HistoryOperationKind.Rename } => Ui.Text("Renamed", "CaptionTextStyle", "TextSecondaryBrush"),
+            { State: OperationState.Failed } => Ui.Text($"Failed · {Lower(op.Error)}", "CaptionTextStyle", "WarningTextBrush"),
+            { State: OperationState.Undone } => Ui.Text(restore?.CompletedAt is { } at ? $"Undone · {Ui.Time(at)}" : "Undone", "CaptionTextStyle"),
+            { Kind: HistoryOperationKind.Import } => Ui.Text("Imported", "CaptionTextStyle"),
+            { Kind: HistoryOperationKind.Rename } => Ui.Text("Renamed", "CaptionTextStyle"),
             { Kind: HistoryOperationKind.Restore } => Ui.Text($"Not restored · {Lower(op.Error)}", "CaptionTextStyle", "WarningTextBrush"),
-            _ => Ui.Text("Moved", "CaptionTextStyle", "TextSecondaryBrush"),
+            _ => Ui.Text("", "CaptionTextStyle"),
         };
 
-        var grid = Ui.Columns("2*", "1.4*", "Auto", "34");
-        grid.Children.Add(Ui.Stack(nameBlock, path).At(0));
-        grid.Children.Add(status.Margin(10, 0, 10, 0).At(1));
-        grid.Children.Add(Ui.Mono(Ui.Time(op.CompletedAt ?? op.PlannedAt), "TextTertiaryBrush").Margin(0, 0, 8, 0).At(2));
+        var grid = Ui.Columns("*", "Auto", "32");
+        grid.Children.Add(Ui.Stack(nameBlock, Ui.Text(path, "CaptionTextStyle")).At(0));
+        grid.Children.Add(status.Margin(12, 0, 8, 0).At(1));
         if (Undoable(op))
         {
             var undo = Ui.Icon(LucideIcons.Undo, $"Undo {name}");
@@ -225,15 +217,16 @@ internal sealed class HistorySection : UserControl
                 _confirming = null;
                 Render();
             };
-            grid.Children.Add(undo.At(3));
+            grid.Children.Add(undo.At(2));
         }
-        var row = Ui.Surface(grid, new Thickness(12, 7, 6, 7));
         if (op.State == OperationState.Undone)
             nameBlock.Opacity = 0.7;
+        var row = Ui.Pad(grid, 52);
+        row.Padding = new Thickness(50, 8, 16, 8);
         return row;
     }
 
-    /// <summary>The inline confirm bar: "Undo 4 moves?" with Cancel and the only primary on screen.</summary>
+    /// <summary>The inline confirm bar: "Undo 4 moves?" with Cancel and the only accent button on screen.</summary>
     private Border Confirm(int count, string? folder, Action undo)
     {
         var cancel = Ui.Button("Cancel");
@@ -250,14 +243,12 @@ internal sealed class HistorySection : UserControl
         };
         var grid = Ui.Columns("*", "Auto", "Auto");
         grid.Children.Add(Ui.Stack(
-            Ui.Text(count == 1 ? "Undo this move?" : $"Undo {count} moves?", "TitleTextStyle"),
-            Ui.Text(folder is null ? "Files go back where they were" : $"Files go back to {Ui.FolderName(folder)}", "CaptionTextStyle", "TextTertiaryBrush")).At(0));
+            Ui.Text(count == 1 ? "Undo this move?" : $"Undo {count} moves?"),
+            Ui.Text(folder is null ? "Files go back where they were" : $"Files go back to {Ui.FolderName(folder)}", "CaptionTextStyle")).At(0));
         grid.Children.Add(cancel.Margin(0, 0, 8, 0).At(1));
         grid.Children.Add(go.At(2));
-        var bar = Ui.Surface(grid, new Thickness(14, 9, 9, 9));
+        var bar = Ui.Pad(grid, 60);
         bar.SetResourceReference(Border.BackgroundProperty, "SurfaceSelectedBrush");
-        bar.SetResourceReference(Border.BorderBrushProperty, "CardBorderBrush");
-        bar.Margin = new Thickness(0, 0, 0, 4);
         return bar;
     }
 
@@ -282,27 +273,26 @@ internal sealed class HistorySection : UserControl
         Render();
     }
 
-    /// <summary>Clear history: a small popover with one consequence line and a Signal Red Deep Clear.</summary>
+    /// <summary>Clear history: a small popover with one consequence line and a Critical Clear.</summary>
     private void ShowClearPopover(Button anchor)
     {
         var popup = new Popup { PlacementTarget = anchor, Placement = PlacementMode.Bottom, StaysOpen = false, AllowsTransparency = true, HorizontalOffset = -150 };
         var cancel = Ui.Button("Cancel");
         cancel.Click += (_, _) => popup.IsOpen = false;
-        var clear = Ui.Button("Clear", "PrimaryButtonStyle");
-        clear.SetResourceReference(BackgroundProperty, "DangerDeepBrush");
+        var clear = Ui.Button("Clear", "CriticalButtonStyle");
         clear.Click += (_, _) =>
         {
             popup.IsOpen = false;
             Clear();
         };
         var content = Ui.Stack(
-            Ui.Text("Clear history?", "TitleTextStyle"),
-            Ui.Text("Files stay where they are. Undo won't be possible.", "CaptionTextStyle", "TextTertiaryBrush").Margin(0, 4, 0, 14),
+            Ui.Text("Clear history?", "HeadlineTextStyle"),
+            Ui.Text("Files stay where they are. Undo won't be possible.", "CaptionTextStyle").Margin(0, 4, 0, 16),
             Ui.Row(cancel, clear.Margin(8, 0, 0, 0)));
         ((FrameworkElement)content.Children[2]).HorizontalAlignment = HorizontalAlignment.Right;
-        var card = new Border { CornerRadius = new CornerRadius(14), Padding = new Thickness(14), BorderThickness = new Thickness(1), Margin = new Thickness(0, 6, 0, 0), Child = content, Width = 300 };
-        card.SetResourceReference(Border.BackgroundProperty, "PanelBrush");
-        card.SetResourceReference(Border.BorderBrushProperty, "BorderStrongBrush");
+        var card = new Border { CornerRadius = new CornerRadius(8), Padding = new Thickness(16), BorderThickness = new Thickness(1), Margin = new Thickness(0, 6, 0, 0), Child = content, Width = 300 };
+        card.SetResourceReference(Border.BackgroundProperty, "FlyoutBrush");
+        card.SetResourceReference(Border.BorderBrushProperty, "WindowBorderBrush");
         popup.Child = card;
         popup.Opened += (_, _) => cancel.Focus();
         popup.IsOpen = true;

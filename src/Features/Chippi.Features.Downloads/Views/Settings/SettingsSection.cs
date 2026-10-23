@@ -13,17 +13,19 @@ using Microsoft.Win32;
 namespace Chippi.Features.Downloads.Views.Settings;
 
 /// <summary>
-/// Settings › the organizer's first section: watched folders (mode, grace, ignore file, remove),
-/// then Keep history, Explorer integration and Import archive. Notifications live on the app-wide page.
+/// Settings › the organizer's first section (DESIGN.md §5 "Downloads organizer"): watched folders as
+/// expander rows (mode, wait, ignore list, remove), then Options: Keep history, Explorer and Import
+/// archive. Notifications live on the app-wide page.
 /// </summary>
 internal sealed class SettingsSection : UserControl
 {
-    private static readonly (string Label, int Seconds)[] Graces = [("0s", 0), ("30s", 30), ("2 min", 120), ("10 min", 600), ("1 hr", 3600)];
+    private static readonly (string Label, int Seconds)[] Graces = [("No wait", 0), ("30 seconds", 30), ("2 minutes", 120), ("10 minutes", 600), ("1 hour", 3600)];
     private static readonly (string Label, int Days)[] Keeps = [("30 days", 30), ("90 days", 90), ("1 year", 365)];
 
     private readonly DownloadsModule _module;
     private readonly Action<Task<PreviewPlan>> _import;
-    private readonly StackPanel _folders = new();
+    private readonly ContentControl _folders = new() { Focusable = false };
+    private readonly HashSet<string> _expanded = new(StringComparer.OrdinalIgnoreCase);
     private readonly TextBlock _error = Ui.Warning("");
     private readonly TextBlock _importError = Ui.Warning("");
 
@@ -33,45 +35,34 @@ internal sealed class SettingsSection : UserControl
         _import = import;
 
         var add = Ui.Button("Add folder", icon: LucideIcons.Plus);
-        add.HorizontalAlignment = HorizontalAlignment.Right;
         add.Click += (_, _) => AddFolder();
-        var header = Ui.Columns("*", "Auto");
-        header.Children.Add(Ui.Eyebrow("Watched folders").At(0));
-        header.Children.Add(add.At(1));
 
         _error.Visibility = Visibility.Collapsed;
         _importError.Visibility = Visibility.Collapsed;
-        var page = Ui.Stack(header.Margin(0, 0, 0, 12), _folders, _error.Margin(0, 6, 0, 0), Ui.Eyebrow("More").Margin(0, 24, 0, 12), KeepHistoryRow(), ExplorerRow(), ImportRow());
-        Content = page;
+        Content = Ui.Stack(
+            Ui.Section("Watched folders", add, first: true),
+            _folders,
+            _error.Margin(0, 6, 0, 0),
+            Ui.Section("Options"),
+            Ui.Card(KeepHistoryRow(), ExplorerRow(), ImportRow()));
         Render();
     }
 
     private void Render()
     {
-        _folders.Children.Clear();
         var folders = _module.Settings.Folders;
-        if (folders.Count == 0)
-        {
-            _folders.Children.Add(Ui.Surface(Ui.Text("No folders yet", "CaptionTextStyle", "TextTertiaryBrush"), new Thickness(14)));
-            return;
-        }
-        foreach (var folder in folders)
-            _folders.Children.Add(FolderRow(folder).Margin(0, 0, 0, 6));
+        _folders.Content = folders.Count == 0
+            ? Ui.Card(Ui.Pad(Ui.Text("No folders yet", "BodyTextStyle", "TextTertiaryBrush")))
+            : Ui.Card([.. folders.Select(FolderRow)]);
     }
 
-    private Border FolderRow(WatchedFolder folder)
+    private ExpanderRow FolderRow(WatchedFolder folder)
     {
+        string name = Ui.FolderName(folder.Path);
         bool paused = folder.Mode == FolderMode.Paused;
-        var chip = new IconChip { Icon = LucideIcons.Folder, IsOn = !paused, VerticalAlignment = VerticalAlignment.Center };
-
         bool exists = Directory.Exists(folder.Path);
-        var name = Ui.Text(Ui.FolderName(folder.Path), "TitleTextStyle");
-        var path = Ui.Text(folder.Path + (folder.Path.StartsWith(@"\\", StringComparison.Ordinal) ? " · network" : "") + (exists ? "" : " · not found"),
-            "CaptionTextStyle", exists ? "TextTertiaryBrush" : "WarningTextBrush");
-        path.ToolTip = folder.Path;
 
-        var mode = Ui.Segment($"{Ui.FolderName(folder.Path)} mode", true, "Silent", "Manual", "Paused");
-        mode.Width = 228;
+        var mode = Ui.Segment($"{name} mode", "Silent", "Manual", "Paused");
         mode.SelectedIndex = folder.Mode switch { FolderMode.Silent => 0, FolderMode.Manual => 1, _ => 2 };
         mode.SelectionChanged += (_, _) => Edit(folder, f => f.Mode = mode.SelectedIndex switch { 0 => FolderMode.Silent, 1 => FolderMode.Manual, _ => FolderMode.Paused });
 
@@ -79,37 +70,53 @@ internal sealed class SettingsSection : UserControl
         var graceLabels = Graces.Select(g => g.Label).ToList();
         if (grace < 0)
         {
-            graceLabels.Add($"{folder.GraceSeconds}s"); // a hand-edited value stays visible
+            graceLabels.Add($"{folder.GraceSeconds} seconds"); // a hand-edited value stays visible
             grace = graceLabels.Count - 1;
         }
-        var graceBox = Ui.Choice(graceLabels, grace, $"{Ui.FolderName(folder.Path)} grace period", 86, mono: true);
+        var graceBox = Ui.Choice(graceLabels, grace, "Wait before moving", 160);
         graceBox.IsEnabled = folder.Mode == FolderMode.Silent;
         graceBox.SelectionChanged += (_, _) =>
         {
             if (graceBox.SelectedIndex is >= 0 and var i && i < Graces.Length)
                 Edit(folder, f => f.GraceSeconds = Graces[i].Seconds);
         };
-        var graceLabel = Ui.Text("Grace", "CaptionTextStyle", "TextTertiaryBrush").Margin(14, 0, 8, 0);
-        graceLabel.Opacity = graceBox.IsEnabled ? 1 : 0.45;
 
-        var ignore = Ui.Button("Ignore file", name: $"{Ui.FolderName(folder.Path)} ignore file").Margin(12, 0, 0, 0);
+        var ignore = Ui.Button("Edit", name: $"Edit {name} ignore list");
         ignore.IsEnabled = exists;
         ignore.Click += (_, _) => OpenIgnoreFile(folder.Path);
-        var remove = Ui.Icon(LucideIcons.Close, $"Remove {Ui.FolderName(folder.Path)}").Margin(6, 0, 0, 0);
+        var remove = Ui.Button("Remove", name: $"Stop watching {name}");
         remove.Click += (_, _) => Save(s => s.Folders.RemoveAll(f => Same(f.Path, folder.Path)));
 
-        var grid = Ui.Columns("32", "*", "Auto", "Auto", "Auto", "Auto", "Auto");
-        grid.Children.Add(chip.At(0));
-        grid.Children.Add(Ui.Stack(name, path).Margin(11, 0, 12, 0).At(1));
-        grid.Children.Add(mode.At(2));
-        grid.Children.Add(graceLabel.At(3));
-        grid.Children.Add(graceBox.At(4));
-        grid.Children.Add(ignore.At(5));
-        grid.Children.Add(remove.At(6));
-        return Ui.Surface(grid, new Thickness(12, 9, 10, 9));
+        var options = new Card();
+        options.SetResourceReference(StyleProperty, "CardRowsStyle");
+        options.Children.Add(Ui.Setting("Mode", folder.Mode switch
+        {
+            FolderMode.Silent => "Moves files on its own",
+            FolderMode.Manual => "Waits for your review",
+            _ => "Not watching",
+        }, mode));
+        options.Children.Add(Ui.Setting("Wait before moving", "Gives downloads time to finish", graceBox));
+        options.Children.Add(Ui.Setting("Ignore list", "Files and patterns to leave alone", ignore));
+        options.Children.Add(Ui.Setting("Stop watching this folder", "", remove));
+
+        string where = folder.Path + (folder.Path.StartsWith(@"\\", StringComparison.Ordinal) ? " · network" : "") + (exists ? "" : " · not found");
+        var row = new ExpanderRow
+        {
+            Header = name,
+            Description = where,
+            Icon = LucideIcons.Folder,
+            Value = folder.Mode.ToString(),
+            Content = options,
+            IsExpanded = _expanded.Contains(folder.Path),
+            ToolTip = folder.Path,
+        };
+        row.SetResourceReference(ForegroundProperty, paused ? "TextMutedBrush" : "AccentBrush");
+        row.Expanded += (_, _) => _expanded.Add(folder.Path);
+        row.Collapsed += (_, _) => _expanded.Remove(folder.Path);
+        return row;
     }
 
-    private Border KeepHistoryRow()
+    private SettingRow KeepHistoryRow()
     {
         int index = Array.FindIndex(Keeps, k => k.Days == _module.Settings.HistoryDays);
         var labels = Keeps.Select(k => k.Label).ToList();
@@ -118,40 +125,38 @@ internal sealed class SettingsSection : UserControl
             labels.Add($"{_module.Settings.HistoryDays} days");
             index = labels.Count - 1;
         }
-        var keep = Ui.Choice(labels, index, "Keep history", 120, mono: true);
+        var keep = Ui.Choice(labels, index, "Keep history", 160);
         keep.SelectionChanged += (_, _) =>
         {
             if (keep.SelectedIndex is >= 0 and var i && i < Keeps.Length)
                 Save(s => s.HistoryDays = Keeps[i].Days);
         };
-        var grid = Ui.Columns("*", "Auto");
-        grid.Children.Add(Ui.Text("Keep history", "TitleTextStyle").At(0));
-        grid.Children.Add(keep.At(1));
-        return Ui.Surface(grid, new Thickness(14, 10, 14, 10)).Margin(0, 0, 0, 6);
+        return Ui.Setting("Keep history", "", keep);
     }
 
-    private Border ExplorerRow()
+    private SettingRow ExplorerRow()
     {
         var toggle = Ui.Switch("Organize in Explorer", _module.Settings.OrganizeInExplorer);
-        toggle.Click += (_, _) =>
+        toggle.SetResourceReference(StyleProperty, "SwitchWithLabelStyle");
+        void Changed()
         {
-            Save(s => s.OrganizeInExplorer = toggle.IsChecked == true);
-            toggle.IsChecked = _module.Settings.OrganizeInExplorer;
-        };
-        var row = Ui.Columns("*", "Auto");
-        row.Children.Add(Ui.Stack(Ui.Text("Organize in Explorer", "TitleTextStyle"), Ui.Text("In \"Show more options\"", "CaptionTextStyle", "TextTertiaryBrush")).At(0));
-        row.Children.Add(toggle.At(1));
-        return Ui.Surface(row, new Thickness(14, 10, 14, 10)).Margin(0, 0, 0, 6);
+            bool on = toggle.IsChecked == true;
+            if (on != _module.Settings.OrganizeInExplorer)
+                Save(s => s.OrganizeInExplorer = on);
+            toggle.IsChecked = _module.Settings.OrganizeInExplorer; // a failed save shows the saved state
+        }
+        // Checked/Unchecked, so a UI Automation toggle saves too.
+        toggle.Checked += (_, _) => Changed();
+        toggle.Unchecked += (_, _) => Changed();
+        return Ui.Setting("Organize in Explorer", "Adds Organize to the right-click menu", toggle);
     }
 
-    private Border ImportRow()
+    private FrameworkElement ImportRow()
     {
         var choose = Ui.Button("Choose file…", name: "Import archive");
         choose.Click += async (_, _) => await ImportAsync(choose);
-        var grid = Ui.Columns("*", "Auto");
-        grid.Children.Add(Ui.Stack(Ui.Text("Import archive", "TitleTextStyle"), Ui.Text("zip, tgz, tar.gz", "CaptionTextStyle", "TextTertiaryBrush"), _importError).At(0));
-        grid.Children.Add(choose.At(1));
-        return Ui.Surface(grid, new Thickness(14, 10, 14, 10));
+        var row = Ui.Setting("Import archive", "zip, tgz or tar.gz", choose);
+        return Ui.Stack(row, _importError.Margin(16, 0, 16, 10));
     }
 
     private async Task ImportAsync(Button choose)

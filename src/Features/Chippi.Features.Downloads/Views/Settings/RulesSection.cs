@@ -29,10 +29,10 @@ internal sealed class RulesSection : UserControl
     private readonly RuleDrafts _drafts;
 
     private List<RuleSetting> _rules => _drafts.Drafts;
-    private readonly StackPanel _list = new();
+    private readonly ContentControl _list = new() { Focusable = false };
+    private readonly List<Border> _rows = [];
     private readonly TextBox _test = Ui.Field(name: "Test a file name");
-    private readonly StackPanel _testResult = Ui.Row();
-    private readonly Border _dropLine = new() { Height = 2, Margin = new Thickness(4, -4, 4, 2), IsHitTestVisible = false };
+    private readonly TextBlock _testResult = Ui.Text("");
     private string? _open;
     private string? _match;
     private readonly Dictionary<string, ContentControl> _badges = [];
@@ -44,25 +44,26 @@ internal sealed class RulesSection : UserControl
     {
         _module = module;
         _drafts = new RuleDrafts(module.Settings.Rules);
-        _dropLine.SetResourceReference(Border.BackgroundProperty, "AccentBrush");
 
+        // The test card: a search glyph, the field, and where the file would go on the right.
         _test.Width = 300;
+        _test.Tag = "Test a file name, like notes.txt";
         _test.TextChanged += (_, _) => RunTest();
+        _testResult.Margin = new Thickness(14, 0, 0, 0);
+        _testResult.HorizontalAlignment = HorizontalAlignment.Right;
         var testGrid = Ui.Columns("Auto", "Auto", "*");
-        testGrid.Children.Add(Ui.Row(Ui.Glyph(LucideIcons.Search, "TextTertiaryBrush", 14).Margin(0, 0, 8, 0), _test).At(0));
-        testGrid.Children.Add(Ui.Glyph(LucideIcons.ChevronRight, "TextTertiaryBrush", 14).Margin(14, 0, 14, 0).At(1));
+        testGrid.Children.Add(Ui.Glyph(LucideIcons.Search, "TextSecondaryBrush", 16).Margin(0, 0, 12, 0).At(0));
+        testGrid.Children.Add(_test.At(1));
         testGrid.Children.Add(_testResult.At(2));
-        var testBox = Ui.Panel(testGrid, new Thickness(14, 10, 14, 10));
 
         var add = Ui.Button("Add rule", icon: LucideIcons.Plus);
-        add.HorizontalAlignment = HorizontalAlignment.Right;
         add.Click += (_, _) => AddRule();
-        var header = Ui.Columns("Auto", "*", "Auto");
-        header.Children.Add(Ui.Eyebrow("Rules").At(0));
-        header.Children.Add(Ui.Text("First match wins", "CaptionTextStyle", "TextTertiaryBrush").Margin(10, 0, 0, 0).At(1));
-        header.Children.Add(add.At(2));
+        var title = Ui.Row(Ui.Text("Rules", "HeadlineTextStyle"), Ui.Text("First match wins", "CaptionTextStyle").Margin(10, 0, 0, 0));
+        var header = Ui.Columns("*", "Auto").Margin(0, 24, 0, 8);
+        header.Children.Add(title.At(0));
+        header.Children.Add(add.At(1));
 
-        Content = Ui.Stack(testBox, header.Margin(0, 22, 0, 12), _list);
+        Content = Ui.Stack(Ui.Card(Ui.Pad(testGrid)).Margin(0, 16, 0, 0), header, _list);
         // Typing saves after a short pause, so the organizer is not re-applied on every key.
         _saveTimer.Tick += (_, _) => SaveNow();
         Unloaded += (_, _) =>
@@ -79,20 +80,26 @@ internal sealed class RulesSection : UserControl
     private void Render(string? focusHandleOf = null)
     {
         _drafts.RevertProblems(); // editors are rebuilt from drafts
-        _list.Children.Clear();
         _badges.Clear();
+        _rows.Clear();
         if (_rules.Count == 0)
-            _list.Children.Add(Ui.Surface(Ui.Text("No rules yet", "CaptionTextStyle", "TextTertiaryBrush"), new Thickness(14)));
+        {
+            _list.Content = Ui.Card(Ui.Pad(Ui.Text("No rules yet", "BodyTextStyle", "TextTertiaryBrush")));
+            return;
+        }
+        var card = new Card();
         for (int i = 0; i < _rules.Count; i++)
         {
-            var card = Card(_rules[i], i, out var handle);
-            _list.Children.Add(card.Margin(0, 0, 0, 6));
+            var row = RuleRow(_rules[i], i, out var handle);
+            _rows.Add(row);
+            card.Children.Add(row);
             if (_rules[i].Id == focusHandleOf)
                 Dispatcher.BeginInvoke(() => handle.Focus());
         }
+        _list.Content = card;
     }
 
-    private Border Card(RuleSetting rule, int index, out DragHandle handle)
+    private Border RuleRow(RuleSetting rule, int index, out DragHandle handle)
     {
         bool open = rule.Id == _open;
         handle = new DragHandle { Width = 16, Height = 16, VerticalAlignment = VerticalAlignment.Center, ToolTip = "Drag to reorder (Alt+Up/Down)" };
@@ -105,19 +112,25 @@ internal sealed class RulesSection : UserControl
         var summary = Ui.Text(RuleChecks.Summary(rule), "CaptionTextStyle", "TextTertiaryBrush");
         var title = Ui.Stack(Ui.Text(rule.Name.Length > 0 ? rule.Name : "New rule", "TitleTextStyle"), summary);
         var enabled = Ui.Switch($"{rule.Name} on", rule.Enabled);
-        enabled.Click += (_, _) =>
+        void Enable()
         {
+            if (enabled.IsChecked == rule.Enabled)
+                return;
             rule.Enabled = enabled.IsChecked == true;
+            title.Opacity = rule.Enabled ? 1 : 0.6;
             Save();
             RunTest();
-        };
+        }
+        // Checked/Unchecked, so a UI Automation toggle reaches the rule too.
+        enabled.Checked += (_, _) => Enable();
+        enabled.Unchecked += (_, _) => Enable();
         var chevron = Ui.Icon(open ? LucideIcons.Up : LucideIcons.ChevronDown, open ? $"Close {rule.Name}" : $"Edit {rule.Name}");
         chevron.Click += (_, _) => Toggle(rule);
 
         var head = Ui.Columns("Auto", "34", "*", "Auto", "Auto", "Auto");
         head.Background = Brushes.Transparent; // the whole header opens the rule
         head.Children.Add(handle.At(0));
-        head.Children.Add(Ui.Mono($"{index + 1:00}", "TextTertiaryBrush").Margin(10, 0, 0, 0).At(1));
+        head.Children.Add(Ui.Number($"{index + 1}", "TextTertiaryBrush").Margin(10, 0, 0, 0).At(1));
         head.Children.Add(title.At(2));
         var badge = new ContentControl { Focusable = false, IsTabStop = false, VerticalAlignment = VerticalAlignment.Center };
         _badges[rule.Id] = badge;
@@ -133,15 +146,12 @@ internal sealed class RulesSection : UserControl
         var stack = Ui.Stack(head);
         if (open)
             stack.Children.Add(Editor(rule, summary));
-        var card = Ui.Surface(stack, new Thickness(12, 10, 10, 10));
+        // The border is the drop line while a drag targets this row.
+        // Padding plus the 2px border makes the 10 / 16 row padding.
+        var row = new Border { Child = stack, Padding = new Thickness(16, 8, 16, 8), MinHeight = 60, BorderBrush = Brushes.Transparent, BorderThickness = new Thickness(0, 2, 0, 2) };
         if (!rule.Enabled)
             title.Opacity = 0.6;
-        if (open)
-        {
-            card.BorderBrush = null;
-            card.SetResourceReference(Border.BorderBrushProperty, "CardBorderBrush");
-        }
-        card.PreviewKeyDown += (_, e) =>
+        row.PreviewKeyDown += (_, e) =>
         {
             // Alt+Up/Down moves the rule from anywhere inside it.
             if (e.Key == Key.System && e.SystemKey is Key.Up or Key.Down) // Alt+arrow arrives as a system key
@@ -150,7 +160,7 @@ internal sealed class RulesSection : UserControl
                 Move(index, e.SystemKey == Key.Up ? -1 : 1);
             }
         };
-        return card;
+        return row;
     }
 
     private void Toggle(RuleSetting rule)
@@ -176,20 +186,38 @@ internal sealed class RulesSection : UserControl
     {
         if (_dragFrom < 0)
             return;
-        // Rows are about one card apart; the gradient line shows where the rule will land.
-        double rowHeight = _list.Children.Count > 0 ? _list.ActualHeight / Math.Max(1, _rules.Count) : 60;
+        // Rows are about one row apart; an accent edge shows where the rule will land.
+        double rowHeight = _list.ActualHeight > 0 ? _list.ActualHeight / Math.Max(1, _rules.Count) : 60;
         int target = Math.Clamp(index + (int)Math.Round(e.VerticalChange / rowHeight), 0, _rules.Count - 1);
         if (target == _dragTo)
             return;
         _dragTo = target;
-        _list.Children.Remove(_dropLine);
-        if (target != _dragFrom)
-            _list.Children.Insert(target > _dragFrom ? target + 1 : target, _dropLine);
+        ShowDropLine(target == _dragFrom ? -1 : target, below: target > _dragFrom);
+    }
+
+    /// <summary>The 2px accent line on the target row's top edge (moving up) or bottom edge (moving down).</summary>
+    private void ShowDropLine(int row, bool below)
+    {
+        for (int i = 0; i < _rows.Count; i++)
+        {
+            if (i == row)
+            {
+                _rows[i].SetResourceReference(Border.BorderBrushProperty, "AccentBrush");
+                _rows[i].BorderThickness = below ? new Thickness(0, 0, 0, 2) : new Thickness(0, 2, 0, 0);
+                _rows[i].Padding = below ? new Thickness(16, 10, 16, 8) : new Thickness(16, 8, 16, 10);
+            }
+            else
+            {
+                _rows[i].BorderBrush = Brushes.Transparent;
+                _rows[i].BorderThickness = new Thickness(0, 2, 0, 2);
+                _rows[i].Padding = new Thickness(16, 8, 16, 8);
+            }
+        }
     }
 
     private void DropDragged()
     {
-        _list.Children.Remove(_dropLine);
+        ShowDropLine(-1, false);
         int from = _dragFrom, to = _dragTo;
         _dragFrom = _dragTo = -1;
         if (from < 0 || to < 0 || from == to)
@@ -242,7 +270,7 @@ internal sealed class RulesSection : UserControl
         editor.Children.Add(Line("Name", Ui.Stack(name, nameError)));
 
         // Conditions: each turns on with a checkbox; an unchecked one's fields dim.
-        editor.Children.Add(Ui.Eyebrow("Conditions").Margin(0, 14, 0, 8));
+        editor.Children.Add(Ui.Text("Conditions", "HeadlineTextStyle").Margin(0, 14, 0, 8));
 
         var extensions = Ui.Field(rule.Extensions is { } e ? string.Join(", ", e) : "", name: "Extensions", width: 320);
         var extensionsError = Hidden(Ui.Warning(""));
@@ -258,7 +286,7 @@ internal sealed class RulesSection : UserControl
         extensions.TextChanged += (_, _) => ApplyExtensions();
         editor.Children.Add(Condition(extensionsOn, "Extension", Ui.Stack(extensions, extensionsError), ApplyExtensions));
 
-        var regex = Ui.Field(rule.NameRegex ?? "", mono: true, name: "Name pattern", width: 460);
+        var regex = Ui.Field(rule.NameRegex ?? "", code: true, name: "Name pattern", width: 460);
         var regexError = Hidden(Ui.Warning(""));
         var regexOn = Ui.Check("Name matches", rule.NameRegex is { Length: > 0 });
         void ApplyRegex()
@@ -272,9 +300,9 @@ internal sealed class RulesSection : UserControl
         editor.Children.Add(Condition(regexOn, "Name matches", Ui.Stack(regex, regexError), ApplyRegex));
 
         int unit = rule.MaxBytes is { } mx && mx % Units[2].Bytes == 0 && mx > 0 ? 2 : rule.MaxBytes is { } k && k % Units[1].Bytes != 0 ? 0 : 1;
-        var min = Ui.Field(Amount(rule.MinBytes, Units[unit].Bytes), mono: true, name: "Minimum size", width: 90);
-        var max = Ui.Field(Amount(rule.MaxBytes, Units[unit].Bytes), mono: true, name: "Maximum size", width: 90);
-        var units = Ui.Choice(Units.Select(u => u.Label), unit, "Size unit", 76, mono: true);
+        var min = Ui.Field(Amount(rule.MinBytes, Units[unit].Bytes), name: "Minimum size", width: 90);
+        var max = Ui.Field(Amount(rule.MaxBytes, Units[unit].Bytes), name: "Maximum size", width: 90);
+        var units = Ui.Choice(Units.Select(u => u.Label), unit, "Size unit", 76);
         var sizeError = Hidden(Ui.Warning(""));
         var sizeOn = Ui.Check("Size", rule.MinBytes is not null || rule.MaxBytes is not null);
         void ApplySize()
@@ -295,8 +323,8 @@ internal sealed class RulesSection : UserControl
             Ui.Text("Max", "CaptionTextStyle", "TextTertiaryBrush").Margin(14, 0, 8, 0), max, units.Margin(8, 0, 0, 0));
         editor.Children.Add(Condition(sizeOn, "Size", Ui.Stack(sizeFields, sizeError), ApplySize));
 
-        var after = Ui.Field(rule.ModifiedAfter?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "", mono: true, name: "Modified after", width: 120);
-        var before = Ui.Field(rule.ModifiedBefore?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "", mono: true, name: "Modified before", width: 120);
+        var after = Ui.Field(rule.ModifiedAfter?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "", name: "Modified after", width: 120);
+        var before = Ui.Field(rule.ModifiedBefore?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "", name: "Modified before", width: 120);
         var dateError = Hidden(Ui.Warning(""));
         var dateOn = Ui.Check("Modified", rule.ModifiedAfter is not null || rule.ModifiedBefore is not null);
         void ApplyDates()
@@ -316,15 +344,13 @@ internal sealed class RulesSection : UserControl
         editor.Children.Add(Condition(dateOn, "Modified", Ui.Stack(dateFields, dateError), ApplyDates));
 
         // Action
-        editor.Children.Add(Ui.Eyebrow("Action").Margin(0, 14, 0, 8));
+        editor.Children.Add(Ui.Text("Action", "HeadlineTextStyle").Margin(0, 14, 0, 8));
         bool hold = rule.Action == RuleActionKind.Hold;
-        var action = hold ? Ui.Segment("Action", true, "Move to folder", "Rename", "Hold") : Ui.Segment("Action", true, "Move to folder", "Rename");
-        action.Width = hold ? 390 : 270;
-        action.HorizontalAlignment = HorizontalAlignment.Left;
+        var action = hold ? Ui.Segment("Action", "Move to folder", "Rename", "Hold") : Ui.Segment("Action", "Move to folder", "Rename");
         action.SelectedIndex = (int)rule.Action;
         editor.Children.Add(Line("", action));
 
-        var template = Ui.Field(rule.Template ?? "", mono: true, name: "Destination", width: 460);
+        var template = Ui.Field(rule.Template ?? "", code: true, name: "Destination", width: 460);
         var templateNote = Ui.Row();
         var tokens = new WrapPanel { Margin = new Thickness(0, 6, 0, 0) };
         var targetLabel = Ui.Text(rule.Action == RuleActionKind.Rename ? "New name" : "Destination", "BodyTextStyle");
@@ -343,8 +369,8 @@ internal sealed class RulesSection : UserControl
                 var chip = Ui.Button(token, name: $"Insert {token}");
                 chip.SetResourceReference(Control.FontFamilyProperty, "CodeFont");
                 chip.Padding = new Thickness(8, 0, 8, 0);
-                chip.MinHeight = 26;
-                chip.Height = 26;
+                chip.MinHeight = 22;
+                chip.Height = 22;
                 chip.Margin = new Thickness(0, 0, 6, 6);
                 chip.Click += (_, _) =>
                 {
@@ -414,7 +440,7 @@ internal sealed class RulesSection : UserControl
             Render();
         };
         var divider = new Border { Height = 1, Margin = new Thickness(0, 14, 0, 12) };
-        divider.SetResourceReference(Border.BackgroundProperty, "BorderSoftBrush");
+        divider.SetResourceReference(Border.BackgroundProperty, "BorderBrush");
         editor.Children.Add(divider);
         editor.Children.Add(Ui.Row(duplicate, delete.Margin(8, 0, 0, 0)));
         return editor;
@@ -477,11 +503,14 @@ internal sealed class RulesSection : UserControl
             fields.IsEnabled = toggle.IsChecked == true;
             fields.Opacity = fields.IsEnabled ? 1 : 0.45;
         }
-        toggle.Click += (_, _) =>
+        // Checked/Unchecked, so a UI Automation toggle applies the condition too.
+        void Flipped()
         {
             Dim();
             apply();
-        };
+        }
+        toggle.Checked += (_, _) => Flipped();
+        toggle.Unchecked += (_, _) => Flipped();
         Dim();
         var grid = Ui.Columns("164", "*");
         grid.Children.Add(head.At(0));
@@ -494,14 +523,10 @@ internal sealed class RulesSection : UserControl
 
     private void RunTest()
     {
-        _testResult.Children.Clear();
         string name = _test.Text.Trim();
         _match = null;
-        if (name.Length == 0)
-        {
-            _testResult.Children.Add(Ui.Text("Type a file name to see where it goes", "CaptionTextStyle", "TextTertiaryBrush"));
-        }
-        else
+        _testResult.Text = "";
+        if (name.Length > 0)
         {
             string folder = SampleFolder();
             // What would actually run: the committed rules, not drafts mid-edit.
@@ -516,26 +541,23 @@ internal sealed class RulesSection : UserControl
             {
                 plan = new PlannedOperation(OperationKind.Hold, name, null, null, [new PlanWarning(WarningKind.InvalidPath, "Not a valid file name")]);
             }
-            _match = plan.RuleId;
+            _match = plan.Kind is OperationKind.Move or OperationKind.Rename or OperationKind.Hold ? plan.RuleId : null;
             int index = _rules.FindIndex(r => r.Id == plan.RuleId);
-            switch (plan.Kind)
+            // DESIGN.md §5: "Txt Files → Documents" in Secondary, a hold in caution, no match in Caption.
+            (string text, string style, string brush) = plan.Kind switch
             {
-                case OperationKind.Move or OperationKind.Rename:
-                    _testResult.Children.Add(Ui.Badge($"{index + 1:00} {_rules[index].Name}", BadgeKind.Source).Margin(0, 0, 10, 0));
-                    _testResult.Children.Add(Ui.Text(Ui.Relative(folder, plan.Destination!), "BodyTextStyle"));
-                    break;
-                case OperationKind.Hold:
-                    _testResult.Children.Add(Ui.Text($"Held · {plan.HoldReason ?? plan.Warnings.LastOrDefault()?.Detail ?? "held"}", "BodyTextStyle", "WarningTextBrush"));
-                    break;
-                default:
-                    _match = null;
-                    _testResult.Children.Add(Ui.Text($"No match · stays in {Ui.FolderName(folder)}", "BodyTextStyle", "TextTertiaryBrush"));
-                    break;
-            }
+                OperationKind.Move or OperationKind.Rename =>
+                    ($"{(index >= 0 ? _rules[index].Name : "Rule")} → {Ui.Relative(folder, plan.Destination!)}", "BodyTextStyle", "TextSecondaryBrush"),
+                OperationKind.Hold => ($"Held · {plan.HoldReason ?? plan.Warnings.LastOrDefault()?.Detail ?? "held"}", "BodyTextStyle", "WarningTextBrush"),
+                _ => ($"No rule matches · stays in {Ui.FolderName(folder)}", "CaptionTextStyle", "TextTertiaryBrush"),
+            };
+            _testResult.Text = text;
+            _testResult.SetResourceReference(StyleProperty, style);
+            _testResult.SetResourceReference(TextBlock.ForegroundProperty, brush);
         }
-        // The winning rule gets the Match badge, in place, so a field being edited keeps focus.
+        // The winning rule gets a neutral Match badge, in place, so a field being edited keeps focus.
         foreach (var (id, host) in _badges)
-            host.Content = id == _match ? Ui.Badge("Match", BadgeKind.Source).Margin(0, 0, 10, 0) : null;
+            host.Content = id == _match ? Ui.Badge("Match", BadgeKind.Needs).Margin(0, 0, 10, 0) : null;
     }
 
     private string SampleFolder() =>
