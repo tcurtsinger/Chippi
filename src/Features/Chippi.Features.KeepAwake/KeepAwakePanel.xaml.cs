@@ -32,6 +32,8 @@ public partial class KeepAwakePanel : UserControl
         for (int minute = 0; minute < 1440; minute++)
             UntilTime.Items.Add(new ComboBoxItem { Content = KeepAwakeText.Until(minute), Tag = minute });
 
+        OnFlip(Switch, OnSwitch);
+        OnFlip(Screen, OnScreen);
         _tick.Tick += (_, _) => Refresh();
         Loaded += (_, _) => { _module.Changed += Refresh; _tick.Start(); Refresh(); };
         Unloaded += (_, _) => { _module.Changed -= Refresh; _tick.Stop(); };
@@ -41,10 +43,25 @@ public partial class KeepAwakePanel : UserControl
     {
         var chip = new ToggleButton { Content = label, Margin = new Thickness(0, 0, 8, 8) };
         chip.SetResourceReference(StyleProperty, "DurationChipStyle");
-        chip.Click += (_, _) => OnChip(chip, length);
+        OnFlip(chip, () => OnChip(chip, length));
         _chips.Add((chip, length));
         Chips.Children.Add(chip);
     }
+
+    /// <summary>
+    /// Runs <paramref name="changed"/> when the button's state flips by mouse, keyboard or UI
+    /// Automation (whose Toggle raises no Click). Handlers compare with the module's state, so
+    /// Refresh writing that state back does nothing.
+    /// </summary>
+    internal static void OnFlip(ToggleButton button, Action changed)
+    {
+        button.Checked += (_, _) => changed();
+        button.Unchecked += (_, _) => changed();
+    }
+
+    private bool IsSelected(KeepAwakeSettings? length) => _module.Active is { } active && (length is null
+        ? active.Mode == AwakeMode.UntilTime
+        : KeepAwakeText.SameLength(active, length));
 
     private void Refresh()
     {
@@ -53,25 +70,27 @@ public partial class KeepAwakePanel : UserControl
         Detail.Text = _module.Error ?? KeepAwakeText.Detail(_module);
         Switch.IsChecked = _module.IsOn;
         Screen.IsChecked = _module.Settings.KeepDisplayOn;
-
-        var active = _module.Active;
         foreach (var (chip, length) in _chips)
         {
-            bool selected = active is not null && (length is null
-                ? active.Mode == AwakeMode.UntilTime
-                : KeepAwakeText.SameLength(active, length));
+            bool selected = IsSelected(length);
             chip.IsChecked = selected;
             if (length is null)
-                chip.Content = selected ? $"Until {KeepAwakeText.Until(active!.UntilMinute)}" : UntilLabel;
+                chip.Content = selected ? $"Until {KeepAwakeText.Until(_module.Active!.UntilMinute)}" : UntilLabel;
         }
     }
 
-    private void OnSwitch(object sender, RoutedEventArgs e) => Run(_module.ToggleAsync());
+    private void OnSwitch()
+    {
+        if (Switch.IsChecked != _module.IsOn)
+            Run(_module.ToggleAsync());
+    }
 
     private void OnChip(ToggleButton chip, KeepAwakeSettings? length)
     {
-        bool selected = chip.IsChecked != true; // the click already flipped it
-        Refresh();
+        bool selected = IsSelected(length);
+        if (chip.IsChecked == selected)
+            return;
+        Refresh(); // the module's state shows until the change lands
         if (selected)
             Run(_module.StopSessionAsync());
         else if (length is not null)
@@ -91,11 +110,11 @@ public partial class KeepAwakePanel : UserControl
         Run(_module.StartSessionAsync(new KeepAwakeSettings { Mode = AwakeMode.UntilTime, UntilMinute = Math.Max(0, UntilTime.SelectedIndex) }));
     }
 
-    private void OnScreen(object sender, RoutedEventArgs e)
+    private void OnScreen()
     {
         bool on = Screen.IsChecked == true;
-        Refresh();
-        Run(_module.ApplyAsync(_module.Settings with { KeepDisplayOn = on }));
+        if (on != _module.Settings.KeepDisplayOn)
+            Run(_module.ApplyAsync(_module.Settings with { KeepDisplayOn = on }));
     }
 
     private void OnMoreOptions(object sender, RoutedEventArgs e) => _module.OpenSettings();

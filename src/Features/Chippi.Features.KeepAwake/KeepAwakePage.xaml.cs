@@ -25,6 +25,8 @@ public partial class KeepAwakePage : UserControl
             Length.Items.Add(new ComboBoxItem { Content = label, Tag = length });
         Length.SelectedItem = Length.Items.Cast<ComboBoxItem>().First(i => KeepAwakeText.SameLength((KeepAwakeSettings)i.Tag, saved));
         _ready = true;
+        KeepAwakePanel.OnFlip(Switch, OnSwitch);
+        KeepAwakePanel.OnFlip(Screen, OnScreen);
         Loaded += (_, _) => { _module.Changed += Refresh; Refresh(); };
         Unloaded += (_, _) => _module.Changed -= Refresh;
     }
@@ -37,7 +39,11 @@ public partial class KeepAwakePage : UserControl
         Screen.IsChecked = _module.Settings.KeepDisplayOn;
     }
 
-    private void OnSwitch(object sender, RoutedEventArgs e) => Run(_module.ToggleAsync());
+    private void OnSwitch()
+    {
+        if (Switch.IsChecked != _module.IsOn)
+            Run(_module.ToggleAsync());
+    }
 
     private void OnLength(object sender, SelectionChangedEventArgs e)
     {
@@ -51,8 +57,12 @@ public partial class KeepAwakePage : UserControl
         }));
     }
 
-    private void OnScreen(object sender, RoutedEventArgs e) =>
-        Run(_module.ApplyAsync(_module.Settings with { KeepDisplayOn = Screen.IsChecked == true }));
+    private void OnScreen()
+    {
+        bool on = Screen.IsChecked == true;
+        if (on != _module.Settings.KeepDisplayOn)
+            Run(_module.ApplyAsync(_module.Settings with { KeepDisplayOn = on }));
+    }
 
     private async void Run(Task change)
     {

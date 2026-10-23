@@ -19,7 +19,7 @@
       <TextBlock x:Name="Detail" Style="{DynamicResource CaptionTextStyle}" TextWrapping="Wrap" />
      </StackPanel>
      <ToggleButton x:Name="Switch" Grid.Column="1" Style="{DynamicResource SwitchStyle}" VerticalAlignment="Center"
-                   AutomationProperties.Name="Keep awake" Click="OnSwitch" />
+                   AutomationProperties.Name="Keep awake" />
     </Grid>
     <!-- 3 columns with 8px gaps: each chip carries 8px right and below, the grid takes the right back. -->
     <UniformGrid x:Name="Chips" Columns="3" Margin="12,0,4,4" />
@@ -31,7 +31,7 @@
     </Grid.ColumnDefinitions>
     <TextBlock Text="Keep screen on" VerticalAlignment="Center" />
     <ToggleButton x:Name="Screen" Grid.Column="1" Style="{DynamicResource SwitchStyle}" VerticalAlignment="Center"
-                  AutomationProperties.Name="Keep screen on" Click="OnScreen" />
+                  AutomationProperties.Name="Keep screen on" />
    </Grid>
    <Button Style="{DynamicResource FlyoutRowButtonStyle}" Click="OnMoreOptions" AutomationProperties.Name="More options">
     <DockPanel>

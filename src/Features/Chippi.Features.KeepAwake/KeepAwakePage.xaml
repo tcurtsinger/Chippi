@@ -8,7 +8,7 @@
  <StackPanel>
   <c:Card>
    <c:SettingRow x:Name="Status" Header="Keep awake" Icon="{x:Static c:LucideIcons.Coffee}" Foreground="{DynamicResource AccentBrush}">
-    <ToggleButton x:Name="Switch" Style="{DynamicResource SwitchWithLabelStyle}" Click="OnSwitch" />
+    <ToggleButton x:Name="Switch" Style="{DynamicResource SwitchWithLabelStyle}" />
    </c:SettingRow>
   </c:Card>
 
@@ -18,7 +18,7 @@
     <ComboBox x:Name="Length" Style="{DynamicResource HopperComboBoxStyle}" MinWidth="160" SelectionChanged="OnLength" />
    </c:SettingRow>
    <c:SettingRow Header="Keep screen on">
-    <ToggleButton x:Name="Screen" Style="{DynamicResource SwitchWithLabelStyle}" Click="OnScreen" />
+    <ToggleButton x:Name="Screen" Style="{DynamicResource SwitchWithLabelStyle}" />
    </c:SettingRow>
    <c:SettingRow Header="After a restart" Description="Sessions don't carry over">
     <TextBlock Text="Starts off" Style="{DynamicResource BodyTextStyle}" Foreground="{DynamicResource TextSecondaryBrush}" />
