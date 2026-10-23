@@ -6,7 +6,7 @@ Build the app, then run from the checkout:
 
 ```powershell
 dotnet build src/Chippi.App/Chippi.App.csproj -c Release -r win-x64
-$env:CHIPPI_SMOKE_EXE = (Resolve-Path src/Chippi.App/bin/Release/net10.0-windows/win-x64/Chippi.exe).Path
+$env:CHIPPI_SMOKE_EXE = (Resolve-Path src/Chippi.App/bin/Release/net10.0-windows10.0.19041.0/win-x64/Chippi.exe).Path
 $env:CHIPPI_UI_SMOKE = '1'
 dotnet test tests/Chippi.UiSmoke/Chippi.UiSmoke.csproj -c Release --logger 'console;verbosity=normal'
 Remove-Item Env:CHIPPI_UI_SMOKE, Env:CHIPPI_SMOKE_EXE

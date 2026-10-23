@@ -164,6 +164,18 @@ internal sealed class DesktopSession : IDisposable
             try { if (!child.HasExited) { child.Kill(entireProcessTree: true); child.WaitForExit(10000); } }
             finally { child.Dispose(); }
         }
+        bool notificationsCleaned = false;
+        try
+        {
+            var info = new ProcessStartInfo(Executable) { UseShellExecute = false, CreateNoWindow = true };
+            info.ArgumentList.Add("--cleanup-dev-notifications");
+            info.ArgumentList.Add("--dev-profile");
+            info.ArgumentList.Add(_profile);
+            using var cleanup = System.Diagnostics.Process.Start(info) ?? throw new InvalidOperationException("Notification cleanup did not start");
+            if (cleanup.WaitForExit(15000)) notificationsCleaned = cleanup.ExitCode == 0;
+            else { cleanup.Kill(entireProcessTree: true); cleanup.WaitForExit(10000); }
+        }
+        catch (Exception ex) { _output.WriteLine($"Notification cleanup failed: {ex.Message}"); }
         using (var key = Registry.CurrentUser.OpenSubKey(RunKey, writable: true))
             key?.DeleteValue(StartupName, throwOnMissingValue: false);
         if (Directory.Exists(Path.Combine(_local, "logs")))
@@ -174,6 +186,7 @@ internal sealed class DesktopSession : IDisposable
         DeleteProfile(_local);
         if (_foreground != 0) SetForegroundWindow(_foreground);
         Assert.Null(StartupCommand);
+        Assert.True(notificationsCleaned, "Dev notification registration was not cleaned");
     }
 
     private void DeleteProfile(string path)

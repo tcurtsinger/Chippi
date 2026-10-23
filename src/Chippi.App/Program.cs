@@ -13,7 +13,7 @@ namespace Chippi.App;
 public static class Program
 {
     [STAThread]
-    public static void Main()
+    public static int Main()
     {
         // Before Velopack too: the processes it starts can arrive without %windir%.
         App.EnsureWindowsDirectoryEnvironment();
@@ -27,11 +27,15 @@ public static class Program
                 try { new StartupRegistration().SetEnabled(false); }
                 catch (Exception) { }
                 try { new ExplorerRegistration().SetEnabled(false); } catch (Exception) { }
+                Notifications.ClassicToastPresenter.Uninstall();
             })
             .Run();
 
-        var app = new App();
+        var startup = Notifications.ToastStartup.Prepare(Environment.GetCommandLineArgs()[1..]);
+        if (startup.Exit) return startup.ExitCode;
+        var app = new App { NotificationStartup = startup };
         app.InitializeComponent();
         app.Run();
+        return 0;
     }
 }

@@ -21,6 +21,8 @@ namespace Chippi.App;
 public partial class App : Application
 {
     private SingleInstance? _instance;
+    internal Notifications.ToastStartup? NotificationStartup { get; init; }
+    private Notifications.ClassicToastPresenter? _toasts;
 
     /// <summary>Another launch handed this instance its arguments (a verb, or nothing: open the flyout). Raised on the UI thread.</summary>
     public event EventHandler<ActivationEventArgs>? ActivationRequested;
@@ -79,7 +81,7 @@ public partial class App : Application
         }
 
         // One instance per session. A second launch hands its arguments to the first and exits.
-        _instance = SingleInstance.TryAcquire(string.IsNullOrWhiteSpace(devProfile) ? "Chippi" : $"Chippi-{devProfile}", e.Args);
+        _instance = NotificationStartup?.Owner ?? SingleInstance.TryAcquire(string.IsNullOrWhiteSpace(devProfile) ? "Chippi" : $"Chippi-{devProfile}", e.Args);
         if (_instance is null)
         {
             Log.Info("Chippi is already running; passed this launch to it");
@@ -116,6 +118,13 @@ public partial class App : Application
         bool debugMode = e.Args.Contains("--debug", StringComparer.OrdinalIgnoreCase)
             || Environment.GetEnvironmentVariable("CHIPPI_DEBUG") == "1";
         Shell = new ShellContext(Config, LoggerFactory, debugMode, devProfile);
+        _toasts = NotificationStartup?.Presenter ?? Notifications.ClassicToastPresenter.TryCreate(devProfile, Dispatcher);
+        Shell.Services.Toasts = _toasts;
+        if (_toasts is not null)
+        {
+            _toasts.Unavailable += () => Shell.Services.Toasts = null;
+            _toasts.RouteTo(arguments => Shell.HandleActivation(arguments));
+        }
         Shell.Commands.QuitRequested += async (_, _) => await QuitAsync();
         ActivationRequested += (_, args) => Shell.HandleActivation(args.Arguments);
 
@@ -126,7 +135,7 @@ public partial class App : Application
             Shutdown();
             return;
         }
-        _ = RouteLaunchAsync(e.Args);
+        _ = RouteLaunchAsync(NotificationStartup?.Arguments ?? e.Args);
     }
 
     /// <summary>
@@ -215,6 +224,7 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        _toasts?.Dispose();
         _instance?.Dispose();
         LoggerFactory?.Dispose();
         base.OnExit(e);
