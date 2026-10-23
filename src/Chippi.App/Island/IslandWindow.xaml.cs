@@ -64,16 +64,22 @@ public partial class IslandWindow : Window
     private const int WS_EX_APPWINDOW = 0x00040000;
     private const int WS_EX_NOACTIVATE = 0x08000000;
 
-    private static readonly TimeSpan Morph = TimeSpan.FromMilliseconds(260);
+    private static readonly TimeSpan Morph = TimeSpan.FromMilliseconds(240);
     private static readonly TimeSpan ContentFadeIn = TimeSpan.FromMilliseconds(150);
     private static readonly TimeSpan ContentFadeOut = TimeSpan.FromMilliseconds(90);
-    private static readonly TimeSpan HoverDelay = TimeSpan.FromMilliseconds(400);
+    private static readonly TimeSpan HoverDelay = TimeSpan.FromMilliseconds(150);
 
-    private static readonly TimeSpan LeaveCheck = TimeSpan.FromMilliseconds(180);
+    // Leaving and re-entering within this time (crossing the hairline, say) does not collapse.
+    private static readonly TimeSpan LeaveGrace = TimeSpan.FromMilliseconds(120);
 
     private readonly DispatcherTimer _hoverTimer;
     private readonly DispatcherTimer _leaveTimer;
     private readonly DispatcherTimer _clockTimer;
+
+    // The surface: the lift and content clip share one shape; the hairline follows it half a pixel in.
+    private readonly RectangleGeometry _shape = new();
+    private readonly RectangleGeometry _ring = new();
+    private Size _expandedSize = new(ExpandedWidth, RestingHeight);
     private IReadOnlyList<IslandActivity> _activities = [];
     private IslandState _state = IslandState.Resting;
     private bool _expandRequested;
@@ -90,25 +96,25 @@ public partial class IslandWindow : Window
     {
         InitializeComponent();
 
+        Lift.Data = _shape;
+        Frame.Data = _ring;
+        Stage.Clip = _shape;
+
+        // The window never resizes under the pointer, so enter and leave are reported faithfully:
+        // no pointer polling. Both timers are one-shot.
         _hoverTimer = new DispatcherTimer { Interval = HoverDelay };
         _hoverTimer.Tick += (_, _) =>
         {
             _hoverTimer.Stop();
-            if (PointerOverIsland())
+            if (Island.IsMouseOver)
                 Expand();
         };
-        // Resizing a layered window under the pointer can produce a spurious mouse-leave before the new
-        // frame is on screen, so a leave only collapses once the pointer is really outside the island.
-        _leaveTimer = new DispatcherTimer { Interval = LeaveCheck };
+        _leaveTimer = new DispatcherTimer { Interval = LeaveGrace };
         _leaveTimer.Tick += (_, _) =>
         {
-            if (!_expandRequested || PointerOverIsland() || DebugMenu.IsOpen)
-            {
-                if (!_expandRequested)
-                    _leaveTimer.Stop();
-                return; // keep checking while the pointer is over it (WPF may not report the next leave)
-            }
             _leaveTimer.Stop();
+            if (!_expandRequested || Island.IsMouseOver || DebugMenu.IsOpen)
+                return; // a closing debug menu restarts this
             _expandRequested = false;
             Refresh();
         };
@@ -117,6 +123,7 @@ public partial class IslandWindow : Window
 
         Island.MouseEnter += (_, _) =>
         {
+            _leaveTimer.Stop();
             if (!_expandRequested)
                 _hoverTimer.Start();
         };
@@ -148,16 +155,15 @@ public partial class IslandWindow : Window
             if (_expandRequested)
                 _leaveTimer.Start();
         };
-        Island.SizeChanged += (_, _) => UpdateCornerRadius();
         PlayPauseButton.Click += (_, _) => TogglePlayGlyph();
         Motion.Changed += OnMotionChanged;
         Closed += (_, _) => Motion.Changed -= OnMotionChanged;
         DpiChanged += (_, _) => Dispatcher.BeginInvoke(DispatcherPriority.Render, Place);
 
-        _windowSize = WindowSizeFor(RestingWidth, RestingHeight);
+        Render();
+        FitWindowToContent();
         Width = _windowSize.Width;
         Height = _windowSize.Height;
-        Render();
         SnapTo(IslandState.Resting);
     }
 
@@ -278,11 +284,16 @@ public partial class IslandWindow : Window
             SET_WINDOW_POS_FLAGS.SWP_NOACTIVATE | SET_WINDOW_POS_FLAGS.SWP_NOOWNERZORDER);
     }
 
-    private static Size WindowSizeFor(double islandWidth, double islandHeight) =>
-        new(Math.Ceiling(islandWidth + 2 * LiftSide), Math.Ceiling(TopGap + islandHeight + LiftBelow));
-
-    private void SetWindowSize(Size size)
+    /// <summary>
+    /// One window size for every state: the expanded island plus its lift. It changes only when the
+    /// expanded content does (a new activity section), never on hover or during a morph.
+    /// </summary>
+    private void FitWindowToContent()
     {
+        _expandedSize = IslandSizeFor(IslandState.Expanded);
+        double surfaceHeight = Math.Max(_expandedSize.Height, LiveHeight);
+        Island.Height = surfaceHeight;
+        var size = new Size(Math.Ceiling(ExpandedWidth + 2 * LiftSide), Math.Ceiling(TopGap + surfaceHeight + LiftBelow));
         if (size == _windowSize)
             return;
         _windowSize = size;
@@ -312,16 +323,6 @@ public partial class IslandWindow : Window
         : _activities.Count > 0 ? IslandState.Live
         : IslandState.Resting;
 
-    /// <summary>Whether the pointer is inside the island's current bounds, read from the system cursor (physical pixels).</summary>
-    private bool PointerOverIsland()
-    {
-        if (!IsVisible || PresentationSource.FromVisual(Island) is null || !PInvoke.GetCursorPos(out var cursor))
-            return false;
-        var topLeft = Island.PointToScreen(new Point(0, 0));
-        var bottomRight = Island.PointToScreen(new Point(Island.ActualWidth, Island.ActualHeight));
-        return cursor.X >= topLeft.X && cursor.X < bottomRight.X && cursor.Y >= topLeft.Y && cursor.Y < bottomRight.Y;
-    }
-
     private void Expand()
     {
         if (_expandRequested || !IsVisible)
@@ -335,12 +336,13 @@ public partial class IslandWindow : Window
     {
         var target = TargetState;
         UpdatePetMood(target);
+        FitWindowToContent();
         bool animate = IsVisible && !Motion.IsReduced;
         if (target == _state)
         {
             // Same state, new content: re-fit the live pill's width or the expanded height.
             var size = IslandSizeFor(target);
-            if (Math.Abs(size.Width - Island.Width) > 0.5 || Math.Abs(size.Height - Island.Height) > 0.5)
+            if (Math.Abs(size.Width - _shape.Rect.Width) > 0.5 || Math.Abs(size.Height - _shape.Rect.Height) > 0.5)
                 MorphTo(target, animate);
             UpdateEqualizer();
             return;
@@ -355,9 +357,25 @@ public partial class IslandWindow : Window
         _state = target;
         int generation = ++_morphGeneration;
         var size = IslandSizeFor(target);
+        var shape = ShapeFor(size);
+        double radius = target == IslandState.Expanded ? ExpandedRadius : size.Height / 2;
         var (petLeft, petTop, petSize) = PetSlot(target);
+        // The pet's slot is inside the hairline of the pill, which is centered on the canvas.
+        double petX = shape.X + 1 + petLeft, petY = shape.Y + 1 + petTop, petScale = petSize / Pet.Size;
 
-        Lift.Effect = (Effect)FindResource(target == IslandState.Expanded ? "IslandExpandedShadow" : "IslandShadow");
+        // The live layer sits where the live pill will be; only content changes move it, never a frame.
+        if (target == IslandState.Live)
+        {
+            Canvas.SetLeft(LiveLayer, shape.X + 1 + LiveTextInset);
+            Canvas.SetTop(LiveLayer, shape.Y + 1);
+            LiveLayer.Width = Math.Max(0, size.Width - 2 - LiveTextInset - LiveRightInset);
+            LiveLayer.Height = size.Height - 2;
+        }
+
+        // The larger lift appears as the island opens and stays until it has closed.
+        bool expanding = target == IslandState.Expanded;
+        if (expanding || !animate)
+            Lift.Effect = (Effect)FindResource(expanding ? "IslandExpandedShadow" : "IslandShadow");
         LiveLayer.IsHitTestVisible = target == IslandState.Live;
         ExpandedLayer.IsHitTestVisible = target == IslandState.Expanded;
         double liveOpacity = target == IslandState.Live ? 1 : 0;
@@ -375,12 +393,16 @@ public partial class IslandWindow : Window
 
         if (!animate)
         {
-            SetWindowSize(WindowSizeFor(size.Width, size.Height));
-            Set(Island, WidthProperty, size.Width);
-            Set(Island, HeightProperty, size.Height);
-            Set(Pet, Canvas.LeftProperty, petLeft);
-            Set(Pet, Canvas.TopProperty, petTop);
-            Set(Pet, Gumdrop.SizeProperty, petSize);
+            Set(_shape, RectangleGeometry.RectProperty, shape);
+            Set(_shape, RectangleGeometry.RadiusXProperty, radius);
+            Set(_shape, RectangleGeometry.RadiusYProperty, radius);
+            Set(_ring, RectangleGeometry.RectProperty, Inset(shape));
+            Set(_ring, RectangleGeometry.RadiusXProperty, radius - 0.5);
+            Set(_ring, RectangleGeometry.RadiusYProperty, radius - 0.5);
+            Set(PetMove, TranslateTransform.XProperty, petX);
+            Set(PetMove, TranslateTransform.YProperty, petY);
+            Set(PetScale, ScaleTransform.ScaleXProperty, petScale);
+            Set(PetScale, ScaleTransform.ScaleYProperty, petScale);
             Set(LiveLayer, OpacityProperty, liveOpacity);
             Set(ExpandedLayer, OpacityProperty, expandedOpacity);
             if (liveOpacity == 0)
@@ -391,33 +413,51 @@ public partial class IslandWindow : Window
             return;
         }
 
-        // Grow the window first so the morph is never clipped; shrink it once the morph is done.
-        double fromWidth = Island.ActualWidth > 0 ? Island.ActualWidth : Island.Width;
-        double fromHeight = Island.ActualHeight > 0 ? Island.ActualHeight : Island.Height;
-        SetWindowSize(WindowSizeFor(Math.Max(fromWidth, size.Width), Math.Max(fromHeight, size.Height)));
-
-        var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
-        var width = new DoubleAnimation(size.Width, new Duration(Morph)) { EasingFunction = ease };
-        width.Completed += (_, _) =>
+        // Only render properties animate: the shape (which is also the content clip), the hairline and
+        // the pet's transform. No layout pass and no window resize happen per frame.
+        var shapeAnimation = Animate(new RectAnimation(shape, new Duration(Morph)));
+        shapeAnimation.Completed += (_, _) =>
         {
-            if (generation == _morphGeneration)
-                SetWindowSize(WindowSizeFor(size.Width, size.Height));
+            if (generation == _morphGeneration && !expanding)
+                Lift.Effect = (Effect)FindResource("IslandShadow");
         };
-        Island.BeginAnimation(WidthProperty, width, HandoffBehavior.SnapshotAndReplace);
-        Island.BeginAnimation(HeightProperty, new DoubleAnimation(size.Height, new Duration(Morph)) { EasingFunction = ease }, HandoffBehavior.SnapshotAndReplace);
-        Pet.BeginAnimation(Canvas.LeftProperty, new DoubleAnimation(petLeft, new Duration(Morph)) { EasingFunction = ease }, HandoffBehavior.SnapshotAndReplace);
-        Pet.BeginAnimation(Canvas.TopProperty, new DoubleAnimation(petTop, new Duration(Morph)) { EasingFunction = ease }, HandoffBehavior.SnapshotAndReplace);
-        Pet.BeginAnimation(Gumdrop.SizeProperty, new DoubleAnimation(petSize, new Duration(Morph)) { EasingFunction = ease }, HandoffBehavior.SnapshotAndReplace);
+        _shape.BeginAnimation(RectangleGeometry.RectProperty, shapeAnimation, HandoffBehavior.SnapshotAndReplace);
+        _shape.BeginAnimation(RectangleGeometry.RadiusXProperty, Animate(new DoubleAnimation(radius, new Duration(Morph))), HandoffBehavior.SnapshotAndReplace);
+        _shape.BeginAnimation(RectangleGeometry.RadiusYProperty, Animate(new DoubleAnimation(radius, new Duration(Morph))), HandoffBehavior.SnapshotAndReplace);
+        _ring.BeginAnimation(RectangleGeometry.RectProperty, Animate(new RectAnimation(Inset(shape), new Duration(Morph))), HandoffBehavior.SnapshotAndReplace);
+        _ring.BeginAnimation(RectangleGeometry.RadiusXProperty, Animate(new DoubleAnimation(radius - 0.5, new Duration(Morph))), HandoffBehavior.SnapshotAndReplace);
+        _ring.BeginAnimation(RectangleGeometry.RadiusYProperty, Animate(new DoubleAnimation(radius - 0.5, new Duration(Morph))), HandoffBehavior.SnapshotAndReplace);
+        PetMove.BeginAnimation(TranslateTransform.XProperty, Animate(new DoubleAnimation(petX, new Duration(Morph))), HandoffBehavior.SnapshotAndReplace);
+        PetMove.BeginAnimation(TranslateTransform.YProperty, Animate(new DoubleAnimation(petY, new Duration(Morph))), HandoffBehavior.SnapshotAndReplace);
+        PetScale.BeginAnimation(ScaleTransform.ScaleXProperty, Animate(new DoubleAnimation(petScale, new Duration(Morph))), HandoffBehavior.SnapshotAndReplace);
+        PetScale.BeginAnimation(ScaleTransform.ScaleYProperty, Animate(new DoubleAnimation(petScale, new Duration(Morph))), HandoffBehavior.SnapshotAndReplace);
         FadeLayer(LiveLayer, liveOpacity, generation);
         FadeLayer(ExpandedLayer, expandedOpacity, generation);
         UpdateEqualizer();
     }
 
+    /// <summary>The surface for a state's size: centered on the 328-wide canvas, at its top.</summary>
+    private static Rect ShapeFor(Size size) => new((ExpandedWidth - size.Width) / 2, 0, size.Width, size.Height);
+
+    /// <summary>The hairline is stroked half a pixel inside the shape, so all of it is inside the edge.</summary>
+    private static Rect Inset(Rect rect) => new(rect.X + 0.5, rect.Y + 0.5, Math.Max(0, rect.Width - 1), Math.Max(0, rect.Height - 1));
+
+    private static T Animate<T>(T animation) where T : AnimationTimeline
+    {
+        if (animation is DoubleAnimation number)
+            number.EasingFunction = MorphEase;
+        else if (animation is RectAnimation rect)
+            rect.EasingFunction = MorphEase;
+        return animation;
+    }
+
+    private static readonly IEasingFunction MorphEase = new QuarticEase { EasingMode = EasingMode.EaseOut };
+
     /// <summary>Outgoing content fades quickly, then hides; incoming content fades in once the surface has mostly reached its size.</summary>
     private void FadeLayer(UIElement layer, double to, int generation)
     {
         var animation = to > 0
-            ? new DoubleAnimation(to, new Duration(ContentFadeIn)) { BeginTime = TimeSpan.FromMilliseconds(Morph.TotalMilliseconds * 0.55) }
+            ? new DoubleAnimation(to, new Duration(ContentFadeIn)) { BeginTime = TimeSpan.FromMilliseconds(Morph.TotalMilliseconds * 0.45) }
             : new DoubleAnimation(to, new Duration(ContentFadeOut));
         if (to == 0)
         {
@@ -430,10 +470,11 @@ public partial class IslandWindow : Window
         layer.BeginAnimation(OpacityProperty, animation, HandoffBehavior.SnapshotAndReplace);
     }
 
-    private static void Set(DependencyObject target, DependencyProperty property, double value)
+    /// <summary>Stops any running animation of the property, then sets it.</summary>
+    private static void Set(DependencyObject target, DependencyProperty property, object value)
     {
-        if (target is UIElement element)
-            element.BeginAnimation(property, null);
+        if (target is IAnimatable animatable)
+            animatable.BeginAnimation(property, null);
         target.SetValue(property, value);
     }
 
@@ -450,7 +491,8 @@ public partial class IslandWindow : Window
                 return new Size(Math.Clamp(Math.Ceiling(content), RestingWidth, LiveMaxWidth), LiveHeight);
             case IslandState.Expanded:
                 ExpandedLayer.Measure(new Size(ExpandedWidth - 2, double.PositiveInfinity));
-                return new Size(ExpandedWidth, Math.Ceiling(ExpandedLayer.DesiredSize.Height + 2));
+                // The layer sits 12 below the top edge (1px hairline + 11 padding); 13 padding + 1px hairline below.
+                return new Size(ExpandedWidth, Math.Ceiling(Canvas.GetTop(ExpandedLayer) + ExpandedLayer.DesiredSize.Height + 14));
             default:
                 return new Size(RestingWidth, RestingHeight);
         }
@@ -463,14 +505,6 @@ public partial class IslandWindow : Window
         IslandState.Expanded => (13, 11, 28),
         _ => ((RestingWidth - 2 - 28) / 2, (RestingHeight - 2 - 28) / 2, 28),
     };
-
-    /// <summary>Pills are fully rounded (half the height); the expanded island has a 24px radius.</summary>
-    private void UpdateCornerRadius()
-    {
-        double radius = Math.Min(Island.ActualHeight / 2, Math.Max(ExpandedRadius, Math.Min(Island.ActualHeight, LiveHeight) / 2));
-        Lift.CornerRadius = new CornerRadius(radius);
-        Frame.CornerRadius = new CornerRadius(radius);
-    }
 
     /// <summary>Resting is sleepy; the expanded header shows the pet awake (idle) even when nothing is live.</summary>
     private void UpdatePetMood(IslandState target) =>
