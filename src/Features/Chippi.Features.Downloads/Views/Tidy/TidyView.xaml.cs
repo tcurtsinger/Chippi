@@ -92,7 +92,7 @@ public partial class TidyView : UserControl
                 ModeLine.ToolTip = current.Path;
                 Folders.ToolTip = current.Path;
                 Modes.SelectedIndex = current.Mode switch { FolderMode.Silent => 0, FolderMode.Manual => 1, _ => 2 };
-                FolderChip.SetResourceReference(Border.BackgroundProperty, current.Mode == FolderMode.Paused ? "ChipBrush" : "AccentGradientBrush");
+                FolderChip.IsOn = current.Mode != FolderMode.Paused;
             }
             var history = engine?.History.Query(new HistoryQuery { Take = 24, From = _module.Settings.HistoryClearedUtc }) ?? [];
             var rows = TidyProjection.Rows(pending, history, DateTimeOffset.UtcNow);

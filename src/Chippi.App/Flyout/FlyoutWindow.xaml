@@ -53,7 +53,7 @@
 
                 <!-- Tabs: the segmented trough, only the tabs something contributes to. -->
                 <c:SegmentedControl x:Name="Tabs" Grid.Row="1" Margin="0,12,0,0"
-                                    Style="{StaticResource TabSegmentedControlStyle}"
+                                    Style="{StaticResource FlyoutTabsStyle}"
                                     AutomationProperties.Name="Flyout sections"
                                     SelectionChanged="OnTabChanged" />
 

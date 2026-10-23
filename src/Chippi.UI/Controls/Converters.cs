@@ -43,13 +43,3 @@ public sealed class IconKeyToGeometryConverter : IValueConverter
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
         Binding.DoNothing;
 }
-
-/// <summary>Formats a 0-100 volume as a whole-number percent for the mono readout.</summary>
-public sealed class PercentConverter : IValueConverter
-{
-    public object Convert(object value, Type targetType, object parameter, CultureInfo culture) =>
-        value is double d ? Math.Round(d).ToString("0", culture) + "%" : "";
-
-    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
-        Binding.DoNothing;
-}

@@ -11,7 +11,7 @@ namespace Chippi.UI.Controls;
 /// <summary>
 /// Renders a <see cref="Geometry"/> as a stroke icon. The geometry is authored in a 24x24 box
 /// (see <see cref="LucideIcons"/>); a Viewbox scales everything, stroke included, so icons keep
-/// their weight at any size. Ported from Hopper; the default stroke is DESIGN.md's 1.8.
+/// their weight at any size. Ported from Hopper; the default stroke is DESIGN.md's 1.6.
 /// </summary>
 public sealed class LucideIcon : Viewbox
 {
@@ -21,7 +21,7 @@ public sealed class LucideIcon : Viewbox
     {
         _path = new Path
         {
-            StrokeThickness = 1.8,
+            StrokeThickness = 1.6,
             StrokeLineJoin = PenLineJoin.Round,
             StrokeStartLineCap = PenLineCap.Round,
             StrokeEndLineCap = PenLineCap.Round,
@@ -66,7 +66,7 @@ public sealed class LucideIcon : Viewbox
             icon.Height = (double)e.NewValue;
         }));
 
-    /// <summary>Drawn size in DIPs. DESIGN.md draws icons at 15-17px.</summary>
+    /// <summary>Drawn size in DIPs. DESIGN.md draws icons at 16px (20px for a Settings row lead glyph).</summary>
     public double Size
     {
         get => (double)GetValue(SizeProperty);
@@ -75,7 +75,7 @@ public sealed class LucideIcon : Viewbox
 
     public static readonly DependencyProperty ThicknessProperty = DependencyProperty.Register(
         nameof(Thickness), typeof(double), typeof(LucideIcon),
-        new PropertyMetadata(1.8, (d, e) => ((LucideIcon)d)._path.StrokeThickness = (double)e.NewValue));
+        new PropertyMetadata(1.6, (d, e) => ((LucideIcon)d)._path.StrokeThickness = (double)e.NewValue));
 
     /// <summary>Stroke width in the 24px design grid.</summary>
     public double Thickness

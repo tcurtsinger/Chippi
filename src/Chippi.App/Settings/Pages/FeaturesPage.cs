@@ -39,7 +39,7 @@ internal sealed class FeaturesPage : UserControl
         _shell = shell;
         _openModulePage = openModulePage;
 
-        _count.SetResourceReference(StyleProperty, "MonoTextStyle");
+        _count.SetResourceReference(StyleProperty, "NumberTextStyle");
         _count.SetResourceReference(TextBlock.ForegroundProperty, "TextTertiaryBrush");
         AutomationProperties.SetLiveSetting(_count, AutomationLiveSetting.Polite);
 
@@ -195,7 +195,7 @@ internal sealed class HubCard : FeatureCard
     {
         Entry = entry;
         SetResourceReference(StyleProperty, typeof(FeatureCard));
-        FocusVisualStyle = (Style)Application.Current.FindResource("FocusRing14");
+        FocusVisualStyle = (Style)Application.Current.FindResource("FocusRing8");
         var d = entry.Descriptor;
         FeatureName = d.Name;
         Description = d.Description;

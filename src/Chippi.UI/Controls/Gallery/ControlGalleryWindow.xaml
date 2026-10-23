@@ -1,236 +1,282 @@
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
 <!-- Debug-only control gallery (run Chippi.exe with &#45;&#45;gallery in a Debug build). Shows every token
-     and control state for review against DESIGN.md. Hover and Tab through it to see hover and
-     the focus rings; "Disable all" shows the .45 disabled state. -->
+     and control state for review against DESIGN.md, in dark and light and with any accent. Hover
+     and Tab through it to see hover and the focus rings; "Disable all" shows the .45 disabled state. -->
 <Window x:Class="Chippi.UI.Controls.Gallery.ControlGalleryWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:c="clr-namespace:Chippi.UI.Controls"
-        xmlns:m="clr-namespace:Chippi.Core.Modules;assembly=Chippi.Core"
         Title="Chippi control gallery (debug)" Width="1180" Height="900"
-        Style="{StaticResource ChippiWindowStyle}"
-        Background="{DynamicResource BackdropBrush}" WindowStartupLocation="CenterScreen">
+        Style="{StaticResource ChippiWindowStyle}" WindowStartupLocation="CenterScreen">
     <Window.Resources>
-        <Style x:Key="Section" TargetType="{x:Type Border}">
-            <Setter Property="Background" Value="{DynamicResource WindowBackgroundBrush}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource WindowBorderBrush}" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="13" />
-            <Setter Property="Padding" Value="16" />
-            <Setter Property="Margin" Value="0,0,0,14" />
+        <Style x:Key="Section" TargetType="{x:Type TextBlock}" BasedOn="{StaticResource HeadlineTextStyle}">
+            <Setter Property="Margin" Value="0,24,0,8" />
         </Style>
-        <Style x:Key="Swatch" TargetType="{x:Type Border}">
+        <Style x:Key="Token" TargetType="{x:Type Border}">
             <Setter Property="Width" Value="118" />
-            <Setter Property="Height" Value="40" />
-            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Height" Value="36" />
+            <Setter Property="CornerRadius" Value="4" />
             <Setter Property="BorderBrush" Value="{DynamicResource BorderStrongBrush}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Margin" Value="0,0,8,8" />
+            <Setter Property="Margin" Value="0,0,8,4" />
         </Style>
     </Window.Resources>
 
     <DockPanel>
-        <Border DockPanel.Dock="Top" Background="{DynamicResource TitlebarBrush}" Padding="16,10">
+        <Border DockPanel.Dock="Top" Background="{DynamicResource TitlebarBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" Padding="28,10">
             <DockPanel>
-                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
-                    <TextBlock Text="Disable all" VerticalAlignment="Center" Margin="0,0,10,0" Foreground="{DynamicResource TextTertiaryBrush}" />
-                    <ToggleButton x:Name="DisableAll" Style="{StaticResource SwitchStyle}" AutomationProperties.Name="Disable all controls" />
+                <ToggleButton x:Name="DisableAll" DockPanel.Dock="Right" Style="{StaticResource SwitchStyle}" VerticalAlignment="Center" AutomationProperties.Name="Disable all controls" />
+                <TextBlock DockPanel.Dock="Right" Text="Disable all" VerticalAlignment="Center" Margin="0,0,12,0" />
+                <StackPanel Orientation="Horizontal">
+                    <c:SegmentedControl x:Name="ThemePicker" SelectionChanged="OnThemeChanged" AutomationProperties.Name="Theme">
+                        <c:SegmentItem Label="Dark" />
+                        <c:SegmentItem Label="Light" />
+                        <c:SegmentItem Label="Follow Windows" />
+                    </c:SegmentedControl>
+                    <c:SegmentedControl x:Name="AccentPicker" Margin="12,0,0,0" SelectionChanged="OnAccentChanged" AutomationProperties.Name="Accent">
+                        <c:SegmentItem Label="Blue" />
+                        <c:SegmentItem Label="Violet" />
+                        <c:SegmentItem Label="Green" />
+                        <c:SegmentItem Label="Pink" />
+                    </c:SegmentedControl>
                 </StackPanel>
-                <c:SegmentedControl x:Name="ThemePicker" Width="300" HorizontalAlignment="Left" SelectionChanged="OnThemeChanged"
-                                    AutomationProperties.Name="Theme">
+            </DockPanel>
+        </Border>
+
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <Border x:Name="Root" Padding="28,4,40,40" Background="{DynamicResource WindowBackgroundBrush}"
+                    IsEnabled="{Binding IsChecked, ElementName=DisableAll, Converter={StaticResource InverseBool}}">
+            <StackPanel>
+
+                <!-- Type -->
+                <TextBlock Style="{StaticResource Section}" Text="Typography" />
+                <c:Card>
+                    <StackPanel Margin="16,12">
+                        <TextBlock Style="{StaticResource DisplayTextStyle}" Text="Page title 20/600 Display · Downloads organizer" />
+                        <TextBlock Style="{StaticResource HeadlineTextStyle}" Text="Section 14/600 · Watched folders" Margin="0,8,0,0" />
+                        <TextBlock Style="{StaticResource BodyTextStyle}" Text="Body 14/400 · Keep screen on" Margin="0,8,0,0" />
+                        <TextBlock Style="{StaticResource CaptionTextStyle}" Text="Caption 12/400 · Silent · moves after 30s" Margin="0,4,0,0" />
+                        <TextBlock Style="{StaticResource NavGroupTextStyle}" Text="Nav group 12/600 · Your features" Margin="0,8,0,0" />
+                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                            <TextBlock Style="{StaticResource NumberTextStyle}" Text="1111111111" />
+                            <TextBlock Style="{StaticResource NumberTextStyle}" Text="0000000000" Margin="16,0,0,0" />
+                            <TextBlock Style="{StaticResource CaptionTextStyle}" Text="Tabular figures: both runs are the same width" Margin="16,0,0,0" VerticalAlignment="Center" />
+                        </StackPanel>
+                        <TextBlock Text="Code · ^invoice-(\d{4})\.pdf$ → Invoices\{year}" FontFamily="{StaticResource CodeFont}" Margin="0,8,0,0" />
+                        <TextBlock x:Name="FontReport" Style="{StaticResource CaptionTextStyle}" Margin="0,12,0,0" TextWrapping="Wrap" />
+                    </StackPanel>
+                </c:Card>
+
+                <!-- Tokens -->
+                <TextBlock Style="{StaticResource Section}" Text="Tokens" />
+                <WrapPanel x:Name="Swatches" />
+
+                <!-- Buttons -->
+                <TextBlock Style="{StaticResource Section}" Text="Buttons" />
+                <WrapPanel VerticalAlignment="Center">
+                    <Button Style="{StaticResource PrimaryButtonStyle}" Content="Organize now" Margin="0,0,8,0" />
+                    <Button Style="{StaticResource SecondaryButtonStyle}" Content="Rules" Margin="0,0,8,0" />
+                    <Button Style="{StaticResource SecondaryButtonStyle}" Content="Disabled" IsEnabled="False" Margin="0,0,8,0" />
+                    <Button Style="{StaticResource CriticalButtonStyle}" Content="Clear" Margin="0,0,8,0" />
+                    <Button Style="{StaticResource SubtleButtonStyle}" Margin="0,0,16,0" AutomationProperties.Name="Settings">
+                        <StackPanel Orientation="Horizontal">
+                            <c:LucideIcon Data="{x:Static c:LucideIcons.Settings}" Size="16" VerticalAlignment="Center"
+                                          Brush="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                            <TextBlock Text="Settings" Margin="8,0,0,0" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <c:IconButton Icon="{x:Static c:LucideIcons.Undo}" ToolTip="Undo" Margin="0,0,4,0" />
+                    <c:IconButton Icon="{x:Static c:LucideIcons.Trash}" AutomationProperties.Name="Remove" Margin="0,0,16,0" />
+                    <Button Style="{StaticResource WindowButtonStyle}" AutomationProperties.Name="Minimize">
+                        <c:LucideIcon Data="{x:Static c:LucideIcons.Minus}" Size="14"
+                                      Brush="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                    </Button>
+                    <Button Style="{StaticResource CloseButtonStyle}" AutomationProperties.Name="Close">
+                        <c:LucideIcon Data="{x:Static c:LucideIcons.Close}" Size="14"
+                                      Brush="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                    </Button>
+                </WrapPanel>
+
+                <!-- Inputs -->
+                <TextBlock Style="{StaticResource Section}" Text="Switches, slider, combo, fields" />
+                <WrapPanel VerticalAlignment="Center">
+                    <ToggleButton Style="{StaticResource SwitchStyle}" AutomationProperties.Name="Off switch" Margin="0,0,16,0" />
+                    <ToggleButton Style="{StaticResource SwitchStyle}" IsChecked="True" AutomationProperties.Name="On switch" Margin="0,0,16,0" />
+                    <ToggleButton Style="{StaticResource SwitchStyle}" IsEnabled="False" AutomationProperties.Name="Disabled switch" Margin="0,0,16,0" />
+                    <ToggleButton Style="{StaticResource SwitchWithLabelStyle}" IsChecked="True" AutomationProperties.Name="Labeled switch" Margin="0,0,24,0" />
+                    <Slider Style="{StaticResource HopperSliderStyle}" Width="200" Minimum="0" Maximum="100" Value="64"
+                            AutomationProperties.Name="Volume" VerticalAlignment="Center" Margin="0,0,24,0" />
+                    <ComboBox Style="{StaticResource HopperComboBoxStyle}" SelectedIndex="1" AutomationProperties.Name="Default length">
+                        <ComboBoxItem Content="30 min" />
+                        <ComboBoxItem Content="1 hr" />
+                        <ComboBoxItem Content="No limit" />
+                    </ComboBox>
+                    <ComboBox Style="{StaticResource HopperComboBoxStyle}" Tag="Pick a folder" Margin="8,0,0,0" AutomationProperties.Name="Folder">
+                        <ComboBoxItem Content="Downloads" />
+                    </ComboBox>
+                </WrapPanel>
+                <WrapPanel Margin="0,12,0,0" VerticalAlignment="Center">
+                    <CheckBox Content="Unchecked" Margin="0,0,16,0" />
+                    <CheckBox Content="Checked" IsChecked="True" Margin="0,0,16,0" />
+                    <CheckBox Content="Mixed" IsChecked="{x:Null}" IsThreeState="True" Margin="0,0,16,0" />
+                    <CheckBox Content="Disabled" IsEnabled="False" Margin="0,0,16,0" />
+                    <CheckBox Content="Disabled checked" IsChecked="True" IsEnabled="False" />
+                </WrapPanel>
+                <WrapPanel Margin="0,12,0,0">
+                    <TextBox Style="{StaticResource TextFieldStyle}" Width="240" Tag="Test a file name, like notes.txt" AutomationProperties.Name="Test" Margin="0,0,8,0" />
+                    <TextBox Style="{StaticResource TextFieldStyle}" Width="240" Text="Invoices\{year}\{month}" FontFamily="{StaticResource CodeFont}" AutomationProperties.Name="Destination" Margin="0,0,8,0" />
+                    <TextBox Style="{StaticResource TextFieldStyle}" Width="160" Text="Disabled" IsEnabled="False" AutomationProperties.Name="Disabled field" Margin="0,0,8,0" />
+                    <c:SearchBox Width="240" Placeholder="Find a setting" AutomationProperties.Name="Find a setting" />
+                </WrapPanel>
+
+                <!-- Selection -->
+                <TextBlock Style="{StaticResource Section}" Text="Segmented, SelectorBar, tabs, nav" />
+                <c:SegmentedControl SelectedIndex="2" AutomationProperties.Name="Theme sample">
                     <c:SegmentItem Label="Dark" />
                     <c:SegmentItem Label="Light" />
                     <c:SegmentItem Label="Follow Windows" />
                 </c:SegmentedControl>
-            </DockPanel>
-        </Border>
+                <c:SegmentedControl Style="{StaticResource FlyoutSegmentedControlStyle}" Width="356" HorizontalAlignment="Left" SelectedIndex="0" Margin="0,12,0,0"
+                                    AutomationProperties.Name="Folder mode">
+                    <c:SegmentItem Label="Silent" />
+                    <c:SegmentItem Label="Manual" />
+                    <c:SegmentItem Label="Paused" />
+                </c:SegmentedControl>
+                <c:SegmentedControl Style="{StaticResource SelectorBarStyle}" SelectedIndex="0" Margin="0,12,0,0" AutomationProperties.Name="Section">
+                    <c:SegmentItem Label="Settings" />
+                    <c:SegmentItem Label="Rules" />
+                    <c:SegmentItem Label="History" />
+                </c:SegmentedControl>
+                <DockPanel Margin="0,12,0,0">
+                    <c:SegmentedControl Style="{StaticResource FlyoutTabsStyle}" SelectedIndex="0" VerticalAlignment="Top" AutomationProperties.Name="Flyout sections">
+                        <c:SegmentItem Label="Keep awake" Icon="{x:Static c:LucideIcons.Coffee}" />
+                        <c:SegmentItem Label="Tidy" Icon="{x:Static c:LucideIcons.Folder}" />
+                        <c:SegmentItem Label="Sound" Icon="{x:Static c:LucideIcons.Volume}" />
+                    </c:SegmentedControl>
+                    <ListBox Width="272" Margin="40,0,0,0" HorizontalAlignment="Left" Background="Transparent" BorderThickness="0" SelectedIndex="0"
+                             ItemContainerStyle="{StaticResource NavItemStyle}" ItemTemplate="{StaticResource NavItemTemplate}"
+                             AutomationProperties.Name="Settings pages">
+                        <ListBox.Template>
+                            <ControlTemplate TargetType="{x:Type ListBox}">
+                                <ItemsPresenter />
+                            </ControlTemplate>
+                        </ListBox.Template>
+                        <c:SegmentItem Label="Downloads organizer" Icon="{x:Static c:LucideIcons.Folder}" />
+                        <c:SegmentItem Label="Keep awake" Icon="{x:Static c:LucideIcons.Coffee}" />
+                        <c:SegmentItem Label="General" Icon="{x:Static c:LucideIcons.Settings}" />
+                    </ListBox>
+                </DockPanel>
 
-        <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="18">
-            <StackPanel x:Name="Root" IsEnabled="{Binding IsChecked, ElementName=DisableAll, Converter={StaticResource InverseBool}}">
-                <!-- Type -->
-                <Border Style="{StaticResource Section}">
+                <!-- Rows -->
+                <TextBlock Style="{StaticResource Section}" Text="Card, rows, expander" />
+                <c:Card>
+                    <c:SettingRow Header="Keep awake" Description="On · no time limit" Icon="{x:Static c:LucideIcons.Coffee}" Foreground="{DynamicResource AccentBrush}">
+                        <ToggleButton Style="{StaticResource SwitchWithLabelStyle}" IsChecked="True" />
+                    </c:SettingRow>
+                    <c:SettingRow Header="Default length" Description="Used when you start it without picking one">
+                        <ComboBox Style="{StaticResource HopperComboBoxStyle}" SelectedIndex="0">
+                            <ComboBoxItem Content="No limit" />
+                            <ComboBoxItem Content="1 hr" />
+                        </ComboBox>
+                    </c:SettingRow>
+                    <c:SettingRow Header="Keep screen on">
+                        <ToggleButton Style="{StaticResource SwitchWithLabelStyle}" />
+                    </c:SettingRow>
+                    <c:ExpanderRow Header="Downloads" Description="C:\Users\you\Downloads" Icon="{x:Static c:LucideIcons.Folder}" Value="Silent"
+                                   Foreground="{DynamicResource AccentBrush}" IsExpanded="True">
+                        <c:Card Style="{StaticResource CardRowsStyle}">
+                            <c:SettingRow Header="Wait before moving" Description="Gives downloads time to finish">
+                                <ComboBox Style="{StaticResource HopperComboBoxStyle}" SelectedIndex="0">
+                                    <ComboBoxItem Content="30 seconds" />
+                                </ComboBox>
+                            </c:SettingRow>
+                            <c:SettingRow Header="Stop watching this folder">
+                                <Button Style="{StaticResource SecondaryButtonStyle}" Content="Remove" />
+                            </c:SettingRow>
+                        </c:Card>
+                    </c:ExpanderRow>
+                </c:Card>
+
+                <!-- Flyout parts -->
+                <TextBlock Style="{StaticResource Section}" Text="Flyout card, duration chips, icon chips (at flyout width)" />
+                <WrapPanel>
+                    <StackPanel Width="356" Margin="0,0,24,0" TextElement.FontSize="13">
+                        <c:Card Style="{StaticResource FlyoutCardStyle}">
+                            <Grid Margin="16,12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Text="On · 1 hr left" />
+                                    <TextBlock Text="Until 11:42 AM" Style="{StaticResource CaptionTextStyle}" />
+                                </StackPanel>
+                                <ToggleButton Grid.Column="1" Style="{StaticResource SwitchStyle}" IsChecked="True" VerticalAlignment="Center" AutomationProperties.Name="Keep awake" />
+                            </Grid>
+                            <UniformGrid Columns="3" Margin="12,12,8,8">
+                                <ToggleButton Style="{StaticResource DurationChipStyle}" Content="30 min" Margin="0,0,8,8" />
+                                <ToggleButton Style="{StaticResource DurationChipStyle}" Content="1 hr" IsChecked="True" Margin="0,0,8,8" />
+                                <ToggleButton Style="{StaticResource DurationChipStyle}" Content="2 hr" Margin="0,0,8,8" />
+                                <ToggleButton Style="{StaticResource DurationChipStyle}" Content="4 hr" Margin="0,0,8,8" />
+                                <ToggleButton Style="{StaticResource DurationChipStyle}" Content="No limit" Margin="0,0,8,8" />
+                                <ToggleButton Style="{StaticResource DurationChipStyle}" Content="Until…" Margin="0,0,8,8" />
+                            </UniformGrid>
+                        </c:Card>
+                    </StackPanel>
                     <StackPanel>
-                        <c:Eyebrow Text="Typography" Margin="0,0,0,10" />
-                        <TextBlock Style="{StaticResource DisplayTextStyle}" Text="Display 17/800 · Features" />
-                        <TextBlock Style="{StaticResource HeadlineTextStyle}" Text="Headline 15.5/700 · Chippi" Margin="0,6,0,0" />
-                        <TextBlock Style="{StaticResource TitleTextStyle}" Text="Title 13.5/600 · Keep awake" Margin="0,6,0,0" />
-                        <TextBlock Style="{StaticResource BodyTextStyle}" Text="Body 12.5/500 · Prevents sleep while you are away" Margin="0,6,0,0" />
-                        <TextBlock Style="{StaticResource CaptionTextStyle}" Text="Caption 11.5/500 · Pinned · noise suppression on" Margin="0,6,0,0" />
-                        <c:Eyebrow Text="Label 10.5/700 now playing to" Margin="0,8,0,0" />
-                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                            <TextBlock Style="{StaticResource MonoTextStyle}" Text="Mono 11.5/600 · 64% 12:04 1.2 MB/s" />
-                            <TextBlock Style="{StaticResource MonoReadoutTextStyle}" Text="23%" Margin="18,0,0,0" />
+                        <StackPanel Orientation="Horizontal">
+                            <c:IconChip Icon="{x:Static c:LucideIcons.Folder}" IsOn="True" Margin="0,0,8,0" />
+                            <c:IconChip Icon="{x:Static c:LucideIcons.Folder}" Margin="0,0,24,0" />
+                            <c:DragHandle Margin="0,0,8,0" />
+                            <TextBlock Text="Txt Files" VerticalAlignment="Center" />
                         </StackPanel>
-                        <TextBlock x:Name="FontReport" Style="{StaticResource MonoTextStyle}" Foreground="{DynamicResource TextTertiaryBrush}"
-                                   Margin="0,12,0,0" TextWrapping="Wrap" />
-                    </StackPanel>
-                </Border>
-
-                <!-- Tokens -->
-                <Border Style="{StaticResource Section}">
-                    <StackPanel>
-                        <c:Eyebrow Text="Chassis, ink and accent tokens" Margin="0,0,0,10" />
-                        <WrapPanel x:Name="Swatches" />
-                    </StackPanel>
-                </Border>
-
-                <!-- Buttons -->
-                <Border Style="{StaticResource Section}">
-                    <StackPanel>
-                        <c:Eyebrow Text="Buttons" Margin="0,0,0,10" />
-                        <WrapPanel>
-                            <Button Style="{StaticResource PrimaryButtonStyle}" Content="Organize now" Margin="0,0,10,0" />
-                            <Button Style="{StaticResource SecondaryButtonStyle}" Content="Rules" Margin="0,0,10,0" />
-                            <Button Style="{StaticResource SecondaryButtonStyle}" Content="Disabled" IsEnabled="False" Margin="0,0,20,0" />
-                            <c:IconButton Icon="{x:Static c:LucideIcons.Settings}" AutomationProperties.Name="Settings" Margin="0,0,6,0" />
-                            <c:IconButton Icon="{x:Static c:LucideIcons.Undo}" ToolTip="Undo" Margin="0,0,6,0" />
-                            <c:IconToggleButton Icon="{x:Static c:LucideIcons.Volume}" CheckedIcon="{x:Static c:LucideIcons.VolumeMuted}"
-                                                AutomationProperties.Name="Mute" Margin="0,0,20,0" />
-                            <Button Style="{StaticResource WindowButtonStyle}" AutomationProperties.Name="Minimize" Margin="0,0,4,0">
-                                <c:LucideIcon Data="{x:Static c:LucideIcons.Minus}" Size="15"
-                                              Brush="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
-                            </Button>
-                            <Button Style="{StaticResource CloseButtonStyle}" AutomationProperties.Name="Close">
-                                <c:LucideIcon Data="{x:Static c:LucideIcons.Close}" Size="15"
-                                              Brush="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
-                            </Button>
-                        </WrapPanel>
-                    </StackPanel>
-                </Border>
-
-                <!-- Inputs -->
-                <Border Style="{StaticResource Section}">
-                    <StackPanel>
-                        <c:Eyebrow Text="Switch, segmented, slider, search, combo" Margin="0,0,0,10" />
-                        <WrapPanel VerticalAlignment="Center">
-                            <ToggleButton Style="{StaticResource SwitchStyle}" AutomationProperties.Name="Off switch" Margin="0,0,12,0" />
-                            <ToggleButton Style="{StaticResource SwitchStyle}" IsChecked="True" AutomationProperties.Name="On switch" Margin="0,0,12,0" />
-                            <ToggleButton Style="{StaticResource SwitchStyle}" IsEnabled="False" AutomationProperties.Name="Disabled switch" Margin="0,0,12,0" />
-                            <ToggleButton Style="{StaticResource SwitchStyle}" IsChecked="True" IsEnabled="False" AutomationProperties.Name="Disabled on switch" Margin="0,0,24,0" />
-                            <Slider Style="{StaticResource HopperSliderStyle}" Width="220" Minimum="0" Maximum="100" Value="64"
-                                    AutomationProperties.Name="Volume" VerticalAlignment="Center" Margin="0,0,24,0" />
-                            <ComboBox Style="{StaticResource HopperComboBoxStyle}" Width="220" Tag="Pick a device..." AutomationProperties.Name="Device">
-                                <ComboBoxItem Content="Speakers (Realtek)" />
-                                <ComboBoxItem Content="Headphones (USB)" />
-                            </ComboBox>
-                        </WrapPanel>
-                        <c:SegmentedControl Margin="0,16,0,0" Width="560" HorizontalAlignment="Left" SelectedIndex="0" AutomationProperties.Name="Preset">
-                            <c:SegmentItem Label="Essentials" />
-                            <c:SegmentItem Label="Audio" />
-                            <c:SegmentItem Label="Power user" />
-                            <c:SegmentItem Label="Everything" />
-                            <c:SegmentItem Label="Custom" />
-                        </c:SegmentedControl>
-                        <c:SegmentedControl Style="{StaticResource TabSegmentedControlStyle}" Margin="0,12,0,0" Width="352" HorizontalAlignment="Left"
-                                            SelectedIndex="3" AutomationProperties.Name="Flyout tabs">
-                            <c:SegmentItem Label="Sound" Icon="{x:Static c:LucideIcons.Volume}" />
-                            <c:SegmentItem Label="System" Icon="{x:Static c:LucideIcons.Cpu}" />
-                            <c:SegmentItem Label="Tidy" Icon="{x:Static c:LucideIcons.Folder}" />
-                            <c:SegmentItem Label="Tools" Icon="{x:Static c:LucideIcons.Wrench}" />
-                        </c:SegmentedControl>
-                        <c:SearchBox Margin="0,14,0,0" Width="320" HorizontalAlignment="Left" Placeholder="Search features" AutomationProperties.Name="Search features" />
-                    </StackPanel>
-                </Border>
-
-                <!-- Badges and dots -->
-                <Border Style="{StaticResource Section}">
-                    <StackPanel>
-                        <c:Eyebrow Text="Badges and status dots" Margin="0,0,0,10" />
-                        <WrapPanel VerticalAlignment="Center">
-                            <c:Badge Kind="Source" Text="From Hopper" Margin="0,0,8,0" />
+                        <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
+                            <RadioButton Style="{StaticResource SwatchPillStyle}" GroupName="Accent" Content="Windows" IsChecked="True" AutomationProperties.Name="Follow Windows" Margin="0,0,4,0" />
+                            <RadioButton Style="{StaticResource SwatchStyle}" GroupName="Accent" Background="#4CC2FF" AutomationProperties.Name="Blue" />
+                            <RadioButton Style="{StaticResource SwatchStyle}" GroupName="Accent" Background="#B79CFF" AutomationProperties.Name="Violet" />
+                            <RadioButton Style="{StaticResource SwatchStyle}" GroupName="Accent" Background="#6CCB5F" AutomationProperties.Name="Green" />
+                            <RadioButton Style="{StaticResource SwatchStyle}" GroupName="Accent" Background="#FF99A4" AutomationProperties.Name="Pink" />
+                        </StackPanel>
+                        <StackPanel x:Name="PetSwatches" Orientation="Horizontal" Margin="0,8,0,0" />
+                        <WrapPanel Margin="0,16,0,0" VerticalAlignment="Center">
                             <c:Badge Kind="Overlap" Text="Overlaps PowerToys" Margin="0,0,8,0" />
-                            <c:Badge Kind="Needs" Text="Needs VB-CABLE" Margin="0,0,24,0" />
+                            <c:Badge Kind="Needs" Text="Other drive" Margin="0,0,16,0" />
                             <c:StatusDot Kind="Active" Margin="0,0,6,0" VerticalAlignment="Center" />
-                            <TextBlock Text="Pinned · noise suppression on" Style="{StaticResource CaptionTextStyle}" Margin="0,0,18,0" VerticalAlignment="Center" />
+                            <TextBlock Text="Live" Style="{StaticResource CaptionTextStyle}" Margin="0,0,12,0" VerticalAlignment="Center" />
                             <c:StatusDot Kind="Attention" Margin="0,0,6,0" VerticalAlignment="Center" />
-                            <TextBlock Text="2 files held" Style="{StaticResource CaptionTextStyle}" Margin="0,0,18,0" VerticalAlignment="Center" />
+                            <TextBlock Text="1 held" Style="{StaticResource CaptionTextStyle}" Margin="0,0,12,0" VerticalAlignment="Center" />
                             <c:StatusDot Kind="Offline" Margin="0,0,6,0" VerticalAlignment="Center" />
                             <TextBlock Text="Offline" Style="{StaticResource CaptionTextStyle}" VerticalAlignment="Center" />
                         </WrapPanel>
                     </StackPanel>
-                </Border>
+                </WrapPanel>
 
-                <!-- Flyout parts at flyout width -->
-                <Border Style="{StaticResource Section}">
-                    <StackPanel>
-                        <c:Eyebrow Text="Rows and tiles (at flyout width, 352px inside 14px padding)" Margin="0,0,0,10" />
-                        <WrapPanel>
-                            <StackPanel Width="352" Margin="0,0,24,0">
-                                <c:AppVolumeRow AppName="Spotify" DeviceName="Headphones (USB)" Volume="64" Margin="0,0,0,8" />
-                                <c:AppVolumeRow AppName="Microsoft Teams" DeviceName="Speakers (Realtek)" Volume="30" IsMuted="True" Margin="0,0,0,8" />
-                                <c:StashRow FileName="invoice-2026-10.pdf" Destination="Documents › Invoices" Age="2m" Margin="0,0,0,8" />
-                                <c:StashRow FileName="AnyDesk.exe" IsHeld="True" HeldReason="Held · remote-access installer" Age="5m" />
-                            </StackPanel>
-                            <StackPanel Width="352">
-                                <UniformGrid Columns="2" Margin="0,0,0,8">
-                                    <c:StatTile x:Name="CpuTile" Label="CPU" Value="23%" Caption="3.4 GHz" Margin="0,0,4,4" />
-                                    <c:StatTile x:Name="MemTile" Label="Memory" Value="61%" Caption="19.4 GB" Margin="4,0,0,4" />
-                                </UniformGrid>
-                                <UniformGrid Columns="3">
-                                    <c:ToolTile Title="Keep awake" StateLine="Until 6:00 PM" Icon="{x:Static c:LucideIcons.Coffee}" IsChecked="True" Margin="0,0,4,0" />
-                                    <c:ToolTile Title="Color picker" StateLine="Win+Shift+C" Icon="{x:Static c:LucideIcons.Droplet}" Margin="4,0,4,0" />
-                                    <c:ToolTile Title="Disabled" StateLine="Off" Icon="{x:Static c:LucideIcons.Zap}" IsEnabled="False" Margin="4,0,0,0" />
-                                </UniformGrid>
-                            </StackPanel>
-                        </WrapPanel>
-                    </StackPanel>
-                </Border>
+                <!-- Interim controls, until R2 and R3 replace them -->
+                <TextBlock Style="{StaticResource Section}" Text="Interim: tool tile and feature card" />
+                <StackPanel Orientation="Horizontal">
+                    <c:ToolTile Width="112" Title="Keep awake" StateLine="Until 6:00 PM" Icon="{x:Static c:LucideIcons.Coffee}" IsChecked="True" Margin="0,0,8,0" />
+                    <c:ToolTile Width="112" Title="Color picker" StateLine="Win+Shift+C" Icon="{x:Static c:LucideIcons.Droplet}" Margin="0,0,24,0" />
+                    <c:FeatureCard x:Name="KeepAwakeCard" Width="260" FeatureName="Keep awake" Description="Stops the PC from sleeping, for a while or until you say"
+                                   Icon="{x:Static c:LucideIcons.Coffee}" IsInstalled="True" Margin="0,0,8,0" />
+                    <c:FeatureCard Width="260" FeatureName="Clipboard history" Description="Keeps what you copied, searchable"
+                                   Icon="{x:Static c:LucideIcons.Clipboard}" IsComingSoon="True" />
+                </StackPanel>
 
-                <!-- Feature cards -->
-                <Border Style="{StaticResource Section}">
+                <!-- Island -->
+                <TextBlock Style="{StaticResource Section}" Text="Island (theme-invariant)" />
+                <Border Background="{DynamicResource IslandBrush}" BorderBrush="{DynamicResource IslandBorderBrush}" BorderThickness="1"
+                        CornerRadius="8" Width="328" HorizontalAlignment="Left" Padding="12">
                     <StackPanel>
-                        <c:Eyebrow Text="Feature cards" Margin="0,0,0,10" />
-                        <UniformGrid Columns="3">
-                            <c:FeatureCard x:Name="KeepAwakeCard" FeatureName="Keep awake" Description="Stops the PC from sleeping, for a while or until you say"
-                                           Icon="{x:Static c:LucideIcons.Coffee}" IsInstalled="True" Margin="0,0,6,0" />
-                            <c:FeatureCard x:Name="RoutingCard" FeatureName="Audio routing" Description="Switches output by priority and pins your mic"
-                                           Icon="{x:Static c:LucideIcons.Headphones}" Margin="6,0,6,0" />
-                            <c:FeatureCard x:Name="ClipboardCard" FeatureName="Clipboard history" Description="Keeps what you copied, searchable"
-                                           Icon="{x:Static c:LucideIcons.Clipboard}" IsComingSoon="True" Margin="6,0,0,0" />
-                        </UniformGrid>
-                    </StackPanel>
-                </Border>
-
-                <!-- Phase 2 controls (provisional) -->
-                <Border Style="{StaticResource Section}">
-                    <StackPanel>
-                        <c:Eyebrow Text="Phase 2 controls (provisional)" Margin="0,0,0,10" />
-                        <WrapPanel VerticalAlignment="Center">
-                            <CheckBox Content="Unchecked" Margin="0,0,18,0" />
-                            <CheckBox Content="Checked" IsChecked="True" Margin="0,0,18,0" />
-                            <CheckBox Content="Mixed" IsChecked="{x:Null}" IsThreeState="True" Margin="0,0,18,0" />
-                            <CheckBox Content="Disabled" IsEnabled="False" Margin="0,0,18,0" />
-                            <CheckBox Content="Disabled checked" IsChecked="True" IsEnabled="False" Margin="0,0,18,0" />
-                            <CheckBox AutomationProperties.Name="Select row" IsChecked="True" />
-                        </WrapPanel>
-                        <WrapPanel Margin="0,14,0,0">
-                            <TextBox Style="{StaticResource TextFieldStyle}" Width="260" Tag="Destination, e.g. Documents\{year}" AutomationProperties.Name="Destination" Margin="0,0,14,0" />
-                            <TextBox Style="{StaticResource TextFieldStyle}" Width="260" Text="Invoices\{year}\{month}" AutomationProperties.Name="Filled" Margin="0,0,14,0" />
-                            <TextBox Style="{StaticResource TextFieldStyle}" Width="200" Text="Read only" IsReadOnly="True" AutomationProperties.Name="Read only" Margin="0,0,14,0" />
-                            <TextBox Style="{StaticResource TextFieldStyle}" Width="200" Text="Disabled" IsEnabled="False" AutomationProperties.Name="Disabled field" />
-                        </WrapPanel>
-                        <WrapPanel Margin="0,14,0,0" VerticalAlignment="Center">
-                            <c:DragHandle Margin="0,0,8,0" />
-                            <TextBlock Text="PDFs to Documents" VerticalAlignment="Center" Margin="0,0,24,0" />
-                            <c:DragHandle IsEnabled="False" Margin="0,0,8,0" />
-                            <TextBlock Text="Disabled" VerticalAlignment="Center" Style="{StaticResource CaptionTextStyle}" />
-                        </WrapPanel>
-                    </StackPanel>
-                </Border>
-                <!-- Island tokens -->
-                <Border Style="{StaticResource Section}">
-                    <StackPanel>
-                        <c:Eyebrow Text="Island and pet tokens (theme-invariant)" Margin="0,0,0,10" />
-                        <Border Background="{DynamicResource IslandBrush}" BorderBrush="{DynamicResource IslandBorderBrush}" BorderThickness="1"
-                                CornerRadius="19" Height="38" Width="292" HorizontalAlignment="Left" Padding="14,0" Effect="{DynamicResource IslandShadow}">
-                            <TextBlock VerticalAlignment="Center" FontWeight="Bold" Foreground="{DynamicResource IslandTextBrush}">
-                                <Run Text="Weekend Mix" /><Run Text="  ·  Spotify" Foreground="{DynamicResource IslandTextTertiaryBrush}" FontWeight="Medium" />
-                            </TextBlock>
+                        <TextBlock Foreground="{DynamicResource IslandTextBrush}" FontSize="13">
+                            <Run Text="Weekend Mix" /><Run Text=" · Spotify" Foreground="{DynamicResource IslandTextTertiaryBrush}" />
+                        </TextBlock>
+                        <Border Height="4" CornerRadius="2" Margin="0,8,0,0" Background="{DynamicResource IslandPanelBrush}">
+                            <Border Width="180" HorizontalAlignment="Left" CornerRadius="2" Background="{DynamicResource IslandAccentBrush}" />
                         </Border>
-                        <WrapPanel x:Name="PetSwatches" Margin="0,14,0,0" />
                     </StackPanel>
                 </Border>
             </StackPanel>
+            </Border>
         </ScrollViewer>
     </DockPanel>
 </Window>

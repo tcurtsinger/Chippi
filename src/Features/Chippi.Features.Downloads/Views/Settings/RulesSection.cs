@@ -44,7 +44,7 @@ internal sealed class RulesSection : UserControl
     {
         _module = module;
         _drafts = new RuleDrafts(module.Settings.Rules);
-        _dropLine.SetResourceReference(Border.BackgroundProperty, "AccentGradientBrush");
+        _dropLine.SetResourceReference(Border.BackgroundProperty, "AccentBrush");
 
         _test.Width = 300;
         _test.TextChanged += (_, _) => RunTest();
@@ -341,7 +341,7 @@ internal sealed class RulesSection : UserControl
             foreach (string token in rule.Action == RuleActionKind.Rename ? RuleChecks.RenameTokens : RuleChecks.MoveTokens)
             {
                 var chip = Ui.Button(token, name: $"Insert {token}");
-                chip.SetResourceReference(Control.FontFamilyProperty, "MonoFont");
+                chip.SetResourceReference(Control.FontFamilyProperty, "CodeFont");
                 chip.Padding = new Thickness(8, 0, 8, 0);
                 chip.MinHeight = 26;
                 chip.Height = 26;

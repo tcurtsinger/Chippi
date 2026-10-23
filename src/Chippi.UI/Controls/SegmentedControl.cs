@@ -8,10 +8,11 @@ using System.Windows.Media;
 namespace Chippi.UI.Controls;
 
 /// <summary>
-/// Input-colored trough (11px radius, 4px padding, 4px gaps) of equal-width segments. Arrow keys
-/// move the selection; Tab enters at the selected segment. The default style is the 36px text
-/// segment (presets, folder modes); <c>TabSegmentedControlStyle</c> is the flyout's 46px
-/// icon-over-label tabs. Items can be strings or <see cref="SegmentItem"/>.
+/// A single-choice row of items. Arrow keys move the selection; Tab enters at the selected item.
+/// The default style is the segmented trough sized to its labels (Settings);
+/// <c>FlyoutSegmentedControlStyle</c> splits the width equally, <c>SelectorBarStyle</c> is the text
+/// tabs under a page title and <c>FlyoutTabsStyle</c> the flyout's icon tabs. Items can be strings
+/// or <see cref="SegmentItem"/>.
 /// </summary>
 public class SegmentedControl : ListBox
 {
@@ -21,7 +22,7 @@ public class SegmentedControl : ListBox
     public SegmentedControl() => SelectionMode = SelectionMode.Single;
 }
 
-/// <summary>A segment with an optional icon (used by the flyout tabs) and a value to bind against.</summary>
+/// <summary>An item with an optional icon (flyout tabs, nav items) and a value to bind against.</summary>
 public sealed class SegmentItem
 {
     public string Label { get; init; } = "";

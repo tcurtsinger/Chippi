@@ -50,10 +50,10 @@ internal sealed class AboutPage : UserControl
         var version = new TextBlock();
         version.SetResourceReference(StyleProperty, "CaptionTextStyle");
         version.Inlines.Add(new Run("Version "));
-        version.Inlines.Add(SettingsUi.Mono(AppInfo.Version));
+        version.Inlines.Add(new Run(AppInfo.Version));
         page.Children.Add(SettingsUi.Row("Chippi", "", version));
         page.Children.Add(SettingsUi.Row("License", "Free software: you can share and change it under the GNU General Public License, version 3 or later.",
-            SettingsUi.Styled(new TextBlock { Text = AppInfo.License }, "MonoTextStyle")));
+            SettingsUi.Styled(new TextBlock { Text = AppInfo.License }, "BodyTextStyle")));
         page.Children.Add(SettingsUi.Row("Privacy", "No telemetry and no network calls. Your settings stay on this PC.", new FrameworkElement()));
 
         page.Children.Add(SettingsUi.Eyebrow("Third-party notices"));
@@ -65,7 +65,7 @@ internal sealed class AboutPage : UserControl
             MaxHeight = 320,
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             Focusable = true,
-            FocusVisualStyle = (Style)Application.Current.FindResource("FocusRing12"),
+            FocusVisualStyle = (Style)Application.Current.FindResource("FocusRing8"),
         };
         System.Windows.Automation.AutomationProperties.SetName(viewer, "Third-party notices");
         var box = new Border { CornerRadius = new CornerRadius(12), BorderThickness = new Thickness(1), Child = viewer };

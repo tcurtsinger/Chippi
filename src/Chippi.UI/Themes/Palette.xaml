@@ -1,48 +1,26 @@
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
 <!-- Theme-invariant tokens: identical in dark and light, so they are defined once here and never
-     swapped by ThemeManager. DESIGN.md §2 (deep gradient, signals, island), §4 (glows), §6
-     (badges), §7 (pet). -->
+     swapped by ThemeManager. DESIGN.md §2 (critical, island), §4 (island shadows), §7 (pet). -->
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
-    <!-- Deep Synth: under readable text or glyphs (primary button, island play/pause). -->
-    <LinearGradientBrush x:Key="AccentGradientDeepBrush" StartPoint="0,0" EndPoint="1,1">
-        <GradientStop Color="#8E3FD0" Offset="0" />
-        <GradientStop Color="#2A6AD6" Offset="1" />
-    </LinearGradientBrush>
-    <!-- Signal Red Deep: red fills behind white text (the muted-mic button). -->
-    <SolidColorBrush x:Key="DangerDeepBrush" Color="#C42B3E" />
+    <!-- Critical fills behind white text. -->
+    <SolidColorBrush x:Key="DangerDeepBrush" Color="#C42B1C" />
 
-    <!-- 16% gradient wash: a tool tile that is on. -->
-    <LinearGradientBrush x:Key="AccentWashBrush" StartPoint="0,0" EndPoint="1,1">
-        <GradientStop Color="#29B15CF0" Offset="0" />
-        <GradientStop Color="#294D9BFF" Offset="1" />
-    </LinearGradientBrush>
-    <SolidColorBrush x:Key="AccentBorder40Brush" Color="#66B15CF0" />
-    <SolidColorBrush x:Key="AccentBorder50Brush" Color="#80B15CF0" />
-    <SolidColorBrush x:Key="AzureBrush" Color="#4D9BFF" />
-    <SolidColorBrush x:Key="WarningBorder45Brush" Color="#73F5A64B" />
-
-    <!-- Island: darker than any window and never themed. Text on it uses the dark ink. -->
-    <SolidColorBrush x:Key="IslandBrush" Color="#05070F" />
-    <SolidColorBrush x:Key="IslandBorderBrush" Color="#14FFFFFF" />
-    <SolidColorBrush x:Key="IslandTextBrush" Color="#EEF1F8" />
-    <SolidColorBrush x:Key="IslandTextTertiaryBrush" Color="#8A93AD" />
-    <SolidColorBrush x:Key="IslandPanelBrush" Color="#0F1426" />
+    <!-- Island: darker than any window and never themed. It always uses the dark accent shade, which
+         ThemeManager.SetAccent writes at the application level (the island merges Dark.xaml locally,
+         which would hide an AccentBrush). -->
+    <SolidColorBrush x:Key="IslandBrush" Color="#0A0A0A" />
+    <SolidColorBrush x:Key="IslandBorderBrush" Color="#1AFFFFFF" />
+    <SolidColorBrush x:Key="IslandTabBorderBrush" Color="#24FFFFFF" />
+    <SolidColorBrush x:Key="IslandTextBrush" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="IslandTextTertiaryBrush" Color="#ABABAB" />
+    <SolidColorBrush x:Key="IslandPanelBrush" Color="#0FFFFFFF" />
+    <SolidColorBrush x:Key="IslandAccentBrush" Color="#4CC2FF" />
     <DropShadowEffect x:Key="IslandShadow" Color="#000000" BlurRadius="24" ShadowDepth="8" Direction="270" Opacity="0.45" />
-    <DropShadowEffect x:Key="IslandExpandedShadow" Color="#000000" BlurRadius="40" ShadowDepth="16" Direction="270" Opacity="0.55" />
+    <DropShadowEffect x:Key="IslandExpandedShadow" Color="#000000" BlurRadius="40" ShadowDepth="16" Direction="270" Opacity="0.45" />
 
-    <!-- Thumb glow 0 0 10px rgba(177,92,240,.7). -->
-    <DropShadowEffect x:Key="ThumbGlow" Color="#B15CF0" BlurRadius="10" ShadowDepth="0" Opacity="0.7" />
-
-    <!-- Badges, DESIGN.md §6. Source and Overlap tints and borders are fixed; their text colors are themed
-         (Dark.xaml / Light.xaml, DESIGN.md §2 "Light theme"). Needs uses themed chip and ink. -->
-    <SolidColorBrush x:Key="BadgeSourceBackgroundBrush" Color="#29B15CF0" />
-    <SolidColorBrush x:Key="BadgeSourceBorderBrush" Color="#59B15CF0" />
-    <SolidColorBrush x:Key="BadgeOverlapBackgroundBrush" Color="#1FF5A64B" />
-    <SolidColorBrush x:Key="BadgeOverlapBorderBrush" Color="#4DF5A64B" />
-
-    <!-- Gumdrop, DESIGN.md §7. -->
+    <!-- Gumdrop, DESIGN.md §7. The Synth body is the app's one gradient. -->
     <LinearGradientBrush x:Key="PetSynthBrush" StartPoint="0,0" EndPoint="1,1">
         <GradientStop Color="#B15CF0" Offset="0" />
         <GradientStop Color="#4D9BFF" Offset="1" />
@@ -59,6 +37,6 @@
     <SolidColorBrush x:Key="PetBlushBrush" Color="#B3FF8FB0" />
     <SolidColorBrush x:Key="PetSparkBrush" Color="#F5C451" />
     <SolidColorBrush x:Key="PetShadowBrush" Color="#59000000" />
-    <!-- The sleepy z's are Ink Tertiary; the pet lives on the dark island, so it uses the dark value. -->
-    <SolidColorBrush x:Key="PetZBrush" Color="#8A93AD" />
+    <!-- The sleepy z's are Muted; the pet lives on the dark island, so it uses the dark value. -->
+    <SolidColorBrush x:Key="PetZBrush" Color="#9D9D9D" />
 </ResourceDictionary>

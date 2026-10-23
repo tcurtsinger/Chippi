@@ -12,6 +12,25 @@ public enum ThemePreference
     System,
 }
 
+/// <summary>The accent color (DESIGN.md §2). Each named choice has a dark and a light shade.</summary>
+public enum AccentChoice
+{
+    /// <summary>The Windows accent: its AccentLight2 shade in dark, AccentDark1 in light.</summary>
+    FollowWindows,
+    Blue,
+    Violet,
+    Green,
+    Pink,
+}
+
+/// <summary>The screen edge the island tab docks on (DESIGN.md §5 Island).</summary>
+public enum IslandEdge
+{
+    Top,
+    Left,
+    Right,
+}
+
 /// <summary>Gumdrop's body color (DESIGN.md §7). Synth is the gradient and the default.</summary>
 public enum PetColor
 {
@@ -44,9 +63,17 @@ public sealed class AppSettings
     /// <summary>The island's display out of the box (Travis chose Main display, 2026-10-22). The one place to change it.</summary>
     public const IslandDisplay DefaultIslandDisplay = IslandDisplay.MainDisplay;
 
-    public ThemePreference Theme { get; set; } = ThemePreference.Dark;
+    /// <summary>Follow Windows out of the box (2026-10-23). A saved choice is kept.</summary>
+    public ThemePreference Theme { get; set; } = ThemePreference.System;
+
+    public AccentChoice Accent { get; set; } = AccentChoice.FollowWindows;
 
     public bool IslandEnabled { get; set; } = true;
+
+    public IslandEdge IslandEdge { get; set; } = IslandEdge.Top;
+
+    /// <summary>Where the tab sits along <see cref="IslandEdge"/>, 0 to 1 (0.5 is centered), so resolution changes don't move it.</summary>
+    public double IslandPlace { get; set; } = 0.5;
 
     /// <summary>Settings › Notifications master switch: off silences every Windows notification; each event's choice is kept.</summary>
     public bool WindowsNotices { get; set; } = true;

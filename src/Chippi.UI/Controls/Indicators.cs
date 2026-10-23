@@ -1,17 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
-using System.Globalization;
 using System.Windows;
 using System.Windows.Automation.Peers;
 using System.Windows.Controls;
-using System.Windows.Documents;
 using System.Windows.Media;
 using Chippi.Core.Modules;
 
 namespace Chippi.UI.Controls;
 
-/// <summary>20px tall, 6px radius, 10.5/700. Source is violet, Overlap amber, Needs neutral (DESIGN.md §6).</summary>
+/// <summary>18px tall, 4px radius, 11/600. Overlap is caution on a caution tint; every other kind is neutral (DESIGN.md §6).</summary>
 public class Badge : Control
 {
     static Badge()
@@ -38,7 +36,7 @@ public class Badge : Control
         set => SetValue(KindProperty, value);
     }
 
-    /// <summary>Screen readers read the badge's words ("From Hopper"); its text lives inside the template, where they would not look.</summary>
+    /// <summary>Screen readers read the badge's words ("Other drive"); its text lives inside the template, where they would not look.</summary>
     protected override AutomationPeer OnCreateAutomationPeer() => new BadgeAutomationPeer(this);
 
     private sealed class BadgeAutomationPeer(Badge owner) : FrameworkElementAutomationPeer(owner)
@@ -56,17 +54,17 @@ public class Badge : Control
 
 public enum StatusKind
 {
-    /// <summary>Signal Green: active, online, routing.</summary>
+    /// <summary>Success: active, online, routing.</summary>
     Active,
 
-    /// <summary>Signal Amber: needs attention.</summary>
+    /// <summary>Caution: needs attention.</summary>
     Attention,
 
-    /// <summary>Ink Muted: offline.</summary>
+    /// <summary>Muted: offline.</summary>
     Offline,
 }
 
-/// <summary>7px dot; green or amber get a soft glow, offline does not.</summary>
+/// <summary>A 7px dot in Success, Caution or Muted. No glow.</summary>
 public class StatusDot : Control
 {
     static StatusDot()
@@ -86,80 +84,32 @@ public class StatusDot : Control
 }
 
 /// <summary>
-/// Label role (DESIGN.md §3): 10.5/700, UPPERCASE, +0.13em tracking. WPF's TextBlock has no
-/// letter-spacing, so this draws each character with the tracking added. Text is uppercased here,
-/// so callers pass sentence case.
+/// Icon chip (DESIGN.md §6): 32px, 6px radius, control fill, with a 16px glyph in the accent when
+/// <see cref="IsOn"/> and Muted when off. Feature rows, the folder row and the Tidy card use it.
 /// </summary>
-public class Eyebrow : FrameworkElement
+public class IconChip : Control
 {
-    private const double Tracking = 0.13;
-    private List<FormattedText>? _glyphs;
-
-    public static readonly DependencyProperty TextProperty = DependencyProperty.Register(
-        nameof(Text), typeof(string), typeof(Eyebrow),
-        new FrameworkPropertyMetadata("", FrameworkPropertyMetadataOptions.AffectsMeasure | FrameworkPropertyMetadataOptions.AffectsRender, Invalidate));
-
-    public string Text
+    static IconChip()
     {
-        get => (string)GetValue(TextProperty);
-        set => SetValue(TextProperty, value);
+        DefaultStyleKeyProperty.OverrideMetadata(typeof(IconChip), new FrameworkPropertyMetadata(typeof(IconChip)));
+        FocusableProperty.OverrideMetadata(typeof(IconChip), new FrameworkPropertyMetadata(false));
     }
 
-    public static readonly DependencyProperty ForegroundProperty = TextElement.ForegroundProperty.AddOwner(
-        typeof(Eyebrow), new FrameworkPropertyMetadata(Brushes.Gray, FrameworkPropertyMetadataOptions.AffectsRender | FrameworkPropertyMetadataOptions.Inherits, Invalidate));
+    public static readonly DependencyProperty IconProperty = DependencyProperty.Register(
+        nameof(Icon), typeof(Geometry), typeof(IconChip), new PropertyMetadata(null));
 
-    public Brush Foreground
+    public Geometry? Icon
     {
-        get => (Brush)GetValue(ForegroundProperty);
-        set => SetValue(ForegroundProperty, value);
+        get => (Geometry?)GetValue(IconProperty);
+        set => SetValue(IconProperty, value);
     }
 
-    public static readonly DependencyProperty FontSizeProperty = TextElement.FontSizeProperty.AddOwner(
-        typeof(Eyebrow), new FrameworkPropertyMetadata(10.5, FrameworkPropertyMetadataOptions.AffectsMeasure | FrameworkPropertyMetadataOptions.Inherits, Invalidate));
+    public static readonly DependencyProperty IsOnProperty = DependencyProperty.Register(
+        nameof(IsOn), typeof(bool), typeof(IconChip), new PropertyMetadata(false));
 
-    public double FontSize
+    public bool IsOn
     {
-        get => (double)GetValue(FontSizeProperty);
-        set => SetValue(FontSizeProperty, value);
-    }
-
-    protected override Size MeasureOverride(Size availableSize)
-    {
-        var glyphs = Glyphs();
-        if (glyphs.Count == 0)
-            return new Size(0, Math.Round(FontSize * 1.2, 1));
-        double width = glyphs.Sum(g => g.WidthIncludingTrailingWhitespace) + Tracking * FontSize * (glyphs.Count - 1);
-        return new Size(Math.Ceiling(width), Math.Round(FontSize * 1.2, 1));
-    }
-
-    protected override void OnRender(DrawingContext dc)
-    {
-        double x = 0;
-        double lineHeight = FontSize * 1.2;
-        foreach (var glyph in Glyphs())
-        {
-            dc.DrawText(glyph, new Point(x, (lineHeight - glyph.Height) / 2));
-            x += glyph.WidthIncludingTrailingWhitespace + Tracking * FontSize;
-        }
-    }
-
-    private static void Invalidate(DependencyObject d, DependencyPropertyChangedEventArgs e) => ((Eyebrow)d)._glyphs = null;
-
-    private List<FormattedText> Glyphs()
-    {
-        if (_glyphs is not null)
-            return _glyphs;
-        var family = TryFindResource("UiFont") as FontFamily ?? new FontFamily("Segoe UI");
-        var typeface = new Typeface(family, FontStyles.Normal, FontWeights.Bold, FontStretches.Normal);
-        double ppd = VisualTreeHelper.GetDpi(this).PixelsPerDip;
-        _glyphs = [.. (Text ?? "").ToUpper(CultureInfo.CurrentCulture).Select(ch =>
-            new FormattedText(ch.ToString(), CultureInfo.CurrentCulture, FlowDirection.LeftToRight, typeface, FontSize, Foreground, ppd))];
-        return _glyphs;
-    }
-
-    protected override void OnDpiChanged(DpiScale oldDpi, DpiScale newDpi)
-    {
-        _glyphs = null;
-        base.OnDpiChanged(oldDpi, newDpi);
+        get => (bool)GetValue(IsOnProperty);
+        set => SetValue(IsOnProperty, value);
     }
 }
