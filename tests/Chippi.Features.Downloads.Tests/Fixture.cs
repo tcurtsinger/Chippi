@@ -96,6 +96,10 @@ internal sealed class Fixture : IDisposable
     {
         string path = In(name);
         File.WriteAllText(path, content);
+        // The watcher reports the file on its own thread, which can outlast Settle's passes on a slow
+        // CI runner. Wait until the engine has seen it (a Paused folder never tracks it).
+        if (Settings.Folders[0].Mode != FolderMode.Paused)
+            SpinWait.SpinUntil(() => Engine.IsTracking(path), TimeSpan.FromSeconds(5));
         return path;
     }
 
