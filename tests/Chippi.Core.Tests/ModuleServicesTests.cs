@@ -17,13 +17,15 @@ public sealed class ModuleServicesTests : IDisposable
     private readonly TempDir _dir = new();
     private readonly ConfigStore _config;
     private readonly IslandActivityHub _island = new();
+    private readonly ModuleServicesHardeningTests.ManualTime _time = new();
     private readonly ModuleServices _services;
     private readonly ModuleRegistry _registry;
 
     public ModuleServicesTests()
     {
         _config = new ConfigStore(_dir.File("settings.json"));
-        _services = new ModuleServices { DataRoot = Path.Combine(_dir.Path, "data"), IslandNoticeDuration = TimeSpan.FromMilliseconds(150) };
+        // Delivery assertions must not race a wall-clock expiry; the expiry test fires its timer explicitly.
+        _services = new ModuleServices { DataRoot = Path.Combine(_dir.Path, "data"), IslandNoticeDuration = TimeSpan.FromMilliseconds(150), Time = _time };
         _registry = new ModuleRegistry(_config, _island, NullLoggerFactory.Instance, _services);
     }
 
@@ -163,8 +165,9 @@ public sealed class ModuleServicesTests : IDisposable
 
         Assert.NotNull(_island.Current);
         Assert.Equal("downloads", celebrated!.ModuleId);
-        for (int i = 0; i < 40 && _island.Current is not null; i++)
-            await Task.Delay(50);
+        var timer = Assert.Single(_time.Timers);
+        Assert.Equal(_services.IslandNoticeDuration, timer.DueTime);
+        timer.Fire();
         Assert.Null(_island.Current);
     }
 
@@ -298,7 +301,7 @@ public sealed class ModuleServicesHardeningTests : IDisposable
     public void Dispose() => _dir.Dispose();
 
     /// <summary>Timers fire only when told to.</summary>
-    private sealed class ManualTime : TimeProvider
+    internal sealed class ManualTime : TimeProvider
     {
         public List<ManualTimer> Timers { get; } = [];
 
@@ -310,13 +313,19 @@ public sealed class ModuleServicesHardeningTests : IDisposable
         }
     }
 
-    private sealed class ManualTimer(TimerCallback callback, object? state) : ITimer
+    internal sealed class ManualTimer(TimerCallback callback, object? state) : ITimer
     {
         public bool Disposed { get; private set; }
 
         public void Fire() => callback(state);
 
-        public bool Change(TimeSpan dueTime, TimeSpan period) => !Disposed;
+        public TimeSpan DueTime { get; private set; } = Timeout.InfiniteTimeSpan;
+
+        public bool Change(TimeSpan dueTime, TimeSpan period)
+        {
+            DueTime = dueTime;
+            return !Disposed;
+        }
 
         public void Dispose() => Disposed = true;
 
