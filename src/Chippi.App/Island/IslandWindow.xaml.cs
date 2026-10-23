@@ -16,7 +16,7 @@ using Chippi.UI.Themes;
 using Windows.Win32;
 using Windows.Win32.Foundation;
 using Windows.Win32.Graphics.Gdi;
-using Windows.Win32.UI.Input.KeyboardAndMouse;
+using Windows.Win32.UI.WindowsAndMessaging;
 
 namespace Chippi.App.Island;
 
@@ -45,7 +45,6 @@ public partial class IslandWindow : Window
     private const double LineLength = 84;
     private const double LineThickness = 3;
     private const double GlyphGap = 4;
-    private const int EscapeHotKey = 1;
     private const uint VK_ESCAPE = 0x1B;
 
     private static readonly TimeSpan HoverDelay = TimeSpan.FromMilliseconds(150);
@@ -65,7 +64,8 @@ public partial class IslandWindow : Window
     private bool _enabled = true;
     private bool _suppressed;
     private bool _hovered;
-    private bool _escapeRegistered;
+    private readonly HOOKPROC _onKeyboard; // kept alive for as long as the hook exists
+    private UnhookWindowsHookExSafeHandle? _escapeHook;
     private HWND _hwnd;
     private HMONITOR _monitor;
     private Point? _pressAt;
@@ -75,6 +75,7 @@ public partial class IslandWindow : Window
     public IslandWindow()
     {
         InitializeComponent();
+        _onKeyboard = OnKeyboard;
 
         // Both timers are one-shot.
         _hoverTimer = new DispatcherTimer { Interval = HoverDelay };
@@ -298,12 +299,20 @@ public partial class IslandWindow : Window
             case PInvoke.WM_SETTINGCHANGE:
                 Dispatcher.BeginInvoke(DispatcherPriority.Background, () => DisplayChanged?.Invoke(this, EventArgs.Empty));
                 break;
-            case PInvoke.WM_HOTKEY when wParam == EscapeHotKey:
-                handled = true;
-                CloseIsland();
-                break;
         }
         return 0;
+    }
+
+    /// <summary>
+    /// Esc closes the island. It never has keyboard focus (it never activates), so a low-level
+    /// keyboard hook watches for Esc while it is open, and always passes the key on: the app in
+    /// front still gets its Esc (a dialog it closes, a selection it cancels).
+    /// </summary>
+    private unsafe LRESULT OnKeyboard(int code, WPARAM wParam, LPARAM lParam)
+    {
+        if (code >= 0 && wParam.Value == PInvoke.WM_KEYDOWN && ((KBDLLHOOKSTRUCT*)lParam.Value)->vkCode == VK_ESCAPE)
+            Dispatcher.BeginInvoke(CloseIsland);
+        return PInvoke.CallNextHookEx(_escapeHook, code, wParam, lParam);
     }
 
     // ----- Open and close -----
@@ -321,21 +330,16 @@ public partial class IslandWindow : Window
         if (!IsVisible || _dragging || Area is not { } area)
             return;
         _panel.Open(_docked, Home(area), area);
-        // Esc closes the island. It never has keyboard focus (it never activates), so Esc is a hot
-        // key, held only while the island is open.
-        if (!_escapeRegistered)
-            _escapeRegistered = PInvoke.RegisterHotKey(_hwnd, EscapeHotKey, HOT_KEY_MODIFIERS.MOD_NOREPEAT, VK_ESCAPE);
+        if (_escapeHook is null || _escapeHook.IsInvalid)
+            _escapeHook = PInvoke.SetWindowsHookEx(WINDOWS_HOOK_ID.WH_KEYBOARD_LL, _onKeyboard, PInvoke.GetModuleHandle((string?)null), 0);
         RefreshTab();
     }
 
     private void CloseIsland()
     {
         _leaveTimer.Stop();
-        if (_escapeRegistered)
-        {
-            PInvoke.UnregisterHotKey(_hwnd, EscapeHotKey);
-            _escapeRegistered = false;
-        }
+        _escapeHook?.Dispose(); // unhooks
+        _escapeHook = null;
         if (!_panel.IsOpen)
             return;
         _panel.CloseIsland();

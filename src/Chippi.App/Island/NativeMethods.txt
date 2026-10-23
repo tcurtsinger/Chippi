@@ -32,6 +32,9 @@ DISPLAYCONFIG_TARGET_DEVICE_NAME
 EnumDisplayMonitors
 MONITORINFOEXW
 MONITORINFOF_PRIMARY
-RegisterHotKey
-UnregisterHotKey
-WM_HOTKEY
+SetWindowsHookEx
+UnhookWindowsHookEx
+CallNextHookEx
+GetModuleHandle
+KBDLLHOOKSTRUCT
+WM_KEYDOWN
