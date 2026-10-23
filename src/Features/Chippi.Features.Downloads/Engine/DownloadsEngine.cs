@@ -809,6 +809,7 @@ public sealed class DownloadsEngine : IDisposable
                     {
                         Body = Failed.Count == 0 ? body : $"{body} · {Failed.Count} failed",
                         Activation = DownloadsNotices.RunActivation(runId),
+                        Actions = Organized.Count > 0 ? [DownloadsNotices.Undo(runId), DownloadsNotices.History(runId)] : [DownloadsNotices.History(runId)],
                         Celebrate = Failed.Count == 0,
                         NeedsAttention = Failed.Count > 0,
                     });
@@ -822,33 +823,41 @@ public sealed class DownloadsEngine : IDisposable
                 {
                     Body = Organized.Count == 1 ? Path.GetDirectoryName(destination) : null,
                     Activation = DownloadsNotices.RunActivation(runId),
+                    Actions = [DownloadsNotices.Undo(runId), DownloadsNotices.History(runId)],
                     Celebrate = true,
                 });
             }
             if (Held.Count > 0)
             {
+                // A held file is not moved, so it has no history run: the body and Review open the
+                // pending review, where held files are listed.
                 notifier.Show(new Notice(DownloadsNotices.Held, Held.Count == 1 ? "1 file held" : $"{Held.Count} files held")
                 {
                     Body = Held.Count == 1 ? $"{Held[0].Name} · {Held[0].Reason}" : null,
                     Activation = DownloadsNotices.ReviewActivation,
+                    Actions = [DownloadsNotices.Review],
                     NeedsAttention = true,
                 });
             }
             if (Failed.Count > 0)
             {
-                notifier.Show(new Notice(DownloadsNotices.Failed, Failed.Count == 1 ? $"{Failed[0].Name} failed" : $"{Failed.Count} files failed")
+                long runId = Failed[0].RunId;
+                notifier.Show(new Notice(DownloadsNotices.Failed, Failed.Count == 1 ? "1 file not moved" : $"{Failed.Count} files not moved")
                 {
-                    Body = Failed.Count == 1 ? Failed[0].Error : null,
-                    Activation = DownloadsNotices.RunActivation(Failed[0].RunId),
+                    Body = Failed.Count == 1 ? $"{Failed[0].Name} · {Failed[0].Error}" : null,
+                    Activation = DownloadsNotices.RunActivation(runId),
+                    Actions = [DownloadsNotices.History(runId)],
                     NeedsAttention = true,
                 });
             }
             if (Review.Count > 0)
             {
+                // No run yet: nothing has moved.
                 notifier.Show(new Notice(DownloadsNotices.ReadyToReview, Review.Count == 1 ? "1 file to review" : $"{Review.Count} files to review")
                 {
                     Body = Review.Count == 1 ? Review[0] : null,
                     Activation = DownloadsNotices.ReviewActivation,
+                    Actions = [DownloadsNotices.Review],
                 });
             }
         }

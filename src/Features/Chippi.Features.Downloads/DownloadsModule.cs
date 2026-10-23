@@ -27,6 +27,9 @@ public enum DownloadsRequestKind
 
     /// <summary>Show the rules editor.</summary>
     Rules,
+
+    /// <summary>Show a run in History with its inline Undo confirmation (a notification's Undo button). Nothing is undone until confirmed.</summary>
+    Undo,
 }
 
 /// <summary>Something asked to show part of the organizer (a notice click, the Explorer menu, the Tidy tab).</summary>
@@ -100,6 +103,8 @@ public sealed class DownloadsModule : IFeatureModule
         context.Activation.Register(DownloadsNotices.RunVerb, args =>
             Raise(new DownloadsRequest(DownloadsRequestKind.Run, RunId: long.TryParse(args.FirstOrDefault(), NumberStyles.None, CultureInfo.InvariantCulture, out long id) ? id : null)));
         context.Activation.Register(DownloadsNotices.ReviewVerb, _ => Raise(new DownloadsRequest(DownloadsRequestKind.Review)));
+        context.Activation.Register(DownloadsNotices.UndoVerb, args =>
+            Raise(new DownloadsRequest(DownloadsRequestKind.Undo, RunId: long.TryParse(args.FirstOrDefault(), NumberStyles.None, CultureInfo.InvariantCulture, out long id) ? id : null)));
 
         context.Ui.SetSettingsPage(section => new Views.Settings.DownloadsPage(this, section));
         context.Ui.AddFlyoutTab(FlyoutTab.Tidy, () => new Views.Tidy.TidyView(this, RequestView, () => RequestView(new DownloadsRequest(DownloadsRequestKind.Rules))));
@@ -120,8 +125,9 @@ public sealed class DownloadsModule : IFeatureModule
             { Kind: DownloadsRequestKind.Organize, Folder: { Length: > 0 } folder, FromExplorer: true } => $"explorer/{folder}",
             { Kind: DownloadsRequestKind.Organize, Folder: { Length: > 0 } folder } => $"preview/{folder}",
             { Kind: DownloadsRequestKind.Organize or DownloadsRequestKind.Review } => "review",
+            { Kind: DownloadsRequestKind.Undo, RunId: { } run } => $"history/{run}/undo",
             { Kind: DownloadsRequestKind.Run, RunId: { } run } => $"history/{run}",
-            { Kind: DownloadsRequestKind.Run } => "history",
+            { Kind: DownloadsRequestKind.Run or DownloadsRequestKind.Undo } => "history",
             _ => "rules",
         };
     }
