@@ -9,12 +9,31 @@
     <SolidColorBrush x:Key="IslandHoverBrush" Color="#17FFFFFF" />
     <SolidColorBrush x:Key="IslandTrackBrush" Color="#24FFFFFF" />
 
-    <!-- The 38px accent play/pause (DESIGN.md §5 Island). -->
+    <!-- The docked tab: only its content draws (the half-oval paths), so transparent pixels click through.
+         A Button for Enter, Space and UI Automation's Invoke; the window handles the mouse itself. -->
+    <Style x:Key="IslandTabStyle" TargetType="{x:Type Button}">
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type Button}">
+                    <ContentPresenter />
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Inner cards: white at 6%, 8px radius, 12px padding. -->
+    <Style x:Key="IslandCardStyle" TargetType="{x:Type Border}">
+        <Setter Property="Background" Value="{StaticResource IslandPanelBrush}" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="Padding" Value="12" />
+    </Style>
+
+    <!-- The 32px accent play/pause (DESIGN.md §5 Island). -->
     <Style x:Key="IslandPlayButtonStyle" TargetType="{x:Type Button}">
-        <Setter Property="Width" Value="38" />
-        <Setter Property="Height" Value="38" />
+        <Setter Property="Width" Value="32" />
+        <Setter Property="Height" Value="32" />
         <Setter Property="Focusable" Value="False" />
-        <Setter Property="Cursor" Value="Hand" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type Button}">
@@ -38,15 +57,14 @@
     <!-- Debug menu (DebugMode only): a themed list, no stock menu chrome. -->
     <Style x:Key="IslandMenuItemStyle" TargetType="{x:Type Button}">
         <Setter Property="Focusable" Value="False" />
-        <Setter Property="Cursor" Value="Hand" />
         <Setter Property="Foreground" Value="{StaticResource IslandTextBrush}" />
-        <Setter Property="FontSize" Value="12.5" />
-        <Setter Property="Height" Value="30" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="Height" Value="32" />
         <Setter Property="HorizontalContentAlignment" Value="Left" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type Button}">
-                    <Border x:Name="Chrome" Background="Transparent" CornerRadius="8" Padding="10,0">
+                    <Border x:Name="Chrome" Background="Transparent" CornerRadius="4" Padding="10,0">
                         <ContentPresenter VerticalAlignment="Center" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" />
                     </Border>
                     <ControlTemplate.Triggers>
@@ -59,21 +77,13 @@
         </Setter>
     </Style>
 
-    <!-- Equalizer bar: accent, 3px wide, scaled about its middle. -->
+    <!-- The tab's 3-bar equalizer glyph: 12px tall, accent. -->
     <Style x:Key="IslandEqualizerBarStyle" TargetType="{x:Type Rectangle}">
-        <Setter Property="Width" Value="3" />
-        <Setter Property="Height" Value="14" />
-        <Setter Property="RadiusX" Value="1.5" />
-        <Setter Property="RadiusY" Value="1.5" />
+        <Setter Property="Width" Value="2" />
+        <Setter Property="RadiusX" Value="1" />
+        <Setter Property="RadiusY" Value="1" />
         <Setter Property="Margin" Value="1,0" />
+        <Setter Property="VerticalAlignment" Value="Bottom" />
         <Setter Property="Fill" Value="{DynamicResource IslandAccentBrush}" />
-        <Setter Property="RenderTransformOrigin" Value="0.5,0.5" />
-    </Style>
-
-    <!-- Panel-colored island tile and row: 12px radius. -->
-    <Style x:Key="IslandTileStyle" TargetType="{x:Type Border}">
-        <Setter Property="Background" Value="{StaticResource IslandPanelBrush}" />
-        <Setter Property="CornerRadius" Value="12" />
-        <Setter Property="Padding" Value="12,9,12,10" />
     </Style>
 </ResourceDictionary>

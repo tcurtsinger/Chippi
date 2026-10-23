@@ -59,8 +59,15 @@ public sealed class IslandHost : IDisposable
             _window.SetSuppressed(_tracker.FullscreenInFront);
         };
         _window.DisplayChanged += (_, _) => _tracker.OnDisplaysChanged();
+        _window.PlacementChosen += OnPlacementChosen;
+        _window.DropRefused += (_, _) => _logger.LogInformation("Island drop refused: the taskbar's edge, the bottom or a corner");
 
         _shell.Island.Changed += (_, _) => ScheduleRefresh();
+        _shell.Registry.Changed += (_, _) => _dispatcher.BeginInvoke(DispatcherPriority.Background, () =>
+        {
+            if (!_disposed)
+                RefreshPanels();
+        });
         _shell.Island.Succeeded += (_, _) => _dispatcher.BeginInvoke(() => _window.Celebrate());
         _shell.Config.SectionChanged += OnSectionChanged;
 
@@ -69,6 +76,7 @@ public sealed class IslandHost : IDisposable
 
         LoadSettings();
         Refresh();
+        RefreshPanels();
         _tracker.Start();
 
         if (Application.Current is { } app)
@@ -104,65 +112,96 @@ public sealed class IslandHost : IDisposable
     }
 
     /// <summary>
-    /// Debug builds (<c>--island-shots &lt;dir&gt;</c>): steps the island through its states with fake
-    /// activities and saves the window's pixels, once with the app in the dark theme and once in
-    /// light (the island must look the same), over the matching backdrop color.
+    /// Debug builds (<c>--island-shots &lt;dir&gt;</c>): docks the tab on Top, Left and Right with the
+    /// island open over a fake media activity, and saves each scene in both app themes (the island
+    /// must look the same) with Follow Windows and Violet. Then drops the tab on the taskbar's edge
+    /// and in the corners, which must be refused, and once on the top edge, which must be taken
+    /// (r5-drop-check.txt). Use a CHIPPI_DEV_PROFILE: it saves the island settings it moves through,
+    /// then puts them back.
     /// </summary>
     private async Task SaveIslandShotsAsync(string directory)
     {
+        var original = _shell.Config.GetSection<AppSettings>(AppSettings.SectionName);
         try
         {
             Directory.CreateDirectory(directory);
             var debug = _shell.Island.CreatePublisher(DebugModuleId);
-            var keepAwake = _shell.Island.CreatePublisher(KeepAwakeModuleId);
-            var original = _shell.Config.GetSection<AppSettings>(AppSettings.SectionName).Theme;
             var settle = TimeSpan.FromMilliseconds(900);
-            await Task.Delay(1200);
-            foreach (var (theme, backdrop) in new[] { (ThemePreference.Dark, "#0A0D18"), (ThemePreference.Light, "#E9EDF4") })
+            await Task.Delay(1500); // let the registry start the modules
+            debug.Publish(new IslandActivity("media", IslandActivityKind.Media, "Weekend Mix", "Spotify") { Progress = 0.38 });
+            foreach (var accent in new[] { AccentChoice.FollowWindows, AccentChoice.Violet })
             {
-                Chippi.UI.Themes.ThemeManager.Apply(theme);
-                var color = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(backdrop);
-                string suffix = theme.ToString().ToLowerInvariant();
-                void Shot(string name) => _window.SaveSnapshot(Path.Combine(directory, $"ws3-island-{name}-{suffix}.png"), color);
-
-                _shell.Island.ClearModule(DebugModuleId);
-                keepAwake.Clear(DebugWideAwakeKey);
-                await Task.Delay(settle);
-                Shot("resting");
-
-                debug.Publish(new IslandActivity("media", IslandActivityKind.Media, "Weekend Mix", "Spotify") { Progress = 0.38 });
-                await Task.Delay(settle);
-                Shot("live");
-
-                _shell.Island.ClearModule(DebugModuleId);
-                keepAwake.Publish(new IslandActivity(DebugWideAwakeKey, IslandActivityKind.Status, "Keep awake", "Until 6:00 PM"));
-                await Task.Delay(settle);
-                Shot("live-keepawake");
-                keepAwake.Clear(DebugWideAwakeKey);
-
-                debug.Publish(new IslandActivity("media", IslandActivityKind.Media, "Weekend Mix", "Spotify") { Progress = 0.38 });
-                debug.Publish(new IslandActivity("timer", IslandActivityKind.Timer, "Focus timer", "18:42") { Progress = 0.4 });
-                debug.Publish(new IslandActivity("stash", IslandActivityKind.Stash, "invoice-october.pdf", "Documents"));
-                debug.Publish(new IslandActivity("agent", IslandActivityKind.Agent, "Claude Code", "62% of 5h · resets 4:10 PM") { Progress = 0.62 });
-                debug.Publish(new IslandActivity("status", IslandActivityKind.Status, "Cleaning mode", "Keyboard paused"));
-                await Task.Delay(TimeSpan.FromMilliseconds(300));
-                _window.ForceExpanded(true);
-                await Task.Delay(settle);
-                Shot("expanded");
-                debug.ReportSuccess("Snapshot");
-                await Task.Delay(TimeSpan.FromMilliseconds(500));
-                Shot("expanded-celebrating");
-                _window.ForceExpanded(false);
-                _shell.Island.ClearModule(DebugModuleId);
-                await Task.Delay(TimeSpan.FromSeconds(3));
+                UpdateSettings(s => s.Accent = accent);
+                foreach (var (theme, backdrop) in new[] { (ThemePreference.Dark, "#202020"), (ThemePreference.Light, "#F3F3F3") })
+                {
+                    Chippi.UI.Themes.ThemeManager.Apply(theme);
+                    var color = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(backdrop);
+                    foreach (var edge in new[] { IslandEdge.Top, IslandEdge.Left, IslandEdge.Right })
+                    {
+                        UpdateSettings(s => (s.IslandEdge, s.IslandPlace) = (edge, 0.5));
+                        await Task.Delay(settle);
+                        _window.ForceOpen(true);
+                        await Task.Delay(settle);
+                        string name = $"r5-island-{edge}-{theme}-{accent}".ToLowerInvariant();
+                        _window.SaveScene(Path.Combine(directory, name + ".png"), color);
+                        _window.ForceOpen(false);
+                    }
+                }
             }
-            Chippi.UI.Themes.ThemeManager.Apply(original);
+            _shell.Island.ClearModule(DebugModuleId);
+            UpdateSettings(s => (s.IslandEdge, s.IslandPlace) = (IslandEdge.Top, 0.5));
+            await Task.Delay(settle);
+            await File.WriteAllLinesAsync(Path.Combine(directory, "r5-drop-check.txt"), await DropCheckAsync());
             _logger.LogInformation("Island snapshots saved to {Directory}", directory);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Island snapshots failed");
         }
+        finally
+        {
+            UpdateSettings(s =>
+            {
+                (s.Accent, s.Theme, s.IslandEdge, s.IslandPlace) = (original.Accent, original.Theme, original.IslandEdge, original.IslandPlace);
+                (s.IslandDisplay, s.IslandMonitorId) = (original.IslandDisplay, original.IslandMonitorId);
+            });
+            Chippi.UI.Themes.ThemeManager.Apply(original.Theme);
+        }
+    }
+
+    /// <summary>Drops the tab at points on its monitor through the real drop path and reports what was taken.</summary>
+    private async Task<List<string>> DropCheckAsync()
+    {
+        var lines = new List<string>();
+        if (_window.CurrentArea is not { } area)
+            return ["No monitor"];
+        var (m, w, s) = (area.Monitor, area.Work, area.Scale);
+        var taskbar = IslandGeometry.TaskbarEdge(m, w);
+        lines.Add($"Monitor {m}, work area {w}, scale {s}, taskbar edge {taskbar?.ToString() ?? "none (auto-hide)"}");
+        var cases = new List<(string Name, Point Pointer, bool Expected)>
+        {
+            ("Bottom edge, center", new(w.Left + w.Width / 2, w.Bottom - 2), false),
+            ("Top-left corner", new(w.Left + 4, w.Top + 4), false),
+            ("Top-right corner", new(w.Right - 4, w.Top + 4), false),
+            ("Top edge, 100 DIPs from the left end (inside the 160 margin)", new(w.Left + 100 * s, w.Top + 2), false),
+            ("Left edge, 30 DIPs from the bottom end (inside the 64 margin)", new(w.Left + 2, w.Bottom - 30 * s), false),
+            ("Right edge, 30 DIPs from the top end (inside the 64 margin)", new(w.Right - 2, w.Top + 30 * s), false),
+        };
+        if (taskbar is { } bar && bar != ScreenEdge.Bottom)
+            cases.Add(("Taskbar edge, center", bar switch
+            {
+                ScreenEdge.Top => new(w.Left + w.Width / 2, w.Top + 2),
+                ScreenEdge.Left => new(w.Left + 2, w.Top + w.Height / 2),
+                _ => new(w.Right - 2, w.Top + w.Height / 2),
+            }, false));
+        cases.Add(("Top edge, center (control)", new(w.Left + w.Width / 2, w.Top + 2), taskbar != ScreenEdge.Top));
+        foreach (var (name, pointer, expected) in cases)
+        {
+            bool taken = _window.DropAt(pointer);
+            await Task.Delay(400);
+            lines.Add($"{(taken == expected ? "PASS" : "FAIL")}  {name} at ({pointer.X:0},{pointer.Y:0}): {(taken ? "taken" : "refused")}");
+        }
+        return lines;
     }
 #endif
 
@@ -185,12 +224,37 @@ public sealed class IslandHost : IDisposable
         _window.SetActivities(activities, MoodFor(activities));
     }
 
+    /// <summary>The running features' panels that have an island view, in sidebar (registry) order.</summary>
+    private void RefreshPanels() =>
+        _window.SetPanels([.. _shell.Registry.Features.Where(f => f.IsRunning).SelectMany(f => f.FlyoutPanels).Where(p => p.CreateIslandView is not null)]);
+
     private void LoadSettings()
     {
         var settings = _shell.Config.GetSection<AppSettings>(AppSettings.SectionName);
         _window.SetPetColor(settings.PetColor);
+        _window.SetPlacement(settings.IslandEdge, settings.IslandPlace);
         _window.SetEnabled(settings.IslandEnabled);
         _tracker.SetPlacement(settings.IslandDisplay, settings.IslandMonitorId);
+    }
+
+    /// <summary>
+    /// Saves where the tab was dropped. A drop on another display than the island's switches the
+    /// display setting to that one monitor (DESIGN.md §5); otherwise the setting stays as it was.
+    /// </summary>
+    private void OnPlacementChosen(object? sender, IslandPlacementEventArgs e)
+    {
+        string? monitorId = e.Monitor == _tracker.Monitor ? null : Displays.Connected().FirstOrDefault(d => d.Handle == e.Monitor)?.Id;
+        UpdateSettings(s =>
+        {
+            s.IslandEdge = e.Edge;
+            s.IslandPlace = e.Place;
+            if (monitorId is not null)
+            {
+                s.IslandDisplay = IslandDisplay.SpecificMonitor;
+                s.IslandMonitorId = monitorId;
+            }
+        });
+        _logger.LogInformation("Island docked on {Edge} at {Place:0.###}{Display}", e.Edge, e.Place, monitorId is null ? "" : " on another display (now One monitor)");
     }
 
     private void OnSectionChanged(object? sender, ConfigSectionChangedEventArgs e)

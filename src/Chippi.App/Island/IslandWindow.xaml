@@ -1,9 +1,8 @@
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
-<!-- The island (DESIGN.md §5 Island): a borderless, transparent, topmost tool window that never
-     activates. One surface morphs between the resting pill, the live pill and the expanded island;
-     Gumdrop is a single resident that moves between the three slots. The window keeps one size (the
-     expanded island plus its lift) and never resizes during a morph: only the surface's shape, the
-     content clip and the pet's transform animate. Fully transparent pixels are click-through. -->
+<!-- The island's docked tab (DESIGN.md §5 Island): a borderless, transparent, topmost tool window that
+     never activates, sized to the tab's live size on its edge. The half-oval is two paths built in code
+     (the fill, and the stroke on every side but the flat one); the tab draws at its rest or live size
+     inside the window, flat side on the edge. Fully transparent pixels click through. -->
 <Window x:Class="Chippi.App.Island.IslandWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -13,8 +12,8 @@
         Style="{StaticResource ChippiWindowStyle}"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         ResizeMode="NoResize" ShowInTaskbar="False" ShowActivated="False" Topmost="True"
-        Focusable="False" SizeToContent="Manual" WindowStartupLocation="Manual"
-        Left="-32000" Top="-32000" Width="180" Height="110">
+        SizeToContent="Manual" WindowStartupLocation="Manual"
+        Left="-32000" Top="-32000" Width="84" Height="26">
     <Window.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
@@ -27,156 +26,38 @@
     </Window.Resources>
 
     <Grid x:Name="Root">
-        <!-- A fixed 328-wide canvas, top-center. The surface is two paths over geometry animated in code:
-             the lift (fill plus shadow) and the 1px hairline. Hovering means being over the shape itself. -->
-        <Canvas x:Name="Island" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,8,0,0" Width="328">
-            <Path x:Name="Lift" Fill="{StaticResource IslandBrush}" Effect="{StaticResource IslandShadow}" />
-            <Path x:Name="Frame" Stroke="{StaticResource IslandBorderBrush}" StrokeThickness="1" IsHitTestVisible="False" />
-            <Canvas x:Name="Stage">
-
-                <!-- Live pill: 6px left (pet) and 14px right padding, title · source, equalizer. Placed in code. -->
-                <Grid x:Name="LiveLayer" Opacity="0" IsHitTestVisible="False">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <TextBlock x:Name="LiveText" FontSize="12.5" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
-                               Foreground="{StaticResource IslandTextBrush}" />
-                    <StackPanel x:Name="Equalizer" Grid.Column="1" Orientation="Horizontal" Margin="10,0,0,0" VerticalAlignment="Center">
-                        <Rectangle Style="{StaticResource IslandEqualizerBarStyle}"><Rectangle.RenderTransform><ScaleTransform ScaleY="0.45" /></Rectangle.RenderTransform></Rectangle>
-                        <Rectangle Style="{StaticResource IslandEqualizerBarStyle}"><Rectangle.RenderTransform><ScaleTransform ScaleY="0.8" /></Rectangle.RenderTransform></Rectangle>
-                        <Rectangle Style="{StaticResource IslandEqualizerBarStyle}"><Rectangle.RenderTransform><ScaleTransform ScaleY="1" /></Rectangle.RenderTransform></Rectangle>
-                        <Rectangle Style="{StaticResource IslandEqualizerBarStyle}"><Rectangle.RenderTransform><ScaleTransform ScaleY="0.62" /></Rectangle.RenderTransform></Rectangle>
-                        <Rectangle Style="{StaticResource IslandEqualizerBarStyle}"><Rectangle.RenderTransform><ScaleTransform ScaleY="0.35" /></Rectangle.RenderTransform></Rectangle>
-                    </StackPanel>
-                    <!-- Stash: a folder glyph in the equalizer's slot; held or failed swaps it for an amber dot. -->
-                    <Grid x:Name="StashTail" Grid.Column="1" Width="15" Margin="10,0,0,0" VerticalAlignment="Center" Visibility="Collapsed">
-                        <c:LucideIcon x:Name="StashGlyph" Data="{x:Static c:LucideIcons.Folder}" Size="15" Brush="{StaticResource IslandTextTertiaryBrush}" />
-                        <c:StatusDot x:Name="StashDot" Kind="Attention" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed" />
-                    </Grid>
-                </Grid>
-
-                <!-- Expanded: 328 wide, padding 12 / 14 / 14, 10px gaps (inside the 1px hairline). -->
-                <StackPanel x:Name="ExpandedLayer" Opacity="0" IsHitTestVisible="False" Width="300" Canvas.Left="14" Canvas.Top="12">
-
-                    <!-- 1. Header: the pet's slot, "Chippi" 13/600, a clock. -->
-                    <Grid Height="28">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="38" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="1" Text="Chippi" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"
-                                   Foreground="{StaticResource IslandTextBrush}" />
-                        <TextBlock x:Name="Clock" Grid.Column="2" Style="{StaticResource NumberTextStyle}" VerticalAlignment="Center"
-                                   Foreground="{StaticResource IslandTextTertiaryBrush}" />
-                    </Grid>
-
-                    <TextBlock x:Name="EmptyText" Margin="0,10,0,0" Style="{StaticResource BodyTextStyle}"
-                               Foreground="{StaticResource IslandTextTertiaryBrush}" Text="Nothing live right now" />
-
-                    <!-- 2. Media: 46px art tile, title and source, 4px gradient progress. -->
-                    <Grid x:Name="MediaSection" Margin="0,10,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="46" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <Border Width="46" Height="46" CornerRadius="11" Background="{DynamicResource ChipBrush}">
-                            <TextBlock x:Name="MediaMonogram" Style="{StaticResource HeadlineTextStyle}" HorizontalAlignment="Center" VerticalAlignment="Center"
-                                       Foreground="{StaticResource IslandTextBrush}" />
-                        </Border>
-                        <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
-                            <TextBlock x:Name="MediaTitle" Style="{StaticResource TitleTextStyle}" TextTrimming="CharacterEllipsis"
-                                       Foreground="{StaticResource IslandTextBrush}" />
-                            <TextBlock x:Name="MediaSource" Style="{StaticResource CaptionTextStyle}" TextTrimming="CharacterEllipsis" Margin="0,1,0,0"
-                                       Foreground="{StaticResource IslandTextTertiaryBrush}" />
-                            <Grid x:Name="MediaProgress" Height="4" Margin="0,8,0,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <Border Grid.ColumnSpan="2" CornerRadius="2" Background="{StaticResource IslandTrackBrush}" />
-                                <Border CornerRadius="2" Background="{DynamicResource IslandAccentBrush}" />
-                            </Grid>
+        <Button x:Name="Tab" Style="{StaticResource IslandTabStyle}" AutomationProperties.Name="Chippi">
+            <Grid x:Name="TabBody">
+                <Path x:Name="TabFill" Fill="{StaticResource IslandBrush}" />
+                <Path x:Name="TabStroke" Stroke="{StaticResource IslandTabBorderBrush}" StrokeThickness="1" IsHitTestVisible="False" />
+                <!-- Gumdrop, then the live glyph beside it (top) or under it (sides). Decorative: the
+                     button's name and help text carry the state (DESIGN.md §7 Accessibility). -->
+                <StackPanel x:Name="TabContent" HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False">
+                    <pet:Gumdrop x:Name="Pet" Size="14" Mood="Sleepy" IsDecorative="True" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    <Grid x:Name="Glyph" Width="12" Height="12" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed">
+                        <StackPanel x:Name="Equalizer" Orientation="Horizontal" HorizontalAlignment="Center" Height="12">
+                            <Rectangle Style="{StaticResource IslandEqualizerBarStyle}" Height="7" />
+                            <Rectangle Style="{StaticResource IslandEqualizerBarStyle}" Height="12" />
+                            <Rectangle Style="{StaticResource IslandEqualizerBarStyle}" Height="9" />
                         </StackPanel>
+                        <Grid x:Name="Ring">
+                            <Ellipse Stroke="{StaticResource IslandTrackBrush}" StrokeThickness="2" />
+                            <Path x:Name="RingArc" Stroke="{DynamicResource IslandAccentBrush}" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                        </Grid>
+                        <c:LucideIcon x:Name="FolderGlyph" Data="{x:Static c:LucideIcons.Folder}" Size="12" Thickness="2" Brush="{DynamicResource IslandAccentBrush}" />
+                        <Ellipse x:Name="Dot" Width="6" Height="6" Fill="{DynamicResource IslandAccentBrush}" />
+                        <Ellipse x:Name="CautionDot" Width="6" Height="6" Fill="{StaticResource WarningBrush}" />
                     </Grid>
-
-                    <!-- 3. Transport: previous and next at 32px around a 38px deep-gradient play/pause. -->
-                    <StackPanel x:Name="TransportSection" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,10,0,0">
-                        <c:IconButton x:Name="PreviousButton" Width="32" Height="32" Focusable="False" VerticalAlignment="Center"
-                                      Icon="{x:Static c:LucideIcons.SkipBack}" AutomationProperties.Name="Previous track" />
-                        <Button x:Name="PlayPauseButton" Style="{StaticResource IslandPlayButtonStyle}" Margin="14,0" AutomationProperties.Name="Pause">
-                            <c:LucideIcon x:Name="PlayPauseIcon" Data="{x:Static c:LucideIcons.Pause}" Size="16" Brush="Black" />
-                        </Button>
-                        <c:IconButton x:Name="NextButton" Width="32" Height="32" Focusable="False" VerticalAlignment="Center"
-                                      Icon="{x:Static c:LucideIcons.SkipForward}" AutomationProperties.Name="Next track" />
-                    </StackPanel>
-
-                    <!-- 4. Two tiles: FOCUS TIMER in mono, JUST STASHED in title text. -->
-                    <Grid x:Name="TileSection" Margin="0,10,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="10" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <Border x:Name="TimerTile" Style="{StaticResource IslandTileStyle}">
-                            <StackPanel>
-                                <TextBlock x:Name="TimerLabel" Style="{StaticResource CaptionTextStyle}" Foreground="{StaticResource IslandTextTertiaryBrush}" />
-                                <TextBlock x:Name="TimerValue" Style="{StaticResource NumberTextStyle}" FontSize="13.5" Margin="0,5,0,0"
-                                           TextTrimming="CharacterEllipsis" Foreground="{StaticResource IslandTextBrush}" />
-                            </StackPanel>
-                        </Border>
-                        <Border x:Name="StashTile" Grid.Column="2" Style="{StaticResource IslandTileStyle}">
-                            <StackPanel>
-                                <TextBlock x:Name="StashLabel" Style="{StaticResource CaptionTextStyle}" Foreground="{StaticResource IslandTextTertiaryBrush}" />
-                                <TextBlock x:Name="StashValue" Style="{StaticResource TitleTextStyle}" Margin="0,4,0,0"
-                                           TextTrimming="CharacterEllipsis" Foreground="{StaticResource IslandTextBrush}" />
-                            </StackPanel>
-                        </Border>
-                    </Grid>
-
-                    <!-- 5. Agent usage: name, usage line, 5px accent bar. -->
-                    <Border x:Name="AgentSection" Style="{StaticResource IslandTileStyle}" Margin="0,10,0,0">
-                        <StackPanel>
-                            <TextBlock x:Name="AgentName" Style="{StaticResource BodyTextStyle}" TextTrimming="CharacterEllipsis"
-                                       Foreground="{StaticResource IslandTextBrush}" />
-                            <TextBlock x:Name="AgentUsage" Style="{StaticResource NumberTextStyle}" Margin="0,3,0,0" TextTrimming="CharacterEllipsis"
-                                       Foreground="{DynamicResource TextStrongBrush}" />
-                            <Grid x:Name="AgentProgress" Height="5" Margin="0,8,0,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <Border Grid.ColumnSpan="2" CornerRadius="2.5" Background="{StaticResource IslandTrackBrush}" />
-                                <Border CornerRadius="2.5" Background="{DynamicResource IslandAccentBrush}" />
-                            </Grid>
-                        </StackPanel>
-                    </Border>
-
-                    <!-- Status rows (Keep awake and other background state). Not in DESIGN.md §5; see the WS3 report. -->
-                    <StackPanel x:Name="StatusSection" />
                 </StackPanel>
+            </Grid>
+        </Button>
 
-                <!-- The resident: one Gumdrop that moves between the resting, live and expanded slots by its
-                     transform (drawn at 30, scaled). Decorative here: the text beside it carries the state
-                     (DESIGN.md §7 Accessibility). -->
-                <pet:Gumdrop x:Name="Pet" Size="30" Mood="Sleepy" IsDecorative="True">
-                    <pet:Gumdrop.RenderTransform>
-                        <TransformGroup>
-                            <ScaleTransform x:Name="PetScale" />
-                            <TranslateTransform x:Name="PetMove" />
-                        </TransformGroup>
-                    </pet:Gumdrop.RenderTransform>
-                </pet:Gumdrop>
-            </Canvas>
-
-            <Popup x:Name="DebugMenu" AllowsTransparency="True" StaysOpen="False" Placement="Bottom" VerticalOffset="8"
-                   PlacementTarget="{Binding ElementName=Lift}" PopupAnimation="None">
-                <Border Background="{StaticResource IslandPanelBrush}" BorderBrush="{StaticResource IslandBorderBrush}" BorderThickness="1"
-                        CornerRadius="12" Padding="6" MinWidth="200">
-                    <StackPanel x:Name="DebugItems" TextElement.FontFamily="{StaticResource UiFont}" />
-                </Border>
-            </Popup>
-        </Canvas>
+        <Popup x:Name="DebugMenu" AllowsTransparency="True" StaysOpen="False" Placement="Bottom" VerticalOffset="8"
+               PlacementTarget="{Binding ElementName=Tab}" PopupAnimation="None">
+            <Border Background="{StaticResource IslandBrush}" BorderBrush="{StaticResource IslandBorderBrush}" BorderThickness="1"
+                    CornerRadius="8" Padding="4" MinWidth="200">
+                <StackPanel x:Name="DebugItems" TextElement.FontFamily="{StaticResource UiFont}" />
+            </Border>
+        </Popup>
     </Grid>
 </Window>
