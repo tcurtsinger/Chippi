@@ -259,8 +259,8 @@ Mockup: the "Movable island" row. A small dark tab docked on a screen edge. Hove
   - 8px radius, Island color, 1px `rgba(255,255,255,.10)` stroke, island shadow, 12px padding, 8px gaps. It slides 12px in from the tab's side over 180ms, with no slide under reduced motion.
   - Contents, top to bottom:
     1. A header: Gumdrop at 22px, "Chippi" (13 / 600) and a clock.
-    2. The live activity card. Media: a 40px art tile, title and source, previous / accent play-pause / next, and a 4px accent progress bar with times. Timer: a "Focus timer" caption, the time at 20px, and Stop.
-    3. The installed features' island panels, in sidebar order. Keep awake: its status and four chips (30 min · 1 hr · 2 hr · No limit). Downloads: the folder, its mode line and Organize now.
+    2. The live activity card. Media: a 40px art tile, title and source with previous / accent play-pause / next beside them, then a 4px accent progress bar. Elapsed and remaining times show only once a media source reports them. Timer: a "Focus timer" caption, the time at 20px, and Stop once a timer feature exists.
+    3. The installed features' island panels, in sidebar order. Keep awake: its name with the status on the right, then four chips (30 min · 1 hr · 2 hr · No limit). Downloads: the folder over its mode line, with a compact secondary Organize now beside it.
 
     Inner cards are `rgba(255,255,255,.06)` with an 8px radius. Sections without data are left out. While Keep awake is on, the header pet is wide awake.
 - **Colors:** the island always uses the dark accent shade and dark text tokens, whatever the app theme.
@@ -278,12 +278,12 @@ Mockup: the "Movable island" row. A small dark tab docked on a screen edge. Hove
 - **Page template:** title, then an optional SelectorBar, then sections. A section is a Section header (with an optional right-aligned button) over one card of rows. Two cards in a row of the same section sit 8px apart.
 - **Rows:** at least 60px with a caption, 48px without; 10 / 16 padding; 14px gap. Label over caption on the left, the control on the right. A switch shows "On" or "Off" in body text just left of it. An expander row ends in a chevron and its sub-rows are indented 50px.
 - **Downloads organizer:** a SelectorBar of Settings · Rules · History (§5 Downloads organizer).
-- **Keep awake:** a card with the status row (accent coffee glyph, "Keep awake", caption "Off" or "On · no time limit", switch). Options: Default length (combo, "Used when you start it without picking one"), Keep screen on (switch), After a restart (value "Starts off", caption "Sessions don't carry over").
+- **Keep awake:** a card with the status row (accent coffee glyph, "Keep awake", caption "Off" or "On · no time limit", switch). Options: Default length (combo, "Used when you start it without picking one"), Keep screen on (switch, "The display stays on too"), After a restart (value "Starts off", caption "Sessions don't carry over").
 - **Add features** (replaces the Features hub): a search field with the "2 on" count beside it. **Available** lists the features that work, each a row with a 32px icon chip (accent glyph when on, muted when off), name, one-line description and a switch; Overlap badges sit after the name. One collapsed **Coming later** row ("39 features on the way") expands into one row per group listing the names. Presets are hidden until enough features exist for them to matter. Toggling a feature installs or uninstalls it, and an installed feature appears in the sidebar at once.
-- **General:** Theme (Dark · Light · Follow Windows segment, default Follow Windows), Accent color (a "Windows" pill and four 24px swatches; the caption reads "Follows your Windows accent" or the color's name), Run at startup (switch). A Settings file section with Export… and Import… beside the path.
+- **General:** Theme (Dark · Light · Follow Windows segment, default Follow Windows), Accent color (a "Windows" pill and four 24px swatches; the caption reads "Follows your Windows accent" or the color's name), Run at startup (switch, "Starts quietly in the tray when you sign in"). A Settings file section with one row, "Back up or move your settings", captioned with the path, and Export… and Import… on the right.
 - **Island & pet:** Island (switch, "Shows what's live from a screen edge"), Position (Top · Left edge · Right edge combo plus a Reset button, captioned "Or drag the island to any screen edge"), Display (combo). A Gumdrop section: a Color row with a 48px Gumdrop preview, the color's name as caption and six swatches; Reduce motion (combo: Follow Windows · On · Off).
 - **Notifications:** see below.
-- **About:** Chippi with a 32px Gumdrop and "Version 0.1.0"; License (GPL-3.0-or-later, View); Privacy ("No telemetry. Your settings stay on this PC."); Third-party notices (View). Notices open as rendered text, never raw markdown.
+- **About:** Chippi with a 32px Gumdrop, captioned "Everyday Windows utilities", with "Version 0.1.0" on the right; License (GPL-3.0-or-later, View); Privacy ("No telemetry. Your settings stay on this PC."); Third-party notices ("Fonts, icons and libraries", View). The sidebar has no version footer. Notices open as rendered text, never raw markdown.
 - **Swatch selection:** a selected swatch or pill gets a 2px gap in the card color and a 2px accent ring.
 
 ### Downloads organizer
@@ -292,12 +292,12 @@ Behavior approved 2026-10-22 (`docs/phase-2/design/phase-2-mockups.html`); visua
   - Watched folders, with Add folder on the header's right. Each folder is an expander row: folder glyph (accent while watched, muted when Paused), name over path, the mode as a value, and a chevron. Its sub-rows: Mode (Silent · Manual · Paused segment, caption "Moves files on its own", "Waits for your review" or "Not watching"), Wait before moving (combo, "Gives downloads time to finish"), Ignore list (Edit, "Files and patterns to leave alone") and Stop watching this folder (Remove).
   - Options: Keep history (combo), Organize in Explorer (switch, "Adds Organize to the right-click menu"), Import archive (Choose file…, "zip, tgz or tar.gz").
 - **Rules tab:**
-  - A card holding the test field: a search glyph, "Test a file name, like notes.txt", and the result on the right ("Txt Files → Documents" in Secondary, or "No rule matches · stays in Downloads" in Caption). It runs the whole rule set.
+  - A card holding the test field, borderless across the whole card: a search glyph, "Test a file name, like notes.txt", and the result on the right ("Txt Files → Documents" in Secondary, or "No rule matches · stays in Downloads" in Caption). It runs the whole rule set.
   - "Rules" with a "First match wins" caption, and Add rule on the right.
   - One card of rule rows: drag grip, number, name over a summary (".txt → Documents"), switch, and a chevron that opens the rule. One rule is open at a time. Edits save when valid, with no Save button. Drag, or Alt+Up/Down, reorders; the drop target is a 2px accent line.
   - Regex and templates use the code font. Placeholder tokens are 22px chips in control fill, insertable by click. Validation messages are caution text under the field.
 - **History tab:**
-  - A toolbar: search field, All folders combo, Clear history.
+  - A toolbar: search field ("Search history"), All folders combo, Clear history (text only, no glyph).
   - Grouped by day under Section headers. One card per run: a header row ("Silent · Downloads" over "10:07 AM · 1 moved") with Undo run, then indented file rows (name over "Downloads › Documents") with an undo icon button. Runs over 10 files collapse.
   - Undo per row and per run goes through an inline confirm bar ("Undo 4"). Clear history uses a popover with a Critical "Clear" button.
 - **Preview** is a view inside Settings with a back button, not a dialog.
@@ -309,7 +309,7 @@ Behavior approved 2026-10-22 (`docs/phase-2/design/phase-2-mockups.html`); visua
 
 ### Notifications page
 Behavior approved 2026-10-22 (`docs/phase-2/design/notifications/`); visuals restyled 2026-10-23.
-- **Destinations:** one card with two switch rows, Windows notifications and Island.
+- **Destinations:** one card with two switch rows, Windows notifications and Island, with no icons.
 - **Turning a destination off** keeps its choices. Its caption reads "Off · choices kept", and that checkbox column dims to 60% in every group while staying editable.
 - **When the Windows backend is unavailable,** one line sits under the card: a 7px caution dot and "Windows notifications unavailable" in caution caption. No button, and no claims about Focus or Do not disturb.
 - **Feature groups** follow the sidebar order. Each is a Section header with "Windows" and "Island" caption labels over 96px columns, then a card of 48px rows with one 20px checkbox centered in each column. A feature with no events gets no group.
