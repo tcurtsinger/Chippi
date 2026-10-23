@@ -17,7 +17,7 @@
    <c:SettingRow Header="Default length" Description="Used when you start it without picking one">
     <ComboBox x:Name="Length" Style="{DynamicResource HopperComboBoxStyle}" MinWidth="160" SelectionChanged="OnLength" />
    </c:SettingRow>
-   <c:SettingRow Header="Keep screen on">
+   <c:SettingRow Header="Keep screen on" Description="The display stays on too">
     <ToggleButton x:Name="Screen" Style="{DynamicResource SwitchWithLabelStyle}" />
    </c:SettingRow>
    <c:SettingRow Header="After a restart" Description="Sessions don't carry over">

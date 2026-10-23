@@ -44,7 +44,6 @@ public partial class SettingsWindow : Window
     {
         _shell = shell;
         InitializeComponent();
-        VersionLine.Text = $"v{AppInfo.Version} \u00B7 GPL-3.0-or-later";
         Nav.ItemsSource = Pages.Skip(1).Select(Item).ToList();
         RefreshFeatures();
         Navigate(page);
