@@ -347,6 +347,10 @@ The approved mockup is `docs/phase-2/design/notifications/`.
 - **Accessible names** read "Feature, Event, Destination", for example "Downloads organizer, Held, Windows".
 - **Quiet hours and sound** stay with Windows. Chippi has no setting for them.
   - Notification copy states what happened first: "4 files organized", "1 file held", "1 file not moved", "photos-2025.zip imported".
+  - Click targets (approved 2026-10-22): one notification per run.
+    - **Organized and Archive imported:** clicking opens that run in History. The buttons are Undo, which opens the run's inline Undo confirmation and never undoes on its own, and History. Undo appears only when the run has something undoable.
+    - **Failed:** clicking opens the run in History, and the button is History.
+    - **Held and Ready to review:** there is no run, because nothing moved. Clicking, or the Review button, opens the review.
   - Island stash pill: Gumdrop celebrates, then goes idle, and a folder glyph replaces the equalizer. Held and failed pills use amber source text and an amber dot.
 
 ## 6. Components
