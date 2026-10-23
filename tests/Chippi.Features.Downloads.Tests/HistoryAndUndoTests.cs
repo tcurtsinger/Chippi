@@ -19,6 +19,23 @@ public sealed class HistoryAndUndoTests
         return f.History.RunOperations(result.RunId).Single().Id;
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Manual_preview_offers_undone_files_again(bool restart)
+    {
+        using var f = new Fixture(FolderMode.Manual, existingFilesAreOld: true);
+        f.AddRule(new RuleSetting { Extensions = ["txt"], Action = RuleActionKind.Move, Template = "Documents" });
+        long id = await OrganizeOne(f, "a.txt");
+        Assert.True((await f.Engine.UndoAsync(id)).Succeeded);
+        if (restart) f.Restart();
+
+        var preview = await f.Engine.CreatePreviewAsync(f.Folder);
+        var item = Assert.Single(preview.Items);
+        await f.Engine.ApproveAsync(preview.Id, [item.Id]);
+        Assert.True(File.Exists(f.In("Documents", "a.txt")));
+    }
+
     [Fact]
     public async Task Undo_puts_the_file_back_and_records_a_restore()
     {

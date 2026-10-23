@@ -91,13 +91,15 @@ internal static class FileVersion
 /// move, a rename that stayed in the watched folder, an undo restore) is not organized again
 /// while its size and last-write time are unchanged. Backed by history, so it holds across
 /// restarts and rescans; a real change to the file makes it new again.
+/// Explicit previews allow undo restores so the person can organize them again.
 /// </summary>
 internal sealed class SelfTriggerGuard(IHistoryStore history)
 {
     private static readonly TimeSpan Tolerance = TimeSpan.FromSeconds(2); // FAT and network shares round times
 
-    public bool IsOwnOutput(string path, long bytes, DateTimeOffset lastWriteUtc) =>
+    public bool IsOwnOutput(string path, long bytes, DateTimeOffset lastWriteUtc, bool allowRestores = false) =>
         history.LatestOutputAt(path) is { DestinationModifiedUtc: { } produced } record
+        && (!allowRestores || record.Kind != HistoryOperationKind.Restore)
         && record.Bytes == bytes
         && (lastWriteUtc - produced).Duration() <= Tolerance;
 }
