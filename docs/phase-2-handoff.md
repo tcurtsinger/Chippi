@@ -73,6 +73,7 @@ These aren't designed yet. Marge produces mockups in the Studio Rack style and T
 
 - Branch and worktree per workstream. Each owner touches only the folders they own.
 - A second member reviews before merge. Marge merges and pushes `main`.
+- **Review bar (Travis, 2026-10-22):** findings that block a merge are bugs that break functionality or affect normal use. Theoretical edge cases and extra security hardening don't block a merge and don't get a fix round. List them in one line as "not fixing", or put them in a later phase's backlog if they ever matter.
 - Scratch, review notes and probes go in `X:\code\chippi-scratch\phase-2\`, never the repo root.
 - Dev runs use `CHIPPI_DEV_PROFILE`. Nobody installs on Travis's PC without asking.
 - One lead thread. No side jobs.

@@ -11,7 +11,11 @@ Run this once a phase's report is written and the last change is merged and push
 2. **Archive.** Zip the untracked and ignored leftovers in the main checkout (review notes, handoffs, probes, scripts, screenshots, scratch files) to `X:\code\chippi-archive\phase-N-leftovers-<date>.zip`. Keep `build\artifacts` (the current installers) and `bin`/`obj`.
 3. **Delete** the archived originals, then confirm `git status` shows nothing untracked.
 4. **Worktrees and branches.** `git worktree remove` each workstream worktree, `git branch -d` its branch, then `git worktree prune`. Only `main` remains, locally and on GitHub.
-5. **Dev profiles and temp files.** Delete `%APPDATA%\Chippi-dev`, `%LOCALAPPDATA%\Chippi-dev` and `%TEMP%\chippi*` (probes, UI Automation runs, generated assets, the Core tests' `chippi-tests` folder). Confirm no `Chippi-dev-*` value is left under `HKCU\...\CurrentVersion\Run`.
+5. **Dev profiles and temp files.** Delete `%APPDATA%\Chippi-dev`, `%LOCALAPPDATA%\Chippi-dev` and `%TEMP%\chippi*` (probes, UI Automation runs, generated assets, the Core tests' `chippi-tests` folder). Then confirm none of these dev registrations are left:
+   - `Chippi-dev-*` values under `HKCU\...\CurrentVersion\Run`
+   - `ChippiOrganize-dev-*` keys under `HKCU\Software\Classes\Directory\shell` and `...\Directory\Background\shell`
+   - `Chippi-dev-*.lnk` under `%APPDATA%\Microsoft\Windows\Start Menu\Programs`
+   - the dev notification `CLSID` keys under `HKCU\Software\Classes\CLSID`
 6. **Processes.** No dev or test Chippi is left running. Travis's installed copy is never touched.
 7. **Record** what was archived and removed in the phase tracker.
 
