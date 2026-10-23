@@ -110,6 +110,48 @@ public sealed class NoticeActionTests : IDisposable
     }
 
     [Fact]
+    public void Two_folders_in_one_pass_get_one_notice_per_run()
+    {
+        using var f = new Fixture();
+        string inbox = Path.Combine(f.Root, "Inbox");
+        Directory.CreateDirectory(inbox);
+        f.Settings.Folders.Add(new WatchedFolder { Path = inbox, Mode = FolderMode.Silent, GraceSeconds = 0, BaselineUtc = f.Settings.Folders[0].BaselineUtc });
+        f.AddRule(MovePdfs());
+        f.Write("a.pdf");
+        File.WriteAllText(Path.Combine(inbox, "b.pdf"), "b");
+        f.Settle();
+
+        var runs = f.History.Query(new HistoryQuery()).Select(o => o.RunId).Distinct().Order().ToList();
+        var notices = f.Notifier.Shown.Where(n => n.Kind == DownloadsNotices.Organized).ToList();
+        Assert.Equal(2, runs.Count);
+        Assert.Equal(runs, notices.Select(n => long.Parse(n.Activation!.Split(' ')[1], System.Globalization.CultureInfo.InvariantCulture)).Order());
+        Assert.All(notices, n =>
+        {
+            Assert.EndsWith(" organized", n.Title, StringComparison.Ordinal);
+            Assert.DoesNotContain("2 files", n.Title, StringComparison.Ordinal);
+            Assert.All(n.Actions, a => Assert.EndsWith(n.Activation!.Split(' ')[1], a.Activation, StringComparison.Ordinal));
+        });
+    }
+
+    [Fact]
+    public async Task An_import_with_nothing_undoable_offers_only_History()
+    {
+        using var f = new Fixture(FolderMode.Manual);
+        f.AddRule(MovePdfs());
+        string zip = Path.Combine(f.Root, "in.zip");
+        using (var archive = ZipFile.Open(zip, ZipArchiveMode.Create))
+        using (var writer = new StreamWriter(archive.CreateEntry("notes.txt").Open()))
+            writer.Write("no rule wants this"); // lands straight in the folder: an Import row
+        var extracted = ArchiveImporter.Extract(zip, f.Folder, Path.Combine(f.Root, "data", "imports"));
+        var preview = await f.Engine.PreviewImportAsync(f.Folder, extracted);
+        var result = await f.Engine.ApproveAsync(preview.Id, [.. preview.Items.Select(i => i.Id)]);
+
+        Assert.Equal(HistoryOperationKind.Import, f.History.RunOperations(result.RunId).Single().Kind);
+        var notice = f.Notifier.Shown.Single(n => n.Kind == DownloadsNotices.ArchiveImported);
+        Assert.Equal([("History", $"--downloads-run {result.RunId}")], Buttons(notice));
+    }
+
+    [Fact]
     public void Every_button_label_is_one_bare_word()
     {
         string[] labels = [DownloadsNotices.Undo(1).Label, DownloadsNotices.History(1).Label, DownloadsNotices.Review.Label];

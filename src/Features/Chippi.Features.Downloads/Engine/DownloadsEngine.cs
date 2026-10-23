@@ -512,7 +512,7 @@ public sealed class DownloadsEngine : IDisposable
                         plan.RuleId is { } id && names.TryGetValue(id, out var name) ? name : null,
                         file.Bytes, file.Modified, AllowRenumber: true));
                     if (result.Succeeded)
-                        batch.Organized.Add((file.Name, result.Destination, runId.Value));
+                        batch.Organized.Add((file.Name, result.Destination, runId.Value, true));
                     else
                         batch.Failed.Add((file.Name, result.Error ?? "Failed", runId.Value));
                     break;
@@ -629,7 +629,7 @@ public sealed class DownloadsEngine : IDisposable
             if (result.Succeeded)
             {
                 Drop(item.Source);
-                batch.Organized.Add((item.Name, result.Destination, runId));
+                batch.Organized.Add((item.Name, result.Destination, runId, kind != HistoryOperationKind.Import));
             }
             else
             {
@@ -786,7 +786,8 @@ public sealed class DownloadsEngine : IDisposable
     /// <summary>One pass's events turned into a few notices. Copy is state first and short.</summary>
     private sealed class NoticeBatch(RunTrigger trigger)
     {
-        public List<(string Name, string Destination, long RunId)> Organized { get; } = [];
+        /// <param name="Undoable">A move or rename; an archive file that landed straight in the folder (Import) is not.</param>
+        public List<(string Name, string Destination, long RunId, bool Undoable)> Organized { get; } = [];
 
         public List<(string Name, string Reason)> Held { get; } = [];
 
@@ -796,6 +797,10 @@ public sealed class DownloadsEngine : IDisposable
 
         /// <summary>Archive import: the archive's name, which titles the one notice.</summary>
         public string? Archive { get; init; }
+
+        /// <summary>Undo only when the run has something undo can put back; History always.</summary>
+        private static IReadOnlyList<NoticeAction> Buttons(long runId, bool undoable) =>
+            undoable ? [DownloadsNotices.Undo(runId), DownloadsNotices.History(runId)] : [DownloadsNotices.History(runId)];
 
         public void Send(INotifier notifier)
         {
@@ -809,21 +814,23 @@ public sealed class DownloadsEngine : IDisposable
                     {
                         Body = Failed.Count == 0 ? body : $"{body} · {Failed.Count} failed",
                         Activation = DownloadsNotices.RunActivation(runId),
-                        Actions = Organized.Count > 0 ? [DownloadsNotices.Undo(runId), DownloadsNotices.History(runId)] : [DownloadsNotices.History(runId)],
+                        Actions = Buttons(runId, Organized.Any(o => o.Undoable)),
                         Celebrate = Failed.Count == 0,
                         NeedsAttention = Failed.Count > 0,
                     });
                 }
                 return;
             }
-            if (Organized.Count > 0)
+            // One notice per run, so its count, Undo and History all mean the same files
+            // (two Silent folders in one pass are two runs).
+            foreach (var run in Organized.GroupBy(o => o.RunId))
             {
-                var (name, destination, runId) = Organized[0];
-                notifier.Show(new Notice(DownloadsNotices.Organized, Organized.Count == 1 ? $"{name} organized" : $"{Organized.Count} files organized")
+                var files = run.ToList();
+                notifier.Show(new Notice(DownloadsNotices.Organized, files.Count == 1 ? $"{files[0].Name} organized" : $"{files.Count} files organized")
                 {
-                    Body = Organized.Count == 1 ? Path.GetDirectoryName(destination) : null,
-                    Activation = DownloadsNotices.RunActivation(runId),
-                    Actions = [DownloadsNotices.Undo(runId), DownloadsNotices.History(runId)],
+                    Body = files.Count == 1 ? Path.GetDirectoryName(files[0].Destination) : null,
+                    Activation = DownloadsNotices.RunActivation(run.Key),
+                    Actions = Buttons(run.Key, files.Any(o => o.Undoable)),
                     Celebrate = true,
                 });
             }
@@ -839,14 +846,14 @@ public sealed class DownloadsEngine : IDisposable
                     NeedsAttention = true,
                 });
             }
-            if (Failed.Count > 0)
+            foreach (var run in Failed.GroupBy(o => o.RunId))
             {
-                long runId = Failed[0].RunId;
-                notifier.Show(new Notice(DownloadsNotices.Failed, Failed.Count == 1 ? "1 file not moved" : $"{Failed.Count} files not moved")
+                var files = run.ToList();
+                notifier.Show(new Notice(DownloadsNotices.Failed, files.Count == 1 ? "1 file not moved" : $"{files.Count} files not moved")
                 {
-                    Body = Failed.Count == 1 ? $"{Failed[0].Name} · {Failed[0].Error}" : null,
-                    Activation = DownloadsNotices.RunActivation(runId),
-                    Actions = [DownloadsNotices.History(runId)],
+                    Body = files.Count == 1 ? $"{files[0].Name} · {files[0].Error}" : null,
+                    Activation = DownloadsNotices.RunActivation(run.Key),
+                    Actions = [DownloadsNotices.History(run.Key)],
                     NeedsAttention = true,
                 });
             }
