@@ -4,7 +4,7 @@
 
 `ToastStartup` handles `--toast-server` before WPF's ordinary instance check. Its STA dispatcher waits at most ten seconds for a valid callback. A warm click forwards decoded arguments to the existing named-pipe owner and exits. A cold click retains its new `SingleInstance` owner for App startup, with the decoded initial arguments; App never acquires that owner twice. Additional callbacks queue until the shell's activation router is attached.
 
-On every primary startup (and server startup), registration refreshes the Start Menu shortcut's AppUserModelID and ToastActivatorCLSID plus HKCU LocalServer32. The installed identity is `velopack.ChippiApp`; production preserves Velopack's existing shortcut target and other properties. A missing installed shortcut makes the backend unavailable. Portable builds without that installed shortcut do not create a production shortcut.
+On every primary startup (and server startup), registration refreshes the Start Menu shortcut's AppUserModelID and ToastActivatorCLSID plus HKCU LocalServer32. The installed identity is `velopack.ChippiApp`; production preserves Velopack's existing shortcut target and other properties. A missing installed shortcut makes the backend unavailable. An unprofiled executable outside the installed ChippiApp path is unavailable and cannot modify the production shortcut or COM registration, even when an installed shortcut exists.
 
 Dev profiles derive separate deterministic CLSIDs/AUMIDs and own a separate shortcut. Normal exit revokes the live factory but leaves persistent activation available for cold clicks. Test harnesses must explicitly clean up afterwards:
 

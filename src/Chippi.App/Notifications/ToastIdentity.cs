@@ -24,5 +24,9 @@ internal sealed record ToastIdentity(string AppId, Guid Activator, string Execut
             Path.Combine(programs, profile is null ? "Chippi.lnk" : $"Chippi-dev-{profile}.lnk"), profile);
     }
 
+    internal bool CanRegister => Profile is not null || string.Equals(Path.GetFullPath(Executable),
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ChippiApp", "current", "Chippi.exe"),
+        StringComparison.OrdinalIgnoreCase);
+
     internal string ServerArguments => "--toast-server" + (Profile is null ? "" : $" --dev-profile \"{Profile}\"");
 }

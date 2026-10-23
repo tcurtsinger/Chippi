@@ -13,6 +13,8 @@ internal sealed class ToastRegistration(ToastIdentity identity, string classesRo
 
     internal void Apply()
     {
+        if (!identity.CanRegister)
+            throw new InvalidOperationException("Windows notifications require the installed executable or a dev profile");
         // Load an existing installed shortcut, preserving Velopack's target and other properties.
         // Only dev profiles create a separate, owned shortcut.
         ShortcutProperties.Apply(identity);

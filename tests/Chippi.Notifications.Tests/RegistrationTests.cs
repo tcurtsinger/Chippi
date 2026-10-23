@@ -42,7 +42,7 @@ public sealed class RegistrationTests : IDisposable
     {
         var identity = ToastIdentity.Create("fixture", @"C:\Tools\Chippi.exe", _folder);
         ShortcutProperties.Apply(identity); // create a test-owned stand-in, never the real Start Menu
-        identity = identity with { Profile = null };
+        identity = identity with { Profile = null, Executable = InstalledExecutable };
         var registration = new ToastRegistration(identity, _root);
         registration.Apply(); registration.Remove();
         Assert.True(File.Exists(identity.Shortcut));
@@ -69,10 +69,35 @@ public sealed class RegistrationTests : IDisposable
     [Fact]
     public void Missing_installed_shortcut_does_not_leave_a_com_key()
     {
-        var identity = ToastIdentity.Create(null, @"C:\Tools\Chippi.exe", _folder);
+        var identity = ToastIdentity.Create(null, InstalledExecutable, _folder);
         var registration = new ToastRegistration(identity, _root);
         Assert.Throws<FileNotFoundException>(registration.Apply);
         Assert.Null(Registry.CurrentUser.OpenSubKey(registration.ComKey));
         Assert.False(File.Exists(identity.Shortcut));
+    }
+    private static string InstalledExecutable => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ChippiApp", "current", "Chippi.exe");
+
+    [Theory]
+    [InlineData(@"C:\Portable\Chippi.exe")]
+    [InlineData(@"C:\code\Chippi\bin\Debug\net10.0-windows\Chippi.exe")]
+    [InlineData(@"C:\code\Chippi\bin\Release\net10.0-windows\Chippi.exe")]
+    public void Unprofiled_noninstalled_copy_leaves_shortcut_and_registration_untouched(string executable)
+    {
+        var fixture = ToastIdentity.Create("fixture", executable, _folder);
+        ShortcutProperties.Apply(fixture);
+        var identity = ToastIdentity.Create(null, executable, _folder);
+        File.Copy(fixture.Shortcut, identity.Shortcut);
+        byte[] before = File.ReadAllBytes(identity.Shortcut);
+        var registration = new ToastRegistration(identity, _root);
+        Assert.Throws<InvalidOperationException>(registration.Apply);
+        Assert.Null(Registry.CurrentUser.OpenSubKey(registration.ComKey));
+        Assert.Equal(before, File.ReadAllBytes(identity.Shortcut));
+        using (var key = Registry.CurrentUser.CreateSubKey(registration.ComKey + @"\LocalServer32"))
+            key.SetValue(null, "installed-command");
+        Assert.Throws<InvalidOperationException>(registration.Apply);
+        using (var key = Registry.CurrentUser.OpenSubKey(registration.ComKey + @"\LocalServer32")!)
+            Assert.Equal("installed-command", key.GetValue(null));
+        Assert.Equal(before, File.ReadAllBytes(identity.Shortcut));
     }
 }
