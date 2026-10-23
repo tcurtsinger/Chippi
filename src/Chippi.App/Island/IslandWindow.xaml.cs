@@ -1,196 +1,184 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
-using System.Globalization;
+using System.Diagnostics;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
-using System.Windows.Documents;
 using System.Windows.Input;
-using System.Windows.Interop;
 using System.Windows.Media;
-using System.Windows.Media.Animation;
-using System.Windows.Media.Effects;
-using System.Windows.Shapes;
 using System.Windows.Threading;
 using Chippi.App.Pet;
 using Chippi.Core.Config;
 using Chippi.Core.Island;
-using Chippi.UI.Controls;
+using Chippi.Core.Modules;
 using Chippi.UI.Themes;
 using Windows.Win32;
 using Windows.Win32.Foundation;
 using Windows.Win32.Graphics.Gdi;
-using Windows.Win32.UI.HiDpi;
 using Windows.Win32.UI.WindowsAndMessaging;
 
 namespace Chippi.App.Island;
 
+/// <summary>The user dropped the tab on an edge: where, and on which monitor.</summary>
+internal sealed class IslandPlacementEventArgs(IslandEdge edge, double place, HMONITOR monitor) : EventArgs
+{
+    public IslandEdge Edge { get; } = edge;
+
+    public double Place { get; } = place;
+
+    /// <summary>The monitor it landed on.</summary>
+    public HMONITOR Monitor { get; } = monitor;
+}
+
 /// <summary>
-/// The island window (DESIGN.md §5 Island, §9). Never activates (WS_EX_NOACTIVATE plus
-/// WM_MOUSEACTIVATE), never shows in Alt+Tab or the taskbar (WS_EX_TOOLWINDOW), and is placed in
-/// physical pixels top-center on the monitor it is given, 8 DIPs below the top of its work area.
-/// <see cref="IslandHost"/> feeds it activities, the mood, the monitor and whether to hide.
+/// The island's docked tab (DESIGN.md §5 Island, §9), and the controller for the open island and
+/// the drag. Every window here never activates (WS_EX_NOACTIVATE plus WM_MOUSEACTIVATE) and never
+/// shows in Alt+Tab or the taskbar, and is placed in physical pixels on the monitor it is given.
+/// Hovering opens the island after 150ms and it closes 250ms after the pointer leaves both; a press
+/// that moves 4px drags the tab to another edge. <see cref="IslandHost"/> feeds it activities, the
+/// mood, the monitor, the saved edge and place, and whether to hide.
 /// </summary>
 public partial class IslandWindow : Window
 {
-    internal enum IslandState
-    {
-        Resting,
-        Live,
-        Expanded,
-    }
+    private const double DragThreshold = 4;
+    private const double LineLength = 84;
+    private const double LineThickness = 3;
+    private const double GlyphGap = 4;
+    private const uint VK_ESCAPE = 0x1B;
 
-    // DESIGN.md §5: resting 84×34, live up to 292×38, expanded 328 wide.
-    private const double RestingWidth = 84;
-    private const double RestingHeight = 34;
-    private const double LiveHeight = 38;
-    private const double LiveMaxWidth = 292;
-    private const double ExpandedWidth = 328;
-    private const double ExpandedRadius = 24;
-    private const double TopGap = 8;
-
-    // Room for the island lift (0 8px 24px pills, 0 16px 40px expanded) around the island.
-    private const double LiftSide = 44;
-    private const double LiftBelow = 60;
-
-    // Live pill geometry inside the 1px hairline: 6px left padding (pet), 8px to the text, 14px right padding.
-    private const double LiveTextInset = 43;
-    private const double LiveRightInset = 13;
-    private const double EqualizerWidth = 10 + 25;
-    private const double StashTailWidth = 10 + 15;
-
-    private const int GWL_EXSTYLE = -20;
-    private const int WS_EX_TOOLWINDOW = 0x00000080;
-    private const int WS_EX_APPWINDOW = 0x00040000;
-    private const int WS_EX_NOACTIVATE = 0x08000000;
-
-    private static readonly TimeSpan Morph = TimeSpan.FromMilliseconds(240);
-    private static readonly TimeSpan ContentFadeIn = TimeSpan.FromMilliseconds(150);
-    private static readonly TimeSpan ContentFadeOut = TimeSpan.FromMilliseconds(90);
     private static readonly TimeSpan HoverDelay = TimeSpan.FromMilliseconds(150);
+    private static readonly TimeSpan CloseDelay = TimeSpan.FromMilliseconds(250);
+    private static readonly TimeSpan SlideTime = TimeSpan.FromMilliseconds(180);
 
-    // Leaving and re-entering within this time (crossing the hairline, say) does not collapse.
-    private static readonly TimeSpan LeaveGrace = TimeSpan.FromMilliseconds(120);
-
+    private readonly IslandPanelWindow _panel = new();
+    private readonly IslandOverlay _bubble = IslandOverlay.Bubble();
+    private readonly IslandOverlay _line = IslandOverlay.Line();
     private readonly DispatcherTimer _hoverTimer;
     private readonly DispatcherTimer _leaveTimer;
-    private readonly DispatcherTimer _clockTimer;
-
-    // The surface: the lift and content clip share one shape; the hairline follows it half a pixel in.
-    private readonly RectangleGeometry _shape = new();
-    private readonly RectangleGeometry _ring = new();
-    private Size _expandedSize = new(ExpandedWidth, RestingHeight);
     private IReadOnlyList<IslandActivity> _activities = [];
-    private IslandState _state = IslandState.Resting;
-    private bool _expandRequested;
-    private PetMood _baseMood = PetMood.Sleepy;
+    private PetMood _mood = PetMood.Sleepy;
+    private IslandEdge _edge = IslandEdge.Top;
+    private IslandEdge _docked = IslandEdge.Top;
+    private double _place = 0.5;
     private bool _enabled = true;
     private bool _suppressed;
-    private bool _equalizerRunning;
-    private int _morphGeneration;
-    private Size _windowSize;
+    private bool _hovered;
+    private readonly HOOKPROC _onKeyboard; // kept alive for as long as the hook exists
+    private UnhookWindowsHookExSafeHandle? _escapeHook;
     private HWND _hwnd;
     private HMONITOR _monitor;
+    private Point? _pressAt;
+    private bool _dragging;
+    private EventHandler? _slideFrame;
 
     public IslandWindow()
     {
         InitializeComponent();
+        _onKeyboard = OnKeyboard;
 
-        Lift.Data = _shape;
-        Frame.Data = _ring;
-        Stage.Clip = _shape;
-
-        // The window never resizes under the pointer, so enter and leave are reported faithfully:
-        // no pointer polling. Both timers are one-shot.
+        // Both timers are one-shot.
         _hoverTimer = new DispatcherTimer { Interval = HoverDelay };
         _hoverTimer.Tick += (_, _) =>
         {
             _hoverTimer.Stop();
-            if (Island.IsMouseOver)
-                Expand();
+            if (Tab.IsMouseOver && _pressAt is null)
+                OpenIsland();
         };
-        _leaveTimer = new DispatcherTimer { Interval = LeaveGrace };
+        _leaveTimer = new DispatcherTimer { Interval = CloseDelay };
         _leaveTimer.Tick += (_, _) =>
         {
             _leaveTimer.Stop();
-            if (!_expandRequested || Island.IsMouseOver || DebugMenu.IsOpen)
-                return; // a closing debug menu restarts this
-            _expandRequested = false;
-            Refresh();
+            if (Tab.IsMouseOver || _panel.IsMouseOver || DebugMenu.IsOpen)
+                return; // leaving again restarts this
+            if (Mouse.Captured is not null)
+            {
+                _leaveTimer.Start(); // a list or menu inside the island is open
+                return;
+            }
+            CloseIsland();
         };
-        _clockTimer = new DispatcherTimer();
-        _clockTimer.Tick += (_, _) => UpdateClock();
 
-        Island.MouseEnter += (_, _) =>
+        Tab.MouseEnter += (_, _) =>
         {
+            _hovered = true;
             _leaveTimer.Stop();
-            if (!_expandRequested)
+            if (!_panel.IsOpen && _pressAt is null)
                 _hoverTimer.Start();
+            RefreshTab();
         };
-        Island.MouseLeave += (_, _) =>
+        Tab.MouseLeave += (_, _) =>
         {
+            _hovered = false;
             _hoverTimer.Stop();
-            if (_expandRequested)
+            if (_panel.IsOpen)
                 _leaveTimer.Start();
+            RefreshTab();
         };
-        Island.MouseLeftButtonUp += (_, e) =>
+        _panel.MouseEnter += (_, _) => _leaveTimer.Stop();
+        _panel.MouseLeave += (_, _) => _leaveTimer.Start();
+
+        // The mouse is handled here, before the button sees it: a press is a click or the start of a drag.
+        // Click itself comes only from Enter, Space or UI Automation's Invoke.
+        Tab.PreviewMouseLeftButtonDown += OnPress;
+        Tab.PreviewMouseMove += OnPointerMove;
+        Tab.PreviewMouseLeftButtonUp += OnRelease;
+        Tab.LostMouseCapture += OnLostCapture;
+        Tab.Click += (_, _) => Toggle();
+        Tab.MouseRightButtonUp += (_, e) =>
         {
-            if (!_expandRequested)
-            {
-                _hoverTimer.Stop();
-                Expand();
-                e.Handled = true;
-            }
-        };
-        Island.MouseRightButtonUp += (_, e) =>
-        {
-            if (DebugItems.Children.Count > 0)
-            {
-                DebugMenu.IsOpen = true;
-                e.Handled = true;
-            }
+            if (DebugItems.Children.Count == 0)
+                return;
+            DebugMenu.IsOpen = true;
+            e.Handled = true;
         };
         DebugMenu.Closed += (_, _) =>
         {
-            if (_expandRequested)
+            if (_panel.IsOpen)
                 _leaveTimer.Start();
         };
-        PlayPauseButton.Click += (_, _) => TogglePlayGlyph();
-        Motion.Changed += OnMotionChanged;
-        Closed += (_, _) => Motion.Changed -= OnMotionChanged;
         DpiChanged += (_, _) => Dispatcher.BeginInvoke(DispatcherPriority.Render, Place);
 
-        Render();
-        FitWindowToContent();
-        Width = _windowSize.Width;
-        Height = _windowSize.Height;
-        SnapTo(IslandState.Resting);
+        ApplyEdgeLayout(IslandEdge.Top);
     }
 
     /// <summary>Raised when the display layout or work area changed (WM_DISPLAYCHANGE, WM_SETTINGCHANGE).</summary>
     public event EventHandler? DisplayChanged;
 
+    /// <summary>The user dropped the tab on an edge it can dock on. It is already there; save it.</summary>
+    internal event EventHandler<IslandPlacementEventArgs>? PlacementChosen;
+
+    /// <summary>The user dropped the tab on the taskbar's edge, the bottom or a corner; it went back.</summary>
+    public event EventHandler? DropRefused;
+
     internal HWND Handle => _hwnd;
 
-    internal IslandState State => _state;
-
-    /// <summary>Creates the window handle with the no-activate tool-window styles, before anything is shown.</summary>
+    /// <summary>Creates the window handles with the no-activate tool-window styles, before anything is shown.</summary>
     public void Initialize()
     {
-        var helper = new WindowInteropHelper(this);
-        _hwnd = (HWND)helper.EnsureHandle();
-        int ex = PInvoke.GetWindowLong(_hwnd, WINDOW_LONG_PTR_INDEX.GWL_EXSTYLE);
-        ex = (ex | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE) & ~WS_EX_APPWINDOW;
-        _ = PInvoke.SetWindowLong(_hwnd, WINDOW_LONG_PTR_INDEX.GWL_EXSTYLE, ex);
-        HwndSource.FromHwnd(_hwnd)?.AddHook(WndProc);
+        _hwnd = IslandNative.MakeNoActivate(this, WndProc);
+        _panel.Initialize();
+        _bubble.Initialize();
+        _line.Initialize();
     }
 
-    /// <summary>The monitor the island sits on (the one holding the foreground window).</summary>
+    /// <summary>The monitor the island sits on, for the island display setting.</summary>
     internal void SetMonitor(HMONITOR monitor)
     {
         if (monitor == default || monitor == _monitor)
             return;
         _monitor = monitor;
+        Place();
+        ApplyVisibility();
+    }
+
+    /// <summary>AppSettings.IslandEdge and IslandPlace.</summary>
+    public void SetPlacement(IslandEdge edge, double place)
+    {
+        if (edge == _edge && Math.Abs(place - _place) < 1e-6)
+            return; // the drop already put it there
+        _edge = edge;
+        _place = place;
         Place();
     }
 
@@ -208,21 +196,34 @@ public partial class IslandWindow : Window
         ApplyVisibility();
     }
 
-    public void SetPetColor(PetColor color) => Pet.PetColor = color;
+    public void SetPetColor(PetColor color)
+    {
+        Pet.PetColor = color;
+        _panel.SetPetColor(color);
+        if (_bubble.Pet is { } pet)
+            pet.PetColor = color;
+    }
 
     /// <summary>The activities in display priority order (<see cref="IslandActivityHub.Activities"/>) and the pet's mood for them.</summary>
     public void SetActivities(IReadOnlyList<IslandActivity> activities, PetMood mood)
     {
         _activities = activities;
-        _baseMood = mood;
-        Render();
-        Refresh();
+        _mood = mood;
+        RefreshTab();
+        _panel.SetActivities(activities, mood);
     }
 
-    /// <summary>A module reported success: Gumdrop celebrates for about 2.5s.</summary>
-    public void Celebrate() => Pet.Celebrate();
+    /// <summary>The running features' panels that have an island view, in sidebar order.</summary>
+    public void SetPanels(IReadOnlyList<FlyoutPanelContribution> panels) => _panel.SetPanels(panels);
 
-    /// <summary>Debug menu entries (null is a separator). Right-clicking the island opens them.</summary>
+    /// <summary>A module reported success: Gumdrop celebrates for about 2.5s.</summary>
+    public void Celebrate()
+    {
+        Pet.Celebrate();
+        _panel.Celebrate();
+    }
+
+    /// <summary>Debug menu entries (null is a separator). Right-clicking the tab opens them.</summary>
     public void SetDebugMenu(IEnumerable<(string Label, Action Action)?> items)
     {
         DebugItems.Children.Clear();
@@ -252,62 +253,48 @@ public partial class IslandWindow : Window
         {
             Show();
             Place();
-            Refresh();
+            RefreshTab();
         }
         else if (!visible && IsVisible)
         {
             _hoverTimer.Stop();
             _leaveTimer.Stop();
             DebugMenu.IsOpen = false;
-            _expandRequested = false;
+            if (_pressAt is not null)
+                Tab.ReleaseMouseCapture(); // ends a drag: OnLostCapture
+            CloseIsland();
             Hide();
-            Refresh();
         }
     }
 
-    /// <summary>Sizes and positions the window in the target monitor's physical pixels, top-center, and re-asserts topmost.</summary>
-    private void Place()
+    private MonitorArea? Area => IslandNative.Area(_monitor);
+
+    /// <summary>The tab window's rectangle at its saved edge and place: sized to the live tab, flat side on the edge.</summary>
+    private Rect Home(MonitorArea area)
     {
-        if (_hwnd == default || _monitor == default)
-            return;
-        var info = new MONITORINFO { cbSize = (uint)System.Runtime.InteropServices.Marshal.SizeOf<MONITORINFO>() };
-        if (!PInvoke.GetMonitorInfo(_monitor, ref info))
-            return;
-        double scale = OperatingSystem.IsWindowsVersionAtLeast(10)
-            && PInvoke.GetDpiForMonitor(_monitor, MONITOR_DPI_TYPE.MDT_EFFECTIVE_DPI, out uint dpi, out _).Succeeded ? dpi / 96.0 : 1.0;
-        int width = (int)Math.Ceiling(_windowSize.Width * scale);
-        int height = (int)Math.Ceiling(_windowSize.Height * scale);
-        var monitor = info.rcMonitor;
-        int x = monitor.left + (monitor.right - monitor.left - width) / 2;
-        int y = info.rcWork.top;
-        PInvoke.SetWindowPos(_hwnd, (HWND)(nint)(-1) /* HWND_TOPMOST */, x, y, width, height,
-            SET_WINDOW_POS_FLAGS.SWP_NOACTIVATE | SET_WINDOW_POS_FLAGS.SWP_NOOWNERZORDER);
+        var edge = IslandGeometry.Docked(_edge, area.Monitor, area.Work);
+        var anchor = IslandGeometry.Anchor(edge, _place, area.Monitor, area.Work, area.Scale);
+        var size = IslandGeometry.TabSize(edge, large: true);
+        return IslandGeometry.TabRect(edge, anchor, new Size(size.Width * area.Scale, size.Height * area.Scale));
     }
 
-    /// <summary>
-    /// One window size for every state: the expanded island plus its lift. It changes only when the
-    /// expanded content does (a new activity section), never on hover or during a morph.
-    /// </summary>
-    private void FitWindowToContent()
+    /// <summary>Puts the tab at home on its monitor (and the open island beside it), and re-asserts topmost.</summary>
+    private void Place()
     {
-        _expandedSize = IslandSizeFor(IslandState.Expanded);
-        double surfaceHeight = Math.Max(_expandedSize.Height, LiveHeight);
-        Island.Height = surfaceHeight;
-        var size = new Size(Math.Ceiling(ExpandedWidth + 2 * LiftSide), Math.Ceiling(TopGap + surfaceHeight + LiftBelow));
-        if (size == _windowSize)
+        if (_hwnd == default || _dragging || Area is not { } area)
             return;
-        _windowSize = size;
-        Place();
+        StopSlide();
+        ApplyEdgeLayout(IslandGeometry.Docked(_edge, area.Monitor, area.Work));
+        var home = Home(area);
+        IslandNative.Move(_hwnd, home);
+        if (_panel.IsOpen)
+            _panel.Open(_docked, home, area);
     }
 
     private nint WndProc(nint hwnd, int msg, nint wParam, nint lParam, ref bool handled)
     {
         switch ((uint)msg)
         {
-            case PInvoke.WM_MOUSEACTIVATE:
-                // Clicks never activate the island: the previously active window keeps focus.
-                handled = true;
-                return (nint)PInvoke.MA_NOACTIVATE;
             case PInvoke.WM_DISPLAYCHANGE:
             case PInvoke.WM_SETTINGCHANGE:
                 Dispatcher.BeginInvoke(DispatcherPriority.Background, () => DisplayChanged?.Invoke(this, EventArgs.Empty));
@@ -316,405 +303,361 @@ public partial class IslandWindow : Window
         return 0;
     }
 
-    // ----- States -----
-
-    private IslandState TargetState =>
-        _expandRequested && IsVisible ? IslandState.Expanded
-        : _activities.Count > 0 ? IslandState.Live
-        : IslandState.Resting;
-
-    private void Expand()
+    /// <summary>
+    /// Esc closes the island. It never has keyboard focus (it never activates), so a low-level
+    /// keyboard hook watches for Esc while it is open, and always passes the key on: the app in
+    /// front still gets its Esc (a dialog it closes, a selection it cancels).
+    /// </summary>
+    private unsafe LRESULT OnKeyboard(int code, WPARAM wParam, LPARAM lParam)
     {
-        if (_expandRequested || !IsVisible)
-            return;
-        _expandRequested = true;
-        Refresh();
+        if (code >= 0 && wParam.Value == PInvoke.WM_KEYDOWN && ((KBDLLHOOKSTRUCT*)lParam.Value)->vkCode == VK_ESCAPE)
+            Dispatcher.BeginInvoke(CloseIsland);
+        return PInvoke.CallNextHookEx(_escapeHook, code, wParam, lParam);
     }
 
-    /// <summary>Moves to the state the activities and pointer ask for, morphing unless motion is reduced or the window is hidden.</summary>
-    private void Refresh()
+    // ----- Open and close -----
+
+    private void Toggle()
     {
-        var target = TargetState;
-        UpdatePetMood(target);
-        FitWindowToContent();
-        bool animate = IsVisible && !Motion.IsReduced;
-        if (target == _state)
-        {
-            // Same state, new content: re-fit the live pill's width or the expanded height.
-            var size = IslandSizeFor(target);
-            if (Math.Abs(size.Width - _shape.Rect.Width) > 0.5 || Math.Abs(size.Height - _shape.Rect.Height) > 0.5)
-                MorphTo(target, animate);
-            UpdateEqualizer();
-            return;
-        }
-        MorphTo(target, animate);
-    }
-
-    private void SnapTo(IslandState state) => MorphTo(state, animate: false);
-
-    private void MorphTo(IslandState target, bool animate)
-    {
-        _state = target;
-        int generation = ++_morphGeneration;
-        var size = IslandSizeFor(target);
-        var shape = ShapeFor(size);
-        double radius = target == IslandState.Expanded ? ExpandedRadius : size.Height / 2;
-        var (petLeft, petTop, petSize) = PetSlot(target);
-        // The pet's slot is inside the hairline of the pill, which is centered on the canvas.
-        double petX = shape.X + 1 + petLeft, petY = shape.Y + 1 + petTop, petScale = petSize / Pet.Size;
-
-        // The live layer sits where the live pill will be; only content changes move it, never a frame.
-        if (target == IslandState.Live)
-        {
-            Canvas.SetLeft(LiveLayer, shape.X + 1 + LiveTextInset);
-            Canvas.SetTop(LiveLayer, shape.Y + 1);
-            LiveLayer.Width = Math.Max(0, size.Width - 2 - LiveTextInset - LiveRightInset);
-            LiveLayer.Height = size.Height - 2;
-        }
-
-        // The larger lift appears as the island opens and stays until it has closed.
-        bool expanding = target == IslandState.Expanded;
-        if (expanding || !animate)
-            Lift.Effect = (Effect)FindResource(expanding ? "IslandExpandedShadow" : "IslandShadow");
-        LiveLayer.IsHitTestVisible = target == IslandState.Live;
-        ExpandedLayer.IsHitTestVisible = target == IslandState.Expanded;
-        double liveOpacity = target == IslandState.Live ? 1 : 0;
-        double expandedOpacity = target == IslandState.Expanded ? 1 : 0;
-        // Inactive layers end up Hidden (not Collapsed, so they still measure): screen readers skip them.
-        if (liveOpacity > 0)
-            LiveLayer.Visibility = Visibility.Visible;
-        if (expandedOpacity > 0)
-            ExpandedLayer.Visibility = Visibility.Visible;
-
-        if (target == IslandState.Expanded)
-            StartClock();
+        if (_panel.IsOpen)
+            CloseIsland();
         else
-            _clockTimer.Stop();
+            OpenIsland();
+    }
 
-        if (!animate)
-        {
-            Set(_shape, RectangleGeometry.RectProperty, shape);
-            Set(_shape, RectangleGeometry.RadiusXProperty, radius);
-            Set(_shape, RectangleGeometry.RadiusYProperty, radius);
-            Set(_ring, RectangleGeometry.RectProperty, Inset(shape));
-            Set(_ring, RectangleGeometry.RadiusXProperty, radius - 0.5);
-            Set(_ring, RectangleGeometry.RadiusYProperty, radius - 0.5);
-            Set(PetMove, TranslateTransform.XProperty, petX);
-            Set(PetMove, TranslateTransform.YProperty, petY);
-            Set(PetScale, ScaleTransform.ScaleXProperty, petScale);
-            Set(PetScale, ScaleTransform.ScaleYProperty, petScale);
-            Set(LiveLayer, OpacityProperty, liveOpacity);
-            Set(ExpandedLayer, OpacityProperty, expandedOpacity);
-            if (liveOpacity == 0)
-                LiveLayer.Visibility = Visibility.Hidden;
-            if (expandedOpacity == 0)
-                ExpandedLayer.Visibility = Visibility.Hidden;
-            UpdateEqualizer();
+    private void OpenIsland()
+    {
+        if (!IsVisible || _dragging || Area is not { } area)
             return;
-        }
+        _panel.Open(_docked, Home(area), area);
+        if (_escapeHook is null || _escapeHook.IsInvalid)
+            _escapeHook = PInvoke.SetWindowsHookEx(WINDOWS_HOOK_ID.WH_KEYBOARD_LL, _onKeyboard, PInvoke.GetModuleHandle((string?)null), 0);
+        RefreshTab();
+    }
 
-        // Only render properties animate: the shape (which is also the content clip), the hairline and
-        // the pet's transform. No layout pass and no window resize happen per frame.
-        var shapeAnimation = Animate(new RectAnimation(shape, new Duration(Morph)));
-        shapeAnimation.Completed += (_, _) =>
+    private void CloseIsland()
+    {
+        _leaveTimer.Stop();
+        _escapeHook?.Dispose(); // unhooks
+        _escapeHook = null;
+        if (!_panel.IsOpen)
+            return;
+        _panel.CloseIsland();
+        RefreshTab();
+    }
+
+    // ----- The tab -----
+
+    private void ApplyEdgeLayout(IslandEdge docked)
+    {
+        _docked = docked;
+        (Tab.HorizontalAlignment, Tab.VerticalAlignment) = docked switch
         {
-            if (generation == _morphGeneration && !expanding)
-                Lift.Effect = (Effect)FindResource("IslandShadow");
+            IslandEdge.Left => (HorizontalAlignment.Left, VerticalAlignment.Center),
+            IslandEdge.Right => (HorizontalAlignment.Right, VerticalAlignment.Center),
+            _ => (HorizontalAlignment.Center, VerticalAlignment.Top),
         };
-        _shape.BeginAnimation(RectangleGeometry.RectProperty, shapeAnimation, HandoffBehavior.SnapshotAndReplace);
-        _shape.BeginAnimation(RectangleGeometry.RadiusXProperty, Animate(new DoubleAnimation(radius, new Duration(Morph))), HandoffBehavior.SnapshotAndReplace);
-        _shape.BeginAnimation(RectangleGeometry.RadiusYProperty, Animate(new DoubleAnimation(radius, new Duration(Morph))), HandoffBehavior.SnapshotAndReplace);
-        _ring.BeginAnimation(RectangleGeometry.RectProperty, Animate(new RectAnimation(Inset(shape), new Duration(Morph))), HandoffBehavior.SnapshotAndReplace);
-        _ring.BeginAnimation(RectangleGeometry.RadiusXProperty, Animate(new DoubleAnimation(radius - 0.5, new Duration(Morph))), HandoffBehavior.SnapshotAndReplace);
-        _ring.BeginAnimation(RectangleGeometry.RadiusYProperty, Animate(new DoubleAnimation(radius - 0.5, new Duration(Morph))), HandoffBehavior.SnapshotAndReplace);
-        PetMove.BeginAnimation(TranslateTransform.XProperty, Animate(new DoubleAnimation(petX, new Duration(Morph))), HandoffBehavior.SnapshotAndReplace);
-        PetMove.BeginAnimation(TranslateTransform.YProperty, Animate(new DoubleAnimation(petY, new Duration(Morph))), HandoffBehavior.SnapshotAndReplace);
-        PetScale.BeginAnimation(ScaleTransform.ScaleXProperty, Animate(new DoubleAnimation(petScale, new Duration(Morph))), HandoffBehavior.SnapshotAndReplace);
-        PetScale.BeginAnimation(ScaleTransform.ScaleYProperty, Animate(new DoubleAnimation(petScale, new Duration(Morph))), HandoffBehavior.SnapshotAndReplace);
-        FadeLayer(LiveLayer, liveOpacity, generation);
-        FadeLayer(ExpandedLayer, expandedOpacity, generation);
-        UpdateEqualizer();
+        TabContent.Orientation = docked == IslandEdge.Top ? Orientation.Horizontal : Orientation.Vertical;
+        Glyph.Margin = docked == IslandEdge.Top ? new Thickness(GlyphGap, 0, 0, 0) : new Thickness(0, GlyphGap, 0, 0);
+        RefreshTab();
     }
 
-    /// <summary>The surface for a state's size: centered on the 328-wide canvas, at its top.</summary>
-    private static Rect ShapeFor(Size size) => new((ExpandedWidth - size.Width) / 2, 0, size.Width, size.Height);
-
-    /// <summary>The hairline is stroked half a pixel inside the shape, so all of it is inside the edge.</summary>
-    private static Rect Inset(Rect rect) => new(rect.X + 0.5, rect.Y + 0.5, Math.Max(0, rect.Width - 1), Math.Max(0, rect.Height - 1));
-
-    private static T Animate<T>(T animation) where T : AnimationTimeline
+    /// <summary>
+    /// Sizes and fills the tab: 14px sleepy Gumdrop at rest; 18px with the highest activity's glyph
+    /// when something is live, idle when only hovered or open.
+    /// </summary>
+    private void RefreshTab()
     {
-        if (animation is DoubleAnimation number)
-            number.EasingFunction = MorphEase;
-        else if (animation is RectAnimation rect)
-            rect.EasingFunction = MorphEase;
-        return animation;
+        var top = _activities.Count > 0 ? _activities[0] : null;
+        bool large = top is not null || _hovered || _panel.IsOpen;
+        var size = IslandGeometry.TabSize(_docked, large);
+        TabBody.Width = size.Width;
+        TabBody.Height = size.Height;
+        var (fill, stroke) = TabShape(_docked, size);
+        TabFill.Data = fill;
+        TabStroke.Data = stroke;
+
+        Pet.Size = large ? 18 : 14;
+        Pet.ShowMood(top is not null ? _mood : large ? PetMood.Idle : PetMood.Sleepy);
+
+        Glyph.Visibility = Shown(top is not null);
+        Equalizer.Visibility = Shown(top?.Kind == IslandActivityKind.Media);
+        Ring.Visibility = Shown(top?.Kind is IslandActivityKind.Timer or IslandActivityKind.Agent);
+        bool folder = top?.Kind is IslandActivityKind.Download or IslandActivityKind.Stash;
+        FolderGlyph.Visibility = Shown(folder && !top!.NeedsAttention);
+        CautionDot.Visibility = Shown(folder && top!.NeedsAttention);
+        Dot.Visibility = Shown(top?.Kind == IslandActivityKind.Status);
+        if (top?.Kind is IslandActivityKind.Timer or IslandActivityKind.Agent)
+            RingArc.Data = Arc(top.Progress ?? 1);
+
+        AutomationProperties.SetHelpText(Tab, top is null ? "" : string.IsNullOrWhiteSpace(top.Source) ? top.Title : $"{top.Title}, {top.Source}");
     }
-
-    private static readonly IEasingFunction MorphEase = new QuarticEase { EasingMode = EasingMode.EaseOut };
-
-    /// <summary>Outgoing content fades quickly, then hides; incoming content fades in once the surface has mostly reached its size.</summary>
-    private void FadeLayer(UIElement layer, double to, int generation)
-    {
-        var animation = to > 0
-            ? new DoubleAnimation(to, new Duration(ContentFadeIn)) { BeginTime = TimeSpan.FromMilliseconds(Morph.TotalMilliseconds * 0.45) }
-            : new DoubleAnimation(to, new Duration(ContentFadeOut));
-        if (to == 0)
-        {
-            animation.Completed += (_, _) =>
-            {
-                if (generation == _morphGeneration)
-                    layer.Visibility = Visibility.Hidden;
-            };
-        }
-        layer.BeginAnimation(OpacityProperty, animation, HandoffBehavior.SnapshotAndReplace);
-    }
-
-    /// <summary>Stops any running animation of the property, then sets it.</summary>
-    private static void Set(DependencyObject target, DependencyProperty property, object value)
-    {
-        if (target is IAnimatable animatable)
-            animatable.BeginAnimation(property, null);
-        target.SetValue(property, value);
-    }
-
-    private Size IslandSizeFor(IslandState state)
-    {
-        switch (state)
-        {
-            case IslandState.Live:
-                LiveText.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-                // +2: layout rounding can leave the star column a fraction short, and trimming would then cut a word.
-                double text = Math.Ceiling(LiveText.DesiredSize.Width) + 2;
-                double tail = Equalizer.Visibility == Visibility.Visible ? EqualizerWidth : StashTail.Visibility == Visibility.Visible ? StashTailWidth : 0;
-                double content = LiveTextInset + text + tail + LiveRightInset + 2;
-                return new Size(Math.Clamp(Math.Ceiling(content), RestingWidth, LiveMaxWidth), LiveHeight);
-            case IslandState.Expanded:
-                ExpandedLayer.Measure(new Size(ExpandedWidth - 2, double.PositiveInfinity));
-                // The layer sits 12 below the top edge (1px hairline + 11 padding); 13 padding + 1px hairline below.
-                return new Size(ExpandedWidth, Math.Ceiling(Canvas.GetTop(ExpandedLayer) + ExpandedLayer.DesiredSize.Height + 14));
-            default:
-                return new Size(RestingWidth, RestingHeight);
-        }
-    }
-
-    /// <summary>Gumdrop's slot inside the hairline: centered at 28 resting, 30 at the live pill's left, 28 in the expanded header.</summary>
-    private static (double Left, double Top, double Size) PetSlot(IslandState state) => state switch
-    {
-        IslandState.Live => (5, (LiveHeight - 2 - 30) / 2, 30),
-        IslandState.Expanded => (13, 11, 28),
-        _ => ((RestingWidth - 2 - 28) / 2, (RestingHeight - 2 - 28) / 2, 28),
-    };
-
-    /// <summary>Resting is sleepy; the expanded header shows the pet awake (idle) even when nothing is live.</summary>
-    private void UpdatePetMood(IslandState target) =>
-        Pet.ShowMood(target == IslandState.Expanded && _baseMood == PetMood.Sleepy ? PetMood.Idle : _baseMood);
-
-    // ----- Content -----
-
-    private void Render()
-    {
-        var current = _activities.Count > 0 ? _activities[0] : null;
-
-        // Live pill: the title, then the tertiary source.
-        LiveText.Inlines.Clear();
-        if (current is not null)
-        {
-            LiveText.Inlines.Add(new Run(current.Title));
-            if (!string.IsNullOrWhiteSpace(current.Source))
-            {
-                LiveText.Inlines.Add(new Run(" · ") { Foreground = (Brush)FindResource("IslandTextTertiaryBrush") });
-                var source = SourceRun(current.Source);
-                if (current.NeedsAttention)
-                    source.Foreground = (Brush)FindResource("WarningBrush");
-                LiveText.Inlines.Add(source);
-            }
-        }
-        Equalizer.Visibility = current?.Kind == IslandActivityKind.Media ? Visibility.Visible : Visibility.Collapsed;
-        bool stashed = current?.Kind == IslandActivityKind.Stash;
-        StashTail.Visibility = Shown(stashed);
-        StashGlyph.Visibility = Shown(stashed && !current!.NeedsAttention);
-        StashDot.Visibility = Shown(stashed && current!.NeedsAttention);
-
-        // Expanded: only the sections that have data.
-        var media = First(IslandActivityKind.Media);
-        MediaSection.Visibility = TransportSection.Visibility = Shown(media is not null);
-        if (media is not null)
-        {
-            MediaTitle.Text = media.Title;
-            MediaSource.Text = media.Source;
-            string monogramSource = string.IsNullOrWhiteSpace(media.Source) ? media.Title : media.Source;
-            MediaMonogram.Text = monogramSource.Length > 0 ? monogramSource[..1].ToUpper(CultureInfo.CurrentCulture) : "";
-            SetProgress(MediaProgress, media.Progress);
-        }
-
-        var timer = First(IslandActivityKind.Timer);
-        var stash = First(IslandActivityKind.Stash);
-        var download = stash is null ? First(IslandActivityKind.Download) : null;
-        TimerTile.Visibility = Shown(timer is not null);
-        if (timer is not null)
-        {
-            TimerLabel.Text = timer.Title;
-            TimerValue.Text = timer.Source;
-        }
-        var held = stash ?? download;
-        StashTile.Visibility = Shown(held is not null);
-        if (held is not null)
-        {
-            StashLabel.Text = stash is not null ? "Just stashed" : "Downloading";
-            StashValue.Text = held.Title;
-        }
-        TileSection.Visibility = Shown(timer is not null || held is not null);
-        Grid.SetColumnSpan(TimerTile, held is null ? 3 : 1);
-        Grid.SetColumn(StashTile, timer is null ? 0 : 2);
-        Grid.SetColumnSpan(StashTile, timer is null ? 3 : 1);
-
-        var agent = First(IslandActivityKind.Agent);
-        AgentSection.Visibility = Shown(agent is not null);
-        if (agent is not null)
-        {
-            AgentName.Text = agent.Title;
-            AgentUsage.Text = agent.Source;
-            SetProgress(AgentProgress, agent.Progress);
-        }
-
-        StatusSection.Children.Clear();
-        foreach (var status in _activities.Where(a => a.Kind == IslandActivityKind.Status))
-            StatusSection.Children.Add(StatusRow(status));
-
-        EmptyText.Visibility = Shown(_activities.Count == 0);
-    }
-
-    private IslandActivity? First(IslandActivityKind kind) => _activities.FirstOrDefault(a => a.Kind == kind);
 
     private static Visibility Shown(bool shown) => shown ? Visibility.Visible : Visibility.Collapsed;
 
-    private static bool IsMeasurement(string text) => text.Any(char.IsDigit);
-
-    private Run SourceRun(string source) => new(source) { Foreground = (Brush)FindResource("IslandTextTertiaryBrush") };
-
-    private Border StatusRow(IslandActivity status)
+    /// <summary>
+    /// The half-oval for a tab of <paramref name="size"/> DIPs: flat against the edge, fully round on
+    /// the side away from it. The stroke runs half a pixel inside on every side but the flat one.
+    /// </summary>
+    internal static (Geometry Fill, Geometry Stroke) TabShape(IslandEdge edge, Size size)
     {
-        var grid = new Grid();
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        var name = new TextBlock
+        // Built for the top edge (x along it, y away from it), then turned for the sides.
+        double along = edge == IslandEdge.Top ? size.Width : size.Height;
+        double across = edge == IslandEdge.Top ? size.Height : size.Width;
+        var fill = HalfOval(along, across, 0, close: true);
+        var stroke = HalfOval(along, across, 0.5, close: false);
+        var turn = edge switch
         {
-            Text = status.Title,
-            Style = (Style)FindResource("BodyTextStyle"),
-            Foreground = (Brush)FindResource("IslandTextBrush"),
-            TextTrimming = TextTrimming.CharacterEllipsis,
-            VerticalAlignment = VerticalAlignment.Center,
+            IslandEdge.Left => new Matrix(0, 1, 1, 0, 0, 0), // (x, y) → (y, x)
+            IslandEdge.Right => new Matrix(0, 1, -1, 0, across, 0), // (x, y) → (across - y, x)
+            _ => Matrix.Identity,
         };
-        var value = new TextBlock
-        {
-            Text = status.Source,
-            Style = (Style)FindResource(IsMeasurement(status.Source) ? "NumberTextStyle" : "CaptionTextStyle"),
-            Foreground = (Brush)FindResource("IslandTextTertiaryBrush"),
-            Margin = new Thickness(10, 0, 0, 0),
-            VerticalAlignment = VerticalAlignment.Center,
-        };
-        Grid.SetColumn(value, 1);
-        grid.Children.Add(name);
-        grid.Children.Add(value);
-        return new Border { Style = (Style)FindResource("IslandTileStyle"), Margin = new Thickness(0, 10, 0, 0), Child = grid };
+        fill.Transform = stroke.Transform = new MatrixTransform(turn);
+        fill.Freeze();
+        stroke.Freeze();
+        return (fill, stroke);
     }
 
-    private static void SetProgress(Grid bar, double? progress)
+    private static PathGeometry HalfOval(double along, double across, double inset, bool close)
     {
-        bar.Visibility = Shown(progress is not null);
-        double value = Math.Clamp(progress ?? 0, 0, 1);
-        bar.ColumnDefinitions[0].Width = new GridLength(value, GridUnitType.Star);
-        bar.ColumnDefinitions[1].Width = new GridLength(1 - value, GridUnitType.Star);
+        double r = Math.Max(0, Math.Min(across, along / 2) - inset);
+        double left = inset, right = along - inset, bottom = across - inset;
+        var figure = new PathFigure { StartPoint = new Point(right, 0), IsClosed = close, IsFilled = close };
+        figure.Segments.Add(new LineSegment(new Point(right, bottom - r), true));
+        figure.Segments.Add(new ArcSegment(new Point(right - r, bottom), new Size(r, r), 0, false, SweepDirection.Clockwise, true));
+        figure.Segments.Add(new LineSegment(new Point(left + r, bottom), true));
+        figure.Segments.Add(new ArcSegment(new Point(left, bottom - r), new Size(r, r), 0, false, SweepDirection.Clockwise, true));
+        figure.Segments.Add(new LineSegment(new Point(left, 0), true));
+        return new PathGeometry { Figures = { figure } };
     }
 
-    private void StartClock()
+    /// <summary>The progress ring's arc on the 12px glyph, clockwise from 12 o'clock.</summary>
+    private static Geometry Arc(double progress)
     {
-        UpdateClock();
-        _clockTimer.Start();
+        progress = Math.Clamp(progress, 0, 1);
+        const double c = 6, r = 5;
+        if (progress >= 0.999)
+            return new EllipseGeometry(new Point(c, c), r, r);
+        double angle = progress * 2 * Math.PI;
+        var end = new Point(c + r * Math.Sin(angle), c - r * Math.Cos(angle));
+        var figure = new PathFigure { StartPoint = new Point(c, c - r), IsFilled = false };
+        figure.Segments.Add(new ArcSegment(end, new Size(r, r), 0, progress > 0.5, SweepDirection.Clockwise, true));
+        var arc = new PathGeometry { Figures = { figure } };
+        arc.Freeze();
+        return arc;
     }
 
-    private void UpdateClock()
+    // ----- Drag -----
+
+    private void OnPress(object sender, MouseButtonEventArgs e)
     {
-        var now = DateTime.Now;
-        Clock.Text = now.ToString("t", CultureInfo.CurrentCulture);
-        _clockTimer.Interval = TimeSpan.FromSeconds(60 - now.Second) - TimeSpan.FromMilliseconds(now.Millisecond) + TimeSpan.FromMilliseconds(50);
+        e.Handled = true;
+        _pressAt = IslandNative.Cursor();
+        _hoverTimer.Stop();
+        Tab.CaptureMouse();
     }
 
-    /// <summary>Phase 1 has no media session behind the island, so play/pause only flips its own glyph.</summary>
-    private void TogglePlayGlyph()
+    private void OnPointerMove(object sender, MouseEventArgs e)
     {
-        bool showingPause = PlayPauseIcon.Data == LucideIcons.Pause;
-        PlayPauseIcon.Data = showingPause ? LucideIcons.Play : LucideIcons.Pause;
-        System.Windows.Automation.AutomationProperties.SetName(PlayPauseButton, showingPause ? "Play" : "Pause");
-    }
-
-    // ----- Equalizer -----
-
-    private static readonly double[] RestHeights = [0.45, 0.8, 1, 0.62, 0.35];
-    private static readonly double[] BarPeriods = [0.82, 0.64, 0.96, 0.72, 0.88];
-
-    /// <summary>Animates on the live media pill; static under reduced motion and whenever it is not on screen.</summary>
-    private void UpdateEqualizer()
-    {
-        bool run = IsVisible && _state == IslandState.Live && Equalizer.Visibility == Visibility.Visible && !Motion.IsReduced;
-        if (run == _equalizerRunning)
+        if (_pressAt is not { } start)
             return;
-        _equalizerRunning = run;
-        for (int i = 0; i < Equalizer.Children.Count; i++)
+        var pointer = IslandNative.Cursor();
+        if (!_dragging)
         {
-            var scale = (ScaleTransform)((Rectangle)Equalizer.Children[i]).RenderTransform;
-            if (!run)
-            {
-                scale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
-                scale.ScaleY = RestHeights[i];
-                continue;
-            }
-            var bounce = new DoubleAnimation(0.28, 1, new Duration(TimeSpan.FromSeconds(BarPeriods[i] / 2)))
-            {
-                AutoReverse = true,
-                RepeatBehavior = RepeatBehavior.Forever,
-                BeginTime = TimeSpan.FromMilliseconds(-130 * i),
-                EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut },
-            };
-            Timeline.SetDesiredFrameRate(bounce, 30);
-            scale.BeginAnimation(ScaleTransform.ScaleYProperty, bounce);
+            double threshold = DragThreshold * (Area?.Scale ?? 1);
+            if ((pointer - start).Length < threshold)
+                return;
+            BeginDrag();
+        }
+        DragTo(pointer);
+    }
+
+    private void OnRelease(object sender, MouseButtonEventArgs e)
+    {
+        if (_pressAt is null)
+            return;
+        e.Handled = true;
+        bool dragged = _dragging;
+        _pressAt = null;
+        _dragging = false;
+        Tab.ReleaseMouseCapture();
+        if (dragged)
+            DropAt(IslandNative.Cursor());
+        else
+            Toggle();
+    }
+
+    /// <summary>Capture taken away mid-drag (another window, the island hiding): the tab goes back.</summary>
+    private void OnLostCapture(object sender, MouseEventArgs e)
+    {
+        if (_pressAt is null)
+            return;
+        bool dragged = _dragging;
+        _pressAt = null;
+        _dragging = false;
+        if (dragged)
+        {
+            EndDragVisuals();
+            Return(IslandNative.Cursor());
         }
     }
 
-    private void OnMotionChanged(object? sender, EventArgs e) => Dispatcher.BeginInvoke(() =>
+    private void BeginDrag()
     {
-        if (Motion.IsReduced)
-            SnapTo(_state); // finish any running morph at its end state
-        UpdateEqualizer();
-    });
-
-#if DEBUG
-    /// <summary>Debug builds: hold the island expanded (or release it) without a pointer, for snapshots.</summary>
-    internal void ForceExpanded(bool expanded)
-    {
-        _expandRequested = expanded && IsVisible;
-        Refresh();
+        _dragging = true;
+        _hoverTimer.Stop();
+        CloseIsland();
+        TabBody.Opacity = 0;
     }
 
-    /// <summary>Debug builds: renders the window's own pixels (island, lift, transparent surround) over a backdrop color, at 1x.</summary>
-    internal void SaveSnapshot(string path, Color backdrop)
+    /// <summary>The bubble follows the pointer; the accent line shows where the tab would land, if it can.</summary>
+    private void DragTo(Point pointer)
     {
-        double width = Root.ActualWidth, height = Root.ActualHeight;
-        var content = new System.Windows.Media.Imaging.RenderTargetBitmap((int)Math.Ceiling(width), (int)Math.Ceiling(height), 96, 96, PixelFormats.Pbgra32);
-        content.Render(Root);
+        if (IslandNative.Area(IslandNative.MonitorAt(pointer)) is not { } area)
+            return;
+        double bubble = IslandOverlay.BubbleWindow * area.Scale;
+        _bubble.ShowAt(new Rect(pointer.X - bubble / 2, pointer.Y - bubble / 2, bubble, bubble));
+        if (IslandGeometry.Snap(pointer, area.Monitor, area.Work, area.Scale) is { } target)
+            _line.ShowAt(LineRect(target.Edge, IslandGeometry.Anchor(target.Edge, target.Place, area.Monitor, area.Work, area.Scale), area.Scale));
+        else
+            _line.Hide();
+    }
+
+    private static Rect LineRect(IslandEdge edge, Point anchor, double scale)
+    {
+        double length = LineLength * scale, thickness = LineThickness * scale;
+        return edge switch
+        {
+            IslandEdge.Left => new Rect(anchor.X, anchor.Y - length / 2, thickness, length),
+            IslandEdge.Right => new Rect(anchor.X - thickness, anchor.Y - length / 2, thickness, length),
+            _ => new Rect(anchor.X - length / 2, anchor.Y, length, thickness),
+        };
+    }
+
+    private void EndDragVisuals()
+    {
+        _bubble.Hide();
+        _line.Hide();
+        TabBody.Opacity = 1;
+    }
+
+    /// <summary>
+    /// Docks the tab where <paramref name="pointer"/> (physical pixels) lets go, sliding it into place,
+    /// and reports it. A drop on the taskbar's edge, the bottom or in a corner is refused: the tab
+    /// slides back home. Returns whether the drop was taken.
+    /// </summary>
+    internal bool DropAt(Point pointer)
+    {
+        EndDragVisuals();
+        var monitor = IslandNative.MonitorAt(pointer);
+        if (IslandNative.Area(monitor) is not { } area || IslandGeometry.Snap(pointer, area.Monitor, area.Work, area.Scale) is not { } target)
+        {
+            Return(pointer);
+            DropRefused?.Invoke(this, EventArgs.Empty);
+            return false;
+        }
+        _edge = target.Edge;
+        _place = target.Place;
+        _monitor = monitor;
+        ApplyEdgeLayout(target.Edge);
+        SlideTo(pointer, Home(area));
+        PlacementChosen?.Invoke(this, new IslandPlacementEventArgs(target.Edge, target.Place, monitor));
+        return true;
+    }
+
+    /// <summary>Slides the tab from the pointer back to where it was.</summary>
+    private void Return(Point pointer)
+    {
+        if (Area is not { } area)
+            return;
+        ApplyEdgeLayout(IslandGeometry.Docked(_edge, area.Monitor, area.Work));
+        SlideTo(pointer, Home(area));
+    }
+
+    /// <summary>Moves the tab window from centered on <paramref name="from"/> to <paramref name="to"/> over 180ms (at once under reduced motion).</summary>
+    private void SlideTo(Point from, Rect to)
+    {
+        StopSlide();
+        if (Motion.IsReduced)
+        {
+            IslandNative.Move(_hwnd, to);
+            return;
+        }
+        var start = new Rect(from.X - to.Width / 2, from.Y - to.Height / 2, to.Width, to.Height);
+        long began = Stopwatch.GetTimestamp();
+        IslandNative.Move(_hwnd, start);
+        _slideFrame = (_, _) =>
+        {
+            double t = Math.Min(1, Stopwatch.GetElapsedTime(began) / SlideTime);
+            double eased = 1 - Math.Pow(1 - t, 3);
+            IslandNative.Move(_hwnd, new Rect(start.X + (to.X - start.X) * eased, start.Y + (to.Y - start.Y) * eased, to.Width, to.Height));
+            if (t >= 1)
+                StopSlide();
+        };
+        CompositionTarget.Rendering += _slideFrame;
+    }
+
+    private void StopSlide()
+    {
+        if (_slideFrame is null)
+            return;
+        CompositionTarget.Rendering -= _slideFrame;
+        _slideFrame = null;
+    }
+
+#if DEBUG
+    /// <summary>Debug builds: open or close the island without a pointer, for snapshots.</summary>
+    internal void ForceOpen(bool open)
+    {
+        if (open)
+            OpenIsland();
+        else
+            CloseIsland();
+    }
+
+    internal MonitorArea? CurrentArea => Area;
+
+    /// <summary>
+    /// Debug builds: the tab and the open island as they sit on the monitor, over a backdrop color,
+    /// in physical pixels: the region around both, with the work area's edge drawn so the dock shows.
+    /// </summary>
+    internal void SaveScene(string path, Color backdrop)
+    {
+        if (Area is not { } area)
+            return;
+        var tab = IslandNative.WindowRect(_hwnd);
+        var region = tab;
+        if (_panel.IsOpen)
+            region.Union(IslandNative.WindowRect(_panel.Handle));
+        region.Inflate(48 * area.Scale, 48 * area.Scale);
+        region.Intersect(area.Monitor);
+        region = new Rect(Math.Floor(region.X), Math.Floor(region.Y), Math.Ceiling(region.Width), Math.Ceiling(region.Height));
+
         var visual = new DrawingVisual();
         using (var dc = visual.RenderOpen())
         {
-            dc.DrawRectangle(new SolidColorBrush(backdrop), null, new Rect(0, 0, content.PixelWidth, content.PixelHeight));
-            dc.DrawImage(content, new Rect(0, 0, content.PixelWidth, content.PixelHeight));
+            dc.DrawRectangle(new SolidColorBrush(backdrop), null, new Rect(region.Size));
+            var work = area.Work;
+            work.Offset(-region.X, -region.Y);
+            dc.DrawRectangle(null, new Pen(new SolidColorBrush(Color.FromArgb(0x80, 0x80, 0x80, 0x80)), 1), work);
+            Draw(dc, Root, tab, region, area.Scale);
+            if (_panel.IsOpen)
+                Draw(dc, _panel.Visual, IslandNative.WindowRect(_panel.Handle), region, area.Scale);
         }
-        var image = new System.Windows.Media.Imaging.RenderTargetBitmap(content.PixelWidth, content.PixelHeight, 96, 96, PixelFormats.Pbgra32);
+        var image = new System.Windows.Media.Imaging.RenderTargetBitmap((int)region.Width, (int)region.Height, 96, 96, PixelFormats.Pbgra32);
         image.Render(visual);
         var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
         encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(image));
         using var stream = System.IO.File.Create(path);
         encoder.Save(stream);
+    }
+
+    private static void Draw(DrawingContext dc, FrameworkElement root, Rect window, Rect region, double scale)
+    {
+        var pixels = new System.Windows.Media.Imaging.RenderTargetBitmap(
+            (int)Math.Ceiling(root.ActualWidth * scale), (int)Math.Ceiling(root.ActualHeight * scale), 96 * scale, 96 * scale, PixelFormats.Pbgra32);
+        pixels.Render(root);
+        dc.DrawImage(pixels, new Rect(window.X - region.X, window.Y - region.Y, pixels.PixelWidth, pixels.PixelHeight));
     }
 #endif
 
@@ -722,7 +665,11 @@ public partial class IslandWindow : Window
     {
         _hoverTimer.Stop();
         _leaveTimer.Stop();
-        _clockTimer.Stop();
+        StopSlide();
+        CloseIsland();
+        _panel.Close();
+        _bubble.Close();
+        _line.Close();
         base.OnClosed(e);
     }
 }

@@ -13,6 +13,7 @@
     <Project Path="tests/Chippi.Core.Tests/Chippi.Core.Tests.csproj" />
     <Project Path="tests/Chippi.Features.Downloads.Tests/Chippi.Features.Downloads.Tests.csproj" />
     <Project Path="tests/Chippi.Features.KeepAwake.Tests/Chippi.Features.KeepAwake.Tests.csproj" />
+    <Project Path="tests/Chippi.Island.Tests/Chippi.Island.Tests.csproj" />
     <Project Path="tests/Chippi.Notifications.Tests/Chippi.Notifications.Tests.csproj" />
     <Project Path="tests/Chippi.Rules.Tests/Chippi.Rules.Tests.csproj" />
     <Project Path="tests/Chippi.UiSmoke/Chippi.UiSmoke.csproj" />

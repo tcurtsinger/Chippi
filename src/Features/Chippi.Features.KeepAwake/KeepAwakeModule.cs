@@ -55,7 +55,7 @@ public sealed class KeepAwakeModule : IFeatureModule
         Deadline = null;
         StateLine = "Off";
         CreateSession();
-        context.Ui.AddFlyoutPanel(Descriptor.Name, nameof(LucideIcons.Coffee), () => new KeepAwakePanel(this));
+        context.Ui.AddFlyoutPanel(Descriptor.Name, nameof(LucideIcons.Coffee), () => new KeepAwakePanel(this), () => new KeepAwakeIslandView(this));
         context.Ui.SetSettingsPage(() => new KeepAwakePage(this));
         return Task.CompletedTask;
     }
