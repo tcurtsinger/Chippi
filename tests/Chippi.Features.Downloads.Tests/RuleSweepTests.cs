@@ -7,10 +7,10 @@ using Chippi.Features.Downloads.Storage;
 
 namespace Chippi.Features.Downloads.Tests;
 
-/// <summary>A rule that is added, changed or turned on sorts the files already there once it settles.</summary>
+/// <summary>A rule that is saved or switched on sorts the files already there.</summary>
 public sealed class RuleSweepTests
 {
-    private static RuleSetting MovePdfs(string to = "Docs") => new() { Id = "pdfs", Extensions = ["pdf"], Action = RuleActionKind.Move, Template = to };
+    private static RuleSetting MovePdfs(string to = "Docs") => new() { Id = "pdfs", Name = "PDFs", Extensions = ["pdf"], Action = RuleActionKind.Move, Template = to };
 
     /// <summary>Files that were there before the folder was watched, old enough to be past the stability wait.</summary>
     private static void Existing(Fixture f, params string[] names)
@@ -21,23 +21,23 @@ public sealed class RuleSweepTests
         f.Engine.ProcessDueNow();
     }
 
-    private static void Wait(Fixture f, double seconds)
+    /// <summary>What Save (or the switch going On) does: settings applied, then the rule sorts.</summary>
+    private static void Save(Fixture f, string id)
     {
-        f.Time.Advance(TimeSpan.FromSeconds(seconds));
+        f.Engine.Apply(f.Settings);
+        f.Engine.SortExisting(id);
         f.Engine.ProcessDueNow();
     }
 
     [Fact]
-    public void A_new_rule_waits_for_quiet_then_sorts_the_files_as_one_run()
+    public void Saving_a_new_rule_sorts_the_files_already_there_as_one_run()
     {
         using var f = new Fixture(existingFilesAreOld: true);
         Existing(f, "a.pdf", "b.pdf");
-        f.AddRule(MovePdfs());
+        f.Settings.Rules.Add(MovePdfs());
 
-        Wait(f, 2);
-        Assert.True(File.Exists(f.In("a.pdf")));
+        Save(f, "pdfs");
 
-        Wait(f, 1.5);
         Assert.True(File.Exists(f.In("Docs", "a.pdf")));
         Assert.True(File.Exists(f.In("Docs", "b.pdf")));
         var ops = f.History.Query(new HistoryQuery());
@@ -48,54 +48,30 @@ public sealed class RuleSweepTests
     }
 
     [Fact]
-    public void Closing_the_editor_settles_the_rule_at_once()
+    public void Saving_a_changed_rule_uses_its_new_destination()
     {
         using var f = new Fixture(existingFilesAreOld: true);
-        Existing(f, "a.pdf");
-        f.AddRule(MovePdfs());
-
-        f.Engine.SettleRule("pdfs");
-        f.Engine.ProcessDueNow();
-
-        Assert.True(File.Exists(f.In("Docs", "a.pdf")));
-    }
-
-    [Fact]
-    public void A_rule_open_in_the_editor_is_not_used_until_it_closes()
-    {
-        using var f = new Fixture(existingFilesAreOld: true);
-        Existing(f, "a.pdf");
-        f.Engine.EditingRule("pdfs");
-        f.AddRule(MovePdfs("Documents")); // the editor's default destination
-
-        Wait(f, 10);
-        Assert.True(File.Exists(f.In("a.pdf")));
-
-        f.Settings.Rules[0].Template = "Docs"; // the folder the person picked
-        f.Engine.Apply(f.Settings);
-        f.Engine.SettleRule("pdfs");
-        f.Engine.ProcessDueNow();
-
-        Assert.True(File.Exists(f.In("Docs", "a.pdf")));
-        Assert.False(Directory.Exists(f.In("Documents")));
-    }
-
-    [Fact]
-    public void Every_edit_restarts_the_quiet_period_and_the_last_destination_wins()
-    {
-        using var f = new Fixture(existingFilesAreOld: true);
-        Existing(f, "a.pdf");
         f.AddRule(MovePdfs("Doc"));
+        Existing(f, "a.pdf");
 
-        Wait(f, 2);
         f.Settings.Rules[0].Template = "Docs";
-        f.Engine.Apply(f.Settings);
-        Wait(f, 2);
-        Assert.True(File.Exists(f.In("a.pdf")));
+        Save(f, "pdfs");
 
-        Wait(f, 1.5);
         Assert.True(File.Exists(f.In("Docs", "a.pdf")));
         Assert.False(Directory.Exists(f.In("Doc")));
+    }
+
+    [Fact]
+    public void Settings_applied_without_a_Save_sort_nothing()
+    {
+        using var f = new Fixture(existingFilesAreOld: true);
+        Existing(f, "a.pdf");
+        f.AddRule(MovePdfs()); // reorder, Delete and Duplicate apply settings this way
+
+        f.Settle();
+
+        Assert.True(File.Exists(f.In("a.pdf")));
+        Assert.Empty(f.History.Query(new HistoryQuery()));
     }
 
     [Fact]
@@ -103,14 +79,12 @@ public sealed class RuleSweepTests
     {
         using var f = new Fixture(existingFilesAreOld: true);
         f.AddRule(MovePdfs());
-        f.Engine.SettleRule("pdfs");
-        f.Engine.ProcessDueNow();
         Existing(f, "a.pdf", "notes.txt", "photo.png");
 
-        f.AddRule(new RuleSetting { Id = "other", Extensions = ["pdf", "txt"], Action = RuleActionKind.Move, Template = "Other" });
-        Wait(f, 3.5);
+        f.Settings.Rules.Add(new RuleSetting { Id = "other", Name = "Other", Order = 1, Extensions = ["pdf", "txt"], Action = RuleActionKind.Move, Template = "Other" });
+        Save(f, "other");
 
-        Assert.True(File.Exists(f.In("a.pdf"))); // the earlier rule wins it, and it didn't change
+        Assert.True(File.Exists(f.In("a.pdf"))); // the earlier rule wins it, and it wasn't saved
         Assert.True(File.Exists(f.In("Other", "notes.txt")));
         Assert.True(File.Exists(f.In("photo.png")));
     }
@@ -120,9 +94,10 @@ public sealed class RuleSweepTests
     {
         using var f = new Fixture(FolderMode.Manual, existingFilesAreOld: true);
         Existing(f, "a.pdf");
-        f.AddRule(MovePdfs());
+        f.Settings.Rules.Add(MovePdfs());
 
-        f.Settle(); // past the quiet period and the rescanned file's own readiness checks
+        Save(f, "pdfs");
+        f.Settle(); // past the rescanned file's own readiness checks
 
         Assert.True(File.Exists(f.In("a.pdf")));
         Assert.Equal(PendingStatus.Ready, Assert.Single(f.Engine.Pending).Status);
@@ -130,27 +105,19 @@ public sealed class RuleSweepTests
     }
 
     [Fact]
-    public void Turning_a_rule_on_counts_as_a_change_and_off_cancels_it()
+    public void Switching_a_rule_on_sorts_and_an_off_rule_never_does()
     {
         using var f = new Fixture(existingFilesAreOld: true);
         Existing(f, "a.pdf");
         var rule = MovePdfs();
         rule.Enabled = false;
-        f.AddRule(rule);
-        Wait(f, 3.5);
+        f.Settings.Rules.Add(rule);
+
+        Save(f, "pdfs");
         Assert.True(File.Exists(f.In("a.pdf")));
 
         rule.Enabled = true;
-        f.Engine.Apply(f.Settings);
-        Wait(f, 2);
-        rule.Enabled = false;
-        f.Engine.Apply(f.Settings);
-        Wait(f, 3.5);
-        Assert.True(File.Exists(f.In("a.pdf")));
-
-        rule.Enabled = true;
-        f.Engine.Apply(f.Settings);
-        Wait(f, 3.5);
+        Save(f, "pdfs");
         Assert.True(File.Exists(f.In("Docs", "a.pdf")));
     }
 
@@ -159,10 +126,10 @@ public sealed class RuleSweepTests
     {
         using var f = new Fixture(existingFilesAreOld: true);
         Existing(f, "a.pdf");
-        f.AddRule(new RuleSetting { Id = "bad", NameRegex = "(", Action = RuleActionKind.Move, Template = "Docs" });
+        f.Settings.Rules.Add(new RuleSetting { Id = "bad", Name = "Bad", NameRegex = "(", Action = RuleActionKind.Move, Template = "Docs" });
 
-        f.Engine.SettleRule("bad");
-        Wait(f, 3.5);
+        Save(f, "bad");
+        f.Settle();
 
         Assert.True(File.Exists(f.In("a.pdf")));
         Assert.Empty(f.History.Query(new HistoryQuery()));
@@ -173,9 +140,9 @@ public sealed class RuleSweepTests
     {
         using var f = new Fixture(FolderMode.Paused, existingFilesAreOld: true);
         Existing(f, "a.pdf");
-        f.AddRule(MovePdfs());
+        f.Settings.Rules.Add(MovePdfs());
 
-        Wait(f, 3.5);
+        Save(f, "pdfs");
 
         Assert.True(File.Exists(f.In("a.pdf")));
     }
@@ -188,24 +155,23 @@ public sealed class RuleSweepTests
         Existing(f, "a.pdf");
 
         f.Restart();
-        Wait(f, 3.5);
+        f.Settle();
 
         Assert.True(File.Exists(f.In("a.pdf")));
     }
 
     [Fact]
-    public async Task An_undone_file_is_not_sorted_again_when_the_rule_changes()
+    public async Task An_undone_file_is_not_sorted_again_when_the_rule_is_saved()
     {
         using var f = new Fixture(existingFilesAreOld: true);
         Existing(f, "a.pdf");
-        f.AddRule(MovePdfs());
-        Wait(f, 3.5);
+        f.Settings.Rules.Add(MovePdfs());
+        Save(f, "pdfs");
         long run = Assert.Single(f.History.Query(new HistoryQuery())).RunId;
         Assert.All(await f.Engine.UndoRunAsync(run), u => Assert.True(u.Succeeded));
 
         f.Settings.Rules[0].Template = "Papers";
-        f.Engine.Apply(f.Settings);
-        Wait(f, 3.5);
+        Save(f, "pdfs");
 
         Assert.True(File.Exists(f.In("a.pdf")));
     }

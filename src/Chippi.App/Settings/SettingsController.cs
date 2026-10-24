@@ -107,6 +107,21 @@ internal sealed class SettingsController
                                         await Idle();
                                         Render(_window.PageContent, System.IO.Path.Combine(directory, $"r4-downloads-rule{rule}-{name}-{accent}.png"), full: true);
                                     }
+                                    // A new rule's draft open with Save and Cancel, then collapsed (Unsaved changes),
+                                    // then the ask on leaving; Discard goes on to History.
+                                    if (section == "rules" && _window.InvokeSnapshotActionStartingWith("Add rule"))
+                                    {
+                                        await Idle();
+                                        Render(_window.PageContent, System.IO.Path.Combine(directory, $"r4-downloads-draft-{name}-{accent}.png"), full: true);
+                                        _window.InvokeSnapshotAction("Close New rule");
+                                        await Idle();
+                                        Render(_window.PageContent, System.IO.Path.Combine(directory, $"r4-downloads-unsaved-{name}-{accent}.png"), full: true);
+                                        Open($"{page.Id}/history");
+                                        await Idle();
+                                        Render(_window.PageContent, System.IO.Path.Combine(directory, $"r4-downloads-leave-{name}-{accent}.png"), full: true);
+                                        _window.InvokeSnapshotAction("Discard unsaved rules");
+                                        await Idle();
+                                    }
                                 }
                             }
                             if (page.Id == "features")

@@ -3,6 +3,7 @@
 
 using System.Windows;
 using System.Windows.Controls;
+using Chippi.Core.Modules;
 using Chippi.Features.Downloads.Engine;
 using Chippi.Features.Downloads.Storage;
 using Chippi.UI.Controls;
@@ -29,8 +30,11 @@ public sealed class DownloadsPage : UserControl
         _segment = Ui.SelectorBar("Section", "Settings", "Rules", "History");
         _segment.SelectionChanged += (_, _) =>
         {
-            if (!_switching && _segment.SelectedIndex >= 0)
-                Show(_sections[_segment.SelectedIndex]);
+            if (_switching || _segment.SelectedIndex < 0)
+                return;
+            string section = _sections[_segment.SelectedIndex];
+            if (!Leave(() => Show(section)))
+                SelectTab("rules"); // the Rules tab asked first; stay on it
         };
         var page = new DockPanel { LastChildFill = true };
         DockPanel.SetDock(_segment, Dock.Top);
@@ -40,8 +44,30 @@ public sealed class DownloadsPage : UserControl
         Open(section);
     }
 
-    /// <summary>Opens a deep-link section.</summary>
+    /// <summary>Runs <paramref name="next"/> now, or once the Rules tab's unsaved drafts are discarded. False when it waits.</summary>
+    private bool Leave(Action next)
+    {
+        if (_host.Content is ISettingsLeaveGuard guard && !guard.ConfirmLeave(next))
+            return false;
+        next();
+        return true;
+    }
+
+    private void SelectTab(string section)
+    {
+        _switching = true;
+        _segment.SelectedIndex = Array.IndexOf(_sections, section);
+        _switching = false;
+    }
+
+    /// <summary>Opens a deep-link section (asking first if the Rules tab has unsaved drafts).</summary>
     public void Open(string? section)
+    {
+        if (!Leave(() => OpenNow(section)))
+            SelectTab("rules");
+    }
+
+    private void OpenNow(string? section)
     {
         string head = section?.Split('/', 2)[0].ToLowerInvariant() ?? "settings";
         string? tail = section?.Split('/', 2) is [_, var rest] ? rest : null;
@@ -77,9 +103,7 @@ public sealed class DownloadsPage : UserControl
 
     private void Show(string section, long? runId = null, bool confirmUndo = false)
     {
-        _switching = true;
-        _segment.SelectedIndex = Array.IndexOf(_sections, section);
-        _switching = false;
+        SelectTab(section);
         _segment.Visibility = Visibility.Visible;
         if (_module.Engine is null)
         {

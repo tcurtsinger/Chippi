@@ -36,10 +36,7 @@ public sealed class DownloadsEngine : IDisposable
     private readonly CancellationTokenSource _stop = new();
     private DownloadsSettings _settings = new();
     private IReadOnlyList<Rule> _rules = [];
-    private Dictionary<string, (string Shape, bool Enabled)> _ruleShapes = [];
-    private readonly Dictionary<string, DateTimeOffset> _sweeps = new(StringComparer.Ordinal); // rule id → when it has settled
-    private string? _editing;
-    private bool _started;
+    private readonly HashSet<string> _sweeps = new(StringComparer.Ordinal); // rules saved or switched on, waiting for the loop
     private Task? _loop;
     private bool _disposed;
     private volatile bool _closed;
@@ -79,26 +76,18 @@ public sealed class DownloadsEngine : IDisposable
         if (pruned > 0)
             _logger.LogInformation("Pruned {Count} history entries older than {Days} days", pruned, settings.HistoryDays);
         Apply(settings);
-        _started = true; // from here on, a rule that is added or changed sorts the files already there
         if (runLoop)
             _loop = Task.Run(() => LoopAsync(_stop.Token));
     }
 
-    /// <summary>
-    /// Settings changed (folders, modes, rules): re-sync watchers and rescan. A rule that was added,
-    /// changed or turned on is swept once it settles: see <see cref="SettleRule"/>.
-    /// </summary>
+    /// <summary>Settings changed (folders, modes, rules): re-sync watchers and rescan.</summary>
     public void Apply(DownloadsSettings settings)
     {
         ArgumentNullException.ThrowIfNull(settings);
         var rules = ValidRules(settings.Rules);
         var watched = settings.Folders.Where(f => f.Mode != FolderMode.Paused && Directory.Exists(f.Path)).ToList();
-        var shapes = settings.Rules.ToDictionary(r => r.Id, r => (Shape(r), r.Enabled), StringComparer.Ordinal);
         lock (_gate)
         {
-            if (_started)
-                ScheduleSweeps(shapes, rules);
-            _ruleShapes = shapes;
             _settings = settings;
             _rules = rules;
             foreach (var path in _watchers.Keys.Where(k => !watched.Any(f => Same(f.Path, k))).ToList())
@@ -123,56 +112,14 @@ public sealed class DownloadsEngine : IDisposable
     }
 
     /// <summary>
-    /// The person is done with a rule (its editor closed): sort the files already there now rather
-    /// than after the quiet period. Does nothing unless the rule was added or changed and not yet swept.
+    /// A rule was saved or switched on (after <see cref="Apply"/>): the loop sorts the files already
+    /// there that it wins. Only a valid, enabled rule that moves or renames does anything.
     /// </summary>
-    public void SettleRule(string ruleId)
+    public void SortExisting(string ruleId)
     {
         lock (_gate)
-        {
-            if (_editing == ruleId)
-                _editing = null;
-            if (_sweeps.ContainsKey(ruleId))
-                _sweeps[ruleId] = _time.GetUtcNow();
-        }
+            _sweeps.Add(ruleId);
     }
-
-    /// <summary>
-    /// The rules editor has this rule open, or none. An open rule is still being edited (a default
-    /// destination, a half-typed pattern), so it is never swept until <see cref="SettleRule"/>.
-    /// </summary>
-    public void EditingRule(string? ruleId)
-    {
-        lock (_gate)
-            _editing = ruleId;
-    }
-
-    /// <summary>
-    /// Every saved edit restarts a rule's quiet period, so a rule half-way through an edit is never
-    /// used on files already there. Only rules that move or rename, and are valid and on, are swept.
-    /// Call under the gate.
-    /// </summary>
-    private void ScheduleSweeps(Dictionary<string, (string Shape, bool Enabled)> shapes, IReadOnlyList<Rule> rules)
-    {
-        var due = _time.GetUtcNow() + _options.RuleSettle;
-        foreach (var (id, (shape, enabled)) in shapes)
-        {
-            bool changed = !_ruleShapes.TryGetValue(id, out var before) || before.Shape != shape || enabled && !before.Enabled;
-            if (changed && enabled && rules.Any(r => r.Id == id && r.Action is MoveTo or RenameTo))
-                _sweeps[id] = due;
-            else if (changed)
-                _sweeps.Remove(id); // turned off, now invalid, or now a hold
-        }
-        foreach (var gone in _sweeps.Keys.Where(id => !shapes.ContainsKey(id)).ToList())
-            _sweeps.Remove(gone);
-    }
-
-    /// <summary>What a rule does, without its name, order or switch: a change here re-sorts what is already there.</summary>
-    private static string Shape(RuleSetting rule) => System.Text.Json.JsonSerializer.Serialize(new
-    {
-        rule.Extensions, rule.NameRegex, rule.MinBytes, rule.MaxBytes, rule.ModifiedAfter, rule.ModifiedBefore,
-        rule.Action, rule.Template, rule.HoldReason,
-    });
 
     /// <summary>Plans every eligible file in <paramref name="folder"/> for review (Organize now, the Explorer menu).</summary>
     public Task<PreviewPlan> CreatePreviewAsync(string folder, RunTrigger trigger = RunTrigger.Preview, CancellationToken ct = default)
@@ -430,17 +377,16 @@ public sealed class DownloadsEngine : IDisposable
     private void ProcessDue()
     {
         var now = _time.GetUtcNow();
-        List<string> settled;
+        List<string> sorting;
         lock (_gate)
         {
-            settled = [.. _sweeps.Where(s => s.Value <= now && s.Key != _editing).Select(s => s.Key)];
-            foreach (var id in settled)
-                _sweeps.Remove(id);
+            sorting = [.. _sweeps];
+            _sweeps.Clear();
         }
-        if (settled.Count > 0)
+        if (sorting.Count > 0)
         {
             var swept = new NoticeBatch(RunTrigger.Silent);
-            foreach (var id in settled)
+            foreach (var id in sorting)
                 Sweep(id, swept);
             swept.Send(_notifier);
         }
@@ -617,7 +563,7 @@ public sealed class DownloadsEngine : IDisposable
     }
 
     /// <summary>
-    /// A rule settled: in each Silent folder, organize the files already there that this rule wins
+    /// A rule was saved or switched on: in each Silent folder, organize the files already there that this rule wins
     /// under first-match order, as one run. Manual folders need nothing more: the rescan in
     /// <see cref="Apply"/> already lists them for review. Every check a new file gets still applies:
     /// exclusions, the ignore list, misleading names (held, so not this rule's), Chippi's own output

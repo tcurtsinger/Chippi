@@ -39,6 +39,7 @@ public partial class SettingsWindow : Window
     private bool _selecting;
     private bool _closed;
     private string _currentPage = "";
+    private FrameworkElement? _pageView; // the current page's view, kept while search results show
     private const string ModulePrefix = "module:";
 
     public SettingsWindow(ShellContext shell, string page)
@@ -87,10 +88,27 @@ public partial class SettingsWindow : Window
         if (_closed)
             return;
         RefreshFeatures();
-        Navigate(_currentPage.Length == 0 ? "features" : _currentPage);
+        // A page still here keeps its unsaved work; one whose module went has nothing left to save.
+        if (_currentPage.Length > 0 && LeaveGuard() is { } guard && !guard.ConfirmLeave(() => Navigate(_currentPage)))
+        {
+            ShowCurrent();
+            return;
+        }
+        NavigateNow(_currentPage.Length == 0 ? "features" : _currentPage);
     });
 
+    /// <summary>Shows <paramref name="page"/>, once the current page agrees to be left (it may ask first).</summary>
     public void Navigate(string page)
+    {
+        if (LeaveGuard() is { } guard && !guard.ConfirmLeave(() => Navigate(page)))
+        {
+            ShowCurrent();
+            return;
+        }
+        NavigateNow(page);
+    }
+
+    private void NavigateNow(string page)
     {
         string baseId = page.Split('/')[0];
         var target = NavigationPages.FirstOrDefault(p => p.Id.Equals(baseId, StringComparison.OrdinalIgnoreCase));
@@ -103,15 +121,36 @@ public partial class SettingsWindow : Window
         string id = target.Id;
         if (id.StartsWith(ModulePrefix, StringComparison.Ordinal) && page.Contains('/'))
             id += page[page.IndexOf('/')..];
-        _selecting = true;
-        SettingsSearch.Clear();
-        FeatureNav.SelectedItem = FeatureNav.Items.OfType<SegmentItem>().FirstOrDefault(i => Equals(i.Value, target.Id));
-        Nav.SelectedItem = Nav.Items.OfType<SegmentItem>().FirstOrDefault(i => Equals(i.Value, target.Id));
-        _selecting = false;
-        PageHost.Content = View(id);
+        Select(target.Id);
+        _pageView = View(id);
+        PageHost.Content = _pageView;
         _currentPage = id;
         Scroller.ScrollToTop();
     }
+
+    /// <summary>Highlights a page in the sidebar and clears the search, without navigating.</summary>
+    private void Select(string pageId)
+    {
+        _selecting = true;
+        SettingsSearch.Clear();
+        FeatureNav.SelectedItem = FeatureNav.Items.OfType<SegmentItem>().FirstOrDefault(i => Equals(i.Value, pageId));
+        Nav.SelectedItem = Nav.Items.OfType<SegmentItem>().FirstOrDefault(i => Equals(i.Value, pageId));
+        _selecting = false;
+    }
+
+    /// <summary>The current page stays (it is asking before it is left): its sidebar item and view come back.</summary>
+    private void ShowCurrent()
+    {
+        Select(_currentPage.Split('/')[0]);
+        PageHost.Content = _pageView;
+    }
+
+    /// <summary>The current page's view that asks before it is left, if any (found even while search results show).</summary>
+    private ISettingsLeaveGuard? LeaveGuard() => _pageView is null ? null : FindGuard(_pageView);
+
+    private static ISettingsLeaveGuard? FindGuard(DependencyObject root) =>
+        root as ISettingsLeaveGuard
+        ?? LogicalTreeHelper.GetChildren(root).OfType<DependencyObject>().Select(FindGuard).FirstOrDefault(g => g is not null);
 
     private void OnFeatureSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
@@ -179,7 +218,7 @@ public partial class SettingsWindow : Window
         if (query.Length == 0)
         {
             if (_currentPage.Length > 0)
-                PageHost.Content = View(_currentPage);
+                PageHost.Content = _pageView ?? View(_currentPage);
             return;
         }
         _selecting = true;
@@ -275,9 +314,21 @@ public partial class SettingsWindow : Window
         }
     }
 
+    /// <summary>A page with unsaved work asks in place first; its Discard closes the window.</summary>
+    protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
+    {
+        base.OnClosing(e);
+        if (!e.Cancel && LeaveGuard() is { } guard && !guard.ConfirmLeave(Close))
+        {
+            e.Cancel = true;
+            ShowCurrent();
+        }
+    }
+
     protected override void OnClosed(EventArgs e)
     {
         _closed = true;
+        _pageView = null;
         _shell.Registry.Changed -= OnRegistryChanged;
         PageHost.Content = null;
         _views.Clear();

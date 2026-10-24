@@ -39,6 +39,15 @@ public sealed record SettingsPageContribution(string ModuleId, Func<string?, obj
     public object CreateView(string? section = null) => CreateSectionView(section);
 }
 
+/// <summary>
+/// A Settings view holding work that leaving would lose. Settings asks before it shows another page
+/// or closes. The view can say no, ask the person in place, and call <c>leave</c> itself if they discard.
+/// </summary>
+public interface ISettingsLeaveGuard
+{
+    bool ConfirmLeave(Action leave);
+}
+
 /// <summary>Collects one module's contributions for the lifetime of a start.</summary>
 internal sealed class ModuleUi(string moduleId, Action changed) : IModuleUi
 {

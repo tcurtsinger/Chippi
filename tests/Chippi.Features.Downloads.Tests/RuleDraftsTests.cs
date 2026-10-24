@@ -6,7 +6,7 @@ using Chippi.Features.Downloads.Views.Settings;
 
 namespace Chippi.Features.Downloads.Tests;
 
-/// <summary>The rules editor's model: a draft with a problem never changes what is saved (Karl's reviews of 06623d1 and fbf74ca).</summary>
+/// <summary>The rules editor's model: a draft changes nothing until its Save (Karl's reviews of 06623d1 and fbf74ca, Travis's Save button).</summary>
 public sealed class RuleDraftsTests
 {
     private static RuleDrafts Drafts() => new(
@@ -20,80 +20,101 @@ public sealed class RuleDraftsTests
     {
         drafts.Drafts[0].NameRegex = null;
         drafts.SetError("narrow", "regex", problem: true);
-        drafts.Commit();
     }
 
     [Fact]
-    public void A_cleared_pattern_keeps_the_saved_rule_narrow()
+    public void An_unchanged_rule_has_nothing_to_save()
+    {
+        var drafts = Drafts();
+
+        Assert.False(drafts.HasUnsaved);
+        Assert.False(drafts.CanSave("narrow"));
+    }
+
+    [Fact]
+    public void A_draft_changes_nothing_until_it_is_saved()
+    {
+        var drafts = Drafts();
+        drafts.Drafts[0].NameRegex = "^bill";
+
+        Assert.Equal("^invoice", drafts.Effective()[0].NameRegex);
+        Assert.True(drafts.IsChanged("narrow"));
+        Assert.True(drafts.Save("narrow"));
+        Assert.Equal("^bill", drafts.Effective()[0].NameRegex);
+        Assert.False(drafts.HasUnsaved);
+    }
+
+    [Fact]
+    public void A_field_with_a_problem_cant_be_saved()
     {
         var drafts = Drafts();
         ClearPattern(drafts);
 
+        Assert.True(drafts.IsChanged("narrow"));
+        Assert.False(drafts.Save("narrow"));
         Assert.Equal("^invoice", drafts.Effective().Single(r => r.Id == "narrow").NameRegex);
     }
 
     [Fact]
-    public void Duplicating_a_draft_with_a_problem_copies_the_saved_version()
+    public void An_invalid_destination_cant_be_saved()
+    {
+        var drafts = Drafts();
+        drafts.Drafts[0].Template = "Bad?Folder";
+
+        Assert.False(drafts.Save("narrow"));
+        Assert.Equal("Invoices", drafts.Effective()[0].Template);
+    }
+
+    [Fact]
+    public void Cancel_puts_a_saved_rule_back()
+    {
+        var drafts = Drafts();
+        ClearPattern(drafts);
+
+        drafts.Cancel("narrow");
+
+        Assert.Equal("^invoice", drafts.Drafts[0].NameRegex);
+        Assert.False(drafts.HasUnsaved);
+    }
+
+    [Fact]
+    public void A_new_rule_is_not_saved_or_copied_until_its_Save_and_Cancel_removes_it()
+    {
+        var drafts = Drafts();
+        var draft = new RuleSetting { Id = "new", Name = "New", Extensions = ["txt"], Action = RuleActionKind.Move, Template = "Text" };
+        drafts.Drafts.Add(draft);
+
+        Assert.DoesNotContain(drafts.Effective(), r => r.Id == "new");
+        Assert.Null(drafts.Duplicate(draft));
+        Assert.True(drafts.CanSave("new"));
+
+        drafts.Cancel("new");
+        Assert.DoesNotContain(drafts.Drafts, r => r.Id == "new");
+    }
+
+    [Fact]
+    public void Duplicating_a_draft_copies_and_saves_the_saved_version()
     {
         var drafts = Drafts();
         ClearPattern(drafts);
 
         var copy = drafts.Duplicate(drafts.Drafts[0])!;
-        drafts.Commit();
 
         Assert.Equal("^invoice", copy.NameRegex);
         Assert.Equal(["narrow", copy.Id, "fallback"], drafts.Effective().Select(r => r.Id));
-        Assert.All(drafts.Effective().Where(r => r.Id != "fallback"), r => Assert.Equal("^invoice", r.NameRegex));
+        Assert.False(drafts.IsChanged(copy.Id));
     }
 
     [Fact]
-    public void An_invalid_destination_keeps_the_rule_in_place()
-    {
-        var drafts = Drafts();
-        drafts.Drafts[0].Template = "Bad?Folder";
-        drafts.Commit();
-
-        var saved = drafts.Effective();
-        Assert.Equal(["narrow", "fallback"], saved.Select(r => r.Id));
-        Assert.Equal("Invoices", saved[0].Template);
-    }
-
-    [Fact]
-    public void On_off_applies_while_another_field_has_a_problem()
+    public void On_off_applies_at_once_while_the_draft_is_unsaved()
     {
         var drafts = Drafts();
         ClearPattern(drafts);
-        drafts.Drafts[0].Enabled = false;
-        drafts.Commit();
+        drafts.SetEnabled(drafts.Drafts[0], false);
 
         var narrow = drafts.Effective().Single(r => r.Id == "narrow");
         Assert.False(narrow.Enabled);
         Assert.Equal("^invoice", narrow.NameRegex);
-    }
-
-    [Fact]
-    public void Rebuilding_editors_reverts_a_draft_with_a_problem()
-    {
-        var drafts = Drafts();
-        ClearPattern(drafts);
-
-        drafts.RevertProblems();
-        drafts.Commit();
-
-        Assert.Equal("^invoice", drafts.Drafts[0].NameRegex);
-        Assert.Equal("^invoice", drafts.Effective()[0].NameRegex);
-    }
-
-    [Fact]
-    public void A_new_rule_never_valid_is_not_saved_or_copied()
-    {
-        var drafts = Drafts();
-        var draft = new RuleSetting { Id = "new", Name = "New", Action = RuleActionKind.Move, Template = "" };
-        drafts.Drafts.Add(draft);
-        drafts.Commit();
-
-        Assert.DoesNotContain(drafts.Effective(), r => r.Id == "new");
-        Assert.Null(drafts.Duplicate(draft));
     }
 
     [Fact]
