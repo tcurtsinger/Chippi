@@ -37,7 +37,7 @@ public enum DownloadsRequestKind
 public sealed record DownloadsRequest(DownloadsRequestKind Kind, string? Folder = null, long? RunId = null, bool FromExplorer = false);
 
 /// <summary>
-/// The Downloads organizer. Owns the engine and the history database while installed; the views
+/// The File organizer. Owns the engine and the history database while installed; the views
 /// (P2-C) read <see cref="Engine"/> and save settings through <see cref="SaveSettings"/>.
 /// </summary>
 public sealed class DownloadsModule : IFeatureModule
@@ -54,7 +54,7 @@ public sealed class DownloadsModule : IFeatureModule
     private ModuleContext? _context;
     private SqliteHistoryStore? _history;
 
-    public FeatureDescriptor Descriptor { get; } = new("downloads-organizer", "Downloads organizer", "Sorts new downloads into folders by your rules", FeatureGroup.Files)
+    public FeatureDescriptor Descriptor { get; } = new("downloads-organizer", "File organizer", "Sorts new files into folders by your rules", FeatureGroup.Files)
     {
         Icon = nameof(LucideIcons.Folder),
         Presets = PresetMembership.Essentials | PresetMembership.PowerUser,
@@ -141,7 +141,7 @@ public sealed class DownloadsModule : IFeatureModule
     {
         ArgumentNullException.ThrowIfNull(settings);
         if (_context is null || Engine is null)
-            throw new InvalidOperationException("The Downloads organizer is uninstalled.");
+            throw new InvalidOperationException("The File organizer is uninstalled.");
         var now = DateTimeOffset.UtcNow;
         foreach (var folder in settings.Folders)
         {

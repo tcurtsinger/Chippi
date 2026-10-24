@@ -13,7 +13,7 @@ using Microsoft.Win32;
 namespace Chippi.Features.Downloads.Views.Settings;
 
 /// <summary>
-/// Settings › the organizer's first section (DESIGN.md §5 "Downloads organizer"): watched folders as
+/// Settings › the organizer's first section (DESIGN.md §5 "File organizer"): watched folders as
 /// expander rows (mode, wait, ignore list, remove), then Options: Keep history, Explorer and Import
 /// archive. Notifications live on the app-wide page.
 /// </summary>

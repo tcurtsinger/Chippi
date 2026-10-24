@@ -52,7 +52,7 @@
                 <TextBlock Style="{StaticResource Section}" Text="Typography" />
                 <c:Card>
                     <StackPanel Margin="16,12">
-                        <TextBlock Style="{StaticResource DisplayTextStyle}" Text="Page title 20/600 Display · Downloads organizer" />
+                        <TextBlock Style="{StaticResource DisplayTextStyle}" Text="Page title 20/600 Display · File organizer" />
                         <TextBlock Style="{StaticResource HeadlineTextStyle}" Text="Section 14/600 · Watched folders" Margin="0,8,0,0" />
                         <TextBlock Style="{StaticResource BodyTextStyle}" Text="Body 14/400 · Keep screen on" Margin="0,8,0,0" />
                         <TextBlock Style="{StaticResource CaptionTextStyle}" Text="Caption 12/400 · Silent · moves after 30s" Margin="0,4,0,0" />
@@ -161,7 +161,7 @@
                                 <ItemsPresenter />
                             </ControlTemplate>
                         </ListBox.Template>
-                        <c:SegmentItem Label="Downloads organizer" Icon="{x:Static c:LucideIcons.Folder}" />
+                        <c:SegmentItem Label="File organizer" Icon="{x:Static c:LucideIcons.Folder}" />
                         <c:SegmentItem Label="Keep awake" Icon="{x:Static c:LucideIcons.Coffee}" />
                         <c:SegmentItem Label="General" Icon="{x:Static c:LucideIcons.Settings}" />
                     </ListBox>

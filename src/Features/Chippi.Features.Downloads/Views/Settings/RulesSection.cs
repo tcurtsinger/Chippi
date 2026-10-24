@@ -287,7 +287,7 @@ internal sealed class RulesSection : UserControl
         extensions.TextChanged += (_, _) => ApplyExtensions();
         editor.Children.Add(Condition(extensionsOn, "Extension", Ui.Stack(extensions, extensionsError), ApplyExtensions));
 
-        var regex = Ui.Field(rule.NameRegex ?? "", code: true, name: "Name pattern", width: 460);
+        var regex = Ui.Field(rule.NameRegex ?? "", code: true, name: "Name pattern");
         var regexError = Hidden(Ui.Warning(""));
         var regexOn = Ui.Check("Name matches", rule.NameRegex is { Length: > 0 });
         void ApplyRegex()
@@ -298,7 +298,7 @@ internal sealed class RulesSection : UserControl
             Changed();
         }
         regex.TextChanged += (_, _) => ApplyRegex();
-        editor.Children.Add(Condition(regexOn, "Name matches", Ui.Stack(regex, regexError), ApplyRegex));
+        editor.Children.Add(Condition(regexOn, "Name matches", Ui.Stack(Wide(regex), regexError), ApplyRegex));
 
         int unit = rule.MaxBytes is { } mx && mx % Units[2].Bytes == 0 && mx > 0 ? 2 : rule.MaxBytes is { } k && k % Units[1].Bytes != 0 ? 0 : 1;
         var min = Ui.Field(Amount(rule.MinBytes, Units[unit].Bytes), name: "Minimum size", width: 90);
@@ -354,7 +354,7 @@ internal sealed class RulesSection : UserControl
         // Rename types its template. Move shows the folder, chosen with the Windows folder picker,
         // which has its own New folder button.
         var templateNote = Ui.Row();
-        var template = Ui.Field(rule.Template ?? "", code: true, name: "New name", width: 460);
+        var template = Ui.Field(rule.Template ?? "", code: true, name: "New name");
         var path = Ui.Field(name: "Destination", width: 320);
         path.IsReadOnly = true;
         var browse = Ui.Button("Browse…", name: "Choose destination folder");
@@ -388,8 +388,11 @@ internal sealed class RulesSection : UserControl
         }
         void FillTokens()
         {
+            // Only a new name takes placeholders; a destination is just the folder picked.
             tokens.Children.Clear();
-            foreach (string token in rule.Action == RuleActionKind.Rename ? RuleChecks.RenameTokens : RuleChecks.MoveTokens)
+            if (rule.Action != RuleActionKind.Rename)
+                return;
+            foreach (string token in RuleChecks.RenameTokens)
             {
                 var chip = Ui.Button(token, name: $"Insert {token}");
                 chip.SetResourceReference(Control.FontFamilyProperty, "CodeFont");
@@ -399,15 +402,6 @@ internal sealed class RulesSection : UserControl
                 chip.Margin = new Thickness(0, 0, 6, 6);
                 chip.Click += (_, _) =>
                 {
-                    if (rule.Action == RuleActionKind.Move)
-                    {
-                        // The destination isn't typed, so a placeholder goes on its end.
-                        rule.Template = (rule.Template ?? "") + token;
-                        ShowPath();
-                        ShowTemplateNote(rule, templateNote);
-                        Changed();
-                        return;
-                    }
                     int at = template.CaretIndex;
                     template.Text = template.Text.Insert(at, token);
                     template.CaretIndex = at + token.Length;
@@ -422,7 +416,7 @@ internal sealed class RulesSection : UserControl
             rule.HoldReason = reason.Text.Trim();
             Changed();
         };
-        var targetBlock = Ui.Stack(template, pathRow, templateNote.Margin(0, 6, 0, 0), tokens);
+        var targetBlock = Ui.Stack(Wide(template), pathRow, templateNote.Margin(0, 6, 0, 0), tokens);
         var targetLine = Line("", targetBlock);
         var reasonLine = Line("Reason", reason);
         targetLine.Children.Add(TopLabel(targetLabel).At(0));
@@ -661,6 +655,19 @@ internal sealed class RulesSection : UserControl
     }
 
     // ---- helpers
+
+    /// <summary>
+    /// A long field (a pattern, a name template) fills its column up to 460, never past the page edge.
+    /// The cap is on a grid column: a capped stretched field would center itself.
+    /// </summary>
+    private static Grid Wide(TextBox field)
+    {
+        field.HorizontalAlignment = HorizontalAlignment.Stretch;
+        var grid = new Grid();
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star), MaxWidth = 460 });
+        grid.Children.Add(field);
+        return grid;
+    }
 
     private static TextBlock Hidden(TextBlock block)
     {
