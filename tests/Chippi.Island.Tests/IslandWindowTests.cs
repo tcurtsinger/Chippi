@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
-using System.Windows;
 using System.Windows.Threading;
 using Chippi.App.Island;
 
@@ -14,43 +13,28 @@ public sealed class IslandWindowTests
     public void Esc_closes_the_island_without_throwing_on_the_dispatcher()
     {
         Exception? thrown = null;
-        OnUiThread(() =>
+        WpfTestThread.Run(() =>
         {
             var window = new IslandWindow();
-            Dispatcher.CurrentDispatcher.UnhandledException += (_, e) =>
+            DispatcherUnhandledExceptionEventHandler handler = (_, e) =>
             {
                 thrown = e.Exception;
                 e.Handled = true; // as App does, which is why it went unnoticed
             };
-            window.Escape();
-            var frame = new DispatcherFrame();
-            Dispatcher.CurrentDispatcher.BeginInvoke(DispatcherPriority.Background, () => frame.Continue = false);
-            Dispatcher.PushFrame(frame);
-        });
-        Assert.Null(thrown);
-    }
-
-    private static void OnUiThread(Action test)
-    {
-        Exception? failure = null;
-        var thread = new Thread(() =>
-        {
+            Dispatcher.CurrentDispatcher.UnhandledException += handler;
             try
             {
-                var app = Application.Current ?? new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
-                foreach (var source in new[] { "Themes/Dark.xaml", "Themes/Palette.xaml", "Themes/SharedStyles.xaml", "Controls/Controls.xaml" })
-                    app.Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri($"pack://application:,,,/Chippi.UI;component/{source}") });
-                test();
+                window.Escape();
+                var frame = new DispatcherFrame();
+                Dispatcher.CurrentDispatcher.BeginInvoke(DispatcherPriority.Background, () => frame.Continue = false);
+                Dispatcher.PushFrame(frame);
             }
-            catch (Exception e)
+            finally
             {
-                failure = e;
+                Dispatcher.CurrentDispatcher.UnhandledException -= handler;
+                window.Close();
             }
         });
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        thread.Join();
-        if (failure is not null)
-            throw new InvalidOperationException("The UI thread failed.", failure);
+        Assert.Null(thrown);
     }
 }

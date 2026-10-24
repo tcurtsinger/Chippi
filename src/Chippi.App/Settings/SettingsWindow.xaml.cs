@@ -9,9 +9,9 @@ using System.Windows.Interop;
 using System.Windows.Media;
 using Chippi.App.Settings.Pages;
 using Chippi.App.Shell;
-using Chippi.Core.Diagnostics;
 using Chippi.Core.Modules;
 using Chippi.UI.Controls;
+using Microsoft.Extensions.Logging;
 using Windows.Win32;
 using Windows.Win32.Foundation;
 using Windows.Win32.Graphics.Dwm;
@@ -32,6 +32,7 @@ public partial class SettingsWindow : Window
     ];
 
     private readonly ShellContext _shell;
+    private readonly ILogger _logger;
     private readonly Dictionary<string, FrameworkElement> _views = [];
     private readonly Dictionary<string, SettingsPageContribution> _contributions = [];
     private List<SettingsPageInfo> _featurePages = [];
@@ -43,6 +44,7 @@ public partial class SettingsWindow : Window
     public SettingsWindow(ShellContext shell, string page)
     {
         _shell = shell;
+        _logger = shell.LoggerFactory.CreateLogger<SettingsWindow>();
         InitializeComponent();
         Nav.ItemsSource = Pages.Skip(1).Select(Item).ToList();
         RefreshFeatures();
@@ -91,8 +93,13 @@ public partial class SettingsWindow : Window
     public void Navigate(string page)
     {
         string baseId = page.Split('/')[0];
-        var target = NavigationPages.FirstOrDefault(p => p.Id.Equals(baseId, StringComparison.OrdinalIgnoreCase))
-            ?? (page.StartsWith(ModulePrefix, StringComparison.OrdinalIgnoreCase) ? Pages[0] : NavigationPages.First());
+        var target = NavigationPages.FirstOrDefault(p => p.Id.Equals(baseId, StringComparison.OrdinalIgnoreCase));
+        if (target is null)
+        {
+            if (page.Length > 0)
+                _logger.LogWarning("Settings request '{Page}' could not be shown: the page is unavailable", page);
+            target = page.StartsWith(ModulePrefix, StringComparison.OrdinalIgnoreCase) ? Pages[0] : NavigationPages.First();
+        }
         string id = target.Id;
         if (id.StartsWith(ModulePrefix, StringComparison.Ordinal) && page.Contains('/'))
             id += page[page.IndexOf('/')..];
@@ -126,7 +133,10 @@ public partial class SettingsWindow : Window
 
     private FrameworkElement View(string id)
     {
-        if (_views.TryGetValue(id, out var cached))
+        // A module view can switch tabs internally, so its cached route no longer describes it.
+        // Every navigation must reapply the section through the module's factory.
+        bool module = id.StartsWith(ModulePrefix, StringComparison.Ordinal);
+        if (!module && _views.TryGetValue(id, out var cached))
             return cached;
         FrameworkElement view;
         try
@@ -153,10 +163,11 @@ public partial class SettingsWindow : Window
         }
         catch (Exception ex)
         {
-            Log.Error($"Settings page '{id}' failed to load", ex);
+            _logger.LogWarning(ex, "Settings request '{Page}' could not be shown: the page failed to load", id);
             view = new TextBlock { Text = "Couldn't open this page. Close Settings and try again.", TextWrapping = TextWrapping.Wrap };
         }
-        _views[id] = view;
+        if (!module)
+            _views[id] = view;
         return view;
     }
 

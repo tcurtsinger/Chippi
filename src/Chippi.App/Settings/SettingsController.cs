@@ -45,7 +45,8 @@ internal sealed class SettingsController
 
         if (_window.WindowState == WindowState.Minimized)
             _window.WindowState = WindowState.Normal;
-        _window.Activate();
+        if (!_window.Activate())
+            Core.Diagnostics.Log.Warn($"Settings request '{page}' was shown, but Windows did not bring Settings to the foreground.");
     }
 
 #if DEBUG
