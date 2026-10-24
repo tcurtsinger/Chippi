@@ -126,7 +126,22 @@ internal static class RuleChecks
         {
             RuleActionKind.Rename => $"{when} · rename to {rule.Template}",
             RuleActionKind.Hold => $"{when} · hold",
-            _ => $"{when} → {rule.Template}",
+            _ => $"{when} → {DestinationName(rule.Template ?? "")}",
         };
+    }
+
+    /// <summary>
+    /// A move destination as the summary shows it: a chosen folder by its own name, from the last
+    /// named folder on when it ends in placeholders ("Documents\{year}"). Relative ones read as typed.
+    /// </summary>
+    public static string DestinationName(string template)
+    {
+        if (!WindowsPaths.IsAbsolute(template))
+            return template;
+        var parts = template.TrimEnd('\\', '/').Split('\\', '/');
+        int from = parts.Length - 1;
+        while (from > 0 && parts[from].Contains('{'))
+            from--;
+        return string.Join('\\', parts[from..]);
     }
 }

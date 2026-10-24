@@ -20,7 +20,7 @@ public static class FeatureCatalog
 
     public static IReadOnlyList<FeatureDescriptor> Placeholders { get; } =
     [
-        // Files (Downloads organizer is a real module since Phase 2: Chippi.Features.Downloads)
+        // Files (File organizer is a real module since Phase 2: Chippi.Features.Downloads)
         new("shelf", "Shelf", "Holds dragged files and text while you move between apps", FeatureGroup.Files)
         {
             Icon = "Download",

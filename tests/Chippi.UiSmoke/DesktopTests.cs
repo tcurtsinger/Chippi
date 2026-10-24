@@ -72,7 +72,7 @@ public sealed class DesktopTests(ITestOutputHelper output)
         DesktopSession.Select(settings, "Add features");
         var search = DesktopSession.Find(settings, "Search features", ValuePattern.Pattern);
         Assert.Equal(ToggleState.On, DesktopSession.Toggle(DesktopSession.Find(settings, "Keep awake", TogglePattern.Pattern)).Current.ToggleState);
-        Assert.Equal(ToggleState.On, DesktopSession.Toggle(DesktopSession.Find(settings, "Downloads organizer", TogglePattern.Pattern)).Current.ToggleState);
+        Assert.Equal(ToggleState.On, DesktopSession.Toggle(DesktopSession.Find(settings, "File organizer", TogglePattern.Pattern)).Current.ToggleState);
         DesktopSession.Find(settings, "Overlaps PowerToys");
         var later = DesktopSession.Find(settings, "Coming later", ExpandCollapsePattern.Pattern);
         var expand = (ExpandCollapsePattern)later.GetCurrentPattern(ExpandCollapsePattern.Pattern);

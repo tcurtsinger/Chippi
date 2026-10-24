@@ -83,7 +83,7 @@ public sealed class DownloadsPage : UserControl
         _segment.Visibility = Visibility.Visible;
         if (_module.Engine is null)
         {
-            _host.Content = Ui.Text("Downloads organizer is off", "BodyTextStyle", "TextTertiaryBrush");
+            _host.Content = Ui.Text("File organizer is off", "BodyTextStyle", "TextTertiaryBrush");
             return;
         }
         _host.Content = section switch

@@ -193,7 +193,7 @@ internal sealed class PreviewView : UserControl
         }
         catch (ObjectDisposedException)
         {
-            ShowError("Downloads organizer is off");
+            ShowError("File organizer is off");
         }
         catch (InvalidOperationException ex)
         {

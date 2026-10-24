@@ -278,7 +278,7 @@ Mockup: the "Movable island" row, except that its open boards show the island as
 - **Content:** padding 4 / 40 / 40 / 28. The page title (20 / 600 Display) sits 14px above the first section, with no description.
 - **Page template:** title, then an optional SelectorBar, then sections. A section is a Section header (with an optional right-aligned button) over one card of rows. Two cards in a row of the same section sit 8px apart.
 - **Rows:** at least 60px with a caption, 48px without; 10 / 16 padding; 14px gap. Label over caption on the left, the control on the right. A switch shows "On" or "Off" in body text just left of it. An expander row ends in a chevron and its sub-rows are indented 50px.
-- **Downloads organizer:** a SelectorBar of Settings · Rules · History (§5 Downloads organizer).
+- **File organizer:** a SelectorBar of Settings · Rules · History (§5 File organizer).
 - **Keep awake:** a card with the status row (accent coffee glyph, "Keep awake", caption "Off" or "On · no time limit", switch). Options: Default length (combo, "Used when you start it without picking one"), Keep screen on (switch, "The display stays on too"), After a restart (value "Starts off", caption "Sessions don't carry over").
 - **Add features** (replaces the Features hub): a search field with the "2 on" count beside it. **Available** lists the features that work, each a row with a 32px icon chip (accent glyph when on, muted when off), name, one-line description and a switch; Overlap badges sit after the name. One collapsed **Coming later** row ("39 features on the way") expands into one row per group listing the names. Presets are hidden until enough features exist for them to matter. Toggling a feature installs or uninstalls it, and an installed feature appears in the sidebar at once.
 - **General:** Theme (Dark · Light · Follow Windows segment, default Follow Windows), Accent color (a "Windows" pill and four 24px swatches; the caption reads "Follows your Windows accent" or the color's name), Run at startup (switch, "Starts quietly in the tray when you sign in"). A Settings file section with one row, "Back up or move your settings", captioned with the path, and Export… and Import… on the right.
@@ -287,7 +287,7 @@ Mockup: the "Movable island" row, except that its open boards show the island as
 - **About:** Chippi with a 32px Gumdrop, captioned "Everyday Windows utilities", with "Version 0.1.0" on the right; License (GPL-3.0-or-later, View); Privacy ("No telemetry. Your settings stay on this PC."); Third-party notices ("Fonts, icons and libraries", View). The sidebar has no version footer. Notices open as rendered text, never raw markdown.
 - **Swatch selection:** a selected swatch or pill gets a 2px gap in the card color and a 2px accent ring.
 
-### Downloads organizer
+### File organizer
 Behavior approved 2026-10-22 (`docs/phase-2/design/phase-2-mockups.html`); visuals restyled 2026-10-23. The Tidy panel is under Tray flyout above.
 - **Settings tab:**
   - Watched folders, with Add folder on the header's right. Each folder is an expander row: folder glyph (accent while watched, muted when Paused), name over path, the mode as a value, and a chevron. Its sub-rows: Mode (Silent · Manual · Paused segment, caption "Moves files on its own", "Waits for your review" or "Not watching"), Wait before moving (combo, "Gives downloads time to finish"), Ignore list (Edit, "Files and patterns to leave alone") and Stop watching this folder (Remove).
@@ -296,7 +296,8 @@ Behavior approved 2026-10-22 (`docs/phase-2/design/phase-2-mockups.html`); visua
   - A card holding the test field, borderless across the whole card: a search glyph, "Test a file name, like notes.txt", and the result on the right ("Txt Files → Documents" in Secondary, or "No rule matches · stays in Downloads" in Caption). It runs the whole rule set.
   - "Rules" with a "First match wins" caption, and Add rule on the right.
   - One card of rule rows: drag grip, number, name over a summary (".txt → Documents"), switch, and a chevron that opens the rule. One rule is open at a time. Edits save when valid, with no Save button. Drag, or Alt+Up/Down, reorders; the drop target is a 2px accent line.
-  - Regex and templates use the code font. Placeholder tokens are 22px chips in control fill, insertable by click. Validation messages are caution text under the field.
+  - Action is a Move to folder · Rename segment. **Move** shows the destination as a read-only path with Browse… beside it, which opens the Windows folder picker (it has its own New folder); the rule saves the full path, shown in the summary by the folder's name with the full path on hover. A new rule starts at Documents. A relative destination from before the picker stays as it is: it means "inside the watched folder the file is in", reads as "Downloads\Documents" with the caption "Inside each watched folder", and picking a folder replaces it. Move takes no placeholders. **Rename** is a typed template whose placeholders are 22px chips in control fill, insertable by click.
+  - Regex and rename templates use the code font and fill their column up to 460px. Validation messages are caution text under the field.
 - **History tab:**
   - A toolbar: search field ("Search history"), All folders combo, Clear history (text only, no glyph).
   - Grouped by day under Section headers. One card per run: a header row ("Silent · Downloads" over "10:07 AM · 1 moved") with Undo run, then indented file rows (name over "Downloads › Documents") with an undo icon button. Runs over 10 files collapse.
@@ -315,7 +316,7 @@ Behavior approved 2026-10-22 (`docs/phase-2/design/notifications/`); visuals res
 - **When the Windows backend is unavailable,** one line sits under the card: a 7px caution dot and "Windows notifications unavailable" in caution caption. No button, and no claims about Focus or Do not disturb.
 - **Feature groups** follow the sidebar order. Each is a Section header with "Windows" and "Island" caption labels over 96px columns, then a card of 48px rows with one 20px checkbox centered in each column. A feature with no events gets no group.
 - **Downloads defaults:** Organized and Ready to review: Island only. Held and Failed: both. Archive imported: Windows only.
-- **Accessible names** read "Feature, Event, Destination", for example "Downloads organizer, Held, Windows".
+- **Accessible names** read "Feature, Event, Destination", for example "File organizer, Held, Windows".
 - **Quiet hours and sound** stay with Windows. Chippi has no setting for them.
 - **Copy and clicks:** a notification states what happened first ("4 files organized", "1 file held", "1 file not moved", "photos-2025.zip imported"), one per run.
   - Organized and Archive imported: clicking opens that run in History. The buttons are Undo (opens the run's inline Undo confirmation, never undoes on its own; only when something is undoable) and History.
