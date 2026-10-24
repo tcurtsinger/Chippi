@@ -175,4 +175,57 @@ public sealed class RuleSweepTests
 
         Assert.True(File.Exists(f.In("a.pdf")));
     }
+
+    /// <summary>Karl's review of 338e247: the watcher only moves new files, so the sweep must come back.</summary>
+    [Fact]
+    public void A_file_in_use_during_Save_is_sorted_once_it_is_free()
+    {
+        using var f = new Fixture(existingFilesAreOld: true);
+        Existing(f, "a.pdf", "b.pdf");
+        f.Settings.Rules.Add(MovePdfs());
+
+        using (new FileStream(f.In("a.pdf"), FileMode.Open, FileAccess.Read, FileShare.Read))
+        {
+            Save(f, "pdfs");
+            f.Settle(2);
+            Assert.True(File.Exists(f.In("a.pdf")));
+            Assert.True(File.Exists(f.In("Docs", "b.pdf")));
+        }
+        f.Settle();
+
+        Assert.True(File.Exists(f.In("Docs", "a.pdf")));
+        Assert.Empty(f.Engine.Pending);
+        Assert.Equal(2, f.History.Query(new HistoryQuery()).Count);
+    }
+
+    [Fact]
+    public void A_file_changed_just_before_Save_is_sorted_once_it_settles()
+    {
+        using var f = new Fixture(existingFilesAreOld: true);
+        f.Write("a.pdf"); // old (before the folder's baseline) but modified just now
+        f.Settings.Rules.Add(MovePdfs());
+
+        Save(f, "pdfs");
+        Assert.True(File.Exists(f.In("a.pdf")));
+        f.Settle();
+
+        Assert.True(File.Exists(f.In("Docs", "a.pdf")));
+    }
+
+    [Fact]
+    public void A_file_waiting_for_its_rule_stays_if_the_rule_is_switched_off()
+    {
+        using var f = new Fixture(existingFilesAreOld: true);
+        Existing(f, "a.pdf");
+        f.Settings.Rules.Add(MovePdfs());
+
+        using (new FileStream(f.In("a.pdf"), FileMode.Open, FileAccess.Read, FileShare.Read))
+            Save(f, "pdfs");
+        f.Settings.Rules[0].Enabled = false;
+        f.Engine.Apply(f.Settings);
+        f.Settle();
+
+        Assert.True(File.Exists(f.In("a.pdf")));
+        Assert.Empty(f.History.Query(new HistoryQuery()));
+    }
 }

@@ -37,6 +37,7 @@ public sealed class DownloadsEngine : IDisposable
     private DownloadsSettings _settings = new();
     private IReadOnlyList<Rule> _rules = [];
     private readonly HashSet<string> _sweeps = new(StringComparer.Ordinal); // rules saved or switched on, waiting for the loop
+    private readonly Dictionary<string, (string RuleId, DateTimeOffset Next)> _waiting = new(StringComparer.OrdinalIgnoreCase); // files a sweep found busy or settling
     private Task? _loop;
     private bool _disposed;
     private volatile bool _closed;
@@ -378,16 +379,24 @@ public sealed class DownloadsEngine : IDisposable
     {
         var now = _time.GetUtcNow();
         List<string> sorting;
+        List<IGrouping<string, string>> retrying;
         lock (_gate)
         {
             sorting = [.. _sweeps];
             _sweeps.Clear();
+            // Taken out here; a retry that is still busy puts its file back.
+            var retry = _waiting.Where(w => w.Value.Next <= now).ToList();
+            foreach (var (path, _) in retry)
+                _waiting.Remove(path);
+            retrying = [.. retry.GroupBy(w => w.Value.RuleId, w => w.Key)];
         }
-        if (sorting.Count > 0)
+        if (sorting.Count > 0 || retrying.Count > 0)
         {
             var swept = new NoticeBatch(RunTrigger.Silent);
             foreach (var id in sorting)
                 Sweep(id, swept);
+            foreach (var group in retrying)
+                Sweep(group.Key, swept, [.. group]);
             swept.Send(_notifier);
         }
 
@@ -567,9 +576,11 @@ public sealed class DownloadsEngine : IDisposable
     /// under first-match order, as one run. Manual folders need nothing more: the rescan in
     /// <see cref="Apply"/> already lists them for review. Every check a new file gets still applies:
     /// exclusions, the ignore list, misleading names (held, so not this rule's), Chippi's own output
-    /// (Undo restores included), and a file still being written or in use is left to the watcher.
+    /// (Undo restores included). A file still being written or in use is tried again every
+    /// stability interval, with the rules, mode and checks as they are then, until it is free.
     /// </summary>
-    private void Sweep(string ruleId, NoticeBatch batch)
+    /// <param name="only">A retry: just these files, which were busy or still settling last time.</param>
+    private void Sweep(string ruleId, NoticeBatch batch, IReadOnlyList<string>? only = null)
     {
         List<WatchedFolder> folders;
         IReadOnlyList<Rule> rules;
@@ -590,17 +601,22 @@ public sealed class DownloadsEngine : IDisposable
                 continue;
             }
             var facts = new List<FileFacts>();
+            var settling = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             try
             {
-                foreach (var path in Directory.EnumerateFiles(folder.Path, "*", SearchOption.TopDirectoryOnly))
+                var paths = only is null
+                    ? Directory.EnumerateFiles(folder.Path, "*", SearchOption.TopDirectoryOnly)
+                    : only.Where(p => Path.GetDirectoryName(p) is { } parent && Same(parent, folder.Path));
+                foreach (var path in paths)
                 {
                     var info = new FileInfo(path);
                     if (!info.Exists)
                         continue;
                     var fact = Facts(info);
-                    bool settling = now - fact.Modified < _options.StabilityInterval + TimeSpan.FromSeconds(Math.Max(0, folder.GraceSeconds));
-                    if (settling || FileSafety.Exclusion(fact) is not null || _guard.IsOwnOutput(path, fact.Bytes, fact.Modified))
+                    if (FileSafety.Exclusion(fact) is not null || _guard.IsOwnOutput(path, fact.Bytes, fact.Modified))
                         continue;
+                    if (now - fact.Modified < _options.StabilityInterval + TimeSpan.FromSeconds(Math.Max(0, folder.GraceSeconds)))
+                        settling.Add(path);
                     facts.Add(fact);
                 }
             }
@@ -616,8 +632,15 @@ public sealed class DownloadsEngine : IDisposable
             for (int i = 0; i < plans.Count && !_stop.IsCancellationRequested; i++)
             {
                 var (plan, file) = (plans[i], facts[i]);
-                if (plan.RuleId != ruleId || plan.Kind is not (OperationKind.Move or OperationKind.Rename) || !Available(file.FullPath))
+                if (plan.RuleId != ruleId || plan.Kind is not (OperationKind.Move or OperationKind.Rename))
                     continue;
+                if (settling.Contains(file.FullPath) || !Available(file.FullPath))
+                {
+                    // The watcher only moves new files, so this rule comes back for it (Karl's review of 338e247).
+                    lock (_gate)
+                        _waiting[file.FullPath] = (ruleId, now + _options.StabilityInterval);
+                    continue;
+                }
                 Organize(folder, plan, file, names, ref runId, batch);
                 Drop(file.FullPath);
             }
