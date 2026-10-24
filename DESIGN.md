@@ -106,7 +106,7 @@ rounded:
   switch: "10px"
   badge: "4px"
   island-tab: "half-oval: fully round on the side away from the edge"
-  island: "8px"
+  island: "20px away from the edge, square against it"
 spacing:
   flyout-padding: "12px"
   card-row: "12px 16px"
@@ -244,7 +244,7 @@ Flat, like Windows 11. Depth comes from the surface steps (window → card → c
 - **Tray menu (right-click):** flyout styling, 8px radius, 36px items with a 16px glyph and a 13 / 400 label: Open settings, Quit. Its bottom edge sits at the click point, kept 12px off the taskbar.
 
 ### Island (movable, approved 2026-10-23)
-Mockup: the "Movable island" row. A small dark tab docked on a screen edge. Hovering it opens the island. It never hides at rest, because hover-to-open is the reason to have it; it only hides while a fullscreen app is in front on its display.
+Mockup: the "Movable island" row, except that its open boards show the island as a separate box beside the tab; this section replaces that (2026-10-23). A small dark tab docked on a screen edge. Hovering it grows the tab into the island. It never hides at rest, because hover-to-open is the reason to have it; it only hides while a fullscreen app is in front on its display.
 - **Position:** the user drags the tab to the **Top** (the default, centered), **Left** or **Right** edge, and it snaps there on release.
   - It never docks on the taskbar's edge or in a corner. It stays at least 64px from the ends of a side edge, and 160px from the ends of the top edge, so it never covers window buttons.
   - Its edge and its place along that edge (0–1) are saved, so resolution changes don't move it.
@@ -255,8 +255,9 @@ Mockup: the "Movable island" row. A small dark tab docked on a screen edge. Hove
   - When several activities are live, the tab shows the highest: media, then timer, then download or stash, then agent, then status. On a stash Gumdrop celebrates; held and failed stashes show a caution dot.
 - **Dragging:** pressing and moving 4px starts a drag and cancels hover-open. While dragging, a 44px bubble with Gumdrop follows the pointer, and a 3px accent line on the target edge shows where it will land. On release it slides into place over 180ms. A press without movement is a click and toggles the island.
 - **Opening:** hovering opens it after 150ms. It closes 250ms after the pointer leaves both the tab and the island. Esc closes it. With the tab focused, Enter or Space toggles it.
-- **The island:** 328 wide, opening beside the tab with an 8px gap toward the screen center: right of a left tab, left of a right tab, below a top tab. It is centered on the tab and kept 8px inside the work area.
-  - 8px radius, Island color, 1px `rgba(255,255,255,.10)` stroke, island shadow, 12px padding, 8px gaps. It slides 12px in from the tab's side over 180ms, with no slide under reduced motion.
+- **The island:** the tab itself, grown. It is one 328-wide shape with its flat side on the tab's edge, never a second box beside the tab. It is centered on the tab along that edge and kept 8px inside the edge's ends.
+  - Island color, 20px corners on the side away from the edge and square ones against it, a 1px `rgba(255,255,255,.10)` stroke on every side but the flat one, island shadow, 12px padding, 8px gaps.
+  - **Morph:** opening grows the tab's half-oval into the island over 220ms, easing out. Size, place and corners move together, and the content fades in over the second half. Closing runs it backward over 160ms, and the tab keeps its live size until the island is back inside it. Under reduced motion it appears and disappears at once. Starting a drag, or the island hiding for a fullscreen app, closes it at once.
   - Contents, top to bottom:
     1. A header: Gumdrop at 22px, "Chippi" (13 / 600) and a clock.
     2. The live activity card. Media: a 40px art tile, title and source with previous / accent play-pause / next beside them, then a 4px accent progress bar. Elapsed and remaining times show only once a media source reports them. Timer: a "Focus timer" caption, the time at 20px, and Stop once a timer feature exists.

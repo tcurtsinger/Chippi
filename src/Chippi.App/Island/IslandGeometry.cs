@@ -29,7 +29,7 @@ public static class IslandGeometry
     /// <summary>The tab stays this far (DIPs) from the ends of a side edge.</summary>
     public const double SideEndMargin = 64;
 
-    /// <summary>The panel opens this far (DIPs) from the tab, and stays this far inside the work area.</summary>
+    /// <summary>The open island stays this far (DIPs) inside the ends of its edge.</summary>
     public const double Gap = 8;
 
     /// <summary>The tab's size in DIPs: 64×18 at rest and 84×26 when live or hovered on the top edge, turned on the sides.</summary>
@@ -108,8 +108,8 @@ public static class IslandGeometry
     }
 
     /// <summary>
-    /// The panel's top-left: beside the tab with a gap, toward the screen center (below a top tab,
-    /// right of a left tab, left of a right tab), centered on the tab and kept inside the work area.
+    /// The open island's top-left: grown out of the tab, so its flat side is on the tab's edge,
+    /// centered on the tab along that edge and kept 8px inside the edge's ends.
     /// </summary>
     public static Point PanelOrigin(IslandEdge edge, Rect tab, Size panel, Rect work, double scale)
     {
@@ -118,20 +118,22 @@ public static class IslandGeometry
         switch (edge)
         {
             case IslandEdge.Left:
-                x = tab.Right + gap;
+                x = tab.Left;
                 y = tab.Top + tab.Height / 2 - panel.Height / 2;
                 break;
             case IslandEdge.Right:
-                x = tab.Left - gap - panel.Width;
+                x = tab.Right - panel.Width;
                 y = tab.Top + tab.Height / 2 - panel.Height / 2;
                 break;
             default:
                 x = tab.Left + tab.Width / 2 - panel.Width / 2;
-                y = tab.Bottom + gap;
+                y = tab.Top;
                 break;
         }
-        x = Math.Clamp(x, work.Left + gap, Math.Max(work.Left + gap, work.Right - gap - panel.Width));
-        y = Math.Clamp(y, work.Top + gap, Math.Max(work.Top + gap, work.Bottom - gap - panel.Height));
+        if (edge == IslandEdge.Top)
+            x = Math.Clamp(x, work.Left + gap, Math.Max(work.Left + gap, work.Right - gap - panel.Width));
+        else
+            y = Math.Clamp(y, work.Top + gap, Math.Max(work.Top + gap, work.Bottom - gap - panel.Height));
         return new Point(x, y);
     }
 

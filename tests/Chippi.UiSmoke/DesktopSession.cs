@@ -80,13 +80,27 @@ internal sealed class DesktopSession : IDisposable
 
     public AutomationElement OpenFlyout()
     {
+        // The flyout hides when another window takes the foreground. If that happens before its
+        // content is reachable, open it again once rather than wait on a hidden window.
+        if (TryOpenFlyout() is { } flyout)
+            return flyout;
+        _output.WriteLine("The flyout hid before its sections were found (it lost the foreground); opening it again");
+        return TryOpenFlyout() ?? throw new TimeoutException("The flyout hid twice before its sections were found");
+    }
+
+    private AutomationElement? TryOpenFlyout()
+    {
         var activation = Start();
         Assert.True(activation.WaitForExit(15000), "Second launch did not exit");
         LastActivationExitCode = activation.ExitCode;
         Assert.Equal(0, LastActivationExitCode);
         AutomationElement? window = null;
         Until(() => (window = WindowOrNull("Chippi")) is not null, "profile flyout opened");
-        return window!;
+        var handle = (nint)window!.Current.NativeWindowHandle;
+        bool shown = false;
+        Until(() => !IsWindowVisible(handle) || (shown = FirstOrNull(window, "Flyout sections", null) is not null),
+            "'Flyout sections' in the flyout, or the flyout hidden");
+        return shown ? window : null;
     }
 
     public AutomationElement OpenSettings()
@@ -104,14 +118,14 @@ internal sealed class DesktopSession : IDisposable
     public static AutomationElement Find(AutomationElement root, string name, AutomationPattern? pattern = null)
     {
         AutomationElement? found = null;
-        Until(() =>
-        {
-            var matches = root.FindAll(TreeScope.Descendants, Named(name));
-            found = matches.Cast<AutomationElement>().FirstOrDefault(e => pattern is null || e.TryGetCurrentPattern(pattern, out _));
-            return found is not null;
-        }, $"'{name}'{(pattern is null ? "" : " with " + pattern.ProgrammaticName)}");
+        Until(() => (found = FirstOrNull(root, name, pattern)) is not null,
+            $"'{name}'{(pattern is null ? "" : " with " + pattern.ProgrammaticName)}");
         return found!;
     }
+
+    private static AutomationElement? FirstOrNull(AutomationElement root, string name, AutomationPattern? pattern) =>
+        root.FindAll(TreeScope.Descendants, Named(name)).Cast<AutomationElement>()
+            .FirstOrDefault(e => pattern is null || e.TryGetCurrentPattern(pattern, out _));
 
     public static void Until(Func<bool> condition, string description)
     {
@@ -181,7 +195,14 @@ internal sealed class DesktopSession : IDisposable
         // These are GUID-specific paths constructed here, never a supplied or shared profile root.
         DeleteProfile(_roaming);
         DeleteProfile(_local);
-        if (_foreground != 0) SetForegroundWindow(_foreground);
+        if (_foreground != 0)
+        {
+            // Activation crosses processes asynchronously: let it land here, not on the next test's flyout.
+            SetForegroundWindow(_foreground);
+            var restore = Stopwatch.StartNew();
+            while (GetForegroundWindow() != _foreground && restore.Elapsed < TimeSpan.FromSeconds(2))
+                Thread.Sleep(50);
+        }
         Assert.Null(StartupCommand);
         Assert.True(notificationsCleaned, "Dev notification registration was not cleaned");
     }
@@ -194,6 +215,7 @@ internal sealed class DesktopSession : IDisposable
     }
 
     [DllImport("user32.dll")] private static extern nint GetForegroundWindow();
+    [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool IsWindowVisible(nint window);
     [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool SetForegroundWindow(nint window);
     [DllImport("user32.dll")] private static extern void keybd_event(byte key, byte scan, uint flags, nuint extra);
 }
