@@ -110,17 +110,18 @@ internal sealed class DesktopSession : IDisposable
         {
             // What UI Automation sees, through the last lookup and straight from the handle.
             _output.WriteLine($"Flyout timeout: window 0x{handle:X}, visible {IsWindowVisible(handle)}");
-            _output.WriteLine($"  children by lookup: {Children(window)}");
-            _output.WriteLine($"  children by handle: {Children(AutomationElement.FromHandle(handle))}");
+            _output.WriteLine($"  children by lookup: {Children(() => window)}");
+            _output.WriteLine($"  children by handle: {Children(() => AutomationElement.FromHandle(handle))}");
             throw;
         }
         return shown ? window : null;
     }
 
-    private static string Children(AutomationElement? element)
+    private static string Children(Func<AutomationElement?> resolve)
     {
         try
         {
+            var element = resolve();
             if (element is null)
                 return "(no window)";
             var children = element.FindAll(TreeScope.Children, Condition.TrueCondition).Cast<AutomationElement>()
