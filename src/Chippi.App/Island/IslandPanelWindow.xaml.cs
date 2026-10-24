@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using System.Diagnostics;
 using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using Chippi.App.Pet;
 using Chippi.Core.Config;
@@ -19,13 +19,15 @@ namespace Chippi.App.Island;
 
 /// <summary>
 /// The open island (DESIGN.md §5 Island): the header, the live activity card and the installed
-/// features' island views, beside the tab. <see cref="IslandWindow"/> opens, places and closes it.
+/// features' island views, in one shape that grows out of the tab. <see cref="IslandWindow"/>
+/// opens, places and closes it.
 /// </summary>
 public partial class IslandPanelWindow : Window
 {
     private const double Width328 = 328;
-    private const double SlideDistance = 12;
-    private static readonly TimeSpan SlideTime = TimeSpan.FromMilliseconds(180);
+    private const double OpenRadius = 20;
+    private static readonly TimeSpan GrowTime = TimeSpan.FromMilliseconds(220);
+    private static readonly TimeSpan ShrinkTime = TimeSpan.FromMilliseconds(160);
 
     private readonly DispatcherTimer _clock = new();
     private readonly Dictionary<FlyoutPanelContribution, FrameworkElement> _views = [];
@@ -34,6 +36,12 @@ public partial class IslandPanelWindow : Window
     private IslandEdge _edge;
     private Rect _tab;
     private MonitorArea _area;
+    private Rect _bounds; // the open island, in physical pixels
+    private Rect _from; // the tab, in the island's own DIPs
+    private Rect _to; // the whole island, likewise
+    private double _grown; // 0 is the tab, 1 the whole island
+    private long _lastFrame;
+    private EventHandler? _frame;
 
     public IslandPanelWindow()
     {
@@ -87,7 +95,7 @@ public partial class IslandPanelWindow : Window
             AttachPanels();
     }
 
-    /// <summary>Opens beside <paramref name="tab"/> (physical pixels) on <paramref name="edge"/>, or moves there when already open.</summary>
+    /// <summary>Grows out of <paramref name="tab"/> (physical pixels) on <paramref name="edge"/>, or moves there when already open.</summary>
     internal void Open(IslandEdge edge, Rect tab, MonitorArea area)
     {
         _edge = edge;
@@ -103,56 +111,142 @@ public partial class IslandPanelWindow : Window
         // so it is pointed at the island accent (the dark shade of the user's choice) on every open.
         if (Application.Current?.TryFindResource("IslandAccentBrush") is { } accent)
             Resources["AccentBrush"] = accent;
-        AttachPanels();
+        if (!IsVisible) // reopened while still shrinking, it keeps its views
+            AttachPanels();
         UpdateClock();
-        Show();
         Place();
-        SlideIn();
+        Show();
+        Animate();
     }
 
-    public void CloseIsland()
+    /// <summary>Shrinks back into the tab, then hides; <paramref name="immediate"/> hides at once.</summary>
+    public void CloseIsland(bool immediate = false)
     {
         if (!IsOpen)
             return;
         IsOpen = false;
         _clock.Stop();
+        if (immediate)
+            Collapse();
+        else
+            Animate();
+    }
+
+    /// <summary>Whether <paramref name="physical"/> is on the open island's shape, whether or not the window has seen the pointer yet.</summary>
+    internal bool Covers(Point physical) => IsOpen && _bounds.Contains(physical);
+
+    /// <summary>Sizes the window to the island and its shadow, flat side on the tab's edge, and redraws the shape there.</summary>
+    private void Place()
+    {
+        double s = _area.Scale;
+        var room = Room(_edge);
+        Surface.Margin = room;
+        Root.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        double height = Surface.DesiredSize.Height - room.Top - room.Bottom;
+        var origin = IslandGeometry.PanelOrigin(_edge, _tab, new Size(Width328 * s, height * s), _area.Work, s);
+        _bounds = new Rect(origin.X, origin.Y, Width328 * s, height * s);
+        IslandNative.Move(_hwnd, new Rect(origin.X - room.Left * s, origin.Y - room.Top * s,
+            (Width328 + room.Left + room.Right) * s, (height + room.Top + room.Bottom) * s));
+        _from = new Rect((_tab.X - origin.X) / s, (_tab.Y - origin.Y) / s, _tab.Width / s, _tab.Height / s);
+        _to = new Rect(0, 0, Width328, height);
+        ShapeFill.BorderThickness = _edge switch
+        {
+            IslandEdge.Left => new Thickness(0, 1, 1, 1),
+            IslandEdge.Right => new Thickness(1, 1, 0, 1),
+            _ => new Thickness(1, 0, 1, 1),
+        };
+        Draw();
+    }
+
+    /// <summary>Room around the island for its shadow, none on the edge it grows from.</summary>
+    private static Thickness Room(IslandEdge edge) => edge switch
+    {
+        IslandEdge.Left => new Thickness(0, 24, 40, 56),
+        IslandEdge.Right => new Thickness(40, 24, 0, 56),
+        _ => new Thickness(40, 0, 40, 56),
+    };
+
+    /// <summary>
+    /// Grows toward the whole island while open and shrinks toward the tab once closed, over 220ms
+    /// and 160ms; one running animation turns around when that flips. Under reduced motion it
+    /// appears and hides at once.
+    /// </summary>
+    private void Animate()
+    {
+        if (Motion.IsReduced)
+        {
+            StopFrames();
+            if (!IsOpen)
+            {
+                Collapse();
+                return;
+            }
+            _grown = 1;
+            Draw();
+            return;
+        }
+        if (_frame is not null)
+            return;
+        _lastFrame = 0;
+        _frame = (_, _) =>
+        {
+            // The clock starts on the first frame, so a slow first show doesn't skip the start.
+            long now = Stopwatch.GetTimestamp();
+            var step = _lastFrame == 0 ? TimeSpan.Zero : Stopwatch.GetElapsedTime(_lastFrame, now);
+            _lastFrame = now;
+            _grown = IsOpen ? Math.Min(1, _grown + step / GrowTime) : Math.Max(0, _grown - step / ShrinkTime);
+            Draw();
+            if (!IsOpen && _grown <= 0)
+                Collapse();
+            else if (IsOpen && _grown >= 1)
+                StopFrames();
+        };
+        System.Windows.Media.CompositionTarget.Rendering += _frame;
+    }
+
+    private void StopFrames()
+    {
+        if (_frame is null)
+            return;
+        System.Windows.Media.CompositionTarget.Rendering -= _frame;
+        _frame = null;
+    }
+
+    /// <summary>Back in the tab: hidden, with the views let go.</summary>
+    private void Collapse()
+    {
+        StopFrames();
+        _grown = 0;
         Hide();
         // Unparented views get Unloaded and stop listening until the island opens again.
         Panels.Children.Clear();
     }
 
-    private void Place()
+    /// <summary>
+    /// The shape at <see cref="_grown"/>: from the tab's half-oval to the whole island with 20px
+    /// corners away from the edge, easing out as it grows (and in as it shrinks). The content fades
+    /// in over the second half, once the shape is nearly full.
+    /// </summary>
+    private void Draw()
     {
-        Root.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-        double s = _area.Scale;
-        var room = Surface.Margin;
-        double height = Surface.DesiredSize.Height - room.Top - room.Bottom;
-        var origin = IslandGeometry.PanelOrigin(_edge, _tab, new Size(Width328 * s, height * s), _area.Work, s);
-        IslandNative.Move(_hwnd, new Rect(origin.X - room.Left * s, origin.Y - room.Top * s,
-            (Width328 + room.Left + room.Right) * s, (height + room.Top + room.Bottom) * s));
+        double t = 1 - Math.Pow(1 - _grown, 3);
+        Canvas.SetLeft(Shape, Lerp(_from.X, _to.X, t));
+        Canvas.SetTop(Shape, Lerp(_from.Y, _to.Y, t));
+        Shape.Width = Lerp(_from.Width, _to.Width, t);
+        Shape.Height = Lerp(_from.Height, _to.Height, t);
+        // The tab's corners are as round as it is deep.
+        double tab = _edge == IslandEdge.Top ? Math.Min(_from.Height, _from.Width / 2) : Math.Min(_from.Width, _from.Height / 2);
+        double r = Lerp(tab, OpenRadius, t);
+        ShapeShadow.CornerRadius = ShapeFill.CornerRadius = _edge switch
+        {
+            IslandEdge.Left => new CornerRadius(0, r, r, 0),
+            IslandEdge.Right => new CornerRadius(r, 0, 0, r),
+            _ => new CornerRadius(0, 0, r, r),
+        };
+        Card.Opacity = Math.Clamp(_grown * 2 - 1, 0, 1);
     }
 
-    /// <summary>Slides 12px in from the tab's side over 180ms; under reduced motion it just appears.</summary>
-    private void SlideIn()
-    {
-        Slide.BeginAnimation(System.Windows.Media.TranslateTransform.XProperty, null);
-        Slide.BeginAnimation(System.Windows.Media.TranslateTransform.YProperty, null);
-        Surface.BeginAnimation(OpacityProperty, null);
-        Slide.X = Slide.Y = 0;
-        Surface.Opacity = 1;
-        if (Motion.IsReduced)
-            return;
-        var (x, y) = _edge switch
-        {
-            IslandEdge.Left => (-SlideDistance, 0.0),
-            IslandEdge.Right => (SlideDistance, 0.0),
-            _ => (0.0, -SlideDistance),
-        };
-        var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
-        Slide.BeginAnimation(System.Windows.Media.TranslateTransform.XProperty, new DoubleAnimation(x, 0, SlideTime) { EasingFunction = ease });
-        Slide.BeginAnimation(System.Windows.Media.TranslateTransform.YProperty, new DoubleAnimation(y, 0, SlideTime) { EasingFunction = ease });
-        Surface.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, SlideTime) { EasingFunction = ease });
-    }
+    private static double Lerp(double from, double to, double t) => from + (to - from) * t;
 
     private void AttachPanels()
     {
@@ -245,6 +339,7 @@ public partial class IslandPanelWindow : Window
     protected override void OnClosed(EventArgs e)
     {
         _clock.Stop();
+        StopFrames();
         base.OnClosed(e);
     }
 }

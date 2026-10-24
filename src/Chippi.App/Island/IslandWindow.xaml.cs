@@ -89,7 +89,8 @@ public partial class IslandWindow : Window
         _leaveTimer.Tick += (_, _) =>
         {
             _leaveTimer.Stop();
-            if (Tab.IsMouseOver || _panel.IsMouseOver || DebugMenu.IsOpen)
+            // The island grows over the tab, so the pointer can be on it before its window sees a move.
+            if (Tab.IsMouseOver || _panel.IsMouseOver || _panel.Covers(IslandNative.Cursor()) || DebugMenu.IsOpen)
                 return; // leaving again restarts this
             if (Mouse.Captured is not null)
             {
@@ -117,6 +118,8 @@ public partial class IslandWindow : Window
         };
         _panel.MouseEnter += (_, _) => _leaveTimer.Stop();
         _panel.MouseLeave += (_, _) => _leaveTimer.Start();
+        // The tab stays large until the island has shrunk back into it.
+        _panel.IsVisibleChanged += (_, _) => RefreshTab();
 
         // The mouse is handled here, before the button sees it: a press is a click or the start of a drag.
         // Click itself comes only from Enter, Space or UI Automation's Invoke.
@@ -262,7 +265,7 @@ public partial class IslandWindow : Window
             DebugMenu.IsOpen = false;
             if (_pressAt is not null)
                 Tab.ReleaseMouseCapture(); // ends a drag: OnLostCapture
-            CloseIsland();
+            CloseIsland(immediate: true);
             Hide();
         }
     }
@@ -335,14 +338,15 @@ public partial class IslandWindow : Window
         RefreshTab();
     }
 
-    private void CloseIsland()
+    /// <summary>Shrinks the island back into the tab; <paramref name="immediate"/> hides it at once.</summary>
+    private void CloseIsland(bool immediate = false)
     {
         _leaveTimer.Stop();
         _escapeHook?.Dispose(); // unhooks
         _escapeHook = null;
         if (!_panel.IsOpen)
             return;
-        _panel.CloseIsland();
+        _panel.CloseIsland(immediate);
         RefreshTab();
     }
 
@@ -369,7 +373,7 @@ public partial class IslandWindow : Window
     private void RefreshTab()
     {
         var top = _activities.Count > 0 ? _activities[0] : null;
-        bool large = top is not null || _hovered || _panel.IsOpen;
+        bool large = top is not null || _hovered || _panel.IsVisible;
         var size = IslandGeometry.TabSize(_docked, large);
         TabBody.Width = size.Width;
         TabBody.Height = size.Height;
@@ -506,7 +510,7 @@ public partial class IslandWindow : Window
     {
         _dragging = true;
         _hoverTimer.Stop();
-        CloseIsland();
+        CloseIsland(immediate: true);
         TabBody.Opacity = 0;
     }
 
@@ -627,7 +631,7 @@ public partial class IslandWindow : Window
             return;
         var tab = IslandNative.WindowRect(_hwnd);
         var region = tab;
-        if (_panel.IsOpen)
+        if (_panel.IsVisible)
             region.Union(IslandNative.WindowRect(_panel.Handle));
         region.Inflate(48 * area.Scale, 48 * area.Scale);
         region.Intersect(area.Monitor);
@@ -641,7 +645,7 @@ public partial class IslandWindow : Window
             work.Offset(-region.X, -region.Y);
             dc.DrawRectangle(null, new Pen(new SolidColorBrush(Color.FromArgb(0x80, 0x80, 0x80, 0x80)), 1), work);
             Draw(dc, Root, tab, region, area.Scale);
-            if (_panel.IsOpen)
+            if (_panel.IsVisible)
                 Draw(dc, _panel.Visual, IslandNative.WindowRect(_panel.Handle), region, area.Scale);
         }
         var image = new System.Windows.Media.Imaging.RenderTargetBitmap((int)region.Width, (int)region.Height, 96, 96, PixelFormats.Pbgra32);

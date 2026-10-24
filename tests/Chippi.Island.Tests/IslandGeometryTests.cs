@@ -134,19 +134,19 @@ public sealed class IslandGeometryTests
     }
 
     [Fact]
-    public void The_island_opens_8px_from_the_tab_toward_the_screen_center()
+    public void The_island_grows_out_of_the_tab_flat_on_the_same_edge()
     {
         var panel = new Size(328, 300);
         var top = new Rect(918, 0, 84, 26);
-        Assert.Equal(new Point(796, 34), IslandGeometry.PanelOrigin(IslandEdge.Top, top, panel, Work, 1));
+        Assert.Equal(new Point(796, 0), IslandGeometry.PanelOrigin(IslandEdge.Top, top, panel, Work, 1));
         var left = new Rect(0, 458, 26, 84);
-        Assert.Equal(new Point(34, 350), IslandGeometry.PanelOrigin(IslandEdge.Left, left, panel, Work, 1));
+        Assert.Equal(new Point(0, 350), IslandGeometry.PanelOrigin(IslandEdge.Left, left, panel, Work, 1));
         var right = new Rect(1894, 458, 26, 84);
-        Assert.Equal(new Point(1894 - 8 - 328, 350), IslandGeometry.PanelOrigin(IslandEdge.Right, right, panel, Work, 1));
+        Assert.Equal(new Point(1920 - 328, 350), IslandGeometry.PanelOrigin(IslandEdge.Right, right, panel, Work, 1));
     }
 
     [Fact]
-    public void The_island_stays_8px_inside_the_work_area()
+    public void The_island_stays_8px_inside_the_ends_of_its_edge()
     {
         var panel = new Size(328, 300);
         // A left tab near the top end: centering would put the island above the screen.
