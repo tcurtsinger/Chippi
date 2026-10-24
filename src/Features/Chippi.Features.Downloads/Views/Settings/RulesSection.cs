@@ -16,27 +16,32 @@ namespace Chippi.Features.Downloads.Views.Settings;
 
 /// <summary>
 /// The rules editor (DESIGN.md §5): a "test a file name" box over an ordered accordion, one rule
-/// open at a time. Edits save as soon as the rule is valid; there is no Save button. Reorder with
-/// the grip (drag, or Up/Down while it has focus) or Alt+Up/Down anywhere in a rule.
+/// open at a time. Edits stay a draft until Save; Cancel puts the rule back. The switch, reorder,
+/// Duplicate and Delete save at once. Reorder with the grip (drag, or Up/Down while it has focus)
+/// or Alt+Up/Down anywhere in a rule.
 /// </summary>
-internal sealed class RulesSection : UserControl
+internal sealed class RulesSection : UserControl, ISettingsLeaveGuard
 {
     private static readonly (string Label, long Bytes)[] Units = [("KB", 1024), ("MB", 1024 * 1024), ("GB", 1024L * 1024 * 1024)];
 
     private readonly DownloadsModule _module;
 
-    /// <summary>Drafts on screen and the committed rules that are saved and tested.</summary>
+    /// <summary>Drafts on screen and the saved rules that run and are tested.</summary>
     private readonly RuleDrafts _drafts;
 
     private List<RuleSetting> _rules => _drafts.Drafts;
     private readonly ContentControl _list = new() { Focusable = false };
+    private readonly ContentControl _leaveBar = new() { Focusable = false };
     private readonly List<Border> _rows = [];
     private readonly TextBox _test = Ui.BareField("Test a file name, like notes.txt", "Test a file name");
     private readonly TextBlock _testResult = Ui.Text("");
     private string? _open;
     private string? _match;
     private readonly Dictionary<string, ContentControl> _badges = [];
-    private readonly System.Windows.Threading.DispatcherTimer _saveTimer = new() { Interval = TimeSpan.FromMilliseconds(500) };
+    private readonly Dictionary<string, TextBlock> _summaries = [];
+
+    /// <summary>Editors kept while their rule has a draft, so collapsing one keeps what was typed (even text the draft can't hold yet).</summary>
+    private readonly Dictionary<string, StackPanel> _editors = [];
     private int _dragFrom = -1;
     private int _dragTo = -1;
 
@@ -61,28 +66,60 @@ internal sealed class RulesSection : UserControl
         header.Children.Add(title.At(0));
         header.Children.Add(add.At(1));
 
-        Content = Ui.Stack(Ui.Card(Ui.Pad(testGrid)).Margin(0, 16, 0, 0), header, _list);
-        // Typing saves after a short pause, so the organizer is not re-applied on every key.
-        _saveTimer.Tick += (_, _) => SaveNow();
-        Unloaded += (_, _) =>
-        {
-            if (_saveTimer.IsEnabled)
-                SaveNow();
-        };
+        Content = Ui.Stack(_leaveBar, Ui.Card(Ui.Pad(testGrid)).Margin(0, 16, 0, 0), header, _list);
         Render();
-        RunTest();
+    }
+
+    // ---- leaving with unsaved drafts
+
+    /// <summary>
+    /// Settings is about to show another page or close. With an unsaved draft, a bar at the top asks
+    /// first: Discard drops every draft and goes on, Keep editing opens the first one.
+    /// </summary>
+    public bool ConfirmLeave(Action leave)
+    {
+        if (!_drafts.HasUnsaved)
+            return true;
+        var discard = Ui.Button("Discard", "PrimaryButtonStyle", name: "Discard unsaved rules");
+        var keep = Ui.Button("Keep editing");
+        discard.Click += (_, _) =>
+        {
+            _leaveBar.Content = null;
+            _drafts.CancelAll();
+            _editors.Clear();
+            _open = null;
+            Render();
+            leave();
+        };
+        keep.Click += (_, _) =>
+        {
+            _leaveBar.Content = null;
+            _open = _rules.FirstOrDefault(r => _drafts.IsChanged(r.Id))?.Id;
+            Render();
+        };
+        var bar = Ui.Columns("Auto", "*", "Auto", "Auto");
+        bar.Children.Add(Ui.Glyph(LucideIcons.Info, "WarningBrush", 16).Margin(0, 0, 12, 0).At(0));
+        bar.Children.Add(Ui.Text("Unsaved rule changes. Discard them?", "BodyTextStyle").At(1));
+        bar.Children.Add(discard.At(2));
+        bar.Children.Add(keep.Margin(8, 0, 0, 0).At(3));
+        var card = Ui.Card(Ui.Pad(bar)).Margin(0, 16, 0, 0);
+        _leaveBar.Content = card;
+        card.BringIntoView();
+        keep.Focus();
+        return false;
     }
 
     // ---- list
 
     private void Render(string? focusHandleOf = null)
     {
-        _drafts.RevertProblems(); // editors are rebuilt from drafts
         _badges.Clear();
+        _summaries.Clear();
         _rows.Clear();
         if (_rules.Count == 0)
         {
             _list.Content = Ui.Card(Ui.Pad(Ui.Text("No rules yet", "BodyTextStyle", "TextTertiaryBrush")));
+            RunTest();
             return;
         }
         var card = new Card();
@@ -95,6 +132,7 @@ internal sealed class RulesSection : UserControl
                 Dispatcher.BeginInvoke(() => handle.Focus());
         }
         _list.Content = card;
+        RunTest();
     }
 
     private Border RuleRow(RuleSetting rule, int index, out DragHandle handle)
@@ -109,6 +147,7 @@ internal sealed class RulesSection : UserControl
 
         var summary = Ui.Text(RuleChecks.Summary(rule), "CaptionTextStyle", "TextTertiaryBrush");
         summary.ToolTip = DestinationTip(rule);
+        _summaries[rule.Id] = summary;
         var title = Ui.Stack(Ui.Text(rule.Name.Length > 0 ? rule.Name : "New rule", "TitleTextStyle"), summary);
         var enabled = Ui.Switch($"{rule.Name} on", rule.Enabled);
         enabled.SetResourceReference(StyleProperty, "SwitchWithLabelStyle"); // "On" or "Off" left of the switch (DESIGN.md §5 Rows)
@@ -116,9 +155,11 @@ internal sealed class RulesSection : UserControl
         {
             if (enabled.IsChecked == rule.Enabled)
                 return;
-            rule.Enabled = enabled.IsChecked == true;
+            _drafts.SetEnabled(rule, enabled.IsChecked == true);
             title.Opacity = rule.Enabled ? 1 : 0.6;
-            Save();
+            SaveNow();
+            if (rule.Enabled && _drafts.IsSaved(rule.Id))
+                _module.SortExisting(rule.Id);
             RunTest();
         }
         // Checked/Unchecked, so a UI Automation toggle reaches the rule too.
@@ -127,16 +168,19 @@ internal sealed class RulesSection : UserControl
         var chevron = Ui.Icon(open ? LucideIcons.Up : LucideIcons.ChevronDown, open ? $"Close {rule.Name}" : $"Edit {rule.Name}");
         chevron.Click += (_, _) => Toggle(rule);
 
-        var head = Ui.Columns("Auto", "34", "*", "Auto", "Auto", "Auto");
+        var head = Ui.Columns("Auto", "34", "*", "Auto", "Auto", "Auto", "Auto");
         head.Background = Brushes.Transparent; // the whole header opens the rule
         head.Children.Add(handle.At(0));
         head.Children.Add(Ui.Number($"{index + 1}", "TextTertiaryBrush").Margin(10, 0, 0, 0).At(1));
         head.Children.Add(title.At(2));
+        // A collapsed rule with a draft says so; the draft waits for its Save.
+        if (!open && _drafts.IsChanged(rule.Id))
+            head.Children.Add(Ui.Badge("Unsaved changes", BadgeKind.Overlap).Margin(0, 0, 10, 0).At(3));
         var badge = new ContentControl { Focusable = false, IsTabStop = false, VerticalAlignment = VerticalAlignment.Center };
         _badges[rule.Id] = badge;
-        head.Children.Add(badge.At(3));
-        head.Children.Add(enabled.At(4));
-        head.Children.Add(chevron.Margin(8, 0, 0, 0).At(5));
+        head.Children.Add(badge.At(4));
+        head.Children.Add(enabled.At(5));
+        head.Children.Add(chevron.Margin(8, 0, 0, 0).At(6));
         head.MouseLeftButtonUp += (_, e) =>
         {
             if (e.OriginalSource is DependencyObject source && !IsInside<ButtonBase>(source) && !IsInside<Thumb>(source))
@@ -145,7 +189,12 @@ internal sealed class RulesSection : UserControl
 
         var stack = Ui.Stack(head);
         if (open)
-            stack.Children.Add(Editor(rule, summary));
+        {
+            if (!_editors.TryGetValue(rule.Id, out var editor))
+                _editors[rule.Id] = editor = Editor(rule);
+            (editor.Parent as Panel)?.Children.Remove(editor); // from the row it was in before this render
+            stack.Children.Add(editor);
+        }
         // The border is the drop line while a drag targets this row.
         // Padding plus the 2px border makes the 10 / 16 row padding.
         var row = new Border { Child = stack, Padding = new Thickness(16, 8, 16, 8), MinHeight = 60, BorderBrush = Brushes.Transparent, BorderThickness = new Thickness(0, 2, 0, 2) };
@@ -163,6 +212,7 @@ internal sealed class RulesSection : UserControl
         return row;
     }
 
+    /// <summary>Opens or collapses a rule. Collapsing keeps its draft (and editor) for later.</summary>
     private void Toggle(RuleSetting rule)
     {
         _open = _open == rule.Id ? null : rule.Id;
@@ -177,8 +227,7 @@ internal sealed class RulesSection : UserControl
         var rule = _rules[index];
         _rules.RemoveAt(index);
         _rules.Insert(target, rule);
-        Save();
-        RunTest();
+        SaveNow();
         Render(focusHandleOf: rule.Id);
     }
 
@@ -225,11 +274,11 @@ internal sealed class RulesSection : UserControl
         var rule = _rules[from];
         _rules.RemoveAt(from);
         _rules.Insert(to, rule);
-        Save();
-        RunTest();
+        SaveNow();
         Dispatcher.BeginInvoke(() => Render(focusHandleOf: rule.Id)); // after the thumb finishes its own drag
     }
 
+    /// <summary>A new rule is a draft until its Save; Cancel removes it.</summary>
     private void AddRule()
     {
         var rule = new RuleSetting
@@ -242,24 +291,27 @@ internal sealed class RulesSection : UserControl
         };
         _rules.Add(rule);
         _open = rule.Id;
-        Save();
         Render();
     }
 
     // ---- editor
 
-    /// <summary>The drafts and committed rules (tests drive the editor through these).</summary>
+    /// <summary>The drafts and saved rules (tests drive the editor through these).</summary>
     internal RuleDrafts Drafts => _drafts;
 
-    internal StackPanel Editor(RuleSetting rule, TextBlock summary)
+    internal StackPanel Editor(RuleSetting rule)
     {
         var editor = new StackPanel { Margin = new Thickness(48, 14, 6, 4) };
+        var save = Ui.Button("Save", "PrimaryButtonStyle", name: $"Save {rule.Name}");
+        save.IsEnabled = false;
         void Changed()
         {
-            summary.Text = RuleChecks.Summary(rule);
-            summary.ToolTip = DestinationTip(rule);
-            Save();
-            RunTest();
+            if (_summaries.TryGetValue(rule.Id, out var summary))
+            {
+                summary.Text = RuleChecks.Summary(rule);
+                summary.ToolTip = DestinationTip(rule);
+            }
+            save.IsEnabled = _drafts.CanSave(rule.Id);
         }
 
         // Name
@@ -457,30 +509,54 @@ internal sealed class RulesSection : UserControl
         };
         ShowAction();
 
-        // Duplicate, Delete
+        // Save, Cancel on the left; Duplicate, Delete (which save at once) on the right.
+        save.IsEnabled = _drafts.CanSave(rule.Id);
+        save.Click += (_, _) =>
+        {
+            if (!_drafts.Save(rule.Id))
+                return;
+            _editors.Remove(rule.Id);
+            _open = null;
+            SaveNow();
+            _module.SortExisting(rule.Id); // the files already there that it wins
+            Render();
+        };
+        var cancel = Ui.Button("Cancel", name: $"Cancel changes to {rule.Name}");
+        cancel.Click += (_, _) =>
+        {
+            _drafts.Cancel(rule.Id);
+            _editors.Remove(rule.Id);
+            _open = null;
+            Render();
+        };
         var duplicate = Ui.Button("Duplicate", name: $"Duplicate {rule.Name}");
-        duplicate.IsEnabled = _drafts.IsCommitted(rule.Id); // a rule that has never been valid has nothing to copy
+        duplicate.IsEnabled = _drafts.IsSaved(rule.Id); // copies the saved rule; a new one has nothing to copy
         duplicate.Click += (_, _) =>
         {
             if (_drafts.Duplicate(rule) is not { } copy)
                 return;
             _open = copy.Id;
-            Save();
+            SaveNow();
             Render();
         };
         var delete = Ui.Button("Delete", icon: LucideIcons.Trash, name: $"Delete {rule.Name}");
         delete.Click += (_, _) =>
         {
             _drafts.Remove(rule);
+            _editors.Remove(rule.Id);
             _open = null;
-            Save();
-            RunTest();
+            SaveNow();
             Render();
         };
         var divider = new Border { Height = 1, Margin = new Thickness(0, 14, 0, 12) };
         divider.SetResourceReference(Border.BackgroundProperty, "BorderBrush");
         editor.Children.Add(divider);
-        editor.Children.Add(Ui.Row(duplicate, delete.Margin(8, 0, 0, 0)));
+        var buttons = Ui.Columns("Auto", "Auto", "*", "Auto", "Auto");
+        buttons.Children.Add(save.At(0));
+        buttons.Children.Add(cancel.Margin(8, 0, 0, 0).At(1));
+        buttons.Children.Add(duplicate.At(3));
+        buttons.Children.Add(delete.Margin(8, 0, 0, 0).At(4));
+        editor.Children.Add(buttons);
         return editor;
     }
 
@@ -633,19 +709,9 @@ internal sealed class RulesSection : UserControl
 
     // ---- saving
 
-    /// <summary>Commits every fully valid draft, then saves after a short pause.</summary>
-    private void Save()
-    {
-        _drafts.Commit();
-        _saveTimer.Stop();
-        _saveTimer.Start();
-    }
-
-    /// <summary>Saves the committed rules in list order. A draft with a problem leaves its last valid version in place.</summary>
+    /// <summary>Saves the saved rules in list order. Drafts are not in it until their Save.</summary>
     private void SaveNow()
     {
-        _saveTimer.Stop();
-        _drafts.Commit();
         var settings = _module.Settings.Clone();
         settings.Rules = _drafts.Effective();
         try
@@ -680,7 +746,7 @@ internal sealed class RulesSection : UserControl
         return block;
     }
 
-    /// <summary>Shows or clears a field's problem and remembers it, so the rule is not committed while it shows.</summary>
+    /// <summary>Shows or clears a field's problem and remembers it, so the rule can't be saved while it shows.</summary>
     private void Flag(RuleSetting rule, string field, TextBlock block, string? message)
     {
         _drafts.SetError(rule.Id, field, message is not null);
