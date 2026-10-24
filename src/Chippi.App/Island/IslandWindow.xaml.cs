@@ -65,6 +65,7 @@ public partial class IslandWindow : Window
     private bool _suppressed;
     private bool _hovered;
     private bool _waitForLeave; // closed under the pointer: no hover-open until it leaves the tab
+    private bool _reopenOnEnter; // shrinking because the pointer left: coming back grows it again
     private readonly HOOKPROC _onKeyboard; // kept alive for as long as the hook exists
     private UnhookWindowsHookExSafeHandle? _escapeHook;
     private HWND _hwnd;
@@ -99,6 +100,7 @@ public partial class IslandWindow : Window
                 return;
             }
             CloseIsland();
+            _reopenOnEnter = true;
         };
 
         Tab.MouseEnter += (_, _) =>
@@ -118,7 +120,13 @@ public partial class IslandWindow : Window
                 _leaveTimer.Start();
             RefreshTab();
         };
-        _panel.MouseEnter += (_, _) => _leaveTimer.Stop();
+        _panel.MouseEnter += (_, _) =>
+        {
+            _leaveTimer.Stop();
+            // Back on the shape while it shrinks after the pointer left: it grows again.
+            if (_reopenOnEnter && !_panel.IsOpen && _panel.IsVisible && _pressAt is null)
+                OpenIsland();
+        };
         _panel.MouseLeave += (_, _) => _leaveTimer.Start();
         // The tab stays large until the island has shrunk back into it.
         _panel.IsVisibleChanged += (_, _) =>
@@ -126,6 +134,8 @@ public partial class IslandWindow : Window
             // The pointer left while the island still covered the tab, so the tab never saw it.
             if (!_panel.IsVisible && Area is { } area && !Home(area).Contains(IslandNative.Cursor()))
                 _waitForLeave = false;
+            if (!_panel.IsVisible)
+                _reopenOnEnter = false;
             RefreshTab();
         };
         _panel.TabPressed += OnPress;
@@ -354,6 +364,7 @@ public partial class IslandWindow : Window
     private void CloseIsland(bool immediate = false)
     {
         _leaveTimer.Stop();
+        _reopenOnEnter = false; // the leave timer sets it again after this
         _escapeHook?.Dispose(); // unhooks
         _escapeHook = null;
         if (!_panel.IsOpen)
