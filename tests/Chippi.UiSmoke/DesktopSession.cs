@@ -84,8 +84,8 @@ internal sealed class DesktopSession : IDisposable
         // content is reachable, open it again once rather than wait on a hidden window.
         if (TryOpenFlyout() is { } flyout)
             return flyout;
-        _output.WriteLine("The flyout hid before its sections were found (it lost the foreground); opening it again");
-        return TryOpenFlyout() ?? throw new TimeoutException("The flyout hid twice before its sections were found");
+        _output.WriteLine("The flyout hid before its content was found (it lost the foreground); opening it again");
+        return TryOpenFlyout() ?? throw new TimeoutException("The flyout hid twice before its content was found");
     }
 
     private AutomationElement? TryOpenFlyout()
@@ -97,9 +97,12 @@ internal sealed class DesktopSession : IDisposable
         AutomationElement? window = null;
         Until(() => (window = WindowOrNull("Chippi")) is not null, "profile flyout opened");
         var handle = (nint)window!.Current.NativeWindowHandle;
+        // Look the window up again on every poll: an element taken while the flyout's UI thread is
+        // still busy starting up can stay without any of its content.
         bool shown = false;
-        Until(() => !IsWindowVisible(handle) || (shown = FirstOrNull(window, "Flyout sections", null) is not null),
-            "'Flyout sections' in the flyout, or the flyout hidden");
+        Until(() => !IsWindowVisible(handle)
+                || ((window = WindowOrNull("Chippi")) is not null && (shown = FirstOrNull(window, "Settings", InvokePattern.Pattern) is not null)),
+            "the flyout's Settings button, or the flyout hidden");
         return shown ? window : null;
     }
 
