@@ -215,6 +215,15 @@ public partial class SettingsWindow : Window
         button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
     }
 
+    /// <summary>Clicks the first button whose name starts with <paramref name="prefix"/>; false when there is none.</summary>
+    internal bool InvokeSnapshotActionStartingWith(string prefix)
+    {
+        if (Descendants(PageHost).OfType<Button>().FirstOrDefault(b => AutomationProperties.GetName(b)?.StartsWith(prefix, StringComparison.Ordinal) == true) is not { } button)
+            return false;
+        button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        return true;
+    }
+
     internal void VerifyFeatureSearchSnapshot() => Descendants(PageHost).OfType<AddFeaturesPage>().Single().VerifySearchSnapshot();
 
     internal void ExpandSnapshotFeatures(bool expanded) =>

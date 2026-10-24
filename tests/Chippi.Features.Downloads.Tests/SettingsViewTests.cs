@@ -56,6 +56,19 @@ public sealed class SettingsViewTests
     }
 
     [Theory]
+    [InlineData(@"C:\Users\x\Documents", "Documents")]
+    [InlineData(@"D:\Sorted\Invoices\", "Invoices")]
+    [InlineData(@"D:\Sorted\Invoices\{year}\{month}", @"Invoices\{year}\{month}")]
+    [InlineData(@"\\server\share\Scans", "Scans")]
+    [InlineData(@"Documents\{year}", @"Documents\{year}")] // relative, from before the picker: as typed
+    public void A_chosen_folder_reads_by_its_name_in_the_summary(string template, string shown)
+    {
+        Assert.Equal(shown, RuleChecks.DestinationName(template));
+        var rule = new RuleSetting { Extensions = ["txt"], Action = RuleActionKind.Move, Template = template };
+        Assert.Equal($".txt → {shown}", RuleChecks.Summary(rule));
+    }
+
+    [Theory]
     [InlineData(DownloadsRequestKind.Organize, @"C:\Users\x\Downloads", null, @"module:downloads-organizer/preview/C:\Users\x\Downloads")]
     [InlineData(DownloadsRequestKind.Organize, null, null, "module:downloads-organizer/review")]
     [InlineData(DownloadsRequestKind.Review, null, null, "module:downloads-organizer/review")]

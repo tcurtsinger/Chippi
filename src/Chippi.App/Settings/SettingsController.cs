@@ -100,6 +100,12 @@ internal sealed class SettingsController
                                     Open($"{page.Id}/{section}");
                                     await Idle();
                                     Render(_window.PageContent, System.IO.Path.Combine(directory, $"r4-downloads-{section}-{name}-{accent}.png"), full: true);
+                                    // The first two rules, each open in turn: an open rule's chevron reads Close, so the next Edit is the next rule.
+                                    for (int rule = 1; section == "rules" && rule <= 2 && _window.InvokeSnapshotActionStartingWith("Edit "); rule++)
+                                    {
+                                        await Idle();
+                                        Render(_window.PageContent, System.IO.Path.Combine(directory, $"r4-downloads-rule{rule}-{name}-{accent}.png"), full: true);
+                                    }
                                 }
                             }
                             if (page.Id == "features")

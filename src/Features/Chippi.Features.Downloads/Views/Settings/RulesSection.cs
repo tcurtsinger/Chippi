@@ -108,6 +108,7 @@ internal sealed class RulesSection : UserControl
         handle.DragCompleted += (_, _) => DropDragged();
 
         var summary = Ui.Text(RuleChecks.Summary(rule), "CaptionTextStyle", "TextTertiaryBrush");
+        summary.ToolTip = DestinationTip(rule);
         var title = Ui.Stack(Ui.Text(rule.Name.Length > 0 ? rule.Name : "New rule", "TitleTextStyle"), summary);
         var enabled = Ui.Switch($"{rule.Name} on", rule.Enabled);
         enabled.SetResourceReference(StyleProperty, "SwitchWithLabelStyle"); // "On" or "Off" left of the switch (DESIGN.md §5 Rows)
@@ -237,7 +238,7 @@ internal sealed class RulesSection : UserControl
             Name = "New rule",
             Extensions = ["pdf"],
             Action = RuleActionKind.Move,
-            Template = "Documents",
+            Template = DocumentsFolder(),
         };
         _rules.Add(rule);
         _open = rule.Id;
@@ -253,6 +254,7 @@ internal sealed class RulesSection : UserControl
         void Changed()
         {
             summary.Text = RuleChecks.Summary(rule);
+            summary.ToolTip = DestinationTip(rule);
             Save();
             RunTest();
         }
@@ -349,8 +351,32 @@ internal sealed class RulesSection : UserControl
         action.SelectedIndex = (int)rule.Action;
         editor.Children.Add(Line("", action));
 
-        var template = Ui.Field(rule.Template ?? "", code: true, name: "Destination", width: 460);
+        // Rename types its template. Move shows the folder, chosen with the Windows folder picker,
+        // which has its own New folder button.
         var templateNote = Ui.Row();
+        var template = Ui.Field(rule.Template ?? "", code: true, name: "New name", width: 460);
+        var path = Ui.Field(name: "Destination", width: 320);
+        path.IsReadOnly = true;
+        var browse = Ui.Button("Browse…", name: "Choose destination folder");
+        browse.Margin = new Thickness(8, 0, 0, 0);
+        var pathRow = Ui.Row(path, browse);
+        void ShowPath()
+        {
+            path.Text = DestinationShown(rule.Template ?? "");
+            path.ToolTip = DestinationTip(rule);
+        }
+        browse.Click += (_, _) =>
+        {
+            var dialog = new Microsoft.Win32.OpenFolderDialog { Title = "Choose destination", Multiselect = false };
+            if (ExistingFolder(rule.Template ?? "") is { } start)
+                dialog.InitialDirectory = start;
+            if (dialog.ShowDialog(Window.GetWindow(this)) != true)
+                return;
+            rule.Template = dialog.FolderName;
+            ShowPath();
+            ShowTemplateNote(rule, templateNote);
+            Changed();
+        };
         var tokens = new WrapPanel { Margin = new Thickness(0, 6, 0, 0) };
         var targetLabel = Ui.Text(rule.Action == RuleActionKind.Rename ? "New name" : "Destination", "BodyTextStyle");
         var reason = Ui.Field(rule.HoldReason ?? "", name: "Hold reason", width: 320);
@@ -373,6 +399,15 @@ internal sealed class RulesSection : UserControl
                 chip.Margin = new Thickness(0, 0, 6, 6);
                 chip.Click += (_, _) =>
                 {
+                    if (rule.Action == RuleActionKind.Move)
+                    {
+                        // The destination isn't typed, so a placeholder goes on its end.
+                        rule.Template = (rule.Template ?? "") + token;
+                        ShowPath();
+                        ShowTemplateNote(rule, templateNote);
+                        Changed();
+                        return;
+                    }
                     int at = template.CaretIndex;
                     template.Text = template.Text.Insert(at, token);
                     template.CaretIndex = at + token.Length;
@@ -387,7 +422,7 @@ internal sealed class RulesSection : UserControl
             rule.HoldReason = reason.Text.Trim();
             Changed();
         };
-        var targetBlock = Ui.Stack(template, templateNote.Margin(0, 6, 0, 0), tokens);
+        var targetBlock = Ui.Stack(template, pathRow, templateNote.Margin(0, 6, 0, 0), tokens);
         var targetLine = Line("", targetBlock);
         var reasonLine = Line("Reason", reason);
         targetLine.Children.Add(TopLabel(targetLabel).At(0));
@@ -398,8 +433,11 @@ internal sealed class RulesSection : UserControl
             bool isHold = rule.Action == RuleActionKind.Hold;
             targetLine.Visibility = isHold ? Visibility.Collapsed : Visibility.Visible;
             reasonLine.Visibility = isHold ? Visibility.Visible : Visibility.Collapsed;
-            targetLabel.Text = rule.Action == RuleActionKind.Rename ? "New name" : "Destination";
-            System.Windows.Automation.AutomationProperties.SetName(template, targetLabel.Text);
+            bool rename = rule.Action == RuleActionKind.Rename;
+            targetLabel.Text = rename ? "New name" : "Destination";
+            template.Visibility = rename ? Visibility.Visible : Visibility.Collapsed;
+            pathRow.Visibility = rename ? Visibility.Collapsed : Visibility.Visible;
+            ShowPath();
             FillTokens();
             ShowTemplateNote(rule, templateNote);
         }
@@ -411,8 +449,11 @@ internal sealed class RulesSection : UserControl
             if (kind == rule.Action)
                 return;
             rule.Action = kind;
-            // A folder template rarely makes a good file name, and the other way round.
-            template.Text = kind == RuleActionKind.Rename ? "{year}-{month}-{day} {filename}" : kind == RuleActionKind.Move ? "Documents" : template.Text;
+            // A folder rarely makes a good file name, and the other way round.
+            if (kind == RuleActionKind.Rename)
+                template.Text = "{year}-{month}-{day} {filename}";
+            else if (kind == RuleActionKind.Move)
+                rule.Template = DocumentsFolder();
             ShowAction();
             Changed();
         };
@@ -469,9 +510,13 @@ internal sealed class RulesSection : UserControl
         {
             return;
         }
-        string where = rename ? $"Stays in place · {rendered}"
-            : WindowsPaths.IsAbsolute(rendered) ? rendered
-            : $"Under {Ui.FolderName(folder)} · {rendered}";
+        // The destination field already shows a plain folder; the note adds what it can't.
+        string? where = rename ? $"Stays in place · {rendered}"
+            : !WindowsPaths.IsAbsolute(rendered) ? "Inside each watched folder"
+            : rendered != rule.Template ? rendered
+            : null;
+        if (where is null)
+            return;
         note.Children.Add(Ui.Glyph(LucideIcons.Check, "SuccessBrush", 12));
         note.Children.Add(Ui.Text(where, "CaptionTextStyle", "TextTertiaryBrush").Margin(5, 0, 0, 0));
     }
@@ -561,6 +606,32 @@ internal sealed class RulesSection : UserControl
 
     private string SampleFolder() =>
         _module.Settings.Folders.FirstOrDefault()?.Path ?? DownloadsModule.DownloadsFolder() ?? Path.GetTempPath();
+
+    // ---- destinations
+    // A relative destination (rules from before the folder picker) stays relative: it means "inside
+    // the watched folder the file is in", which no single full path can say once two folders are watched.
+
+    private static string DocumentsFolder() => Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+
+    /// <summary>The destination field: a chosen folder in full, a relative one under the watched folder's name ("Downloads\Documents").</summary>
+    private string DestinationShown(string template) =>
+        WindowsPaths.IsAbsolute(template) ? template : Path.Combine(Ui.FolderName(SampleFolder()), template);
+
+    /// <summary>The full path on hover, for a Move rule.</summary>
+    private string? DestinationTip(RuleSetting rule) =>
+        rule.Action != RuleActionKind.Move || string.IsNullOrEmpty(rule.Template) ? null
+        : WindowsPaths.IsAbsolute(rule.Template) ? rule.Template
+        : Path.Combine(SampleFolder(), rule.Template);
+
+    /// <summary>Where the picker opens: the deepest existing folder of the destination, else the watched folder.</summary>
+    private string? ExistingFolder(string template)
+    {
+        string? folder = template.IndexOf('{') is int at and >= 0 ? template[..at] : template;
+        folder = WindowsPaths.IsAbsolute(folder) ? folder : Path.Combine(SampleFolder(), folder);
+        while (!string.IsNullOrEmpty(folder) && !Directory.Exists(folder))
+            folder = Path.GetDirectoryName(folder);
+        return string.IsNullOrEmpty(folder) ? null : folder;
+    }
 
     // ---- saving
 
