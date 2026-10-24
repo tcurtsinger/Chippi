@@ -14,6 +14,9 @@ public sealed record EngineOptions
     /// <summary>Size and last-write time must hold still this long between two samples.</summary>
     public TimeSpan StabilityInterval { get; init; } = TimeSpan.FromSeconds(2);
 
+    /// <summary>A new or changed rule must hold still this long before it sorts the files already there.</summary>
+    public TimeSpan RuleSettle { get; init; } = TimeSpan.FromSeconds(3);
+
     /// <summary>How often due files are re-checked.</summary>
     public TimeSpan Tick { get; init; } = TimeSpan.FromMilliseconds(250);
 

@@ -98,8 +98,9 @@ public sealed class PipelineTests
     public void Files_already_there_are_never_moved_silently()
     {
         using var f = new Fixture(existingFilesAreOld: true);
-        f.Write("old.pdf");
         f.AddRule(MovePdfs());
+        f.Settle(); // the rule settles first, so only the watcher sees the file (RuleSweepTests covers a new rule)
+        f.Write("old.pdf");
 
         f.Settle();
 

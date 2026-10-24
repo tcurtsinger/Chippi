@@ -68,6 +68,8 @@ internal sealed class RulesSection : UserControl
         {
             if (_saveTimer.IsEnabled)
                 SaveNow();
+            if (_open is { } open)
+                _module.SettleRule(open); // leaving the page closes the editor too
         };
         Render();
         RunTest();
@@ -165,8 +167,23 @@ internal sealed class RulesSection : UserControl
 
     private void Toggle(RuleSetting rule)
     {
-        _open = _open == rule.Id ? null : rule.Id;
+        Open(_open == rule.Id ? null : rule.Id);
         Render();
+    }
+
+    /// <summary>
+    /// Opens one rule's editor (or none). Closing an editor means the person is done with that rule:
+    /// it saves now and, if it was added or changed, sorts the files already there without waiting.
+    /// </summary>
+    private void Open(string? id)
+    {
+        if (_open is { } closing && closing != id)
+        {
+            SaveNow();
+            _module.SettleRule(closing);
+        }
+        _open = id;
+        _module.EditingRule(id);
     }
 
     private void Move(int index, int delta)
@@ -241,7 +258,7 @@ internal sealed class RulesSection : UserControl
             Template = DocumentsFolder(),
         };
         _rules.Add(rule);
-        _open = rule.Id;
+        Open(rule.Id); // its PDFs → Documents default is not used until the editor closes
         Save();
         Render();
     }
@@ -464,7 +481,7 @@ internal sealed class RulesSection : UserControl
         {
             if (_drafts.Duplicate(rule) is not { } copy)
                 return;
-            _open = copy.Id;
+            Open(copy.Id);
             Save();
             Render();
         };
@@ -473,6 +490,7 @@ internal sealed class RulesSection : UserControl
         {
             _drafts.Remove(rule);
             _open = null;
+            _module.EditingRule(null);
             Save();
             RunTest();
             Render();

@@ -36,6 +36,10 @@ public sealed class DownloadsEngine : IDisposable
     private readonly CancellationTokenSource _stop = new();
     private DownloadsSettings _settings = new();
     private IReadOnlyList<Rule> _rules = [];
+    private Dictionary<string, (string Shape, bool Enabled)> _ruleShapes = [];
+    private readonly Dictionary<string, DateTimeOffset> _sweeps = new(StringComparer.Ordinal); // rule id → when it has settled
+    private string? _editing;
+    private bool _started;
     private Task? _loop;
     private bool _disposed;
     private volatile bool _closed;
@@ -75,18 +79,26 @@ public sealed class DownloadsEngine : IDisposable
         if (pruned > 0)
             _logger.LogInformation("Pruned {Count} history entries older than {Days} days", pruned, settings.HistoryDays);
         Apply(settings);
+        _started = true; // from here on, a rule that is added or changed sorts the files already there
         if (runLoop)
             _loop = Task.Run(() => LoopAsync(_stop.Token));
     }
 
-    /// <summary>Settings changed (folders, modes, rules): re-sync watchers and rescan.</summary>
+    /// <summary>
+    /// Settings changed (folders, modes, rules): re-sync watchers and rescan. A rule that was added,
+    /// changed or turned on is swept once it settles: see <see cref="SettleRule"/>.
+    /// </summary>
     public void Apply(DownloadsSettings settings)
     {
         ArgumentNullException.ThrowIfNull(settings);
         var rules = ValidRules(settings.Rules);
         var watched = settings.Folders.Where(f => f.Mode != FolderMode.Paused && Directory.Exists(f.Path)).ToList();
+        var shapes = settings.Rules.ToDictionary(r => r.Id, r => (Shape(r), r.Enabled), StringComparer.Ordinal);
         lock (_gate)
         {
+            if (_started)
+                ScheduleSweeps(shapes, rules);
+            _ruleShapes = shapes;
             _settings = settings;
             _rules = rules;
             foreach (var path in _watchers.Keys.Where(k => !watched.Any(f => Same(f.Path, k))).ToList())
@@ -109,6 +121,58 @@ public sealed class DownloadsEngine : IDisposable
         }
         PendingChanged?.Invoke(this, EventArgs.Empty);
     }
+
+    /// <summary>
+    /// The person is done with a rule (its editor closed): sort the files already there now rather
+    /// than after the quiet period. Does nothing unless the rule was added or changed and not yet swept.
+    /// </summary>
+    public void SettleRule(string ruleId)
+    {
+        lock (_gate)
+        {
+            if (_editing == ruleId)
+                _editing = null;
+            if (_sweeps.ContainsKey(ruleId))
+                _sweeps[ruleId] = _time.GetUtcNow();
+        }
+    }
+
+    /// <summary>
+    /// The rules editor has this rule open, or none. An open rule is still being edited (a default
+    /// destination, a half-typed pattern), so it is never swept until <see cref="SettleRule"/>.
+    /// </summary>
+    public void EditingRule(string? ruleId)
+    {
+        lock (_gate)
+            _editing = ruleId;
+    }
+
+    /// <summary>
+    /// Every saved edit restarts a rule's quiet period, so a rule half-way through an edit is never
+    /// used on files already there. Only rules that move or rename, and are valid and on, are swept.
+    /// Call under the gate.
+    /// </summary>
+    private void ScheduleSweeps(Dictionary<string, (string Shape, bool Enabled)> shapes, IReadOnlyList<Rule> rules)
+    {
+        var due = _time.GetUtcNow() + _options.RuleSettle;
+        foreach (var (id, (shape, enabled)) in shapes)
+        {
+            bool changed = !_ruleShapes.TryGetValue(id, out var before) || before.Shape != shape || enabled && !before.Enabled;
+            if (changed && enabled && rules.Any(r => r.Id == id && r.Action is MoveTo or RenameTo))
+                _sweeps[id] = due;
+            else if (changed)
+                _sweeps.Remove(id); // turned off, now invalid, or now a hold
+        }
+        foreach (var gone in _sweeps.Keys.Where(id => !shapes.ContainsKey(id)).ToList())
+            _sweeps.Remove(gone);
+    }
+
+    /// <summary>What a rule does, without its name, order or switch: a change here re-sorts what is already there.</summary>
+    private static string Shape(RuleSetting rule) => System.Text.Json.JsonSerializer.Serialize(new
+    {
+        rule.Extensions, rule.NameRegex, rule.MinBytes, rule.MaxBytes, rule.ModifiedAfter, rule.ModifiedBefore,
+        rule.Action, rule.Template, rule.HoldReason,
+    });
 
     /// <summary>Plans every eligible file in <paramref name="folder"/> for review (Organize now, the Explorer menu).</summary>
     public Task<PreviewPlan> CreatePreviewAsync(string folder, RunTrigger trigger = RunTrigger.Preview, CancellationToken ct = default)
@@ -366,6 +430,21 @@ public sealed class DownloadsEngine : IDisposable
     private void ProcessDue()
     {
         var now = _time.GetUtcNow();
+        List<string> settled;
+        lock (_gate)
+        {
+            settled = [.. _sweeps.Where(s => s.Value <= now && s.Key != _editing).Select(s => s.Key)];
+            foreach (var id in settled)
+                _sweeps.Remove(id);
+        }
+        if (settled.Count > 0)
+        {
+            var swept = new NoticeBatch(RunTrigger.Silent);
+            foreach (var id in settled)
+                Sweep(id, swept);
+            swept.Send(_notifier);
+        }
+
         List<Tracked> due;
         lock (_gate)
             due = [.. _tracked.Values.Where(t => !t.GaveUp && t.NextCheck <= now)];
@@ -455,16 +534,7 @@ public sealed class DownloadsEngine : IDisposable
         }
 
         // Nobody else has it open. A failure can also mean access denied: logged, treated the same, retried.
-        try
-        {
-            using var probe = new FileStream(tracked.Path, FileMode.Open, FileAccess.Read, FileShare.None);
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            _logger.LogDebug("{File} is unavailable: {Reason}", tracked.Path, ex.Message);
-            return (Readiness.Waiting, "In use", facts);
-        }
-        return (Readiness.Ready, null, facts);
+        return Available(tracked.Path) ? (Readiness.Ready, null, facts) : (Readiness.Waiting, "In use", facts);
     }
 
     private void Backoff(Tracked tracked, string? reason, DateTimeOffset now)
@@ -512,16 +582,7 @@ public sealed class DownloadsEngine : IDisposable
                         batch.Held.Add((file.Name, reason));
                     break;
                 case OperationKind.Move or OperationKind.Rename when folder.Mode == FolderMode.Silent && IsNew(folder, file):
-                    runId ??= _history.BeginRun(RunTrigger.Silent, folder.Path);
-                    var result = _executor.Execute(runId.Value, new ExecutionRequest(
-                        plan.Kind == OperationKind.Rename ? HistoryOperationKind.Rename : HistoryOperationKind.Move,
-                        file.FullPath, plan.Destination!, plan.RuleId,
-                        plan.RuleId is { } id && names.TryGetValue(id, out var name) ? name : null,
-                        file.Bytes, file.Modified, AllowRenumber: true));
-                    if (result.Succeeded)
-                        batch.Organized.Add((file.Name, result.Destination, runId.Value, true));
-                    else
-                        batch.Failed.Add((file.Name, result.Error ?? "Failed", runId.Value));
+                    Organize(folder, plan, file, names, ref runId, batch);
                     break;
                 case OperationKind.Move or OperationKind.Rename:
                     // Manual, or already there when the folder was added: only Organize now moves it.
@@ -537,6 +598,104 @@ public sealed class DownloadsEngine : IDisposable
         {
             _history.EndRun(run);
             HistoryChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    /// <summary>Moves or renames one planned file in a Silent run, which starts on its first file.</summary>
+    private void Organize(WatchedFolder folder, PlannedOperation plan, FileFacts file, Dictionary<string, string> names, ref long? runId, NoticeBatch batch)
+    {
+        runId ??= _history.BeginRun(RunTrigger.Silent, folder.Path);
+        var result = _executor.Execute(runId.Value, new ExecutionRequest(
+            plan.Kind == OperationKind.Rename ? HistoryOperationKind.Rename : HistoryOperationKind.Move,
+            file.FullPath, plan.Destination!, plan.RuleId,
+            plan.RuleId is { } id && names.TryGetValue(id, out var name) ? name : null,
+            file.Bytes, file.Modified, AllowRenumber: true));
+        if (result.Succeeded)
+            batch.Organized.Add((file.Name, result.Destination, runId.Value, true));
+        else
+            batch.Failed.Add((file.Name, result.Error ?? "Failed", runId.Value));
+    }
+
+    /// <summary>
+    /// A rule settled: in each Silent folder, organize the files already there that this rule wins
+    /// under first-match order, as one run. Manual folders need nothing more: the rescan in
+    /// <see cref="Apply"/> already lists them for review. Every check a new file gets still applies:
+    /// exclusions, the ignore list, misleading names (held, so not this rule's), Chippi's own output
+    /// (Undo restores included), and a file still being written or in use is left to the watcher.
+    /// </summary>
+    private void Sweep(string ruleId, NoticeBatch batch)
+    {
+        List<WatchedFolder> folders;
+        IReadOnlyList<Rule> rules;
+        lock (_gate)
+        {
+            folders = [.. _settings.Folders.Where(f => f.Mode == FolderMode.Silent && Directory.Exists(f.Path))];
+            rules = _rules;
+        }
+        if (!rules.Any(r => r.Id == ruleId && r.Enabled))
+            return;
+        var names = rules.ToDictionary(r => r.Id, r => r.Name);
+        var now = _time.GetUtcNow();
+        foreach (var folder in folders)
+        {
+            if (IgnorePatterns(folder.Path) is not { } patterns)
+            {
+                _logger.LogWarning("Rule {Id} left the files in {Folder} alone: its ignore file can't be read", ruleId, folder.Path);
+                continue;
+            }
+            var facts = new List<FileFacts>();
+            try
+            {
+                foreach (var path in Directory.EnumerateFiles(folder.Path, "*", SearchOption.TopDirectoryOnly))
+                {
+                    var info = new FileInfo(path);
+                    if (!info.Exists)
+                        continue;
+                    var fact = Facts(info);
+                    bool settling = now - fact.Modified < _options.StabilityInterval + TimeSpan.FromSeconds(Math.Max(0, folder.GraceSeconds));
+                    if (settling || FileSafety.Exclusion(fact) is not null || _guard.IsOwnOutput(path, fact.Bytes, fact.Modified))
+                        continue;
+                    facts.Add(fact);
+                }
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                _logger.LogWarning(ex, "Could not scan {Folder}", folder.Path);
+                continue;
+            }
+
+            var context = new PlanContext(folder.Path, now, TimeZoneInfo.Local, []) { IgnorePatterns = patterns };
+            var plans = Planner.PlanBatch(facts, rules, context);
+            long? runId = null;
+            for (int i = 0; i < plans.Count && !_stop.IsCancellationRequested; i++)
+            {
+                var (plan, file) = (plans[i], facts[i]);
+                if (plan.RuleId != ruleId || plan.Kind is not (OperationKind.Move or OperationKind.Rename) || !Available(file.FullPath))
+                    continue;
+                Organize(folder, plan, file, names, ref runId, batch);
+                Drop(file.FullPath);
+            }
+            if (runId is { } run)
+            {
+                _history.EndRun(run);
+                _logger.LogInformation("Rule {Id} sorted the files already in {Folder}", ruleId, folder.Path);
+                HistoryChanged?.Invoke(this, EventArgs.Empty);
+            }
+        }
+    }
+
+    /// <summary>Nobody else has the file open (a download or an editor still writing it).</summary>
+    private bool Available(string path)
+    {
+        try
+        {
+            using var probe = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.None);
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            _logger.LogDebug("{File} is unavailable: {Reason}", path, ex.Message);
+            return false;
         }
     }
 

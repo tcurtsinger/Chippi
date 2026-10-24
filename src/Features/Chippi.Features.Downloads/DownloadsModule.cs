@@ -134,8 +134,10 @@ public sealed class DownloadsModule : IFeatureModule
     }
 
     /// <summary>
-    /// Saves and applies settings. A folder that is new, or newly set to Silent, gets a fresh baseline
-    /// so the files already in it are never moved silently.
+    /// Saves and applies settings. A folder that is new, or newly set to Silent, gets a fresh baseline:
+    /// adding a folder or changing its mode never moves the files already in it. A rule that is added,
+    /// changed or turned on does, once it settles (<see cref="SettleRule"/>): in a Silent folder the
+    /// files already there that it wins move as one run with Undo; a Manual folder lists them for review.
     /// </summary>
     public void SaveSettings(DownloadsSettings settings)
     {
@@ -164,6 +166,12 @@ public sealed class DownloadsModule : IFeatureModule
         Settings = settings;
         Engine.Apply(settings);
     }
+
+    /// <summary>The rule's editor closed: a rule just added or changed sorts the files already there now, not after its quiet period.</summary>
+    public void SettleRule(string ruleId) => Engine?.SettleRule(ruleId);
+
+    /// <summary>The rules editor opened this rule (or none): it isn't used on the files already there while open.</summary>
+    public void EditingRule(string? ruleId) => Engine?.EditingRule(ruleId);
 
     /// <summary>Asks the Settings views to show <paramref name="request"/>. Call on the UI thread (the Tidy tab does).</summary>
     public void RequestView(DownloadsRequest request)
