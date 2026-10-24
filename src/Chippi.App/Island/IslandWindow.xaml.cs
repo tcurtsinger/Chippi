@@ -64,6 +64,7 @@ public partial class IslandWindow : Window
     private bool _enabled = true;
     private bool _suppressed;
     private bool _hovered;
+    private bool _waitForLeave; // closed under the pointer: no hover-open until it leaves the tab
     private readonly HOOKPROC _onKeyboard; // kept alive for as long as the hook exists
     private UnhookWindowsHookExSafeHandle? _escapeHook;
     private HWND _hwnd;
@@ -82,7 +83,7 @@ public partial class IslandWindow : Window
         _hoverTimer.Tick += (_, _) =>
         {
             _hoverTimer.Stop();
-            if (Tab.IsMouseOver && _pressAt is null)
+            if (Tab.IsMouseOver && _pressAt is null && !_waitForLeave)
                 OpenIsland();
         };
         _leaveTimer = new DispatcherTimer { Interval = CloseDelay };
@@ -104,13 +105,14 @@ public partial class IslandWindow : Window
         {
             _hovered = true;
             _leaveTimer.Stop();
-            if (!_panel.IsOpen && _pressAt is null)
+            if (!_panel.IsOpen && _pressAt is null && !_waitForLeave)
                 _hoverTimer.Start();
             RefreshTab();
         };
         Tab.MouseLeave += (_, _) =>
         {
             _hovered = false;
+            _waitForLeave = false;
             _hoverTimer.Stop();
             if (_panel.IsOpen)
                 _leaveTimer.Start();
@@ -119,7 +121,14 @@ public partial class IslandWindow : Window
         _panel.MouseEnter += (_, _) => _leaveTimer.Stop();
         _panel.MouseLeave += (_, _) => _leaveTimer.Start();
         // The tab stays large until the island has shrunk back into it.
-        _panel.IsVisibleChanged += (_, _) => RefreshTab();
+        _panel.IsVisibleChanged += (_, _) =>
+        {
+            // The pointer left while the island still covered the tab, so the tab never saw it.
+            if (!_panel.IsVisible && Area is { } area && !Home(area).Contains(IslandNative.Cursor()))
+                _waitForLeave = false;
+            RefreshTab();
+        };
+        _panel.TabPressed += OnPress;
 
         // The mouse is handled here, before the button sees it: a press is a click or the start of a drag.
         // Click itself comes only from Enter, Space or UI Automation's Invoke.
@@ -314,9 +323,12 @@ public partial class IslandWindow : Window
     private unsafe LRESULT OnKeyboard(int code, WPARAM wParam, LPARAM lParam)
     {
         if (code >= 0 && wParam.Value == PInvoke.WM_KEYDOWN && ((KBDLLHOOKSTRUCT*)lParam.Value)->vkCode == VK_ESCAPE)
-            Dispatcher.BeginInvoke(CloseIsland);
+            Escape();
         return PInvoke.CallNextHookEx(_escapeHook, code, wParam, lParam);
     }
+
+    // A lambda: CloseIsland's optional parameter turns a method group into Action<bool>, which throws.
+    internal void Escape() => Dispatcher.BeginInvoke(() => CloseIsland());
 
     // ----- Open and close -----
 
@@ -346,6 +358,10 @@ public partial class IslandWindow : Window
         _escapeHook = null;
         if (!_panel.IsOpen)
             return;
+        // Closed with the pointer on the tab (Esc, a click): the tab sees a fresh MouseEnter once the
+        // island has shrunk off it, and mustn't reopen until the pointer has left.
+        if (!immediate && Area is { } area && Home(area).Contains(IslandNative.Cursor()))
+            _waitForLeave = true;
         _panel.CloseIsland(immediate);
         RefreshTab();
     }

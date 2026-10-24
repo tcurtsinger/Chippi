@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Threading;
 using Chippi.App.Pet;
 using Chippi.Core.Config;
@@ -48,6 +49,12 @@ public partial class IslandPanelWindow : Window
         InitializeComponent();
         _clock.Tick += (_, _) => UpdateClock();
         PlayPauseButton.Click += (_, _) => TogglePlayGlyph();
+        // The island grows over the tab: a press where the tab sits is the tab's (click or drag).
+        PreviewMouseLeftButtonDown += (_, e) =>
+        {
+            if (_from.Contains(e.GetPosition(Surface)))
+                TabPressed?.Invoke(this, e);
+        };
         // Content that grows or shrinks (a module's view refreshing) keeps the island centered on the tab.
         Card.SizeChanged += (_, _) =>
         {
@@ -61,6 +68,9 @@ public partial class IslandPanelWindow : Window
         });
         Render(null);
     }
+
+    /// <summary>A left press inside the tab's footprint, which the island covers while it is visible.</summary>
+    internal event MouseButtonEventHandler? TabPressed;
 
     public bool IsOpen { get; private set; }
 
@@ -244,6 +254,7 @@ public partial class IslandPanelWindow : Window
             _ => new CornerRadius(0, 0, r, r),
         };
         Card.Opacity = Math.Clamp(_grown * 2 - 1, 0, 1);
+        Card.IsHitTestVisible = _grown >= 1; // nothing half-faded takes a click
     }
 
     private static double Lerp(double from, double to, double t) => from + (to - from) * t;
