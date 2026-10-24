@@ -248,7 +248,10 @@ internal sealed class RulesSection : UserControl
 
     // ---- editor
 
-    private StackPanel Editor(RuleSetting rule, TextBlock summary)
+    /// <summary>The drafts and committed rules (tests drive the editor through these).</summary>
+    internal RuleDrafts Drafts => _drafts;
+
+    internal StackPanel Editor(RuleSetting rule, TextBlock summary)
     {
         var editor = new StackPanel { Margin = new Thickness(48, 14, 6, 4) };
         void Changed()
@@ -444,8 +447,9 @@ internal sealed class RulesSection : UserControl
                 return;
             rule.Action = kind;
             // A folder rarely makes a good file name, and the other way round.
+            // Set on the rule itself: the field may already hold this text, and then raises no TextChanged.
             if (kind == RuleActionKind.Rename)
-                template.Text = "{year}-{month}-{day} {filename}";
+                rule.Template = template.Text = "{year}-{month}-{day} {filename}";
             else if (kind == RuleActionKind.Move)
                 rule.Template = DocumentsFolder();
             ShowAction();
