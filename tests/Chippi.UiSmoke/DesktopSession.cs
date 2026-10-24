@@ -91,7 +91,19 @@ internal sealed class DesktopSession : IDisposable
 
     public AutomationElement OpenSettings()
     {
-        Invoke(Find(OpenFlyout(), "Settings", InvokePattern.Pattern));
+        // The flyout hides when another window takes the foreground. If that happens before its
+        // Settings button is found, open it again once rather than wait on a hidden window.
+        var flyout = OpenFlyout();
+        var handle = (nint)flyout.Current.NativeWindowHandle;
+        AutomationElement? button = null;
+        Until(() => !IsWindowVisible(handle) || (button = FirstOrNull(flyout, "Settings", InvokePattern.Pattern)) is not null,
+            "'Settings' in the flyout, or the flyout hidden");
+        if (button is null)
+        {
+            _output.WriteLine("The flyout hid before Settings was found (it lost the foreground); opening it again");
+            button = Find(OpenFlyout(), "Settings", InvokePattern.Pattern);
+        }
+        Invoke(button);
         AutomationElement? window = null;
         Until(() => (window = WindowOrNull("Chippi Settings")) is not null, "profile settings opened");
         return window!;
@@ -104,14 +116,14 @@ internal sealed class DesktopSession : IDisposable
     public static AutomationElement Find(AutomationElement root, string name, AutomationPattern? pattern = null)
     {
         AutomationElement? found = null;
-        Until(() =>
-        {
-            var matches = root.FindAll(TreeScope.Descendants, Named(name));
-            found = matches.Cast<AutomationElement>().FirstOrDefault(e => pattern is null || e.TryGetCurrentPattern(pattern, out _));
-            return found is not null;
-        }, $"'{name}'{(pattern is null ? "" : " with " + pattern.ProgrammaticName)}");
+        Until(() => (found = FirstOrNull(root, name, pattern)) is not null,
+            $"'{name}'{(pattern is null ? "" : " with " + pattern.ProgrammaticName)}");
         return found!;
     }
+
+    private static AutomationElement? FirstOrNull(AutomationElement root, string name, AutomationPattern? pattern) =>
+        root.FindAll(TreeScope.Descendants, Named(name)).Cast<AutomationElement>()
+            .FirstOrDefault(e => pattern is null || e.TryGetCurrentPattern(pattern, out _));
 
     public static void Until(Func<bool> condition, string description)
     {
@@ -194,6 +206,7 @@ internal sealed class DesktopSession : IDisposable
     }
 
     [DllImport("user32.dll")] private static extern nint GetForegroundWindow();
+    [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool IsWindowVisible(nint window);
     [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool SetForegroundWindow(nint window);
     [DllImport("user32.dll")] private static extern void keybd_event(byte key, byte scan, uint flags, nuint extra);
 }
