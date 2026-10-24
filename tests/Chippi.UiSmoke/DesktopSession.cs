@@ -100,10 +100,37 @@ internal sealed class DesktopSession : IDisposable
         // Look the window up again on every poll: an element taken while the flyout's UI thread is
         // still busy starting up can stay without any of its content.
         bool shown = false;
-        Until(() => !IsWindowVisible(handle)
-                || ((window = WindowOrNull("Chippi")) is not null && (shown = FirstOrNull(window, "Settings", InvokePattern.Pattern) is not null)),
-            "the flyout's Settings button, or the flyout hidden");
+        try
+        {
+            Until(() => !IsWindowVisible(handle)
+                    || ((window = WindowOrNull("Chippi")) is not null && (shown = FirstOrNull(window, "Settings", InvokePattern.Pattern) is not null)),
+                "the flyout's Settings button, or the flyout hidden");
+        }
+        catch (TimeoutException)
+        {
+            // What UI Automation sees, through the last lookup and straight from the handle.
+            _output.WriteLine($"Flyout timeout: window 0x{handle:X}, visible {IsWindowVisible(handle)}");
+            _output.WriteLine($"  children by lookup: {Children(window)}");
+            _output.WriteLine($"  children by handle: {Children(AutomationElement.FromHandle(handle))}");
+            throw;
+        }
         return shown ? window : null;
+    }
+
+    private static string Children(AutomationElement? element)
+    {
+        try
+        {
+            if (element is null)
+                return "(no window)";
+            var children = element.FindAll(TreeScope.Children, Condition.TrueCondition).Cast<AutomationElement>()
+                .Select(c => $"{c.Current.ControlType.ProgrammaticName.Replace("ControlType.", "")} '{c.Current.Name}'").ToList();
+            return children.Count == 0 ? "(none)" : string.Join(", ", children);
+        }
+        catch (Exception ex)
+        {
+            return $"({ex.GetType().Name})";
+        }
     }
 
     public AutomationElement OpenSettings()
