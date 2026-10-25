@@ -164,6 +164,27 @@ public class RoleArbiterTests
     }
 
     [Fact]
+    public void Back_off_expires_even_when_the_role_is_already_right_again()
+    {
+        AudioRole[] mm = [AudioRole.Multimedia];
+        _sys.With(Speaker("A"), Speaker("B")).WithDefault("A");
+        _arbiter.Claim(RoleOwner.Routing, AudioFlow.Render, mm, List("A"));
+        Enforce();
+        for (var i = 0; i <= RoleArbiter.MaxRepairs; i++)
+        {
+            _sys.ChangeDefault("B", mm);
+            Enforce();
+        }
+        Assert.NotNull(_arbiter.BackoffEnds);
+
+        _sys.ChangeDefault("A", mm); // put right by someone else during the back-off
+        _clock.Advance(RoleArbiter.BackoffPeriod);
+        Assert.Empty(Enforce());
+
+        Assert.Null(_arbiter.BackoffEnds);
+    }
+
+    [Fact]
     public void Repairs_spread_over_more_than_the_window_never_back_off()
     {
         AudioRole[] mm = [AudioRole.Multimedia];

@@ -92,6 +92,12 @@ internal sealed class RoleArbiter(ILogger logger, TimeProvider time, TimeSpan? b
     /// <summary>Points every claimed role at its owner's target and reports what it changed.</summary>
     public IReadOnlyList<RoleChange> Enforce(DeviceCatalog catalog, IDeviceSystem system)
     {
+        // Expire back-offs whether or not their role needs a repair now, so BackoffEnds is never in
+        // the past (the engine schedules a reconcile for it).
+        var now = time.GetUtcNow();
+        foreach (var key in _backoffUntil.Where(b => b.Value <= now).Select(b => b.Key).ToList())
+            _backoffUntil.Remove(key);
+
         var applied = new List<(RoleKey Key, string Target, RoleOwner Owner, RoleChangeKind Kind)>();
         foreach (var (key, owners) in _claims)
         {

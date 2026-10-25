@@ -173,6 +173,36 @@ public sealed class AudioServiceTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task A_back_off_whose_role_was_put_right_meanwhile_stops_rechecking()
+    {
+        // Karl's c851d90 probe: the default is restored before the back-off ends.
+        AudioRole[] mm = [AudioRole.Multimedia];
+        var service = new AudioService(() => _sys, null, options: new AudioServiceOptions
+        {
+            Debounce = TimeSpan.FromMilliseconds(10),
+            RepairBackoff = TimeSpan.FromMilliseconds(200),
+        });
+        _sys.With(Mic("Preferred"), Mic("Other")).WithDefault("Preferred");
+        var lease = service.Acquire();
+        await service.ClaimRolesAsync(RoleOwner.Routing, AudioFlow.Capture, mm, List("Preferred"));
+        for (var i = 0; i < RoleArbiter.MaxRepairs; i++)
+        {
+            _sys.ChangeDefault("Other", mm);
+            await WaitUntil(() => _sys.DefaultOf(AudioFlow.Capture, AudioRole.Multimedia) == "Preferred");
+        }
+        _sys.ChangeDefault("Other", mm);
+        await Task.Delay(50);
+        _sys.ChangeDefault("Preferred", mm);
+
+        await Task.Delay(400); // past the back-off
+        var before = _sys.Enumerations;
+        await Task.Delay(200);
+
+        Assert.True(_sys.Enumerations - before <= 4, $"{_sys.Enumerations - before} enumerations while idle");
+        await lease.DisposeAsync();
+    }
+
+    [Fact]
     public async Task A_failed_start_reaches_the_caller_and_a_later_command_recovers()
     {
         var broken = true;
