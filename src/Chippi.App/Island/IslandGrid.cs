@@ -17,7 +17,7 @@ namespace Chippi.App.Island;
 /// <summary>One tile on the grid, as the island shows it.</summary>
 /// <param name="Active">Something is live on it: the 6px dot.</param>
 /// <param name="Caution">The dot, and the status, in Caution (a muted mic).</param>
-internal sealed record IslandTileView(string Key, string Name, Geometry Icon, string Status, bool Active = false, bool Caution = false);
+internal sealed record IslandTileView(string Key, string Name, Geometry Icon, string Status, bool Active = false, bool Caution = false, bool CautionIcon = false);
 
 /// <summary>
 /// The island's grid (DESIGN.md §5 Island): a 28px header with Gumdrop, Chippi and the clock, then
@@ -70,7 +70,7 @@ internal sealed class IslandGrid : UserControl
     private Button Tile(IslandTileView tile)
     {
         var glyph = new LucideIcon { Data = tile.Icon, Size = 20, HorizontalAlignment = HorizontalAlignment.Center };
-        glyph.SetResourceReference(LucideIcon.BrushProperty, tile.Active && !tile.Caution ? "IslandAccentBrush" : "IslandTextBrush");
+        glyph.SetResourceReference(LucideIcon.BrushProperty, tile.CautionIcon ? "WarningBrush" : tile.Active && !tile.Caution ? "IslandAccentBrush" : "IslandTextBrush");
         var name = new TextBlock { Text = tile.Name, FontSize = 12, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 6, 0, 0),
             HorizontalAlignment = HorizontalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
         var status = new TextBlock { Text = tile.Status, FontSize = 12, HorizontalAlignment = HorizontalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis,

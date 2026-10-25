@@ -203,17 +203,20 @@ public sealed class IslandPanelTests
             var muted = new IslandActivity("muted", IslandActivityKind.Status, "Muted", "Microphone") { NeedsAttention = true, TileKey = "sound.microphone", ModuleId = "mic-mute" };
             panel.SetActivities([stopped, muted], PetMood.Idle);
             Assert.Same(LucideIcons.MicOff, TileIcon(panel, "sound.microphone"));
+            Assert.Same(panel.Visual.FindResource("WarningBrush"), TileGlyph(panel, "sound.microphone").Brush);
 
             panel.SetActivities([], PetMood.Idle);
             Assert.Same(LucideIcons.Mic, TileIcon(panel, "sound.microphone"));
         }, Tiles(mute)));
     }
 
-    private static Geometry TileIcon(IslandPanelWindow panel, string key)
+    private static Geometry TileIcon(IslandPanelWindow panel, string key) => TileGlyph(panel, key).Data!;
+
+    private static LucideIcon TileGlyph(IslandPanelWindow panel, string key)
     {
         var tile = Grid(panel).Buttons().Single(b => (string)b.Tag == key);
         tile.ApplyTemplate();
-        return Descendants(tile).OfType<LucideIcon>().Single().Data!;
+        return Descendants(tile).OfType<LucideIcon>().Single();
     }
 
     private static IEnumerable<object> Descendants(object parent) =>
