@@ -58,7 +58,7 @@ public sealed class RoutingQuickView : UserControl
             AutomationProperties.SetName(combo, flow == AudioFlow.Render ? "Preferred output" : "Preferred microphone");
             combo.SelectionChanged += (_, _) =>
             {
-                if (!_refreshing && combo.SelectedItem is PriorityEntry entry) Run(_module.PreferAsync(flow, entry.Id));
+                if (!_refreshing && combo.SelectedItem is PriorityEntry { Id.Length: > 0 } entry) Run(_module.PreferAsync(flow, entry.Id));
             };
             _choices[flow] = combo;
             var grid = RoutingUi.Columns(GridLength.Auto, new(1, GridUnitType.Star));
@@ -98,12 +98,15 @@ public sealed class RoutingQuickView : UserControl
         _refreshing = true;
         try
         {
-            var key = string.Join("|", _module.Settings.Output.Devices.Concat(_module.Settings.Microphone.Devices)) + string.Join("|", _module.Snapshot.Endpoints);
+            var key = string.Join("|", _module.Settings.Output.Devices.Concat(_module.Settings.Microphone.Devices)) + string.Join("|", _module.Snapshot.Endpoints) + string.Join("|", _module.Snapshot.Defaults.Values);
             foreach (var (flow, combo) in _choices)
             {
-                if (_choiceKey != key) combo.ItemsSource = _module.Settings.For(flow).Devices.Where(e => _module.Snapshot.Find(e.Id)?.IsActive == true).ToList();
-                combo.SelectedValue = _module.Snapshot.Default(flow, AudioRole.Multimedia);
-                combo.IsEnabled = _module.Settings.For(flow).Enabled && combo.Items.Count > 0;
+                var available = _module.Settings.For(flow).Devices.Where(e => _module.Snapshot.Find(e.Id)?.IsActive == true).ToList();
+                var current = _module.Snapshot.Default(flow, AudioRole.Multimedia);
+                var listed = available.Any(e => string.Equals(e.Id, current, StringComparison.OrdinalIgnoreCase));
+                if (_choiceKey != key) combo.ItemsSource = listed ? available : [new PriorityEntry("", _module.CurrentName(flow)), .. available];
+                combo.SelectedValue = listed ? available.First(e => string.Equals(e.Id, current, StringComparison.OrdinalIgnoreCase)).Id : "";
+                combo.IsEnabled = _module.Settings.For(flow).Enabled && available.Count > 0;
             }
             _choiceKey = key;
             var output = _module.Snapshot.Default(AudioFlow.Render, AudioRole.Multimedia);
@@ -136,7 +139,7 @@ public sealed class RoutingQuickView : UserControl
             RoutingUi.Add(content, stack, 1);
             var rank = _module.Settings.For(flow).Devices.ToList().IndexOf(entry) + 1;
             RoutingUi.Add(content, RoutingUi.Text($"#{rank}", "CaptionTextStyle", "TextSecondaryBrush"), 2);
-            var button = new Button { Content = content, HorizontalContentAlignment = HorizontalAlignment.Stretch, IsEnabled = _module.Snapshot.Find(entry.Id)?.IsActive == true };
+            var button = new Button { Content = content, HorizontalContentAlignment = HorizontalAlignment.Stretch, IsEnabled = _module.Settings.For(flow).Enabled && _module.Snapshot.Find(entry.Id)?.IsActive == true };
             button.SetResourceReference(StyleProperty, "FlyoutRowButtonStyle");
             if (selected) button.SetResourceReference(BackgroundProperty, "IslandPanelBrush");
             if (!button.IsEnabled) button.Opacity = 0.5;

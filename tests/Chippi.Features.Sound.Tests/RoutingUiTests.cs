@@ -67,6 +67,26 @@ public sealed class RoutingUiTests
         Assert.Equal("M", f.Ui.Tiles[1].Status);
     }
 
+    [Fact]
+    public async Task Off_island_choices_are_disabled_and_unlisted_default_still_shows_in_flyout()
+    {
+        await using var f = new RoutingFixture();
+        f.System.With(Speaker("A"), Speaker("Windows")).WithDefault("A");
+        await f.Start();
+        await f.Module.SetEnabledAsync(AudioFlow.Render, false);
+        await f.Module.RemoveAsync(AudioFlow.Render, "Windows");
+        f.System.ChangeDefault("Windows");
+        await f.Audio.RefreshAsync();
+        await Sta(() =>
+        {
+            var island = new RoutingQuickView(f.Module, AudioFlow.Render, true);
+            var prefer = Descendants(island).OfType<System.Windows.Controls.Button>().Single(b => AutomationProperties.GetName(b) == "Prefer A");
+            Assert.False(prefer.IsEnabled);
+            var flyout = new RoutingQuickView(f.Module);
+            var combo = Descendants(flyout).OfType<System.Windows.Controls.ComboBox>().First();
+            Assert.Equal("Windows", Assert.IsType<PriorityEntry>(combo.SelectedItem).Name);
+        });
+    }
     private static IEnumerable<DependencyObject> Descendants(DependencyObject root)
     {
         yield return root;
