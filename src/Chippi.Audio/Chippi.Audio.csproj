@@ -19,9 +19,10 @@
   </ItemGroup>
 
   <!-- RNNoise, built in CI from native/rnnoise (hashes.csv). Both architectures ship; RnnoiseNative
-       loads runtimes\win-<arch>\native\rnnoise.dll for the process architecture. -->
+       loads runtimes\win-<arch>\native\rnnoise.dll for the process architecture. A single-file publish
+       would otherwise bundle both DLLs into Chippi.exe, where that path never finds them. -->
   <ItemGroup>
-    <None Include="..\..\native\rnnoise\runtimes\**\rnnoise.dll" Link="runtimes\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Visible="false" />
+    <None Include="..\..\native\rnnoise\runtimes\**\rnnoise.dll" Link="runtimes\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" Visible="false" />
   </ItemGroup>
 
 </Project>
