@@ -159,7 +159,8 @@ public sealed class AudioService
     public Task<AppDeviceChoice> GetAppOutputAsync(AppKey app) => Run(e =>
     {
         var session = e.Sessions.SessionsOf(app).FirstOrDefault(s => s.ProcessId > 0 && s.ExePath is not null && !s.IsSystemSounds);
-        return session is null || e.System is not IPerAppDeviceSystem policy ? new(false) : policy.GetAppOutput(session.ProcessId);
+        return session is null ? new(false, HasSession: false)
+            : e.System is not IPerAppDeviceSystem policy ? new(false) : policy.GetAppOutput(session.ProcessId);
     });
 
     /// <summary>Sets only this app's persisted output. Null uses Windows' default; open streams may stay put.</summary>
@@ -168,11 +169,11 @@ public sealed class AudioService
         if (endpointId is not null && !e.Catalog.Active(AudioFlow.Render).Any(d => PriorityPolicy.Eq(d.Id, endpointId) && !VbCable.IsCable(d)))
             throw new InvalidOperationException("Output unavailable");
         var pids = e.Sessions.SessionsOf(app).Where(s => s.ProcessId > 0 && s.ExePath is not null && !s.IsSystemSounds).Select(s => s.ProcessId).Distinct().ToList();
-        if (pids.Count == 0 || e.System is not IPerAppDeviceSystem policy)
-            throw new InvalidOperationException("App output unavailable");
+        if (pids.Count == 0) throw new InvalidOperationException("App output unavailable");
+        if (e.System is not IPerAppDeviceSystem policy) throw new AppOutputPolicyException();
         foreach (var pid in pids)
             if (!policy.GetAppOutput(pid).Available || !policy.SetAppOutput(pid, endpointId))
-                throw new InvalidOperationException("App output unavailable");
+                throw new AppOutputPolicyException();
         return true;
     });
     public Task SetAppMuteAsync(AppKey app, bool muted) =>

@@ -105,7 +105,7 @@ public sealed class AppVolumeModule(AudioService? audio = null) : IFeatureModule
     {
         if (!CanPickOutput(app)) throw new InvalidOperationException("App output unavailable");
         try { await _audio!.SetAppOutputAsync(app, id); }
-        catch { _routingFailed = true; throw; }
+        catch (AppOutputPolicyException) { _routingFailed = true; throw; }
         _current[app] = new(true, id);
         _seen.Remove(app);
         var choices = new Dictionary<string, string>(Settings.Outputs);
@@ -159,6 +159,11 @@ public sealed class AppVolumeModule(AudioService? audio = null) : IFeatureModule
         foreach (var app in apps.Where(a => a.ExePath is not null && a.Key != AppKey.SystemSounds))
         {
             var choice = await _audio!.GetAppOutputAsync(app.Key);
+            if (!choice.HasSession)
+            {
+                _current.Remove(app.Key); _seen.Remove(app.Key);
+                continue;
+            }
             if (!choice.Available)
             {
                 if (_current.Values.Any(v => v.Available)) _routingFailed = true;
@@ -176,7 +181,7 @@ public sealed class AppVolumeModule(AudioService? audio = null) : IFeatureModule
                 if (!string.Equals(choice.EndpointId, target, StringComparison.OrdinalIgnoreCase))
                 {
                     try { await _audio.SetAppOutputAsync(app.Key, target); _current[app.Key] = new(true, target); }
-                    catch { _routingFailed = true; throw; }
+                    catch (AppOutputPolicyException) { _routingFailed = true; throw; }
                 }
             }
             _seen[app.Key] = signature;

@@ -34,6 +34,46 @@ public sealed class VolumeFixture : IAsyncDisposable
 
 public sealed class VolumeTests
 {
+    // The app closes while its output picker is open, then starts again.
+    [Fact]
+    public async Task A_missing_session_is_distinct_from_an_unsupported_policy_probe()
+    {
+        await using var f = new VolumeFixture(); await f.Start();
+        f.System.EndSession("one"); await f.Audio.RefreshAsync();
+        var missing = await f.Audio.GetAppOutputAsync(VolumeFixture.Key);
+        Assert.False(missing.HasSession);
+        f.System.WithSession(VolumeFixture.Session("again","A",456)); await f.Audio.RefreshAsync();
+        f.System.AppPolicyAvailable = false;
+        var unsupported = await f.Audio.GetAppOutputAsync(VolumeFixture.Key);
+        Assert.True(unsupported.HasSession); Assert.False(unsupported.Available);
+    }
+    [Fact]
+    public async Task App_closing_mid_pick_keeps_the_picker()
+    {
+        await using var f = new VolumeFixture();
+        await f.Start();
+        Assert.True(f.Module.CanPickOutput(VolumeFixture.Key));
+        f.System.EndSession("one");
+        await f.Audio.RefreshAsync();
+        await Assert.ThrowsAsync<InvalidOperationException>(() => f.Module.SetOutputAsync(VolumeFixture.Key, "B"));
+        f.System.WithSession(VolumeFixture.Session("again", "A", 130));
+        await f.Audio.RefreshAsync();
+        await Task.Delay(300);
+        Assert.True(f.Module.DevicePickerAvailable, "picker gone for the session after an app closed");
+    }
+
+    // The chosen output is unplugged between opening the picker and choosing it.
+    [Fact]
+    public async Task Output_unplugged_mid_pick_keeps_the_picker()
+    {
+        await using var f = new VolumeFixture();
+        await f.Start();
+        f.System.Remove("B");
+        await f.Audio.RefreshAsync();
+        await Assert.ThrowsAsync<InvalidOperationException>(() => f.Module.SetOutputAsync(VolumeFixture.Key, "B"));
+        await Task.Delay(300);
+        Assert.True(f.Module.DevicePickerAvailable, "picker gone for the session after an output was unplugged");
+    }
     [Fact]
     public async Task Transport_endpoints_are_never_picker_or_system_control_targets()
     {
@@ -147,7 +187,7 @@ public sealed class VolumeTests
     public async Task Failed_device_write_disables_picker_without_disabling_volume()
     {
         await using var f = new VolumeFixture(); await f.Start(); f.System.AppPolicyFailsWrite=true;
-        await Assert.ThrowsAsync<InvalidOperationException>(()=>f.Module.SetOutputAsync(VolumeFixture.Key,"B"));
+        await Assert.ThrowsAsync<AppOutputPolicyException>(()=>f.Module.SetOutputAsync(VolumeFixture.Key,"B"));
         Assert.False(f.Module.DevicePickerAvailable); Assert.Empty(f.Settings.Value.Outputs);
         await f.Module.SetVolumeAsync(VolumeFixture.Key,0.4f);
         Assert.Equal(0.4f,f.System.SessionById("one").Volume);
