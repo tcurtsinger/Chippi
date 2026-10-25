@@ -89,6 +89,43 @@ internal sealed class RoleArbiter(ILogger logger, TimeProvider time, TimeSpan? b
         }
     }
 
+    /// <summary>
+    /// After Mic processing stops or crashed (architecture §3): every capture role still on the
+    /// marker's cable, and that no remaining claim can take now, goes back to what it replaced or, when that mic is gone, to another real
+    /// mic: one the marker recorded, then <paramref name="preferred"/>, then the first active one.
+    /// Roles someone moved off the cable are left alone, except when <paramref name="cableJustLost"/>:
+    /// then the cable vanished under a live pipeline, and what Windows fell back to goes back to what
+    /// processing replaced. Returns false while a role stays on the cable for want of a real mic, so
+    /// the caller keeps the marker.
+    /// </summary>
+    public bool Recover(Processing.ProcessingMarker marker, string? preferred, DeviceCatalog catalog, IDeviceSystem system, bool cableJustLost = false)
+    {
+        var real = catalog.Active(AudioFlow.Capture).Where(e => !VbCable.IsCable(e)).Select(e => e.Id).ToList();
+        string? Live(string? id) => id is null ? null : real.FirstOrDefault(r => PriorityPolicy.Eq(r, id));
+        var settled = true;
+        foreach (var role in AllRoles)
+        {
+            var key = new RoleKey(AudioFlow.Capture, role);
+            var current = system.GetDefault(AudioFlow.Capture, role);
+            var onCable = PriorityPolicy.Eq(current, marker.CableCaptureId);
+            // A claim defers only when it has a target now: Routing's empty or unplugged list has none.
+            var claimed = _claims.TryGetValue(key, out var owners) && Effective(owners).Claim.Target(catalog.Active(AudioFlow.Capture)) is not null;
+            if (claimed || !(onCable || cableJustLost))
+                continue;
+            var id = Live(marker.Replaced.GetValueOrDefault(role));
+            if (onCable || current is null)
+                id ??= marker.Replaced.Values.Select(Live).FirstOrDefault(r => r is not null) ?? Live(preferred) ?? real.FirstOrDefault();
+            if (id is null)
+            {
+                settled &= !onCable;
+                continue;
+            }
+            if (!PriorityPolicy.Eq(current, id))
+                settled &= Write(id, key, RoleOwner.Processing, "recover", system) || !onCable;
+        }
+        return settled;
+    }
+
     /// <summary>Points every claimed role at its owner's target and reports what it changed.</summary>
     public IReadOnlyList<RoleChange> Enforce(DeviceCatalog catalog, IDeviceSystem system)
     {

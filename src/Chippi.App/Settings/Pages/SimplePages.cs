@@ -43,10 +43,15 @@ internal sealed class AboutPage : UserControl
         var notices = SettingsUi.Button("View");
         AutomationProperties.SetName(notices, "View third-party notices");
         notices.Click += (_, _) => ShowDocument("Third-party notices", ReadNotices());
+        // VB-CABLE's license asks redistributors to name its origin and that it is donationware.
+        var donate = SettingsUi.Button("Donate");
+        AutomationProperties.SetName(donate, "Donate to VB-Audio");
+        donate.Click += (_, _) => System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("https://vb-audio.com/Cable/") { UseShellExecute = true })?.Dispose();
         _page.Children.Add(SettingsUi.Group(product,
             SettingsUi.Row("License", AppInfo.License, license),
             SettingsUi.Row("Privacy", "No telemetry", new FrameworkElement()),
-            SettingsUi.Row("Third-party notices", "", notices)));
+            SettingsUi.Row("Third-party notices", "", notices),
+            SettingsUi.Row("VB-CABLE", "Donationware from www.vb-cable.com", donate)));
         Content = _page;
     }
 

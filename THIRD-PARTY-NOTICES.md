@@ -11,6 +11,14 @@ Chippi uses fonts installed on Windows: Segoe UI Variable (with Segoe UI fallbac
 - Lucide geometry: ISC, including the upstream Feather/MIT notice. Source: https://github.com/lucide-icons/lucide
 - Hopper: theme, icon, tray, logging, config, startup, startup-hardening and audio engine code adapted into Chippi. The original author has authorized GPL-3.0-or-later relicensing for Chippi (phase-1-handoff.md). Hopper's separate repository is unchanged. Source: https://github.com/tcurtsinger/Hopper
 
+## Bundled driver package: VB-CABLE
+
+Chippi ships VB-Audio's VB-CABLE Driver Pack 45 (`vendor\vb-cable\VBCABLE_Driver_Pack45.zip`) unmodified, as its license requires, for Mic processing. It is installed only when the user presses Install Driver, by VB-Audio's own setup. Uninstalling Chippi never removes it. Bundled with VB-Audio's agreement.
+
+- Origin: www.vb-cable.com. Programmed by V. Burel and JS-Loezic, copyright V. Burel 2010-2024, all rights reserved.
+- VB-CABLE is a donationware, all participations are welcome.
+- Licensing: https://vb-audio.com/Services/licensing.htm
+
 ## Runtime NuGet packages
 
 The self-contained app embeds these packages, each MIT licensed, copyright Microsoft Corporation:

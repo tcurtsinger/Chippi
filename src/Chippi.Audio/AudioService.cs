@@ -2,6 +2,7 @@
 // Copyright (C) Chippi contributors
 
 using System.Collections.Concurrent;
+using Chippi.Audio.Processing;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -21,6 +22,9 @@ public sealed class AudioServiceOptions
 
     /// <summary>Sessions of this process are left out of <see cref="AudioSnapshot.Apps"/>.</summary>
     public int OwnProcessId { get; init; } = Environment.ProcessId;
+
+    /// <summary>Builds Mic processing's pipeline. Tests pass a fake; the default captures and renders for real.</summary>
+    public MicPipelineFactory PipelineFactory { get; init; } = MicPipeline.Factory;
 }
 
 /// <summary>
@@ -166,6 +170,35 @@ public sealed class AudioService
     public Task<T> InvokeAsync<T>(Func<IDeviceSystem, T> op) => Run(e => op(e.System));
 
     /// <summary>
+    /// Turns Mic processing on with <paramref name="request"/>, or off with null, and returns where it
+    /// stands after the engine tried. A new request retries after a failure.
+    /// </summary>
+    public Task<ProcessingStatus> SetProcessingAsync(ProcessingRequest? request) =>
+        Run(e =>
+        {
+            e.Processing.Set(request);
+            e.Reconcile();
+            return e.Processing.Status;
+        });
+
+    /// <summary>
+    /// After a crash: capture roles still on the marker's cable go back to what it replaced, or to
+    /// another real mic when that one is gone (roles another owner claims are left to it). Returns
+    /// false while a role stays on the cable because no real mic is active; the engine then keeps
+    /// the marker, retries on every reconcile, and calls <paramref name="save"/>(null) once settled.
+    /// </summary>
+    public Task<bool> RecoverProcessingAsync(ProcessingMarker marker, Action<ProcessingMarker?>? save = null) =>
+        Run(e =>
+        {
+            e.Catalog.Refresh(e.System);
+            var restored = e.Arbiter.Recover(marker, null, e.Catalog, e.System);
+            if (!restored && save is not null)
+                e.Processing.Adopt(marker, save);
+            e.Reconcile();
+            return restored;
+        });
+
+    /// <summary>
     /// Polls peaks for these endpoints and apps until disposed, raising <see cref="MetersChanged"/>.
     /// Nothing polls while no watch is open.
     /// </summary>
@@ -271,6 +304,7 @@ public sealed class AudioService
             _service = service;
             var log = service._logger;
             Arbiter = new RoleArbiter(log, service._options.Time, service._options.RepairBackoff);
+            Processing = new MicPipelineHost(log, service._options.PipelineFactory, op => Enqueue(op), Reconcile);
             Controls = new EndpointControls(log);
             Sessions = new SessionCatalog(service._options.OwnProcessId);
             _debounce = service._options.Time.CreateTimer(_ => Enqueue(Reconcile), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
@@ -287,6 +321,8 @@ public sealed class AudioService
         public EndpointControls Controls { get; }
 
         public SessionCatalog Sessions { get; }
+
+        public MicPipelineHost Processing { get; }
 
         public IDeviceSystem System => _system ?? throw new InvalidOperationException("The audio service couldn't start.", _startError);
 
@@ -321,6 +357,11 @@ public sealed class AudioService
             {
                 _debounce.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
                 _backoffTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+                if (_system is not null)
+                {
+                    try { Processing.Shutdown(Arbiter, Catalog, _system); }
+                    catch (Exception ex) { Log.LogError(ex, "Stopping mic processing failed"); }
+                }
                 _meterTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
                 if (_system is not null)
                 {
@@ -352,6 +393,7 @@ public sealed class AudioService
         {
             var system = System;
             Catalog.Refresh(system);
+            Processing.Update(Arbiter, Catalog, system);
             var changes = Arbiter.Enforce(Catalog, system);
             if (changes.Count > 0)
                 Catalog.RefreshDefaults(system);
@@ -429,7 +471,7 @@ public sealed class AudioService
                 new Dictionary<RoleKey, string>(Catalog.Defaults),
                 Arbiter.Owners,
                 Controls.Levels,
-                Sessions.Apps);
+                Sessions.Apps) { Processing = Processing.Status };
             _service.Publish(snapshot, changes);
         }
 
@@ -474,7 +516,7 @@ public sealed class AudioService
             var appPeaks = apps.ToDictionary(
                 app => app,
                 app => Sessions.SessionsOf(app).Select(s => Peak(() => _system.GetSessionPeak(s.SessionId))).DefaultIfEmpty(0f).Max());
-            var readings = new MeterReadings(endpoints, appPeaks);
+            var readings = new MeterReadings(endpoints, appPeaks, Processing.InputLevel, Processing.OutputLevel);
             _service.Post(() => _service.MetersChanged?.Invoke(_service, readings));
 
             static float Peak(Func<float> read)

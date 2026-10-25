@@ -21,9 +21,11 @@ public readonly record struct RoleKey(AudioFlow Flow, AudioRole Role);
 /// <summary>
 /// An endpoint as Windows lists it. <see cref="Id"/> is the endpoint ID string (compare it
 /// case-insensitively); <see cref="AdapterName"/> is the device it belongs to ("VB-Audio Virtual
-/// Cable", "Realtek(R) Audio") and is display data, never identity.
+/// Cable", "Realtek(R) Audio") and is display data, never identity. <see cref="Filter"/> is the
+/// driver's KS filter the endpoint connects to (<c>{2}.\\?\usb#vid_...#{6994ad04-...}\global</c>): set by
+/// the driver's INF, not renameable, so it identifies a driver's endpoints (<see cref="VbCable"/>).
 /// </summary>
-public sealed record AudioEndpoint(string Id, string Name, AudioFlow Flow, EndpointState State, string AdapterName = "")
+public sealed record AudioEndpoint(string Id, string Name, AudioFlow Flow, EndpointState State, string AdapterName = "", string Filter = "")
 {
     public bool IsActive => State == EndpointState.Active;
 }
@@ -99,7 +101,8 @@ public enum RoleChangeKind
 public sealed record RoleChange(AudioFlow Flow, IReadOnlyList<AudioRole> Roles, string EndpointId, RoleOwner Owner, RoleChangeKind Kind);
 
 /// <summary>Peaks (0 to 1) for the endpoints and apps a meter watcher asked for.</summary>
-public sealed record MeterReadings(IReadOnlyDictionary<string, float> Endpoints, IReadOnlyDictionary<AppKey, float> Apps);
+/// <remarks><paramref name="ProcessingInput"/> and <paramref name="ProcessingOutput"/> are Mic processing's raw and cleaned peaks, 0 when it isn't live.</remarks>
+public sealed record MeterReadings(IReadOnlyDictionary<string, float> Endpoints, IReadOnlyDictionary<AppKey, float> Apps, float ProcessingInput = 0, float ProcessingOutput = 0);
 
 /// <summary>Picks the endpoint a claimed role should point at, from the flow's active endpoints. Null leaves Windows alone.</summary>
 public delegate string? RoleTarget(IReadOnlyList<AudioEndpoint> active);

@@ -28,6 +28,10 @@ public static class Program
                 catch (Exception) { }
                 try { new ExplorerRegistration().SetEnabled(false); } catch (Exception) { }
                 Notifications.ClassicToastPresenter.Uninstall();
+                // A crash can leave CABLE Output as the default mic; uninstall puts the real one back.
+                // VB-CABLE itself is never removed.
+                try { Chippi.Features.Sound.Processing.MicProcessingModule.RestoreOnUninstall(System.IO.Path.Combine(Chippi.Core.Modules.ModuleServices.DefaultDataRoot, Chippi.Features.Sound.Processing.MicProcessingModule.Id)); }
+                catch (Exception) { }
             })
             .Run();
 

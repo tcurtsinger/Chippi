@@ -45,7 +45,7 @@ public sealed class CoreAudioDeviceSystem : IDeviceSystem, IMMNotificationClient
         {
             var id = device.ID;
             var state = (EndpointState)device.State;
-            list.Add(new AudioEndpoint(id, Read(() => device.FriendlyName) ?? id, flow, state, Read(() => device.DeviceFriendlyName) ?? ""));
+            list.Add(new AudioEndpoint(id, Read(() => device.FriendlyName) ?? id, flow, state, Read(() => device.DeviceFriendlyName) ?? "", Filter(device)));
 
             if (state == EndpointState.Active && !_active.ContainsKey(id))
                 Track(id, device);
@@ -250,6 +250,24 @@ public sealed class CoreAudioDeviceSystem : IDeviceSystem, IMMNotificationClient
             return "App";
         var description = Read(() => FileVersionInfo.GetVersionInfo(exePath).FileDescription);
         return string.IsNullOrWhiteSpace(description) ? Path.GetFileNameWithoutExtension(exePath) : description;
+    }
+
+    // The KS filter on the other side of the endpoint's connector, e.g.
+    // {2}.\\?\usb#vid_19f7&pid_001c&mi_00#9&ca801cc&0&0000#{6994ad04-93ef-11d0-a3cc-00a0c9223196}\global.
+    private static string Filter(MMDevice device)
+    {
+        try
+        {
+            var topology = device.DeviceTopology;
+            for (uint i = 0; i < topology.ConnectorCount; i++)
+            {
+                var connector = topology.GetConnector(i);
+                if (connector.IsConnected)
+                    return connector.ConnectedToDeviceId;
+            }
+        }
+        catch (Exception ex) when (ex is COMException or InvalidCastException) { }
+        return "";
     }
 
     private static string? Read(Func<string?> read)

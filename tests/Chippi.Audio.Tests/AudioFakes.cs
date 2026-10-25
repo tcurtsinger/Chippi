@@ -47,6 +47,40 @@ public sealed class FakeDeviceSystem : IDeviceSystem
 
     public static AudioEndpoint Mic(string id, string? name = null) => new(id, name ?? id, AudioFlow.Capture, EndpointState.Active);
 
+    /// <summary>The KS device VB-CABLE's endpoints hang off (root-enumerated, as its INF installs it).</summary>
+    public const string CableDevice = @"{2}.\\?\root#media#0000#{6994ad04-93ef-11d0-a3cc-00a0c9223196}";
+
+    /// <summary>VB-CABLE's render endpoint, with the reference string from vbMmeCable64_win10.inf.</summary>
+    public static AudioEndpoint CableInput(string id = "CableIn", string device = CableDevice) =>
+        new(id, "CABLE Input", AudioFlow.Render, EndpointState.Active, "VB-Audio Virtual Cable", device + @"\vbaudiovacwdm2022_out1_topo_e51a78a01fb100001");
+
+    /// <summary>VB-CABLE's capture endpoint, the one apps record from.</summary>
+    public static AudioEndpoint CableOutput(string id = "CableOut", string device = CableDevice) =>
+        new(id, "CABLE Output", AudioFlow.Capture, EndpointState.Active, "VB-Audio Virtual Cable", device + @"\vbaudiovacwdm2022_in1_topo_e51a78a01fb200001");
+
+    /// <summary>An endpoint is turned on or off in Sound settings, or unplugged.</summary>
+    public void SetState(string id, EndpointState state)
+    {
+        lock (_gate)
+        {
+            var i = _endpoints.FindIndex(e => e.Id == id);
+            _endpoints[i] = _endpoints[i] with { State = state };
+        }
+        Raise(DeviceChange.Devices);
+    }
+
+    /// <summary>A driver is uninstalled: its endpoints are gone from every list.</summary>
+    public void Remove(params string[] ids)
+    {
+        lock (_gate)
+        {
+            _endpoints.RemoveAll(e => ids.Contains(e.Id));
+            foreach (var key in _defaults.Where(d => ids.Contains(d.Value)).Select(d => d.Key).ToList())
+                _defaults.Remove(key);
+        }
+        Raise(DeviceChange.Devices);
+    }
+
     public FakeDeviceSystem With(params AudioEndpoint[] endpoints)
     {
         lock (_gate)
@@ -247,4 +281,60 @@ public sealed class ManualClock : TimeProvider
     public override DateTimeOffset GetUtcNow() => _now;
 
     public void Advance(TimeSpan by) => _now += by;
+}
+
+/// <summary>Records every pipeline the engine builds instead of capturing or rendering anything.</summary>
+public sealed class FakePipelines
+{
+    private readonly Lock _gate = new();
+    private readonly List<FakePipeline> _created = [];
+
+    /// <summary>Source IDs whose pipeline throws on Start.</summary>
+    public HashSet<string> FailOnStart { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+    public IReadOnlyList<FakePipeline> Created
+    {
+        get { lock (_gate) return _created.ToList(); }
+    }
+
+    public FakePipeline? Live => Created.LastOrDefault(p => p.Started && !p.Disposed);
+
+    public Chippi.Audio.Processing.MicPipelineFactory Factory => (source, sink, settings) =>
+    {
+        var pipeline = new FakePipeline(source, sink, settings, FailOnStart.Contains(source));
+        lock (_gate)
+            _created.Add(pipeline);
+        return pipeline;
+    };
+}
+
+public sealed class FakePipeline(string source, string sink, Chippi.Audio.Processing.MicSettings settings, bool failOnStart) : Chippi.Audio.Processing.IMicPipeline
+{
+    public string Source { get; } = source;
+
+    public string Sink { get; } = sink;
+
+    public Chippi.Audio.Processing.MicSettings Settings { get; } = settings;
+
+    public bool Started { get; private set; }
+
+    public bool Disposed { get; private set; }
+
+    public float InputLevel { get; set; } = 0.3f;
+
+    public float OutputLevel { get; set; } = 0.2f;
+
+    public event Action<Exception?>? Failed;
+
+    public void Start()
+    {
+        if (failOnStart)
+            throw new InvalidOperationException("Device in use");
+        Started = true;
+    }
+
+    /// <summary>The device went away under a running stream.</summary>
+    public void Fail(string message) => Failed?.Invoke(new InvalidOperationException(message));
+
+    public void Dispose() => Disposed = true;
 }
