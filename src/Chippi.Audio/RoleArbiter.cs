@@ -14,13 +14,15 @@ namespace Chippi.Audio;
 /// Every enforce compares the target with the default Windows reports now, so the notification
 /// echo of our own write finds nothing to do and is never counted as someone else's change.
 /// </remarks>
-internal sealed class RoleArbiter(ILogger logger, TimeProvider time)
+internal sealed class RoleArbiter(ILogger logger, TimeProvider time, TimeSpan? backoff = null)
 {
     // Fights with other software that also enforces defaults: after this many repairs of one role
     // inside the window, stop repairing it for the back-off period (brief §2) and log it.
     internal const int MaxRepairs = 3;
     internal static readonly TimeSpan RepairWindow = TimeSpan.FromSeconds(10);
     internal static readonly TimeSpan BackoffPeriod = TimeSpan.FromSeconds(60);
+
+    private readonly TimeSpan _backoff = backoff ?? BackoffPeriod;
 
     private static readonly AudioRole[] AllRoles = [AudioRole.Console, AudioRole.Multimedia, AudioRole.Communications];
 
@@ -36,6 +38,9 @@ internal sealed class RoleArbiter(ILogger logger, TimeProvider time)
     private readonly Dictionary<RoleKey, (RoleOwner Owner, string Target)> _last = [];
     private readonly Dictionary<RoleKey, List<DateTimeOffset>> _repairs = [];
     private readonly Dictionary<RoleKey, DateTimeOffset> _backoffUntil = [];
+
+    /// <summary>When the earliest back-off ends, or null. The engine reconciles then, so a role isn't left wrong until the next device event.</summary>
+    public DateTimeOffset? BackoffEnds => _backoffUntil.Count == 0 ? null : _backoffUntil.Values.Min();
 
     public IReadOnlyDictionary<RoleKey, RoleOwner> Owners =>
         _claims.Where(c => c.Value.Count > 0).ToDictionary(c => c.Key, c => Effective(c.Value).Owner);
@@ -154,10 +159,10 @@ internal sealed class RoleArbiter(ILogger logger, TimeProvider time)
         times.RemoveAll(t => now - t > RepairWindow);
         if (times.Count >= MaxRepairs)
         {
-            _backoffUntil[key] = now + BackoffPeriod;
+            _backoffUntil[key] = now + _backoff;
             times.Clear();
             logger.LogWarning("Default {Flow} {Role} repaired {Count} times in {Window}s; something else keeps changing it. Not repairing for {Backoff}s",
-                key.Flow, key.Role, MaxRepairs, RepairWindow.TotalSeconds, BackoffPeriod.TotalSeconds);
+                key.Flow, key.Role, MaxRepairs, RepairWindow.TotalSeconds, _backoff.TotalSeconds);
             return false;
         }
         times.Add(now);

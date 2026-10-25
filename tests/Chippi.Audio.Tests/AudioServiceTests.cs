@@ -146,6 +146,65 @@ public sealed class AudioServiceTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task A_role_in_back_off_is_repaired_when_the_back_off_ends_without_a_new_event()
+    {
+        // Karl's S1 review probe: three repairs, a fourth external change, then no further event.
+        AudioRole[] mm = [AudioRole.Multimedia];
+        var service = new AudioService(() => _sys, null, options: new AudioServiceOptions
+        {
+            Debounce = TimeSpan.FromMilliseconds(10),
+            RepairBackoff = TimeSpan.FromMilliseconds(300),
+        });
+        _sys.With(Mic("Preferred"), Mic("Other")).WithDefault("Preferred");
+        var lease = service.Acquire();
+        await service.ClaimRolesAsync(RoleOwner.Routing, AudioFlow.Capture, mm, List("Preferred"));
+
+        for (var i = 0; i < RoleArbiter.MaxRepairs; i++)
+        {
+            _sys.ChangeDefault("Other", mm);
+            await WaitUntil(() => _sys.DefaultOf(AudioFlow.Capture, AudioRole.Multimedia) == "Preferred");
+        }
+        _sys.ChangeDefault("Other", mm);
+        await Task.Delay(100);
+        Assert.Equal("Other", _sys.DefaultOf(AudioFlow.Capture, AudioRole.Multimedia));
+
+        await WaitUntil(() => _sys.DefaultOf(AudioFlow.Capture, AudioRole.Multimedia) == "Preferred");
+        await lease.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task A_failed_start_reaches_the_caller_and_a_later_command_recovers()
+    {
+        var broken = true;
+        var service = new AudioService(() => broken ? throw new InvalidOperationException("Core Audio unavailable") : _sys, null);
+        _sys.With(Speaker("A"));
+        var lease = service.Acquire();
+
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(service.RefreshAsync);
+        Assert.Equal("Core Audio unavailable", error.InnerException?.Message);
+        Assert.False(service.IsRunning);
+
+        broken = false;
+        await service.ClaimRolesAsync(RoleOwner.Routing, AudioFlow.Render, All, List("A"));
+        Assert.True(service.IsRunning);
+        Assert.Equal("A", service.Snapshot.Default(AudioFlow.Render, AudioRole.Multimedia));
+        await lease.DisposeAsync();
+        Assert.True(_sys.IsDisposed);
+    }
+
+    [Fact]
+    public async Task A_start_that_keeps_failing_fails_every_command()
+    {
+        var service = new AudioService(() => throw new InvalidOperationException("Core Audio unavailable"), null);
+        var lease = service.Acquire();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(service.RefreshAsync);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.ClaimRolesAsync(RoleOwner.Routing, AudioFlow.Render, All, List("A")));
+        Assert.False(service.IsRunning);
+        await lease.DisposeAsync();
+    }
+
+    [Fact]
     public async Task Events_are_posted_to_the_given_context()
     {
         var context = new RecordingContext();

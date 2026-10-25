@@ -14,6 +14,9 @@ public sealed class AudioServiceOptions
 
     public TimeSpan MeterInterval { get; init; } = TimeSpan.FromMilliseconds(50);
 
+    /// <summary>How long a role is left alone after 3 repairs in 10 s (a fight with other software).</summary>
+    public TimeSpan RepairBackoff { get; init; } = TimeSpan.FromSeconds(60);
+
     public TimeProvider Time { get; init; } = TimeProvider.System;
 
     /// <summary>Sessions of this process are left out of <see cref="AudioSnapshot.Apps"/>.</summary>
@@ -57,7 +60,7 @@ public sealed class AudioService
 
     public bool IsRunning
     {
-        get { lock (_gate) return _engine is not null; }
+        get { lock (_gate) return _engine is { Failed: false }; }
     }
 
     public event EventHandler<AudioSnapshot>? SnapshotChanged;
@@ -68,7 +71,11 @@ public sealed class AudioService
     /// <summary>Raised every meter interval while at least one <see cref="WatchMeters"/> is open.</summary>
     public event EventHandler<MeterReadings>? MetersChanged;
 
-    /// <summary>Starts the engine on the first lease. Dispose the lease to give it back; the last one stops the engine.</summary>
+    /// <summary>
+    /// Starts the engine on the first lease. Dispose the lease to give it back; the last one stops the
+    /// engine. If the device system can't be created, commands fail with that error and
+    /// <see cref="IsRunning"/> is false; the next lease or command tries to start again.
+    /// </summary>
     public IAsyncDisposable Acquire()
     {
         lock (_gate)
@@ -77,6 +84,10 @@ public sealed class AudioService
             {
                 _engine = new Engine(this);
                 _engine.Start();
+            }
+            else
+            {
+                CurrentEngine();
             }
         }
         return new Lease(this);
@@ -162,7 +173,7 @@ public sealed class AudioService
     {
         Engine engine;
         lock (_gate)
-            engine = _engine ?? throw new InvalidOperationException("The audio service isn't running.");
+            engine = CurrentEngine() ?? throw new InvalidOperationException("The audio service isn't running.");
         return engine.Watch(endpointIds, apps);
     }
 
@@ -170,10 +181,22 @@ public sealed class AudioService
     {
         Engine? engine;
         lock (_gate)
-            engine = _engine;
+            engine = CurrentEngine();
         return engine is null
             ? Task.FromException<T>(new InvalidOperationException("The audio service isn't running."))
             : engine.Invoke(op);
+    }
+
+    // Caller holds _gate. An engine whose device system failed to start is replaced, so a later
+    // lease or command retries instead of failing forever.
+    private Engine? CurrentEngine()
+    {
+        if (_engine is not { Failed: true } failed)
+            return _engine;
+        _engine = new Engine(this);
+        _engine.Start();
+        _ = failed.StopAsync();
+        return _engine;
     }
 
     private async ValueTask ReleaseAsync()
@@ -235,8 +258,10 @@ public sealed class AudioService
         private readonly TaskCompletionSource _stopped = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly ITimer _debounce;
         private readonly ITimer _meterTimer;
+        private readonly ITimer _backoffTimer;
         private readonly List<MeterWatch> _watches = [];
         private IDeviceSystem? _system;
+        private volatile Exception? _startError;
         private int _lightQueued;
         private int _meterQueued;
         private long _version;
@@ -245,11 +270,12 @@ public sealed class AudioService
         {
             _service = service;
             var log = service._logger;
-            Arbiter = new RoleArbiter(log, service._options.Time);
+            Arbiter = new RoleArbiter(log, service._options.Time, service._options.RepairBackoff);
             Controls = new EndpointControls(log);
             Sessions = new SessionCatalog(service._options.OwnProcessId);
             _debounce = service._options.Time.CreateTimer(_ => Enqueue(Reconcile), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
             _meterTimer = service._options.Time.CreateTimer(_ => OnMeterTick(), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+            _backoffTimer = service._options.Time.CreateTimer(_ => Enqueue(Reconcile), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
             _thread = new Thread(Loop) { IsBackground = true, Name = "Chippi.Audio" };
             _thread.SetApartmentState(ApartmentState.MTA);
         }
@@ -262,7 +288,10 @@ public sealed class AudioService
 
         public SessionCatalog Sessions { get; }
 
-        public IDeviceSystem System => _system ?? throw new InvalidOperationException("No audio device system.");
+        public IDeviceSystem System => _system ?? throw new InvalidOperationException("The audio service couldn't start.", _startError);
+
+        /// <summary>The device system couldn't be created; commands fail with its error until the engine is replaced.</summary>
+        public bool Failed => _startError is not null;
 
         private ILogger Log => _service._logger;
 
@@ -271,7 +300,16 @@ public sealed class AudioService
             _thread.Start();
             Enqueue(() =>
             {
-                _system = _service._createSystem();
+                try
+                {
+                    _system = _service._createSystem();
+                }
+                catch (Exception ex)
+                {
+                    Log.LogError(ex, "The audio device system couldn't start");
+                    _startError = ex;
+                    return;
+                }
                 _system.Changed += OnChanged;
                 Reconcile();
             });
@@ -282,6 +320,7 @@ public sealed class AudioService
             Enqueue(() =>
             {
                 _debounce.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+                _backoffTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
                 _meterTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
                 if (_system is not null)
                 {
@@ -311,12 +350,12 @@ public sealed class AudioService
         /// <summary>Re-reads devices, enforces role claims, then publishes. Device events land here after the debounce.</summary>
         public void Reconcile()
         {
-            if (_system is null)
-                return;
-            Catalog.Refresh(_system);
-            var changes = Arbiter.Enforce(Catalog, _system);
+            var system = System;
+            Catalog.Refresh(system);
+            var changes = Arbiter.Enforce(Catalog, system);
             if (changes.Count > 0)
-                Catalog.RefreshDefaults(_system);
+                Catalog.RefreshDefaults(system);
+            ScheduleBackoffRecheck();
             Read();
             Publish(changes);
         }
@@ -325,8 +364,6 @@ public sealed class AudioService
         public void RefreshLevels()
         {
             Volatile.Write(ref _lightQueued, 0);
-            if (_system is null)
-                return;
             Read();
             Publish([]);
         }
@@ -359,6 +396,15 @@ public sealed class AudioService
                 if (_watches.Remove(watch) && _watches.Count == 0)
                     SetMeterTimer(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
             }
+        }
+
+        // A role in back-off is repaired again only by a reconcile, so one is scheduled for when it ends.
+        private void ScheduleBackoffRecheck()
+        {
+            if (Arbiter.BackoffEnds is not { } end)
+                return;
+            var due = end - _service._options.Time.GetUtcNow();
+            _backoffTimer.Change(due > TimeSpan.Zero ? due : TimeSpan.Zero, Timeout.InfiniteTimeSpan);
         }
 
         private void SetMeterTimer(TimeSpan due, TimeSpan period)
@@ -467,6 +513,7 @@ public sealed class AudioService
             {
                 _debounce.Dispose();
                 _meterTimer.Dispose();
+                _backoffTimer.Dispose();
                 _queue.Dispose();
                 _stopped.TrySetResult();
             }
