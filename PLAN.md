@@ -18,7 +18,7 @@ and [Mouzi](https://github.com/hsr88/mouzi) (Downloads organizer). Absorbs
 | License | GPL-3.0-or-later |
 | Audience | Public open-source release (GitHub releases, installer, auto-update) |
 | Look | Native Windows 11 (2026-10-23): neutral grays, one flat accent (Follow Windows by default, or Blue, Violet, Green, Pink), Segoe UI Variable, a panel-first flyout. It replaced Direction A "Studio Rack" after the [UI/UX audit](docs/phase-1-2-ui-ux-audit.md). See [DESIGN.md](DESIGN.md) |
-| Island | A movable tab docked on the top (default), left or right screen edge that opens on hover: media, timers, downloads, notifications, AI agent usage, plus each feature's island panel (2026-10-23) |
+| Island | A movable tab docked on the top (default), left or right screen edge; opens on click to a grid of tiles, each opening its own page (2026-10-25) |
 | Pet | Gumdrop, a blob with a face in the Synth gradient that lives in the island. See DESIGN.md §7 |
 | Mouzi | Rebuilt from scratch with the same functionality. Its code is reference only |
 | vorssaint | Feature list and behavior are the spec. We do not port its code |
@@ -77,7 +77,7 @@ Brief: [docs/ui-refresh-handoff.md](docs/ui-refresh-handoff.md). Moves the shell
 - Restyled controls, grouped cards, no gradients except Gumdrop
 - Panel-first flyout: icon tab strip, Keep awake and Tidy panels
 - Settings sidebar with search and installed features; Add features replaces the Features hub
-- Movable island: a tab the user drags to the top (default), left or right edge, which opens on click, grid of tiles
+- Movable island: a tab the user drags to the top (default), left or right edge, which opens on hover
 
 ### Phase 3: Sound
 - Audio routing from Hopper: output priority switching, mic pinning, mic processing
