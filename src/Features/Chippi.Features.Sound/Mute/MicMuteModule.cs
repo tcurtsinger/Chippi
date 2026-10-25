@@ -69,7 +69,7 @@ public sealed class MicMuteModule : IFeatureModule
             ct.ThrowIfCancellationRequested();
             _hotkey = _createHotkey();
             ShortcutError = _hotkey.Register(Settings.Shortcut, OnHotkey) ? null : "Shortcut in use";
-            _tile = context.Ui.AddIslandTile(new("sound.microphone", "Microphone", "MicOff", 30, 20,
+            _tile = context.Ui.AddIslandTile(new("sound.microphone", "Microphone", "Mic", 30, 20,
                 () => new MicMuteView(this, compact: true)) { StatusPriority = 100 });
             context.Ui.AddFlyoutSection("sound", "Sound", "AudioLines", 30, () => new MicMuteView(this, compact: true));
             context.Ui.SetSettingsPage(() => new MicMuteView(this));

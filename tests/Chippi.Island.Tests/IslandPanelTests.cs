@@ -4,6 +4,7 @@
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Media;
 using System.Windows.Threading;
 using Chippi.App.Island;
 using Chippi.App.Island.Media;
@@ -11,6 +12,7 @@ using Chippi.App.Pet;
 using Chippi.Core.Config;
 using Chippi.Core.Island;
 using Chippi.Core.Modules;
+using Chippi.UI.Controls;
 
 namespace Chippi.Island.Tests;
 
@@ -184,6 +186,41 @@ public sealed class IslandPanelTests
             Assert.Equal(440, ((FrameworkElement)panel.FindName("Shape")).Width, 3);
         }, Tiles(Part("sound.microphone", "Microphone", 30, status: "Muted"))));
     }
+
+    [Fact]
+    public void The_microphone_tile_shows_mic_off_only_while_the_mute_shortcut_has_it_muted()
+    {
+        var mute = new IslandTileContribution("mic-mute", new IslandTileSpec("sound.microphone", "Microphone", "Mic", 30, 20, () => new Border()) { StatusPriority = 100 });
+        WpfTestThread.Run(() => WithPanel(panel =>
+        {
+            Open(panel);
+            Assert.Same(LucideIcons.Mic, TileIcon(panel, "sound.microphone"));
+
+            var stopped = new IslandActivity("stopped", IslandActivityKind.Status, "Stopped", "Microphone") { NeedsAttention = true, TileKey = "sound.microphone", ModuleId = "mic-processing" };
+            panel.SetActivities([stopped], PetMood.Idle);
+            Assert.Same(LucideIcons.Mic, TileIcon(panel, "sound.microphone"));
+
+            var muted = new IslandActivity("muted", IslandActivityKind.Status, "Muted", "Microphone") { NeedsAttention = true, TileKey = "sound.microphone", ModuleId = "mic-mute" };
+            panel.SetActivities([stopped, muted], PetMood.Idle);
+            Assert.Same(LucideIcons.MicOff, TileIcon(panel, "sound.microphone"));
+            Assert.Same(panel.FindResource("WarningBrush"), TileGlyph(panel, "sound.microphone").Brush);
+
+            panel.SetActivities([], PetMood.Idle);
+            Assert.Same(LucideIcons.Mic, TileIcon(panel, "sound.microphone"));
+        }, Tiles(mute)));
+    }
+
+    private static Geometry TileIcon(IslandPanelWindow panel, string key) => TileGlyph(panel, key).Data!;
+
+    private static LucideIcon TileGlyph(IslandPanelWindow panel, string key)
+    {
+        var tile = Grid(panel).Buttons().Single(b => (string)b.Tag == key);
+        tile.ApplyTemplate();
+        return Descendants(tile).OfType<LucideIcon>().Single();
+    }
+
+    private static IEnumerable<object> Descendants(object parent) =>
+        parent is DependencyObject d ? LogicalTreeHelper.GetChildren(d).Cast<object>().SelectMany(c => Descendants(c).Prepend(c)) : [];
 
     [Fact]
     public void The_orbit_buttons_count_as_the_island_for_outside_clicks()

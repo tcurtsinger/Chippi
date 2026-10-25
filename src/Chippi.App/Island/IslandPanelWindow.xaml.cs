@@ -340,7 +340,8 @@ public partial class IslandPanelWindow : Window
         foreach (var group in _groups.Where(g => g.Key != NowPlayingKey))
         {
             var live = LiveOn(group.Key);
-            tiles.Add(new(group.Key, group.Name, LucideIcons.Get(group.Icon), group.Status, live is not null, live?.NeedsAttention == true));
+            bool muted = _activities.Any(a => a.ModuleId == "mic-mute" && a.NeedsAttention && a.TileKey == group.Key);
+            tiles.Add(new(group.Key, group.Name, muted ? LucideIcons.MicOff : LucideIcons.Get(group.Icon), group.Status, live is not null, live?.NeedsAttention == true, muted));
         }
         _grid.SetTiles(tiles);
     }
