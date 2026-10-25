@@ -35,9 +35,10 @@ internal sealed class IslandPlacementEventArgs(IslandEdge edge, double place, HM
 /// The island's docked tab (DESIGN.md §5 Island, §9), and the controller for the open island and
 /// the drag. Every window here never activates (WS_EX_NOACTIVATE plus WM_MOUSEACTIVATE) and never
 /// shows in Alt+Tab or the taskbar, and is placed in physical pixels on the monitor it is given.
-/// Hovering opens the island after 150ms and it closes 250ms after the pointer leaves both; a press
-/// that moves 4px drags the tab to another edge. <see cref="IslandHost"/> feeds it activities, the
-/// mood, the monitor, the saved edge and place, and whether to hide.
+/// Hovering only swells the tab; a click opens the island, and it stays open until a click outside
+/// it, Esc or another click on the tab. A press that moves 4px drags the tab to another edge.
+/// <see cref="IslandHost"/> feeds it activities, the mood, the monitor, the saved edge and place,
+/// and whether to hide.
 /// </summary>
 public partial class IslandWindow : Window
 {
@@ -47,15 +48,12 @@ public partial class IslandWindow : Window
     private const double GlyphGap = 4;
     private const uint VK_ESCAPE = 0x1B;
 
-    private static readonly TimeSpan HoverDelay = TimeSpan.FromMilliseconds(150);
-    private static readonly TimeSpan CloseDelay = TimeSpan.FromMilliseconds(250);
+    private static readonly TimeSpan SwellTime = TimeSpan.FromMilliseconds(120);
     private static readonly TimeSpan SlideTime = TimeSpan.FromMilliseconds(180);
 
     private readonly IslandPanelWindow _panel = new();
     private readonly IslandOverlay _bubble = IslandOverlay.Bubble();
     private readonly IslandOverlay _line = IslandOverlay.Line();
-    private readonly DispatcherTimer _hoverTimer;
-    private readonly DispatcherTimer _leaveTimer;
     private IReadOnlyList<IslandActivity> _activities = [];
     private PetMood _mood = PetMood.Sleepy;
     private IslandEdge _edge = IslandEdge.Top;
@@ -64,78 +62,42 @@ public partial class IslandWindow : Window
     private bool _enabled = true;
     private bool _suppressed;
     private bool _hovered;
-    private bool _waitForLeave; // closed under the pointer: no hover-open until it leaves the tab
-    private bool _reopenOnEnter; // shrinking because the pointer left: coming back grows it again
-    private readonly HOOKPROC _onKeyboard; // kept alive for as long as the hook exists
+    private readonly HOOKPROC _onKeyboard; // both kept alive for as long as their hook exists
+    private readonly HOOKPROC _onMouse;
     private UnhookWindowsHookExSafeHandle? _escapeHook;
+    private UnhookWindowsHookExSafeHandle? _clickHook;
     private HWND _hwnd;
     private HMONITOR _monitor;
     private Point? _pressAt;
     private bool _dragging;
     private EventHandler? _slideFrame;
+    private EventHandler? _swellFrame;
+    private Size _tabSize; // drawn now
+    private IslandEdge _tabEdge; // the edge it was drawn for
+    private Size _tabTarget; // where the swell is heading
 
     public IslandWindow()
     {
         InitializeComponent();
         _onKeyboard = OnKeyboard;
-
-        // Both timers are one-shot.
-        _hoverTimer = new DispatcherTimer { Interval = HoverDelay };
-        _hoverTimer.Tick += (_, _) =>
-        {
-            _hoverTimer.Stop();
-            if (Tab.IsMouseOver && _pressAt is null && !_waitForLeave)
-                OpenIsland();
-        };
-        _leaveTimer = new DispatcherTimer { Interval = CloseDelay };
-        _leaveTimer.Tick += (_, _) =>
-        {
-            _leaveTimer.Stop();
-            // The island grows over the tab, so the pointer can be on it before its window sees a move.
-            if (Tab.IsMouseOver || _panel.IsMouseOver || _panel.Covers(IslandNative.Cursor()) || DebugMenu.IsOpen)
-                return; // leaving again restarts this
-            if (Mouse.Captured is not null)
-            {
-                _leaveTimer.Start(); // a list or menu inside the island is open
-                return;
-            }
-            CloseIsland();
-            _reopenOnEnter = true;
-        };
+        _onMouse = OnMouse;
 
         Tab.MouseEnter += (_, _) =>
         {
             _hovered = true;
-            _leaveTimer.Stop();
-            if (!_panel.IsOpen && _pressAt is null && !_waitForLeave)
-                _hoverTimer.Start();
             RefreshTab();
         };
         Tab.MouseLeave += (_, _) =>
         {
             _hovered = false;
-            _waitForLeave = false;
-            _hoverTimer.Stop();
-            if (_panel.IsOpen)
-                _leaveTimer.Start();
             RefreshTab();
         };
-        _panel.MouseEnter += (_, _) =>
-        {
-            _leaveTimer.Stop();
-            // Back on the shape while it shrinks after the pointer left: it grows again.
-            if (_reopenOnEnter && !_panel.IsOpen && _panel.IsVisible && _pressAt is null)
-                OpenIsland();
-        };
-        _panel.MouseLeave += (_, _) => _leaveTimer.Start();
-        // The tab stays large until the island has shrunk back into it.
+        // The tab stays swollen until the island has shrunk back into it.
         _panel.IsVisibleChanged += (_, _) =>
         {
-            // The pointer left while the island still covered the tab, so the tab never saw it.
-            if (!_panel.IsVisible && Area is { } area && !Home(area).Contains(IslandNative.Cursor()))
-                _waitForLeave = false;
-            if (!_panel.IsVisible)
-                _reopenOnEnter = false;
+            // The island covered the tab, so the tab never saw the pointer come or go.
+            if (!_panel.IsVisible && Area is { } area)
+                _hovered = Grown(area).Contains(IslandNative.Cursor());
             RefreshTab();
         };
         _panel.TabPressed += OnPress;
@@ -153,11 +115,6 @@ public partial class IslandWindow : Window
                 return;
             DebugMenu.IsOpen = true;
             e.Handled = true;
-        };
-        DebugMenu.Closed += (_, _) =>
-        {
-            if (_panel.IsOpen)
-                _leaveTimer.Start();
         };
         DpiChanged += (_, _) => Dispatcher.BeginInvoke(DispatcherPriority.Render, Place);
 
@@ -279,8 +236,6 @@ public partial class IslandWindow : Window
         }
         else if (!visible && IsVisible)
         {
-            _hoverTimer.Stop();
-            _leaveTimer.Stop();
             DebugMenu.IsOpen = false;
             if (_pressAt is not null)
                 Tab.ReleaseMouseCapture(); // ends a drag: OnLostCapture
@@ -291,26 +246,30 @@ public partial class IslandWindow : Window
 
     private MonitorArea? Area => IslandNative.Area(_monitor);
 
-    /// <summary>The tab window's rectangle at its saved edge and place: sized to the live tab, flat side on the edge.</summary>
-    private Rect Home(MonitorArea area)
+    /// <summary>The tab window's rectangle at its saved edge and place: sized to the swollen live tab, flat side on the edge.</summary>
+    private Rect Home(MonitorArea area) => TabAt(area, live: true);
+
+    /// <summary>The swollen tab as it is drawn now, in physical pixels: what the island grows out of and shrinks back into.</summary>
+    private Rect Grown(MonitorArea area) => TabAt(area, live: _activities.Count > 0);
+
+    private Rect TabAt(MonitorArea area, bool live)
     {
         var edge = IslandGeometry.Docked(_edge, area.Monitor, area.Work);
         var anchor = IslandGeometry.Anchor(edge, _place, area.Monitor, area.Work, area.Scale);
-        var size = IslandGeometry.TabSize(edge, large: true);
+        var size = IslandGeometry.TabSize(edge, live, swollen: true);
         return IslandGeometry.TabRect(edge, anchor, new Size(size.Width * area.Scale, size.Height * area.Scale));
     }
 
-    /// <summary>Puts the tab at home on its monitor (and the open island beside it), and re-asserts topmost.</summary>
+    /// <summary>Puts the tab at home on its monitor (and the open island around it), and re-asserts topmost.</summary>
     private void Place()
     {
         if (_hwnd == default || _dragging || Area is not { } area)
             return;
         StopSlide();
         ApplyEdgeLayout(IslandGeometry.Docked(_edge, area.Monitor, area.Work));
-        var home = Home(area);
-        IslandNative.Move(_hwnd, home);
+        IslandNative.Move(_hwnd, Home(area));
         if (_panel.IsOpen)
-            _panel.Open(_docked, home, area);
+            _panel.Open(_docked, Grown(area), area);
     }
 
     private nint WndProc(nint hwnd, int msg, nint wParam, nint lParam, ref bool handled)
@@ -340,6 +299,34 @@ public partial class IslandWindow : Window
     // A lambda: CloseIsland's optional parameter turns a method group into Action<bool>, which throws.
     internal void Escape() => Dispatcher.BeginInvoke(() => CloseIsland());
 
+    /// <summary>
+    /// A click anywhere off the island closes it. It never activates, so it can't lose focus to see
+    /// that; a low-level mouse hook watches for presses while it is open, and always passes them
+    /// on: the click still reaches the app under the pointer.
+    /// </summary>
+    private unsafe LRESULT OnMouse(int code, WPARAM wParam, LPARAM lParam)
+    {
+        uint message = (uint)wParam.Value;
+        if (code >= 0 && message is PInvoke.WM_LBUTTONDOWN or PInvoke.WM_RBUTTONDOWN or PInvoke.WM_MBUTTONDOWN or PInvoke.WM_XBUTTONDOWN)
+        {
+            var at = ((MSLLHOOKSTRUCT*)lParam.Value)->pt;
+            PressedAt(new Point(at.X, at.Y));
+        }
+        return PInvoke.CallNextHookEx(_clickHook, code, wParam, lParam);
+    }
+
+    /// <summary>
+    /// A press at <paramref name="physical"/> while the island is open: off the island and the tab it
+    /// closes the island, unless a list or menu the island opened has the mouse.
+    /// </summary>
+    internal void PressedAt(Point physical)
+    {
+        if (!_panel.IsOpen || _panel.Covers(physical) || IslandNative.WindowRect(_hwnd).Contains(physical)
+            || DebugMenu.IsOpen || Mouse.Captured is not null)
+            return;
+        Dispatcher.BeginInvoke(() => CloseIsland());
+    }
+
     // ----- Open and close -----
 
     private void Toggle()
@@ -354,28 +341,32 @@ public partial class IslandWindow : Window
     {
         if (!IsVisible || _dragging || Area is not { } area)
             return;
-        _panel.Open(_docked, Home(area), area);
+        _panel.Open(_docked, Grown(area), area);
+        var module = PInvoke.GetModuleHandle((string?)null);
         if (_escapeHook is null || _escapeHook.IsInvalid)
-            _escapeHook = PInvoke.SetWindowsHookEx(WINDOWS_HOOK_ID.WH_KEYBOARD_LL, _onKeyboard, PInvoke.GetModuleHandle((string?)null), 0);
+            _escapeHook = PInvoke.SetWindowsHookEx(WINDOWS_HOOK_ID.WH_KEYBOARD_LL, _onKeyboard, module, 0);
+        if (_clickHook is null || _clickHook.IsInvalid)
+            _clickHook = PInvoke.SetWindowsHookEx(WINDOWS_HOOK_ID.WH_MOUSE_LL, _onMouse, module, 0);
         RefreshTab();
     }
 
     /// <summary>Shrinks the island back into the tab; <paramref name="immediate"/> hides it at once.</summary>
     private void CloseIsland(bool immediate = false)
     {
-        _leaveTimer.Stop();
-        _reopenOnEnter = false; // the leave timer sets it again after this
         _escapeHook?.Dispose(); // unhooks
         _escapeHook = null;
+        _clickHook?.Dispose();
+        _clickHook = null;
         if (!_panel.IsOpen)
             return;
-        // Closed with the pointer on the tab (Esc, a click): the tab sees a fresh MouseEnter once the
-        // island has shrunk off it, and mustn't reopen until the pointer has left.
-        if (!immediate && Area is { } area && Home(area).Contains(IslandNative.Cursor()))
-            _waitForLeave = true;
         _panel.CloseIsland(immediate);
         RefreshTab();
     }
+
+    internal bool IsIslandOpen => _panel.IsOpen;
+
+    /// <summary>Whether the keyboard and mouse hooks are installed (only while the island is open).</summary>
+    internal bool IsHooked => _escapeHook is { IsInvalid: false } || _clickHook is { IsInvalid: false };
 
     // ----- The tab -----
 
@@ -395,21 +386,16 @@ public partial class IslandWindow : Window
 
     /// <summary>
     /// Sizes and fills the tab: 14px sleepy Gumdrop at rest; 18px with the highest activity's glyph
-    /// when something is live, idle when only hovered or open.
+    /// when something is live. Hovered or open it swells, and Gumdrop wakes.
     /// </summary>
     private void RefreshTab()
     {
         var top = _activities.Count > 0 ? _activities[0] : null;
-        bool large = top is not null || _hovered || _panel.IsVisible;
-        var size = IslandGeometry.TabSize(_docked, large);
-        TabBody.Width = size.Width;
-        TabBody.Height = size.Height;
-        var (fill, stroke) = TabShape(_docked, size);
-        TabFill.Data = fill;
-        TabStroke.Data = stroke;
+        bool swollen = _hovered || _panel.IsVisible;
+        SwellTo(IslandGeometry.TabSize(_docked, top is not null, swollen));
 
-        Pet.Size = large ? 18 : 14;
-        Pet.ShowMood(top is not null ? _mood : large ? PetMood.Idle : PetMood.Sleepy);
+        Pet.Size = top is not null ? 18 : 14;
+        Pet.ShowMood(top is not null ? _mood : swollen ? PetMood.Idle : PetMood.Sleepy);
 
         Glyph.Visibility = Shown(top is not null);
         Equalizer.Visibility = Shown(top?.Kind == IslandActivityKind.Media);
@@ -425,6 +411,56 @@ public partial class IslandWindow : Window
     }
 
     private static Visibility Shown(bool shown) => shown ? Visibility.Visible : Visibility.Collapsed;
+
+    /// <summary>
+    /// Grows or shrinks the tab to <paramref name="target"/> DIPs over 120ms, easing out, around its
+    /// center. It snaps under reduced motion, while hidden, and when it moved to another edge.
+    /// </summary>
+    private void SwellTo(Size target)
+    {
+        if (target == _tabTarget && _tabEdge == _docked)
+            return;
+        _tabTarget = target;
+        StopSwell();
+        if (Motion.IsReduced || !IsVisible || _tabSize == default || _tabEdge != _docked)
+        {
+            DrawTab(target);
+            return;
+        }
+        var from = _tabSize;
+        long began = Stopwatch.GetTimestamp();
+        _swellFrame = (_, _) =>
+        {
+            double t = Math.Min(1, Stopwatch.GetElapsedTime(began) / SwellTime);
+            double eased = 1 - Math.Pow(1 - t, 3);
+            DrawTab(new Size(from.Width + (target.Width - from.Width) * eased, from.Height + (target.Height - from.Height) * eased));
+            if (t >= 1)
+                StopSwell();
+        };
+        CompositionTarget.Rendering += _swellFrame;
+    }
+
+    private void StopSwell()
+    {
+        if (_swellFrame is null)
+            return;
+        CompositionTarget.Rendering -= _swellFrame;
+        _swellFrame = null;
+    }
+
+    private void DrawTab(Size size)
+    {
+        _tabSize = size;
+        _tabEdge = _docked;
+        TabBody.Width = size.Width;
+        TabBody.Height = size.Height;
+        var (fill, stroke) = TabShape(_docked, size);
+        TabFill.Data = fill;
+        TabStroke.Data = stroke;
+    }
+
+    /// <summary>The size the tab is drawn at, or heading to while it swells.</summary>
+    internal Size TabTarget => _tabTarget;
 
     /// <summary>
     /// The half-oval for a tab of <paramref name="size"/> DIPs: flat against the edge, fully round on
@@ -480,11 +516,13 @@ public partial class IslandWindow : Window
 
     // ----- Drag -----
 
+    /// <summary>The pointer in physical pixels; tests stand in their own.</summary>
+    internal Func<Point> PointerAt { get; set; } = IslandNative.Cursor;
+
     private void OnPress(object sender, MouseButtonEventArgs e)
     {
         e.Handled = true;
-        _pressAt = IslandNative.Cursor();
-        _hoverTimer.Stop();
+        _pressAt = PointerAt();
         Tab.CaptureMouse();
     }
 
@@ -492,7 +530,7 @@ public partial class IslandWindow : Window
     {
         if (_pressAt is not { } start)
             return;
-        var pointer = IslandNative.Cursor();
+        var pointer = PointerAt();
         if (!_dragging)
         {
             double threshold = DragThreshold * (Area?.Scale ?? 1);
@@ -513,7 +551,7 @@ public partial class IslandWindow : Window
         _dragging = false;
         Tab.ReleaseMouseCapture();
         if (dragged)
-            DropAt(IslandNative.Cursor());
+            DropAt(PointerAt());
         else
             Toggle();
     }
@@ -529,14 +567,13 @@ public partial class IslandWindow : Window
         if (dragged)
         {
             EndDragVisuals();
-            Return(IslandNative.Cursor());
+            Return(PointerAt());
         }
     }
 
     private void BeginDrag()
     {
         _dragging = true;
-        _hoverTimer.Stop();
         CloseIsland(immediate: true);
         TabBody.Opacity = 0;
     }
@@ -646,6 +683,13 @@ public partial class IslandWindow : Window
             CloseIsland();
     }
 
+    /// <summary>Debug builds: swell the tab as if hovered, for snapshots.</summary>
+    internal void ForceHover(bool hovered)
+    {
+        _hovered = hovered;
+        RefreshTab();
+    }
+
     internal MonitorArea? CurrentArea => Area;
 
     /// <summary>
@@ -694,9 +738,8 @@ public partial class IslandWindow : Window
 
     protected override void OnClosed(EventArgs e)
     {
-        _hoverTimer.Stop();
-        _leaveTimer.Stop();
         StopSlide();
+        StopSwell();
         CloseIsland();
         _panel.Close();
         _bubble.Close();

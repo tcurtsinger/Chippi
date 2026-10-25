@@ -113,7 +113,7 @@ public sealed class IslandHost : IDisposable
 
     /// <summary>
     /// Debug builds (<c>--island-shots &lt;dir&gt;</c>): the closed tab at rest and with a fake media
-    /// activity live, then the tab docked on Top, Left and Right with the island open, each scene in
+    /// activity live, each also swollen as if hovered, then the tab docked on Top, Left and Right with the island open, each scene in
     /// both app themes (the island must look the same) with Follow Windows, Blue (the mockup's
     /// default) and Violet. Then drops the tab on the taskbar's edge
     /// and in the corners, which must be refused, and once on the top edge, which must be taken
@@ -130,6 +130,14 @@ public sealed class IslandHost : IDisposable
             var settle = TimeSpan.FromMilliseconds(900);
             await Task.Delay(1500); // let the registry start the modules
             var media = new IslandActivity("media", IslandActivityKind.Media, "Weekend Mix", "Spotify") { Progress = 0.38 };
+            async Task SaveSwellAsync(string name, System.Windows.Media.Color color)
+            {
+                _window.ForceHover(true);
+                await Task.Delay(settle);
+                _window.SaveScene(Path.Combine(directory, name.ToLowerInvariant() + ".png"), color);
+                _window.ForceHover(false);
+                await Task.Delay(settle);
+            }
             foreach (var accent in new[] { AccentChoice.FollowWindows, AccentChoice.Blue, AccentChoice.Violet })
             {
                 UpdateSettings(s => s.Accent = accent);
@@ -141,9 +149,11 @@ public sealed class IslandHost : IDisposable
                     _shell.Island.ClearModule(DebugModuleId);
                     await Task.Delay(settle);
                     _window.SaveScene(Path.Combine(directory, $"r5-island-rest-{theme}-{accent}".ToLowerInvariant() + ".png"), color);
+                    await SaveSwellAsync($"r5-island-rest-swell-{theme}-{accent}", color);
                     debug.Publish(media);
                     await Task.Delay(settle);
                     _window.SaveScene(Path.Combine(directory, $"r5-island-live-{theme}-{accent}".ToLowerInvariant() + ".png"), color);
+                    await SaveSwellAsync($"r5-island-live-swell-{theme}-{accent}", color);
                     foreach (var edge in new[] { IslandEdge.Top, IslandEdge.Left, IslandEdge.Right })
                     {
                         UpdateSettings(s => (s.IslandEdge, s.IslandPlace) = (edge, 0.5));

@@ -119,10 +119,19 @@ public sealed class IslandGeometryTests
     [Fact]
     public void The_tab_is_64_by_18_at_rest_and_84_by_26_live_turned_on_the_sides()
     {
-        Assert.Equal(new Size(64, 18), IslandGeometry.TabSize(IslandEdge.Top, large: false));
-        Assert.Equal(new Size(84, 26), IslandGeometry.TabSize(IslandEdge.Top, large: true));
-        Assert.Equal(new Size(18, 64), IslandGeometry.TabSize(IslandEdge.Left, large: false));
-        Assert.Equal(new Size(26, 84), IslandGeometry.TabSize(IslandEdge.Right, large: true));
+        Assert.Equal(new Size(64, 18), IslandGeometry.TabSize(IslandEdge.Top, live: false));
+        Assert.Equal(new Size(84, 26), IslandGeometry.TabSize(IslandEdge.Top, live: true));
+        Assert.Equal(new Size(18, 64), IslandGeometry.TabSize(IslandEdge.Left, live: false));
+        Assert.Equal(new Size(26, 84), IslandGeometry.TabSize(IslandEdge.Right, live: true));
+    }
+
+    [Fact]
+    public void A_swollen_tab_is_about_a_fifth_longer_and_4px_deeper()
+    {
+        Assert.Equal(new Size(76, 22), IslandGeometry.TabSize(IslandEdge.Top, live: false, swollen: true));
+        Assert.Equal(new Size(100, 30), IslandGeometry.TabSize(IslandEdge.Top, live: true, swollen: true));
+        Assert.Equal(new Size(22, 76), IslandGeometry.TabSize(IslandEdge.Left, live: false, swollen: true));
+        Assert.Equal(new Size(30, 100), IslandGeometry.TabSize(IslandEdge.Right, live: true, swollen: true));
     }
 
     [Fact]

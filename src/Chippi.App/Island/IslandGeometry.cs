@@ -32,10 +32,19 @@ public static class IslandGeometry
     /// <summary>The open island stays this far (DIPs) inside the ends of its edge.</summary>
     public const double Gap = 8;
 
-    /// <summary>The tab's size in DIPs: 64×18 at rest and 84×26 when live or hovered on the top edge, turned on the sides.</summary>
-    public static Size TabSize(IslandEdge edge, bool large)
+    /// <summary>
+    /// The tab's size in DIPs on the top edge, turned on the sides: 64×18 at rest and 84×26 when
+    /// live. Swollen (hovered, or the island open) it is about 20% longer and 4px deeper: 76×22 and 100×30.
+    /// </summary>
+    public static Size TabSize(IslandEdge edge, bool live, bool swollen = false)
     {
-        var (along, across) = large ? (84.0, 26.0) : (64.0, 18.0);
+        var (along, across) = (live, swollen) switch
+        {
+            (false, false) => (64.0, 18.0),
+            (false, true) => (76.0, 22.0),
+            (true, false) => (84.0, 26.0),
+            (true, true) => (100.0, 30.0),
+        };
         return edge == IslandEdge.Top ? new Size(along, across) : new Size(across, along);
     }
 
