@@ -203,7 +203,7 @@ public sealed class IslandPanelTests
             var muted = new IslandActivity("muted", IslandActivityKind.Status, "Muted", "Microphone") { NeedsAttention = true, TileKey = "sound.microphone", ModuleId = "mic-mute" };
             panel.SetActivities([stopped, muted], PetMood.Idle);
             Assert.Same(LucideIcons.MicOff, TileIcon(panel, "sound.microphone"));
-            Assert.Same(panel.Visual.FindResource("WarningBrush"), TileGlyph(panel, "sound.microphone").Brush);
+            Assert.Same(panel.FindResource("WarningBrush"), TileGlyph(panel, "sound.microphone").Brush);
 
             panel.SetActivities([], PetMood.Idle);
             Assert.Same(LucideIcons.Mic, TileIcon(panel, "sound.microphone"));
