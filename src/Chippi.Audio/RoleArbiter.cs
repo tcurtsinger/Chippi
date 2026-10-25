@@ -89,6 +89,25 @@ internal sealed class RoleArbiter(ILogger logger, TimeProvider time, TimeSpan? b
         }
     }
 
+    /// <summary>
+    /// Crash recovery (architecture §3): roles that still point at the marker's cable go back to what
+    /// it replaced, when that endpoint is active and nobody claims the role. Returns whether any did.
+    /// </summary>
+    public bool Recover(Processing.ProcessingMarker marker, DeviceCatalog catalog, IDeviceSystem system)
+    {
+        var restored = false;
+        foreach (var (role, id) in marker.Replaced)
+        {
+            var key = new RoleKey(AudioFlow.Capture, role);
+            if (_claims.ContainsKey(key)
+                || !PriorityPolicy.Eq(system.GetDefault(AudioFlow.Capture, role), marker.CableCaptureId)
+                || !catalog.Active(AudioFlow.Capture).Any(e => PriorityPolicy.Eq(e.Id, id)))
+                continue;
+            restored |= Write(id, key, RoleOwner.Processing, "recover", system);
+        }
+        return restored;
+    }
+
     /// <summary>Points every claimed role at its owner's target and reports what it changed.</summary>
     public IReadOnlyList<RoleChange> Enforce(DeviceCatalog catalog, IDeviceSystem system)
     {

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using Chippi.Audio.Processing;
+
 namespace Chippi.Audio;
 
 /// <summary>
@@ -16,6 +18,9 @@ public sealed record AudioSnapshot(
     IReadOnlyDictionary<string, EndpointLevel> Levels,
     IReadOnlyList<AppAudio> Apps)
 {
+    /// <summary>Where Mic processing actually is.</summary>
+    public ProcessingStatus Processing { get; init; } = ProcessingStatus.Off;
+
     public static AudioSnapshot Empty { get; } = new(
         0, [], new Dictionary<RoleKey, string>(), new Dictionary<RoleKey, RoleOwner>(),
         new Dictionary<string, EndpointLevel>(StringComparer.OrdinalIgnoreCase), []);

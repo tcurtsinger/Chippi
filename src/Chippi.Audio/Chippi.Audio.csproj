@@ -18,4 +18,10 @@
     <InternalsVisibleTo Include="Chippi.Audio.Tests" />
   </ItemGroup>
 
+  <!-- RNNoise, built in CI from native/rnnoise (hashes.csv). Both architectures ship; RnnoiseNative
+       loads runtimes\win-<arch>\native\rnnoise.dll for the process architecture. -->
+  <ItemGroup>
+    <None Include="..\..\native\rnnoise\runtimes\**\rnnoise.dll" Link="runtimes\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Visible="false" />
+  </ItemGroup>
+
 </Project>
