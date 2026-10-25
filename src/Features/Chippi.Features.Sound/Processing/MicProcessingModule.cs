@@ -237,8 +237,9 @@ public sealed class MicProcessingModule : IFeatureModule
             return;
         try
         {
-            // No real mic yet: keep the marker, so the next start tries again.
-            if (!await audio.RecoverProcessingAsync(marker))
+            // No real mic yet: the engine keeps the marker, retries as devices change, and deletes the
+            // file through SaveMarker once a real mic is back.
+            if (!await audio.RecoverProcessingAsync(marker, SaveMarker))
             {
                 context.Logger.LogWarning("The cable is still the default mic and no real mic is active to put back");
                 return;

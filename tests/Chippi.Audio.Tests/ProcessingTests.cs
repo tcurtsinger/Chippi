@@ -301,6 +301,35 @@ public sealed class ProcessingTests : IAsyncDisposable
         Assert.Equal("CableOut", DefaultMic());
     }
 
+    // Karl's 30b56a5 review: relaunch with the mic still unplugged, processing off, then plug it in.
+    [Fact]
+    public async Task Unsettled_startup_recovery_finishes_when_a_real_mic_arrives()
+    {
+        _sys.With(CableInput(), CableOutput()).WithDefault("CableOut");
+        var restored = await _service.RecoverProcessingAsync(new("CableOut", All.ToDictionary(r => r, _ => "Desk")), _markers.Enqueue);
+        Assert.False(restored);
+
+        _sys.Connect(Mic("Desk"));
+
+        await WaitUntil(() => All.All(r => DefaultMic(r) == "Desk"));
+        await WaitUntil(() => _markers.Count == 1 && LastMarker is null);
+    }
+
+    // Karl's 30b56a5 review: Audio routing installed, its mic list empty or unplugged.
+    [Fact]
+    public async Task Off_restores_the_mic_when_routing_claims_but_has_no_target()
+    {
+        _sys.With(Mic("Desk"), CableInput(), CableOutput()).WithDefault("Desk");
+        await _service.ClaimRolesAsync(RoleOwner.Routing, AudioFlow.Capture, All, _ => null);
+        await _service.SetProcessingAsync(Request());
+        Assert.Equal("CableOut", DefaultMic());
+
+        await _service.SetProcessingAsync(null);
+
+        Assert.All(All, r => Assert.Equal("Desk", DefaultMic(r)));
+        Assert.Null(LastMarker);
+    }
+
     [Fact]
     public async Task With_no_real_mic_left_the_marker_stays_until_one_returns()
     {

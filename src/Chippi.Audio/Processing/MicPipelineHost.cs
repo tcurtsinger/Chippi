@@ -78,6 +78,18 @@ internal sealed class MicPipelineHost(ILogger log, MicPipelineFactory factory, A
         _failedSource = _failedError = null;
     }
 
+    /// <summary>
+    /// A crash marker startup couldn't settle (no real mic yet): kept here so every reconcile retries
+    /// it, and <paramref name="save"/>(null) clears the file once it settles.
+    /// </summary>
+    public void Adopt(ProcessingMarker marker, Action<ProcessingMarker?> save)
+    {
+        if (_marker is not null)
+            return;
+        _marker = marker;
+        _saveMarker = save;
+    }
+
     public void Update(RoleArbiter arbiter, DeviceCatalog catalog, IDeviceSystem system)
     {
         if (_request is null)

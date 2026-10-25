@@ -90,8 +90,8 @@ internal sealed class RoleArbiter(ILogger logger, TimeProvider time, TimeSpan? b
     }
 
     /// <summary>
-    /// After Mic processing stops or crashed (architecture §3): every unclaimed capture role still on
-    /// the marker's cable goes back to what it replaced or, when that mic is gone, to another real
+    /// After Mic processing stops or crashed (architecture §3): every capture role still on the
+    /// marker's cable, and that no remaining claim can take now, goes back to what it replaced or, when that mic is gone, to another real
     /// mic: one the marker recorded, then <paramref name="preferred"/>, then the first active one.
     /// Roles someone moved off the cable are left alone, except when <paramref name="cableJustLost"/>:
     /// then the cable vanished under a live pipeline, and what Windows fell back to goes back to what
@@ -108,7 +108,9 @@ internal sealed class RoleArbiter(ILogger logger, TimeProvider time, TimeSpan? b
             var key = new RoleKey(AudioFlow.Capture, role);
             var current = system.GetDefault(AudioFlow.Capture, role);
             var onCable = PriorityPolicy.Eq(current, marker.CableCaptureId);
-            if (_claims.ContainsKey(key) || !(onCable || cableJustLost))
+            // A claim defers only when it has a target now: Routing's empty or unplugged list has none.
+            var claimed = _claims.TryGetValue(key, out var owners) && Effective(owners).Claim.Target(catalog.Active(AudioFlow.Capture)) is not null;
+            if (claimed || !(onCable || cableJustLost))
                 continue;
             var id = Live(marker.Replaced.GetValueOrDefault(role));
             if (onCable || current is null)

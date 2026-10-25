@@ -184,13 +184,16 @@ public sealed class AudioService
     /// <summary>
     /// After a crash: capture roles still on the marker's cable go back to what it replaced, or to
     /// another real mic when that one is gone (roles another owner claims are left to it). Returns
-    /// false while a role stays on the cable because no real mic is active; keep the marker then.
+    /// false while a role stays on the cable because no real mic is active; the engine then keeps
+    /// the marker, retries on every reconcile, and calls <paramref name="save"/>(null) once settled.
     /// </summary>
-    public Task<bool> RecoverProcessingAsync(ProcessingMarker marker) =>
+    public Task<bool> RecoverProcessingAsync(ProcessingMarker marker, Action<ProcessingMarker?>? save = null) =>
         Run(e =>
         {
             e.Catalog.Refresh(e.System);
             var restored = e.Arbiter.Recover(marker, null, e.Catalog, e.System);
+            if (!restored && save is not null)
+                e.Processing.Adopt(marker, save);
             e.Reconcile();
             return restored;
         });
