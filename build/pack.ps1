@@ -16,12 +16,25 @@ try {
     dotnet tool restore
     if ($LASTEXITCODE -ne 0) { throw 'Velopack tool restore failed. Stop and report; do not replace the packaging tool.' }
 
+    # VB-CABLE ships unmodified (its readme allows copying only as is), pinned by size and SHA-256 in
+    # build/vendor/vb-cable.json. Downloaded once into the cache; any mismatch fails the build.
+    $pin = Get-Content -Raw -LiteralPath (Join-Path $PSScriptRoot 'vendor/vb-cable.json') | ConvertFrom-Json
+    $vendorCache = Join-Path $PSScriptRoot 'artifacts/vendor'
+    New-Item -ItemType Directory -Force -Path $vendorCache | Out-Null
+    $vbZip = Join-Path $vendorCache $pin.file
+    $vbOk = { (Test-Path -LiteralPath $vbZip) -and (Get-Item -LiteralPath $vbZip).Length -eq $pin.bytes -and (Get-FileHash -LiteralPath $vbZip -Algorithm SHA256).Hash -eq $pin.sha256 }
+    if (!(& $vbOk)) {
+        Invoke-WebRequest -Uri $pin.url -OutFile $vbZip -UseBasicParsing
+        if (!(& $vbOk)) { throw 'VB-CABLE package does not match build/vendor/vb-cable.json. Stop and report; do not update the pin without review.' }
+    }
+
     foreach ($rid in $Runtime) {
         $staging = Join-Path $PSScriptRoot "artifacts/staging/$([Guid]::NewGuid().ToString('N'))/$rid"
         $output = Join-Path $PSScriptRoot "artifacts/releases/$Version/$rid"
         dotnet publish src/Chippi.App/Chippi.App.csproj "-p:PublishProfile=$rid" "-p:Version=$Version" -o $staging
         if ($LASTEXITCODE -ne 0) { throw "Publish failed for $rid." }
-        foreach ($required in 'Chippi.exe', 'LICENSE', 'THIRD-PARTY-NOTICES.md') {
+        Copy-Item -LiteralPath $vbZip -Destination (Join-Path $staging "vendor/vb-cable/$($pin.file)")
+        foreach ($required in 'Chippi.exe', 'LICENSE', 'THIRD-PARTY-NOTICES.md', 'vendor/vb-cable/vb-cable.json', "vendor/vb-cable/$($pin.file)", 'runtimes/win-x64/native/rnnoise.dll', 'runtimes/win-arm64/native/rnnoise.dll') {
             if (!(Test-Path -LiteralPath (Join-Path $staging $required))) { throw "Missing published file: $required" }
         }
         # Offline packaging: no update feed, framework downloads, signing or upload commands.

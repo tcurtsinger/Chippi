@@ -28,13 +28,6 @@ public static class FeatureCatalog
         },
 
         // Phase 3: Sound
-        new("mic-processing", "Mic processing", "Noise suppression and cleanup on your mic before other apps hear it", FeatureGroup.Sound)
-        {
-            Icon = "Mic",
-            Requires = [Capability.VbCable],
-            Badges = [FeatureBadge.Needs("Needs VB-CABLE")],
-            Presets = Audio,
-        },
         new("app-volume", "App volume", "Volume and output device for each app, right from the tray", FeatureGroup.Sound)
         {
             Icon = "Sliders",

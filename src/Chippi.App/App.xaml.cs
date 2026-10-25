@@ -163,7 +163,12 @@ public partial class App : Application
         shell.Registry.Register(keepAwake);
         Exit += (_, _) => keepAwake.ReleaseOnExit();
         shell.Registry.Register(new Chippi.Features.Downloads.DownloadsModule());
-        shell.Registry.Register(new Chippi.Features.Sound.Routing.AudioRoutingModule());
+        // [Phase 3] Sound. Routing never lists VB-CABLE (recognized by device identity); Mic
+        // processing's "Pinned mic" is routing's microphone list.
+        var routing = new Chippi.Features.Sound.Routing.AudioRoutingModule(null, Chippi.Audio.VbCable.IsCable);
+        shell.Registry.Register(routing);
+        shell.Registry.Register(new Chippi.Features.Sound.Processing.MicProcessingModule(null, () => routing.Settings.Microphone.Devices,
+            Path.Combine(shell.Services.DataRoot, Chippi.Features.Sound.Processing.MicProcessingModule.Id)));
 
         // [WS2] "Coming soon" placeholders for the PLAN.md features.
         Settings.Features.FeatureCatalog.RegisterPlaceholders(shell.Registry);
