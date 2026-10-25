@@ -9,7 +9,7 @@ Chippi uses fonts installed on Windows: Segoe UI Variable (with Segoe UI fallbac
 ## Icons and reused application code
 
 - Lucide geometry: ISC, including the upstream Feather/MIT notice. Source: https://github.com/lucide-icons/lucide
-- Hopper: theme, icon, tray, logging, config, startup and startup-hardening code adapted into Chippi. The original author has authorized GPL-3.0-or-later relicensing for Chippi (phase-1-handoff.md). Hopper's separate repository is unchanged. Source: https://github.com/tcurtsinger/Hopper
+- Hopper: theme, icon, tray, logging, config, startup, startup-hardening and audio engine code adapted into Chippi. The original author has authorized GPL-3.0-or-later relicensing for Chippi (phase-1-handoff.md). Hopper's separate repository is unchanged. Source: https://github.com/tcurtsinger/Hopper
 
 ## Runtime NuGet packages
 
@@ -1714,3 +1714,17 @@ DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
 THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
+## NAudio.Core and NAudio.Wasapi 2.2.1
+
+Source: https://github.com/naudio/NAudio/tree/v2.2.1
+License: MIT
+
+Copyright 2020 Mark Heath
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
