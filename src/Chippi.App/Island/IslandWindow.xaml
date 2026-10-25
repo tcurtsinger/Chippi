@@ -48,6 +48,7 @@
                         <Ellipse x:Name="Dot" Width="7" Height="7" Fill="{DynamicResource IslandAccentBrush}" />
                         <Ellipse x:Name="CautionDot" Width="7" Height="7" Fill="{StaticResource WarningBrush}" />
                     </Grid>
+                    <c:LucideIcon x:Name="MutedMicGlyph" Data="{x:Static c:LucideIcons.MicOff}" Size="14" Thickness="2" Brush="{StaticResource WarningBrush}" Visibility="Collapsed" HorizontalAlignment="Center" />
                 </StackPanel>
             </Grid>
         </Button>

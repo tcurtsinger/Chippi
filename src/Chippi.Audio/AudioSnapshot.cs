@@ -21,6 +21,8 @@ public sealed record AudioSnapshot(
     /// <summary>Where Mic processing actually is.</summary>
     public ProcessingStatus Processing { get; init; } = ProcessingStatus.Off;
 
+    public MicrophoneMuteStatus MicrophoneMute { get; init; } = MicrophoneMuteStatus.Empty;
+
     public static AudioSnapshot Empty { get; } = new(
         0, [], new Dictionary<RoleKey, string>(), new Dictionary<RoleKey, RoleOwner>(),
         new Dictionary<string, EndpointLevel>(StringComparer.OrdinalIgnoreCase), []);

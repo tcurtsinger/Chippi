@@ -216,6 +216,10 @@ public partial class FlyoutWindow : Window
     /// <summary>"Keep awake is on" while it runs (DESIGN.md §5 Tray flyout), otherwise how many features are on.</summary>
     private void UpdateStatusLine()
     {
+        var mic = _shell.Island.Activities.FirstOrDefault(a => a.ModuleId == "mic-mute" && a.NeedsAttention);
+        bool muted = mic is not null;
+        StatusLine.SetResourceReference(TextBlock.ForegroundProperty, muted ? "WarningTextBrush" : "TextSecondaryBrush");
+        if (muted) { StatusLine.Text = mic!.Title == "Muted" ? "Microphone muted" : mic.Title; return; }
         if (_shell.Island.Activities.Any(a => a.Kind == IslandActivityKind.Status && a.ModuleId == Island.IslandHost.KeepAwakeModuleId))
         {
             StatusLine.Text = "Keep awake is on";

@@ -432,7 +432,12 @@ public partial class IslandWindow : Window
         if (top?.Kind is IslandActivityKind.Timer or IslandActivityKind.Agent)
             RingArc.Data = Arc(top.Progress ?? 1);
 
-        AutomationProperties.SetHelpText(Tab, top is null ? "" : string.IsNullOrWhiteSpace(top.Source) ? top.Title : $"{top.Title}, {top.Source}");
+        var mic = _activities.FirstOrDefault(a => a.ModuleId == "mic-mute" && a.NeedsAttention);
+        bool micMuted = mic is not null;
+        MutedMicGlyph.Visibility = Shown(micMuted);
+        MutedMicGlyph.Margin = _docked == IslandEdge.Top ? new Thickness(4, 0, 0, 0) : new Thickness(0, 4, 0, 0);
+
+        AutomationProperties.SetHelpText(Tab, micMuted ? (mic!.Title == "Muted" ? "Microphone muted" : mic.Title) : top is null ? "" : string.IsNullOrWhiteSpace(top.Source) ? top.Title : $"{top.Title}, {top.Source}");
     }
 
     private static Visibility Shown(bool shown) => shown ? Visibility.Visible : Visibility.Collapsed;

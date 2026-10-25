@@ -28,12 +28,6 @@ public static class FeatureCatalog
         },
 
         // Phase 3: Sound
-        new("mic-mute", "Mic mute shortcut", "One shortcut mutes your mic in every app", FeatureGroup.Sound)
-        {
-            Icon = "Mic",
-            Badges = [FeatureBadge.Overlap("Overlaps Win+Alt+K")],
-            Presets = Audio | PowerUser,
-        },
         new("volume-boost", "Volume boost", "Lifts quiet apps past their 100% limit", FeatureGroup.Sound)
         {
             Icon = "Volume",
