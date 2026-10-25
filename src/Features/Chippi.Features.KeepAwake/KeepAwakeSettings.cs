@@ -15,7 +15,7 @@ public sealed record KeepAwakeSettings
     public void Validate()
     {
         if (!Enum.IsDefined(Mode) || DurationMinutes is < 1 or > 1440 || UntilMinute is < 0 or >= 1440)
-            throw new ArgumentException("Choose a duration from 1 to 1440 minutes and a valid time.");
+            throw new ArgumentException("1–1440 minutes");
     }
 
     public DateTimeOffset? Deadline(DateTimeOffset now)
@@ -26,7 +26,7 @@ public sealed record KeepAwakeSettings
         var local = now.LocalDateTime.Date.AddMinutes(UntilMinute);
         if (local <= now.LocalDateTime) local = local.AddDays(1);
         if (TimeZoneInfo.Local.IsInvalidTime(local))
-            throw new ArgumentException("That time does not exist on this date. Choose another time.");
+            throw new ArgumentException("Time doesn't exist on this date");
         return new DateTimeOffset(local);
     }
 }

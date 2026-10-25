@@ -44,7 +44,7 @@ public static class ArchiveImporter
     {
         limits ??= new ArchiveLimits();
         if (!IsSupported(archive))
-            throw new ArchiveRejectedException("Only zip, tgz and tar.gz archives can be imported.");
+            throw new ArchiveRejectedException("Not a zip, tgz or tar.gz");
         long archiveBytes = new FileInfo(archive).Length;
         long budget = Math.Min(limits.MaxBytes, Math.Max(1, archiveBytes) * limits.MaxRatio);
         string staging = Path.Combine(stagingRoot, Guid.NewGuid().ToString("N"));
@@ -67,7 +67,7 @@ public static class ArchiveImporter
             if (ex is ArchiveRejectedException or OperationCanceledException)
                 throw;
             if (ex is IOException or InvalidDataException or UnauthorizedAccessException or FormatException)
-                throw new ArchiveRejectedException("The archive could not be read.");
+                throw new ArchiveRejectedException("Archive unreadable");
             throw;
         }
     }
@@ -133,7 +133,7 @@ public static class ArchiveImporter
     }
 
     private static ArchiveRejectedException TooMany(ArchiveLimits limits) =>
-        new($"The archive has more than {limits.MaxEntries:N0} entries.");
+        new($"Over {limits.MaxEntries:N0} entries");
 
     private sealed class State(string staging, HashSet<string> taken, long budget, ArchiveLimits limits)
     {
@@ -202,7 +202,7 @@ public static class ArchiveImporter
 
         private ArchiveRejectedException TooBig() =>
             budget < Limits.MaxBytes
-                ?new($"The archive expands more than {Limits.MaxRatio}:1, so it was not imported.")
-                : new($"The archive expands past {Limits.MaxBytes / (1024 * 1024 * 1024)} GB, so it was not imported.");
+                ?new($"Expands over {Limits.MaxRatio}:1")
+                : new($"Expands past {Limits.MaxBytes / (1024 * 1024 * 1024)} GB");
     }
 }

@@ -179,7 +179,7 @@ public sealed class ConfigStore
             throw new InvalidDataException("That file is not valid JSON.", ex);
         }
         if (FirstInvalidSection(imported) is { } bad)
-            throw new InvalidDataException($"The \"{bad}\" section of that file is not valid Chippi settings.");
+            throw new InvalidDataException($"\"{bad}\" section not valid");
 
         List<string> touched;
         lock (_gate)
@@ -253,9 +253,9 @@ public sealed class ConfigStore
     private static JsonObject Parse(string json)
     {
         if (JsonNode.Parse(json) is not JsonObject root)
-            throw new InvalidDataException("Settings must be a JSON object.");
+            throw new InvalidDataException("Not a JSON object");
         if (root[VersionKey] is not JsonValue v || !v.TryGetValue(out int version) || version < 1)
-            throw new InvalidDataException("Settings have no version, so they are not a Chippi settings file.");
+            throw new InvalidDataException("Not a Chippi settings file");
 
         // Migrations go here as the schema changes: if (version < 2) { ...; root["version"] = 2; }
         // A newer file than this build is loaded as-is; its version number is kept so the
@@ -368,7 +368,7 @@ public sealed class ConfigStore
                 {
                     // Leaving the temp file is harmless; the next save overwrites it.
                 }
-                throw new IOException($"Could not save {Path.GetFileName(path)}: another program is using it.", ex);
+                throw new IOException($"{Path.GetFileName(path)} in use", ex);
             }
         }
     }

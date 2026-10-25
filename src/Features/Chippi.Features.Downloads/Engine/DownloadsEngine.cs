@@ -165,11 +165,11 @@ public sealed class DownloadsEngine : IDisposable
         lock (_gate)
             _previews.Remove(previewId, out preview);
         if (preview is null)
-            throw new InvalidOperationException("That preview was already used.");
+            throw new InvalidOperationException("Preview already used");
         try
         {
             if (preview.ExpiresAt <= _time.GetUtcNow())
-                throw new InvalidOperationException("That preview expired. Organize again to see a fresh one.");
+                throw new InvalidOperationException("Preview expired");
             return await ExclusiveAsync(() => ApplyPreview(preview, selected), ct).ConfigureAwait(false);
         }
         finally
@@ -744,12 +744,12 @@ public sealed class DownloadsEngine : IDisposable
         {
             if (_stop.IsCancellationRequested)
             {
-                results.Add(new ItemResult(item.Id, item.Source, null, false, "Chippi closed before this file."));
+                results.Add(new ItemResult(item.Id, item.Source, null, false, "Stopped before this file"));
                 continue;
             }
             if (item.Kind is not (OperationKind.Move or OperationKind.Rename) || item.Destination is null)
             {
-                results.Add(new ItemResult(item.Id, item.Source, null, false, "Nothing to do for this file."));
+                results.Add(new ItemResult(item.Id, item.Source, null, false, "Nothing to do"));
                 continue;
             }
             // An imported file is recorded as coming from the folder it was imported into, so undo
@@ -783,21 +783,21 @@ public sealed class DownloadsEngine : IDisposable
     {
         var record = _history.Get(operationId);
         if (record is null || record.Kind == HistoryOperationKind.Restore)
-            return new UndoResult(false, null, "Nothing to undo.");
+            return new UndoResult(false, null, "Nothing to undo");
         if (record.Kind == HistoryOperationKind.Import)
-            return new UndoResult(false, null, "Imported straight into the folder, so there is nothing to undo.");
+            return new UndoResult(false, null, "Imported · nothing to undo");
         if (record.State != OperationState.Completed)
-            return new UndoResult(false, null, record.State == OperationState.Undone ? "Already undone." : "Only completed changes can be undone.");
+            return new UndoResult(false, null, record.State == OperationState.Undone ? "Already undone" : "Not completed");
         var current = new FileInfo(record.DestinationPath);
         if (!current.Exists)
-            return new UndoResult(false, null, "The file is no longer where it was put.");
+            return new UndoResult(false, null, "Moved or deleted since");
         if (record.Sha256 is null)
             return new UndoResult(false, null, Executor.ChangedSinceOrganized);
         if (File.Exists(record.SourcePath) || Directory.Exists(record.SourcePath))
-            return new UndoResult(false, null, "Something already has the original name.");
+            return new UndoResult(false, null, "Name taken");
         string originalFolder = Path.GetDirectoryName(record.SourcePath)!;
         if (!Directory.Exists(originalFolder))
-            return new UndoResult(false, null, "The original folder is gone.");
+            return new UndoResult(false, null, "Original folder gone");
 
         long runId = _history.BeginRun(RunTrigger.Undo, originalFolder);
         var result = _executor.Execute(runId, new ExecutionRequest(

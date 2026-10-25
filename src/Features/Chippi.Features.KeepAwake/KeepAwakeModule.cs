@@ -66,7 +66,7 @@ public sealed class KeepAwakeModule : IFeatureModule
         await _gate.WaitAsync(ct);
         try
         {
-            if (_context is null || _session is null) throw new InvalidOperationException("Keep awake is uninstalled.");
+            if (_context is null || _session is null) throw new InvalidOperationException("Keep awake uninstalled");
             _context.Settings.Save(settings);
             Settings = settings;
             // The default length waits for the next start; only the screen setting reaches a running session.
@@ -93,7 +93,7 @@ public sealed class KeepAwakeModule : IFeatureModule
         await _gate.WaitAsync(ct);
         try
         {
-            if (_session is null) throw new InvalidOperationException("Keep awake is uninstalled.");
+            if (_session is null) throw new InvalidOperationException("Keep awake uninstalled");
             if (_session.HasFailed)
             {
                 // Let the failed worker finish releasing its request before a new one starts.

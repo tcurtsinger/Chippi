@@ -179,7 +179,7 @@ internal sealed class SettingsSection : UserControl
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            ShowImportError("The archive could not be read.");
+            ShowImportError("Archive unreadable");
         }
         finally
         {

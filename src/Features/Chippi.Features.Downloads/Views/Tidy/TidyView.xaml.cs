@@ -102,7 +102,7 @@ public partial class TidyView : UserControl
         }
         catch (ObjectDisposedException)
         {
-            ShowError("Organizer stopped.");
+            ShowError("Organizer stopped");
             FolderCard.IsEnabled = Actions.IsEnabled = false;
         }
         finally { _refreshing = false; }

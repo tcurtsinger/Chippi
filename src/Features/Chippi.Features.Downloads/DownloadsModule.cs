@@ -143,7 +143,7 @@ public sealed class DownloadsModule : IFeatureModule
     {
         ArgumentNullException.ThrowIfNull(settings);
         if (_context is null || Engine is null)
-            throw new InvalidOperationException("The File organizer is uninstalled.");
+            throw new InvalidOperationException("File organizer uninstalled");
         var now = DateTimeOffset.UtcNow;
         foreach (var folder in settings.Folders)
         {

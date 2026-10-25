@@ -20,7 +20,7 @@ internal sealed class WindowsExecutionState : IExecutionState
         if (active) flags |= EXECUTION_STATE.ES_SYSTEM_REQUIRED;
         if (active && display) flags |= EXECUTION_STATE.ES_DISPLAY_REQUIRED;
         if (PInvoke.SetThreadExecutionState(flags) == 0)
-            throw new InvalidOperationException("Windows could not change the sleep prevention request.");
+            throw new InvalidOperationException("Couldn't change sleep setting");
     }
 }
 

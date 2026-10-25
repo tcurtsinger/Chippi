@@ -86,7 +86,7 @@ internal sealed class GeneralPage : UserControl
         catch (Exception ex) when (ex is UnauthorizedAccessException or System.Security.SecurityException or IOException)
         {
             enabled = false;
-            SettingsUi.Show(message, "Windows would not let Chippi read its startup entry.", problem: true);
+            SettingsUi.Show(message, "Couldn't read startup entry", problem: true);
         }
 
         var toggle = SettingsUi.Switch(enabled);
@@ -101,7 +101,7 @@ internal sealed class GeneralPage : UserControl
             {
                 Log.Warn("Run at startup could not be changed", ex);
                 toggle.IsChecked = !want;
-                SettingsUi.Show(message, "Windows would not let Chippi change its startup entry.", problem: true);
+                SettingsUi.Show(message, "Couldn't change startup entry", problem: true);
             }
         });
         return SettingsUi.Row("Run at startup", "", toggle, message);
@@ -139,7 +139,7 @@ internal sealed class GeneralPage : UserControl
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             Log.Warn("Settings export failed", ex);
-            SettingsUi.Show(message, $"Couldn't export: {ex.Message}", problem: true);
+            SettingsUi.Show(message, $"Couldn't export · {ex.Message}", problem: true);
         }
     }
 
@@ -158,13 +158,13 @@ internal sealed class GeneralPage : UserControl
         }
         catch (InvalidDataException ex)
         {
-            SettingsUi.Show(message, $"Nothing changed. {ex.Message}", problem: true);
+            SettingsUi.Show(message, $"Not imported · {ex.Message}", problem: true);
             return;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             Log.Warn("Settings import failed", ex);
-            SettingsUi.Show(message, $"Nothing changed. {ex.Message}", problem: true);
+            SettingsUi.Show(message, $"Not imported · {ex.Message}", problem: true);
             return;
         }
 
