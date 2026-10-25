@@ -36,7 +36,6 @@ internal sealed class AboutPage : UserControl
         product.Children.Add(new Gumdrop { Size = 32, Margin = new Thickness(0, 0, 14, 0) });
         var name = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
         name.Children.Add(SettingsUi.Styled(new TextBlock { Text = "Chippi" }, "BodyTextStyle"));
-        name.Children.Add(SettingsUi.Styled(new TextBlock { Text = "Everyday Windows utilities" }, "CaptionTextStyle"));
         product.Children.Add(name);
         var license = SettingsUi.Button("View");
         AutomationProperties.SetName(license, "View license");
@@ -46,8 +45,8 @@ internal sealed class AboutPage : UserControl
         notices.Click += (_, _) => ShowDocument("Third-party notices", ReadNotices());
         _page.Children.Add(SettingsUi.Group(product,
             SettingsUi.Row("License", AppInfo.License, license),
-            SettingsUi.Row("Privacy", "No telemetry. Your settings stay on this PC.", new FrameworkElement()),
-            SettingsUi.Row("Third-party notices", "Fonts, icons and libraries", notices)));
+            SettingsUi.Row("Privacy", "No telemetry", new FrameworkElement()),
+            SettingsUi.Row("Third-party notices", "", notices)));
         Content = _page;
     }
 

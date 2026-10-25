@@ -87,8 +87,65 @@ public sealed class SettingsWindowTests
                 {
                     Assert.Contains(Descendants(window.PageContent).OfType<Button>(), b => AutomationProperties.GetName(b) == "Hide files"); // requested run expanded
                     if (route == "history/undo")
-                        Assert.Contains(Descendants(window.PageContent).OfType<Button>(), b => Equals(b.Content, "Undo 11"));
+                    {
+                        Assert.Contains(Descendants(window.PageContent).OfType<TextBlock>(), t => t.Text == "Undo 11 moves?");
+                        Assert.Contains(Descendants(window.PageContent).OfType<Button>(), b => AutomationProperties.GetName(b) == "Confirm undo" && Equals(b.Content, "Undo"));
+                    }
                 }
+            }
+            finally
+            {
+                window?.Close();
+                shell.Registry.StopAllAsync().GetAwaiter().GetResult();
+                foreach (string folder in new[] { root, Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Chippi-dev", profile) })
+                    if (Directory.Exists(folder)) Directory.Delete(folder, true);
+            }
+        });
+    }
+
+    /// <summary>Travis: a run collapsed only when it had more than 10 files. Every run starts collapsed and its header toggles it.</summary>
+    [Fact]
+    public void Every_history_run_starts_collapsed_and_its_header_toggles_it()
+    {
+        WpfTestThread.Run(() =>
+        {
+            string profile = "settings-history-" + Guid.NewGuid().ToString("N");
+            string root = Path.Combine(Path.GetTempPath(), profile);
+            Directory.CreateDirectory(root);
+            var config = new ConfigStore(Path.Combine(root, "settings.json"));
+            config.SetModuleSettings("downloads-organizer", new DownloadsSettings
+            {
+                Initialized = true, OrganizeInExplorer = false,
+                Folders = [new WatchedFolder { Path = root, Mode = FolderMode.Manual }],
+            });
+            var shell = new ShellContext(config, NullLoggerFactory.Instance, false, profile);
+            var module = new DownloadsModule();
+            shell.Registry.Register(module);
+            SettingsWindow? window = null;
+            try
+            {
+                shell.Registry.SetInstalledAsync("downloads-organizer", true).GetAwaiter().GetResult();
+                var history = module.Engine!.History;
+                foreach (int files in new[] { 2, 11 })
+                {
+                    long run = history.BeginRun(RunTrigger.Preview, root);
+                    for (int i = 0; i < files; i++)
+                    {
+                        long op = history.Plan(run, HistoryOperationKind.Move, Path.Combine(root, $"{run}-{i}.txt"), Path.Combine(root, "sorted", $"{run}-{i}.txt"), "r", "Text", 1);
+                        history.MarkCompleted(op, Path.Combine(root, "sorted", $"{run}-{i}.txt"), "hash", DateTimeOffset.UtcNow);
+                    }
+                    history.EndRun(run);
+                }
+                window = new SettingsWindow(shell, "module:downloads-organizer/history");
+                IEnumerable<string?> Toggles() => Descendants(window.PageContent).OfType<IconButton>().Select(AutomationProperties.GetName).Where(n => n is "Hide files" || n?.StartsWith("Show ", StringComparison.Ordinal) == true);
+
+                Assert.Equal(["Show 11 files", "Show 2 files"], Toggles().OrderBy(n => n));
+                Assert.Contains(Descendants(window.PageContent).OfType<Button>(), b => AutomationProperties.GetName(b) == "Undo run" && Descendants(b).OfType<TextBlock>().Any(t => t.Text == "Undo"));
+
+                // A click on the header's text, not the chevron, opens the run.
+                var title = Descendants(window.PageContent).OfType<TextBlock>().First(t => t.Text.StartsWith("Organize now", StringComparison.Ordinal));
+                title.RaiseEvent(new System.Windows.Input.MouseButtonEventArgs(System.Windows.Input.Mouse.PrimaryDevice, 0, System.Windows.Input.MouseButton.Left) { RoutedEvent = UIElement.MouseUpEvent });
+                Assert.Contains("Hide files", Toggles());
             }
             finally
             {

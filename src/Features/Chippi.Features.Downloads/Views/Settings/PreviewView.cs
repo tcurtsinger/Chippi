@@ -236,7 +236,7 @@ internal sealed class PreviewView : UserControl
         _footer.Children.Add(summary.At(0));
         if (_canPreviewAgain)
         {
-            var again = Ui.Button("Preview again");
+            var again = Ui.Button("Refresh");
             again.Click += async (_, _) => await LoadAsync();
             _footer.Children.Add(again.Margin(0, 0, 8, 0).At(1));
         }

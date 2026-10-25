@@ -126,6 +126,18 @@ internal sealed class SettingsController
                                         _window.InvokeSnapshotAction("Discard unsaved rules");
                                         await Idle();
                                     }
+                                    // History: the first run opened (every run starts collapsed), then its Undo confirm bar.
+                                    if (section == "history" && _window.InvokeSnapshotActionStartingWith("Show "))
+                                    {
+                                        await Idle();
+                                        Render(_window.PageContent, System.IO.Path.Combine(directory, $"r4-downloads-history-open-{name}-{accent}.png"), full: true);
+                                        if (_window.InvokeSnapshotActionStartingWith("Undo run"))
+                                        {
+                                            await Idle();
+                                            Render(_window.PageContent, System.IO.Path.Combine(directory, $"r4-downloads-history-confirm-{name}-{accent}.png"), full: true);
+                                            _window.InvokeSnapshotAction("Cancel");
+                                        }
+                                    }
                                 }
                             }
                             if (page.Id == "features")

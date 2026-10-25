@@ -14,13 +14,13 @@
 
   <TextBlock Text="Options" Style="{DynamicResource HeadlineTextStyle}" Margin="0,24,0,8" />
   <c:Card>
-   <c:SettingRow Header="Default length" Description="Used when you start it without picking one">
+   <c:SettingRow Header="Default length">
     <ComboBox x:Name="Length" Style="{DynamicResource HopperComboBoxStyle}" MinWidth="160" SelectionChanged="OnLength" />
    </c:SettingRow>
-   <c:SettingRow Header="Keep screen on" Description="The display stays on too">
+   <c:SettingRow Header="Keep screen on">
     <ToggleButton x:Name="Screen" Style="{DynamicResource SwitchWithLabelStyle}" />
    </c:SettingRow>
-   <c:SettingRow Header="After a restart" Description="Sessions don't carry over">
+   <c:SettingRow Header="After a restart">
     <TextBlock Text="Starts off" Style="{DynamicResource BodyTextStyle}" Foreground="{DynamicResource TextSecondaryBrush}" />
    </c:SettingRow>
   </c:Card>

@@ -56,7 +56,6 @@
   <StackPanel x:Name="Empty" Visibility="Collapsed" Margin="0,24,0,24">
    <c:LucideIcon Data="{x:Static c:LucideIcons.Folder}" Size="24" Brush="{DynamicResource TextTertiaryBrush}" HorizontalAlignment="Center"/>
    <TextBlock Text="No folders yet" HorizontalAlignment="Center" Margin="0,12,0,0"/>
-   <TextBlock Text="New folders start in Manual" Style="{StaticResource CaptionTextStyle}" HorizontalAlignment="Center"/>
    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,16,0,0">
     <Button Content="Add Downloads" Style="{StaticResource PrimaryButtonStyle}" Click="OnAddDownloads" AutomationProperties.Name="Add Downloads"/>
     <Button Content="Choose folder…" Style="{StaticResource SecondaryButtonStyle}" Margin="8,0,0,0" Click="OnChooseFolder" AutomationProperties.Name="Choose folder"/>

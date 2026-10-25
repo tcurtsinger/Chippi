@@ -31,10 +31,8 @@ public static class KeepAwakeText
         : module.Deadline is { } end ? $"On · {Left(end - now)} left"
         : "On · no time limit";
 
-    /// <summary>The line under the status: "PC sleeps as usual", "Until 11:42 AM" or "Until you turn it off".</summary>
-    public static string Detail(KeepAwakeModule module) => !module.IsOn ? "PC sleeps as usual"
-        : module.Deadline is { } end ? $"Until {end.LocalDateTime:t}"
-        : "Until you turn it off";
+    /// <summary>The line under the status, only with an end time: "Until 11:42 AM". Otherwise empty.</summary>
+    public static string Detail(KeepAwakeModule module) => module.IsOn && module.Deadline is { } end ? $"Until {end.LocalDateTime:t}" : "";
 
     /// <summary>"45 min", "1 hr", "1 hr 30 min", rounded up to the minute.</summary>
     public static string Left(TimeSpan left)

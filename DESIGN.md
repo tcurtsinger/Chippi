@@ -203,9 +203,9 @@ The flyout's "Chippi" name is 14 / 600.
 
 Copy is sentence case, plain and short. State comes first and detail second: "On · 1 hr left", "Silent · moves after 30s", "Held · a program named like a PDF". No exclamation marks, no emoji.
 
-**The Bare Label Rule** (Travis, 2026-10-22). A label names the action and nothing else. Never repeat the app's name where its icon already says it, and never pad a label with explanation. The Explorer entry is "Organize", not "Organize with Chippi". When a label seems to need a sentence, the design is wrong; fix the design, not the copy.
+**The Bare Label Rule** (Travis, 2026-10-22). A label names the action and nothing else. Never repeat the app's name where its icon already says it, and never pad a label with explanation. The Explorer entry is "Organize", not "Organize with Chippi". When a label seems to need a sentence, the design is wrong; fix the design, not the copy. This is a technical tool (Travis, 2026-10-24): **buttons name only the verb** ("Undo", not "Undo run" or "Undo 4"; "Refresh", not "Preview again"), and **a confirmation is the question plus Cancel and the action** ("Clear history?" · Cancel · Clear), with no line explaining what happens. Statuses, error reasons and section labels stay, because they say something you can't see ("Failed · in use").
 
-**No page intros** (2026-10-23). A Settings page title has no description under it. A row caption may explain that row, in one short line.
+**No page intros** (2026-10-23). A Settings page title has no description under it. A row caption shows state or data (a path, a count, the chosen accent), never an explanation of the row.
 
 ## 4. Elevation
 
@@ -232,15 +232,15 @@ Flat, like Windows 11. Depth comes from the surface steps (window → card → c
 - **Footer:** 48px of flyout-footer color with a hairline above. Settings (gear + label) on the left, Quit (power + label) on the right, both subtle 32px buttons.
 - **Keep awake panel:**
   - Flyout section title "Keep awake".
-  - One flyout card. The status row reads "Off" over "PC sleeps as usual", or "On · 1 hr left" over "Until 11:42 AM", with a switch on the right. The switch starts the default length.
+  - One flyout card. The status row reads "Off", "On · no time limit", or "On · 1 hr left" over "Until 11:42 AM", with a switch on the right. The switch starts the default length.
   - Under it, a 3-column grid of 32px duration chips: 30 min · 1 hr · 2 hr · 4 hr · No limit · Until…. Clicking a chip starts that length and selects it (accent fill); clicking the selected chip stops. "Until…" opens a time picker and then reads "Until 6:00 PM".
   - Then a "Keep screen on" switch row and the "More options" row.
 - **Tidy panel:**
   - A flyout card with the folder row: a 32px icon chip (accent glyph while watched, muted when Paused), the folder name as a picker (name + small chevron; it lists every folder with its mode, plus Add folder), and the mode line under it ("Silent · moves after 30s", "Manual · 3 to review", "Paused · not watching"). Under that, the full-width Silent / Manual / Paused segment.
   - Below the card, always visible: "Organize now" (accent, fills the row) and "Rules" (96px).
   - A "Recent" header with a "History ›" link on the right, then one flyout card of up to 4 rows. Held rows come first: a caution triangle, the file name, the reason in caution ("Held · a program named like a PDF") and a Review button. Moved rows: a muted file glyph, the name, "Documents · 23m", and an undo icon button. After undo the row reads "Restored to Downloads" and loses its button. Waiting rows: a clock glyph and "Waiting · reason", no action.
-  - Empty state: "No folders yet" with the caption "New folders start in Manual", an accent "Add Downloads" and a standard "Choose folder…".
-- **Empty flyout:** with nothing installed, the tab strip is hidden and the panel shows "No features on yet" with an accent "Add features" button that opens Settings › Add features.
+  - Empty state: "No folders yet", an accent "Add Downloads" and a standard "Choose folder…".
+- **Empty flyout:** with nothing installed, the tab strip is hidden and the panel shows "No features on" with an accent "Add features" button that opens Settings › Add features.
 - **Tray menu (right-click):** flyout styling, 8px radius, 36px items with a 16px glyph and a 13 / 400 label: Open settings, Quit. Its bottom edge sits at the click point, kept 12px off the taskbar.
 
 ### Island (movable, approved 2026-10-23)
@@ -279,42 +279,42 @@ Mockup: the "Movable island" row, except that its open boards show the island as
 - **Page template:** title, then an optional SelectorBar, then sections. A section is a Section header (with an optional right-aligned button) over one card of rows. Two cards in a row of the same section sit 8px apart.
 - **Rows:** at least 60px with a caption, 48px without; 10 / 16 padding; 14px gap. Label over caption on the left, the control on the right. A switch shows "On" or "Off" in body text just left of it. An expander row ends in a chevron and its sub-rows are indented 50px.
 - **File organizer:** a SelectorBar of Settings · Rules · History (§5 File organizer).
-- **Keep awake:** a card with the status row (accent coffee glyph, "Keep awake", caption "Off" or "On · no time limit", switch). Options: Default length (combo, "Used when you start it without picking one"), Keep screen on (switch, "The display stays on too"), After a restart (value "Starts off", caption "Sessions don't carry over").
-- **Add features** (replaces the Features hub): a search field with the "2 on" count beside it. **Available** lists the features that work, each a row with a 32px icon chip (accent glyph when on, muted when off), name, one-line description and a switch; Overlap badges sit after the name. One collapsed **Coming later** row ("39 features on the way") expands into one row per group listing the names. Presets are hidden until enough features exist for them to matter. Toggling a feature installs or uninstalls it, and an installed feature appears in the sidebar at once.
-- **General:** Theme (Dark · Light · Follow Windows segment, default Follow Windows), Accent color (a "Windows" pill and four 24px swatches; the caption reads "Follows your Windows accent" or the color's name), Run at startup (switch, "Starts quietly in the tray when you sign in"). A Settings file section with one row, "Back up or move your settings", captioned with the path, and Export… and Import… on the right.
-- **Island & pet:** Island (switch, "Shows what's live from a screen edge"), Position (Top · Left edge · Right edge combo plus a Reset button, captioned "Or drag the island to any screen edge"), Display (combo). A Gumdrop section: a Color row with a 48px Gumdrop preview, the color's name as caption and six swatches; Reduce motion (combo: Follow Windows · On · Off).
+- **Keep awake:** a card with the status row (accent coffee glyph, "Keep awake", caption "Off" or "On · no time limit", switch). Options: Default length (combo), Keep screen on (switch), After a restart (value "Starts off").
+- **Add features** (replaces the Features hub): a search field with the "2 on" count beside it. **Available** lists the features that work, each a row with a 32px icon chip (accent glyph when on, muted when off), name, one-line description and a switch; Overlap badges sit after the name. One collapsed **Coming later** row ("39 features") expands into one row per group listing the names. Presets are hidden until enough features exist for them to matter. Toggling a feature installs or uninstalls it, and an installed feature appears in the sidebar at once.
+- **General:** Theme (Dark · Light · Follow Windows segment, default Follow Windows), Accent color (a "Windows" pill and four 24px swatches; the caption reads "Follow Windows" or the color's name), Run at startup (switch). A Settings file section with one row, "Location", captioned with the path, and Export… and Import… on the right.
+- **Island & pet:** Island (switch), Position (Top · Left edge · Right edge combo plus a Reset button; dragging the island also sets it), Display (combo). A Gumdrop section: a Color row with a 48px Gumdrop preview, the color's name as caption and six swatches; Reduce motion (combo: Follow Windows · On · Off).
 - **Notifications:** see below.
-- **About:** Chippi with a 32px Gumdrop, captioned "Everyday Windows utilities", with "Version 0.1.0" on the right; License (GPL-3.0-or-later, View); Privacy ("No telemetry. Your settings stay on this PC."); Third-party notices ("Fonts, icons and libraries", View). The sidebar has no version footer. Notices open as rendered text, never raw markdown.
+- **About:** Chippi with a 32px Gumdrop and "Version 0.1.0" on the right; License (GPL-3.0-or-later, View); Privacy ("No telemetry"); Third-party notices (View). The sidebar has no version footer. Notices open as rendered text, never raw markdown.
 - **Swatch selection:** a selected swatch or pill gets a 2px gap in the card color and a 2px accent ring.
 
 ### File organizer
 Behavior approved 2026-10-22 (`docs/phase-2/design/phase-2-mockups.html`); visuals restyled 2026-10-23. The Tidy panel is under Tray flyout above.
 - **Settings tab:**
-  - Watched folders, with Add folder on the header's right. Each folder is an expander row: folder glyph (accent while watched, muted when Paused), name over path, the mode as a value, and a chevron. Its sub-rows: Mode (Silent · Manual · Paused segment, caption "Moves files on its own", "Waits for your review" or "Not watching"), Wait before moving (combo, "Gives downloads time to finish"), Ignore list (Edit, "Files and patterns to leave alone") and Stop watching this folder (Remove).
-  - Options: Keep history (combo), Organize in Explorer (switch, "Adds Organize to the right-click menu"), Import archive (Choose file…, "zip, tgz or tar.gz").
+  - Watched folders, with Add folder on the header's right. Each folder is an expander row: folder glyph (accent while watched, muted when Paused), name over path, the mode as a value, and a chevron. Its sub-rows: Mode (Silent · Manual · Paused segment), Wait before moving (combo), Ignore list (Edit) and Stop watching this folder (Remove).
+  - Options: Keep history (combo), Organize in Explorer (switch), Import archive (Choose file…; the picker filters to zip, tgz and tar.gz).
 - **Rules tab:**
-  - A card holding the test field, borderless across the whole card: a search glyph, "Test a file name, like notes.txt", and the result on the right ("Txt Files → Documents" in Secondary, or "No rule matches · stays in Downloads" in Caption). It runs the whole rule set.
+  - A card holding the test field, borderless across the whole card: a search glyph, "Test a file name", and the result on the right ("Txt Files → Documents" in Secondary, or "No rule matches · stays in Downloads" in Caption). It runs the whole rule set.
   - "Rules" with a "First match wins" caption, and Add rule on the right.
   - One card of rule rows: drag grip, number, name over a summary (".txt → Documents"), switch, and a chevron that opens the rule. One rule is open at a time. Drag, or Alt+Up/Down, reorders; the drop target is a 2px accent line.
-  - **Saving.** Everything inside the editor (name, conditions, action, destination) is a draft until Save. The editor ends with Save (accent, enabled only when the draft is valid and changed) and Cancel on the left, Duplicate and Delete on the right. Save keeps the rule and closes the editor; Cancel puts it back, and removes a rule from Add rule that was never saved. The switch, reorder, Duplicate and Delete save at once, like Windows switches. Collapsing a rule keeps its draft and shows an amber "Unsaved changes" badge on the row. Leaving the page (another tab, another Settings page, a deep link, closing Settings) with a draft shows a card at the top of Rules instead: "Unsaved rule changes. Discard them?" with Discard (accent, then goes on) and Keep editing (opens the first draft).
+  - **Saving.** Everything inside the editor (name, conditions, action, destination) is a draft until Save. The editor ends with Save (accent, enabled only when the draft is valid and changed) and Cancel on the left, Duplicate and Delete on the right. Save keeps the rule and closes the editor; Cancel puts it back, and removes a rule from Add rule that was never saved. The switch, reorder, Duplicate and Delete save at once, like Windows switches. Collapsing a rule keeps its draft and shows an amber "Unsaved changes" badge on the row. Leaving the page (another tab, another Settings page, a deep link, closing Settings) with a draft shows a card at the top of Rules instead: "Discard changes?" with Discard (accent, then goes on) and Keep editing (opens the first draft).
   - Action is a Move to folder · Rename segment. **Move** shows the destination as a read-only path with Browse… beside it, which opens the Windows folder picker (it has its own New folder); the rule saves the full path, shown in the summary by the folder's name with the full path on hover. A new rule starts at Documents. A relative destination from before the picker stays as it is: it means "inside the watched folder the file is in", reads as "Downloads\Documents" with the caption "Inside each watched folder", and picking a folder replaces it. Move takes no placeholders. **Rename** is a typed template whose placeholders are 22px chips in control fill, insertable by click.
   - Regex and rename templates use the code font and fill their column up to 460px. Validation messages are caution text under the field.
   - **Files already there.** Adding a folder or changing its mode never moves the files already in it. Saving a rule, or switching one on, sorts them: only the top-level files that rule wins under first match. Files Chippi just moved or put back with Undo, partial downloads, the ignore list and misleading names stay out. Silent moves them as one run with history, Undo and a notice; Manual lists them in Ready to review; Paused does nothing. An invalid or Off rule never runs.
 - **History tab:**
   - A toolbar: search field ("Search history"), All folders combo, Clear history (text only, no glyph).
-  - Grouped by day under Section headers. One card per run: a header row ("Silent · Downloads" over "10:07 AM · 1 moved") with Undo run, then indented file rows (name over "Downloads › Documents") with an undo icon button. Runs over 10 files collapse.
-  - Undo per row and per run goes through an inline confirm bar ("Undo 4"). Clear history uses a popover with a Critical "Clear" button.
+  - Grouped by day under Section headers. One card per run: a header row ("Silent · Downloads" over "10:07 AM · 1 moved") with Undo, then indented file rows (name over "Downloads › Documents") with an undo icon button. Every run starts collapsed behind a chevron, except the run a notice or link opened; clicking anywhere on the header (but a button) opens or closes it, like a rule's header.
+  - Undo per row and per run goes through an inline confirm bar: "Undo 4 moves?" (or "Undo this move?") with Cancel and an accent Undo. Clear history uses a popover: "Clear history?" with Cancel and a Critical Clear.
 - **Preview** is a view inside Settings with a back button, not a dialog.
   - Each row has a checkbox, the file name with its size, the rule and the destination. Warnings are a caution line under the name, and a move to another drive gets a neutral "Other drive" badge.
   - Held rows start unchecked. Files no rule matches show a disabled checkbox. The header checkbox shows mixed when some rows are selected.
   - The footer shows the selected count and total size, with Cancel and Approve (accent).
-  - After apply: a success check and Undo on each moved row, a caution failure line on each failed one, then "Preview again" and "Done".
+  - After apply: a success check and Undo on each moved row, a caution failure line on each failed one, then "Refresh" and "Done".
 - **Notices:** event kinds are Organized, Ready to review, Held, Failed, Archive imported. Which events reach Windows notifications and the island is set on the app-wide Notifications page.
 
 ### Notifications page
 Behavior approved 2026-10-22 (`docs/phase-2/design/notifications/`); visuals restyled 2026-10-23.
 - **Destinations:** one card with two switch rows, Windows notifications and Island, with no icons.
-- **Turning a destination off** keeps its choices. Its caption reads "Off · choices kept", and that checkbox column dims to 60% in every group while staying editable.
+- **Turning a destination off** keeps its choices. Its row has no caption; its checkbox column dims to 60% in every group while staying editable.
 - **When the Windows backend is unavailable,** one line sits under the card: a 7px caution dot and "Windows notifications unavailable" in caution caption. No button, and no claims about Focus or Do not disturb.
 - **Feature groups** follow the sidebar order. Each is a Section header with "Windows" and "Island" caption labels over 96px columns, then a card of 48px rows with one 20px checkbox centered in each column. A feature with no events gets no group.
 - **Downloads defaults:** Organized and Ready to review: Island only. Held and Failed: both. Archive imported: Windows only.

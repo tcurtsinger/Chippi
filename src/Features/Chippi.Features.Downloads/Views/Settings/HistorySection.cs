@@ -5,6 +5,7 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Media;
 using System.Windows.Threading;
 using Chippi.Features.Downloads.Storage;
 using Chippi.UI.Controls;
@@ -18,7 +19,6 @@ namespace Chippi.Features.Downloads.Views.Settings;
 /// </summary>
 internal sealed class HistorySection : UserControl
 {
-    private const int CollapseOver = 10;
     private const int Take = 500;
 
     private readonly DownloadsModule _module;
@@ -125,8 +125,8 @@ internal sealed class HistorySection : UserControl
     private Card Run(RunRecord? run, IReadOnlyList<OperationRecord> rows, IReadOnlyDictionary<long, OperationRecord> restores)
     {
         long runId = rows[0].RunId;
-        bool collapsed = rows.Count > CollapseOver && !_expanded.Contains(runId);
-        // Undo run acts on the whole run, so it counts the whole run: never just the rows a search
+        bool collapsed = !_expanded.Contains(runId); // every run starts collapsed; the focused run starts open
+        // Undo acts on the whole run, so it counts the whole run: never just the rows a search
         // or the row limit left on screen (Karl's review).
         int undoable = _module.Engine?.History.RunOperations(runId).Count(Undoable) ?? 0;
 
@@ -145,23 +145,29 @@ internal sealed class HistorySection : UserControl
         string counts = string.Join(" · ", new[] { (moved, "moved"), (failed, "failed"), (undone, "undone") }.Where(c => c.Item1 > 0).Select(c => $"{c.Item1} {c.Item2}"));
         string time = Ui.Time(run?.StartedAt ?? rows[0].PlannedAt);
 
-        // Header row: "Silent · Downloads" over "10:07 AM · 1 moved", then Undo run.
-        var head = Ui.Columns("Auto", "*", "Auto");
-        if (rows.Count > CollapseOver)
+        void Toggle()
         {
-            var expand = Ui.Icon(collapsed ? LucideIcons.ChevronRight : LucideIcons.ChevronDown, collapsed ? $"Show {rows.Count} files" : "Hide files");
-            expand.Click += (_, _) =>
-            {
-                if (!_expanded.Add(runId))
-                    _expanded.Remove(runId);
-                Render();
-            };
-            head.Children.Add(expand.Margin(-8, 0, 8, 0).At(0));
+            if (!_expanded.Add(runId))
+                _expanded.Remove(runId);
+            Render();
         }
+
+        // Header row: a chevron, "Silent · Downloads" over "10:07 AM · 1 moved", then Undo.
+        // Clicking anywhere on it (but a button) opens or closes the run, like a rule's header.
+        var head = Ui.Columns("Auto", "*", "Auto");
+        head.Background = Brushes.Transparent;
+        var expand = Ui.Icon(collapsed ? LucideIcons.ChevronRight : LucideIcons.ChevronDown, collapsed ? $"Show {rows.Count} files" : "Hide files");
+        expand.Click += (_, _) => Toggle();
+        head.Children.Add(expand.Margin(-8, 0, 8, 0).At(0));
         head.Children.Add(Ui.Stack(Ui.Text(trigger + where), Ui.Text(counts.Length > 0 ? $"{time} · {counts}" : time, "CaptionTextStyle")).At(1));
+        head.MouseLeftButtonUp += (_, e) =>
+        {
+            if (e.OriginalSource is DependencyObject source && !Ui.IsInside<ButtonBase>(source))
+                Toggle();
+        };
         if (undoable > 0)
         {
-            var undoRun = Ui.Button("Undo run", icon: LucideIcons.Undo);
+            var undoRun = Ui.Button("Undo", icon: LucideIcons.Undo, name: "Undo run");
             undoRun.Click += (_, _) =>
             {
                 _confirming = runId;
@@ -174,14 +180,14 @@ internal sealed class HistorySection : UserControl
         var card = Ui.Card(Ui.Pad(head, 60));
         card.Tag = runId;
         if (_confirming == runId && undoable > 0)
-            card.Children.Add(Confirm(undoable, run?.Folder, () => _ = UndoRunAsync(runId)));
+            card.Children.Add(Confirm(undoable, () => _ = UndoRunAsync(runId)));
         if (!collapsed)
         {
             foreach (var row in rows)
             {
                 card.Children.Add(Row(row, restores.GetValueOrDefault(row.Id)));
                 if (_confirmingRow == row.Id)
-                    card.Children.Add(Confirm(1, Path.GetDirectoryName(row.SourcePath), () => _ = UndoRowAsync(row.Id)));
+                    card.Children.Add(Confirm(1, () => _ = UndoRowAsync(row.Id)));
             }
         }
         return card;
@@ -227,7 +233,7 @@ internal sealed class HistorySection : UserControl
     }
 
     /// <summary>The inline confirm bar: "Undo 4 moves?" with Cancel and the only accent button on screen.</summary>
-    private Border Confirm(int count, string? folder, Action undo)
+    private Border Confirm(int count, Action undo)
     {
         var cancel = Ui.Button("Cancel");
         cancel.Click += (_, _) =>
@@ -235,16 +241,16 @@ internal sealed class HistorySection : UserControl
             _confirming = _confirmingRow = null;
             Render();
         };
-        var go = Ui.Button($"Undo {count}", "PrimaryButtonStyle");
+        var go = Ui.Button("Undo", "PrimaryButtonStyle", name: "Confirm undo");
         go.Click += (_, _) =>
         {
             go.IsEnabled = cancel.IsEnabled = false;
             undo();
         };
         var grid = Ui.Columns("*", "Auto", "Auto");
-        grid.Children.Add(Ui.Stack(
-            Ui.Text(count == 1 ? "Undo this move?" : $"Undo {count} moves?"),
-            Ui.Text(folder is null ? "Files go back where they were" : $"Files go back to {Ui.FolderName(folder)}", "CaptionTextStyle")).At(0));
+        var question = Ui.Text(count == 1 ? "Undo this move?" : $"Undo {count} moves?");
+        question.VerticalAlignment = VerticalAlignment.Center;
+        grid.Children.Add(question.At(0));
         grid.Children.Add(cancel.Margin(0, 0, 8, 0).At(1));
         grid.Children.Add(go.At(2));
         var bar = Ui.Pad(grid, 60);
@@ -273,7 +279,7 @@ internal sealed class HistorySection : UserControl
         Render();
     }
 
-    /// <summary>Clear history: a small popover with one consequence line and a Critical Clear.</summary>
+    /// <summary>Clear history: a small popover, the question with Cancel and a Critical Clear.</summary>
     private void ShowClearPopover(Button anchor)
     {
         var popup = new Popup { PlacementTarget = anchor, Placement = PlacementMode.Bottom, StaysOpen = false, AllowsTransparency = true, HorizontalOffset = -150 };
@@ -286,11 +292,10 @@ internal sealed class HistorySection : UserControl
             Clear();
         };
         var content = Ui.Stack(
-            Ui.Text("Clear history?", "HeadlineTextStyle"),
-            Ui.Text("Files stay where they are. Undo won't be possible.", "CaptionTextStyle").Margin(0, 4, 0, 16),
+            Ui.Text("Clear history?", "HeadlineTextStyle").Margin(0, 0, 0, 16),
             Ui.Row(cancel, clear.Margin(8, 0, 0, 0)));
-        ((FrameworkElement)content.Children[2]).HorizontalAlignment = HorizontalAlignment.Right;
-        var card = new Border { CornerRadius = new CornerRadius(8), Padding = new Thickness(16), BorderThickness = new Thickness(1), Margin = new Thickness(0, 6, 0, 0), Child = content, Width = 300 };
+        ((FrameworkElement)content.Children[1]).HorizontalAlignment = HorizontalAlignment.Right;
+        var card = new Border { CornerRadius = new CornerRadius(8), Padding = new Thickness(16), BorderThickness = new Thickness(1), Margin = new Thickness(0, 6, 0, 0), Child = content, Width = 240 };
         card.SetResourceReference(Border.BackgroundProperty, "FlyoutBrush");
         card.SetResourceReference(Border.BorderBrushProperty, "WindowBorderBrush");
         popup.Child = card;
