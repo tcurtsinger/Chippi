@@ -101,6 +101,13 @@ public partial class IslandWindow : Window
             RefreshTab();
         };
         _panel.TabPressed += OnPress;
+        _panel.EscapePressed += (_, _) => CloseIsland();
+        _panel.SettingsRequested += (_, _) =>
+        {
+            CloseIsland(immediate: true);
+            SettingsRequested?.Invoke(this, EventArgs.Empty);
+        };
+        _panel.LastPageChanged += (_, key) => LastPageChanged?.Invoke(this, key);
 
         // The mouse is handled here, before the button sees it: a press is a click or the start of a drag.
         // Click itself comes only from Enter, Space or UI Automation's Invoke.
@@ -130,7 +137,22 @@ public partial class IslandWindow : Window
     /// <summary>The user dropped the tab on the taskbar's edge, the bottom or a corner; it went back.</summary>
     public event EventHandler? DropRefused;
 
+    /// <summary>The Settings orbit button: the island has closed; open Settings.</summary>
+    public event EventHandler? SettingsRequested;
+
+    /// <summary>The user opened an island page (a tile key): save it as AppSettings.IslandLastPage.</summary>
+    public event EventHandler<string>? LastPageChanged;
+
     internal HWND Handle => _hwnd;
+
+    /// <summary>The open island's window.</summary>
+    internal HWND PanelHandle => _panel.Handle;
+
+    /// <summary>AppSettings.IslandLastPage: the page the next open restores while its tile exists.</summary>
+    public void SetLastPage(string? key) => _panel.SetLastPage(key);
+
+    /// <summary>Now Playing's media sessions.</summary>
+    internal void SetMedia(Media.IMediaSessions media) => _panel.SetMedia(media);
 
     /// <summary>Creates the window handles with the no-activate tool-window styles, before anything is shown.</summary>
     public void Initialize()
@@ -364,6 +386,9 @@ public partial class IslandWindow : Window
     }
 
     internal bool IsIslandOpen => _panel.IsOpen;
+
+    /// <summary>The open island itself, for tests and snapshots.</summary>
+    internal IslandPanelWindow Panel => _panel;
 
     /// <summary>Whether the keyboard and mouse hooks are installed (only while the island is open).</summary>
     internal bool IsHooked => _escapeHook is { IsInvalid: false } || _clickHook is { IsInvalid: false };
@@ -703,7 +728,7 @@ public partial class IslandWindow : Window
         var tab = IslandNative.WindowRect(_hwnd);
         var region = tab;
         if (_panel.IsVisible)
-            region.Union(IslandNative.WindowRect(_panel.Handle));
+            region.Union(_panel.Footprint);
         region.Inflate(48 * area.Scale, 48 * area.Scale);
         region.Intersect(area.Monitor);
         region = new Rect(Math.Floor(region.X), Math.Floor(region.Y), Math.Ceiling(region.Width), Math.Ceiling(region.Height));

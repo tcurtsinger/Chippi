@@ -78,6 +78,16 @@ internal static class IslandNative
             SET_WINDOW_POS_FLAGS.SWP_NOACTIVATE | SET_WINDOW_POS_FLAGS.SWP_NOOWNERZORDER);
     }
 
+    /// <summary>
+    /// Makes the window the foreground window. Only after the user clicked into it: the click is the
+    /// last input, so Windows allows it.
+    /// </summary>
+    public static void Activate(HWND hwnd)
+    {
+        if (hwnd != default)
+            PInvoke.SetForegroundWindow(hwnd);
+    }
+
     public static Rect WindowRect(HWND hwnd) =>
         hwnd != default && PInvoke.GetWindowRect(hwnd, out var r) ? ToRect(r) : Rect.Empty;
 

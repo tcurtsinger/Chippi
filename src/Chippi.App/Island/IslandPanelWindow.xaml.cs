@@ -2,11 +2,13 @@
 // Copyright (C) Chippi contributors
 
 using System.Diagnostics;
-using System.Globalization;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Threading;
+using Chippi.App.Island.Media;
 using Chippi.App.Pet;
 using Chippi.Core.Config;
 using Chippi.Core.Diagnostics;
@@ -19,95 +21,173 @@ using Windows.Win32.Foundation;
 namespace Chippi.App.Island;
 
 /// <summary>
-/// The open island (DESIGN.md §5 Island): the header, the live activity card and the installed
-/// features' island views, in one shape that grows out of the tab. <see cref="IslandWindow"/>
-/// opens, places and closes it.
+/// The open island (DESIGN.md §5 Island): the tile grid or one tile's page, in one shape that grows
+/// out of the tab and morphs from page to page, with the orbit buttons around it.
+/// <see cref="IslandWindow"/> opens, places and closes it.
 /// </summary>
 public partial class IslandPanelWindow : Window
 {
-    private const double Width328 = 328;
+    /// <summary>The shell's Now Playing tile, always on the grid.</summary>
+    public const string NowPlayingKey = "now-playing";
+
+    private const double GridWidth = 328;
+    private const double NowPlayingWidth = 440;
     private const double OpenRadius = 20;
+    private const double ShadowRoom = 40; // beside the shape, for its shadow
+    private const double ShadowBelow = 56;
     private static readonly TimeSpan GrowTime = TimeSpan.FromMilliseconds(220);
     private static readonly TimeSpan ShrinkTime = TimeSpan.FromMilliseconds(160);
+    private static readonly TimeSpan PageFadeDelay = TimeSpan.FromMilliseconds(60);
+    private static readonly TimeSpan PageFadeTime = TimeSpan.FromMilliseconds(180);
+
+    private enum Morph { Open, Page, Close }
 
     private readonly DispatcherTimer _clock = new();
+    private readonly IslandGrid _grid = new();
     private readonly Dictionary<IslandTileContribution, FrameworkElement> _views = [];
-    private IReadOnlyList<IslandTileContribution> _parts = [];
+    private readonly Dictionary<OrbitSlot, Button> _orbit = [];
+    private IReadOnlyList<IslandTileGroup> _groups = [];
+    private IReadOnlyList<IslandActivity> _activities = [];
+    private IMediaSessions? _media;
+    private NowPlayingView? _nowPlaying;
+    private string? _page; // null is the grid
+    private string? _lastPage;
     private HWND _hwnd;
     private IslandEdge _edge;
-    private Rect _tab;
+    private Rect _tab; // physical pixels
     private MonitorArea _area;
-    private Rect _bounds; // the open island, in physical pixels
-    private Rect _from; // the tab, in the island's own DIPs
-    private Rect _to; // the whole island, likewise
-    private double _grown; // 0 is the tab, 1 the whole island
+    private Rect _window; // the window while open, physical pixels
+    private Rect _tabLocal; // the tab, in the window's DIPs
+    private Rect _target; // where the shape is heading, likewise
+    private Rect _drawn; // where it is drawn now
+    private Rect _from;
+    private double _radiusFrom;
+    private Morph _morph;
+    private TimeSpan _elapsed;
+    private double _fadeFrom;
     private long _lastFrame;
     private EventHandler? _frame;
+    private bool _keyboard;
 
     public IslandPanelWindow()
     {
         InitializeComponent();
         _clock.Tick += (_, _) => UpdateClock();
-        PlayPauseButton.Click += (_, _) => TogglePlayGlyph();
+        _grid.TileOpened += (_, key) => ShowPage(key);
+        foreach (var slot in Enum.GetValues<OrbitSlot>())
+            Orbit.Children.Add(_orbit[slot] = OrbitButton(slot));
+
         // The island grows over the tab: a press where the tab sits is the tab's (click or drag).
+        // Any other press is the user clicking into the island: from then on it takes the keyboard.
         PreviewMouseLeftButtonDown += (_, e) =>
         {
-            if (_from.Contains(e.GetPosition(Surface)))
+            if (_tabLocal.Contains(e.GetPosition(Root)))
                 TabPressed?.Invoke(this, e);
+            else
+                TakeKeyboard(e.OriginalSource as DependencyObject);
         };
-        // Content that grows or shrinks (a module's view refreshing) keeps the island centered on the tab.
+        PreviewMouseRightButtonDown += (_, e) => TakeKeyboard(e.OriginalSource as DependencyObject);
+        PreviewKeyDown += (_, e) =>
+        {
+            if (e.Key != Key.Escape)
+                return;
+            e.Handled = true;
+            EscapePressed?.Invoke(this, EventArgs.Empty);
+        };
+        // Content that grows or shrinks (a module's view refreshing) reshapes the island around it.
         Card.SizeChanged += (_, _) =>
         {
             if (IsOpen)
-                Place();
+                Reshape(snap: _frame is null);
         };
         DpiChanged += (_, _) => Dispatcher.BeginInvoke(DispatcherPriority.Render, () =>
         {
             if (IsOpen)
                 Place();
         });
-        Render(null);
     }
 
     /// <summary>A left press inside the tab's footprint, which the island covers while it is visible.</summary>
     internal event MouseButtonEventHandler? TabPressed;
 
+    /// <summary>Esc while the island has the keyboard (the user clicked into it).</summary>
+    internal event EventHandler? EscapePressed;
+
+    /// <summary>The Settings orbit button.</summary>
+    internal event EventHandler? SettingsRequested;
+
+    /// <summary>The user opened a page (a tile key) to restore next time.</summary>
+    internal event EventHandler<string>? LastPageChanged;
+
     public bool IsOpen { get; private set; }
 
     internal HWND Handle => _hwnd;
 
+    /// <summary>The page showing: a tile key, or null for the grid.</summary>
+    internal string? CurrentPage => _page;
+
+    /// <summary>Whether the island took the keyboard after the user clicked into it.</summary>
+    internal bool HasKeyboard => _keyboard;
+
     public void Initialize() => _hwnd = IslandNative.MakeNoActivate(this);
 
-    public void SetPetColor(PetColor color) => Pet.PetColor = color;
+    public void SetPetColor(PetColor color) => _grid.Pet.PetColor = color;
+
+    /// <summary>Now Playing's media sessions.</summary>
+    internal void SetMedia(IMediaSessions media)
+    {
+        if (_media is not null)
+            _media.Changed -= OnMediaChanged;
+        _media = media;
+        _media.Changed += OnMediaChanged;
+        _nowPlaying = null;
+        RefreshGrid();
+    }
+
+    /// <summary>AppSettings.IslandLastPage.</summary>
+    internal void SetLastPage(string? key) => _lastPage = key;
 
     public void Celebrate()
     {
         if (IsOpen)
-            Pet.Celebrate();
+            _grid.Pet.Celebrate();
     }
 
-    /// <summary>The live card shows the highest activity, except Keep awake's status, which its own island view shows.</summary>
+    /// <summary>The activities give tiles their dots and pick the live orbit button.</summary>
     public void SetActivities(IReadOnlyList<IslandActivity> activities, PetMood mood)
     {
-        Pet.ShowMood(mood == PetMood.WideAwake ? PetMood.WideAwake : PetMood.Idle);
-        Render(activities.FirstOrDefault(a => !(a.Kind == IslandActivityKind.Status && a.ModuleId == IslandHost.KeepAwakeModuleId)));
+        _activities = activities;
+        _grid.Pet.ShowMood(mood == PetMood.WideAwake ? PetMood.WideAwake : PetMood.Idle);
+        RefreshGrid();
+        RefreshOrbit();
     }
 
-    /// <summary>
-    /// The running features' island tiles, in grid order. Until the grid is built (Phase 3 S6) each
-    /// tile's page shows here in that order, its sections stacked, as the island views did before.
-    /// </summary>
+    /// <summary>The running features' island tiles, in grid order. A page whose tile went away falls back to the grid.</summary>
     public void SetTiles(IReadOnlyList<IslandTileGroup> tiles)
     {
-        var parts = tiles.SelectMany(t => t.Parts).ToList();
-        if (parts.SequenceEqual(_parts))
-            return;
-        _parts = parts;
-        foreach (var gone in _views.Keys.Where(p => !parts.Contains(p)).ToList())
+        foreach (var gone in _views.Keys.Where(p => !tiles.SelectMany(t => t.Parts).Contains(p)).ToList())
             _views.Remove(gone);
-        if (IsOpen)
-            AttachPanels();
+        foreach (var group in _groups)
+            foreach (var part in group.Parts)
+                part.StatusChanged -= OnStatusChanged;
+        _groups = tiles;
+        foreach (var group in _groups)
+            foreach (var part in group.Parts)
+                part.StatusChanged += OnStatusChanged;
+        RefreshGrid();
+        if (!IsOpen)
+            return;
+        if (_page is not null && !Exists(_page))
+            ShowPage(null, remember: false);
+        else
+            Attach(_page);
+        RefreshOrbit();
+        Reshape(snap: _frame is null);
     }
+
+    private void OnStatusChanged(object? sender, EventArgs e) => Dispatcher.BeginInvoke(RefreshGrid);
+
+    private void OnMediaChanged(object? sender, EventArgs e) => RefreshGrid();
 
     /// <summary>Grows out of <paramref name="tab"/> (physical pixels) on <paramref name="edge"/>, or moves there when already open.</summary>
     internal void Open(IslandEdge edge, Rect tab, MonitorArea area)
@@ -125,12 +205,15 @@ public partial class IslandPanelWindow : Window
         // so it is pointed at the island accent (the dark shade of the user's choice) on every open.
         if (Application.Current?.TryFindResource("IslandAccentBrush") is { } accent)
             Resources["AccentBrush"] = accent;
-        if (!IsVisible) // reopened while still shrinking, it keeps its views
-            AttachPanels();
+        bool shrinking = IsVisible;
+        if (!shrinking)
+            _page = _lastPage is not null && Exists(_lastPage) ? _lastPage : null;
+        Attach(_page);
+        RefreshOrbit();
         UpdateClock();
         Place();
         Show();
-        Animate();
+        Begin(Morph.Open);
     }
 
     /// <summary>Shrinks back into the tab, then hides; <paramref name="immediate"/> hides at once.</summary>
@@ -139,140 +222,89 @@ public partial class IslandPanelWindow : Window
         if (!IsOpen)
             return;
         IsOpen = false;
+        _keyboard = false;
         _clock.Stop();
         if (immediate)
             Collapse();
         else
-            Animate();
+            Begin(Morph.Close);
     }
 
-    /// <summary>Whether <paramref name="physical"/> is on the open island's shape, whether or not the window has seen the pointer yet.</summary>
-    internal bool Covers(Point physical) => IsOpen && _bounds.Contains(physical);
-
-    /// <summary>Sizes the window to the island and its shadow, flat side on the tab's edge, and redraws the shape there.</summary>
-    private void Place()
+    /// <summary>Whether <paramref name="physical"/> is on the open island: its shape or an orbit button.</summary>
+    internal bool Covers(Point physical)
     {
-        double s = _area.Scale;
-        var room = Room(_edge);
-        Surface.Margin = room;
-        Root.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-        double height = Surface.DesiredSize.Height - room.Top - room.Bottom;
-        var origin = IslandGeometry.PanelOrigin(_edge, _tab, new Size(Width328 * s, height * s), _area.Work, s);
-        _bounds = new Rect(origin.X, origin.Y, Width328 * s, height * s);
-        IslandNative.Move(_hwnd, new Rect(origin.X - room.Left * s, origin.Y - room.Top * s,
-            (Width328 + room.Left + room.Right) * s, (height + room.Top + room.Bottom) * s));
-        _from = new Rect((_tab.X - origin.X) / s, (_tab.Y - origin.Y) / s, _tab.Width / s, _tab.Height / s);
-        _to = new Rect(0, 0, Width328, height);
-        ShapeFill.BorderThickness = _edge switch
+        if (!IsOpen)
+            return false;
+        var local = new Point((physical.X - _window.X) / _area.Scale, (physical.Y - _window.Y) / _area.Scale);
+        return _target.Contains(local) || IslandGeometry.OrbitLayout(_edge, _target, Slots()).Any(o => o.Rect.Contains(local));
+    }
+
+    /// <summary>Shows <paramref name="key"/>'s page, or the grid for null, morphing the shape to fit.</summary>
+    internal void ShowPage(string? key, bool remember = true)
+    {
+        if (key is not null && !Exists(key))
+            key = null;
+        if (remember && key is not null && key != _lastPage)
         {
-            IslandEdge.Left => new Thickness(0, 1, 1, 1),
-            IslandEdge.Right => new Thickness(1, 1, 0, 1),
-            _ => new Thickness(1, 0, 1, 1),
-        };
-        Draw();
+            _lastPage = key;
+            LastPageChanged?.Invoke(this, key);
+        }
+        if (key == _page && IsOpen)
+            return;
+        _page = key;
+        if (!IsOpen)
+            return;
+        Attach(key);
+        RefreshOrbit();
+        Reshape(snap: false); // sets the target; the morph below animates to it from what is drawn
+        Begin(Morph.Page);
+        if (_keyboard)
+            Dispatcher.BeginInvoke(DispatcherPriority.Input, FocusFirst);
     }
 
-    /// <summary>Room around the island for its shadow, none on the edge it grows from.</summary>
-    private static Thickness Room(IslandEdge edge) => edge switch
+    // ----- Pages -----
+
+    /// <summary>Every page the grid offers, in grid order.</summary>
+    internal IReadOnlyList<string> PageKeys() => [NowPlayingKey, .. _groups.Where(g => g.Key != NowPlayingKey).Select(g => g.Key)];
+
+    private bool Exists(string key) => key == NowPlayingKey || _groups.Any(g => g.Key == key);
+
+    private IslandTileGroup? Group(string? key) => _groups.FirstOrDefault(g => g.Key == key);
+
+    private double PageWidth(string? key) => key switch
     {
-        IslandEdge.Left => new Thickness(0, 24, 40, 56),
-        IslandEdge.Right => new Thickness(40, 24, 0, 56),
-        _ => new Thickness(40, 0, 40, 56),
+        null => GridWidth,
+        NowPlayingKey => Math.Max(NowPlayingWidth, Group(key)?.PageWidth ?? 0),
+        _ => Group(key)?.PageWidth ?? GridWidth,
     };
 
-    /// <summary>
-    /// Grows toward the whole island while open and shrinks toward the tab once closed, over 220ms
-    /// and 160ms; one running animation turns around when that flips. Under reduced motion it
-    /// appears and hides at once.
-    /// </summary>
-    private void Animate()
+    private void Attach(string? key)
     {
-        if (Motion.IsReduced)
+        Detach();
+        if (key is null)
         {
-            StopFrames();
-            if (!IsOpen)
-            {
-                Collapse();
-                return;
-            }
-            _grown = 1;
-            Draw();
+            Page.Content = _grid;
             return;
         }
-        if (_frame is not null)
-            return;
-        _lastFrame = 0;
-        _frame = (_, _) =>
-        {
-            // The clock starts on the first frame, so a slow first show doesn't skip the start.
-            long now = Stopwatch.GetTimestamp();
-            var step = _lastFrame == 0 ? TimeSpan.Zero : Stopwatch.GetElapsedTime(_lastFrame, now);
-            _lastFrame = now;
-            _grown = IsOpen ? Math.Min(1, _grown + step / GrowTime) : Math.Max(0, _grown - step / ShrinkTime);
-            Draw();
-            if (!IsOpen && _grown <= 0)
-                Collapse();
-            else if (IsOpen && _grown >= 1)
-                StopFrames();
-        };
-        System.Windows.Media.CompositionTarget.Rendering += _frame;
-    }
-
-    private void StopFrames()
-    {
-        if (_frame is null)
-            return;
-        System.Windows.Media.CompositionTarget.Rendering -= _frame;
-        _frame = null;
-    }
-
-    /// <summary>Back in the tab: hidden, with the views let go.</summary>
-    private void Collapse()
-    {
-        StopFrames();
-        _grown = 0;
-        Hide();
-        // Unparented views get Unloaded and stop listening until the island opens again.
-        Panels.Children.Clear();
-    }
-
-    /// <summary>
-    /// The shape at <see cref="_grown"/>: from the tab's half-oval to the whole island with 20px
-    /// corners away from the edge, easing out as it grows (and in as it shrinks). The content fades
-    /// in over the second half, once the shape is nearly full.
-    /// </summary>
-    private void Draw()
-    {
-        double t = 1 - Math.Pow(1 - _grown, 3);
-        Canvas.SetLeft(Shape, Lerp(_from.X, _to.X, t));
-        Canvas.SetTop(Shape, Lerp(_from.Y, _to.Y, t));
-        Shape.Width = Lerp(_from.Width, _to.Width, t);
-        Shape.Height = Lerp(_from.Height, _to.Height, t);
-        // The tab's corners are as round as it is deep.
-        double tab = _edge == IslandEdge.Top ? Math.Min(_from.Height, _from.Width / 2) : Math.Min(_from.Width, _from.Height / 2);
-        double r = Lerp(tab, OpenRadius, t);
-        ShapeShadow.CornerRadius = ShapeFill.CornerRadius = _edge switch
-        {
-            IslandEdge.Left => new CornerRadius(0, r, r, 0),
-            IslandEdge.Right => new CornerRadius(r, 0, 0, r),
-            _ => new CornerRadius(0, 0, r, r),
-        };
-        Card.Opacity = Math.Clamp(_grown * 2 - 1, 0, 1);
-        Card.IsHitTestVisible = _grown >= 1; // nothing half-faded takes a click
-    }
-
-    private static double Lerp(double from, double to, double t) => from + (to - from) * t;
-
-    private void AttachPanels()
-    {
-        Panels.Children.Clear();
-        foreach (var part in _parts)
+        var page = new StackPanel();
+        if (key == NowPlayingKey && _media is not null)
+            page.Children.Add(_nowPlaying ??= new NowPlayingView(_media));
+        foreach (var part in Group(key)?.Parts ?? [])
         {
             if (View(part) is not { } view)
                 continue;
-            view.Margin = new Thickness(0, 8, 0, 0);
-            Panels.Children.Add(view);
+            view.Margin = new Thickness(0, page.Children.Count > 0 ? 8 : 0, 0, 0);
+            page.Children.Add(view);
         }
+        Page.Content = page;
+    }
+
+    // The old page's sections are let go before they are reused on another page (one parent each).
+    private void Detach()
+    {
+        if (Page.Content is Panel old)
+            old.Children.Clear();
+        Page.Content = null;
     }
 
     private FrameworkElement? View(IslandTileContribution part)
@@ -292,69 +324,360 @@ public partial class IslandPanelWindow : Window
         return null;
     }
 
-    private void Render(IslandActivity? live)
+    /// <summary>Now Playing first, then the features' tiles, each with its status and dot.</summary>
+    private void RefreshGrid()
     {
-        LiveCard.Visibility = Shown(live is not null);
-        if (live is null)
-            return;
-        MediaLayout.Visibility = Shown(live.Kind == IslandActivityKind.Media);
-        TimerLayout.Visibility = Shown(live.Kind == IslandActivityKind.Timer);
-        OtherLayout.Visibility = Shown(live.Kind is not (IslandActivityKind.Media or IslandActivityKind.Timer));
-        switch (live.Kind)
+        var track = _media?.Current;
+        var tiles = new List<IslandTileView>
         {
-            case IslandActivityKind.Media:
-                MediaTitle.Text = live.Title;
-                MediaSource.Text = live.Source;
-                string initial = string.IsNullOrWhiteSpace(live.Source) ? live.Title : live.Source;
-                MediaMonogram.Text = initial.Length > 0 ? initial[..1].ToUpper(CultureInfo.CurrentCulture) : "";
-                break;
-            case IslandActivityKind.Timer:
-                TimerLabel.Text = live.Title;
-                TimerValue.Text = live.Source;
-                break;
-            default:
-                OtherTitle.Text = live.Title;
-                OtherSource.Text = live.Source;
-                if (live.NeedsAttention)
-                    OtherSource.SetResourceReference(TextBlock.ForegroundProperty, "WarningTextBrush");
-                else
-                    OtherSource.SetResourceReference(TextBlock.ForegroundProperty, "IslandTextTertiaryBrush");
-                break;
+            new(NowPlayingKey, "Now Playing", LucideIcons.Music, track?.Title ?? "", track?.Playing == true || LiveOn(NowPlayingKey) is not null),
+        };
+        foreach (var group in _groups.Where(g => g.Key != NowPlayingKey))
+        {
+            var live = LiveOn(group.Key);
+            tiles.Add(new(group.Key, group.Name, LucideIcons.Get(group.Icon), group.Status, live is not null, live?.NeedsAttention == true));
         }
-        Progress.Visibility = Shown(live.Progress is not null);
-        double value = Math.Clamp(live.Progress ?? 0, 0, 1);
-        Progress.ColumnDefinitions[0].Width = new GridLength(value, GridUnitType.Star);
-        Progress.ColumnDefinitions[1].Width = new GridLength(1 - value, GridUnitType.Star);
+        _grid.SetTiles(tiles);
     }
 
-    private static Visibility Shown(bool shown) => shown ? Visibility.Visible : Visibility.Collapsed;
+    private IslandActivity? LiveOn(string key) =>
+        _activities.FirstOrDefault(a => a.TileKey == key || (key == NowPlayingKey && a.Kind == IslandActivityKind.Media));
+
+    /// <summary>
+    /// The live button's tile: Now Playing while media plays, otherwise the tile of an activity that
+    /// needs attention (a muted mic), or none.
+    /// </summary>
+    private string? LiveKey()
+    {
+        if (_activities.Any(a => a.Kind == IslandActivityKind.Media) || _media?.Current?.Playing == true)
+            return NowPlayingKey;
+        return _activities.FirstOrDefault(a => a.NeedsAttention && a.TileKey is { } key && Exists(key))?.TileKey;
+    }
+
+    // ----- Orbit buttons -----
+
+    private Button OrbitButton(OrbitSlot slot)
+    {
+        var glyph = new LucideIcon { Size = 16 };
+        glyph.SetResourceReference(LucideIcon.BrushProperty, "IslandTextBrush");
+        var button = new Button { Content = glyph, Visibility = Visibility.Collapsed };
+        button.SetResourceReference(StyleProperty, "IslandOrbitButtonStyle");
+        button.Click += (_, _) => OnOrbit(slot);
+        return button;
+    }
+
+    private void OnOrbit(OrbitSlot slot)
+    {
+        switch (slot)
+        {
+            case OrbitSlot.Back:
+                ShowPage(_page is null ? _lastPage : null, remember: false);
+                break;
+            case OrbitSlot.Settings:
+                SettingsRequested?.Invoke(this, EventArgs.Empty);
+                break;
+            default:
+                if (OrbitTarget(slot) is { } key)
+                    ShowPage(key);
+                break;
+        }
+    }
+
+    private string? OrbitTarget(OrbitSlot slot) => slot switch
+    {
+        OrbitSlot.Left => _groups.FirstOrDefault(g => g.Orbit == IslandOrbit.Left)?.Key,
+        OrbitSlot.Right => _groups.FirstOrDefault(g => g.Orbit == IslandOrbit.Right)?.Key,
+        OrbitSlot.Live => LiveKey(),
+        _ => null,
+    };
+
+    private List<OrbitSlot> Slots()
+    {
+        var slots = new List<OrbitSlot>();
+        if (_page is not null || (_lastPage is not null && Exists(_lastPage)))
+            slots.Add(OrbitSlot.Back);
+        if (OrbitTarget(OrbitSlot.Left) is not null)
+            slots.Add(OrbitSlot.Left);
+        slots.Add(OrbitSlot.Settings);
+        if (OrbitTarget(OrbitSlot.Right) is not null)
+            slots.Add(OrbitSlot.Right);
+        if (OrbitTarget(OrbitSlot.Live) is not null)
+            slots.Add(OrbitSlot.Live);
+        return slots;
+    }
+
+    /// <summary>Which buttons show, with their glyphs, names and the active page's ring.</summary>
+    private void RefreshOrbit()
+    {
+        var slots = Slots();
+        foreach (var (slot, button) in _orbit)
+        {
+            button.Visibility = slots.Contains(slot) ? Visibility.Visible : Visibility.Collapsed;
+            string? target = slot == OrbitSlot.Back ? (_page is null ? _lastPage : null) : OrbitTarget(slot);
+            var (glyph, name) = slot switch
+            {
+                OrbitSlot.Back when _page is null => (LucideIcons.Undo, $"Back to {TileName(target)}"),
+                OrbitSlot.Back => (LucideIcons.LayoutGrid, "All features"),
+                OrbitSlot.Settings => (LucideIcons.Settings, "Settings"),
+                _ when target == NowPlayingKey => (LucideIcons.Music, "Now Playing"),
+                _ => (LucideIcons.Get(Group(target)?.Icon), TileName(target)),
+            };
+            ((LucideIcon)button.Content).Data = glyph;
+            AutomationProperties.SetName(button, name);
+            button.Tag = slot is not (OrbitSlot.Back or OrbitSlot.Settings) && target is not null && target == _page ? "Active" : null;
+        }
+        if (IsOpen)
+            Draw();
+    }
+
+    private string TileName(string? key) => key == NowPlayingKey ? "Now Playing" : Group(key)?.Name ?? "";
+
+    // ----- Keyboard -----
+
+    /// <summary>
+    /// The first press inside the island: it becomes the foreground window, so Tab, arrows and Enter
+    /// reach it the normal way. Until then only the Esc hook watches the keyboard (no global hook takes
+    /// keys from the app in front).
+    /// </summary>
+    private void TakeKeyboard(DependencyObject? pressed)
+    {
+        if (_keyboard || !IsOpen)
+            return;
+        _keyboard = true;
+        IslandNative.Activate(_hwnd);
+        Dispatcher.BeginInvoke(DispatcherPriority.Input, () =>
+        {
+            for (var at = pressed; at is not null; at = at is System.Windows.Media.Visual or System.Windows.Media.Media3D.Visual3D ? VisualTreeHelper.GetParent(at) : LogicalTreeHelper.GetParent(at))
+            {
+                if (at is UIElement { Focusable: true, IsEnabled: true } target && target.Focus())
+                    return;
+            }
+            FocusFirst();
+        });
+    }
+
+    private void FocusFirst()
+    {
+        if (_page is null)
+            _grid.Buttons().FirstOrDefault()?.Focus();
+        else
+            Card.MoveFocus(new TraversalRequest(FocusNavigationDirection.First));
+    }
+
+    // ----- Placement and the morph -----
+
+    /// <summary>
+    /// Covers a fixed area around the tab while open, so the morph never moves the window: on the top
+    /// edge the widest page plus both orbit columns, centered on the tab; on a side edge the widest page
+    /// plus one column; the work area's full height either way.
+    /// </summary>
+    private void Place()
+    {
+        double s = _area.Scale;
+        var work = _area.Work;
+        double widest = Math.Max(Math.Max(GridWidth, NowPlayingWidth), _groups.Select(g => g.PageWidth).DefaultIfEmpty(0).Max());
+        double reach = IslandGeometry.OrbitGap + IslandGeometry.OrbitSize;
+        double width = (_edge == IslandEdge.Top ? widest + 2 * (reach + ShadowRoom) : widest + reach + ShadowRoom) * s;
+        double left = _edge switch
+        {
+            IslandEdge.Left => work.Left,
+            IslandEdge.Right => work.Right - width,
+            _ => Math.Clamp(_tab.Left + _tab.Width / 2 - width / 2, work.Left, Math.Max(work.Left, work.Right - width)),
+        };
+        _window = new Rect(left, work.Top, width, work.Height);
+        IslandNative.Move(_hwnd, _window);
+        Root.Width = _window.Width / s;
+        Root.Height = _window.Height / s;
+        _tabLocal = Local(_tab);
+        ShapeFill.BorderThickness = _edge switch
+        {
+            IslandEdge.Left => new Thickness(0, 1, 1, 1),
+            IslandEdge.Right => new Thickness(1, 1, 0, 1),
+            _ => new Thickness(1, 0, 1, 1),
+        };
+        Reshape(snap: _frame is null);
+    }
+
+    private Rect Local(Rect physical) =>
+        new((physical.X - _window.X) / _area.Scale, (physical.Y - _window.Y) / _area.Scale, physical.Width / _area.Scale, physical.Height / _area.Scale);
+
+    /// <summary>
+    /// Measures the page at its width and centers it on the tab, keeping it and its orbit buttons in
+    /// the work area. <paramref name="snap"/> also draws it there at once (no morph running).
+    /// </summary>
+    private void Reshape(bool snap)
+    {
+        double s = _area.Scale;
+        double width = PageWidth(_page);
+        Card.Width = width;
+        Card.Measure(new Size(width, double.PositiveInfinity));
+        double height = Card.DesiredSize.Height;
+        var reach = IslandGeometry.OrbitReach(_edge, new Size(width, height), Slots());
+        var origin = IslandGeometry.PanelOrigin(_edge, _tab, new Size(width * s, height * s), _area.Work, s, reach);
+        _target = Local(new Rect(origin.X, origin.Y, width * s, height * s));
+        Canvas.SetLeft(Card, _target.X);
+        Canvas.SetTop(Card, _target.Y);
+        if (snap && _morph != Morph.Close)
+        {
+            _drawn = _target;
+            Draw();
+        }
+    }
+
+    /// <summary>
+    /// Starts a morph from what is drawn now: open (tab to page, 220ms, content fading in over the
+    /// second half), page (page to page, 220ms, the new content fading in over 180ms after 60ms) or
+    /// close (back to the swollen tab, 160ms, content fading out). Reduced motion snaps.
+    /// </summary>
+    private void Begin(Morph morph)
+    {
+        _morph = morph;
+        bool fromTab = morph == Morph.Open && _frame is null;
+        _from = fromTab ? _tabLocal : _drawn;
+        _radiusFrom = fromTab ? TabRadius() : _radius;
+        _fadeFrom = Card.Opacity;
+        _elapsed = TimeSpan.Zero;
+        if (Motion.IsReduced)
+        {
+            StopFrames();
+            if (morph == Morph.Close)
+            {
+                Collapse();
+                return;
+            }
+            _elapsed = TimeSpan.FromSeconds(1);
+            Step();
+            return;
+        }
+        if (morph == Morph.Page)
+            Card.Opacity = 0;
+        if (_frame is not null)
+            return;
+        _lastFrame = 0;
+        _frame = (_, _) =>
+        {
+            // The clock starts on the first frame, so a slow first show doesn't skip the start.
+            long now = Stopwatch.GetTimestamp();
+            _elapsed += _lastFrame == 0 ? TimeSpan.Zero : Stopwatch.GetElapsedTime(_lastFrame, now);
+            _lastFrame = now;
+            Step();
+        };
+        CompositionTarget.Rendering += _frame;
+        Step();
+    }
+
+    private void Step()
+    {
+        var time = _morph == Morph.Close ? ShrinkTime : GrowTime;
+        double t = Math.Min(1, _elapsed / time);
+        double eased = 1 - Math.Pow(1 - t, 3);
+        var to = _morph == Morph.Close ? _tabLocal : _target;
+        _drawn = new Rect(Lerp(_from.X, to.X, eased), Lerp(_from.Y, to.Y, eased), Lerp(_from.Width, to.Width, eased), Lerp(_from.Height, to.Height, eased));
+        _radius = Lerp(_radiusFrom, _morph == Morph.Close ? TabRadius() : OpenRadius, eased);
+        Card.Opacity = _morph switch
+        {
+            Morph.Open => Math.Max(_fadeFrom, Math.Clamp(t * 2 - 1, 0, 1)),
+            Morph.Page => Math.Clamp((_elapsed - PageFadeDelay) / PageFadeTime, 0, 1),
+            _ => _fadeFrom * Math.Clamp(1 - t * 2, 0, 1),
+        };
+        Draw();
+        bool done = _morph == Morph.Page ? _elapsed >= PageFadeDelay + PageFadeTime && t >= 1 : t >= 1;
+        if (!done)
+            return;
+        StopFrames();
+        if (_morph == Morph.Close)
+            Collapse();
+    }
+
+    private double _radius = OpenRadius;
+
+    // The tab's corners are as round as it is deep.
+    private double TabRadius() =>
+        _edge == IslandEdge.Top ? Math.Min(_tabLocal.Height, _tabLocal.Width / 2) : Math.Min(_tabLocal.Width, _tabLocal.Height / 2);
+
+    private void StopFrames()
+    {
+        if (_frame is null)
+            return;
+        CompositionTarget.Rendering -= _frame;
+        _frame = null;
+    }
+
+    /// <summary>Back in the tab: hidden, with the views let go.</summary>
+    private void Collapse()
+    {
+        StopFrames();
+        _radius = OpenRadius;
+        Hide();
+        Card.Opacity = 0;
+        // Unparented views get Unloaded and stop listening until the island opens again.
+        Detach();
+    }
+
+    /// <summary>The shape at <see cref="_drawn"/>, flat on its edge, and the orbit buttons following it.</summary>
+    private void Draw()
+    {
+        Canvas.SetLeft(Shape, _drawn.X);
+        Canvas.SetTop(Shape, _drawn.Y);
+        Shape.Width = Math.Max(0, _drawn.Width);
+        Shape.Height = Math.Max(0, _drawn.Height);
+        ShapeShadow.CornerRadius = ShapeFill.CornerRadius = _edge switch
+        {
+            IslandEdge.Left => new CornerRadius(0, _radius, _radius, 0),
+            IslandEdge.Right => new CornerRadius(_radius, 0, 0, _radius),
+            _ => new CornerRadius(0, 0, _radius, _radius),
+        };
+        // Mid-morph the content already sits at its final place; only what's inside the shape shows.
+        var inside = new Rect(_drawn.X - Canvas.GetLeft(Card), _drawn.Y - Canvas.GetTop(Card), Math.Max(0, _drawn.Width), Math.Max(0, _drawn.Height));
+        Card.Clip = new RectangleGeometry(inside, _radius, _radius);
+        bool settled = Card.Opacity >= 1;
+        Card.IsHitTestVisible = settled; // nothing half-faded takes a click
+        // Opening and closing fade the buttons with the content; between pages they stay.
+        Orbit.Opacity = _morph == Morph.Page ? 1 : Card.Opacity;
+        Orbit.IsHitTestVisible = IsOpen && Orbit.Opacity >= 1;
+        foreach (var (slot, rect) in IslandGeometry.OrbitLayout(_edge, _drawn, Slots()))
+        {
+            Canvas.SetLeft(_orbit[slot], rect.X);
+            Canvas.SetTop(_orbit[slot], rect.Y);
+        }
+    }
+
+    private static double Lerp(double from, double to, double t) => from + (to - from) * t;
 
     private void UpdateClock()
     {
         var now = DateTime.Now;
-        Clock.Text = now.ToString("t", CultureInfo.CurrentCulture);
+        _grid.SetClock(now);
         _clock.Interval = TimeSpan.FromSeconds(60 - now.Second) - TimeSpan.FromMilliseconds(now.Millisecond) + TimeSpan.FromMilliseconds(50);
         if (IsOpen)
             _clock.Start();
     }
 
-    /// <summary>No media session is behind the island yet, so play/pause only flips its own glyph.</summary>
-    private void TogglePlayGlyph()
-    {
-        bool showingPause = PlayPauseIcon.Data == LucideIcons.Pause;
-        PlayPauseIcon.Data = showingPause ? LucideIcons.Play : LucideIcons.Pause;
-        System.Windows.Automation.AutomationProperties.SetName(PlayPauseButton, showingPause ? "Play" : "Pause");
-    }
-
 #if DEBUG
     /// <summary>Debug builds: the window's own pixels, for <see cref="IslandWindow.SaveScene"/>.</summary>
     internal FrameworkElement Visual => Root;
+
+    /// <summary>Debug builds: the shape as drawn and where it is heading, with its orbit buttons, in physical pixels.</summary>
+    internal Rect Footprint
+    {
+        get
+        {
+            var box = _drawn;
+            box.Union(_target);
+            foreach (var (_, rect) in IslandGeometry.OrbitLayout(_edge, _drawn, Slots()))
+                box.Union(rect);
+            double s = _area.Scale;
+            return new Rect(_window.X + box.X * s, _window.Y + box.Y * s, box.Width * s, box.Height * s);
+        }
+    }
 #endif
 
     protected override void OnClosed(EventArgs e)
     {
         _clock.Stop();
         StopFrames();
+        if (_media is not null)
+            _media.Changed -= OnMediaChanged;
         base.OnClosed(e);
     }
 }
