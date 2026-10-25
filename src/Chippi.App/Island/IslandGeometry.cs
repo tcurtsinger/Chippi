@@ -33,17 +33,17 @@ public static class IslandGeometry
     public const double Gap = 8;
 
     /// <summary>
-    /// The tab's size in DIPs on the top edge, turned on the sides: 64×18 at rest and 84×26 when
-    /// live. Swollen (hovered, or the island open) it is about 20% longer and 4px deeper: 76×22 and 100×30.
+    /// The tab's size in DIPs on the top edge, turned on the sides: 96×28 at rest and 120×32 when
+    /// live. Swollen (hovered, or the island open) it is 16px longer and 4px deeper: 112×32 and 136×36.
     /// </summary>
     public static Size TabSize(IslandEdge edge, bool live, bool swollen = false)
     {
         var (along, across) = (live, swollen) switch
         {
-            (false, false) => (64.0, 18.0),
-            (false, true) => (76.0, 22.0),
-            (true, false) => (84.0, 26.0),
-            (true, true) => (100.0, 30.0),
+            (false, false) => (96.0, 28.0),
+            (false, true) => (112.0, 32.0),
+            (true, false) => (120.0, 32.0),
+            (true, true) => (136.0, 36.0),
         };
         return edge == IslandEdge.Top ? new Size(along, across) : new Size(across, along);
     }

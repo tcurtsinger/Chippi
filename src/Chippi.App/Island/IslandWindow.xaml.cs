@@ -385,7 +385,7 @@ public partial class IslandWindow : Window
     }
 
     /// <summary>
-    /// Sizes and fills the tab: 14px sleepy Gumdrop at rest; 18px with the highest activity's glyph
+    /// Sizes and fills the tab: 20px sleepy Gumdrop at rest; 22px with the highest activity's 14px glyph
     /// when something is live. Hovered or open it swells, and Gumdrop wakes.
     /// </summary>
     private void RefreshTab()
@@ -394,7 +394,7 @@ public partial class IslandWindow : Window
         bool swollen = _hovered || _panel.IsVisible;
         SwellTo(IslandGeometry.TabSize(_docked, top is not null, swollen));
 
-        Pet.Size = top is not null ? 18 : 14;
+        Pet.Size = top is not null ? 22 : 20;
         Pet.ShowMood(top is not null ? _mood : swollen ? PetMood.Idle : PetMood.Sleepy);
 
         Glyph.Visibility = Shown(top is not null);
@@ -498,11 +498,11 @@ public partial class IslandWindow : Window
         return new PathGeometry { Figures = { figure } };
     }
 
-    /// <summary>The progress ring's arc on the 12px glyph, clockwise from 12 o'clock.</summary>
+    /// <summary>The progress ring's arc on the 14px glyph, clockwise from 12 o'clock.</summary>
     private static Geometry Arc(double progress)
     {
         progress = Math.Clamp(progress, 0, 1);
-        const double c = 6, r = 5;
+        const double c = 7, r = 6;
         if (progress >= 0.999)
             return new EllipseGeometry(new Point(c, c), r, r);
         double angle = progress * 2 * Math.PI;

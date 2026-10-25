@@ -13,7 +13,7 @@
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         ResizeMode="NoResize" ShowInTaskbar="False" ShowActivated="False" Topmost="True"
         SizeToContent="Manual" WindowStartupLocation="Manual"
-        Left="-32000" Top="-32000" Width="84" Height="26">
+        Left="-32000" Top="-32000" Width="136" Height="36">
     <Window.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
@@ -33,20 +33,20 @@
                 <!-- Gumdrop, then the live glyph beside it (top) or under it (sides). Decorative: the
                      button's name and help text carry the state (DESIGN.md §7 Accessibility). -->
                 <StackPanel x:Name="TabContent" HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False">
-                    <pet:Gumdrop x:Name="Pet" Size="14" Mood="Sleepy" IsDecorative="True" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                    <Grid x:Name="Glyph" Width="12" Height="12" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed">
-                        <StackPanel x:Name="Equalizer" Orientation="Horizontal" HorizontalAlignment="Center" Height="12">
-                            <Rectangle Style="{StaticResource IslandEqualizerBarStyle}" Height="7" />
-                            <Rectangle Style="{StaticResource IslandEqualizerBarStyle}" Height="12" />
-                            <Rectangle Style="{StaticResource IslandEqualizerBarStyle}" Height="9" />
+                    <pet:Gumdrop x:Name="Pet" Size="20" Mood="Sleepy" IsDecorative="True" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    <Grid x:Name="Glyph" Width="14" Height="14" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed">
+                        <StackPanel x:Name="Equalizer" Orientation="Horizontal" HorizontalAlignment="Center" Height="14">
+                            <Rectangle Style="{StaticResource IslandEqualizerBarStyle}" Height="8" />
+                            <Rectangle Style="{StaticResource IslandEqualizerBarStyle}" Height="14" />
+                            <Rectangle Style="{StaticResource IslandEqualizerBarStyle}" Height="10" />
                         </StackPanel>
                         <Grid x:Name="Ring">
                             <Ellipse Stroke="{StaticResource IslandTrackBrush}" StrokeThickness="2" />
                             <Path x:Name="RingArc" Stroke="{DynamicResource IslandAccentBrush}" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
                         </Grid>
-                        <c:LucideIcon x:Name="FolderGlyph" Data="{x:Static c:LucideIcons.Folder}" Size="12" Thickness="2" Brush="{DynamicResource IslandAccentBrush}" />
-                        <Ellipse x:Name="Dot" Width="6" Height="6" Fill="{DynamicResource IslandAccentBrush}" />
-                        <Ellipse x:Name="CautionDot" Width="6" Height="6" Fill="{StaticResource WarningBrush}" />
+                        <c:LucideIcon x:Name="FolderGlyph" Data="{x:Static c:LucideIcons.Folder}" Size="14" Thickness="2" Brush="{DynamicResource IslandAccentBrush}" />
+                        <Ellipse x:Name="Dot" Width="7" Height="7" Fill="{DynamicResource IslandAccentBrush}" />
+                        <Ellipse x:Name="CautionDot" Width="7" Height="7" Fill="{StaticResource WarningBrush}" />
                     </Grid>
                 </StackPanel>
             </Grid>

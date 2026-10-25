@@ -112,8 +112,8 @@ public sealed class IslandHost : IDisposable
     }
 
     /// <summary>
-    /// Debug builds (<c>--island-shots &lt;dir&gt;</c>): the closed tab at rest and with a fake media
-    /// activity live, each also swollen as if hovered, then the tab docked on Top, Left and Right with the island open, each scene in
+    /// Debug builds (<c>--island-shots &lt;dir&gt;</c>): the closed tab on Top and Right at rest and with
+    /// a fake media activity live, each also swollen as if hovered, then the tab docked on Top, Left and Right with the island open, each scene in
     /// both app themes (the island must look the same) with Follow Windows, Blue (the mockup's
     /// default) and Violet. Then drops the tab on the taskbar's edge
     /// and in the corners, which must be refused, and once on the top edge, which must be taken
@@ -145,15 +145,18 @@ public sealed class IslandHost : IDisposable
                 {
                     Chippi.UI.Themes.ThemeManager.Apply(theme);
                     var color = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(backdrop);
-                    UpdateSettings(s => (s.IslandEdge, s.IslandPlace) = (IslandEdge.Top, 0.5));
-                    _shell.Island.ClearModule(DebugModuleId);
-                    await Task.Delay(settle);
-                    _window.SaveScene(Path.Combine(directory, $"r5-island-rest-{theme}-{accent}".ToLowerInvariant() + ".png"), color);
-                    await SaveSwellAsync($"r5-island-rest-swell-{theme}-{accent}", color);
-                    debug.Publish(media);
-                    await Task.Delay(settle);
-                    _window.SaveScene(Path.Combine(directory, $"r5-island-live-{theme}-{accent}".ToLowerInvariant() + ".png"), color);
-                    await SaveSwellAsync($"r5-island-live-swell-{theme}-{accent}", color);
+                    foreach (var edge in new[] { IslandEdge.Top, IslandEdge.Right })
+                    {
+                        UpdateSettings(s => (s.IslandEdge, s.IslandPlace) = (edge, 0.5));
+                        _shell.Island.ClearModule(DebugModuleId);
+                        await Task.Delay(settle);
+                        _window.SaveScene(Path.Combine(directory, $"r5-island-rest-{edge}-{theme}-{accent}".ToLowerInvariant() + ".png"), color);
+                        await SaveSwellAsync($"r5-island-rest-swell-{edge}-{theme}-{accent}", color);
+                        debug.Publish(media);
+                        await Task.Delay(settle);
+                        _window.SaveScene(Path.Combine(directory, $"r5-island-live-{edge}-{theme}-{accent}".ToLowerInvariant() + ".png"), color);
+                        await SaveSwellAsync($"r5-island-live-swell-{edge}-{theme}-{accent}", color);
+                    }
                     foreach (var edge in new[] { IslandEdge.Top, IslandEdge.Left, IslandEdge.Right })
                     {
                         UpdateSettings(s => (s.IslandEdge, s.IslandPlace) = (edge, 0.5));
