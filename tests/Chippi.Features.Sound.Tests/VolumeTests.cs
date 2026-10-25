@@ -53,9 +53,21 @@ public sealed class VolumeTests
         await using var f = new VolumeFixture();
         await f.Start();
         Assert.True(f.Module.CanPickOutput(VolumeFixture.Key));
-        f.System.EndSession("one");
-        await f.Audio.RefreshAsync();
-        await Assert.ThrowsAsync<InvalidOperationException>(() => f.Module.SetOutputAsync(VolumeFixture.Key, "B"));
+        using var release = new ManualResetEventSlim();
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var closing = f.Audio.InvokeAsync(_ =>
+        {
+            f.System.EndSession("one"); // queue the session refresh ahead of the pick
+            entered.SetResult();
+            if (!release.Wait(TimeSpan.FromSeconds(5))) throw new TimeoutException();
+            return true;
+        });
+        await entered.Task;
+        Task pick;
+        try { pick = f.Module.SetOutputAsync(VolumeFixture.Key, "B"); }
+        finally { release.Set(); }
+        await closing;
+        await Assert.ThrowsAsync<InvalidOperationException>(() => pick);
         f.System.WithSession(VolumeFixture.Session("again", "A", 130));
         await f.Audio.RefreshAsync();
         await Task.Delay(300);
