@@ -1,0 +1,51 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: RNNoise native
+on:
+  push:
+    paths: ['native/rnnoise/**', '.github/workflows/rnnoise.yml']
+  pull_request:
+    paths: ['native/rnnoise/**', '.github/workflows/rnnoise.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-2025
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x64, arm64]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Build with static CRT
+        shell: cmd
+        run: native\rnnoise\build.cmd ${{ matrix.arch }}
+      - uses: actions/upload-artifact@v6
+        with:
+          name: rnnoise-${{ matrix.arch }}
+          path: |
+            build/artifacts/rnnoise/${{ matrix.arch }}/rnnoise.dll
+            build/artifacts/rnnoise/${{ matrix.arch }}/rnnoise-smoke.exe
+  smoke:
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: windows-2025
+          - arch: arm64
+            runner: windows-11-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          name: rnnoise-${{ matrix.arch }}
+          path: native-test
+      - name: Load and process on native runner
+        shell: pwsh
+        run: |
+          ./native-test/rnnoise-smoke.exe "$PWD/native-test/rnnoise.dll"
+          if ($LASTEXITCODE -ne 0) { throw 'RNNoise smoke failed' }
