@@ -21,3 +21,8 @@ releases its claims without changing Windows' current selection.
 Settings, flyout and island views use S0 contributions. Tests link the unchanged
 AudioFakes.cs. Offscreen review screenshots and a parity coverage map are under
 X:/code/chippi-scratch/phase-3/s2/.
+## Mic mute shortcut
+
+`Mute/MicMuteModule` takes an audio lease and a message-only `RegisterHotKey` registration (Ctrl+Shift+M by default). All microphone writes run on the shared engine through `MicrophoneMute`; there is no keyboard hook or separate audio enumerator. The latch includes VB-CABLE capture endpoints, mutes newly active mics before processing rebuilds, and releases only mute changes it owns. Mixed, unavailable and absent microphones remain visible states. Shortcut collisions keep manual Mute usable. Windows chords and F12 are never registered. Shortcut creation, registration and disposal use the application dispatcher even when the registry starts a module on a worker thread.
+
+The settings page, Sound section and shared Microphone page use `MicMuteView`. `Play a sound` defaults off and uses Windows system sounds only after a successful explicit toggle when enabled. Tests inject fake registration and tone actions, so no real shortcut, sound or audio setting is touched. A running latch is session-owned; it cannot restore an unplugged mic after the final audio lease or recover an app crash by itself.

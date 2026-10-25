@@ -27,6 +27,7 @@ public static class LucideIcons
     public static Geometry Headphones { get; } = G("M3,14 h3 a2,2 0 0 1 2,2 v3 a2,2 0 0 1 -2,2 H5 a2,2 0 0 1 -2,-2 v-5 a9,9 0 0 1 18,0 v5 a2,2 0 0 1 -2,2 h-1 a2,2 0 0 1 -2,-2 v-3 a2,2 0 0 1 2,-2 h3");
     public static Geometry Earbuds { get; } = G("M5,8 a3,3 0 1 0 6,0 a3,3 0 1 0 -6,0 Z M8,11 v5 a1.5,1.5 0 0 0 1.5,1.5 M13,8 a3,3 0 1 0 6,0 a3,3 0 1 0 -6,0 Z M16,11 v5 a1.5,1.5 0 0 1 -1.5,1.5");
     public static Geometry Mic { get; } = G("M12,2 a3,3 0 0 0 -3,3 v7 a3,3 0 0 0 6,0 V5 a3,3 0 0 0 -3,-3 Z M19,10 v2 a7,7 0 0 1 -14,0 v-2 M12,19 v3 M8,22 h8");
+    public static Geometry MicOff { get; } = G("M2,2 L22,22 M18.89,13.23 A7.12,7.12 0 0 0 19,12 V10 M5,10 V12 A7,7 0 0 0 17,17 M15,9.34 V5 A3,3 0 0 0 9.32,3.67 M9,9 V12 A3,3 0 0 0 14.12,14.12 M12,19 V22");
     public static Geometry Video { get; } = G("M22,8 L16,12 L22,16 Z M4,6 H14 A2,2 0 0 1 16,8 V16 A2,2 0 0 1 14,18 H4 A2,2 0 0 1 2,16 V8 A2,2 0 0 1 4,6 Z");
     public static Geometry Speaker { get; } = G("M11,5 L6,9 L2,9 L2,15 L6,15 L11,19 Z M15.5,8.5 a5,5 0 0 1 0,7 M19,5 a10,10 0 0 1 0,14");
 

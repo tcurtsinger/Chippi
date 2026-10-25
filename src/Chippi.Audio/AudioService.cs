@@ -129,6 +129,24 @@ public sealed class AudioService
         return true;
     });
 
+    /// <summary>Mutes all active capture endpoints unless all are muted, then unmutes all.</summary>
+    public Task ToggleMicrophoneMuteAsync() => Run(e =>
+    {
+        e.Catalog.Refresh(e.System);
+        e.Microphones.Toggle(e.System, e.Catalog);
+        e.RefreshLevels();
+        return true;
+    });
+
+    /// <summary>Releases the latch and unmutes only endpoints this latch muted.</summary>
+    public Task ReleaseMicrophoneMuteAsync() => Run(e =>
+    {
+        e.Catalog.Refresh(e.System);
+        e.Microphones.Stop(e.System, e.Catalog);
+        e.RefreshLevels();
+        return true;
+    });
+
     public Task SetEndpointVolumeAsync(string endpointId, float volume) =>
         Run(e =>
         {
@@ -316,6 +334,8 @@ public sealed class AudioService
 
         public DeviceCatalog Catalog { get; } = new();
 
+        public MicrophoneMute Microphones { get; } = new();
+
         public RoleArbiter Arbiter { get; }
 
         public EndpointControls Controls { get; }
@@ -359,6 +379,7 @@ public sealed class AudioService
                 _backoffTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
                 if (_system is not null)
                 {
+                    Microphones.Stop(_system, Catalog);
                     try { Processing.Shutdown(Arbiter, Catalog, _system); }
                     catch (Exception ex) { Log.LogError(ex, "Stopping mic processing failed"); }
                 }
@@ -393,6 +414,7 @@ public sealed class AudioService
         {
             var system = System;
             Catalog.Refresh(system);
+            Microphones.Refresh(system, Catalog);
             Processing.Update(Arbiter, Catalog, system);
             var changes = Arbiter.Enforce(Catalog, system);
             if (changes.Count > 0)
@@ -458,6 +480,7 @@ public sealed class AudioService
         private void Read()
         {
             var system = System;
+            Microphones.Refresh(system, Catalog);
             Controls.Refresh(system, Catalog.Active(AudioFlow.Render).Concat(Catalog.Active(AudioFlow.Capture)));
             try { Sessions.Refresh(system, Catalog.Active(AudioFlow.Render)); }
             catch (Exception ex) { Log.LogWarning(ex, "Reading sessions failed"); }
@@ -471,7 +494,7 @@ public sealed class AudioService
                 new Dictionary<RoleKey, string>(Catalog.Defaults),
                 Arbiter.Owners,
                 Controls.Levels,
-                Sessions.Apps) { Processing = Processing.Status };
+                Sessions.Apps) { Processing = Processing.Status, MicrophoneMute = Microphones.Status };
             _service.Publish(snapshot, changes);
         }
 
