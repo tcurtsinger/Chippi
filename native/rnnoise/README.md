@@ -20,7 +20,7 @@ This establishes load/API compatibility, not microphone quality or performance.
 Prebuilt DLLs for the Sound module live under runtimes/win-*/native/.
 hashes.csv records their byte sizes and SHA-256 hashes. These exact files came
 from workflow run https://github.com/tcurtsinger/Chippi/actions/runs/40208306781.
-MSVC 14.44 compiled both with /MT. The workflow also verifies hashes and
+CI used MSVC 14.51.36260 (Visual Studio 2026) with /MT for both DLLs; the local x64 check used MSVC 14.44. The workflow also verifies hashes and
 test-loads the committed DLLs on native x64 and ARM64 runners. Rebuilding can
 change binary hashes (including linker timestamps); a refresh must commit new
 DLLs and hashes together. S3 will wire these files into the Sound module.
