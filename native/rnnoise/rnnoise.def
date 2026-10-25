@@ -1,0 +1,12 @@
+; Exported symbols for rnnoise.dll.
+; Using a .def keeps exports explicit and independent of the header's
+; __declspec(dllexport) macros, so the build does not depend on RNNOISE_BUILD/DLL_EXPORT.
+LIBRARY rnnoise
+EXPORTS
+    rnnoise_get_size
+    rnnoise_init
+    rnnoise_create
+    rnnoise_destroy
+    rnnoise_process_frame
+    rnnoise_model_from_file
+    rnnoise_model_free
