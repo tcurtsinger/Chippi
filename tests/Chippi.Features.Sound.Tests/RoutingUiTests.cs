@@ -8,6 +8,7 @@ using System.Windows.Automation.Provider;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 using Chippi.Audio;
 using Chippi.Features.Sound.Routing;
 using static Chippi.Audio.Tests.FakeDeviceSystem;
@@ -23,12 +24,13 @@ public sealed class RoutingUiTests
         await using var f = new RoutingFixture();
         f.System.With(Speaker("A"), Speaker("B")).WithDefault("A");
         await f.Start();
-        await Sta(() =>
+        await Sta(async () =>
         {
             var page = new RoutingPage(f.Module);
             var toggle = Descendants(page).OfType<ToggleButton>().Single(t => AutomationProperties.GetName(t) == "Switch outputs automatically");
             ((IToggleProvider)new ToggleButtonAutomationPeer(toggle)).Toggle();
-            Assert.True(SpinWait.SpinUntil(() => !f.Module.Settings.Output.Enabled, TimeSpan.FromSeconds(3)));
+            await Until(() => !Descendants(page).Contains(toggle));
+            Assert.False(f.Module.Settings.Output.Enabled);
         });
         f.System.ChangeDefault("B");
         await f.Audio.RefreshAsync();
@@ -41,12 +43,13 @@ public sealed class RoutingUiTests
         await using var f = new RoutingFixture();
         f.System.With(Speaker("A"), Speaker("B")).WithDefault("A");
         await f.Start();
-        await Sta(() =>
+        await Sta(async () =>
         {
             var page = new RoutingPage(f.Module);
             var handle = Descendants(page).OfType<Chippi.UI.Controls.DragHandle>().First();
             handle.RaiseEvent(new KeyEventArgs(Keyboard.PrimaryDevice, new UnshownSource { RootVisual = page }, 0, Key.Down) { RoutedEvent = Keyboard.KeyDownEvent });
-            Assert.True(SpinWait.SpinUntil(() => f.Module.Settings.Output.Devices[0].Id == "B", TimeSpan.FromSeconds(3)));
+            await Until(() => !Descendants(page).Contains(handle));
+            Assert.Equal("B", f.Module.Settings.Output.Devices[0].Id);
         });
         Assert.Equal("B", f.System.DefaultOf(AudioFlow.Render, AudioRole.Multimedia));
     }
@@ -101,13 +104,35 @@ public sealed class RoutingUiTests
         protected override CompositionTarget GetCompositionTargetCore() => null!;
     }
 
-    private static Task Sta(Action run)
+    private static async Task Until(Func<bool> condition)
+    {
+        var until = DateTime.UtcNow.AddSeconds(3);
+        while (!condition())
+        {
+            Assert.True(DateTime.UtcNow < until, "The page did not finish refreshing after the command.");
+            await Task.Delay(10);
+        }
+    }
+
+    private static Task Sta(Action run) => Sta(() => { run(); return Task.CompletedTask; });
+
+    private static Task Sta(Func<Task> run)
     {
         var done = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var thread = new Thread(() =>
         {
-            try { run(); done.SetResult(); }
-            catch (Exception ex) { done.SetException(ex); }
+            var dispatcher = Dispatcher.CurrentDispatcher;
+            SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(dispatcher));
+            Exception? error = null;
+            dispatcher.BeginInvoke(async () =>
+            {
+                try { await run(); }
+                catch (Exception ex) { error = ex; }
+                finally { dispatcher.BeginInvokeShutdown(DispatcherPriority.Background); }
+            });
+            Dispatcher.Run();
+            if (error is null) done.SetResult();
+            else done.SetException(error);
         });
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();
