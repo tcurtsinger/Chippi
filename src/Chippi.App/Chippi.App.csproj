@@ -1,4 +1,4 @@
-﻿<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
@@ -33,6 +33,7 @@
     <ProjectReference Include="..\Chippi.UI\Chippi.UI.csproj" />
     <ProjectReference Include="..\Features\Chippi.Features.KeepAwake\Chippi.Features.KeepAwake.csproj" />
     <ProjectReference Include="..\Features\Chippi.Features.Downloads\Chippi.Features.Downloads.csproj" />
+    <ProjectReference Include="..\Features\Chippi.Features.Sound\Chippi.Features.Sound.csproj" />
   </ItemGroup>
 
   <!-- P/Invoke via CsWin32. Each workstream lists its APIs in a NativeMethods.txt inside its own

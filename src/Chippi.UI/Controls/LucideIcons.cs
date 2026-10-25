@@ -23,6 +23,7 @@ public static class LucideIcons
 
     // Devices (from Hopper).
     public static Geometry Monitor { get; } = G("M4,3 H20 A2,2 0 0 1 22,5 V15 A2,2 0 0 1 20,17 H4 A2,2 0 0 1 2,15 V5 A2,2 0 0 1 4,3 Z M8,21 H16 M12,17 V21");
+    public static Geometry AudioLines { get; } = G("M2,10 v4 M6,6 v12 M10,3 v18 M14,8 v8 M18,5 v14 M22,10 v4");
     public static Geometry Headphones { get; } = G("M3,14 h3 a2,2 0 0 1 2,2 v3 a2,2 0 0 1 -2,2 H5 a2,2 0 0 1 -2,-2 v-5 a9,9 0 0 1 18,0 v5 a2,2 0 0 1 -2,2 h-1 a2,2 0 0 1 -2,-2 v-3 a2,2 0 0 1 2,-2 h3");
     public static Geometry Earbuds { get; } = G("M5,8 a3,3 0 1 0 6,0 a3,3 0 1 0 -6,0 Z M8,11 v5 a1.5,1.5 0 0 0 1.5,1.5 M13,8 a3,3 0 1 0 6,0 a3,3 0 1 0 -6,0 Z M16,11 v5 a1.5,1.5 0 0 1 -1.5,1.5");
     public static Geometry Mic { get; } = G("M12,2 a3,3 0 0 0 -3,3 v7 a3,3 0 0 0 6,0 V5 a3,3 0 0 0 -3,-3 Z M19,10 v2 a7,7 0 0 1 -14,0 v-2 M12,19 v3 M8,22 h8");

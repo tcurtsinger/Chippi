@@ -163,6 +163,7 @@ public partial class App : Application
         shell.Registry.Register(keepAwake);
         Exit += (_, _) => keepAwake.ReleaseOnExit();
         shell.Registry.Register(new Chippi.Features.Downloads.DownloadsModule());
+        shell.Registry.Register(new Chippi.Features.Sound.Routing.AudioRoutingModule());
 
         // [WS2] "Coming soon" placeholders for the PLAN.md features.
         Settings.Features.FeatureCatalog.RegisterPlaceholders(shell.Registry);

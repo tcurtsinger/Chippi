@@ -28,11 +28,6 @@ public static class FeatureCatalog
         },
 
         // Phase 3: Sound
-        new("audio-routing", "Audio routing", "Switches outputs by priority and keeps your mic pinned when devices change", FeatureGroup.Sound)
-        {
-            Icon = "Headphones",
-            Presets = Audio | PowerUser,
-        },
         new("mic-processing", "Mic processing", "Noise suppression and cleanup on your mic before other apps hear it", FeatureGroup.Sound)
         {
             Icon = "Mic",
