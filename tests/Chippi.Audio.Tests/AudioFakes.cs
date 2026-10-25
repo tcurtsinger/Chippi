@@ -10,7 +10,7 @@ namespace Chippi.Audio.Tests;
 /// command, raising <see cref="Changed"/> the way Windows would. The Sound feature tests link this
 /// file. Thread-safe: tests change it while the engine thread reads it.
 /// </summary>
-public sealed class FakeDeviceSystem : IDeviceSystem
+public sealed class FakeDeviceSystem : IDeviceSystem, IPerAppDeviceSystem
 {
     private readonly Lock _gate = new();
     private readonly List<AudioEndpoint> _endpoints = [];
@@ -22,6 +22,19 @@ public sealed class FakeDeviceSystem : IDeviceSystem
     private int _enumerations;
     private int _peakReads;
 
+    public bool AppPolicyAvailable { get; set; }
+    public bool AppPolicyFailsWrite { get; set; }
+    public Dictionary<int, string?> AppOutputs { get; } = [];
+    public List<(int Pid, string? Output)> AppOutputWrites { get; } = [];
+    public AppDeviceChoice GetAppOutput(int processId) => new(AppPolicyAvailable, AppOutputs.GetValueOrDefault(processId));
+    public bool SetAppOutput(int processId, string? endpointId)
+    {
+        if (!AppPolicyAvailable || AppPolicyFailsWrite) return false;
+        AppOutputs[processId] = endpointId;
+        AppOutputWrites.Add((processId, endpointId));
+        return true;
+    }
+    public void EndSession(string id) => UpdateSession(id, s => s with { State = SessionState.Expired });
     public event Action<DeviceChange>? Changed;
 
     /// <summary>Endpoint IDs whose SetDefault or SetMute throws.</summary>

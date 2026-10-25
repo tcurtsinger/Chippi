@@ -44,7 +44,7 @@ internal sealed class SessionCatalog(int ownProcessId)
                     lead.Volume,
                     g.All(s => s.Muted),
                     g.Any(s => s.State == SessionState.Active),
-                    g.Select(s => s.EndpointId).Distinct(StringComparer.OrdinalIgnoreCase).ToList());
+                    g.Select(s => s.EndpointId).Distinct(StringComparer.OrdinalIgnoreCase).ToList()) { ProcessIds = g.Select(s => s.ProcessId).Distinct().ToList() };
             })
             .ToList();
 }

@@ -80,7 +80,10 @@ public sealed record AppAudio(
     float Volume,
     bool Muted,
     bool IsActive,
-    IReadOnlyList<string> EndpointIds);
+    IReadOnlyList<string> EndpointIds)
+{
+    public IReadOnlyList<int> ProcessIds { get; init; } = [];
+}
 
 /// <summary>What a Core Audio notification was about. Devices and Defaults are debounced; the rest coalesce.</summary>
 public enum DeviceChange { Devices, Defaults, Levels, Sessions }

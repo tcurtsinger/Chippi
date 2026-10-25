@@ -16,7 +16,7 @@ namespace Chippi.Audio;
 /// volume and session callbacks keep arriving; every callback only raises <see cref="Changed"/>.
 /// Must be created, used and disposed on one MTA thread (the engine's).
 /// </summary>
-public sealed class CoreAudioDeviceSystem : IDeviceSystem, IMMNotificationClient
+public sealed class CoreAudioDeviceSystem : IDeviceSystem, IMMNotificationClient, IPerAppDeviceSystem
 {
     // PKEY_Device_DeviceDesc (2) and PKEY_Device_FriendlyName (14) share a format ID; the adapter
     // name is PKEY_DeviceInterface_FriendlyName. Other property changes don't affect routing.
@@ -28,6 +28,9 @@ public sealed class CoreAudioDeviceSystem : IDeviceSystem, IMMNotificationClient
     private readonly Dictionary<string, MMDevice> _active = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, TrackedSession> _sessions = new(StringComparer.OrdinalIgnoreCase);
     private bool _disposed;
+    private PerAppDevicePolicy? _appPolicy;
+    public AppDeviceChoice GetAppOutput(int processId) => (_appPolicy ??= new(_logger)).Get(processId);
+    public bool SetAppOutput(int processId, string? endpointId) => (_appPolicy ??= new(_logger)).Set(processId, endpointId);
 
     public CoreAudioDeviceSystem(ILogger logger)
     {
@@ -134,6 +137,7 @@ public sealed class CoreAudioDeviceSystem : IDeviceSystem, IMMNotificationClient
         if (_disposed)
             return;
         _disposed = true;
+        _appPolicy?.Dispose();
         try { _enumerator.UnregisterEndpointNotificationCallback(this); }
         catch (COMException ex) { _logger.LogDebug(ex, "Unregistering endpoint notifications failed"); }
         foreach (var (id, tracked) in _sessions.ToList())

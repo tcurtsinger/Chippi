@@ -28,12 +28,6 @@ public static class FeatureCatalog
         },
 
         // Phase 3: Sound
-        new("app-volume", "App volume", "Volume and output device for each app, right from the tray", FeatureGroup.Sound)
-        {
-            Icon = "Sliders",
-            Badges = [FeatureBadge.Overlap("Overlaps Volume mixer")],
-            Presets = Essentials | Audio | PowerUser,
-        },
         new("volume-boost", "Volume boost", "Lifts quiet apps past their 100% limit", FeatureGroup.Sound)
         {
             Icon = "Volume",
