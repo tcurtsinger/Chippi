@@ -176,7 +176,7 @@ public sealed class ConfigStore
         }
         catch (JsonException ex)
         {
-            throw new InvalidDataException("That file is not valid JSON.", ex);
+            throw new InvalidDataException("Invalid JSON", ex);
         }
         if (FirstInvalidSection(imported) is { } bad)
             throw new InvalidDataException($"\"{bad}\" section not valid");
