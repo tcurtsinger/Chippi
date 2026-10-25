@@ -8,6 +8,7 @@ using Chippi.App.Pet;
 using Chippi.App.Shell;
 using Chippi.Core.Config;
 using Chippi.Core.Island;
+using Chippi.Core.Modules;
 using Microsoft.Extensions.Logging;
 
 namespace Chippi.App.Island;
@@ -245,9 +246,9 @@ public sealed class IslandHost : IDisposable
         _window.SetActivities(activities, MoodFor(activities));
     }
 
-    /// <summary>The running features' panels that have an island view, in sidebar (registry) order.</summary>
+    /// <summary>The running features' island tiles, in grid order.</summary>
     private void RefreshPanels() =>
-        _window.SetPanels([.. _shell.Registry.Features.Where(f => f.IsRunning).SelectMany(f => f.FlyoutPanels).Where(p => p.CreateIslandView is not null)]);
+        _window.SetTiles(IslandTileContribution.Group(_shell.Registry.Features.Where(f => f.IsRunning).SelectMany(f => f.IslandTiles)));
 
     private void LoadSettings()
     {

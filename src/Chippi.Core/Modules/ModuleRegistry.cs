@@ -35,6 +35,9 @@ public sealed class FeatureEntry
     /// <summary>Flyout panels and settings page the running module contributed. Empty when not running.</summary>
     public IReadOnlyList<FlyoutPanelContribution> FlyoutPanels => Ui?.Panels ?? [];
 
+    /// <summary>Island tile parts the running module contributed. Empty when not running.</summary>
+    public IReadOnlyList<IslandTileContribution> IslandTiles => Ui?.Tiles ?? [];
+
     public SettingsPageContribution? SettingsPage => Ui?.SettingsPage;
 
     internal IFeatureModule? Module { get; }

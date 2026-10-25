@@ -176,38 +176,39 @@ public partial class FlyoutWindow : Window
         var running = _shell.Registry.Features.Where(f => f.IsRunning).ToList();
         UpdateStatusLine();
 
-        // One tab per panel, in sidebar (registry) order. Past eight, the rest go under More.
+        // One tab per panel or shared tab, in sidebar (registry) order. Past eight, the rest go under More.
         var panels = running.SelectMany(f => f.FlyoutPanels).ToList();
         if (!panels.SequenceEqual(_panels))
         {
             _panels = panels;
-            var shown = panels.Count > MaxTabs ? panels.Take(MaxTabs - 1).ToList() : panels;
-            var items = shown.Select(p => new SegmentItem { Label = p.Name, Icon = LucideIcons.Get(p.Icon), Value = p }).ToList();
-            if (shown.Count < panels.Count)
-                items.Add(new SegmentItem { Label = "More", Icon = LucideIcons.Ellipsis, Value = panels.Skip(shown.Count).ToList() });
+            var tabs = FlyoutTab.Group(panels);
+            var shown = tabs.Count > MaxTabs ? tabs.Take(MaxTabs - 1).ToList() : tabs;
+            var items = shown.Select(t => new SegmentItem { Label = t.Name, Icon = LucideIcons.Get(t.Icon), Value = t }).ToList();
+            if (shown.Count < tabs.Count)
+                items.Add(new SegmentItem { Label = "More", Icon = LucideIcons.Ellipsis, Value = tabs.Skip(shown.Count).ToList() });
 
             Tabs.SelectionChanged -= OnTabChanged;
             Tabs.ItemsSource = items;
             Tabs.SelectionChanged += OnTabChanged;
             // Reopen on the last tab used, across module restarts too.
-            int index = items.FindIndex(i => i.Value is FlyoutPanelContribution p ? FlyoutPages.Key(p) == _lastTab
-                : ((List<FlyoutPanelContribution>)i.Value!).Any(p => FlyoutPages.Key(p) == _lastTab));
+            int index = items.FindIndex(i => i.Value is FlyoutTab t ? t.Key == _lastTab
+                : ((List<FlyoutTab>)i.Value!).Any(t => t.Key == _lastTab));
             Tabs.SelectedIndex = items.Count == 0 ? -1 : Math.Max(index, 0);
         }
 
         TabStrip.Visibility = panels.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         Page.Content = (Tabs.SelectedItem as SegmentItem)?.Value switch
         {
-            FlyoutPanelContribution panel => _pages.Build(panel, running),
-            List<FlyoutPanelContribution> more when more.FirstOrDefault(p => FlyoutPages.Key(p) == _lastTab) is { } picked => _pages.Build(picked, running),
-            List<FlyoutPanelContribution> more => _pages.BuildMore(more, OpenFromMore),
+            FlyoutTab tab => _pages.Build(tab, running),
+            List<FlyoutTab> more when more.FirstOrDefault(t => t.Key == _lastTab) is { } picked => _pages.Build(picked, running),
+            List<FlyoutTab> more => _pages.BuildMore(more, OpenFromMore),
             _ => _pages.BuildNothingInstalled(),
         };
     }
 
-    private void OpenFromMore(FlyoutPanelContribution panel)
+    private void OpenFromMore(FlyoutTab tab)
     {
-        _lastTab = FlyoutPages.Key(panel);
+        _lastTab = tab.Key;
         Rebuild();
         Scroller.ScrollToTop();
     }
@@ -235,7 +236,7 @@ public partial class FlyoutWindow : Window
         if (e.AddedItems.Count == 0)
             return;
         // More opens on its list; a panel picked there is remembered by OpenFromMore.
-        _lastTab = (Tabs.SelectedItem as SegmentItem)?.Value is FlyoutPanelContribution panel ? FlyoutPages.Key(panel) : null;
+        _lastTab = (Tabs.SelectedItem as SegmentItem)?.Value is FlyoutTab tab ? tab.Key : null;
         Rebuild();
         Scroller.ScrollToTop();
     }

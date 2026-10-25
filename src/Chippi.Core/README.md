@@ -8,19 +8,21 @@ Contract changes after WS0 go through Kayla.
 | Type | What it is |
 |---|---|
 | `IFeatureModule` | `Descriptor`, `StartAsync(ModuleContext, ct)`, `StopAsync(ct)`. The constructor must acquire nothing: uninstalled modules are constructed (so the hub can read the descriptor) but never started. |
-| `FeatureDescriptor` | Record: `Id` (kebab-case, also the config section), `Name`, `Description`, `Group`, plus `Requires`, `Badges`, `Presets`, `Icon` (a `LucideIcons` property name). |
+| `FeatureDescriptor` | Record: `Id` (kebab-case, also the config section), `Name`, `Description`, `Group`, plus `Requires`, `Badges`, `Presets`, `Icon` (a `LucideIcons` property name), `Requirement`. |
 | `FeatureGroup` | `Files, Sound, System, ClipboardText, Windows, Capture, Apps` (hub order). `DisplayName()` gives "Clipboard & text". |
 | `Capability` | Record, equal by `Id`. Built-ins: `Admin`, `VbCable`, `InputHooks`, `ScreenCapture`. |
 | `FeatureBadge`, `BadgeKind` | `Source` / `Overlap` / `Needs` + text. Factories `FeatureBadge.Source("From Hopper")` and so on. |
 | `FeaturePreset`, `PresetMembership` | Presets `Essentials, Audio, PowerUser, Everything, Custom`; a descriptor opts into the first three with flags. Everything = every installable feature. |
 | `ModuleContext` | `ModuleId`, `Settings` (`IModuleSettings`), `Logger` (`ILogger`), `Island` (`IIslandPublisher`), `Ui` (`IModuleUi`). |
 | `IModuleSettings` | `Get<T>()`, `Save<T>(value)`. Section `modules.<id>` in settings.json, kept after uninstall. |
-| `IModuleUi` | `AddFlyoutPanel(name, icon, createView, createIslandView = null)`, `SetSettingsPage(Func<object>)`. All removed automatically when the module stops. The flyout shows a tab per panel in sidebar order; only panels with an island view appear in the island. |
-| `FlyoutPanelContribution`, `SettingsPageContribution` | What the shell reads back per feature. |
+| `IModuleUi` | `AddFlyoutPanel(name, icon, createView)`, `AddFlyoutSection(tabKey, tabName, icon, order, createSection)`, `AddIslandTile(IslandTileSpec)` (returns `IIslandTile` for `SetStatus`), `SetSettingsPage(Func<object>)`. All removed automatically when the module stops. The flyout shows a tab per panel, and one tab per shared `tabKey`, in sidebar order. Island tiles with the same key share one tile and one page. |
+| `FlyoutPanelContribution`, `IslandTileContribution`, `SettingsPageContribution` | What the shell reads back per feature. `IslandTileContribution.Group` makes the tiles. |
+| `IslandTileSpec`, `IslandOrbit` | A tile part: `Key`, `Name`, `Icon`, `Order` (grid), `SectionOrder` (page), `CreateSection`, plus `PageWidth` (328), `Orbit` and `StatusPriority`. |
+| `IFeatureRequirement`, `RequirementState` | Something outside Chippi a feature needs before install (a driver). `FeatureDescriptor.Requirement` creates one; Add features shows the row by its state. |
 | `ModuleRegistry` | `Register(module)`, `RegisterComingSoon(descriptor)`, `StartAsync()`, `SetInstalledAsync(id, bool)` (switches preset to Custom), `ApplyPresetAsync(preset)`, `ReloadAsync()` (after import), `StopAllAsync()` (exit), `Features`, `Find(id)`, `Preset`, `InstalledCount`, `PresetMembers(preset)`, `GetPermissions()`, `DismissUnusedCapability(id)`, event `Changed` (any thread). First run applies Essentials. |
-| `FeatureEntry` | `Descriptor`, `Id`, `IsComingSoon`, `IsInstalled`, `IsRunning`, `LastError`, `FlyoutPanels`, `SettingsPage`. |
+| `FeatureEntry` | `Descriptor`, `Id`, `IsComingSoon`, `IsInstalled`, `IsRunning`, `LastError`, `FlyoutPanels`, `IslandTiles`, `SettingsPage`. |
 
-**Why UI contributions look like this.** Core cannot reference WPF. Panels, island views and
+**Why UI contributions look like this.** Core cannot reference WPF. Panels, island pages and
 settings pages are free-form, so the module passes a factory returning `object` and the App casts
 it to `FrameworkElement`. Only a module that ships its own views references WPF, and
 then it references `Chippi.UI` (below), never `Chippi.App`.

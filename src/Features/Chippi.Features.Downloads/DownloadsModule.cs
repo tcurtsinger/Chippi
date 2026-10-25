@@ -61,6 +61,9 @@ public sealed class DownloadsModule : IFeatureModule
         Requires = [Capability.ShellIntegration],
     };
 
+    /// <summary>The island tile's key.</summary>
+    public const string TileKey = "downloads";
+
     /// <summary>The running engine; null while uninstalled.</summary>
     public DownloadsEngine? Engine { get; private set; }
 
@@ -107,8 +110,9 @@ public sealed class DownloadsModule : IFeatureModule
             Raise(new DownloadsRequest(DownloadsRequestKind.Undo, RunId: long.TryParse(args.FirstOrDefault(), NumberStyles.None, CultureInfo.InvariantCulture, out long id) ? id : null)));
 
         context.Ui.SetSettingsPage(section => new Views.Settings.DownloadsPage(this, section));
-        context.Ui.AddFlyoutPanel("Tidy", nameof(LucideIcons.Folder), () => new Views.Tidy.TidyView(this, RequestView, () => RequestView(new DownloadsRequest(DownloadsRequestKind.Rules))),
-            () => new Views.Tidy.TidyIslandView(this, RequestView));
+        context.Ui.AddFlyoutPanel("Tidy", nameof(LucideIcons.Folder), () => new Views.Tidy.TidyView(this, RequestView, () => RequestView(new DownloadsRequest(DownloadsRequestKind.Rules))));
+        context.Ui.AddIslandTile(new IslandTileSpec(TileKey, Descriptor.Name, nameof(LucideIcons.Folder), Order: 50, SectionOrder: 0,
+            () => new Views.Tidy.TidyIslandView(this, RequestView)));
         return Task.CompletedTask;
     }
 

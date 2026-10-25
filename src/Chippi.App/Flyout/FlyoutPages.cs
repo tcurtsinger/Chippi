@@ -12,7 +12,20 @@ using Chippi.UI.Controls;
 namespace Chippi.App.Flyout;
 
 /// <summary>
-/// Builds the flyout's pages: the panel each running module contributes, and the empty state.
+/// One flyout tab: a module's own panel, or the sections several modules add to a shared tab (the
+/// Sound tab), in section order. Named and drawn by its first contribution in sidebar order.
+/// </summary>
+internal sealed record FlyoutTab(string Key, string Name, string Icon, IReadOnlyList<FlyoutPanelContribution> Parts)
+{
+    /// <summary>The tabs for <paramref name="panels"/> (in sidebar order), each where its first contribution sits.</summary>
+    public static IReadOnlyList<FlyoutTab> Group(IEnumerable<FlyoutPanelContribution> panels) =>
+        [.. panels
+            .GroupBy(FlyoutPages.Key, StringComparer.Ordinal)
+            .Select(g => new FlyoutTab(g.Key, g.First().Name, g.First().Icon, [.. g.OrderBy(p => p.Order)]))];
+}
+
+/// <summary>
+/// Builds the flyout's pages: the tab each running module contributes, and the empty state.
 /// Panels are created once and reused across rebuilds, so their state and focus survive a
 /// registry change.
 /// </summary>
@@ -21,17 +34,22 @@ internal sealed class FlyoutPages(FlyoutWindow owner)
     private readonly Dictionary<FlyoutPanelContribution, FrameworkElement> _views = [];
     private readonly List<Panel> _attached = [];
 
-    /// <summary>Identifies a panel across module restarts, which create a new contribution.</summary>
-    public static string Key(FlyoutPanelContribution panel) => $"{panel.ModuleId}/{panel.Name}";
+    /// <summary>Identifies a tab across module restarts, which create a new contribution.</summary>
+    public static string Key(FlyoutPanelContribution panel) => panel.TabKey is { } tab ? $"tab:{tab}" : $"{panel.ModuleId}/{panel.Name}";
 
-    public FrameworkElement Build(FlyoutPanelContribution panel, IReadOnlyList<FeatureEntry> running)
+    public FrameworkElement Build(FlyoutTab tab, IReadOnlyList<FeatureEntry> running)
     {
         Detach();
         Prune(running);
         var page = new StackPanel();
         _attached.Add(page);
-        if (View(panel) is { } view)
+        foreach (var part in tab.Parts)
+        {
+            if (View(part) is not { } view)
+                continue;
+            view.Margin = page.Children.Count == 0 ? default : new Thickness(0, 12, 0, 0);
             page.Children.Add(view);
+        }
         return page;
     }
 
@@ -47,13 +65,13 @@ internal sealed class FlyoutPages(FlyoutWindow owner)
         return state;
     }
 
-    /// <summary>The More tab: a row per panel that didn't fit in the tab strip.</summary>
-    public FrameworkElement BuildMore(IReadOnlyList<FlyoutPanelContribution> panels, Action<FlyoutPanelContribution> open)
+    /// <summary>The More tab: a row per tab that didn't fit in the tab strip.</summary>
+    public FrameworkElement BuildMore(IReadOnlyList<FlyoutTab> tabs, Action<FlyoutTab> open)
     {
         Detach();
         var card = new Card();
         card.SetResourceReference(FrameworkElement.StyleProperty, "FlyoutCardStyle");
-        foreach (var panel in panels)
+        foreach (var panel in tabs)
         {
             var glyph = new LucideIcon { Data = LucideIcons.Get(panel.Icon), Size = 16, Margin = new Thickness(0, 0, 12, 0) };
             glyph.SetResourceReference(LucideIcon.BrushProperty, "TextSecondaryBrush");
