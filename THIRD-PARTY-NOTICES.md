@@ -145,7 +145,7 @@ License notice for Unicode data
 
 https://www.unicode.org/license.html
 
-Copyright Â© 1991-2024 Unicode, Inc. All rights reserved.
+Copyright © 1991-2024 Unicode, Inc. All rights reserved.
 Distributed under the Terms of Use in https://www.unicode.org/copyright.html.
 
 Permission is hereby granted, free of charge, to any person obtaining a
@@ -355,7 +355,7 @@ By obtaining and/or copying this work, you (the licensee) agree that you have re
 Permission to copy, modify, and distribute this work, with or without modification, for any purpose and without fee or royalty is hereby granted, provided that you include the following on ALL copies of the work or portions thereof, including modifications:
 The full text of this NOTICE in a location viewable to users of the redistributed or derivative work.
 Any pre-existing intellectual property disclaimers, notices, or terms and conditions. If none exist, the W3C Software and Document Short Notice should be included.
-Notice of any changes or modifications, through a copyright statement on the new code or document such as "This software or document includes material copied from or derived from [title and URI of the W3C document]. Copyright Â© [YEAR] W3CÂ® (MIT, ERCIM, Keio, Beihang)."
+Notice of any changes or modifications, through a copyright statement on the new code or document such as "This software or document includes material copied from or derived from [title and URI of the W3C document]. Copyright © [YEAR] W3C® (MIT, ERCIM, Keio, Beihang)."
 Disclaimers
 THIS WORK IS PROVIDED "AS IS," AND COPYRIGHT HOLDERS MAKE NO REPRESENTATIONS OR WARRANTIES, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO, WARRANTIES OF MERCHANTABILITY OR FITNESS FOR ANY PARTICULAR PURPOSE OR THAT THE USE OF THE SOFTWARE OR DOCUMENT WILL NOT INFRINGE ANY THIRD PARTY PATENTS, COPYRIGHTS, TRADEMARKS OR OTHER RIGHTS.
 COPYRIGHT HOLDERS WILL NOT BE LIABLE FOR ANY DIRECT, INDIRECT, SPECIAL OR CONSEQUENTIAL DAMAGES ARISING OUT OF ANY USE OF THE SOFTWARE OR DOCUMENT.
@@ -370,8 +370,8 @@ By Sean Eron Anderson
 seander@cs.stanford.edu
 
 Individually, the code snippets here are in the public domain (unless otherwise
-noted) â€” feel free to use them however you please. The aggregate collection and
-descriptions are Â© 1997-2005 Sean Eron Anderson. The code and descriptions are
+noted) — feel free to use them however you please. The aggregate collection and
+descriptions are © 1997-2005 Sean Eron Anderson. The code and descriptions are
 distributed in the hope that they will be useful, but WITHOUT ANY WARRANTY and
 without even the implied warranty of merchantability or fitness for a particular
 purpose.
@@ -1071,7 +1071,7 @@ License notice for musl
 
 musl as a whole is licensed under the following standard MIT license:
 
-Copyright Â© 2005-2020 Rich Felker, et al.
+Copyright © 2005-2020 Rich Felker, et al.
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -1443,7 +1443,7 @@ THE SOFTWARE.
 License notice for Avx512Vbmi base64 encoding / decoding
 --------------------------------------------------------
 
-Copyright (c) 2015-2018, Wojciech MuÅ‚a
+Copyright (c) 2015-2018, Wojciech Muła
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -1472,7 +1472,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 --------------------------------------------------------
 
 Aspects of base64 encoding / decoding are based on algorithm described in "Base64 encoding and decoding at almost the speed of a memory
-copy", Wojciech MuÅ‚a and Daniel Lemire. https://arxiv.org/pdf/1910.05109.pdf
+copy", Wojciech Muła and Daniel Lemire. https://arxiv.org/pdf/1910.05109.pdf
 
 License for FormatJS Intl.Segmenter grapheme segmentation algorithm
 --------------------------------------------------------------------------
@@ -1624,8 +1624,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ### Velopack MIT license (managed library and native components)
 
-Copyright Â© 2021 Caelan Sayler
-Copyright Â© 2024 Velopack Ltd.
+Copyright © 2021 Caelan Sayler
+Copyright © 2024 Velopack Ltd.
 
 Permission is hereby granted,  free of charge,  to any person obtaining a
 copy of this software and associated documentation files (the "Software"),

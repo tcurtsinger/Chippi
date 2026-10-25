@@ -17,4 +17,14 @@ DLL on its native Windows runner. smoke.c checks all seven exports and processes
 in-memory silence and synthetic PCM. It never opens an audio device.
 This establishes load/API compatibility, not microphone quality or performance.
 
-Prebuilt DLLs for the Sound module will live under runtimes/win-*/native/.
+Prebuilt DLLs for the Sound module live under runtimes/win-*/native/.
+hashes.csv records their byte sizes and SHA-256 hashes. These exact files came
+from workflow run https://github.com/tcurtsinger/Chippi/actions/runs/40208306781.
+MSVC 14.44 compiled both with /MT. The workflow also verifies hashes and
+test-loads the committed DLLs on native x64 and ARM64 runners. Rebuilding can
+change binary hashes (including linker timestamps); a refresh must commit new
+DLLs and hashes together. S3 will wire these files into the Sound module.
+
+CI runner references:
+- https://docs.github.com/en/actions/reference/runners/github-hosted-runners
+- https://github.com/actions/runner-images/blob/main/images/windows/Windows2025-Readme.md
