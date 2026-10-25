@@ -28,7 +28,7 @@ public sealed class IslandGeometryTests
     {
         var snap = IslandGeometry.Snap(new Point(x, y), Monitor, Work, 1);
         Assert.Equal(edge, snap?.Edge);
-        Assert.Equal((500 - 64) / (1032 - 128.0), snap!.Value.Place, 6);
+        Assert.Equal((500 - 76) / (1032 - 152.0), snap!.Value.Place, 6);
     }
 
     [Theory]
@@ -38,7 +38,7 @@ public sealed class IslandGeometryTests
     [InlineData(1916, 4)] // top-right corner
     [InlineData(159, 2)] // top edge, inside the 160px end margin
     [InlineData(1761, 2)]
-    [InlineData(2, 63)] // left edge, inside the 64px end margin
+    [InlineData(2, 75)] // left edge, inside the 76px end margin
     [InlineData(2, 970)]
     [InlineData(1918, 40)] // right edge, inside the margin
     public void Drops_on_the_taskbar_edge_the_bottom_or_a_corner_are_refused(double x, double y) =>
@@ -49,7 +49,7 @@ public sealed class IslandGeometryTests
     {
         Assert.Equal((IslandEdge.Top, 0.0), IslandGeometry.Snap(new Point(160, 2), Monitor, Work, 1));
         Assert.Equal((IslandEdge.Top, 1.0), IslandGeometry.Snap(new Point(1760, 2), Monitor, Work, 1));
-        Assert.Equal((IslandEdge.Left, 0.0), IslandGeometry.Snap(new Point(2, 64), Monitor, Work, 1));
+        Assert.Equal((IslandEdge.Left, 0.0), IslandGeometry.Snap(new Point(2, 76), Monitor, Work, 1));
     }
 
     [Fact]
@@ -117,12 +117,38 @@ public sealed class IslandGeometryTests
     }
 
     [Fact]
-    public void The_tab_is_64_by_18_at_rest_and_84_by_26_live_turned_on_the_sides()
+    public void The_tab_is_96_by_28_at_rest_and_120_by_32_live_turned_on_the_sides()
     {
-        Assert.Equal(new Size(64, 18), IslandGeometry.TabSize(IslandEdge.Top, large: false));
-        Assert.Equal(new Size(84, 26), IslandGeometry.TabSize(IslandEdge.Top, large: true));
-        Assert.Equal(new Size(18, 64), IslandGeometry.TabSize(IslandEdge.Left, large: false));
-        Assert.Equal(new Size(26, 84), IslandGeometry.TabSize(IslandEdge.Right, large: true));
+        Assert.Equal(new Size(96, 28), IslandGeometry.TabSize(IslandEdge.Top, live: false));
+        Assert.Equal(new Size(120, 32), IslandGeometry.TabSize(IslandEdge.Top, live: true));
+        Assert.Equal(new Size(28, 96), IslandGeometry.TabSize(IslandEdge.Left, live: false));
+        Assert.Equal(new Size(32, 120), IslandGeometry.TabSize(IslandEdge.Right, live: true));
+    }
+
+    [Fact]
+    public void A_swollen_tab_is_16px_longer_and_4px_deeper()
+    {
+        Assert.Equal(new Size(112, 32), IslandGeometry.TabSize(IslandEdge.Top, live: false, swollen: true));
+        Assert.Equal(new Size(136, 36), IslandGeometry.TabSize(IslandEdge.Top, live: true, swollen: true));
+        Assert.Equal(new Size(32, 112), IslandGeometry.TabSize(IslandEdge.Left, live: false, swollen: true));
+        Assert.Equal(new Size(36, 136), IslandGeometry.TabSize(IslandEdge.Right, live: true, swollen: true));
+    }
+
+    [Theory]
+    [InlineData(IslandEdge.Top)]
+    [InlineData(IslandEdge.Left)]
+    [InlineData(IslandEdge.Right)]
+    public void At_either_end_of_an_edge_every_tab_size_stays_inside_the_work_area(IslandEdge edge)
+    {
+        foreach (double scale in new[] { 1.0, 1.5 })
+        foreach (double place in new[] { 0.0, 1.0 })
+        foreach (bool live in new[] { false, true })
+        foreach (bool swollen in new[] { false, true })
+        {
+            var size = IslandGeometry.TabSize(edge, live, swollen);
+            var tab = IslandGeometry.TabRect(edge, IslandGeometry.Anchor(edge, place, Monitor, Work, scale), new Size(size.Width * scale, size.Height * scale));
+            Assert.True(Work.Contains(tab), $"{edge} {place} live={live} swollen={swollen} x{scale}: {tab}");
+        }
     }
 
     [Fact]

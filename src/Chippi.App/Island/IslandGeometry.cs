@@ -26,16 +26,25 @@ public static class IslandGeometry
     /// <summary>The tab stays this far (DIPs) from the ends of the top edge, clear of window buttons.</summary>
     public const double TopEndMargin = 160;
 
-    /// <summary>The tab stays this far (DIPs) from the ends of a side edge.</summary>
-    public const double SideEndMargin = 64;
+    /// <summary>The tab's center stays this far (DIPs) from the ends of a side edge: half the swollen live tab (68) plus 8, so all of it stays on screen.</summary>
+    public const double SideEndMargin = 76;
 
     /// <summary>The open island stays this far (DIPs) inside the ends of its edge.</summary>
     public const double Gap = 8;
 
-    /// <summary>The tab's size in DIPs: 64×18 at rest and 84×26 when live or hovered on the top edge, turned on the sides.</summary>
-    public static Size TabSize(IslandEdge edge, bool large)
+    /// <summary>
+    /// The tab's size in DIPs on the top edge, turned on the sides: 96×28 at rest and 120×32 when
+    /// live. Swollen (hovered, or the island open) it is 16px longer and 4px deeper: 112×32 and 136×36.
+    /// </summary>
+    public static Size TabSize(IslandEdge edge, bool live, bool swollen = false)
     {
-        var (along, across) = large ? (84.0, 26.0) : (64.0, 18.0);
+        var (along, across) = (live, swollen) switch
+        {
+            (false, false) => (96.0, 28.0),
+            (false, true) => (112.0, 32.0),
+            (true, false) => (120.0, 32.0),
+            (true, true) => (136.0, 36.0),
+        };
         return edge == IslandEdge.Top ? new Size(along, across) : new Size(across, along);
     }
 
