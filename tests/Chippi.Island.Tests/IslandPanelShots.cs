@@ -35,7 +35,7 @@ public sealed class IslandPanelShots
         {
             var media = new FakeMedia
             {
-                Sessions = [new MediaTrack("Spotify.exe", "Spotify", "Weekend Mix", "Various Artists", true, true, true, true,
+                Sessions = [new MediaTrack("Spotify.exe", "Spotify", "Weekend Mix", "Various Artists", true, true, true, true, true, true,
                     TimeSpan.FromSeconds(72), TimeSpan.FromSeconds(232), DateTimeOffset.Now, null)],
             };
             var tiles = Tiles(

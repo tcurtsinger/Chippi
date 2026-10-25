@@ -68,6 +68,7 @@ public partial class IslandPanelWindow : Window
     private long _lastFrame;
     private EventHandler? _frame;
     private bool _keyboard;
+    private List<OrbitSlot> _placedSlots = []; // the buttons the current placement made room for
 
     public IslandPanelWindow()
     {
@@ -181,13 +182,17 @@ public partial class IslandPanelWindow : Window
             ShowPage(null, remember: false);
         else
             Attach(_page);
-        RefreshOrbit();
+        RefreshOrbit(place: false);
         Reshape(snap: _frame is null);
     }
 
     private void OnStatusChanged(object? sender, EventArgs e) => Dispatcher.BeginInvoke(RefreshGrid);
 
-    private void OnMediaChanged(object? sender, EventArgs e) => RefreshGrid();
+    private void OnMediaChanged(object? sender, EventArgs e)
+    {
+        RefreshGrid();
+        RefreshOrbit(); // playing or not decides the live button
+    }
 
     /// <summary>Grows out of <paramref name="tab"/> (physical pixels) on <paramref name="edge"/>, or moves there when already open.</summary>
     internal void Open(IslandEdge edge, Rect tab, MonitorArea area)
@@ -209,7 +214,7 @@ public partial class IslandPanelWindow : Window
         if (!shrinking)
             _page = _lastPage is not null && Exists(_lastPage) ? _lastPage : null;
         Attach(_page);
-        RefreshOrbit();
+        RefreshOrbit(place: false);
         UpdateClock();
         Place();
         Show();
@@ -255,7 +260,7 @@ public partial class IslandPanelWindow : Window
         if (!IsOpen)
             return;
         Attach(key);
-        RefreshOrbit();
+        RefreshOrbit(place: false);
         Reshape(snap: false); // sets the target; the morph below animates to it from what is drawn
         Begin(Morph.Page);
         if (_keyboard)
@@ -406,8 +411,12 @@ public partial class IslandPanelWindow : Window
         return slots;
     }
 
-    /// <summary>Which buttons show, with their glyphs, names and the active page's ring.</summary>
-    private void RefreshOrbit()
+    /// <summary>
+    /// Which buttons show, with their glyphs, names and the active page's ring. Unless
+    /// <paramref name="place"/> is false (the caller places the island next), a changed set of buttons
+    /// re-places the open island.
+    /// </summary>
+    private void RefreshOrbit(bool place = true)
     {
         var slots = Slots();
         foreach (var (slot, button) in _orbit)
@@ -426,7 +435,13 @@ public partial class IslandPanelWindow : Window
             AutomationProperties.SetName(button, name);
             button.Tag = slot is not (OrbitSlot.Back or OrbitSlot.Settings) && target is not null && target == _page ? "Active" : null;
         }
-        if (IsOpen)
+        if (!IsOpen || !place)
+            return;
+        // A button that appeared or went (the live one, once music starts) changes how far the island
+        // reaches, so it is placed again to keep every button in the work area.
+        if (!slots.SequenceEqual(_placedSlots))
+            Reshape(snap: _frame is null);
+        else
             Draw();
     }
 
@@ -512,7 +527,8 @@ public partial class IslandPanelWindow : Window
         Card.Width = width;
         Card.Measure(new Size(width, double.PositiveInfinity));
         double height = Card.DesiredSize.Height;
-        var reach = IslandGeometry.OrbitReach(_edge, new Size(width, height), Slots());
+        _placedSlots = Slots();
+        var reach = IslandGeometry.OrbitReach(_edge, new Size(width, height), _placedSlots);
         var origin = IslandGeometry.PanelOrigin(_edge, _tab, new Size(width * s, height * s), _area.Work, s, reach);
         _target = Local(new Rect(origin.X, origin.Y, width * s, height * s));
         Canvas.SetLeft(Card, _target.X);

@@ -14,11 +14,20 @@ namespace Chippi.App.Island.Media;
 /// <param name="Id">The app's AppUserModelID; picks the session.</param>
 /// <param name="Source">The app's display name, such as "Spotify".</param>
 /// <param name="UpdatedAt">When Windows last reported <paramref name="Position"/>.</param>
+/// <param name="CanPlay">The app's separate Play, Pause and Toggle capabilities, as Windows reports them.</param>
 public sealed record MediaTrack(
     string Id, string Source, string Title, string Artist, bool Playing,
-    bool CanPrevious, bool CanPlayPause, bool CanNext,
+    bool CanPrevious, bool CanPlay, bool CanPause, bool CanToggle, bool CanNext,
     TimeSpan Position, TimeSpan Duration, DateTimeOffset UpdatedAt, ImageSource? Artwork)
 {
+    /// <summary>
+    /// What the play/pause button sends: Pause while playing and Play while not, when the app offers
+    /// that; else Toggle; else nothing (the button is disabled).
+    /// </summary>
+    public PlayPauseCommand PlayPause => Playing
+        ? CanPause ? PlayPauseCommand.Pause : CanToggle ? PlayPauseCommand.Toggle : PlayPauseCommand.None
+        : CanPlay ? PlayPauseCommand.Play : CanToggle ? PlayPauseCommand.Toggle : PlayPauseCommand.None;
+
     /// <summary>Where playback is at <paramref name="now"/>: the reported position, moved on while playing.</summary>
     public TimeSpan PositionAt(DateTimeOffset now)
     {
@@ -28,6 +37,8 @@ public sealed record MediaTrack(
         return Duration > TimeSpan.Zero && at > Duration ? Duration : at;
     }
 }
+
+public enum PlayPauseCommand { None, Play, Pause, Toggle }
 
 /// <summary>The media sessions Now Playing shows and controls. Raises <see cref="Changed"/> on the UI thread.</summary>
 public interface IMediaSessions : IDisposable
@@ -99,7 +110,13 @@ public sealed class SystemMediaSessions : IMediaSessions
 
     public Task PreviousAsync() => Command(s => s.TrySkipPreviousAsync().AsTask());
 
-    public Task PlayPauseAsync() => Command(s => s.TryTogglePlayPauseAsync().AsTask());
+    public Task PlayPauseAsync() => Current?.PlayPause switch
+    {
+        PlayPauseCommand.Play => Command(s => s.TryPlayAsync().AsTask()),
+        PlayPauseCommand.Pause => Command(s => s.TryPauseAsync().AsTask()),
+        PlayPauseCommand.Toggle => Command(s => s.TryTogglePlayPauseAsync().AsTask()),
+        _ => Task.CompletedTask,
+    };
 
     public Task NextAsync() => Command(s => s.TrySkipNextAsync().AsTask());
 
@@ -187,7 +204,7 @@ public sealed class SystemMediaSessions : IMediaSessions
             var duration = timeline.EndTime - timeline.StartTime;
             return new MediaTrack(id, AppName(id), title, artist,
                 playback.PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing,
-                controls.IsPreviousEnabled, controls.IsPlayPauseToggleEnabled || controls.IsPlayEnabled || controls.IsPauseEnabled, controls.IsNextEnabled,
+                controls.IsPreviousEnabled, controls.IsPlayEnabled, controls.IsPauseEnabled, controls.IsPlayPauseToggleEnabled, controls.IsNextEnabled,
                 timeline.Position - timeline.StartTime, duration > TimeSpan.Zero ? duration : TimeSpan.Zero, timeline.LastUpdatedTime,
                 await Artwork(id, title + "\n" + artist, properties));
         }

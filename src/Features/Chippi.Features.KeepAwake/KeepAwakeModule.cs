@@ -14,6 +14,8 @@ public sealed class KeepAwakeModule : IFeatureModule
     private readonly IExecutionState _native;
     private AwakeSession? _session;
     private ModuleContext? _context;
+    private IIslandTile? _tile;
+    private Timer? _tileClock;
     public KeepAwakeSettings Settings { get; private set; } = new();
     public bool IsOn { get; private set; }
 
@@ -59,10 +61,13 @@ public sealed class KeepAwakeModule : IFeatureModule
         StateLine = "Off";
         CreateSession();
         context.Ui.AddFlyoutPanel(Descriptor.Name, nameof(LucideIcons.Coffee), () => new KeepAwakePanel(this));
-        context.Ui.AddIslandTile(new IslandTileSpec(TileKey, Descriptor.Name, nameof(LucideIcons.Coffee), Order: 40, SectionOrder: 0, () => new KeepAwakeIslandView(this))
+        _tile = context.Ui.AddIslandTile(new IslandTileSpec(TileKey, Descriptor.Name, nameof(LucideIcons.Coffee), Order: 40, SectionOrder: 0, () => new KeepAwakeIslandView(this))
         {
             Orbit = IslandOrbit.Left,
         });
+        UpdateTile();
+        // A timed session's tile counts down ("45 min left"); checked twice a minute, so it is never a minute stale.
+        _tileClock = new Timer(_ => UpdateTile(), null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
         context.Ui.SetSettingsPage(() => new KeepAwakePage(this));
         return Task.CompletedTask;
     }
@@ -130,12 +135,20 @@ public sealed class KeepAwakeModule : IFeatureModule
         if (!active) Active = null;
         StateLine = active ? deadline is { } end ? $"Until {end.LocalDateTime:t}" : "Indefinitely" : "Off";
         if (active)
-            _context?.Island.Publish(new IslandActivity("awake", IslandActivityKind.Status, "Keep awake", StateLine));
+            _context?.Island.Publish(new IslandActivity("awake", IslandActivityKind.Status, "Keep awake", StateLine) { TileKey = TileKey });
         else _context?.Island.Clear("awake");
+        UpdateTile();
         if (timed) _context?.Island.ReportSuccess("Keep awake finished");
         if (error is not null) _context?.Logger.LogError(error, "Keep awake execution state failed");
         Changed?.Invoke();
     }
+
+    /// <summary>The island tile's status: "Off", "45 min left" or "No limit".</summary>
+    public string TileStatus(DateTimeOffset now) => !IsOn ? "Off"
+        : Deadline is { } end ? $"{KeepAwakeText.Left(end - now)} left"
+        : "No limit";
+
+    private void UpdateTile() => _tile?.SetStatus(TileStatus(DateTimeOffset.Now));
 
     /// <summary>Opens this feature's Settings page.</summary>
     public void OpenSettings() => _context?.OpenSettings(null);
@@ -164,6 +177,9 @@ public sealed class KeepAwakeModule : IFeatureModule
             StateLine = "Off";
             _context?.Island.Clear("awake");
             _context = null;
+            _tileClock?.Dispose();
+            _tileClock = null;
+            _tile = null;
             Changed?.Invoke();
         }
         finally { _gate.Release(); }

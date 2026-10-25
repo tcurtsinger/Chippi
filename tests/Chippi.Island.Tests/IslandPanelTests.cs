@@ -216,6 +216,44 @@ public sealed class IslandPanelTests
         }));
     }
 
+    // Karl's S6 review: music starting after the island opened near the bottom of a side edge put the
+    // new live button below the work area (1076 against 1032).
+    [Fact]
+    public void A_live_button_that_appears_after_opening_stays_in_the_work_area()
+    {
+        WpfTestThread.Run(() => WithPanel(panel =>
+        {
+            var lowTab = new Rect(-20000, 1032 - 76 - 68, 36, 136); // a Left tab at the bottom end margin
+            panel.SetLastPage("keep-awake");
+            panel.Open(IslandEdge.Left, lowTab, Offscreen);
+            Pump(TimeSpan.FromMilliseconds(400));
+            Assert.DoesNotContain("Now Playing", OrbitNames(panel));
+
+            panel.SetActivities([new IslandActivity("media", IslandActivityKind.Media, "Weekend Mix", "Spotify")], PetMood.Idle);
+            Pump(TimeSpan.FromMilliseconds(100));
+
+            var live = Orbit(panel, "Now Playing");
+            var window = IslandNative.WindowRect(panel.Handle);
+            double bottom = window.Y + Canvas.GetTop(live) + live.Height;
+            Assert.True(bottom <= 1032 - 8, $"live button bottom {bottom}");
+        }, Tiles(Part("keep-awake", "Keep awake", 40)))); // no feature buttons, so only the live one reaches below
+    }
+
+    // Karl's S6 review: play/pause enabled for Play or Pause alone but always sent Toggle.
+    [Theory]
+    [InlineData(true, false, true, false, PlayPauseCommand.Pause)] // playing, Pause only
+    [InlineData(true, true, false, false, PlayPauseCommand.None)] // playing, Play only: nothing to send
+    [InlineData(true, false, false, true, PlayPauseCommand.Toggle)]
+    [InlineData(false, true, false, false, PlayPauseCommand.Play)]
+    [InlineData(false, false, true, false, PlayPauseCommand.None)] // paused, Pause only
+    [InlineData(false, false, false, true, PlayPauseCommand.Toggle)]
+    [InlineData(true, true, true, true, PlayPauseCommand.Pause)] // the specific command wins over Toggle
+    public void Play_pause_sends_what_the_app_supports_for_its_state(bool playing, bool play, bool pause, bool toggle, PlayPauseCommand expected)
+    {
+        var track = new MediaTrack("App", "App", "Title", "", playing, false, play, pause, toggle, false, TimeSpan.Zero, TimeSpan.Zero, default, null);
+        Assert.Equal(expected, track.PlayPause);
+    }
+
     internal static void Pump(TimeSpan time)
     {
         var until = DateTime.UtcNow + time;

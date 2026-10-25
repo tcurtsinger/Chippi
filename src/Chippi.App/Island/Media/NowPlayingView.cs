@@ -128,7 +128,7 @@ internal sealed class NowPlayingView : UserControl
         _progress.Visibility = _times.Visibility = timed ? Visibility.Visible : Visibility.Collapsed;
         _previous.IsEnabled = track?.CanPrevious == true;
         _next.IsEnabled = track?.CanNext == true;
-        _playPause.IsEnabled = track?.CanPlayPause == true;
+        _playPause.IsEnabled = track is not null && track.PlayPause != PlayPauseCommand.None;
         bool playing = track?.Playing == true;
         _playGlyph.Data = playing ? LucideIcons.Pause : LucideIcons.Play;
         AutomationProperties.SetName(_playPause, playing ? "Pause" : "Play");
