@@ -1,0 +1,21 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- The shared audio service for the Sound features: one engine thread, the device catalog,
+     default-role ownership, sessions and endpoint controls. No WPF and no module code; every
+     policy is tested against a fake IDeviceSystem, never real devices. -->
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <RootNamespace>Chippi.Audio</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <PackageReference Include="NAudio.Wasapi" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Chippi.Audio.Tests" />
+  </ItemGroup>
+
+</Project>
