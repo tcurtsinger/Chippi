@@ -246,7 +246,7 @@ Flat, like Windows 11. Depth comes from the surface steps (window → card → c
 ### Island (movable, approved 2026-10-23)
 Mockup: the "Movable island" row, except that its open boards show the island as a separate box beside the tab; this section replaces that (2026-10-23). A small dark tab docked on a screen edge. Hovering it swells the tab a little; clicking it grows the tab into the island (Travis, 2026-10-24). It never hides at rest, so it stays reachable; it only hides while a fullscreen app is in front on its display.
 - **Position:** the user drags the tab to the **Top** (the default, centered), **Left** or **Right** edge, and it snaps there on release.
-  - It never docks on the taskbar's edge or in a corner. It stays at least 64px from the ends of a side edge, and 160px from the ends of the top edge, so it never covers window buttons.
+  - It never docks on the taskbar's edge or in a corner. Its center stays at least 76px from the ends of a side edge and 160px from the ends of the top edge. Both are measured to the tab's center and keep the largest tab (swollen and live, 136 long) fully on screen; the top margin also keeps it clear of window buttons.
   - Its edge and its place along that edge (0–1) are saved, so resolution changes don't move it.
   - Which display it lives on is still a setting: **Main display** (the default), **Follow active window**, or **One monitor** by name. Dragging it onto another display switches the setting to One monitor for that display. If that display disconnects, it falls back to the main display on the same edge.
 - **Tab:** a half-oval with its flat side against the edge, in Island color with a 1px `rgba(255,255,255,.14)` stroke on every side but the flat one.

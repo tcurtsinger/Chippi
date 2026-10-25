@@ -26,8 +26,8 @@ public static class IslandGeometry
     /// <summary>The tab stays this far (DIPs) from the ends of the top edge, clear of window buttons.</summary>
     public const double TopEndMargin = 160;
 
-    /// <summary>The tab stays this far (DIPs) from the ends of a side edge.</summary>
-    public const double SideEndMargin = 64;
+    /// <summary>The tab's center stays this far (DIPs) from the ends of a side edge: half the swollen live tab (68) plus 8, so all of it stays on screen.</summary>
+    public const double SideEndMargin = 76;
 
     /// <summary>The open island stays this far (DIPs) inside the ends of its edge.</summary>
     public const double Gap = 8;
