@@ -37,3 +37,16 @@ Our own default writes echo back as a notification; the reconcile it causes find
 | `RnnoiseNative` | Loads `runtimes\win-<arch>\native\rnnoise.dll` (from native/rnnoise) for the process architecture. |
 
 Tests use `FakePipelines` from AudioFakes.cs: nothing captures, renders or plays.
+
+## App volume
+
+`AudioService.GetAppOutputAsync` performs a read-only capability probe for an app with a session;
+`SetAppOutputAsync` applies one persisted output to each current process of that app. These run on
+the engine through optional `IPerAppDeviceSystem`, with no default-role claim. Session snapshots
+include process IDs for detecting app return; persistence remains keyed by `AppKey`, never PID.
+
+`PerAppDevicePolicy` activates the undocumented factory only on native x64 Windows build 26300,
+the exact build verified by the Phase 3 spike. ARM64 and other builds keep volume and mute but hide
+the output picker. Read probes must succeed before Set; each write is read back; any failure disables
+the instance and is logged. It never calls clear-all. An output choice affects the next audio stream,
+not necessarily an existing stream. Tests use fake policy methods; no test changes real routing.
