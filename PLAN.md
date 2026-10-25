@@ -77,7 +77,7 @@ Brief: [docs/ui-refresh-handoff.md](docs/ui-refresh-handoff.md). Moves the shell
 - Restyled controls, grouped cards, no gradients except Gumdrop
 - Panel-first flyout: icon tab strip, Keep awake and Tidy panels
 - Settings sidebar with search and installed features; Add features replaces the Features hub
-- Movable island: a tab the user drags to the top (default), left or right edge, which opens on hover
+- Movable island: a tab the user drags to the top (default), left or right edge, which opens on click, grid of tiles
 
 ### Phase 3: Sound
 - Audio routing from Hopper: output priority switching, mic pinning, mic processing

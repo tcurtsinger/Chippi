@@ -197,7 +197,7 @@ Text and glyphs on an accent fill are black in dark and white in light (**On-acc
 
 The flyout's "Chippi" name is 14 / 600.
 
-**The Weight Rule.** Regular (400) for everything you read. Semibold (600) only for page titles, section headers, the selected nav item, the selected SelectorBar tab and the flyout's name. Never Bold or heavier. Most of the clean look comes from this rule.
+**The Weight Rule.** Regular (400) for everything you read. Semibold (600) only for page titles, section headers, island tile names, the selected nav item, the selected SelectorBar tab and the flyout's name. Never Bold or heavier. Most of the clean look comes from this rule.
 
 **The Tabular Rule.** Every number (times, counts, sizes, durations, versions) uses the UI font with tabular figures, so digits line up and don't shift as they change. Numbers never switch to a monospace font.
 
@@ -224,7 +224,7 @@ Flat, like Windows 11. Depth comes from the surface steps (window → card → c
 - **Placement:** anchored to the tray icon, 12px above the taskbar, right edge 16px from the screen edge. It closes on Esc, on click-away and when the tray icon is clicked again.
 - **Frame:** 380 wide. Its height fits the open panel, up to 640, and a taller panel scrolls inside. Flyout color, 1px stroke (`rgba(255,255,255,.08)` / `rgba(0,0,0,.12)`), 8px radius, flyout shadow.
 - **Header:** Gumdrop at 24px, idle, beside "Chippi" (14 / 600) over a caption status line ("2 features on", "Keep awake is on"). There is no settings button in the header; Settings lives in the footer.
-- **Tab strip:** one icon tab per installed feature that has a flyout panel, in sidebar order, left-aligned under the header with a hairline below.
+- **Tab strip:** one icon tab per installed feature that has a flyout panel, except Sound features share one **Sound** tab (audio-lines glyph). Tabs follow sidebar order, with a shared tab at its first contributing feature; sections inside it follow their defined order. Left-aligned under the header with a hairline below.
   - Tabs are 40×36 with a 2px gap and a 16px glyph. Eight fit at 380 wide; any more go into a final "More" tab that lists the rest.
   - Selected: subtle-selected fill, the glyph in the accent, and a 14×3 accent bar 2px from the bottom.
   - Each tab's tooltip and accessible name is the feature's short name. The flyout reopens on the last tab used.
@@ -240,32 +240,46 @@ Flat, like Windows 11. Depth comes from the surface steps (window → card → c
   - Below the card, always visible: "Organize now" (accent, fills the row) and "Rules" (96px).
   - A "Recent" header with a "History ›" link on the right, then one flyout card of up to 4 rows. Held rows come first: a caution triangle, the file name, the reason in caution ("Held · a program named like a PDF") and a Review button. Moved rows: a muted file glyph, the name, "Documents · 23m", and an undo icon button. After undo the row reads "Restored to Downloads" and loses its button. Waiting rows: a clock glyph and "Waiting · reason", no action.
   - Empty state: "No folders yet", an accent "Add Downloads" and a standard "Choose folder…".
+- **Sound panel** (Phase 3, approved 2026-10-25; `FlyoutSound.dc.html` in the offline Sound mockup):
+  - One Sound tab for all installed Sound features, never one tab per feature. Use the six-line audio-lines glyph; accessible name and tooltip are "Sound". Keep the existing tab dimensions and selection treatment.
+  - Output card: chosen output picker, system volume slider and mute action. Then the microphone row: real mic name, actual processing or muted status, and Mute / Unmute. A muted mic makes the flyout header status and mic-off glyph Caution.
+  - Mic clean-up row: actual processing state and switch. With its dependency missing, Set up opens Settings > Add features; it never starts a driver install from the flyout.
+  - Apps: app icon (or a monogram when unavailable), name, mute action and volume slider. More options opens the relevant Sound settings. Only installed features contribute controls; no static sample apps, fake levels or duplicate system-volume rows.
+  - The same state drives Settings and the island. Per-app device selection shows a chosen destination without claiming an existing stream has moved. Volume above 100% is unavailable until the Volume boost research gate passes.
 - **Empty flyout:** with nothing installed, the tab strip is hidden and the panel shows "No features on" with an accent "Add features" button that opens Settings › Add features.
 - **Tray menu (right-click):** flyout styling, 8px radius, 36px items with a 16px glyph and a 13 / 400 label: Open settings, Quit. Its bottom edge sits at the click point, kept 12px off the taskbar.
 
-### Island (movable, approved 2026-10-23)
-Mockup: the "Movable island" row, except that its open boards show the island as a separate box beside the tab; this section replaces that (2026-10-23). A small dark tab docked on a screen edge. Hovering it swells the tab a little; clicking it grows the tab into the island (Travis, 2026-10-24). It never hides at rest, so it stays reachable; it only hides while a fullscreen app is in front on its display.
-- **Position:** the user drags the tab to the **Top** (the default, centered), **Left** or **Right** edge, and it snaps there on release.
-  - It never docks on the taskbar's edge or in a corner. Its center stays at least 76px from the ends of a side edge and 160px from the ends of the top edge. Both are measured to the tab's center and keep the largest tab (swollen and live, 136 long) fully on screen; the top margin also keeps it clear of window buttons.
-  - Its edge and its place along that edge (0–1) are saved, so resolution changes don't move it.
-  - Which display it lives on is still a setting: **Main display** (the default), **Follow active window**, or **One monitor** by name. Dragging it onto another display switches the setting to One monitor for that display. If that display disconnects, it falls back to the main display on the same edge.
-- **Tab:** a half-oval with its flat side against the edge, in Island color with a 1px `rgba(255,255,255,.14)` stroke on every side but the flat one.
-  - Top edge: 96×28 at rest and 120×32 when something is live (Travis, 2026-10-24: the old 64×18 was too small to see Gumdrop). Side edges: 28×96 and 32×120.
-  - **Swell:** with the pointer on it, or while the island is open, it is 16px longer along the edge and 4px deeper: 112×32 at rest and 136×36 live on the top edge (32×112 and 36×136 on the sides). It swells at once, with no delay, over 120ms easing out, and shrinks back the same way when the pointer leaves. It grows around its center, so it never slides out from under the pointer. Under reduced motion it snaps. Hovering never opens the island.
-  - Contents: Gumdrop's small form, 20px at rest and 22px when live; sleepy at rest, idle when hovered or open. Beside it (top) or under it (sides) is one 14px live glyph in the island accent: a 3-bar equalizer for media, a progress ring for timers and agents, a folder for downloads and stashes, a dot for status activities such as Keep awake.
-  - When several activities are live, the tab shows the highest: media, then timer, then download or stash, then agent, then status. On a stash Gumdrop celebrates; held and failed stashes show a caution dot.
-- **Dragging:** pressing and moving 4px starts a drag, which never opens the island. While dragging, a 44px bubble with Gumdrop follows the pointer, and a 3px accent line on the target edge shows where it will land. On release it slides into place over 180ms. A press without movement is a click and toggles the island.
-- **Opening:** a click on the tab opens the island; with the tab focused, Enter or Space does too. It stays open until it is dismissed: a click anywhere off the island and the tab, Esc, or another click on the tab. Moving the pointer away doesn't close it. The click outside still reaches what is under it.
-- **The island:** the tab itself, grown. It is one 328-wide shape with its flat side on the tab's edge, never a second box beside the tab. It is centered on the tab along that edge and kept 8px inside the edge's ends.
-  - Island color, 20px corners on the side away from the edge and square ones against it, a 1px `rgba(255,255,255,.10)` stroke on every side but the flat one, island shadow, 12px padding, 8px gaps.
-  - **Morph:** opening grows the swollen tab's half-oval into the island over 220ms, easing out. Size, place and corners move together, and the content fades in over the second half. Closing runs it backward over 160ms, and the tab stays swollen until the island is back inside it. Under reduced motion it appears and disappears at once. Starting a drag, or the island hiding for a fullscreen app, closes it at once.
-  - Contents, top to bottom:
-    1. A header: Gumdrop at 22px, "Chippi" (13 / 600) and a clock.
-    2. The live activity card. Media: a 40px art tile, title and source with previous / accent play-pause / next beside them, then a 4px accent progress bar. Elapsed and remaining times show only once a media source reports them. Timer: a "Focus timer" caption, the time at 20px, and Stop once a timer feature exists.
-    3. The installed features' island panels, in sidebar order. Keep awake: its name with the status on the right, then four chips (30 min · 1 hr · 2 hr · No limit). Downloads: the folder over its mode line, with a compact secondary Organize now beside it.
+### Island (movable tab and tile grid, approved 2026-10-25)
+Reference: the offline Sound mockup at `X:\code\chippi-scratch\phase-3-prep\mockup\` (`Island.dc.html`, `IslandTabs.dc.html`), with the side-edge column approved in the Phase 3 kickoff. This replaces the old stack of installed-feature panels. The tab remains one shape that grows into the island; hovering only swells it, and clicking opens it. It never hides at rest, except while a fullscreen app is in front on its display.
 
-    Inner cards are `rgba(255,255,255,.06)` with an 8px radius. Sections without data are left out. While Keep awake is on, the header pet is wide awake.
-- **Colors:** the island always uses the dark accent shade and dark text tokens, whatever the app theme.
+- **Position:** drag to Top (default, centered), Left or Right, never the taskbar edge or a corner.
+  - The tab's center stays at least 76px from a side edge's ends and 160px from the top edge's ends. These center margins keep the largest swollen live tab (136 long) fully on screen; the top margin also keeps it clear of window buttons.
+  - Save edge and place along it (0 to 1). Display stays a setting: Main display (default), Follow active window, or One monitor by name. Dropping on another monitor selects it; disconnection falls back to the main display on the same edge.
+- **Tab:** half-oval, flat against its edge, Island fill, 1px `rgba(255,255,255,.14)` stroke except on the flat side.
+  - Top: 96x28 at rest, 120x32 live. Sides: 28x96 and 32x120. Gumdrop's small form is 20px at rest, 22px live; sleepy at rest and awake on hover or while open.
+  - Swell adds 16px along the edge and 4px depth: Top 112x32 or 136x36; sides 32x112 or 36x136. No delay; 120ms ease-out, shrinking when the pointer leaves. Grow about the center, never away from the pointer. Reduced motion snaps. Hover never opens the island.
+  - The highest activity supplies a 14px accent glyph beside Gumdrop (under it on side edges): media, timer, download/stash, agent, then status. Held/failed uses Caution; a successful stash celebrates.
+  - **Muted mic:** always add a 14px mic-off glyph in Caution after the highest activity glyph, even when music is playing. A muted mic alone counts as live and uses the live size; no preference can hide this indicator. The glyph/status clears when microphones are unmuted. Accessible state includes "Microphone muted".
+- **Dragging:** a press moving 4px starts a drag and closes the island immediately. A 44px Gumdrop bubble follows the pointer and a 3px accent line marks an allowed drop. Release snaps over 180ms, or returns to the saved position for a refused drop. Dragging never opens it; a press without movement toggles it.
+- **Opening and closing:** clicking the tab opens the last available page, or the grid if none is remembered or its feature was removed. A focused tab also accepts Enter or Space. Another tab click, Esc or an outside click closes it; leaving the pointer does not. Outside clicks still reach the underlying app. Orbit buttons and child menus are inside the island's interaction region.
+  - Only Esc is watched before the user clicks into the island. After that click, Tab, arrows and Enter navigate its controls; do not take those keys from the app in front with a global hook. Grid arrows move among its three columns, Enter opens the focused tile. Esc closes the island.
+- **Shape and pages:** one Island-colored shape, flat on its docked edge, 20px corners away from it and square against it, 1px `rgba(255,255,255,.10)` stroke away from the edge, island shadow. Center on the tab and keep the shape and its orbit buttons inside the work area. Content uses 12px inset, 8px gaps; height fits the page, not a fixed mockup height.
+  - Widths: grid 328px; Now Playing 440px; Volume mixer 344px; Output, Microphone, Keep awake and File organizer 328px. Pages sharing a tile combine their sections, never duplicate the tile.
+  - **Morph:** tab to page and page to page animate shape size, place and corners together over 220ms ease-out. Opening content fades over the second half; page content fades in over 180ms after 60ms. Closing reverses to the swollen tab over 160ms, then lets the tab shrink. Drag/fullscreen hide closes immediately. Reduced motion snaps every transition and removes continuous animation. Orbit positions follow every morph frame.
+- **Grid:** three equal columns with 8px gaps. Tiles are 84px high, 8px radius, `rgba(255,255,255,.06)` fill; hover `.10`, pressed `.04`. A 20px glyph sits above the 12px semibold name and 12px Caption status, with 6px before the name. Status is actual state ("Muted", "1 hr left", current media title), not a shortcut. Truncate long statuses with a tooltip and full accessible name.
+  - Order: Now Playing, Volume mixer, Output, Microphone, Keep awake, File organizer. Now Playing is shell-owned and always available; other tiles appear only when at least one contributing feature is installed. Routing, processing and mute share Microphone; its highest-priority nonempty status wins, with Muted above Live.
+  - An active tile may show the mockup's 6px status dot, 8px from its top/right; muted uses Caution. The grid's 28px header holds Gumdrop, Chippi and the clock. Tile names are structural labels, the semibold exception to the Weight Rule.
+- **Pages:**
+  - **Now Playing:** source picker, actual artwork at 112px (neutral placeholder if absent), title/source, previous / 40px accent play-pause / next, 4px progress bar and reported elapsed/remaining time. Disable unsupported actions. Show an empty state without sample music. System volume and output picker sit below.
+  - **Volume mixer:** selected output, system strip, divider, then app strips using the vertical volume bar in section 6. System stays 0 to 100%; app bars reach 200% only with the approved, working Volume boost backend. Use real app icons or monograms, percentages and names.
+  - **Output:** ordered devices with current/connected/unavailable state, selection and Switch by priority. **Microphone:** selected real mic, actual level/status, Mute / Unmute and installed cleanup controls. Muted status is Caution. Settings, flyout and these pages reflect the same engine state.
+  - **Keep awake and File organizer:** their existing compact controls become pages. Keep current duration/mode/Undo behavior; do not copy the mockup's sample delay, paths or verbose button text. Button labels follow the Bare Label Rule.
+  - Inner cards use `rgba(255,255,255,.06)`, 8px radius and 12px padding. Omit sections without a contributing installed feature.
+- **Orbit buttons:** 40px circles, Island fill, 1px `rgba(255,255,255,.14)` stroke, 16px glyph, `0 8px 20px rgba(0,0,0,.3)` shadow. Hover `#1F1F1F`, pressed `#000000`; the active page's button gets a `.5` white stroke. Accessible names describe the target/action. They are part of the island window and hit region, not click-away.
+  - **Top edge:** buttons sit 12px outside the shape. Left: All features at 12px from its top, then Keep awake at 60px. Right: Settings at 12px, Volume mixer at 60px. On the grid, All features becomes Back to the remembered page, if available. Feature buttons appear only with their installed feature.
+  - **Left/Right edges:** all four buttons stack on the open side in order All features/Back, Keep awake, Settings, Volume mixer. The column is 12px off the shape, starts 12px from its top and uses the same 8px inter-button gap as the Top layout. Nothing sits beyond the screen edge. Clamp the complete interactive footprint inside the work area.
+  - One live button is centered 12px below the shape: Now Playing for music, otherwise Microphone when muted. Closed-tab indicators still show both music and mute. Hide orbit buttons while closed or dragging. A removed target falls back to the grid.
+- **Colors:** the island always uses its dark accent and dark text tokens in either app theme. Only real media artwork may supply its own colors; do not copy the mockup's decorative gradient art placeholder.
 
 ### Settings window
 - **Frame:** 1120×720 by default and resizable, on the Windows 11 frame: system corners and shadow, so snap layouts, maximize and resize stay native.
@@ -350,11 +364,15 @@ Every interactive control is custom-templated with the full state set: rest, hov
 - **Icon chip:** 32×32, 6px radius, control fill, a 16px glyph in the accent when on and Muted when off. For feature rows, the folder row and the Tidy card.
 - **Duration chip:** 32px, control fill and stroke, 4px radius, 13px label with tabular figures, in a 3-column grid with 8px gaps. Selected: accent fill and stroke, on-accent text.
 - **Swatch:** a 24px circle. The "Windows" accent choice is a 24px pill with a 12px label. Selection: §5 Settings window.
+- **Vertical volume bar** (Sound island mixer; `Island.dc.html`): a 40x136px track, 12px radius, `rgba(255,255,255,.12)` fill (`.16` hover), filling upward in accent with no separate thumb. A 56px strip holds a 28px app/mute button, bar, 12px tabular percentage and 12px Caption app name, with 6px gaps. Strips have 4px gaps; a 1px `.10` white divider with 8px side margins separates System from apps.
+  - Normal range 0 to 100%. With validated Volume boost, app range 0 to 200% in 5-point steps, with a 1px `.45` white line at 100% (halfway, inset 8px). Above 100%, fill and percentage are Caution; System remains 0 to 100%. The gate failing disables the above-100 range, not ordinary volume/mute.
+  - Pointer drag changes volume; keyboard arrows adjust a step, Home/End select bounds. Accessible name identifies app/output, and RangeValue exposes the actual percentage. Focus is a 2px white outline with 2px gap on the island. Mute is a separate named button and does not discard the stored level.
 - **Badges:** 18px, 6px side padding, 4px radius, 11 / 600.
   - **Overlap:** caution text on caution tint, for example "Overlaps PowerToys", for features Windows or PowerToys already cover.
   - **Neutral:** Secondary text on control fill, for example "Other drive" or "Needs VB-CABLE".
 - **Status dot:** 7px. Success for active, caution for attention, Muted for offline. No glow.
 - **Drag handle:** a 16px six-dot grip in Muted. Alt+Up/Down moves the row.
+- **Sound glyphs:** Sound tab uses `AudioLines` (six vertical audio lines); Mic processing uses `Mic`; Mic mute shortcut uses `MicOff` (slashed microphone). Use the matching mic-off glyph for muted state in the flyout, island tab and Microphone tile/page, in Caution. These are distinct feature glyphs, not two features sharing Mic.
 - **Icons:** Lucide on a 24px grid at 1.6 stroke, round caps and joins, drawn at 16px (20px for a Settings row lead glyph). Each feature has its own glyph; no glyph is reused for two features. Brand logos are never redrawn: an app shows its real icon, or a monogram tile when no icon is available.
 
 ## 7. The pet: Gumdrop
