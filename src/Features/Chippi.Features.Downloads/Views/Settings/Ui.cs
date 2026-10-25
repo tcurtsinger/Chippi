@@ -179,6 +179,17 @@ internal static class Ui
 
     public static Badge Badge(string text, BadgeKind kind) => new() { Text = text, Kind = kind, VerticalAlignment = VerticalAlignment.Center };
 
+    /// <summary>A click came from inside a <typeparamref name="T"/> (a button or grip in a header that toggles on click).</summary>
+    public static bool IsInside<T>(DependencyObject element) where T : DependencyObject
+    {
+        for (var current = element; current is not null; current = current is Visual or System.Windows.Media.Media3D.Visual3D ? VisualTreeHelper.GetParent(current) : LogicalTreeHelper.GetParent(current))
+        {
+            if (current is T)
+                return true;
+        }
+        return false;
+    }
+
     public static CheckBox Check(string name, bool? isChecked = false)
     {
         var box = new CheckBox { IsChecked = isChecked, VerticalAlignment = VerticalAlignment.Center };

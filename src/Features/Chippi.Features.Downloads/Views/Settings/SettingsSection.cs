@@ -89,14 +89,9 @@ internal sealed class SettingsSection : UserControl
 
         var options = new Card();
         options.SetResourceReference(StyleProperty, "CardRowsStyle");
-        options.Children.Add(Ui.Setting("Mode", folder.Mode switch
-        {
-            FolderMode.Silent => "Moves files on its own",
-            FolderMode.Manual => "Waits for your review",
-            _ => "Not watching",
-        }, mode));
-        options.Children.Add(Ui.Setting("Wait before moving", "Gives downloads time to finish", graceBox));
-        options.Children.Add(Ui.Setting("Ignore list", "Files and patterns to leave alone", ignore));
+        options.Children.Add(Ui.Setting("Mode", "", mode));
+        options.Children.Add(Ui.Setting("Wait before moving", "", graceBox));
+        options.Children.Add(Ui.Setting("Ignore list", "", ignore));
         options.Children.Add(Ui.Setting("Stop watching this folder", "", remove));
 
         string where = folder.Path + (folder.Path.StartsWith(@"\\", StringComparison.Ordinal) ? " · network" : "") + (exists ? "" : " · not found");
@@ -148,14 +143,14 @@ internal sealed class SettingsSection : UserControl
         // Checked/Unchecked, so a UI Automation toggle saves too.
         toggle.Checked += (_, _) => Changed();
         toggle.Unchecked += (_, _) => Changed();
-        return Ui.Setting("Organize in Explorer", "Adds Organize to the right-click menu", toggle);
+        return Ui.Setting("Organize in Explorer", "", toggle);
     }
 
     private FrameworkElement ImportRow()
     {
         var choose = Ui.Button("Choose file…", name: "Import archive");
         choose.Click += async (_, _) => await ImportAsync(choose);
-        var row = Ui.Setting("Import archive", "zip, tgz or tar.gz", choose);
+        var row = Ui.Setting("Import archive", "", choose);
         return Ui.Stack(row, _importError.Margin(16, 0, 16, 10));
     }
 
@@ -184,7 +179,7 @@ internal sealed class SettingsSection : UserControl
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            ShowImportError("The archive could not be read.");
+            ShowImportError("Archive unreadable");
         }
         finally
         {

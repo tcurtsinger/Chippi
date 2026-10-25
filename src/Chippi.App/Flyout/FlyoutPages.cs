@@ -39,7 +39,7 @@ internal sealed class FlyoutPages(FlyoutWindow owner)
     public FrameworkElement BuildNothingInstalled()
     {
         Detach();
-        var state = EmptyState(LucideIcons.LayoutGrid, "No features on yet");
+        var state = EmptyState(LucideIcons.LayoutGrid, "No features on");
         var add = new Button { Content = "Add features", Margin = new Thickness(0, 14, 0, 0), HorizontalAlignment = HorizontalAlignment.Center };
         add.SetResourceReference(FrameworkElement.StyleProperty, "PrimaryButtonStyle");
         add.Click += (_, _) => owner.OpenSettings("features");

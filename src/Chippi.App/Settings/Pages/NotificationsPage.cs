@@ -177,12 +177,8 @@ internal sealed class NotificationsPage : UserControl
     private static SettingRow Destination(string title, bool on, Action<bool> changed)
     {
         var toggle = SettingsUi.Switch(on);
-        var row = new SettingRow { Header = title, Description = on ? "" : "Off \u00B7 choices kept", Content = toggle };
-        SettingsUi.OnSwitched(toggle, value =>
-        {
-            row.Description = value ? "" : "Off \u00B7 choices kept";
-            changed(value);
-        });
+        var row = new SettingRow { Header = title, Content = toggle };
+        SettingsUi.OnSwitched(toggle, changed);
         return row;
     }
     private static FrameworkElement Unavailable()

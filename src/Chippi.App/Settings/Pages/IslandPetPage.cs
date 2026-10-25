@@ -27,7 +27,7 @@ internal sealed class IslandPetPage : UserControl
         var island = SettingsUi.Switch(app.IslandEnabled);
         SettingsUi.OnSwitched(island, on => SettingsUi.SaveApp(shell.Config, s => s.IslandEnabled = on));
         page.Children.Add(SettingsUi.Group(
-            SettingsUi.Row("Island", "Shows what's live from a screen edge", island),
+            SettingsUi.Row("Island", "", island),
             PositionRow(app), DisplayRow(app)));
         page.Children.Add(SettingsUi.Section("Gumdrop"));
         page.Children.Add(SettingsUi.Group(ColorRow(app), MotionRow(app)));
@@ -51,7 +51,7 @@ internal sealed class IslandPetPage : UserControl
         var controls = new StackPanel { Orientation = Orientation.Horizontal };
         controls.Children.Add(picker);
         controls.Children.Add(reset);
-        return SettingsUi.Row("Position", "Or drag the island to any screen edge", controls);
+        return SettingsUi.Row("Position", "", controls);
     }
 
     private Border DisplayRow(AppSettings app)
@@ -68,7 +68,7 @@ internal sealed class IslandPetPage : UserControl
             bool specific = mode.SelectedItem is ComboBoxItem { Tag: IslandDisplay.SpecificMonitor };
             picker.Visibility = specific ? Visibility.Visible : Visibility.Collapsed;
             if (specific && picker.SelectedItem is null)
-                SettingsUi.Show(note, "Choose a connected monitor. Using the main display for now.", false);
+                SettingsUi.Show(note, "Monitor not connected · using main display", false);
             else
                 note.Visibility = Visibility.Collapsed;
         }

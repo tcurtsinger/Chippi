@@ -53,7 +53,7 @@ internal sealed class GeneralPage : UserControl
     {
         var selected = SettingsUi.ReadApp(_shell.Config).Accent;
         var swatches = new StackPanel { Orientation = Orientation.Horizontal };
-        var row = new SettingRow { Header = "Accent color", Description = selected == AccentChoice.FollowWindows ? "Follows your Windows accent" : selected.ToString(), Content = swatches };
+        var row = new SettingRow { Header = "Accent color", Description = selected == AccentChoice.FollowWindows ? "Follow Windows" : selected.ToString(), Content = swatches };
         foreach (var choice in Enum.GetValues<AccentChoice>())
         {
             var swatch = SettingsUi.Styled(new RadioButton { GroupName = "Accent", IsChecked = selected == choice, Content = "Windows", Margin = new Thickness(4, 0, 0, 0), ToolTip = choice == AccentChoice.FollowWindows ? "Follow Windows" : choice.ToString() }, choice == AccentChoice.FollowWindows ? "SwatchPillStyle" : "SwatchStyle");
@@ -68,7 +68,7 @@ internal sealed class GeneralPage : UserControl
             swatch.Unloaded += (_, _) => ThemeManager.ThemeChanged -= UpdateSwatch;
             swatch.Checked += (_, _) =>
             {
-                row.Description = choice == AccentChoice.FollowWindows ? "Follows your Windows accent" : choice.ToString();
+                row.Description = choice == AccentChoice.FollowWindows ? "Follow Windows" : choice.ToString();
                 SettingsUi.SaveApp(_shell.Config, s => s.Accent = choice);
             };
             swatches.Children.Add(swatch);
@@ -86,7 +86,7 @@ internal sealed class GeneralPage : UserControl
         catch (Exception ex) when (ex is UnauthorizedAccessException or System.Security.SecurityException or IOException)
         {
             enabled = false;
-            SettingsUi.Show(message, "Windows would not let Chippi read its startup entry.", problem: true);
+            SettingsUi.Show(message, "Couldn't read startup entry", problem: true);
         }
 
         var toggle = SettingsUi.Switch(enabled);
@@ -101,10 +101,10 @@ internal sealed class GeneralPage : UserControl
             {
                 Log.Warn("Run at startup could not be changed", ex);
                 toggle.IsChecked = !want;
-                SettingsUi.Show(message, "Windows would not let Chippi change its startup entry.", problem: true);
+                SettingsUi.Show(message, "Couldn't change startup entry", problem: true);
             }
         });
-        return SettingsUi.Row("Run at startup", "Starts quietly in the tray when you sign in", toggle, message);
+        return SettingsUi.Row("Run at startup", "", toggle, message);
     }
 
     private Border TransferRow()
@@ -117,7 +117,7 @@ internal sealed class GeneralPage : UserControl
         var buttons = new StackPanel { Orientation = Orientation.Horizontal };
         buttons.Children.Add(export);
         buttons.Children.Add(import);
-        return SettingsUi.Row("Back up or move your settings", _shell.Config.FilePath, buttons, message);
+        return SettingsUi.Row("Location", _shell.Config.FilePath, buttons, message);
     }
 
     private void Export(TextBlock message)
@@ -139,7 +139,7 @@ internal sealed class GeneralPage : UserControl
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             Log.Warn("Settings export failed", ex);
-            SettingsUi.Show(message, $"Couldn't export: {ex.Message}", problem: true);
+            SettingsUi.Show(message, $"Couldn't export · {ex.Message}", problem: true);
         }
     }
 
@@ -158,13 +158,13 @@ internal sealed class GeneralPage : UserControl
         }
         catch (InvalidDataException ex)
         {
-            SettingsUi.Show(message, $"Nothing changed. {ex.Message}", problem: true);
+            SettingsUi.Show(message, $"Not imported · {ex.Message}", problem: true);
             return;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             Log.Warn("Settings import failed", ex);
-            SettingsUi.Show(message, $"Nothing changed. {ex.Message}", problem: true);
+            SettingsUi.Show(message, $"Not imported · {ex.Message}", problem: true);
             return;
         }
 

@@ -83,7 +83,7 @@ internal sealed class AddFeaturesPage : UserControl
             }
         }
         names.Margin = new Thickness(50, 0, 16, 16);
-        _coming = new ExpanderRow { Header = "Coming later", Description = $"{placeholders.Count} features on the way", Content = names };
+        _coming = new ExpanderRow { Header = "Coming later", Description = $"{placeholders.Count} features", Content = names };
         var laterCard = SettingsUi.Group(_coming);
         laterCard.Margin = new Thickness(0, 16, 0, 0);
         page.Children.Add(laterCard);
@@ -107,7 +107,7 @@ internal sealed class AddFeaturesPage : UserControl
         catch (Exception ex)
         {
             Log.Error($"Changing {entry.Id} install state failed", ex);
-            SettingsUi.Show(_message, $"Couldn't change {entry.Descriptor.Name}. Try again.", problem: true);
+            SettingsUi.Show(_message, $"Couldn't change {entry.Descriptor.Name}", problem: true);
         }
         finally
         {
@@ -126,7 +126,7 @@ internal sealed class AddFeaturesPage : UserControl
             toggle.IsChecked = entry.IsInstalled;
             toggle.Content = entry.IsInstalled ? "On" : "Off";
             chip.IsOn = entry.IsInstalled;
-            caption.Text = entry.LastError is not null ? "Couldn't start. Turn off and try again." : entry.Descriptor.Description;
+            caption.Text = entry.LastError is not null ? "Couldn't start" : entry.Descriptor.Description;
         }
         _count.Text = $"{_shell.Registry.InstalledCount} on";
         _syncing = false;

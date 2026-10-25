@@ -33,7 +33,7 @@ internal sealed class RulesSection : UserControl, ISettingsLeaveGuard
     private readonly ContentControl _list = new() { Focusable = false };
     private readonly ContentControl _leaveBar = new() { Focusable = false };
     private readonly List<Border> _rows = [];
-    private readonly TextBox _test = Ui.BareField("Test a file name, like notes.txt", "Test a file name");
+    private readonly TextBox _test = Ui.BareField("Test a file name", "Test a file name");
     private readonly TextBlock _testResult = Ui.Text("");
     private string? _open;
     private string? _match;
@@ -99,7 +99,7 @@ internal sealed class RulesSection : UserControl, ISettingsLeaveGuard
         };
         var bar = Ui.Columns("Auto", "*", "Auto", "Auto");
         bar.Children.Add(Ui.Glyph(LucideIcons.Info, "WarningBrush", 16).Margin(0, 0, 12, 0).At(0));
-        bar.Children.Add(Ui.Text("Unsaved rule changes. Discard them?", "BodyTextStyle").At(1));
+        bar.Children.Add(Ui.Text("Discard changes?", "BodyTextStyle").At(1));
         bar.Children.Add(discard.At(2));
         bar.Children.Add(keep.Margin(8, 0, 0, 0).At(3));
         var card = Ui.Card(Ui.Pad(bar)).Margin(0, 16, 0, 0);
@@ -183,7 +183,7 @@ internal sealed class RulesSection : UserControl, ISettingsLeaveGuard
         head.Children.Add(chevron.Margin(8, 0, 0, 0).At(6));
         head.MouseLeftButtonUp += (_, e) =>
         {
-            if (e.OriginalSource is DependencyObject source && !IsInside<ButtonBase>(source) && !IsInside<Thumb>(source))
+            if (e.OriginalSource is DependencyObject source && !Ui.IsInside<ButtonBase>(source) && !Ui.IsInside<Thumb>(source))
                 Toggle(rule);
         };
 
@@ -782,15 +782,5 @@ internal sealed class RulesSection : UserControl, ISettingsLeaveGuard
             return false;
         date = parsed;
         return true;
-    }
-
-    private static bool IsInside<T>(DependencyObject element) where T : DependencyObject
-    {
-        for (var current = element; current is not null; current = current is Visual or System.Windows.Media.Media3D.Visual3D ? VisualTreeHelper.GetParent(current) : LogicalTreeHelper.GetParent(current))
-        {
-            if (current is T)
-                return true;
-        }
-        return false;
     }
 }

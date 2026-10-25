@@ -134,7 +134,7 @@ internal sealed class Executor(IHistoryStore history, EngineOptions options)
 {
     internal const string PartialSuffix = ".chippi-partial";
 
-    internal const string ChangedSinceOrganized = "The file changed since it was organized, so it was left alone.";
+    internal const string ChangedSinceOrganized = "Changed since moved";
 
     internal static string PartialPath(string destination, long operationId) => $"{destination}.{operationId}{PartialSuffix}";
 
@@ -150,11 +150,11 @@ internal sealed class Executor(IHistoryStore history, EngineOptions options)
         }
         catch (FileNotFoundException)
         {
-            return Fail(runId, request, "The file is gone.");
+            return Fail(runId, request, "File gone");
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            return Fail(runId, request, "The file is in use.");
+            return Fail(runId, request, "In use");
         }
 
         using (source)
@@ -163,7 +163,7 @@ internal sealed class Executor(IHistoryStore history, EngineOptions options)
             if (RandomAccess.GetLength(source) != request.ExpectedBytes
                 || new DateTimeOffset(modified, TimeSpan.Zero) != request.ExpectedModifiedUtc
                 || request.ExpectedVersion is { } version && FileVersion.Of(source) != version)
-                return Fail(runId, request, request.ExpectedSha256 is null ? "The file changed after it was planned." : ChangedSinceOrganized);
+                return Fail(runId, request, request.ExpectedSha256 is null ? "Changed since preview" : ChangedSinceOrganized);
 
             string sha = FileHandles.Sha256(source);
             if (request.ExpectedSha256 is { } expected && !string.Equals(sha, expected, StringComparison.Ordinal))
@@ -173,7 +173,7 @@ internal sealed class Executor(IHistoryStore history, EngineOptions options)
             if (Exists(destination))
             {
                 if (!request.AllowRenumber)
-                    return Fail(runId, request, "Something already has that name.");
+                    return Fail(runId, request, "Name taken");
                 destination = NextFreeName(destination);
             }
 
@@ -211,9 +211,9 @@ internal sealed class Executor(IHistoryStore history, EngineOptions options)
             FileHandles.Copy(source, partial);
             File.SetLastWriteTimeUtc(partial, modified);
             if (!string.Equals(FileHandles.Sha256(partial), sha, StringComparison.Ordinal))
-                throw new IOException("The copy did not match the original.");
+                throw new IOException("Copy didn't match");
             if (!FileHandles.TryRename(partial, destination))
-                throw new IOException("The copy could not be put in place.");
+                throw new IOException("Copy couldn't be placed");
             placed = true;
             history.MarkPartial(id, null);
             FileHandles.DeleteOnClose(source); // the validated original, gone when the handle closes
@@ -264,11 +264,11 @@ internal sealed class Executor(IHistoryStore history, EngineOptions options)
             }
             else if (atSource)
             {
-                history.MarkFailed(record.Id, "Interrupted before it finished; the file was left where it was.");
+                history.MarkFailed(record.Id, "Interrupted · left in place");
             }
             else
             {
-                history.MarkFailed(record.Id, "Interrupted; the file was found in neither place.");
+                history.MarkFailed(record.Id, "Interrupted · file missing");
             }
             settled++;
         }

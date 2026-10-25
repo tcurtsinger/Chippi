@@ -23,7 +23,7 @@ internal sealed class PermissionsPage : UserControl
         _shell = shell;
         var page = new StackPanel();
         page.Children.Add(SettingsUi.Header("Permissions",
-            "What features need beyond a standard user account. Chippi never runs as administrator; features that need it will ask through a separate helper."));
+            ""));
         page.Children.Add(_list);
         Content = page;
         Build();
@@ -44,7 +44,7 @@ internal sealed class PermissionsPage : UserControl
         var usages = _shell.Registry.GetPermissions();
         if (usages.Count == 0)
         {
-            _list.Children.Add(SettingsUi.Styled(new TextBlock { Text = "No feature needs anything extra yet." }, "CaptionTextStyle"));
+            _list.Children.Add(SettingsUi.Styled(new TextBlock { Text = "Nothing needed" }, "CaptionTextStyle"));
             return;
         }
         foreach (var usage in usages)
@@ -73,7 +73,7 @@ internal sealed class PermissionsPage : UserControl
         else if (usage.IsUnused)
         {
             var dismiss = SettingsUi.Button("Dismiss");
-            dismiss.ToolTip = "Stop flagging this. Remove the driver or setting yourself if you no longer want it.";
+            dismiss.ToolTip = "Stop flagging";
             System.Windows.Automation.AutomationProperties.SetName(dismiss, $"Dismiss unused {capability.Name}");
             dismiss.Click += (_, _) => _shell.Registry.DismissUnusedCapability(capability.Id);
             var panel = new StackPanel { Orientation = Orientation.Horizontal };

@@ -68,6 +68,7 @@ public partial class KeepAwakePanel : UserControl
         if (!Dispatcher.CheckAccess()) { Dispatcher.BeginInvoke(Refresh); return; }
         Status.Text = KeepAwakeText.Status(_module, DateTimeOffset.Now);
         Detail.Text = _module.Error ?? KeepAwakeText.Detail(_module);
+        Detail.Visibility = Detail.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
         Switch.IsChecked = _module.IsOn;
         Screen.IsChecked = _module.Settings.KeepDisplayOn;
         foreach (var (chip, length) in _chips)
@@ -127,6 +128,7 @@ public partial class KeepAwakePanel : UserControl
             Log.Error("Keep awake: a change from the flyout failed", ex);
             Refresh();
             Detail.Text = ex.Message;
+            Detail.Visibility = Visibility.Visible;
             return;
         }
         Refresh();

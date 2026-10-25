@@ -19,7 +19,7 @@ public sealed class TidyTests(ITestOutputHelper output)
         using var app = new DesktopSession(output);
         var tidy = OpenTidy(app);
         DesktopSession.Find(tidy, "No folders yet");
-        DesktopSession.Find(tidy, "New folders start in Manual");
+        DesktopSession.ExpectAbsent(tidy, "New folders start in Manual");
         DesktopSession.Find(tidy, "Add Downloads", InvokePattern.Pattern);
         DesktopSession.Find(tidy, "Choose folder", InvokePattern.Pattern);
         DesktopSession.ExpectAbsent(tidy, "Organize now");

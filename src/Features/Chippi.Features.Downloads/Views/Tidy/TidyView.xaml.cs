@@ -102,7 +102,7 @@ public partial class TidyView : UserControl
         }
         catch (ObjectDisposedException)
         {
-            ShowError("Organizer stopped.");
+            ShowError("Organizer stopped");
             FolderCard.IsEnabled = Actions.IsEnabled = false;
         }
         finally { _refreshing = false; }
@@ -168,7 +168,7 @@ public partial class TidyView : UserControl
         try
         {
             var result = await engine.UndoAsync(operation);
-            if (!result.Succeeded) ShowError(result.Error ?? "Couldn't undo. Open History.");
+            if (!result.Succeeded) ShowError(result.Error ?? "Couldn't undo");
         }
         catch (Exception ex) { ShowError(ex.Message); }
         finally
@@ -193,12 +193,12 @@ public partial class TidyView : UserControl
         if (DownloadsModule.DownloadsFolder() is { } folder)
             AddFolder(folder);
         else
-            ShowError("Folder not found. Choose folder.");
+            ShowError("Folder not found");
     }
 
     private void AddFolder(string path)
     {
-        if (!Directory.Exists(path)) { ShowError("Folder not found. Choose folder."); return; }
+        if (!Directory.Exists(path)) { ShowError("Folder not found"); return; }
         var settings = _module.Settings.Clone();
         if (!settings.Folders.Any(f => Same(f.Path, path)))
             settings.Folders.Add(new WatchedFolder { Path = path, Mode = FolderMode.Manual });
