@@ -16,11 +16,12 @@ public sealed class KeepAwakeSessionTests : IAsyncLifetime
     private readonly RecordingNative _native = new();
     private readonly KeepAwakeModule _module;
     private readonly ModuleRegistry _registry;
+    private readonly IslandActivityHub _hub = new();
 
     public KeepAwakeSessionTests()
     {
         _module = new KeepAwakeModule(_native);
-        _registry = new ModuleRegistry(new ConfigStore(_path), new IslandActivityHub(), NullLoggerFactory.Instance);
+        _registry = new ModuleRegistry(new ConfigStore(_path), _hub, NullLoggerFactory.Instance);
         _registry.Register(_module);
     }
 
@@ -82,6 +83,26 @@ public sealed class KeepAwakeSessionTests : IAsyncLifetime
         Assert.Equal(30, _module.Active!.DurationMinutes);
         Assert.Equal(240, _module.Settings.DurationMinutes);
         Assert.Equal(calls + 1, _native.Calls.Count); // only the screen call, same request
+    }
+
+    // Karl's S6 review: the real tile had no status and the activity no tile, so the grid showed neither.
+    [Fact]
+    public async Task The_island_tile_shows_the_state_and_the_live_activity_points_at_it()
+    {
+        var tile = Assert.Single(_registry.Features.Single().IslandTiles);
+        Assert.Equal("Off", tile.Status);
+
+        await _module.StartSessionAsync(new KeepAwakeSettings { Mode = AwakeMode.Duration, DurationMinutes = 60 });
+        Assert.Equal("1 hr left", tile.Status);
+        var awake = Assert.Single(_hub.Activities);
+        Assert.Equal(KeepAwakeModule.TileKey, awake.TileKey);
+
+        await _module.StartSessionAsync(new KeepAwakeSettings { Mode = AwakeMode.Indefinitely });
+        Assert.Equal("No limit", tile.Status);
+
+        await _module.StopSessionAsync();
+        Assert.Equal("Off", tile.Status);
+        Assert.Empty(_hub.Activities);
     }
 
     [Theory]

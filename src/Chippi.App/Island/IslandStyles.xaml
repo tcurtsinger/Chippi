@@ -29,15 +29,107 @@
         <Setter Property="Padding" Value="12" />
     </Style>
 
-    <!-- The 32px accent play/pause (DESIGN.md §5 Island). -->
-    <Style x:Key="IslandPlayButtonStyle" TargetType="{x:Type Button}">
-        <Setter Property="Width" Value="32" />
-        <Setter Property="Height" Value="32" />
-        <Setter Property="Focusable" Value="False" />
+    <!-- Keyboard focus on the island, after the user clicked into it: a 2px white ring. -->
+    <Style x:Key="IslandFocusVisual">
+        <Setter Property="Control.Template">
+            <Setter.Value>
+                <ControlTemplate>
+                    <Border Margin="-3" CornerRadius="11" BorderBrush="{StaticResource IslandTextBrush}" BorderThickness="2" />
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Orbit buttons (DESIGN.md §5 Island): 40px circles in Island fill with a .14 stroke and a 16px glyph;
+         hover #1F1F1F, pressed #000000; the active page's button (Tag "Active") gets a .5 white stroke. -->
+    <DropShadowEffect x:Key="IslandOrbitShadow" Color="#000000" BlurRadius="20" ShadowDepth="8" Direction="270" Opacity="0.3" />
+    <Style x:Key="IslandOrbitButtonStyle" TargetType="{x:Type Button}">
+        <Setter Property="Width" Value="40" />
+        <Setter Property="Height" Value="40" />
+        <Setter Property="Foreground" Value="{StaticResource IslandTextBrush}" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource IslandFocusVisual}" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type Button}">
                     <Grid>
+                        <Ellipse Fill="{StaticResource IslandBrush}" Effect="{StaticResource IslandOrbitShadow}" />
+                        <Ellipse x:Name="Fill" Fill="{StaticResource IslandBrush}" Stroke="{StaticResource IslandTabBorderBrush}" StrokeThickness="1" />
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="Tag" Value="Active">
+                            <Setter TargetName="Fill" Property="Stroke" Value="#80FFFFFF" />
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Fill" Property="Fill" Value="#1F1F1F" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Fill" Property="Fill" Value="#000000" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Grid tiles: 84px high, 8px radius, white at .06; hover .10, pressed .04. -->
+    <Style x:Key="IslandTileStyle" TargetType="{x:Type Button}">
+        <Setter Property="Height" Value="84" />
+        <Setter Property="Foreground" Value="{StaticResource IslandTextBrush}" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource IslandFocusVisual}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type Button}">
+                    <Border x:Name="Chrome" CornerRadius="8" Background="#0FFFFFFF">
+                        <ContentPresenter />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Chrome" Property="Background" Value="#1AFFFFFF" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Chrome" Property="Background" Value="#0AFFFFFF" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Now Playing's previous and next: 32px, glyph only, hover wash; dimmed when the app doesn't offer them. -->
+    <Style x:Key="IslandTransportButtonStyle" TargetType="{x:Type Button}">
+        <Setter Property="Width" Value="32" />
+        <Setter Property="Height" Value="32" />
+        <Setter Property="Foreground" Value="{StaticResource IslandTextBrush}" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource IslandFocusVisual}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type Button}">
+                    <Border x:Name="Chrome" CornerRadius="16" Background="Transparent">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Chrome" Property="Background" Value="{StaticResource IslandHoverBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="Chrome" Property="Opacity" Value="0.36" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- The 40px accent play/pause on Now Playing. -->
+    <Style x:Key="IslandPlayLargeButtonStyle" TargetType="{x:Type Button}">
+        <Setter Property="Width" Value="40" />
+        <Setter Property="Height" Value="40" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource IslandFocusVisual}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type Button}">
+                    <Grid x:Name="Root">
                         <Ellipse x:Name="Fill" Fill="{DynamicResource IslandAccentBrush}" />
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Grid>
@@ -48,11 +140,15 @@
                         <Trigger Property="IsPressed" Value="True">
                             <Setter TargetName="Fill" Property="Opacity" Value="0.76" />
                         </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="Root" Property="Opacity" Value="0.36" />
+                        </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
     </Style>
+
 
     <!-- Debug menu (DebugMode only): a themed list, no stock menu chrome. -->
     <Style x:Key="IslandMenuItemStyle" TargetType="{x:Type Button}">

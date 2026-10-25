@@ -53,6 +53,7 @@ public sealed class DownloadsModule : IFeatureModule
 
     private ModuleContext? _context;
     private SqliteHistoryStore? _history;
+    private IIslandTile? _tile;
 
     public FeatureDescriptor Descriptor { get; } = new("downloads-organizer", "File organizer", "Sorts new files into folders by your rules", FeatureGroup.Files)
     {
@@ -111,8 +112,10 @@ public sealed class DownloadsModule : IFeatureModule
 
         context.Ui.SetSettingsPage(section => new Views.Settings.DownloadsPage(this, section));
         context.Ui.AddFlyoutPanel("Tidy", nameof(LucideIcons.Folder), () => new Views.Tidy.TidyView(this, RequestView, () => RequestView(new DownloadsRequest(DownloadsRequestKind.Rules))));
-        context.Ui.AddIslandTile(new IslandTileSpec(TileKey, Descriptor.Name, nameof(LucideIcons.Folder), Order: 50, SectionOrder: 0,
+        _tile = context.Ui.AddIslandTile(new IslandTileSpec(TileKey, Descriptor.Name, nameof(LucideIcons.Folder), Order: 50, SectionOrder: 0,
             () => new Views.Tidy.TidyIslandView(this, RequestView)));
+        Engine.PendingChanged += OnPendingChanged;
+        UpdateTile();
         return Task.CompletedTask;
     }
 
@@ -169,7 +172,25 @@ public sealed class DownloadsModule : IFeatureModule
         }
         Settings = settings;
         Engine.Apply(settings);
+        UpdateTile();
     }
+
+    /// <summary>
+    /// The island tile's status, for the first watched folder (the one the island page shows): files to
+    /// review in Manual, else its mode ("Silent", "Manual", "Paused"); empty with no folder.
+    /// </summary>
+    public static string TileStatus(WatchedFolder? folder, IReadOnlyList<PendingFile> pending)
+    {
+        if (folder is null)
+            return "";
+        int ready = pending.Count(p => p.Status == PendingStatus.Ready
+            && string.Equals(Path.TrimEndingDirectorySeparator(p.Folder), Path.TrimEndingDirectorySeparator(folder.Path), StringComparison.OrdinalIgnoreCase));
+        return folder.Mode == FolderMode.Manual && ready > 0 ? $"{ready} to review" : folder.Mode.ToString();
+    }
+
+    private void OnPendingChanged(object? sender, EventArgs e) => UpdateTile();
+
+    private void UpdateTile() => _tile?.SetStatus(TileStatus(Settings.Folders.FirstOrDefault(), Engine?.Pending ?? []));
 
     /// <summary>A rule was saved or switched on: it sorts the files already there that it wins. Call after <see cref="SaveSettings"/>.</summary>
     public void SortExisting(string ruleId) => Engine?.SortExisting(ruleId);
@@ -187,6 +208,9 @@ public sealed class DownloadsModule : IFeatureModule
         // history closes only after the file being moved right now is settled.
         var engine = Engine;
         Engine = null;
+        _tile = null;
+        if (engine is not null)
+            engine.PendingChanged -= OnPendingChanged;
         if (engine is not null)
             await Task.Run(engine.Dispose, CancellationToken.None).ConfigureAwait(false);
         _history?.Dispose();

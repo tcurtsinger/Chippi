@@ -79,8 +79,8 @@ internal sealed class ForegroundTracker : IDisposable
     /// <summary>A fullscreen app, D3D game or presentation is in front, so the island hides.</summary>
     public bool FullscreenInFront { get; private set; }
 
-    /// <summary>The island's own window, never treated as the foreground.</summary>
-    public HWND Ignore { get; set; }
+    /// <summary>The island's own windows (the tab, and the open island once the user clicks into it), never treated as the foreground.</summary>
+    public IReadOnlyCollection<HWND> Ignore { get; set; } = [];
 
     public void Start()
     {
@@ -95,7 +95,7 @@ internal sealed class ForegroundTracker : IDisposable
         if (_disposed)
             return;
         var foreground = PInvoke.GetForegroundWindow();
-        if (foreground == Ignore)
+        if (Ignore.Contains(foreground))
             foreground = _foreground;
         if (foreground != _foreground)
         {

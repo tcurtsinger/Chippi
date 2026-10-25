@@ -95,4 +95,7 @@ public sealed class AppSettings
     /// chosen, so switching back remembers the monitor.
     /// </summary>
     public string? IslandMonitorId { get; set; }
+
+    /// <summary>The island page last opened (a tile key), which the next open restores while that tile exists; null for the grid.</summary>
+    public string? IslandLastPage { get; set; }
 }
