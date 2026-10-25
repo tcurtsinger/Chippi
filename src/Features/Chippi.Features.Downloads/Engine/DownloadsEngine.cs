@@ -677,7 +677,7 @@ public sealed class DownloadsEngine : IDisposable
         lock (_gate)
             rules = _rules;
         var patterns = IgnorePatterns(folder)
-            ?? throw new InvalidOperationException($"{EngineOptions.IgnoreFileName} in this folder can't be read right now. Try again in a moment.");
+            ?? throw new InvalidOperationException($"{EngineOptions.IgnoreFileName} can't be read");
         var facts = new List<FileFacts>();
         var real = new List<string>();
         foreach (var (path, planned) in files)

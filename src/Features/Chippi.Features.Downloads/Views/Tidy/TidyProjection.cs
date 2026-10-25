@@ -87,7 +87,7 @@ internal static class TidyProjection
             .Where(o => !pending.Any(p => string.Equals(p.Path, o.SourcePath, StringComparison.OrdinalIgnoreCase)))
             .Select(o => new TidyRow(
                 Path.GetFileName(o.State == OperationState.Failed ? o.SourcePath : o.DestinationPath),
-                o.State == OperationState.Failed ? $"Failed · {o.Error ?? "Try again"}" :
+                o.State == OperationState.Failed ? o.Error is { } error ? $"Failed · {error}" : "Failed" :
                     o.State == OperationState.Undone ? $"Restored to {FolderName(Path.GetDirectoryName(o.SourcePath) ?? "")}" :
                     $"{FolderName(Path.GetDirectoryName(o.DestinationPath) ?? "")} · {Age(now - (o.CompletedAt ?? o.PlannedAt))}",
                 Path.GetDirectoryName(o.SourcePath) ?? "", o.SourcePath, false, false, o.State == OperationState.Failed,
