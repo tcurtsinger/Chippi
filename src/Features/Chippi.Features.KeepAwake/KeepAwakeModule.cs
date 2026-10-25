@@ -35,6 +35,9 @@ public sealed class KeepAwakeModule : IFeatureModule
         _native = native;
     }
 
+    /// <summary>The island tile's key.</summary>
+    public const string TileKey = "keep-awake";
+
     public FeatureDescriptor Descriptor { get; } = new("keep-awake", "Keep awake", "Stops your PC from sleeping", FeatureGroup.System)
     {
         Icon = nameof(LucideIcons.Coffee),
@@ -55,7 +58,11 @@ public sealed class KeepAwakeModule : IFeatureModule
         Deadline = null;
         StateLine = "Off";
         CreateSession();
-        context.Ui.AddFlyoutPanel(Descriptor.Name, nameof(LucideIcons.Coffee), () => new KeepAwakePanel(this), () => new KeepAwakeIslandView(this));
+        context.Ui.AddFlyoutPanel(Descriptor.Name, nameof(LucideIcons.Coffee), () => new KeepAwakePanel(this));
+        context.Ui.AddIslandTile(new IslandTileSpec(TileKey, Descriptor.Name, nameof(LucideIcons.Coffee), Order: 40, SectionOrder: 0, () => new KeepAwakeIslandView(this))
+        {
+            Orbit = IslandOrbit.Left,
+        });
         context.Ui.SetSettingsPage(() => new KeepAwakePage(this));
         return Task.CompletedTask;
     }

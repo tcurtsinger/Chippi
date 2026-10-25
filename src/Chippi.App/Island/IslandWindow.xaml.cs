@@ -192,8 +192,8 @@ public partial class IslandWindow : Window
         _panel.SetActivities(activities, mood);
     }
 
-    /// <summary>The running features' panels that have an island view, in sidebar order.</summary>
-    public void SetPanels(IReadOnlyList<FlyoutPanelContribution> panels) => _panel.SetPanels(panels);
+    /// <summary>The running features' island tiles, in grid order.</summary>
+    public void SetTiles(IReadOnlyList<IslandTileGroup> tiles) => _panel.SetTiles(tiles);
 
     /// <summary>A module reported success: Gumdrop celebrates for about 2.5s.</summary>
     public void Celebrate()

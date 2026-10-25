@@ -95,4 +95,11 @@ public sealed record FeatureDescriptor(string Id, string Name, string Descriptio
 
     /// <summary>Icon key the shell resolves to a Lucide geometry (a property name on <c>LucideIcons</c>, e.g. "Coffee").</summary>
     public string? Icon { get; init; }
+
+    /// <summary>
+    /// Something outside Chippi the feature needs before it can be installed (Mic processing's
+    /// VB-CABLE driver). Add features creates one while it shows the feature's row and disposes it
+    /// after; null for features that need nothing.
+    /// </summary>
+    public Func<IFeatureRequirement>? Requirement { get; init; }
 }

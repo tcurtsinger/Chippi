@@ -31,8 +31,8 @@ public partial class IslandPanelWindow : Window
     private static readonly TimeSpan ShrinkTime = TimeSpan.FromMilliseconds(160);
 
     private readonly DispatcherTimer _clock = new();
-    private readonly Dictionary<FlyoutPanelContribution, FrameworkElement> _views = [];
-    private IReadOnlyList<FlyoutPanelContribution> _panels = [];
+    private readonly Dictionary<IslandTileContribution, FrameworkElement> _views = [];
+    private IReadOnlyList<IslandTileContribution> _parts = [];
     private HWND _hwnd;
     private IslandEdge _edge;
     private Rect _tab;
@@ -93,13 +93,17 @@ public partial class IslandPanelWindow : Window
         Render(activities.FirstOrDefault(a => !(a.Kind == IslandActivityKind.Status && a.ModuleId == IslandHost.KeepAwakeModuleId)));
     }
 
-    /// <summary>The running features' panels that have an island view, in sidebar order.</summary>
-    public void SetPanels(IReadOnlyList<FlyoutPanelContribution> panels)
+    /// <summary>
+    /// The running features' island tiles, in grid order. Until the grid is built (Phase 3 S6) each
+    /// tile's page shows here in that order, its sections stacked, as the island views did before.
+    /// </summary>
+    public void SetTiles(IReadOnlyList<IslandTileGroup> tiles)
     {
-        if (panels.SequenceEqual(_panels))
+        var parts = tiles.SelectMany(t => t.Parts).ToList();
+        if (parts.SequenceEqual(_parts))
             return;
-        _panels = panels;
-        foreach (var gone in _views.Keys.Where(p => !panels.Contains(p)).ToList())
+        _parts = parts;
+        foreach (var gone in _views.Keys.Where(p => !parts.Contains(p)).ToList())
             _views.Remove(gone);
         if (IsOpen)
             AttachPanels();
@@ -262,28 +266,28 @@ public partial class IslandPanelWindow : Window
     private void AttachPanels()
     {
         Panels.Children.Clear();
-        foreach (var panel in _panels)
+        foreach (var part in _parts)
         {
-            if (View(panel) is not { } view)
+            if (View(part) is not { } view)
                 continue;
             view.Margin = new Thickness(0, 8, 0, 0);
             Panels.Children.Add(view);
         }
     }
 
-    private FrameworkElement? View(FlyoutPanelContribution panel)
+    private FrameworkElement? View(IslandTileContribution part)
     {
-        if (_views.TryGetValue(panel, out var view))
+        if (_views.TryGetValue(part, out var view))
             return view;
         try
         {
-            if (panel.CreateIslandView?.Invoke() is FrameworkElement created)
-                return _views[panel] = created;
-            Log.Warn($"Island: {panel.ModuleId} returned a {panel.Name} island view that is not a FrameworkElement");
+            if (part.Spec.CreateSection() is FrameworkElement created)
+                return _views[part] = created;
+            Log.Warn($"Island: {part.ModuleId} returned a {part.Spec.Name} island page that is not a FrameworkElement");
         }
         catch (Exception ex)
         {
-            Log.Error($"Island: {panel.ModuleId} failed to build its {panel.Name} island view", ex);
+            Log.Error($"Island: {part.ModuleId} failed to build its {part.Spec.Name} island page", ex);
         }
         return null;
     }

@@ -43,6 +43,9 @@ public sealed record IslandActivity(string Key, IslandActivityKind Kind, string 
     /// <summary>Held or failed: the shell shows the source in amber with an amber dot (DESIGN.md §5).</summary>
     public bool NeedsAttention { get; init; }
 
+    /// <summary>The island tile this activity opens (<see cref="Modules.IslandTileSpec.Key"/>), or null for none.</summary>
+    public string? TileKey { get; init; }
+
     /// <summary>Set by the hub to the publishing module's id.</summary>
     public string ModuleId { get; init; } = "";
 }

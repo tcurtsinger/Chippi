@@ -55,6 +55,8 @@ public sealed class KeepAwakeRecoveryTests
             Assert.NotEqual(oldWorker, recoveredStart.Thread);
             Assert.Equal(0, celebrations);
             Assert.Single(registry.Find("keep-awake")!.FlyoutPanels);
+            var tile = Assert.Single(registry.Find("keep-awake")!.IslandTiles);
+            Assert.Equal((KeepAwakeModule.TileKey, IslandOrbit.Left), (tile.Spec.Key, tile.Spec.Orbit));
 
             await registry.SetInstalledAsync("keep-awake", false);
             Assert.False(native.Calls.Last().Active);
