@@ -31,3 +31,10 @@ Run this once a phase's report is written and the last change is merged and push
 - Deleted the toast spike in `build/toast-spike/` (classic COM was chosen; see `docs/phase-2-handoff.md`).
 - Every workstream worktree and branch was already removed at merge. Only `main` remains, locally and on GitHub.
 - Deleted the `Chippi-dev` profiles (lead, p2-core-review, p2-core-review-ui), `%TEMP%\chippi-tests`, and the dev profile's Windows notification entry. No dev Run, Explorer, CLSID or Start Menu entries were present. The installed copy's registrations and running process were left alone.
+
+## Phase 2.5 cleanup (2026-10-24)
+- Run after the report (`docs/phase-2-report.md`, #27). Karl took a read-only inventory first.
+- Archived `X:\code\chippi-scratch\phase-2.5` (2,005 files, 399 MB) to `X:\code\chippi-archive\phase-2.5-leftovers-2026-10-24.zip` (197 MB), checked the entry count, then deleted it. The main checkout had no untracked leftovers.
+- Superseded installer sets are kept in `X:\code\chippi-archive\phase-2.5-installers-0.1.0*`. `build\artifacts` holds the current build (#26).
+- Every worktree and branch was removed at merge (PRs #2 to #27). Only `main` remains, locally and on GitHub.
+- Deleted 17 `Chippi-dev` profiles each in Roaming and Local, 2 `%TEMP%\chippi*` items, 22 dev Explorer keys, 16 dev Start Menu shortcuts and 16 dev notification CLSIDs. No dev Run values or dev processes were present. The installed copy's registrations and running process were left alone.
