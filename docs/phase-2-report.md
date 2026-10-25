@@ -13,7 +13,7 @@ Briefs: [phase-2-handoff.md](phase-2-handoff.md) and [ui-refresh-handoff.md](ui-
 | Rules | Rules model, first-match planner, placeholders, rename templates, `.chippiignore`, misleading-name check, path validation | `src/Chippi.Rules` |
 | Pipeline | Watcher, readiness (grace period, lock, partial and 0 KB checks, retry with backoff), executor that skips its own output, SQLite history (schema v1) behind `IHistoryStore`, SHA-256 verified undo, archive import (zip, tgz, tar.gz) with entry, size and ratio limits | `src/Features/Chippi.Features.Downloads/Engine`, `Import` |
 | Views | Tidy flyout view, Preview and approve, rules editor, History, organizer settings page; the app-wide Notifications page | `Views`, `src/Chippi.App/Settings` |
-| Notices | Windows notifications through the classic COM activator (click routing, update-safe registration, removed on uninstall) and island notices, chosen per event kind | `src/Chippi.Notifications` (`86c21ba`, `669c058`) |
+| Notices | Windows notifications through the classic COM activator (click routing, update-safe registration, removed on uninstall) and island notices, chosen per event kind | `src/Chippi.App/Notifications` (`86c21ba`, `669c058`) |
 | Explorer | Per-user classic menu entry "Organize", removed on module and app uninstall, plus a startup sweep for stale keys | `b033613`, `49d2887` |
 | Tests | Desktop UI smoke tests, run only with `CHIPPI_UI_SMOKE=1` | `tests/Chippi.UiSmoke` (`d4cbb95`) |
 
@@ -47,7 +47,7 @@ Unchanged from the [Phase 1 report](phase-1-report.md#how-to-build-and-run). Add
 
 ## Screenshots
 
-The review sets are in `X:\code\chippi-scratch\phase-2.5\final-snap` (flyout in Follow Windows and Violet, settings, island, and a Blue set), with later sets beside them (`switch-flicker`, `rules-save`, `terse-copy\shots\after`). They go into the end-of-phase archive. `docs/phase-1/screens` shows the old look.
+The post-fix mockup comparisons are `X:\code\chippi-scratch\phase-2.5\fix-settings\index.html` and `fix-flyout-island\index.html` (their before set is `final-snap`), with later sets beside them (`switch-flicker`, `rules-save`, `terse-copy\shots\after`). They go into the end-of-phase archive. `docs/phase-1/screens` shows the old look.
 
 ## Test results
 
@@ -78,13 +78,13 @@ At `main` `398935f`:
 | Check | Status | Evidence |
 |---|---|---|
 | 0 warnings both platforms | Done | See Test results |
-| Mockup screens match in dark and light, Follow Windows and Violet; Windows accent change recolors live | Done | `final-snap` compared with the mockup copy, reviewed by Karl. Marge's live run at `5e5d56c`: gray to blue without a restart |
+| Mockup screens match in dark and light, Follow Windows and Violet; Windows accent change recolors live | Partly | Post-fix comparisons `fix-settings/index.html` and `fix-flyout-island/index.html` (#11, #12), spec synced in #13. Marge's live run at `5e5d56c`: the flyout's selected tab went from gray to blue without a restart. Island recoloring wasn't observed |
 | Keep awake for an hour is one click; Organize now visible without scrolling | Done by review | Six duration chips (#6); Organize now beside the folder (#12). Not measured on a small display |
-| Island drags to top, left, right, snaps, opens on hover; reopens there after restart; never covers caption buttons | Partly | 18/18 live checks passed at `414d221`. Reopening after a restart and the caption-button rule weren't recorded as checks |
+| Island drags to top, left, right, snaps, opens on hover; reopens there after restart; never covers caption buttons | Partly | 18/18 live checks passed across sessions 1 and 3 (Top hover and stay from session 1, the rest at `414d221`). Reopening after a restart and the caption-button rule weren't recorded as checks |
 | Installed features in the sidebar; Add features lists only working features | Done | #4 review; UiSmoke `AddFeaturesExposesAvailableSwitchesAndComingLaterNames` passed |
 | No Manrope or JetBrains Mono; no gradient outside Gumdrop | Done | No font files or keys in `src`. The only `LinearGradientBrush` is `PetSynthBrush` in `Chippi.UI/Themes/Palette.xaml`, used only for Gumdrop |
 | No description under page titles; Bare Label Rule | Done | #4 removed the page description style; #25 swept captions and errors |
-| Installer installs, updates in place, uninstalls | Partly | Travis installed the #16, #18, #20, #22 and #24 builds over each other. No uninstall in Phase 2.5 |
+| Installer installs, updates in place, uninstalls | Partly | Travis updated his install in place on 2026-10-24 and passed the latest build (#26) the same day. Not every package PR was installed. No uninstall in Phase 2.5 |
 
 ## Deviations from DESIGN.md
 
