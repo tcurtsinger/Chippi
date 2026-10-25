@@ -77,7 +77,7 @@ internal static class SettingsUi
             card.Children.Add(row);
         return card;
     }
-    /// <summary>A caption line for results and errors ("Settings imported", "That file is not valid JSON").</summary>
+    /// <summary>A caption line for results and errors ("Settings imported", "Not imported · Invalid JSON").</summary>
     public static TextBlock Message() => Styled(new TextBlock { Visibility = Visibility.Collapsed, Margin = new Thickness(0, 10, 0, 0), TextWrapping = TextWrapping.Wrap }, "CaptionTextStyle");
 
     public static void Show(TextBlock message, string text, bool problem)
