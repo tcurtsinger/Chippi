@@ -43,7 +43,12 @@ public sealed record IslandActivity(string Key, IslandActivityKind Kind, string 
     /// <summary>Held or failed: the shell shows the source in amber with an amber dot (DESIGN.md §5).</summary>
     public bool NeedsAttention { get; init; }
 
-    /// <summary>The island tile this activity opens (<see cref="Modules.IslandTileSpec.Key"/>), or null for none.</summary>
+    /// <summary>
+    /// The island tile this activity opens (<see cref="Modules.IslandTileSpec.Key"/>), or null for none.
+    /// The tile shows a dot while the activity is live (Caution with <see cref="NeedsAttention"/>).
+    /// Media takes the live orbit button below the island; without media, the first activity with a
+    /// tile and <see cref="NeedsAttention"/> (a muted mic) does.
+    /// </summary>
     public string? TileKey { get; init; }
 
     /// <summary>Set by the hub to the publishing module's id.</summary>

@@ -4,6 +4,7 @@
 using System.IO;
 using System.Windows;
 using System.Windows.Threading;
+using Chippi.App.Island.Media;
 using Chippi.App.Pet;
 using Chippi.App.Shell;
 using Chippi.Core.Config;
@@ -31,6 +32,7 @@ public sealed class IslandHost : IDisposable
     private readonly Dispatcher _dispatcher;
     private readonly IslandWindow _window;
     private readonly ForegroundTracker _tracker;
+    private SystemMediaSessions? _media;
     private bool _refreshPending;
     private bool _disposed;
 
@@ -53,7 +55,10 @@ public sealed class IslandHost : IDisposable
     public void Start()
     {
         _window.Initialize();
-        _tracker.Ignore = _window.Handle;
+        _tracker.Ignore = [_window.Handle, _window.PanelHandle];
+        _window.SettingsRequested += (_, _) => _shell.Commands.OpenSettings();
+        _window.LastPageChanged += (_, key) => UpdateSettings(s => s.IslandLastPage = key);
+        StartMedia();
         _tracker.Changed += (_, _) =>
         {
             _window.SetMonitor(_tracker.Monitor);
@@ -94,6 +99,9 @@ public sealed class IslandHost : IDisposable
         int shots = Array.FindIndex(args, a => string.Equals(a, "--island-shots", StringComparison.OrdinalIgnoreCase));
         if (_shell.DebugMode && shots >= 0 && shots + 1 < args.Length)
             _ = SaveIslandShotsAsync(args[shots + 1]);
+        int pages = Array.FindIndex(args, a => string.Equals(a, "--island-pages", StringComparison.OrdinalIgnoreCase));
+        if (_shell.DebugMode && pages >= 0 && pages + 1 < args.Length)
+            _ = SaveIslandPagesAsync(args[pages + 1]);
 #endif
         _logger.LogInformation("Island started");
     }
@@ -191,6 +199,61 @@ public sealed class IslandHost : IDisposable
         }
     }
 
+    /// <summary>
+    /// Debug builds (<c>--island-pages &lt;dir&gt;</c>): with a fake media activity live, the island open on
+    /// Top, Left and Right, on the grid and on every page, plus a page-to-page morph caught midway
+    /// (s6-*.png). Use a CHIPPI_DEV_PROFILE: the island settings it moves through are put back.
+    /// </summary>
+    private async Task SaveIslandPagesAsync(string directory)
+    {
+        var original = _shell.Config.GetSection<AppSettings>(AppSettings.SectionName);
+        var debug = _shell.Island.CreatePublisher(DebugModuleId);
+        try
+        {
+            Directory.CreateDirectory(directory);
+            var settle = TimeSpan.FromMilliseconds(900);
+            await Task.Delay(1500); // let the registry start the modules
+            var color = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#202020");
+            debug.Publish(new IslandActivity("media", IslandActivityKind.Media, "Weekend Mix", "Spotify"));
+            foreach (var edge in new[] { IslandEdge.Top, IslandEdge.Left, IslandEdge.Right })
+            {
+                UpdateSettings(s => (s.IslandEdge, s.IslandPlace, s.IslandLastPage) = (edge, 0.5, null));
+                await Task.Delay(settle);
+                _window.ForceOpen(true);
+                await Task.Delay(settle);
+                _window.SaveScene(Path.Combine(directory, $"s6-{edge}-grid".ToLowerInvariant() + ".png"), color);
+                foreach (var key in _window.Panel.PageKeys())
+                {
+                    _window.Panel.ShowPage(key);
+                    await Task.Delay(settle);
+                    _window.SaveScene(Path.Combine(directory, $"s6-{edge}-{key}".ToLowerInvariant() + ".png"), color);
+                }
+                _window.Panel.ShowPage(null, remember: false);
+                await Task.Delay(settle);
+                _window.SaveScene(Path.Combine(directory, $"s6-{edge}-grid-back".ToLowerInvariant() + ".png"), color);
+                if (edge == IslandEdge.Top)
+                {
+                    _window.Panel.ShowPage(IslandPanelWindow.NowPlayingKey);
+                    await Task.Delay(110); // half of the 220ms morph
+                    _window.SaveScene(Path.Combine(directory, "s6-top-morph-midway.png"), color);
+                    await Task.Delay(settle);
+                }
+                _window.ForceOpen(false);
+                await Task.Delay(settle);
+            }
+            _logger.LogInformation("Island page snapshots saved to {Directory}", directory);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Island page snapshots failed");
+        }
+        finally
+        {
+            _shell.Island.ClearModule(DebugModuleId);
+            UpdateSettings(s => (s.IslandEdge, s.IslandPlace, s.IslandLastPage) = (original.IslandEdge, original.IslandPlace, original.IslandLastPage));
+        }
+    }
+
     /// <summary>Drops the tab at points on its monitor through the real drop path and reports what was taken.</summary>
     private async Task<List<string>> DropCheckAsync()
     {
@@ -227,6 +290,29 @@ public sealed class IslandHost : IDisposable
     }
 #endif
 
+    /// <summary>
+    /// Now Playing reads Windows' media sessions; while one plays it is the island's media activity
+    /// (the tab's equalizer, the live orbit button), opening Now Playing.
+    /// </summary>
+    private void StartMedia()
+    {
+        var media = new SystemMediaSessions();
+        _media = media;
+        var publisher = _shell.Island.CreatePublisher(IslandPanelWindow.NowPlayingKey);
+        media.Changed += (_, _) =>
+        {
+            if (media.Current is { Playing: true } track)
+                publisher.Publish(new IslandActivity("track", IslandActivityKind.Media, track.Title.Length > 0 ? track.Title : track.Source, track.Source)
+                {
+                    TileKey = IslandPanelWindow.NowPlayingKey,
+                });
+            else
+                publisher.Clear("track");
+        };
+        _window.SetMedia(media);
+        _ = media.StartAsync();
+    }
+
     private void ScheduleRefresh()
     {
         // The hub raises on the publisher's thread; coalesce bursts into one UI update.
@@ -255,6 +341,7 @@ public sealed class IslandHost : IDisposable
         var settings = _shell.Config.GetSection<AppSettings>(AppSettings.SectionName);
         _window.SetPetColor(settings.PetColor);
         _window.SetPlacement(settings.IslandEdge, settings.IslandPlace);
+        _window.SetLastPage(settings.IslandLastPage);
         _window.SetEnabled(settings.IslandEnabled);
         _tracker.SetPlacement(settings.IslandDisplay, settings.IslandMonitorId);
     }
@@ -349,6 +436,7 @@ public sealed class IslandHost : IDisposable
             return;
         _disposed = true;
         _shell.Config.SectionChanged -= OnSectionChanged;
+        _media?.Dispose();
         _tracker.Dispose();
         _window.Close();
     }

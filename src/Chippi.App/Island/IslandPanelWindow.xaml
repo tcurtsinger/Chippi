@@ -1,13 +1,12 @@
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
-<!-- The open island (DESIGN.md §5 Island): the tab grown into one 328-wide shape, flat side on the same
-     edge, Island color, 1px stroke on every side but the flat one, 20px corners away from the edge,
-     the island shadow, 12px padding and 8px gaps. A transparent, topmost tool window that never
-     activates; the margin around the shape holds its shadow, except on the edge side. -->
+<!-- The open island (DESIGN.md §5 Island): one Island-colored shape grown out of the tab, flat side on the
+     same edge, 1px stroke on every side but the flat one, 20px corners away from the edge, the island
+     shadow, 12px padding. It shows the tile grid or one tile's page and morphs between them; the orbit
+     buttons sit around it. A transparent, topmost tool window that doesn't activate until the user clicks
+     into it; while open it covers a fixed area around the tab, and its transparent pixels click through. -->
 <Window x:Class="Chippi.App.Island.IslandPanelWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:c="urn:chippi-ui"
-        xmlns:pet="clr-namespace:Chippi.App.Pet"
         Title="Chippi island"
         Style="{StaticResource ChippiWindowStyle}"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
@@ -23,90 +22,17 @@
         </ResourceDictionary>
     </Window.Resources>
 
-    <Grid x:Name="Root" VerticalAlignment="Top">
-        <Grid x:Name="Surface" Width="328">
-            <!-- The shape grows from the tab's rectangle to the whole island. On a canvas, so its size
-                 never feeds the island's measured height. The shadow sits on its own layer, so the
-                 content above it renders without an effect. -->
-            <Canvas>
-                <Grid x:Name="Shape">
-                    <Border x:Name="ShapeShadow" Background="{StaticResource IslandBrush}" Effect="{StaticResource IslandExpandedShadow}" />
-                    <Border x:Name="ShapeFill" Background="{StaticResource IslandBrush}" BorderBrush="{StaticResource IslandBorderBrush}" />
-                </Grid>
-            </Canvas>
-            <Border x:Name="Card" Padding="12" Opacity="0" TextElement.Foreground="{StaticResource IslandTextBrush}">
-                <StackPanel x:Name="Sections">
-
-                    <!-- 1. Header: Gumdrop at 22, "Chippi" 13 / 600, a clock. -->
-                    <Grid Height="24">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <pet:Gumdrop x:Name="Pet" Size="22" Mood="Idle" IsDecorative="True" VerticalAlignment="Center" />
-                        <TextBlock Grid.Column="1" Text="Chippi" FontSize="13" FontWeight="SemiBold" Margin="8,0,0,0" VerticalAlignment="Center" />
-                        <TextBlock x:Name="Clock" Grid.Column="2" Style="{StaticResource NumberTextStyle}" FontSize="12" VerticalAlignment="Center"
-                                   Foreground="{StaticResource IslandTextTertiaryBrush}" />
-                    </Grid>
-
-                    <!-- 2. The live activity card. -->
-                    <Border x:Name="LiveCard" Style="{StaticResource IslandCardStyle}" Margin="0,8,0,0">
-                        <StackPanel>
-                            <!-- Media: a 40px art tile, title and source, and the transport beside them; the progress bar below. -->
-                            <Grid x:Name="MediaLayout">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="40" />
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <Border Width="40" Height="40" CornerRadius="6" Background="{StaticResource IslandTrackBrush}">
-                                    <TextBlock x:Name="MediaMonogram" FontSize="16" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                </Border>
-                                <StackPanel Grid.Column="1" Margin="10,0,8,0" VerticalAlignment="Center">
-                                    <TextBlock x:Name="MediaTitle" FontSize="13" TextTrimming="CharacterEllipsis" />
-                                    <TextBlock x:Name="MediaSource" Style="{StaticResource CaptionTextStyle}" TextTrimming="CharacterEllipsis"
-                                               Foreground="{StaticResource IslandTextTertiaryBrush}" />
-                                </StackPanel>
-                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                                    <c:IconButton Width="28" Height="28" Focusable="False" VerticalAlignment="Center"
-                                                  Icon="{x:Static c:LucideIcons.SkipBack}" AutomationProperties.Name="Previous track" />
-                                    <Button x:Name="PlayPauseButton" Style="{StaticResource IslandPlayButtonStyle}" Margin="4,0" AutomationProperties.Name="Pause">
-                                        <c:LucideIcon x:Name="PlayPauseIcon" Data="{x:Static c:LucideIcons.Pause}" Size="14" Brush="Black" />
-                                    </Button>
-                                    <c:IconButton Width="28" Height="28" Focusable="False" VerticalAlignment="Center"
-                                                  Icon="{x:Static c:LucideIcons.SkipForward}" AutomationProperties.Name="Next track" />
-                                </StackPanel>
-                            </Grid>
-
-                            <!-- Timer: the caption, the time at 20px. -->
-                            <StackPanel x:Name="TimerLayout">
-                                <TextBlock x:Name="TimerLabel" Style="{StaticResource CaptionTextStyle}" Foreground="{StaticResource IslandTextTertiaryBrush}" />
-                                <TextBlock x:Name="TimerValue" Style="{StaticResource NumberTextStyle}" FontSize="20" />
-                            </StackPanel>
-
-                            <!-- Anything else live (a download, a stash, an agent, a status): title and source. -->
-                            <StackPanel x:Name="OtherLayout">
-                                <TextBlock x:Name="OtherTitle" FontSize="13" TextTrimming="CharacterEllipsis" />
-                                <TextBlock x:Name="OtherSource" Style="{StaticResource CaptionTextStyle}" TextTrimming="CharacterEllipsis"
-                                           Foreground="{StaticResource IslandTextTertiaryBrush}" />
-                            </StackPanel>
-
-                            <Grid x:Name="Progress" Height="4" Margin="0,8,0,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <Border Grid.ColumnSpan="2" CornerRadius="2" Background="{StaticResource IslandTrackBrush}" />
-                                <Border CornerRadius="2" Background="{DynamicResource IslandAccentBrush}" />
-                            </Grid>
-                        </StackPanel>
-                    </Border>
-
-                    <!-- 3. The installed features' island panels, in sidebar order. -->
-                    <StackPanel x:Name="Panels" />
-                </StackPanel>
-            </Border>
+    <Canvas x:Name="Root" KeyboardNavigation.TabNavigation="Cycle" KeyboardNavigation.ControlTabNavigation="Cycle">
+        <!-- The shape; the shadow sits on its own layer, so the content above it renders without an effect. -->
+        <Grid x:Name="Shape">
+            <Border x:Name="ShapeShadow" Background="{StaticResource IslandBrush}" Effect="{StaticResource IslandExpandedShadow}" />
+            <Border x:Name="ShapeFill" Background="{StaticResource IslandBrush}" BorderBrush="{StaticResource IslandBorderBrush}" />
         </Grid>
-    </Grid>
+        <!-- The grid or a page, placed where the shape is heading. -->
+        <Border x:Name="Card" Padding="12" Opacity="0" TextElement.Foreground="{StaticResource IslandTextBrush}">
+            <ContentControl x:Name="Page" Focusable="False" />
+        </Border>
+        <!-- The round buttons around the shape (IslandGeometry.OrbitLayout). -->
+        <Canvas x:Name="Orbit" />
+    </Canvas>
 </Window>

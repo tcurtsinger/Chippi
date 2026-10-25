@@ -28,6 +28,7 @@ public static class LucideIcons
     public static Geometry Earbuds { get; } = G("M5,8 a3,3 0 1 0 6,0 a3,3 0 1 0 -6,0 Z M8,11 v5 a1.5,1.5 0 0 0 1.5,1.5 M13,8 a3,3 0 1 0 6,0 a3,3 0 1 0 -6,0 Z M16,11 v5 a1.5,1.5 0 0 1 -1.5,1.5");
     public static Geometry Mic { get; } = G("M12,2 a3,3 0 0 0 -3,3 v7 a3,3 0 0 0 6,0 V5 a3,3 0 0 0 -3,-3 Z M19,10 v2 a7,7 0 0 1 -14,0 v-2 M12,19 v3 M8,22 h8");
     public static Geometry Video { get; } = G("M22,8 L16,12 L22,16 Z M4,6 H14 A2,2 0 0 1 16,8 V16 A2,2 0 0 1 14,18 H4 A2,2 0 0 1 2,16 V8 A2,2 0 0 1 4,6 Z");
+    public static Geometry Music { get; } = G("M9,18 V5 L21,3 V16 M3,18 a3,3 0 1 0 6,0 a3,3 0 1 0 -6,0 Z M15,16 a3,3 0 1 0 6,0 a3,3 0 1 0 -6,0 Z");
     public static Geometry Speaker { get; } = G("M11,5 L6,9 L2,9 L2,15 L6,15 L11,19 Z M15.5,8.5 a5,5 0 0 1 0,7 M19,5 a10,10 0 0 1 0,14");
 
     // Shell and controls (from Hopper).
