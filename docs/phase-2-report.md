@@ -94,6 +94,7 @@ None. Each design change this phase went into DESIGN.md in the same commit or PR
 
 - **Unsaved rule draft lost on quit.** The leave prompt covers Settings navigation and closing the Settings window, but Quit from the tray or flyout exits without asking.
 - **Logs left after uninstall.** `%LOCALAPPDATA%\Chippi\logs` stays, as in Phase 1.
+- **History likely left after uninstall.** `history.db` is in `%LOCALAPPDATA%\Chippi\data`, outside the install folder (`ChippiApp`), like the logs. Not checked, since no uninstall was run.
 - **Old failure reasons stay long.** History rows written before #25 keep the full-sentence reasons; only new rows use the short fragments.
 - **UiSmoke not run since #25.** #25 changed `TidyTests` (the removed empty-state caption is now expected absent). Its last run was 15/15 at `5e5d56c`.
 - **Flyout-wait flake.** The #15 fix (re-query the window on each poll, wait on the footer Settings button) was followed by a 15/15 run, but the cause was inferred, so one clean run doesn't prove it's gone.
