@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/Chippi.App/Chippi.App.csproj" />
+    <Project Path="src/Chippi.Audio/Chippi.Audio.csproj" />
     <Project Path="src/Chippi.Core/Chippi.Core.csproj" />
     <Project Path="src/Chippi.Rules/Chippi.Rules.csproj" />
     <Project Path="src/Chippi.UI/Chippi.UI.csproj" />
@@ -10,6 +11,7 @@
     <Project Path="src/Features/Chippi.Features.KeepAwake/Chippi.Features.KeepAwake.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/Chippi.Audio.Tests/Chippi.Audio.Tests.csproj" />
     <Project Path="tests/Chippi.Core.Tests/Chippi.Core.Tests.csproj" />
     <Project Path="tests/Chippi.Features.Downloads.Tests/Chippi.Features.Downloads.Tests.csproj" />
     <Project Path="tests/Chippi.Features.KeepAwake.Tests/Chippi.Features.KeepAwake.Tests.csproj" />
