@@ -107,6 +107,10 @@ internal sealed class SettingsController
                                         await Idle();
                                         Render(_window.PageContent, System.IO.Path.Combine(directory, $"r4-downloads-rule{rule}-{name}-{accent}.png"), full: true);
                                     }
+                                    // The list right after a redraw (closing the open rule), before any animation runs:
+                                    // On switches must already sit at On.
+                                    if (section == "rules" && _window.InvokeSnapshotActionStartingWith("Close "))
+                                        Render(_window.PageContent, System.IO.Path.Combine(directory, $"r4-downloads-redraw-{name}-{accent}.png"), full: true);
                                     // A new rule's draft open with Save and Cancel, then collapsed (Unsaved changes),
                                     // then the ask on leaving; Discard goes on to History.
                                     if (section == "rules" && _window.InvokeSnapshotActionStartingWith("Add rule"))

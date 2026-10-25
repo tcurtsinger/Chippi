@@ -261,8 +261,9 @@
     </Style>
 
     <!-- ===== Switch: 40x20, 10px radius. Off: stroke and a 12px knob 4px from the left. On: accent
-         fill with a 14px on-accent knob at 22px. The knob slides in 150ms. Content, when there is
-         any, is a label left of the track (SwitchWithLabelStyle's "On" and "Off"). ===== -->
+         fill with a 14px on-accent knob at 22px. A change slides the knob in 150ms; a switch that
+         appears On is drawn On at once (SwitchKnob). Content, when there is any, is a label left of
+         the track (SwitchWithLabelStyle's "On" and "Off"). ===== -->
     <ControlTemplate x:Key="SwitchTrackTemplate" TargetType="{x:Type ToggleButton}">
         <StackPanel Orientation="Horizontal" Background="Transparent">
             <ContentPresenter x:Name="Label" VerticalAlignment="Center" Margin="0,0,12,0"
@@ -271,11 +272,8 @@
                 <Border x:Name="Track" CornerRadius="10" BorderThickness="1"
                         Background="Transparent" BorderBrush="{DynamicResource SwitchOffStrokeBrush}" />
                 <Ellipse x:Name="Knob" Width="12" Height="12" Fill="{DynamicResource SwitchOffKnobBrush}"
-                         HorizontalAlignment="Left" VerticalAlignment="Center" Margin="4,0,0,0">
-                    <Ellipse.RenderTransform>
-                        <TranslateTransform x:Name="KnobOffset" X="0" />
-                    </Ellipse.RenderTransform>
-                </Ellipse>
+                         HorizontalAlignment="Left" VerticalAlignment="Center" Margin="4,0,0,0"
+                         c:SwitchKnob.IsOn="{Binding IsChecked, RelativeSource={RelativeSource TemplatedParent}}" />
             </Grid>
         </StackPanel>
         <ControlTemplate.Triggers>
@@ -292,28 +290,6 @@
                 <Setter TargetName="Knob" Property="Width" Value="14" />
                 <Setter TargetName="Knob" Property="Height" Value="14" />
                 <Setter TargetName="Knob" Property="Margin" Value="3,0,0,0" />
-                <Trigger.EnterActions>
-                    <BeginStoryboard>
-                        <Storyboard>
-                            <DoubleAnimation Storyboard.TargetName="KnobOffset" Storyboard.TargetProperty="X" To="19" Duration="0:0:0.15">
-                                <DoubleAnimation.EasingFunction>
-                                    <CubicEase EasingMode="EaseOut" />
-                                </DoubleAnimation.EasingFunction>
-                            </DoubleAnimation>
-                        </Storyboard>
-                    </BeginStoryboard>
-                </Trigger.EnterActions>
-                <Trigger.ExitActions>
-                    <BeginStoryboard>
-                        <Storyboard>
-                            <DoubleAnimation Storyboard.TargetName="KnobOffset" Storyboard.TargetProperty="X" To="0" Duration="0:0:0.15">
-                                <DoubleAnimation.EasingFunction>
-                                    <CubicEase EasingMode="EaseOut" />
-                                </DoubleAnimation.EasingFunction>
-                            </DoubleAnimation>
-                        </Storyboard>
-                    </BeginStoryboard>
-                </Trigger.ExitActions>
             </Trigger>
             <MultiTrigger>
                 <MultiTrigger.Conditions>
