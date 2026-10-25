@@ -28,12 +28,6 @@ public static class FeatureCatalog
         },
 
         // Phase 3: Sound
-        new("app-volume", "App volume", "Volume and output device for each app, right from the tray", FeatureGroup.Sound)
-        {
-            Icon = "Sliders",
-            Badges = [FeatureBadge.Overlap("Overlaps Volume mixer")],
-            Presets = Essentials | Audio | PowerUser,
-        },
         new("mic-mute", "Mic mute shortcut", "One shortcut mutes your mic in every app", FeatureGroup.Sound)
         {
             Icon = "Mic",

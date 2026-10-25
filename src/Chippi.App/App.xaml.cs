@@ -170,6 +170,8 @@ public partial class App : Application
         shell.Registry.Register(new Chippi.Features.Sound.Processing.MicProcessingModule(null, () => routing.Settings.Microphone.Devices,
             Path.Combine(shell.Services.DataRoot, Chippi.Features.Sound.Processing.MicProcessingModule.Id)));
 
+        shell.Registry.Register(new Chippi.Features.Sound.Volume.AppVolumeModule());
+
         // [WS2] "Coming soon" placeholders for the PLAN.md features.
         Settings.Features.FeatureCatalog.RegisterPlaceholders(shell.Registry);
 
