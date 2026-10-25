@@ -67,6 +67,32 @@ public sealed class MicMuteTests
     }
 
     [Fact]
+    public async Task Shared_tile_preserves_processing_failure_unless_microphones_are_muted()
+    {
+        await using var f = new MuteFixture();
+        f.System.With(Mic("A"), Mic("B"));
+        await f.Start();
+        var mute = Assert.Single(f.Ui.Tiles);
+        var processing = new IslandTileContribution("mic-processing", new("sound.microphone", "Microphone", "Mic", 30, 10, () => new object()) { StatusPriority = 10 });
+        processing.SetStatus("Stopped");
+        var group = Assert.Single(IslandTileContribution.Group([processing, mute]));
+
+        Assert.Equal("Stopped", group.Status);
+        await f.Module.ToggleAsync();
+        Assert.Equal("Muted", group.Status);
+        f.System.ChangeLevel("B", new(.5f, false));
+        await f.Audio.RefreshAsync();
+        Assert.Equal("Some microphones muted", group.Status);
+        f.System.ChangeLevel("A", new(.5f, false));
+        await f.Audio.RefreshAsync();
+        Assert.Equal("Stopped", group.Status);
+        Assert.Equal("", mute.Status);
+
+        f.System.Remove("A", "B");
+        await f.Audio.RefreshAsync();
+        Assert.Equal("Stopped", group.Status);
+    }
+    [Fact]
     public async Task Shortcut_changes_persist_only_on_success_and_reject_OS_shortcuts()
     {
         await using var f = new MuteFixture();

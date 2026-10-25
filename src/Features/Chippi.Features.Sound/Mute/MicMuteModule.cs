@@ -127,7 +127,7 @@ public sealed class MicMuteModule : IFeatureModule
     private void UpdateState()
     {
         bool warning = Status.State is MicrophoneMuteState.Muted or MicrophoneMuteState.Mixed;
-        _tile?.SetStatus(StatusText);
+        _tile?.SetStatus(warning ? StatusText : "");
         if (warning)
             _context?.Island.Publish(new("muted", IslandActivityKind.Status, StatusText, "Microphone")
                 { NeedsAttention = true, TileKey = "sound.microphone" });
