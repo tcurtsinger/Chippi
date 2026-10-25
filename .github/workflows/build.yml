@@ -25,7 +25,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-dotnet@v6
         with:
-          global-json-file: global.json
+          dotnet-version: '10.0.402'
       - name: Build application
         run: dotnet build src/Chippi.App/Chippi.App.csproj -c Release -r ${{ matrix.rid }} --no-incremental
       - name: Test on x64
