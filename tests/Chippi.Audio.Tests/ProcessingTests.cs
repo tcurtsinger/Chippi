@@ -117,7 +117,7 @@ public sealed class ProcessingTests : IAsyncDisposable
         await WaitUntil(() => Status.Reason == StopReason.NoMicrophone);
         Assert.Equal(ProcessingState.Stopped, Status.State);
         Assert.True(_pipelines.Created[0].Disposed);
-        Assert.Null(LastMarker);
+        Assert.NotNull(LastMarker); // nothing real to put back yet: the marker waits for a mic
         Assert.NotEqual(RoleOwner.Processing, _service.Snapshot.Owner(AudioFlow.Capture, AudioRole.Console));
     }
 
@@ -260,12 +260,63 @@ public sealed class ProcessingTests : IAsyncDisposable
     }
 
     [Fact]
-    public async Task Recovery_does_nothing_when_the_cable_no_longer_holds_a_role()
+    public async Task Recovery_leaves_roles_the_cable_no_longer_holds()
     {
         _sys.With(Mic("Real"), Mic("Other"), CableInput(), CableOutput()).WithDefault("Other");
         var restored = await _service.RecoverProcessingAsync(new("CableOut", All.ToDictionary(r => r, _ => "Real")));
-        Assert.False(restored);
+        Assert.True(restored);
         Assert.Equal("Other", DefaultMic());
+    }
+
+    // Karl's S3 review: the replaced mic is gone, another real one is there.
+    [Fact]
+    public async Task Off_moves_the_roles_to_another_real_mic_when_the_replaced_one_is_gone()
+    {
+        _sys.With(Mic("Desk"), Mic("Headset"), CableInput(), CableOutput()).WithDefault("Desk");
+        await _service.SetProcessingAsync(Request(true, "Headset"));
+        _sys.Remove("Desk");
+        await WaitUntil(() => _service.Snapshot.Endpoints.All(e => e.Id != "Desk"));
+
+        await _service.SetProcessingAsync(null);
+
+        Assert.All(All, r => Assert.Equal("Headset", DefaultMic(r)));
+        Assert.Null(LastMarker);
+    }
+
+    [Fact]
+    public async Task Recovery_uses_another_real_mic_when_the_replaced_one_is_gone()
+    {
+        _sys.With(Mic("Headset"), CableInput(), CableOutput()).WithDefault("CableOut");
+        var restored = await _service.RecoverProcessingAsync(new("CableOut", All.ToDictionary(r => r, _ => "Desk")));
+        Assert.True(restored);
+        Assert.All(All, r => Assert.Equal("Headset", DefaultMic(r)));
+    }
+
+    [Fact]
+    public async Task Recovery_with_no_real_mic_reports_unsettled_and_leaves_the_cable()
+    {
+        _sys.With(CableInput(), CableOutput()).WithDefault("CableOut");
+        var restored = await _service.RecoverProcessingAsync(new("CableOut", All.ToDictionary(r => r, _ => "Desk")));
+        Assert.False(restored);
+        Assert.Equal("CableOut", DefaultMic());
+    }
+
+    [Fact]
+    public async Task With_no_real_mic_left_the_marker_stays_until_one_returns()
+    {
+        _sys.With(Mic("Real"), CableInput(), CableOutput()).WithDefault("Real");
+        await _service.SetProcessingAsync(Request());
+        _sys.SetState("Real", EndpointState.Unplugged);
+        await WaitUntil(() => Status.Reason == StopReason.NoMicrophone);
+        await _service.SetProcessingAsync(null);
+        Assert.Equal("CableOut", DefaultMic());
+        Assert.NotNull(LastMarker);
+
+        _sys.SetState("Real", EndpointState.Active);
+
+        await WaitUntil(() => DefaultMic() == "Real");
+        Assert.All(All, r => Assert.Equal("Real", DefaultMic(r)));
+        await WaitUntil(() => LastMarker is null);
     }
 
     [Fact]

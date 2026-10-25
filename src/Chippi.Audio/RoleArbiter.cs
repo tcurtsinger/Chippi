@@ -90,22 +90,38 @@ internal sealed class RoleArbiter(ILogger logger, TimeProvider time, TimeSpan? b
     }
 
     /// <summary>
-    /// Crash recovery (architecture §3): roles that still point at the marker's cable go back to what
-    /// it replaced, when that endpoint is active and nobody claims the role. Returns whether any did.
+    /// After Mic processing stops or crashed (architecture §3): every unclaimed capture role still on
+    /// the marker's cable goes back to what it replaced or, when that mic is gone, to another real
+    /// mic: one the marker recorded, then <paramref name="preferred"/>, then the first active one.
+    /// Roles someone moved off the cable are left alone, except when <paramref name="cableJustLost"/>:
+    /// then the cable vanished under a live pipeline, and what Windows fell back to goes back to what
+    /// processing replaced. Returns false while a role stays on the cable for want of a real mic, so
+    /// the caller keeps the marker.
     /// </summary>
-    public bool Recover(Processing.ProcessingMarker marker, DeviceCatalog catalog, IDeviceSystem system)
+    public bool Recover(Processing.ProcessingMarker marker, string? preferred, DeviceCatalog catalog, IDeviceSystem system, bool cableJustLost = false)
     {
-        var restored = false;
-        foreach (var (role, id) in marker.Replaced)
+        var real = catalog.Active(AudioFlow.Capture).Where(e => !VbCable.IsCable(e)).Select(e => e.Id).ToList();
+        string? Live(string? id) => id is null ? null : real.FirstOrDefault(r => PriorityPolicy.Eq(r, id));
+        var settled = true;
+        foreach (var role in AllRoles)
         {
             var key = new RoleKey(AudioFlow.Capture, role);
-            if (_claims.ContainsKey(key)
-                || !PriorityPolicy.Eq(system.GetDefault(AudioFlow.Capture, role), marker.CableCaptureId)
-                || !catalog.Active(AudioFlow.Capture).Any(e => PriorityPolicy.Eq(e.Id, id)))
+            var current = system.GetDefault(AudioFlow.Capture, role);
+            var onCable = PriorityPolicy.Eq(current, marker.CableCaptureId);
+            if (_claims.ContainsKey(key) || !(onCable || cableJustLost))
                 continue;
-            restored |= Write(id, key, RoleOwner.Processing, "recover", system);
+            var id = Live(marker.Replaced.GetValueOrDefault(role));
+            if (onCable || current is null)
+                id ??= marker.Replaced.Values.Select(Live).FirstOrDefault(r => r is not null) ?? Live(preferred) ?? real.FirstOrDefault();
+            if (id is null)
+            {
+                settled &= !onCable;
+                continue;
+            }
+            if (!PriorityPolicy.Eq(current, id))
+                settled &= Write(id, key, RoleOwner.Processing, "recover", system) || !onCable;
         }
-        return restored;
+        return settled;
     }
 
     /// <summary>Points every claimed role at its owner's target and reports what it changed.</summary>

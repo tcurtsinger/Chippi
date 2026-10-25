@@ -33,8 +33,8 @@ public static class VbCablePackage
     public static string VendorFolder { get; } = Path.Combine(AppContext.BaseDirectory, "vendor", "vb-cable");
 
     /// <summary>
-    /// Checks the zip against the pin, extracts it whole (the setup reads its INF and drivers from its
-    /// own folder) to <paramref name="extractRoot"/>\&lt;zip hash&gt;, then checks the setup exe's hash
+    /// Checks the zip against the pin, extracts it whole and fresh (the setup reads its INF and drivers
+    /// from its own folder) to <paramref name="extractRoot"/>\&lt;zip hash&gt;, then checks the setup exe's hash
     /// and that its Authenticode signature is valid and from the pinned certificate. Returns the
     /// setup's path. Never runs anything.
     /// </summary>
@@ -47,14 +47,13 @@ public static class VbCablePackage
         if (new FileInfo(zip).Length != pin.Bytes || !HashIs(zip, pin.Sha256))
             throw new DriverPackageException("Driver package damaged");
 
+        // Extracted fresh every time: setup reads the INF, SYS and CAT beside it, so an earlier
+        // extraction is never trusted, only the zip just checked.
         var folder = Path.Combine(extractRoot, pin.Sha256);
         var setup = Path.Combine(folder, pin.Setup);
-        if (!File.Exists(setup) || !HashIs(setup, pin.SetupSha256))
-        {
-            if (Directory.Exists(folder))
-                Directory.Delete(folder, recursive: true);
-            ZipFile.ExtractToDirectory(zip, folder);
-        }
+        if (Directory.Exists(folder))
+            Directory.Delete(folder, recursive: true);
+        ZipFile.ExtractToDirectory(zip, folder);
         if (!File.Exists(setup) || !HashIs(setup, pin.SetupSha256) || !SignedBy(setup, pin.SignerThumbprint))
             throw new DriverPackageException("Driver package damaged");
         return setup;

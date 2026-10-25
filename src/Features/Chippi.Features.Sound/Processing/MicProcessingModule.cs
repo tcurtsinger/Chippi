@@ -237,8 +237,12 @@ public sealed class MicProcessingModule : IFeatureModule
             return;
         try
         {
-            if (await audio.RecoverProcessingAsync(marker))
-                context.Logger.LogInformation("Restored the microphone mic processing left as default before a crash");
+            // No real mic yet: keep the marker, so the next start tries again.
+            if (!await audio.RecoverProcessingAsync(marker))
+            {
+                context.Logger.LogWarning("The cable is still the default mic and no real mic is active to put back");
+                return;
+            }
             File.Delete(path);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
@@ -260,7 +264,8 @@ public sealed class MicProcessingModule : IFeatureModule
         var lease = audio.Acquire();
         try
         {
-            if (audio.RecoverProcessingAsync(marker).Wait(TimeSpan.FromSeconds(10)))
+            var recover = audio.RecoverProcessingAsync(marker);
+            if (recover.Wait(TimeSpan.FromSeconds(10)) && recover.Result)
                 File.Delete(path);
         }
         catch (Exception ex) when (ex is AggregateException or IOException or UnauthorizedAccessException) { }

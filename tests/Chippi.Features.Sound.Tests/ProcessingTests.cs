@@ -337,13 +337,13 @@ public sealed class VbCablePackageTests : IDisposable
         try { Directory.Delete(_root, true); } catch (DirectoryNotFoundException) { }
     }
 
-    private string Vendor(byte[] zip, string? sha = null, long? bytes = null)
+    private string Vendor(byte[] zip, string? sha = null, long? bytes = null, string? setupSha = null, string? signer = null)
     {
         var vendor = Path.Combine(_root, "vendor");
         Directory.CreateDirectory(vendor);
         File.WriteAllBytes(Path.Combine(vendor, "pack.zip"), zip);
         var pin = new VbCablePin("https://example.invalid/pack.zip", "pack.zip", bytes ?? zip.Length, sha ?? Convert.ToHexString(SHA256.HashData(zip)),
-            "setup.exe", new string('0', 64), new string('0', 40), "Nobody");
+            "setup.exe", setupSha ?? new string('0', 64), signer ?? new string('0', 40), "Nobody");
         File.WriteAllText(Path.Combine(vendor, "vb-cable.json"), JsonSerializer.Serialize(pin, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }));
         return vendor;
     }
@@ -383,6 +383,31 @@ public sealed class VbCablePackageTests : IDisposable
     {
         var vendor = Vendor(Zip(("setup.exe", [1, 2, 3])));
         Assert.Equal("Driver package damaged", Assert.Throws<DriverPackageException>(() => VbCablePackage.Prepare(vendor, Path.Combine(_root, "x"))).Message);
+    }
+
+    // Karl's S3 review: setup reads the INF beside it, so a damaged earlier extraction must never reach it.
+    [Fact]
+    public void Every_prepare_extracts_the_whole_package_again()
+    {
+        var signed = File.ReadAllBytes(typeof(object).Assembly.Location); // Authenticode-signed stand-in for the setup
+#pragma warning disable SYSLIB0057
+        var thumbprint = new X509Certificate2(X509Certificate.CreateFromSignedFile(typeof(object).Assembly.Location)).Thumbprint;
+#pragma warning restore SYSLIB0057
+        byte[] inf = [1, 2, 3];
+        var vendor = Vendor(Zip(("setup.exe", signed), ("cable.inf", inf)), setupSha: Convert.ToHexString(SHA256.HashData(signed)), signer: thumbprint);
+        var extract = Path.Combine(_root, "x");
+        var setup = VbCablePackage.Prepare(vendor, extract);
+        var installed = Path.Combine(Path.GetDirectoryName(setup)!, "cable.inf");
+
+        File.WriteAllBytes(installed, [9]);
+        File.WriteAllBytes(Path.Combine(Path.GetDirectoryName(setup)!, "planted.dll"), [9]);
+        Assert.Equal(setup, VbCablePackage.Prepare(vendor, extract));
+        Assert.Equal(inf, File.ReadAllBytes(installed));
+        Assert.False(File.Exists(Path.Combine(Path.GetDirectoryName(setup)!, "planted.dll")));
+
+        File.Delete(installed);
+        VbCablePackage.Prepare(vendor, extract);
+        Assert.Equal(inf, File.ReadAllBytes(installed));
     }
 
     [Fact]

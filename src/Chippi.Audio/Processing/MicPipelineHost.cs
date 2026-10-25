@@ -61,6 +61,7 @@ internal sealed class MicPipelineHost(ILogger log, MicPipelineFactory factory, A
     private string? _failedSource;
     private string? _failedError;
     private ProcessingMarker? _marker;
+    private bool _claimed;
 
     public ProcessingStatus Status { get; private set; } = ProcessingStatus.Off;
 
@@ -189,22 +190,38 @@ internal sealed class MicPipelineHost(ILogger log, MicPipelineFactory factory, A
     // The marker is written before the roles change, so a crash right after still knows what to restore.
     private void TakeRoles(string cableCaptureId, RoleArbiter arbiter, DeviceCatalog catalog)
     {
-        if (_marker is not null && PriorityPolicy.Eq(_marker.CableCaptureId, cableCaptureId))
+        if (_claimed && PriorityPolicy.Eq(_marker?.CableCaptureId, cableCaptureId))
             return;
-        var replaced = CaptureRoles
-            .Select(role => (role, id: catalog.Default(new RoleKey(AudioFlow.Capture, role))))
-            .Where(r => r.id is not null && !PriorityPolicy.Eq(r.id, cableCaptureId))
-            .ToDictionary(r => r.role, r => r.id!);
-        _marker = new ProcessingMarker(cableCaptureId, replaced);
-        _saveMarker?.Invoke(_marker);
+        // A marker still waiting for a real mic to put back keeps what it recorded.
+        if (_marker is null || !PriorityPolicy.Eq(_marker.CableCaptureId, cableCaptureId))
+        {
+            var replaced = CaptureRoles
+                .Select(role => (role, id: catalog.Default(new RoleKey(AudioFlow.Capture, role))))
+                .Where(r => r.id is not null && !PriorityPolicy.Eq(r.id, cableCaptureId))
+                .ToDictionary(r => r.role, r => r.id!);
+            _marker = new ProcessingMarker(cableCaptureId, replaced);
+            _saveMarker?.Invoke(_marker);
+        }
         arbiter.Claim(RoleOwner.Processing, AudioFlow.Capture, CaptureRoles, _ => cableCaptureId);
+        _claimed = true;
     }
 
+    // Roles left on the cable go back to a real mic. With none active the marker stays, here and on
+    // disk, and every reconcile tries again until one appears.
     private void ReleaseRoles(RoleArbiter arbiter, DeviceCatalog catalog, IDeviceSystem system)
     {
         if (_marker is null)
             return;
-        arbiter.Release(RoleOwner.Processing, AudioFlow.Capture, _marker.Replaced, catalog, system);
+        var cableJustLost = false;
+        if (_claimed)
+        {
+            arbiter.Release(RoleOwner.Processing, AudioFlow.Capture, null, catalog, system);
+            _claimed = false;
+            cableJustLost = !catalog.Active(AudioFlow.Capture).Any(e => PriorityPolicy.Eq(e.Id, _marker.CableCaptureId));
+        }
+        var preferred = _request?.Source(catalog.Active(AudioFlow.Capture).Where(e => !VbCable.IsCable(e)).ToList());
+        if (!arbiter.Recover(_marker, preferred, catalog, system, cableJustLost))
+            return;
         _marker = null;
         _saveMarker?.Invoke(null);
     }
