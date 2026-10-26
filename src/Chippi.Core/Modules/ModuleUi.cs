@@ -4,8 +4,8 @@
 namespace Chippi.Core.Modules;
 
 // Why "object" view factories:
-// Core must not reference WPF, so it cannot hand out FrameworkElements. Flyout panels, island
-// pages and settings pages are free-form, so the module supplies a factory returning `object`,
+// Core must not reference WPF, so it cannot hand out FrameworkElements. Island pages and settings
+// pages are free-form, so the module supplies a factory returning `object`,
 // which the App casts to a FrameworkElement. A module that contributes one references WPF in its
 // own project; Core still does not.
 
@@ -13,21 +13,8 @@ namespace Chippi.Core.Modules;
 public interface IModuleUi
 {
     /// <summary>
-    /// Adds a flyout panel: a tab named <paramref name="name"/> with the Lucide <paramref name="icon"/>,
-    /// shown in sidebar order. <paramref name="createView"/> must return a WPF FrameworkElement.
-    /// </summary>
-    void AddFlyoutPanel(string name, string icon, Func<object> createView);
-
-    /// <summary>
-    /// Adds a section to a flyout tab several modules share (the Sound tab). Sections with the same
-    /// <paramref name="tabKey"/> make one tab, named and drawn by the first module in sidebar order,
-    /// with the sections stacked by <paramref name="order"/>. <paramref name="createSection"/> must
-    /// return a WPF FrameworkElement.
-    /// </summary>
-    void AddFlyoutSection(string tabKey, string tabName, string icon, int order, Func<object> createSection);
-
-    /// <summary>
-    /// Adds an island tile with its page. Modules that use the same <see cref="IslandTileSpec.Key"/>
+    /// Adds an island tile with its page, Chippi's only quick panel: the island and the tray icon both
+    /// open it. Modules that use the same <see cref="IslandTileSpec.Key"/>
     /// share one tile, and their sections make one page. The handle sets the tile's status line.
     /// </summary>
     IIslandTile AddIslandTile(IslandTileSpec spec);
@@ -41,11 +28,6 @@ public interface IModuleUi
     /// </summary>
     void SetSettingsPage(Func<string?, object> createView);
 }
-
-/// <param name="Icon">Lucide icon key, as in <see cref="FeatureDescriptor.Icon"/>.</param>
-/// <param name="TabKey">Set for a section of a shared tab (<see cref="IModuleUi.AddFlyoutSection"/>); null for a tab of its own.</param>
-/// <param name="Order">Where a section sits in its shared tab, lowest first.</param>
-public sealed record FlyoutPanelContribution(string ModuleId, string Name, string Icon, Func<object> CreateView, string? TabKey = null, int Order = 0);
 
 public sealed record SettingsPageContribution(string ModuleId, Func<string?, object> CreateSectionView)
 {
@@ -66,14 +48,8 @@ public interface ISettingsLeaveGuard
 internal sealed class ModuleUi(string moduleId, Action changed) : IModuleUi
 {
     private readonly Lock _gate = new();
-    private readonly List<FlyoutPanelContribution> _panels = [];
     private readonly List<IslandTileContribution> _tiles = [];
     private SettingsPageContribution? _settingsPage;
-
-    public IReadOnlyList<FlyoutPanelContribution> Panels
-    {
-        get { lock (_gate) return [.. _panels]; }
-    }
 
     public IReadOnlyList<IslandTileContribution> Tiles
     {
@@ -83,25 +59,6 @@ internal sealed class ModuleUi(string moduleId, Action changed) : IModuleUi
     public SettingsPageContribution? SettingsPage
     {
         get { lock (_gate) return _settingsPage; }
-    }
-
-    public void AddFlyoutPanel(string name, string icon, Func<object> createView)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        ArgumentException.ThrowIfNullOrWhiteSpace(icon);
-        ArgumentNullException.ThrowIfNull(createView);
-        lock (_gate) _panels.Add(new FlyoutPanelContribution(moduleId, name, icon, createView));
-        changed();
-    }
-
-    public void AddFlyoutSection(string tabKey, string tabName, string icon, int order, Func<object> createSection)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(tabKey);
-        ArgumentException.ThrowIfNullOrWhiteSpace(tabName);
-        ArgumentException.ThrowIfNullOrWhiteSpace(icon);
-        ArgumentNullException.ThrowIfNull(createSection);
-        lock (_gate) _panels.Add(new FlyoutPanelContribution(moduleId, tabName, icon, createSection, tabKey, order));
-        changed();
     }
 
     public IIslandTile AddIslandTile(IslandTileSpec spec)
@@ -128,7 +85,6 @@ internal sealed class ModuleUi(string moduleId, Action changed) : IModuleUi
     {
         lock (_gate)
         {
-            _panels.Clear();
             _tiles.Clear();
             _settingsPage = null;
         }

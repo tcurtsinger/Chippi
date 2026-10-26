@@ -183,7 +183,7 @@ public class Gumdrop : UserControl
     }
 
     /// <summary>
-    /// True where the text beside the pet carries the state (island, flyout header): screen readers
+    /// True where the text beside the pet carries the state (island, Settings titlebar): screen readers
     /// skip it. This is WPF's stand-in for <c>AccessibilityView="Raw"</c>, which WPF does not have;
     /// the pet's peer leaves the control and content views. False (the default) reads it as
     /// "Gumdrop pet, &lt;mood&gt;", for where it stands alone (the Settings preview).

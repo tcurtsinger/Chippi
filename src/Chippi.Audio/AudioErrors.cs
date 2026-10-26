@@ -9,7 +9,7 @@ namespace Chippi.Audio;
 public class AudioFailure(string reason, Exception? inner = null) : InvalidOperationException(reason, inner);
 
 /// <summary>
-/// The reason fragment a failure shows in Settings, the flyout, the island and notices. Only an
+/// The reason fragment a failure shows in Settings, the island and notices. Only an
 /// <see cref="AudioFailure"/>'s own text is shown; every other message is diagnostic and stays in the log.
 /// </summary>
 public static class AudioErrors

@@ -8,6 +8,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
+using Chippi.App.Flyout;
 using Chippi.App.Island.Media;
 using Chippi.App.Pet;
 using Chippi.Core.Config;
@@ -22,8 +23,9 @@ namespace Chippi.App.Island;
 
 /// <summary>
 /// The open island (DESIGN.md §5 Island): the tile grid or one tile's page, in one shape that grows
-/// out of the tab and morphs from page to page, with the orbit buttons around it.
-/// <see cref="IslandWindow"/> opens, places and closes it.
+/// out of the tab and morphs from page to page, with the orbit buttons around it. Docked by the tray
+/// (the island off, or hidden for a fullscreen app) the same pages show in a card above the tray,
+/// with a footer instead of the orbit buttons. <see cref="IslandWindow"/> opens, places and closes it.
 /// </summary>
 public partial class IslandPanelWindow : Window
 {
@@ -46,6 +48,11 @@ public partial class IslandPanelWindow : Window
     private readonly IslandGrid _grid = new();
     private readonly Dictionary<IslandTileContribution, FrameworkElement> _views = [];
     private readonly Dictionary<OrbitSlot, Button> _orbit = [];
+    private readonly Button _footerGrid;
+    private readonly List<Panel> _attached = []; // the page's panels, which hold reused section views
+    private readonly TextBlock _pageStatus = new() { FontSize = 12, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
+    private TrayDisplay? _dock; // set while docked by the tray
+    private IslandLayout _layout = IslandLayout.Default;
     private IReadOnlyList<IslandTileGroup> _groups = [];
     private IReadOnlyList<IslandActivity> _activities = [];
     private IMediaSessions? _media;
@@ -77,12 +84,17 @@ public partial class IslandPanelWindow : Window
         _grid.TileOpened += (_, key) => ShowPage(key);
         foreach (var slot in Enum.GetValues<OrbitSlot>())
             Orbit.Children.Add(_orbit[slot] = OrbitButton(slot));
+        _footerGrid = FooterButton(LucideIcons.LayoutGrid, "All features", () => ShowPage(null, remember: false));
+        var settings = FooterButton(LucideIcons.Settings, "Settings", () => SettingsRequested?.Invoke(this, EventArgs.Empty));
+        DockPanel.SetDock(settings, Dock.Right);
+        FooterButtons.Children.Add(_footerGrid);
+        FooterButtons.Children.Add(settings);
 
         // The island grows over the tab: a press where the tab sits is the tab's (click or drag).
         // Any other press is the user clicking into the island: from then on it takes the keyboard.
         PreviewMouseLeftButtonDown += (_, e) =>
         {
-            if (_tabLocal.Contains(e.GetPosition(Root)))
+            if (_dock is null && _tabLocal.Contains(e.GetPosition(Root)))
                 TabPressed?.Invoke(this, e);
             else
                 TakeKeyboard(e.OriginalSource as DependencyObject);
@@ -114,13 +126,16 @@ public partial class IslandPanelWindow : Window
     /// <summary>Esc while the island has the keyboard (the user clicked into it).</summary>
     internal event EventHandler? EscapePressed;
 
-    /// <summary>The Settings orbit button.</summary>
+    /// <summary>The Settings orbit button, or the docked footer's.</summary>
     internal event EventHandler? SettingsRequested;
 
     /// <summary>The user opened a page (a tile key) to restore next time.</summary>
     internal event EventHandler<string>? LastPageChanged;
 
     public bool IsOpen { get; private set; }
+
+    /// <summary>Open, or closing, docked by the tray rather than grown out of the tab.</summary>
+    internal bool IsDocked => _dock is not null && IsVisible;
 
     internal HWND Handle => _hwnd;
 
@@ -147,6 +162,16 @@ public partial class IslandPanelWindow : Window
 
     /// <summary>AppSettings.IslandLastPage.</summary>
     internal void SetLastPage(string? key) => _lastPage = key;
+
+    /// <summary>Settings › Island &amp; pet: where it opens, the tiles' order and which show, and the round buttons.</summary>
+    internal void SetLayout(IslandLayout layout)
+    {
+        if (layout == _layout)
+            return;
+        _layout = layout;
+        RefreshGrid();
+        RefreshOrbit();
+    }
 
     public void Celebrate()
     {
@@ -197,9 +222,28 @@ public partial class IslandPanelWindow : Window
     /// <summary>Grows out of <paramref name="tab"/> (physical pixels) on <paramref name="edge"/>, or moves there when already open.</summary>
     internal void Open(IslandEdge edge, Rect tab, MonitorArea area)
     {
+        if (_dock is not null && IsVisible)
+            Collapse(); // a docked card still fading out
+        _dock = null;
         _edge = edge;
         _tab = tab;
         _area = area;
+        Grow();
+    }
+
+    /// <summary>Opens the pages in a card above the tray on <paramref name="display"/>, or moves it there when already open.</summary>
+    internal void OpenDocked(TrayDisplay display)
+    {
+        if (_dock is null && IsVisible)
+            Collapse(); // the island still shrinking into its tab
+        _dock = display;
+        static Rect Pixels(PixelRect r) => new(r.Left, r.Top, r.Width, r.Height);
+        _area = new MonitorArea(default, Pixels(display.Monitor), Pixels(display.Work), display.Scale);
+        Grow();
+    }
+
+    private void Grow()
+    {
         if (IsOpen)
         {
             Place();
@@ -212,7 +256,7 @@ public partial class IslandPanelWindow : Window
             Resources["AccentBrush"] = accent;
         bool shrinking = IsVisible;
         if (!shrinking)
-            _page = _lastPage is not null && Exists(_lastPage) ? _lastPage : null;
+            _page = _layout.OpensOn == IslandOpensOn.LastPage && _lastPage is not null && Exists(_lastPage) ? _lastPage : null;
         Attach(_page);
         RefreshOrbit(place: false);
         UpdateClock();
@@ -241,8 +285,11 @@ public partial class IslandPanelWindow : Window
         if (!IsOpen)
             return false;
         var local = new Point((physical.X - _window.X) / _area.Scale, (physical.Y - _window.Y) / _area.Scale);
-        return _target.Contains(local) || IslandGeometry.OrbitLayout(_edge, _target, Slots()).Any(o => o.Rect.Contains(local));
+        return _target.Contains(local) || (_dock is null && IslandGeometry.OrbitLayout(_edge, _target, Slots()).Any(o => o.Rect.Contains(local)));
     }
+
+    /// <summary>Takes the keyboard without a click (the tray icon chosen with the keyboard, or a second launch).</summary>
+    internal void TakeKeyboard() => TakeKeyboard(null);
 
     /// <summary>Shows <paramref name="key"/>'s page, or the grid for null, morphing the shape to fit.</summary>
     internal void ShowPage(string? key, bool remember = true)
@@ -286,29 +333,93 @@ public partial class IslandPanelWindow : Window
     private void Attach(string? key)
     {
         Detach();
+        Footer.Visibility = _dock is null ? Visibility.Collapsed : Visibility.Visible;
+        _footerGrid.Visibility = key is null ? Visibility.Collapsed : Visibility.Visible;
         if (key is null)
         {
             Page.Content = _grid;
             return;
         }
         var page = new StackPanel();
+        _attached.Add(page);
         if (key == NowPlayingKey && _media is not null)
             page.Children.Add(_nowPlaying ??= new NowPlayingView(_media));
-        foreach (var part in Group(key)?.Parts ?? [])
+        else
+            page.Children.Add(PageHeader(key));
+        var parts = Group(key)?.Parts ?? [];
+        var columns = parts.GroupBy(p => p.Spec.Column).ToList(); // parts are in section order, so columns are too
+        if (columns.Any(c => c.Key is not null))
+            page.Children.Add(Columns(columns));
+        else
+            AddSections(page, parts);
+        Page.Content = page;
+        RefreshPageStatus();
+    }
+
+    /// <summary>Every page but Now Playing (which has its own) starts with its name, and the tile's status where the page doesn't show it.</summary>
+    private DockPanel PageHeader(string key)
+    {
+        var name = new TextBlock { Text = TileName(key), FontSize = 13, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center };
+        _pageStatus.Margin = new Thickness(12, 0, 0, 0);
+        DockPanel.SetDock(_pageStatus, Dock.Right);
+        var header = new DockPanel { Height = 28, Margin = new Thickness(0, 0, 0, 8), Children = { _pageStatus, name } };
+        _attached.Add(header);
+        return header;
+    }
+
+    /// <summary>Side-by-side columns, 16px apart, each under its name.</summary>
+    private Grid Columns(IReadOnlyList<IGrouping<string?, IslandTileContribution>> columns)
+    {
+        var grid = new Grid();
+        foreach (var column in columns)
+        {
+            if (grid.ColumnDefinitions.Count > 0)
+                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(16) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition());
+            var stack = new StackPanel();
+            _attached.Add(stack);
+            if (column.Key is { } title)
+            {
+                var label = new TextBlock { Text = title, FontSize = 12, FontWeight = FontWeights.SemiBold, Height = 24, Padding = new Thickness(2, 4, 0, 0) };
+                label.SetResourceReference(TextBlock.ForegroundProperty, "IslandTextTertiaryBrush");
+                stack.Children.Add(label);
+            }
+            AddSections(stack, column);
+            Grid.SetColumn(stack, grid.ColumnDefinitions.Count - 1);
+            grid.Children.Add(stack);
+        }
+        return grid;
+    }
+
+    private void AddSections(Panel panel, IEnumerable<IslandTileContribution> parts)
+    {
+        bool first = true;
+        foreach (var part in parts)
         {
             if (View(part) is not { } view)
                 continue;
-            view.Margin = new Thickness(0, page.Children.Count > 0 ? 8 : 0, 0, 0);
-            page.Children.Add(view);
+            view.Margin = new Thickness(0, first ? 0 : 8, 0, 0);
+            first = false;
+            panel.Children.Add(view);
         }
-        Page.Content = page;
+    }
+
+    /// <summary>The open page's status, when its tile puts it there: the tile's, in Caution while it needs attention.</summary>
+    private void RefreshPageStatus()
+    {
+        if (_page is null || Group(_page) is not { } group)
+            return;
+        _pageStatus.Text = group.StatusOnPage ? group.Status : "";
+        bool caution = LiveOn(group.Key)?.NeedsAttention == true || Muted(group.Key);
+        _pageStatus.SetResourceReference(TextBlock.ForegroundProperty, caution ? "WarningTextBrush" : "IslandTextTertiaryBrush");
     }
 
     // The old page's sections are let go before they are reused on another page (one parent each).
     private void Detach()
     {
-        if (Page.Content is Panel old)
-            old.Children.Clear();
+        foreach (var panel in _attached)
+            panel.Children.Clear();
+        _attached.Clear();
         Page.Content = null;
     }
 
@@ -329,7 +440,7 @@ public partial class IslandPanelWindow : Window
         return null;
     }
 
-    /// <summary>Now Playing first, then the features' tiles, each with its status and dot.</summary>
+    /// <summary>Now Playing, then the features' tiles, each with its status and dot, in the chosen order without the hidden ones.</summary>
     private void RefreshGrid()
     {
         var track = _media?.Current;
@@ -340,11 +451,15 @@ public partial class IslandPanelWindow : Window
         foreach (var group in _groups.Where(g => g.Key != NowPlayingKey))
         {
             var live = LiveOn(group.Key);
-            bool muted = _activities.Any(a => a.ModuleId == "mic-mute" && a.NeedsAttention && a.TileKey == group.Key);
-            tiles.Add(new(group.Key, group.Name, muted ? LucideIcons.MicOff : LucideIcons.Get(group.Icon), group.Status, live is not null, live?.NeedsAttention == true, muted));
+            bool muted = Muted(group.Key);
+            tiles.Add(new(group.Key, group.Name, muted ? LucideIcons.MicOff : LucideIcons.Get(group.Icon), group.Status, live is not null, live?.NeedsAttention == true || muted, muted));
         }
-        _grid.SetTiles(tiles);
+        var shown = _layout.Shown(tiles.Select(t => t.Key));
+        _grid.SetTiles([.. shown.Select(key => tiles.First(t => t.Key == key))]);
+        RefreshPageStatus();
     }
+
+    private bool Muted(string key) => _activities.Any(a => a.ModuleId == "mic-mute" && a.NeedsAttention && a.TileKey == key);
 
     private IslandActivity? LiveOn(string key) =>
         _activities.FirstOrDefault(a => a.TileKey == key || (key == NowPlayingKey && a.Kind == IslandActivityKind.Media));
@@ -391,9 +506,9 @@ public partial class IslandPanelWindow : Window
 
     private string? OrbitTarget(OrbitSlot slot) => slot switch
     {
-        OrbitSlot.Left => _groups.FirstOrDefault(g => g.Orbit == IslandOrbit.Left)?.Key,
-        OrbitSlot.Right => _groups.FirstOrDefault(g => g.Orbit == IslandOrbit.Right)?.Key,
-        OrbitSlot.Live => LiveKey(),
+        OrbitSlot.Left => IslandLayout.Button(_layout.Left, Exists, _groups.FirstOrDefault(g => g.Orbit == IslandOrbit.Left)?.Key),
+        OrbitSlot.Right => IslandLayout.Button(_layout.Right, Exists, _groups.FirstOrDefault(g => g.Orbit == IslandOrbit.Right)?.Key),
+        OrbitSlot.Live => _layout.Live ? LiveKey() : null,
         _ => null,
     };
 
@@ -448,6 +563,20 @@ public partial class IslandPanelWindow : Window
 
     private string TileName(string? key) => key == NowPlayingKey ? "Now Playing" : Group(key)?.Name ?? "";
 
+    private static Button FooterButton(Geometry icon, string name, Action click)
+    {
+        var glyph = new LucideIcon { Data = icon, Size = 16, Margin = new Thickness(0, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center };
+        glyph.SetResourceReference(LucideIcon.BrushProperty, "IslandTextBrush");
+        var button = new Button
+        {
+            Content = new StackPanel { Orientation = Orientation.Horizontal, Children = { glyph, new TextBlock { Text = name, VerticalAlignment = VerticalAlignment.Center } } },
+        };
+        button.SetResourceReference(StyleProperty, "IslandFooterButtonStyle");
+        AutomationProperties.SetName(button, name);
+        button.Click += (_, _) => click();
+        return button;
+    }
+
     // ----- Keyboard -----
 
     /// <summary>
@@ -484,14 +613,19 @@ public partial class IslandPanelWindow : Window
 
     /// <summary>
     /// Covers a fixed area around the tab while open, so the morph never moves the window: on the top
-    /// edge the widest page plus both orbit columns, centered on the tab; on a side edge the widest page
-    /// plus one column; the work area's full height either way.
+    /// edge the widest page plus both orbit pairs, centered on the tab; on a side edge the widest page
+    /// plus the live button beside it; the work area's full height either way.
     /// </summary>
     private void Place()
     {
+        if (_dock is { } dock)
+        {
+            PlaceDocked(dock);
+            return;
+        }
         double s = _area.Scale;
         var work = _area.Work;
-        double widest = Math.Max(Math.Max(GridWidth, NowPlayingWidth), _groups.Select(g => g.PageWidth).DefaultIfEmpty(0).Max());
+        double widest = Widest();
         double reach = IslandGeometry.OrbitGap + IslandGeometry.OrbitSize;
         double width = (_edge == IslandEdge.Top ? widest + 2 * (reach + ShadowRoom) : widest + reach + ShadowRoom) * s;
         double left = _edge switch
@@ -514,6 +648,28 @@ public partial class IslandPanelWindow : Window
         Reshape(snap: _frame is null);
     }
 
+    /// <summary>Docked by the tray: the widest page plus its shadow, the work area's full height, at the tray's end.</summary>
+    private void PlaceDocked(TrayDisplay dock)
+    {
+        double s = _area.Scale;
+        var work = _area.Work;
+        double width = (Widest() + 2 * ShadowRoom) * s;
+        double left = dock.Edge switch
+        {
+            TaskbarEdge.Left => work.Left,
+            TaskbarEdge.Right => work.Right - width,
+            _ => dock.AnchorAlong >= (dock.Monitor.Left + dock.Monitor.Right) / 2 ? work.Right - width : work.Left,
+        };
+        _window = new Rect(left, work.Top, width, work.Height);
+        IslandNative.Move(_hwnd, _window);
+        Root.Width = _window.Width / s;
+        Root.Height = _window.Height / s;
+        ShapeFill.BorderThickness = new Thickness(1);
+        Reshape(snap: _frame is null);
+    }
+
+    private double Widest() => Math.Max(Math.Max(GridWidth, NowPlayingWidth), _groups.Select(g => g.PageWidth).DefaultIfEmpty(0).Max());
+
     private Rect Local(Rect physical) =>
         new((physical.X - _window.X) / _area.Scale, (physical.Y - _window.Y) / _area.Scale, physical.Width / _area.Scale, physical.Height / _area.Scale);
 
@@ -529,9 +685,19 @@ public partial class IslandPanelWindow : Window
         Card.Measure(new Size(width, double.PositiveInfinity));
         double height = Card.DesiredSize.Height;
         _placedSlots = Slots();
-        var reach = IslandGeometry.OrbitReach(_edge, new Size(width, height), _placedSlots);
-        var origin = IslandGeometry.PanelOrigin(_edge, _tab, new Size(width * s, height * s), _area.Work, s, reach);
-        _target = Local(new Rect(origin.X, origin.Y, width * s, height * s));
+        if (_dock is { } dock)
+        {
+            // The card's corner by the tray stays put; a new page grows it away from the taskbar.
+            var (x, y) = FlyoutPlacement.Place(dock, width, height);
+            _target = Local(new Rect(x, y, width * s, height * s));
+            _tabLocal = _target; // it opens and closes in place, fading
+        }
+        else
+        {
+            var reach = IslandGeometry.OrbitReach(_edge, new Size(width, height), _placedSlots);
+            var origin = IslandGeometry.PanelOrigin(_edge, _tab, new Size(width * s, height * s), _area.Work, s, reach);
+            _target = Local(new Rect(origin.X, origin.Y, width * s, height * s));
+        }
         Canvas.SetLeft(Card, _target.X);
         Canvas.SetTop(Card, _target.Y);
         if (snap && _morph != Morph.Close)
@@ -608,9 +774,10 @@ public partial class IslandPanelWindow : Window
 
     private double _radius = OpenRadius;
 
-    // The tab's corners are as round as it is deep.
+    // The tab's corners are as round as it is deep. Docked by the tray there is no tab.
     private double TabRadius() =>
-        _edge == IslandEdge.Top ? Math.Min(_tabLocal.Height, _tabLocal.Width / 2) : Math.Min(_tabLocal.Width, _tabLocal.Height / 2);
+        _dock is not null ? OpenRadius
+        : _edge == IslandEdge.Top ? Math.Min(_tabLocal.Height, _tabLocal.Width / 2) : Math.Min(_tabLocal.Width, _tabLocal.Height / 2);
 
     private void StopFrames()
     {
@@ -638,7 +805,7 @@ public partial class IslandPanelWindow : Window
         Canvas.SetTop(Shape, _drawn.Y);
         Shape.Width = Math.Max(0, _drawn.Width);
         Shape.Height = Math.Max(0, _drawn.Height);
-        ShapeShadow.CornerRadius = ShapeFill.CornerRadius = _edge switch
+        ShapeShadow.CornerRadius = ShapeFill.CornerRadius = _dock is not null ? new CornerRadius(_radius) : _edge switch
         {
             IslandEdge.Left => new CornerRadius(0, _radius, _radius, 0),
             IslandEdge.Right => new CornerRadius(_radius, 0, 0, _radius),
@@ -649,9 +816,14 @@ public partial class IslandPanelWindow : Window
         Card.Clip = new RectangleGeometry(inside, _radius, _radius);
         bool settled = Card.Opacity >= 1;
         Card.IsHitTestVisible = settled; // nothing half-faded takes a click
-        // Opening and closing fade the buttons with the content; between pages they stay.
+        // Opening and closing fade the buttons with the content; between pages they stay. Docked by
+        // the tray there is no tab to grow out of, so the whole card fades with its content.
         Orbit.Opacity = _morph == Morph.Page ? 1 : Card.Opacity;
         Orbit.IsHitTestVisible = IsOpen && Orbit.Opacity >= 1;
+        Orbit.Visibility = _dock is null ? Visibility.Visible : Visibility.Collapsed;
+        Shape.Opacity = _dock is not null && _morph != Morph.Page ? Card.Opacity : 1;
+        if (_dock is not null)
+            return;
         foreach (var (slot, rect) in IslandGeometry.OrbitLayout(_edge, _drawn, Slots()))
         {
             Canvas.SetLeft(_orbit[slot], rect.X);

@@ -53,11 +53,11 @@
             </Grid>
         </Button>
 
-        <Popup x:Name="DebugMenu" AllowsTransparency="True" StaysOpen="False" Placement="Bottom" VerticalOffset="8"
+        <Popup x:Name="TabMenu" AllowsTransparency="True" StaysOpen="False" Placement="Bottom" VerticalOffset="8"
                PlacementTarget="{Binding ElementName=Tab}" PopupAnimation="None">
             <Border Background="{StaticResource IslandBrush}" BorderBrush="{StaticResource IslandBorderBrush}" BorderThickness="1"
                     CornerRadius="8" Padding="4" MinWidth="200">
-                <StackPanel x:Name="DebugItems" TextElement.FontFamily="{StaticResource UiFont}" />
+                <StackPanel x:Name="TabMenuItems" TextElement.FontFamily="{StaticResource UiFont}" />
             </Border>
         </Popup>
     </Grid>

@@ -64,11 +64,7 @@ public sealed class RoutingNotifier : INotifier
 public sealed class RoutingUiFake : IModuleUi
 {
     public List<IslandTileContribution> Tiles { get; } = [];
-    public List<FlyoutPanelContribution> Flyouts { get; } = [];
     public Func<string?, object>? Page { get; private set; }
-    public void AddFlyoutPanel(string name, string icon, Func<object> createView) => throw new NotSupportedException();
-    public void AddFlyoutSection(string tabKey, string tabName, string icon, int order, Func<object> createSection) =>
-        Flyouts.Add(new("audio-routing", tabName, icon, createSection, tabKey, order));
     public IIslandTile AddIslandTile(IslandTileSpec spec)
     {
         var tile = new IslandTileContribution("audio-routing", spec);

@@ -83,8 +83,8 @@ public sealed class ProcessingModuleTests
         Assert.Equal(ProcessingState.Off, f.Module.Status.State);
         Assert.Equal("Real", f.System.DefaultOf(AudioFlow.Capture, AudioRole.Multimedia));
         var tile = Assert.Single(f.Ui.Tiles);
-        Assert.Equal(("sound.microphone", 10, 10), (tile.Spec.Key, tile.Spec.SectionOrder, tile.Spec.StatusPriority));
-        Assert.Equal(("sound", 20), (Assert.Single(f.Ui.Flyouts).TabKey, f.Ui.Flyouts[0].Order));
+        Assert.Equal((SoundTile.Key, SoundTile.Microphone, 30, 10), (tile.Spec.Key, tile.Spec.Column, tile.Spec.SectionOrder, tile.Spec.StatusPriority));
+        Assert.Equal("", tile.Status); // the Sound tile shows the output until clean-up stops
     }
 
     [Fact]
@@ -97,7 +97,7 @@ public sealed class ProcessingModuleTests
         await f.Module.SetEnabledAsync(true);
 
         Assert.Equal(ProcessingState.Live, f.Module.Status.State);
-        Assert.Equal("Live", f.Ui.Tiles[0].Status);
+        Assert.Equal("", f.Ui.Tiles[0].Status); // live is the normal state; the Sound tile keeps showing the output
         Assert.True(f.Settings.Value.Enabled);
         var marker = JsonSerializer.Deserialize<ProcessingMarker>(File.ReadAllText(f.MarkerPath))!;
         Assert.Equal("CableOut", marker.CableCaptureId);

@@ -7,7 +7,7 @@
 <Window x:Class="Chippi.App.Island.IslandPanelWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Chippi island"
+        Title="Chippi"
         Style="{StaticResource ChippiWindowStyle}"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         ResizeMode="NoResize" ShowInTaskbar="False" ShowActivated="False" Topmost="True"
@@ -28,9 +28,16 @@
             <Border x:Name="ShapeShadow" Background="{StaticResource IslandBrush}" Effect="{StaticResource IslandExpandedShadow}" />
             <Border x:Name="ShapeFill" Background="{StaticResource IslandBrush}" BorderBrush="{StaticResource IslandBorderBrush}" />
         </Grid>
-        <!-- The grid or a page, placed where the shape is heading. -->
+        <!-- The grid or a page, placed where the shape is heading. Docked by the tray, a footer takes the
+             round buttons' place: All features (on a page) and Settings. -->
         <Border x:Name="Card" Padding="12" Opacity="0" TextElement.Foreground="{StaticResource IslandTextBrush}">
-            <ContentControl x:Name="Page" Focusable="False" />
+            <DockPanel>
+                <Border x:Name="Footer" DockPanel.Dock="Bottom" Visibility="Collapsed" Margin="-4,12,-4,-4" Padding="0,8,0,0"
+                        BorderBrush="{StaticResource IslandBorderBrush}" BorderThickness="0,1,0,0">
+                    <DockPanel x:Name="FooterButtons" LastChildFill="False" />
+                </Border>
+                <ContentControl x:Name="Page" Focusable="False" />
+            </DockPanel>
         </Border>
         <!-- The round buttons around the shape (IslandGeometry.OrbitLayout). -->
         <Canvas x:Name="Orbit" />

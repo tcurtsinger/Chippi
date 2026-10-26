@@ -4,53 +4,57 @@
 using System.Windows;
 using Chippi.App.Flyout;
 using Chippi.App.Shell;
+using Chippi.Core.Config;
 using Chippi.Core.Diagnostics;
-using Windows.Win32;
 using Windows.Win32.Foundation;
 
 namespace Chippi.App.Tray;
 
+/// <summary>The tray icon's display, and the icon itself in physical pixels when the shell knows it.</summary>
+internal sealed record TrayAnchor(TrayDisplay Display, Rect? Icon);
+
 /// <summary>
-/// WS1's composition: the tray icon, the flyout and the tray menu, wired to <see cref="ShellCommands"/>.
-/// Left click toggles the flyout, right click opens the menu, a second launch shows the flyout.
+/// WS1's composition: the tray icon and its menu, wired to <see cref="ShellCommands"/>. The icon is a
+/// door to the island's pages, not a panel of its own: left click toggles them (in the island while
+/// it shows, otherwise docked by the tray), right click opens the menu. With Hide tray icon on, the
+/// icon leaves the notification area while the island shows.
 /// </summary>
 public sealed class TrayController : IDisposable
 {
-    /// <summary>
-    /// A click on the icon while the flyout is open first deactivates (and hides) the flyout, then
-    /// arrives as a select. A select this soon after a deactivation-hide with the cursor on the
-    /// icon is that same click, and must not reopen it.
-    /// </summary>
-    private const long ReopenGuardMs = 500;
-
     private readonly ShellContext _shell;
     private readonly TrayIcon _icon;
-    private readonly FlyoutWindow _flyout;
     private readonly TrayMenuWindow _menu;
-    private long _deactivatedAt = long.MinValue / 2;
-    private bool _deactivatedOverIcon;
     private string? _lastFallback;
     private bool _disposed;
 
     private TrayController(ShellContext shell)
     {
         _shell = shell;
-        _flyout = new FlyoutWindow(shell);
-        _flyout.Dismissed += OnFlyoutDismissed;
         _menu = new TrayMenuWindow();
         _menu.SettingsRequested += (_, _) => shell.Commands.OpenSettings();
         _menu.QuitRequested += (_, _) => shell.Commands.Quit();
 
         _icon = new TrayIcon("Chippi");
-        _icon.Selected += OnSelected;
-        _icon.ContextMenuRequested += OnContextMenu;
+        _icon.Selected += (_, e) =>
+        {
+            _menu.Hide();
+            shell.Commands.TogglePages(e.Keyboard);
+        };
+        _icon.ContextMenuRequested += (_, e) => _menu.ShowAt(e.X, e.Y, DescribeDisplay(_icon.GetRect()));
 
-        shell.Commands.RegisterFlyout(Toggle, ShowFlyout);
+        shell.Commands.RegisterTray(Anchor);
+        shell.Commands.IslandShowingChanged += (_, _) => ApplyVisibility();
+        shell.Config.SectionChanged += (_, e) =>
+        {
+            if (e.Name == AppSettings.SectionName)
+                Application.Current?.Dispatcher.BeginInvoke(ApplyVisibility);
+        };
+        ApplyVisibility();
         Application.Current.Exit += (_, _) => Dispose();
         Application.Current.Dispatcher.ShutdownStarted += (_, _) => Dispose();
     }
 
-    /// <summary>The [WS1] slot: builds the tray and flyout and registers them. Returns true (the tray keeps the app reachable).</summary>
+    /// <summary>The [WS1] slot: builds the tray and registers it. Returns true (the tray keeps the app reachable).</summary>
     public static bool Compose(ShellContext shell)
     {
         var tray = new TrayController(shell);
@@ -60,60 +64,38 @@ public sealed class TrayController : IDisposable
         return true;
     }
 
-    private void Toggle()
+    private void ApplyVisibility()
     {
-        if (_flyout.IsVisible)
-            _flyout.Dismiss();
-        else
-            ShowFlyout();
+        if (_disposed)
+            return;
+        bool hide = _shell.Config.GetSection<AppSettings>(AppSettings.SectionName).HideTrayIcon && _shell.Commands.IslandShowing;
+        if (_icon.Visible == !hide)
+            return;
+        _icon.Visible = !hide;
+        if (hide)
+            _menu.Hide();
+        Log.Info(hide ? "Tray: icon hidden while the island shows" : "Tray: icon shown");
     }
 
-    private void ShowFlyout()
+    private TrayAnchor? Anchor()
     {
-        _menu.Hide();
-        _flyout.ShowAnchored(DescribeDisplay);
-        if (_shell.DebugMode)
-            Log.Info("Flyout: shown; " + _flyout.DescribePlacement());
-    }
-
-    private TrayDisplay DescribeDisplay()
-    {
+        if (!_icon.Visible)
+            return null;
         var rect = _icon.GetRect();
+        Rect? icon = rect is RECT r ? new Rect(r.left, r.top, r.right - r.left, r.bottom - r.top) : null;
+        return new TrayAnchor(DescribeDisplay(rect), icon);
+    }
+
+    private TrayDisplay DescribeDisplay(RECT? rect)
+    {
         var display = FlyoutPlacement.Describe(rect, out bool fallback);
         string? message = fallback
-            ? $"Flyout: tray anchor fallback; raw icon {(rect is RECT icon ? PixelRect.From(icon).ToString() : "unavailable")}; monitor {display.Monitor}"
+            ? $"Tray: anchor fallback; raw icon {(rect is RECT icon ? PixelRect.From(icon).ToString() : "unavailable")}; monitor {display.Monitor}"
             : null;
         if (message is not null && message != _lastFallback)
             Log.Info(message);
         _lastFallback = message;
         return display;
-    }
-
-    private void OnSelected(object? sender, TrayEventArgs e)
-    {
-        if (!e.Keyboard && !_flyout.IsVisible && _deactivatedOverIcon
-            && Environment.TickCount64 - _deactivatedAt < ReopenGuardMs)
-        {
-            _deactivatedOverIcon = false;
-            return;
-        }
-        Toggle();
-    }
-
-    private void OnFlyoutDismissed(object? sender, bool byDeactivation)
-    {
-        if (!byDeactivation)
-            return;
-        _deactivatedAt = Environment.TickCount64;
-        _deactivatedOverIcon = false;
-        if (_icon.GetRect() is RECT icon && PInvoke.GetCursorPos(out var cursor))
-            _deactivatedOverIcon = cursor.X >= icon.left && cursor.X < icon.right && cursor.Y >= icon.top && cursor.Y < icon.bottom;
-    }
-
-    private void OnContextMenu(object? sender, TrayEventArgs e)
-    {
-        _flyout.Dismiss();
-        _menu.ShowAt(e.X, e.Y, DescribeDisplay());
     }
 
     public void Dispose()
@@ -126,8 +108,9 @@ public sealed class TrayController : IDisposable
 
 #if DEBUG
     /// <summary>
-    /// Debug builds: <c>--flyout-snapshot &lt;dir&gt;</c> opens the flyout and the menu, renders
-    /// each in dark and light to ws1-*.png in that folder, then quits. For reviews and reports.
+    /// Debug builds: <c>--flyout-snapshot &lt;dir&gt;</c> opens the tray menu, renders it in dark and
+    /// light to ws1-menu-*.png in that folder, then quits. For reviews and reports. The island's
+    /// pages, docked by the tray too, are <c>--island-pages</c>.
     /// </summary>
     private void SnapshotIfRequested()
     {
@@ -143,40 +126,15 @@ public sealed class TrayController : IDisposable
         try
         {
             System.IO.Directory.CreateDirectory(directory);
-            await Task.Delay(1500); // let the registry start the modules
+            await _shell.ModulesReady; // their tiles and pages exist once they run
             var original = Chippi.UI.Themes.ThemeManager.Mode;
-            foreach (var (theme, name) in new[] { (Core.Config.ThemePreference.Dark, "dark"), (Core.Config.ThemePreference.Light, "light") })
+            foreach (var (theme, name) in new[] { (ThemePreference.Dark, "dark"), (ThemePreference.Light, "light") })
             {
                 Chippi.UI.Themes.ThemeManager.Apply(theme);
-                ShowFlyout();
-                await Idle();
-                Render(_flyout, System.IO.Path.Combine(directory, $"ws1-flyout-{name}.png"));
-                foreach (var tab in _flyout.TabNames)
-                {
-                    _flyout.SelectTab(tab);
-                    await Idle();
-                    Render(_flyout, System.IO.Path.Combine(directory, $"flyout-{tab.ToLowerInvariant().Replace(' ', '-')}-{name}.png"));
-                }
-                // Keep awake on, as the mockup shows it: the 1 hr chip starts a session in this
-                // process, which stops it again right after the shot.
-                if (_flyout.TabNames.Contains("Keep awake"))
-                    _flyout.SelectTab("Keep awake");
-                await Idle();
-                if (_flyout.TabNames.Contains("Keep awake") && Chip(_flyout, "1 hr") is { } hour)
-                {
-                    hour.IsChecked = true;
-                    await Task.Delay(1000);
-                    await Idle();
-                    Render(_flyout, System.IO.Path.Combine(directory, $"flyout-keep-awake-on-{name}.png"));
-                    hour.IsChecked = false;
-                    await Task.Delay(1000);
-                }
-                _flyout.Dismiss();
-
-                var display = DescribeDisplay();
-                var icon = _icon.GetRect();
-                int x = icon is RECT r ? (r.left + r.right) / 2 : display.Work.Right - 40;
-                int y = icon is RECT r2 ? (r2.top + r2.bottom) / 2 : display.Work.Bottom + 20;
+                var rect = _icon.GetRect();
+                var display = DescribeDisplay(rect);
+                int x = rect is RECT r ? (r.left + r.right) / 2 : display.Work.Right - 40;
+                int y = rect is RECT r2 ? (r2.top + r2.bottom) / 2 : display.Work.Bottom + 20;
                 _menu.ShowAt(x, y, display);
                 await Idle();
                 Render(_menu, System.IO.Path.Combine(directory, $"ws1-menu-{name}.png"));
@@ -186,19 +144,9 @@ public sealed class TrayController : IDisposable
         }
         catch (Exception ex)
         {
-            Log.Error("Flyout snapshot failed", ex);
+            Log.Error("Tray snapshot failed", ex);
         }
         _shell.Commands.Quit();
-    }
-
-    private static System.Windows.Controls.Primitives.ToggleButton? Chip(DependencyObject root, string label)
-    {
-        if (root is System.Windows.Controls.Primitives.ToggleButton { Content: string text } chip && text == label)
-            return chip;
-        foreach (var child in LogicalTreeHelper.GetChildren(root).OfType<DependencyObject>())
-            if (Chip(child, label) is { } found)
-                return found;
-        return null;
     }
 
     private static async Task Idle()

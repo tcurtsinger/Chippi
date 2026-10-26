@@ -24,7 +24,7 @@ public partial class App : Application
     internal Notifications.ToastStartup? NotificationStartup { get; init; }
     private Notifications.ClassicToastPresenter? _toasts;
 
-    /// <summary>Another launch handed this instance its arguments (a verb, or nothing: open the flyout). Raised on the UI thread.</summary>
+    /// <summary>Another launch handed this instance its arguments (a verb, or nothing: show the island's pages). Raised on the UI thread.</summary>
     public event EventHandler<ActivationEventArgs>? ActivationRequested;
 
     private Task _modulesStarted = Task.CompletedTask;
@@ -185,7 +185,7 @@ public partial class App : Application
         // [WS2] Settings: create the settings controller and call shell.Commands.RegisterSettings(...).
         Settings.SettingsController.Compose(shell);
 
-        // [WS1] Tray and flyout: create them, call shell.Commands.RegisterFlyout(...), then return true.
+        // [WS1] Tray: create it (it registers itself with shell.Commands), then return true.
         return Tray.TrayController.Compose(shell);
     }
 

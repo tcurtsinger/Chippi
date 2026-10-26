@@ -12,17 +12,17 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace Chippi.Features.KeepAwake.Tests;
 
 /// <summary>
-/// UI Automation's Toggle (Narrator, Voice access) flips a switch without a Click; the panel and the
-/// page must still start and stop Keep awake.
+/// UI Automation's Toggle (Narrator, Voice access) flips a switch or chip without a Click; the island
+/// page and the Settings page must still start and stop Keep awake.
 /// </summary>
-public sealed class KeepAwakePanelTests
+public sealed class KeepAwakeViewTests
 {
     [Theory]
-    [InlineData("panel")]
+    [InlineData("island")]
     [InlineData("page")]
     public async Task An_automation_toggle_starts_and_stops_keep_awake(string view)
     {
-        var path = Path.Combine(Path.GetTempPath(), $"Chippi-panel-{Guid.NewGuid():N}.json");
+        var path = Path.Combine(Path.GetTempPath(), $"Chippi-view-{Guid.NewGuid():N}.json");
         var module = new KeepAwakeModule(new NullNative());
         var registry = new ModuleRegistry(new ConfigStore(path), new IslandActivityHub(), NullLoggerFactory.Instance);
         registry.Register(module);
@@ -31,8 +31,8 @@ public sealed class KeepAwakePanelTests
             await registry.StartAsync();
             await OnSta(() =>
             {
-                object root = view == "panel" ? new KeepAwakePanel(module) : new KeepAwakePage(module);
-                var toggle = (IToggleProvider)new ToggleButtonAutomationPeer((ToggleButton)((System.Windows.FrameworkElement)root).FindName("Switch"));
+                var button = view == "island" ? Chip(new KeepAwakeIslandView(module), "1 hr")! : (ToggleButton)new KeepAwakePage(module).FindName("Switch");
+                var toggle = (IToggleProvider)new ToggleButtonAutomationPeer(button);
                 toggle.Toggle();
                 Assert.True(SpinWait.SpinUntil(() => module.IsOn, TimeSpan.FromSeconds(5)));
                 toggle.Toggle();
@@ -45,6 +45,10 @@ public sealed class KeepAwakePanelTests
             File.Delete(path);
         }
     }
+
+    private static ToggleButton? Chip(System.Windows.DependencyObject root, string label) =>
+        root is ToggleButton { Content: string text } chip && text == label ? chip
+        : System.Windows.LogicalTreeHelper.GetChildren(root).OfType<System.Windows.DependencyObject>().Select(c => Chip(c, label)).FirstOrDefault(c => c is not null);
 
     private static Task OnSta(Action action)
     {

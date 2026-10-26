@@ -4,12 +4,12 @@
 using System.Windows.Automation.Peers;
 using System.Windows.Controls;
 
-namespace Chippi.App.Flyout;
+namespace Chippi.App.Settings;
 
 /// <summary>
 /// Hides its child from screen readers: the WPF stand-in for UWP's
 /// <c>AutomationProperties.AccessibilityView="Raw"</c>, which WPF does not have. Used for the
-/// header pet, which is decorative because the status line beside it carries the state (DESIGN.md §7).
+/// Island &amp; pet preview, a picture of what the rows beside it already say.
 /// </summary>
 public sealed class DecorativeHost : Decorator
 {

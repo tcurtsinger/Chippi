@@ -21,8 +21,7 @@ public sealed class RoutingTests
         Assert.Equal(["M2", "M1"], f.Module.Settings.Microphone.Devices.Select(d => d.Id));
         Assert.True(f.Module.Settings.Output.Seeded);
         Assert.Empty(f.Notices.Sent);
-        Assert.Equal("Sound", Assert.Single(f.Ui.Flyouts).Name);
-        Assert.Equal(["sound.output", "sound.microphone", "now-playing"], f.Ui.Tiles.Select(t => t.Spec.Key));
+        Assert.Equal([SoundTile.Key, SoundTile.Key], f.Ui.Tiles.Select(t => t.Spec.Key));
     }
 
     [Fact]
@@ -216,7 +215,7 @@ public sealed class RoutingTests
         var module = new AudioRoutingModule(audio);
         await Assert.ThrowsAnyAsync<InvalidOperationException>(() => module.StartAsync(f.Context, CancellationToken.None));
         Assert.False(audio.IsRunning);
-        Assert.Empty(f.Ui.Flyouts);
+        Assert.Empty(f.Ui.Tiles);
         await module.StopAsync(CancellationToken.None);
     }
 
