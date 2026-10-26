@@ -57,6 +57,7 @@ public sealed class AppVolumeModule(AudioService? audio = null) : IFeatureModule
             _tile = context.Ui.AddIslandTile(new("sound.mixer", "Volume mixer", "Sliders", 10, 0, () => new VolumeView(this, VolumeSurface.Island))
             { PageWidth = 344, Orbit = IslandOrbit.Right });
             context.Ui.AddIslandTile(new("sound.output", "Output", "Headphones", 20, 20, () => new VolumeView(this, VolumeSurface.Output)));
+            context.Ui.AddIslandTile(new(Routing.AudioRoutingModule.NowPlayingTile, "Now Playing", "Music", 0, 10, () => new VolumeView(this, VolumeSurface.Output)));
             context.Ui.AddFlyoutSection("sound", "Sound", "AudioLines", 30, () => new VolumeView(this, VolumeSurface.Flyout));
             context.Ui.SetSettingsPage(_ => new VolumeView(this, VolumeSurface.Settings));
             _audio.SnapshotChanged += OnSnapshot;

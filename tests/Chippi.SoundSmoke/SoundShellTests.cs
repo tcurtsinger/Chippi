@@ -8,6 +8,7 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using Chippi.App.Flyout;
 using Chippi.App.Island;
+using Chippi.App.Island.Media;
 using Chippi.App.Pet;
 using Chippi.App.Settings;
 using Chippi.App.Settings.Pages;
@@ -181,6 +182,52 @@ public sealed class SoundShellTests
             Assert.DoesNotContain(Assert.IsType<IslandGrid>(host.Content).Buttons(), b => AutomationProperties.GetName(b).StartsWith("Volume mixer,", StringComparison.Ordinal));
         }
         finally { panel.Close(); media.Dispose(); }
+    });
+
+    [Fact]
+    public Task Now_playing_shows_system_volume_and_output_picker_only_for_installed_features() => SmokeDispatcher.Run(async () =>
+    {
+        await using var scene = new SoundScene();
+        await scene.Start();
+        var panel = new IslandPanelWindow();
+        IReadOnlyList<IslandTileGroup> Tiles() => IslandTileContribution.Group(scene.Shell.Registry.Features.SelectMany(e => e.IslandTiles));
+        void Reopen()
+        {
+            panel.SetTiles(Tiles());
+            panel.ShowPage("now-playing");
+        }
+        try
+        {
+            panel.SetMedia(new FakeMedia());
+            panel.SetTiles(Tiles());
+            panel.Initialize();
+            var offscreen = new MonitorArea(default, new Rect(-20000, 0, 1920, 1080), new Rect(-20000, 0, 1920, 1032), 1);
+            panel.Open(IslandEdge.Top, new Rect(-19100, 0, 112, 32), offscreen);
+            var host = (ContentControl)panel.FindName("Page");
+            Assert.Single(Assert.IsType<IslandGrid>(host.Content).Buttons(), b => AutomationProperties.GetName(b).StartsWith("Now Playing", StringComparison.Ordinal));
+            panel.ShowPage("now-playing");
+            Assert.Single(All<NowPlayingView>(host));
+
+            // System volume is the Output page's control on the same engine state.
+            var volume = Named<Slider>(host, "System volume");
+            ((IRangeValueProvider)new SliderAutomationPeer(volume).GetPattern(PatternInterface.RangeValue)).SetValue(40);
+            await SmokeDispatcher.Until(() => Math.Abs(scene.Devices.GetLevel("speakers").Volume - .4f) < .001);
+
+            // The output picker is the flyout's: choosing an output puts it first in routing's list.
+            Named<ComboBox>(host, "Preferred output").SelectedValue = "headphones";
+            await SmokeDispatcher.Until(() => scene.Routing.Settings.Output.Devices[0].Id == "headphones");
+
+            await scene.Shell.Registry.SetInstalledAsync("app-volume", false);
+            Reopen();
+            Assert.DoesNotContain(All<Slider>(host), s => AutomationProperties.GetName(s) == "System volume");
+            Assert.NotNull(Named<ComboBox>(host, "Preferred output"));
+
+            await scene.Shell.Registry.SetInstalledAsync("audio-routing", false);
+            Reopen();
+            Assert.DoesNotContain(All<ComboBox>(host), c => AutomationProperties.GetName(c) == "Preferred output");
+            Assert.Single(All<NowPlayingView>(host));
+        }
+        finally { panel.Close(); }
     });
 
     private static IEnumerable<T> All<T>(DependencyObject root) where T : DependencyObject
