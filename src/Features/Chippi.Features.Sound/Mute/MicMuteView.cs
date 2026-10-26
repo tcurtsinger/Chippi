@@ -64,7 +64,7 @@ public sealed class MicMuteView : UserControl
         bool warning = _module.Status.State is MicrophoneMuteState.Muted or MicrophoneMuteState.Mixed;
         var glyph = new LucideIcon { Data = warning ? LucideIcons.MicOff : LucideIcons.Mic, Size = 16, Margin = new Thickness(0, 0, 10, 0), VerticalAlignment = VerticalAlignment.Center };
         glyph.SetResourceReference(LucideIcon.BrushProperty, warning ? "WarningBrush" : "IslandAccentBrush");
-        var state = new TextBlock { Text = muted ? "Muted in every app" : _module.StatusText, FontSize = 13, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
+        var state = new TextBlock { Text = muted ? "Muted" : _module.StatusText, FontSize = 13, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
         if (warning) state.SetResourceReference(TextBlock.ForegroundProperty, "WarningTextBrush");
         AutomationProperties.SetLiveSetting(state, AutomationLiveSetting.Polite);
         var action = RoutingUi.Button(muted ? "Unmute" : "Mute", Toggle);

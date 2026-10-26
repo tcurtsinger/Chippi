@@ -54,12 +54,12 @@ internal sealed class IslandPetPage : UserControl
         _left.SelectionChanged += (_, _) => SaveButton(_left, (s, key) => s.IslandLeftButton = key);
         _right.SelectionChanged += (_, _) => SaveButton(_right, (s, key) => s.IslandRightButton = key);
         var live = SettingsUi.Switch(app.IslandLiveButton);
-        AutomationProperties.SetName(live, "Button for what's live");
+        AutomationProperties.SetName(live, "Live button");
         SettingsUi.OnSwitched(live, on => Save(s => s.IslandLiveButton = on));
         page.Children.Add(SettingsUi.Group(
             SettingsUi.Row("Left button", "", _left),
             SettingsUi.Row("Right button", "", _right),
-            SettingsUi.Row("Button for what's live", "", live)));
+            SettingsUi.Row("Live button", "", live)));
 
         page.Children.Add(SettingsUi.Section("Gumdrop"));
         page.Children.Add(SettingsUi.Group(ColorRow(app), MotionRow(app)));
