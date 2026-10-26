@@ -64,7 +64,7 @@
 
   <Border x:Name="Recent" Style="{DynamicResource IslandCardStyle}" Padding="0" Margin="0,8,0,0">
    <StackPanel>
-    <TextBlock x:Name="NoRecent" Text="Nothing moved yet" Style="{StaticResource CaptionTextStyle}" Margin="12"/>
+    <TextBlock x:Name="NoRecent" Text="No recent files" Style="{StaticResource CaptionTextStyle}" Margin="12"/>
     <ItemsControl x:Name="Rows" Focusable="False">
      <ItemsControl.ItemsPanel><ItemsPanelTemplate><c:Card Style="{StaticResource CardRowsStyle}"/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
      <ItemsControl.ItemTemplate><DataTemplate>
