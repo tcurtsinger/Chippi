@@ -27,7 +27,7 @@ public sealed class RoutingUiTests
         await Sta(async () =>
         {
             var page = new RoutingPage(f.Module);
-            var toggle = Descendants(page).OfType<ToggleButton>().Single(t => AutomationProperties.GetName(t) == "Switch outputs automatically");
+            var toggle = Descendants(page).OfType<ToggleButton>().Single(t => AutomationProperties.GetName(t) == "Priority switching");
             ((IToggleProvider)new ToggleButtonAutomationPeer(toggle)).Toggle();
             await Until(() => !Descendants(page).Contains(toggle));
             Assert.False(f.Module.Settings.Output.Enabled);

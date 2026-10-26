@@ -205,6 +205,8 @@ Copy is sentence case, plain and short. State comes first and detail second: "On
 
 **The Bare Label Rule** (Travis, 2026-10-22). A label names the action and nothing else. Never repeat the app's name where its icon already says it, and never pad a label with explanation. The Explorer entry is "Organize", not "Organize with Chippi". When a label seems to need a sentence, the design is wrong; fix the design, not the copy. This is a technical tool (Travis, 2026-10-24): **buttons name only the verb** ("Undo", not "Undo run" or "Undo 4"; "Refresh", not "Preview again"), and **a confirmation is the question plus Cancel and the action** ("Clear history?" · Cancel · Clear), with no line explaining what happens. Statuses, error reasons and section labels stay, because they say something you can't see ("Failed · in use").
 
+**Setting labels** (Travis, 2026-10-25). The Bare Label Rule covers every setting too. A setting's label is a noun phrase in Windows' own terms ("Communications device", "Sound feedback", "Input device"), never a sentence or an instruction. No "my", "your", "it" or "too". No row that only explains fixed behavior ("New devices · Add to the end"): if the user can't change it, it isn't a row. Tooltips follow the same rule and never explain.
+
 **No page intros** (2026-10-23). A Settings page title has no description under it. A row caption shows state or data (a path, a count, the chosen accent), never an explanation of the row.
 
 ## 4. Elevation
@@ -243,7 +245,7 @@ Flat, like Windows 11. Depth comes from the surface steps (window → card → c
 - **Sound panel** (Phase 3, approved 2026-10-25; `FlyoutSound.dc.html` in the offline Sound mockup):
   - One Sound tab for all installed Sound features, never one tab per feature. Use the six-line audio-lines glyph; accessible name and tooltip are "Sound". Keep the existing tab dimensions and selection treatment.
   - Output card: chosen output picker, system volume slider and mute action. Then the microphone row: real mic name, actual processing or muted status, and Mute / Unmute. A muted mic makes the flyout header status and mic-off glyph Caution.
-  - Mic clean-up row: actual processing state and switch. With its dependency missing, Set up opens Settings > Add features; it never starts a driver install from the flyout.
+  - Mic processing row: actual processing state and switch. With its dependency missing, Set up opens Settings > Add features; it never starts a driver install from the flyout.
   - Apps: app icon (or a monogram when unavailable), name, mute action and volume slider. More options opens the relevant Sound settings. Only installed features contribute controls; no static sample apps, fake levels or duplicate system-volume rows.
   - The same state drives Settings and the island. Per-app device selection shows a chosen destination without claiming an existing stream has moved. Volume above 100% is unavailable until the Volume boost research gate passes.
 - **Empty flyout:** with nothing installed, the tab strip is hidden and the panel shows "No features on" with an accent "Add features" button that opens Settings › Add features.
@@ -272,7 +274,7 @@ Reference: the offline Sound mockup at `X:\code\chippi-scratch\phase-3-prep\mock
 - **Pages:**
   - **Now Playing:** source picker, actual artwork at 112px (neutral placeholder if absent), title/source, previous / 40px accent play-pause / next, 4px progress bar and reported elapsed/remaining time. Disable unsupported actions. Show an empty state without sample music. System volume and output picker sit below.
   - **Volume mixer:** selected output, system strip, divider, then app strips using the vertical volume bar in section 6. System stays 0 to 100%; app bars reach 200% only with the approved, working Volume boost backend. Use real app icons or monograms, percentages and names.
-  - **Output:** ordered devices with current/connected/unavailable state, selection and Switch by priority. **Microphone:** selected real mic, actual level/status, Mute / Unmute and installed cleanup controls. Muted status is Caution. Settings, flyout and these pages reflect the same engine state.
+  - **Output:** ordered devices with current/connected/unavailable state, selection and Priority switching. **Microphone:** selected real mic, actual level/status, Mute / Unmute and installed cleanup controls. Muted status is Caution. Settings, flyout and these pages reflect the same engine state.
   - **Keep awake and File organizer:** their existing compact controls become pages. Keep current duration/mode/Undo behavior; do not copy the mockup's sample delay, paths or verbose button text. Button labels follow the Bare Label Rule.
   - Inner cards use `rgba(255,255,255,.06)`, 8px radius and 12px padding. Omit sections without a contributing installed feature.
 - **Orbit buttons:** 40px circles, Island fill, 1px `rgba(255,255,255,.14)` stroke, 16px glyph, `0 8px 20px rgba(0,0,0,.3)` shadow. Hover `#1F1F1F`, pressed `#000000`; the active page's button gets a `.5` white stroke. Accessible names describe the target/action. They are part of the island window and hit region, not click-away.

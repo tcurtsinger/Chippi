@@ -28,7 +28,7 @@ public static class FeatureCatalog
         },
 
         // Phase 3: Sound
-        new("volume-boost", "Volume boost", "Lifts quiet apps past their 100% limit", FeatureGroup.Sound)
+        new("volume-boost", "Volume boost", "App volume past 100%", FeatureGroup.Sound)
         {
             Icon = "Volume",
             Presets = Audio,

@@ -20,7 +20,7 @@ public sealed class AppVolumeModule(AudioService? audio = null) : IFeatureModule
     private bool _routingFailed;
     private string? _viewedOutput;
 
-    public FeatureDescriptor Descriptor { get; } = new("app-volume", "App volume", "Volume and output device for each app, right from the tray", FeatureGroup.Sound)
+    public FeatureDescriptor Descriptor { get; } = new("app-volume", "App volume", "Volume and output device per app", FeatureGroup.Sound)
     {
         Icon = "Sliders",
         Presets = PresetMembership.Essentials | PresetMembership.Audio | PresetMembership.PowerUser,

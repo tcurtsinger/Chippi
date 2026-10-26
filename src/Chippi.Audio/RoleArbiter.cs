@@ -47,7 +47,7 @@ internal sealed class RoleArbiter(ILogger logger, TimeProvider time, TimeSpan? b
 
     /// <summary>
     /// <paramref name="owner"/> claims <paramref name="roles"/> of <paramref name="flow"/> and drops
-    /// any other role of that flow it held, so turning "Switch call audio too" off frees Communications.
+    /// any other role of that flow it held, so turning "Communications device" off frees Communications.
     /// </summary>
     public void Claim(RoleOwner owner, AudioFlow flow, IReadOnlyCollection<AudioRole> roles, RoleTarget target)
     {

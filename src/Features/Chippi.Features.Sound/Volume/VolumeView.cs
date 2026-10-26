@@ -85,8 +85,8 @@ public sealed class VolumeView : UserControl
         {
             _root.Children.Add(RoutingUi.Section("Options"));
             _root.Children.Add(RoutingUi.Card(
-                new SettingRow { Header = "Show quiet apps", Content = RoutingUi.Switch("Show quiet apps", _module.Settings.ShowQuietApps, on => Run(_module.SetShowQuietAsync(on))) },
-                new SettingRow { Header = "Remember each app's output", Content = RoutingUi.Switch("Remember each app's output", _module.Settings.RememberOutputs, on => Run(_module.SetRememberAsync(on))) }));
+                new SettingRow { Header = "Inactive apps", Content = RoutingUi.Switch("Inactive apps", _module.Settings.ShowQuietApps, on => Run(_module.SetShowQuietAsync(on))) },
+                new SettingRow { Header = "Saved app outputs", Content = RoutingUi.Switch("Saved app outputs", _module.Settings.RememberOutputs, on => Run(_module.SetRememberAsync(on))) }));
         }
         if (_module.Error is { } error) _root.Children.Add(RoutingUi.Text(error, "CaptionTextStyle", "WarningTextBrush"));
     }
@@ -183,7 +183,6 @@ public sealed class VolumeView : UserControl
             items.Add(new(chosen,(_module.Snapshot.Find(chosen)?.Name ?? "Output") + " (Unavailable)"));
         var combo = new ComboBox { ItemsSource = items, SelectedValuePath = "Id", DisplayMemberPath = "Name" };        combo.SetResourceReference(StyleProperty,"HopperComboBoxStyle");
         AutomationProperties.SetName(combo,AppName(key) + " output");
-        combo.ToolTip = "Applies when the app next opens audio";
         combo.SelectionChanged += (_, _) =>
         {
             if (!_refreshing && combo.SelectedValue is string id) Run(_module.SetOutputAsync(key,id.Length == 0 ? null : id));

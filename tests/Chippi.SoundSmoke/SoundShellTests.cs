@@ -69,11 +69,11 @@ public sealed class SoundShellTests
         {
             Assert.Single(All<RoutingPage>(settings.PageContent));
             var calls = scene.Routing.Settings.Output.Calls;
-            Toggle(Named<ToggleButton>(settings.PageContent, "Switch call audio too"));
+            Toggle(Named<ToggleButton>(settings.PageContent, "Communications device"));
             await SmokeDispatcher.Until(() => scene.Routing.Settings.Output.Calls != calls);
             settings.Navigate("module:audio-routing/microphone");
             Assert.Single(All<RoutingPage>(settings.PageContent));
-            Assert.NotNull(Named<ToggleButton>(settings.PageContent, "Pin the call mic too"));
+            Assert.NotNull(Named<ToggleButton>(settings.PageContent, "Communications device"));
 
             settings.Navigate("module:mic-processing");
             Assert.Single(All<ProcessingPage>(settings.PageContent));
@@ -93,7 +93,7 @@ public sealed class SoundShellTests
             Invoke(Named<Button>(settings.PageContent, "Mute all microphones"));
             await SmokeDispatcher.Until(() => scene.Devices.GetLevel("desk").Muted);
             settings.Navigate("module:audio-routing");
-            Assert.NotNull(Named<ToggleButton>(settings.PageContent, "Switch outputs automatically"));
+            Assert.NotNull(Named<ToggleButton>(settings.PageContent, "Priority switching"));
             Assert.Equal("module:audio-routing", settings.CurrentPage);
         }
         finally { settings.Close(); }

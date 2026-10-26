@@ -51,11 +51,11 @@ public sealed class RoutingPage : UserControl
         _body.Children.Clear();
         _handles.Clear();
         var list = _module.Settings.For(_flow);
-        var toggle = RoutingUi.Switch(_flow == AudioFlow.Render ? "Switch outputs automatically" : "Pin my microphone", list.Enabled,
+        var toggle = RoutingUi.Switch("Priority switching", list.Enabled,
             enabled => Run(_module.SetEnabledAsync(_flow, enabled)));
         var top = new SettingRow
         {
-            Header = _flow == AudioFlow.Render ? "Switch outputs automatically" : "Pin my microphone",
+            Header = "Priority switching",
             Description = list.Enabled ? _module.CurrentName(_flow) : "Off",
             Icon = _flow == AudioFlow.Render ? LucideIcons.Headphones : LucideIcons.Mic,
             Content = toggle,
@@ -86,22 +86,15 @@ public sealed class RoutingPage : UserControl
             card.Children.Add(DeviceRow(list.Devices[i], i, list.Devices.Count));
         _body.Children.Add(card);
         _body.Children.Add(RoutingUi.Section("Options"));
-        var callSwitch = RoutingUi.Switch(_flow == AudioFlow.Render ? "Switch call audio too" : "Pin the call mic too", list.Calls,
+        var callSwitch = RoutingUi.Switch("Communications device", list.Calls,
             calls => Run(_module.SetCallsAsync(_flow, calls)));
-        var options = RoutingUi.Card(new SettingRow { Header = _flow == AudioFlow.Render ? "Switch call audio too" : "Pin the call mic too", Content = callSwitch });
-        if (_flow == AudioFlow.Render)
-        {
-            options.Children.Add(new SettingRow { Header = "When none are connected", Content = RoutingUi.Text("Leave to Windows", "CaptionTextStyle", "TextSecondaryBrush") });
-            options.Children.Add(new SettingRow { Header = "New devices", Content = RoutingUi.Text("Add to the end", "CaptionTextStyle", "TextSecondaryBrush") });
-        }
-        else options.Children.Add(new SettingRow { Header = "Headset mics", Content = RoutingUi.Text("Only if listed", "CaptionTextStyle", "TextSecondaryBrush") });
-        _body.Children.Add(options);
+        _body.Children.Add(RoutingUi.Card(new SettingRow { Header = "Communications device", Content = callSwitch }));
     }
 
     private FrameworkElement DeviceRow(PriorityEntry entry, int index, int count)
     {
         var grid = RoutingUi.Columns(GridLength.Auto, GridLength.Auto, GridLength.Auto, new(1, GridUnitType.Star), GridLength.Auto, GridLength.Auto);
-        var handle = new DragHandle { Width = 16, Height = 24, Margin = new Thickness(0, 0, 16, 0), ToolTip = "Drag to reorder (Up/Down)" };
+        var handle = new DragHandle { Width = 16, Height = 24, Margin = new Thickness(0, 0, 16, 0), ToolTip = "Reorder" };
         AutomationProperties.SetName(handle, $"Reorder {entry.Name}");
         _handles[entry.Id] = handle;
         handle.MoveRequested += (_, delta) => Run(_module.MoveAsync(_flow, entry.Id, index + delta), entry.Id);
