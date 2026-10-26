@@ -127,6 +127,6 @@ public sealed class AppSettings
     /// <summary>Likewise for the right or lower pair; null is its feature's own (App volume).</summary>
     public string? IslandRightButton { get; set; }
 
-    /// <summary>Settings › Island &amp; pet › Button for what's live: the round button for music or a muted mic.</summary>
+    /// <summary>Settings › Island &amp; pet › Live button: the round button for music or a muted mic.</summary>
     public bool IslandLiveButton { get; set; } = true;
 }
