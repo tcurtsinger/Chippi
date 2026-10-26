@@ -33,6 +33,8 @@ public sealed class AppVolumeModule(AudioService? audio = null) : IFeatureModule
     public AudioEndpoint? Output => Outputs.FirstOrDefault(e => e.Id == _viewedOutput)
         ?? Outputs.FirstOrDefault(e => e.Id == Snapshot.Default(AudioFlow.Render, AudioRole.Multimedia)) ?? Outputs.FirstOrDefault();
     public void ViewOutput(string? id) { _viewedOutput = id; Changed?.Invoke(); }
+    /// <summary>The default output, whatever the Volume mixer is showing.</summary>
+    public AudioEndpoint? DefaultOutput => Outputs.FirstOrDefault(e => e.Id == Snapshot.Default(AudioFlow.Render, AudioRole.Multimedia)) ?? Outputs.FirstOrDefault();
     public string? Error { get; private set; }
     public bool DevicePickerAvailable => !_routingFailed && _current.Values.Any(v => v.Available);
     public event Action? Changed;
@@ -57,6 +59,7 @@ public sealed class AppVolumeModule(AudioService? audio = null) : IFeatureModule
             _tile = context.Ui.AddIslandTile(new("sound.mixer", "Volume mixer", "Sliders", 10, 0, () => new VolumeView(this, VolumeSurface.Island))
             { PageWidth = 344, Orbit = IslandOrbit.Right });
             context.Ui.AddIslandTile(new("sound.output", "Output", "Headphones", 20, 20, () => new VolumeView(this, VolumeSurface.Output)));
+            context.Ui.AddIslandTile(new(Routing.AudioRoutingModule.NowPlayingTile, "Now Playing", "Music", 0, 10, () => new VolumeView(this, VolumeSurface.Output)));
             context.Ui.AddFlyoutSection("sound", "Sound", "AudioLines", 30, () => new VolumeView(this, VolumeSurface.Flyout));
             context.Ui.SetSettingsPage(_ => new VolumeView(this, VolumeSurface.Settings));
             _audio.SnapshotChanged += OnSnapshot;
@@ -89,14 +92,15 @@ public sealed class AppVolumeModule(AudioService? audio = null) : IFeatureModule
 
     public Task SetVolumeAsync(AppKey app, float volume) => Change(async () => await _audio!.SetAppVolumeAsync(app, volume));
     public Task SetMutedAsync(AppKey app, bool muted) => Change(async () => await _audio!.SetAppMuteAsync(app, muted));
-    public Task SetSystemVolumeAsync(float volume) => Change(async () =>
+    /// <summary>Sets <paramref name="target"/>'s volume, or the mixer's output's without one.</summary>
+    public Task SetSystemVolumeAsync(float volume, AudioEndpoint? target = null) => Change(async () =>
     {
-        if (Output is not { } output) throw new InvalidOperationException("No output");
+        if ((target ?? Output) is not { } output) throw new InvalidOperationException("No output");
         await _audio!.SetEndpointVolumeAsync(output.Id, volume);
     });
-    public Task SetSystemMutedAsync(bool muted) => Change(async () =>
+    public Task SetSystemMutedAsync(bool muted, AudioEndpoint? target = null) => Change(async () =>
     {
-        if (Output is not { } output) throw new InvalidOperationException("No output");
+        if ((target ?? Output) is not { } output) throw new InvalidOperationException("No output");
         var failed = await _audio!.SetEndpointMuteAsync([output.Id], muted);
         if (failed.Count > 0) throw new InvalidOperationException("Couldn't mute output");
     });

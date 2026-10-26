@@ -13,6 +13,8 @@ public sealed class AudioRoutingModule : IFeatureModule
 {
     public const string OutputTile = "sound.output";
     public const string MicrophoneTile = "sound.microphone";
+    /// <summary>The shell's Now Playing page; sections under this key sit below the player.</summary>
+    public const string NowPlayingTile = "now-playing";
     private static readonly AudioRole[] AllRoles = [AudioRole.Console, AudioRole.Multimedia, AudioRole.Communications];
     private static readonly AudioRole[] WithoutCalls = [AudioRole.Console, AudioRole.Multimedia];
     private readonly SemaphoreSlim _gate = new(1);
@@ -75,6 +77,7 @@ public sealed class AudioRoutingModule : IFeatureModule
                 () => new RoutingQuickView(this, AudioFlow.Render, island: true)));
             _microphoneTile = context.Ui.AddIslandTile(new(MicrophoneTile, "Microphone", "Mic", 30, 0,
                 () => new RoutingQuickView(this, AudioFlow.Capture, island: true)));
+            context.Ui.AddIslandTile(new(NowPlayingTile, "Now Playing", "Music", 0, 20, () => RoutingQuickView.OutputPicker(this)));
             context.Ui.AddFlyoutSection("sound", "Sound", "AudioLines", 10, () => new RoutingQuickView(this));
             context.Ui.SetSettingsPage(section => new RoutingPage(this, section == "microphone" ? AudioFlow.Capture : AudioFlow.Render));
             _audio.SnapshotChanged += OnSnapshot;

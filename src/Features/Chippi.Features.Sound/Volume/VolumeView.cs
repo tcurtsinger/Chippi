@@ -39,7 +39,7 @@ public sealed class VolumeView : UserControl
         var apps = _module.Apps.ToList();
         var shape = string.Join("|", apps.Select(a => a.Key + a.Name + _module.CanPickOutput(a.Key)))
             + ":" + string.Join("|", _module.Snapshot.Known(AudioFlow.Render).Select(e => e.Id + e.Name + e.State))
-            + ":" + _module.Output?.Id + ":" + _module.Settings.ShowQuietApps + _module.Settings.RememberOutputs + ":" + _module.Error;
+            + ":" + SystemOutput?.Id + ":" + _module.Settings.ShowQuietApps + _module.Settings.RememberOutputs + ":" + _module.Error;
         _refreshing = true;
         try
         {
@@ -91,13 +91,15 @@ public sealed class VolumeView : UserControl
         if (_module.Error is { } error) _root.Children.Add(RoutingUi.Text(error, "CaptionTextStyle", "WarningTextBrush"));
     }
 
+    // The mixer's strip follows its output picker; every other system row is the default output's.
+    private AudioEndpoint? SystemOutput => _surface == VolumeSurface.Island ? _module.Output : _module.DefaultOutput;
     private AppAudio? App(AppKey? key) => key is { } value ? _module.Snapshot.Apps.FirstOrDefault(a => a.Key == value) : null;
     private (float Volume, bool Muted) Level(AppKey? key) => key is null
-        ? _module.Output is { } output && _module.Snapshot.Levels.TryGetValue(output.Id, out var level) ? (level.Volume, level.Muted) : (0, false)
+        ? SystemOutput is { } output && _module.Snapshot.Levels.TryGetValue(output.Id, out var level) ? (level.Volume, level.Muted) : (0, false)
         : App(key) is { } app ? (app.Volume, app.Muted) : (0, false);
     private string AppName(AppKey? key) => key is null ? "System" : App(key)?.Name ?? "App";
-    private Task SetVolume(AppKey? key, double value) => key is { } app ? _module.SetVolumeAsync(app, (float)value / 100) : _module.SetSystemVolumeAsync((float)value / 100);
-    private Task SetMute(AppKey? key) => key is { } app ? _module.SetMutedAsync(app, !Level(key).Muted) : _module.SetSystemMutedAsync(!Level(key).Muted);
+    private Task SetVolume(AppKey? key, double value) => key is { } app ? _module.SetVolumeAsync(app, (float)value / 100) : _module.SetSystemVolumeAsync((float)value / 100, SystemOutput);
+    private Task SetMute(AppKey? key) => key is { } app ? _module.SetMutedAsync(app, !Level(key).Muted) : _module.SetSystemMutedAsync(!Level(key).Muted, SystemOutput);
 
     private IconButton Mute(AppKey? key)
     {
@@ -110,7 +112,7 @@ public sealed class VolumeView : UserControl
                 Monogram(AppName(key));
             button.ToolTip = muted ? "Unmute" : "Mute";
             AutomationProperties.SetName(button, $"{button.ToolTip} {AppName(key)}");
-            button.IsEnabled = key is not null || _module.Output is not null;
+            button.IsEnabled = key is not null || SystemOutput is not null;
         });
         return button;
     }
@@ -139,7 +141,7 @@ public sealed class VolumeView : UserControl
         {
             if (!slider.IsMouseCaptureWithin && !slider.IsKeyboardFocusWithin) slider.Value = Level(key).Volume * 100;
             label.Text = $"{Math.Round(slider.Value)}%";
-            slider.IsEnabled = key is not null || _module.Output is not null;
+            slider.IsEnabled = key is not null || SystemOutput is not null;
         });
         percentage = label;
         return slider;
@@ -151,7 +153,7 @@ public sealed class VolumeView : UserControl
         var row = RoutingUi.Columns(new(1,GridUnitType.Star),GridLength.Auto,GridLength.Auto,GridLength.Auto,GridLength.Auto);
         var name = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
         name.Children.Add(RoutingUi.Text(key is null ? "System volume" : AppName(key)));
-        if (key is null && _module.Output is { } output) name.Children.Add(RoutingUi.Text(output.Name,"CaptionTextStyle","TextSecondaryBrush"));
+        if (key is null && SystemOutput is { } output) name.Children.Add(RoutingUi.Text(output.Name,"CaptionTextStyle","TextSecondaryBrush"));
         RoutingUi.Add(row,name,0); RoutingUi.Add(row,Mute(key),1);
         var slider = VolumeSlider(key,false,out var percent);
         slider.SetResourceReference(StyleProperty,"HopperSliderStyle");

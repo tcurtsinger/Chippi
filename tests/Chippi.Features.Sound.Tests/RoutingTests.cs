@@ -22,7 +22,7 @@ public sealed class RoutingTests
         Assert.True(f.Module.Settings.Output.Seeded);
         Assert.Empty(f.Notices.Sent);
         Assert.Equal("Sound", Assert.Single(f.Ui.Flyouts).Name);
-        Assert.Equal(["sound.output", "sound.microphone"], f.Ui.Tiles.Select(t => t.Spec.Key));
+        Assert.Equal(["sound.output", "sound.microphone", "now-playing"], f.Ui.Tiles.Select(t => t.Spec.Key));
     }
 
     [Fact]

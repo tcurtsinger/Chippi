@@ -12,9 +12,12 @@ using Chippi.Audio;
 
 namespace Chippi.Features.Sound.Routing;
 
-/// <summary>Routing's flyout section, or its part of one shared island page.</summary>
+/// <summary>Routing's flyout section, its part of one shared island page, or Now Playing's output picker.</summary>
 public sealed class RoutingQuickView : UserControl
 {
+    /// <summary>Only the flyout's output picker, for the island's Now Playing page.</summary>
+    public static RoutingQuickView OutputPicker(AudioRoutingModule module) => new(module, picker: true);
+
     private readonly AudioRoutingModule _module;
     private readonly AudioFlow? _flow;
     private readonly bool _island;
@@ -49,9 +52,21 @@ public sealed class RoutingQuickView : UserControl
         Refresh();
     }
 
-    private void BuildFlyout()
+    private RoutingQuickView(AudioRoutingModule module, bool picker)
     {
-        foreach (var flow in new[] { AudioFlow.Render, AudioFlow.Capture })
+        _module = module;
+        BuildFlyout([AudioFlow.Render], volume: false);
+        Content = _root;
+        Loaded += (_, _) => { _module.Changed += Refresh; Refresh(); };
+        Unloaded += (_, _) => _module.Changed -= Refresh;
+        Refresh();
+    }
+
+    private void BuildFlyout() => BuildFlyout([AudioFlow.Render, AudioFlow.Capture], volume: true);
+
+    private void BuildFlyout(AudioFlow[] flows, bool volume)
+    {
+        foreach (var flow in flows)
         {
             var combo = new ComboBox { MinWidth = 180, MaxWidth = 240, DisplayMemberPath = nameof(PriorityEntry.Name), SelectedValuePath = nameof(PriorityEntry.Id) };
             combo.SetResourceReference(StyleProperty, "HopperComboBoxStyle");
@@ -67,7 +82,7 @@ public sealed class RoutingQuickView : UserControl
             RoutingUi.Add(grid, label, 0);
             RoutingUi.Add(grid, combo, 1);
             _root.Children.Add(RoutingUi.Pad(grid, 48));
-            if (flow == AudioFlow.Render)
+            if (flow == AudioFlow.Render && volume)
             {
                 _volume.SetResourceReference(StyleProperty, "HopperSliderStyle");
                 AutomationProperties.SetName(_volume, "Output volume");
