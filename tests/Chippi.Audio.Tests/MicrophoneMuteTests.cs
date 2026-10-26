@@ -84,6 +84,9 @@ public sealed class MicrophoneMuteTests : IAsyncDisposable
         _system.With(Mic("Good"), Mic("Bad"));
         _system.Failing.Add("Bad");
         await _audio.ToggleMicrophoneMuteAsync();
+        // Good's mute queued a level refresh that retries Bad. Let it run while Bad still fails,
+        // or it mutes Bad after Failing.Clear() and the next toggle unmutes both.
+        await _audio.RefreshAsync();
         Assert.Equal(MicrophoneMuteState.Mixed, _audio.Snapshot.MicrophoneMute.State);
         Assert.Contains("Bad", _audio.Snapshot.MicrophoneMute.Failed);
         _system.Failing.Clear();
