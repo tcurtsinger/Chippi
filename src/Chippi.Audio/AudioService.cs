@@ -185,9 +185,9 @@ public sealed class AudioService
     public Task SetAppOutputAsync(AppKey app, string? endpointId) => Run(e =>
     {
         if (endpointId is not null && !e.Catalog.Active(AudioFlow.Render).Any(d => PriorityPolicy.Eq(d.Id, endpointId) && !VbCable.IsCable(d)))
-            throw new InvalidOperationException("Output unavailable");
+            throw new AudioFailure("Output unavailable");
         var pids = e.Sessions.SessionsOf(app).Where(s => s.ProcessId > 0 && s.ExePath is not null && !s.IsSystemSounds).Select(s => s.ProcessId).Distinct().ToList();
-        if (pids.Count == 0) throw new InvalidOperationException("App output unavailable");
+        if (pids.Count == 0) throw new AudioFailure("App output unavailable");
         if (e.System is not IPerAppDeviceSystem policy) throw new AppOutputPolicyException();
         foreach (var pid in pids)
             if (!policy.GetAppOutput(pid).Available || !policy.SetAppOutput(pid, endpointId))
@@ -245,7 +245,7 @@ public sealed class AudioService
     {
         Engine engine;
         lock (_gate)
-            engine = CurrentEngine() ?? throw new InvalidOperationException("Audio service stopped");
+            engine = CurrentEngine() ?? throw new AudioFailure("Audio service stopped");
         return engine.Watch(endpointIds, apps);
     }
 
@@ -255,7 +255,7 @@ public sealed class AudioService
         lock (_gate)
             engine = CurrentEngine();
         return engine is null
-            ? Task.FromException<T>(new InvalidOperationException("Audio service stopped"))
+            ? Task.FromException<T>(new AudioFailure("Audio service stopped"))
             : engine.Invoke(op);
     }
 
@@ -365,7 +365,7 @@ public sealed class AudioService
 
         public MicPipelineHost Processing { get; }
 
-        public IDeviceSystem System => _system ?? throw new InvalidOperationException("Audio service failed", _startError);
+        public IDeviceSystem System => _system ?? throw new AudioFailure("Audio service failed", _startError);
 
         /// <summary>The device system couldn't be created; commands fail with its error until the engine is replaced.</summary>
         public bool Failed => _startError is not null;

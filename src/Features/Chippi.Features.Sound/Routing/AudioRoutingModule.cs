@@ -129,7 +129,7 @@ public sealed class AudioRoutingModule : IFeatureModule
     public Task AddAsync(AudioFlow flow, string id) => EditAsync(flow, list =>
     {
         var device = Snapshot.Known(flow).FirstOrDefault(e => Eq(e.Id, id) && !_excluded(e))
-            ?? throw new ArgumentException("Device unavailable");
+            ?? throw new AudioFailure("Device unavailable");
         if (list.Devices.Any(e => Eq(e.Id, id))) return list;
         return list with
         {
@@ -169,7 +169,7 @@ public sealed class AudioRoutingModule : IFeatureModule
         await _gate.WaitAsync();
         try
         {
-            if (_context is null || _stopping) throw new InvalidOperationException("Audio routing uninstalled");
+            if (_context is null || _stopping) throw new AudioFailure("Audio routing uninstalled");
             var settings = Settings.With(flow, edit(Settings.For(flow)));
             settings.Validate();
             _context.Settings.Save(settings);

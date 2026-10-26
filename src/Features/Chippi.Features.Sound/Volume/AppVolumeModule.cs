@@ -95,19 +95,19 @@ public sealed class AppVolumeModule(AudioService? audio = null) : IFeatureModule
     /// <summary>Sets <paramref name="target"/>'s volume, or the mixer's output's without one.</summary>
     public Task SetSystemVolumeAsync(float volume, AudioEndpoint? target = null) => Change(async () =>
     {
-        if ((target ?? Output) is not { } output) throw new InvalidOperationException("No output");
+        if ((target ?? Output) is not { } output) throw new AudioFailure("No output");
         await _audio!.SetEndpointVolumeAsync(output.Id, volume);
     });
     public Task SetSystemMutedAsync(bool muted, AudioEndpoint? target = null) => Change(async () =>
     {
-        if ((target ?? Output) is not { } output) throw new InvalidOperationException("No output");
+        if ((target ?? Output) is not { } output) throw new AudioFailure("No output");
         var failed = await _audio!.SetEndpointMuteAsync([output.Id], muted);
-        if (failed.Count > 0) throw new InvalidOperationException("Couldn't mute output");
+        if (failed.Count > 0) throw new AudioFailure("Couldn't mute output");
     });
 
     public Task SetOutputAsync(AppKey app, string? id) => Change(async () =>
     {
-        if (!CanPickOutput(app)) throw new InvalidOperationException("App output unavailable");
+        if (!CanPickOutput(app)) throw new AudioFailure("App output unavailable");
         try { await _audio!.SetAppOutputAsync(app, id); }
         catch (AppOutputPolicyException) { _routingFailed = true; throw; }
         _current[app] = new(true, id);
@@ -132,7 +132,7 @@ public sealed class AppVolumeModule(AudioService? audio = null) : IFeatureModule
         await _gate.WaitAsync();
         try
         {
-            if (_context is null || _stopping) throw new InvalidOperationException("App volume uninstalled");
+            if (_context is null || _stopping) throw new AudioFailure("App volume uninstalled");
             await command();
             Error = null;
             UpdateTile();

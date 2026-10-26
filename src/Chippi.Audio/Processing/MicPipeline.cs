@@ -149,7 +149,7 @@ public sealed class MicPipeline : IMicPipeline
         if (mix.Channels == 2)
             chain = new MonoToStereoSampleProvider(chain);
         else if (mix.Channels > 2)
-            throw new NotSupportedException($"Unsupported channel count ({mix.Channels})");
+            throw new AudioFailure($"Unsupported channel count ({mix.Channels})");
         _processed = chain.ToWaveProvider();
     }
 

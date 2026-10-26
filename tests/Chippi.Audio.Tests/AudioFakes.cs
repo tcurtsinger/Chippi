@@ -342,12 +342,12 @@ public sealed class FakePipeline(string source, string sink, Chippi.Audio.Proces
     public void Start()
     {
         if (failOnStart)
-            throw new InvalidOperationException("Device in use");
+            throw new AudioFailure("Device in use");
         Started = true;
     }
 
     /// <summary>The device went away under a running stream.</summary>
-    public void Fail(string message) => Failed?.Invoke(new InvalidOperationException(message));
+    public void Fail(string message) => Failed?.Invoke(new AudioFailure(message));
 
     public void Dispose() => Disposed = true;
 }

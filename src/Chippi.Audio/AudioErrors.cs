@@ -5,9 +5,12 @@ using System.Runtime.InteropServices;
 
 namespace Chippi.Audio;
 
+/// <summary>A failure whose message is a reason fragment fit to show on screen (DESIGN.md §3).</summary>
+public class AudioFailure(string reason, Exception? inner = null) : InvalidOperationException(reason, inner);
+
 /// <summary>
-/// The reason fragment a failure shows in Settings, the flyout, the island and notices (DESIGN.md §3:
-/// errors are fragments). The full exception belongs in the log, never on screen.
+/// The reason fragment a failure shows in Settings, the flyout, the island and notices. Only an
+/// <see cref="AudioFailure"/>'s own text is shown; every other message is diagnostic and stays in the log.
 /// </summary>
 public static class AudioErrors
 {
@@ -16,16 +19,12 @@ public static class AudioErrors
 
     public static string Reason(Exception error) => error switch
     {
+        AudioFailure => error.Message,
         COMException { HResult: DeviceInvalidated } => "Device removed",
         COMException { HResult: DeviceInUse } => "Device in use",
-        COMException or ExternalException => "Device error",
+        ExternalException => "Device error",
         DllNotFoundException or BadImageFormatException or EntryPointNotFoundException => "Noise suppression unavailable",
         UnauthorizedAccessException => "Access denied",
-        _ when IsFragment(error.Message) => error.Message,
         _ => "Audio error",
     };
-
-    // Chippi's own reasons are short and unpunctuated; anything else is diagnostic text.
-    private static bool IsFragment(string message) =>
-        message.Length is > 0 and <= 40 && !message.EndsWith('.') && !message.Contains('{') && !message.Contains(';');
 }

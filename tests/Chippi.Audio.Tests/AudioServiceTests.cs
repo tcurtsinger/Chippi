@@ -83,7 +83,7 @@ public sealed class AudioServiceTests : IAsyncDisposable
         Assert.False(_service.IsRunning);
         Assert.True(_sys.IsDisposed);
         Assert.Same(AudioSnapshot.Empty, _service.Snapshot);
-        await Assert.ThrowsAsync<InvalidOperationException>(_service.RefreshAsync);
+        await Assert.ThrowsAnyAsync<InvalidOperationException>(_service.RefreshAsync);
     }
 
     [Fact]
@@ -210,7 +210,7 @@ public sealed class AudioServiceTests : IAsyncDisposable
         _sys.With(Speaker("A"));
         var lease = service.Acquire();
 
-        var error = await Assert.ThrowsAsync<InvalidOperationException>(service.RefreshAsync);
+        var error = await Assert.ThrowsAnyAsync<InvalidOperationException>(service.RefreshAsync);
         Assert.Equal("Core Audio unavailable", error.InnerException?.Message);
         Assert.False(service.IsRunning);
 
@@ -228,8 +228,8 @@ public sealed class AudioServiceTests : IAsyncDisposable
         var service = new AudioService(() => throw new InvalidOperationException("Core Audio unavailable"), null);
         var lease = service.Acquire();
 
-        await Assert.ThrowsAsync<InvalidOperationException>(service.RefreshAsync);
-        await Assert.ThrowsAsync<InvalidOperationException>(() => service.ClaimRolesAsync(RoleOwner.Routing, AudioFlow.Render, All, List("A")));
+        await Assert.ThrowsAnyAsync<InvalidOperationException>(service.RefreshAsync);
+        await Assert.ThrowsAnyAsync<InvalidOperationException>(() => service.ClaimRolesAsync(RoleOwner.Routing, AudioFlow.Render, All, List("A")));
         Assert.False(service.IsRunning);
         await lease.DisposeAsync();
     }

@@ -81,7 +81,7 @@ internal sealed class RnnoiseSuppressor : ISampleProvider, IDisposable
         _settings = settings;
         _state = RnnoiseNative.rnnoise_create(IntPtr.Zero);
         if (_state == IntPtr.Zero)
-            throw new InvalidOperationException("Noise suppression failed");
+            throw new AudioFailure("Noise suppression failed");
     }
 
     public WaveFormat WaveFormat => _source.WaveFormat;

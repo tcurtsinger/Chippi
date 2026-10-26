@@ -168,7 +168,7 @@ public sealed class MicProcessingModule : IFeatureModule
         try
         {
             if (_context is null || _stopping)
-                throw new InvalidOperationException("Mic processing uninstalled");
+                throw new AudioFailure("Mic processing uninstalled");
             Settings = edit(Settings).Normalized();
             Settings.ApplyTo(_live);
             if (saveNow)

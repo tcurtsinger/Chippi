@@ -165,10 +165,10 @@ public sealed class CoreAudioDeviceSystem : IDeviceSystem, IMMNotificationClient
     private void Raise(DeviceChange change) => Changed?.Invoke(change);
 
     private MMDevice Device(string id) =>
-        _active.TryGetValue(id, out var device) ? device : throw new InvalidOperationException("Device inactive");
+        _active.TryGetValue(id, out var device) ? device : throw new AudioFailure("Device inactive");
 
     private AudioSessionControl Session(string id) =>
-        _sessions.TryGetValue(id, out var tracked) ? tracked.Control : throw new InvalidOperationException("App closed");
+        _sessions.TryGetValue(id, out var tracked) ? tracked.Control : throw new AudioFailure("App closed");
 
     private void Track(string id, MMDevice device)
     {

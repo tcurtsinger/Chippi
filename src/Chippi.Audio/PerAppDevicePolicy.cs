@@ -9,7 +9,7 @@ namespace Chippi.Audio;
 public sealed record AppDeviceChoice(bool Available, string? EndpointId = null, bool HasSession = true);
 
 /// <summary>A policy probe/write failed, distinct from a stale app or endpoint selection.</summary>
-public sealed class AppOutputPolicyException() : InvalidOperationException("App output unavailable");
+public sealed class AppOutputPolicyException() : AudioFailure("App output unavailable");
 
 /// <summary>Optional per-app policy capability. Calls stay on the audio engine thread.</summary>
 public interface IPerAppDeviceSystem
