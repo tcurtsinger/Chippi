@@ -1,6 +1,6 @@
 # Chippi Phase 3 report: Sound
 
-Phase 3 (the Sound group and the island grid) is built and on GitHub at `main` `1e6341c`. Every merge went through a second member's review first. The installers from `fcdb871` are in `build\artifacts\releases\0.1.0` (PR #46, 12/12 hashes checked). Travis's live checks are still to come, so nothing that changes his audio setup has run on real hardware yet. ARM64 is built and packaged but never run.
+Phase 3 (the Sound group and the island grid) is built and on GitHub at `main` `1e6341c`. Every merge went through a second member's review first, except the one-line CI SDK pin (#41). The installers from `fcdb871` are in `build\artifacts\releases\0.1.0` (PR #46, 12/12 hashes checked). Travis's live checks are still to come, so nothing that changes his audio setup has run on real hardware yet. ARM64 is built and packaged but never run.
 
 Brief: [phase-3-handoff.md](phase-3-handoff.md), with [phase-3/architecture.md](phase-3/architecture.md) and [phase-3/behavior-spec.md](phase-3/behavior-spec.md). Phase 3 is PRs #31 to #46.
 
@@ -47,10 +47,10 @@ At `main` `1e6341c`:
 | 0 warnings both platforms; policy tests cover the behavior spec, Hopper's parity table and its three gaps | Done | See Test results. Parity rows on fakes in the Sound and Audio tests (#36, #37). Gaps: `The_pipeline_follows_the_winning_mic`, `Recovery_after_a_crash_puts_back_roles_still_on_the_cable`, `A_real_mic_named_like_the_cable_is_still_a_mic` (`tests/Chippi.Audio.Tests/ProcessingTests.cs`) |
 | Audio routing: higher-priority output switches in, falls back on disconnect, leaves Windows' choice alone with nothing listed; pinned mic stays (AirPods stereo); removed device stays removed | Done in tests, waiting on a live check | Routing tests on fakes (#36). Live: `live-checks.md` Part A steps 2 to 4. Result: pending |
 | Mic processing: cleaned mic through CABLE Output; follows its mic; stop and uninstall restore the real mic; Install Driver states; RNNoise loads on x64 and in CI on ARM64 | Partly | Pipeline, recovery and requirement states in tests (#37); Install Driver states in S7 smoke tests. RNNoise: CI on x64 and ARM64 (#34); a single-file harness with the shipping publish settings loads it from the published layout and processes a frame (#45). Install Driver has never run, and VB-CABLE identity is untested on real hardware. Live: Part B. Result: pending |
-| App volume: volume, mute and output device per app from Settings, flyout and island | Done in tests, waiting on a live check | S4 tests and the S7 smoke test (Settings slider reaches the fake engine; island mixer page). No per-app routing write was made on real hardware. Live: Part A step 5. Result: pending |
+| App volume: volume, mute and output device per app from Settings, flyout and island | Done in tests, waiting on a live check | S4 tests and the S7 smoke test (Settings slider reaches the fake engine; island mixer page). No per-app routing write was made on real hardware. Live: Part A step 5 covers volume and mute; the output picker has no live step yet. Result: pending |
 | Mic mute shortcut: mutes every mic, new mics join, caution glyph on the tab, flyout header shows muted | Done in tests, waiting on a live check | `MicMuteTests`, `MicMuteTabTests`, S7 flyout test. The native hotkey has never been pressed. Live: Part A step 6. Result: pending |
 | Volume boost: works as its spike decided, or deferred with Travis's sign-off | Waiting on Travis | Karl's spike: no-go for now (`X:\code\chippi-scratch\phase-3\boost-gate\findings.md`). Task 19. Decision: pending |
-| Island: grid with tiles only for installed features; pages, orbit buttons and morph; Esc, then after a click Tab, arrows and Enter | Done in tests, waiting on a live check | `IslandPanelTests`, `IslandOrbitTests`, offscreen shots (#40). Clicking in and the keyboard were checked by reading the code only. Live: section 1. Result: pending |
+| Island: grid with tiles only for installed features; pages, orbit buttons and morph; Esc, then after a click Tab, arrows and Enter | Partly | `IslandPanelTests`, `IslandOrbitTests`, offscreen shots (#40). Now Playing lacks its system volume and output picker (see Deviations). Clicking in and the keyboard were checked by reading the code only. Live: section 1. Result: pending |
 | Installer installs, updates in place, uninstalls cleanly; uninstall restores the real mic and never removes VB-CABLE | Partly | Packages built and hash-checked (#46); the x64 portable starts under a dev profile. Update in place: section 1 step 1. Uninstall: Part B step 5 (optional). Result: pending |
 | Hopper: Travis told once Chippi covers it | Waiting on the live checks | Told after Parts A and B pass |
 
@@ -73,6 +73,7 @@ At `main` `1e6341c`:
 
 - S2: the flyout volume slider may tug during a fast drag (check in the live run); the section's own "Sound" heading moves to the tab once more sections arrive.
 - S4: a stale reapply in `RefreshOutputsAsync` skips the remaining apps for that snapshot; the next snapshot retries.
+- S4: a per-app output write that fails partway through its roles can leave the app's roles on different outputs; the picker is then switched off, with no rollback.
 - S5: no crash marker for the mute latch (see Known issues).
 - S5: the test added in `d0fa298` is missing a blank line before the next test.
 - S7: if a cleanup assertion fails, that run's `s7-*` profile folder stays behind.
