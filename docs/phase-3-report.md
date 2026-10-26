@@ -1,8 +1,8 @@
 # Chippi Phase 3 report: Sound
 
-Phase 3 (the Sound group and the island grid) is built and on GitHub at `main` `af2d171`. Every merge went through a second member's review first, except the one-line CI SDK pin (#41). The phase ended with the Surfaces model (#52): the flyout is gone, and every quick control lives on the island's pages. The installers for the live checks are rebuilt from main after it, as `pack/phase-3-d`. Travis's live checks are still to come, so nothing that changes his audio setup has run on real hardware yet. ARM64 is built and packaged but never run.
+Phase 3 (the Sound group and the island grid) is built and on GitHub at `main` `26c311a`. Every merge went through a second member's review first, except the one-line CI SDK pin (#41). The phase ended with the Surfaces model (#52): the flyout is gone, and every quick control lives on the island's pages. The installers for the live checks are rebuilt from main after it, as `pack/phase-3-d`. Travis's live checks are still to come, so nothing that changes his audio setup has run on real hardware yet. ARM64 is built and packaged but never run.
 
-Brief: [phase-3-handoff.md](phase-3-handoff.md), with [phase-3/architecture.md](phase-3/architecture.md) and [phase-3/behavior-spec.md](phase-3/behavior-spec.md). Phase 3 is PRs #31 to #52.
+Brief: [phase-3-handoff.md](phase-3-handoff.md), with [phase-3/architecture.md](phase-3/architecture.md) and [phase-3/behavior-spec.md](phase-3/behavior-spec.md). Phase 3 is PRs #31 to #53.
 
 ## What was built
 
@@ -30,6 +30,7 @@ Brief: [phase-3-handoff.md](phase-3-handoff.md), with [phase-3/architecture.md](
 | #50 | Flaky mic mute test fixed (the test raced the latch's own retry; product unchanged) |
 | #51 | Installers rebuilt after #49 |
 | #52 | Surfaces model (Travis's UI/UX agent, approved 2026-10-26): the flyout is gone and the island's pages are the only quick panel. The tray icon opens them, in the island or docked by the tray while the island is off or hidden; the island tab's right click has Open settings and Quit; Hide tray icon. One Sound tile (Output and Microphone side by side) and one App volume tile (each app's output in its ⋯ menu) replace Output, Microphone and Volume mixer. Island & pet sets tile order, hidden tiles, round buttons and Opens on. Settings is grouped by area: Files, Sound (Output, Microphone, App volume), System, Chippi. Review fixes: a failed pick with switching off releases its claim; a test hang; labels back to #49's wording |
+| #53 | Three labels #52 left: "Live button", "Muted" on the Microphone card, and "No recent files" for File organizer's empty Recent list |
 
 ## How to build and run
 
@@ -40,7 +41,7 @@ Unchanged from the [Phase 1 report](phase-1-report.md#how-to-build-and-run). Add
 
 ## Test results
 
-At `main` `af2d171`:
+At `main` `af2d171` (#53 after it changes three labels only):
 - Release win-x64 and win-arm64 with `--no-incremental`: 0 warnings, 0 errors each.
 - Every test project except UiSmoke: 664 passed, 0 failed (Audio 107, Core 103, Downloads 117, Keep awake 30, Sound 68, Island 92, Notifications 25, Rules 117, Sound smoke 5). Island is 93 in Debug, which adds the shots test. Phase 2.5 ended at 425.
 - CI runs every test project on x64, including the new `Chippi.SoundSmoke`, and builds both platforms. RNNoise's own CI job loads the DLL on x64 and ARM64 runners.
@@ -57,7 +58,7 @@ At `main` `af2d171`:
 | Mic mute shortcut: mutes every mic, new mics join, caution glyph on the tab and the Sound tile | Done in tests, waiting on a live check | `MicMuteTests`, `MicMuteTabTests`, S7 smoke tests. The flyout header named in the brief went with the flyout (#52); the Sound tile shows "Mic muted" instead. The native hotkey has never been pressed. Live: Part A step 9. Result: pending |
 | Volume boost: works as its spike decided, or deferred with Travis's sign-off | Done (deferred) | Deferred with Travis's sign-off (task 21, 2026-10-25) to its own phase, "Volume boost backend" in PLAN.md. See Volume boost below |
 | Island: grid with tiles only for installed features; pages, orbit buttons and morph; Esc, then after a click Tab, arrows and Enter | Done in tests, waiting on a live check | `IslandPanelTests`, `IslandOrbitTests`, `IslandWindowTests` (tray toggle, docked pages), `IslandPetPageTests`, offscreen shots (#40, #52). Now Playing is media only since #52, reversing #47 by Travis's approved design. Clicking in and the keyboard were checked by reading the code only. Live: section 1, which also covers the tray icon, docked pages, Hide tray icon with Quit from the tab, and Keep awake's "Until…" picker. Result: pending |
-| Installer installs, updates in place, uninstalls cleanly; uninstall restores the real mic and never removes VB-CABLE | Partly | Packages built and hash-checked each time (#46, #48, #51); the x64 portable starts under a dev profile. Rebuild after #52: `pack/phase-3-d`. Update in place: section 1 step 1. Uninstall with the cable as default mic: Part B step 6 (optional). Result: pending |
+| Installer installs, updates in place, uninstalls cleanly; uninstall restores the real mic and never removes VB-CABLE | Partly | Packages built and hash-checked each time (#46, #48, #51); the x64 portable starts under a dev profile. Rebuild after #52 and #53: `pack/phase-3-d` (`a4511eb`, 12/12 hashes checked). Update in place: section 1 step 1. Uninstall with the cable as default mic: Part B step 6 (optional). Result: pending |
 | Hopper: Travis told once Chippi covers it | Waiting on the live checks | Told after Parts A and B pass |
 
 ## Deviations from DESIGN.md
