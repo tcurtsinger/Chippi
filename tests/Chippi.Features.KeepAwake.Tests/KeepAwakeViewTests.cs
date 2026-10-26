@@ -4,6 +4,7 @@
 using System.Windows.Automation.Peers;
 using System.Windows.Automation.Provider;
 using System.Windows.Controls.Primitives;
+using System.Windows.Threading;
 using Chippi.Core.Config;
 using Chippi.Core.Island;
 using Chippi.Core.Modules;
@@ -29,14 +30,14 @@ public sealed class KeepAwakeViewTests
         try
         {
             await registry.StartAsync();
-            await OnSta(() =>
+            await OnSta(async () =>
             {
                 var button = view == "island" ? Chip(new KeepAwakeIslandView(module), "1 hr")! : (ToggleButton)new KeepAwakePage(module).FindName("Switch");
                 var toggle = (IToggleProvider)new ToggleButtonAutomationPeer(button);
                 toggle.Toggle();
-                Assert.True(SpinWait.SpinUntil(() => module.IsOn, TimeSpan.FromSeconds(5)));
+                await Until(() => module.IsOn && button.IsChecked == true); // the view shows it on, as a user would see
                 toggle.Toggle();
-                Assert.True(SpinWait.SpinUntil(() => !module.IsOn, TimeSpan.FromSeconds(5)));
+                await Until(() => !module.IsOn);
             });
         }
         finally
@@ -50,13 +51,31 @@ public sealed class KeepAwakeViewTests
         root is ToggleButton { Content: string text } chip && text == label ? chip
         : System.Windows.LogicalTreeHelper.GetChildren(root).OfType<System.Windows.DependencyObject>().Select(c => Chip(c, label)).FirstOrDefault(c => c is not null);
 
-    private static Task OnSta(Action action)
+    private static async Task Until(Func<bool> condition)
+    {
+        var until = DateTime.UtcNow.AddSeconds(5);
+        while (!condition())
+        {
+            Assert.True(DateTime.UtcNow < until, "Keep awake did not change after the toggle.");
+            await Task.Delay(10);
+        }
+    }
+
+    /// <summary>Runs on an STA thread whose dispatcher pumps, so the views' queued refreshes run while the test waits.</summary>
+    private static Task OnSta(Func<Task> action)
     {
         var done = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var thread = new Thread(() =>
         {
-            try { action(); done.SetResult(); }
-            catch (Exception ex) { done.SetException(ex); }
+            var dispatcher = Dispatcher.CurrentDispatcher;
+            SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(dispatcher));
+            dispatcher.BeginInvoke(async () =>
+            {
+                try { await action(); done.SetResult(); }
+                catch (Exception ex) { done.SetException(ex); }
+                finally { dispatcher.BeginInvokeShutdown(DispatcherPriority.Background); }
+            });
+            Dispatcher.Run();
         });
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();
