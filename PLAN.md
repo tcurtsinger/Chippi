@@ -62,7 +62,7 @@ build brief is [docs/phase-1-handoff.md](docs/phase-1-handoff.md).
   - First, test the untried no-driver ways of silencing an app.
   - Then evaluate a dedicated virtual audio device and a render audio plugin (APO).
   - Cost each route: signing, ARM64, installer, crash recovery.
-  - Findings so far: `X:\code\chippi-scratch\phase-3\boost-gate\findings.md` (Karl's gate) and `X:\code\chippi-scratch\phase-3\boost-experiment\findings.md` (route 1 experiment).
+  - Findings so far: [docs/phase-3/boost-gate.md](docs/phase-3/boost-gate.md) (Karl's gate) and [docs/phase-3/boost-experiment.md](docs/phase-3/boost-experiment.md) (route 1 experiment).
 
 ### Phase 2: Downloads organizer (Mouzi-style)
 Brief: [docs/phase-2-handoff.md](docs/phase-2-handoff.md). In progress since 2026-10-22.
