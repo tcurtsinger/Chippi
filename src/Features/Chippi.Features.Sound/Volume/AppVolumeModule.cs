@@ -102,7 +102,7 @@ public sealed class AppVolumeModule(AudioService? audio = null) : IFeatureModule
     {
         if ((target ?? Output) is not { } output) throw new AudioFailure("No output");
         var failed = await _audio!.SetEndpointMuteAsync([output.Id], muted);
-        if (failed.Count > 0) throw new AudioFailure("Couldn't mute output");
+        if (failed.Count > 0) throw new AudioFailure("Mute failed");
     });
 
     public Task SetOutputAsync(AppKey app, string? id) => Change(async () =>

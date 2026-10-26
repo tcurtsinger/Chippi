@@ -35,7 +35,7 @@ public sealed class MicMuteModule : IFeatureModule
         _tone = tone ?? (muted => { if (muted) SystemSounds.Hand.Play(); else SystemSounds.Asterisk.Play(); });
     }
 
-    public FeatureDescriptor Descriptor { get; } = new(Id, "Mic mute shortcut", "One shortcut for every mic", FeatureGroup.Sound)
+    public FeatureDescriptor Descriptor { get; } = new(Id, "Mic mute shortcut", "Hotkey for all microphones", FeatureGroup.Sound)
     {
         Icon = "MicOff", Requires = [Capability.InputHooks], Presets = PresetMembership.Audio | PresetMembership.PowerUser,
         Badges = [FeatureBadge.Overlap("Overlaps Win+Alt+K")],
