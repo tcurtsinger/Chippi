@@ -208,10 +208,16 @@ public sealed class SoundShellTests
             panel.ShowPage("now-playing");
             Assert.Single(All<NowPlayingView>(host));
 
-            // System volume is the Output page's control on the same engine state.
+            // System volume and mute act on the default output, even with the Volume mixer showing another.
+            scene.Volume.ViewOutput("headphones");
+            var headphones = scene.Devices.GetLevel("headphones");
             var volume = Named<Slider>(host, "System volume");
             ((IRangeValueProvider)new SliderAutomationPeer(volume).GetPattern(PatternInterface.RangeValue)).SetValue(40);
             await SmokeDispatcher.Until(() => Math.Abs(scene.Devices.GetLevel("speakers").Volume - .4f) < .001);
+            Invoke(Named<IconButton>(host, "Mute System"));
+            await SmokeDispatcher.Until(() => scene.Devices.GetLevel("speakers").Muted);
+            Assert.Equal(headphones, scene.Devices.GetLevel("headphones"));
+            scene.Volume.ViewOutput(null);
 
             // The output picker is the flyout's: choosing an output puts it first in routing's list.
             Named<ComboBox>(host, "Preferred output").SelectedValue = "headphones";
