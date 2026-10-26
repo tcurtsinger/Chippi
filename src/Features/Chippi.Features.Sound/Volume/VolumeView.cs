@@ -62,8 +62,8 @@ public sealed class VolumeView : UserControl
         if (_surface == VolumeSurface.Settings)
         {
             _root.Children.Add(RoutingUi.Card(
-                new SettingRow { Header = "Show apps that aren't playing", Content = RoutingUi.Switch("Show apps that aren't playing", _module.Settings.ShowQuietApps, on => Run(_module.SetShowQuietAsync(on))) },
-                new SettingRow { Header = "Remember each app's output", Content = RoutingUi.Switch("Remember each app's output", _module.Settings.RememberOutputs, on => Run(_module.SetRememberAsync(on))) }));
+                new SettingRow { Header = "Inactive apps", Content = RoutingUi.Switch("Inactive apps", _module.Settings.ShowQuietApps, on => Run(_module.SetShowQuietAsync(on))) },
+                new SettingRow { Header = "Saved app outputs", Content = RoutingUi.Switch("Saved app outputs", _module.Settings.RememberOutputs, on => Run(_module.SetRememberAsync(on))) }));
         }
         else
         {

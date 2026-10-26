@@ -53,7 +53,7 @@ public sealed class MicMuteView : UserControl
         shortcut.Children.Add(change);
         _body.Children.Add(RoutingUi.Card(
             new SettingRow { Header = "Shortcut", Content = shortcut },
-            new SettingRow { Header = "Sound on mute", Content = RoutingUi.Switch("Sound on mute", _module.Settings.PlaySound, _module.SetPlaySound) }));
+            new SettingRow { Header = "Sound feedback", Content = RoutingUi.Switch("Sound feedback", _module.Settings.PlaySound, _module.SetPlaySound) }));
         if (_module.ShortcutError is { } shortcutError) Error(shortcutError);
         if (_module.Error is { } error) Error(error);
     }

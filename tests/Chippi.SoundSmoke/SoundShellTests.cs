@@ -69,7 +69,7 @@ public sealed class SoundShellTests
             Assert.Equal("page:sound-output", settings.CurrentPage);
             Assert.Single(All<RoutingPage>(settings.PageContent));
             var calls = scene.Routing.Settings.Output.Calls;
-            Toggle(Named<ToggleButton>(settings.PageContent, "Calls use it too"));
+            Toggle(Named<ToggleButton>(settings.PageContent, "Communications device"));
             await SmokeDispatcher.Until(() => scene.Routing.Settings.Output.Calls != calls);
             Assert.NotNull(Named<ToggleButton>(settings.PageContent, "Priority switching"));
 
@@ -80,13 +80,13 @@ public sealed class SoundShellTests
             Assert.Single(All<ProcessingPage>(settings.PageContent));
             Assert.Single(All<MicMuteView>(settings.PageContent));
             Assert.Equal(["Mic in use", "Clean-up", "Mute shortcut"], Texts(settings.PageContent).Where(t => t is "Mic in use" or "Clean-up" or "Mute shortcut").Distinct());
-            Assert.NotNull(Named<ToggleButton>(settings.PageContent, "Pin my mic"));
+            Assert.NotNull(Named<ToggleButton>(settings.PageContent, "Priority switching"));
             Toggle(Named<ToggleButton>(settings.PageContent, "Clean-up"));
             await SmokeDispatcher.Until(() => scene.Pipelines.Live is not null);
             Assert.Equal("desk", scene.Pipelines.Live!.Source);
             Assert.DoesNotContain(All<Button>(settings.PageContent), b => AutomationProperties.GetName(b) == "Mute all microphones"); // muting is the Sound page's
             var tone = scene.Mute.Settings.PlaySound;
-            Toggle(Named<ToggleButton>(settings.PageContent, "Sound on mute"));
+            Toggle(Named<ToggleButton>(settings.PageContent, "Sound feedback"));
             Assert.NotEqual(tone, scene.Mute.Settings.PlaySound);
 
             settings.Navigate("module:mic-processing");
@@ -97,7 +97,7 @@ public sealed class SoundShellTests
             Assert.Single(All<VolumeView>(settings.PageContent));
             Assert.Empty(All<Slider>(settings.PageContent));
             var quiet = scene.Volume.Settings.ShowQuietApps;
-            Toggle(Named<ToggleButton>(settings.PageContent, "Show apps that aren't playing"));
+            Toggle(Named<ToggleButton>(settings.PageContent, "Inactive apps"));
             await SmokeDispatcher.Until(() => scene.Volume.Settings.ShowQuietApps != quiet);
         }
         finally { settings.Close(); }

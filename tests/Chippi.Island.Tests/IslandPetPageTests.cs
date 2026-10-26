@@ -6,7 +6,6 @@ using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Automation.Peers;
 using System.Windows.Automation.Provider;
-using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using Chippi.App.Settings.Pages;
 using Chippi.App.Shell;
@@ -19,23 +18,20 @@ namespace Chippi.Island.Tests;
 public sealed class IslandPetPageTests
 {
     [Fact]
-    public void Hide_tray_icon_needs_the_island_and_says_how_to_get_the_icon_back()
+    public void Hide_tray_icon_needs_the_island()
     {
         WpfTestThread.Run(() => WithPage((page, config) =>
         {
             var island = Named<ToggleButton>(page, "Island");
             var hide = Named<ToggleButton>(page, "Hide tray icon");
             Assert.True(hide.IsEnabled);
-            Assert.DoesNotContain("To get it back, start Chippi from Start", Visible(page));
 
             Toggle(hide);
             Assert.True(Read(config).HideTrayIcon);
-            Assert.Contains("To get it back, start Chippi from Start", Visible(page));
 
             Toggle(island);
             Assert.False(Read(config).IslandEnabled);
             Assert.False(hide.IsEnabled); // the tray icon is the only way in while the island is off
-            Assert.DoesNotContain("To get it back, start Chippi from Start", Visible(page));
         }));
     }
 
@@ -70,9 +66,6 @@ public sealed class IslandPetPageTests
 
     private static T Named<T>(DependencyObject root, string name) where T : DependencyObject =>
         Assert.Single(All<T>(root), e => AutomationProperties.GetName(e) == name);
-
-    private static IEnumerable<string> Visible(DependencyObject root) =>
-        All<TextBlock>(root).Where(t => t.Visibility == Visibility.Visible).Select(t => t.Text);
 
     private static IEnumerable<T> All<T>(DependencyObject root) where T : DependencyObject
     {

@@ -86,7 +86,7 @@ internal sealed class IslandPetPage : UserControl
 
     /// <summary>
     /// Island, and Hide tray icon, which only applies while the island is on: the island is then
-    /// the only way in, and a note says how to get the icon back.
+    /// the only way in.
     /// </summary>
     private Border[] DoorRows(AppSettings app)
     {
@@ -94,27 +94,14 @@ internal sealed class IslandPetPage : UserControl
         AutomationProperties.SetName(island, "Island");
         var hide = SettingsUi.Switch(app.HideTrayIcon);
         AutomationProperties.SetName(hide, "Hide tray icon");
-        var note = SettingsUi.Message();
-        void Refresh()
-        {
-            hide.IsEnabled = island.IsChecked == true;
-            if (island.IsChecked == true && hide.IsChecked == true)
-                SettingsUi.Show(note, "To get it back, start Chippi from Start", false);
-            else
-                note.Visibility = Visibility.Collapsed;
-        }
+        hide.IsEnabled = island.IsChecked == true;
         SettingsUi.OnSwitched(island, on =>
         {
             Save(s => s.IslandEnabled = on);
-            Refresh();
+            hide.IsEnabled = on;
         });
-        SettingsUi.OnSwitched(hide, on =>
-        {
-            Save(s => s.HideTrayIcon = on);
-            Refresh();
-        });
-        Refresh();
-        return [SettingsUi.Row("Island", "", island), SettingsUi.Row("Hide tray icon", "", hide, note)];
+        SettingsUi.OnSwitched(hide, on => Save(s => s.HideTrayIcon = on));
+        return [SettingsUi.Row("Island", "", island), SettingsUi.Row("Hide tray icon", "", hide)];
     }
 
     private Border OpensOnRow(AppSettings app)

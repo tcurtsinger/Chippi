@@ -191,9 +191,12 @@ public sealed class AudioRoutingModule : IFeatureModule
     /// <summary>Points the flow's roles at <paramref name="id"/> once: claimed, applied, then released to Windows.</summary>
     private async Task PickOnceAsync(AudioFlow flow, string id, bool calls)
     {
-        await _audio!.ClaimRolesAsync(RoleOwner.Routing, flow, calls ? AllRoles : WithoutCalls,
-            active => active.FirstOrDefault(e => Eq(e.Id, id))?.Id);
-        await _audio.ReleaseRolesAsync(RoleOwner.Routing, flow);
+        try
+        {
+            await _audio!.ClaimRolesAsync(RoleOwner.Routing, flow, calls ? AllRoles : WithoutCalls,
+                active => active.FirstOrDefault(e => Eq(e.Id, id))?.Id);
+        }
+        finally { await _audio!.ReleaseRolesAsync(RoleOwner.Routing, flow); } // a failed pick must not leave switching on
     }
 
     private async void OnSnapshot(object? sender, AudioSnapshot snapshot)

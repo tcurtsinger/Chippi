@@ -86,8 +86,9 @@ public sealed class RoutingUiTests
             Assert.Equal(["Mute system volume", "A, in use", "Use B"], rows); // the card's mute, then connected outputs only
             var pick = Descendants(page).OfType<System.Windows.Controls.Button>().Single(b => AutomationProperties.GetName(b) == "Use B");
             ((IInvokeProvider)new ButtonAutomationPeer(pick)).Invoke();
-            await Until(() => f.System.DefaultOf(AudioFlow.Render, AudioRole.Multimedia) == "B");
+            await Until(() => !Descendants(page).Contains(pick)); // rebuilt once the pick has finished
         });
+        Assert.Equal("B", f.System.DefaultOf(AudioFlow.Render, AudioRole.Multimedia));
         Assert.Equal("B", f.Module.Settings.Output.Devices[0].Id);
         Assert.False(f.Module.Settings.Output.Enabled); // the pick is set once; switching stays off
         f.System.ChangeDefault("A");

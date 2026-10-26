@@ -39,13 +39,11 @@ public sealed class RoutingPage : UserControl
         _body.Children.Clear();
         _handles.Clear();
         var list = _module.Settings.For(_flow);
-        // The mic's switch keeps the top mic in use however something else changes it: "Pin my mic".
-        string switching = _flow == AudioFlow.Render ? "Priority switching" : "Pin my mic";
-        var toggle = RoutingUi.Switch(switching, list.Enabled, enabled => Run(_module.SetEnabledAsync(_flow, enabled)));
-        var calls = RoutingUi.Switch("Calls use it too", list.Calls, on => Run(_module.SetCallsAsync(_flow, on)));
+        var toggle = RoutingUi.Switch("Priority switching", list.Enabled, enabled => Run(_module.SetEnabledAsync(_flow, enabled)));
+        var calls = RoutingUi.Switch("Communications device", list.Calls, on => Run(_module.SetCallsAsync(_flow, on)));
         _body.Children.Add(RoutingUi.Card(
-            new SettingRow { Header = switching, Content = toggle },
-            new SettingRow { Header = "Calls use it too", Content = calls }));
+            new SettingRow { Header = "Priority switching", Content = toggle },
+            new SettingRow { Header = "Communications device", Content = calls }));
         if (_module.Error is { } error)
         {
             var text = RoutingUi.Text(error, "CaptionTextStyle", "WarningTextBrush");

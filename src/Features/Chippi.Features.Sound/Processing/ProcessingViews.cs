@@ -170,10 +170,10 @@ public sealed class ProcessingPage : UserControl
             Level("Threshold", ProcessingSettings.GateRange, s.GateDb, db => Stages(x => x with { GateDb = db }), s.Gate),
             new SettingRow { Header = "Auto gain", Content = RoutingUi.Switch("Auto gain", s.Agc, on => Stages(x => x with { Agc = on })) },
             Level("Target level", ProcessingSettings.TargetRange, s.TargetDb, db => Stages(x => x with { TargetDb = db }), s.Agc),
-            Level("Most it can raise", ProcessingSettings.MaxGainRange, s.MaxGainDb, db => Stages(x => x with { MaxGainDb = db }), s.Agc),
-            new SettingRow { Header = "Use as default mic", Content = RoutingUi.Switch("Use as default mic", s.SetDefault, on => Run(_module.SetDefaultMicAsync(on))) });
+            Level("Max gain", ProcessingSettings.MaxGainRange, s.MaxGainDb, db => Stages(x => x with { MaxGainDb = db }), s.Agc),
+            new SettingRow { Header = "Default device", Content = RoutingUi.Switch("Default device", s.SetDefault, on => Run(_module.SetDefaultMicAsync(on))) });
         if (s.Source != ProcessingSettings.PinnedSource)
-            cleanup.Children.Add(new SettingRow { Header = "Mic to clean up", Content = SourcePicker() });
+            cleanup.Children.Add(new SettingRow { Header = "Input device", Content = SourcePicker() });
         _body.Children.Add(cleanup);
         // Only what needs attention: a failure, or clean-up that stopped.
         if ((_module.Error ?? (_module.Status.State == ProcessingState.Stopped ? _module.StatusText : null)) is { } problem)
@@ -224,13 +224,13 @@ public sealed class ProcessingPage : UserControl
 
     private ComboBox SourcePicker()
     {
-        var items = new List<KeyValuePair<string, string>> { new(ProcessingSettings.PinnedSource, "Mic in use") };
+        var items = new List<KeyValuePair<string, string>> { new(ProcessingSettings.PinnedSource, "Highest priority") };
         items.AddRange(_module.Sources.Select(e => new KeyValuePair<string, string>(e.Id, e.Name)));
         if (_module.Settings.Source != ProcessingSettings.PinnedSource && items.All(i => i.Key != _module.Settings.Source))
             items.Add(new(_module.Settings.Source, "Not connected"));
         var combo = new ComboBox { MinWidth = 180, ItemsSource = items, DisplayMemberPath = "Value", SelectedValuePath = "Key", SelectedValue = _module.Settings.Source };
         combo.SetResourceReference(StyleProperty, "HopperComboBoxStyle");
-        AutomationProperties.SetName(combo, "Mic to clean up");
+        AutomationProperties.SetName(combo, "Input device");
         combo.SelectionChanged += (_, _) =>
         {
             if (combo.SelectedValue is string id && id != _module.Settings.Source)

@@ -101,6 +101,22 @@ public sealed class RoutingTests
         Assert.Equal("B", f.System.DefaultOf(AudioFlow.Render, AudioRole.Multimedia));
     }
 
+    [Fact]
+    public async Task A_failed_pick_with_switching_off_leaves_the_device_to_windows()
+    {
+        await using var f = new RoutingFixture();
+        f.System.With(Speaker("A"), Speaker("B")).WithDefault("A");
+        await f.Start();
+        await f.Module.SetEnabledAsync(AudioFlow.Render, false);
+        var before = f.System.Enumerations;
+        await f.Audio.RefreshAsync();
+        f.System.ReadsBeforeFailure = f.System.Enumerations - before; // the pick's release passes, then its claim fails
+        await Assert.ThrowsAnyAsync<Exception>(() => f.Module.PreferAsync(AudioFlow.Render, "B"));
+        Assert.Null(f.System.ReadsBeforeFailure);
+        await f.Audio.RefreshAsync();
+        Assert.Equal("A", f.System.DefaultOf(AudioFlow.Render, AudioRole.Multimedia)); // Routing let go of the roles
+    }
+
     [Theory]
     [InlineData(AudioFlow.Render)]
     [InlineData(AudioFlow.Capture)]
