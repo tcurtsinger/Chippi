@@ -30,7 +30,7 @@ public sealed record ProcessingSettings
     /// <summary><see cref="PinnedSource"/>, or one mic's endpoint ID.</summary>
     public string Source { get; init; } = PinnedSource;
 
-    /// <summary>"Make it the default mic": CABLE Output takes the capture roles while live.</summary>
+    /// <summary>"Default device": CABLE Output takes the capture roles while live.</summary>
     public bool SetDefault { get; init; } = true;
 
     // The mockup's slider ranges (behavior spec, Main:851-853).

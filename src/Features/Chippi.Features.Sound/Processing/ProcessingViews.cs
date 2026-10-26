@@ -182,14 +182,14 @@ public sealed class ProcessingPage : UserControl
         if (s.Agc)
         {
             cleanup.Children.Add(Level("Target level", ProcessingSettings.TargetRange, s.TargetDb, db => Stages(x => x with { TargetDb = db })));
-            cleanup.Children.Add(Level("Most it can raise", ProcessingSettings.MaxGainRange, s.MaxGainDb, db => Stages(x => x with { MaxGainDb = db })));
+            cleanup.Children.Add(Level("Max gain", ProcessingSettings.MaxGainRange, s.MaxGainDb, db => Stages(x => x with { MaxGainDb = db })));
         }
         _body.Children.Add(cleanup);
 
         _body.Children.Add(RoutingUi.Section("Options"));
         _body.Children.Add(RoutingUi.Card(
-            new SettingRow { Header = "Microphone", Content = SourcePicker() },
-            new SettingRow { Header = "Make it the default mic", Content = RoutingUi.Switch("Make it the default mic", s.SetDefault, on => Run(_module.SetDefaultMicAsync(on))) }));
+            new SettingRow { Header = "Input device", Content = SourcePicker() },
+            new SettingRow { Header = "Default device", Content = RoutingUi.Switch("Default device", s.SetDefault, on => Run(_module.SetDefaultMicAsync(on))) }));
     }
 
     private FrameworkElement Meters()
@@ -216,7 +216,7 @@ public sealed class ProcessingPage : UserControl
                 grid.Children.Add(child);
             }
         }
-        AutomationProperties.SetName(grid, "Level before and after clean-up");
+        AutomationProperties.SetName(grid, "Input and output level");
         return grid;
     }
 
@@ -230,13 +230,13 @@ public sealed class ProcessingPage : UserControl
 
     private ComboBox SourcePicker()
     {
-        var items = new List<KeyValuePair<string, string>> { new(ProcessingSettings.PinnedSource, "Pinned mic") };
+        var items = new List<KeyValuePair<string, string>> { new(ProcessingSettings.PinnedSource, "Highest priority") };
         items.AddRange(_module.Sources.Select(e => new KeyValuePair<string, string>(e.Id, e.Name)));
         if (_module.Settings.Source != ProcessingSettings.PinnedSource && items.All(i => i.Key != _module.Settings.Source))
             items.Add(new(_module.Settings.Source, "Not connected"));
         var combo = new ComboBox { MinWidth = 180, ItemsSource = items, DisplayMemberPath = "Value", SelectedValuePath = "Key", SelectedValue = _module.Settings.Source };
         combo.SetResourceReference(StyleProperty, "HopperComboBoxStyle");
-        AutomationProperties.SetName(combo, "Microphone");
+        AutomationProperties.SetName(combo, "Input device");
         combo.SelectionChanged += (_, _) =>
         {
             if (combo.SelectedValue is string id && id != _module.Settings.Source)
@@ -267,13 +267,13 @@ public sealed class ProcessingQuickView : UserControl
     {
         _module = module;
         _island = island;
-        _switch = RoutingUi.Switch("Mic clean-up", module.Settings.Enabled, on =>
+        _switch = RoutingUi.Switch("Mic processing", module.Settings.Enabled, on =>
         {
             if (!_refreshing)
                 ProcessingUi.Run(_module.SetEnabledAsync(on), Refresh);
         });
         var labels = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
-        labels.Children.Add(RoutingUi.Text(island ? "Clean-up" : "Mic clean-up"));
+        labels.Children.Add(RoutingUi.Text(island ? "Clean-up" : "Mic processing"));
         labels.Children.Add(_status);
         var row = RoutingUi.Columns(new(1, GridUnitType.Star), GridLength.Auto);
         RoutingUi.Add(row, labels, 0);

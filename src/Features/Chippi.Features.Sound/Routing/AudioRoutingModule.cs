@@ -36,7 +36,7 @@ public sealed class AudioRoutingModule : IFeatureModule
     }
 
     public FeatureDescriptor Descriptor { get; } = new("audio-routing", "Audio routing",
-        "Switches outputs by priority and keeps your mic pinned when devices change", FeatureGroup.Sound)
+        "Default output and mic by priority", FeatureGroup.Sound)
     {
         Icon = "Headphones",
         Presets = PresetMembership.Audio | PresetMembership.PowerUser,
@@ -71,7 +71,7 @@ public sealed class AudioRoutingModule : IFeatureModule
             await EnforceAsync(AudioFlow.Capture);
             context.Notifier.Declare([
                 new("output-switched", "Output switched", NoticePlaces.Island),
-                new("mic-pinned", "Mic pinned again", NoticePlaces.None),
+                new("mic-pinned", "Microphone switched", NoticePlaces.None),
             ]);
             _outputTile = context.Ui.AddIslandTile(new(OutputTile, "Output", "Headphones", 20, 0,
                 () => new RoutingQuickView(this, AudioFlow.Render, island: true)));
@@ -129,7 +129,7 @@ public sealed class AudioRoutingModule : IFeatureModule
     public Task AddAsync(AudioFlow flow, string id) => EditAsync(flow, list =>
     {
         var device = Snapshot.Known(flow).FirstOrDefault(e => Eq(e.Id, id) && !_excluded(e))
-            ?? throw new ArgumentException("Device unavailable");
+            ?? throw new AudioFailure("Device unavailable");
         if (list.Devices.Any(e => Eq(e.Id, id))) return list;
         return list with
         {
@@ -169,7 +169,7 @@ public sealed class AudioRoutingModule : IFeatureModule
         await _gate.WaitAsync();
         try
         {
-            if (_context is null || _stopping) throw new InvalidOperationException("Audio routing uninstalled");
+            if (_context is null || _stopping) throw new AudioFailure("Audio routing uninstalled");
             var settings = Settings.With(flow, edit(Settings.For(flow)));
             settings.Validate();
             _context.Settings.Save(settings);
@@ -178,7 +178,7 @@ public sealed class AudioRoutingModule : IFeatureModule
             Error = null;
             UpdateTiles();
         }
-        catch (Exception ex) { Error = ex.Message; throw; }
+        catch (Exception ex) { Error = AudioErrors.Reason(ex); throw; }
         finally { _gate.Release(); Changed?.Invoke(); }
     }
 
@@ -198,7 +198,7 @@ public sealed class AudioRoutingModule : IFeatureModule
             }
             UpdateTiles();
         }
-        catch (Exception ex) { Error = ex.Message; _context?.Logger.LogWarning(ex, "Refreshing audio routing failed"); }
+        catch (Exception ex) { Error = AudioErrors.Reason(ex); _context?.Logger.LogWarning(ex, "Refreshing audio routing failed"); }
         finally { _gate.Release(); Changed?.Invoke(); }
     }
 
@@ -209,13 +209,13 @@ public sealed class AudioRoutingModule : IFeatureModule
         if (change.Flow == AudioFlow.Render && change.Roles.Contains(AudioRole.Multimedia))
             _context.Notifier.Show(new("output-switched", "Output switched") { Body = name, IslandKind = IslandActivityKind.Status });
         else if (change.Flow == AudioFlow.Capture && change.Kind == RoleChangeKind.Repair)
-            _context.Notifier.Show(new("mic-pinned", "Mic pinned again") { Body = name, IslandKind = IslandActivityKind.Status });
+            _context.Notifier.Show(new("mic-pinned", "Microphone switched") { Body = name, IslandKind = IslandActivityKind.Status });
     }
 
     public async Task SetOutputVolumeAsync(string id, float volume)
     {
         try { await _audio!.SetEndpointVolumeAsync(id, volume); Error = null; }
-        catch (Exception ex) { Error = ex.Message; throw; }
+        catch (Exception ex) { Error = AudioErrors.Reason(ex); throw; }
         finally { Changed?.Invoke(); }
     }
 

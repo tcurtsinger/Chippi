@@ -62,7 +62,7 @@ public sealed class VbCableRequirement : IFeatureRequirement
             var setup = await Task.Run(_prepare, ct);
             int? exit;
             try { exit = await _setup.RunAsync(setup, ct); }
-            catch (Win32Exception ex) { throw new InvalidOperationException("Couldn't start driver setup", ex); }
+            catch (Win32Exception ex) { throw new AudioFailure("Driver setup failed", ex); }
             if (exit is not null)
             {
                 // The exit code is logged by the caller, not trusted: the devices decide.

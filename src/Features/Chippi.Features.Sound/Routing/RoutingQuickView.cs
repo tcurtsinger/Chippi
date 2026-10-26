@@ -163,11 +163,11 @@ public sealed class RoutingQuickView : UserControl
             _root.Children.Add(button);
         }
         if (_module.Settings.For(flow).Devices.Count == 0) _root.Children.Add(RoutingUi.Text("No devices"));
-        var toggle = RoutingUi.Switch(flow == AudioFlow.Render ? "Switch by priority" : "Pin my microphone", _module.Settings.For(flow).Enabled,
+        var toggle = RoutingUi.Switch("Priority switching", _module.Settings.For(flow).Enabled,
             on => Run(_module.SetEnabledAsync(flow, on)));
         var footer = RoutingUi.Columns(new(1, GridUnitType.Star), GridLength.Auto);
         footer.Margin = new Thickness(0, 12, 0, 0);
-        RoutingUi.Add(footer, RoutingUi.Text(flow == AudioFlow.Render ? "Switch by priority" : "Pin my microphone"), 0);
+        RoutingUi.Add(footer, RoutingUi.Text("Priority switching"), 0);
         RoutingUi.Add(footer, toggle, 1);
         _root.Children.Add(footer);
         if (_module.Error is { } error) _root.Children.Add(RoutingUi.Text(error, "CaptionTextStyle", "WarningTextBrush"));

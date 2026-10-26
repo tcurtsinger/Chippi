@@ -9,6 +9,7 @@ using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text.Json;
+using Chippi.Audio;
 
 namespace Chippi.Features.Sound.Processing;
 
@@ -22,7 +23,7 @@ public sealed record VbCablePin(string Url, string File, long Bytes, string Sha2
 }
 
 /// <summary>The package is missing, altered, or its setup isn't signed by the pinned VB-Audio signer.</summary>
-public sealed class DriverPackageException(string message) : Exception(message);
+public sealed class DriverPackageException(string message) : AudioFailure(message);
 
 /// <summary>
 /// VB-CABLE as Chippi ships it: the unmodified zip and its pin in <c>vendor\vb-cable</c> next to

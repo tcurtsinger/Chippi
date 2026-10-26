@@ -35,7 +35,7 @@ public sealed class MicMuteModule : IFeatureModule
         _tone = tone ?? (muted => { if (muted) SystemSounds.Hand.Play(); else SystemSounds.Asterisk.Play(); });
     }
 
-    public FeatureDescriptor Descriptor { get; } = new(Id, "Mic mute shortcut", "One shortcut mutes your mic in every app", FeatureGroup.Sound)
+    public FeatureDescriptor Descriptor { get; } = new(Id, "Mic mute shortcut", "Hotkey for all microphones", FeatureGroup.Sound)
     {
         Icon = "MicOff", Requires = [Capability.InputHooks], Presets = PresetMembership.Audio | PresetMembership.PowerUser,
         Badges = [FeatureBadge.Overlap("Overlaps Win+Alt+K")],
@@ -93,12 +93,12 @@ public sealed class MicMuteModule : IFeatureModule
         {
             if (_stopping || _lease is null) return;
             await _audio!.ToggleMicrophoneMuteAsync();
-            Error = Status.Failed.Count > 0 ? "Some microphones could not be changed" : null;
+            Error = Status.Failed.Count > 0 ? "Some microphones failed" : null;
             if (Error is null && Settings.PlaySound && Status.State is MicrophoneMuteState.Muted or MicrophoneMuteState.Live)
                 _tone(Status.State == MicrophoneMuteState.Muted);
             UpdateState();
         }
-        catch (Exception ex) { Error = ex.Message; Changed?.Invoke(); throw; }
+        catch (Exception ex) { Error = AudioErrors.Reason(ex); Changed?.Invoke(); throw; }
         finally { _gate.Release(); }
     }
 

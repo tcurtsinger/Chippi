@@ -67,7 +67,7 @@ public sealed class VolumeTests
         try { pick = f.Module.SetOutputAsync(VolumeFixture.Key, "B"); }
         finally { release.Set(); }
         await closing;
-        await Assert.ThrowsAsync<InvalidOperationException>(() => pick);
+        await Assert.ThrowsAnyAsync<InvalidOperationException>(() => pick);
         f.System.WithSession(VolumeFixture.Session("again", "A", 130));
         await f.Audio.RefreshAsync();
         await Task.Delay(300);
@@ -82,7 +82,7 @@ public sealed class VolumeTests
         await f.Start();
         f.System.Remove("B");
         await f.Audio.RefreshAsync();
-        await Assert.ThrowsAsync<InvalidOperationException>(() => f.Module.SetOutputAsync(VolumeFixture.Key, "B"));
+        await Assert.ThrowsAnyAsync<InvalidOperationException>(() => f.Module.SetOutputAsync(VolumeFixture.Key, "B"));
         await Task.Delay(300);
         Assert.True(f.Module.DevicePickerAvailable, "picker gone for the session after an output was unplugged");
     }
@@ -191,7 +191,7 @@ public sealed class VolumeTests
         Assert.False(f.Module.DevicePickerAvailable);
         await f.Module.SetVolumeAsync(VolumeFixture.Key,0.3f); await f.Module.SetMutedAsync(VolumeFixture.Key,true);
         Assert.Equal((0.3f,true),(f.System.SessionById("one").Volume,f.System.SessionById("one").Muted));
-        await Assert.ThrowsAsync<InvalidOperationException>(()=>f.Module.SetOutputAsync(VolumeFixture.Key,"B"));
+        await Assert.ThrowsAnyAsync<InvalidOperationException>(()=>f.Module.SetOutputAsync(VolumeFixture.Key,"B"));
         Assert.Empty(f.System.AppOutputWrites);
     }
 

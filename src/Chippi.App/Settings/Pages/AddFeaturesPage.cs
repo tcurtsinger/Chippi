@@ -129,7 +129,7 @@ internal sealed class AddFeaturesPage : UserControl
             toggle.IsChecked = entry.IsInstalled;
             toggle.Content = entry.IsInstalled ? "On" : "Off";
             chip.IsOn = entry.IsInstalled;
-            caption.Text = entry.LastError is not null ? "Couldn't start" : entry.Descriptor.Description;
+            caption.Text = entry.LastError is not null ? "Start failed" : entry.Descriptor.Description;
             ShowRequirement(entry, caption, toggle, action);
         }
         _count.Text = $"{_shell.Registry.InstalledCount} on";

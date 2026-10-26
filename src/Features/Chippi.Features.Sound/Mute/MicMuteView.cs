@@ -56,12 +56,10 @@ public sealed class MicMuteView : UserControl
         keys.Margin = new Thickness(0, 0, 12, 0);
         shortcut.Children.Add(keys);
         shortcut.Children.Add(change);
-        _body.Children.Add(RoutingUi.Card(
-            new SettingRow { Header = "Shortcut", Content = shortcut },
-            new SettingRow { Header = "Mics it mutes", Content = RoutingUi.Text("All microphones") }));
+        _body.Children.Add(RoutingUi.Card(new SettingRow { Header = "Shortcut", Content = shortcut }));
         if (_module.ShortcutError is { } shortcutError) Error(shortcutError);
         _body.Children.Add(RoutingUi.Section("Options"));
-        _body.Children.Add(RoutingUi.Card(new SettingRow { Header = "Play a sound", Content = RoutingUi.Switch("Play a sound", _module.Settings.PlaySound, _module.SetPlaySound) }));
+        _body.Children.Add(RoutingUi.Card(new SettingRow { Header = "Sound feedback", Content = RoutingUi.Switch("Sound feedback", _module.Settings.PlaySound, _module.SetPlaySound) }));
     }
 
     private void BeginCapture()
@@ -70,7 +68,7 @@ public sealed class MicMuteView : UserControl
         _module.CaptureShortcut(true);
         Focusable = true;
         _body.Children.Clear();
-        _body.Children.Add(RoutingUi.Card(new SettingRow { Header = "Press a shortcut", Content = RoutingUi.Button("Cancel", CancelCapture) }));
+        _body.Children.Add(RoutingUi.Card(new SettingRow { Header = "New shortcut", Content = RoutingUi.Button("Cancel", CancelCapture) }));
         Focus();
     }
 

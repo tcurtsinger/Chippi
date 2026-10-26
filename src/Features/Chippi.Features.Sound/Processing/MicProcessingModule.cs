@@ -39,7 +39,7 @@ public sealed class MicProcessingModule : IFeatureModule
 
     public MicProcessingModule() : this(null) { }
 
-    /// <param name="pinned">Audio routing's microphone list, read at every reconcile for the "Pinned mic" source.</param>
+    /// <param name="pinned">Audio routing's microphone list, read at every reconcile for the "Highest priority" source.</param>
     /// <param name="dataDirectory">This module's data folder; the Install Driver row needs it before the module starts.</param>
     public MicProcessingModule(AudioService? audio, Func<IReadOnlyList<PriorityEntry>>? pinned = null, string? dataDirectory = null, IDriverSetup? setup = null)
     {
@@ -47,7 +47,7 @@ public sealed class MicProcessingModule : IFeatureModule
         _pinned = pinned ?? (() => []);
         _dataDirectory = dataDirectory ?? Path.Combine(ModuleServices.DefaultDataRoot, Id);
         _setup = setup ?? new ElevatedDriverSetup();
-        Descriptor = new(Id, "Mic processing", "Noise suppression and cleanup on your mic before other apps hear it", FeatureGroup.Sound)
+        Descriptor = new(Id, "Mic processing", "Noise suppression, gate and auto gain for the mic", FeatureGroup.Sound)
         {
             Icon = "Mic",
             Requires = [Capability.VbCable],
@@ -146,7 +146,7 @@ public sealed class MicProcessingModule : IFeatureModule
             StopReason.NoDriver => "No driver",
             StopReason.DriverDisabled => "Driver disabled",
             StopReason.NoMicrophone => "No microphone",
-            _ => Status.Error ?? "Couldn't start",
+            _ => Status.Error ?? "Start failed",
         },
     };
 
@@ -168,7 +168,7 @@ public sealed class MicProcessingModule : IFeatureModule
         try
         {
             if (_context is null || _stopping)
-                throw new InvalidOperationException("Mic processing uninstalled");
+                throw new AudioFailure("Mic processing uninstalled");
             Settings = edit(Settings).Normalized();
             Settings.ApplyTo(_live);
             if (saveNow)
@@ -181,7 +181,7 @@ public sealed class MicProcessingModule : IFeatureModule
         }
         catch (Exception ex)
         {
-            Error = ex.Message;
+            Error = AudioErrors.Reason(ex);
             throw;
         }
         finally

@@ -214,7 +214,7 @@ public sealed class RoutingTests
         var audio = new AudioService(() => throw new InvalidOperationException("Unavailable"), null);
         var f = new RoutingFixture();
         var module = new AudioRoutingModule(audio);
-        await Assert.ThrowsAsync<InvalidOperationException>(() => module.StartAsync(f.Context, CancellationToken.None));
+        await Assert.ThrowsAnyAsync<InvalidOperationException>(() => module.StartAsync(f.Context, CancellationToken.None));
         Assert.False(audio.IsRunning);
         Assert.Empty(f.Ui.Flyouts);
         await module.StopAsync(CancellationToken.None);
