@@ -98,7 +98,7 @@ public sealed class MicMuteModule : IFeatureModule
                 _tone(Status.State == MicrophoneMuteState.Muted);
             UpdateState();
         }
-        catch (Exception ex) { Error = ex.Message; Changed?.Invoke(); throw; }
+        catch (Exception ex) { Error = AudioErrors.Reason(ex); Changed?.Invoke(); throw; }
         finally { _gate.Release(); }
     }
 

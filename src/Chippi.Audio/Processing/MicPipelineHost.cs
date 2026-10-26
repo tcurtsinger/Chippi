@@ -165,7 +165,7 @@ internal sealed class MicPipelineHost(ILogger log, MicPipelineFactory factory, A
             log.LogWarning(ex, "Mic processing couldn't start on {Source}", source);
             pipeline?.Dispose();
             _failedSource = source;
-            _failedError = ex.Message;
+            _failedError = AudioErrors.Reason(ex);
             return false;
         }
     }
@@ -177,7 +177,7 @@ internal sealed class MicPipelineHost(ILogger log, MicPipelineFactory factory, A
             return;
         log.LogWarning(error, "Mic processing stopped on {Source}", _source);
         _failedSource = _source;
-        _failedError = error?.Message;
+        _failedError = error is null ? null : AudioErrors.Reason(error);
         DisposePipeline();
         reconcile();
     }

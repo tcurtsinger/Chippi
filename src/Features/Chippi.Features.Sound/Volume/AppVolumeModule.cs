@@ -137,7 +137,7 @@ public sealed class AppVolumeModule(AudioService? audio = null) : IFeatureModule
             Error = null;
             UpdateTile();
         }
-        catch (Exception ex) { Error = ex.Message; throw; }
+        catch (Exception ex) { Error = AudioErrors.Reason(ex); throw; }
         finally { _gate.Release(); Changed?.Invoke(); }
     }
 
@@ -150,7 +150,7 @@ public sealed class AppVolumeModule(AudioService? audio = null) : IFeatureModule
             await RefreshOutputsAsync();
             UpdateTile();
         }
-        catch (Exception ex) { Error = ex.Message; }
+        catch (Exception ex) { Error = AudioErrors.Reason(ex); }
         finally { _gate.Release(); }
         Changed?.Invoke();
     }

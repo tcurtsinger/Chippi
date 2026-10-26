@@ -178,7 +178,7 @@ public sealed class AudioRoutingModule : IFeatureModule
             Error = null;
             UpdateTiles();
         }
-        catch (Exception ex) { Error = ex.Message; throw; }
+        catch (Exception ex) { Error = AudioErrors.Reason(ex); throw; }
         finally { _gate.Release(); Changed?.Invoke(); }
     }
 
@@ -198,7 +198,7 @@ public sealed class AudioRoutingModule : IFeatureModule
             }
             UpdateTiles();
         }
-        catch (Exception ex) { Error = ex.Message; _context?.Logger.LogWarning(ex, "Refreshing audio routing failed"); }
+        catch (Exception ex) { Error = AudioErrors.Reason(ex); _context?.Logger.LogWarning(ex, "Refreshing audio routing failed"); }
         finally { _gate.Release(); Changed?.Invoke(); }
     }
 
@@ -215,7 +215,7 @@ public sealed class AudioRoutingModule : IFeatureModule
     public async Task SetOutputVolumeAsync(string id, float volume)
     {
         try { await _audio!.SetEndpointVolumeAsync(id, volume); Error = null; }
-        catch (Exception ex) { Error = ex.Message; throw; }
+        catch (Exception ex) { Error = AudioErrors.Reason(ex); throw; }
         finally { Changed?.Invoke(); }
     }
 

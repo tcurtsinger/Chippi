@@ -245,7 +245,7 @@ public sealed class AudioService
     {
         Engine engine;
         lock (_gate)
-            engine = CurrentEngine() ?? throw new InvalidOperationException("The audio service isn't running.");
+            engine = CurrentEngine() ?? throw new InvalidOperationException("Audio service stopped");
         return engine.Watch(endpointIds, apps);
     }
 
@@ -255,7 +255,7 @@ public sealed class AudioService
         lock (_gate)
             engine = CurrentEngine();
         return engine is null
-            ? Task.FromException<T>(new InvalidOperationException("The audio service isn't running."))
+            ? Task.FromException<T>(new InvalidOperationException("Audio service stopped"))
             : engine.Invoke(op);
     }
 
@@ -365,7 +365,7 @@ public sealed class AudioService
 
         public MicPipelineHost Processing { get; }
 
-        public IDeviceSystem System => _system ?? throw new InvalidOperationException("The audio service couldn't start.", _startError);
+        public IDeviceSystem System => _system ?? throw new InvalidOperationException("Audio service failed", _startError);
 
         /// <summary>The device system couldn't be created; commands fail with its error until the engine is replaced.</summary>
         public bool Failed => _startError is not null;

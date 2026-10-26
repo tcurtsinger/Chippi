@@ -181,7 +181,7 @@ public sealed class MicProcessingModule : IFeatureModule
         }
         catch (Exception ex)
         {
-            Error = ex.Message;
+            Error = AudioErrors.Reason(ex);
             throw;
         }
         finally
