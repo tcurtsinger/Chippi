@@ -14,7 +14,7 @@ public enum IslandOrbit
 /// <summary>
 /// One module's part of an island tile (docs/phase-3/architecture.md §5).
 /// </summary>
-/// <param name="Key">Identifies the tile, such as "sound.microphone". Modules that use the same key share the tile and its page.</param>
+/// <param name="Key">Identifies the tile, such as "sound". Modules that use the same key share the tile and its page.</param>
 /// <param name="Name">The tile's name, such as "Microphone". A shared tile takes the name and icon of its first section.</param>
 /// <param name="Icon">Lucide icon key, as in <see cref="FeatureDescriptor.Icon"/>.</param>
 /// <param name="Order">Where the tile sits in the grid, lowest first. Now Playing is always first.</param>
@@ -31,8 +31,18 @@ public sealed record IslandTileSpec(string Key, string Name, string Icon, int Or
     /// <summary>A round button beside the open island that opens this tile.</summary>
     public IslandOrbit Orbit { get; init; } = IslandOrbit.None;
 
-    /// <summary>On a shared tile, the status of the module with the highest priority that set one shows ("Muted" over "Live").</summary>
+    /// <summary>On a shared tile, the status of the module with the highest priority that set one shows ("Mic muted" over the output).</summary>
     public int StatusPriority { get; init; }
+
+    /// <summary>
+    /// On a page of side-by-side columns (Sound's Output and Microphone), the column this section
+    /// stacks in, under that name. Columns sit in the order of their first section. Null for a page
+    /// of one column.
+    /// </summary>
+    public string? Column { get; init; }
+
+    /// <summary>The page's header repeats the tile's status, for a page whose controls don't show it (Keep awake's time left).</summary>
+    public bool StatusOnPage { get; init; }
 }
 
 /// <summary>A module's handle on its island tile.</summary>
@@ -86,6 +96,8 @@ public sealed record IslandTileGroup(string Key, IReadOnlyList<IslandTileContrib
     public double PageWidth => Parts.Max(p => p.Spec.PageWidth);
 
     public IslandOrbit Orbit => Parts.Select(p => p.Spec.Orbit).FirstOrDefault(o => o != IslandOrbit.None);
+
+    public bool StatusOnPage => Parts.Any(p => p.Spec.StatusOnPage);
 
     /// <summary>The highest-priority non-empty status, or empty.</summary>
     public string Status =>

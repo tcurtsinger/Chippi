@@ -21,20 +21,17 @@ public sealed class DesktopFactAttribute : FactAttribute
 public sealed class DesktopTests(ITestOutputHelper output)
 {
     [DesktopFact]
-    public void SecondLaunchOpensFlyout()
+    public void SecondLaunchOpensThePages()
     {
         using var app = new DesktopSession(output);
-        var flyout = app.OpenFlyout();
-        Assert.False(flyout.Current.IsOffscreen);
-        DesktopSession.Find(flyout, "Settings", InvokePattern.Pattern);
-        var quit = DesktopSession.Find(flyout, "Quit Chippi", InvokePattern.Pattern);
+        var pages = app.OpenPages();
+        Assert.False(pages.Current.IsOffscreen);
+        DesktopSession.Find(pages, "Settings", InvokePattern.Pattern);
+        DesktopSession.Find(pages, "Chippi"); // the grid's header
         Assert.False(app.Process.HasExited);
         Assert.Equal(0, app.LastActivationExitCode);
-        Assert.DoesNotContain(flyout.FindAll(TreeScope.Descendants, Condition.TrueCondition).Cast<AutomationElement>(),
+        Assert.DoesNotContain(pages.FindAll(TreeScope.Descendants, Condition.TrueCondition).Cast<AutomationElement>(),
             e => e.Current.Name.Contains('{'));
-        DesktopSession.Invoke(quit);
-        Assert.True(app.Process.WaitForExit(15000), "Quit did not exit the profile process");
-        Assert.Equal(0, app.Process.ExitCode);
     }
 
     [DesktopFact]
@@ -115,30 +112,37 @@ public sealed class DesktopTests(ITestOutputHelper output)
     }
 
     [DesktopFact]
-    public void FlyoutTabsKeepTheirSelectionAndSettingsOpensTheFirstFeature()
+    public void PagesReopenOnTheLastPageAndSettingsOpensTheFirstFeature()
     {
         using var app = new DesktopSession(output);
-        var flyout = app.OpenFlyout();
-        var tabs = DesktopSession.Find(flyout, "Flyout sections");
-        DesktopSession.Select(tabs, "Keep awake");
-        DesktopSession.Find(flyout, "Keep awake", TogglePattern.Pattern);
-        DesktopSession.Select(tabs, "Tidy");
-        DesktopSession.Find(flyout, "No folders yet");
-        DesktopSession.Invoke(DesktopSession.Find(flyout, "Settings", InvokePattern.Pattern));
+        var pages = app.OpenPages();
+        DesktopSession.Invoke(Tile(pages, "Keep awake"));
+        DesktopSession.Find(pages, "1 hr", TogglePattern.Pattern);
+        DesktopSession.Invoke(DesktopSession.Find(pages, "All features", InvokePattern.Pattern));
+        DesktopSession.Invoke(Tile(pages, "File organizer"));
+        DesktopSession.Find(pages, "No folders yet");
+        DesktopSession.Invoke(DesktopSession.Find(pages, "Settings", InvokePattern.Pattern));
         AutomationElement? settings = null;
         DesktopSession.Until(() => (settings = app.WindowOrNull("Chippi Settings")) is not null, "settings opened");
         AssertFirstFeature(settings!);
         ((WindowPattern)settings!.GetCurrentPattern(WindowPattern.Pattern)).Close();
-        flyout = app.OpenFlyout();
-        var tidy = DesktopSession.Find(DesktopSession.Find(flyout, "Flyout sections"), "Tidy", SelectionItemPattern.Pattern);
-        Assert.True(((SelectionItemPattern)tidy.GetCurrentPattern(SelectionItemPattern.Pattern)).Current.IsSelected);
-        DesktopSession.Find(flyout, "No folders yet");
+        pages = app.OpenPages();
+        DesktopSession.Find(pages, "No folders yet"); // the last page used
     }
 
+    /// <summary>A grid tile: its accessible name is the tile's name, then its status.</summary>
+    internal static AutomationElement Tile(AutomationElement pages, string name)
+    {
+        AutomationElement? tile = null;
+        DesktopSession.Until(() => (tile = pages.FindAll(TreeScope.Descendants, new PropertyCondition(AutomationElement.IsInvokePatternAvailableProperty, true))
+            .Cast<AutomationElement>().FirstOrDefault(e => e.Current.Name == name || e.Current.Name.StartsWith(name + ",", StringComparison.Ordinal))) is not null, $"{name} tile");
+        return tile!;
+    }
+
+    // The sidebar's first item: Files comes first, so File organizer.
     private static void AssertFirstFeature(AutomationElement settings)
     {
-        var first = DesktopSession.Find(settings, "Keep awake", SelectionItemPattern.Pattern);
+        var first = DesktopSession.Find(settings, "File organizer", SelectionItemPattern.Pattern);
         Assert.True(((SelectionItemPattern)first.GetCurrentPattern(SelectionItemPattern.Pattern)).Current.IsSelected);
-        DesktopSession.Find(settings, "Keep awake", TogglePattern.Pattern);
     }
 }

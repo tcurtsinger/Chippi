@@ -20,15 +20,36 @@ namespace Chippi.App.Settings;
 
 public sealed record SettingsPageInfo(string Id, string Label, Geometry Icon);
 
+/// <summary>
+/// A Settings page organized by task that several features share (DESIGN.md §5 Settings): Sound's
+/// Output and Microphone. Each section is one installed feature's page, or one section of it.
+/// </summary>
+internal sealed record SharedPage(string Id, string Label, Geometry Icon, FeatureGroup Group, IReadOnlyList<SharedSection> Sections);
+
+/// <param name="Section">The section of the feature's page, as its factory takes it; null for its first.</param>
+/// <param name="Title">The heading over it, or null for none.</param>
+internal sealed record SharedSection(string ModuleId, string? Section, string? Title);
+
 public partial class SettingsWindow : Window
 {
+    /// <summary>The Chippi group, in sidebar order.</summary>
     public static IReadOnlyList<SettingsPageInfo> Pages { get; } =
     [
-        new("features", "Add features", LucideIcons.Plus),
         new("general", "General", LucideIcons.Settings),
         new("island", "Island & pet", LucideIcons.Droplet),
         new("notifications", "Notifications", LucideIcons.Bell),
+        new("features", "Add features", LucideIcons.Plus),
         new("about", "About", LucideIcons.Info),
+    ];
+
+    private const string AddFeatures = "features";
+
+    /// <summary>Sound by task: what you set for your output and for your mic, whichever features do it.</summary>
+    internal static IReadOnlyList<SharedPage> SharedPages { get; } =
+    [
+        new("page:sound-output", "Output", LucideIcons.Speaker, FeatureGroup.Sound, [new("audio-routing", "output", null)]),
+        new("page:sound-microphone", "Microphone", LucideIcons.Mic, FeatureGroup.Sound,
+            [new("audio-routing", "microphone", "Mic in use"), new("mic-processing", null, "Clean-up"), new("mic-mute", null, "Mute shortcut")]),
     ];
 
     private readonly ShellContext _shell;
@@ -36,6 +57,7 @@ public partial class SettingsWindow : Window
     private readonly Dictionary<string, FrameworkElement> _views = [];
     private readonly Dictionary<string, SettingsPageContribution> _contributions = [];
     private List<SettingsPageInfo> _featurePages = [];
+    private readonly List<ListBox> _featureLists = []; // one per group with installed features
     private bool _selecting;
     private bool _closed;
     private string _currentPage = "";
@@ -47,7 +69,7 @@ public partial class SettingsWindow : Window
         _shell = shell;
         _logger = shell.LoggerFactory.CreateLogger<SettingsWindow>();
         InitializeComponent();
-        Nav.ItemsSource = Pages.Skip(1).Select(Item).ToList();
+        Nav.ItemsSource = Pages.Select(Item).ToList();
         RefreshFeatures();
         Navigate(page);
         _shell.Registry.Changed += OnRegistryChanged;
@@ -77,11 +99,42 @@ public partial class SettingsWindow : Window
         }
         foreach (var entry in entries)
             _contributions[ModulePrefix + entry.Id] = entry.SettingsPage!;
-        _featurePages = entries.Select(f => new SettingsPageInfo(ModulePrefix + f.Id, f.Descriptor.Name, LucideIcons.Get(f.Descriptor.Icon))).ToList();
+
+        // The sidebar groups the features' pages as Add features does, and Sound by task.
+        var shared = SharedPages.Where(p => p.Sections.Any(section => _contributions.ContainsKey(ModulePrefix + section.ModuleId))).ToList();
+        var covered = SharedPages.SelectMany(p => p.Sections).Select(section => section.ModuleId).ToHashSet();
+        _featurePages = [];
         _selecting = true;
-        FeatureNav.ItemsSource = _featurePages.Append(Pages[0]).Select(Item).ToList();
+        FeatureGroups.Children.Clear();
+        _featureLists.Clear();
+        foreach (var group in Enum.GetValues<FeatureGroup>())
+        {
+            var pages = shared.Where(p => p.Group == group).Select(p => new SettingsPageInfo(p.Id, p.Label, p.Icon))
+                .Concat(entries.Where(f => f.Descriptor.Group == group && !covered.Contains(f.Id))
+                    .Select(f => new SettingsPageInfo(ModulePrefix + f.Id, f.Descriptor.Name, LucideIcons.Get(f.Descriptor.Icon))))
+                .ToList();
+            if (pages.Count == 0)
+                continue;
+            _featurePages.AddRange(pages);
+            var header = new TextBlock { Text = group.DisplayName(), Margin = new Thickness(12, FeatureGroups.Children.Count == 0 ? 0 : 20, 0, 6) };
+            header.SetResourceReference(StyleProperty, "NavGroupTextStyle");
+            var list = new ListBox { Background = Brushes.Transparent, BorderThickness = new Thickness(0), ItemsSource = pages.Select(Item).ToList() };
+            list.SetResourceReference(ItemsControl.ItemContainerStyleProperty, "NavItemStyle");
+            list.SetResourceReference(ItemsControl.ItemTemplateProperty, "NavItemTemplate");
+            AutomationProperties.SetName(list, group.DisplayName());
+            list.SelectionChanged += OnNavSelectionChanged;
+            FeatureGroups.Children.Add(header);
+            FeatureGroups.Children.Add(list);
+            _featureLists.Add(list);
+        }
+        ChippiGroup.Margin = new Thickness(12, FeatureGroups.Children.Count == 0 ? 0 : 20, 0, 6);
         _selecting = false;
     }
+
+    /// <summary>The shared page a feature's deep link lands on: the one with that section, else its first.</summary>
+    private static string? SharedFor(string moduleId, string? section) =>
+        (SharedPages.FirstOrDefault(p => p.Sections.Any(x => x.ModuleId == moduleId && x.Section == section))
+            ?? SharedPages.FirstOrDefault(p => p.Sections.Any(x => x.ModuleId == moduleId)))?.Id;
 
     private void OnRegistryChanged(object? sender, EventArgs e) => Dispatcher.BeginInvoke(() =>
     {
@@ -112,11 +165,18 @@ public partial class SettingsWindow : Window
     {
         string baseId = page.Split('/')[0];
         var target = NavigationPages.FirstOrDefault(p => p.Id.Equals(baseId, StringComparison.OrdinalIgnoreCase));
+        // A feature on a shared page (Sound's) is opened there.
+        if (target is null && baseId.StartsWith(ModulePrefix, StringComparison.OrdinalIgnoreCase)
+            && SharedFor(baseId[ModulePrefix.Length..], page.Contains('/') ? page[(page.IndexOf('/') + 1)..] : null) is { } sharedId)
+        {
+            target = NavigationPages.FirstOrDefault(p => p.Id == sharedId);
+            page = sharedId;
+        }
         if (target is null)
         {
             if (page.Length > 0)
                 _logger.LogWarning("Settings request '{Page}' could not be shown: the page is unavailable", page);
-            target = page.StartsWith(ModulePrefix, StringComparison.OrdinalIgnoreCase) ? Pages[0] : NavigationPages.First();
+            target = page.StartsWith(ModulePrefix, StringComparison.OrdinalIgnoreCase) ? Pages.First(p => p.Id == AddFeatures) : NavigationPages.First();
         }
         string id = target.Id;
         if (id.StartsWith(ModulePrefix, StringComparison.Ordinal) && page.Contains('/'))
@@ -133,8 +193,8 @@ public partial class SettingsWindow : Window
     {
         _selecting = true;
         SettingsSearch.Clear();
-        FeatureNav.SelectedItem = FeatureNav.Items.OfType<SegmentItem>().FirstOrDefault(i => Equals(i.Value, pageId));
-        Nav.SelectedItem = Nav.Items.OfType<SegmentItem>().FirstOrDefault(i => Equals(i.Value, pageId));
+        foreach (var list in _featureLists.Append(Nav))
+            list.SelectedItem = list.Items.OfType<SegmentItem>().FirstOrDefault(i => Equals(i.Value, pageId));
         _selecting = false;
     }
 
@@ -152,15 +212,9 @@ public partial class SettingsWindow : Window
         root as ISettingsLeaveGuard
         ?? LogicalTreeHelper.GetChildren(root).OfType<DependencyObject>().Select(FindGuard).FirstOrDefault(g => g is not null);
 
-    private void OnFeatureSelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (!_selecting && FeatureNav.SelectedItem is SegmentItem { Value: string id })
-            Navigate(id);
-    }
-
     private void OnNavSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (!_selecting && Nav.SelectedItem is SegmentItem { Value: string id })
+        if (!_selecting && sender is ListBox { SelectedItem: SegmentItem { Value: string id } })
             Navigate(id);
     }
 
@@ -173,14 +227,18 @@ public partial class SettingsWindow : Window
     private FrameworkElement View(string id)
     {
         // A module view can switch tabs internally, so its cached route no longer describes it.
-        // Every navigation must reapply the section through the module's factory.
-        bool module = id.StartsWith(ModulePrefix, StringComparison.Ordinal);
+        // Every navigation must reapply the section through the module's factory. A shared page is
+        // made of module views too.
+        var shared = SharedPages.FirstOrDefault(p => p.Id == id);
+        bool module = id.StartsWith(ModulePrefix, StringComparison.Ordinal) || shared is not null;
         if (!module && _views.TryGetValue(id, out var cached))
             return cached;
         FrameworkElement view;
         try
         {
-            if (id.StartsWith(ModulePrefix, StringComparison.Ordinal))
+            if (shared is not null)
+                view = SharedView(shared);
+            else if (id.StartsWith(ModulePrefix, StringComparison.Ordinal))
             {
                 int slash = id.IndexOf('/');
                 string baseId = slash < 0 ? id : id[..slash];
@@ -210,6 +268,28 @@ public partial class SettingsWindow : Window
         return view;
     }
 
+    /// <summary>A shared page: its title, then each installed feature's section under its heading.</summary>
+    private FrameworkElement SharedView(SharedPage shared)
+    {
+        var page = new StackPanel();
+        page.Children.Add(SettingsUi.Header(shared.Label, ""));
+        foreach (var section in shared.Sections)
+        {
+            if (!_contributions.TryGetValue(ModulePrefix + section.ModuleId, out var contribution))
+                continue;
+            if (section.Title is { } title)
+            {
+                var heading = SettingsUi.Section(title);
+                if (page.Children.Count == 1)
+                    heading.Margin = new Thickness(0, 0, 0, 8); // the title already sits 14px above
+                page.Children.Add(heading);
+            }
+            page.Children.Add(contribution.CreateView(section.Section) as FrameworkElement
+                ?? throw new InvalidOperationException("The settings factory did not return a FrameworkElement."));
+        }
+        return page;
+    }
+
     private void OnSearchChanged(object sender, TextChangedEventArgs e)
     {
         if (_selecting)
@@ -222,8 +302,8 @@ public partial class SettingsWindow : Window
             return;
         }
         _selecting = true;
-        FeatureNav.SelectedItem = null;
-        Nav.SelectedItem = null;
+        foreach (var list in _featureLists.Append(Nav))
+            list.SelectedItem = null;
         _selecting = false;
         var results = new StackPanel();
         results.Children.Add(SettingsUi.Header("Search results", ""));

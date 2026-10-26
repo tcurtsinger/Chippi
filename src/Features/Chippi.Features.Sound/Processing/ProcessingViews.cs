@@ -109,6 +109,11 @@ internal static class ProcessingUi
 }
 
 /// <summary>Settings › Mic processing (mockup settings-mic-processing). Switches apply at once; levels are heard at once and saved after a pause.</summary>
+/// <summary>
+/// The Clean-up section of Settings › Microphone: the switch and levels, then each stage with its
+/// tuning dimmed while the stage is off. The mic is the one in use, picked above; a mic chosen here
+/// before shows until it is set back to that.
+/// </summary>
 public sealed class ProcessingPage : UserControl
 {
     private readonly MicProcessingModule _module;
@@ -157,39 +162,27 @@ public sealed class ProcessingPage : UserControl
         _body.Children.Clear();
         var s = _module.Settings;
 
-        var master = RoutingUi.Switch("Mic processing", s.Enabled, on => Run(_module.SetEnabledAsync(on)));
-        var status = _module.Status.State == ProcessingState.Live ? $"Live · {_module.SourceName}" : _module.StatusText;
-        var top = RoutingUi.Card(
-            new SettingRow { Header = "Mic processing", Description = status, Icon = LucideIcons.Mic, Content = master },
-            new SettingRow { Header = "Level", Content = Meters() });
-        top.Margin = new Thickness(0, 8, 0, 0);
-        _body.Children.Add(top);
-        if (_module.Error is { } error)
+        var cleanup = RoutingUi.Card(
+            new SettingRow { Header = "Clean-up", Content = RoutingUi.Switch("Clean-up", s.Enabled, on => Run(_module.SetEnabledAsync(on))) },
+            new SettingRow { Header = "Level", Content = Meters() },
+            new SettingRow { Header = "Noise suppression", Content = RoutingUi.Switch("Noise suppression", s.Suppression, on => Stages(x => x with { Suppression = on })) },
+            new SettingRow { Header = "Noise gate", Content = RoutingUi.Switch("Noise gate", s.Gate, on => Stages(x => x with { Gate = on })) },
+            Level("Threshold", ProcessingSettings.GateRange, s.GateDb, db => Stages(x => x with { GateDb = db }), s.Gate),
+            new SettingRow { Header = "Auto gain", Content = RoutingUi.Switch("Auto gain", s.Agc, on => Stages(x => x with { Agc = on })) },
+            Level("Target level", ProcessingSettings.TargetRange, s.TargetDb, db => Stages(x => x with { TargetDb = db }), s.Agc),
+            Level("Max gain", ProcessingSettings.MaxGainRange, s.MaxGainDb, db => Stages(x => x with { MaxGainDb = db }), s.Agc),
+            new SettingRow { Header = "Default device", Content = RoutingUi.Switch("Default device", s.SetDefault, on => Run(_module.SetDefaultMicAsync(on))) });
+        if (s.Source != ProcessingSettings.PinnedSource)
+            cleanup.Children.Add(new SettingRow { Header = "Input device", Content = SourcePicker() });
+        _body.Children.Add(cleanup);
+        // Only what needs attention: a failure, or clean-up that stopped.
+        if ((_module.Error ?? (_module.Status.State == ProcessingState.Stopped ? _module.StatusText : null)) is { } problem)
         {
-            var text = RoutingUi.Text(error, "CaptionTextStyle", "WarningTextBrush");
+            var text = RoutingUi.Text(problem, "CaptionTextStyle", "WarningTextBrush");
             text.Margin = new Thickness(0, 8, 0, 0);
             AutomationProperties.SetLiveSetting(text, AutomationLiveSetting.Polite);
             _body.Children.Add(text);
         }
-
-        _body.Children.Add(RoutingUi.Section("Clean-up"));
-        var cleanup = RoutingUi.Card(
-            new SettingRow { Header = "Noise suppression", Content = RoutingUi.Switch("Noise suppression", s.Suppression, on => Stages(x => x with { Suppression = on })) },
-            new SettingRow { Header = "Noise gate", Content = RoutingUi.Switch("Noise gate", s.Gate, on => Stages(x => x with { Gate = on })) });
-        if (s.Gate)
-            cleanup.Children.Add(Level("Threshold", ProcessingSettings.GateRange, s.GateDb, db => Stages(x => x with { GateDb = db })));
-        cleanup.Children.Add(new SettingRow { Header = "Auto gain", Content = RoutingUi.Switch("Auto gain", s.Agc, on => Stages(x => x with { Agc = on })) });
-        if (s.Agc)
-        {
-            cleanup.Children.Add(Level("Target level", ProcessingSettings.TargetRange, s.TargetDb, db => Stages(x => x with { TargetDb = db })));
-            cleanup.Children.Add(Level("Max gain", ProcessingSettings.MaxGainRange, s.MaxGainDb, db => Stages(x => x with { MaxGainDb = db })));
-        }
-        _body.Children.Add(cleanup);
-
-        _body.Children.Add(RoutingUi.Section("Options"));
-        _body.Children.Add(RoutingUi.Card(
-            new SettingRow { Header = "Input device", Content = SourcePicker() },
-            new SettingRow { Header = "Default device", Content = RoutingUi.Switch("Default device", s.SetDefault, on => Run(_module.SetDefaultMicAsync(on))) }));
     }
 
     private FrameworkElement Meters()
@@ -222,10 +215,11 @@ public sealed class ProcessingPage : UserControl
 
     private static void Detach(FrameworkElement element) => (element.Parent as Panel)?.Children.Remove(element);
 
-    private static SettingRow Level(string name, (double Min, double Max) range, double value, Action<double> changed)
+    /// <summary>A stage's tuning, indented under it and dimmed while the stage is off.</summary>
+    private static SettingRow Level(string name, (double Min, double Max) range, double value, Action<double> changed, bool enabled)
     {
         var slider = ProcessingUi.Slider(name, range, value, changed, out var label);
-        return new SettingRow { Header = name, Content = ProcessingUi.WithLabel(slider, label), Margin = new Thickness(34, 0, 0, 0) };
+        return new SettingRow { Header = name, Content = ProcessingUi.WithLabel(slider, label), Margin = new Thickness(34, 0, 0, 0), IsEnabled = enabled, Opacity = enabled ? 1 : 0.45 };
     }
 
     private ComboBox SourcePicker()
@@ -251,49 +245,43 @@ public sealed class ProcessingPage : UserControl
 }
 
 /// <summary>
-/// Mic processing's part of the flyout's Sound tab and of the island's Microphone page (mockup
-/// flyout-sound and island-microphone): the clean-up switch, its status, and on the island a meter.
+/// Mic processing's section of the Sound page (DESIGN.md §5 Island): the Clean-up switch, and while
+/// it runs a meter of the cleaned-up mic. A warning shows only when it failed or stopped.
 /// </summary>
 public sealed class ProcessingQuickView : UserControl
 {
     private readonly MicProcessingModule _module;
-    private readonly bool _island;
-    private readonly ToggleButton _switch;
-    private readonly TextBlock _status = RoutingUi.Text("", "CaptionTextStyle", "TextSecondaryBrush");
+    private readonly ToggleButton _switch = new() { VerticalAlignment = VerticalAlignment.Center };
+    private readonly TextBlock _warning = RoutingUi.Text("", "CaptionTextStyle", "WarningTextBrush");
     private readonly LevelBar _meter = new() { Margin = new Thickness(0, 10, 0, 0) };
     private bool _refreshing;
 
-    public ProcessingQuickView(MicProcessingModule module, bool island)
+    public ProcessingQuickView(MicProcessingModule module)
     {
         _module = module;
-        _island = island;
-        _switch = RoutingUi.Switch("Mic processing", module.Settings.Enabled, on =>
-        {
-            if (!_refreshing)
-                ProcessingUi.Run(_module.SetEnabledAsync(on), Refresh);
-        });
-        var labels = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
-        labels.Children.Add(RoutingUi.Text(island ? "Clean-up" : "Mic processing"));
-        labels.Children.Add(_status);
-        var row = RoutingUi.Columns(new(1, GridUnitType.Star), GridLength.Auto);
-        RoutingUi.Add(row, labels, 0);
-        RoutingUi.Add(row, _switch, 1);
-        var root = new StackPanel();
-        root.Children.Add(row);
-        if (island)
-        {
-            root.Margin = new Thickness(0, 12, 0, 0);
-            root.Children.Add(_meter);
-            ProcessingUi.Meter(this, module, readings => _meter.Level = ProcessingUi.MeterFill(readings.ProcessingOutput));
-            Content = root;
-        }
-        else
-        {
-            Content = RoutingUi.Pad(root, 48);
-        }
+        _switch.SetResourceReference(StyleProperty, "SwitchStyle");
+        AutomationProperties.SetName(_switch, "Clean-up");
+        _switch.Checked += (_, _) => Flip(true);
+        _switch.Unchecked += (_, _) => Flip(false);
+        var label = RoutingUi.Text("Clean-up");
+        label.FontSize = 13;
+        label.VerticalAlignment = VerticalAlignment.Center;
+        DockPanel.SetDock(_switch, Dock.Right);
+        var row = new DockPanel { MinHeight = 36, Margin = new Thickness(10, 0, 6, 0), Children = { _switch, label } };
+        _warning.Margin = new Thickness(10, 2, 0, 0);
+        AutomationProperties.SetLiveSetting(_warning, AutomationLiveSetting.Polite);
+        _meter.Margin = new Thickness(10, 6, 10, 0);
+        Content = new StackPanel { Children = { row, _warning, _meter } };
+        ProcessingUi.Meter(this, module, readings => _meter.Level = ProcessingUi.MeterFill(readings.ProcessingOutput));
         Loaded += (_, _) => { _module.Changed += Refresh; Refresh(); };
         Unloaded += (_, _) => _module.Changed -= Refresh;
         Refresh();
+    }
+
+    private void Flip(bool on)
+    {
+        if (!_refreshing)
+            ProcessingUi.Run(_module.SetEnabledAsync(on), Refresh);
     }
 
     private void Refresh()
@@ -303,10 +291,8 @@ public sealed class ProcessingQuickView : UserControl
         try
         {
             _switch.IsChecked = _module.Settings.Enabled;
-            _switch.Content = _module.Settings.Enabled ? "On" : "Off";
-            _status.Text = _module.Error ?? _module.StatusText;
-            _status.SetResourceReference(TextBlock.ForegroundProperty,
-                _module.Error is not null || _module.Status.State == ProcessingState.Stopped ? "WarningTextBrush" : "TextSecondaryBrush");
+            _warning.Text = _module.Error ?? (_module.Status.State == ProcessingState.Stopped ? _module.StatusText : "");
+            _warning.Visibility = _warning.Text.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
             _meter.Visibility = _module.Status.State == ProcessingState.Live ? Visibility.Visible : Visibility.Collapsed;
         }
         finally { _refreshing = false; }

@@ -9,6 +9,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using Chippi.App.Pet;
+using Chippi.App.Tray;
 using Chippi.Core.Config;
 using Chippi.Core.Island;
 using Chippi.Core.Modules;
@@ -36,7 +37,8 @@ internal sealed class IslandPlacementEventArgs(IslandEdge edge, double place, HM
 /// the drag. Every window here never activates (WS_EX_NOACTIVATE plus WM_MOUSEACTIVATE) and never
 /// shows in Alt+Tab or the taskbar, and is placed in physical pixels on the monitor it is given.
 /// Hovering only swells the tab; a click opens the island, and it stays open until a click outside
-/// it, Esc or another click on the tab. A press that moves 4px drags the tab to another edge.
+/// it, Esc or another click on the tab. A press that moves 4px drags the tab to another edge. The
+/// tray icon opens the same pages: in the island while it shows, otherwise docked by the tray.
 /// <see cref="IslandHost"/> feeds it activities, the mood, the monitor, the saved edge and place,
 /// and whether to hide.
 /// </summary>
@@ -69,6 +71,7 @@ public partial class IslandWindow : Window
     private HWND _hwnd;
     private HMONITOR _monitor;
     private Point? _pressAt;
+    private Rect? _trayIcon; // physical pixels, read when the pages open
     private bool _dragging;
     private EventHandler? _slideFrame;
     private EventHandler? _swellFrame;
@@ -118,9 +121,9 @@ public partial class IslandWindow : Window
         Tab.Click += (_, _) => Toggle();
         Tab.MouseRightButtonUp += (_, e) =>
         {
-            if (DebugItems.Children.Count == 0)
+            if (TabMenuItems.Children.Count == 0)
                 return;
-            DebugMenu.IsOpen = true;
+            TabMenu.IsOpen = true;
             e.Handled = true;
         };
         DpiChanged += (_, _) => Dispatcher.BeginInvoke(DispatcherPriority.Render, Place);
@@ -145,11 +148,17 @@ public partial class IslandWindow : Window
 
     internal HWND Handle => _hwnd;
 
+    /// <summary>The tray icon's rectangle in physical pixels, or null without one. A press on it is the tray's click, not a click away.</summary>
+    internal Func<Rect?>? TrayIconRect { get; set; }
+
     /// <summary>The open island's window.</summary>
     internal HWND PanelHandle => _panel.Handle;
 
     /// <summary>AppSettings.IslandLastPage: the page the next open restores while its tile exists.</summary>
     public void SetLastPage(string? key) => _panel.SetLastPage(key);
+
+    /// <summary>Settings › Island &amp; pet: where the island opens, its tiles and its round buttons.</summary>
+    internal void SetLayout(IslandLayout layout) => _panel.SetLayout(layout);
 
     /// <summary>Now Playing's media sessions.</summary>
     internal void SetMedia(Media.IMediaSessions media) => _panel.SetMedia(media);
@@ -224,24 +233,24 @@ public partial class IslandWindow : Window
         _panel.Celebrate();
     }
 
-    /// <summary>Debug menu entries (null is a separator). Right-clicking the tab opens them.</summary>
-    public void SetDebugMenu(IEnumerable<(string Label, Action Action)?> items)
+    /// <summary>The tab's right-click menu (null is a separator): Open settings and Quit, after the debug entries with --debug.</summary>
+    public void SetTabMenu(IEnumerable<(string Label, Action Action)?> items)
     {
-        DebugItems.Children.Clear();
+        TabMenuItems.Children.Clear();
         foreach (var item in items)
         {
             if (item is not { } entry)
             {
-                DebugItems.Children.Add(new Border { Height = 1, Margin = new Thickness(6, 4, 6, 4), Background = (Brush)FindResource("IslandBorderBrush") });
+                TabMenuItems.Children.Add(new Border { Height = 1, Margin = new Thickness(6, 4, 6, 4), Background = (Brush)FindResource("IslandBorderBrush") });
                 continue;
             }
             var button = new Button { Content = entry.Label, Style = (Style)FindResource("IslandMenuItemStyle") };
             button.Click += (_, _) =>
             {
-                DebugMenu.IsOpen = false;
+                TabMenu.IsOpen = false;
                 entry.Action();
             };
-            DebugItems.Children.Add(button);
+            TabMenuItems.Children.Add(button);
         }
     }
 
@@ -258,7 +267,7 @@ public partial class IslandWindow : Window
         }
         else if (!visible && IsVisible)
         {
-            DebugMenu.IsOpen = false;
+            TabMenu.IsOpen = false;
             if (_pressAt is not null)
                 Tab.ReleaseMouseCapture(); // ends a drag: OnLostCapture
             CloseIsland(immediate: true);
@@ -290,7 +299,7 @@ public partial class IslandWindow : Window
         StopSlide();
         ApplyEdgeLayout(IslandGeometry.Docked(_edge, area.Monitor, area.Work));
         IslandNative.Move(_hwnd, Home(area));
-        if (_panel.IsOpen)
+        if (_panel.IsOpen && !_panel.IsDocked)
             _panel.Open(_docked, Grown(area), area);
     }
 
@@ -332,19 +341,21 @@ public partial class IslandWindow : Window
         if (code >= 0 && message is PInvoke.WM_LBUTTONDOWN or PInvoke.WM_RBUTTONDOWN or PInvoke.WM_MBUTTONDOWN or PInvoke.WM_XBUTTONDOWN)
         {
             var at = ((MSLLHOOKSTRUCT*)lParam.Value)->pt;
-            PressedAt(new Point(at.X, at.Y));
+            PressedAt(new Point(at.X, at.Y), left: message == PInvoke.WM_LBUTTONDOWN);
         }
         return PInvoke.CallNextHookEx(_clickHook, code, wParam, lParam);
     }
 
     /// <summary>
     /// A press at <paramref name="physical"/> while the island is open: off the island and the tab it
-    /// closes the island, unless a list or menu the island opened has the mouse.
+    /// closes the island, unless a list or menu the island opened has the mouse. A left press on the
+    /// tray icon is left to the tray, whose click toggles the pages.
     /// </summary>
-    internal void PressedAt(Point physical)
+    internal void PressedAt(Point physical, bool left = true)
     {
-        if (!_panel.IsOpen || _panel.Covers(physical) || IslandNative.WindowRect(_hwnd).Contains(physical)
-            || DebugMenu.IsOpen || Mouse.Captured is not null)
+        if (!_panel.IsOpen || _panel.Covers(physical) || (IsVisible && IslandNative.WindowRect(_hwnd).Contains(physical))
+            || (left && _trayIcon is { } tray && tray.Contains(physical))
+            || TabMenu.IsOpen || Mouse.Captured is not null)
             return;
         Dispatcher.BeginInvoke(() => CloseIsland());
     }
@@ -359,11 +370,50 @@ public partial class IslandWindow : Window
             OpenIsland();
     }
 
+    /// <summary>
+    /// The tray icon's click, or a second launch: the pages close if open, and otherwise open in the
+    /// island while its tab shows, or docked by <paramref name="tray"/>. From the keyboard they take it.
+    /// </summary>
+    internal void TogglePages(TrayAnchor? tray, bool keyboard)
+    {
+        if (_panel.IsOpen)
+            CloseIsland();
+        else
+            ShowPages(tray, keyboard);
+    }
+
+    /// <inheritdoc cref="TogglePages"/>
+    internal void ShowPages(TrayAnchor? tray, bool keyboard)
+    {
+        if (!_panel.IsOpen)
+        {
+            if (IsVisible)
+                OpenIsland();
+            else if (tray is not null)
+                OpenDocked(tray);
+        }
+        if (keyboard && _panel.IsOpen)
+            _panel.TakeKeyboard();
+    }
+
     private void OpenIsland()
     {
         if (!IsVisible || _dragging || Area is not { } area)
             return;
         _panel.Open(_docked, Grown(area), area);
+        Hook();
+    }
+
+    private void OpenDocked(TrayAnchor tray)
+    {
+        _panel.OpenDocked(tray.Display);
+        Hook();
+    }
+
+    /// <summary>Watches for Esc and clicks away while the pages are open.</summary>
+    private void Hook()
+    {
+        _trayIcon = TrayIconRect?.Invoke();
         var module = PInvoke.GetModuleHandle((string?)null);
         if (_escapeHook is null || _escapeHook.IsInvalid)
             _escapeHook = PInvoke.SetWindowsHookEx(WINDOWS_HOOK_ID.WH_KEYBOARD_LL, _onKeyboard, module, 0);
@@ -416,7 +466,7 @@ public partial class IslandWindow : Window
     private void RefreshTab()
     {
         var top = _activities.Count > 0 ? _activities[0] : null;
-        bool swollen = _hovered || _panel.IsVisible;
+        bool swollen = _hovered || (_panel.IsVisible && !_panel.IsDocked);
         SwellTo(IslandGeometry.TabSize(_docked, top is not null, swollen));
 
         Pet.Size = top is not null ? 22 : 20;
@@ -730,9 +780,11 @@ public partial class IslandWindow : Window
     {
         if (Area is not { } area)
             return;
+        // Docked by the tray, the pages are all there is: the tab is hidden with the island off.
+        bool docked = _panel.IsDocked;
         var tab = IslandNative.WindowRect(_hwnd);
-        var region = tab;
-        if (_panel.IsVisible)
+        var region = docked ? _panel.Footprint : tab;
+        if (_panel.IsVisible && !docked)
             region.Union(_panel.Footprint);
         region.Inflate(48 * area.Scale, 48 * area.Scale);
         region.Intersect(area.Monitor);
@@ -745,7 +797,8 @@ public partial class IslandWindow : Window
             var work = area.Work;
             work.Offset(-region.X, -region.Y);
             dc.DrawRectangle(null, new Pen(new SolidColorBrush(Color.FromArgb(0x80, 0x80, 0x80, 0x80)), 1), work);
-            Draw(dc, Root, tab, region, area.Scale);
+            if (!docked)
+                Draw(dc, Root, tab, region, area.Scale);
             if (_panel.IsVisible)
                 Draw(dc, _panel.Visual, IslandNative.WindowRect(_panel.Handle), region, area.Scale);
         }

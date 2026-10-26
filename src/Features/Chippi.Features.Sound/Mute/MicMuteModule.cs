@@ -69,9 +69,7 @@ public sealed class MicMuteModule : IFeatureModule
             ct.ThrowIfCancellationRequested();
             _hotkey = _createHotkey();
             ShortcutError = _hotkey.Register(Settings.Shortcut, OnHotkey) ? null : "Shortcut in use";
-            _tile = context.Ui.AddIslandTile(new("sound.microphone", "Microphone", "Mic", 30, 20,
-                () => new MicMuteView(this, compact: true)) { StatusPriority = 100 });
-            context.Ui.AddFlyoutSection("sound", "Sound", "AudioLines", 30, () => new MicMuteView(this, compact: true));
+            _tile = context.Ui.AddIslandTile(SoundTile.Section(10, SoundTile.Microphone, () => new MicMuteView(this, compact: true)) with { StatusPriority = 100 });
             context.Ui.SetSettingsPage(() => new MicMuteView(this));
             _audio.SnapshotChanged += OnSnapshot;
             UpdateState();
@@ -127,10 +125,10 @@ public sealed class MicMuteModule : IFeatureModule
     private void UpdateState()
     {
         bool warning = Status.State is MicrophoneMuteState.Muted or MicrophoneMuteState.Mixed;
-        _tile?.SetStatus(warning ? StatusText : "");
+        _tile?.SetStatus(!warning ? "" : Status.State == MicrophoneMuteState.Muted ? "Mic muted" : StatusText);
         if (warning)
             _context?.Island.Publish(new("muted", IslandActivityKind.Status, StatusText, "Microphone")
-                { NeedsAttention = true, TileKey = "sound.microphone" });
+                { NeedsAttention = true, TileKey = SoundTile.Key });
         else _context?.Island.Clear("muted");
         Changed?.Invoke();
     }

@@ -13,7 +13,7 @@ namespace Chippi.App.Tray;
 
 /// <summary>
 /// The tray icon's themed right-click menu (Open settings, Quit). Opens at the click, kept off the
-/// taskbar by the flyout's 12px gap, and hides on Esc, on a choice or when it loses activation.
+/// taskbar by the tray's 12px gap, and hides on Esc, on a choice or when it loses activation.
 /// </summary>
 public partial class TrayMenuWindow : Window
 {

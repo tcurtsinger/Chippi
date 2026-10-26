@@ -1,176 +1,153 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using System.Globalization;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
-using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using System.Windows.Shapes;
-using Chippi.UI.Controls;
 using Chippi.Audio;
+using Chippi.UI.Controls;
 
 namespace Chippi.Features.Sound.Routing;
 
-/// <summary>Routing's flyout section, its part of one shared island page, or Now Playing's output picker.</summary>
+/// <summary>
+/// Routing's sections of the Sound page (DESIGN.md §5 Island). Output: the device in use with the
+/// system volume and mute, then every connected output. Microphone: every connected mic. A pick
+/// always works and moves the device to the top of its priority list; unplugged devices are only in
+/// Settings.
+/// </summary>
 public sealed class RoutingQuickView : UserControl
 {
-    /// <summary>Only the flyout's output picker, for the island's Now Playing page.</summary>
-    public static RoutingQuickView OutputPicker(AudioRoutingModule module) => new(module, picker: true);
-
     private readonly AudioRoutingModule _module;
-    private readonly AudioFlow? _flow;
-    private readonly bool _island;
-    private readonly StackPanel _root = new();
-    private readonly Dictionary<AudioFlow, ComboBox> _choices = [];
+    private readonly AudioFlow _flow;
+    private readonly StackPanel _rows = new();
     private readonly TextBlock _error = RoutingUi.Text("", "CaptionTextStyle", "WarningTextBrush");
-    private readonly Slider _volume = new() { Minimum = 0, Maximum = 100, Width = 180 };
-    private readonly TextBlock _percent = RoutingUi.Text("", "NumberTextStyle", "TextSecondaryBrush");
+    private readonly TextBlock _output = new() { FontSize = 13, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center };
+    private readonly IconButton _mute = new() { Width = 28, Height = 28 };
+    private readonly Slider _volume = new() { Minimum = 0, Maximum = 100, SmallChange = 5, LargeChange = 10, IsMoveToPointEnabled = true, VerticalAlignment = VerticalAlignment.Center };
+    private readonly TextBlock _percent = new() { FontSize = 12, Width = 40, TextAlignment = TextAlignment.Right, VerticalAlignment = VerticalAlignment.Center };
+    private string _shape = "";
     private bool _refreshing;
-    private string _choiceKey = "";
 
-    public RoutingQuickView(AudioRoutingModule module, AudioFlow? flow = null, bool island = false)
+    public RoutingQuickView(AudioRoutingModule module, AudioFlow flow)
     {
         _module = module;
         _flow = flow;
-        _island = island;
-        if (island) Content = _root;
-        if (!island)
-        {
-            BuildFlyout();
-            var card = RoutingUi.Card(_root);
-            card.SetResourceReference(StyleProperty, "FlyoutCardStyle");
-            var panel = new StackPanel();
-            var heading = RoutingUi.Text("Sound", "HeadlineTextStyle");
-            heading.Margin = new Thickness(4, 0, 0, 8);
-            panel.Children.Add(heading);
-            panel.Children.Add(card);
-            Content = panel;
-        }
+        var root = new StackPanel();
+        if (flow == AudioFlow.Render)
+            root.Children.Add(OutputCard());
+        root.Children.Add(_rows);
+        _error.Margin = new Thickness(2, 6, 0, 0);
+        AutomationProperties.SetLiveSetting(_error, AutomationLiveSetting.Polite);
+        root.Children.Add(_error);
+        Content = root;
         Loaded += (_, _) => { _module.Changed += Refresh; Refresh(); };
         Unloaded += (_, _) => _module.Changed -= Refresh;
         Refresh();
     }
 
-    private RoutingQuickView(AudioRoutingModule module, bool picker)
+    /// <summary>The output in use, its mute and the system volume, which sets that output.</summary>
+    private Border OutputCard()
     {
-        _module = module;
-        BuildFlyout([AudioFlow.Render], volume: false);
-        Content = _root;
-        Loaded += (_, _) => { _module.Changed += Refresh; Refresh(); };
-        Unloaded += (_, _) => _module.Changed -= Refresh;
-        Refresh();
-    }
-
-    private void BuildFlyout() => BuildFlyout([AudioFlow.Render, AudioFlow.Capture], volume: true);
-
-    private void BuildFlyout(AudioFlow[] flows, bool volume)
-    {
-        foreach (var flow in flows)
+        var glyph = new LucideIcon { Data = LucideIcons.Speaker, Size = 16, Margin = new Thickness(0, 0, 10, 0), VerticalAlignment = VerticalAlignment.Center };
+        glyph.SetResourceReference(LucideIcon.BrushProperty, "IslandAccentBrush");
+        _mute.Click += (_, _) =>
         {
-            var combo = new ComboBox { MinWidth = 180, MaxWidth = 240, DisplayMemberPath = nameof(PriorityEntry.Name), SelectedValuePath = nameof(PriorityEntry.Id) };
-            combo.SetResourceReference(StyleProperty, "HopperComboBoxStyle");
-            AutomationProperties.SetName(combo, flow == AudioFlow.Render ? "Preferred output" : "Preferred microphone");
-            combo.SelectionChanged += (_, _) =>
-            {
-                if (!_refreshing && combo.SelectedItem is PriorityEntry { Id.Length: > 0 } entry) Run(_module.PreferAsync(flow, entry.Id));
-            };
-            _choices[flow] = combo;
-            var grid = RoutingUi.Columns(GridLength.Auto, new(1, GridUnitType.Star));
-            var label = RoutingUi.Text(flow == AudioFlow.Render ? "Output" : "Microphone");
-            label.Margin = new Thickness(0, 0, 12, 0);
-            RoutingUi.Add(grid, label, 0);
-            RoutingUi.Add(grid, combo, 1);
-            _root.Children.Add(RoutingUi.Pad(grid, 48));
-            if (flow == AudioFlow.Render && volume)
-            {
-                _volume.SetResourceReference(StyleProperty, "HopperSliderStyle");
-                AutomationProperties.SetName(_volume, "Output volume");
-                _volume.ValueChanged += (_, _) =>
-                {
-                    if (!_refreshing && _module.Snapshot.Default(AudioFlow.Render, AudioRole.Multimedia) is { } id)
-                        Run(SetVolume(id, (float)_volume.Value / 100));
-                };
-                var levels = RoutingUi.Columns(new(1, GridUnitType.Star), GridLength.Auto);
-                _volume.HorizontalAlignment = HorizontalAlignment.Stretch;
-                _volume.Width = double.NaN;
-                RoutingUi.Add(levels, _volume, 0);
-                _percent.Margin = new Thickness(16, 0, 0, 0);
-                _percent.MinWidth = 28;
-                RoutingUi.Add(levels, _percent, 1);
-                _root.Children.Add(RoutingUi.Pad(levels, 40));
-            }
-        }
-        _root.Children.Add(_error);
+            if (_module.InUse(AudioFlow.Render) is { } id)
+                Run(_module.SetOutputMutedAsync(id, !Level(id).Muted));
+        };
+        DockPanel.SetDock(glyph, Dock.Left);
+        DockPanel.SetDock(_mute, Dock.Right);
+        var top = new DockPanel { Children = { glyph, _mute, _output } };
+
+        _volume.SetResourceReference(StyleProperty, "HopperSliderStyle");
+        AutomationProperties.SetName(_volume, "System volume");
+        _volume.ValueChanged += (_, e) =>
+        {
+            ShowPercent();
+            if (!_refreshing && _module.InUse(AudioFlow.Render) is { } id)
+                Run(_module.SetOutputVolumeAsync(id, (float)e.NewValue / 100));
+        };
+        _percent.SetResourceReference(TextBlock.ForegroundProperty, "IslandTextTertiaryBrush");
+        DockPanel.SetDock(_percent, Dock.Right);
+        var levels = new DockPanel { Margin = new Thickness(0, 8, 0, 0), Children = { _percent, _volume } };
+
+        var card = new Border { Child = new StackPanel { Children = { top, levels } }, Margin = new Thickness(0, 0, 0, 6) };
+        card.SetResourceReference(StyleProperty, "IslandCardStyle");
+        return card;
     }
 
-    private Task SetVolume(string id, float volume) => _module.SetOutputVolumeAsync(id, volume);
+    private (float Volume, bool Muted) Level(string id) =>
+        _module.Snapshot.Levels.TryGetValue(id, out var level) ? (level.Volume, level.Muted) : (0, false);
+
+    private void ShowPercent() =>
+        _percent.Text = _module.InUse(AudioFlow.Render) is { } id && Level(id).Muted ? "Muted" : $"{Math.Round(_volume.Value).ToString(CultureInfo.CurrentCulture)}%";
 
     private void Refresh()
     {
         if (!Dispatcher.CheckAccess()) { Dispatcher.BeginInvoke(Refresh); return; }
-        if (_island) { RenderIsland(); return; }
         _refreshing = true;
         try
         {
-            var key = string.Join("|", _module.Settings.Output.Devices.Concat(_module.Settings.Microphone.Devices)) + string.Join("|", _module.Snapshot.Endpoints) + string.Join("|", _module.Snapshot.Defaults.Values);
-            foreach (var (flow, combo) in _choices)
+            var inUse = _module.InUse(_flow);
+            var connected = _module.Settings.For(_flow).Devices.Where(e => _module.Snapshot.Find(e.Id)?.IsActive == true).ToList();
+            var shape = string.Join("|", connected.Select(e => e.Id + e.Name)) + ":" + inUse;
+            if (shape != _shape)
             {
-                var available = _module.Settings.For(flow).Devices.Where(e => _module.Snapshot.Find(e.Id)?.IsActive == true).ToList();
-                var current = _module.Snapshot.Default(flow, AudioRole.Multimedia);
-                var listed = available.Any(e => string.Equals(e.Id, current, StringComparison.OrdinalIgnoreCase));
-                if (_choiceKey != key) combo.ItemsSource = listed ? available : [new PriorityEntry("", _module.CurrentName(flow)), .. available];
-                combo.SelectedValue = listed ? available.First(e => string.Equals(e.Id, current, StringComparison.OrdinalIgnoreCase)).Id : "";
-                combo.IsEnabled = _module.Settings.For(flow).Enabled && available.Count > 0;
+                _shape = shape;
+                _rows.Children.Clear();
+                foreach (var entry in connected)
+                    _rows.Children.Add(Row(entry, string.Equals(entry.Id, inUse, StringComparison.OrdinalIgnoreCase)));
+                if (connected.Count == 0)
+                {
+                    var none = RoutingUi.Text("None connected", "CaptionTextStyle", "IslandTextTertiaryBrush");
+                    none.Margin = new Thickness(2, 4, 0, 4);
+                    _rows.Children.Add(none);
+                }
             }
-            _choiceKey = key;
-            var output = _module.Snapshot.Default(AudioFlow.Render, AudioRole.Multimedia);
-            _volume.IsEnabled = output is not null && _module.Snapshot.Levels.ContainsKey(output);
-            _volume.Value = output is not null && _module.Snapshot.Levels.TryGetValue(output, out var level) ? level.Volume * 100 : 0;
-            _percent.Text = Math.Round(_volume.Value).ToString(System.Globalization.CultureInfo.CurrentCulture);
+            if (_flow == AudioFlow.Render)
+            {
+                _output.Text = _module.CurrentName(AudioFlow.Render);
+                bool known = inUse is not null && _module.Snapshot.Levels.ContainsKey(inUse);
+                var (volume, muted) = inUse is null ? (0f, false) : Level(inUse);
+                _volume.IsEnabled = _mute.IsEnabled = known;
+                if (!_volume.IsMouseCaptureWithin && !_volume.IsKeyboardFocusWithin)
+                    _volume.Value = volume * 100;
+                ShowPercent();
+                _mute.Icon = muted ? LucideIcons.VolumeMuted : LucideIcons.Volume;
+                _mute.ToolTip = muted ? "Unmute" : "Mute";
+                AutomationProperties.SetName(_mute, muted ? "Unmute system volume" : "Mute system volume");
+            }
             _error.Text = _module.Error ?? "";
-            _error.Visibility = string.IsNullOrEmpty(_error.Text) ? Visibility.Collapsed : Visibility.Visible;
+            _error.Visibility = _error.Text.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
         }
         finally { _refreshing = false; }
     }
 
-    private void RenderIsland()
+    /// <summary>A connected device: a radio, its name and state. Picking it makes it the one in use.</summary>
+    private Button Row(PriorityEntry entry, bool selected)
     {
-        var flow = _flow ?? AudioFlow.Render;
-        _root.Children.Clear();
-        var header = RoutingUi.Text(flow == AudioFlow.Render ? "Output" : "Microphone", "HeadlineTextStyle");
-        header.Margin = new Thickness(0, 0, 0, 8);
-        _root.Children.Add(header);
-        foreach (var entry in _module.Settings.For(flow).Devices)
+        var radio = new Ellipse
         {
-            var stack = new StackPanel();
-            stack.Children.Add(RoutingUi.Text(entry.Name));
-            stack.Children.Add(RoutingUi.Text(_module.Status(flow, entry), "CaptionTextStyle", "TextSecondaryBrush"));
-            var content = RoutingUi.Columns(GridLength.Auto, new(1, GridUnitType.Star), GridLength.Auto);
-            var selected = string.Equals(_module.Snapshot.Default(flow, AudioRole.Multimedia), entry.Id, StringComparison.OrdinalIgnoreCase);
-            var circle = new Ellipse { Width = 14, Height = 14, StrokeThickness = selected ? 4 : 1, Margin = new Thickness(0, 0, 10, 0), VerticalAlignment = VerticalAlignment.Center };
-            circle.SetResourceReference(Shape.StrokeProperty, selected ? "IslandAccentBrush" : "TextSecondaryBrush");
-            RoutingUi.Add(content, circle, 0);
-            RoutingUi.Add(content, stack, 1);
-            var rank = _module.Settings.For(flow).Devices.ToList().IndexOf(entry) + 1;
-            RoutingUi.Add(content, RoutingUi.Text($"#{rank}", "CaptionTextStyle", "TextSecondaryBrush"), 2);
-            var button = new Button { Content = content, HorizontalContentAlignment = HorizontalAlignment.Stretch, IsEnabled = _module.Settings.For(flow).Enabled && _module.Snapshot.Find(entry.Id)?.IsActive == true };
-            button.SetResourceReference(StyleProperty, "FlyoutRowButtonStyle");
-            if (selected) button.SetResourceReference(BackgroundProperty, "IslandPanelBrush");
-            if (!button.IsEnabled) button.Opacity = 0.5;
-            AutomationProperties.SetName(button, $"Prefer {entry.Name}");
-            button.Click += (_, _) => Run(_module.PreferAsync(flow, entry.Id));
-            _root.Children.Add(button);
-        }
-        if (_module.Settings.For(flow).Devices.Count == 0) _root.Children.Add(RoutingUi.Text("No devices"));
-        var toggle = RoutingUi.Switch("Priority switching", _module.Settings.For(flow).Enabled,
-            on => Run(_module.SetEnabledAsync(flow, on)));
-        var footer = RoutingUi.Columns(new(1, GridUnitType.Star), GridLength.Auto);
-        footer.Margin = new Thickness(0, 12, 0, 0);
-        RoutingUi.Add(footer, RoutingUi.Text("Priority switching"), 0);
-        RoutingUi.Add(footer, toggle, 1);
-        _root.Children.Add(footer);
-        if (_module.Error is { } error) _root.Children.Add(RoutingUi.Text(error, "CaptionTextStyle", "WarningTextBrush"));
+            Width = 16, Height = 16, StrokeThickness = selected ? 5 : 1, Margin = new Thickness(0, 0, 10, 0),
+            VerticalAlignment = VerticalAlignment.Center, Fill = selected ? Brushes.Black : Brushes.Transparent,
+        };
+        radio.SetResourceReference(Shape.StrokeProperty, selected ? "IslandAccentBrush" : "IslandTextTertiaryBrush");
+        var name = new TextBlock { Text = entry.Name, FontSize = 13, TextTrimming = TextTrimming.CharacterEllipsis };
+        var state = RoutingUi.Text(_module.Status(_flow, entry), "CaptionTextStyle", "IslandTextTertiaryBrush");
+        DockPanel.SetDock(radio, Dock.Left);
+        var content = new DockPanel { Children = { radio, new StackPanel { VerticalAlignment = VerticalAlignment.Center, Children = { name, state } } } };
+        var button = new Button { Content = content, ToolTip = entry.Name, Tag = selected ? "Selected" : null };
+        button.SetResourceReference(StyleProperty, "IslandRowButtonStyle");
+        AutomationProperties.SetName(button, selected ? $"{entry.Name}, in use" : $"Use {entry.Name}");
+        button.Click += (_, _) =>
+        {
+            if (!selected)
+                Run(_module.PreferAsync(_flow, entry.Id));
+        };
+        return button;
     }
 
     private async void Run(Task change)

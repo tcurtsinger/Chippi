@@ -66,14 +66,12 @@
                                      AutomationProperties.Name="Find a setting" TextChanged="OnSearchChanged" />
                         <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False">
                             <StackPanel>
-                                <TextBlock Text="Your features" Style="{StaticResource NavGroupTextStyle}" Margin="12,0,0,6" />
-                                <ListBox x:Name="FeatureNav" Background="Transparent" BorderThickness="0"
-                                         ItemContainerStyle="{StaticResource NavItemStyle}" ItemTemplate="{StaticResource NavItemTemplate}"
-                                         SelectionChanged="OnFeatureSelectionChanged" AutomationProperties.Name="Your features" />
-                                <TextBlock Text="Chippi" Style="{StaticResource NavGroupTextStyle}" Margin="12,20,0,6" />
+                                <!-- The installed features' pages under their catalog groups (Files, Sound, System…), built in code. -->
+                                <StackPanel x:Name="FeatureGroups" />
+                                <TextBlock x:Name="ChippiGroup" Text="Chippi" Style="{StaticResource NavGroupTextStyle}" Margin="12,20,0,6" />
                                 <ListBox x:Name="Nav" Background="Transparent" BorderThickness="0"
                                          ItemContainerStyle="{StaticResource NavItemStyle}" ItemTemplate="{StaticResource NavItemTemplate}"
-                                         SelectionChanged="OnNavSelectionChanged" AutomationProperties.Name="Settings pages" />
+                                         SelectionChanged="OnNavSelectionChanged" AutomationProperties.Name="Chippi" />
                             </StackPanel>
                         </ScrollViewer>
                     </DockPanel>

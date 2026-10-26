@@ -25,7 +25,7 @@ public sealed class MicMuteUiTests
         await f.Start();
         await Sta(async () =>
         {
-            var page = new MicMuteView(f.Module);
+            var page = new MicMuteView(f.Module, compact: true); // the Sound page's mic card
             var mute = Children(page).OfType<Button>().Single(b => AutomationProperties.GetName(b) == "Mute all microphones");
             ((IInvokeProvider)new ButtonAutomationPeer(mute)).Invoke();
             await Until(() => page.IsEnabled && f.Module.Status.State == MicrophoneMuteState.Muted);
@@ -53,17 +53,17 @@ public sealed class MicMuteUiTests
     }
 
     [Fact]
-    public async Task Missing_mic_disables_mute_in_every_contributed_surface()
+    public async Task Missing_mic_disables_mute_on_the_sound_page_and_settings_holds_only_the_shortcut()
     {
         await using var f = new MuteFixture();
         await f.Start();
         await Sta(() =>
         {
-            foreach (var surface in new[] { f.Ui.Page!(null), f.Ui.Flyouts.Single().CreateView(), f.Ui.Tiles.Single().Spec.CreateSection() })
-            {
-                var view = Assert.IsType<MicMuteView>(surface);
-                Assert.False(Children(view).OfType<Button>().Single(b => AutomationProperties.GetName(b) == "Mute all microphones").IsEnabled);
-            }
+            var card = Assert.IsType<MicMuteView>(f.Ui.Tiles.Single().Spec.CreateSection());
+            Assert.False(Children(card).OfType<Button>().Single(b => AutomationProperties.GetName(b) == "Mute all microphones").IsEnabled);
+            var settings = Assert.IsType<MicMuteView>(f.Ui.Page!(null));
+            Assert.DoesNotContain(Children(settings).OfType<Button>(), b => AutomationProperties.GetName(b) == "Mute all microphones");
+            Assert.Contains(Children(settings).OfType<Button>(), b => AutomationProperties.GetName(b) == "Change shortcut");
             return Task.CompletedTask;
         });
     }

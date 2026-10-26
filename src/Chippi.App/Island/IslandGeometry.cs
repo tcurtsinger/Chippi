@@ -26,7 +26,7 @@ public enum OrbitSlot
 
     Settings,
 
-    /// <summary>The tile with <c>IslandOrbit.Right</c> (Volume mixer).</summary>
+    /// <summary>The tile with <c>IslandOrbit.Right</c> (App volume).</summary>
     Right,
 
     /// <summary>The live activity's tile, below the island.</summary>
@@ -167,47 +167,51 @@ public static class IslandGeometry
     /// <summary>An orbit button's diameter (DIPs).</summary>
     public const double OrbitSize = 40;
 
-    /// <summary>The gap between the shape and its orbit buttons, and from the shape's top to the first one (DIPs).</summary>
+    /// <summary>The gap between the shape and its orbit buttons (DIPs).</summary>
     public const double OrbitGap = 12;
 
     /// <summary>From one orbit button's top to the next one's: 40 plus the 8px gap (DIPs).</summary>
     public const double OrbitStep = 48;
 
     /// <summary>
-    /// The orbit buttons around an open shape (DIPs, any origin), DESIGN.md §5 Island. On the top edge
-    /// <see cref="OrbitSlot.Back"/> sits 12px from the shape's top on the left with
-    /// <see cref="OrbitSlot.Left"/> under it, and Settings and <see cref="OrbitSlot.Right"/> likewise on
-    /// the right. On a side edge all four stack on the open side in that order; a missing feature
-    /// closes up its column. Back's place is always kept, so nothing moves when it appears on a page.
-    /// <see cref="OrbitSlot.Live"/> is centered below.
+    /// The orbit buttons around an open shape (DIPs, any origin), DESIGN.md §5 Island: two pairs 12px
+    /// off the shape, beside it along its edge, each pair centered on it. On the top edge
+    /// <see cref="OrbitSlot.Back"/> over <see cref="OrbitSlot.Left"/> sit left of the shape and Settings
+    /// over <see cref="OrbitSlot.Right"/> right of it, never closer than 8px to its top. On a side edge
+    /// Back and Left sit side by side above it and Settings and Right below it. Each pair keeps both
+    /// places, so nothing moves when a button appears. <see cref="OrbitSlot.Live"/> is centered on the
+    /// far side: below the shape on top, beside it on a side.
     /// </summary>
     public static IReadOnlyList<(OrbitSlot Slot, Rect Rect)> OrbitLayout(IslandEdge edge, Rect shape, IReadOnlyCollection<OrbitSlot> slots)
     {
         var placed = new List<(OrbitSlot, Rect)>();
-        Rect At(double x, double row) => new(x, shape.Top + OrbitGap + row * OrbitStep, OrbitSize, OrbitSize);
-        void Column(double x, OrbitSlot[] order)
+        const double pair = OrbitStep + OrbitSize; // two buttons and the 8px between them
+        void Place(OrbitSlot slot, double x, double y)
         {
-            int row = 0;
-            foreach (var slot in order)
-            {
-                if (slots.Contains(slot))
-                    placed.Add((slot, At(x, row)));
-                if (slots.Contains(slot) || slot == OrbitSlot.Back)
-                    row++;
-            }
+            if (slots.Contains(slot))
+                placed.Add((slot, new Rect(x, y, OrbitSize, OrbitSize)));
         }
         if (edge == IslandEdge.Top)
         {
-            Column(shape.Left - OrbitGap - OrbitSize, [OrbitSlot.Back, OrbitSlot.Left]);
-            Column(shape.Right + OrbitGap, [OrbitSlot.Settings, OrbitSlot.Right]);
+            double top = shape.Top + Math.Max(Gap, shape.Height / 2 - pair / 2);
+            double left = shape.Left - OrbitGap - OrbitSize, right = shape.Right + OrbitGap;
+            Place(OrbitSlot.Back, left, top);
+            Place(OrbitSlot.Left, left, top + OrbitStep);
+            Place(OrbitSlot.Settings, right, top);
+            Place(OrbitSlot.Right, right, top + OrbitStep);
+            Place(OrbitSlot.Live, shape.Left + shape.Width / 2 - OrbitSize / 2, shape.Bottom + OrbitGap);
         }
         else
         {
-            Column(edge == IslandEdge.Left ? shape.Right + OrbitGap : shape.Left - OrbitGap - OrbitSize,
-                [OrbitSlot.Back, OrbitSlot.Left, OrbitSlot.Settings, OrbitSlot.Right]);
+            double left = shape.Left + shape.Width / 2 - pair / 2;
+            double above = shape.Top - OrbitGap - OrbitSize, below = shape.Bottom + OrbitGap;
+            Place(OrbitSlot.Back, left, above);
+            Place(OrbitSlot.Left, left + OrbitStep, above);
+            Place(OrbitSlot.Settings, left, below);
+            Place(OrbitSlot.Right, left + OrbitStep, below);
+            Place(OrbitSlot.Live, edge == IslandEdge.Left ? shape.Right + OrbitGap : shape.Left - OrbitGap - OrbitSize,
+                shape.Top + shape.Height / 2 - OrbitSize / 2);
         }
-        if (slots.Contains(OrbitSlot.Live))
-            placed.Add((OrbitSlot.Live, new Rect(shape.Left + shape.Width / 2 - OrbitSize / 2, shape.Bottom + OrbitGap, OrbitSize, OrbitSize)));
         return placed;
     }
 

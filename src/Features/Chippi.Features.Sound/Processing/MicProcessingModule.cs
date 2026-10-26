@@ -84,11 +84,7 @@ public sealed class MicProcessingModule : IFeatureModule
             _lease = audio.Acquire();
             await RecoverAsync(audio, context);
             context.Notifier.Declare([new("stopped", "Stopped", NoticePlaces.Windows | NoticePlaces.Island)]);
-            _tile = context.Ui.AddIslandTile(new("sound.microphone", "Microphone", "Mic", 30, 10, () => new ProcessingQuickView(this, island: true))
-            {
-                StatusPriority = 10,
-            });
-            context.Ui.AddFlyoutSection("sound", "Sound", "AudioLines", 20, () => new ProcessingQuickView(this, island: false));
+            _tile = context.Ui.AddIslandTile(SoundTile.Section(30, SoundTile.Microphone, () => new ProcessingQuickView(this)) with { StatusPriority = 10 });
             context.Ui.SetSettingsPage(_ => new ProcessingPage(this));
             audio.SnapshotChanged += OnSnapshot;
             _lastState = ProcessingState.Off;
@@ -296,12 +292,8 @@ public sealed class MicProcessingModule : IFeatureModule
     private void UpdateTile(ProcessingStatus status)
     {
         _lastState = status.State;
-        _tile?.SetStatus(status.State switch
-        {
-            ProcessingState.Live => "Live",
-            ProcessingState.Stopped => "Stopped",
-            _ => "",
-        });
+        // The Sound tile shows the output; clean-up speaks up only when it stopped.
+        _tile?.SetStatus(status.State == ProcessingState.Stopped ? "Clean-up stopped" : "");
     }
 
     private void ScheduleSave()

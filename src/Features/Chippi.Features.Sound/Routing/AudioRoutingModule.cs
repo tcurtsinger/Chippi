@@ -11,10 +11,6 @@ namespace Chippi.Features.Sound.Routing;
 
 public sealed class AudioRoutingModule : IFeatureModule
 {
-    public const string OutputTile = "sound.output";
-    public const string MicrophoneTile = "sound.microphone";
-    /// <summary>The shell's Now Playing page; sections under this key sit below the player.</summary>
-    public const string NowPlayingTile = "now-playing";
     private static readonly AudioRole[] AllRoles = [AudioRole.Console, AudioRole.Multimedia, AudioRole.Communications];
     private static readonly AudioRole[] WithoutCalls = [AudioRole.Console, AudioRole.Multimedia];
     private readonly SemaphoreSlim _gate = new(1);
@@ -22,8 +18,7 @@ public sealed class AudioRoutingModule : IFeatureModule
     private AudioService? _audio;
     private IAsyncDisposable? _lease;
     private ModuleContext? _context;
-    private IIslandTile? _outputTile;
-    private IIslandTile? _microphoneTile;
+    private IIslandTile? _tile;
     private volatile bool _stopping;
 
     public AudioRoutingModule() : this(null) { }
@@ -73,12 +68,8 @@ public sealed class AudioRoutingModule : IFeatureModule
                 new("output-switched", "Output switched", NoticePlaces.Island),
                 new("mic-pinned", "Microphone switched", NoticePlaces.None),
             ]);
-            _outputTile = context.Ui.AddIslandTile(new(OutputTile, "Output", "Headphones", 20, 0,
-                () => new RoutingQuickView(this, AudioFlow.Render, island: true)));
-            _microphoneTile = context.Ui.AddIslandTile(new(MicrophoneTile, "Microphone", "Mic", 30, 0,
-                () => new RoutingQuickView(this, AudioFlow.Capture, island: true)));
-            context.Ui.AddIslandTile(new(NowPlayingTile, "Now Playing", "Music", 0, 20, () => RoutingQuickView.OutputPicker(this)));
-            context.Ui.AddFlyoutSection("sound", "Sound", "AudioLines", 10, () => new RoutingQuickView(this));
+            _tile = context.Ui.AddIslandTile(SoundTile.Section(0, SoundTile.Output, () => new RoutingQuickView(this, AudioFlow.Render)));
+            context.Ui.AddIslandTile(SoundTile.Section(20, SoundTile.Microphone, () => new RoutingQuickView(this, AudioFlow.Capture)));
             context.Ui.SetSettingsPage(section => new RoutingPage(this, section == "microphone" ? AudioFlow.Capture : AudioFlow.Render));
             _audio.SnapshotChanged += OnSnapshot;
             _audio.RolesChanged += OnRoles;
@@ -161,10 +152,23 @@ public sealed class AudioRoutingModule : IFeatureModule
         return list with { Devices = items };
     });
 
-    /// <summary>A quick selection permanently promotes the device, not a one-off OS override.</summary>
-    public Task PreferAsync(AudioFlow flow, string id) => MoveAsync(flow, id, 0);
+    /// <summary>
+    /// A pick on the Sound page: the device moves to the top of its priority list and is used now.
+    /// With priority switching off, it is set once and then left to Windows, so a pick always works;
+    /// switching only decides what happens when devices come and go.
+    /// </summary>
+    public Task PreferAsync(AudioFlow flow, string id) => EditAsync(flow, list =>
+    {
+        var items = list.Devices.ToList();
+        var from = items.FindIndex(e => Eq(e.Id, id));
+        if (from <= 0) return list;
+        var item = items[from];
+        items.RemoveAt(from);
+        items.Insert(0, item);
+        return list with { Devices = items };
+    }, pick: id);
 
-    private async Task EditAsync(AudioFlow flow, Func<RoutingList, RoutingList> edit)
+    private async Task EditAsync(AudioFlow flow, Func<RoutingList, RoutingList> edit, string? pick = null)
     {
         await _gate.WaitAsync();
         try
@@ -175,11 +179,24 @@ public sealed class AudioRoutingModule : IFeatureModule
             _context.Settings.Save(settings);
             Settings = settings;
             await EnforceAsync(flow);
+            if (pick is not null && !settings.For(flow).Enabled)
+                await PickOnceAsync(flow, pick, settings.For(flow).Calls);
             Error = null;
             UpdateTiles();
         }
         catch (Exception ex) { Error = AudioErrors.Reason(ex); throw; }
         finally { _gate.Release(); Changed?.Invoke(); }
+    }
+
+    /// <summary>Points the flow's roles at <paramref name="id"/> once: claimed, applied, then released to Windows.</summary>
+    private async Task PickOnceAsync(AudioFlow flow, string id, bool calls)
+    {
+        try
+        {
+            await _audio!.ClaimRolesAsync(RoleOwner.Routing, flow, calls ? AllRoles : WithoutCalls,
+                active => active.FirstOrDefault(e => Eq(e.Id, id))?.Id);
+        }
+        finally { await _audio!.ReleaseRolesAsync(RoleOwner.Routing, flow); } // a failed pick must not leave switching on
     }
 
     private async void OnSnapshot(object? sender, AudioSnapshot snapshot)
@@ -219,8 +236,30 @@ public sealed class AudioRoutingModule : IFeatureModule
         finally { Changed?.Invoke(); }
     }
 
+    /// <summary>Sets the output's mute.</summary>
+    public async Task SetOutputMutedAsync(string id, bool muted)
+    {
+        try
+        {
+            if ((await _audio!.SetEndpointMuteAsync([id], muted)).Count > 0) throw new AudioFailure("Mute failed");
+            Error = null;
+        }
+        catch (Exception ex) { Error = AudioErrors.Reason(ex); throw; }
+        finally { Changed?.Invoke(); }
+    }
+
+    /// <summary>
+    /// The device in use: the Windows default, except a mic while Mic processing holds the default
+    /// (its cable), when it is the real mic Routing picked.
+    /// </summary>
+    public string? InUse(AudioFlow flow)
+    {
+        var id = Snapshot.Default(flow, AudioRole.Multimedia);
+        return flow == AudioFlow.Capture && (id is null || Snapshot.Find(id) is not { } endpoint || _excluded(endpoint)) ? WinningMicrophone : id;
+    }
+
     public string CurrentName(AudioFlow flow) =>
-        Snapshot.Find(Snapshot.Default(flow, AudioRole.Multimedia) ?? "")?.Name ?? (flow == AudioFlow.Render ? "No output" : "No microphone");
+        Snapshot.Find(InUse(flow) ?? "")?.Name ?? (flow == AudioFlow.Render ? "No output" : "No microphone");
 
     public IReadOnlyList<AudioEndpoint> Addable(AudioFlow flow) => Snapshot.Known(flow)
         .Where(e => !_excluded(e) && !Settings.For(flow).Devices.Any(d => Eq(d.Id, e.Id))).ToList();
@@ -229,18 +268,15 @@ public sealed class AudioRoutingModule : IFeatureModule
     {
         var endpoint = Snapshot.Find(entry.Id);
         if (endpoint is null || !endpoint.IsActive) return "Not connected";
-        return Eq(Snapshot.Default(flow, AudioRole.Multimedia), entry.Id)
+        return Eq(InUse(flow), entry.Id)
             ? flow == AudioFlow.Render ? "Playing now" : "In use"
             : "Connected";
     }
 
     public void OpenSettings(AudioFlow flow) => _context?.OpenSettings(flow == AudioFlow.Render ? "output" : "microphone");
 
-    private void UpdateTiles()
-    {
-        _outputTile?.SetStatus(CurrentName(AudioFlow.Render));
-        _microphoneTile?.SetStatus(CurrentName(AudioFlow.Capture));
-    }
+    /// <summary>The Sound tile shows the output in use.</summary>
+    private void UpdateTiles() => _tile?.SetStatus(CurrentName(AudioFlow.Render));
 
     public async Task StopAsync(CancellationToken ct)
     {
@@ -254,7 +290,7 @@ public sealed class AudioRoutingModule : IFeatureModule
                 await ReleaseLeaseAsync();
             }
             _context = null;
-            _outputTile = _microphoneTile = null;
+            _tile = null;
         }
         finally { _gate.Release(); Changed?.Invoke(); }
     }

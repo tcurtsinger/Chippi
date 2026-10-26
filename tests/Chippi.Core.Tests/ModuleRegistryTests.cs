@@ -189,7 +189,7 @@ public sealed class ModuleRegistryTests : IDisposable
         module.OnStart = ctx =>
         {
             ctx.Island.Publish(new IslandActivity("on", IslandActivityKind.Timer, "Half started", "bad"));
-            ctx.Ui.AddFlyoutPanel("Bad", "Zap", () => new object());
+            ctx.Ui.AddIslandTile(new IslandTileSpec("bad", "Bad", "Zap", 10, 0, () => new object()));
         };
         module.FailOnStart = new InvalidOperationException("boom");
         _f.Registry.Register(module);
@@ -199,7 +199,7 @@ public sealed class ModuleRegistryTests : IDisposable
 
         Assert.Equal(1, module.Stops);
         Assert.False(module.HoldsResource);
-        Assert.Empty(_f.Registry.Find("bad")!.FlyoutPanels);
+        Assert.Empty(_f.Registry.Find("bad")!.IslandTiles);
         Assert.Null(_f.Island.Current);
     }
 
@@ -210,7 +210,7 @@ public sealed class ModuleRegistryTests : IDisposable
         module.OnStart = ctx =>
         {
             ctx.Island.Publish(new IslandActivity("on", IslandActivityKind.Timer, "Starting", "slow"));
-            ctx.Ui.AddFlyoutPanel("Slow", "Zap", () => new object());
+            ctx.Ui.AddIslandTile(new IslandTileSpec("slow", "Slow", "Zap", 10, 0, () => new object()));
         };
         module.FailOnStart = new OperationCanceledException();
         _f.Registry.Register(module);
@@ -220,7 +220,7 @@ public sealed class ModuleRegistryTests : IDisposable
 
         Assert.Equal(1, module.Stops);
         Assert.False(module.HoldsResource);
-        Assert.Empty(_f.Registry.Find("slow")!.FlyoutPanels);
+        Assert.Empty(_f.Registry.Find("slow")!.IslandTiles);
         Assert.Null(_f.Island.Current);
         Assert.Null(_f.Registry.Find("slow")!.LastError); // cancelled, not broken
     }
@@ -252,7 +252,7 @@ public sealed class ModuleRegistryTests : IDisposable
         module.OnStart = ctx =>
         {
             ctx.Island.Publish(new IslandActivity("on", IslandActivityKind.Timer, "Keeping awake", "Keep awake"));
-            ctx.Ui.AddFlyoutPanel("Keep awake", "Coffee", () => new object());
+            ctx.Ui.AddIslandTile(new IslandTileSpec("keep-awake", "Keep awake", "Coffee", 40, 0, () => new object()));
             ctx.Ui.SetSettingsPage(() => new object());
         };
         _f.Registry.Register(module);
@@ -260,12 +260,12 @@ public sealed class ModuleRegistryTests : IDisposable
 
         await _f.Registry.SetInstalledAsync("m", true);
         var entry = _f.Registry.Find("m")!;
-        Assert.Single(entry.FlyoutPanels);
+        Assert.Single(entry.IslandTiles);
         Assert.NotNull(entry.SettingsPage);
         Assert.Equal("m", _f.Island.Current!.ModuleId);
 
         await _f.Registry.SetInstalledAsync("m", false);
-        Assert.Empty(entry.FlyoutPanels);
+        Assert.Empty(entry.IslandTiles);
         Assert.Null(entry.SettingsPage);
         Assert.Null(_f.Island.Current);
     }

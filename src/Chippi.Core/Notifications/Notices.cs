@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Chippi.Core.Notifications;
 
-/// <summary>Where a notice may appear. The module's own flyout tab always lists every event; this is only about the two extra places.</summary>
+/// <summary>Where a notice may appear. The module's own island page or Settings always shows every event; this is only about the two extra places.</summary>
 [Flags]
 public enum NoticePlaces
 {

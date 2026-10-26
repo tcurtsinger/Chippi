@@ -86,6 +86,59 @@ public sealed class IslandPanelTests
     }
 
     [Fact]
+    public void Settings_order_and_hide_tiles_and_a_hidden_tile_keeps_its_page()
+    {
+        WpfTestThread.Run(() => WithPanel(panel =>
+        {
+            var hidden = new HashSet<string> { IslandPanelWindow.NowPlayingKey };
+            panel.SetLayout(IslandLayout.Default with { Order = ["keep-awake", "now-playing"], Hidden = hidden });
+            Open(panel);
+            Assert.Equal(["Keep awake", "Volume mixer"], TileNames(panel));
+            panel.ShowPage(IslandPanelWindow.NowPlayingKey);
+            Assert.Equal(IslandPanelWindow.NowPlayingKey, panel.CurrentPage);
+        }));
+    }
+
+    [Fact]
+    public void Settings_choose_the_round_buttons_and_can_turn_off_the_live_one()
+    {
+        WpfTestThread.Run(() => WithPanel(panel =>
+        {
+            panel.SetLayout(IslandLayout.Default with { Left = "", Right = IslandPanelWindow.NowPlayingKey, Live = false });
+            panel.SetActivities([new IslandActivity("track", IslandActivityKind.Media, "Song", "Player")], PetMood.Idle);
+            Open(panel);
+            Assert.Equal(["Settings", "Now Playing"], OrbitNames(panel)); // no left button, Now Playing on the right, no live button
+            panel.SetLayout(IslandLayout.Default);
+            Assert.Equal(["Keep awake", "Settings", "Volume mixer", "Now Playing"], OrbitNames(panel));
+        }));
+    }
+
+    [Fact]
+    public void With_all_features_chosen_it_opens_on_the_grid_even_with_a_page_remembered()
+    {
+        WpfTestThread.Run(() => WithPanel(panel =>
+        {
+            panel.SetLastPage("keep-awake");
+            panel.SetLayout(IslandLayout.Default with { OpensOn = IslandOpensOn.AllFeatures });
+            Open(panel);
+            Assert.Null(panel.CurrentPage);
+            Assert.Contains("Back to Keep awake", OrbitNames(panel));
+        }));
+    }
+
+    [Fact]
+    public void Layout_sorts_listed_keys_first_and_the_rest_in_their_own_order()
+    {
+        var layout = IslandLayout.Default with { Order = ["c", "a"], Hidden = new HashSet<string> { "b" } };
+        Assert.Equal(["c", "a", "b", "d"], layout.Sorted(["a", "b", "c", "d"]));
+        Assert.Equal(["c", "a", "d"], layout.Shown(["a", "b", "c", "d"]));
+        Assert.Equal("x", IslandLayout.Button(null, _ => true, "x"));
+        Assert.Null(IslandLayout.Button("", _ => true, "x"));
+        Assert.Null(IslandLayout.Button("gone", _ => false, "x"));
+        Assert.Equal("y", IslandLayout.Button("y", _ => true, "x"));
+    }
+
+    [Fact]
     public void A_tile_shows_its_status_and_a_shared_tile_the_highest_priority_one()
     {
         var routing = Part("sound.microphone", "Microphone", 30, status: "Live");

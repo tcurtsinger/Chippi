@@ -60,10 +60,10 @@ public sealed class KeepAwakeModule : IFeatureModule
         Deadline = null;
         StateLine = "Off";
         CreateSession();
-        context.Ui.AddFlyoutPanel(Descriptor.Name, nameof(LucideIcons.Coffee), () => new KeepAwakePanel(this));
         _tile = context.Ui.AddIslandTile(new IslandTileSpec(TileKey, Descriptor.Name, nameof(LucideIcons.Coffee), Order: 40, SectionOrder: 0, () => new KeepAwakeIslandView(this))
         {
             Orbit = IslandOrbit.Left,
+            StatusOnPage = true, // the chips show the length, not the time left
         });
         UpdateTile();
         // A timed session's tile counts down ("45 min left"); checked twice a minute, so it is never a minute stale.

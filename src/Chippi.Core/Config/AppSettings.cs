@@ -55,6 +55,16 @@ public enum IslandDisplay
     SpecificMonitor,
 }
 
+/// <summary>The page the island opens on (DESIGN.md §5 Island).</summary>
+public enum IslandOpensOn
+{
+    /// <summary>The page last used, while its tile exists; otherwise the grid.</summary>
+    LastPage,
+
+    /// <summary>Always the grid of all features.</summary>
+    AllFeatures,
+}
+
 /// <summary>Shell settings, the "app" section of settings.json.</summary>
 public sealed class AppSettings
 {
@@ -69,6 +79,9 @@ public sealed class AppSettings
     public AccentChoice Accent { get; set; } = AccentChoice.FollowWindows;
 
     public bool IslandEnabled { get; set; } = true;
+
+    /// <summary>Settings › Island &amp; pet: no tray icon while the island shows. It comes back while the island is off or hidden for a fullscreen app.</summary>
+    public bool HideTrayIcon { get; set; }
 
     public IslandEdge IslandEdge { get; set; } = IslandEdge.Top;
 
@@ -98,4 +111,22 @@ public sealed class AppSettings
 
     /// <summary>The island page last opened (a tile key), which the next open restores while that tile exists; null for the grid.</summary>
     public string? IslandLastPage { get; set; }
+
+    /// <summary>Settings › Island &amp; pet › Opens on.</summary>
+    public IslandOpensOn IslandOpensOn { get; set; } = IslandOpensOn.LastPage;
+
+    /// <summary>Settings › Island &amp; pet › Tiles: tile keys in the grid's order. Tiles not listed follow in their own order.</summary>
+    public List<string>? IslandTileOrder { get; set; }
+
+    /// <summary>Tile keys left off the grid. Their pages stay, for a round button.</summary>
+    public List<string>? IslandHiddenTiles { get; set; }
+
+    /// <summary>The round button beside the island's left (top edge) or upper (side edge) pair: a tile key, "" for none, or null for its feature's own (Keep awake).</summary>
+    public string? IslandLeftButton { get; set; }
+
+    /// <summary>Likewise for the right or lower pair; null is its feature's own (App volume).</summary>
+    public string? IslandRightButton { get; set; }
+
+    /// <summary>Settings › Island &amp; pet › Button for what's live: the round button for music or a muted mic.</summary>
+    public bool IslandLiveButton { get; set; } = true;
 }

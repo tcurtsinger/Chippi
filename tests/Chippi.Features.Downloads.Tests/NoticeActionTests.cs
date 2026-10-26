@@ -119,9 +119,14 @@ public sealed class NoticeActionTests : IDisposable
         f.AddRule(MovePdfs());
         f.Write("a.pdf");
         File.WriteAllText(Path.Combine(inbox, "b.pdf"), "b");
+        // The watchers' events arrive on their own threads; a slow machine (CI) can need more passes
+        // before both folders have been seen.
+        List<long> Runs() => f.History.Query(new HistoryQuery()).Select(o => o.RunId).Distinct().Order().ToList();
         f.Settle();
+        for (int pass = 0; pass < 40 && Runs().Count < 2; pass++)
+            f.Settle(passes: 1);
 
-        var runs = f.History.Query(new HistoryQuery()).Select(o => o.RunId).Distinct().Order().ToList();
+        var runs = Runs();
         var notices = f.Notifier.Shown.Where(n => n.Kind == DownloadsNotices.Organized).ToList();
         Assert.Equal(2, runs.Count);
         Assert.Equal(runs, notices.Select(n => long.Parse(n.Activation!.Split(' ')[1], System.Globalization.CultureInfo.InvariantCulture)).Order());
