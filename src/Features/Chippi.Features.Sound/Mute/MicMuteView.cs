@@ -35,33 +35,47 @@ public sealed class MicMuteView : UserControl
         if (_recording) return;
         _body.Children.Clear();
         bool muted = _module.Status.State == MicrophoneMuteState.Muted;
-        var action = RoutingUi.Button(muted ? "Unmute" : "Mute", Toggle);
-        AutomationProperties.SetName(action, muted ? "Unmute all microphones" : "Mute all microphones");
-        action.IsEnabled = _module.Status.State != MicrophoneMuteState.NoMicrophone;
-        var row = new SettingRow { Header = "Microphone", Description = _module.StatusText, Icon = LucideIcons.MicOff, Content = action };
-        bool warning = _module.Status.State is MicrophoneMuteState.Muted or MicrophoneMuteState.Mixed;
-        var glyph = new LucideIcon { Data = LucideIcons.MicOff, Size = 20, Margin = new Thickness(0, 0, 12, 0) };
-        glyph.SetResourceReference(LucideIcon.BrushProperty, warning ? "WarningTextBrush" : "TextSecondaryBrush");
-        row.Icon = null;
-        var statusRow = RoutingUi.Columns(GridLength.Auto, new GridLength(1, GridUnitType.Star));
-        RoutingUi.Add(statusRow, glyph, 0);
-        RoutingUi.Add(statusRow, row, 1);
-        _body.Children.Add(_compact ? statusRow : RoutingUi.Card(statusRow));
-        if (_module.Error is { } error) Error(error);
-        if (_compact) return;
-        _body.Children.Add(RoutingUi.Section("Shortcut"));
+        if (_compact)
+        {
+            _body.Children.Add(MicCard(muted));
+            if (_module.Error is { } failed) Error(failed);
+            return;
+        }
+        // The Mute shortcut section of Settings › Microphone: the keys, and the sound it plays. Muting
+        // itself is on the Sound page.
         var change = RoutingUi.Button("Change", () => BeginCapture());
+        AutomationProperties.SetName(change, "Change shortcut");
         var shortcut = new StackPanel { Orientation = Orientation.Horizontal };
         var keys = RoutingUi.Text(_module.Settings.Shortcut.ToString());
         keys.Margin = new Thickness(0, 0, 12, 0);
+        keys.VerticalAlignment = VerticalAlignment.Center;
         shortcut.Children.Add(keys);
         shortcut.Children.Add(change);
         _body.Children.Add(RoutingUi.Card(
             new SettingRow { Header = "Shortcut", Content = shortcut },
-            new SettingRow { Header = "Mics it mutes", Content = RoutingUi.Text("All microphones") }));
+            new SettingRow { Header = "Sound feedback", Content = RoutingUi.Switch("Sound feedback", _module.Settings.PlaySound, _module.SetPlaySound) }));
         if (_module.ShortcutError is { } shortcutError) Error(shortcutError);
-        _body.Children.Add(RoutingUi.Section("Options"));
-        _body.Children.Add(RoutingUi.Card(new SettingRow { Header = "Play a sound", Content = RoutingUi.Switch("Play a sound", _module.Settings.PlaySound, _module.SetPlaySound) }));
+        if (_module.Error is { } error) Error(error);
+    }
+
+    /// <summary>The Sound page's mic card: whether the mics are live, and Mute or Unmute.</summary>
+    private Border MicCard(bool muted)
+    {
+        bool warning = _module.Status.State is MicrophoneMuteState.Muted or MicrophoneMuteState.Mixed;
+        var glyph = new LucideIcon { Data = warning ? LucideIcons.MicOff : LucideIcons.Mic, Size = 16, Margin = new Thickness(0, 0, 10, 0), VerticalAlignment = VerticalAlignment.Center };
+        glyph.SetResourceReference(LucideIcon.BrushProperty, warning ? "WarningBrush" : "IslandAccentBrush");
+        var state = new TextBlock { Text = muted ? "Muted in every app" : _module.StatusText, FontSize = 13, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
+        if (warning) state.SetResourceReference(TextBlock.ForegroundProperty, "WarningTextBrush");
+        AutomationProperties.SetLiveSetting(state, AutomationLiveSetting.Polite);
+        var action = RoutingUi.Button(muted ? "Unmute" : "Mute", Toggle);
+        AutomationProperties.SetName(action, muted ? "Unmute all microphones" : "Mute all microphones");
+        action.IsEnabled = _module.Status.State != MicrophoneMuteState.NoMicrophone;
+        action.Margin = new Thickness(8, 0, 0, 0);
+        DockPanel.SetDock(glyph, Dock.Left);
+        DockPanel.SetDock(action, Dock.Right);
+        var card = new Border { Child = new DockPanel { Children = { glyph, action, state } }, Margin = new Thickness(0, 0, 0, 6) };
+        card.SetResourceReference(StyleProperty, "IslandCardStyle");
+        return card;
     }
 
     private void BeginCapture()
@@ -70,7 +84,7 @@ public sealed class MicMuteView : UserControl
         _module.CaptureShortcut(true);
         Focusable = true;
         _body.Children.Clear();
-        _body.Children.Add(RoutingUi.Card(new SettingRow { Header = "Press a shortcut", Content = RoutingUi.Button("Cancel", CancelCapture) }));
+        _body.Children.Add(RoutingUi.Card(new SettingRow { Header = "New shortcut", Content = RoutingUi.Button("Cancel", CancelCapture) }));
         Focus();
     }
 

@@ -39,12 +39,11 @@ public sealed class IslandPanelShots
                     TimeSpan.FromSeconds(72), TimeSpan.FromSeconds(232), DateTimeOffset.Now, null)],
             };
             var tiles = Tiles(
-                Section("sound.mixer", "Volume mixer", 10, 200, IslandOrbit.Right, 344, "4 apps"),
-                Section("sound.output", "Output", 20, 150, status: "OMEN 34c"),
-                Section("sound.microphone", "Microphone", 30, 170, status: "Muted"),
+                Section("sound", "Sound", 10, 220, width: 640, status: "Mic muted"),
+                Section("sound.mixer", "App volume", 20, 200, IslandOrbit.Right, status: "4 apps"),
                 Section("keep-awake", "Keep awake", 40, 96, IslandOrbit.Left, status: "1 hr left"),
                 Section("downloads", "File organizer", 50, 120, status: "Silent"));
-            var muted = new IslandActivity("muted", IslandActivityKind.Status, "Microphone", "Muted") { NeedsAttention = true, TileKey = "sound.microphone" };
+            var muted = new IslandActivity("muted", IslandActivityKind.Status, "Microphone", "Muted") { NeedsAttention = true, TileKey = "sound" };
             foreach (var (edge, tab) in new[]
             {
                 (IslandEdge.Top, new Rect(-20000 + 960 - 68, 0, 136, 36)),
@@ -87,14 +86,13 @@ public sealed class IslandPanelShots
         });
     }
 
-    // A stand-in section: a heading and a card of the given height.
+    // A stand-in section: a card of the given height (the island draws the page's name above it).
     private static IslandTileContribution Section(string key, string name, int order, double height, IslandOrbit orbit = IslandOrbit.None, double width = 328, string status = "")
     {
         var part = new IslandTileContribution(key, new IslandTileSpec(key, name, Icon(key), order, 0, () =>
         {
-            var card = new Border { Height = height, CornerRadius = new CornerRadius(8), Background = new SolidColorBrush(Color.FromArgb(0x0F, 0xFF, 0xFF, 0xFF)), Margin = new Thickness(0, 8, 0, 0),
+            return new Border { Height = height, CornerRadius = new CornerRadius(8), Background = new SolidColorBrush(Color.FromArgb(0x0F, 0xFF, 0xFF, 0xFF)),
                 Child = new TextBlock { Text = $"{name} section", Foreground = Brushes.Gray, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center } };
-            return new StackPanel { Children = { new TextBlock { Text = name, FontSize = 13, FontWeight = FontWeights.SemiBold, Height = 28, Padding = new Thickness(0, 5, 0, 0) }, card } };
         })
         {
             Orbit = orbit,
@@ -106,9 +104,8 @@ public sealed class IslandPanelShots
 
     private static string Icon(string key) => key switch
     {
+        "sound" => "AudioLines",
         "sound.mixer" => "Sliders",
-        "sound.output" => "Headphones",
-        "sound.microphone" => "Mic",
         "keep-awake" => "Coffee",
         _ => "Folder",
     };

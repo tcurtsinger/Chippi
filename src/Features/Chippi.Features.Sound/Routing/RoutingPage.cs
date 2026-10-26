@@ -14,27 +14,15 @@ public sealed class RoutingPage : UserControl
 {
     private readonly AudioRoutingModule _module;
     private readonly StackPanel _body = new();
-    private AudioFlow _flow;
+    private readonly AudioFlow _flow;
     private readonly Dictionary<string, DragHandle> _handles = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>One flow's settings: Settings › Output, or the Mic in use section of Settings › Microphone.</summary>
     public RoutingPage(AudioRoutingModule module, AudioFlow flow = AudioFlow.Render)
     {
         _module = module;
         _flow = flow;
-        var root = new StackPanel();
-
-        var output = new SegmentItem { Label = "Output", Value = AudioFlow.Render };
-        var microphone = new SegmentItem { Label = "Microphone", Value = AudioFlow.Capture };
-        var tabs = new SegmentedControl { ItemsSource = new[] { output, microphone }, SelectedItem = flow == AudioFlow.Render ? output : microphone };
-        tabs.SetResourceReference(StyleProperty, "SelectorBarStyle");
-        AutomationProperties.SetName(tabs, "Audio routing sections");
-        tabs.SelectionChanged += (_, _) =>
-        {
-            if (tabs.SelectedItem is SegmentItem { Value: AudioFlow selected }) { _flow = selected; Render(); }
-        };
-        root.Children.Add(tabs);
-        root.Children.Add(_body);
-        Content = root;
+        Content = _body;
         Loaded += (_, _) => { _module.Changed += Refresh; Render(); };
         Unloaded += (_, _) => _module.Changed -= Refresh;
         Render();
@@ -51,17 +39,11 @@ public sealed class RoutingPage : UserControl
         _body.Children.Clear();
         _handles.Clear();
         var list = _module.Settings.For(_flow);
-        var toggle = RoutingUi.Switch(_flow == AudioFlow.Render ? "Switch outputs automatically" : "Pin my microphone", list.Enabled,
-            enabled => Run(_module.SetEnabledAsync(_flow, enabled)));
-        var top = new SettingRow
-        {
-            Header = _flow == AudioFlow.Render ? "Switch outputs automatically" : "Pin my microphone",
-            Description = list.Enabled ? _module.CurrentName(_flow) : "Off",
-            Icon = _flow == AudioFlow.Render ? LucideIcons.Headphones : LucideIcons.Mic,
-            Content = toggle,
-            Margin = new Thickness(0, 8, 0, 0),
-        };
-        _body.Children.Add(RoutingUi.Card(top));
+        var toggle = RoutingUi.Switch("Priority switching", list.Enabled, enabled => Run(_module.SetEnabledAsync(_flow, enabled)));
+        var calls = RoutingUi.Switch("Communications device", list.Calls, on => Run(_module.SetCallsAsync(_flow, on)));
+        _body.Children.Add(RoutingUi.Card(
+            new SettingRow { Header = "Priority switching", Content = toggle },
+            new SettingRow { Header = "Communications device", Content = calls }));
         if (_module.Error is { } error)
         {
             var text = RoutingUi.Text(error, "CaptionTextStyle", "WarningTextBrush");
@@ -85,23 +67,12 @@ public sealed class RoutingPage : UserControl
         for (var i = 0; i < list.Devices.Count; i++)
             card.Children.Add(DeviceRow(list.Devices[i], i, list.Devices.Count));
         _body.Children.Add(card);
-        _body.Children.Add(RoutingUi.Section("Options"));
-        var callSwitch = RoutingUi.Switch(_flow == AudioFlow.Render ? "Switch call audio too" : "Pin the call mic too", list.Calls,
-            calls => Run(_module.SetCallsAsync(_flow, calls)));
-        var options = RoutingUi.Card(new SettingRow { Header = _flow == AudioFlow.Render ? "Switch call audio too" : "Pin the call mic too", Content = callSwitch });
-        if (_flow == AudioFlow.Render)
-        {
-            options.Children.Add(new SettingRow { Header = "When none are connected", Content = RoutingUi.Text("Leave to Windows", "CaptionTextStyle", "TextSecondaryBrush") });
-            options.Children.Add(new SettingRow { Header = "New devices", Content = RoutingUi.Text("Add to the end", "CaptionTextStyle", "TextSecondaryBrush") });
-        }
-        else options.Children.Add(new SettingRow { Header = "Headset mics", Content = RoutingUi.Text("Only if listed", "CaptionTextStyle", "TextSecondaryBrush") });
-        _body.Children.Add(options);
     }
 
     private FrameworkElement DeviceRow(PriorityEntry entry, int index, int count)
     {
         var grid = RoutingUi.Columns(GridLength.Auto, GridLength.Auto, GridLength.Auto, new(1, GridUnitType.Star), GridLength.Auto, GridLength.Auto);
-        var handle = new DragHandle { Width = 16, Height = 24, Margin = new Thickness(0, 0, 16, 0), ToolTip = "Drag to reorder (Up/Down)" };
+        var handle = new DragHandle { Width = 16, Height = 24, Margin = new Thickness(0, 0, 16, 0), ToolTip = "Reorder" };
         AutomationProperties.SetName(handle, $"Reorder {entry.Name}");
         _handles[entry.Id] = handle;
         handle.MoveRequested += (_, delta) => Run(_module.MoveAsync(_flow, entry.Id, index + delta), entry.Id);
@@ -124,7 +95,8 @@ public sealed class RoutingPage : UserControl
         RoutingUi.Add(grid, icon, 2);
         var name = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 12, 0) };
         name.Children.Add(RoutingUi.Text(entry.Name));
-        if (_module.Snapshot.Find(entry.Id)?.AdapterName is { Length: > 0 } adapter)
+        // Windows often puts the adapter in the name already ("Speakers (INZONE Buds)"); say it once.
+        if (_module.Snapshot.Find(entry.Id)?.AdapterName is { Length: > 0 } adapter && !entry.Name.Contains(adapter, StringComparison.OrdinalIgnoreCase))
             name.Children.Add(RoutingUi.Text(adapter, "CaptionTextStyle", "TextSecondaryBrush"));
         RoutingUi.Add(grid, name, 3);
         var status = RoutingUi.Text(_module.Status(_flow, entry), "CaptionTextStyle", "TextSecondaryBrush");

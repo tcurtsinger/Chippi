@@ -61,17 +61,10 @@ public sealed class TidyRow(string name, string detail, string folder, string so
 
 internal static class TidyProjection
 {
-    /// <summary>The Recent card holds this many rows (DESIGN.md §5 Tidy panel).</summary>
-    public const int RecentRows = 4;
+    /// <summary>The page's recent card holds this many rows (DESIGN.md §5 Island).</summary>
+    public const int RecentRows = 3;
 
     public static string FolderName(string path) => Path.GetFileName(Path.TrimEndingDirectorySeparator(path)) is { Length: > 0 } name ? name : path;
-
-    public static string ModeLine(WatchedFolder folder, int ready) => folder.Mode switch
-    {
-        FolderMode.Manual => $"Manual · {ready} to review",
-        FolderMode.Silent => $"Silent · moves after {Math.Max(0, folder.GraceSeconds)}s",
-        _ => "Paused · not watching",
-    };
 
     /// <summary>Held rows first, then waiting, then the latest moves: "Documents · 23m", "Restored to Downloads".</summary>
     public static IReadOnlyList<TidyRow> Rows(IReadOnlyList<PendingFile> pending, IReadOnlyList<OperationRecord> history, DateTimeOffset now)

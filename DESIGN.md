@@ -138,7 +138,7 @@ The personality comes from one place: **Gumdrop**, a gradient blob with a face w
 - One flat accent, the user's Windows accent by default, used only for what is on, selected or primary.
 - Segoe at Regular for everything you read. Semibold only marks structure.
 - Rows grouped in one card per section, divided by hairlines.
-- The tray flyout is where you act. Settings is where you configure.
+- The island's pages are where you act. Settings is where you configure.
 - Dark and light are equal. Follow Windows is the default.
 
 **Boundaries.** vorssaint-utils is the feature reference, not a visual one: its name, icon, trade dress and branding are covered by its trademark policy. Chippi follows Windows 11 conventions, keeps its own name, icon and pet, and never copies vorssaint's screens or assets.
@@ -205,6 +205,8 @@ Copy is sentence case, plain and short. State comes first and detail second: "On
 
 **The Bare Label Rule** (Travis, 2026-10-22). A label names the action and nothing else. Never repeat the app's name where its icon already says it, and never pad a label with explanation. The Explorer entry is "Organize", not "Organize with Chippi". When a label seems to need a sentence, the design is wrong; fix the design, not the copy. This is a technical tool (Travis, 2026-10-24): **buttons name only the verb** ("Undo", not "Undo run" or "Undo 4"; "Refresh", not "Preview again"), and **a confirmation is the question plus Cancel and the action** ("Clear history?" · Cancel · Clear), with no line explaining what happens. Statuses, error reasons and section labels stay, because they say something you can't see ("Failed · in use").
 
+**Setting labels** (Travis, 2026-10-25). The Bare Label Rule covers every setting too. A setting's label is a noun phrase in Windows' own terms ("Communications device", "Sound feedback", "Input device"), never a sentence or an instruction. No "my", "your", "it" or "too". No row that only explains fixed behavior ("New devices · Add to the end"): if the user can't change it, it isn't a row. Tooltips follow the same rule and never explain.
+
 **No page intros** (2026-10-23). A Settings page title has no description under it. A row caption shows state or data (a path, a count, the chosen accent), never an explanation of the row.
 
 ## 4. Elevation
@@ -220,34 +222,25 @@ Flat, like Windows 11. Depth comes from the surface steps (window → card → c
 
 ## 5. Surfaces
 
-### Tray flyout
-- **Placement:** anchored to the tray icon, 12px above the taskbar, right edge 16px from the screen edge. It closes on Esc, on click-away and when the tray icon is clicked again.
-- **Frame:** 380 wide. Its height fits the open panel, up to 640, and a taller panel scrolls inside. Flyout color, 1px stroke (`rgba(255,255,255,.08)` / `rgba(0,0,0,.12)`), 8px radius, flyout shadow.
-- **Header:** Gumdrop at 24px, idle, beside "Chippi" (14 / 600) over a caption status line ("2 features on", "Keep awake is on"). There is no settings button in the header; Settings lives in the footer.
-- **Tab strip:** one icon tab per installed feature that has a flyout panel, except Sound features share one **Sound** tab (audio-lines glyph). Tabs follow sidebar order, with a shared tab at its first contributing feature; sections inside it follow their defined order. Left-aligned under the header with a hairline below.
-  - Tabs are 40×36 with a 2px gap and a 16px glyph. Eight fit at 380 wide; any more go into a final "More" tab that lists the rest.
-  - Selected: subtle-selected fill, the glyph in the accent, and a 14×3 accent bar 2px from the bottom.
-  - Each tab's tooltip and accessible name is the feature's short name. The flyout reopens on the last tab used.
-- **Panel:** 12px padding. Status comes first, the main actions are visible without scrolling, and a "More options" row (chevron right) opens that feature's Settings page.
-- **Footer:** 48px of flyout-footer color with a hairline above. Settings (gear + label) on the left, Quit (power + label) on the right, both subtle 32px buttons.
-- **Keep awake panel:**
-  - Flyout section title "Keep awake".
-  - One flyout card. The status row reads "Off", "On · no time limit", or "On · 1 hr left" over "Until 11:42 AM", with a switch on the right. The switch starts the default length.
-  - Under it, a 3-column grid of 32px duration chips: 30 min · 1 hr · 2 hr · 4 hr · No limit · Until…. Clicking a chip starts that length and selects it (accent fill); clicking the selected chip stops. "Until…" opens a time picker and then reads "Until 6:00 PM".
-  - Then a "Keep screen on" switch row and the "More options" row.
-- **Tidy panel:**
-  - A flyout card with the folder row: a 32px icon chip (accent glyph while watched, muted when Paused), the folder name as a picker (name + small chevron; it lists every folder with its mode, plus Add folder), and the mode line under it ("Silent · moves after 30s", "Manual · 3 to review", "Paused · not watching"). Under that, the full-width Silent / Manual / Paused segment.
-  - Below the card, always visible: "Organize now" (accent, fills the row) and "Rules" (96px).
-  - A "Recent" header with a "History ›" link on the right, then one flyout card of up to 4 rows. Held rows come first: a caution triangle, the file name, the reason in caution ("Held · a program named like a PDF") and a Review button. Moved rows: a muted file glyph, the name, "Documents · 23m", and an undo icon button. After undo the row reads "Restored to Downloads" and loses its button. Waiting rows: a clock glyph and "Waiting · reason", no action.
-  - Empty state: "No folders yet", an accent "Add Downloads" and a standard "Choose folder…".
-- **Sound panel** (Phase 3, approved 2026-10-25; `FlyoutSound.dc.html` in the offline Sound mockup):
-  - One Sound tab for all installed Sound features, never one tab per feature. Use the six-line audio-lines glyph; accessible name and tooltip are "Sound". Keep the existing tab dimensions and selection treatment.
-  - Output card: chosen output picker, system volume slider and mute action. Then the microphone row: real mic name, actual processing or muted status, and Mute / Unmute. A muted mic makes the flyout header status and mic-off glyph Caution.
-  - Mic clean-up row: actual processing state and switch. With its dependency missing, Set up opens Settings > Add features; it never starts a driver install from the flyout.
-  - Apps: app icon (or a monogram when unavailable), name, mute action and volume slider. More options opens the relevant Sound settings. Only installed features contribute controls; no static sample apps, fake levels or duplicate system-volume rows.
-  - The same state drives Settings and the island. Per-app device selection shows a chosen destination without claiming an existing stream has moved. Volume above 100% is unavailable until the Volume boost research gate passes.
-- **Empty flyout:** with nothing installed, the tab strip is hidden and the panel shows "No features on" with an accent "Add features" button that opens Settings › Add features.
-- **Tray menu (right-click):** flyout styling, 8px radius, 36px items with a 16px glyph and a 13 / 400 label: Open settings, Quit. Its bottom edge sits at the click point, kept 12px off the taskbar.
+### Tray icon (surfaces model, approved 2026-10-26)
+Mockup: [Chippi Surfaces](https://claude.ai/artifact/RJAX7v2QT6MLpPRgZQVXeS). The tray icon is a door to the island's pages, not a panel of its own. There is no separate tray flyout: each feature's page is built once, so the two can't drift apart.
+- **Left click** (or Enter on the focused icon) opens the island on the page it opens on (Settings › Island & pet › Opens on). Another click closes it. While the island is off, or hidden for a fullscreen app, the same pages open **docked by the tray**. From the keyboard, the pages take the keyboard focus.
+- **Docked by the tray:** the island's own window and pages in a floating island-colored card, all four corners 20px, 1px island stroke, island shadow, 12px above the taskbar and 16px from the screen edge at the tray's end. It keeps the island's look in both app themes. The round buttons give way to a footer under a hairline: All features (grid glyph, on a page) on the left, Settings (gear) on the right, 32px subtle buttons with a 13px label. It fades in and out with its content and morphs between pages like the island, its corner by the tray fixed. It closes on Esc, a click away or another click on the icon.
+- **Right click:** the tray menu, in flyout colors: 8px radius, 36px items with a 16px glyph and a 13 / 400 label: Open settings, Quit. Its bottom edge sits at the click point, kept 12px off the taskbar.
+- **Hide tray icon** (Settings › Island & pet, off by default): the icon leaves the notification area while the island shows, so the island is the only door. It comes back while the island is off or hidden for a fullscreen app. Starting Chippi again from Start shows the pages, and right-clicking the island's tab opens the same menu (Open settings, Quit), so Quit is always reachable.
+- A second launch shows the pages the same way.
+
+### Island pages (approved 2026-10-26)
+- **Every page** but Now Playing starts with a 28px header: the tile's name (13 / 600) and, only where the page's controls don't already show it, the tile's status on the right in Caption (Keep awake's "1 hr left"). Now Playing keeps its own header with the source picker.
+- **Now Playing:** media only: source picker, artwork, title and source, previous / play-pause / next, progress and time. No volume or output picker.
+- **Sound** (640 wide; Audio routing, Mic mute shortcut and Mic processing share it): two columns 16px apart, each under a 12 / 600 tertiary label.
+  - **Output:** a card with the output in use (speaker glyph, name), its mute icon button and the system volume slider with its percentage ("Muted" while muted). Below, a radio row per *connected* output (name over "Playing now" or "Connected"); the one in use is filled. Picking one uses it at once and moves it to the top of its priority list, whether or not priority switching is on.
+  - **Microphone:** a card with the mic glyph (Caution mic-off while muted), "Live" or "Muted in every app" in Caution, and Mute / Unmute. Then a radio row per connected mic ("In use", "Connected"), then the Clean-up switch with no caption, and while clean-up runs a meter of the cleaned-up mic. A warning shows inline only when clean-up failed or stopped.
+  - The tile's status is the output in use, "Mic muted" (Caution, with the mic-off glyph and dot) while muted, or "Clean-up stopped".
+- **App volume** (328 wide): the apps only, a vertical strip each: mute (monogram), the volume bar, the percentage, the name and a ⋯ menu for the app's output (Default or a connected output, the chosen one checked). The system volume is the Sound page's. Status: "1 app", "4 apps".
+- **Keep awake:** six 32px chips three across, 6px apart: 30 min · 1 hr · 2 hr · 4 hr · No limit · Until…. A chip starts that length and lights; the lit chip stops it. "Until…" opens a time picker with Start, then reads "Until 6:00 PM". Keep screen on stays in Settings.
+- **File organizer:** a card with the folder (icon chip, the folder name as a picker listing every folder and Add folder) over the Silent / Manual / Paused segment. Then one card of up to 3 rows (held first, then waiting, then the latest moves, each with Review or Undo as before). Then History › on the left and Organize now on the right. No mode line: the segment shows the mode. Empty: "No folders yet", Add Downloads and Choose folder….
+- Quick pages show live state and controls only: no captions that restate a setting, and no unplugged devices (Settings lists those).
 
 ### Island (movable tab and tile grid, approved 2026-10-25)
 Reference: the offline Sound mockup at `X:\code\chippi-scratch\phase-3-prep\mockup\` (`Island.dc.html`, `IslandTabs.dc.html`), with the side-edge column approved in the Phase 3 kickoff. This replaces the old stack of installed-feature panels. The tab remains one shape that grows into the island; hovering only swells it, and clicking opens it. It never hides at rest, except while a fullscreen app is in front on its display.
@@ -264,21 +257,18 @@ Reference: the offline Sound mockup at `X:\code\chippi-scratch\phase-3-prep\mock
 - **Opening and closing:** clicking the tab opens the last available page, or the grid if none is remembered or its feature was removed. A focused tab also accepts Enter or Space. Another tab click, Esc or an outside click closes it; leaving the pointer does not. Outside clicks still reach the underlying app. Orbit buttons and child menus are inside the island's interaction region.
   - Only Esc is watched before the user clicks into the island. After that click, Tab, arrows and Enter navigate its controls; do not take those keys from the app in front with a global hook. Grid arrows move among its three columns, Enter opens the focused tile. Esc closes the island.
 - **Shape and pages:** one Island-colored shape, flat on its docked edge, 20px corners away from it and square against it, 1px `rgba(255,255,255,.10)` stroke away from the edge, island shadow. Center on the tab and keep the shape and its orbit buttons inside the work area. Content uses 12px inset, 8px gaps; height fits the page, not a fixed mockup height.
-  - Widths: grid 328px; Now Playing 440px; Volume mixer 344px; Output, Microphone, Keep awake and File organizer 328px. Pages sharing a tile combine their sections, never duplicate the tile.
+  - Widths: grid 328px; Now Playing 440px; Sound 640px; App volume, Keep awake and File organizer 328px. Pages sharing a tile combine their sections, never duplicate the tile.
   - **Morph:** tab to page and page to page animate shape size, place and corners together over 220ms ease-out. Opening content fades over the second half; page content fades in over 180ms after 60ms. Closing reverses to the swollen tab over 160ms, then lets the tab shrink. Drag/fullscreen hide closes immediately. Reduced motion snaps every transition and removes continuous animation. Orbit positions follow every morph frame.
 - **Grid:** three equal columns with 8px gaps. Tiles are 84px high, 8px radius, `rgba(255,255,255,.06)` fill; hover `.10`, pressed `.04`. A 20px glyph sits above the 12px semibold name and 12px Caption status, with 6px before the name. Status is actual state ("Muted", "1 hr left", current media title), not a shortcut. Truncate long statuses with a tooltip and full accessible name.
-  - Order: Now Playing, Volume mixer, Output, Microphone, Keep awake, File organizer. Now Playing is shell-owned and always available; other tiles appear only when at least one contributing feature is installed. Routing, processing and mute share Microphone; its highest-priority nonempty status wins, with Muted above Live.
+  - Order: Now Playing, Sound, App volume, Keep awake, File organizer, unless Settings › Island & pet reorders them or leaves some off the grid (a hidden tile's page stays, for a round button). Now Playing is shell-owned and always available; other tiles appear only when at least one contributing feature is installed. Routing, processing and mute share Sound; its highest-priority nonempty status wins, with Mic muted above the output.
   - An active tile may show the mockup's 6px status dot, 8px from its top/right; muted uses Caution. The grid's 28px header holds Gumdrop, Chippi and the clock. Tile names are structural labels, the semibold exception to the Weight Rule.
-- **Pages:**
-  - **Now Playing:** source picker, actual artwork at 112px (neutral placeholder if absent), title/source, previous / 40px accent play-pause / next, 4px progress bar and reported elapsed/remaining time. Disable unsupported actions. Show an empty state without sample music. System volume and output picker sit below.
-  - **Volume mixer:** selected output, system strip, divider, then app strips using the vertical volume bar in section 6. System stays 0 to 100%; app bars reach 200% only with the approved, working Volume boost backend. Use real app icons or monograms, percentages and names.
-  - **Output:** ordered devices with current/connected/unavailable state, selection and Switch by priority. **Microphone:** selected real mic, actual level/status, Mute / Unmute and installed cleanup controls. Muted status is Caution. Settings, flyout and these pages reflect the same engine state.
-  - **Keep awake and File organizer:** their existing compact controls become pages. Keep current duration/mode/Undo behavior; do not copy the mockup's sample delay, paths or verbose button text. Button labels follow the Bare Label Rule.
-  - Inner cards use `rgba(255,255,255,.06)`, 8px radius and 12px padding. Omit sections without a contributing installed feature.
+- **Pages:** see Island pages above. Inner cards use `rgba(255,255,255,.06)`, 8px radius and 12px padding. Omit sections without a contributing installed feature.
 - **Orbit buttons:** 40px circles, Island fill, 1px `rgba(255,255,255,.14)` stroke, 16px glyph, `0 8px 20px rgba(0,0,0,.3)` shadow. Hover `#1F1F1F`, pressed `#000000`; the active page's button gets a `.5` white stroke. Accessible names describe the target/action. They are part of the island window and hit region, not click-away.
-  - **Top edge:** buttons sit 12px outside the shape. Left: All features at 12px from its top, then Keep awake at 60px. Right: Settings at 12px, Volume mixer at 60px. On the grid, All features becomes Back to the remembered page, if available; with nothing remembered its place stays empty, so no button moves when it returns. Feature buttons appear only with their installed feature.
-  - **Left/Right edges:** all four buttons stack on the open side in order All features/Back, Keep awake, Settings, Volume mixer. The column is 12px off the shape, starts 12px from its top and uses the same 8px inter-button gap as the Top layout. Nothing sits beyond the screen edge. Clamp the complete interactive footprint inside the work area.
-  - One live button is centered 12px below the shape: Now Playing for music, otherwise Microphone when muted. Closed-tab indicators still show both music and mute. Hide orbit buttons while closed or dragging. A removed target falls back to the grid.
+  - **One rule on every edge (2026-10-26):** the buttons sit 12px off the shape in two pairs, beside it along its edge, each pair centered on it, 8px between the two buttons of a pair. The first pair is All features (Back on the grid) and the left button; the second is Settings and the right button.
+  - **Top edge:** one pair stacked left of the shape, one right, centered on its height and never closer than 8px to its top.
+  - **Left/Right edges:** one pair side by side above the shape, one below, centered on its width.
+  - On the grid, All features becomes Back to the remembered page, if available; with nothing remembered its place stays empty. A pair keeps both places, so no button moves when one appears. The left and right buttons hold Keep awake and App volume unless Settings › Island & pet picks another tile or None; they appear only while their tile exists. Nothing sits beyond the screen edge: clamp the complete interactive footprint inside the work area.
+  - One live button is centered on the shape's far side, 12px off: below it on top, beside it on a side. It opens Now Playing for music, otherwise Sound when the mic is muted. Settings › Island & pet can turn it off. Closed-tab indicators still show both music and mute. Hide orbit buttons while closed or dragging. A removed target falls back to the grid.
 - **Colors:** the island always uses its dark accent and dark text tokens in either app theme. Only real media artwork may supply its own colors; do not copy the mockup's decorative gradient art placeholder.
 
 ### Settings window
@@ -286,14 +276,17 @@ Reference: the offline Sound mockup at `X:\code\chippi-scratch\phase-3-prep\mock
 - **Titlebar:** 40px in window color. Gumdrop's small form at 16px, "Chippi Settings" (12 / 400), and caption buttons 46×40. Close hovers to Critical with a white glyph.
 - **Sidebar:** 272 wide on the window color, no divider.
   - A 34px search field, "Find a setting". Typing replaces the content with matching rows from every page, grouped by page; clicking one opens its page.
-  - **Your features:** each installed feature with a Settings page, in catalog order, then **Add features**.
-  - **Chippi:** General, Island & pet, Notifications, About. Shortcuts and Permissions join this group only once a feature uses them. Appearance is gone.
+  - **Feature groups** (2026-10-26): the installed features' pages under the catalog's group labels, in Add features' order (Files, Sound, System, Clipboard & text, Windows, Capture, Apps). Only groups with an installed feature show.
+  - **Sound is organized by task:** **Output** (Audio routing's output), **Microphone** and **App volume**. Microphone holds three features, one section each, shown while that feature is installed: **Mic in use** (Audio routing: Priority switching, Communications device, the priority list), **Clean-up** (Mic processing) and **Mute shortcut** (Mic mute shortcut: Shortcut, Sound feedback). The mic is picked once there. A feature's deep link opens the page that holds it. Features still install one by one in Add features.
+  - **Chippi:** General, Island & pet, Notifications, Add features, About. Shortcuts and Permissions join this group only once a feature uses them. Appearance is gone.
   - Group labels are Nav group type with 12px of space above. Items are 36px with a 16px glyph and a 14 / 400 label. Hover is subtle-hover. The selected item gets subtle-selected, Semibold and a 3×16 accent pill at its left edge.
-- **Opening:** Settings opens on the page its caller asks for (the flyout's "More options" opens that feature; a notice opens its run in History). With no target it opens the first sidebar item. Sub-tabs open on their first tab.
+- **Opening:** Settings opens on the page its caller asks for (the island's Settings button opens the last page; a notice opens its run in History). With no target it opens the first sidebar item. Sub-tabs open on their first tab.
 - **Content:** padding 4 / 40 / 40 / 28. The page title (20 / 600 Display) sits 14px above the first section, with no description.
 - **Page template:** title, then an optional SelectorBar, then sections. A section is a Section header (with an optional right-aligned button) over one card of rows. Two cards in a row of the same section sit 8px apart.
 - **Rows:** at least 60px with a caption, 48px without; 10 / 16 padding; 14px gap. Label over caption on the left, the control on the right. A switch shows "On" or "Off" in body text just left of it. An expander row ends in a chevron and its sub-rows are indented 50px.
 - **File organizer:** a SelectorBar of Settings · Rules · History (§5 File organizer).
+- **Island & pet** (2026-10-26): one card of Island, Hide tray icon (dimmed while the island is off), Opens on (Last page used / All features), Position with Reset, and Display. Then **Tiles**: a row per tile with a grip (drag, or Up and Down on the focused grip), its glyph, its name and a Show switch, beside a card with a small preview of the open island and its round buttons. Then **Round buttons**: Left button and Right button (None or any tile) and Button for what's live. Then Gumdrop.
+- **Settings never repeats a daily control.** Volume, output, mute, Keep awake lengths and Organize now are on the island's pages; Settings holds what you set once. The one exception is a feature's on/off switch. Subtext appears only when a label can't stand alone, and then in a few words; there are no info buttons.
 - **Keep awake:** a card with the status row (accent coffee glyph, "Keep awake", caption "Off" or "On · no time limit", switch). Options: Default length (combo), Keep screen on (switch), After a restart (value "Starts off").
 - **Add features** (replaces the Features hub): a search field with the "2 on" count beside it. **Available** lists the features that work, each a row with a 32px icon chip (accent glyph when on, muted when off), name, one-line description and a switch; Overlap badges sit after the name. One collapsed **Coming later** row ("39 features") expands into one row per group listing the names. Presets are hidden until enough features exist for them to matter. Toggling a feature installs or uninstalls it, and an installed feature appears in the sidebar at once.
 - **General:** Theme (Dark · Light · Follow Windows segment, default Follow Windows), Accent color (a "Windows" pill and four 24px swatches; the caption reads "Follow Windows" or the color's name), Run at startup (switch). A Settings file section with one row, "Location", captioned with the path, and Export… and Import… on the right.
@@ -303,7 +296,7 @@ Reference: the offline Sound mockup at `X:\code\chippi-scratch\phase-3-prep\mock
 - **Swatch selection:** a selected swatch or pill gets a 2px gap in the card color and a 2px accent ring.
 
 ### File organizer
-Behavior approved 2026-10-22 (`docs/phase-2/design/phase-2-mockups.html`); visuals restyled 2026-10-23. The Tidy panel is under Tray flyout above.
+Behavior approved 2026-10-22 (`docs/phase-2/design/phase-2-mockups.html`); visuals restyled 2026-10-23. Its island page is under Island pages above.
 - **Settings tab:**
   - Watched folders, with Add folder on the header's right. Each folder is an expander row: folder glyph (accent while watched, muted when Paused), name over path, the mode as a value, and a chevron. Its sub-rows: Mode (Silent · Manual · Paused segment), Wait before moving (combo), Ignore list (Edit) and Stop watching this folder (Remove).
   - Options: Keep history (combo), Organize in Explorer (switch), Import archive (Choose file…; the picker filters to zip, tgz and tar.gz).
@@ -354,7 +347,6 @@ Every interactive control is custom-templated with the full state set: rest, hov
 - **Segmented control:** a 2px-padded trough (segment-trough fill, segment stroke, 6px radius). Items are 28px with 13px labels in Secondary, 4px radius; the selected item gets segment-selected fill and Text (plus the light-theme shadow). In Settings items size to their labels with 14px padding; in the flyout they split the width equally.
 - **SelectorBar:** text tabs under a page title, 40px tall, 12px padding, body text in Secondary. The selected tab is Text, Semibold, with a 16×3 accent bar 3px from the bottom.
 - **Nav item:** see Settings window. The pill is 3×16, 2px radius.
-- **Flyout tab:** see Tray flyout.
 - **Text field and search field:** 32–34px, 10px padding, 4px radius, input fill, 1px stroke with a stronger bottom stroke (input-stroke-bottom). Focus: input-focus fill and a bottom stroke in Text. Placeholders are Muted. Search fields lead with a 16px search glyph.
 - **Combo box:** a Button with its value on the left and a chevron on the right, at least 150 wide.
 - **Checkbox:** 20px, 4px radius. Off: a 1px switch-off stroke on `rgba(0,0,0,.1)` (light `#FFFFFF`). On and mixed: accent fill and stroke with an on-accent glyph (2.2 stroke). Use it for multi-select lists and grids; a single setting uses a switch.
@@ -372,7 +364,7 @@ Every interactive control is custom-templated with the full state set: rest, hov
   - **Neutral:** Secondary text on control fill, for example "Other drive" or "Needs VB-CABLE".
 - **Status dot:** 7px. Success for active, caution for attention, Muted for offline. No glow.
 - **Drag handle:** a 16px six-dot grip in Muted. Alt+Up/Down moves the row.
-- **Sound glyphs:** Sound tab uses `AudioLines` (six vertical audio lines); Mic processing uses `Mic`; Mic mute shortcut uses `MicOff` (slashed microphone). Use the matching mic-off glyph for muted state in the flyout, island tab and Microphone tile/page, in Caution. These are distinct feature glyphs, not two features sharing Mic.
+- **Sound glyphs:** the Sound tile uses `AudioLines` (six vertical audio lines); Mic processing uses `Mic`; Mic mute shortcut uses `MicOff` (slashed microphone). Use the matching mic-off glyph for muted state in the flyout, island tab and Microphone tile/page, in Caution. These are distinct feature glyphs, not two features sharing Mic.
 - **Icons:** Lucide on a 24px grid at 1.6 stroke, round caps and joins, drawn at 16px (20px for a Settings row lead glyph). Each feature has its own glyph; no glyph is reused for two features. Brand logos are never redrawn: an app shows its real icon, or a monogram tile when no icon is available.
 
 ## 7. The pet: Gumdrop
@@ -421,7 +413,7 @@ In the island and flyout header, the pet is decorative (`AutomationProperties.Ac
 ## 8. Do's and Don'ts
 
 ### Do
-- **Do** act in the flyout and configure in Settings. If a common action needs Settings, move it to the feature's panel.
+- **Do** act on the island's pages and configure in Settings. If a common action needs Settings, move it to the feature's page.
 - **Do** keep each section's rows in one card with dividers: one shape per section, not per row.
 - **Do** follow the Accent Rule, the Weight Rule and the Tabular Rule.
 - **Do** check every screen in dark and light, and with at least one non-blue accent.
@@ -451,5 +443,5 @@ In the island and flyout header, the pet is decorative (`AutomationProperties.Ac
 - **Theme:** Follow Windows is the default and reads `AppsUseLightTheme`. Both themes define every key; the island keeps its own dark keys.
 - **Pet control:** a `UserControl` with a `Mood` dependency property, the size forms above and one `Path` per part. Moods switch through visual states.
 - **Island window:** borderless, `AllowsTransparency`, topmost, `WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE`, so it never steals focus or shows in Alt+Tab. It sits on the display the island display setting picks and hides while a fullscreen app or game is in front on that display. Because it never activates, dragging uses mouse capture and `SetWindowPos`, not `DragMove`. Keep the window sized to the swollen tab while closed, so the rest of the edge stays clickable. While the island is open, low-level keyboard and mouse hooks watch for Esc and for a click elsewhere; they are installed only while it is open and always pass the input on.
-- **Flyout window:** borderless and topmost, placed from `Shell_NotifyIconGetRect`. It hides when it loses activation.
+- **Docked pages:** the island's panel window, placed from `Shell_NotifyIconGetRect` and the taskbar's edge. Like the island it never activates until clicked into; low-level hooks watch for Esc and a click away, and a left press on the tray icon is left to the icon's own click.
 - **Reduced motion:** read `SystemParameters.ClientAreaAnimation` and listen for changes.

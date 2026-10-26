@@ -24,7 +24,7 @@ public partial class App : Application
     internal Notifications.ToastStartup? NotificationStartup { get; init; }
     private Notifications.ClassicToastPresenter? _toasts;
 
-    /// <summary>Another launch handed this instance its arguments (a verb, or nothing: open the flyout). Raised on the UI thread.</summary>
+    /// <summary>Another launch handed this instance its arguments (a verb, or nothing: show the island's pages). Raised on the UI thread.</summary>
     public event EventHandler<ActivationEventArgs>? ActivationRequested;
 
     private Task _modulesStarted = Task.CompletedTask;
@@ -164,7 +164,7 @@ public partial class App : Application
         Exit += (_, _) => keepAwake.ReleaseOnExit();
         shell.Registry.Register(new Chippi.Features.Downloads.DownloadsModule());
         // [Phase 3] Sound. Routing never lists VB-CABLE (recognized by device identity); Mic
-        // processing's "Pinned mic" is routing's microphone list.
+        // processing's "Highest priority" source is routing's microphone list.
         var routing = new Chippi.Features.Sound.Routing.AudioRoutingModule(null, Chippi.Audio.VbCable.IsCable);
         shell.Registry.Register(routing);
         shell.Registry.Register(new Chippi.Features.Sound.Processing.MicProcessingModule(null, () => routing.Settings.Microphone.Devices,
@@ -185,7 +185,7 @@ public partial class App : Application
         // [WS2] Settings: create the settings controller and call shell.Commands.RegisterSettings(...).
         Settings.SettingsController.Compose(shell);
 
-        // [WS1] Tray and flyout: create them, call shell.Commands.RegisterFlyout(...), then return true.
+        // [WS1] Tray: create it (it registers itself with shell.Commands), then return true.
         return Tray.TrayController.Compose(shell);
     }
 

@@ -40,6 +40,9 @@ public sealed class FakeDeviceSystem : IDeviceSystem, IPerAppDeviceSystem
     /// <summary>Endpoint IDs whose SetDefault or SetMute throws.</summary>
     public HashSet<string> Failing { get; } = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>Endpoint reads that still succeed before one throws; null never throws.</summary>
+    public int? ReadsBeforeFailure { get; set; }
+
     public Thread? CreatedOn { get; } = Thread.CurrentThread;
 
     public Thread? DisposedOn { get; private set; }
@@ -201,7 +204,14 @@ public sealed class FakeDeviceSystem : IDeviceSystem, IPerAppDeviceSystem
     {
         Interlocked.Increment(ref _enumerations);
         lock (_gate)
+        {
+            if (ReadsBeforeFailure is { } left)
+            {
+                ReadsBeforeFailure = left == 0 ? null : left - 1;
+                if (left == 0) throw new InvalidOperationException("Reading endpoints failed");
+            }
             return _endpoints.Where(e => e.Flow == flow && e.State != EndpointState.NotPresent).ToList();
+        }
     }
 
     public string? GetDefault(AudioFlow flow, AudioRole role) => DefaultOf(flow, role);
@@ -342,12 +352,12 @@ public sealed class FakePipeline(string source, string sink, Chippi.Audio.Proces
     public void Start()
     {
         if (failOnStart)
-            throw new InvalidOperationException("Device in use");
+            throw new AudioFailure("Device in use");
         Started = true;
     }
 
     /// <summary>The device went away under a running stream.</summary>
-    public void Fail(string message) => Failed?.Invoke(new InvalidOperationException(message));
+    public void Fail(string message) => Failed?.Invoke(new AudioFailure(message));
 
     public void Dispose() => Disposed = true;
 }

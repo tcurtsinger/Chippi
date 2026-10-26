@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Chippi.Core.Modules;
 
-/// <summary>A registered feature and its live state, as the hub and flyout see it.</summary>
+/// <summary>A registered feature and its live state, as the hub and the island see it.</summary>
 public sealed class FeatureEntry
 {
     internal FeatureEntry(FeatureDescriptor descriptor, IFeatureModule? module)
@@ -32,8 +32,7 @@ public sealed class FeatureEntry
     /// <summary>Why the last start failed, if it did. The feature stays installed.</summary>
     public Exception? LastError { get; internal set; }
 
-    /// <summary>Flyout panels and settings page the running module contributed. Empty when not running.</summary>
-    public IReadOnlyList<FlyoutPanelContribution> FlyoutPanels => Ui?.Panels ?? [];
+    /// <summary>Island tiles and settings page the running module contributed. Empty when not running.</summary>
 
     /// <summary>Island tile parts the running module contributed. Empty when not running.</summary>
     public IReadOnlyList<IslandTileContribution> IslandTiles => Ui?.Tiles ?? [];

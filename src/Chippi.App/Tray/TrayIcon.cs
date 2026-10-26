@@ -24,7 +24,7 @@ internal sealed class TrayEventArgs(int x, int y, bool keyboard) : EventArgs
 
 /// <summary>
 /// Chippi's notification-area icon, owned directly through <c>Shell_NotifyIcon</c> on a hidden
-/// top-level window (not WinForms <c>NotifyIcon</c>), so the flyout can anchor to it with
+/// top-level window (not WinForms <c>NotifyIcon</c>), so the docked pages can anchor to it with
 /// <c>Shell_NotifyIconGetRect</c>. Uses NOTIFYICON_VERSION_4 callbacks, re-adds itself when
 /// Explorer restarts (<c>TaskbarCreated</c>) and reloads its image when the display DPI changes.
 /// Create and use on the UI thread.
@@ -42,6 +42,7 @@ internal sealed class TrayIcon : IDisposable
     private HICON _icon;
     private int _iconSize;
     private long _lastKeySelect;
+    private bool _visible = true;
     private bool _disposed;
 
     public TrayIcon(string tooltip)
@@ -71,6 +72,25 @@ internal sealed class TrayIcon : IDisposable
     public event EventHandler<TrayEventArgs>? ContextMenuRequested;
 
     public HWND Handle => new(_window.Handle);
+
+    /// <summary>Whether the icon is in the notification area. Hiding removes it; showing adds it back.</summary>
+    public bool Visible
+    {
+        get => _visible;
+        set
+        {
+            if (value == _visible || _disposed)
+                return;
+            _visible = value;
+            if (value)
+            {
+                Add();
+                return;
+            }
+            var data = NewData();
+            PInvoke.Shell_NotifyIcon(NOTIFY_ICON_MESSAGE.NIM_DELETE, in data);
+        }
+    }
 
     /// <summary>
     /// The icon's rectangle in physical screen pixels, or null when the shell cannot say (for
@@ -182,7 +202,8 @@ internal sealed class TrayIcon : IDisposable
             Log.Info("Tray: TaskbarCreated, re-adding the icon");
             _iconSize = 0;
             LoadIcon();
-            Add();
+            if (_visible)
+                Add();
         }
         else if (msg is (int)PInvoke.WM_DISPLAYCHANGE or (int)PInvoke.WM_SETTINGCHANGE or (int)PInvoke.WM_DPICHANGED)
         {

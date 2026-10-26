@@ -12,7 +12,7 @@ namespace Chippi.App.Shell;
 
 /// <summary>
 /// Everything the shell windows share, built once by the composition root in <see cref="App"/>.
-/// Tray and flyout (WS1), settings (WS2) and island (WS3) take this in their constructors rather
+/// Tray (WS1), settings (WS2) and island (WS3) take this in their constructors rather
 /// than reaching into <see cref="App.Current"/>.
 /// </summary>
 public sealed class ShellContext
@@ -58,7 +58,7 @@ public sealed class ShellContext
 
     /// <summary>
     /// A later launch, an Explorer menu click or a notice click: a registered verb goes to its module
-    /// (<c>--organize "C:\Downloads"</c>); anything else, including a plain launch, shows the flyout.
+    /// (<c>--organize "C:\Downloads"</c>); anything else, including a plain launch, shows the island's pages.
     /// Until <see cref="ModulesStarted"/> runs, requests wait in order, so a verb is never lost to a
     /// module that hasn't registered it yet. Call on the UI thread.
     /// </summary>
@@ -70,7 +70,7 @@ public sealed class ShellContext
             return;
         }
         if (!Services.Activation.TryRoute(arguments))
-            Commands.ShowFlyout();
+            Commands.ShowPages();
     }
 
     /// <summary>
@@ -82,6 +82,7 @@ public sealed class ShellContext
         if (_modulesStarted)
             return;
         _modulesStarted = true;
+        _modulesReady.TrySetResult();
         Services.Activation.TryRoute(launchArguments); // app flags such as --startup are not verbs
         while (_waitingActivations.TryDequeue(out var waiting))
             HandleActivation(waiting);
@@ -89,10 +90,14 @@ public sealed class ShellContext
 
     private readonly Queue<IReadOnlyList<string>> _waitingActivations = new();
     private bool _modulesStarted;
+    private readonly TaskCompletionSource _modulesReady = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    /// <summary>Completes once the installed modules have started, so their tiles and pages exist (debug snapshots wait on it).</summary>
+    public Task ModulesReady => _modulesReady.Task;
 
     /// <summary>
-    /// Debug surfaces: placeholder flyout tabs (brief §4.4) and the island's fake-activity menu
-    /// (brief §4.6). On with <c>--debug</c> or <c>CHIPPI_DEBUG=1</c>, in any build.
+    /// Debug surfaces: the island's fake-activity menu (brief §4.6). On with <c>--debug</c> or
+    /// <c>CHIPPI_DEBUG=1</c>, in any build.
     /// </summary>
     public bool DebugMode { get; }
 }

@@ -129,7 +129,7 @@ internal sealed class AddFeaturesPage : UserControl
             toggle.IsChecked = entry.IsInstalled;
             toggle.Content = entry.IsInstalled ? "On" : "Off";
             chip.IsOn = entry.IsInstalled;
-            caption.Text = entry.LastError is not null ? "Couldn't start" : entry.Descriptor.Description;
+            caption.Text = entry.LastError is not null ? "Start failed" : entry.Descriptor.Description;
             ShowRequirement(entry, caption, toggle, action);
         }
         _count.Text = $"{_shell.Registry.InstalledCount} on";
@@ -250,7 +250,7 @@ internal sealed class AddFeaturesPage : UserControl
         _search.Text = "no-such-feature-9a845";
         if (_empty.Visibility != Visibility.Visible || ((FrameworkElement)_coming.Parent).Visibility != Visibility.Collapsed)
             throw new InvalidOperationException("Feature search did not show its empty state.");
-        _search.Text = "App volume";
+        _search.Text = "Clipboard history"; // still to come; App volume shipped in Phase 3
         if (!_coming.IsExpanded || _later.Where(item => item.Label.Visibility == Visibility.Visible).Count() != 1)
             throw new InvalidOperationException("Feature search did not reveal the matching upcoming feature.");
         _search.Clear();

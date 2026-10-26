@@ -20,7 +20,7 @@ public sealed class ActivationEventArgs(IReadOnlyList<string> arguments) : Event
 /// One Chippi per user session. The first launch owns a named mutex and listens on a named pipe; a
 /// later launch sends its command-line arguments down the pipe and exits, and the first instance
 /// raises <see cref="ActivationRequested"/> with them (the shell routes a verb such as
-/// <c>--organize</c>, or opens the flyout).
+/// <c>--organize</c>, or shows the island's pages).
 /// </summary>
 /// <remarks>
 /// The pipe is per user and session (its name carries both, and it accepts the current user only).
@@ -201,7 +201,7 @@ public sealed class SingleInstance : IDisposable
         }
     }
 
-    /// <summary>Lets the running instance take the foreground when it opens the flyout. Best effort: a refusal only means no focus.</summary>
+    /// <summary>Lets the running instance take the foreground when it shows the island's pages. Best effort: a refusal only means no focus.</summary>
     private static void AllowOwnerToTakeForeground(string name)
     {
         // Unknown owner (still starting up): let any process take the foreground once instead.

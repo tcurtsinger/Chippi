@@ -35,7 +35,7 @@ public sealed class MicMuteModule : IFeatureModule
         _tone = tone ?? (muted => { if (muted) SystemSounds.Hand.Play(); else SystemSounds.Asterisk.Play(); });
     }
 
-    public FeatureDescriptor Descriptor { get; } = new(Id, "Mic mute shortcut", "One shortcut mutes your mic in every app", FeatureGroup.Sound)
+    public FeatureDescriptor Descriptor { get; } = new(Id, "Mic mute shortcut", "Hotkey for all microphones", FeatureGroup.Sound)
     {
         Icon = "MicOff", Requires = [Capability.InputHooks], Presets = PresetMembership.Audio | PresetMembership.PowerUser,
         Badges = [FeatureBadge.Overlap("Overlaps Win+Alt+K")],
@@ -69,9 +69,7 @@ public sealed class MicMuteModule : IFeatureModule
             ct.ThrowIfCancellationRequested();
             _hotkey = _createHotkey();
             ShortcutError = _hotkey.Register(Settings.Shortcut, OnHotkey) ? null : "Shortcut in use";
-            _tile = context.Ui.AddIslandTile(new("sound.microphone", "Microphone", "Mic", 30, 20,
-                () => new MicMuteView(this, compact: true)) { StatusPriority = 100 });
-            context.Ui.AddFlyoutSection("sound", "Sound", "AudioLines", 30, () => new MicMuteView(this, compact: true));
+            _tile = context.Ui.AddIslandTile(SoundTile.Section(10, SoundTile.Microphone, () => new MicMuteView(this, compact: true)) with { StatusPriority = 100 });
             context.Ui.SetSettingsPage(() => new MicMuteView(this));
             _audio.SnapshotChanged += OnSnapshot;
             UpdateState();
@@ -93,12 +91,12 @@ public sealed class MicMuteModule : IFeatureModule
         {
             if (_stopping || _lease is null) return;
             await _audio!.ToggleMicrophoneMuteAsync();
-            Error = Status.Failed.Count > 0 ? "Some microphones could not be changed" : null;
+            Error = Status.Failed.Count > 0 ? "Some microphones failed" : null;
             if (Error is null && Settings.PlaySound && Status.State is MicrophoneMuteState.Muted or MicrophoneMuteState.Live)
                 _tone(Status.State == MicrophoneMuteState.Muted);
             UpdateState();
         }
-        catch (Exception ex) { Error = ex.Message; Changed?.Invoke(); throw; }
+        catch (Exception ex) { Error = AudioErrors.Reason(ex); Changed?.Invoke(); throw; }
         finally { _gate.Release(); }
     }
 
@@ -127,10 +125,10 @@ public sealed class MicMuteModule : IFeatureModule
     private void UpdateState()
     {
         bool warning = Status.State is MicrophoneMuteState.Muted or MicrophoneMuteState.Mixed;
-        _tile?.SetStatus(warning ? StatusText : "");
+        _tile?.SetStatus(!warning ? "" : Status.State == MicrophoneMuteState.Muted ? "Mic muted" : StatusText);
         if (warning)
             _context?.Island.Publish(new("muted", IslandActivityKind.Status, StatusText, "Microphone")
-                { NeedsAttention = true, TileKey = "sound.microphone" });
+                { NeedsAttention = true, TileKey = SoundTile.Key });
         else _context?.Island.Clear("muted");
         Changed?.Invoke();
     }

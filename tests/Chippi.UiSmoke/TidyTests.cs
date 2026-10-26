@@ -49,8 +49,10 @@ public sealed class TidyTests(ITestOutputHelper output)
         DesktopSession.Select(mode, "Silent");
         DesktopSession.Until(() => Mode(app, "Inbox") == "silent", "Inbox Silent persisted");
         Assert.True(app.DownloadsSettings.GetProperty("folders")[1].GetProperty("baselineUtc").GetDateTimeOffset() > DateTimeOffset.UtcNow.AddMinutes(-1));
-        DesktopSession.Invoke(DesktopSession.Find(tidy, "Rules", InvokePattern.Pattern));
+        // Rules are in Settings; the page's History link opens File organizer's Settings.
+        DesktopSession.Invoke(DesktopSession.Find(tidy, "History", InvokePattern.Pattern));
         var settings = Settings(app);
+        DesktopSession.Select(DesktopSession.Find(settings, "Section"), "Rules");
         DesktopSession.Find(settings, "Test a file name", ValuePattern.Pattern);
     }
 
@@ -156,9 +158,8 @@ public sealed class TidyTests(ITestOutputHelper output)
             history.EndRun(run);
         });
         var tidy = OpenTidy(app);
-        DesktopSession.Find(tidy, "Recent");
         DesktopSession.Find(tidy, "Undo old.pdf", InvokePattern.Pattern);
-        DesktopSession.Invoke(DesktopSession.Find(tidy, "Rules", InvokePattern.Pattern));
+        DesktopSession.Invoke(DesktopSession.Find(tidy, "History", InvokePattern.Pattern));
         var settings = Settings(app);
         DesktopSession.Select(DesktopSession.Find(settings, "Section"), "History");
         DesktopSession.Invoke(DesktopSession.Find(settings, "Clear history", InvokePattern.Pattern));
@@ -177,9 +178,15 @@ public sealed class TidyTests(ITestOutputHelper output)
 
     private static AutomationElement OpenTidy(DesktopSession app)
     {
-        var flyout = app.OpenFlyout();
-        DesktopSession.Select(DesktopSession.Find(flyout, "Flyout sections"), "Tidy");
-        return flyout;
+        var pages = app.OpenPages();
+        if (pages.FindFirst(TreeScope.Descendants, new PropertyCondition(AutomationElement.NameProperty, "File organizer")) is null
+            || pages.FindFirst(TreeScope.Descendants, new PropertyCondition(AutomationElement.NameProperty, "Folder mode")) is null)
+        {
+            if (pages.FindFirst(TreeScope.Descendants, new PropertyCondition(AutomationElement.NameProperty, "All features")) is { } grid)
+                DesktopSession.Invoke(grid);
+            DesktopSession.Invoke(DesktopTests.Tile(pages, "File organizer"));
+        }
+        return pages;
     }
     private static AutomationElement Settings(DesktopSession app)
     {

@@ -58,6 +58,12 @@ public sealed class IslandHost : IDisposable
         _tracker.Ignore = [_window.Handle, _window.PanelHandle];
         _window.SettingsRequested += (_, _) => _shell.Commands.OpenSettings();
         _window.LastPageChanged += (_, key) => UpdateSettings(s => s.IslandLastPage = key);
+        // The tray icon and a second launch open these same pages: in the island, or docked by the tray.
+        _window.TrayIconRect = () => _shell.Commands.TrayAnchor()?.Icon;
+        _shell.Commands.RegisterPages(
+            keyboard => _window.TogglePages(_shell.Commands.TrayAnchor(), keyboard),
+            () => _window.ShowPages(_shell.Commands.TrayAnchor(), keyboard: true));
+        _window.IsVisibleChanged += (_, _) => _shell.Commands.SetIslandShowing(_window.IsVisible);
         StartMedia();
         _tracker.Changed += (_, _) =>
         {
@@ -77,8 +83,13 @@ public sealed class IslandHost : IDisposable
         _shell.Island.Succeeded += (_, _) => _dispatcher.BeginInvoke(() => _window.Celebrate());
         _shell.Config.SectionChanged += OnSectionChanged;
 
+        // The tab's right click is the tray icon's menu, so Quit stays reachable with the icon hidden.
+        var menu = new List<(string Label, Action Action)?>();
         if (_shell.DebugMode)
-            _window.SetDebugMenu(DebugMenu());
+            menu.AddRange([.. DebugMenu(), null]);
+        menu.Add(("Open settings", () => _shell.Commands.OpenSettings()));
+        menu.Add(("Quit", () => _shell.Commands.Quit()));
+        _window.SetTabMenu(menu);
 
         LoadSettings();
         Refresh();
@@ -137,7 +148,7 @@ public sealed class IslandHost : IDisposable
             Directory.CreateDirectory(directory);
             var debug = _shell.Island.CreatePublisher(DebugModuleId);
             var settle = TimeSpan.FromMilliseconds(900);
-            await Task.Delay(1500); // let the registry start the modules
+            await _shell.ModulesReady; // their tiles and pages exist once they run
             var media = new IslandActivity("media", IslandActivityKind.Media, "Weekend Mix", "Spotify") { Progress = 0.38 };
             async Task SaveSwellAsync(string name, System.Windows.Media.Color color)
             {
@@ -201,8 +212,9 @@ public sealed class IslandHost : IDisposable
 
     /// <summary>
     /// Debug builds (<c>--island-pages &lt;dir&gt;</c>): with a fake media activity live, the island open on
-    /// Top, Left and Right, on the grid and on every page, plus a page-to-page morph caught midway
-    /// (s6-*.png). Use a CHIPPI_DEV_PROFILE: the island settings it moves through are put back.
+    /// Top, Left and Right, on the grid and on every page, plus a page-to-page morph caught midway,
+    /// then with the island off the same pages docked by the tray (s6-*.png). Use a
+    /// CHIPPI_DEV_PROFILE: the island settings it moves through are put back.
     /// </summary>
     private async Task SaveIslandPagesAsync(string directory)
     {
@@ -212,7 +224,7 @@ public sealed class IslandHost : IDisposable
         {
             Directory.CreateDirectory(directory);
             var settle = TimeSpan.FromMilliseconds(900);
-            await Task.Delay(1500); // let the registry start the modules
+            await _shell.ModulesReady; // their tiles and pages exist once they run
             var color = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#202020");
             debug.Publish(new IslandActivity("media", IslandActivityKind.Media, "Weekend Mix", "Spotify"));
             foreach (var edge in new[] { IslandEdge.Top, IslandEdge.Left, IslandEdge.Right })
@@ -224,6 +236,7 @@ public sealed class IslandHost : IDisposable
                 _window.SaveScene(Path.Combine(directory, $"s6-{edge}-grid".ToLowerInvariant() + ".png"), color);
                 foreach (var key in _window.Panel.PageKeys())
                 {
+                    await KeepOpenAsync(settle);
                     _window.Panel.ShowPage(key);
                     await Task.Delay(settle);
                     _window.SaveScene(Path.Combine(directory, $"s6-{edge}-{key}".ToLowerInvariant() + ".png"), color);
@@ -241,6 +254,18 @@ public sealed class IslandHost : IDisposable
                 _window.ForceOpen(false);
                 await Task.Delay(settle);
             }
+            UpdateSettings(s => s.IslandEnabled = false);
+            await Task.Delay(settle);
+            _window.ShowPages(_shell.Commands.TrayAnchor(), keyboard: false);
+            await Task.Delay(settle);
+            _window.SaveScene(Path.Combine(directory, "s6-docked-grid.png"), color);
+            foreach (var key in _window.Panel.PageKeys())
+            {
+                _window.Panel.ShowPage(key);
+                await Task.Delay(settle);
+                _window.SaveScene(Path.Combine(directory, $"s6-docked-{key}".ToLowerInvariant() + ".png"), color);
+            }
+            _window.TogglePages(null, keyboard: false);
             _logger.LogInformation("Island page snapshots saved to {Directory}", directory);
         }
         catch (Exception ex)
@@ -250,8 +275,21 @@ public sealed class IslandHost : IDisposable
         finally
         {
             _shell.Island.ClearModule(DebugModuleId);
-            UpdateSettings(s => (s.IslandEdge, s.IslandPlace, s.IslandLastPage) = (original.IslandEdge, original.IslandPlace, original.IslandLastPage));
+            UpdateSettings(s => (s.IslandEdge, s.IslandPlace, s.IslandLastPage, s.IslandEnabled) = (original.IslandEdge, original.IslandPlace, original.IslandLastPage, original.IslandEnabled));
         }
+    }
+
+    /// <summary>
+    /// A click, Esc or a fullscreen window in front closes the island, as it should, even during a
+    /// snapshot run; it is opened again (and logged) so the rest of the run still shows its pages.
+    /// </summary>
+    private async Task KeepOpenAsync(TimeSpan settle)
+    {
+        if (_window.IsIslandOpen)
+            return;
+        _logger.LogInformation("Island page snapshot: the island had closed (a click, Esc or a fullscreen window); opening it again");
+        _window.ForceOpen(true);
+        await Task.Delay(settle);
     }
 
     /// <summary>Drops the tab at points on its monitor through the real drop path and reports what was taken.</summary>
@@ -342,6 +380,7 @@ public sealed class IslandHost : IDisposable
         _window.SetPetColor(settings.PetColor);
         _window.SetPlacement(settings.IslandEdge, settings.IslandPlace);
         _window.SetLastPage(settings.IslandLastPage);
+        _window.SetLayout(IslandLayout.From(settings));
         _window.SetEnabled(settings.IslandEnabled);
         _tracker.SetPlacement(settings.IslandDisplay, settings.IslandMonitorId);
     }
@@ -411,8 +450,6 @@ public sealed class IslandHost : IDisposable
                 };
                 restore.Start();
             }),
-            null,
-            ("Quit Chippi", () => _shell.Commands.Quit()),
         ];
     }
 

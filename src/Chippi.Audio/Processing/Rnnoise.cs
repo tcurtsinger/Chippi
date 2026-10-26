@@ -76,12 +76,12 @@ internal sealed class RnnoiseSuppressor : ISampleProvider, IDisposable
     public RnnoiseSuppressor(ISampleProvider source, MicSettings settings)
     {
         if (source.WaveFormat.Channels != 1 || source.WaveFormat.SampleRate != 48000)
-            throw new ArgumentException("RNNoise needs 48 kHz mono.", nameof(source));
+            throw new ArgumentException("Unsupported format", nameof(source));
         _source = source;
         _settings = settings;
         _state = RnnoiseNative.rnnoise_create(IntPtr.Zero);
         if (_state == IntPtr.Zero)
-            throw new InvalidOperationException("rnnoise_create returned null.");
+            throw new AudioFailure("Noise suppression failed");
     }
 
     public WaveFormat WaveFormat => _source.WaveFormat;

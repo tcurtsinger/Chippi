@@ -6,9 +6,12 @@ using Chippi.Core.Modules;
 
 namespace Chippi.Features.Sound.Volume;
 
-/// <summary>Shared state for Settings, Sound flyout and Volume mixer. Never owns a default role.</summary>
+/// <summary>Shared state for Settings and the island's App volume page. Never owns a default role.</summary>
 public sealed class AppVolumeModule(AudioService? audio = null) : IFeatureModule
 {
+    /// <summary>The island's App volume tile.</summary>
+    public const string TileKey = "sound.mixer";
+
     private readonly SemaphoreSlim _gate = new(1);
     private readonly Dictionary<AppKey, AppDeviceChoice> _current = [];
     private readonly Dictionary<AppKey, string> _seen = [];
@@ -18,9 +21,8 @@ public sealed class AppVolumeModule(AudioService? audio = null) : IFeatureModule
     private IIslandTile? _tile;
     private volatile bool _stopping;
     private bool _routingFailed;
-    private string? _viewedOutput;
 
-    public FeatureDescriptor Descriptor { get; } = new("app-volume", "App volume", "Volume and output device for each app, right from the tray", FeatureGroup.Sound)
+    public FeatureDescriptor Descriptor { get; } = new("app-volume", "App volume", "Volume and output device per app", FeatureGroup.Sound)
     {
         Icon = "Sliders",
         Presets = PresetMembership.Essentials | PresetMembership.Audio | PresetMembership.PowerUser,
@@ -30,9 +32,6 @@ public sealed class AppVolumeModule(AudioService? audio = null) : IFeatureModule
     public AudioSnapshot Snapshot => _audio?.Snapshot ?? AudioSnapshot.Empty;
     public IEnumerable<AppAudio> Apps => Snapshot.Apps.Where(a => Settings.ShowQuietApps || a.IsActive);
     public IReadOnlyList<AudioEndpoint> Outputs => Snapshot.Active(AudioFlow.Render).Where(e => !VbCable.IsCable(e)).ToList();
-    public AudioEndpoint? Output => Outputs.FirstOrDefault(e => e.Id == _viewedOutput)
-        ?? Outputs.FirstOrDefault(e => e.Id == Snapshot.Default(AudioFlow.Render, AudioRole.Multimedia)) ?? Outputs.FirstOrDefault();
-    public void ViewOutput(string? id) { _viewedOutput = id; Changed?.Invoke(); }
     public string? Error { get; private set; }
     public bool DevicePickerAvailable => !_routingFailed && _current.Values.Any(v => v.Available);
     public event Action? Changed;
@@ -54,10 +53,8 @@ public sealed class AppVolumeModule(AudioService? audio = null) : IFeatureModule
             _lease = _audio.Acquire();
             await _audio.RefreshAsync();
             await RefreshOutputsAsync();
-            _tile = context.Ui.AddIslandTile(new("sound.mixer", "Volume mixer", "Sliders", 10, 0, () => new VolumeView(this, VolumeSurface.Island))
-            { PageWidth = 344, Orbit = IslandOrbit.Right });
-            context.Ui.AddIslandTile(new("sound.output", "Output", "Headphones", 20, 20, () => new VolumeView(this, VolumeSurface.Output)));
-            context.Ui.AddFlyoutSection("sound", "Sound", "AudioLines", 30, () => new VolumeView(this, VolumeSurface.Flyout));
+            _tile = context.Ui.AddIslandTile(new(TileKey, Descriptor.Name, "Sliders", 20, 0, () => new VolumeView(this, VolumeSurface.Island))
+            { Orbit = IslandOrbit.Right });
             context.Ui.SetSettingsPage(_ => new VolumeView(this, VolumeSurface.Settings));
             _audio.SnapshotChanged += OnSnapshot;
             UpdateTile();
@@ -89,21 +86,9 @@ public sealed class AppVolumeModule(AudioService? audio = null) : IFeatureModule
 
     public Task SetVolumeAsync(AppKey app, float volume) => Change(async () => await _audio!.SetAppVolumeAsync(app, volume));
     public Task SetMutedAsync(AppKey app, bool muted) => Change(async () => await _audio!.SetAppMuteAsync(app, muted));
-    public Task SetSystemVolumeAsync(float volume) => Change(async () =>
-    {
-        if (Output is not { } output) throw new InvalidOperationException("No output");
-        await _audio!.SetEndpointVolumeAsync(output.Id, volume);
-    });
-    public Task SetSystemMutedAsync(bool muted) => Change(async () =>
-    {
-        if (Output is not { } output) throw new InvalidOperationException("No output");
-        var failed = await _audio!.SetEndpointMuteAsync([output.Id], muted);
-        if (failed.Count > 0) throw new InvalidOperationException("Couldn't mute output");
-    });
-
     public Task SetOutputAsync(AppKey app, string? id) => Change(async () =>
     {
-        if (!CanPickOutput(app)) throw new InvalidOperationException("App output unavailable");
+        if (!CanPickOutput(app)) throw new AudioFailure("App output unavailable");
         try { await _audio!.SetAppOutputAsync(app, id); }
         catch (AppOutputPolicyException) { _routingFailed = true; throw; }
         _current[app] = new(true, id);
@@ -128,12 +113,12 @@ public sealed class AppVolumeModule(AudioService? audio = null) : IFeatureModule
         await _gate.WaitAsync();
         try
         {
-            if (_context is null || _stopping) throw new InvalidOperationException("App volume uninstalled");
+            if (_context is null || _stopping) throw new AudioFailure("App volume uninstalled");
             await command();
             Error = null;
             UpdateTile();
         }
-        catch (Exception ex) { Error = ex.Message; throw; }
+        catch (Exception ex) { Error = AudioErrors.Reason(ex); throw; }
         finally { _gate.Release(); Changed?.Invoke(); }
     }
 
@@ -146,7 +131,7 @@ public sealed class AppVolumeModule(AudioService? audio = null) : IFeatureModule
             await RefreshOutputsAsync();
             UpdateTile();
         }
-        catch (Exception ex) { Error = ex.Message; }
+        catch (Exception ex) { Error = AudioErrors.Reason(ex); }
         finally { _gate.Release(); }
         Changed?.Invoke();
     }
@@ -188,5 +173,5 @@ public sealed class AppVolumeModule(AudioService? audio = null) : IFeatureModule
         }
     }
 
-    private void UpdateTile() => _tile?.SetStatus($"{Apps.Count()} apps");
+    private void UpdateTile() => _tile?.SetStatus(Apps.Count() is var count && count == 1 ? "1 app" : $"{count} apps");
 }

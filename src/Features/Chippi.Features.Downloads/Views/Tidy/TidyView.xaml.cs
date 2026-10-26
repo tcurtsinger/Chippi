@@ -12,23 +12,21 @@ using Microsoft.Win32;
 
 namespace Chippi.Features.Downloads.Views.Tidy;
 
-/// <summary>The flyout's Tidy panel. Navigation is raised through the module's supplied request callbacks.</summary>
+/// <summary>File organizer's island page. Navigation is raised through the module's supplied request callback.</summary>
 public partial class TidyView : UserControl
 {
     private readonly DownloadsModule _module;
     private readonly Action<DownloadsRequest> _request;
-    private readonly Action _rules;
     private readonly DispatcherTimer _ages = new() { Interval = TimeSpan.FromMinutes(1) };
     private DownloadsEngine? _subscribed;
     private string? _selected;
     private bool _refreshing;
     private bool _busy;
 
-    public TidyView(DownloadsModule module, Action<DownloadsRequest> request, Action requestRules)
+    public TidyView(DownloadsModule module, Action<DownloadsRequest> request)
     {
         _module = module;
         _request = request;
-        _rules = requestRules;
         InitializeComponent();
         _ages.Tick += OnRefresh;
         Refresh();
@@ -88,8 +86,6 @@ public partial class TidyView : UserControl
             var pending = engine?.Pending ?? [];
             if (current is not null)
             {
-                ModeLine.Text = TidyProjection.ModeLine(current, pending.Count(p => Same(p.Folder, current.Path) && p.Status == PendingStatus.Ready));
-                ModeLine.ToolTip = current.Path;
                 Folders.ToolTip = current.Path;
                 Modes.SelectedIndex = current.Mode switch { FolderMode.Silent => 0, FolderMode.Manual => 1, _ => 2 };
                 FolderChip.IsOn = current.Mode != FolderMode.Paused;
@@ -142,13 +138,6 @@ public partial class TidyView : UserControl
     {
         if (_busy || _module.Engine is null) return;
         try { _request(new DownloadsRequest(DownloadsRequestKind.Run)); }
-        catch (Exception ex) { ShowError(ex.Message); }
-    }
-
-    private void OnRules(object sender, RoutedEventArgs e)
-    {
-        if (_busy || _module.Engine is null) return;
-        try { _rules(); }
         catch (Exception ex) { ShowError(ex.Message); }
     }
 

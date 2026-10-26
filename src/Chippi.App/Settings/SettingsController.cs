@@ -67,7 +67,7 @@ internal sealed class SettingsController
         try
         {
             System.IO.Directory.CreateDirectory(directory);
-            await Task.Delay(1500); // let the registry start the modules
+            await _shell.ModulesReady; // their tiles and pages exist once they run
             var original = SettingsUi.ReadApp(_shell.Config);
             try
             {

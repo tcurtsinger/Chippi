@@ -78,38 +78,39 @@ internal sealed class DesktopSession : IDisposable
         return process;
     }
 
-    public AutomationElement OpenFlyout()
+    /// <summary>A second launch shows the island's pages (the window named "Chippi"), in the island or docked by the tray.</summary>
+    public AutomationElement OpenPages()
     {
-        // The flyout hides when another window takes the foreground. If that happens before its
-        // content is reachable, open it again once rather than wait on a hidden window.
-        if (TryOpenFlyout() is { } flyout)
-            return flyout;
-        _output.WriteLine("The flyout hid before its content was found (it lost the foreground); opening it again");
-        return TryOpenFlyout() ?? throw new TimeoutException("The flyout hid twice before its content was found");
+        // A click elsewhere closes the pages. If that happens before their content is reachable,
+        // open them again once rather than wait on a hidden window.
+        if (TryOpenPages() is { } pages)
+            return pages;
+        _output.WriteLine("The pages closed before their content was found; opening them again");
+        return TryOpenPages() ?? throw new TimeoutException("The pages closed twice before their content was found");
     }
 
-    private AutomationElement? TryOpenFlyout()
+    private AutomationElement? TryOpenPages()
     {
         var activation = Start();
         Assert.True(activation.WaitForExit(15000), "Second launch did not exit");
         LastActivationExitCode = activation.ExitCode;
         Assert.Equal(0, LastActivationExitCode);
         AutomationElement? window = null;
-        Until(() => (window = WindowOrNull("Chippi")) is not null, "profile flyout opened");
+        Until(() => (window = WindowOrNull("Chippi")) is not null, "profile pages opened");
         var handle = (nint)window!.Current.NativeWindowHandle;
-        // Look the window up again on every poll: an element taken while the flyout's UI thread is
-        // still busy starting up can stay without any of its content.
+        // Look the window up again on every poll: an element taken while the UI thread is still busy
+        // starting up can stay without any of its content.
         bool shown = false;
         try
         {
             Until(() => !IsWindowVisible(handle)
                     || ((window = WindowOrNull("Chippi")) is not null && (shown = FirstOrNull(window, "Settings", InvokePattern.Pattern) is not null)),
-                "the flyout's Settings button, or the flyout hidden");
+                "the pages' Settings button, or the pages hidden");
         }
         catch (TimeoutException)
         {
             // What UI Automation sees, through the last lookup and straight from the handle.
-            _output.WriteLine($"Flyout timeout: window 0x{handle:X}, visible {IsWindowVisible(handle)}");
+            _output.WriteLine($"Pages timeout: window 0x{handle:X}, visible {IsWindowVisible(handle)}");
             _output.WriteLine($"  children by lookup: {Children(() => window)}");
             _output.WriteLine($"  children by handle: {Children(() => AutomationElement.FromHandle(handle))}");
             throw;
@@ -136,7 +137,7 @@ internal sealed class DesktopSession : IDisposable
 
     public AutomationElement OpenSettings()
     {
-        Invoke(Find(OpenFlyout(), "Settings", InvokePattern.Pattern));
+        Invoke(Find(OpenPages(), "Settings", InvokePattern.Pattern));
         AutomationElement? window = null;
         Until(() => (window = WindowOrNull("Chippi Settings")) is not null, "profile settings opened");
         return window!;

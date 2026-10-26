@@ -67,7 +67,7 @@ public sealed class VolumeTests
         try { pick = f.Module.SetOutputAsync(VolumeFixture.Key, "B"); }
         finally { release.Set(); }
         await closing;
-        await Assert.ThrowsAsync<InvalidOperationException>(() => pick);
+        await Assert.ThrowsAnyAsync<InvalidOperationException>(() => pick);
         f.System.WithSession(VolumeFixture.Session("again", "A", 130));
         await f.Audio.RefreshAsync();
         await Task.Delay(300);
@@ -82,19 +82,16 @@ public sealed class VolumeTests
         await f.Start();
         f.System.Remove("B");
         await f.Audio.RefreshAsync();
-        await Assert.ThrowsAsync<InvalidOperationException>(() => f.Module.SetOutputAsync(VolumeFixture.Key, "B"));
+        await Assert.ThrowsAnyAsync<InvalidOperationException>(() => f.Module.SetOutputAsync(VolumeFixture.Key, "B"));
         await Task.Delay(300);
         Assert.True(f.Module.DevicePickerAvailable, "picker gone for the session after an output was unplugged");
     }
     [Fact]
-    public async Task Transport_endpoints_are_never_picker_or_system_control_targets()
+    public async Task Transport_endpoints_are_never_picker_targets()
     {
         await using var f = new VolumeFixture(); f.System.With(CableInput()).WithDefault("CableIn");
         await f.Start();
         Assert.DoesNotContain(f.Module.Outputs,e=>e.Id=="CableIn");
-        Assert.Equal("A",f.Module.Output?.Id);
-        await f.Module.SetSystemMutedAsync(true);
-        Assert.False(f.System.GetLevel("CableIn").Muted);
         Assert.Empty(f.System.Writes);
     }
     [Fact]
@@ -105,10 +102,8 @@ public sealed class VolumeTests
         Assert.Empty(f.System.Writes);
         Assert.Empty(f.System.AppOutputWrites);
         Assert.Equal(0.5f,f.System.SessionById("one").Volume);
-        var mixer = f.Ui.Tiles.Single(t=>t.Spec.Key=="sound.mixer");
-        Assert.Equal((344,IslandOrbit.Right),(mixer.Spec.PageWidth,mixer.Spec.Orbit));
-        Assert.Contains(f.Ui.Tiles,t=>t.Spec.Key=="sound.output");
-        Assert.Equal("sound",Assert.Single(f.Ui.Flyouts).TabKey);
+        var mixer = Assert.Single(f.Ui.Tiles);
+        Assert.Equal((AppVolumeModule.TileKey,"App volume",IslandOrbit.Right),(mixer.Spec.Key,mixer.Spec.Name,mixer.Spec.Orbit));
     }
 
     [Fact]
@@ -122,18 +117,6 @@ public sealed class VolumeTests
         await f.Module.SetMutedAsync(VolumeFixture.Key,true);
         foreach(var id in new[]{"one","two"}) Assert.Equal((1f,true),(f.System.SessionById(id).Volume,f.System.SessionById(id).Muted));
         Assert.Equal((0.5f,false),(f.System.SessionById("other").Volume,f.System.SessionById("other").Muted));
-    }
-
-    [Fact]
-    public async Task System_controls_only_change_the_viewed_output_and_never_a_default()
-    {
-        await using var f = new VolumeFixture(); await f.Start();
-        f.Module.ViewOutput("B");
-        await f.Module.SetSystemVolumeAsync(0.2f);
-        await f.Module.SetSystemMutedAsync(true);
-        Assert.Equal(new EndpointLevel(0.2f,true),f.System.GetLevel("B"));
-        Assert.Equal(new EndpointLevel(0.5f,false),f.System.GetLevel("A"));
-        Assert.Empty(f.System.Writes);
     }
 
     [Fact]
@@ -191,7 +174,7 @@ public sealed class VolumeTests
         Assert.False(f.Module.DevicePickerAvailable);
         await f.Module.SetVolumeAsync(VolumeFixture.Key,0.3f); await f.Module.SetMutedAsync(VolumeFixture.Key,true);
         Assert.Equal((0.3f,true),(f.System.SessionById("one").Volume,f.System.SessionById("one").Muted));
-        await Assert.ThrowsAsync<InvalidOperationException>(()=>f.Module.SetOutputAsync(VolumeFixture.Key,"B"));
+        await Assert.ThrowsAnyAsync<InvalidOperationException>(()=>f.Module.SetOutputAsync(VolumeFixture.Key,"B"));
         Assert.Empty(f.System.AppOutputWrites);
     }
 

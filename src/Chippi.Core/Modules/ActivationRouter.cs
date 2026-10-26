@@ -16,7 +16,7 @@ public interface IModuleActivation
 /// <summary>
 /// Routes activation arguments to the module that registered the verb. Arguments look like
 /// <c>["--organize", "C:\Downloads"]</c>: the first is <c>--verb</c>, the rest are its values. The
-/// shell calls <see cref="TryRoute"/> on the UI thread; anything unrouted falls back to the flyout.
+/// shell calls <see cref="TryRoute"/> on the UI thread; anything unrouted falls back to the island's pages.
 /// </summary>
 public sealed class ActivationRouter
 {

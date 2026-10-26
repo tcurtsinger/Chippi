@@ -25,8 +25,8 @@ public partial class KeepAwakePage : UserControl
             Length.Items.Add(new ComboBoxItem { Content = label, Tag = length });
         Length.SelectedItem = Length.Items.Cast<ComboBoxItem>().First(i => KeepAwakeText.SameLength((KeepAwakeSettings)i.Tag, saved));
         _ready = true;
-        KeepAwakePanel.OnFlip(Switch, OnSwitch);
-        KeepAwakePanel.OnFlip(Screen, OnScreen);
+        KeepAwakeIslandView.OnFlip(Switch, OnSwitch);
+        KeepAwakeIslandView.OnFlip(Screen, OnScreen);
         Loaded += (_, _) => { _module.Changed += Refresh; Refresh(); };
         Unloaded += (_, _) => _module.Changed -= Refresh;
     }

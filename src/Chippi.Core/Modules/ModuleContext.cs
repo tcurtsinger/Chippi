@@ -24,7 +24,7 @@ public sealed class ModuleContext(
     /// <summary>Publish island activities and report successes (which make Gumdrop celebrate).</summary>
     public IIslandPublisher Island { get; } = island;
 
-    /// <summary>Optional flyout panels and settings page.</summary>
+    /// <summary>Optional island tiles and settings page.</summary>
     public IModuleUi Ui { get; } = ui;
 
     /// <summary>

@@ -19,6 +19,7 @@ and [Mouzi](https://github.com/hsr88/mouzi) (Downloads organizer). Absorbs
 | Audience | Public open-source release (GitHub releases, installer, auto-update) |
 | Look | Native Windows 11 (2026-10-23): neutral grays, one flat accent (Follow Windows by default, or Blue, Violet, Green, Pink), Segoe UI Variable, a panel-first flyout. It replaced Direction A "Studio Rack" after the [UI/UX audit](docs/phase-1-2-ui-ux-audit.md). See [DESIGN.md](DESIGN.md) |
 | Island | A movable tab docked on the top (default), left or right screen edge; opens on click to a grid of tiles, each opening its own page (2026-10-25) |
+| Surfaces | The island's pages are the only quick panel; each feature's page is built once. The tray icon opens them, in the island or, while it's off or hidden for a fullscreen app, docked by the tray; right click is Settings and Quit. Hide tray icon leaves the island as the only door. Settings groups pages by the catalog's groups, Sound by task (Output, Microphone, App volume), and never repeats a daily control (2026-10-26, [mockup](https://claude.ai/artifact/RJAX7v2QT6MLpPRgZQVXeS)) |
 | Pet | Gumdrop, a blob with a face in the Synth gradient that lives in the island. See DESIGN.md §7 |
 | Mouzi | Rebuilt from scratch with the same functionality. Its code is reference only |
 | vorssaint | Feature list and behavior are the spec. We do not port its code |
@@ -29,7 +30,7 @@ and [Mouzi](https://github.com/hsr88/mouzi) (Downloads organizer). Absorbs
 
 ## Architecture
 
-- **Shell.** Single instance, tray icon, tray flyout panel with tabs, settings window,
+- **Shell.** Single instance, tray icon (a door to the island's pages), settings window,
   island host window, startup registration, config store, logging, update check,
   settings export/import.
 - **Feature modules.** Each feature is a module with an id, settings, required

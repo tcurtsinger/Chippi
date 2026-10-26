@@ -11,16 +11,13 @@ using static Chippi.Features.Sound.Tests.RoutingFixture;
 namespace Chippi.Features.Sound.Tests;
 public sealed class VolumeUiTests
 {
-    [Theory]
-    [InlineData(VolumeSurface.Settings)]
-    [InlineData(VolumeSurface.Flyout)]
-    [InlineData(VolumeSurface.Island)]
-    public async Task Unshown_volume_and_mute_controls_change_the_same_sessions(VolumeSurface surface)
+    [Fact]
+    public async Task Unshown_volume_and_mute_controls_change_the_same_sessions()
     {
         await using var f = new VolumeFixture(); await f.Start();
         await Sta(async () =>
         {
-            var view = new VolumeView(f.Module,surface);
+            var view = new VolumeView(f.Module,VolumeSurface.Island);
             var slider = Descendants(view).OfType<Slider>().Single(s=>AutomationProperties.GetName(s)=="Music volume");
             var range = (IRangeValueProvider)new SliderAutomationPeer(slider);
             Assert.Equal(100,range.Maximum);

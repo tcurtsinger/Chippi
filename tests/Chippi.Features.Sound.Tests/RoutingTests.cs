@@ -21,8 +21,7 @@ public sealed class RoutingTests
         Assert.Equal(["M2", "M1"], f.Module.Settings.Microphone.Devices.Select(d => d.Id));
         Assert.True(f.Module.Settings.Output.Seeded);
         Assert.Empty(f.Notices.Sent);
-        Assert.Equal("Sound", Assert.Single(f.Ui.Flyouts).Name);
-        Assert.Equal(["sound.output", "sound.microphone"], f.Ui.Tiles.Select(t => t.Spec.Key));
+        Assert.Equal([SoundTile.Key, SoundTile.Key], f.Ui.Tiles.Select(t => t.Spec.Key));
     }
 
     [Fact]
@@ -100,6 +99,22 @@ public sealed class RoutingTests
         await f.Module.PreferAsync(AudioFlow.Render, "B");
         Assert.Equal("B", f.Settings.Value.Output.Devices[0].Id);
         Assert.Equal("B", f.System.DefaultOf(AudioFlow.Render, AudioRole.Multimedia));
+    }
+
+    [Fact]
+    public async Task A_failed_pick_with_switching_off_leaves_the_device_to_windows()
+    {
+        await using var f = new RoutingFixture();
+        f.System.With(Speaker("A"), Speaker("B")).WithDefault("A");
+        await f.Start();
+        await f.Module.SetEnabledAsync(AudioFlow.Render, false);
+        var before = f.System.Enumerations;
+        await f.Audio.RefreshAsync();
+        f.System.ReadsBeforeFailure = f.System.Enumerations - before; // the pick's release passes, then its claim fails
+        await Assert.ThrowsAnyAsync<Exception>(() => f.Module.PreferAsync(AudioFlow.Render, "B"));
+        Assert.Null(f.System.ReadsBeforeFailure);
+        await f.Audio.RefreshAsync();
+        Assert.Equal("A", f.System.DefaultOf(AudioFlow.Render, AudioRole.Multimedia)); // Routing let go of the roles
     }
 
     [Theory]
@@ -214,9 +229,9 @@ public sealed class RoutingTests
         var audio = new AudioService(() => throw new InvalidOperationException("Unavailable"), null);
         var f = new RoutingFixture();
         var module = new AudioRoutingModule(audio);
-        await Assert.ThrowsAsync<InvalidOperationException>(() => module.StartAsync(f.Context, CancellationToken.None));
+        await Assert.ThrowsAnyAsync<InvalidOperationException>(() => module.StartAsync(f.Context, CancellationToken.None));
         Assert.False(audio.IsRunning);
-        Assert.Empty(f.Ui.Flyouts);
+        Assert.Empty(f.Ui.Tiles);
         await module.StopAsync(CancellationToken.None);
     }
 

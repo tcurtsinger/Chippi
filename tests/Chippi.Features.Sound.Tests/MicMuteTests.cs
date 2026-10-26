@@ -59,10 +59,10 @@ public sealed class MicMuteTests
         Assert.False(f.System.GetLevel("A").Muted);
         await f.Module.ToggleAsync();
         Assert.True(f.System.GetLevel("A").Muted);
-        Assert.Equal("Muted", Assert.Single(f.Ui.Tiles).Status);
+        Assert.Equal("Mic muted", Assert.Single(f.Ui.Tiles).Status);
         var activity = Assert.Single(f.Hub.Activities);
         Assert.True(activity.NeedsAttention);
-        Assert.Equal("sound.microphone", activity.TileKey);
+        Assert.Equal(SoundTile.Key, activity.TileKey);
         Assert.Equal("MicOff", f.Module.Descriptor.Icon);
     }
 
@@ -73,24 +73,24 @@ public sealed class MicMuteTests
         f.System.With(Mic("A"), Mic("B"));
         await f.Start();
         var mute = Assert.Single(f.Ui.Tiles);
-        var processing = new IslandTileContribution("mic-processing", new("sound.microphone", "Microphone", "Mic", 30, 10, () => new object()) { StatusPriority = 10 });
-        processing.SetStatus("Stopped");
+        var processing = new IslandTileContribution("mic-processing", SoundTile.Section(30, SoundTile.Microphone, () => new object()) with { StatusPriority = 10 });
+        processing.SetStatus("Clean-up stopped");
         var group = Assert.Single(IslandTileContribution.Group([processing, mute]));
 
-        Assert.Equal("Stopped", group.Status);
+        Assert.Equal("Clean-up stopped", group.Status);
         await f.Module.ToggleAsync();
-        Assert.Equal("Muted", group.Status);
+        Assert.Equal("Mic muted", group.Status);
         f.System.ChangeLevel("B", new(.5f, false));
         await f.Audio.RefreshAsync();
         Assert.Equal("Some microphones muted", group.Status);
         f.System.ChangeLevel("A", new(.5f, false));
         await f.Audio.RefreshAsync();
-        Assert.Equal("Stopped", group.Status);
+        Assert.Equal("Clean-up stopped", group.Status);
         Assert.Equal("", mute.Status);
 
         f.System.Remove("A", "B");
         await f.Audio.RefreshAsync();
-        Assert.Equal("Stopped", group.Status);
+        Assert.Equal("Clean-up stopped", group.Status);
     }
     [Fact]
     public async Task Shortcut_changes_persist_only_on_success_and_reject_OS_shortcuts()

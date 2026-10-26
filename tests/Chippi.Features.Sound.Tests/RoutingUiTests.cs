@@ -27,7 +27,7 @@ public sealed class RoutingUiTests
         await Sta(async () =>
         {
             var page = new RoutingPage(f.Module);
-            var toggle = Descendants(page).OfType<ToggleButton>().Single(t => AutomationProperties.GetName(t) == "Switch outputs automatically");
+            var toggle = Descendants(page).OfType<ToggleButton>().Single(t => AutomationProperties.GetName(t) == "Priority switching");
             ((IToggleProvider)new ToggleButtonAutomationPeer(toggle)).Toggle();
             await Until(() => !Descendants(page).Contains(toggle));
             Assert.False(f.Module.Settings.Output.Enabled);
@@ -55,7 +55,7 @@ public sealed class RoutingUiTests
     }
 
     [Fact]
-    public async Task Contributions_create_the_expected_views_and_share_sound_tab()
+    public async Task Routing_puts_output_beside_microphone_on_the_sound_page_and_its_tile_names_the_output()
     {
         await using var f = new RoutingFixture();
         f.System.With(Speaker("A"), Mic("M")).WithDefault("A").WithDefault("M");
@@ -63,32 +63,37 @@ public sealed class RoutingUiTests
         await Sta(() =>
         {
             Assert.IsType<RoutingPage>(f.Ui.Page!("microphone"));
-            Assert.IsType<RoutingQuickView>(Assert.Single(f.Ui.Flyouts).CreateView());
             Assert.All(f.Ui.Tiles, t => Assert.IsType<RoutingQuickView>(t.Spec.CreateSection()));
         });
-        Assert.Equal("sound", f.Ui.Flyouts[0].TabKey);
-        Assert.Equal("M", f.Ui.Tiles[1].Status);
+        Assert.All(f.Ui.Tiles, t => Assert.Equal(SoundTile.Key, t.Spec.Key));
+        Assert.Equal([SoundTile.Output, SoundTile.Microphone], f.Ui.Tiles.Select(t => t.Spec.Column));
+        Assert.Equal("A", f.Ui.Tiles[0].Status);
     }
 
     [Fact]
-    public async Task Off_island_choices_are_disabled_and_unlisted_default_still_shows_in_flyout()
+    public async Task A_pick_works_with_priority_switching_off_and_only_connected_devices_are_listed()
     {
         await using var f = new RoutingFixture();
-        f.System.With(Speaker("A"), Speaker("Windows")).WithDefault("A");
+        f.System.With(Speaker("A"), Speaker("B"), Speaker("Gone")).WithDefault("A");
         await f.Start();
         await f.Module.SetEnabledAsync(AudioFlow.Render, false);
-        await f.Module.RemoveAsync(AudioFlow.Render, "Windows");
-        f.System.ChangeDefault("Windows");
+        f.System.Disconnect("Gone");
         await f.Audio.RefreshAsync();
-        await Sta(() =>
+        await Sta(async () =>
         {
-            var island = new RoutingQuickView(f.Module, AudioFlow.Render, true);
-            var prefer = Descendants(island).OfType<System.Windows.Controls.Button>().Single(b => AutomationProperties.GetName(b) == "Prefer A");
-            Assert.False(prefer.IsEnabled);
-            var flyout = new RoutingQuickView(f.Module);
-            var combo = Descendants(flyout).OfType<System.Windows.Controls.ComboBox>().First();
-            Assert.Equal("Windows", Assert.IsType<PriorityEntry>(combo.SelectedItem).Name);
+            var page = new RoutingQuickView(f.Module, AudioFlow.Render);
+            var rows = Descendants(page).OfType<System.Windows.Controls.Button>().Select(AutomationProperties.GetName).ToList();
+            Assert.Equal(["Mute system volume", "A, in use", "Use B"], rows); // the card's mute, then connected outputs only
+            var pick = Descendants(page).OfType<System.Windows.Controls.Button>().Single(b => AutomationProperties.GetName(b) == "Use B");
+            ((IInvokeProvider)new ButtonAutomationPeer(pick)).Invoke();
+            await Until(() => !Descendants(page).Contains(pick)); // rebuilt once the pick has finished
         });
+        Assert.Equal("B", f.System.DefaultOf(AudioFlow.Render, AudioRole.Multimedia));
+        Assert.Equal("B", f.Module.Settings.Output.Devices[0].Id);
+        Assert.False(f.Module.Settings.Output.Enabled); // the pick is set once; switching stays off
+        f.System.ChangeDefault("A");
+        await f.Audio.RefreshAsync();
+        Assert.Equal("A", f.System.DefaultOf(AudioFlow.Render, AudioRole.Multimedia));
     }
     private static IEnumerable<DependencyObject> Descendants(DependencyObject root)
     {

@@ -16,26 +16,19 @@ public sealed class IslandTileTests : IDisposable
         new(key, name, "Mic", order, section, () => new object()) { PageWidth = width };
 
     [Fact]
-    public async Task A_running_module_s_tiles_and_sections_are_removed_when_it_stops()
+    public async Task A_running_module_s_tiles_are_removed_when_it_stops()
     {
         var module = FakeModule.Create("m");
-        module.OnStart = ctx =>
-        {
-            ctx.Ui.AddIslandTile(Spec("t", "Tile", 10, 0));
-            ctx.Ui.AddFlyoutSection("sound", "Sound", "AudioLines", 2, () => new object());
-        };
+        module.OnStart = ctx => ctx.Ui.AddIslandTile(Spec("t", "Tile", 10, 0));
         _f.Registry.Register(module);
         await _f.Registry.StartAsync();
 
         await _f.Registry.SetInstalledAsync("m", true);
         var entry = _f.Registry.Find("m")!;
         Assert.Equal("t", Assert.Single(entry.IslandTiles).Spec.Key);
-        var section = Assert.Single(entry.FlyoutPanels);
-        Assert.Equal(("sound", 2), (section.TabKey, section.Order));
 
         await _f.Registry.SetInstalledAsync("m", false);
         Assert.Empty(entry.IslandTiles);
-        Assert.Empty(entry.FlyoutPanels);
     }
 
     [Fact]
