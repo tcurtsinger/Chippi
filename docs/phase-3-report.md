@@ -24,6 +24,7 @@ Brief: [phase-3-handoff.md](phase-3-handoff.md), with [phase-3/architecture.md](
 | #44 | S7 Sound smoke tests on fakes: Sound tab, Settings pages, Install Driver states, island grid pages |
 | #45 | rnnoise.dll kept out of the single-file bundle (published builds couldn't load it) |
 | #46 | Phase 3 installers: release artifact manifest |
+| `0a7fab2` (PR pending) | Now Playing gets the system volume (from App volume) and output picker (from Audio routing) below the player, each only while its feature is installed |
 
 ## How to build and run
 
@@ -50,13 +51,12 @@ At `main` `1e6341c`:
 | App volume: volume, mute and output device per app from Settings, flyout and island | Done in tests, waiting on a live check | S4 tests and the S7 smoke test (Settings slider reaches the fake engine; island mixer page). No per-app routing write was made on real hardware. Live: Part A step 5 covers volume and mute; the output picker has no live step yet. Result: pending |
 | Mic mute shortcut: mutes every mic, new mics join, caution glyph on the tab, flyout header shows muted | Done in tests, waiting on a live check | `MicMuteTests`, `MicMuteTabTests`, S7 flyout test. The native hotkey has never been pressed. Live: Part A step 6. Result: pending |
 | Volume boost: works as its spike decided, or deferred with Travis's sign-off | Waiting on Travis | Karl's spike: no-go for now (`X:\code\chippi-scratch\phase-3\boost-gate\findings.md`). Task 19. Decision: pending |
-| Island: grid with tiles only for installed features; pages, orbit buttons and morph; Esc, then after a click Tab, arrows and Enter | Partly | `IslandPanelTests`, `IslandOrbitTests`, offscreen shots (#40). Now Playing lacks its system volume and output picker (see Deviations). Clicking in and the keyboard were checked by reading the code only. Live: section 1. Result: pending |
+| Island: grid with tiles only for installed features; pages, orbit buttons and morph; Esc, then after a click Tab, arrows and Enter | Done in tests, waiting on a live check | `IslandPanelTests`, `IslandOrbitTests`, offscreen shots (#40). Now Playing's system volume and output picker: `Now_playing_shows_system_volume_and_output_picker_only_for_installed_features` (`0a7fab2`). Clicking in and the keyboard were checked by reading the code only. Live: section 1. Result: pending |
 | Installer installs, updates in place, uninstalls cleanly; uninstall restores the real mic and never removes VB-CABLE | Partly | Packages built and hash-checked (#46); the x64 portable starts under a dev profile. Update in place: section 1 step 1. Uninstall: Part B step 5 (optional). Result: pending |
 | Hopper: Travis told once Chippi covers it | Waiting on the live checks | Told after Parts A and B pass |
 
 ## Deviations from DESIGN.md
 
-- **Now Playing has no system volume or output picker under it.** DESIGN.md › Island says they sit below the transport. The island page takes extra sections under tile key `now-playing`, but no Sound module adds one yet.
 - **App volume's flyout output pickers sit below each app row**, not beside it, to fit the flyout's width (S4).
 - **Two values were extrapolated from the mockup** when DESIGN.md was written (#33): the side-column 12 px offset with 8 px gaps, and Home/End on volume bars. They're in DESIGN.md, so the code matches it.
 
