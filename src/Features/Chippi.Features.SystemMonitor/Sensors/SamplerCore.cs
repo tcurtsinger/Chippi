@@ -63,10 +63,8 @@ internal sealed class SamplerCore(SensorSources sources, ILogger log) : IDisposa
             if (gapAll)
                 foreach (var key in _history.Keys)
                     Append(key, now, null, interval, force: true);
-            if (cpu.Status is not (ReadingStatus.NotRead or ReadingStatus.Pending))
-                Append(Series.Cpu, now, cpu.Value is { } c ? Math.Min(c.Utility, 100) : null, interval);
-            if (memory.Status is not (ReadingStatus.NotRead or ReadingStatus.Pending))
-                Append(Series.Memory, now, memory.Value?.UsedPercent, interval);
+            AppendOne(Series.Cpu, cpu, c => Math.Min(c.Utility, 100), now, interval);
+            AppendOne(Series.Memory, memory, m => m.UsedPercent, now, interval);
             if (need.HasFlag(SensorNeed.GpuLoad))
                 AppendEach(gpus, g => Series.GpuLoad(g.Id), g => g.Load is { } l ? Math.Min(l, 100) : null, now, interval, "gpu.load:");
             AppendEach(network, n => Series.NetworkReceive(n.Id), n => n.ReceiveBytesPerSecond, now, interval, "net.rx:");
@@ -113,6 +111,23 @@ internal sealed class SamplerCore(SensorSources sources, ILogger log) : IDisposa
     {
         var sample = Read<IReadOnlyList<T>>(name, now, wanted, read);
         return sample is { Status: ReadingStatus.Ok, Value.Count: 0 } ? sample with { Status = ReadingStatus.NotSupported } : sample;
+    }
+
+    // Pending (a rate starting over) adds no point of its own but ends a line already drawn: a series
+    // never starts with a gap, and never bridges a sample it didn't get.
+    private void AppendOne<T>(string key, Sample<T> sample, Func<T, double> value, DateTimeOffset now, TimeSpan interval) where T : class
+    {
+        switch (sample.Status)
+        {
+            case ReadingStatus.NotRead:
+                return;
+            case ReadingStatus.Pending:
+                Append(key, now, null, interval, force: true);
+                return;
+            default:
+                Append(key, now, sample.Value is { } v ? value(v) : null, interval);
+                return;
+        }
     }
 
     // Each device's series gets a point; a device that was in the history but missing now gets a gap.

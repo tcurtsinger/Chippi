@@ -107,13 +107,15 @@ internal sealed class GpuSource : IGpuSource
         bool rates = _loadClock.Collected();
 
         // Engine instances are "pid_N_luid_0x…_0x…_phys_P_eng_E_engtype_T". Each engine is summed over
-        // processes; an adapter's load is its busiest engine, as Task Manager shows it.
+        // processes; an adapter's load is its busiest engine, as Task Manager shows it. An instance
+        // without a value (a process that just started) adds nothing; an adapter with no valid
+        // instance at all has no load reading, not 0.
         var loads = rates
             ? _load.Values(_engine)
                 .Select(e => (Luid: Between(e.Name, "luid_", "_phys"), Engine: Between(e.Name, "_phys_", "_engtype"), e.Value))
-                .Where(e => e.Luid is not null && e.Engine is not null)
+                .Where(e => e.Luid is not null && e.Engine is not null && e.Value is not null)
                 .GroupBy(e => (e.Luid, e.Engine))
-                .Select(g => (g.Key.Luid, Sum: g.Sum(e => e.Value ?? 0)))
+                .Select(g => (g.Key.Luid, Sum: g.Sum(e => e.Value!.Value)))
                 .GroupBy(e => e.Luid!, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(g => g.Key, g => Math.Min(g.Max(e => e.Sum), 100), StringComparer.OrdinalIgnoreCase)
             : [];
@@ -123,8 +125,7 @@ internal sealed class GpuSource : IGpuSource
         var result = new Dictionary<string, (double?, ulong?, ulong?)>(StringComparer.OrdinalIgnoreCase);
         foreach (var adapter in _adapters)
         {
-            // An adapter with no engine instance this sample has nothing running on it: 0 is real.
-            double? load = rates ? loads.GetValueOrDefault(adapter.Luid) : null;
+            double? load = loads.TryGetValue(adapter.Luid, out double l) ? l : null;
             result[adapter.Luid] = (load, dedicated.TryGetValue(adapter.Luid, out var d) ? d : null, shared.TryGetValue(adapter.Luid, out var s) ? s : null);
         }
         return result;

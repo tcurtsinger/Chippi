@@ -17,21 +17,10 @@ internal sealed class DiskSource : IDiskSource
     private nint _idle, _read, _write;
     private readonly RateClock _clock = new();
 
-    /// <summary>Takes the first sample now, so the first read has rates. A failure here is retried on read.</summary>
-    public DiskSource()
-    {
-        try
-        {
-            Collect();
-        }
-        catch (PdhException)
-        {
-        }
-    }
-
     public IReadOnlyList<DiskReading>? Read()
     {
         // Every counter here is a rate: the instance list itself only comes with the second sample.
+        // The query is opened on the first read, on the sampler thread.
         if (!Collect())
             return null;
         var idle = Values(_idle);

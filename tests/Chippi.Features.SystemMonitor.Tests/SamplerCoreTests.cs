@@ -83,6 +83,19 @@ public sealed class SamplerCoreTests
     }
 
     [Fact]
+    public void Pending_after_a_value_ends_the_line()
+    {
+        Tick(0);
+        _fake.Cpu = _ => null;
+        Tick(1);
+        Tick(2);
+        _fake.Cpu = _ => new CpuReading(50, 4, null);
+        Tick(3);
+
+        Assert.Equal([25.0, null, 50.0], Values(Series.Cpu));
+    }
+
+    [Fact]
     public void Hardware_the_PC_lacks_is_NotSupported()
     {
         _fake.Gpu = _ => [];

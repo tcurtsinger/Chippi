@@ -15,18 +15,7 @@ internal sealed class CpuSource : ICpuSource
     private nint _utility, _performance, _frequency;
     private readonly RateClock _clock = new();
 
-    /// <summary>Takes the first sample now, so the first read has a rate. A failure here is retried on read.</summary>
-    public CpuSource()
-    {
-        try
-        {
-            Collect();
-        }
-        catch (PdhException)
-        {
-        }
-    }
-
+    /// <summary>The query is opened on the first read, on the sampler thread; that read is Pending.</summary>
     public CpuReading? Read(bool perProcessor)
     {
         if (!Collect())

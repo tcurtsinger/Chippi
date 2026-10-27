@@ -16,7 +16,9 @@ public sealed class WindowsSourcesTests
     public void Every_source_reads_as_a_standard_user()
     {
         using var sources = WindowsSources.Create();
-        sources.Gpu.Read(load: true);
+        Assert.Null(sources.Cpu.Read(perProcessor: true));
+        Assert.Null(sources.Disks.Read());
+        Assert.All(sources.Gpu.Read(load: true), g => Assert.Null(g.Load));
         sources.Network.Read();
         Thread.Sleep(1000);
 
@@ -80,6 +82,9 @@ public sealed class WindowsSourcesTests
     public void A_rate_read_after_a_long_pause_starts_over()
     {
         using var sources = WindowsSources.Create();
+        sources.Cpu.Read(perProcessor: false);
+        Thread.Sleep(500);
+        Assert.NotNull(sources.Cpu.Read(perProcessor: false));
 
         Thread.Sleep(RateClock.StaleAfter + TimeSpan.FromMilliseconds(500));
 
