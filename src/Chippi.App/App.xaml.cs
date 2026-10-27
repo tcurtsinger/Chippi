@@ -107,9 +107,12 @@ public partial class App : Application
 
         bool debugMode = e.Args.Contains("--debug", StringComparer.OrdinalIgnoreCase)
             || Environment.GetEnvironmentVariable("CHIPPI_DEBUG") == "1";
-        // --debug also writes the modules' LogDebug lines, which a normal run leaves out.
-        LoggerFactory = Microsoft.Extensions.Logging.LoggerFactory.Create(b => b.AddProvider(
-            new RollingFileLoggerProvider(Log.Default, debugMode ? LogLevel.Debug : LogLevel.Information)));
+        // --debug also writes the modules' LogDebug lines, which a normal run leaves out. Both the
+        // factory and the provider filter, and the factory's default floor is Information.
+        var level = debugMode ? LogLevel.Debug : LogLevel.Information;
+        LoggerFactory = Microsoft.Extensions.Logging.LoggerFactory.Create(b => b
+            .SetMinimumLevel(level)
+            .AddProvider(new RollingFileLoggerProvider(Log.Default, level)));
         Config = new ConfigStore(devConfigPath, LoggerFactory.CreateLogger("Config"));
         Config.Load();
 
