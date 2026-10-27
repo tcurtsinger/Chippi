@@ -54,6 +54,12 @@ internal static class AccessibleName
             AutomationProperties.SetName(element, tip);
             return;
         }
-        System.Diagnostics.Debug.WriteLine($"Accessibility: icon button '{element.Name}' has no AutomationProperties.Name.");
+        // Logged once per name: views rebuild their buttons, and the log shouldn't fill with one gap.
+        lock (Unnamed)
+            if (!Unnamed.Add(element.Name))
+                return;
+        Chippi.Core.Diagnostics.Log.Warn($"Accessibility: icon button '{element.Name}' has no AutomationProperties.Name");
     }
+
+    private static readonly HashSet<string> Unnamed = [];
 }

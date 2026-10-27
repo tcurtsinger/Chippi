@@ -21,7 +21,7 @@ public sealed class ActivationCallback(string appId, Action<string> activate) : 
     {
         // Never propagate managed exceptions across the COM boundary.
         try { if (string.Equals(appUserModelId, appId, StringComparison.Ordinal)) activate(invokedArgs); }
-        catch (Exception ex) { Console.Error.WriteLine(ex); }
+        catch (Exception ex) { Chippi.Core.Diagnostics.Log.Error("Opening a notification failed", ex); }
     }
 }
 

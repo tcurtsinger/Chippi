@@ -105,7 +105,11 @@ public partial class App : Application
         StartedAtLogin = e.Args.Any(a => string.Equals(a, StartupRegistration.StartupArgument, StringComparison.OrdinalIgnoreCase));
         Log.Info($"Starting Chippi {typeof(App).Assembly.GetName().Version} ({System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture})");
 
-        LoggerFactory = Microsoft.Extensions.Logging.LoggerFactory.Create(b => b.AddProvider(new RollingFileLoggerProvider(Log.Default)));
+        bool debugMode = e.Args.Contains("--debug", StringComparer.OrdinalIgnoreCase)
+            || Environment.GetEnvironmentVariable("CHIPPI_DEBUG") == "1";
+        // --debug also writes the modules' LogDebug lines, which a normal run leaves out.
+        LoggerFactory = Microsoft.Extensions.Logging.LoggerFactory.Create(b => b.AddProvider(
+            new RollingFileLoggerProvider(Log.Default, debugMode ? LogLevel.Debug : LogLevel.Information)));
         Config = new ConfigStore(devConfigPath, LoggerFactory.CreateLogger("Config"));
         Config.Load();
 
@@ -127,8 +131,6 @@ public partial class App : Application
         }
 #endif
 
-        bool debugMode = e.Args.Contains("--debug", StringComparer.OrdinalIgnoreCase)
-            || Environment.GetEnvironmentVariable("CHIPPI_DEBUG") == "1";
         Shell = new ShellContext(Config, LoggerFactory, debugMode, devProfile);
         _toasts = NotificationStartup?.Presenter ?? Notifications.ClassicToastPresenter.TryCreate(devProfile, Dispatcher);
         Shell.Services.Toasts = _toasts;

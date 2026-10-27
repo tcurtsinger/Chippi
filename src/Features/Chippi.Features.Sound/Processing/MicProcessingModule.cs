@@ -178,6 +178,7 @@ public sealed class MicProcessingModule : IFeatureModule
         catch (Exception ex)
         {
             Error = AudioErrors.Reason(ex);
+            _context?.Logger.LogWarning(ex, "Changing mic processing failed");
             throw;
         }
         finally
@@ -275,7 +276,12 @@ public sealed class MicProcessingModule : IFeatureModule
     internal static ProcessingMarker? ReadMarker(string path)
     {
         try { return File.Exists(path) ? JsonSerializer.Deserialize<ProcessingMarker>(File.ReadAllText(path)) : null; }
-        catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException) { return null; }
+        catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
+        {
+            // Also runs from the uninstall hook, before any logger exists.
+            Chippi.Core.Diagnostics.Log.Warn("Reading the mic processing marker failed; the default mic can't be restored from it", ex);
+            return null;
+        }
     }
 
     private void OnSnapshot(object? sender, AudioSnapshot snapshot)
