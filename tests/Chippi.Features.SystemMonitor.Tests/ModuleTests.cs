@@ -143,6 +143,41 @@ public sealed class ModuleTests : IDisposable
     }
 
     [Fact]
+    public async Task An_alert_past_its_threshold_is_the_tile_status_in_Caution()
+    {
+        var fake = new FakeSources { Memory = () => new MemoryReading(93, 100, 1, 2) };
+        var module = new SystemMonitorModule(() => fake.Sources);
+        var config = new ConfigStore(Path.Combine(_root, "settings.json"));
+        config.Load();
+        config.SetModuleSettings("system-monitor", new SystemMonitorSettings { Memory = new() { On = true, Percent = 90 } });
+        var island = new IslandActivityHub();
+        var registry = new ModuleRegistry(config, island, NullLoggerFactory.Instance, new ModuleServices { DataRoot = Path.Combine(_root, "data") });
+        registry.Register(module);
+        try
+        {
+            await registry.StartAsync();
+            using var status = new SemaphoreSlim(0);
+            await registry.SetInstalledAsync("system-monitor", true);
+            var tile = Assert.Single(registry.Find("system-monitor")!.IslandTiles);
+            tile.StatusChanged += (_, _) => status.Release();
+
+            // The alert alone makes the sampler read memory, with nothing on screen.
+            Assert.Equal(SensorNeed.Memory, module.Sampler!.Need);
+            while (tile.Status != "Memory 93%")
+                Assert.True(status.Wait(Wait));
+            Assert.True(module.Alerting("memory", "memory"));
+            var caution = Assert.Single(island.Activities, a => a.TileKey == SystemMonitorModule.TileKey);
+            Assert.True(caution.NeedsAttention);
+
+            module.Save(module.Settings with { Memory = new() { On = false, Percent = 90 } });
+            Assert.False(module.Alerting("memory", "memory"));
+            Assert.DoesNotContain(island.Activities, a => a.TileKey == SystemMonitorModule.TileKey);
+            Assert.Equal(SensorNeed.None, module.Sampler.Need);
+        }
+        finally { await registry.StopAllAsync(); }
+    }
+
+    [Fact]
     public void The_module_replaces_the_catalog_placeholder()
     {
         var descriptor = new SystemMonitorModule(() => new FakeSources().Sources).Descriptor;
