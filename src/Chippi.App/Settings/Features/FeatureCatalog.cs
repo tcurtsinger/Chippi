@@ -35,7 +35,7 @@ public static class FeatureCatalog
         },
 
         // Phase 4: System
-        new("system-monitor", "System monitor", "CPU, GPU, memory, network and battery in the tray, with alerts", FeatureGroup.System)
+        new("system-monitor", "System monitor", "CPU, GPU, memory, network and battery, with alerts", FeatureGroup.System)
         {
             Icon = "Activity",
             Badges = [FeatureBadge.Overlap("Overlaps Task Manager")],
