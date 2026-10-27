@@ -34,13 +34,7 @@ public static class FeatureCatalog
             Presets = Audio,
         },
 
-        // Phase 4: System
-        new("system-monitor", "System monitor", "CPU, GPU, memory, network and battery, with alerts", FeatureGroup.System)
-        {
-            Icon = "Activity",
-            Badges = [FeatureBadge.Overlap("Overlaps Task Manager")],
-            Presets = Essentials | PowerUser,
-        },
+        // System (System monitor is a real module since Phase 4: Chippi.Features.SystemMonitor)
         new("temperatures", "Temperatures", "CPU and GPU temperatures with alerts when they run hot", FeatureGroup.System)
         {
             Icon = "Cpu",

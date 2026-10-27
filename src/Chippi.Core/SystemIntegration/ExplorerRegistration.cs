@@ -63,8 +63,12 @@ public sealed class ExplorerRegistration
             Environment.SetEnvironmentVariable("CHIPPI_DEV_PROFILE", profile);
             return profile;
         }
-        return Environment.GetEnvironmentVariable("CHIPPI_DEV_PROFILE");
+        return EnvironmentProfile();
     }
+
+    /// <summary>CHIPPI_DEV_PROFILE, held to the same rule as the argument, so it can't name a folder outside Chippi-dev.</summary>
+    public static string? EnvironmentProfile() =>
+        Environment.GetEnvironmentVariable("CHIPPI_DEV_PROFILE") is { } profile && !string.IsNullOrWhiteSpace(profile) ? ValidateProfile(profile) : null;
 
     private static string ValidateProfile(string profile)
     {

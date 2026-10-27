@@ -5,6 +5,7 @@ using System.Media;
 using Chippi.Audio;
 using Chippi.Core.Island;
 using Chippi.Core.Modules;
+using Microsoft.Extensions.Logging;
 
 namespace Chippi.Features.Sound.Mute;
 
@@ -96,7 +97,13 @@ public sealed class MicMuteModule : IFeatureModule
                 _tone(Status.State == MicrophoneMuteState.Muted);
             UpdateState();
         }
-        catch (Exception ex) { Error = AudioErrors.Reason(ex); Changed?.Invoke(); throw; }
+        catch (Exception ex)
+        {
+            Error = AudioErrors.Reason(ex);
+            _context?.Logger.LogWarning(ex, "Toggling the microphone mute failed");
+            Changed?.Invoke();
+            throw;
+        }
         finally { _gate.Release(); }
     }
 

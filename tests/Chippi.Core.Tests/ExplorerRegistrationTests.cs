@@ -89,4 +89,22 @@ public sealed class ExplorerProfileArgumentTests
         }
         finally { Environment.SetEnvironmentVariable("CHIPPI_DEV_PROFILE", before); }
     }
+
+    [Theory]
+    [InlineData(@"..\..\x")]
+    [InlineData(@"C:\x")]
+    [InlineData("p2.views")]
+    public void An_environment_profile_that_could_leave_the_dev_folder_is_refused(string profile)
+    {
+        string? before = Environment.GetEnvironmentVariable("CHIPPI_DEV_PROFILE");
+        try
+        {
+            Environment.SetEnvironmentVariable("CHIPPI_DEV_PROFILE", profile);
+            Assert.Throws<ArgumentException>(ExplorerRegistration.EnvironmentProfile);
+            Assert.Throws<ArgumentException>(() => ExplorerRegistration.ResolveDevProfile([]));
+            Environment.SetEnvironmentVariable("CHIPPI_DEV_PROFILE", " ");
+            Assert.Null(ExplorerRegistration.EnvironmentProfile()); // blank is a normal run, as before
+        }
+        finally { Environment.SetEnvironmentVariable("CHIPPI_DEV_PROFILE", before); }
+    }
 }

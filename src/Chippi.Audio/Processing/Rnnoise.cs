@@ -31,8 +31,9 @@ internal static class RnnoiseNative
         }
     }
 
+    // Only the bundled copy: a failed load throws rather than falling back to a search by bare name.
     private static IntPtr Resolve(string name, Assembly assembly, DllImportSearchPath? path) =>
-        name == Dll && NativeLibrary.TryLoad(LibraryPath, out var handle) ? handle : IntPtr.Zero;
+        name == Dll ? NativeLibrary.Load(LibraryPath) : IntPtr.Zero;
 
 #pragma warning disable SYSLIB1054 // blittable arguments only; DllImport keeps the project free of unsafe code
     /// <summary>Allocates a denoiser. <see cref="IntPtr.Zero"/> uses the built-in model.</summary>

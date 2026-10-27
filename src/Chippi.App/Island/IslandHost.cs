@@ -420,8 +420,8 @@ public sealed class IslandHost : IDisposable
     private IEnumerable<(string Label, Action Action)?> DebugMenu()
     {
         var debug = _shell.Island.CreatePublisher(DebugModuleId);
-        // Publishes as Keep awake's module id so the wide-awake wiring can be seen before WS4 lands.
-        // Uses its own key, so it never touches a real Keep awake activity.
+        // Publishes as Keep awake's module id, so the wide-awake mood can be seen without starting a
+        // session. Uses its own key, so it never touches a real Keep awake activity.
         var keepAwake = _shell.Island.CreatePublisher(KeepAwakeModuleId);
         return
         [

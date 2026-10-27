@@ -14,6 +14,10 @@
     <ProjectReference Include="..\..\Chippi.UI\Chippi.UI.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Chippi.Features.KeepAwake.Tests" />
+  </ItemGroup>
+
   <!-- P/Invoke via CsWin32. Each workstream lists its APIs in a NativeMethods.txt inside its own
        folder (Tray/, Island/, ...); every one of them is picked up, so no file is shared. -->
   <PropertyGroup>

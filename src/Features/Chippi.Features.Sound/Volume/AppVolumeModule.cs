@@ -3,6 +3,7 @@
 
 using Chippi.Audio;
 using Chippi.Core.Modules;
+using Microsoft.Extensions.Logging;
 
 namespace Chippi.Features.Sound.Volume;
 
@@ -118,7 +119,7 @@ public sealed class AppVolumeModule(AudioService? audio = null) : IFeatureModule
             Error = null;
             UpdateTile();
         }
-        catch (Exception ex) { Error = AudioErrors.Reason(ex); throw; }
+        catch (Exception ex) { Error = AudioErrors.Reason(ex); _context?.Logger.LogWarning(ex, "Changing app volume failed"); throw; }
         finally { _gate.Release(); Changed?.Invoke(); }
     }
 

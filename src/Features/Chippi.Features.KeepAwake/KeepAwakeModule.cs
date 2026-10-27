@@ -16,6 +16,7 @@ public sealed class KeepAwakeModule : IFeatureModule
     private ModuleContext? _context;
     private IIslandTile? _tile;
     private Timer? _tileClock;
+    private static readonly TimeSpan TileTick = TimeSpan.FromSeconds(30);
     public KeepAwakeSettings Settings { get; private set; } = new();
     public bool IsOn { get; private set; }
 
@@ -66,8 +67,8 @@ public sealed class KeepAwakeModule : IFeatureModule
             StatusOnPage = true, // the chips show the length, not the time left
         });
         UpdateTile();
-        // A timed session's tile counts down ("45 min left"); checked twice a minute, so it is never a minute stale.
-        _tileClock = new Timer(_ => UpdateTile(), null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
+        // Runs only while a timed session counts down ("45 min left"); see OnSessionChanged.
+        _tileClock = new Timer(_ => UpdateTile());
         context.Ui.SetSettingsPage(() => new KeepAwakePage(this));
         return Task.CompletedTask;
     }
@@ -138,6 +139,8 @@ public sealed class KeepAwakeModule : IFeatureModule
             _context?.Island.Publish(new IslandActivity("awake", IslandActivityKind.Status, "Keep awake", StateLine) { TileKey = TileKey });
         else _context?.Island.Clear("awake");
         UpdateTile();
+        // Twice a minute while a timed session counts down, so its tile is never a minute stale.
+        _tileClock?.Change(Deadline is null ? Timeout.InfiniteTimeSpan : TileTick, TileTick);
         if (timed) _context?.Island.ReportSuccess("Keep awake finished");
         if (error is not null) _context?.Logger.LogError(error, "Keep awake execution state failed");
         Changed?.Invoke();

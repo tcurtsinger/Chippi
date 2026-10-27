@@ -60,8 +60,20 @@ public partial class App : Application
         // Dev isolation: CHIPPI_DEV_PROFILE=ws1 gives a run its own instance, settings and logs, so
         // parallel workstreams can launch Chippi side by side without touching the real profile.
         // A dev profile can also arrive as --dev-profile <name> (a dev Explorer entry, which doesn't
-        // inherit the test runner's environment). A malformed value is ignored, never fatal.
+        // inherit the test runner's environment). A malformed argument is ignored; a malformed
+        // CHIPPI_DEV_PROFILE stops the launch, so a dev run never writes outside its folder or into
+        // the real profile.
         string? devProfile;
+        try
+        {
+            devProfile = ExplorerRegistration.EnvironmentProfile();
+        }
+        catch (ArgumentException ex)
+        {
+            Log.Error("Not starting: CHIPPI_DEV_PROFILE isn't a valid profile name", ex);
+            Shutdown(1);
+            return;
+        }
         try
         {
             devProfile = ExplorerRegistration.ResolveDevProfile(e.Args);
@@ -69,7 +81,6 @@ public partial class App : Application
         catch (ArgumentException ex)
         {
             Log.Warn("Ignoring an invalid --dev-profile argument", ex);
-            devProfile = Environment.GetEnvironmentVariable("CHIPPI_DEV_PROFILE");
         }
         string? devConfigPath = null;
         if (!string.IsNullOrWhiteSpace(devProfile))
@@ -94,7 +105,14 @@ public partial class App : Application
         StartedAtLogin = e.Args.Any(a => string.Equals(a, StartupRegistration.StartupArgument, StringComparison.OrdinalIgnoreCase));
         Log.Info($"Starting Chippi {typeof(App).Assembly.GetName().Version} ({System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture})");
 
-        LoggerFactory = Microsoft.Extensions.Logging.LoggerFactory.Create(b => b.AddProvider(new RollingFileLoggerProvider(Log.Default)));
+        bool debugMode = e.Args.Contains("--debug", StringComparer.OrdinalIgnoreCase)
+            || Environment.GetEnvironmentVariable("CHIPPI_DEBUG") == "1";
+        // --debug also writes the modules' LogDebug lines, which a normal run leaves out. Both the
+        // factory and the provider filter, and the factory's default floor is Information.
+        var level = debugMode ? LogLevel.Debug : LogLevel.Information;
+        LoggerFactory = Microsoft.Extensions.Logging.LoggerFactory.Create(b => b
+            .SetMinimumLevel(level)
+            .AddProvider(new RollingFileLoggerProvider(Log.Default, level)));
         Config = new ConfigStore(devConfigPath, LoggerFactory.CreateLogger("Config"));
         Config.Load();
 
@@ -116,8 +134,6 @@ public partial class App : Application
         }
 #endif
 
-        bool debugMode = e.Args.Contains("--debug", StringComparer.OrdinalIgnoreCase)
-            || Environment.GetEnvironmentVariable("CHIPPI_DEBUG") == "1";
         Shell = new ShellContext(Config, LoggerFactory, debugMode, devProfile);
         _toasts = NotificationStartup?.Presenter ?? Notifications.ClassicToastPresenter.TryCreate(devProfile, Dispatcher);
         Shell.Services.Toasts = _toasts;
