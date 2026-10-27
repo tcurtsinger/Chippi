@@ -61,7 +61,7 @@ At `main` `763a619` (CI run 40459651091, push):
 
 - M1: Caution republishes every tick while an alert holds, so the island hub raises Changed every 1 to 2 s.
 - M2: when the pages are already open, a notice click makes System monitor the last page used.
-- M3: the first capability discovery on the Settings page rebuilds its rows and can take focus off a control.
+- M3: the Settings page's first capability discovery can take focus off a control.
 - M3: dragging a threshold slider saves at each 5% step.
 - D: the headers of `phase-4/architecture.md` and `phase-4/behavior-spec.md` still say research draft.
 - M4: the five-disk laptop case above.
