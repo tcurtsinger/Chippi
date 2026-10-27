@@ -11,6 +11,7 @@
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio" />
     <Using Include="Xunit" />
+    <Compile Include="../Chippi.Features.SystemMonitor.Tests/FakeSources.cs" Link="SystemMonitorFakeSources.cs" />
     <ProjectReference Include="../../src/Chippi.App/Chippi.App.csproj" />
   </ItemGroup>
 </Project>
