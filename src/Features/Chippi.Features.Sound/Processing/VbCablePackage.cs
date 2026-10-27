@@ -114,6 +114,7 @@ public static class VbCablePackage
 
 #pragma warning disable SYSLIB1054 // struct marshalling through DllImport keeps the project free of unsafe code
         [DllImport("wintrust.dll", CharSet = CharSet.Unicode)]
+        [DefaultDllImportSearchPaths(DllImportSearchPath.System32)] // not a KnownDLL: never a planted copy beside the app
         private static extern int WinVerifyTrust(IntPtr window, [MarshalAs(UnmanagedType.LPStruct)] Guid action, ref Data data);
 #pragma warning restore SYSLIB1054
 
