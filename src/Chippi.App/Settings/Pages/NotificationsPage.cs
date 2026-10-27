@@ -59,18 +59,25 @@ internal sealed class NotificationsPage : UserControl
         Dim(_windowsColumn, app.WindowsNotices);
         Dim(_islandColumn, app.IslandNotices);
 
-        // Features installed or removed while the page is open change the groups.
-        Loaded += (_, _) => shell.Registry.Changed += OnRegistryChanged;
+        // Features installed or removed while the page is open change the groups. Settings keeps this
+        // page, so it also rebuilds each time it shows: features installed elsewhere meanwhile appear.
+        Loaded += (_, _) =>
+        {
+            shell.Registry.Changed += OnRegistryChanged;
+            Rebuild();
+        };
         Unloaded += (_, _) => shell.Registry.Changed -= OnRegistryChanged;
     }
 
-    private void OnRegistryChanged(object? sender, EventArgs e) => Dispatcher.BeginInvoke(() =>
+    private void OnRegistryChanged(object? sender, EventArgs e) => Dispatcher.BeginInvoke(Rebuild);
+
+    private void Rebuild()
     {
         var app = SettingsUi.ReadApp(_shell.Config);
         BuildGroups();
         Dim(_windowsColumn, app.WindowsNotices);
         Dim(_islandColumn, app.IslandNotices);
-    });
+    }
 
     private void BuildGroups()
     {
