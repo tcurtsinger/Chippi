@@ -1,0 +1,110 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) Chippi contributors
+
+using Chippi.Features.SystemMonitor.Sensors.Platform;
+
+namespace Chippi.Features.SystemMonitor.Tests;
+
+/// <summary>
+/// The real sources on whatever PC runs the tests, read twice a second apart. Hardware differs (CI has
+/// no GPU, no battery), so these check shape and ranges, never particular devices.
+/// </summary>
+public sealed class WindowsSourcesTests
+{
+    [Fact]
+    public void Every_source_reads_as_a_standard_user()
+    {
+        using var sources = WindowsSources.Create();
+        Assert.Null(sources.Cpu.Read(perProcessor: true));
+        Assert.Null(sources.Disks.Read());
+        Assert.All(sources.Gpu.Read(load: true), g => Assert.Null(g.Load));
+        sources.Network.Read();
+        Thread.Sleep(1000);
+
+        var cpu = sources.Cpu.Read(perProcessor: true);
+        var memory = sources.Memory.Read();
+        var gpus = sources.Gpu.Read(load: true);
+        var network = sources.Network.Read();
+        var disks = sources.Disks.Read();
+        var battery = sources.Battery.Read();
+        var zones = sources.Temperature.Read();
+
+        Assert.NotNull(cpu);
+        Assert.InRange(cpu.Utility, 0, 1000);
+        Assert.True(cpu.LogicalProcessors >= 1);
+        Assert.NotNull(cpu.PerProcessor);
+        Assert.Equal(cpu.LogicalProcessors, cpu.PerProcessor.Count);
+        Assert.All(cpu.PerProcessor, p => Assert.True(p >= 0));
+
+        Assert.True(memory.TotalBytes > 0);
+        Assert.InRange(memory.UsedBytes, 1UL, memory.TotalBytes);
+        Assert.True(memory.CommitLimitBytes >= memory.CommitBytes);
+
+        // A virtual GPU (CI's Hyper-V adapter) has no engine counters, temperature or fan: those
+        // readings are null there, and in range wherever they're reported.
+        Assert.All(gpus, g =>
+        {
+            Assert.DoesNotContain("BasicRender", g.Id, StringComparison.OrdinalIgnoreCase);
+            Assert.False(string.IsNullOrWhiteSpace(g.Name));
+            if (g.Load is { } load)
+                Assert.InRange(load, 0, 100);
+            if (g.TemperatureC is { } t)
+                Assert.InRange(t, 1, 150);
+            if (g.FanRpm is { } rpm)
+                Assert.True(rpm > 0);
+            if (g.FanPercent is { } percent)
+                Assert.InRange(percent, 0U, 100U);        });
+        Assert.Equal(gpus.Count, gpus.Select(g => g.Id).Distinct(StringComparer.OrdinalIgnoreCase).Count());
+
+        Assert.Equal(network.Count, network.Select(n => n.Id).Distinct().Count());
+        Assert.All(network, n =>
+        {
+            Assert.True(Guid.TryParse(n.Id, out _));
+            if (!n.Connected)
+                Assert.Null(n.ReceiveBytesPerSecond);
+            if (n.ReceiveBytesPerSecond is { } rx)
+                Assert.True(rx >= 0);
+        });
+
+        // Disks are past their first sample, so the list is there, though a VM's may differ from a PC's.
+        Assert.NotNull(disks);
+        Assert.Equal(disks.Count, disks.Select(d => d.Number).Distinct().Count());
+        Assert.All(disks, d =>
+        {
+            if (d.ActivePercent is { } a)
+                Assert.InRange(a, 0, 100);
+            if (d.ReadBytesPerSecond is { } r)
+                Assert.True(r >= 0);
+            Assert.All(d.Volumes, v =>
+            {
+                Assert.Matches("^[A-Z]:$", v.Letter);
+                Assert.InRange(v.FreeBytes, 0UL, v.TotalBytes);
+            });
+        });
+
+        if (battery is not null)
+        {
+            if (battery.Percent is { } p)
+                Assert.InRange(p, 0, 100);
+            if (battery.TimeLeft is { } left)
+                Assert.True(left > TimeSpan.Zero);
+        }
+
+        Assert.All(zones, z => Assert.InRange(z.TemperatureC, -50, 150));
+    }
+
+    [Fact]
+    public void A_rate_read_after_a_long_pause_starts_over()
+    {
+        using var sources = WindowsSources.Create();
+        sources.Cpu.Read(perProcessor: false);
+        Thread.Sleep(500);
+        Assert.NotNull(sources.Cpu.Read(perProcessor: false));
+
+        Thread.Sleep(RateClock.StaleAfter + TimeSpan.FromMilliseconds(500));
+
+        Assert.Null(sources.Cpu.Read(perProcessor: false));
+        Thread.Sleep(500);
+        Assert.NotNull(sources.Cpu.Read(perProcessor: false));
+    }
+}

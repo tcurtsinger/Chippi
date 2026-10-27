@@ -10,6 +10,7 @@
     <Project Path="src/Features/Chippi.Features.Downloads/Chippi.Features.Downloads.csproj" />
     <Project Path="src/Features/Chippi.Features.KeepAwake/Chippi.Features.KeepAwake.csproj" />
     <Project Path="src/Features/Chippi.Features.Sound/Chippi.Features.Sound.csproj" />
+    <Project Path="src/Features/Chippi.Features.SystemMonitor/Chippi.Features.SystemMonitor.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Chippi.Audio.Tests/Chippi.Audio.Tests.csproj" />
@@ -17,6 +18,7 @@
     <Project Path="tests/Chippi.Features.Downloads.Tests/Chippi.Features.Downloads.Tests.csproj" />
     <Project Path="tests/Chippi.Features.KeepAwake.Tests/Chippi.Features.KeepAwake.Tests.csproj" />
     <Project Path="tests/Chippi.Features.Sound.Tests/Chippi.Features.Sound.Tests.csproj" />
+    <Project Path="tests/Chippi.Features.SystemMonitor.Tests/Chippi.Features.SystemMonitor.Tests.csproj" />
     <Project Path="tests/Chippi.Island.Tests/Chippi.Island.Tests.csproj" />
     <Project Path="tests/Chippi.Notifications.Tests/Chippi.Notifications.Tests.csproj" />
     <Project Path="tests/Chippi.Rules.Tests/Chippi.Rules.Tests.csproj" />
