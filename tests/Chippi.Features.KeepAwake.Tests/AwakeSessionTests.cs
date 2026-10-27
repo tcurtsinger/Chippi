@@ -43,6 +43,24 @@ public sealed class AwakeSessionTests
     }
 
     [Fact]
+    public async Task The_worker_sleeps_until_a_timed_session_needs_it()
+    {
+        var clock = new Clock();
+        await using var session = new AwakeSession(new FakeNative(), clock);
+        Assert.Equal(Timeout.Infinite, session.WaitMilliseconds()); // off: nothing to check
+        await session.StartAsync(new() { Mode = AwakeMode.Indefinitely });
+        Assert.Equal(Timeout.Infinite, session.WaitMilliseconds()); // no time limit
+        await session.StartAsync(new() { Mode = AwakeMode.Duration, DurationMinutes = 1 });
+        Assert.Equal(30_000, session.WaitMilliseconds()); // at most 30s, so a slept PC still ends on time
+        clock.Ticks = TimeSpan.FromSeconds(50).Ticks;
+        Assert.Equal(10_000, session.WaitMilliseconds()); // wakes at the end
+        clock.Ticks = TimeSpan.FromMinutes(2).Ticks;
+        Assert.Equal(0, session.WaitMilliseconds());
+        await session.StopAsync();
+        Assert.Equal(Timeout.Infinite, session.WaitMilliseconds());
+    }
+
+    [Fact]
     public async Task DurationUsesMonotonicClockAndCompletesOnlyOnce()
     {
         var clock = new Clock();

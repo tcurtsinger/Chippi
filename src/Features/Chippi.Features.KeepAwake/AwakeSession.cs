@@ -95,6 +95,20 @@ public sealed class AwakeSession : IAsyncDisposable
         if (elapsed) Release(true);
     }
 
+    /// <summary>
+    /// How long the worker sleeps before checking the deadline again. Off or with no time limit it
+    /// waits for the next command; a timed session wakes at its end, and at least every 30s, so a PC
+    /// that slept or a changed clock ends it on time.
+    /// </summary>
+    internal int WaitMilliseconds()
+    {
+        if (!_active || _settings is null) return Timeout.Infinite;
+        TimeSpan? left = _settings.Mode == AwakeMode.Duration
+            ? TimeSpan.FromMinutes(_settings.DurationMinutes) - _clock.GetElapsedTime(_started)
+            : _deadline - _clock.GetLocalNow();
+        return left is { } remaining ? (int)Math.Clamp(Math.Ceiling(remaining.TotalMilliseconds), 0, 30_000) : Timeout.Infinite;
+    }
+
     private void Release(bool timed)
     {
         if (!_active) return;
@@ -112,7 +126,7 @@ public sealed class AwakeSession : IAsyncDisposable
         {
             while (!_commands.IsCompleted)
             {
-                if (_commands.TryTake(out var command, 250))
+                if (_commands.TryTake(out var command, WaitMilliseconds()))
                 {
                     try { command.Run(); command.Completion.SetResult(); }
                     catch (Exception ex)
