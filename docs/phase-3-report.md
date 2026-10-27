@@ -101,3 +101,7 @@ Deferred out of Phase 3 with Travis's sign-off (task 21, "Plan a driver route").
 
 - **Gate (Karl):** no-go for shipping on the evidence available. Windows caps app volume at 100%, so a boost means processing the app's audio. [phase-3/boost-gate.md](phase-3/boost-gate.md).
 - **Experiment, route 1 (Kayla, Travis chose "Experiment now" on task 19):** capture one app with process loopback, quiet its own output, replay it with gain. No-go as tested, in Windows Sandbox on build 26100 x64: muting the app's session or setting it to volume 0 also silenced its capture, so there was nothing to replay. Capture isolation worked (only the chosen app), and a 60 s replay at gain 2 had no dropouts with a 1.99x level. Latency wasn't measured reliably. Other no-driver ways of silencing an app weren't tested. Nothing reached Travis's speakers. [phase-3/boost-experiment.md](phase-3/boost-experiment.md), code on branch `spike/boost-loopback`.
+
+## Cleanup
+
+Completed after this report merged (#55), following the [end-of-phase checklist](end-of-phase-checklist.md#phase-3-cleanup-2026-10-26). The three Phase 3 scratch folders were archived with every file hash verified, then removed; dev profiles and registrations were cleared. The experiment source branch `spike/boost-loopback` remains on GitHub for the later Volume boost phase. Installed Chippi, VB-CABLE and the current installers were left in place.
