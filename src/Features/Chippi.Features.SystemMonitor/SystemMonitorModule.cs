@@ -2,6 +2,7 @@
 // Copyright (C) Chippi contributors
 
 using Chippi.Core.Modules;
+using Chippi.Features.SystemMonitor.Alerts;
 using Chippi.Features.SystemMonitor.Sensors;
 using Chippi.Features.SystemMonitor.Sensors.Platform;
 using Chippi.Features.SystemMonitor.Views;
@@ -27,6 +28,7 @@ public sealed class SystemMonitorModule : IFeatureModule
     private ModuleContext? _context;
     private IIslandTile? _tile;
     private SensorWatch? _tileWatch;
+    private MonitorAlerts? _alerts;
 
     public SystemMonitorModule() : this(WindowsSources.Create) { }
 
@@ -59,7 +61,8 @@ public sealed class SystemMonitorModule : IFeatureModule
     /// Whether an alert that's on is past its threshold for <paramref name="target"/> (a GPU or
     /// volume ID): its value turns Caution on the page (design notes #18).
     /// </summary>
-    internal bool Alerting(string kind, string target) => false;
+    internal bool Alerting(string kind, string target) =>
+        _alerts?.Current.Conditions.Any(c => c.Kind == kind && string.Equals(c.Target, target, StringComparison.OrdinalIgnoreCase)) == true;
 
     public Task StartAsync(ModuleContext context, CancellationToken ct)
     {
@@ -69,6 +72,10 @@ public sealed class SystemMonitorModule : IFeatureModule
         Sampler = new SensorSampler(_createSources(), log: context.Logger) { Interval = Settings.UpdateInterval };
         Sampler.Updated += OnUpdated;
         context.Ui.SetSettingsPage(() => new SystemMonitorSettingsPage(this));
+        // The alerts watch only what their switched-on alerts need; while one holds, its reading is
+        // the tile's status in Caution (design notes #4).
+        _alerts = new MonitorAlerts(Sampler, context.Notifier, context.Island, Settings);
+        _alerts.Changed += OnAlertsChanged;
         _tile = context.Ui.AddIslandTile(new IslandTileSpec(TileKey, Descriptor.Name, nameof(LucideIcons.Activity), Order: 60, SectionOrder: 0,
             () => new SystemMonitorView(this))
         {
@@ -91,6 +98,12 @@ public sealed class SystemMonitorModule : IFeatureModule
             _tileWatch?.Dispose();
             _tileWatch = null;
         }
+        if (_alerts is not null)
+        {
+            _alerts.Changed -= OnAlertsChanged;
+            _alerts.Dispose(); // before the sampler, which it watches
+            _alerts = null;
+        }
         if (Sampler is not null)
         {
             Sampler.Updated -= OnUpdated;
@@ -110,6 +123,7 @@ public sealed class SystemMonitorModule : IFeatureModule
         if (Sampler is { } sampler)
             sampler.Interval = Settings.UpdateInterval;
         _tile?.SetPageNote(Format.Span(Settings.UpdateInterval));
+        _alerts?.Configure(Settings);
         lock (_gate)
         {
             if (_tileWatch is not null)
@@ -162,17 +176,38 @@ public sealed class SystemMonitorModule : IFeatureModule
     // On the sampler thread. A reading not in this snapshot leaves the last status (a rate starting over).
     private void OnUpdated(SystemSnapshot snapshot) => UpdateTile(snapshot);
 
+    // The alerts evaluate after the tile on each snapshot, so the tile looks again once they have.
+    private void OnAlertsChanged(AlertEvaluation evaluation)
+    {
+        if (Sampler?.Latest is { } latest)
+            UpdateTile(latest);
+    }
+
+    // A reading this snapshot didn't read (the tile off screen) leaves the status; one that was read
+    // but has no value (failed, a rate starting over, an unplugged adapter) clears it: never a stale number.
     private void UpdateTile(SystemSnapshot snapshot)
     {
-        if (Settings.EffectiveTileStatus() is null)
+        if (_alerts?.Current.First is { } alert)
+            _tile?.SetStatus(alert.TileText);
+        else if (Settings.EffectiveTileStatus() is not { } shown)
             _tile?.SetStatus("");
-        else if (TileText(snapshot, Settings, Settings.GpuId, Settings.NetworkAdapterId) is { } status)
-            _tile?.SetStatus(status);
+        else if (TileStatusOf(snapshot, shown) != ReadingStatus.NotRead)
+            _tile?.SetStatus(TileText(snapshot, Settings, Settings.GpuId, Settings.NetworkAdapterId) ?? "");
     }
+
+    private static ReadingStatus TileStatusOf(SystemSnapshot snapshot, TileStatus shown) => shown switch
+    {
+        TileStatus.Memory => snapshot.Memory.Status,
+        TileStatus.Gpu => snapshot.Gpus.Status,
+        TileStatus.Network => snapshot.Network.Status,
+        _ => snapshot.Cpu.Status,
+    };
 
     private void OnPowerModeChanged(object sender, PowerModeChangedEventArgs e)
     {
-        if (e.Mode == PowerModes.Resume)
-            Sampler?.Resumed();
+        if (e.Mode != PowerModes.Resume)
+            return;
+        Sampler?.Resumed();
+        _alerts?.Resumed(); // resume never counts as sustained
     }
 }

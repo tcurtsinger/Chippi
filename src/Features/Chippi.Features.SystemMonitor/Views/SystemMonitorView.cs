@@ -140,7 +140,7 @@ internal sealed class SystemMonitorView : UserControl
 
     // ----- Drawing -----
 
-    private void Show(SystemSnapshot s)
+    internal void Show(SystemSnapshot s)
     {
         _shown = s;
         var settings = _module.Settings;
@@ -161,15 +161,21 @@ internal sealed class SystemMonitorView : UserControl
         if (!_cpu.Visible(settings.IsOn(Reading.Cpu)))
             return;
         var sample = s.Cpu;
+        // The graph follows every snapshot, so a failed or restarting read shows as its gap.
+        _cpu.Graph!.Show(HistoryOf(Series.Cpu), s.At, span, 100);
         if (sample.Status == ReadingStatus.Unavailable)
         {
             _cpu.Unavailable();
             return;
         }
         if (sample.Value is not { } cpu)
-            return; // Pending: what's drawn stays until the rate is back
+        {
+            // A rate starting over: no number until it's back, never the old one.
+            _cpu.ClearHeadline();
+            _cpu.SetLine(Line(), _processorsButton);
+            return;
+        }
         _cpu.Headline(Format.Percent(cpu.Utility), _module.Alerting("cpu-load", "cpu"));
-        _cpu.Graph!.Show(HistoryOf(Series.Cpu), s.At, span, 100);
         var line = Line();
         if (cpu.EffectiveMhz is { } mhz)
             Value(line, Format.Clock(mhz));
@@ -205,15 +211,19 @@ internal sealed class SystemMonitorView : UserControl
     {
         if (!_memory.Visible(settings.IsOn(Reading.Memory)))
             return;
+        _memory.Graph!.Show(HistoryOf(Series.Memory), s.At, span, 100);
         if (s.Memory.Status == ReadingStatus.Unavailable)
         {
             _memory.Unavailable();
             return;
         }
         if (s.Memory.Value is not { } memory)
+        {
+            _memory.ClearHeadline();
+            _memory.SetLine(Line());
             return;
+        }
         _memory.Headline(Format.Percent(memory.UsedPercent), _module.Alerting("memory", "memory"));
-        _memory.Graph!.Show(HistoryOf(Series.Memory), s.At, span, 100);
         var line = Line();
         Value(line, Format.Of(memory.UsedBytes, memory.TotalBytes));
         Fact(line, "Committed", Format.Of(memory.CommitBytes, memory.CommitLimitBytes));
@@ -247,6 +257,8 @@ internal sealed class SystemMonitorView : UserControl
         }
         if (gpu.Load is { } load)
             _gpu.Headline(Format.Percent(load), false);
+        else
+            _gpu.ClearHeadline();
         _gpu.Graph!.Show(HistoryOf(Series.GpuLoad(gpu.Id)), s.At, span, 100);
 
         var first = Line();
@@ -315,7 +327,10 @@ internal sealed class SystemMonitorView : UserControl
         _networkScale.Text = Format.RateLabel(max, unit);
         _network.Graph.Show(rx, s.At, span, max, tx);
         if (adapter.ReceiveBytesPerSecond is not { } down || adapter.SendBytesPerSecond is not { } up)
+        {
+            _network.SetLine(Line()); // a rate starting over: no old speeds
             return;
+        }
         var line = Line();
         line.Inlines.Add(new InlineUIContainer(Legend(dashed: false)) { BaselineAlignment = BaselineAlignment.Center });
         Fact(line, "Receive", Format.Rate(down, unit), separator: false);
@@ -337,6 +352,8 @@ internal sealed class SystemMonitorView : UserControl
         bool alert = _module.Alerting("low-battery", "battery");
         if (battery.Percent is { } percent)
             _battery.Headline(Format.Percent(percent), alert);
+        else
+            _battery.ClearHeadline();
         var line = Line();
         Value(line, battery.State switch
         {

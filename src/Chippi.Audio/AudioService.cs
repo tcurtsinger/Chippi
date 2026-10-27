@@ -322,10 +322,12 @@ public sealed class AudioService
     }
 
     /// <summary>One run of the engine thread, from the first lease to the last.</summary>
-    private sealed class Engine
+    internal sealed class Engine
     {
         private readonly AudioService _service;
         private readonly BlockingCollection<Action> _queue = [];
+        private readonly Lock _queueGate = new();
+        private bool _stopping;
         private readonly Thread _thread;
         private readonly TaskCompletionSource _stopped = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly ITimer _debounce;
@@ -394,25 +396,33 @@ public sealed class AudioService
 
         public Task StopAsync()
         {
-            Enqueue(() =>
+            lock (_queueGate)
             {
-                _debounce.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
-                _backoffTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
-                if (_system is not null)
+                if (_stopping)
+                    return _stopped.Task;
+                Enqueue(() =>
                 {
-                    Microphones.Stop(_system, Catalog);
-                    try { Processing.Shutdown(Arbiter, Catalog, _system); }
-                    catch (Exception ex) { Log.LogError(ex, "Stopping mic processing failed"); }
-                }
-                _meterTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
-                if (_system is not null)
-                {
-                    _system.Changed -= OnChanged;
-                    _system.Dispose();
-                    _system = null;
-                }
-            });
-            _queue.CompleteAdding();
+                    _debounce.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+                    _backoffTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+                    if (_system is not null)
+                    {
+                        Microphones.Stop(_system, Catalog);
+                        try { Processing.Shutdown(Arbiter, Catalog, _system); }
+                        catch (Exception ex) { Log.LogError(ex, "Stopping mic processing failed"); }
+                    }
+                    _meterTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+                    if (_system is not null)
+                    {
+                        _system.Changed -= OnChanged;
+                        _system.Dispose();
+                        _system = null;
+                    }
+                });
+                _stopping = true;
+                // Loop can finish as soon as adding is marked complete. Its disposal must wait
+                // until CompleteAdding itself has returned, even on the very first stop.
+                _queue.CompleteAdding();
+            }
             return _stopped.Task;
         }
 
@@ -572,16 +582,12 @@ public sealed class AudioService
 
         private bool Enqueue(Action op)
         {
-            if (_queue.IsAddingCompleted)
-                return false;
-            try
+            lock (_queueGate)
             {
+                if (_stopping)
+                    return false;
                 _queue.Add(op);
                 return true;
-            }
-            catch (InvalidOperationException)
-            {
-                return false; // completed during shutdown
             }
         }
 
@@ -600,7 +606,11 @@ public sealed class AudioService
                 _debounce.Dispose();
                 _meterTimer.Dispose();
                 _backoffTimer.Dispose();
-                _queue.Dispose();
+                lock (_queueGate)
+                {
+                    _stopping = true;
+                    _queue.Dispose();
+                }
                 _stopped.TrySetResult();
             }
         }

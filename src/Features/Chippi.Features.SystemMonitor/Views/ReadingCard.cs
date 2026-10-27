@@ -83,8 +83,15 @@ internal sealed class ReadingCard
     /// <summary>A failed read: no headline, a short status, and the graph's gap.</summary>
     public void Unavailable()
     {
-        _headline.Text = "";
+        ClearHeadline();
         SetLine(SystemMonitorView.Status("Unavailable"));
+    }
+
+    /// <summary>No value right now: the headline is empty rather than the last one.</summary>
+    public void ClearHeadline()
+    {
+        _headline.Text = "";
+        AutomationProperties.SetName(Card, _title.Text);
     }
 
     /// <summary>One line, with <paramref name="right"/> (CPU's processors button) at its end.</summary>
