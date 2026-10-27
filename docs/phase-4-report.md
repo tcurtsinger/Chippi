@@ -52,7 +52,7 @@ At `main` `763a619` (CI run 40459651091, push):
 - **Five-disk laptop at 1280×720 on a side edge doesn't fit.** A laptop with battery, thermal zone, five physical disks and the processor strip open makes the page 574 DIP (budget 550), and the card with round buttons 702 DIP on a side edge against a 672 DIP work area (598 on the top edge). Marge ruled it an edge case; the layout is Travis's approved design and isn't trimmed for it. The numbers are kept in `chippi-scratch\phase-4\m4\edge-case-c571bae.log` (#63).
 - **No CPU or board temperature, no motherboard fans.** They need the PawnIO driver and an admin helper (Hardware sensors in PLAN.md). The Thermal zone card shows only where firmware exposes one, and is never labelled CPU. Travis's PC has none.
 - **Battery and Thermal zone are checked on fakes only.** Travis's PC has neither.
-- **NVIDIA fan speed is the driver's intended %, not measured RPM.** NVML reports no RPM without admin; the page labels it as a percentage.
+- **NVIDIA's fan % is the driver's intended speed, not a measurement.** NVML supplies it as a percentage; measured RPM shows only where D3DKMT reports it.
 - **The Phase 3 installers are gone from the release folder**: the first Phase 4 packing attempt overwrote them. Nothing depends on them, and they can be rebuilt from `a4511eb`.
 - **CI SDK pin** from Phase 3 (#41) is still in place at 10.0.402.
 - **Not run on real hardware:** ARM64 and the desktop UiSmoke suite.
@@ -61,6 +61,8 @@ At `main` `763a619` (CI run 40459651091, push):
 
 - M1: Caution republishes every tick while an alert holds, so the island hub raises Changed every 1 to 2 s.
 - M2: when the pages are already open, a notice click makes System monitor the last page used.
+- M3: the first capability discovery on the Settings page rebuilds its rows and can take focus off a control.
+- M3: dragging a threshold slider saves at each 5% step.
 - D: the headers of `phase-4/architecture.md` and `phase-4/behavior-spec.md` still say research draft.
 - M4: the five-disk laptop case above.
 - Copy: "Overlaps Task Manager" stays, following DESIGN.md's Overlap badge pattern; "40 to 110 °C" stays as the GPU limit's error, as the shortest useful one.
