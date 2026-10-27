@@ -71,6 +71,7 @@ public sealed class SystemMonitorModule : IFeatureModule
         Settings = context.Settings.Get<SystemMonitorSettings>().Normalized();
         Sampler = new SensorSampler(_createSources(), log: context.Logger) { Interval = Settings.UpdateInterval };
         Sampler.Updated += OnUpdated;
+        context.Ui.SetSettingsPage(() => new SystemMonitorSettingsPage(this));
         // The alerts watch only what their switched-on alerts need; while one holds, its reading is
         // the tile's status in Caution (design notes #4).
         _alerts = new MonitorAlerts(Sampler, context.Notifier, context.Island, Settings);
