@@ -396,6 +396,19 @@ public partial class IslandWindow : Window
             _panel.TakeKeyboard();
     }
 
+    /// <summary>The pages on <paramref name="key"/>'s page (a notice click): moved there when open, otherwise opened on it.</summary>
+    internal void ShowPage(TrayAnchor? tray, string key)
+    {
+        if (_panel.IsOpen)
+        {
+            _panel.ShowPage(key);
+            return;
+        }
+        _panel.OpenOn(key);
+        ShowPages(tray, keyboard: false);
+        _panel.OpenOn(null); // unused when nothing could open
+    }
+
     private void OpenIsland()
     {
         if (!IsVisible || _dragging || Area is not { } area)

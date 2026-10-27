@@ -333,6 +333,7 @@ public sealed class ModuleRegistry(ConfigStore config, IslandActivityHub island,
             Notifier = notifier,
             Activation = new ActivationRouter.ModuleActivation(_services.Activation, id),
             OpenSettings = section => _services.OpenSettings?.Invoke(section is { Length: > 0 } ? $"module:{id}/{section}" : $"module:{id}"),
+            OpenIslandPage = key => _services.OpenIslandPage?.Invoke(key),
         };
 
         entry.Ui = ui;

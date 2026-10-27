@@ -188,6 +188,57 @@ public sealed class IslandPanelTests
     }
 
     [Fact]
+    public void Tiles_are_on_screen_only_while_the_open_grid_shows_them()
+    {
+        var monitor = Part("system-monitor", "System monitor", 60);
+        WpfTestThread.Run(() => WithPanel(panel =>
+        {
+            Assert.False(monitor.OnScreen);
+            Open(panel);
+            Assert.True(monitor.OnScreen);
+            panel.ShowPage("system-monitor");
+            Pump(TimeSpan.FromMilliseconds(400));
+            Assert.False(monitor.OnScreen);
+            panel.ShowPage(null);
+            Pump(TimeSpan.FromMilliseconds(400));
+            Assert.True(monitor.OnScreen);
+            panel.CloseIsland(immediate: true);
+            Assert.False(monitor.OnScreen);
+        }, Tiles(monitor, Part("keep-awake", "Keep awake", 40))));
+    }
+
+    [Fact]
+    public void A_notice_opens_its_page_once_and_the_header_shows_the_page_note()
+    {
+        var monitor = Part("system-monitor", "System monitor", 60, width: 640, status: "CPU 12%");
+        monitor.SetPageNote("Last 4 min");
+        WpfTestThread.Run(() => WithPanel(panel =>
+        {
+            panel.SetLastPage("keep-awake");
+            panel.OpenOn("system-monitor");
+            Open(panel);
+            Assert.Equal("system-monitor", panel.CurrentPage);
+            var texts = Texts((ContentControl)panel.FindName("Page"));
+            Assert.Contains("Last 4 min", texts);
+            Assert.DoesNotContain("CPU 12%", texts);
+
+            panel.CloseIsland(immediate: true);
+            Open(panel);
+            Assert.Equal("keep-awake", panel.CurrentPage);
+        }, Tiles(monitor, Part("keep-awake", "Keep awake", 40))));
+    }
+
+    private static List<string> Texts(DependencyObject root)
+    {
+        var texts = new List<string>();
+        if (root is TextBlock { Text.Length: > 0 } text)
+            texts.Add(text.Text);
+        foreach (var child in LogicalTreeHelper.GetChildren(root).OfType<DependencyObject>())
+            texts.AddRange(Texts(child));
+        return texts;
+    }
+
+    [Fact]
     public void Orbit_buttons_follow_installed_features_and_back_returns_to_the_remembered_page()
     {
         WpfTestThread.Run(() => WithPanel(panel =>

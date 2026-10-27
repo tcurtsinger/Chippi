@@ -41,6 +41,9 @@ public sealed class ModuleContext(
 
     /// <summary>Opens Settings on this module's page, at <c>section</c> when given (a notice click opening History).</summary>
     public Action<string?> OpenSettings { get; init; } = _ => { };
+
+    /// <summary>Opens the island on a tile's page (a notice click opening the System monitor page): in the island, or docked by the tray.</summary>
+    public Action<string> OpenIslandPage { get; init; } = _ => { };
 }
 
 /// <summary>Typed access to a module's config section (<c>modules.&lt;id&gt;</c> in settings.json).</summary>

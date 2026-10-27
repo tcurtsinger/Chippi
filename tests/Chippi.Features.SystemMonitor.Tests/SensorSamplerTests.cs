@@ -106,4 +106,22 @@ public sealed class SensorSamplerTests
 
         Assert.True(fake.Disposed);
     }
+
+    [Fact]
+    public void A_watch_outliving_the_sampler_can_still_change_and_let_go()
+    {
+        var sampler = new SensorSampler(new FakeSources().Sources);
+        var watch = sampler.Watch(SensorNeed.Cpu);
+
+        sampler.Dispose();
+
+        Assert.Null(Record.Exception(() =>
+        {
+            watch.Need = SensorNeed.Memory;
+            watch.Dispose();
+            sampler.Interval = TimeSpan.FromSeconds(1);
+            sampler.Resumed();
+            sampler.Watch(SensorNeed.Cpu).Dispose();
+        }));
+    }
 }
