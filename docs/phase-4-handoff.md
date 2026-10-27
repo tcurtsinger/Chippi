@@ -1,4 +1,4 @@
-﻿# Chippi Phase 4 brief: System monitor
+# Chippi Phase 4 brief: System monitor
 
 Marge, 2026-10-26. APPROVED by Travis with the mockup ("the design is approved, build it", 2026-10-26). Screens and copy: [design/notes.md](phase-4/design/notes.md), boards in [index.html](phase-4/design/index.html), shots in [design/shots/](phase-4/design/shots/). notes.md wins on screens and copy; this brief wins on behavior. Research: [behavior-spec.md](phase-4/behavior-spec.md) (Karl) and [architecture.md](phase-4/architecture.md) (Kayla), both cross-reviewed clean. Design input: [design-input.md](phase-4/design-input.md).
 
@@ -58,4 +58,3 @@ Same as Phase 3: branch and worktree per workstream; the other member reviews (b
 - Alerts fire, repeat after cooldown and respect Notifications settings, checked with controlled inputs.
 - Measured polling cost stays near architecture.md §1 (about 0.24% of one core at 2 s for a full page); nothing polls when nothing is shown and no alert is on.
 - Installer installs, updates in place and uninstalls; Travis's live checks pass.
-

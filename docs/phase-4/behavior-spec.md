@@ -1,4 +1,4 @@
-﻿# Phase 4: System monitor behavior
+# Phase 4: System monitor behavior
 
 Karl, 2026-10-26. Research draft for Kayla's review, before product decisions and mockups.
 
@@ -128,4 +128,3 @@ These are proposed requirements for Marge's brief, pending decisions and the arc
 | Network speed test and per-app rankings | Defer both from the baseline | Reference includes them, but they add active traffic or a separate process-attribution surface beyond the requested readings. Mark as parity deferrals if adopted. |
 
 No decision in this table is treated as approved. The mockup should follow the architecture's actual availability results. Kayla's peer review is pending.
-
