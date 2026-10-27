@@ -17,7 +17,7 @@ and [Mouzi](https://github.com/hsr88/mouzi) (Downloads organizer). Absorbs
 | Target | Windows 11, x64 + ARM64 |
 | License | GPL-3.0-or-later |
 | Audience | Public open-source release (GitHub releases, installer, auto-update) |
-| Look | Native Windows 11 (2026-10-23): neutral grays, one flat accent (Follow Windows by default, or Blue, Violet, Green, Pink), Segoe UI Variable, a panel-first flyout. It replaced Direction A "Studio Rack" after the [UI/UX audit](docs/phase-1-2-ui-ux-audit.md). See [DESIGN.md](DESIGN.md) |
+| Look | Native Windows 11 (2026-10-23): neutral grays, one flat accent (Follow Windows by default, or Blue, Violet, Green, Pink), Segoe UI Variable. It replaced Direction A "Studio Rack" after the [UI/UX audit](docs/phase-1-2-ui-ux-audit.md). See [DESIGN.md](DESIGN.md) |
 | Island | A movable tab docked on the top (default), left or right screen edge; opens on click to a grid of tiles, each opening its own page (2026-10-25) |
 | Surfaces | The island's pages are the only quick panel; each feature's page is built once. The tray icon opens them, in the island or, while it's off or hidden for a fullscreen app, docked by the tray; right click is Settings and Quit. Hide tray icon leaves the island as the only door. Settings groups pages by the catalog's groups, Sound by task (Output, Microphone, App volume), and never repeats a daily control (2026-10-26, [mockup](https://claude.ai/artifact/RJAX7v2QT6MLpPRgZQVXeS)) |
 | Pet | Gumdrop, a blob with a face in the Synth gradient that lives in the island. See DESIGN.md §7 |
@@ -59,6 +59,11 @@ build brief is [docs/phase-1-handoff.md](docs/phase-1-handoff.md).
 
 ### Backlog (requested, not yet scheduled)
 - ~~**Island position**~~ (Travis, 2026-10-22): moved into Phase 2.5 as the movable island (top, left or right edge; designed 2026-10-23). The bottom edge and corners were left out on purpose: the taskbar and window buttons live there.
+- **Volume boost backend** (Travis, 2026-10-25, task 21): its own phase, deferred out of Phase 3. Windows caps app volume at 100%, and replaying a captured copy failed as tested (muting the app or setting it to 0 also silences its capture).
+  - First, test the untried no-driver ways of silencing an app.
+  - Then evaluate a dedicated virtual audio device and a render audio plugin (APO).
+  - Cost each route: signing, ARM64, installer, crash recovery.
+  - Findings so far: [docs/phase-3/boost-gate.md](docs/phase-3/boost-gate.md) (Karl's gate) and [docs/phase-3/boost-experiment.md](docs/phase-3/boost-experiment.md) (route 1 experiment).
 
 ### Phase 2: Downloads organizer (Mouzi-style)
 Brief: [docs/phase-2-handoff.md](docs/phase-2-handoff.md). In progress since 2026-10-22.
@@ -83,7 +88,7 @@ Brief: [docs/ui-refresh-handoff.md](docs/ui-refresh-handoff.md). Moves the shell
 ### Phase 3: Sound
 - Audio routing from Hopper: output priority switching, mic pinning, mic processing
 - Per-app volume mixer, per-app output device, mic mute shortcut
-- Volume boost past 100% (needs research: Windows session volume caps at 100%)
+- ~~Volume boost past 100%~~: deferred to its own phase (see Backlog, "Volume boost backend"); App volume stays 0 to 100%
 
 ### Phase 4: System monitor
 CPU, GPU, memory, temperatures, battery, network, tray readouts, alerts. Fan control
