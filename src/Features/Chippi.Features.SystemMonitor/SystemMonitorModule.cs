@@ -182,15 +182,25 @@ public sealed class SystemMonitorModule : IFeatureModule
             UpdateTile(latest);
     }
 
+    // A reading this snapshot didn't read (the tile off screen) leaves the status; one that was read
+    // but has no value (failed, a rate starting over, an unplugged adapter) clears it: never a stale number.
     private void UpdateTile(SystemSnapshot snapshot)
     {
         if (_alerts?.Current.First is { } alert)
             _tile?.SetStatus(alert.TileText);
-        else if (Settings.EffectiveTileStatus() is null)
+        else if (Settings.EffectiveTileStatus() is not { } shown)
             _tile?.SetStatus("");
-        else if (TileText(snapshot, Settings, Settings.GpuId, Settings.NetworkAdapterId) is { } status)
-            _tile?.SetStatus(status);
+        else if (TileStatusOf(snapshot, shown) != ReadingStatus.NotRead)
+            _tile?.SetStatus(TileText(snapshot, Settings, Settings.GpuId, Settings.NetworkAdapterId) ?? "");
     }
+
+    private static ReadingStatus TileStatusOf(SystemSnapshot snapshot, TileStatus shown) => shown switch
+    {
+        TileStatus.Memory => snapshot.Memory.Status,
+        TileStatus.Gpu => snapshot.Gpus.Status,
+        TileStatus.Network => snapshot.Network.Status,
+        _ => snapshot.Cpu.Status,
+    };
 
     private void OnPowerModeChanged(object sender, PowerModeChangedEventArgs e)
     {

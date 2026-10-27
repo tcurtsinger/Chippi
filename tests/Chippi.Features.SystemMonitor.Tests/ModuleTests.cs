@@ -143,6 +143,34 @@ public sealed class ModuleTests : IDisposable
     }
 
     [Fact]
+    public async Task A_failed_read_clears_the_tile_status_rather_than_keep_the_old_number()
+    {
+        int reads = 0;
+        var fake = new FakeSources { Cpu = _ => Interlocked.Increment(ref reads) == 1 ? new CpuReading(25, 4, null) : throw new InvalidOperationException("PDH failed") };
+        var module = new SystemMonitorModule(() => fake.Sources);
+        var config = new ConfigStore(Path.Combine(_root, "settings.json"));
+        config.Load();
+        config.SetModuleSettings("system-monitor", new SystemMonitorSettings { UpdateSeconds = 1 });
+        var registry = new ModuleRegistry(config, new IslandActivityHub(), NullLoggerFactory.Instance, new ModuleServices { DataRoot = Path.Combine(_root, "data") });
+        registry.Register(module);
+        try
+        {
+            await registry.StartAsync();
+            await registry.SetInstalledAsync("system-monitor", true);
+            var tile = Assert.Single(registry.Find("system-monitor")!.IslandTiles);
+            using var status = new SemaphoreSlim(0);
+            tile.StatusChanged += (_, _) => status.Release();
+
+            tile.SetOnScreen(true);
+            while (tile.Status != "CPU 25%")
+                Assert.True(status.Wait(Wait));
+            while (tile.Status != "")
+                Assert.True(status.Wait(Wait));
+        }
+        finally { await registry.StopAllAsync(); }
+    }
+
+    [Fact]
     public async Task An_alert_past_its_threshold_is_the_tile_status_in_Caution()
     {
         var fake = new FakeSources { Memory = () => new MemoryReading(93, 100, 1, 2) };

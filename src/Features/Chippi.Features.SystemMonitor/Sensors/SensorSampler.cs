@@ -54,6 +54,7 @@ public sealed class SensorSampler : IDisposable
     private readonly Thread _thread;
     private TimeSpan _interval = TimeSpan.FromSeconds(2);
     private volatile bool _stopping;
+    private bool _disposed;
 
     public SensorSampler(SensorSources sources, TimeProvider? time = null, ILogger? log = null)
     {
@@ -77,7 +78,7 @@ public sealed class SensorSampler : IDisposable
             if (value <= TimeSpan.Zero)
                 throw new ArgumentOutOfRangeException(nameof(value));
             lock (_gate) _interval = value;
-            _wake.Set();
+            Changed();
         }
     }
 
@@ -98,7 +99,7 @@ public sealed class SensorSampler : IDisposable
     {
         var lease = new Lease(this, need);
         lock (_gate) _leases.Add(lease);
-        _wake.Set();
+        Changed();
         return lease;
     }
 
@@ -109,9 +110,13 @@ public sealed class SensorSampler : IDisposable
     public void Resumed()
     {
         _core.Resumed();
-        _wake.Set();
+        Changed();
     }
 
+    /// <summary>
+    /// Stops the thread and disposes the sources. Watches still held (a page unloading after its
+    /// module stopped) can still change or be disposed afterwards; they no longer do anything.
+    /// </summary>
     public void Dispose()
     {
         if (_stopping)
@@ -119,10 +124,21 @@ public sealed class SensorSampler : IDisposable
         _stopping = true;
         _wake.Set();
         _thread.Join();
-        _wake.Dispose();
+        lock (_gate)
+        {
+            _disposed = true;
+            _wake.Dispose();
+        }
     }
 
-    private void Changed() => _wake.Set();
+    private void Changed()
+    {
+        lock (_gate)
+        {
+            if (!_disposed)
+                _wake.Set();
+        }
+    }
 
     private void Loop()
     {
