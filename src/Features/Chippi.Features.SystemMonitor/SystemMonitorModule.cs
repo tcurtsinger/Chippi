@@ -68,6 +68,7 @@ public sealed class SystemMonitorModule : IFeatureModule
         Settings = context.Settings.Get<SystemMonitorSettings>().Normalized();
         Sampler = new SensorSampler(_createSources(), log: context.Logger) { Interval = Settings.UpdateInterval };
         Sampler.Updated += OnUpdated;
+        context.Ui.SetSettingsPage(() => new SystemMonitorSettingsPage(this));
         _tile = context.Ui.AddIslandTile(new IslandTileSpec(TileKey, Descriptor.Name, nameof(LucideIcons.Activity), Order: 60, SectionOrder: 0,
             () => new SystemMonitorView(this))
         {
