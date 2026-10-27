@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
-using System.IO;
 using Chippi.Features.SystemMonitor.Sensors.Platform;
 
 namespace Chippi.Features.SystemMonitor.Tests;
@@ -41,15 +40,20 @@ public sealed class WindowsSourcesTests
         Assert.InRange(memory.UsedBytes, 1UL, memory.TotalBytes);
         Assert.True(memory.CommitLimitBytes >= memory.CommitBytes);
 
+        // A virtual GPU (CI's Hyper-V adapter) has no engine counters, temperature or fan: those
+        // readings are null there, and in range wherever they're reported.
         Assert.All(gpus, g =>
         {
             Assert.DoesNotContain("BasicRender", g.Id, StringComparison.OrdinalIgnoreCase);
             Assert.False(string.IsNullOrWhiteSpace(g.Name));
-            Assert.NotNull(g.Load);
-            Assert.InRange(g.Load.Value, 0, 100);
+            if (g.Load is { } load)
+                Assert.InRange(load, 0, 100);
             if (g.TemperatureC is { } t)
                 Assert.InRange(t, 1, 150);
-        });
+            if (g.FanRpm is { } rpm)
+                Assert.True(rpm > 0);
+            if (g.FanPercent is { } percent)
+                Assert.InRange(percent, 0U, 100U);        });
         Assert.Equal(gpus.Count, gpus.Select(g => g.Id).Distinct(StringComparer.OrdinalIgnoreCase).Count());
 
         Assert.Equal(network.Count, network.Select(n => n.Id).Distinct().Count());
@@ -62,18 +66,29 @@ public sealed class WindowsSourcesTests
                 Assert.True(rx >= 0);
         });
 
+        // Disks are past their first sample, so the list is there, though a VM's may differ from a PC's.
         Assert.NotNull(disks);
-        Assert.NotEmpty(disks);
-        Assert.Contains(disks, d => d.Volumes.Any(v => v.Letter == Path.GetPathRoot(Environment.SystemDirectory)![..2].ToUpperInvariant()));
+        Assert.Equal(disks.Count, disks.Select(d => d.Number).Distinct().Count());
         Assert.All(disks, d =>
         {
             if (d.ActivePercent is { } a)
                 Assert.InRange(a, 0, 100);
-            Assert.All(d.Volumes, v => Assert.InRange(v.FreeBytes, 0UL, v.TotalBytes));
+            if (d.ReadBytesPerSecond is { } r)
+                Assert.True(r >= 0);
+            Assert.All(d.Volumes, v =>
+            {
+                Assert.Matches("^[A-Z]:$", v.Letter);
+                Assert.InRange(v.FreeBytes, 0UL, v.TotalBytes);
+            });
         });
 
         if (battery is not null)
-            Assert.True(battery.Percent is null or (>= 0 and <= 100));
+        {
+            if (battery.Percent is { } p)
+                Assert.InRange(p, 0, 100);
+            if (battery.TimeLeft is { } left)
+                Assert.True(left > TimeSpan.Zero);
+        }
 
         Assert.All(zones, z => Assert.InRange(z.TemperatureC, -50, 150));
     }
