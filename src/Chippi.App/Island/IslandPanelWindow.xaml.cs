@@ -59,6 +59,8 @@ public partial class IslandPanelWindow : Window
     private NowPlayingView? _nowPlaying;
     private string? _page; // null is the grid
     private string? _lastPage;
+    private string? _openOn;
+    private IReadOnlyList<string> _shownTiles = [];
     private HWND _hwnd;
     private IslandEdge _edge;
     private Rect _tab; // physical pixels
@@ -163,6 +165,9 @@ public partial class IslandPanelWindow : Window
     /// <summary>AppSettings.IslandLastPage.</summary>
     internal void SetLastPage(string? key) => _lastPage = key;
 
+    /// <summary>The page the next open shows instead of the usual one (a notice click); null for the usual.</summary>
+    internal void OpenOn(string? key) => _openOn = key;
+
     /// <summary>Settings › Island &amp; pet: where it opens, the tiles' order and which show, and the round buttons.</summary>
     internal void SetLayout(IslandLayout layout)
     {
@@ -255,8 +260,11 @@ public partial class IslandPanelWindow : Window
         if (Application.Current?.TryFindResource("IslandAccentBrush") is { } accent)
             Resources["AccentBrush"] = accent;
         bool shrinking = IsVisible;
-        if (!shrinking)
+        if (_openOn is not null && Exists(_openOn))
+            _page = _openOn;
+        else if (!shrinking)
             _page = _layout.OpensOn == IslandOpensOn.LastPage && _lastPage is not null && Exists(_lastPage) ? _lastPage : null;
+        _openOn = null;
         Attach(_page);
         RefreshOrbit(place: false);
         UpdateClock();
@@ -273,6 +281,7 @@ public partial class IslandPanelWindow : Window
         IsOpen = false;
         _keyboard = false;
         _clock.Stop();
+        MarkOnScreen();
         if (immediate)
             Collapse();
         else
@@ -338,6 +347,7 @@ public partial class IslandPanelWindow : Window
         if (key is null)
         {
             Page.Content = _grid;
+            MarkOnScreen();
             return;
         }
         var page = new StackPanel();
@@ -354,6 +364,7 @@ public partial class IslandPanelWindow : Window
             AddSections(page, parts);
         Page.Content = page;
         RefreshPageStatus();
+        MarkOnScreen();
     }
 
     /// <summary>Every page but Now Playing (which has its own) starts with its name, and the tile's status where the page doesn't show it.</summary>
@@ -409,6 +420,12 @@ public partial class IslandPanelWindow : Window
     {
         if (_page is null || Group(_page) is not { } group)
             return;
+        if (group.PageNote.Length > 0)
+        {
+            _pageStatus.Text = group.PageNote;
+            _pageStatus.SetResourceReference(TextBlock.ForegroundProperty, "IslandTextTertiaryBrush");
+            return;
+        }
         _pageStatus.Text = group.StatusOnPage ? group.Status : "";
         bool caution = LiveOn(group.Key)?.NeedsAttention == true || Muted(group.Key);
         _pageStatus.SetResourceReference(TextBlock.ForegroundProperty, caution ? "WarningTextBrush" : "IslandTextTertiaryBrush");
@@ -456,7 +473,18 @@ public partial class IslandPanelWindow : Window
         }
         var shown = _layout.Shown(tiles.Select(t => t.Key));
         _grid.SetTiles([.. shown.Select(key => tiles.First(t => t.Key == key))]);
+        _shownTiles = shown;
         RefreshPageStatus();
+        MarkOnScreen();
+    }
+
+    /// <summary>Tells each tile whether it's seen: the grid open, and the tile not hidden.</summary>
+    private void MarkOnScreen()
+    {
+        bool grid = IsOpen && _page is null;
+        foreach (var group in _groups)
+            foreach (var part in group.Parts)
+                part.SetOnScreen(grid && _shownTiles.Contains(group.Key));
     }
 
     private bool Muted(string key) => _activities.Any(a => a.ModuleId == "mic-mute" && a.NeedsAttention && a.TileKey == key);
@@ -796,6 +824,7 @@ public partial class IslandPanelWindow : Window
         Card.Opacity = 0;
         // Unparented views get Unloaded and stop listening until the island opens again.
         Detach();
+        MarkOnScreen();
     }
 
     /// <summary>The shape at <see cref="_drawn"/>, flat on its edge, and the orbit buttons following it.</summary>

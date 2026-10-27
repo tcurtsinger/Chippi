@@ -50,12 +50,26 @@ public interface IIslandTile
 {
     /// <summary>The tile's status line, such as "Muted" or "1 hr left"; empty for none.</summary>
     void SetStatus(string status);
+
+    /// <summary>
+    /// Text at the right of the page's header instead of the tile's status, for a page that already
+    /// shows its status (the System monitor's "Last 4 min"); empty for none.
+    /// </summary>
+    void SetPageNote(string note);
+
+    /// <summary>Whether the tile is on screen: the grid is open and the tile isn't hidden. Its page doesn't count.</summary>
+    bool OnScreen { get; }
+
+    /// <summary>Raised on the UI thread when <see cref="OnScreen"/> changes, so a status that costs something to keep current runs only while seen.</summary>
+    event EventHandler? OnScreenChanged;
 }
 
 /// <summary>A running module's tile part, as the island host reads it.</summary>
 public sealed class IslandTileContribution(string moduleId, IslandTileSpec spec) : IIslandTile
 {
     private string _status = "";
+    private string _pageNote = "";
+    private volatile bool _onScreen;
 
     public string ModuleId { get; } = moduleId;
 
@@ -63,14 +77,36 @@ public sealed class IslandTileContribution(string moduleId, IslandTileSpec spec)
 
     public string Status => Volatile.Read(ref _status);
 
-    /// <summary>Raised on the thread that set the status.</summary>
+    public string PageNote => Volatile.Read(ref _pageNote);
+
+    public bool OnScreen => _onScreen;
+
+    /// <summary>Raised on the thread that set the status or the page note.</summary>
     public event EventHandler? StatusChanged;
+
+    public event EventHandler? OnScreenChanged;
 
     public void SetStatus(string status)
     {
         status ??= "";
         if (Interlocked.Exchange(ref _status, status) != status)
             StatusChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    public void SetPageNote(string note)
+    {
+        note ??= "";
+        if (Interlocked.Exchange(ref _pageNote, note) != note)
+            StatusChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>The island host reports whether the tile is on screen. Call on the UI thread.</summary>
+    public void SetOnScreen(bool onScreen)
+    {
+        if (_onScreen == onScreen)
+            return;
+        _onScreen = onScreen;
+        OnScreenChanged?.Invoke(this, EventArgs.Empty);
     }
 
     /// <summary>
@@ -98,6 +134,9 @@ public sealed record IslandTileGroup(string Key, IReadOnlyList<IslandTileContrib
     public IslandOrbit Orbit => Parts.Select(p => p.Spec.Orbit).FirstOrDefault(o => o != IslandOrbit.None);
 
     public bool StatusOnPage => Parts.Any(p => p.Spec.StatusOnPage);
+
+    /// <summary>The first part's non-empty page note, or empty.</summary>
+    public string PageNote => Parts.Select(p => p.PageNote).FirstOrDefault(n => n.Length > 0) ?? "";
 
     /// <summary>The highest-priority non-empty status, or empty.</summary>
     public string Status =>

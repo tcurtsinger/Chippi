@@ -62,7 +62,8 @@ public sealed class IslandHost : IDisposable
         _window.TrayIconRect = () => _shell.Commands.TrayAnchor()?.Icon;
         _shell.Commands.RegisterPages(
             keyboard => _window.TogglePages(_shell.Commands.TrayAnchor(), keyboard),
-            () => _window.ShowPages(_shell.Commands.TrayAnchor(), keyboard: true));
+            () => _window.ShowPages(_shell.Commands.TrayAnchor(), keyboard: true),
+            key => _window.ShowPage(_shell.Commands.TrayAnchor(), key));
         _window.IsVisibleChanged += (_, _) => _shell.Commands.SetIslandShowing(_window.IsVisible);
         StartMedia();
         _tracker.Changed += (_, _) =>

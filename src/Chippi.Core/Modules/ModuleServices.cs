@@ -30,4 +30,7 @@ public sealed class ModuleServices
 
     /// <summary>Opens Settings at a page id (<c>module:&lt;id&gt;/&lt;section&gt;</c>). Set by the shell; null in tests.</summary>
     public Action<string>? OpenSettings { get; set; }
+
+    /// <summary>Opens the island on a tile key's page. Set by the shell; null in tests.</summary>
+    public Action<string>? OpenIslandPage { get; set; }
 }

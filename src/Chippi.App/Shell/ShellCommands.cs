@@ -15,6 +15,7 @@ public sealed class ShellCommands
 {
     private Action<bool>? _togglePages;
     private Action? _showPages;
+    private Action<string>? _showPage;
     private Func<TrayAnchor?>? _trayAnchor;
     private Action<string?>? _openSettings;
 
@@ -31,10 +32,11 @@ public sealed class ShellCommands
     /// WS3 registers these: the island's pages, in the island while it shows, otherwise docked by the
     /// tray. Toggle's flag is true when the request came from the keyboard, so the pages take it.
     /// </summary>
-    public void RegisterPages(Action<bool> toggle, Action show)
+    public void RegisterPages(Action<bool> toggle, Action show, Action<string> showPage)
     {
         _togglePages = toggle;
         _showPages = show;
+        _showPage = showPage;
     }
 
     /// <summary>WS1 registers where its icon is, for the pages docked by the tray.</summary>
@@ -47,6 +49,9 @@ public sealed class ShellCommands
     public void TogglePages(bool keyboard = false) => _togglePages?.Invoke(keyboard);
 
     public void ShowPages() => _showPages?.Invoke();
+
+    /// <summary>The pages, open on a tile's page (a notice click). An unknown key opens them as <see cref="ShowPages"/> does.</summary>
+    public void ShowPage(string key) => _showPage?.Invoke(key);
 
     /// <summary>The tray icon and its display, or null without a tray.</summary>
     internal TrayAnchor? TrayAnchor() => _trayAnchor?.Invoke();

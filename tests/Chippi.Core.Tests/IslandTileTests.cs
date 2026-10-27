@@ -92,4 +92,55 @@ public sealed class IslandTileTests : IDisposable
     {
         Assert.Null(FakeModule.Create("m").Descriptor.Requirement);
     }
+
+    [Fact]
+    public void A_page_note_replaces_the_status_in_the_header_and_notifies_the_host()
+    {
+        var part = new IslandTileContribution("system-monitor", Spec("system-monitor", "System monitor", 60, 0));
+        int changes = 0;
+        part.StatusChanged += (_, _) => changes++;
+
+        part.SetPageNote("Last 4 min");
+        part.SetPageNote("Last 4 min");
+        var tile = Assert.Single(IslandTileContribution.Group([part]));
+
+        Assert.Equal("Last 4 min", tile.PageNote);
+        Assert.Equal(1, changes);
+    }
+
+    [Fact]
+    public void On_screen_changes_are_reported_once_each()
+    {
+        var part = new IslandTileContribution("system-monitor", Spec("system-monitor", "System monitor", 60, 0));
+        var seen = new List<bool>();
+        part.OnScreenChanged += (_, _) => seen.Add(part.OnScreen);
+
+        part.SetOnScreen(true);
+        part.SetOnScreen(true);
+        part.SetOnScreen(false);
+
+        Assert.Equal([true, false], seen);
+    }
+
+    [Fact]
+    public async Task A_module_opens_its_island_page_through_the_shell()
+    {
+        string? opened = null;
+        using var dir = new TempDir();
+        var config = new Config.ConfigStore(dir.File("settings.json"));
+        config.Load();
+        var registry = new ModuleRegistry(config, new Island.IslandActivityHub(), Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance,
+            new ModuleServices { OpenIslandPage = key => opened = key, DataRoot = dir.File("data") });
+        var module = FakeModule.Create("m");
+        module.OnStart = ctx => ctx.OpenIslandPage("t");
+        registry.Register(module);
+        try
+        {
+            await registry.StartAsync();
+            await registry.SetInstalledAsync("m", true);
+
+            Assert.Equal("t", opened);
+        }
+        finally { await registry.StopAllAsync(); }
+    }
 }

@@ -34,6 +34,7 @@
     <ProjectReference Include="..\Features\Chippi.Features.KeepAwake\Chippi.Features.KeepAwake.csproj" />
     <ProjectReference Include="..\Features\Chippi.Features.Downloads\Chippi.Features.Downloads.csproj" />
     <ProjectReference Include="..\Features\Chippi.Features.Sound\Chippi.Features.Sound.csproj" />
+    <ProjectReference Include="..\Features\Chippi.Features.SystemMonitor\Chippi.Features.SystemMonitor.csproj" />
   </ItemGroup>
 
   <!-- P/Invoke via CsWin32. Each workstream lists its APIs in a NativeMethods.txt inside its own
