@@ -34,7 +34,8 @@ public interface INetworkSource
 
 public interface IDiskSource : IDisposable
 {
-    IReadOnlyList<DiskReading> Read();
+    /// <returns>Null until a second sample exists (the disk counters are all rates).</returns>
+    IReadOnlyList<DiskReading>? Read();
 }
 
 public interface IBatterySource

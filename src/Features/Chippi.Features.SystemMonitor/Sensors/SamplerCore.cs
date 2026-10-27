@@ -109,7 +109,7 @@ internal sealed class SamplerCore(SensorSources sources, ILogger log) : IDisposa
     }
 
     // A list source that returns nothing means the PC has none (no GPU, no thermal zone): NotSupported.
-    private Sample<IReadOnlyList<T>> ReadList<T>(string name, DateTimeOffset now, bool wanted, Func<IReadOnlyList<T>> read)
+    private Sample<IReadOnlyList<T>> ReadList<T>(string name, DateTimeOffset now, bool wanted, Func<IReadOnlyList<T>?> read)
     {
         var sample = Read<IReadOnlyList<T>>(name, now, wanted, read);
         return sample is { Status: ReadingStatus.Ok, Value.Count: 0 } ? sample with { Status = ReadingStatus.NotSupported } : sample;

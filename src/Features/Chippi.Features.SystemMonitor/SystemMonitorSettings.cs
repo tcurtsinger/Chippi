@@ -132,6 +132,9 @@ public sealed record SystemMonitorSettings
     {
         if (alert is null)
             return fallback;
+        // A threshold missing from the file reads as 0: keep the default, not the minimum.
+        if (alert.Percent == 0)
+            return alert with { Percent = fallback.Percent };
         int snapped = (int)Math.Round(alert.Percent / (double)PercentStep) * PercentStep;
         return alert with { Percent = Math.Clamp(snapped, min, max) };
     }

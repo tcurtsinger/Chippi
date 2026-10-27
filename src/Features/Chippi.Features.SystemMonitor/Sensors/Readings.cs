@@ -23,7 +23,7 @@ public sealed record MemoryReading(ulong UsedBytes, ulong TotalBytes, ulong Comm
 /// </summary>
 /// <param name="Id">PnP device instance ID, stable across boots and different for identical cards.</param>
 /// <param name="Load">The busiest single engine, as Task Manager shows; null until a second sample or when not asked for.</param>
-/// <param name="FanRpm">Measured fan speed (D3DKMT); 0 is a real reading (zero-fan idle).</param>
+/// <param name="FanRpm">Measured fan speed (D3DKMT); null when stopped or not reported, which drivers report alike as 0.</param>
 /// <param name="FanPercent">NVIDIA's intended fan speed (NVML), a percentage, never RPM.</param>
 public sealed record GpuReading(
     string Id,
