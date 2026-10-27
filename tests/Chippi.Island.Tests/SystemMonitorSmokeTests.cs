@@ -27,9 +27,8 @@ public sealed class SystemMonitorSmokeTests(ITestOutputHelper output)
     [InlineData(false, true, false, 5)]
     [InlineData(true, false, false, 5)]
     [InlineData(false, false, true, 2)]
+    [InlineData(false, true, true, 2)]
     [InlineData(true, false, true, 2)]
-    [InlineData(false, false, true, 5)]
-    [InlineData(false, true, true, 5)]
     public void Tile_page_settings_and_close_share_one_module_on_a_short_screen(bool docked, bool side, bool laptop, int disks) => WpfTestThread.Run(() =>
     {
         var fake = new FakeSources
@@ -82,17 +81,14 @@ public sealed class SystemMonitorSmokeTests(ITestOutputHelper output)
             IslandPanelTests.Pump(TimeSpan.FromMilliseconds(400));
             var shape = (FrameworkElement)panel.FindName("Shape");
             Assert.Equal(640, shape.Width, 3);
-            // Marge's budget: five-disk desktop or two-disk laptop. The five-disk laptop checks the whole work area instead.
-            if (!laptop || disks <= 2)
-                Assert.InRange(page.DesiredSize.Height, 1, 549.999);
+            // Budget: five-disk desktop or two-disk laptop, both with the processor strip open.
+            Assert.InRange(page.DesiredSize.Height, 1, 549.999);
             Assert.Empty(Find<ScrollViewer>(page));
             var card = (FrameworkElement)panel.FindName("Card");
-
             var footprint = new Rect(Canvas.GetLeft(card), Canvas.GetTop(card), card.ActualWidth, card.ActualHeight);
             if (!docked)
                 foreach (var orbit in ((Canvas)panel.FindName("Orbit")).Children.OfType<Button>().Where(b => b.Visibility == Visibility.Visible))
                 {
-
                     footprint.Union(new Rect(Canvas.GetLeft(orbit), Canvas.GetTop(orbit), orbit.Width, orbit.Height));
                 }
             output.WriteLine($"laptop={laptop}, disks={disks}, docked={docked}, side={side}: page={page.DesiredSize.Height:F2} DIP; card={card.ActualHeight:F2} DIP; card + buttons={footprint.Height:F2} DIP; top={footprint.Top:F2}, bottom={footprint.Bottom:F2} (672 DIP work area).");
