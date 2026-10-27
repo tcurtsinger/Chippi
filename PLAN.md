@@ -58,6 +58,7 @@ here too, as the reference module that proves the module system end to end. The
 build brief is [docs/phase-1-handoff.md](docs/phase-1-handoff.md).
 
 ### Backlog (requested, not yet scheduled)
+- **Hardware sensors** (Travis, 2026-10-26): a later step using the PawnIO driver and an admin helper for CPU package/core and board temperatures and motherboard fans, followed by hardware-qualified fan control. Phase 4 uses standard-user readings only; no tray readouts. See [Phase 4 architecture](docs/phase-4/architecture.md#2-temperatures-and-fans).
 - ~~**Island position**~~ (Travis, 2026-10-22): moved into Phase 2.5 as the movable island (top, left or right edge; designed 2026-10-23). The bottom edge and corners were left out on purpose: the taskbar and window buttons live there.
 - **Volume boost backend** (Travis, 2026-10-25, task 21): its own phase, deferred out of Phase 3. Windows caps app volume at 100%, and replaying a captured copy failed as tested (muting the app or setting it to 0 also silences its capture).
   - First, test the untried no-driver ways of silencing an app.
@@ -91,8 +92,8 @@ Brief: [docs/ui-refresh-handoff.md](docs/ui-refresh-handoff.md). Moves the shell
 - ~~Volume boost past 100%~~: deferred to its own phase (see Backlog, "Volume boost backend"); App volume stays 0 to 100%
 
 ### Phase 4: System monitor
-CPU, GPU, memory, temperatures, battery, network, tray readouts, alerts. Fan control
-flagged as research (vendor specific).
+Brief: [docs/phase-4-handoff.md](docs/phase-4-handoff.md). Approved 2026-10-26.
+CPU, GPU, memory, battery, network, disk activity and available GPU/thermal-zone temperatures, with opt-in alerts in the island and docked pages. CPU/board sensors and fan control are deferred to Hardware sensors.
 
 ### Phase 5: Clipboard and everyday tools
 Clipboard history, paste as plain text, clean URL, shelf, command bar, quick panel,

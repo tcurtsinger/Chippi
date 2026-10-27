@@ -1,0 +1,511 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>System Monitor Mockup</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;padding:40px;background:#D6D6D6;color:#1A1A1A;font-family:'Segoe UI Variable Text','Segoe UI',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit}
+.doc-h1{margin:0 0 4px;font:600 28px/36px 'Segoe UI Variable Display','Segoe UI',sans-serif}
+.doc-sub{margin:0 0 32px;font-size:14px;line-height:20px;color:#404040}
+.doc-board{margin:0 0 56px}
+.doc-bt{margin:0 0 4px;font-size:18px;line-height:24px;font-weight:600}
+.doc-bc{margin:0 0 14px;font-size:13px;line-height:20px;color:#404040}
+.doc-foot{font-size:12px;color:#5D5D5D}
+.board{position:relative;overflow:hidden;display:inline-block;vertical-align:top}
+body.solo{padding:0;background:#000}
+body.solo .doc-h1,body.solo .doc-sub,body.solo .doc-bt,body.solo .doc-bc,body.solo .doc-foot{display:none}
+body.solo .doc-board{margin:0}
+body.solo .doc-board.off{display:none}
+
+.ico{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.ico14{width:14px;height:14px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.ico20{width:20px;height:20px;flex:none;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+
+/* ---------- Desktop (from the approved Surfaces mockup) ---------- */
+.desk{position:relative;width:1440px;height:900px;background:#202020;user-select:none}
+.wbar{height:40px;display:flex;align-items:flex-end;gap:4px;padding-left:8px;background:#2B2B2B}
+.wtab{width:220px;height:32px;display:flex;align-items:center;gap:8px;padding:0 12px;border-radius:8px 8px 0 0;background:#202020}
+.blk{display:block;border-radius:5px;background:#2E2E2E}
+.blk2{display:block;border-radius:8px;background:#282828}
+.wctl{width:46px;display:flex;align-items:center;justify-content:center;color:#FFF}
+.tb{position:absolute;left:0;bottom:0;z-index:6;width:100%;height:48px;display:flex;align-items:center;padding:0 12px;background:#1C1C1C;border-top:1px solid rgba(255,255,255,.08);color:#FFF}
+.tapp{width:32px;height:32px;border-radius:6px;background:#3A3A3A}
+.trayb{position:relative;width:40px;height:40px;display:flex;align-items:center;justify-content:center;padding:0;border:0;border-radius:4px;background:transparent}
+.trayon{background:rgba(255,255,255,.1)}
+
+/* ---------- Island shell ---------- */
+.isl{position:absolute;z-index:5;background:#0A0A0A;color:#FFF;border:1px solid rgba(255,255,255,.10);box-shadow:0 16px 40px rgba(0,0,0,.45)}
+.isl.top{top:0;left:50%;transform:translateX(-50%);border-top-width:0;border-radius:0 0 20px 20px}
+.isl.right{right:0;border-right-width:0;border-radius:20px 0 0 20px}
+.tab{position:absolute;z-index:5;display:flex;align-items:center;justify-content:center;gap:6px;background:#0A0A0A;border:1px solid rgba(255,255,255,.14)}
+.tab.top{top:0;border-top-width:0}
+.sat{position:absolute;z-index:5;width:40px;height:40px;display:flex;align-items:center;justify-content:center;padding:0;border:1px solid rgba(255,255,255,.14);border-radius:20px;background:#0A0A0A;color:#FFF;box-shadow:0 8px 20px rgba(0,0,0,.3)}
+.saton{border-color:rgba(255,255,255,.5)}
+.dock{position:absolute;right:16px;bottom:60px;z-index:5;background:#0A0A0A;color:#FFF;border:1px solid rgba(255,255,255,.10);border-radius:20px;box-shadow:0 16px 40px rgba(0,0,0,.45);overflow:hidden}
+.dfoot{display:flex;align-items:center;justify-content:space-between;height:48px;padding:0 8px;border-top:1px solid rgba(255,255,255,.08)}
+.fbtn{display:inline-flex;align-items:center;gap:8px;height:32px;padding:0 10px;border:0;border-radius:4px;background:transparent;font-size:13px;cursor:pointer}
+.fbtn:hover{background:rgba(255,255,255,.06)}
+.eq{display:flex;align-items:flex-end;gap:2px;height:14px}
+.eqb{width:3px;border-radius:2px;background:var(--acc)}
+
+/* ---------- Island pages ---------- */
+:root{--acc:#4CC2FF;--cau:#FCE100}
+.ipg{padding:12px;display:flex;flex-direction:column;gap:8px;color:#FFF;font-size:13px;line-height:20px}
+.iph{display:flex;align-items:center;gap:8px;height:28px}
+.ipt{flex:1;min-width:0;font-size:13px;line-height:20px;font-weight:600;white-space:nowrap}
+.ic{font-size:12px;line-height:16px;color:#ABABAB;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
+.icols{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}
+.icol{display:flex;flex-direction:column;gap:8px;min-width:0}
+.icard{background:rgba(255,255,255,.06);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.rh{display:flex;align-items:center;gap:8px;height:24px;min-width:0}
+.rn{flex:none;font-size:12px;line-height:16px;font-weight:600;color:#ABABAB}
+.rv{margin-left:auto;flex:none;font-size:20px;line-height:24px;font-variant-numeric:tabular-nums}
+.rv.cau{color:var(--cau)}
+.pick{display:inline-flex;align-items:center;gap:4px;min-width:0;height:24px;padding:0 4px;margin-left:-4px;border:0;border-radius:4px;background:transparent;color:#C5C5C5;font-size:12px;line-height:16px;cursor:pointer;white-space:nowrap}
+.pick:hover{background:rgba(255,255,255,.06);color:#FFF}
+.pick span{overflow:hidden;text-overflow:ellipsis}
+.pname{min-width:0;font-size:12px;line-height:16px;color:#C5C5C5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gr{display:block;width:100%;height:36px;overflow:visible}
+.grw{position:relative}
+.gscale{position:absolute;right:0;top:-2px;font-size:11px;line-height:14px;color:#9D9D9D;font-variant-numeric:tabular-nums}
+.lines{display:flex;flex-direction:column;gap:2px}
+.il{display:flex;align-items:center;gap:5px;min-width:0;height:20px;font-size:12px;line-height:16px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.il .k{color:#ABABAB}
+.il .sp{flex:1}
+.il .gap{width:10px;flex:none}
+.il .pick{height:20px;margin:0 -4px 0 0}
+.lp{display:grid;grid-template-columns:repeat(16,minmax(0,1fr));gap:2px}
+.lpc{position:relative;height:14px;border-radius:2px;background:rgba(255,255,255,.08);overflow:hidden}
+.lpc span{position:absolute;left:0;right:0;bottom:0;background:var(--acc)}
+.dt{display:grid;grid-template-columns:118px 72px 84px 84px minmax(0,1fr);column-gap:12px;align-items:start}
+.dth{height:22px;display:flex;align-items:center;font-size:12px;line-height:16px;color:#ABABAB;white-space:nowrap}
+.dth.rn{font-weight:600}
+.dtc{min-height:24px;display:flex;flex-direction:column;justify-content:center;font-size:12px;line-height:16px;font-variant-numeric:tabular-nums;white-space:nowrap;border-top:1px solid rgba(255,255,255,.06);padding:2px 0}
+.vol{display:flex;align-items:center;gap:8px;height:18px}
+.vl{width:20px;flex:none;color:#C5C5C5}
+.vb{flex:1;min-width:40px;height:4px;border-radius:2px;background:rgba(255,255,255,.14);overflow:hidden}
+.vb span{display:block;height:4px;background:var(--acc)}
+.vb.cau span{background:var(--cau)}
+.vt{width:60px;flex:none;text-align:right;font-size:12px;color:#C5C5C5}
+.vt.cau{color:var(--cau)}
+.sw{display:inline-block;flex:none;width:14px;height:6px}
+
+/* ---------- Grid ---------- */
+.igrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.tl{position:relative;height:84px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:0 6px;border:0;border-radius:8px;background:rgba(255,255,255,.06);cursor:pointer;min-width:0}
+.tlname{margin-top:6px;font-size:12px;line-height:16px;font-weight:600;white-space:nowrap}
+.tlstat{max-width:100%;font-size:12px;line-height:16px;color:#ABABAB;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
+.tldot{position:absolute;top:8px;right:8px;width:6px;height:6px;border-radius:3px}
+
+/* ---------- Gallery board ---------- */
+.gal{width:1960px;padding:40px;background:#DCDCDC;display:flex;gap:40px;align-items:flex-start}
+.galc{display:flex;flex-direction:column;gap:12px}
+.galt{font-size:14px;line-height:20px;font-weight:600;color:#1A1A1A}
+.galn{font-size:12px;line-height:16px;color:#404040;max-width:640px}
+.ground{background:#0A0A0A;border:1px solid rgba(255,255,255,.10);border-radius:20px;color:#FFF}
+.toast{width:364px;border-radius:8px;background:#2C2C2C;border:1px solid rgba(255,255,255,.08);box-shadow:0 8px 32px rgba(0,0,0,.28);color:#FFF;padding:12px 14px 16px}
+.toasth{display:flex;align-items:center;gap:8px;font-size:12px;color:#C5C5C5;margin-bottom:10px}
+.toastt{font-size:14px;line-height:20px;font-weight:600}
+
+/* ---------- Settings window ---------- */
+.set{--win:#202020;--card:#2B2B2B;--cstroke:rgba(255,255,255,.03);--div:rgba(255,255,255,.06);--ctl:rgba(255,255,255,.06);--ctlstroke:rgba(255,255,255,.09);--sel:rgba(255,255,255,.06);--hov:rgba(255,255,255,.04);--input:rgba(255,255,255,.06);--inputb:rgba(255,255,255,.30);--swoff:rgba(255,255,255,.60);--knob:rgba(255,255,255,.80);--tx:#FFF;--tx2:#C5C5C5;--cap:#ABABAB;--mut:#9D9D9D;--sacc:#4CC2FF;--onacc:#000;--track:rgba(255,255,255,.54);--thumbring:#454545;
+  width:1120px;display:flex;flex-direction:column;background:var(--win);color:var(--tx);border:1px solid rgba(255,255,255,.08);border-radius:8px;overflow:hidden;font-size:14px;line-height:20px;user-select:none}
+.set.lt{--win:#F3F3F3;--card:#FBFBFB;--cstroke:rgba(0,0,0,.06);--div:rgba(0,0,0,.07);--ctl:#FFF;--ctlstroke:rgba(0,0,0,.10);--sel:rgba(0,0,0,.055);--hov:rgba(0,0,0,.04);--input:#FFF;--inputb:rgba(0,0,0,.45);--swoff:rgba(0,0,0,.55);--knob:rgba(0,0,0,.60);--tx:#1A1A1A;--tx2:#404040;--cap:#5D5D5D;--mut:#616161;--sacc:#005FB8;--onacc:#FFF;--track:rgba(0,0,0,.45);--thumbring:#FFF;border-color:rgba(0,0,0,.12)}
+.stbar{height:40px;display:flex;align-items:center;gap:10px;padding-left:16px;font-size:12px}
+.stbar .grow{flex:1}
+.wb{width:46px;height:40px;display:flex;align-items:center;justify-content:center;border:0;background:transparent;color:var(--tx)}
+.sbody{display:flex;flex:1}
+.snav{width:272px;flex:none;padding:14px 12px 16px;display:flex;flex-direction:column}
+.ssearch{display:flex;align-items:center;gap:8px;height:34px;padding:0 10px;margin-bottom:4px;border-radius:4px;background:var(--input);border:1px solid var(--ctlstroke);border-bottom-color:var(--inputb);color:var(--mut);font-size:14px}
+.sgrp{padding:12px 12px 6px;font-size:12px;line-height:16px;font-weight:600;color:var(--mut)}
+.sni{position:relative;display:flex;align-items:center;gap:14px;height:36px;padding:0 12px;border-radius:4px;font-size:14px}
+.sni.on{background:var(--sel);font-weight:600}
+.sni .pill{position:absolute;left:0;top:10px;width:3px;height:16px;border-radius:2px;background:var(--sacc)}
+.smain{flex:1;min-width:0;padding:4px 40px 28px 40px}
+.stitle{margin:0 0 14px;font:600 20px/28px 'Segoe UI Variable Display','Segoe UI',sans-serif}
+.ssec{margin:24px 0 8px;font-size:14px;line-height:20px;font-weight:600}
+.scard{border-radius:8px;overflow:hidden;background:var(--card);border:1px solid var(--cstroke)}
+.srow{display:flex;align-items:center;gap:14px;min-height:48px;padding:10px 16px}
+.srow+.srow{border-top:1px solid var(--div)}
+.srow.sub{padding-left:66px}
+.srow .lab{flex:1;min-width:0}
+.srow.dim .lab,.srow.dim .ctl{opacity:.45}
+.onoff{width:28px;text-align:right}
+.tog{position:relative;width:40px;height:20px;flex:none;padding:0;border:1px solid var(--swoff);border-radius:10px;background:transparent}
+.tog i{position:absolute;top:3px;left:4px;width:12px;height:12px;border-radius:6px;background:var(--knob)}
+.tog.on{background:var(--sacc);border-color:var(--sacc)}
+.tog.on i{top:2px;left:22px;width:14px;height:14px;border-radius:7px;background:var(--onacc)}
+.tog:disabled{opacity:.45}
+.combo{display:inline-flex;align-items:center;justify-content:space-between;gap:12px;min-width:160px;height:32px;padding:0 10px 0 12px;border:1px solid var(--ctlstroke);border-radius:4px;background:var(--ctl);font-size:14px}
+.ctl{display:flex;align-items:center;gap:12px}
+.sld{position:relative;width:200px;height:20px}
+.sld::before{content:"";position:absolute;left:0;right:0;top:8px;height:4px;border-radius:2px;background:var(--track)}
+.sld b{position:absolute;left:0;top:8px;height:4px;border-radius:2px;background:var(--sacc)}
+.sld s{position:absolute;top:0;width:20px;height:20px;margin-left:-10px;border-radius:10px;border:4px solid var(--thumbring);background:var(--sacc);box-shadow:0 0 0 1px rgba(128,128,128,.25)}
+.val{width:72px;text-align:right;color:var(--tx2);font-variant-numeric:tabular-nums}
+.fld{display:flex;align-items:center;width:96px;height:32px;padding:0 10px;border-radius:4px;background:var(--input);border:1px solid var(--ctlstroke);border-bottom-color:var(--inputb);font-variant-numeric:tabular-nums}
+.fld.ph{color:var(--mut)}
+.unit{width:24px;color:var(--tx2)}
+</style>
+</head>
+<body>
+<h1 class="doc-h1">System monitor: Phase 4 mockup</h1>
+<p class="doc-sub">Inside the Surfaces model (PR #52). The island and docked pages are always dark; Settings is shown dark and light. Readings are sample values. Notes: <code>notes.md</code>.</p>
+
+<section class="doc-board" id="b-grid-top">
+  <h2 class="doc-bt">1 · All features, top edge</h2>
+  <p class="doc-bc">The System monitor tile joins the grid after File organizer. Its status is the reading Settings picks (CPU by default).</p>
+  <div class="board desk" data-edge="top" data-page="grid"></div>
+</section>
+
+<section class="doc-board" id="b-page-top">
+  <h2 class="doc-bt">2 · System monitor page, top edge</h2>
+  <p class="doc-bc">Travis's desktop: two GPUs (picker), one real network adapter (no picker), five disks, no battery, no thermal zone. 640 wide, like Sound.</p>
+  <div class="board desk" data-edge="top" data-page="monitor"></div>
+</section>
+
+<section class="doc-board" id="b-page-right">
+  <h2 class="doc-bt">3 · System monitor page, right edge</h2>
+  <p class="doc-bc">The same page against the right edge. Round buttons: one pair above, one below, Now Playing on the far side.</p>
+  <div class="board desk" data-edge="right" data-page="monitor"></div>
+</section>
+
+<section class="doc-board" id="b-docked">
+  <h2 class="doc-bt">4 · Docked by the tray, island off</h2>
+  <p class="doc-bc">The same page in the docked card, with the footer in place of the round buttons.</p>
+  <div class="board desk" data-edge="dock" data-page="monitor"></div>
+</section>
+
+<section class="doc-board" id="b-states">
+  <h2 class="doc-bt">5 · Optional rows and states</h2>
+  <p class="doc-bc">Rows that only some PCs have, the logical processors open, trouble states, and an alert.</p>
+  <div class="board gal" id="gallery"></div>
+</section>
+
+<section class="doc-board" id="b-settings-dark">
+  <h2 class="doc-bt">6 · Settings › System › System monitor, dark</h2>
+  <p class="doc-bc">Travis's desktop, with CPU load and GPU temperature alerts turned on (all alerts start off). The window is stretched to show the whole page.</p>
+  <div class="board" id="settings-dark"></div>
+</section>
+
+<section class="doc-board" id="b-settings-light">
+  <h2 class="doc-bt">7 · Settings › System › System monitor, light</h2>
+  <p class="doc-bc">A laptop: Battery, Thermal zone and Low battery appear; one GPU with no temperature limit set, so its alert can't be turned on yet.</p>
+  <div class="board" id="settings-light"></div>
+</section>
+
+<section class="doc-board" id="b-short">
+  <h2 class="doc-bt">8 · A short screen (notes.md #22)</h2>
+  <p class="doc-bc">The smallest common laptop screen: 1920×1080 at 150% scaling, which apps see as 1280×720. The compact page and its round buttons fit on the right edge with room to spare.</p>
+  <div class="board desk" data-edge="right" data-page="monitor" data-w="1280" data-h="720"></div>
+</section>
+
+<p class="doc-foot">Mockup only. Every reading is a sample.</p>
+
+<script>
+// ---------------------------------------------------------------- icons
+const I = {
+  activity: '<path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>',
+  grid: '<rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect>',
+  back: '<path d="M9 14 4 9l5-5"></path><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"></path>',
+  gear: '<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle>',
+  coffee: '<path d="M10 2v2"></path><path d="M14 2v2"></path><path d="M6 2v2"></path><path d="M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1"></path>',
+  sliders: '<path d="M21 4h-7"></path><path d="M10 4H3"></path><path d="M21 12h-9"></path><path d="M8 12H3"></path><path d="M21 20h-5"></path><path d="M12 20H3"></path><path d="M14 2v4"></path><path d="M8 10v4"></path><path d="M16 18v4"></path>',
+  music: '<path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle>',
+  lines: '<path d="M2 10v3"></path><path d="M6 6v11"></path><path d="M10 3v18"></path><path d="M14 8v7"></path><path d="M18 5v13"></path><path d="M22 10v3"></path>',
+  folder: '<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"></path>',
+  speaker: '<path d="M11 4.7a.7.7 0 0 0-1.2-.5L6.4 7.6a1.4 1.4 0 0 1-1 .4H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.4a1.4 1.4 0 0 1 1 .4l3.4 3.4a.7.7 0 0 0 1.2-.5z"></path><path d="M16 9a5 5 0 0 1 0 6"></path><path d="M19.4 5.6a9 9 0 0 1 0 12.8"></path>',
+  mic: '<path d="M12 19v3"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><rect x="9" y="2" width="6" height="13" rx="3"></rect>',
+  drop: '<path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"></path>',
+  bell: '<path d="M10.268 21a2 2 0 0 0 3.464 0"></path><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"></path>',
+  plus: '<path d="M5 12h14"></path><path d="M12 5v14"></path>',
+  info: '<circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4"></path><path d="M12 8h.01"></path>',
+  search: '<circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path>',
+  down: '<path d="m6 9 6 6 6-6"></path>',
+  up: '<path d="m18 15-6-6-6 6"></path>',
+  wifi: '<path d="M12 20h.01"></path><path d="M2 8.82a15 15 0 0 1 20 0"></path><path d="M5 12.86a10 10 0 0 1 14 0"></path><path d="M8.5 16.43a5 5 0 0 1 7 0"></path>',
+  vol: '<path d="M11 4.7a.7.7 0 0 0-1.2-.5L6.4 7.6a1.4 1.4 0 0 1-1 .4H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.4a1.4 1.4 0 0 1 1 .4l3.4 3.4a.7.7 0 0 0 1.2-.5z"></path><path d="M16 9a5 5 0 0 1 0 6"></path>',
+  x: '<path d="M18 6 6 18"></path><path d="m6 6 12 12"></path>',
+  more: '<circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle><circle cx="5" cy="12" r="1"></circle>'
+};
+const ico = (name, cls = 'ico', style = '') => `<svg class="${cls}" style="${style}" viewBox="0 0 24 24" aria-hidden="true">${I[name]}</svg>`;
+let gid = 0;
+function gumdrop(size, mood = 'idle') {
+  const id = 'gd' + (gid++);
+  const eyes = mood === 'sleepy'
+    ? '<path d="M40 76 Q47 82 54 76 M66 76 Q73 82 80 76" fill="none" stroke="#0B0F1F" stroke-width="7" stroke-linecap="round"></path>'
+    : '<ellipse cx="47" cy="74" rx="6" ry="7.4" fill="#0B0F1F"></ellipse><ellipse cx="73" cy="74" rx="6" ry="7.4" fill="#0B0F1F"></ellipse>';
+  return `<svg width="${size}" height="${size}" viewBox="0 0 120 120" aria-hidden="true"><defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#B15CF0"></stop><stop offset="1" stop-color="#4D9BFF"></stop></linearGradient></defs><path d="M60 16 C80 30 100 52 100 77 C100 98 82 108 60 108 C38 108 20 98 20 77 C20 52 40 30 60 16 Z" fill="url(#${id})"></path>${eyes}</svg>`;
+}
+
+// ---------------------------------------------------------------- sample series (seeded, so every render matches)
+function rand(seed) {
+  return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+}
+function walk(seed, o) {
+  const r = rand(seed), n = 120, out = [];
+  let v = o.base;
+  for (let i = 0; i < n; i++) {
+    v += (o.base - v) * 0.25 + (r() - 0.5) * o.vol;
+    let x = v;
+    if (o.spikes && r() < o.spikes) x += r() * o.spikeAmp;
+    out.push(Math.max(o.min ?? 0, Math.min(o.max ?? 1, x)));
+  }
+  if (o.smooth) for (let k = 0; k < o.smooth; k++) for (let i = 1; i < n - 1; i++) out[i] = (out[i - 1] + out[i] * 2 + out[i + 1]) / 4;
+  if (o.last != null) { out[n - 1] = o.last; out[n - 2] = (out[n - 3] + o.last) / 2; }
+  if (o.gap) for (let i = o.gap[0]; i < o.gap[1]; i++) out[i] = null;
+  if (o.endGap) for (let i = n - o.endGap; i < n; i++) out[i] = null;
+  return out;
+}
+function graph(a, o = {}) {
+  const W = 276, H = 36, max = o.max ?? 1, n = a.length;
+  const pt = (v, i) => [(i * W / (n - 1)).toFixed(1), (H - 1 - (v / max) * (H - 4)).toFixed(1)];
+  const segs = []; let cur = [];
+  a.forEach((v, i) => { if (v == null) { if (cur.length) segs.push(cur); cur = []; } else cur.push([v, i]); });
+  if (cur.length) segs.push(cur);
+  const line = (s) => 'M' + s.map(([v, i]) => pt(v, i).join(',')).join(' L');
+  let fill = '', stroke = '';
+  for (const s of segs) {
+    if (o.fill !== false) fill += `<path d="${line(s)} L${pt(0, s[s.length - 1][1])[0]},${H} L${pt(0, s[0][1])[0]},${H} Z" fill="${o.color || 'var(--acc)'}" fill-opacity="0.14"></path>`;
+    stroke += `<path d="${line(s)}" fill="none" stroke="${o.color || 'var(--acc)'}" stroke-width="1.5" stroke-linejoin="round"${o.dash ? ' stroke-dasharray="3 2"' : ''}></path>`;
+  }
+  return fill + stroke;
+}
+function graphSvg(series, label, o = {}) {
+  let inner = graph(series, o);
+  if (o.second) inner += graph(o.second, { max: o.max, fill: false, dash: true, color: '#C5C5C5' });
+  return `<div class="grw"><svg class="gr" viewBox="0 0 276 36" preserveAspectRatio="none" role="img" aria-label="${label}"><line x1="0" y1="35.5" x2="276" y2="35.5" stroke="rgba(255,255,255,.12)"></line>${inner}</svg>${o.scale ? `<span class="gscale">${o.scale}</span>` : ''}</div>`;
+}
+const swatch = (dash) => `<svg class="sw" viewBox="0 0 14 6" aria-hidden="true"><line x1="0" y1="3" x2="14" y2="3" stroke="${dash ? '#C5C5C5' : 'var(--acc)'}" stroke-width="2"${dash ? ' stroke-dasharray="3 2"' : ''}></line></svg>`;
+
+// ---------------------------------------------------------------- the page
+// A line of readings: '~label' is Caption, '·' a separator, '|' a gap, '>' pushes the rest right; anything else is a value.
+const line = (tokens) => `<div class="il">${tokens.map((t) => t === '·' ? '<span class="k">·</span>' : t === '|' ? '<span class="gap"></span>' : t === '>' ? '<span class="sp"></span>'
+  : t.startsWith('~') ? `<span class="k">${t.slice(1)}</span>` : t.startsWith('<') ? t : `<span>${t}</span>`).join('')}</div>`;
+const lines = (rows) => `<div class="lines">${rows.map(line).join('')}</div>`;
+function head(name, value, opts = {}) {
+  const who = opts.pick ? `<button class="pick" aria-label="${opts.pick}. Choose another">${'<span>' + opts.pick + '</span>'}${ico('down', 'ico', 'width:12px;height:12px')}</button>`
+    : opts.name ? `<span class="pname">${opts.name}</span>` : '';
+  return `<div class="rh"><span class="rn">${name}</span>${who}${value != null ? `<span class="rv ${opts.cau ? 'cau' : ''}">${value}</span>` : ''}</div>`;
+}
+function cpuCard(d) {
+  const c = d.cpu;
+  const grid = c.open ? `<div class="lp" role="group" aria-label="Logical processors">${c.lp.map((v, i) => `<span class="lpc" role="img" aria-label="Logical processor ${i}, ${Math.round(v * 100)}%"><span style="height:${Math.round(v * 100)}%"></span></span>`).join('')}</div>` : '';
+  const more = `<button class="pick" aria-expanded="${c.open ? 'true' : 'false'}"><span>${c.procs} logical processors</span>${ico(c.open ? 'up' : 'down', 'ico', 'width:12px;height:12px')}</button>`;
+  return `<section class="icard" aria-label="CPU">${head('CPU', c.val)}${graphSvg(c.s, 'CPU, last 4 minutes')}${lines([[c.speed, '>', more]])}${grid}</section>`;
+}
+function memCard(d) {
+  const m = d.mem;
+  return `<section class="icard" aria-label="Memory">${head('Memory', m.val, { cau: m.cau })}${graphSvg(m.s, 'Memory, last 4 minutes')}${lines([[m.inUse, '·', '~Committed', m.committed]])}</section>`;
+}
+function gpuCard(d) {
+  const g = d.gpu;
+  return `<section class="icard" aria-label="GPU">${head('GPU', g.val, g.pick ? { pick: g.name } : { name: g.name })}${graphSvg(g.s, 'GPU load, last 4 minutes')}${lines(g.lines)}</section>`;
+}
+function netCard(d) {
+  const n = d.net;
+  const graph = graphSvg(n.s, 'Network, last 4 minutes', { max: 2, second: n.s2, scale: n.off ? null : n.scale });
+  const row = n.off ? ['~Not connected'] : [swatch(false), '~Receive', n.recv, '|', swatch(true), '~Send', n.send];
+  return `<section class="icard" aria-label="Network">${head('Network', null, n.pick ? { pick: n.name } : { name: n.name })}${graph}${lines([row])}</section>`;
+}
+function batteryCard(b) {
+  return `<section class="icard" aria-label="Battery">${head('Battery', b.val, { cau: b.cau })}${lines([[b.state, '·', b.rate, '·', b.left]])}</section>`;
+}
+function thermalCard(t) {
+  return `<section class="icard" aria-label="Thermal zone">${head('Thermal zone', t.val)}</section>`;
+}
+function disksCard(d) {
+  const rows = d.disks.map((k) => {
+    const vols = k.vols.map((v) => `<div class="vol" role="img" aria-label="${v.l} ${v.free} free of ${v.size}"><span class="vl">${v.l}</span><span class="vb ${v.cau ? 'cau' : ''}"><span style="width:${v.used}%"></span></span><span class="vt ${v.cau ? 'cau' : ''}">${v.free}</span></div>`).join('');
+    return `<div class="dtc">${k.name}</div><div class="dtc">${k.active}</div><div class="dtc">${k.read}</div><div class="dtc">${k.write}</div><div class="dtc">${vols}</div>`;
+  }).join('');
+  return `<section class="icard" aria-label="Disks">
+    <div class="dt"><span class="dth rn">Disks</span><span class="dth">Active time</span><span class="dth">Read speed</span><span class="dth">Write speed</span><span class="dth">Free space</span>${rows}</div></section>`;
+}
+function monitorPage(d) {
+  const left = [cpuCard(d), memCard(d), d.battery ? batteryCard(d.battery) : ''].join('');
+  const right = [d.gpu ? gpuCard(d) : '', netCard(d), d.thermal ? thermalCard(d.thermal) : ''].join('');
+  return `<div class="ipg" style="width:640px"><div class="iph"><span class="ipt">System monitor</span><span class="ic">${d.span || 'Last 4 min'}</span></div>
+    <div class="icols"><div class="icol">${left}</div><div class="icol">${right}</div></div>${disksCard(d)}</div>`;
+}
+function gridPage(o = {}) {
+  const t = (icon, name, stat, extra = {}) => `<button class="tl" aria-label="${name}, ${stat}">${extra.dot ? `<span class="tldot" style="background:${extra.dot}"></span>` : ''}${ico(icon, 'ico20', extra.ico || '')}<span class="tlname">${name}</span><span class="tlstat" style="${extra.stat || ''}">${stat}</span></button>`;
+  const mon = o.alert ? t('activity', 'System monitor', o.alert, { dot: 'var(--cau)', stat: 'color:var(--cau)' }) : t('activity', 'System monitor', o.mon || 'CPU 12%');
+  return `<div class="ipg" style="width:328px"><div class="iph">${gumdrop(22)}<span class="ipt" style="font-size:14px">Chippi</span><span class="ic">2:41 PM</span></div>
+    <div class="igrid">${t('music', 'Now Playing', 'Weekend Mix', { dot: 'var(--acc)', ico: 'color:var(--acc)' })}${t('lines', 'Sound', 'Realtek USB')}${t('sliders', 'App volume', '4 apps')}${t('coffee', 'Keep awake', 'Off')}${t('folder', 'File organizer', 'Silent')}${mon}</div></div>`;
+}
+
+// ---------------------------------------------------------------- sample data
+const lpLoads = (() => { const r = rand(77); return Array.from({ length: 32 }, (_, i) => Math.min(1, (r() * r()) * 0.5 + (i % 7 === 2 ? 0.35 : 0.02))); })();
+const DESK = {
+  cpu: { val: '12%', speed: '4.69 GHz', procs: '32', s: walk(11, { base: 0.1, vol: 0.06, spikes: 0.05, spikeAmp: 0.28, last: 0.12 }), lp: lpLoads },
+  mem: { val: '39%', inUse: '24.1 of 61.7 GiB', committed: '33.6 of 65.6 GiB', s: walk(5, { base: 0.385, vol: 0.006, last: 0.39 }) },
+  gpu: { val: '31%', name: 'NVIDIA GeForce RTX 4080', pick: true, s: walk(23, { base: 0.28, vol: 0.12, spikes: 0.04, spikeAmp: 0.3, last: 0.31 }),
+    lines: [['58 °C', '·', '~Fan', '1,120 RPM', '·', '30%'], ['~Dedicated', '3.4 of 16.0 GiB', '·', '~Shared', '0.2 GiB']] },
+  net: { name: 'Ethernet', pick: false, recv: '1.2 MiB/s', send: '84 KiB/s', scale: '2 MiB/s',
+    s: walk(3, { base: 0.5, vol: 0.35, spikes: 0.06, spikeAmp: 0.9, max: 2, smooth: 2, last: 1.2 }), s2: walk(8, { base: 0.08, vol: 0.04, spikes: 0.03, spikeAmp: 0.2, max: 2, smooth: 2, last: 0.082 }) },
+  disks: [
+    { name: 'Disk 0 (C:)', active: '3%', read: '1.2 MiB/s', write: '640 KiB/s', vols: [{ l: 'C:', used: 67, free: '612 GiB', size: '1.82 TiB' }] },
+    { name: 'Disk 1 (D:)', active: '1%', read: '0 KiB/s', write: '12 KiB/s', vols: [{ l: 'D:', used: 67, free: '1.21 TiB', size: '3.64 TiB' }] },
+    { name: 'Disk 2 (E: F:)', active: '0%', read: '0 KiB/s', write: '0 KiB/s', vols: [{ l: 'E:', used: 83, free: '318 GiB', size: '1.82 TiB' }, { l: 'F:', used: 57, free: '402 GiB', size: '931 GiB' }] },
+    { name: 'Disk 3 (G:)', active: '0%', read: '0 KiB/s', write: '0 KiB/s', vols: [{ l: 'G:', used: 92, free: '38 GiB', size: '476 GiB' }] },
+    { name: 'Disk 4 (H:)', active: '0%', read: '0 KiB/s', write: '0 KiB/s', vols: [{ l: 'H:', used: 22, free: '45.1 GiB', size: '57.8 GiB' }] }
+  ]
+};
+const LAPTOP = {
+  cpu: { val: '18%', speed: '3.81 GHz', procs: '16', s: walk(41, { base: 0.16, vol: 0.08, spikes: 0.05, spikeAmp: 0.3, last: 0.18 }), lp: lpLoads.slice(0, 16) },
+  mem: { val: '61%', inUse: '9.5 of 15.6 GiB', committed: '12.8 of 20.6 GiB', s: walk(42, { base: 0.6, vol: 0.01, last: 0.61 }) },
+  gpu: { val: '9%', name: 'AMD Radeon 780M Graphics', pick: false, s: walk(43, { base: 0.08, vol: 0.06, spikes: 0.05, spikeAmp: 0.2, last: 0.09 }),
+    lines: [['49 °C'], ['~Dedicated', '0.4 of 2.0 GiB', '·', '~Shared', '1.1 GiB']] },
+  net: { name: 'Wi-Fi', pick: true, recv: '310 KiB/s', send: '22 KiB/s', scale: '2 MiB/s',
+    s: walk(44, { base: 0.18, vol: 0.15, spikes: 0.05, spikeAmp: 0.8, max: 2, smooth: 2, last: 0.3 }), s2: walk(45, { base: 0.03, vol: 0.02, max: 2, smooth: 2, last: 0.021 }) },
+  battery: { val: '64%', state: 'On battery', rate: '11.8 W', left: '2 hr 40 min left' },
+  thermal: { val: '51 °C' },
+  disks: [{ name: 'Disk 0 (C:)', active: '2%', read: '220 KiB/s', write: '96 KiB/s', vols: [{ l: 'C:', used: 58, free: '397 GiB', size: '953 GiB' }] }]
+};
+const TROUBLE = JSON.parse(JSON.stringify(DESK));
+TROUBLE.cpu.s = walk(11, { base: 0.1, vol: 0.06, spikes: 0.05, spikeAmp: 0.28, last: 0.14, gap: [58, 74] });
+TROUBLE.cpu.val = '14%';
+TROUBLE.mem = { val: '93%', cau: true, inUse: '57.4 of 61.7 GiB', committed: '71.0 of 76.2 GiB', s: walk(6, { base: 0.86, vol: 0.01, last: 0.93, gap: [58, 74] }) };
+TROUBLE.gpu.s = walk(23, { base: 0.28, vol: 0.12, last: 0.29, gap: [58, 74] });
+TROUBLE.gpu.val = '29%';
+TROUBLE.gpu.lines[0] = ['~Temperature unavailable', '·', '~Fan', '1,120 RPM', '·', '30%'];
+TROUBLE.net = { name: 'Ethernet', off: true, s: walk(3, { base: 0.5, vol: 0.35, max: 2, smooth: 2, gap: [58, 74], endGap: 18 }), s2: walk(8, { base: 0.08, vol: 0.04, max: 2, smooth: 2, gap: [58, 74], endGap: 18 }) };
+TROUBLE.disks[3].vols[0].cau = true;
+
+// ---------------------------------------------------------------- desktop boards
+function desktop(el) {
+  const edge = el.dataset.edge, page = el.dataset.page;
+  const SW = +el.dataset.w || 1440, SH = +el.dataset.h || 900, WORK = SH - 48;
+  el.style.width = SW + 'px';
+  el.style.height = SH + 'px';
+  const content = page === 'grid' ? gridPage() : monitorPage(DESK);
+  const fake = `<div aria-hidden="true" style="position:absolute;inset:0 0 48px 0;display:flex;flex-direction:column">
+    <div class="wbar"><div class="wtab"><span style="width:14px;height:14px;border-radius:7px;background:#9AA5B1"></span><span class="blk" style="width:120px;height:8px;border-radius:4px"></span></div><div style="flex:1"></div>
+    <div style="display:flex;align-self:stretch"><span class="wctl"><svg width="10" height="10" viewBox="0 0 10 10" style="fill:none;stroke:currentColor"><path d="M0 5.5H10"></path></svg></span><span class="wctl"><svg width="10" height="10" viewBox="0 0 10 10" style="fill:none;stroke:currentColor"><rect x="0.5" y="0.5" width="9" height="9" rx="1"></rect></svg></span><span class="wctl"><svg width="10" height="10" viewBox="0 0 10 10" style="fill:none;stroke:currentColor"><path d="M0.5 0.5L9.5 9.5M9.5 0.5L0.5 9.5"></path></svg></span></div></div>
+    <div style="flex:1;display:flex;gap:48px;padding:64px 140px"><div style="flex:1;display:flex;flex-direction:column;gap:14px"><span class="blk" style="width:60%;height:22px"></span><span class="blk" style="height:10px"></span><span class="blk" style="width:94%;height:10px"></span><span class="blk" style="width:70%;height:10px"></span><span class="blk2" style="height:300px;margin-top:10px"></span><span class="blk" style="width:96%;height:10px"></span><span class="blk" style="width:88%;height:10px"></span></div>
+    <div style="width:300px;display:flex;flex-direction:column;gap:12px"><span class="blk2" style="height:180px"></span><span class="blk" style="height:10px"></span><span class="blk" style="width:80%;height:10px"></span></div></div></div>`;
+  const tray = `<div class="tb"><div style="flex:1"></div><div aria-hidden="true" style="display:flex;gap:8px"><span class="tapp" style="background:var(--acc);opacity:.85"></span><span class="tapp"></span><span class="tapp"></span><span class="tapp"></span><span class="tapp"></span></div>
+    <div style="flex:1;display:flex;justify-content:flex-end;align-items:center"><span style="width:32px;display:flex;justify-content:center;opacity:.85">${ico('up', 'ico', 'width:14px;height:14px')}</span>
+    <button class="trayb ${edge === 'dock' ? 'trayon' : ''}" aria-label="Chippi">${gumdrop(18)}</button>
+    <span aria-hidden="true" style="display:flex;align-items:center;gap:10px;height:40px;padding:0 10px;opacity:.9">${ico('wifi', 'ico', 'width:15px;height:15px')}${ico('vol', 'ico', 'width:15px;height:15px')}</span>
+    <div aria-hidden="true" style="display:flex;flex-direction:column;align-items:flex-end;width:76px;font-size:11px;line-height:14px;font-variant-numeric:tabular-nums"><span>2:41 PM</span><span>10/26/2026</span></div></div></div>`;
+  let island = '';
+  if (edge === 'dock') {
+    island = `<div class="dock" role="dialog" aria-label="Chippi">${content}<div class="dfoot"><button class="fbtn">${ico('grid')}All features</button><button class="fbtn">${ico('gear')}Settings</button></div></div>`;
+  } else {
+    island = `<div class="isl ${edge}" role="dialog" aria-label="Chippi island">${content}</div>`;
+  }
+  el.innerHTML = fake + island + tray;
+  if (edge === 'dock') return;
+
+  // Round buttons (DESIGN.md §5, one rule on every edge): two pairs 12px off the shape, each pair centered on it.
+  const isl = el.querySelector('.isl');
+  const W = isl.offsetWidth, H = isl.offsetHeight;
+  const onGrid = page === 'grid';
+  const btn = (x, y, icon, label, on) => `<button class="sat ${on ? 'saton' : ''}" style="left:${x}px;top:${y}px" aria-label="${label}">${icon}</button>`;
+  const first = onGrid ? ico('back') : ico('grid');
+  const firstLabel = onGrid ? 'Back to System monitor' : 'All features';
+  let html = '';
+  if (edge === 'top') {
+    const left = SW / 2 - W / 2, cy = Math.max(8, H / 2 - 44);
+    html = btn(left - 52, cy, first, firstLabel) + btn(left - 52, cy + 48, ico('coffee'), 'Keep awake')
+      + btn(left + W + 12, cy, ico('gear'), 'Settings') + btn(left + W + 12, cy + 48, ico('sliders'), 'App volume')
+      + btn(SW / 2 - 20, H + 12, ico('music'), 'Now Playing');
+  } else {
+    const tabY = Math.round(WORK * 0.48);
+    const top = Math.round(Math.min(Math.max(tabY - H / 2, 60), WORK - H - 60));
+    isl.style.top = top + 'px';
+    const cx = SW - W / 2;
+    html = btn(cx - 44, top - 52, first, firstLabel) + btn(cx + 4, top - 52, ico('coffee'), 'Keep awake')
+      + btn(cx - 44, top + H + 12, ico('gear'), 'Settings') + btn(cx + 4, top + H + 12, ico('sliders'), 'App volume')
+      + btn(SW - W - 52, top + H / 2 - 20, ico('music'), 'Now Playing');
+  }
+  el.insertAdjacentHTML('beforeend', html);
+}
+
+// ---------------------------------------------------------------- states gallery
+function gallery() {
+  const g = document.getElementById('gallery');
+  const lpOpen = JSON.parse(JSON.stringify(DESK));
+  lpOpen.cpu.open = true;
+  g.innerHTML = `
+  <div class="galc"><span class="galt">A laptop</span><span class="galn">Battery joins the left column and Thermal zone the right. One GPU: its name, no picker, and no fan reading because the driver reports none. Two adapters: a picker.</span>
+    <div class="ground">${monitorPage(LAPTOP)}</div></div>
+  <div class="galc"><span class="galt">After sleep, a failed read and an alert</span><span class="galn">Every graph has a gap where the PC slept. GPU temperature failed to read: a status, not 0. Ethernet is unplugged. Memory is past its alert threshold and G: past the low disk space one, so their numbers show in Caution; the graph keeps the accent.</span>
+    <div class="ground">${monitorPage(TROUBLE)}</div></div>
+  <div class="galc" style="width:520px"><span class="galt">Logical processors open</span><span class="galn">One cell per logical processor, filled to its load. Sampled only while open.</span>
+    <div class="ground" style="width:326px;padding:12px">${cpuCard(lpOpen)}</div>
+    <span class="galt" style="margin-top:28px">The tile and the tab during an alert</span><span class="galn">The tile shows the alert's reading in Caution with the Caution dot, like Mic muted on Sound. The closed tab adds the System monitor glyph in Caution.</span>
+    <div class="ground" style="width:330px">${gridPage({ alert: 'Memory 93%' })}</div>
+    <div style="position:relative;height:56px;margin-top:8px;background:#1C1C1C;border-radius:8px;overflow:hidden">
+      <div class="tab top" style="left:50%;margin-left:-60px;width:120px;height:32px;border-radius:0 0 32px 32px">${gumdrop(22)}${ico('activity', 'ico14', 'color:var(--cau)')}</div></div>
+    <span class="galt" style="margin-top:28px">The Windows notification</span><span class="galn">One per alert, what happened first. A click opens the System monitor page.</span>
+    <div class="toast"><div class="toasth">${gumdrop(16)}<span style="flex:1">Chippi</span>${ico('more', 'ico', 'width:14px;height:14px')}${ico('x', 'ico', 'width:14px;height:14px')}</div><div class="toastt">Memory in use 93%</div></div>
+  </div>`;
+}
+
+// ---------------------------------------------------------------- Settings
+function settings(el, o) {
+  const nav = (icon, name, on) => `<div class="sni ${on ? 'on' : ''}">${on ? '<span class="pill"></span>' : ''}${ico(icon)}${name}</div>`;
+  const sw = (on, dis) => `<span class="onoff" style="${dis ? 'opacity:.45' : ''}">${on ? 'On' : 'Off'}</span><button class="tog ${on ? 'on' : ''}" role="switch" aria-checked="${on}" ${dis ? 'disabled' : ''}><i></i></button>`;
+  const row = (label, ctl, cls = '') => `<div class="srow ${cls}"><span class="lab">${label}</span><span class="ctl">${ctl}</span></div>`;
+  const combo = (v) => `<button class="combo"><span>${v}</span>${ico('down', 'ico', 'width:14px;height:14px')}</button>`;
+  const slider = (pct, text) => `<span class="sld" aria-hidden="true"><b style="width:${pct}%"></b><s style="left:${pct}%"></s></span><span class="val">${text}</span>`;
+  const field = (v) => `<span class="fld ${v ? '' : 'ph'}">${v || 'Not set'}</span><span class="unit">°C</span>`;
+  // Threshold sliders map their range onto the 200px track.
+  const at = (v, lo, hi) => Math.round((v - lo) / (hi - lo) * 100);
+  // A threshold dims while its alert is off; GPU limits stay editable, since the alert needs one before it can be turned on.
+  const alert = (label, on, sub, dis, keepLive) => row(label, sw(on, dis)) + sub.map(([l, c]) => row(l, c, 'sub' + (on || keepLive ? '' : ' dim'))).join('');
+  const reads = ['CPU', 'Memory', 'GPU', 'Network', 'Disks'].concat(o.laptop ? ['Battery', 'Thermal zone'] : []);
+  const gpus = o.laptop ? [['Radeon 780M', null]] : [['RTX 4080', '83'], ['Radeon', null]];
+  el.innerHTML = `<div class="set ${o.light ? 'lt' : ''}" style="height:${o.h}px">
+    <div class="stbar">${gumdrop(16)}<span class="grow">Chippi Settings</span>
+      <button class="wb" aria-label="Minimize"><svg width="10" height="10" viewBox="0 0 10 10" style="fill:none;stroke:currentColor"><path d="M0 5.5H10"></path></svg></button><button class="wb" aria-label="Maximize"><svg width="10" height="10" viewBox="0 0 10 10" style="fill:none;stroke:currentColor"><rect x="0.5" y="0.5" width="9" height="9" rx="1"></rect></svg></button><button class="wb" aria-label="Close"><svg width="10" height="10" viewBox="0 0 10 10" style="fill:none;stroke:currentColor"><path d="M0.5 0.5L9.5 9.5M9.5 0.5L0.5 9.5"></path></svg></button></div>
+    <div class="sbody">
+      <nav class="snav" aria-label="Settings"><div class="ssearch">${ico('search')}Find a setting</div>
+        <div class="sgrp">Files</div>${nav('folder', 'File organizer')}
+        <div class="sgrp">Sound</div>${nav('speaker', 'Output')}${nav('mic', 'Microphone')}${nav('sliders', 'App volume')}
+        <div class="sgrp">System</div>${nav('coffee', 'Keep awake')}${nav('activity', 'System monitor', true)}
+        <div class="sgrp">Chippi</div>${nav('gear', 'General')}${nav('drop', 'Island &amp; pet')}${nav('bell', 'Notifications')}${nav('plus', 'Add features')}${nav('info', 'About')}
+      </nav>
+      <main class="smain">
+        <h1 class="stitle">System monitor</h1>
+        <div class="scard">${row('Update speed', combo('2 seconds'))}${row('Tile status', combo('CPU'))}</div>
+        <h2 class="ssec">Readings</h2>
+        <div class="scard">${reads.map((r) => row(r, sw(true))).join('')}</div>
+        <h2 class="ssec">Units</h2>
+        <div class="scard">${row('Temperature', combo('Celsius'))}${row('Network speed', combo('Bytes per second'))}</div>
+        <h2 class="ssec">Alerts</h2>
+        <div class="scard">
+          ${alert('CPU load', o.cpuOn, [['Threshold', slider(at(90, 50, 100), '90%')]])}
+          ${alert('Memory in use', false, [['Threshold', slider(at(90, 50, 100), '90%')]])}
+          ${alert('Low disk space', false, [['Threshold', slider(at(10, 5, 30), '10% free')]])}
+          ${o.laptop ? alert('Low battery', true, [['Threshold', slider(at(15, 5, 50), '15%')]]) : ''}
+          ${alert('GPU temperature', o.gpuOn, gpus.map(([n, v]) => [n, field(v)]), !gpus.some(([, v]) => v), true)}
+          ${row('Repeat interval', combo('15 minutes'))}
+        </div>
+      </main>
+    </div></div>`;
+}
+
+// ---------------------------------------------------------------- build
+document.querySelectorAll('.desk').forEach(desktop);
+gallery();
+settings(document.getElementById('settings-dark'), { h: 1236, cpuOn: true, gpuOn: true });
+settings(document.getElementById('settings-light'), { h: 1380, light: true, laptop: true, cpuOn: false, gpuOn: false });
+
+// ?board=<id> shows one board alone, at its own size, for the PNG export.
+const only = new URLSearchParams(location.search).get('board');
+if (only) {
+  document.body.classList.add('solo');
+  document.querySelectorAll('.doc-board').forEach((b) => b.classList.toggle('off', b.id !== 'b-' + only));
+  const shown = document.querySelector('.doc-board:not(.off) .board');
+  document.body.dataset.size = Math.ceil(shown.offsetWidth) + ',' + Math.ceil(shown.offsetHeight); // read by render.ps1
+}
+</script>
+</body>
+</html>
