@@ -17,6 +17,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Chippi.Features.Clipboard.Tests" />
+    <Using Include="System.IO" />
   </ItemGroup>
 
 </Project>

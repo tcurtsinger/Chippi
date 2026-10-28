@@ -14,7 +14,6 @@
     <Using Include="Xunit" />
     <Using Include="System.IO" />
     <Compile Include="../Chippi.Island.Tests/WpfTestThread.cs" Link="WpfTestThread.cs" />
-    <Compile Include="../Chippi.Clipboard.Tests/Fakes/*.cs" Link="Fakes/%(Filename)%(Extension)" />
     <ProjectReference Include="../../src/Features/Chippi.Features.Clipboard/Chippi.Features.Clipboard.csproj" />
   </ItemGroup>
 </Project>
