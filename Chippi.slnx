@@ -5,6 +5,7 @@
     <Project Path="src/Chippi.Clipboard/Chippi.Clipboard.csproj" />
     <Project Path="src/Chippi.Core/Chippi.Core.csproj" />
     <Project Path="src/Chippi.Rules/Chippi.Rules.csproj" />
+    <Project Path="src/Chippi.UrlCleaning/Chippi.UrlCleaning.csproj" />
     <Project Path="src/Chippi.UI/Chippi.UI.csproj" />
   </Folder>
   <Folder Name="/src/Features/">
@@ -24,6 +25,7 @@
     <Project Path="tests/Chippi.Island.Tests/Chippi.Island.Tests.csproj" />
     <Project Path="tests/Chippi.Notifications.Tests/Chippi.Notifications.Tests.csproj" />
     <Project Path="tests/Chippi.Rules.Tests/Chippi.Rules.Tests.csproj" />
+    <Project Path="tests/Chippi.UrlCleaning.Tests/Chippi.UrlCleaning.Tests.csproj" />
     <Project Path="tests/Chippi.UiSmoke/Chippi.UiSmoke.csproj" />
     <Project Path="tests/Chippi.SoundSmoke/Chippi.SoundSmoke.csproj" />
   </Folder>

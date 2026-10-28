@@ -66,7 +66,13 @@ public sealed class ClipboardHub : IClipboardHub, IDisposable
     {
         try
         {
-            return await _clipboard.TransactAsync(session => Read(session, out _), cancel).ConfigureAwait(false);
+            return await _clipboard.TransactAsync(session =>
+            {
+                uint seen = session.Sequence;
+                var read = Read(session, out _);
+                // A delayed-render read runs code in the source app: drop the read if the copy moved meanwhile.
+                return session.Sequence == seen ? read : new ClipRead(ClipStatus.Busy);
+            }, cancel).ConfigureAwait(false);
         }
         catch (ClipboardBusyException)
         {
@@ -78,13 +84,13 @@ public sealed class ClipboardHub : IClipboardHub, IDisposable
     {
         try
         {
-            await _clipboard.TransactAsync(session =>
+            var (_, written) = await _clipboard.WriteAsync(session =>
             {
                 session.Empty();
                 Put(session, content);
                 return true;
             }, cancel).ConfigureAwait(false);
-            MarkOwn();
+            MarkOwn(written);
             return ClipStatus.Ok;
         }
         catch (ClipboardBusyException)
@@ -96,11 +102,11 @@ public sealed class ClipboardHub : IClipboardHub, IDisposable
     public PasteTarget? CaptureTarget() => _foreground.Current();
 
     public Task<PasteOutcome> PasteAsync(ClipContent content, PasteTarget target, CancellationToken cancel = default) =>
-        PasteCoreAsync(_ => content, target, cancel);
+        PasteCoreAsync(_ => content, ofCopy: false, target, cancel);
 
     public Task<PasteOutcome> PastePlainTextAsync(CancellationToken cancel = default) =>
         _foreground.Current() is { } target
-            ? PasteCoreAsync(saved => saved.Text is { } text ? ClipContent.FromText(text) : null, target, cancel)
+            ? PasteCoreAsync(saved => saved.Text is { } text ? ClipContent.FromText(text) : null, ofCopy: true, target, cancel)
             : PlainWithoutTargetAsync(cancel);
 
     public void Beep() => _foreground.Beep();
@@ -273,11 +279,14 @@ public sealed class ClipboardHub : IClipboardHub, IDisposable
             session.Set(ClipFormat.UnicodeText, ClipCodec.EncodeText(content.Text));
     }
 
-    private void MarkOwn()
+    /// <summary>Takes the sequence number the clipboard reported for the write, never one sampled later: another copy can land meanwhile.</summary>
+    private void MarkOwn(uint sequence)
     {
+        if (sequence == 0)
+            return;
         lock (_gate)
         {
-            _own.Enqueue(_clipboard.Sequence);
+            _own.Enqueue(sequence);
             while (_own.Count > 8)
                 _own.Dequeue();
         }
@@ -285,35 +294,48 @@ public sealed class ClipboardHub : IClipboardHub, IDisposable
 
     // ---- Pasting ----
 
-    /// <summary>The previous copy, kept to put back: every plain-memory format, its privacy markers included.</summary>
-    private sealed record Saved(IReadOnlyList<(string Format, byte[] Data)> Formats, string? Text, bool Private);
+    /// <summary>What a copy tells other clipboard managers; a plain-text copy of it says the same.</summary>
+    private static readonly string[] Markers = [ClipFormat.Exclude, ClipFormat.ViewerIgnore, ClipFormat.History, ClipFormat.Cloud];
+
+    private static readonly (string, byte[])[] Excluded = [(ClipFormat.Exclude, ClipCodec.Dword(0))];
+
+    /// <summary>The previous copy, kept to put back: every plain-memory format, its markers included.</summary>
+    private sealed record Saved(IReadOnlyList<(string Format, byte[] Data)> Formats, string? Text, IReadOnlyList<(string Format, byte[] Data)> Markers);
 
     private static Saved Save(IClipboardSession session)
     {
-        bool isPrivate = session.IsAvailable(ClipFormat.Exclude) || session.IsAvailable(ClipFormat.ViewerIgnore);
         var formats = new List<(string, byte[])>();
         foreach (var format in session.Formats())
             if (session.Get(format) is { } data)
                 formats.Add((format, data));
+        var markers = new List<(string, byte[])>();
+        foreach (var marker in Markers)
+            if (session.IsAvailable(marker))
+                markers.Add((marker, session.Get(marker) ?? ClipCodec.Dword(0)));
         string? text = null;
         if (session.IsAvailable(ClipFormat.UnicodeText) && session.SizeOf(ClipFormat.UnicodeText) <= ClipLimits.TextRawBytes)
             text = ClipCodec.DecodeText(session.Get(ClipFormat.UnicodeText) ?? [], out _);
-        return new Saved(formats, string.IsNullOrEmpty(text) ? null : text, isPrivate);
+        return new Saved(formats, string.IsNullOrEmpty(text) ? null : text, markers);
     }
 
-    /// <summary>Plain paste with nothing in front: the plain text becomes the copy.</summary>
+    /// <summary>Plain paste with nothing in front: the plain text, alone, becomes the copy.</summary>
     private async Task<PasteOutcome> PlainWithoutTargetAsync(CancellationToken cancel)
     {
         try
         {
-            return await _clipboard.TransactAsync(session =>
+            var (wrote, sequence) = await _clipboard.WriteAsync(session =>
             {
                 var saved = Save(session);
                 if (saved.Text is null)
-                    return PasteOutcome.NoText;
-                PutPlain(session, saved.Text, saved.Private, delayed: null);
-                return PasteOutcome.Copied;
+                    return false;
+                session.Empty();
+                PutPlain(session, saved.Text, saved.Markers, delayed: null);
+                return true;
             }, cancel).ConfigureAwait(false);
+            if (!wrote)
+                return PasteOutcome.NoText;
+            MarkOwn(sequence);
+            return PasteOutcome.Copied;
         }
         catch (ClipboardBusyException)
         {
@@ -321,7 +343,8 @@ public sealed class ClipboardHub : IClipboardHub, IDisposable
         }
     }
 
-    private async Task<PasteOutcome> PasteCoreAsync(Func<Saved, ClipContent?> choose, PasteTarget target, CancellationToken cancel)
+    /// <param name="ofCopy">The content is the current copy converted (plain paste), so it keeps that copy's markers.</param>
+    private async Task<PasteOutcome> PasteCoreAsync(Func<Saved, ClipContent?> choose, bool ofCopy, PasteTarget target, CancellationToken cancel)
     {
         await _pasting.WaitAsync(cancel).ConfigureAwait(false);
         try
@@ -330,32 +353,30 @@ public sealed class ClipboardHub : IClipboardHub, IDisposable
             bool canSend = _foreground.IsAlive(target) && _foreground.CanSendInput(target);
             Saved saved;
             ClipContent? content;
+            uint ours;
+            IReadOnlyList<(string, byte[])> markers = [];
             try
             {
-                (saved, content) = await _clipboard.TransactAsync(session =>
+                ((saved, content), ours) = await _clipboard.WriteAsync(session =>
                 {
                     var previous = Save(session);
                     var chosen = choose(previous);
                     if (chosen is null || chosen.IsEmpty)
                         return (previous, (ClipContent?)null);
+                    if (ofCopy)
+                        markers = previous.Markers;
                     session.Empty();
-                    // Not sending keys: the content simply becomes the copy, keeping a private copy private.
+                    // Not sending keys: the content simply becomes the copy, with the markers it had.
                     if (!canSend)
                     {
-                        if (chosen.Text is { } plain && chosen.Files is null && chosen.Image is null)
-                            PutPlain(session, plain, previous.Private, delayed: null);
-                        else
-                            Put(session, chosen);
+                        Put(session, chosen, markers);
                         return (previous, chosen);
                     }
                     // Marked so no clipboard manager (Chippi's own listener included) records the temporary copy.
-                    if (chosen.Text is { } text && chosen.Files is null && chosen.Image is null)
-                        PutPlain(session, text, isPrivate: true, delayed: () => requested.TrySetResult());
+                    if (IsText(chosen))
+                        PutPlain(session, chosen.Text!, [.. markers, .. Excluded], delayed: () => requested.TrySetResult());
                     else
-                    {
-                        Put(session, chosen);
-                        session.Set(ClipFormat.Exclude, ClipCodec.Dword(0));
-                    }
+                        Put(session, chosen, [.. markers, .. Excluded]);
                     return (previous, chosen);
                 }, cancel).ConfigureAwait(false);
             }
@@ -365,14 +386,13 @@ public sealed class ClipboardHub : IClipboardHub, IDisposable
             }
             if (content is null)
                 return PasteOutcome.NoText;
-            MarkOwn();
-            uint ours = _clipboard.Sequence;
+            MarkOwn(ours);
             if (!canSend)
                 return PasteOutcome.Copied;
             if (!await _foreground.BringToFrontAsync(target, FrontTimeout, cancel).ConfigureAwait(false))
             {
-                // The target is gone or wouldn't come forward: leave the content as the copy, unmarked.
-                await LeaveAsCopyAsync(content, ours, saved.Private, cancel).ConfigureAwait(false);
+                // The target is gone or wouldn't come forward: leave the content as the copy, without the temporary marker.
+                await LeaveAsCopyAsync(content, ours, markers, cancel).ConfigureAwait(false);
                 return PasteOutcome.Copied;
             }
             await _foreground.WaitForModifiersReleasedAsync(ModifiersTimeout, cancel).ConfigureAwait(false);
@@ -391,32 +411,43 @@ public sealed class ClipboardHub : IClipboardHub, IDisposable
         }
     }
 
-    private static void PutPlain(IClipboardSession session, string text, bool isPrivate, Action? delayed)
+    private static bool IsText(ClipContent content) => content.Text is not null && content.Files is null && content.Image is null;
+
+    private static void Put(IClipboardSession session, ClipContent content, IReadOnlyList<(string Format, byte[] Data)> markers)
+    {
+        if (IsText(content))
+            PutPlain(session, content.Text!, markers, delayed: null);
+        else
+        {
+            Put(session, content);
+            foreach (var (format, data) in markers)
+                session.Set(format, data);
+        }
+    }
+
+    private static void PutPlain(IClipboardSession session, string text, IReadOnlyList<(string Format, byte[] Data)> markers, Action? delayed)
     {
         if (delayed is null)
             session.Set(ClipFormat.UnicodeText, ClipCodec.EncodeText(text));
         else
             session.SetDelayed(ClipFormat.UnicodeText, () => ClipCodec.EncodeText(text), delayed);
-        if (isPrivate)
-            session.Set(ClipFormat.Exclude, ClipCodec.Dword(0));
+        foreach (var (format, data) in markers)
+            session.Set(format, data);
     }
 
-    private async Task LeaveAsCopyAsync(ClipContent content, uint ours, bool isPrivate, CancellationToken cancel)
+    private async Task LeaveAsCopyAsync(ClipContent content, uint ours, IReadOnlyList<(string, byte[])> markers, CancellationToken cancel)
     {
         try
         {
-            await _clipboard.TransactAsync(session =>
+            var (_, written) = await _clipboard.WriteAsync(session =>
             {
                 if (session.Sequence != ours)
                     return false;
                 session.Empty();
-                if (content.Text is { } text && content.Files is null && content.Image is null)
-                    PutPlain(session, text, isPrivate, delayed: null);
-                else
-                    Put(session, content);
+                Put(session, content, markers);
                 return true;
             }, cancel).ConfigureAwait(false);
-            MarkOwn();
+            MarkOwn(written);
         }
         catch (ClipboardBusyException)
         {
@@ -429,7 +460,7 @@ public sealed class ClipboardHub : IClipboardHub, IDisposable
     {
         try
         {
-            bool restored = await _clipboard.TransactAsync(session =>
+            var (_, written) = await _clipboard.WriteAsync(session =>
             {
                 if (session.Sequence != ours)
                     return false;
@@ -438,8 +469,7 @@ public sealed class ClipboardHub : IClipboardHub, IDisposable
                     session.Set(format, data);
                 return true;
             }, cancel).ConfigureAwait(false);
-            if (restored)
-                MarkOwn();
+            MarkOwn(written);
         }
         catch (ClipboardBusyException)
         {
