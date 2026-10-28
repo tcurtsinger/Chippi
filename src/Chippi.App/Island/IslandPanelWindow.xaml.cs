@@ -355,7 +355,12 @@ public partial class IslandPanelWindow : Window
         if (key == NowPlayingKey && _media is not null)
             page.Children.Add(_nowPlaying ??= new NowPlayingView(_media));
         else
-            page.Children.Add(PageHeader(key));
+        {
+            // Construct sections first: a module may expose its header and focus through its view.
+            foreach (var part in Group(key)?.Parts ?? []) _ = View(part);
+            var factory = Group(key)?.Parts.Select(p => p.Spec.CreateHeader).FirstOrDefault(f => f is not null);
+            page.Children.Add(factory?.Invoke() as FrameworkElement ?? PageHeader(key));
+        }
         var parts = Group(key)?.Parts ?? [];
         var columns = parts.GroupBy(p => p.Spec.Column).ToList(); // parts are in section order, so columns are too
         if (columns.Any(c => c.Key is not null))
@@ -634,7 +639,10 @@ public partial class IslandPanelWindow : Window
         if (_page is null)
             _grid.Buttons().FirstOrDefault()?.Focus();
         else
-            Card.MoveFocus(new TraversalRequest(FocusNavigationDirection.First));
+        {
+            var focus = Group(_page)?.Parts.Select(p => p.Spec.InitialFocus?.Invoke()).OfType<UIElement>().FirstOrDefault();
+            if (focus?.Focus() != true) Card.MoveFocus(new TraversalRequest(FocusNavigationDirection.First));
+        }
     }
 
     // ----- Placement and the morph -----

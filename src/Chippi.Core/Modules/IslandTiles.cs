@@ -43,6 +43,12 @@ public sealed record IslandTileSpec(string Key, string Name, string Icon, int Or
 
     /// <summary>The page's header repeats the tile's status, for a page whose controls don't show it (Keep awake's time left).</summary>
     public bool StatusOnPage { get; init; }
+
+    /// <summary>Optional page-owned header. The first header on a shared page replaces the shell header.</summary>
+    public Func<object>? CreateHeader { get; init; }
+
+    /// <summary>The page control to focus after taking the keyboard, never during hover or a drag.</summary>
+    public Func<object?>? InitialFocus { get; init; }
 }
 
 /// <summary>A module's handle on its island tile.</summary>

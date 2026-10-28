@@ -328,7 +328,7 @@ public partial class IslandWindow : Window
     }
 
     // A lambda: CloseIsland's optional parameter turns a method group into Action<bool>, which throws.
-    internal void Escape() => Dispatcher.BeginInvoke(() => CloseIsland());
+    internal void Escape() { if (!_openHolds.IsHeld) Dispatcher.BeginInvoke(() => CloseIsland()); }
 
     /// <summary>
     /// A click anywhere off the island closes it. It never activates, so it can't lose focus to see
@@ -438,6 +438,7 @@ public partial class IslandWindow : Window
     /// <summary>Shrinks the island back into the tab; <paramref name="immediate"/> hides it at once.</summary>
     private void CloseIsland(bool immediate = false)
     {
+        if (!immediate && _openHolds.IsHeld) return;
         _escapeHook?.Dispose(); // unhooks
         _escapeHook = null;
         _clickHook?.Dispose();
@@ -447,6 +448,9 @@ public partial class IslandWindow : Window
         _panel.CloseIsland(immediate);
         RefreshTab();
     }
+
+    private readonly Chippi.Core.Modules.IslandOpenHold _openHolds = new();
+    internal IDisposable HoldIslandOpen() => _openHolds.Hold();
 
     internal bool IsIslandOpen => _panel.IsOpen;
 

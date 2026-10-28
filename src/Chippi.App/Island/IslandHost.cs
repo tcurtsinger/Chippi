@@ -60,6 +60,7 @@ public sealed class IslandHost : IDisposable
         _window.LastPageChanged += (_, key) => UpdateSettings(s => s.IslandLastPage = key);
         // The tray icon and a second launch open these same pages: in the island, or docked by the tray.
         _window.TrayIconRect = () => _shell.Commands.TrayAnchor()?.Icon;
+        _shell.Commands.RegisterIslandHold(_window.HoldIslandOpen);
         _shell.Commands.RegisterPages(
             keyboard => _window.TogglePages(_shell.Commands.TrayAnchor(), keyboard),
             () => _window.ShowPages(_shell.Commands.TrayAnchor(), keyboard: true),
