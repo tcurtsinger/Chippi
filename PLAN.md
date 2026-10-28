@@ -96,7 +96,7 @@ Brief: [docs/phase-4-handoff.md](docs/phase-4-handoff.md). Approved 2026-10-26.
 CPU, GPU, memory, battery, network, disk activity and available GPU/thermal-zone temperatures, with opt-in alerts in the island and docked pages. CPU/board sensors and fan control are deferred to Hardware sensors.
 
 ### Phase 5: Clipboard and everyday tools
-Design: [docs/phase-5/design/notes.md](docs/phase-5/design/notes.md). Approved 2026-10-28.
+Brief: [docs/phase-5-handoff.md](docs/phase-5-handoff.md). Design: [docs/phase-5/design/notes.md](docs/phase-5/design/notes.md). Approved 2026-10-28.
 Clipboard history, paste as plain text, clean URL, scratchpad and shelf, on three island tiles: Clipboard, Scratchpad and Shelf.
 
 ### Phase 5.5: Everyday tools, continued
