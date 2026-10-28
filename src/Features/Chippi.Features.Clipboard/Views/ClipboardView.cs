@@ -39,6 +39,7 @@ internal sealed class ClipboardView : UserControl
     private readonly StackPanel _history = new();
     private readonly CleanUrlView _clean;
     private readonly Dictionary<long, (byte[] Png, BitmapSource Image)> _thumbnails = []; // by row, checked against its bytes: ids come back after a delete
+    private readonly Dictionary<long, (string Path, BitmapSource? Image)> _fileThumbnails = []; // the same, checked against the path; null while reading or unreadable
     private readonly DispatcherTimer _clock = new() { Interval = TimeSpan.FromSeconds(30) };
     private List<HistoryEntry> _shown = [];
     private long? _selected;
@@ -98,8 +99,15 @@ internal sealed class ClipboardView : UserControl
             Detach();
             _clock.Stop();
             _thumbnails.Clear(); // no picture stays in memory while the page is closed
+            _fileThumbnails.Clear();
         };
     }
+
+    /// <summary>Where image files' pictures come from (tests use fakes).</summary>
+    internal FileThumbnails Files { get; set; } = FileThumbnails.Disk;
+
+    /// <summary>The latest image file read (tests wait on it).</summary>
+    internal Task Reading { get; private set; } = Task.CompletedTask;
 
     /// <summary>The page's header: its name, "Paused", then Clean URL, Pause and More (notes #8, #10).</summary>
     public DockPanel Header { get; }
@@ -197,6 +205,8 @@ internal sealed class ClipboardView : UserControl
         var entries = history?.Entries ?? [];
         foreach (var gone in _thumbnails.Keys.Where(id => !entries.Any(e => e.Id == id)).ToList())
             _thumbnails.Remove(gone);
+        foreach (var gone in _fileThumbnails.Keys.Where(id => !entries.Any(e => e.Id == id)).ToList())
+            _fileThumbnails.Remove(gone);
         _history.Visibility = !_cleaning && (recording || entries.Count > 0) ? Visibility.Visible : Visibility.Collapsed;
         if (_history.Visibility != Visibility.Visible)
             return;
@@ -280,7 +290,7 @@ internal sealed class ClipboardView : UserControl
 
     private FrameworkElement Kind(HistoryEntry entry)
     {
-        if (entry.Kind == EntryKind.Picture && Thumbnail(entry) is { } thumbnail)
+        if ((entry.Kind == EntryKind.Picture ? Thumbnail(entry) : HistoryFiles.Missing(entry) == 0 ? FileThumbnail(entry) : null) is { } thumbnail)
             return new Image { Source = thumbnail, Width = 32, Height = 20, Stretch = Stretch.UniformToFill, VerticalAlignment = VerticalAlignment.Center };
         var glyph = entry.Kind switch
         {
@@ -309,6 +319,31 @@ internal sealed class ClipboardView : UserControl
         {
             return null;
         }
+    }
+
+    /// <summary>
+    /// The picture of a row that is one image file, read off the UI thread; null until it's read, or when
+    /// it's online-only, gone or not a picture. The row stays a file row.
+    /// </summary>
+    internal BitmapSource? FileThumbnail(HistoryEntry entry)
+    {
+        if (FileThumbnails.Picture(entry) is not { } path)
+            return null;
+        if (_fileThumbnails.TryGetValue(entry.Id, out var cached) && cached.Path == path)
+            return cached.Image;
+        _fileThumbnails[entry.Id] = (path, null);
+        var files = Files;
+        long id = entry.Id;
+        Reading = Task.Run(() => files.Read(path)).ContinueWith(read => Dispatcher.BeginInvoke(() =>
+        {
+            // The row may have gone, or its id gone to another copy, while the file was read.
+            if (read.Result is not { } image || !_fileThumbnails.TryGetValue(id, out var waiting) || waiting.Path != path)
+                return;
+            _fileThumbnails[id] = (path, image);
+            if (_shown.Any(e => e.Id == id))
+                Refresh(keepScroll: true);
+        }), TaskScheduler.Default);
+        return null;
     }
 
     /// <summary>Up to 4 lines of text, the picture 208 wide, or the files with their sizes (notes #9, #12).</summary>
