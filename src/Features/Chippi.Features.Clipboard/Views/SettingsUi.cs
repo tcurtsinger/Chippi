@@ -5,6 +5,8 @@ using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Documents;
+using System.Windows.Input;
 using Chippi.UI.Controls;
 
 namespace Chippi.Features.Clipboard.Views;
@@ -24,6 +26,43 @@ internal static class SettingsUi
         var button = new Button { Content = text, VerticalAlignment = VerticalAlignment.Center };
         button.SetResourceReference(FrameworkElement.StyleProperty, style);
         return button;
+    }
+
+    /// <summary>The theme-aware Settings menu, as on the Sound pages. Created closed for windowless checks.</summary>
+    public static Popup Menu(FrameworkElement anchor, params (string Text, bool Enabled, Action Click)[] items)
+    {
+        var stack = new StackPanel();
+        var border = new Border { Child = stack, Padding = new Thickness(4), CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(1) };
+        border.SetResourceReference(Border.BackgroundProperty, "FlyoutBrush");
+        border.SetResourceReference(Border.BorderBrushProperty, "BorderBrush");
+        border.SetResourceReference(TextElement.ForegroundProperty, "TextPrimaryBrush");
+        border.SetResourceReference(TextElement.FontFamilyProperty, "UiFont");
+        border.SetValue(TextElement.FontSizeProperty, 14d);
+        var popup = new Popup { Child = border, PlacementTarget = anchor, Placement = PlacementMode.Bottom, StaysOpen = false, AllowsTransparency = true };
+        var buttons = new List<Button>();
+        foreach (var (text, enabled, click) in items)
+        {
+            var button = new Button { Content = text, IsEnabled = enabled, HorizontalContentAlignment = HorizontalAlignment.Left, MinWidth = 160 };
+            button.SetResourceReference(FrameworkElement.StyleProperty, "FlyoutRowButtonStyle");
+            button.Click += (_, _) => { popup.IsOpen = false; click(); };
+            stack.Children.Add(button);
+            if (enabled) buttons.Add(button);
+        }
+        border.PreviewKeyDown += (_, e) =>
+        {
+            if (e.Key == Key.Escape) { popup.IsOpen = false; anchor.Focus(); e.Handled = true; }
+            else if (buttons.Count > 0 && e.Key is Key.Up or Key.Down)
+            {
+                var index = buttons.FindIndex(b => b.IsKeyboardFocusWithin);
+                buttons[(index + (e.Key == Key.Up ? buttons.Count - 1 : 1)) % buttons.Count].Focus();
+                e.Handled = true;
+            }
+        };
+        anchor.Unloaded += Close;
+        popup.Closed += (_, _) => anchor.Unloaded -= Close;
+        void Close(object sender, RoutedEventArgs args) => popup.IsOpen = false;
+        popup.Opened += (_, _) => buttons.FirstOrDefault()?.Focus();
+        return popup;
     }
 
     /// <summary>An On/Off switch that calls <paramref name="changed"/> only when the user flips it.</summary>

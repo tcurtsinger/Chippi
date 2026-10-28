@@ -56,9 +56,11 @@ public sealed class ClipboardHistorySettingsPage : UserControl
     private void Save(IEnumerable<string> apps) => _module.Save(_module.Settings with { AppsToSkip = [.. apps] });
 
     /// <summary>Add app: the running apps with a window, then Browse… for an .exe (notes #52).</summary>
-    private void OpenAdd()
+    private void OpenAdd() => CreateAddMenu(RunningApps()).IsOpen = true;
+
+    internal Popup CreateAddMenu(IEnumerable<(string Name, string Path)> apps)
     {
-        var items = RunningApps().Where(a => !_module.Settings.AppsToSkip.Contains(a.Path, StringComparer.OrdinalIgnoreCase))
+        var items = apps.Where(a => !_module.Settings.AppsToSkip.Contains(a.Path, StringComparer.OrdinalIgnoreCase))
             .Select(app => (app.Name, true, (Action)(() => Save([.. _module.Settings.AppsToSkip, app.Path])))).ToList();
         items.Add(("Browse\u2026", true, () =>
         {
@@ -66,8 +68,7 @@ public sealed class ClipboardHistorySettingsPage : UserControl
             if (dialog.ShowDialog(Window.GetWindow(this)) == true)
                 Save([.. _module.Settings.AppsToSkip, dialog.FileName]);
         }));
-        var menu = Ui.Menu(_add, [.. items]);
-        menu.IsOpen = true;
+        return SettingsUi.Menu(_add, [.. items]);
     }
 
     /// <summary>Apps with a window, by name. One that can't be read (another user's, elevated) is left out.</summary>

@@ -163,6 +163,42 @@ public sealed class ModuleTests : IDisposable
         Assert.Equal(["example.org"], new CleanUrlSettings { SitesToSkip = ["Example.org", "example.org", "not a site"] }.Normalized().SitesToSkip);
     }
 
+    [Theory]
+    [InlineData("Light")]
+    [InlineData("Dark")]
+    public async Task Add_app_menu_uses_settings_theme_resources_without_island_styles(string theme)
+    {
+        await StartHistoryAsync();
+        WpfTestThread.Run(() =>
+        {
+            var dictionaries = Application.Current.Resources.MergedDictionaries;
+            var palette = new ResourceDictionary { Source = new Uri($"pack://application:,,,/Chippi.UI;component/Themes/{theme}.xaml") };
+            dictionaries.Add(palette);
+            try
+            {
+                var page = new ClipboardHistorySettingsPage(_history);
+                var menu = page.CreateAddMenu(new[] { ("Test app", @"C:\Fixtures\Test.exe") });
+                Assert.False(menu.IsOpen); // Never create a popup HWND on the user's desktop.
+                var border = Assert.IsType<Border>(menu.Child);
+                Assert.Equal(((System.Windows.Media.SolidColorBrush)Application.Current.FindResource("FlyoutBrush")).Color,
+                    Assert.IsType<System.Windows.Media.SolidColorBrush>(border.Background).Color);
+                Assert.Equal(((System.Windows.Media.SolidColorBrush)Application.Current.FindResource("BorderBrush")).Color,
+                    Assert.IsType<System.Windows.Media.SolidColorBrush>(border.BorderBrush).Color);
+                var rows = Find<Button>(border).ToArray();
+                Assert.Equal(new[] { "Test app", "Browse\u2026" }, rows.Select(b => b.Content));
+                var style = Application.Current.FindResource("FlyoutRowButtonStyle");
+                Assert.All(rows, row => Assert.Same(style, row.Style));
+                border.Measure(new Size(240, double.PositiveInfinity));
+                border.Arrange(new Rect(0, 0, 240, border.DesiredSize.Height));
+                var rendered = new System.Windows.Media.Imaging.RenderTargetBitmap(240, (int)Math.Ceiling(border.ActualHeight), 96, 96, System.Windows.Media.PixelFormats.Pbgra32);
+                rendered.Render(border);
+                rows[0].RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                Assert.Contains(@"C:\Fixtures\Test.exe", _history.Settings.AppsToSkip);
+            }
+            finally { dictionaries.Remove(palette); }
+        });
+    }
+
     // ---- The page, on a WPF thread without a window ----
 
     private static IEnumerable<T> Find<T>(DependencyObject root) where T : DependencyObject
