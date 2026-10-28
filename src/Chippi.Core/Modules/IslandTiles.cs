@@ -44,6 +44,12 @@ public sealed record IslandTileSpec(string Key, string Name, string Icon, int Or
     /// <summary>The page's header repeats the tile's status, for a page whose controls don't show it (Keep awake's time left).</summary>
     public bool StatusOnPage { get; init; }
 
+    /// <summary>Optional page-owned header. The first header on a shared page replaces the shell header.</summary>
+    public Func<object>? CreateHeader { get; init; }
+
+    /// <summary>The page control to focus after taking the keyboard, never during hover or a drag.</summary>
+    public Func<object?>? InitialFocus { get; init; }
+
     /// <summary>
     /// The page sees Esc first, from the island and the global Esc alike: true when it used it (Clipboard
     /// clears its search or leaves Clean URL), and the island stays open. Null for the usual close.

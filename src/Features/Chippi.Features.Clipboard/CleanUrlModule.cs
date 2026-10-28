@@ -20,6 +20,7 @@ public sealed class CleanUrlModule : IFeatureModule
     private readonly ClipboardFeatures _features;
     private ModuleContext? _context;
     private IIslandTile? _tile;
+    private CleanUrlSection? _section;
 
     public CleanUrlModule(ClipboardFeatures features) => _features = features;
 
@@ -50,8 +51,9 @@ public sealed class CleanUrlModule : IFeatureModule
         context.Ui.SetSettingsPage(() => new CleanUrlSettingsPage(this));
         // Shares Clipboard history's tile; its page is Clean URL alone while History isn't running.
         _tile = context.Ui.AddIslandTile(new IslandTileSpec(ClipboardFeatures.TileKey, "Clipboard", nameof(LucideIcons.ClipboardList), Order: 70, SectionOrder: 1,
-            () => new CleanUrlSection(_features))
+            () => _section ??= new CleanUrlSection(_features))
         {
+            InitialFocus = () => _section?.InitialFocus,
             PageWidth = ClipboardFeatures.PageWidth,
         });
         _features.Changed += UpdateStatus;
@@ -67,6 +69,7 @@ public sealed class CleanUrlModule : IFeatureModule
         Cleaner?.Dispose();
         Cleaner = null;
         _tile = null;
+        _section = null;
         _context = null;
         return Task.CompletedTask;
     }

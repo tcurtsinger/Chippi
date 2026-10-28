@@ -64,6 +64,7 @@ public sealed class IslandHost : IDisposable
         _shell.Services.CloseIsland = _window.ClosePages;
         // The tray icon and a second launch open these same pages: in the island, or docked by the tray.
         _window.TrayIconRect = () => _shell.Commands.TrayAnchor()?.Icon;
+        _shell.Commands.RegisterIslandHold(_window.HoldIslandOpen);
         _shell.Commands.RegisterPages(
             keyboard => _window.TogglePages(_shell.Commands.TrayAnchor(), keyboard),
             () => _window.ShowPages(_shell.Commands.TrayAnchor(), keyboard: true),

@@ -152,6 +152,9 @@ internal sealed class CleanUrlSection : ContentControl
         Unloaded += (_, _) => _features.Changed -= OnChanged;
     }
 
+    /// <summary>The link field while this section is the page (notes #58); null while History runs.</summary>
+    public UIElement? InitialFocus => _features.History is null ? _view.Field : null;
+
     private void OnChanged() => Dispatcher.BeginInvoke(() => Refresh(opening: false));
 
     private void Refresh(bool opening)
@@ -160,9 +163,6 @@ internal sealed class CleanUrlSection : ContentControl
         Content = alone ? _view : null;
         Visibility = alone ? Visibility.Visible : Visibility.Collapsed;
         if (alone && opening)
-        {
             _view.Open();
-            Dispatcher.BeginInvoke(DispatcherPriority.Input, () => _view.Field.Focus());
-        }
     }
 }

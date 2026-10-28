@@ -61,8 +61,10 @@ public sealed class ClipboardHistoryModule : IFeatureModule
         _features.PasteTarget = context.IslandPasteTarget;
         _features.CloseIsland = context.CloseIsland;
         _tile = context.Ui.AddIslandTile(new IslandTileSpec(ClipboardFeatures.TileKey, "Clipboard", nameof(LucideIcons.ClipboardList), Order: 70, SectionOrder: 0,
-            () => _view ??= new ClipboardView(_features))
+            () => View())
         {
+            CreateHeader = () => View().Header,
+            InitialFocus = () => View().InitialFocus, // Search, or the link field in Clean URL (notes #58)
             PageWidth = ClipboardFeatures.PageWidth,
             StatusPriority = 1, // History's status over Clean URL's (notes #4)
             HandleEscape = () => _view?.HandleEscape() == true, // the first Esc clears a search or leaves Clean URL (notes #59)
@@ -70,6 +72,8 @@ public sealed class ClipboardHistoryModule : IFeatureModule
         UpdateStatus();
         _features.History = this;
     }
+
+    private ClipboardView View() => _view ??= new ClipboardView(_features);
 
     public Task StopAsync(CancellationToken ct)
     {

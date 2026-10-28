@@ -329,12 +329,17 @@ public partial class IslandWindow : Window
 
     // A lambda: CloseIsland's optional parameter turns a method group into Action<bool>, which throws.
     // With the keyboard, the panel sees this Esc itself; the page may use it first (a search to clear).
-    internal void Escape() => Dispatcher.BeginInvoke(() =>
+    internal void Escape()
     {
-        if (_panel.HasKeyboard || _panel.PageHandlesEscape())
+        if (_openHolds.IsHeld)
             return;
-        CloseIsland();
-    });
+        Dispatcher.BeginInvoke(() =>
+        {
+            if (_panel.HasKeyboard || _panel.PageHandlesEscape())
+                return;
+            CloseIsland();
+        });
+    }
 
     /// <summary>
     /// A click anywhere off the island closes it. It never activates, so it can't lose focus to see
@@ -444,6 +449,7 @@ public partial class IslandWindow : Window
     /// <summary>Shrinks the island back into the tab; <paramref name="immediate"/> hides it at once.</summary>
     private void CloseIsland(bool immediate = false)
     {
+        if (!immediate && _openHolds.IsHeld) return;
         _escapeHook?.Dispose(); // unhooks
         _escapeHook = null;
         _clickHook?.Dispose();
@@ -453,6 +459,9 @@ public partial class IslandWindow : Window
         _panel.CloseIsland(immediate);
         RefreshTab();
     }
+
+    private readonly Chippi.Core.Modules.IslandOpenHold _openHolds = new();
+    internal IDisposable HoldIslandOpen() => _openHolds.Hold();
 
     internal bool IsIslandOpen => _panel.IsOpen;
 

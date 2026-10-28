@@ -25,7 +25,7 @@ internal sealed class ClipboardView : UserControl
     private const double ListHeight = 336; // about 8 rows (notes #7)
 
     private readonly ClipboardFeatures _features;
-    private readonly StackPanel _commands = new() { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+    private readonly TextBlock _note = new() { FontSize = 12, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 8, 0) };
     private readonly IconButton _cleanButton = Ui.Icon(LucideIcons.Link, "Clean URL");
     private readonly IconButton _pause = Ui.Icon(LucideIcons.Pause, "Pause");
     private readonly IconButton _more = Ui.Icon(LucideIcons.Ellipsis, "More");
@@ -54,9 +54,10 @@ internal sealed class ClipboardView : UserControl
         _cleanButton.Click += (_, _) => SetCleaning(!_cleaning);
         _pause.Click += (_, _) => _module?.SetPaused(!_module.Settings.Paused);
         _more.Click += (_, _) => OpenMore();
-        _commands.Children.Add(_cleanButton);
-        _commands.Children.Add(_pause);
-        _commands.Children.Add(_more);
+        _note.SetResourceReference(TextBlock.ForegroundProperty, "IslandTextTertiaryBrush");
+        var commands = new StackPanel { Orientation = Orientation.Horizontal, Children = { _note, _cleanButton, _pause, _more } };
+        DockPanel.SetDock(commands, Dock.Right);
+        Header = new DockPanel { Height = 32, Margin = new Thickness(0, 0, 0, 8), Children = { commands, new TextBlock { Text = "Clipboard", FontSize = 13, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center } } };
 
         // First use (notes #10): "Recording off" and Turn on.
         var turnOn = Ui.Button("Turn on", "PrimaryButtonStyle");
@@ -77,7 +78,7 @@ internal sealed class ClipboardView : UserControl
         _history.Children.Add(_scroller);
         _history.Children.Add(_empty);
 
-        Content = new StackPanel { Children = { new Border { Child = _commands, Margin = new Thickness(0, 0, 0, 8), HorizontalAlignment = HorizontalAlignment.Right }, _firstUse, _history, _clean } };
+        Content = new StackPanel { Children = { _firstUse, _history, _clean } };
         AutomationProperties.SetName(this, "Clipboard");
 
         _clock.Tick += (_, _) => Refresh(keepScroll: true);
@@ -98,6 +99,9 @@ internal sealed class ClipboardView : UserControl
             _clock.Stop();
         };
     }
+
+    /// <summary>The page's header: its name, "Paused", then Clean URL, Pause and More (notes #8, #10).</summary>
+    public DockPanel Header { get; }
 
     /// <summary>Where the keyboard lands when the page opens: Search, or the link field in Clean URL (notes #58).</summary>
     public UIElement InitialFocus => _cleaning ? _clean.Field : _search;
@@ -184,6 +188,7 @@ internal sealed class ClipboardView : UserControl
         _pause.Icon = settings.Paused ? LucideIcons.Play : LucideIcons.Pause;
         AutomationProperties.SetName(_pause, settings.Paused ? "Resume" : "Pause");
         _pause.ToolTip = settings.Paused ? "Resume" : "Pause";
+        _note.Text = recording && settings.Paused ? "Paused" : "";
 
         _clean.Visibility = _cleaning ? Visibility.Visible : Visibility.Collapsed;
         _firstUse.Visibility = !_cleaning && !recording ? Visibility.Visible : Visibility.Collapsed;
