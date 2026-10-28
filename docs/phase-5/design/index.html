@@ -1,0 +1,824 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clipboard and Text Mockup</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;padding:40px;background:#D6D6D6;color:#1A1A1A;font-family:'Segoe UI Variable Text','Segoe UI',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit}
+p{margin:0}
+.doc-h1{margin:0 0 4px;font:600 28px/36px 'Segoe UI Variable Display','Segoe UI',sans-serif}
+.doc-sub{margin:0 0 32px;font-size:14px;line-height:20px;color:#404040;max-width:1100px}
+.doc-board{margin:0 0 56px}
+.doc-bt{margin:0 0 4px;font-size:18px;line-height:24px;font-weight:600}
+.doc-bc{margin:0 0 14px;font-size:13px;line-height:20px;color:#404040;max-width:1100px}
+.doc-foot{font-size:12px;color:#5D5D5D}
+.board{position:relative;overflow:hidden;display:inline-block;vertical-align:top}
+body.solo{padding:0;background:#000}
+body.solo .doc-h1,body.solo .doc-sub,body.solo .doc-bt,body.solo .doc-bc,body.solo .doc-foot{display:none}
+body.solo .doc-board{margin:0}
+body.solo .doc-board.off{display:none}
+
+.ico{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.ico12{width:12px;height:12px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.ico14{width:14px;height:14px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.ico20{width:20px;height:20px;flex:none;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+
+/* ---------- Desktop (from the approved Surfaces mockup) ---------- */
+.desk{position:relative;background:#202020;user-select:none;overflow:hidden}
+.dinner{position:absolute;left:0;top:0}
+.wbar{height:40px;display:flex;align-items:flex-end;gap:4px;padding-left:8px;background:#2B2B2B}
+.wtab{width:220px;height:32px;display:flex;align-items:center;gap:8px;padding:0 12px;border-radius:8px 8px 0 0;background:#202020}
+.blk{display:block;border-radius:5px;background:#2E2E2E}
+.blk2{display:block;border-radius:8px;background:#282828}
+.wctl{width:46px;display:flex;align-items:center;justify-content:center;color:#FFF}
+.tb{position:absolute;left:0;bottom:0;z-index:6;width:100%;height:48px;display:flex;align-items:center;padding:0 12px;background:#1C1C1C;border-top:1px solid rgba(255,255,255,.08);color:#FFF}
+.tapp{width:32px;height:32px;border-radius:6px;background:#3A3A3A}
+.trayb{position:relative;width:40px;height:40px;display:flex;align-items:center;justify-content:center;padding:0;border:0;border-radius:4px;background:transparent}
+.trayon{background:rgba(255,255,255,.1)}
+.fp{position:absolute;z-index:7;border:1px dashed rgba(252,225,0,.7);pointer-events:none}
+.fp span{position:absolute;left:0;top:-20px;font-size:11px;line-height:16px;color:#FCE100;white-space:nowrap;font-variant-numeric:tabular-nums}
+
+/* ---------- Island shell ---------- */
+:root{--acc:#4CC2FF;--cau:#FCE100;--ok:#6CCB5F}
+.isl{position:absolute;z-index:5;background:#0A0A0A;color:#FFF;border:1px solid rgba(255,255,255,.10);box-shadow:0 16px 40px rgba(0,0,0,.45)}
+.isl.top{top:0;left:50%;transform:translateX(-50%);border-top-width:0;border-radius:0 0 20px 20px}
+.isl.right{right:0;border-right-width:0;border-radius:20px 0 0 20px}
+.tab{position:absolute;z-index:5;display:flex;align-items:center;justify-content:center;gap:6px;background:#0A0A0A;border:1px solid rgba(255,255,255,.14)}
+.tab.top{top:0;border-top-width:0}
+.sat{position:absolute;z-index:5;width:40px;height:40px;display:flex;align-items:center;justify-content:center;padding:0;border:1px solid rgba(255,255,255,.14);border-radius:20px;background:#0A0A0A;color:#FFF;box-shadow:0 8px 20px rgba(0,0,0,.3)}
+.dock{position:absolute;right:16px;bottom:60px;z-index:5;background:#0A0A0A;color:#FFF;border:1px solid rgba(255,255,255,.10);border-radius:20px;box-shadow:0 16px 40px rgba(0,0,0,.45)}
+.dfoot{display:flex;align-items:center;justify-content:space-between;height:48px;padding:0 8px;border-top:1px solid rgba(255,255,255,.08)}
+.fbtn{display:inline-flex;align-items:center;gap:8px;height:32px;padding:0 10px;border:0;border-radius:4px;background:transparent;font-size:13px;cursor:pointer}
+
+/* ---------- Island pages ---------- */
+.ipg{position:relative;padding:12px;display:flex;flex-direction:column;gap:8px;color:#FFF;font-size:13px;line-height:20px}
+.iph{display:flex;align-items:center;gap:2px;height:28px}
+.ipt{flex:1;min-width:0;font-size:13px;line-height:20px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ic{font-size:12px;line-height:16px;color:#ABABAB;white-space:nowrap;font-variant-numeric:tabular-nums;padding:0 6px}
+.ic.cau{color:var(--cau)}
+.icard{background:rgba(255,255,255,.06);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.icard.row{flex-direction:row;align-items:center;gap:8px;padding:8px 8px 8px 12px}
+.ib{width:32px;height:32px;flex:none;display:inline-flex;align-items:center;justify-content:center;padding:0;border:0;border-radius:4px;background:transparent;color:#C5C5C5;cursor:pointer}
+.iph .ib{width:28px;height:28px}
+.ib.hov{background:rgba(255,255,255,.06);color:#FFF}
+.ib.on{background:rgba(255,255,255,.12);color:#FFF}
+.ib:disabled{opacity:.45}
+.btn{height:32px;flex:none;display:inline-flex;align-items:center;justify-content:center;gap:4px;padding:0 12px;border:1px solid rgba(255,255,255,.09);border-radius:4px;background:rgba(255,255,255,.06);font-size:13px;line-height:20px;color:#FFF;cursor:pointer;white-space:nowrap}
+.btn.acc{background:var(--acc);border-color:var(--acc);color:#000}
+.btn.crit{background:#C42B1C;border-color:#C42B1C;color:#FFF}
+.btn.sub{background:transparent;border-color:transparent;color:#C5C5C5;padding:0 8px}
+.btn:disabled{opacity:.45;cursor:default}
+.kf{outline:2px solid #FFF;outline-offset:2px}
+.fi{display:flex;align-items:center;gap:8px;min-height:32px;padding:5px 10px;border-radius:4px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.09);border-bottom-color:rgba(255,255,255,.30);font-size:13px;line-height:20px;color:#FFF;min-width:0}
+.fi.foc{background:#1C1C1C;border-bottom-color:#FFF;box-shadow:inset 0 -1px 0 #FFF}
+.fi .ph{color:#9D9D9D}
+.fi>.ico{color:#9D9D9D}
+.fi.ta{align-items:flex-start}
+.caret{display:inline-block;width:1px;height:17px;margin:0 0 -4px 1px;background:#FFF}
+.hl-sel{background:rgba(76,194,255,.38)}
+.url{font-size:13px;line-height:20px;word-break:break-all}
+.st{display:inline-flex;align-items:center;gap:6px;min-width:0;font-size:12px;line-height:16px;color:#ABABAB;white-space:nowrap}
+.st.cau{color:var(--cau)}
+.dot{width:7px;height:7px;border-radius:4px;flex:none;background:var(--cau)}
+.mut{color:#9D9D9D}
+.meta{min-width:0;font-size:12px;line-height:16px;color:#ABABAB;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.acts{display:flex;align-items:center;gap:8px;min-width:0}
+.sp{flex:1;min-width:0}
+.mono{width:20px;height:20px;flex:none;border-radius:4px;display:inline-flex;align-items:center;justify-content:center;background:#3A3A3A;font-size:11px;font-weight:600;color:#FFF}
+.tgt{display:flex;align-items:center;gap:8px;min-width:0;font-size:12px;line-height:16px;color:#C5C5C5;white-space:nowrap}
+
+/* popovers and menus, in flyout colors */
+.pop{position:absolute;z-index:8;background:#2C2C2C;border:1px solid rgba(255,255,255,.08);border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,.28);color:#FFF;font-size:13px;line-height:20px}
+.menu{padding:4px;min-width:168px}
+.mi{display:flex;align-items:center;gap:10px;height:32px;padding:0 12px;border-radius:4px;white-space:nowrap}
+.mi.hov{background:rgba(255,255,255,.06)}
+.mi .chk{width:16px;flex:none;display:flex;color:var(--acc)}
+.conf{padding:16px;width:264px;display:flex;flex-direction:column;gap:16px}
+.conf p{font-size:14px;line-height:20px}
+.conf .acts{justify-content:flex-end}
+
+/* Clipboard history */
+.hl{position:relative;max-height:336px;overflow:hidden;margin:0 -4px;padding:0 4px}
+.glab{height:24px;display:flex;align-items:flex-end;padding:0 8px 4px;font-size:12px;line-height:16px;font-weight:600;color:#ABABAB}
+.hr{display:flex;align-items:center;gap:10px;height:40px;padding:0 8px;border-radius:6px;min-width:0}
+.hr.hov{background:rgba(255,255,255,.04)}
+.tx{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tm{flex:none;font-size:12px;line-height:16px;color:#ABABAB;font-variant-numeric:tabular-nums;white-space:nowrap}
+.hsel{display:flex;flex-direction:column;gap:8px;margin:2px 0;padding:8px;border-radius:6px;background:rgba(255,255,255,.06)}
+.hsh{display:flex;align-items:center;gap:10px;height:20px;min-width:0}
+.prev{font-size:13px;line-height:20px;white-space:pre-wrap;word-break:break-word;max-height:80px;overflow:hidden}
+.flist{display:flex;flex-direction:column}
+.fl{display:flex;align-items:center;gap:10px;height:28px;min-width:0}
+.sbar{position:absolute;right:1px;width:3px;border-radius:2px;background:rgba(255,255,255,.32)}
+.none{display:flex;align-items:center;height:40px;padding:0 8px;color:#9D9D9D}
+.none.mid{justify-content:center;height:72px}
+
+/* Scratchpad */
+.stabs{display:flex;align-items:center;gap:2px;height:32px;min-width:0}
+.stab{position:relative;height:32px;display:inline-flex;align-items:center;padding:0 10px;border:0;border-radius:4px;background:transparent;color:#C5C5C5;font-size:13px;white-space:nowrap;flex:none}
+.stab.on{color:#FFF;font-weight:600}
+.stab.on::after{content:"";position:absolute;left:50%;bottom:2px;width:16px;height:3px;margin-left:-8px;border-radius:2px;background:var(--acc)}
+.ed{position:relative;height:236px;padding:6px 10px;border-radius:4px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.09);border-bottom-color:rgba(255,255,255,.30);font-size:13px;line-height:20px;white-space:pre-wrap;word-break:break-word;overflow:hidden}
+.ed.foc{background:#1C1C1C;border-bottom-color:#FFF;box-shadow:inset 0 -1px 0 #FFF}
+.md{height:236px;padding:6px 10px;border-radius:4px;border:1px solid transparent;overflow:hidden;font-size:13px;line-height:20px}
+.md h3{margin:0 0 4px;font-size:15px;line-height:22px;font-weight:600}
+.md ul{margin:0 0 8px;padding-left:18px}
+.md p{margin:0 0 6px}
+.md code{font-family:'Cascadia Mono',Consolas,monospace;font-size:12px;padding:1px 4px;border-radius:3px;background:rgba(255,255,255,.08)}
+.md b{font-weight:600}
+.md u{color:#FFF}
+.mdc{display:flex;align-items:center;gap:8px;margin:0 0 6px}
+.cbx{width:16px;height:16px;flex:none;border:1px solid rgba(255,255,255,.6);border-radius:3px}
+.mdimg{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 8px;border-radius:4px;background:rgba(255,255,255,.06);color:#9D9D9D;font-size:12px}
+.seg{display:inline-flex;padding:2px;gap:2px;border-radius:6px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06)}
+.seg span{height:26px;display:inline-flex;align-items:center;padding:0 12px;border-radius:4px;font-size:13px;color:#C5C5C5}
+.seg span.on{background:rgba(255,255,255,.10);color:#FFF}
+
+/* Shelf */
+.sgw{position:relative;border-radius:8px}
+.sgw.over{outline:1px dashed var(--acc);outline-offset:4px}
+.sgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.si{position:relative;height:84px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;padding:0 6px;border:1px solid transparent;border-radius:8px;background:rgba(255,255,255,.06);min-width:0}
+.si.sel{background:rgba(255,255,255,.10);border-color:var(--acc)}
+.si.drag{opacity:.4}
+.si.slot{background:transparent;border:1px dashed rgba(255,255,255,.4)}
+.sit{height:32px;display:flex;align-items:center;justify-content:center;color:#C5C5C5;margin-bottom:4px}
+.sin{max-width:100%;font-size:12px;line-height:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sim{max-width:100%;font-size:12px;line-height:16px;color:#ABABAB;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
+.spin{position:absolute;top:6px;right:6px;display:flex;color:#C5C5C5}
+.sz{height:148px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;border:1px dashed rgba(255,255,255,.22);border-radius:8px;color:#9D9D9D}
+.sz.over{border-color:var(--acc)}
+.sz.over .ico20{color:var(--acc)}
+
+/* ---------- Grid ---------- */
+.igrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.tl{position:relative;height:84px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:0;border:0;border-radius:8px;background:rgba(255,255,255,.06);cursor:pointer;min-width:0}
+.tlname{margin-top:6px;max-width:100%;font-size:12px;line-height:16px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tlstat{max-width:calc(100% - 12px);font-size:12px;line-height:16px;color:#ABABAB;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
+.tldot{position:absolute;top:8px;right:8px;width:6px;height:6px;border-radius:3px}
+
+/* ---------- Galleries ---------- */
+.gal{width:1960px;padding:40px;background:#DCDCDC;display:flex;flex-wrap:wrap;gap:40px 32px;align-items:flex-start}
+.galc{position:relative;display:flex;flex-direction:column;gap:12px}
+.galt{font-size:14px;line-height:20px;font-weight:600;color:#1A1A1A}
+.galn{font-size:12px;line-height:16px;color:#404040}
+.ground{position:relative;background:#0A0A0A;border:1px solid rgba(255,255,255,.10);border-radius:20px;color:#FFF}
+.keys{margin:0;padding:0;list-style:none;font-size:12px;line-height:18px;color:#404040}
+.keys b{display:inline-block;min-width:124px;font-weight:600;color:#1A1A1A}
+
+/* ---------- Drag scenes ---------- */
+.scene{position:relative;width:820px;height:450px;background:#202020;overflow:hidden;border-radius:8px}
+.exp{position:absolute;z-index:3;background:#202020;border:1px solid rgba(255,255,255,.12);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.4);overflow:hidden;color:#FFF;font-size:12px;line-height:16px}
+.exph{height:32px;display:flex;align-items:center;gap:8px;padding:0 12px;background:#2B2B2B}
+.exph.idle{color:#9D9D9D}
+.expr{display:flex;align-items:center;gap:8px;height:28px;padding:0 12px}
+.expr.sel{background:rgba(255,255,255,.10)}
+.expr.hot{background:rgba(255,255,255,.12);box-shadow:inset 0 0 0 1px rgba(255,255,255,.35)}
+.ghost{position:absolute;z-index:9;display:flex;align-items:center;gap:8px;height:36px;padding:0 10px;border-radius:6px;background:rgba(43,43,43,.88);border:1px solid rgba(255,255,255,.15);color:#FFF;font-size:12px}
+.dtip{position:absolute;z-index:10;height:22px;padding:0 8px;display:flex;align-items:center;border-radius:4px;background:#2B2B2B;border:1px solid rgba(255,255,255,.18);font-size:12px;color:#FFF;white-space:nowrap}
+.cur{position:absolute;z-index:11;width:16px;height:22px}
+
+/* ---------- Settings window ---------- */
+.set{--win:#202020;--card:#2B2B2B;--cstroke:rgba(255,255,255,.03);--div:rgba(255,255,255,.06);--ctl:rgba(255,255,255,.06);--ctlstroke:rgba(255,255,255,.09);--sel:rgba(255,255,255,.06);--input:rgba(255,255,255,.06);--inputb:rgba(255,255,255,.30);--inputf:#1C1C1C;--swoff:rgba(255,255,255,.60);--knob:rgba(255,255,255,.80);--tx:#FFF;--tx2:#C5C5C5;--cap:#ABABAB;--mut:#9D9D9D;--sacc:#4CC2FF;--onacc:#000;--scau:#FCE100;--scaut:rgba(252,225,0,.10);--fly:#2C2C2C;--chip:rgba(255,255,255,.06);
+  position:relative;width:1120px;display:flex;flex-direction:column;background:var(--win);color:var(--tx);border:1px solid rgba(255,255,255,.08);border-radius:8px;overflow:hidden;font-size:14px;line-height:20px;user-select:none}
+.set.lt{--win:#F3F3F3;--card:#FBFBFB;--cstroke:rgba(0,0,0,.06);--div:rgba(0,0,0,.07);--ctl:#FFF;--ctlstroke:rgba(0,0,0,.10);--sel:rgba(0,0,0,.055);--input:#FFF;--inputb:rgba(0,0,0,.45);--inputf:#FFF;--swoff:rgba(0,0,0,.55);--knob:rgba(0,0,0,.60);--tx:#1A1A1A;--tx2:#404040;--cap:#5D5D5D;--mut:#616161;--sacc:#005FB8;--onacc:#FFF;--scau:#9D5D00;--scaut:rgba(157,93,0,.10);--fly:#F9F9F9;--chip:rgba(0,0,0,.05);border-color:rgba(0,0,0,.12)}
+.stbar{height:40px;display:flex;align-items:center;gap:10px;padding-left:16px;font-size:12px}
+.stbar .grow{flex:1}
+.wb{width:46px;height:40px;display:flex;align-items:center;justify-content:center;border:0;background:transparent;color:var(--tx)}
+.sbody{display:flex;flex:1;min-height:0}
+.snav{width:272px;flex:none;padding:14px 12px 16px;display:flex;flex-direction:column}
+.ssearch{display:flex;align-items:center;gap:8px;height:34px;padding:0 10px;margin-bottom:4px;border-radius:4px;background:var(--input);border:1px solid var(--ctlstroke);border-bottom-color:var(--inputb);color:var(--mut);font-size:14px}
+.sgrp{padding:12px 12px 6px;font-size:12px;line-height:16px;font-weight:600;color:var(--mut)}
+.sni{position:relative;display:flex;align-items:center;gap:14px;height:36px;padding:0 12px;border-radius:4px;font-size:14px}
+.sni.on{background:var(--sel);font-weight:600}
+.sni .pill{position:absolute;left:0;top:10px;width:3px;height:16px;border-radius:2px;background:var(--sacc)}
+.smain{position:relative;flex:1;min-width:0;padding:4px 40px 28px 40px}
+.stitle{margin:0 0 14px;font:600 20px/28px 'Segoe UI Variable Display','Segoe UI',sans-serif}
+.ssec{display:flex;align-items:center;justify-content:space-between;min-height:32px;margin:24px 0 8px;font-size:14px;line-height:20px;font-weight:600}
+.scard{border-radius:8px;overflow:hidden;background:var(--card);border:1px solid var(--cstroke)}
+.scard.dim60 .srow>*{opacity:.6}
+.scard.dim60 .srow.add>*{opacity:1}
+.srow{display:flex;align-items:center;gap:14px;min-height:48px;padding:10px 16px}
+.srow+.srow{border-top:1px solid var(--div)}
+.srow .lab{flex:1;min-width:0;display:flex;flex-direction:column}
+.scap{font-size:12px;line-height:16px;color:var(--cap);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.smut{color:var(--mut)}
+.onoff{width:28px;text-align:right}
+.tog{position:relative;width:40px;height:20px;flex:none;padding:0;border:1px solid var(--swoff);border-radius:10px;background:transparent}
+.tog i{position:absolute;top:3px;left:4px;width:12px;height:12px;border-radius:6px;background:var(--knob)}
+.tog.on{background:var(--sacc);border-color:var(--sacc)}
+.tog.on i{top:2px;left:22px;width:14px;height:14px;border-radius:7px;background:var(--onacc)}
+.ctl{display:flex;align-items:center;gap:8px}
+.sbtn{height:32px;display:inline-flex;align-items:center;padding:0 12px;border:1px solid var(--ctlstroke);border-radius:4px;background:var(--ctl);font-size:14px;font-weight:400;white-space:nowrap;color:var(--tx)}
+.sbtn.acc{background:var(--sacc);border-color:var(--sacc);color:var(--onacc)}
+.sbtn.crit{background:#C42B1C;border-color:#C42B1C;color:#FFF}
+.sfld{display:flex;align-items:center;width:280px;height:32px;padding:0 10px;border-radius:4px;background:var(--input);border:1px solid var(--ctlstroke);border-bottom-color:var(--inputb)}
+.sfld.foc{background:var(--inputf);border-bottom-color:var(--tx);box-shadow:inset 0 -1px 0 var(--tx)}
+.sfld .caret{background:var(--tx)}
+.keyv{min-width:96px;font-variant-numeric:tabular-nums}
+.serr{display:flex;align-items:center;gap:8px;margin:8px 0 0 2px;font-size:12px;line-height:16px;color:var(--scau)}
+.serr .dot{background:var(--scau)}
+.smono{width:24px;height:24px;flex:none;border-radius:4px;display:inline-flex;align-items:center;justify-content:center;background:var(--chip);font-size:11px;font-weight:600}
+.chip32{width:32px;height:32px;flex:none;border-radius:6px;display:flex;align-items:center;justify-content:center;background:var(--chip);color:var(--sacc)}
+.badge{height:18px;display:inline-flex;align-items:center;padding:0 6px;border-radius:4px;background:var(--scaut);color:var(--scau);font-size:11px;font-weight:600;margin-left:8px;vertical-align:1px}
+.spop{position:absolute;z-index:8;width:280px;padding:16px;display:flex;flex-direction:column;gap:16px;background:var(--fly);border:1px solid var(--ctlstroke);border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,.28)}
+.spop .ctl{justify-content:flex-end}
+</style>
+</head>
+<body>
+<h1 class="doc-h1">Clipboard and text: Phase 5 mockup</h1>
+<p class="doc-sub">Clipboard history, Paste as plain text, Clean URL, Scratchpad and Shelf, inside the Surfaces model, with three tiles as in Vorssaint: Clipboard (History and Clean URL), Scratchpad and Shelf. Paste as plain text is a shortcut with no tile. Island and docked pages are always dark; Settings is shown dark and light. Every copy, note, file and picture here is invented. Notes: <code>notes.md</code>.</p>
+
+<section class="doc-board" id="b-grid-top">
+  <h2 class="doc-bt">1 · All features, top edge</h2>
+  <p class="doc-bc">Three tiles join the grid after System monitor: Clipboard, Scratchpad, Shelf. Nine tiles make three full rows. Statuses are state: item counts, Off or Paused.</p>
+  <div class="board desk" data-edge="top" data-page="grid"></div>
+</section>
+
+<section class="doc-board" id="b-history-top">
+  <h2 class="doc-bt">2 · Clipboard, top edge</h2>
+  <p class="doc-bc">Recording. The header holds Clean URL (link), Pause and More. Pins first, then recent copies, newest first. The selected copy opens in place with its preview and actions. A password copied from a password manager between "Meeting moved…" and the link left no row and no gap.</p>
+  <div class="board desk" data-edge="top" data-page="history"></div>
+</section>
+
+<section class="doc-board" id="b-history-states">
+  <h2 class="doc-bt">3 · Clipboard history states</h2>
+  <p class="doc-bc">First use, paused, a picture and a missing file selected, no match, a busy clipboard, and the two limits.</p>
+  <div class="board gal" id="g-history"></div>
+</section>
+
+<section class="doc-board" id="b-plain">
+  <h2 class="doc-bt">4 · Paste as plain text</h2>
+  <p class="doc-bc">No tile and no page, as in Vorssaint: the shortcut set in Settings pastes the copy as plain text into the app in front. When it can't paste, Windows beeps and the closed tab shows the glyph for 6 seconds. It works the same whether or not Clipboard history is installed or recording.</p>
+  <div class="board gal" id="g-plain"></div>
+</section>
+
+<section class="doc-board" id="b-clean">
+  <h2 class="doc-bt">5 · Clean URL, in the Clipboard page</h2>
+  <p class="doc-bc">Clean URL shares the Clipboard tile. Its link button swaps the list for the manual Clean: the current copy fills the field when it's one web link, the result shows as you type, Copy puts it on the clipboard. Without Clipboard history the page is Clean URL alone. Automatic cleaning and sites to skip are in Settings.</p>
+  <div class="board gal" id="g-clean"></div>
+</section>
+
+<section class="doc-board" id="b-scratch-right">
+  <h2 class="doc-bt">6 · Scratchpad, right edge</h2>
+  <p class="doc-bc">The side edge: one pair of round buttons above, one below, Now Playing on the far side. Editing, with the keyboard in the note.</p>
+  <div class="board desk" data-edge="right" data-page="scratch"></div>
+</section>
+
+<section class="doc-board" id="b-scratch-states">
+  <h2 class="doc-bt">7 · Scratchpad states</h2>
+  <p class="doc-bc">Preview, renaming a note, its menu, a new empty note, 12 notes, a failed save and notes that can't be opened.</p>
+  <div class="board gal" id="g-scratch"></div>
+</section>
+
+<section class="doc-board" id="b-shelf-states">
+  <h2 class="doc-bt">8 · Shelf states</h2>
+  <p class="doc-bc">Empty, a drag over the empty page, mixed items with one selected, a pinned item, a missing file, a full Shelf and the limits.</p>
+  <div class="board gal" id="g-shelf"></div>
+</section>
+
+<section class="doc-board" id="b-shelf-drag">
+  <h2 class="doc-bt">9 · Shelf drag, in and out</h2>
+  <p class="doc-bc">From File Explorer onto the closed tab, into the page, and back out. Explorer keeps the focus throughout: its title stays active.</p>
+  <div class="board gal" id="g-drag"></div>
+</section>
+
+<section class="doc-board" id="b-docked">
+  <h2 class="doc-bt">10 · Docked by the tray</h2>
+  <p class="doc-bc">Island off. The same pages in the docked card, with the footer in place of the round buttons. Crops of the bottom-right corner of a 1440×900 screen.</p>
+  <div class="board gal" id="g-docked"></div>
+</section>
+
+<section class="doc-board" id="b-fit">
+  <h2 class="doc-bt">11 · A 1280×720 screen</h2>
+  <p class="doc-bc">1920×1080 at 150%. The tallest page (Clipboard) on the right edge and Scratchpad on the top edge. The dashed box is the whole interactive footprint, buttons included.</p>
+  <div class="board" id="fit" style="display:inline-flex;gap:40px;padding:40px;background:#DCDCDC"><div class="desk" data-edge="right" data-page="history" data-w="1280" data-h="720" data-fp="1"></div><div class="desk" data-edge="top" data-page="scratch" data-w="1280" data-h="720" data-fp="1"></div></div>
+</section>
+
+<section class="doc-board" id="b-keyboard">
+  <h2 class="doc-bt">12 · Keyboard</h2>
+  <p class="doc-bc">Where the focus lands on each page and the keys each page adds. The shell's keys don't change: Esc closes, Tab moves, arrows move in the grid.</p>
+  <div class="board gal" id="g-keys"></div>
+</section>
+
+<section class="doc-board" id="b-destructive">
+  <h2 class="doc-bt">13 · Clearing, deleting, removing</h2>
+  <p class="doc-bc">Each confirmation is the question, Cancel and the verb. Removing a Shelf item has no confirmation: the file it points to never moves. Uninstalling Clipboard history is in board 14.</p>
+  <div class="board gal" id="g-destroy"></div>
+</section>
+
+<section class="doc-board" id="b-settings-dark">
+  <h2 class="doc-bt">14 · Settings › Clipboard &amp; text, dark</h2>
+  <p class="doc-bc">Configuration only. Clipboard history recording with two apps to skip; Clean URL automatic with two sites to skip; the plain-paste shortcut in use by another app; and uninstalling Clipboard history from Add features.</p>
+  <div class="board" id="s-dark" style="display:inline-grid;grid-template-columns:repeat(2,1120px);gap:40px;padding:40px;background:#DCDCDC"></div>
+</section>
+
+<section class="doc-board" id="b-settings-light">
+  <h2 class="doc-bt">15 · Settings › Clipboard &amp; text, light</h2>
+  <p class="doc-bc">First use: recording off and no apps to skip; automatic cleaning off (its sites dim but stay editable) while a site is added; the shortcut not set, then set.</p>
+  <div class="board" id="s-light" style="display:inline-grid;grid-template-columns:repeat(2,1120px);gap:40px;padding:40px;background:#DCDCDC"></div>
+</section>
+
+<p class="doc-foot">Mockup only. Every copy, note, file, picture and app state is invented.</p>
+
+<script>
+// ---------------------------------------------------------------- icons (Lucide, 24px grid)
+const I = {
+  grid: '<rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect>',
+  back: '<path d="M9 14 4 9l5-5"></path><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"></path>',
+  gear: '<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle>',
+  coffee: '<path d="M10 2v2"></path><path d="M14 2v2"></path><path d="M6 2v2"></path><path d="M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1"></path>',
+  sliders: '<path d="M21 4h-7"></path><path d="M10 4H3"></path><path d="M21 12h-9"></path><path d="M8 12H3"></path><path d="M21 20h-5"></path><path d="M12 20H3"></path><path d="M14 2v4"></path><path d="M8 10v4"></path><path d="M16 18v4"></path>',
+  music: '<path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle>',
+  lines: '<path d="M2 10v3"></path><path d="M6 6v11"></path><path d="M10 3v18"></path><path d="M14 8v7"></path><path d="M18 5v13"></path><path d="M22 10v3"></path>',
+  folder: '<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"></path>',
+  activity: '<path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>',
+  speaker: '<path d="M11 4.7a.7.7 0 0 0-1.2-.5L6.4 7.6a1.4 1.4 0 0 1-1 .4H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.4a1.4 1.4 0 0 1 1 .4l3.4 3.4a.7.7 0 0 0 1.2-.5z"></path><path d="M16 9a5 5 0 0 1 0 6"></path><path d="M19.4 5.6a9 9 0 0 1 0 12.8"></path>',
+  mic: '<path d="M12 19v3"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><rect x="9" y="2" width="6" height="13" rx="3"></rect>',
+  drop: '<path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"></path>',
+  bell: '<path d="M10.268 21a2 2 0 0 0 3.464 0"></path><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"></path>',
+  plus: '<path d="M5 12h14"></path><path d="M12 5v14"></path>',
+  info: '<circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4"></path><path d="M12 8h.01"></path>',
+  search: '<circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path>',
+  down: '<path d="m6 9 6 6 6-6"></path>',
+  up: '<path d="m18 15-6-6-6 6"></path>',
+  wifi: '<path d="M12 20h.01"></path><path d="M2 8.82a15 15 0 0 1 20 0"></path><path d="M5 12.86a10 10 0 0 1 14 0"></path><path d="M8.5 16.43a5 5 0 0 1 7 0"></path>',
+  vol: '<path d="M11 4.7a.7.7 0 0 0-1.2-.5L6.4 7.6a1.4 1.4 0 0 1-1 .4H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.4a1.4 1.4 0 0 1 1 .4l3.4 3.4a.7.7 0 0 0 1.2-.5z"></path><path d="M16 9a5 5 0 0 1 0 6"></path>',
+  more: '<circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle><circle cx="5" cy="12" r="1"></circle>',
+  // Phase 5 feature glyphs
+  clip: '<rect width="8" height="4" x="8" y="2" rx="1" ry="1"></rect><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><path d="M12 11h4"></path><path d="M12 16h4"></path><path d="M8 11h.01"></path><path d="M8 16h.01"></path>',
+  cliptype: '<rect width="8" height="4" x="8" y="2" rx="1" ry="1"></rect><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><path d="M9 12v-1h6v1"></path><path d="M11 17h2"></path><path d="M12 11v6"></path>',
+  link: '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>',
+  notebook: '<path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4"></path><path d="M2 6h4"></path><path d="M2 10h4"></path><path d="M2 14h4"></path><path d="M2 18h4"></path><path d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"></path>',
+  inbox: '<polyline points="22 12 16 12 14 15 10 15 8 12 2 12"></polyline><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path>',
+  // item kinds and actions
+  text: '<path d="M17 6.1H3"></path><path d="M21 12.1H3"></path><path d="M15.1 18H3"></path>',
+  globe: '<circle cx="12" cy="12" r="10"></circle><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"></path><path d="M2 12h20"></path>',
+  image: '<rect width="18" height="18" x="3" y="3" rx="2" ry="2"></rect><circle cx="9" cy="9" r="2"></circle><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"></path>',
+  file: '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path>',
+  files: '<path d="M20 7h-3a2 2 0 0 1-2-2V2"></path><path d="M9 18a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h7l4 4v10a2 2 0 0 1-2 2Z"></path><path d="M3 7.6v12.8A1.6 1.6 0 0 0 4.6 22h9.8"></path>',
+  filex: '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path><path d="m14.5 12.5-5 5"></path><path d="m9.5 12.5 5 5"></path>',
+  cloud: '<path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"></path>',
+  pin: '<path d="M12 17v5"></path><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"></path>',
+  pinoff: '<path d="M12 17v5"></path><path d="M15 9.34V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H7.89"></path><path d="m2 2 20 20"></path><path d="M9 9v1.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h11"></path>',
+  pause: '<rect x="14" y="4" width="4" height="16" rx="1"></rect><rect x="6" y="4" width="4" height="16" rx="1"></rect>',
+  play: '<polygon points="6 3 20 12 6 21 6 3"></polygon>',
+  trash: '<path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>',
+  check: '<path d="M20 6 9 17l-5-5"></path>'
+};
+const ico = (name, cls = 'ico', style = '') => `<svg class="${cls}" style="${style}" viewBox="0 0 24 24" aria-hidden="true">${I[name]}</svg>`;
+const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const caret = '<span class="caret"></span>';
+const ok = (t) => `<span class="st">${ico('check', 'ico14', 'color:var(--ok)')}${t}</span>`;
+const st = (t, cau) => `<span class="st ${cau ? 'cau' : ''}">${cau ? '<span class="dot"></span>' : ''}${t}</span>`;
+let gid = 0;
+function gumdrop(size, mood = 'idle') {
+  const id = 'gd' + (gid++);
+  const eyes = mood === 'sleepy'
+    ? '<path d="M40 76 Q47 82 54 76 M66 76 Q73 82 80 76" fill="none" stroke="#0B0F1F" stroke-width="7" stroke-linecap="round"></path>'
+    : '<ellipse cx="47" cy="74" rx="6" ry="7.4" fill="#0B0F1F"></ellipse><ellipse cx="73" cy="74" rx="6" ry="7.4" fill="#0B0F1F"></ellipse>';
+  return `<svg width="${size}" height="${size}" viewBox="0 0 120 120" aria-hidden="true"><defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#B15CF0"></stop><stop offset="1" stop-color="#4D9BFF"></stop></linearGradient></defs><path d="M60 16 C80 30 100 52 100 77 C100 98 82 108 60 108 C38 108 20 98 20 77 C20 52 40 30 60 16 Z" fill="url(#${id})"></path>${eyes}</svg>`;
+}
+// An invented screenshot, flat blocks only.
+function pic(w, h, v = 0) {
+  const p = [['#1F2A36', '#3B5B7A', '#E8ECF6', '#6CCB5F'], ['#2E2620', '#7A5B3B', '#F5C451', '#C5C5C5']][v];
+  return `<svg width="${w}" height="${h}" viewBox="0 0 160 90" preserveAspectRatio="none" style="display:block;flex:none;border-radius:4px" aria-hidden="true"><rect width="160" height="90" fill="${p[0]}"></rect><rect width="160" height="12" fill="${p[1]}"></rect><rect x="10" y="22" width="60" height="8" rx="2" fill="${p[2]}" opacity=".85"></rect><rect x="10" y="36" width="90" height="5" rx="2" fill="${p[2]}" opacity=".45"></rect><rect x="10" y="46" width="80" height="5" rx="2" fill="${p[2]}" opacity=".45"></rect><rect x="108" y="22" width="42" height="56" rx="3" fill="${p[3]}" opacity=".7"></rect><rect x="10" y="60" width="88" height="18" rx="3" fill="${p[1]}"></rect></svg>`;
+}
+const mono = (ch) => `<span class="mono" aria-hidden="true">${ch}</span>`;
+const hd = (title, right = '') => `<div class="iph"><span class="ipt">${title}</span>${right}</div>`;
+const pg = (w, inner) => `<div class="ipg" style="width:${w}px">${inner}</div>`;
+const menu = (items, pos) => `<div class="pop menu" role="menu" style="${pos}">${items.map((m) => m === '-' ? '<div style="height:1px;margin:4px 0;background:rgba(255,255,255,.08)"></div>'
+  : `<div class="mi ${m.hov ? 'hov' : ''}" role="menuitem">${m.chk !== undefined ? `<span class="chk">${m.chk ? ico('check', 'ico14') : ''}</span>` : ''}${m.t}</div>`).join('')}</div>`;
+const confirm = (q, verb, pos) => `<div class="pop conf" role="alertdialog" aria-label="${q}" style="${pos}"><p>${q}</p><div class="acts"><button class="btn">Cancel</button><button class="btn crit">${verb}</button></div></div>`;
+
+// ---------------------------------------------------------------- Clipboard history
+const HIST = [
+  { k: 'text', pin: true, t: 'Thanks, I’ll review the draft by Friday and send notes.', tm: 'Oct 21', meta: 'Text' },
+  { k: 'text', pin: true, t: 'git log --oneline --graph -20', tm: 'Oct 19', meta: 'Text' },
+  { k: 'link', t: 'https://example.org/docs/setup?ref=nav#install', tm: 'Now', meta: 'Link' },
+  { k: 'text', t: 'Meeting moved to 3:30 PM, Room 2B.', full: 'Meeting moved to 3:30 PM, Room 2B.\nAgenda:\n- Q3 numbers\n- Launch checklist', tm: '2 min', meta: 'Text · 4 lines' },
+  { k: 'pic', dim: '1920 × 1080', tm: '14 min', meta: 'Picture · 1920 × 1080' },
+  { k: 'files', t: 'quarterly-report.pdf, budget.xlsx, notes.txt', tm: '38 min', meta: '3 files', files: [{ n: 'quarterly-report.pdf', s: '2.1 MB' }, { n: 'budget.xlsx', s: '84 KB' }, { n: 'notes.txt', s: '3 KB' }] },
+  { k: 'text', t: 'SELECT name, total FROM orders WHERE total > 100;', tm: '1 hr', meta: 'Text' },
+  { k: 'link', t: 'https://shop.example.com/item/7781', tm: '2 hr', meta: 'Link' },
+  { k: 'files', t: 'trip-photos.zip, packing-list.docx', tm: 'Yesterday', meta: '2 files', files: [{ n: 'trip-photos.zip', missing: true }, { n: 'packing-list.docx', s: '22 KB' }] },
+  { k: 'text', t: 'Flight AB 1234 lands 6:05 PM', tm: 'Yesterday', meta: 'Text' }
+];
+const KG = { text: 'text', link: 'globe', files: 'files' };
+function lead(it) {
+  if (it.k === 'pic') return pic(32, 20);
+  return ico(KG[it.k], 'ico', 'color:#C5C5C5');
+}
+function hRow(it, hov) {
+  const txt = it.k === 'pic' ? 'Picture · ' + it.dim : it.t;
+  return `<div class="hr ${hov ? 'hov' : ''}" role="option" aria-selected="false">${lead(it)}<span class="tx">${esc(txt)}</span><span class="tm">${it.tm}</span></div>`;
+}
+function hSel(it, o) {
+  const files = it.files || [];
+  const missing = files.filter((f) => f.missing).length;
+  const body = it.k === 'pic' ? pic(208, 117)
+    : files.length ? `<div class="flist">${files.map((f) => `<div class="fl">${ico(f.missing ? 'filex' : 'file', 'ico', f.missing ? 'color:#9D9D9D' : 'color:#C5C5C5')}<span class="tx ${f.missing ? 'mut' : ''}">${f.n}</span><span class="tm">${f.missing ? 'Unavailable' : f.s}</span></div>`).join('')}</div>`
+    : `<p class="prev">${esc(it.full || it.t)}</p>`;
+  const status = missing ? st(missing === 1 ? '1 file unavailable' : missing + ' files unavailable') : o.status || '';
+  return `<div class="hsel ${o.selFocus ? 'kf' : ''}" role="option" aria-selected="true"><div class="hsh">${it.k === 'pic' ? ico('image', 'ico', 'color:#C5C5C5') : lead(it)}<span class="meta" style="flex:1">${it.meta}</span><span class="tm">${it.tm}</span></div>${body}
+    <div class="acts"><button class="btn acc" ${missing ? 'disabled' : ''}>Paste</button><button class="btn" ${missing ? 'disabled' : ''}>Copy</button>${status}<span class="sp"></span><button class="ib" aria-label="${it.pin ? 'Unpin' : 'Pin'}">${ico(it.pin ? 'pinoff' : 'pin')}</button><button class="ib" aria-label="Delete">${ico('trash')}</button></div></div>`;
+}
+// Clipboard history and Clean URL share the Clipboard tile, as routing, mute and processing share Sound.
+// The header's link button swaps the list for Clean URL; without History the page is Clean URL alone.
+function historyPage(o = {}) {
+  const items = o.items || HIST;
+  if (o.noHist) return pg(440, hd('Clipboard', `<span class="ic">${o.auto ? 'Automatic' : 'Manual'}</span>`) + cleanBody(o));
+  const link = `<button class="ib ${o.clean ? 'on' : ''} ${o.linkFocus ? 'kf' : ''}" aria-label="Clean URL" aria-pressed="${!!o.clean}">${ico('link')}</button>`;
+  if (o.clean) return pg(440, hd('Clipboard', link) + cleanBody(o));
+  const right = o.off ? link : `${o.paused ? '<span class="ic">Paused</span>' : ''}${link}<button class="ib" aria-label="${o.paused ? 'Resume' : 'Pause'}">${ico(o.paused ? 'play' : 'pause')}</button><button class="ib ${o.menu || o.confirm ? 'hov' : ''}" aria-label="More" aria-haspopup="menu">${ico('more')}</button>`;
+  let body;
+  if (o.off) {
+    body = `<div class="icard row"><span class="sp">Recording off</span><button class="btn acc ${o.kf ? 'kf' : ''}">Turn on</button></div>`;
+  } else {
+    const q = o.q ? esc(o.q) + (o.qf ? caret : '') : (o.qf ? '<span class="caret" style="margin:0 -2px -4px 0"></span>' : '') + '<span class="ph">Search</span>';
+    const search = `<div class="fi ${o.qf ? 'foc' : ''}" role="combobox" aria-label="Search clipboard history">${ico('search')}${q}</div>`;
+    const banner = o.banner ? `<div style="padding:0 8px">${st(o.banner, true)}</div>` : '';
+    let list;
+    const row = (it) => items.indexOf(it) === o.sel ? hSel(it, o) : hRow(it, items.indexOf(it) === o.hov);
+    if (o.noMatch) list = '<div class="none mid">No matches</div>';
+    else if (!items.length) list = '<div class="none mid">No items</div>';
+    else {
+      const pins = items.filter((i) => i.pin), rec = items.filter((i) => !i.pin);
+      list = (pins.length ? `<div class="glab">Pinned</div>${pins.map(row).join('')}` : '')
+        + (o.q ? '' : '<div class="glab">Recent</div>') + (rec.length ? rec.map(row).join('') : '<div class="none">No recent copies</div>');
+    }
+    const bar = o.bar ? `<span class="sbar" style="top:${o.bar[0]}px;height:${o.bar[1]}px"></span>` : '';
+    // o.top scrolls the list, so a selection further down shows.
+    body = search + banner + `<div class="hl" role="listbox" aria-label="Clipboard history" ${o.top ? 'style="height:336px"' : ''}><div style="margin-top:${-(o.top || 0)}px">${list}</div>${bar}</div>`;
+  }
+  const pop = o.menu ? menu([{ t: 'Clear history', hov: o.menu === 1 }, { t: 'Erase all', hov: o.menu === 2 }], 'right:12px;top:42px')
+    : o.confirm === 'clear' ? confirm('Clear unpinned items?', 'Clear', 'right:12px;top:42px')
+    : o.confirm === 'erase' ? confirm('Erase all items and pins?', 'Erase', 'right:12px;top:42px') : '';
+  return pg(440, hd('Clipboard', right) + body + pop);
+}
+
+// ---------------------------------------------------------------- Clean URL, inside the Clipboard page
+function cleanBody(o) {
+  const inner = o.input ? `<span class="url">${esc(o.input)}${o.foc ? caret : ''}</span>` : `${o.foc ? '<span class="caret" style="margin:0 -2px -4px 0"></span>' : ''}<span class="ph">Link</span>`;
+  const field = `<div class="fi ta ${o.foc ? 'foc' : ''}" role="textbox" aria-label="Link">${inner}</div>`;
+  const invalid = o.invalid ? `<div style="margin-top:-2px">${st('Not a web link', true)}</div>` : '';
+  const result = o.out ? `<div class="icard"><span class="url">${esc(o.out)}</span><span class="meta">Removed · ${o.removed}</span></div>`
+    : o.same ? '<div class="icard"><span class="mut">Nothing to remove</span></div>' : '';
+  return field + invalid + result + `<div class="acts">${o.copied ? ok('Copied') : ''}<span class="sp"></span><button class="btn acc" ${o.out ? '' : 'disabled'}>Copy</button></div>`;
+}
+
+// ---------------------------------------------------------------- Paste as plain text: shortcut only, so its only output is the closed tab
+function plainTab(o = {}) {
+  const tab = o.glyph
+    ? `<div class="tab top" style="left:${165 - 60}px;width:120px;height:32px;border-radius:0 0 32px 32px" role="status" aria-label="Chippi, ${o.label}">${gumdrop(22)}${ico('cliptype', 'ico14', `color:${o.cau ? 'var(--cau)' : 'var(--acc)'}`)}</div>`
+    : `<div class="tab top" style="left:${165 - 48}px;width:96px;height:28px;border-radius:0 0 28px 28px">${gumdrop(20, 'sleepy')}</div>`;
+  return `<div style="position:relative;width:330px;height:150px;background:#1B1B1B;border-radius:8px;overflow:hidden">
+    <div class="exp" style="left:20px;top:56px;width:290px;height:120px" aria-hidden="true"><div class="exph"><span class="mono" style="width:16px;height:16px;font-size:9px">${o.app[0]}</span><span style="flex:1">${o.app}</span><span style="letter-spacing:10px">– ▢ ✕</span></div>
+    <div style="padding:12px 16px;font-size:13px;line-height:20px">${o.body || ''}${caret}</div></div>${tab}</div>`;
+}
+
+// ---------------------------------------------------------------- Scratchpad
+const TABS = ['Groceries', 'Standup', 'Ideas', 'Draft reply'];
+const TABS12 = ['Groceries', 'Standup', 'Ideas', 'Draft reply', 'Trip', 'Gift list', 'Recipes', 'Books', 'Sprint 42', 'Snippets', 'Phone call', 'Note 12'];
+const NOTE = '## Standup, Tue\n- Shipped: island fit fix\n- Today: **Shelf** drag-out\n- Blocked: none\n\n[ ] Book a room for Thursday\nBranch: `release/0.6`\nSpec: https://example.org/spec\n![flow](https://example.org/flow.png)';
+const NOTE_MD = `<h3>Standup, Tue</h3><ul><li>Shipped: island fit fix</li><li>Today: <b>Shelf</b> drag-out</li><li>Blocked: none</li></ul>
+  <div class="mdc"><span class="cbx"></span>Book a room for Thursday</div><p>Branch: <code>release/0.6</code></p><p>Spec: <u>https://example.org/spec</u></p><span class="mdimg">${ico('image', 'ico14')}flow</span>`;
+function scratchPage(o = {}) {
+  const tabs = o.tabs || TABS, sel = o.sel ?? 1, shown = o.shown ?? tabs.length;
+  if (o.failed) {
+    return pg(440, hd('Scratchpad') + `<div class="icard row">${st("Load failed", true)}<span class="sp"></span><button class="btn">Retry</button></div>`);
+  }
+  const strip = tabs.slice(0, shown).map((n, i) => i === o.rename
+    ? `<span class="fi foc" style="min-height:28px;height:28px;padding:3px 8px;flex:none"><span class="hl-sel">${n}</span>${caret}</span>`
+    : `<button class="stab ${i === sel ? 'on' : ''} ${i === o.tabFocus ? 'kf' : ''}" role="tab" aria-selected="${i === sel}">${n}</button>`).join('');
+  const overflow = tabs.length > shown ? `<button class="btn sub ${o.allMenu ? 'hov' : ''}" aria-label="All notes, ${tabs.length}" style="height:28px">+${tabs.length - shown}${ico('down', 'ico12')}</button>` : '';
+  const plus = `<button class="ib" aria-label="New note" ${tabs.length >= 12 ? 'disabled' : ''}>${ico('plus')}</button>`;
+  const status = o.status || '<span class="ic">Saved</span>';
+  const text = o.text ?? NOTE;
+  const area = o.preview ? `<div class="md" aria-label="${tabs[sel]}, preview">${NOTE_MD}</div>`
+    : `<div class="ed ${o.foc ? 'foc' : ''}" role="textbox" aria-multiline="true" aria-label="${tabs[sel]}">${esc(text)}${o.foc ? caret : ''}</div>`;
+  const foot = `<div class="acts"><span class="seg" role="radiogroup" aria-label="View"><span class="${o.preview ? '' : 'on'}">Edit</span><span class="${o.preview ? 'on' : ''}">Preview</span></span><span class="sp"></span><button class="ib ${o.menu || o.confirm ? 'hov' : ''}" aria-label="More" aria-haspopup="menu">${ico('more')}</button></div>`;
+  const pop = o.menu ? menu([{ t: 'Rename', hov: true }, { t: 'Export…' }, '-', { t: 'Delete' }], 'right:12px;bottom:50px')
+    : o.confirm ? confirm(`Delete “${tabs[sel]}”?`, 'Delete', 'right:12px;bottom:50px')
+    : o.allMenu ? menu(tabs.map((n, i) => ({ t: n, chk: i === sel })), 'right:12px;top:84px;min-width:180px') : '';
+  return pg(440, hd('Scratchpad', status) + `<div class="stabs" role="tablist">${strip}${overflow}${plus}</div>` + area + foot + pop);
+}
+
+// ---------------------------------------------------------------- Shelf
+const SHELF = [
+  { k: 'file', n: 'invoice-0412.pdf', m: 'PDF · 2.1 MB' },
+  { k: 'pic', n: 'Picture', m: '1280 × 720', pin: true },
+  { k: 'text', n: 'Call Dana about the venue', m: 'Text · 2 lines' },
+  { k: 'link', n: 'example.org/docs/setup', m: 'Link' },
+  { k: 'files', n: '3 files', m: 'Files · 4.8 MB' },
+  { k: 'missing', n: 'old-logo.svg', m: 'Unavailable' },
+  { k: 'cloud', n: 'Budget 2027.xlsx', m: 'Online only' }
+];
+const SG = { file: 'file', text: 'text', link: 'globe', files: 'files', missing: 'filex', cloud: 'cloud' };
+function shelfItem(it, cls = '') {
+  const g = it.k === 'pic' ? pic(48, 28, 1) : ico(SG[it.k], 'ico20', it.k === 'missing' ? 'color:#9D9D9D' : '');
+  return `<button class="si ${cls}" aria-label="${it.n}, ${it.m}${it.pin ? ', pinned' : ''}"><span class="sit">${g}</span><span class="sin ${it.k === 'missing' ? 'mut' : ''}">${esc(it.n)}</span><span class="sim">${it.m}</span>${it.pin ? `<span class="spin">${ico('pin', 'ico12')}</span>` : ''}</button>`;
+}
+function shelfPage(o = {}) {
+  const items = o.items ?? SHELF.slice(0, 5);
+  if (!items.length) return pg(328, hd('Shelf') + `<div class="sz ${o.over ? 'over' : ''}" aria-label="Shelf, empty">${ico('inbox', 'ico20')}<span>No items</span></div>`);
+  const cells = (o.slot ? '<span class="si slot" aria-hidden="true"></span>' : '') + items.map((it, i) => shelfItem(it, [i === o.sel ? 'sel' : '', i === o.drag ? 'drag' : '', i === o.kf ? 'kf' : ''].join(' '))).join('');
+  const grid = `<div class="sgw ${o.over ? 'over' : ''}" style="${o.h ? `height:${o.h}px;overflow:hidden;margin-right:-6px;padding-right:6px` : ''}"><div class="sgrid" role="listbox" aria-label="Shelf">${cells}</div>${o.h ? `<span class="sbar" style="top:2px;height:${o.barH}px;right:0"></span>` : ''}</div>`;
+  const it = items[o.sel], dead = !it || it.k === 'missing';
+  const acts = `<div class="acts">${o.status || ''}<span class="sp"></span><button class="btn" ${dead ? 'disabled' : ''}>Copy</button><button class="btn" ${it ? '' : 'disabled'}>${it && it.pin ? 'Unpin' : 'Pin'}</button><button class="btn" ${it ? '' : 'disabled'}>Remove</button></div>`;
+  return pg(328, hd('Shelf') + grid + acts);
+}
+
+// ---------------------------------------------------------------- All features
+function gridPage(o = {}) {
+  const tiles = [
+    ['music', 'Now Playing', 'Weekend Mix', { dot: 'var(--acc)', ico: 'color:var(--acc)' }],
+    ['lines', 'Sound', 'Realtek USB'], ['sliders', 'App volume', '4 apps'], ['coffee', 'Keep awake', 'Off'],
+    ['folder', 'File organizer', 'Silent'], ['activity', 'System monitor', 'CPU 12%'],
+    ['clip', 'Clipboard', o.hist ?? '23 items'], ['notebook', 'Scratchpad', '4 notes'], ['inbox', 'Shelf', '5 items']
+  ].filter((t) => !(o.without || []).includes(t[1]));
+  const tile = ([icon, name, stat, x = {}]) => `<button class="tl ${o.focus === name ? 'kf' : ''}" aria-label="${name}, ${stat}">${x.dot ? `<span class="tldot" style="background:${x.dot}"></span>` : ''}${ico(icon, 'ico20', x.ico || '')}<span class="tlname">${name}</span><span class="tlstat">${stat}</span></button>`;
+  return pg(328, `<div class="iph">${gumdrop(22)}<span class="ipt" style="font-size:14px;padding-left:6px">Chippi</span><span class="ic">2:41 PM</span></div><div class="igrid">${tiles.map(tile).join('')}</div>`);
+}
+
+// ---------------------------------------------------------------- desktop boards
+const PAGES = {
+  grid: () => gridPage(),
+  'grid-nohist': () => gridPage({ hist: 'Manual' }),
+  history: () => historyPage({ sel: 3, bar: [4, 196] }),
+  scratch: () => scratchPage({ foc: true }),
+  clean: () => historyPage({ noHist: true, input: 'https://youtu.be/abc?si=share&t=30', out: 'https://youtu.be/abc?t=30', removed: 'si' }),
+  shelf: () => shelfPage({ items: SHELF.slice(0, 4), over: true, slot: true })
+};
+const cursor = (x, y) => `<svg class="cur" style="left:${x}px;top:${y}px" viewBox="0 0 16 22" aria-hidden="true"><path d="M1 1 L1 17 L5 13.4 L8 20 L10.6 18.8 L7.8 12.4 L13 12.4 Z" fill="#FFF" stroke="#000" stroke-width="1" stroke-linejoin="round"></path></svg>`;
+const ghost = (x, y, icon, name) => `<div class="ghost" style="left:${x}px;top:${y}px">${ico(icon, 'ico', 'color:#C5C5C5')}${name}</div>`;
+function explorer(x, y, w, h, o) {
+  return `<div class="exp" style="left:${x}px;top:${y}px;width:${w}px;height:${h}px" aria-hidden="true"><div class="exph ${o.idle ? 'idle' : ''}">${ico('folder', 'ico14', 'color:#F5C451')}<span style="flex:1">${o.title}</span><span style="letter-spacing:10px">– ▢ ✕</span></div>
+    <div style="height:36px;display:flex;align-items:center;gap:8px;padding:0 12px;border-bottom:1px solid rgba(255,255,255,.06)"><span class="blk" style="width:90px;height:10px"></span><span class="blk" style="width:60px;height:10px"></span></div>
+    ${o.rows.map((r) => `<div class="expr ${r.sel ? 'sel' : ''} ${r.hot ? 'hot' : ''}">${ico(r.i || 'file', 'ico14', r.i === 'folder' ? 'color:#F5C451' : 'color:#C5C5C5')}<span>${r.n}</span></div>`).join('')}</div>`;
+}
+const EXTRA = {
+  // The docked Shelf, already open from the tray, takes a file dragged from File Explorer.
+  'shelf-drop': (box) => {
+    const d = box.querySelector('.dock').getBoundingClientRect(), b = box.getBoundingClientRect();
+    const x = d.left - b.left, y = d.top - b.top;
+    box.insertAdjacentHTML('beforeend', explorer(x - 380, y + 40, 340, 300, { title: 'Downloads', rows: [{ n: 'Invoices', i: 'folder' }, { n: 'invoice-0412.pdf', sel: true }, { n: 'q3-summary.docx' }, { n: 'setup-notes.txt' }, { n: 'photo-0918.jpg' }] })
+      + ghost(x + 112, y + 104, 'file', 'invoice-0412.pdf') + cursor(x + 104, y + 96) + `<div class="dtip" style="left:${x + 124}px;top:${y + 144}px">+ Copy</div>`);
+  }
+};
+function desktop(el) {
+  const edge = el.dataset.edge, page = el.dataset.page;
+  const SW = +el.dataset.w || 1440, SH = +el.dataset.h || 900, WORK = SH - 48;
+  const crop = el.dataset.crop ? el.dataset.crop.split(',').map(Number) : null;
+  el.style.width = (crop ? crop[2] : SW) + 'px';
+  el.style.height = (crop ? crop[3] : SH) + 'px';
+  const content = PAGES[page]();
+  const fake = `<div aria-hidden="true" style="position:absolute;inset:0 0 48px 0;display:flex;flex-direction:column">
+    <div class="wbar"><div class="wtab"><span style="width:14px;height:14px;border-radius:7px;background:#9AA5B1"></span><span class="blk" style="width:120px;height:8px;border-radius:4px"></span></div><div style="flex:1"></div>
+    <div style="display:flex;align-self:stretch"><span class="wctl"><svg width="10" height="10" viewBox="0 0 10 10" style="fill:none;stroke:currentColor"><path d="M0 5.5H10"></path></svg></span><span class="wctl"><svg width="10" height="10" viewBox="0 0 10 10" style="fill:none;stroke:currentColor"><rect x="0.5" y="0.5" width="9" height="9" rx="1"></rect></svg></span><span class="wctl"><svg width="10" height="10" viewBox="0 0 10 10" style="fill:none;stroke:currentColor"><path d="M0.5 0.5L9.5 9.5M9.5 0.5L0.5 9.5"></path></svg></span></div></div>
+    <div style="flex:1;display:flex;gap:48px;padding:64px 140px"><div style="flex:1;display:flex;flex-direction:column;gap:14px"><span class="blk" style="width:60%;height:22px"></span><span class="blk" style="height:10px"></span><span class="blk" style="width:94%;height:10px"></span><span class="blk" style="width:70%;height:10px"></span><span class="blk2" style="height:300px;margin-top:10px"></span><span class="blk" style="width:96%;height:10px"></span><span class="blk" style="width:88%;height:10px"></span></div>
+    <div style="width:300px;display:flex;flex-direction:column;gap:12px"><span class="blk2" style="height:180px"></span><span class="blk" style="height:10px"></span><span class="blk" style="width:80%;height:10px"></span></div></div></div>`;
+  const tray = `<div class="tb"><div style="flex:1"></div><div aria-hidden="true" style="display:flex;gap:8px"><span class="tapp" style="background:var(--acc);opacity:.85"></span><span class="tapp"></span><span class="tapp"></span><span class="tapp"></span><span class="tapp"></span></div>
+    <div style="flex:1;display:flex;justify-content:flex-end;align-items:center"><span style="width:32px;display:flex;justify-content:center;opacity:.85">${ico('up', 'ico', 'width:14px;height:14px')}</span>
+    <button class="trayb ${edge === 'dock' ? 'trayon' : ''}" aria-label="Chippi">${gumdrop(18)}</button>
+    <span aria-hidden="true" style="display:flex;align-items:center;gap:10px;height:40px;padding:0 10px;opacity:.9">${ico('wifi', 'ico', 'width:15px;height:15px')}${ico('vol', 'ico', 'width:15px;height:15px')}</span>
+    <div aria-hidden="true" style="display:flex;flex-direction:column;align-items:flex-end;width:76px;font-size:11px;line-height:14px;font-variant-numeric:tabular-nums"><span>2:41 PM</span><span>10/27/2026</span></div></div></div>`;
+  const island = edge === 'dock'
+    ? `<div class="dock" role="dialog" aria-label="Chippi">${content}<div class="dfoot"><button class="fbtn">${ico('grid')}All features</button><button class="fbtn">${ico('gear')}Settings</button></div></div>`
+    : `<div class="isl ${edge}" role="dialog" aria-label="Chippi island">${content}</div>`;
+  el.innerHTML = `<div class="dinner" style="width:${SW}px;height:${SH}px;${crop ? `left:${-crop[0]}px;top:${-crop[1]}px` : ''}">${fake}${island}${tray}</div>`;
+  const box = el.firstElementChild;
+  if (el.dataset.extra) EXTRA[el.dataset.extra](box);
+  if (edge === 'dock') return;
+
+  // Round buttons (DESIGN.md §5, one rule on every edge): two pairs 12px off the shape, each pair centered on it.
+  const isl = box.querySelector('.isl');
+  const W = isl.offsetWidth, H = isl.offsetHeight;
+  const onGrid = page.startsWith('grid');
+  const btn = (x, y, icon, label) => `<button class="sat" style="left:${x}px;top:${y}px" aria-label="${label}">${icon}</button>`;
+  const first = onGrid ? ico('back') : ico('grid');
+  const firstLabel = onGrid ? 'Back to Clipboard' : 'All features';
+  let html = '', fp;
+  if (edge === 'top') {
+    const left = SW / 2 - W / 2, cy = Math.max(8, H / 2 - 44);
+    html = btn(left - 52, cy, first, firstLabel) + btn(left - 52, cy + 48, ico('coffee'), 'Keep awake')
+      + btn(left + W + 12, cy, ico('gear'), 'Settings') + btn(left + W + 12, cy + 48, ico('sliders'), 'App volume')
+      + btn(SW / 2 - 20, H + 12, ico('music'), 'Now Playing');
+    fp = [left - 52, 0, W + 104, H + 52];
+  } else {
+    const tabY = Math.round(WORK * 0.48);
+    const top = Math.round(Math.min(Math.max(tabY - H / 2, 60), WORK - H - 60));
+    isl.style.top = top + 'px';
+    const cx = SW - W / 2;
+    html = btn(cx - 44, top - 52, first, firstLabel) + btn(cx + 4, top - 52, ico('coffee'), 'Keep awake')
+      + btn(cx - 44, top + H + 12, ico('gear'), 'Settings') + btn(cx + 4, top + H + 12, ico('sliders'), 'App volume')
+      + btn(SW - W - 52, top + H / 2 - 20, ico('music'), 'Now Playing');
+    fp = [SW - W - 52, top - 52, W + 52, H + 104];
+  }
+  if (el.dataset.fp) html += `<div class="fp" style="left:${fp[0] - 1}px;top:${fp[1] - 1}px;width:${fp[2] + 2}px;height:${fp[3] + 2}px"><span style="${fp[1] < 24 ? 'top:auto;bottom:-20px' : ''}">${Math.round(fp[2])} × ${Math.round(fp[3])} · work area ${SW} × ${WORK}</span></div>`;
+  box.insertAdjacentHTML('beforeend', html);
+}
+
+// ---------------------------------------------------------------- galleries
+const col = (title, note, body, w) => `<div class="galc" style="${w ? 'width:' + w + 'px' : ''}"><span class="galt">${title}</span>${note ? `<span class="galn">${note}</span>` : ''}${body}</div>`;
+const ground = (page, style = '') => `<div class="ground" style="${style}">${page}</div>`;
+const keys = (list) => `<ul class="keys">${list.map(([k, v]) => `<li><b>${k}</b>${v}</li>`).join('')}</ul>`;
+
+function galleries() {
+  const W = 'width:442px';
+  document.getElementById('g-history').innerHTML = [
+    col('First use', 'Installed, recording off. Nothing is recorded until Turn on (or the Settings switch).', ground(historyPage({ off: true }), W), 442),
+    col('Paused', 'Saved copies stay usable; new copies aren\'t recorded until Resume.', ground(historyPage({ paused: true, bar: [4, 196] }), W), 442),
+    col('A picture selected', 'Pictures preview at up to 208 wide.', ground(historyPage({ sel: 4, top: 84, bar: [44, 196] }), W), 442),
+    col('A missing file', 'One of two files was moved or deleted. Paste and Copy wait rather than paste a shorter list.', ground(historyPage({ sel: 8, top: 184, bar: [110, 196] }), W), 442),
+    col('No match', '', ground(historyPage({ q: 'invoice 2025', qf: true, noMatch: true }), W), 442),
+    col('Clipboard busy', 'Another app held the clipboard through every retry.', ground(historyPage({ sel: 3, bar: [4, 196], status: st('Clipboard busy', true) }), W), 442),
+    col('A picture over the limit', 'The copy wasn\'t saved. The line stays until the next copy.', ground(historyPage({ banner: 'Picture not saved · over 16 MiB', bar: [4, 196] }), W), 442),
+    col('History full', 'Pins fill the 128 MiB. New copies wait until a pin is removed.', ground(historyPage({ banner: 'History full · 128 MiB', bar: [4, 196] }), W), 442)
+  ].join('');
+
+  document.getElementById('g-plain').innerHTML = [
+    col('Pasted', 'The shortcut pasted into Outlook. Nothing shows, since Chippi can\'t know the text landed.', plainTab({ app: 'Outlook · New message', body: 'Revenue grew 12% over Q2.' }), 330),
+    col('An admin app in front', 'Chippi can\'t paste into it, so the plain text becomes the copy. A beep, and the tab shows the glyph for 6 seconds.', plainTab({ app: 'Administrator: PowerShell', glyph: true, label: 'Plain text copied' }), 330),
+    col('Pictures or files copied', 'Nothing changes. A beep, and the glyph in Caution.', plainTab({ app: 'Outlook · New message', glyph: true, cau: true, label: 'No text copied' }), 330),
+    col('Clipboard busy', 'Another app held the clipboard. A beep, and the glyph in Caution.', plainTab({ app: 'Outlook · New message', glyph: true, cau: true, label: 'Clipboard busy' }), 330)
+  ].join('');
+
+  document.getElementById('g-clean').innerHTML = [
+    col('Opening Clean URL', 'The link button in the Clipboard header swaps the list for the link field. Again, or Esc, goes back.', ground(historyPage({ bar: [4, 196], linkFocus: true }), W), 442),
+    col('A link with a tracker', 'The copy was one web link, so it fills the field. The playback time stays.', ground(historyPage({ clean: true, input: 'https://youtu.be/abc?si=share&t=30', out: 'https://youtu.be/abc?t=30', removed: 'si' }), W), 442),
+    col('Several removed', 'Order, other fields and the fragment stay.', ground(historyPage({ clean: true, input: 'https://example.org/p?utm_source=news&utm_medium=email&item=7#part', out: 'https://example.org/p?item=7#part', removed: 'utm_source, utm_medium' }), W), 442),
+    col('Nothing to remove', '<code>si</code> only goes on YouTube and Spotify links, and <code>ref</code> is kept everywhere.', ground(historyPage({ clean: true, input: 'https://example.org/?si=keep&ref=keep', same: true }), W), 442),
+    col('Not a web link', '', ground(historyPage({ clean: true, input: 'ftp://files.example.org/a.zip', invalid: true, foc: true }), W), 442),
+    col('Copied', 'The cleaned link is the copy, and History lists it.', ground(historyPage({ clean: true, input: 'https://youtu.be/abc?si=share&t=30', out: 'https://youtu.be/abc?t=30', removed: 'si', copied: true }), W), 442),
+    col('Clipboard history not installed', 'The Clipboard tile stays for Clean URL, and its page is Clean URL alone. Nothing copied.', ground(historyPage({ noHist: true, foc: true }), W), 442)
+  ].join('');
+
+  document.getElementById('g-scratch').innerHTML = [
+    col('Preview', 'Local Markdown only: the link is text, the picture isn\'t fetched.', ground(scratchPage({ preview: true }), W), 442),
+    col('Renaming a note', 'F2, or Rename in the note\'s menu. Enter keeps, Esc cancels.', ground(scratchPage({ rename: 1 }), W), 442),
+    col('The note\'s menu', 'Also on right-clicking a tab.', ground(scratchPage({ menu: true }), W), 442),
+    col('A new note', 'Named in order. The keyboard is in it.', ground(scratchPage({ tabs: [...TABS, 'Note 5'], sel: 4, text: '', foc: true }), W), 442),
+    col('12 notes', 'The tabs that fit, then the rest in a list. New note is off at 12.', ground(scratchPage({ tabs: TABS12, sel: 1, shown: 4, allMenu: true }), W) + '<div style="height:80px"></div>', 442),
+    col('Save failed', 'The text stays as typed; the next keystroke tries again.', ground(scratchPage({ status: '<span class="ic cau">Save failed</span>', foc: true }), W), 442),
+    col('Notes can\'t be opened', 'No empty note in their place, so nothing can overwrite them.', ground(scratchPage({ failed: true }), W), 442)
+  ].join('');
+
+  const S = 'width:330px';
+  document.getElementById('g-shelf').innerHTML = [
+    col('Empty', '', ground(shelfPage({ items: [] }), S), 330),
+    col('Empty, a drag over it', '', ground(shelfPage({ items: [], over: true }), S), 330),
+    col('Mixed, one selected', 'A file, a picture (pinned), text, a link and three files from one drop.', ground(shelfPage({ sel: 0 }), S), 330),
+    col('A pinned item selected', 'Pinned items stay after a drag out.', ground(shelfPage({ sel: 1 }), S), 330),
+    col('A missing file', 'Moved or deleted since. An online-only file is listed by name and not downloaded.', ground(shelfPage({ items: SHELF, sel: 5 }), S), 330),
+    col('Full', 'Three rows show; the rest scroll inside the page.', ground(shelfPage({ items: [...SHELF, { k: 'text', n: 'Gate 14, boarding 5:20', m: 'Text' }, { k: 'link', n: 'shop.example.com/item/7781', m: 'Link' }, { k: 'file', n: 'lease-draft.docx', m: 'DOCX · 61 KB' }, { k: 'pic', n: 'Picture', m: '800 × 600' }, { k: 'file', n: 'w9-form.pdf', m: 'PDF · 310 KB' }], h: 268, barH: 112 }), S), 330),
+    col('Over the file limit', 'A drop of 140 files was refused.', ground(shelfPage({ status: st('Over 100 files', true) }), S), 330),
+    col('Picture too large', '', ground(shelfPage({ status: st('Picture over 16 MiB', true) }), S), 330)
+  ].join('');
+}
+
+// ---------------------------------------------------------------- Shelf drag scenes
+function scene(o) {
+  const CX = 470;
+  const island = o.tab
+    ? `<div class="tab top" style="left:${CX - 68}px;width:136px;height:36px;border-radius:0 0 36px 36px">${gumdrop(22)}${ico('inbox', 'ico14', 'color:var(--acc)')}</div>`
+    : `<div class="isl top" style="left:${CX}px">${o.page}</div>`;
+  const rows = [{ n: 'Invoices', i: 'folder' }, { n: 'Shared', i: 'folder', hot: o.hotShared }, { n: 'invoice-0412.pdf', sel: o.selInvoice }, { n: 'setup-notes.txt' }, { n: 'photo-0918.jpg' }, { n: 'trip-budget.xlsx' }];
+  return `<div class="scene" aria-hidden="true"><div style="position:absolute;inset:0;background:#1B1B1B"></div>${explorer(20, 130, 280, 290, { title: 'Downloads', idle: false, rows })}${island}${o.extra || ''}</div>`;
+}
+function dragScenes() {
+  const before = [{ k: 'file', n: 'q3-summary.docx', m: 'DOCX · 48 KB' }, SHELF[1], SHELF[2], SHELF[3]];
+  const after = [SHELF[0], ...before];
+  const frames = [
+    ['1 · Over the closed tab', 'A file dragged from Explorer swells the tab and shows the Shelf glyph. Nothing has opened yet.',
+      scene({ tab: true, selInvoice: true, extra: ghost(486, 28, 'file', 'invoice-0412.pdf') + cursor(470, 18) })],
+    ['2 · The Shelf opens', 'Without activation: Explorer keeps the focus, and the drag carries on.',
+      scene({ page: shelfPage({ items: before }), selInvoice: true, extra: ghost(486, 58, 'file', 'invoice-0412.pdf') + cursor(470, 48) })],
+    ['3 · Into the page', 'Anywhere on the page takes the drop; the grid shows where the item will land.',
+      scene({ page: shelfPage({ items: before, over: true, slot: true }), selInvoice: true, extra: ghost(380, 106, 'file', 'invoice-0412.pdf') + cursor(364, 96) + '<div class="dtip" style="left:384px;top:146px">+ Copy</div>' })],
+    ['4 · Dropped', 'A reference to the file, first in the Shelf. The file stays in Downloads.',
+      scene({ page: shelfPage({ items: after }), extra: cursor(364, 96) })],
+    ['5 · Dragging one out', 'q3-summary.docx onto the Shared folder. Copy only, so Explorer offers Copy, never Move.',
+      scene({ page: shelfPage({ items: after, drag: 1 }), hotShared: true, extra: ghost(150, 200, 'file', 'q3-summary.docx') + cursor(134, 190) + '<div class="dtip" style="left:154px;top:240px">+ Copy to Shared</div>' })],
+    ['6 · Accepted', 'An unpinned item leaves the Shelf once a drop is accepted. A pinned one would stay.',
+      scene({ page: shelfPage({ items: after.filter((_, i) => i !== 1) }), extra: cursor(134, 190) })],
+    ['7 · Canceled', 'Esc, or a drop nowhere: the item stays.',
+      scene({ page: shelfPage({ items: after }), extra: cursor(560, 300) })]
+  ];
+  document.getElementById('g-drag').innerHTML = frames.map(([t, n, s]) => col(t, n, s, 820)).join('');
+}
+
+// ---------------------------------------------------------------- docked crops
+function docked() {
+  const crop = (page, note, title, extra = '') => col(title, note, `<div class="desk" data-edge="dock" data-page="${page}" data-crop="680,240,760,660" ${extra}></div>`, 760);
+  document.getElementById('g-docked').innerHTML = [
+    crop('history', 'Opened from the tray; the footer replaces the round buttons.', 'Clipboard'),
+    crop('grid-nohist', 'Clipboard history uninstalled: the Clipboard tile stays for Clean URL, with its status.', 'All features without Clipboard history'),
+    crop('clean', 'History uninstalled. The manual Clean doesn\'t need it.', 'Clean URL'),
+    crop('shelf', 'Already open from the tray, it takes a drop. The tray icon itself never does.', 'Shelf receiving a drop', 'data-extra="shelf-drop"')
+  ].join('');
+}
+
+// ---------------------------------------------------------------- keyboard
+function keyboard() {
+  const g = 'width:442px';
+  const roomItems = [HIST[3], { k: 'text', t: 'Room 2B is booked for Thursday', tm: 'Mon', meta: 'Text' }];
+  document.getElementById('g-keys').innerHTML = [
+    col('Opening a page', 'Arrows reach the tile, Enter opens it. Each page then puts the keyboard in one place.',
+      ground(gridPage({ focus: 'Clipboard' }), 'width:330px') + keys([['Clipboard', 'Search field (link field in Clean URL)'], ['Scratchpad', 'The note, at its end'], ['Shelf', 'First item']]), 330),
+    col('Clipboard', 'Typing searches. The selection moves while the keyboard stays in the field.',
+      ground(historyPage({ q: 'room', qf: true, items: roomItems, sel: 0 }), g) + keys([['Up, Down', 'Select'], ['Enter', 'Paste into the app in front'], ['Ctrl+C', 'Copy'], ['Ctrl+P', 'Pin or unpin'], ['Delete', 'Delete the copy, with the search empty'], ['Esc', 'Clear the search or leave Clean URL, then close']]), 442),
+    col('Scratchpad', 'Tab leaves the note (no tab characters), so the keys never get stuck in it.',
+      ground(scratchPage({ tabFocus: 1 }), g) + keys([['Left, Right', 'Switch notes in the tab row'], ['F2', 'Rename'], ['Ctrl+Tab', 'Next note, from the note'], ['Ctrl+N', 'New note'], ['Esc', 'Close; the note is already saved']]), 442),
+    col('Shelf', 'Selection follows the focus.',
+      ground(shelfPage({ sel: 2, kf: 2 }), 'width:330px') + keys([['Arrows', 'Move through items'], ['Ctrl+C', 'Copy'], ['Ctrl+P', 'Pin or unpin'], ['Delete', 'Remove'], ['Shift+F10', 'The item\'s menu']]), 330),
+    col('Paste, before', 'The island has the keyboard, so Outlook\'s title is inactive. Enter on the selected copy…',
+      handoff(`<div class="isl top" style="left:260px">${historyPage({ q: 'room', items: roomItems, sel: 0 })}</div>`, false, 'Hi Sam,|'), 520),
+    col('Paste, after', '…hands the keyboard back to Outlook, waits for it to be in front, then pastes. The island closes. Chippi shows no Pasted state.',
+      handoff(`<div class="tab top" style="left:212px;width:96px;height:28px;border-radius:0 0 28px 28px">${gumdrop(20, 'sleepy')}</div>`, true, 'Hi Sam,|Meeting moved to 3:30 PM, Room 2B.'), 520)
+  ].join('');
+}
+// An app window under the island, for the paste handoff.
+function handoff(island, active, body) {
+  const [a, b] = body.split('|');
+  return `<div style="position:relative;width:520px;height:560px;background:#1B1B1B;border-radius:8px;overflow:hidden" aria-hidden="true">
+    <div class="exp" style="left:24px;top:330px;width:472px;height:206px"><div class="exph ${active ? '' : 'idle'}"><span class="mono" style="width:16px;height:16px;font-size:9px">O</span><span style="flex:1">Outlook · New message</span><span style="letter-spacing:10px">– ▢ ✕</span></div>
+    <div style="padding:16px;font-size:13px;line-height:20px"><div>${a}</div><div>${b}${active ? caret : ''}</div></div></div>${island}</div>`;
+}
+
+// ---------------------------------------------------------------- destructive
+function destructive() {
+  const g = 'width:442px';
+  const pinsOnly = HIST.filter((i) => i.pin);
+  document.getElementById('g-destroy').innerHTML = [
+    col('History\'s menu', 'Clear history keeps pins; Erase all doesn\'t.', ground(historyPage({ menu: 1, bar: [4, 196] }), g), 442),
+    col('Clear history', '', ground(historyPage({ confirm: 'clear', bar: [4, 196] }), g), 442),
+    col('After Clear', 'Pins stay.', ground(historyPage({ items: pinsOnly }), g), 442),
+    col('Erase all', '', ground(historyPage({ confirm: 'erase', bar: [4, 196] }), g), 442),
+    col('After Erase all', 'Recording carries on.', ground(historyPage({ items: [] }), g), 442),
+    col('Deleting a note', '', ground(scratchPage({ confirm: true }), g), 442),
+    col('Removing a Shelf item', 'Before and after Remove. invoice-0412.pdf is still in Downloads.', ground(shelfPage({ sel: 0 }), 'width:330px') + ground(shelfPage({ items: SHELF.slice(1, 5) }), 'width:330px'), 330)
+  ].join('');
+}
+
+// ---------------------------------------------------------------- Settings
+function settings(o) {
+  const NAV = [['Files', [['folder', 'File organizer']]], ['Sound', [['speaker', 'Output'], ['mic', 'Microphone'], ['sliders', 'App volume']]],
+    ['System', [['coffee', 'Keep awake'], ['activity', 'System monitor']]], ['Clipboard &amp; text', [['clip', 'Clipboard history'], ['cliptype', 'Paste as plain text'], ['link', 'Clean URL']]],
+    ['Chippi', [['gear', 'General'], ['drop', 'Island &amp; pet'], ['bell', 'Notifications'], ['plus', 'Add features'], ['info', 'About']]]];
+  const selName = { history: 'Clipboard history', paste: 'Paste as plain text', clean: 'Clean URL', features: 'Add features' }[o.page];
+  const nav = NAV.map(([g, items]) => `<div class="sgrp">${g}</div>` + items.map(([icon, n]) => `<div class="sni ${n === selName ? 'on' : ''}">${n === selName ? '<span class="pill"></span>' : ''}${ico(icon)}${n}</div>`).join('')).join('');
+  const sw = (on) => `<span class="onoff">${on ? 'On' : 'Off'}</span><button class="tog ${on ? 'on' : ''}" role="switch" aria-checked="${on}"><i></i></button>`;
+  const row = (label, ctl, cap) => `<div class="srow"><span class="lab"><span>${label}</span>${cap ? `<span class="scap">${cap}</span>` : ''}</span><span class="ctl">${ctl}</span></div>`;
+  const sec = (t, b) => `<h2 class="ssec"><span>${t}</span>${b ? `<button class="sbtn">${b}</button>` : ''}</h2>`;
+  let main = '';
+  if (o.page === 'history') {
+    const apps = o.apps.length ? o.apps.map(([m, n, p]) => `<div class="srow"><span class="smono">${m}</span><span class="lab"><span>${n}</span><span class="scap">${p}</span></span><span class="ctl"><button class="sbtn">Remove</button></span></div>`).join('')
+      : '<div class="srow"><span class="lab smut">No apps</span></div>';
+    main = `<h1 class="stitle">Clipboard history</h1><div class="scard">${row('Recording', sw(o.rec))}</div>${sec('Apps to skip', 'Add app')}<div class="scard">${apps}</div>`;
+  } else if (o.page === 'paste') {
+    const ctl = o.keys ? `<span class="keyv">${o.keys}</span><button class="sbtn">Change</button><button class="sbtn">Remove</button>` : '<span class="keyv smut">Not set</span><button class="sbtn">Set</button>';
+    main = `<h1 class="stitle">Paste as plain text</h1><div class="scard">${row('Shortcut', ctl)}</div>${o.inUse ? '<div class="serr"><span class="dot"></span>Shortcut in use</div>' : ''}`;
+  } else if (o.page === 'clean') {
+    const sites = o.sites.map((s) => `<div class="srow"><span class="lab"><span>${s}</span></span><span class="ctl"><button class="sbtn">Remove</button></span></div>`).join('');
+    const add = o.adding ? `<div class="srow add"><span class="sfld foc">intranet.example.net${caret}</span><span class="lab"></span><span class="ctl"><button class="sbtn acc">Add</button><button class="sbtn">Cancel</button></span></div>` : '';
+    main = `<h1 class="stitle">Clean URL</h1><div class="scard">${row('Automatic cleaning', sw(o.auto))}</div>${sec('Sites to skip', 'Add site')}<div class="scard ${o.auto ? '' : 'dim60'}">${add}${sites}</div>`;
+  } else if (o.page === 'features') {
+    const F = [['clip', 'Clipboard history', 'Searchable history of what you copied, with pinned items', 'Overlaps Win+V'], ['cliptype', 'Paste as plain text', 'Pastes without the source formatting', 'Overlaps PowerToys'],
+      ['link', 'Clean URL', 'Strips tracking parameters from links you copy'], ['notebook', 'Scratchpad', 'A quick notes pad that saves as you type', 'Overlaps Notepad'], ['inbox', 'Shelf', 'Holds dragged files and text while you move between apps']];
+    const rows = F.map(([i, n, d, b]) => `<div class="srow"><span class="chip32">${ico(i)}</span><span class="lab"><span>${n}${b ? `<span class="badge">${b}</span>` : ''}</span><span class="scap">${d}</span></span><span class="ctl">${sw(true)}</span></div>`).join('');
+    main = `<h1 class="stitle">Add features</h1><div style="display:flex;align-items:center;gap:12px"><div class="ssearch" style="flex:1;margin:0">${ico('search')}Search features</div><span class="smut" style="font-variant-numeric:tabular-nums">11 on</span></div>${sec('Available')}<div class="scard">${rows}</div>
+      <div class="spop" role="alertdialog" style="right:40px;top:186px"><span>Uninstall and erase history?</span><div class="ctl"><button class="sbtn">Cancel</button><button class="sbtn crit">Uninstall</button></div></div>`;
+  }
+  return `<div class="set ${o.light ? 'lt' : ''}" style="height:${o.h || 800}px">
+    <div class="stbar">${gumdrop(16)}<span class="grow">Chippi Settings</span><button class="wb" aria-label="Minimize"><svg width="10" height="10" viewBox="0 0 10 10" style="fill:none;stroke:currentColor"><path d="M0 5.5H10"></path></svg></button><button class="wb" aria-label="Maximize"><svg width="10" height="10" viewBox="0 0 10 10" style="fill:none;stroke:currentColor"><rect x="0.5" y="0.5" width="9" height="9" rx="1"></rect></svg></button><button class="wb" aria-label="Close"><svg width="10" height="10" viewBox="0 0 10 10" style="fill:none;stroke:currentColor"><path d="M0.5 0.5L9.5 9.5M9.5 0.5L0.5 9.5"></path></svg></button></div>
+    <div class="sbody"><nav class="snav" aria-label="Settings"><div class="ssearch">${ico('search')}Find a setting</div>${nav}</nav><main class="smain">${main}</main></div></div>`;
+}
+
+// ---------------------------------------------------------------- build
+galleries();
+dragScenes();
+docked();
+keyboard();
+destructive();
+document.querySelectorAll('.desk').forEach(desktop);
+const APPS = [['R', 'Remote Desktop Connection', 'C:\\Windows\\System32\\mstsc.exe'], ['K', 'KeePassXC', 'C:\\Program Files\\KeePassXC\\KeePassXC.exe']];
+document.getElementById('s-dark').innerHTML = settings({ page: 'history', rec: true, apps: APPS }) + settings({ page: 'clean', auto: true, sites: ['bank.example.com', 'drive.example.org'] })
+  + settings({ page: 'paste', keys: 'Ctrl+Shift+V', inUse: true }) + settings({ page: 'features' });
+document.getElementById('s-light').innerHTML = settings({ light: true, page: 'history', rec: false, apps: [] }) + settings({ light: true, page: 'clean', auto: false, adding: true, sites: ['bank.example.com', 'drive.example.org'] })
+  + settings({ light: true, page: 'paste' }) + settings({ light: true, page: 'paste', keys: 'Ctrl+Alt+V' });
+
+// ?board=<id> shows one board alone, at its own size, for the PNG export.
+const only = new URLSearchParams(location.search).get('board');
+if (only) {
+  document.body.classList.add('solo');
+  document.querySelectorAll('.doc-board').forEach((b) => b.classList.toggle('off', b.id !== 'b-' + only));
+  const shown = document.querySelector('.doc-board:not(.off) .board');
+  document.body.dataset.size = Math.ceil(shown.offsetWidth) + ',' + Math.ceil(shown.offsetHeight); // read by render.ps1
+}
+</script>
+</body>
+</html>
