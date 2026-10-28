@@ -17,6 +17,9 @@ public enum StopReason
     /// <summary>VB-CABLE is installed but its endpoints are disabled.</summary>
     DriverDisabled,
 
+    /// <summary>More than one active VB-CABLE pair: Chippi won't guess which to use.</summary>
+    MoreThanOneCable,
+
     /// <summary>No real microphone to clean.</summary>
     NoMicrophone,
 
@@ -101,8 +104,13 @@ internal sealed class MicPipelineHost(ILogger log, MicPipelineFactory factory, A
         var (cable, pair) = VbCable.Find([.. catalog.Endpoints(AudioFlow.Render), .. catalog.Endpoints(AudioFlow.Capture)]);
         if (cable != CableState.Ready)
         {
-            var reason = cable == CableState.Disabled ? StopReason.DriverDisabled : StopReason.NoDriver;
-            Halt(new(ProcessingState.Stopped, reason, Error: cable == CableState.Ambiguous ? "More than one VB-CABLE" : null), arbiter, catalog, system);
+            var reason = cable switch
+            {
+                CableState.Disabled => StopReason.DriverDisabled,
+                CableState.Ambiguous => StopReason.MoreThanOneCable,
+                _ => StopReason.NoDriver,
+            };
+            Halt(new(ProcessingState.Stopped, reason), arbiter, catalog, system);
             return;
         }
 

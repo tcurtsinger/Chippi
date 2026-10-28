@@ -30,7 +30,7 @@ Our own default writes echo back as a notification; the reconcile it causes find
 
 | Type | What it is |
 |---|---|
-| `VbCable` | Recognizes VB-CABLE by `AudioEndpoint.Filter`, the KS filter its INF registers (`...\vbaudiovacwdm2022_out1_topo_...` for CABLE Input, `_in1_` for CABLE Output), never by names. `Find` gives Missing, Disabled, Ready (one pair on one device) or Ambiguous. `IsCable` matches any of its endpoints, CABLE In 16ch too. |
+| `VbCable` | Recognizes VB-CABLE by `AudioEndpoint.Filter`, the KS filter pin its INF registers (`...\vbaudiovacwdm2022_out1_topo_.../00010001` for CABLE Input, `_in1_` for CABLE Output), never by names. `Find` gives Missing, Disabled, Ready (one pair on one device) or Ambiguous. `IsCable` matches any of its endpoints, CABLE In 16ch (pin `00010002` on the same filter) too. |
 | `MicPipeline` | Hopper's chain: capture, mono, 48 kHz, input meter, RNNoise, gate, AGC, output meter, the transport's mix format. `RenderDeviceTransport` renders into CABLE Input. `Failed` fires when capture or render stops by itself. |
 | `MicPipelineHost` (internal) | On the engine, every reconcile: stops on a missing driver or mic, rebuilds when the winning real mic changes, waits after a failure until its mic changes or returns. Takes all three capture roles for CABLE Output when asked, writing the marker first, and gives them back on stop. |
 | `AudioService.SetProcessingAsync(request)` / `RecoverProcessingAsync(marker)` | On or off, and crash recovery: roles still on the marker's cable go back to what it replaced. `AudioSnapshot.Processing` says what actually runs; `MeterReadings.ProcessingInput`/`Output` carry the levels. |

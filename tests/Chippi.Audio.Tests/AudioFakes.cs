@@ -66,13 +66,19 @@ public sealed class FakeDeviceSystem : IDeviceSystem, IPerAppDeviceSystem
     /// <summary>The KS device VB-CABLE's endpoints hang off (root-enumerated, as its INF installs it).</summary>
     public const string CableDevice = @"{2}.\\?\root#media#0000#{6994ad04-93ef-11d0-a3cc-00a0c9223196}";
 
+    // The pins below are the ones pack 45 shows on Travis's PC (read-only probe, 2026-10-28).
+
     /// <summary>VB-CABLE's render endpoint, with the reference string from vbMmeCable64_win10.inf.</summary>
     public static AudioEndpoint CableInput(string id = "CableIn", string device = CableDevice) =>
-        new(id, "CABLE Input", AudioFlow.Render, EndpointState.Active, "VB-Audio Virtual Cable", device + @"\vbaudiovacwdm2022_out1_topo_e51a78a01fb100001");
+        new(id, "CABLE Input", AudioFlow.Render, EndpointState.Active, "VB-Audio Virtual Cable", device + @"\vbaudiovacwdm2022_out1_topo_e51a78a01fb100001/00010001");
+
+    /// <summary>"CABLE In 16ch": a second pin on CABLE Input's own filter.</summary>
+    public static AudioEndpoint CableIn16(string id = "CableIn16", string device = CableDevice) =>
+        new(id, "CABLE In 16ch", AudioFlow.Render, EndpointState.Active, "VB-Audio Virtual Cable", device + @"\vbaudiovacwdm2022_out1_topo_e51a78a01fb100001/00010002");
 
     /// <summary>VB-CABLE's capture endpoint, the one apps record from.</summary>
     public static AudioEndpoint CableOutput(string id = "CableOut", string device = CableDevice) =>
-        new(id, "CABLE Output", AudioFlow.Capture, EndpointState.Active, "VB-Audio Virtual Cable", device + @"\vbaudiovacwdm2022_in1_topo_e51a78a01fb200001");
+        new(id, "CABLE Output", AudioFlow.Capture, EndpointState.Active, "VB-Audio Virtual Cable", device + @"\vbaudiovacwdm2022_in1_topo_e51a78a01fb200001/00010000");
 
     /// <summary>An endpoint is turned on or off in Sound settings, or unplugged.</summary>
     public void SetState(string id, EndpointState state)

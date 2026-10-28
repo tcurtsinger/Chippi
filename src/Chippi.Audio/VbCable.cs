@@ -27,9 +27,10 @@ public sealed record CablePair(string RenderId, string CaptureId);
 /// Recognizes VB-CABLE by device identity, never by endpoint names (which users can rename, and a
 /// real mic can be called "Cable Room Mic"). VB-CABLE's INF (vbMmeCable64_win10.inf, pack 45)
 /// registers its KS filters with fixed reference strings: <c>VBAudioVACWDM2022_Out1_Topo_...</c>
-/// for CABLE Input and <c>VBAudioVACWDM2022_In1_Topo_...</c> for CABLE Output. Each endpoint's
-/// <see cref="AudioEndpoint.Filter"/> ends in one of those. "CABLE In 16ch" has its own reference
-/// string, so it never matches the pair.
+/// for the render side and <c>VBAudioVACWDM2022_In1_Topo_...</c> for CABLE Output. Each endpoint's
+/// <see cref="AudioEndpoint.Filter"/> is a pin on one of those. The render filter has two pins:
+/// <c>/00010001</c> is CABLE Input and <c>/00010002</c> is "CABLE In 16ch", which never counts as
+/// the input.
 /// </summary>
 public static partial class VbCable
 {
@@ -67,7 +68,7 @@ public static partial class VbCable
     [GeneratedRegex(@"\\vbaudiovacwdm[^\\]*$", RegexOptions.IgnoreCase)]
     private static partial Regex AnyCable();
 
-    [GeneratedRegex(@"\\vbaudiovacwdm[^\\_]*_out1_[^\\]*$", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"\\vbaudiovacwdm[^\\_]*_out1_[^\\/]*/00010001$", RegexOptions.IgnoreCase)]
     private static partial Regex CableInput();
 
     [GeneratedRegex(@"\\vbaudiovacwdm[^\\_]*_in1_[^\\]*$", RegexOptions.IgnoreCase)]

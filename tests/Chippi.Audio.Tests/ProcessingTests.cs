@@ -194,6 +194,25 @@ public sealed class ProcessingTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task Two_cables_read_as_more_than_one_cable_not_no_driver()
+    {
+        const string second = @"{2}.\\?\root#media#0001#{6994ad04-93ef-11d0-a3cc-00a0c9223196}";
+        _sys.With(Mic("Real"), CableInput(), CableOutput(), CableInput("In2", second), CableOutput("Out2", second));
+        var status = await _service.SetProcessingAsync(Request());
+        Assert.Equal(StopReason.MoreThanOneCable, status.Reason);
+        Assert.Empty(_pipelines.Created);
+    }
+
+    [Fact]
+    public async Task One_install_with_cable_in_16ch_goes_live_on_cable_input()
+    {
+        _sys.With(Mic("Real"), CableIn16(), CableInput(), CableOutput()).WithDefault("Real");
+        var status = await _service.SetProcessingAsync(Request());
+        Assert.Equal(ProcessingState.Live, status.State);
+        Assert.Single(_pipelines.Created);
+    }
+
+    [Fact]
     public async Task Without_vb_cable_nothing_starts()
     {
         _sys.With(Mic("Real"));
