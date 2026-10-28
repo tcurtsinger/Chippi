@@ -23,7 +23,7 @@ public static class FeatureCatalog
         // Files (File organizer is a real module since Phase 2: Chippi.Features.Downloads)
         new("shelf", "Shelf", "Holds dragged files and text while you move between apps", FeatureGroup.Files)
         {
-            Icon = "Download",
+            Icon = "Inbox",
             Presets = PowerUser,
         },
 
@@ -77,24 +77,25 @@ public static class FeatureCatalog
         // Phase 5: Clipboard and text
         new("clipboard-history", "Clipboard history", "Searchable history of what you copied, with pinned items", FeatureGroup.ClipboardText)
         {
-            Icon = "Clipboard",
+            Icon = "ClipboardList",
             Badges = [FeatureBadge.Overlap("Overlaps Win+V")],
             Presets = Essentials | PowerUser,
         },
         new("paste-plain-text", "Paste as plain text", "Pastes without the source formatting", FeatureGroup.ClipboardText)
         {
-            Icon = "Clipboard",
+            Icon = "ClipboardType",
             Badges = [FeatureBadge.Overlap("Overlaps PowerToys")],
             Presets = Essentials | PowerUser,
         },
         new("clean-url", "Clean URL", "Strips tracking parameters from links you copy", FeatureGroup.ClipboardText)
         {
-            Icon = "Check",
+            Icon = "Link",
             Presets = Essentials | PowerUser,
         },
         new("scratchpad", "Scratchpad", "A quick notes pad that saves as you type", FeatureGroup.ClipboardText)
         {
-            Icon = "Keyboard",
+            Icon = "NotebookPen",
+            Badges = [FeatureBadge.Overlap("Overlaps Notepad")],
             Presets = PowerUser,
         },
         new("text-snippets", "Text snippets", "Type a short abbreviation and it expands into saved text", FeatureGroup.ClipboardText)
@@ -104,16 +105,11 @@ public static class FeatureCatalog
             Presets = PowerUser,
         },
 
-        // Phase 5 and 6: Windows and input
+        // Phase 5.5 and 6: Windows and input
         new("command-bar", "Command bar", "Type to launch apps, run commands and reach any Chippi feature", FeatureGroup.Windows)
         {
             Icon = "Search",
             Badges = [FeatureBadge.Overlap("Overlaps PowerToys Run")],
-            Presets = PowerUser,
-        },
-        new("quick-panel", "Quick panel", "A shortcut opens your pinned tools wherever you are", FeatureGroup.Windows)
-        {
-            Icon = "LayoutGrid",
             Presets = PowerUser,
         },
         new("radial-menu", "Radial menu", "Hold a mouse button for a ring of actions under the pointer", FeatureGroup.Windows)

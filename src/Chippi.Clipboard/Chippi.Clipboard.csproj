@@ -1,0 +1,23 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- The shared clipboard service for the Phase 5 features: the listener, privacy gate, format reader
+     and writer, the paste sender and the sealed store. No WPF and no module code; behavior is tested
+     on FakeClipboard and FakeForeground, never the real clipboard. -->
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <RootNamespace>Chippi.Clipboard</RootNamespace>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Chippi.Core\Chippi.Core.csproj" />
+    <PackageReference Include="Microsoft.Data.Sqlite" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Chippi.Clipboard.Tests" />
+  </ItemGroup>
+
+</Project>
