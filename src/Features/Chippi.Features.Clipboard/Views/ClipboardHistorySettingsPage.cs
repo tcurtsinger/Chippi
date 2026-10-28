@@ -58,23 +58,15 @@ public sealed class ClipboardHistorySettingsPage : UserControl
     /// <summary>Add app: the running apps with a window, then Browse… for an .exe (notes #52).</summary>
     private void OpenAdd()
     {
-        var menu = new ContextMenu { PlacementTarget = _add, Placement = PlacementMode.Bottom };
-        foreach (var (name, path) in RunningApps().Where(a => !_module.Settings.AppsToSkip.Contains(a.Path, StringComparer.OrdinalIgnoreCase)))
-        {
-            var item = new MenuItem { Header = name };
-            item.Click += (_, _) => Save([.. _module.Settings.AppsToSkip, path]);
-            menu.Items.Add(item);
-        }
-        if (menu.Items.Count > 0)
-            menu.Items.Add(new Separator());
-        var browse = new MenuItem { Header = "Browse…" };
-        browse.Click += (_, _) =>
+        var items = RunningApps().Where(a => !_module.Settings.AppsToSkip.Contains(a.Path, StringComparer.OrdinalIgnoreCase))
+            .Select(app => (app.Name, true, (Action)(() => Save([.. _module.Settings.AppsToSkip, app.Path])))).ToList();
+        items.Add(("Browse\u2026", true, () =>
         {
             var dialog = new OpenFileDialog { Filter = "Apps (*.exe)|*.exe", CheckFileExists = true };
             if (dialog.ShowDialog(Window.GetWindow(this)) == true)
                 Save([.. _module.Settings.AppsToSkip, dialog.FileName]);
-        };
-        menu.Items.Add(browse);
+        }));
+        var menu = Ui.Menu(_add, [.. items]);
         menu.IsOpen = true;
     }
 
