@@ -89,6 +89,43 @@ public sealed class ModuleTests : IDisposable
     }
 
     [Fact]
+    public async Task Uninstall_asks_only_when_history_is_saved()
+    {
+        await StartHistoryAsync();
+        Assert.Null(((IFeatureModule)_history).UninstallQuestion());
+        _history.SetRecording(true);
+        _hub.CopyText("saved");
+        await _history.History!.IdleAsync();
+        Assert.Equal("Uninstall and erase history?", ((IFeatureModule)_history).UninstallQuestion());
+    }
+
+    [Fact]
+    public async Task The_page_sees_esc_first_and_paste_goes_to_the_shells_target()
+    {
+        var target = new Core.Clipboard.PasteTarget(42, 7);
+        bool closed = false;
+        var context = new ModuleContext(ClipboardHistoryModule.Id, _settings, NullLogger.Instance, new Island(), _historyUi)
+        {
+            Clipboard = _hub, DataDirectory = _folder.Path, IslandPasteTarget = () => target, CloseIsland = () => closed = true,
+        };
+        await _history.StartAsync(context, default);
+        _history.SetRecording(true);
+        _hub.CopyText("to paste");
+        await _history.History!.IdleAsync();
+        Assert.Same(target, _features.PasteTarget!());
+        WpfTestThread.Run(() =>
+        {
+            var view = (ClipboardView)_historyUi.Spec!.CreateSection();
+            Load(view);
+            Assert.False(_historyUi.Spec.HandleEscape!());
+            Find<SearchBox>(view).Single().Text = "to";
+            Assert.True(_historyUi.Spec.HandleEscape!());
+        });
+        _features.CloseIsland!();
+        Assert.True(closed);
+    }
+
+    [Fact]
     public async Task Clean_url_alone_shows_manual_or_automatic_on_the_page_and_with_history_only_on_the_tile()
     {
         await StartCleanAsync();

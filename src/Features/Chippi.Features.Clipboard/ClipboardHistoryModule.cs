@@ -22,6 +22,7 @@ public sealed class ClipboardHistoryModule : IFeatureModule
     private readonly string _dataDirectory;
     private ModuleContext? _context;
     private IIslandTile? _tile;
+    private ClipboardView? _view;
 
     /// <param name="dataDirectory">This module's data folder, so uninstalling can erase it without a start.</param>
     public ClipboardHistoryModule(ClipboardFeatures features, string? dataDirectory = null)
@@ -57,11 +58,14 @@ public sealed class ClipboardHistoryModule : IFeatureModule
         await History.LoadAsync(File.Exists(path)).ConfigureAwait(false);
         History.Apply(Settings.Recording, Settings.Paused, Settings.AppsToSkip);
         context.Ui.SetSettingsPage(() => new ClipboardHistorySettingsPage(this));
+        _features.PasteTarget = context.IslandPasteTarget;
+        _features.CloseIsland = context.CloseIsland;
         _tile = context.Ui.AddIslandTile(new IslandTileSpec(ClipboardFeatures.TileKey, "Clipboard", nameof(LucideIcons.ClipboardList), Order: 70, SectionOrder: 0,
-            () => new ClipboardView(_features))
+            () => _view ??= new ClipboardView(_features))
         {
             PageWidth = ClipboardFeatures.PageWidth,
             StatusPriority = 1, // History's status over Clean URL's (notes #4)
+            HandleEscape = () => _view?.HandleEscape() == true, // the first Esc clears a search or leaves Clean URL (notes #59)
         });
         UpdateStatus();
         _features.History = this;
@@ -77,7 +81,10 @@ public sealed class ClipboardHistoryModule : IFeatureModule
             History.Dispose();
             History = null;
         }
+        _features.PasteTarget = null;
+        _features.CloseIsland = null;
         _tile = null;
+        _view = null;
         _context = null;
         return Task.CompletedTask;
     }
@@ -96,6 +103,8 @@ public sealed class ClipboardHistoryModule : IFeatureModule
 
     /// <summary>Whether uninstalling would erase anything, so the switch asks first (notes #56).</summary>
     public bool HasHistory => History?.Any() ?? File.Exists(Path.Combine(_dataDirectory, FileName));
+
+    public string? UninstallQuestion() => HasHistory ? "Uninstall and erase history?" : null;
 
     public void Save(ClipboardHistorySettings settings)
     {
