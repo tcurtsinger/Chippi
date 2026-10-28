@@ -86,4 +86,4 @@ Steps: `chippi-scratch\phase-4\live-checks.md` (task 26), reviewed by Karl. Trav
 
 ## Cleanup
 
-Not done yet. Follows the [end-of-phase checklist](end-of-phase-checklist.md) after this report merges.
+Completed after the live-check results merged (#67). See [Phase 4 cleanup](end-of-phase-checklist.md#phase-4-cleanup-2026-10-27) for the verified 377-file archive and removals. The audit folder, current installers, boost experiment and installed Chippi were preserved. One local report reference is retained because its commit is not ancestry-merged, although its patch is already on main. The cleanup worktree remains until its PR merges.
