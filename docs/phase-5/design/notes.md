@@ -20,7 +20,7 @@ Phase 5 inside the Surfaces model: Clipboard history, Paste as plain text, Clean
 | `scratch-states` | Preview, renaming, the note's menu, a new note, 12 notes, save failed, notes that can't be opened |
 | `shelf-states` | Empty, a drag over it, mixed items, pinned, missing file, full, the two limits |
 | `shelf-drag` | Seven frames: over the closed tab, opening, into the page, dropped, dragging out, accepted, canceled |
-| `docked` | Docked by the tray: Clipboard; the grid and Clean URL with History uninstalled; the Shelf taking a drop |
+| `docked` | Docked by the tray: Clipboard; the grid and Clean URL with History uninstalled; the Shelf taking a drop (since 2026-10-28 the docked Shelf only drags out; see #50) |
 | `fit` | A 1280×720 screen: History on the right edge, Scratchpad on the top edge, footprints outlined |
 | `keyboard` | Focus on opening each page, the keys each page adds, the paste handoff before and after |
 | `destructive` | History's menu, Clear and Erase confirmations and results, deleting a note, removing a Shelf item |
@@ -188,7 +188,7 @@ All eight, as drawn. The alternatives in the numbered notes were turned down.
     - Accepted: an unpinned item leaves the Shelf and a pinned one stays.
     - Canceled (Esc, or a drop nowhere): the item stays.
     - The island stays open either way.
-50. **Docked:** the tray icon never takes a drop. Once the docked Shelf is open from the tray, it takes drops the same way.
+50. **Docked:** the tray icon never takes a drop. ~~Once the docked Shelf is open from the tray, it takes drops the same way.~~ Changed 2026-10-28: the docked Shelf only drags items out. Pressing in another app closes the docked pages before its drag can start, and Travis chose to leave that as a known limit rather than close the pages on release. Drops go through the island tab.
 
 ### Settings
 51. **Sidebar:** Clipboard & text holds Clipboard history, Paste as plain text and Clean URL. Scratchpad and Shelf have no page (#36, #47).
