@@ -137,8 +137,6 @@ public partial class IslandWindow : Window
             e.Handled = true;
             DragLeft();
         };
-        _dragOpen.Tick += (_, _) => OpenForDrag();
-        _dragClose.Tick += (_, _) => CloseAfterDrag();
         // The open island: a page that takes drops (the Shelf) handles them; elsewhere a drop does nothing.
         // Seen even when the page handled them, which the Shelf's drop zone does.
         _panel.AllowDrop = true;
@@ -153,7 +151,7 @@ public partial class IslandWindow : Window
                 e.Handled = true;
             }
             _openedByDrag = false;
-            _dragClose.Stop();
+            DragCloseTimer.Stop();
         }), handledEventsToo: true);
         // A press or a key on the island ends the drag-opened mode: normal closing resumes.
         _panel.PreviewMouseDown += (_, _) => _openedByDrag = false;
@@ -491,7 +489,7 @@ public partial class IslandWindow : Window
         _clickHook?.Dispose();
         _clickHook = null;
         _openedByDrag = false;
-        _dragClose.Stop();
+        DragCloseTimer.Stop();
         if (!_panel.IsOpen)
             return;
         _panel.CloseIsland(immediate);
@@ -500,10 +498,16 @@ public partial class IslandWindow : Window
 
     // ----- A drag from another app (Phase 5 notes #48) -----
 
-    private static readonly TimeSpan DragOpenDelay = TimeSpan.FromMilliseconds(250), DragCloseDelay = TimeSpan.FromMilliseconds(500);
-    private readonly DispatcherTimer _dragOpen = new() { Interval = DragOpenDelay };
-    private readonly DispatcherTimer _dragClose = new() { Interval = DragCloseDelay };
+    internal static readonly TimeSpan DragOpenDelay = TimeSpan.FromMilliseconds(250), DragCloseDelay = TimeSpan.FromMilliseconds(500);
+    private IIslandTimer? _dragOpen, _dragClose;
     private IReadOnlyList<IslandTileGroup> _tiles = [];
+
+    /// <summary>Makes the drag timers on first use: a dispatcher timer, or a timer a test fires itself, so no test waits on wall time.</summary>
+    internal Func<TimeSpan, Action, IIslandTimer> CreateTimer { get; set; } = (interval, tick) => new DispatcherIslandTimer(interval, tick);
+
+    private IIslandTimer DragOpenTimer => _dragOpen ??= CreateTimer(DragOpenDelay, OpenForDrag);
+
+    private IIslandTimer DragCloseTimer => _dragClose ??= CreateTimer(DragCloseDelay, CloseAfterDrag);
     private string? _dragKey; // the tile a drag over the closed tab is about to open
     private bool _openedByDrag; // open because of a drag that hasn't dropped, been clicked into or typed into
 
@@ -520,19 +524,19 @@ public partial class IslandWindow : Window
     {
         e.Effects = DragDropEffects.None; // the tab never takes the drop
         e.Handled = true;
-        _dragClose.Stop();
+        DragCloseTimer.Stop();
         if (_panel.IsOpen || _dragKey is not null || _dragging || DragTile is not { } tile)
             return;
         _dragKey = tile.Key;
         DropGlyph.Data = Chippi.UI.Controls.LucideIcons.Get(tile.Icon);
         RefreshTab();
-        _dragOpen.Start();
+        DragOpenTimer.Start();
     }
 
     /// <summary>250 ms over the tab: the island opens on that page, without the keyboard.</summary>
     private void OpenForDrag()
     {
-        _dragOpen.Stop();
+        DragOpenTimer.Stop();
         if (_dragKey is not { } key)
             return;
         _dragKey = null;
@@ -546,7 +550,7 @@ public partial class IslandWindow : Window
 
     private void DragOverPanel(DragEventArgs e)
     {
-        _dragClose.Stop();
+        DragCloseTimer.Stop();
         if (e.Handled)
             return;
         e.Effects = DragDropEffects.None;
@@ -561,17 +565,17 @@ public partial class IslandWindow : Window
     {
         if (_dragKey is not null)
         {
-            _dragOpen.Stop();
+            DragOpenTimer.Stop();
             _dragKey = null;
             RefreshTab();
         }
         if (_openedByDrag)
-            _dragClose.Start();
+            DragCloseTimer.Start();
     }
 
     private void CloseAfterDrag()
     {
-        _dragClose.Stop();
+        DragCloseTimer.Stop();
         if (!_openedByDrag)
             return;
         var at = CursorAt();

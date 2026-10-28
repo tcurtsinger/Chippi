@@ -67,18 +67,7 @@ public static class FeatureCatalog
             Presets = PowerUser,
         },
 
-        // Phase 5: Clipboard and text
-        new("clean-url", "Clean URL", "Strips tracking parameters from links you copy", FeatureGroup.ClipboardText)
-        {
-            Icon = "Link",
-            Presets = Essentials | PowerUser,
-        },
-        new("scratchpad", "Scratchpad", "A quick notes pad that saves as you type", FeatureGroup.ClipboardText)
-        {
-            Icon = "NotebookPen",
-            Badges = [FeatureBadge.Overlap("Overlaps Notepad")],
-            Presets = PowerUser,
-        },
+        // Clipboard and text (Phase 5's five features are real modules: Chippi.Features.Clipboard, PlainPaste, Scratchpad, Shelf)
         new("text-snippets", "Text snippets", "Type a short abbreviation and it expands into saved text", FeatureGroup.ClipboardText)
         {
             Icon = "Keyboard",
