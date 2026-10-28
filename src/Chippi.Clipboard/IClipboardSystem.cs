@@ -54,6 +54,13 @@ public interface IClipboardSystem : IDisposable
     /// <see cref="ClipboardBusyException"/> when another app held it through every retry.
     /// </summary>
     Task<T> TransactAsync<T>(Func<IClipboardSession, T> work, CancellationToken cancel = default);
+
+    /// <summary>
+    /// <see cref="TransactAsync"/> for a write, also returning the sequence number of the copy it left, read
+    /// once the clipboard is closed (Windows moves it again on close). 0 when nothing was written or another
+    /// app's copy already replaced it, so a later copy is never taken for Chippi's.
+    /// </summary>
+    Task<(T Result, uint Sequence)> WriteAsync<T>(Func<IClipboardSession, T> work, CancellationToken cancel = default);
 }
 
 /// <summary>The clipboard while Chippi holds it open. Valid only inside its transaction.</summary>

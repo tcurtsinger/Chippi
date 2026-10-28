@@ -54,7 +54,23 @@ public sealed class WindowsClipboardSystem : IClipboardSystem
         }
     }
 
-    public Task<T> TransactAsync<T>(Func<IClipboardSession, T> work, CancellationToken cancel = default)
+    public Task<T> TransactAsync<T>(Func<IClipboardSession, T> work, CancellationToken cancel = default) =>
+        Transact(work, afterClose: _ => { }, cancel);
+
+    public async Task<(T Result, uint Sequence)> WriteAsync<T>(Func<IClipboardSession, T> work, CancellationToken cancel = default)
+    {
+        uint sequence = 0;
+        // On the clipboard thread straight after CloseClipboard. Read the number, then check the copy is still
+        // ours: another app's copy landing before either step makes it the owner, and the write counts as lost.
+        T result = await Transact(work, wrote =>
+        {
+            uint closed = GetClipboardSequenceNumber();
+            sequence = wrote && GetClipboardOwner() == _hwnd ? closed : 0;
+        }, cancel).ConfigureAwait(false);
+        return (result, sequence);
+    }
+
+    private Task<T> Transact<T>(Func<IClipboardSession, T> work, Action<bool> afterClose, CancellationToken cancel)
     {
         var done = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
         Run(() =>
@@ -64,18 +80,21 @@ public sealed class WindowsClipboardSystem : IClipboardSystem
             for (int i = 0; i < OpenAttempts && !(open = OpenClipboard(_hwnd)); i++)
                 Thread.Sleep(OpenRetry);
             if (!open) { done.TrySetException(new ClipboardBusyException()); return; }
+            var session = new Session(this);
+            T result;
             try
             {
-                done.TrySetResult(work(new Session(this)));
+                result = work(session);
             }
             catch (Exception ex)
             {
-                done.TrySetException(ex);
-            }
-            finally
-            {
                 CloseClipboard();
+                done.TrySetException(ex);
+                return;
             }
+            CloseClipboard();
+            afterClose(session.Wrote);
+            done.TrySetResult(result);
         });
         return done.Task;
     }
@@ -180,6 +199,8 @@ public sealed class WindowsClipboardSystem : IClipboardSystem
 
     private sealed class Session(WindowsClipboardSystem owner) : IClipboardSession
     {
+        public bool Wrote { get; private set; }
+
         public uint Sequence => GetClipboardSequenceNumber();
 
         public string? OwnerPath() => ProcessPath(GetClipboardOwner());
@@ -214,12 +235,18 @@ public sealed class WindowsClipboardSystem : IClipboardSystem
         {
             EmptyClipboard();
             owner._delayed.Clear();
+            Wrote = true;
         }
 
-        public void Set(string format, byte[] data) => SetClipboardData(Id(format), ToGlobal(data));
+        public void Set(string format, byte[] data)
+        {
+            SetClipboardData(Id(format), ToGlobal(data));
+            Wrote = true;
+        }
 
         public void SetDelayed(string format, Func<byte[]> render, Action? requested = null)
         {
+            Wrote = true;
             uint id = Id(format);
             owner._delayed[id] = (render, requested);
             SetClipboardData(id, 0);

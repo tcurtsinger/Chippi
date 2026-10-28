@@ -84,12 +84,13 @@ public sealed class ClipboardHub : IClipboardHub, IDisposable
     {
         try
         {
-            MarkOwn(await _clipboard.TransactAsync(session =>
+            var (_, written) = await _clipboard.WriteAsync(session =>
             {
                 session.Empty();
                 Put(session, content);
-                return session.Sequence;
-            }, cancel).ConfigureAwait(false));
+                return true;
+            }, cancel).ConfigureAwait(false);
+            MarkOwn(written);
             return ClipStatus.Ok;
         }
         catch (ClipboardBusyException)
@@ -278,9 +279,11 @@ public sealed class ClipboardHub : IClipboardHub, IDisposable
             session.Set(ClipFormat.UnicodeText, ClipCodec.EncodeText(content.Text));
     }
 
-    /// <summary>Takes the sequence number read inside the writing transaction: once it closes, another copy can land.</summary>
+    /// <summary>Takes the sequence number the clipboard reported for the write, never one sampled later: another copy can land meanwhile.</summary>
     private void MarkOwn(uint sequence)
     {
+        if (sequence == 0)
+            return;
         lock (_gate)
         {
             _own.Enqueue(sequence);
@@ -320,16 +323,16 @@ public sealed class ClipboardHub : IClipboardHub, IDisposable
     {
         try
         {
-            uint? written = await _clipboard.TransactAsync(session =>
+            var (wrote, sequence) = await _clipboard.WriteAsync(session =>
             {
                 var saved = Save(session);
                 if (saved.Text is null)
-                    return (uint?)null;
+                    return false;
                 session.Empty();
                 PutPlain(session, saved.Text, saved.Markers, delayed: null);
-                return session.Sequence;
+                return true;
             }, cancel).ConfigureAwait(false);
-            if (written is not { } sequence)
+            if (!wrote)
                 return PasteOutcome.NoText;
             MarkOwn(sequence);
             return PasteOutcome.Copied;
@@ -354,12 +357,12 @@ public sealed class ClipboardHub : IClipboardHub, IDisposable
             IReadOnlyList<(string, byte[])> markers = [];
             try
             {
-                (saved, content, ours) = await _clipboard.TransactAsync(session =>
+                ((saved, content), ours) = await _clipboard.WriteAsync(session =>
                 {
                     var previous = Save(session);
                     var chosen = choose(previous);
                     if (chosen is null || chosen.IsEmpty)
-                        return (previous, (ClipContent?)null, 0u);
+                        return (previous, (ClipContent?)null);
                     if (ofCopy)
                         markers = previous.Markers;
                     session.Empty();
@@ -367,14 +370,14 @@ public sealed class ClipboardHub : IClipboardHub, IDisposable
                     if (!canSend)
                     {
                         Put(session, chosen, markers);
-                        return (previous, chosen, session.Sequence);
+                        return (previous, chosen);
                     }
                     // Marked so no clipboard manager (Chippi's own listener included) records the temporary copy.
                     if (IsText(chosen))
                         PutPlain(session, chosen.Text!, [.. markers, .. Excluded], delayed: () => requested.TrySetResult());
                     else
                         Put(session, chosen, [.. markers, .. Excluded]);
-                    return (previous, chosen, session.Sequence);
+                    return (previous, chosen);
                 }, cancel).ConfigureAwait(false);
             }
             catch (ClipboardBusyException)
@@ -436,16 +439,15 @@ public sealed class ClipboardHub : IClipboardHub, IDisposable
     {
         try
         {
-            uint? written = await _clipboard.TransactAsync(session =>
+            var (_, written) = await _clipboard.WriteAsync(session =>
             {
                 if (session.Sequence != ours)
-                    return (uint?)null;
+                    return false;
                 session.Empty();
                 Put(session, content, markers);
-                return session.Sequence;
+                return true;
             }, cancel).ConfigureAwait(false);
-            if (written is { } sequence)
-                MarkOwn(sequence);
+            MarkOwn(written);
         }
         catch (ClipboardBusyException)
         {
@@ -458,17 +460,16 @@ public sealed class ClipboardHub : IClipboardHub, IDisposable
     {
         try
         {
-            uint? restored = await _clipboard.TransactAsync(session =>
+            var (_, written) = await _clipboard.WriteAsync(session =>
             {
                 if (session.Sequence != ours)
-                    return (uint?)null;
+                    return false;
                 session.Empty();
                 foreach (var (format, data) in saved.Formats)
                     session.Set(format, data);
-                return session.Sequence;
+                return true;
             }, cancel).ConfigureAwait(false);
-            if (restored is { } sequence)
-                MarkOwn(sequence);
+            MarkOwn(written);
         }
         catch (ClipboardBusyException)
         {

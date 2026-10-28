@@ -6,8 +6,8 @@ using Chippi.Clipboard;
 namespace Chippi.Clipboard.Tests;
 
 /// <summary>
-/// An in-memory clipboard with Windows' rules: a sequence number that moves with each new copy (when it's
-/// written, not when it's closed, and not with a delayed render), owner tracking, delayed rendering and change events. Tests never touch the real one.
+/// An in-memory clipboard with Windows' rules: a sequence number that moves with each new copy (while it's
+/// written and again on close, not with a delayed render), owner tracking, delayed rendering and change events. Tests never touch the real one.
 /// </summary>
 public sealed class FakeClipboard : IClipboardSystem
 {
@@ -70,6 +70,31 @@ public sealed class FakeClipboard : IClipboardSystem
 
     public Task<T> TransactAsync<T>(Func<IClipboardSession, T> work, CancellationToken cancel = default)
     {
+        try
+        {
+            return Task.FromResult(Transact(work, out _));
+        }
+        catch (ClipboardBusyException ex)
+        {
+            return Task.FromException<T>(ex);
+        }
+    }
+
+    public Task<(T Result, uint Sequence)> WriteAsync<T>(Func<IClipboardSession, T> work, CancellationToken cancel = default)
+    {
+        try
+        {
+            T result = Transact(work, out uint sequence);
+            return Task.FromResult((result, sequence));
+        }
+        catch (ClipboardBusyException ex)
+        {
+            return Task.FromException<(T, uint)>(ex);
+        }
+    }
+
+    private T Transact<T>(Func<IClipboardSession, T> work, out uint written)
+    {
         lock (_gate)
         {
             Transactions++;
@@ -77,7 +102,7 @@ public sealed class FakeClipboard : IClipboardSystem
             {
                 if (BusyOpens != int.MaxValue)
                     BusyOpens--;
-                return Task.FromException<T>(new ClipboardBusyException());
+                throw new ClipboardBusyException();
             }
         }
         OnOpen?.Invoke();
@@ -85,15 +110,20 @@ public sealed class FakeClipboard : IClipboardSystem
         T result;
         lock (_gate)
             result = work(session);
+        written = 0;
         if (session.Changed)
         {
             lock (_gate)
+            {
+                // Windows moves the number again on close (Sandbox: 52 inside, 55 after).
                 _owner = "Chippi";
+                written = ++_sequence;
+            }
             if (Listening)
                 Changed?.Invoke();
         }
         AfterClose?.Invoke();
-        return Task.FromResult(result);
+        return result;
     }
 
     /// <summary>Runs after the clipboard is closed and before the caller continues: another app's copy that raced in.</summary>
