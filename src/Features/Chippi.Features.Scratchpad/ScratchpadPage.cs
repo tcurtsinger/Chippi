@@ -25,7 +25,7 @@ public sealed class ScratchpadPage : Grid, IDisposable
     private readonly TextBox _editor = new() { AcceptsReturn = true, AcceptsTab = false, TextWrapping = TextWrapping.Wrap, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, FontSize = 13, Padding = new Thickness(12), BorderThickness = new Thickness(0) };
     private readonly ScrollViewer _preview = new() { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Padding = new Thickness(12), Visibility = Visibility.Collapsed };
     private readonly IconButton _add = Icon(LucideIcons.Plus, "New note");
-    private readonly Button _overflow = Button("More notes");
+    private readonly Button _overflow = Button("All notes");
     private readonly IconButton _more = Icon(LucideIcons.Ellipsis, "More");
     private readonly Grid _surface = new() { Height = 236 };
     private readonly Grid _tabHost = new();

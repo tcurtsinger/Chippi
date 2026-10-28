@@ -11,6 +11,7 @@ public sealed class ScratchpadModule : IFeatureModule
     private readonly Func<ModuleContext, IScratchpadStore> _open;
     private ScratchpadSession? _session;
     private ScratchpadPage? _page;
+    private IIslandTile? _tile;
     public ScratchpadModule() : this(c => new ScratchpadStore(Path.Combine(c.DataDirectory, "notes.db"), DpapiKeyProtector.Instance)) { }
     public ScratchpadModule(Func<ModuleContext, IScratchpadStore> open) => _open = open;
     public FeatureDescriptor Descriptor { get; } = new("scratchpad", "Scratchpad", "A quick notes pad that saves as you type", FeatureGroup.ClipboardText)
@@ -23,14 +24,22 @@ public sealed class ScratchpadModule : IFeatureModule
         ct.ThrowIfCancellationRequested();
         _session = new ScratchpadSession(() => _open(context));
         ScratchpadPage Page() => _page ??= new ScratchpadPage(_session, context.HoldIslandOpen);
-        context.Ui.AddIslandTile(new IslandTileSpec("scratchpad", "Scratchpad", "NotebookPen", 80, 0, () => Page())
+        _tile = context.Ui.AddIslandTile(new IslandTileSpec("scratchpad", "Scratchpad", "NotebookPen", 80, 0, () => Page())
         {
             PageWidth = 440, CreateHeader = () => Page().Header, InitialFocus = () => Page().InitialFocus,
         });
-        return Task.CompletedTask;
+        _session.Changed += UpdateTile;
+        return _session.LoadAsync();
+    }
+    private void UpdateTile(ScratchpadState state)
+    {
+        var count = state.Document?.Notes.Count;
+        _tile?.SetStatus(count is null ? "" : count == 1 ? "1 note" : $"{count} notes");
     }
     public async Task StopAsync(CancellationToken ct)
     {
+        if (_session is { } active) active.Changed -= UpdateTile;
+        _tile?.SetStatus(""); _tile = null;
         _page?.Dispose(); _page = null;
         if (_session is { } session) await session.DisposeAsync().ConfigureAwait(false);
         _session = null;

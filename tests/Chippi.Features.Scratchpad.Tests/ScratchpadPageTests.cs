@@ -83,7 +83,7 @@ public sealed class ScratchpadPageTests
         Assert.Equal("", Named<TextBox>(page, "Note").Text);
         session.ChangeAsync(d => { while (d.Notes.Count < 12) d = d.Add(); return d; }).GetAwaiter().GetResult(); Pump();
         Assert.False(Named<Button>(page, "New note").IsEnabled);
-        Assert.Equal(12, int.Parse(((string)Named<Button>(page, "More notes").Content)[1..]) + Named<SegmentedControl>(page, "Notes").Items.Count);
+        Assert.Equal(12, int.Parse(((string)Named<Button>(page, "All notes").Content)[1..]) + Named<SegmentedControl>(page, "Notes").Items.Count);
     });
 
     [Fact]
