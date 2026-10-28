@@ -364,6 +364,31 @@ public sealed class HubTests : IDisposable
     }
 
     [Fact]
+    public async Task A_read_between_the_restore_and_its_bookkeeping_still_skips_it()
+    {
+        // CI's flake, made certain: the listener reads after the restore lands but before the hub
+        // has noted the write as its own.
+        using var lease = Listen();
+        CopyRich("rich");
+        await SettleAsync();
+        _copies.Clear();
+        _foreground.OnPaste = () =>
+        {
+            _ = _clipboard.Text;
+            _clipboard.AfterClose = () =>
+            {
+                _clipboard.AfterClose = null;
+                _time.Advance(ClipboardHub.Settle);
+                _hub.Processing.GetAwaiter().GetResult();
+            };
+        };
+        await PasteAndFinishAsync(_hub.PastePlainTextAsync(), ClipboardHub.RestoreAfterRequest);
+        await SettleAsync();
+        Assert.Empty(_copies);
+        Assert.Equal([1, 2, 3], _clipboard.Snapshot()[ClipFormat.Html]);
+    }
+
+    [Fact]
     public async Task A_plain_copy_keeps_the_history_and_cloud_markers()
     {
         (string, byte[])[] markers = [(ClipFormat.History, Zero), (ClipFormat.Cloud, Zero)];

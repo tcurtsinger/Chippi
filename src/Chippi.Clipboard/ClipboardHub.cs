@@ -33,6 +33,7 @@ public sealed class ClipboardHub : IClipboardHub, IDisposable
     private readonly Lock _gate = new();
     private readonly List<Lease> _leases = [];
     private readonly Queue<uint> _own = new();
+    private int _writing; // own writes not yet in _own
     private readonly SemaphoreSlim _pasting = new(1, 1);
     private ITimer? _settle;
     private Task _processing = Task.CompletedTask;
@@ -84,13 +85,12 @@ public sealed class ClipboardHub : IClipboardHub, IDisposable
     {
         try
         {
-            var (_, written) = await _clipboard.WriteAsync(session =>
+            await WriteOwnAsync(session =>
             {
                 session.Empty();
                 Put(session, content);
                 return true;
             }, cancel).ConfigureAwait(false);
-            MarkOwn(written);
             return ClipStatus.Ok;
         }
         catch (ClipboardBusyException)
@@ -140,11 +140,20 @@ public sealed class ClipboardHub : IClipboardHub, IDisposable
 
     private async Task ProcessAsync()
     {
-        uint seen = _clipboard.Sequence;
+        uint seen;
         Lease[] leases;
         lock (_gate)
         {
-            if (_disposed || _own.Contains(seen))
+            if (_disposed)
+                return;
+            // An own write between its close and being noted would read as someone else's copy: look again after.
+            if (_writing > 0)
+            {
+                _settle?.Change(Settle, Timeout.InfiniteTimeSpan);
+                return;
+            }
+            seen = _clipboard.Sequence;
+            if (_own.Contains(seen))
                 return;
             leases = [.. _leases];
         }
@@ -279,16 +288,32 @@ public sealed class ClipboardHub : IClipboardHub, IDisposable
             session.Set(ClipFormat.UnicodeText, ClipCodec.EncodeText(content.Text));
     }
 
-    /// <summary>Takes the sequence number the clipboard reported for the write, never one sampled later: another copy can land meanwhile.</summary>
-    private void MarkOwn(uint sequence)
+    /// <summary>
+    /// A write of Chippi's own, noted by the sequence number the clipboard reported for it, never one
+    /// sampled later: another copy can land meanwhile. The listener holds off until it's noted.
+    /// </summary>
+    private async Task<(T Result, uint Sequence)> WriteOwnAsync<T>(Func<IClipboardSession, T> work, CancellationToken cancel)
     {
-        if (sequence == 0)
-            return;
         lock (_gate)
+            _writing++;
+        try
         {
-            _own.Enqueue(sequence);
-            while (_own.Count > 8)
-                _own.Dequeue();
+            var written = await _clipboard.WriteAsync(work, cancel).ConfigureAwait(false);
+            if (written.Sequence != 0)
+            {
+                lock (_gate)
+                {
+                    _own.Enqueue(written.Sequence);
+                    while (_own.Count > 8)
+                        _own.Dequeue();
+                }
+            }
+            return written;
+        }
+        finally
+        {
+            lock (_gate)
+                _writing--;
         }
     }
 
@@ -323,7 +348,7 @@ public sealed class ClipboardHub : IClipboardHub, IDisposable
     {
         try
         {
-            var (wrote, sequence) = await _clipboard.WriteAsync(session =>
+            var (wrote, _) = await WriteOwnAsync(session =>
             {
                 var saved = Save(session);
                 if (saved.Text is null)
@@ -332,10 +357,7 @@ public sealed class ClipboardHub : IClipboardHub, IDisposable
                 PutPlain(session, saved.Text, saved.Markers, delayed: null);
                 return true;
             }, cancel).ConfigureAwait(false);
-            if (!wrote)
-                return PasteOutcome.NoText;
-            MarkOwn(sequence);
-            return PasteOutcome.Copied;
+            return wrote ? PasteOutcome.Copied : PasteOutcome.NoText;
         }
         catch (ClipboardBusyException)
         {
@@ -357,7 +379,7 @@ public sealed class ClipboardHub : IClipboardHub, IDisposable
             IReadOnlyList<(string, byte[])> markers = [];
             try
             {
-                ((saved, content), ours) = await _clipboard.WriteAsync(session =>
+                ((saved, content), ours) = await WriteOwnAsync(session =>
                 {
                     var previous = Save(session);
                     var chosen = choose(previous);
@@ -386,7 +408,6 @@ public sealed class ClipboardHub : IClipboardHub, IDisposable
             }
             if (content is null)
                 return PasteOutcome.NoText;
-            MarkOwn(ours);
             if (!canSend)
                 return PasteOutcome.Copied;
             if (!await _foreground.BringToFrontAsync(target, FrontTimeout, cancel).ConfigureAwait(false))
@@ -439,7 +460,7 @@ public sealed class ClipboardHub : IClipboardHub, IDisposable
     {
         try
         {
-            var (_, written) = await _clipboard.WriteAsync(session =>
+            await WriteOwnAsync(session =>
             {
                 if (session.Sequence != ours)
                     return false;
@@ -447,7 +468,6 @@ public sealed class ClipboardHub : IClipboardHub, IDisposable
                 Put(session, content, markers);
                 return true;
             }, cancel).ConfigureAwait(false);
-            MarkOwn(written);
         }
         catch (ClipboardBusyException)
         {
@@ -460,7 +480,7 @@ public sealed class ClipboardHub : IClipboardHub, IDisposable
     {
         try
         {
-            var (_, written) = await _clipboard.WriteAsync(session =>
+            await WriteOwnAsync(session =>
             {
                 if (session.Sequence != ours)
                     return false;
@@ -469,7 +489,6 @@ public sealed class ClipboardHub : IClipboardHub, IDisposable
                     session.Set(format, data);
                 return true;
             }, cancel).ConfigureAwait(false);
-            MarkOwn(written);
         }
         catch (ClipboardBusyException)
         {
