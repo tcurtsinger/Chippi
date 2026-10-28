@@ -50,7 +50,7 @@ internal static class SmokeDispatcher
         var done = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         Ui.Value.BeginInvoke(async () =>
         {
-            try { await test(); done.SetResult(); }
+            try { Chippi.SmokeTests.SmokeLog.Check(); await test(); Chippi.SmokeTests.SmokeLog.Check(); done.SetResult(); }
             catch (Exception ex) { done.SetException(ex); }
         });
         return done.Task.WaitAsync(TimeSpan.FromSeconds(45));

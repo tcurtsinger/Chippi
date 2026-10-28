@@ -33,3 +33,5 @@ These require a freshly authorized idle desktop session. They have not been exec
 5. At 1280x720, open Shelf docked through the tray, drop on its page and drag a test item out. Confirm three columns remain usable with more than nine items and the scrollbar does not cover the third column.
 
 Automated C6 coverage: real module/page/panel drop routing and hold release, top/side/docked layout, and outgoing text/file/picture payloads run without an HWND. Two `ShelfSmokeTests.Visible_*` cases exercise the injected 250/500 ms timers and drop-ending mode using manual timer ticks, synthetic routed drags and actual windows on CI. They do not invoke native OLE drag-out. The payload test does not claim to exercise DoDragDrop's Copy-only argument or accepted/canceled removal; those are steps 2 and 3 above.
+
+Smoke logging: the testhost uses its own GUID dev-profile log. Every app launch, including notification cleanup, gets the session's explicit CHIPPI_DEV_PROFILE. Program configures logging before notification activation/cleanup, which run before App.OnStartup. Windowless LogIsolationTests and SmokeLogTests run without enabling desktop tests.
