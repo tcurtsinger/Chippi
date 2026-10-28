@@ -21,6 +21,7 @@ public sealed class CleanUrlSettingsPage : UserControl
     private readonly Action _syncAutomatic;
     private readonly TextBox _field = new() { MinWidth = 240, VerticalContentAlignment = VerticalAlignment.Center };
     private readonly Button _addConfirm = SettingsUi.Button("Add", "PrimaryButtonStyle");
+    private DockPanel? _addRow;
     private bool _adding;
 
     public CleanUrlSettingsPage(CleanUrlModule module)
@@ -80,17 +81,18 @@ public sealed class CleanUrlSettingsPage : UserControl
         _sites.Opacity = _module.Settings.Automatic ? 1 : 0.6;
     }
 
+    /// <summary>One row for the page's life: Refresh clears the list it sits in, so it can always go back.</summary>
     private DockPanel AddRow()
     {
-        if (_field.Parent is Panel old)
-            old.Children.Clear();
+        if (_addRow is not null)
+            return _addRow;
         var cancel = SettingsUi.Button("Cancel");
         cancel.Margin = new Thickness(8, 0, 0, 0);
         cancel.Click += (_, _) => Cancel();
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, Children = { _addConfirm, cancel } };
         DockPanel.SetDock(buttons, Dock.Right);
         _field.Margin = new Thickness(0, 0, 12, 0);
-        return new DockPanel { MinHeight = 60, Margin = new Thickness(16, 0, 16, 0), Children = { buttons, _field } };
+        return _addRow = new DockPanel { MinHeight = 60, Margin = new Thickness(16, 0, 16, 0), Children = { buttons, _field } };
     }
 
     private void Add()

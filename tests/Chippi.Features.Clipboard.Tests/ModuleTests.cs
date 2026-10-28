@@ -252,6 +252,46 @@ public sealed class ModuleTests : IDisposable
     }
 
     [Fact]
+    public void A_new_picture_on_a_reused_row_id_never_shows_the_erased_ones_thumbnail()
+    {
+        using var store = History.HistoryStore.Open(_folder.File("pictures.db"), new TestKeys());
+        var blue = History.Pictures.Encode(new Core.Clipboard.ClipImage(1, 1, [255, 0, 0, 255]))!.Value;
+        var red = History.Pictures.Encode(new Core.Clipboard.ClipImage(1, 1, [0, 0, 255, 255]))!.Value;
+        var erased = store.Add(History.HistoryCapture.FromPicture(1, 1, blue.Thumbnail, blue.Png), DateTimeOffset.UtcNow).Entry!;
+        store.EraseAll();
+        var next = store.Add(History.HistoryCapture.FromPicture(1, 1, red.Thumbnail, red.Png), DateTimeOffset.UtcNow).Entry!;
+        Assert.Equal(erased.Id, next.Id);
+        WpfTestThread.Run(() =>
+        {
+            var view = new ClipboardView(_features);
+            var first = view.Thumbnail(erased);
+            var second = view.Thumbnail(next);
+            Assert.NotSame(first, second);
+            Assert.Same(second, view.Thumbnail(next));
+        });
+    }
+
+    [Fact]
+    public async Task Add_site_opens_again_after_cancel_and_survives_a_change_while_open()
+    {
+        await StartCleanAsync();
+        WpfTestThread.Run(() =>
+        {
+            var page = new CleanUrlSettingsPage(_clean);
+            Button Named(string text) => Find<Button>(page).First(b => b.Content as string == text && IsShown(b));
+            Named("Add site").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Named("Cancel").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Named("Add site").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            _clean.Save(_clean.Settings with { Automatic = true });
+            Flush(page);
+            var field = Find<TextBox>(page).Single(t => System.Windows.Automation.AutomationProperties.GetName(t) == "Site");
+            field.Text = "Example.org";
+            Named("Add").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        });
+        Assert.Equal(["example.org"], _clean.Settings.SitesToSkip);
+    }
+
+    [Fact]
     public async Task Without_history_the_page_is_clean_url_and_cleans_as_you_type()
     {
         await StartCleanAsync();

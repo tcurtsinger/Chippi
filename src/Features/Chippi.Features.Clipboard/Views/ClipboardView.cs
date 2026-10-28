@@ -38,7 +38,7 @@ internal sealed class ClipboardView : UserControl
     private readonly TextBlock _empty = Ui.Muted("", 13);
     private readonly StackPanel _history = new();
     private readonly CleanUrlView _clean;
-    private readonly Dictionary<long, BitmapSource> _thumbnails = [];
+    private readonly Dictionary<long, (byte[] Png, BitmapSource Image)> _thumbnails = []; // by row, checked against its bytes: ids come back after a delete
     private readonly DispatcherTimer _clock = new() { Interval = TimeSpan.FromSeconds(30) };
     private List<HistoryEntry> _shown = [];
     private long? _selected;
@@ -97,6 +97,7 @@ internal sealed class ClipboardView : UserControl
             _features.Changed -= OnFeatures;
             Detach();
             _clock.Stop();
+            _thumbnails.Clear(); // no picture stays in memory while the page is closed
         };
     }
 
@@ -194,6 +195,8 @@ internal sealed class ClipboardView : UserControl
         _firstUse.Visibility = !_cleaning && !recording ? Visibility.Visible : Visibility.Collapsed;
         // Saved copies stay usable with recording off only when there are some.
         var entries = history?.Entries ?? [];
+        foreach (var gone in _thumbnails.Keys.Where(id => !entries.Any(e => e.Id == id)).ToList())
+            _thumbnails.Remove(gone);
         _history.Visibility = !_cleaning && (recording || entries.Count > 0) ? Visibility.Visible : Visibility.Collapsed;
         if (_history.Visibility != Visibility.Visible)
             return;
@@ -290,15 +293,17 @@ internal sealed class ClipboardView : UserControl
         return Ui.Glyph(glyph, 16, "IslandTextTertiaryBrush");
     }
 
-    private BitmapSource? Thumbnail(HistoryEntry entry)
+    internal BitmapSource? Thumbnail(HistoryEntry entry)
     {
-        if (_thumbnails.TryGetValue(entry.Id, out var cached))
-            return cached;
         if (entry.Thumbnail is not { Length: > 0 } png)
             return null;
+        if (_thumbnails.TryGetValue(entry.Id, out var cached) && cached.Png.AsSpan().SequenceEqual(png))
+            return cached.Image;
         try
         {
-            return _thumbnails[entry.Id] = Pictures.Load(png);
+            var image = Pictures.Load(png);
+            _thumbnails[entry.Id] = (png, image);
+            return image;
         }
         catch (Exception)
         {
@@ -429,7 +434,7 @@ internal sealed class ClipboardView : UserControl
     /// </summary>
     private async void Paste(HistoryEntry entry)
     {
-        if (_module?.History is not { } history || HistoryFiles.Missing(entry) > 0)
+        if (_module?.History is not { } history || HistoryFiles.Missing(entry) > 0 || Gone(history, entry))
             return;
         _selected = entry.Id;
         if (_features.PasteTarget?.Invoke() is not { } target)
@@ -454,10 +459,21 @@ internal sealed class ClipboardView : UserControl
 
     private async void Copy(HistoryEntry entry)
     {
-        if (_module?.History is not { } history || HistoryFiles.Missing(entry) > 0)
+        if (_module?.History is not { } history || HistoryFiles.Missing(entry) > 0 || Gone(history, entry))
             return;
         _selected = entry.Id;
         ShowStatus(await history.CopyAsync(entry) == ClipStatus.Ok ? "Copied" : "Clipboard busy");
+    }
+
+    /// <summary>A copy past its 7 days: the list drops it instead of copying it (notes #11).</summary>
+    private bool Gone(ClipboardHistory history, HistoryEntry entry)
+    {
+        if (!history.Expired(entry))
+            return false;
+        _selected = null;
+        _status = null;
+        Refresh(keepScroll: true);
+        return true;
     }
 
     private void ShowStatus(string status)

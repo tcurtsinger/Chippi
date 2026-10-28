@@ -28,6 +28,7 @@ public sealed class ClipboardHistory : IDisposable
     private ClipLimit _limit;
     private bool _full, _disposed;
     private int _generation; // moves on Clear and Erase all, so a copy read before them isn't saved after
+    private int _pruning; // 1 while a prune of expired copies is queued
 
     /// <param name="open">Opens the store; called on first need, so nothing is created while recording has never been on.</param>
     /// <param name="autoClean">The cleaned link when automatic cleaning will rewrite this text, else null (notes #28).</param>
@@ -43,8 +44,31 @@ public sealed class ClipboardHistory : IDisposable
     /// <summary>Raised after the entries, the limit line or the full state change.</summary>
     public event Action? Changed;
 
-    /// <summary>Every saved copy, newest first.</summary>
-    public IReadOnlyList<HistoryEntry> Entries { get { lock (_gate) return _entries; } }
+    /// <summary>
+    /// Every saved copy, newest first. An unpinned copy past its 7 days drops out as soon as it is, and
+    /// leaves the store right after, without waiting for the next copy (notes #11).
+    /// </summary>
+    public IReadOnlyList<HistoryEntry> Entries
+    {
+        get
+        {
+            IReadOnlyList<HistoryEntry> entries;
+            lock (_gate)
+                entries = _entries;
+            if (!entries.Any(Expired))
+                return entries;
+            if (Interlocked.Exchange(ref _pruning, 1) == 0)
+                _ = RunAsync(store =>
+                {
+                    Volatile.Write(ref _pruning, 0);
+                    Publish(store);
+                });
+            return [.. entries.Where(e => !Expired(e))];
+        }
+    }
+
+    /// <summary>Unpinned and older than <see cref="HistoryStore.RecentAge"/>: not shown, copied or pasted.</summary>
+    public bool Expired(HistoryEntry entry) => !entry.Pinned && entry.Recent < _time.GetUtcNow() - HistoryStore.RecentAge;
 
     /// <summary>The last copy's limit, shown until the next copy (notes #13); None when it was saved.</summary>
     public ClipLimit Limit { get { lock (_gate) return _limit; } }
@@ -228,6 +252,11 @@ public sealed class ClipboardHistory : IDisposable
 
     private async Task<ClipContent?> ContentAsync(HistoryEntry entry)
     {
+        if (Expired(entry))
+        {
+            _ = Entries; // queues the prune, so the row goes
+            return null;
+        }
         switch (entry.Kind)
         {
             case EntryKind.Files:

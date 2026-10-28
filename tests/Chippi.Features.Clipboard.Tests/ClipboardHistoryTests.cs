@@ -51,6 +51,41 @@ public sealed class ClipboardHistoryTests : IDisposable
     }
 
     [Fact]
+    public async Task A_copy_past_seven_days_goes_without_another_copy_and_pins_stay()
+    {
+        var clock = new Clock();
+        string path = _folder.File("age.db");
+        using (var history = new ClipboardHistory(_hub, () => HistoryStore.Open(path, new TestKeys()), time: clock))
+        {
+            history.Apply(true, false, []);
+            _hub.CopyText("kept by its pin");
+            await history.IdleAsync();
+            _hub.CopyText("old");
+            await history.IdleAsync();
+            await history.PinAsync(history.Entries.Single(e => e.Text == "kept by its pin").Id, true);
+            var old = history.Entries.Single(e => e.Text == "old");
+
+            clock.Now += TimeSpan.FromDays(8);
+            Assert.Equal("kept by its pin", Assert.Single(history.Entries).Text);
+            Assert.Equal(ClipStatus.Empty, await history.CopyAsync(old));
+            Assert.Equal(PasteOutcome.NoText, await history.PasteAsync(old, new PasteTarget(1, 1)));
+            Assert.Empty(_hub.Written);
+            Assert.Empty(_hub.Pasted);
+            await history.IdleAsync();
+        }
+        // Gone from the store too: read back as of before it expired, so this load prunes nothing.
+        using var store = HistoryStore.Open(path, new TestKeys());
+        Assert.Equal("kept by its pin", Assert.Single(store.Load(DateTimeOffset.UtcNow)).Text);
+    }
+
+    private sealed class Clock : TimeProvider
+    {
+        public DateTimeOffset Now = DateTimeOffset.UtcNow;
+
+        public override DateTimeOffset GetUtcNow() => Now;
+    }
+
+    [Fact]
     public async Task Copies_are_saved_and_a_copy_not_for_history_leaves_nothing()
     {
         _history.Apply(true, false, []);
