@@ -1,0 +1,10 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<Project>
+  <!-- TargetFramework is known here, after each test project's PropertyGroup. The pure
+       net10.0 Rules/UrlCleaning tests cannot reference the Windows-only static log. -->
+  <ItemGroup Condition="$([System.String]::Copy('$(TargetFramework)').Contains('-windows'))">
+    <Compile Include="$(MSBuildThisFileDirectory)SmokeLog.cs" Link="SmokeLog.cs" />
+    <ProjectReference Include="$(MSBuildThisFileDirectory)..\src\Chippi.Core\Chippi.Core.csproj"
+                      Condition="!$([System.String]::Copy('@(ProjectReference)').Contains('Chippi.Core.csproj'))" />
+  </ItemGroup>
+</Project>

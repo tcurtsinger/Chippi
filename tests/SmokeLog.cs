@@ -19,6 +19,15 @@ internal static class SmokeLog
         AppDomain.CurrentDomain.ProcessExit += (_, _) => { if (Directory.Exists(Root)) Directory.Delete(Root, true); };
     }
 
+    internal static void AssertOnlyHere(string marker)
+    {
+        Check();
+        Assert.Contains(marker, File.ReadAllText(Log.Default.CurrentFile));
+        if (Directory.Exists(RollingFileLog.DefaultDirectory))
+            foreach (string file in Directory.EnumerateFiles(RollingFileLog.DefaultDirectory, "*.log"))
+                Assert.DoesNotContain(marker, File.ReadAllText(file));
+    }
+
     internal static void Check()
     {
         var actual = Path.GetFullPath(Log.Default.Directory);
@@ -36,9 +45,8 @@ public sealed class SmokeLogTests
         SmokeLog.Check(); // fail before a regression could write the real log
         string marker = "smoke-log-probe-" + Guid.NewGuid().ToString("N");
         Log.Info(marker);
-        Assert.Contains(marker, File.ReadAllText(Log.Default.CurrentFile));
-        if (Directory.Exists(RollingFileLog.DefaultDirectory))
-            foreach (string file in Directory.EnumerateFiles(RollingFileLog.DefaultDirectory, "*.log"))
-                Assert.DoesNotContain(marker, File.ReadAllText(file));
+        SmokeLog.AssertOnlyHere(marker);
     }
 }
+
+

@@ -20,8 +20,11 @@ public sealed class CallbackTests
     [Fact]
     public void Managed_handler_failure_never_escapes_the_com_boundary()
     {
-        var callback = new ActivationCallback("test", _ => throw new InvalidOperationException("expected"));
+        Chippi.SmokeTests.SmokeLog.Check();
+        string marker = "expected-test-callback-" + Guid.NewGuid().ToString("N");
+        var callback = new ActivationCallback("test", _ => throw new InvalidOperationException(marker));
         callback.Activate("test", "data", 0, 0);
+        Chippi.SmokeTests.SmokeLog.AssertOnlyHere(marker);
     }
 
     [Fact]
