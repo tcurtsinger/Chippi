@@ -188,7 +188,7 @@ All eight, as drawn. The alternatives in the numbered notes were turned down.
     - Accepted: an unpinned item leaves the Shelf and a pinned one stays.
     - Canceled (Esc, or a drop nowhere): the item stays.
     - The island stays open either way.
-50. **Docked:** the tray icon never takes a drop. ~~Once the docked Shelf is open from the tray, it takes drops the same way.~~ Changed 2026-10-28: the docked Shelf only drags items out. Pressing in another app closes the docked pages before its drag can start, and Travis chose to leave that as a known limit rather than close the pages on release. Drops go through the island tab.
+50. **Docked:** the tray icon never takes a drop, and the docked Shelf only drags items out (changed 2026-10-28; it was meant to take drops once open from the tray). Pressing in another app closes the docked pages before its drag can start, and Travis chose to leave that as a known limit rather than close the pages on release. Drops go through the island tab.
 
 ### Settings
 51. **Sidebar:** Clipboard & text holds Clipboard history, Paste as plain text and Clean URL. Scratchpad and Shelf have no page (#36, #47).
