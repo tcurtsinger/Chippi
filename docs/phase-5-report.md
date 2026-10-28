@@ -2,7 +2,7 @@
 
 Phase 5 (Clipboard history, Clean URL, Paste as plain text, Scratchpad and Shelf) is built and on GitHub at `main` `9b72093`. Every merge went through a second member's review first and merged only after both CI runs passed. The features live in three island tiles (Clipboard, Scratchpad, Shelf) and the docked pages, as Travis decided: Clean URL sits behind the Clipboard header's link button, and plain paste is a shortcut only. Recording is off until turned on, and nothing listens to the clipboard unless History is recording or automatic cleaning is on. The installers were built from `ce2afc4` (`pack/phase-5`, PR #80), then rebuilt from `9b72093` (`pack/phase-5b`, PR #84) with two fixes found while they waited: Mic processing reading "No driver" with VB-CABLE installed (#82), and test runs writing to the installed app's log (#83). Travis's live checks (task 34) are pending. ARM64 is built and packaged but never run.
 
-Brief: [phase-5-handoff.md](phase-5-handoff.md), with [phase-5/architecture.md](phase-5/architecture.md), [phase-5/behavior-spec.md](phase-5/behavior-spec.md), [phase-5/scope.md](phase-5/scope.md) and the approved design in [phase-5/design/](phase-5/design/notes.md). Phase 5 is PRs #69 to #84.
+Brief: [phase-5-handoff.md](phase-5-handoff.md), with [phase-5/architecture.md](phase-5/architecture.md), [phase-5/behavior-spec.md](phase-5/behavior-spec.md), [phase-5/scope.md](phase-5/scope.md) and the approved design in [phase-5/design/](phase-5/design/notes.md). Phase 5 is PRs #69 to #85.
 
 ## What was built
 
@@ -24,6 +24,7 @@ Brief: [phase-5-handoff.md](phase-5-handoff.md), with [phase-5/architecture.md](
 | #82 | Mic processing showed "Stopped · No driver" with VB-CABLE installed. Pack 45 puts CABLE Input and CABLE In 16ch on one topology filter (pins `00010001` and `00010002`), so both matched as the input and `VbCable.Find` returned Ambiguous, which showed as No driver. `AudioEndpoint.Filter` is now the connector ID and only pin `00010001` is CABLE Input; Ambiguous has its own status, "More than one cable". Confirmed with a read-only probe on Travis's PC (`chippi-scratch\cable-probe`) |
 | #83 | Test runs wrote to the installed app's log (`%LOCALAPPDATA%\Chippi\logs`): SoundSmoke's fake Install Driver click and a Notifications callback test. Every Windows test project now logs to its own dev profile and fails if its log points at the real one |
 | #84 | Phase 5 installers rebuilt from `9b72093`: release artifact manifest |
+| #85 | Clipboard hub: a listener read between an own write and its bookkeeping recorded Chippi's own copy (see Flaky tests). Not in the installers Travis tests |
 
 ## How to build and run
 
@@ -64,6 +65,8 @@ None recorded in reviews.
 Phase 3 (#50, the mic mute test racing the latch's own retry) and Phase 4 (#61, the audio engine shutdown race) both showed the same pattern: a test that depended on timing passed locally and failed on CI's x64 runner, which is slower and busier than Travis's PC. In Phase 5, `DragTabTests` waited on real 250 ms and 500 ms `DispatcherTimer`s and failed the same way, on `main` `81945ca` (after #77) and on #79's first push run.
 
 #79 removed the wait instead of lengthening it: `IslandWindow` makes its drag timers through an injectable `CreateTimer` (`IslandTimer.cs`), and the tests fire them by hand, with no pumping or sleeping. A test checks that both timers come from the factory with the approved delays, so a timer that bypasses it fails 4 of the 6 drag tests. Lesson kept for later phases: tests drive timers through a seam rather than waiting on wall time.
+
+A fake clock alone wasn't enough for `HubTests.The_temporary_copy_and_the_restore_are_not_recorded`, which failed on #84's x64 PR run. One clock advance fired the listener's settle read (on the thread pool) and the paste's restore together, and a read landing after the restore closed but before the hub noted it as its own recorded the restored copy. The gap was in the product too, for every write Chippi makes. #85 counts each own write until it's noted, and the listener waits while one is in flight. A test puts the read in that window on purpose (3 of 3 failures before, passes after), and the original test failed on run 6 of a 2,000-run loop before and passed all 2,000 after. Second lesson: when a fake clock fires two things at once, a test of their order needs an explicit hook, not luck.
 
 ## Not fixing (from reviews)
 
