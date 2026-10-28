@@ -1,0 +1,23 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Clipboard history and Clean URL (Phase 5): two features that share the Clipboard tile and page. -->
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>Chippi.Features.Clipboard</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Chippi.Core\Chippi.Core.csproj" />
+    <ProjectReference Include="..\..\Chippi.UI\Chippi.UI.csproj" />
+    <ProjectReference Include="..\..\Chippi.Clipboard\Chippi.Clipboard.csproj" />
+    <ProjectReference Include="..\..\Chippi.UrlCleaning\Chippi.UrlCleaning.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Chippi.Features.Clipboard.Tests" />
+    <Using Include="System.IO" />
+  </ItemGroup>
+
+</Project>

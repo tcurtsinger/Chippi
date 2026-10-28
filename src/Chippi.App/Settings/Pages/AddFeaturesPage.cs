@@ -101,6 +101,12 @@ internal sealed class AddFeaturesPage : UserControl
     {
         if (_syncing)
             return;
+        // A feature with something to lose asks first (Clipboard history, Phase 5 notes #56); Cancel leaves it installed.
+        if (!on && entry.UninstallQuestion() is { } question && !await AskAsync(toggle, question))
+        {
+            Refresh();
+            return;
+        }
         toggle.IsEnabled = false;
         try
         {
@@ -117,6 +123,38 @@ internal sealed class AddFeaturesPage : UserControl
             toggle.IsEnabled = true;
             Refresh();
         }
+    }
+
+    /// <summary>A popover under the switch: the question, then Cancel and Uninstall (Critical). Closing it any other way cancels.</summary>
+    private static Task<bool> AskAsync(ToggleButton toggle, string question)
+    {
+        var answer = new TaskCompletionSource<bool>();
+        var popup = new Popup { PlacementTarget = toggle, Placement = PlacementMode.Bottom, StaysOpen = false, AllowsTransparency = true, HorizontalOffset = -220 };
+        var cancel = SettingsUi.Button("Cancel");
+        cancel.Click += (_, _) => popup.IsOpen = false;
+        var uninstall = SettingsUi.Styled(new Button { Content = "Uninstall", Margin = new Thickness(8, 0, 0, 0) }, "CriticalButtonStyle");
+        uninstall.Click += (_, _) =>
+        {
+            answer.TrySetResult(true);
+            popup.IsOpen = false;
+        };
+        var body = new StackPanel
+        {
+            Margin = new Thickness(16),
+            Children =
+            {
+                SettingsUi.Styled(new TextBlock { Text = question }, "BodyTextStyle"),
+                new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 16, 0, 0), Children = { cancel, uninstall } },
+            },
+        };
+        var panel = new Border { MinWidth = 260, CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(1), Child = body };
+        panel.SetResourceReference(Border.BackgroundProperty, "FlyoutBrush");
+        panel.SetResourceReference(Border.BorderBrushProperty, "BorderBrush");
+        popup.Child = panel;
+        popup.Opened += (_, _) => cancel.Focus();
+        popup.Closed += (_, _) => answer.TrySetResult(false);
+        popup.IsOpen = true;
+        return answer.Task;
     }
 
     private void OnRegistryChanged(object? sender, EventArgs e) => Dispatcher.BeginInvoke(Refresh);

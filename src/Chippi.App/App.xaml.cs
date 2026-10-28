@@ -191,6 +191,11 @@ public partial class App : Application
         // [Phase 4] System monitor: replaces its catalog placeholder.
         shell.Registry.Register(new Chippi.Features.SystemMonitor.SystemMonitorModule());
         shell.Registry.Register(new Chippi.Features.Scratchpad.ScratchpadModule());
+        // [Phase 5] Clipboard history and Clean URL share the Clipboard tile.
+        var clipboard = new Chippi.Features.Clipboard.ClipboardFeatures();
+        shell.Registry.Register(new Chippi.Features.Clipboard.ClipboardHistoryModule(clipboard,
+            System.IO.Path.Combine(shell.Services.DataRoot, Chippi.Features.Clipboard.ClipboardHistoryModule.Id)));
+        shell.Registry.Register(new Chippi.Features.Clipboard.CleanUrlModule(clipboard));
 
         // [WS2] "Coming soon" placeholders for the PLAN.md features.
         Settings.Features.FeatureCatalog.RegisterPlaceholders(shell.Registry);

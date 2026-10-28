@@ -50,6 +50,12 @@ public sealed class ModuleContext(
 
     /// <summary>Keep the island open during a dialog or drag. Dispose the scope when it ends.</summary>
     public Func<IDisposable> HoldIslandOpen { get; init; } = () => new IslandOpenHold().Hold();
+
+    /// <summary>The app that was in front before the island took the keyboard or opened docked, for a page's Paste; null when there was none.</summary>
+    public Func<Clipboard.PasteTarget?> IslandPasteTarget { get; init; } = () => null;
+
+    /// <summary>Closes the island, after a page's paste was sent.</summary>
+    public Action CloseIsland { get; init; } = () => { };
 }
 
 /// <summary>Typed access to a module's config section (<c>modules.&lt;id&gt;</c> in settings.json).</summary>

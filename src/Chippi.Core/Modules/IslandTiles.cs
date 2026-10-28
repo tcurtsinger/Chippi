@@ -49,6 +49,12 @@ public sealed record IslandTileSpec(string Key, string Name, string Icon, int Or
 
     /// <summary>The page control to focus after taking the keyboard, never during hover or a drag.</summary>
     public Func<object?>? InitialFocus { get; init; }
+
+    /// <summary>
+    /// The page sees Esc first, from the island and the global Esc alike: true when it used it (Clipboard
+    /// clears its search or leaves Clean URL), and the island stays open. Null for the usual close.
+    /// </summary>
+    public Func<bool>? HandleEscape { get; init; }
 }
 
 /// <summary>A module's handle on its island tile.</summary>

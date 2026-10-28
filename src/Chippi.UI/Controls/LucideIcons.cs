@@ -81,6 +81,15 @@ public static class LucideIcons
 
     public static Geometry TriangleAlert { get; } = G("M21.73,18 L13.73,4 a2,2 0 0 0 -3.48,0 L2.27,18 A2,2 0 0 0 4,21 H20 a2,2 0 0 0 1.73,-3 Z M12,9 V13 M12,17 h0.01");
     public static Geometry File { get; } = G("M15,2 H6 a2,2 0 0 0 -2,2 V20 a2,2 0 0 0 2,2 H18 a2,2 0 0 0 2,-2 V7 Z M14,2 V6 a2,2 0 0 0 2,2 H20");
+    // Clipboard history's item kinds and row actions (Phase 5 design notes #2, #9).
+    public static Geometry AlignLeft { get; } = G("M21,6 H3 M15,12 H3 M17,18 H3");
+    public static Geometry Globe { get; } = G("M12,2 a10,10 0 1 0 0,20 a10,10 0 1 0 0,-20 Z M12,2 a14.5,14.5 0 0 0 0,20 a14.5,14.5 0 0 0 0,-20 M2,12 H22");
+    public static Geometry Image { get; } = G("M5,3 H19 a2,2 0 0 1 2,2 V19 a2,2 0 0 1 -2,2 H5 a2,2 0 0 1 -2,-2 V5 a2,2 0 0 1 2,-2 Z M7,9 a2,2 0 1 0 4,0 a2,2 0 1 0 -4,0 M21,15 l-3.09,-3.09 a2,2 0 0 0 -2.83,0 L6,21");
+    public static Geometry Files { get; } = G("M20,7 h-3 a2,2 0 0 1 -2,-2 V2 M9,18 a2,2 0 0 1 -2,-2 V4 a2,2 0 0 1 2,-2 h7 l4,4 v10 a2,2 0 0 1 -2,2 Z M3,7.6 v12.8 A1.6,1.6 0 0 0 4.6,22 h9.8");
+    public static Geometry FileX { get; } = G("M15,2 H6 a2,2 0 0 0 -2,2 V20 a2,2 0 0 0 2,2 H18 a2,2 0 0 0 2,-2 V7 Z M14,2 V6 a2,2 0 0 0 2,2 H20 M14.5,12.5 l-5,5 M9.5,12.5 l5,5");
+    public static Geometry Cloud { get; } = G("M17.5,19 H9 a7,7 0 1 1 6.71,-9 h1.79 a4.5,4.5 0 1 1 0,9 Z");
+    public static Geometry Pin { get; } = G("M12,17 v5 M9,10.76 a2,2 0 0 1 -1.11,1.79 l-1.78,0.9 A2,2 0 0 0 5,15.24 V16 a1,1 0 0 0 1,1 h12 a1,1 0 0 0 1,-1 v-0.76 a2,2 0 0 0 -1.11,-1.79 l-1.78,-0.9 A2,2 0 0 1 15,10.76 V7 a1,1 0 0 1 1,-1 a2,2 0 0 0 0,-4 H8 a2,2 0 0 0 0,4 a1,1 0 0 1 1,1 Z");
+    public static Geometry PinOff { get; } = G("M12,17 v5 M15,9.34 V7 a1,1 0 0 1 1,-1 a2,2 0 0 0 0,-4 H7.89 M2,2 L22,22 M9,9 v1.76 a2,2 0 0 1 -1.11,1.79 l-1.78,0.9 A2,2 0 0 0 5,15.24 V16 a1,1 0 0 0 1,1 h11");
     public static Geometry Clock { get; } = G("M12,2 a10,10 0 1 0 0,20 a10,10 0 1 0 0,-20 Z M12,6 V12 L16,14");
     public static Geometry Keyboard { get; } = G("M4,4 H20 a2,2 0 0 1 2,2 V18 a2,2 0 0 1 -2,2 H4 a2,2 0 0 1 -2,-2 V6 a2,2 0 0 1 2,-2 Z M6,8 h.01 M10,8 h.01 M14,8 h.01 M18,8 h.01 M8,12 h.01 M12,12 h.01 M16,12 h.01 M7,16 h10");
     public static Geometry Shield { get; } = G("M20,13 c0,5 -3.5,7.5 -7.66,8.95 a1,1 0 0 1 -.67,-.01 C7.5,20.5 4,18 4,13 V6 a1,1 0 0 1 1,-1 c2,0 4.5,-1.2 6.24,-2.72 a1.17,1.17 0 0 1 1.52,0 C14.51,3.81 17,5 19,5 a1,1 0 0 1 1,1 Z");
