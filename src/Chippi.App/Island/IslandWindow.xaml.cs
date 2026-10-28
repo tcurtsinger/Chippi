@@ -220,7 +220,7 @@ public partial class IslandWindow : Window
         _activities = activities;
         _mood = mood;
         RefreshTab();
-        _panel.SetActivities(activities, mood);
+        _panel.SetActivities(activities.Where(a => a.ModuleId != Chippi.Features.PlainPaste.PlainPasteModule.Id).ToArray(), mood);
     }
 
     /// <summary>The running features' island tiles, in grid order.</summary>
@@ -502,31 +502,33 @@ public partial class IslandWindow : Window
     /// </summary>
     private void RefreshTab()
     {
-        var top = _activities.Count > 0 ? _activities[0] : null;
+        var feedback = _activities.FirstOrDefault(a => a.ModuleId == Chippi.Features.PlainPaste.PlainPasteModule.Id);
+        var top = _activities.FirstOrDefault(a => a.ModuleId != Chippi.Features.PlainPaste.PlainPasteModule.Id);
+        bool hasGlyph = feedback is not null || top is not null;
         bool swollen = _hovered || (_panel.IsVisible && !_panel.IsDocked);
-        SwellTo(IslandGeometry.TabSize(_docked, top is not null, swollen));
-
-        Pet.Size = top is not null ? 22 : 20;
-        Pet.ShowMood(top is not null ? _mood : swollen ? PetMood.Idle : PetMood.Sleepy);
-
-        Glyph.Visibility = Shown(top is not null);
-        Equalizer.Visibility = Shown(top?.Kind == IslandActivityKind.Media);
-        Ring.Visibility = Shown(top?.Kind is IslandActivityKind.Timer or IslandActivityKind.Agent);
+        SwellTo(IslandGeometry.TabSize(_docked, hasGlyph, swollen));
+        Pet.Size = hasGlyph ? 22 : 20;
+        Pet.ShowMood(hasGlyph ? _mood : swollen ? PetMood.Idle : PetMood.Sleepy);
+        Glyph.Visibility = Shown(hasGlyph);
+        PlainPasteGlyph.Visibility = Shown(feedback is not null);
+        PlainPasteGlyph.SetResourceReference(Chippi.UI.Controls.LucideIcon.BrushProperty, feedback?.NeedsAttention == true ? "WarningBrush" : "IslandAccentBrush");
+        // Feedback uses the existing live-glyph slot, then restores the activity beneath it.
+        bool live = feedback is null;
+        Equalizer.Visibility = Shown(live && top?.Kind == IslandActivityKind.Media);
+        Ring.Visibility = Shown(live && top?.Kind is IslandActivityKind.Timer or IslandActivityKind.Agent);
         bool folder = top?.Kind is IslandActivityKind.Download or IslandActivityKind.Stash;
-        FolderGlyph.Visibility = Shown(folder && !top!.NeedsAttention);
-        CautionDot.Visibility = Shown(folder && top!.NeedsAttention);
-        Dot.Visibility = Shown(top?.Kind == IslandActivityKind.Status);
-        if (top?.Kind is IslandActivityKind.Timer or IslandActivityKind.Agent)
-            RingArc.Data = Arc(top.Progress ?? 1);
-
+        FolderGlyph.Visibility = Shown(live && folder && !top!.NeedsAttention);
+        CautionDot.Visibility = Shown(live && folder && top!.NeedsAttention);
+        Dot.Visibility = Shown(live && top?.Kind == IslandActivityKind.Status);
+        if (top?.Kind is IslandActivityKind.Timer or IslandActivityKind.Agent) RingArc.Data = Arc(top.Progress ?? 1);
         var mic = _activities.FirstOrDefault(a => a.ModuleId == "mic-mute" && a.NeedsAttention);
         bool micMuted = mic is not null;
         MutedMicGlyph.Visibility = Shown(micMuted);
         MutedMicGlyph.Margin = _docked == IslandEdge.Top ? new Thickness(4, 0, 0, 0) : new Thickness(0, 4, 0, 0);
-
-        AutomationProperties.SetHelpText(Tab, micMuted ? (mic!.Title == "Muted" ? "Microphone muted" : mic.Title) : top is null ? "" : string.IsNullOrWhiteSpace(top.Source) ? top.Title : $"{top.Title}, {top.Source}");
+        AutomationProperties.SetName(Tab, feedback?.Title ?? "Chippi");
+        AutomationProperties.SetLiveSetting(Tab, System.Windows.Automation.AutomationLiveSetting.Polite);
+        AutomationProperties.SetHelpText(Tab, feedback is not null ? "" : (micMuted ? (mic!.Title == "Muted" ? "Microphone muted" : mic.Title) : top is null ? "" : string.IsNullOrWhiteSpace(top.Source) ? top.Title : $"{top.Title}, {top.Source}"));
     }
-
     private static Visibility Shown(bool shown) => shown ? Visibility.Visible : Visibility.Collapsed;
 
     /// <summary>

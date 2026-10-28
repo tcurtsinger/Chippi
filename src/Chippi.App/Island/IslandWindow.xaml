@@ -45,6 +45,7 @@
                             <Path x:Name="RingArc" Stroke="{DynamicResource IslandAccentBrush}" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
                         </Grid>
                         <c:LucideIcon x:Name="FolderGlyph" Data="{x:Static c:LucideIcons.Folder}" Size="14" Thickness="2" Brush="{DynamicResource IslandAccentBrush}" />
+                        <c:LucideIcon x:Name="PlainPasteGlyph" Data="{x:Static c:LucideIcons.ClipboardType}" Size="14" Thickness="2" Visibility="Collapsed" />
                         <Ellipse x:Name="Dot" Width="7" Height="7" Fill="{DynamicResource IslandAccentBrush}" />
                         <Ellipse x:Name="CautionDot" Width="7" Height="7" Fill="{StaticResource WarningBrush}" />
                     </Grid>
