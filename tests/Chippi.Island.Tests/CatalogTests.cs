@@ -28,7 +28,9 @@ public sealed class CatalogTests
         Core.Modules.FeatureDescriptor[] shipped =
         [
             new Features.Clipboard.ClipboardHistoryModule(new Features.Clipboard.ClipboardFeatures()).Descriptor,
+            new Features.Clipboard.CleanUrlModule(new Features.Clipboard.ClipboardFeatures()).Descriptor,
             new Features.PlainPaste.PlainPasteModule().Descriptor,
+            new Features.Scratchpad.ScratchpadModule().Descriptor,
             new Features.Shelf.ShelfModule().Descriptor,
         ];
         var entry = Assert.Single(FeatureCatalog.Placeholders.Concat(shipped), e => e.Id == id);
