@@ -68,6 +68,8 @@ internal sealed class ShelfPage : UserControl
         _gridStroke.SetResourceReference(Shape.StrokeProperty, "IslandAccentBrush");
         _gridStroke.Visibility = Visibility.Collapsed;
         _scroller.Content = _items;
+        _scroller.Margin = new Thickness(0, 0, -8, 0); // the bar sits in the page's padding, not over the third column
+        _items.HorizontalAlignment = HorizontalAlignment.Left;
         _grid.Children.Add(_gridStroke);
         _grid.Children.Add(_scroller);
         AutomationProperties.SetName(_items, "Shelf");
