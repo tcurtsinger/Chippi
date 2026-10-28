@@ -36,4 +36,10 @@ public sealed class ModuleServices
 
     /// <summary>The shared clipboard service (Phase 5). Set by the shell; null in tests. Idle until a feature uses it.</summary>
     public Clipboard.IClipboardHub? Clipboard { get; set; }
+
+    /// <summary>The app in front before the island took the keyboard or opened docked. Set by the shell; null in tests.</summary>
+    public Func<Clipboard.PasteTarget?>? IslandPasteTarget { get; set; }
+
+    /// <summary>Closes the island (after a paste was sent). Set by the shell; null in tests.</summary>
+    public Action? CloseIsland { get; set; }
 }

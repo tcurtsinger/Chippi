@@ -25,4 +25,10 @@ public interface IFeatureModule
     Task StopAsync(CancellationToken ct);
     /// <summary>Remove persistent integration on feature uninstall or startup while uninstalled, not ordinary app exit.</summary>
     Task UninstallAsync(CancellationToken ct) => Task.CompletedTask;
+
+    /// <summary>
+    /// What Add features asks before uninstalling ("Uninstall and erase history?"), with Cancel and
+    /// Uninstall; null uninstalls at once. Cancel leaves the module and its data alone.
+    /// </summary>
+    string? UninstallQuestion() => null;
 }

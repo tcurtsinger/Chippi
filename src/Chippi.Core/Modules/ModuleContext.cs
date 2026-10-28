@@ -47,6 +47,12 @@ public sealed class ModuleContext(
 
     /// <summary>The shared clipboard service; no module opens the clipboard itself. Null when the shell has none (tests pass a fake).</summary>
     public Clipboard.IClipboardHub? Clipboard { get; init; }
+
+    /// <summary>The app that was in front before the island took the keyboard or opened docked, for a page's Paste; null when there was none.</summary>
+    public Func<Clipboard.PasteTarget?> IslandPasteTarget { get; init; } = () => null;
+
+    /// <summary>Closes the island, after a page's paste was sent.</summary>
+    public Action CloseIsland { get; init; } = () => { };
 }
 
 /// <summary>Typed access to a module's config section (<c>modules.&lt;id&gt;</c> in settings.json).</summary>

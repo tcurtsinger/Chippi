@@ -9,6 +9,7 @@
     <Project Path="src/Chippi.UI/Chippi.UI.csproj" />
   </Folder>
   <Folder Name="/src/Features/">
+    <Project Path="src/Features/Chippi.Features.Clipboard/Chippi.Features.Clipboard.csproj" />
     <Project Path="src/Features/Chippi.Features.Downloads/Chippi.Features.Downloads.csproj" />
     <Project Path="src/Features/Chippi.Features.KeepAwake/Chippi.Features.KeepAwake.csproj" />
     <Project Path="src/Features/Chippi.Features.Sound/Chippi.Features.Sound.csproj" />
@@ -18,6 +19,7 @@
     <Project Path="tests/Chippi.Audio.Tests/Chippi.Audio.Tests.csproj" />
     <Project Path="tests/Chippi.Clipboard.Tests/Chippi.Clipboard.Tests.csproj" />
     <Project Path="tests/Chippi.Core.Tests/Chippi.Core.Tests.csproj" />
+    <Project Path="tests/Chippi.Features.Clipboard.Tests/Chippi.Features.Clipboard.Tests.csproj" />
     <Project Path="tests/Chippi.Features.Downloads.Tests/Chippi.Features.Downloads.Tests.csproj" />
     <Project Path="tests/Chippi.Features.KeepAwake.Tests/Chippi.Features.KeepAwake.Tests.csproj" />
     <Project Path="tests/Chippi.Features.Sound.Tests/Chippi.Features.Sound.Tests.csproj" />

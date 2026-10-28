@@ -107,7 +107,8 @@ public partial class IslandPanelWindow : Window
             if (e.Key != Key.Escape)
                 return;
             e.Handled = true;
-            EscapePressed?.Invoke(this, EventArgs.Empty);
+            if (!PageHandlesEscape())
+                EscapePressed?.Invoke(this, EventArgs.Empty);
         };
         // Content that grows or shrinks (a module's view refreshing) reshapes the island around it.
         Card.SizeChanged += (_, _) =>
@@ -146,6 +147,32 @@ public partial class IslandPanelWindow : Window
 
     /// <summary>Whether the island took the keyboard after the user clicked into it.</summary>
     internal bool HasKeyboard => _keyboard;
+
+    /// <summary>The app in front, read just before the island takes the keyboard (Phase 5 notes #62).</summary>
+    internal Func<Core.Clipboard.PasteTarget?>? CaptureTarget { get; set; }
+
+    /// <summary>The app that was in front before the island took the keyboard; null until it has, and after it closes.</summary>
+    internal Core.Clipboard.PasteTarget? PasteTarget { get; private set; }
+
+    /// <summary>Lets the page use Esc first (a search to clear): true when it did, and the island stays open.</summary>
+    internal bool PageHandlesEscape()
+    {
+        if (!IsOpen || Group(_page) is not { } group)
+            return false;
+        foreach (var part in group.Parts)
+        {
+            try
+            {
+                if (part.Spec.HandleEscape?.Invoke() == true)
+                    return true;
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"Island: {part.ModuleId} failed to handle Esc", ex);
+            }
+        }
+        return false;
+    }
 
     public void Initialize() => _hwnd = IslandNative.MakeNoActivate(this);
 
@@ -242,6 +269,7 @@ public partial class IslandPanelWindow : Window
         if (_dock is null && IsVisible)
             Collapse(); // the island still shrinking into its tab
         _dock = display;
+        PasteTarget = CaptureTarget?.Invoke() ?? PasteTarget; // after a tray click, the taskbar: counts as none
         static Rect Pixels(PixelRect r) => new(r.Left, r.Top, r.Width, r.Height);
         _area = new MonitorArea(default, Pixels(display.Monitor), Pixels(display.Work), display.Scale);
         Grow();
@@ -280,6 +308,7 @@ public partial class IslandPanelWindow : Window
             return;
         IsOpen = false;
         _keyboard = false;
+        PasteTarget = null;
         _clock.Stop();
         MarkOnScreen();
         if (immediate)
@@ -617,6 +646,8 @@ public partial class IslandPanelWindow : Window
         if (_keyboard || !IsOpen)
             return;
         _keyboard = true;
+        // Before activating: once the island is in front, the app the user was in is gone from view.
+        PasteTarget = CaptureTarget?.Invoke() ?? PasteTarget;
         IslandNative.Activate(_hwnd);
         Dispatcher.BeginInvoke(DispatcherPriority.Input, () =>
         {

@@ -43,6 +43,12 @@ public sealed record IslandTileSpec(string Key, string Name, string Icon, int Or
 
     /// <summary>The page's header repeats the tile's status, for a page whose controls don't show it (Keep awake's time left).</summary>
     public bool StatusOnPage { get; init; }
+
+    /// <summary>
+    /// The page sees Esc first, from the island and the global Esc alike: true when it used it (Clipboard
+    /// clears its search or leaves Clean URL), and the island stays open. Null for the usual close.
+    /// </summary>
+    public Func<bool>? HandleEscape { get; init; }
 }
 
 /// <summary>A module's handle on its island tile.</summary>

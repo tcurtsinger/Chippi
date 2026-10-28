@@ -328,7 +328,13 @@ public partial class IslandWindow : Window
     }
 
     // A lambda: CloseIsland's optional parameter turns a method group into Action<bool>, which throws.
-    internal void Escape() => Dispatcher.BeginInvoke(() => CloseIsland());
+    // With the keyboard, the panel sees this Esc itself; the page may use it first (a search to clear).
+    internal void Escape() => Dispatcher.BeginInvoke(() =>
+    {
+        if (_panel.HasKeyboard || _panel.PageHandlesEscape())
+            return;
+        CloseIsland();
+    });
 
     /// <summary>
     /// A click anywhere off the island closes it. It never activates, so it can't lose focus to see
@@ -449,6 +455,15 @@ public partial class IslandWindow : Window
     }
 
     internal bool IsIslandOpen => _panel.IsOpen;
+
+    /// <summary>Reads the app in front before the island takes the keyboard (Phase 5 notes #62).</summary>
+    internal Func<Core.Clipboard.PasteTarget?>? CaptureTarget { set => _panel.CaptureTarget = value; }
+
+    /// <summary>The app that was in front before the island took the keyboard, for a page's Paste.</summary>
+    internal Core.Clipboard.PasteTarget? PasteTarget => _panel.PasteTarget;
+
+    /// <summary>Closes the island the usual way, after a page's paste was sent.</summary>
+    internal void ClosePages() => CloseIsland();
 
     /// <summary>The open island itself, for tests and snapshots.</summary>
     internal IslandPanelWindow Panel => _panel;

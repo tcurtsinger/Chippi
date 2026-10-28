@@ -58,6 +58,10 @@ public sealed class IslandHost : IDisposable
         _tracker.Ignore = [_window.Handle, _window.PanelHandle];
         _window.SettingsRequested += (_, _) => _shell.Commands.OpenSettings();
         _window.LastPageChanged += (_, key) => UpdateSettings(s => s.IslandLastPage = key);
+        // A page's Paste goes to the app that was in front before the island took the keyboard (Phase 5 notes #62).
+        _window.CaptureTarget = () => _shell.Clipboard.CaptureTarget();
+        _shell.Services.IslandPasteTarget = () => _window.PasteTarget;
+        _shell.Services.CloseIsland = _window.ClosePages;
         // The tray icon and a second launch open these same pages: in the island, or docked by the tray.
         _window.TrayIconRect = () => _shell.Commands.TrayAnchor()?.Icon;
         _shell.Commands.RegisterPages(
