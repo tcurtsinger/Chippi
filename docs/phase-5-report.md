@@ -1,8 +1,8 @@
 # Chippi Phase 5 report: Clipboard and text
 
-Phase 5 (Clipboard history, Clean URL, Paste as plain text, Scratchpad and Shelf) is built and on GitHub at `main` `9b72093`. Every merge went through a second member's review first and merged only after both CI runs passed. The features live in three island tiles (Clipboard, Scratchpad, Shelf) and the docked pages, as Travis decided: Clean URL sits behind the Clipboard header's link button, and plain paste is a shortcut only. Recording is off until turned on, and nothing listens to the clipboard unless History is recording or automatic cleaning is on. The installers were built from `ce2afc4` (`pack/phase-5`, PR #80), then rebuilt from `9b72093` (`pack/phase-5b`, PR #84) with two fixes found while they waited: Mic processing reading "No driver" with VB-CABLE installed (#82), and test runs writing to the installed app's log (#83). Travis's live checks (task 34) are pending. ARM64 is built and packaged but never run.
+Phase 5 (Clipboard history, Clean URL, Paste as plain text, Scratchpad and Shelf) is built and on GitHub at `main` `028a58a`. Every merge went through a second member's review first and merged only after both CI runs passed. The features live in three island tiles (Clipboard, Scratchpad, Shelf) and the docked pages, as Travis decided: Clean URL sits behind the Clipboard header's link button, and plain paste is a shortcut only. Recording is off until turned on, and nothing listens to the clipboard unless History is recording or automatic cleaning is on. The installers were built from `ce2afc4` (`pack/phase-5`, PR #80), rebuilt from `9b72093` (`pack/phase-5b`, PR #84) with two fixes found while they waited: Mic processing reading "No driver" with VB-CABLE installed (#82), and test runs writing to the installed app's log (#83). Travis's live checks on that build passed (task 34, 2026-10-28). The four things they turned up are fixed (#86 to #88) or recorded as a limit (#89), and the final installers were built from `f342b70` (`pack/phase-5c`, PR #90). Travis's spot-check of the final build (task 57) is pending. ARM64 is built and packaged but never run.
 
-Brief: [phase-5-handoff.md](phase-5-handoff.md), with [phase-5/architecture.md](phase-5/architecture.md), [phase-5/behavior-spec.md](phase-5/behavior-spec.md), [phase-5/scope.md](phase-5/scope.md) and the approved design in [phase-5/design/](phase-5/design/notes.md). Phase 5 is PRs #69 to #85.
+Brief: [phase-5-handoff.md](phase-5-handoff.md), with [phase-5/architecture.md](phase-5/architecture.md), [phase-5/behavior-spec.md](phase-5/behavior-spec.md), [phase-5/scope.md](phase-5/scope.md) and the approved design in [phase-5/design/](phase-5/design/notes.md). Phase 5 is PRs #69 to #90.
 
 ## What was built
 
@@ -24,7 +24,12 @@ Brief: [phase-5-handoff.md](phase-5-handoff.md), with [phase-5/architecture.md](
 | #82 | Mic processing showed "Stopped · No driver" with VB-CABLE installed. Pack 45 puts CABLE Input and CABLE In 16ch on one topology filter (pins `00010001` and `00010002`), so both matched as the input and `VbCable.Find` returned Ambiguous, which showed as No driver. `AudioEndpoint.Filter` is now the connector ID and only pin `00010001` is CABLE Input; Ambiguous has its own status, "More than one cable". Confirmed with a read-only probe on Travis's PC (`chippi-scratch\cable-probe`) |
 | #83 | Test runs wrote to the installed app's log (`%LOCALAPPDATA%\Chippi\logs`): SoundSmoke's fake Install Driver click and a Notifications callback test. Every Windows test project now logs to its own dev profile and fails if its log points at the real one |
 | #84 | Phase 5 installers rebuilt from `9b72093`: release artifact manifest |
-| #85 | Clipboard hub: a listener read between an own write and its bookkeeping recorded Chippi's own copy (see Flaky tests). Not in the installers Travis tests |
+| #85 | Clipboard hub: a listener read between an own write and its bookkeeping recorded Chippi's own copy (see Flaky tests). In the final installers (#90) |
+| #86 | From live check 1.2 (task 48, Travis: yes): a Clipboard row for one copied image file (png, jpg, jpeg, gif, bmp, webp) shows the picture, scaled to 320 wide and read off the UI thread. Online-only files are never opened (Offline and both recall attributes are checked first), and files over 16 MiB or 16.6 MP keep the file icon |
+| #87 | From live check 2.2: the Clean URL field stays on one line at full width, and the result shows only the clean link (the "Removed" line is gone; DESIGN.md and notes #23 and #26 updated) |
+| #88 | From live check 4.5: Scratchpad's ⋯ and note-tab menus were unstyled Windows menus, and Export showed a replacement character. They now use the island menu, Export… shows its dots, and the delete question's quotes are fixed. The same audit moved Clipboard history's Add app picker to the Settings menu style |
+| #89 | From live check 5.8 (task 50, Travis: leave it): the docked Shelf only drags items out. It closes on a click elsewhere like every docked page, so a drop from another app can't reach it. DESIGN.md, notes #50 and architecture.md record the limit |
+| #90 | Final Phase 5 installers from `f342b70`: release artifact manifest |
 
 ## How to build and run
 
@@ -35,20 +40,20 @@ Unchanged from the [Phase 1 report](phase-1-report.md#how-to-build-and-run). Add
 
 ## Test results
 
-At `main` `9b72093`, the rebuilt installers' commit (CI run 40770613072, push):
+At `main` `f342b70`, the final installers' source (CI run 40784871601, push; `028a58a` after it changes only the manifest):
 - Release win-x64 and win-arm64 with `--no-incremental`: 0 warnings, 0 errors each.
-- Every test project except UiSmoke: 1,235 passed, 0 failed (Audio 114, Clipboard 49, Clean URL rules 272, Clipboard features 45, Core 111, Downloads 118, Keep awake 32, Plain paste 14, Scratchpad 23, Shelf 17, Sound 71, System monitor 80, Island 139, Notifications 26, Rules 117, Sound smoke 7). Phase 4 ended at 757; Core, Keep awake and Sound grew with #66. #83 adds one log check to each Windows test project.
+- Every test project except UiSmoke: 1,247 passed, 0 failed (Audio 114, Clipboard 50, Clean URL rules 272, Clipboard features 54, Core 111, Downloads 118, Keep awake 32, Plain paste 14, Scratchpad 25, Shelf 17, Sound 71, System monitor 80, Island 139, Notifications 26, Rules 117, Sound smoke 7). Phase 4 ended at 757; Core, Keep awake and Sound grew with #66. #83 adds one log check to each Windows test project.
 - UiSmoke: its 2 windowless log checks pass; its 16 desktop cases skip, as always on CI. The desktop suite wasn't run in Phase 5.
-- The first installers' commit, `ce2afc4` (CI run 40761850949), passed 1,216 with 0 warnings.
+- Earlier installers: `ce2afc4` (CI run 40761850949) passed 1,216 and `9b72093` (CI run 40770613072) passed 1,235, both with 0 warnings. Since then #85, #86 and #88 added 12 tests.
 
 ## Acceptance checklist (brief §6)
 
 | Check | Status | Evidence |
 |---|---|---|
 | 0 warnings on both platforms; tests pass on x64; behavior-spec §10 checks within scope covered on fakes; deferred features stay out | Done | See Test results. Privacy: `HubTests` (`A_private_copy_is_never_read`, `A_private_copy_that_lands_after_the_early_check_is_still_never_read`, `The_history_marker_is_read_as_a_dword_and_fails_closed`, `An_allowed_history_marker_never_overrides_an_exclusion`, `An_app_to_skip_is_not_read_for_that_lease_only`, `A_private_copy_pastes_and_stays_private_throughout`). Clean URL: `Chippi.UrlCleaning.Tests` (272). Quick panel is out of the catalog; the Phase 5.5 features stay there as coming-soon entries that can't be installed (`FeatureCatalog.cs`, `CatalogTests`) |
-| Tiles, pages, docked versions and Settings match the approved notes and DESIGN.md §3 | Done, live pending | Offscreen renders of the Clipboard page and Shelf (`chippi-scratch\phase-5\c3\render`, `c5\render`). Every new string checked by the reviewer and by Marge's Decide pass. C6 smoke fits the Clipboard, Scratchpad and Shelf pages at 1280×720 on the top edge, a side edge and docked; Settings and the confirmations are checked live only. Live: sections 1 to 6. Result: _pending_ |
+| Tiles, pages, docked versions and Settings match the approved notes and DESIGN.md §3 | Done, live pending | Offscreen renders of the Clipboard page and Shelf (`chippi-scratch\phase-5\c3\render`, `c5\render`). Every new string checked by the reviewer and by Marge's Decide pass. C6 smoke fits the Clipboard, Scratchpad and Shelf pages at 1280×720 on the top edge, a side edge and docked; Settings and the confirmations are checked live only. Live: sections 1 to 6 passed (task 34); the four fixes from them (#86 to #89) are in the final build. Spot-check of the final build (task 57): _pending_ |
 | Nothing listens to the clipboard unless History is recording (not paused) or automatic cleaning is on | Done | `HubTests.Nothing_listens_without_a_lease_and_the_last_lease_stops_it`, `HubTests.On_demand_reads_never_start_the_listener`, `ClipboardHistoryTests.Nothing_listens_or_is_created_until_recording_is_on_and_not_paused`, `AutoCleanerTests.Off_by_default_and_listens_only_while_on` |
-| Installer installs, updates in place and uninstalls; Travis's live checks pass, using test text he copies himself | Live pending | `pack/phase-5b` (`9a478d6`, PR #84, built from `9b72093`): 12/12 hashes checked by Kayla and Marge (the first build, `ef35929`, is archived in `chippi-archive\phase-5-installers-0.1.0-ef35929`); both rnnoise.dll files and the VB-CABLE zip match their pins in both packages. Live: sections 0, 7 and 8. Result: _pending_ |
+| Installer installs, updates in place and uninstalls; Travis's live checks pass, using test text he copies himself | Done, spot-check pending | Live checks on `pack/phase-5b` (`9a478d6`, PR #84, built from `9b72093`): sections 0, 7 and 8 passed (task 34). Final build `pack/phase-5c` (`fa63a54`, PR #90, built from `f342b70`): 12/12 hashes checked by Kayla and Marge; both rnnoise.dll files and the VB-CABLE zip match their pins in both packages. Earlier builds are archived in `chippi-archive\phase-5-installers-0.1.0-ef35929` and `phase-5-installers-0.1.0-9a478d6`. Spot-check of the final build (task 57): _pending_ |
 
 ## Deviations from DESIGN.md
 
@@ -56,8 +61,9 @@ None recorded in reviews.
 
 ## Known issues
 
-- **Clipboard behavior is tested on fakes.** The real clipboard, paste into elevated targets and the privacy markers were checked in Windows Sandbox (C0), not on Travis's PC. Live sections 1 to 3 are the first real run.
+- **Clipboard behavior is tested on fakes.** The real clipboard, paste into elevated targets and the privacy markers were checked in Windows Sandbox (C0), not on Travis's PC. Live sections 1 to 3 were the first real run, and passed.
 - **Plain paste into an admin window beeps and leaves plain text as the copy.** That's the design (notes #19): Chippi never sends keystrokes to an elevated window.
+- **The docked Shelf only drags items out.** A docked page closes on a click elsewhere, so a drag from another app can't reach it. Drops go through the island tab. Travis's call (task 50); recorded in DESIGN.md by #89.
 - **Not run on real hardware:** ARM64 and the desktop UiSmoke suite (including the new Scratchpad keyboard case).
 
 ## Flaky tests
@@ -79,20 +85,27 @@ A fake clock alone wasn't enough for `HubTests.The_temporary_copy_and_the_restor
 
 ## Live checks
 
-Steps: `chippi-scratch\phase-5\live-checks.md` (task 34), reviewed by Karl and Marge. Installer `X:\code\chippi\build\artifacts\releases\0.1.0\win-x64\ChippiApp-win-x64-Setup.exe` (82,161,514 bytes), built from `9b72093`.
+Steps: `chippi-scratch\phase-5\live-checks.md` (task 34), reviewed by Karl and Marge. Installer `X:\code\chippi\build\artifacts\releases\0.1.0\win-x64\ChippiApp-win-x64-Setup.exe` (82,161,514 bytes), built from `9b72093`. Travis's result, 2026-10-28: Pass.
 
-| Section | Result |
-|---|---|
-| 0. Setup | |
-| 1. Clipboard history | |
-| 2. Clean URL | |
-| 3. Paste as plain text | |
-| 4. Scratchpad | |
-| 5. Shelf | |
-| 6. Keyboard | |
-| 7. Install | |
-| 8. Afterwards | |
+Step fixes during the run, after Travis's questions:
+- 0.3 and 1.2 now spell out making `pic.png` and typing each test line before copying it.
+- Every Shelf drop goes through the island tab, since the island closes when Explorer is clicked.
+- 5.8 checks drag out only (task 50, #89).
+
+| Section | Result | Found |
+|---|---|---|
+| 0. Setup | Pass | |
+| 1. Clipboard history | Pass | A copied image file showed only a file icon: #86 |
+| 2. Clean URL | Pass | The link wrapped to a second line, and the removed list wasn't wanted: #87 |
+| 3. Paste as plain text | Pass | |
+| 4. Scratchpad | Pass | Classic Windows menu with a broken glyph: #88 |
+| 5. Shelf | Pass | The docked Shelf can't take drops: #89 |
+| 6. Keyboard | Pass | |
+| 7. Install | Pass | |
+| 8. Afterwards | Pass | |
+
+Final build (`pack/phase-5c`, 82,165,247 bytes, built from `f342b70`): Travis's spot-check of the thumbnail, the Clean URL field and the menus (task 57) is _pending_.
 
 ## Cleanup
 
-After the live-check results merge: remove the remaining Phase 5 worktrees (`chippi-pack-phase-5b`, `chippi-report`) and merged branches, and archive `chippi-scratch\phase-5` and `chippi-scratch\cable-probe` to `chippi-archive`, following the [end-of-phase checklist](end-of-phase-checklist.md).
+After this report merges: remove the `chippi-report` worktree and the merged Phase 5 branches on GitHub (keep `main` and `spike/boost-loopback`), and archive `chippi-scratch\phase-5` and `chippi-scratch\cable-probe` to `chippi-archive`, following the [end-of-phase checklist](end-of-phase-checklist.md).
