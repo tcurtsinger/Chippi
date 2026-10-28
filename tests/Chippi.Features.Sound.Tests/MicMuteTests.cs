@@ -98,6 +98,9 @@ public sealed class MicMuteTests
         await using var f = new MuteFixture();
         await f.Start();
         var original = f.Module.Settings.Shortcut;
+        Assert.False(f.Module.ChangeShortcut(new(ShortcutModifiers.Shift, 0x56)));
+        Assert.Equal("Shortcut unavailable", f.Module.ShortcutError);
+        Assert.Equal(original, f.Module.Settings.Shortcut);
         f.Hotkey.Available = false;
         Assert.False(f.Module.ChangeShortcut(new(ShortcutModifiers.Control, 0x4B)));
         Assert.Equal(original, f.Module.Settings.Shortcut);
