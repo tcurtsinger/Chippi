@@ -134,6 +134,22 @@ public sealed class ClipboardHistory : IDisposable
     public async Task<PasteOutcome> PasteAsync(HistoryEntry entry, PasteTarget target, CancellationToken cancel = default) =>
         await ContentAsync(entry).ConfigureAwait(false) is { } content ? await _hub.PasteAsync(content, target, cancel).ConfigureAwait(false) : PasteOutcome.NoText;
 
+    /// <summary>
+    /// Saves text Chippi itself put on the clipboard (Clean URL's Copy, notes #26), which the listener
+    /// never sees. Only while recording and not paused.
+    /// </summary>
+    public Task RecordAsync(string text)
+    {
+        if (!Listening)
+            return Task.CompletedTask;
+        return RunAsync(store =>
+        {
+            if (store.Add(HistoryCapture.FromText(text), _time.GetUtcNow()).Outcome == AddOutcome.Full)
+                lock (_gate) _full = true;
+            Publish(store);
+        });
+    }
+
     /// <summary>A saved picture's PNG, for the selected row's preview.</summary>
     public Task<byte[]?> PictureAsync(long id) => RunAsync(store => store.Picture(id));
 
