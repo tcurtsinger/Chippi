@@ -34,11 +34,11 @@ Unchanged from the [Phase 1 report](phase-1-report.md#how-to-build-and-run). Add
 
 ## Test results
 
-At `ce2afc4`, the installer commit (CI run 40761850949, push):
+At `main` `9b72093`, the rebuilt installers' commit (CI run 40770613072, push):
 - Release win-x64 and win-arm64 with `--no-incremental`: 0 warnings, 0 errors each.
-- Every test project except UiSmoke: 1,216 passed, 0 failed (Audio 110, Clipboard 48, Clean URL rules 272, Clipboard features 44, Core 110, Downloads 117, Keep awake 31, Plain paste 13, Scratchpad 22, Shelf 16, Sound 69, System monitor 79, Island 138, Notifications 25, Rules 117, Sound smoke 5). Phase 4 ended at 757; Core, Keep awake and Sound grew with #66.
-- At `main` `9b72093`, the rebuilt installers' commit (CI run 40770613072, push): _pending_.
-- UiSmoke (the desktop suite) wasn't run in Phase 5.
+- Every test project except UiSmoke: 1,235 passed, 0 failed (Audio 114, Clipboard 49, Clean URL rules 272, Clipboard features 45, Core 111, Downloads 118, Keep awake 32, Plain paste 14, Scratchpad 23, Shelf 17, Sound 71, System monitor 80, Island 139, Notifications 26, Rules 117, Sound smoke 7). Phase 4 ended at 757; Core, Keep awake and Sound grew with #66. #83 adds one log check to each Windows test project.
+- UiSmoke: its 2 windowless log checks pass; its 16 desktop cases skip, as always on CI. The desktop suite wasn't run in Phase 5.
+- The first installers' commit, `ce2afc4` (CI run 40761850949), passed 1,216 with 0 warnings.
 
 ## Acceptance checklist (brief §6)
 
