@@ -33,4 +33,7 @@ public sealed class ModuleServices
 
     /// <summary>Opens the island on a tile key's page. Set by the shell; null in tests.</summary>
     public Action<string>? OpenIslandPage { get; set; }
+
+    /// <summary>The shared clipboard service (Phase 5). Set by the shell; null in tests. Idle until a feature uses it.</summary>
+    public Clipboard.IClipboardHub? Clipboard { get; set; }
 }

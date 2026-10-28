@@ -253,6 +253,7 @@ public partial class App : Application
     protected override void OnExit(ExitEventArgs e)
     {
         _toasts?.Dispose();
+        Shell?.Clipboard.Dispose();
         _instance?.Dispose();
         LoggerFactory?.Dispose();
         base.OnExit(e);

@@ -2,6 +2,8 @@
 // Copyright (C) Chippi contributors
 
 using System.IO;
+using Chippi.Clipboard;
+using Chippi.Clipboard.Windows;
 using Chippi.Core.Config;
 using Chippi.Core.Island;
 using Chippi.Core.Modules;
@@ -32,6 +34,8 @@ public sealed class ShellContext
         };
         Services.OpenSettings = page => Commands.OpenSettings(page);
         Services.OpenIslandPage = key => Commands.ShowPage(key);
+        // Its thread starts on first use; nothing listens until History records or Clean URL cleans automatically.
+        Services.Clipboard = Clipboard = new ClipboardHub(new WindowsClipboardSystem(), new WindowsForeground(), log: loggerFactory.CreateLogger("Clipboard"));
         Registry = new ModuleRegistry(config, Island, loggerFactory, Services);
         Startup = string.IsNullOrWhiteSpace(devProfile)
             ? new StartupRegistration()
@@ -50,6 +54,9 @@ public sealed class ShellContext
     public ModuleRegistry Registry { get; }
 
     public ShellCommands Commands { get; } = new();
+
+    /// <summary>The shared clipboard service. Disposed at exit, after the modules stop.</summary>
+    public ClipboardHub Clipboard { get; }
 
     /// <summary>
     /// Module data folders, activation verbs and notices. P2-D sets <see cref="ModuleServices.Toasts"/>

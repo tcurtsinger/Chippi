@@ -44,6 +44,9 @@ public sealed class ModuleContext(
 
     /// <summary>Opens the island on a tile's page (a notice click opening the System monitor page): in the island, or docked by the tray.</summary>
     public Action<string> OpenIslandPage { get; init; } = _ => { };
+
+    /// <summary>The shared clipboard service; no module opens the clipboard itself. Null when the shell has none (tests pass a fake).</summary>
+    public Clipboard.IClipboardHub? Clipboard { get; init; }
 }
 
 /// <summary>Typed access to a module's config section (<c>modules.&lt;id&gt;</c> in settings.json).</summary>

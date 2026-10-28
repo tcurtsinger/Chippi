@@ -64,6 +64,11 @@ public static class LucideIcons
     public static Geometry Folder { get; } = G("M20,20 a2,2 0 0 0 2,-2 V8 a2,2 0 0 0 -2,-2 H12.1 a2,2 0 0 1 -1.69,-0.9 L9.6,3.9 A2,2 0 0 0 7.93,3 H4 a2,2 0 0 0 -2,2 V18 a2,2 0 0 0 2,2 Z");
     public static Geometry Download { get; } = G("M21,15 v4 a2,2 0 0 1 -2,2 H5 a2,2 0 0 1 -2,-2 v-4 M7,10 L12,15 L17,10 M12,15 V3");
     public static Geometry Clipboard { get; } = G("M9,2 H15 a1,1 0 0 1 1,1 V5 a1,1 0 0 1 -1,1 H9 a1,1 0 0 1 -1,-1 V3 a1,1 0 0 1 1,-1 Z M16,4 h2 a2,2 0 0 1 2,2 v14 a2,2 0 0 1 -2,2 H6 a2,2 0 0 1 -2,-2 V6 a2,2 0 0 1 2,-2 h2");
+    public static Geometry ClipboardList { get; } = G("M9,2 H15 a1,1 0 0 1 1,1 V5 a1,1 0 0 1 -1,1 H9 a1,1 0 0 1 -1,-1 V3 a1,1 0 0 1 1,-1 Z M16,4 h2 a2,2 0 0 1 2,2 v14 a2,2 0 0 1 -2,2 H6 a2,2 0 0 1 -2,-2 V6 a2,2 0 0 1 2,-2 h2 M12,11 h4 M12,16 h4 M8,11 h.01 M8,16 h.01");
+    public static Geometry ClipboardType { get; } = G("M9,2 H15 a1,1 0 0 1 1,1 V5 a1,1 0 0 1 -1,1 H9 a1,1 0 0 1 -1,-1 V3 a1,1 0 0 1 1,-1 Z M16,4 h2 a2,2 0 0 1 2,2 v14 a2,2 0 0 1 -2,2 H6 a2,2 0 0 1 -2,-2 V6 a2,2 0 0 1 2,-2 h2 M9,12 v-1 h6 v1 M11,17 h2 M12,11 v6");
+    public static Geometry Link { get; } = G("M10,13 a5,5 0 0 0 7.54,0.54 l3,-3 a5,5 0 0 0 -7.07,-7.07 l-1.72,1.71 M14,11 a5,5 0 0 0 -7.54,-0.54 l-3,3 a5,5 0 0 0 7.07,7.07 l1.71,-1.71");
+    public static Geometry NotebookPen { get; } = G("M13.4,2 H6 a2,2 0 0 0 -2,2 v16 a2,2 0 0 0 2,2 h12 a2,2 0 0 0 2,-2 v-7.4 M2,6 h4 M2,10 h4 M2,14 h4 M2,18 h4 M21.378,5.626 a1,1 0 1 0 -3.004,-3.004 l-5.01,5.012 a2,2 0 0 0 -0.506,0.854 l-0.837,2.87 a0.5,0.5 0 0 0 0.62,0.62 l2.87,-0.837 a2,2 0 0 0 0.854,-0.506 Z");
+    public static Geometry Inbox { get; } = G("M22,12 H16 L14,15 H10 L8,12 H2 M5.45,5.11 L2,12 v6 a2,2 0 0 0 2,2 h16 a2,2 0 0 0 2,-2 v-6 l-3.45,-6.89 A2,2 0 0 0 16.76,4 H7.24 a2,2 0 0 0 -1.79,1.11 Z");
     public static Geometry Camera { get; } = G("M14.5,4 h-5 L7,7 H4 a2,2 0 0 0 -2,2 v9 a2,2 0 0 0 2,2 h16 a2,2 0 0 0 2,-2 V9 a2,2 0 0 0 -2,-2 h-3 Z M12,10 a3,3 0 1 0 0,6 a3,3 0 1 0 0,-6 Z");
     public static Geometry AppWindow { get; } = G("M4,4 H20 a2,2 0 0 1 2,2 V18 a2,2 0 0 1 -2,2 H4 a2,2 0 0 1 -2,-2 V6 a2,2 0 0 1 2,-2 Z M2,8 H22 M6,4 V8 M10,4 V8");
     public static Geometry Ellipsis { get; } = G("M5,11 a1,1 0 1 0 0,2 a1,1 0 1 0 0,-2 Z M12,11 a1,1 0 1 0 0,2 a1,1 0 1 0 0,-2 Z M19,11 a1,1 0 1 0 0,2 a1,1 0 1 0 0,-2 Z");
