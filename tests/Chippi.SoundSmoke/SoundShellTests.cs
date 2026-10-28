@@ -118,6 +118,8 @@ public sealed class SoundShellTests
             await SmokeDispatcher.Until(() => All<Button>(page).Any(b => AutomationProperties.GetName(b) == "Install Driver, Mic processing"));
             Invoke(Named<Button>(page, "Install Driver, Mic processing"));
             await SmokeDispatcher.Until(() => scene.Requirement.Installs == 1 && Texts(page).Contains("Restart to finish"));
+            Chippi.SmokeTests.SmokeLog.Check();
+            Assert.Contains("Install Driver for mic-processing", System.IO.File.ReadAllText(Chippi.Core.Diagnostics.Log.Default.CurrentFile));
             Assert.False(scene.Shell.Registry.Find("mic-processing")!.IsInstalled);
 
             scene.Requirement.Change(RequirementState.Installing);

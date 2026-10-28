@@ -15,4 +15,5 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Features\Chippi.Features.Downloads\Chippi.Features.Downloads.csproj" />
   </ItemGroup>
+  <ItemGroup><Compile Include="../SmokeLog.cs" Link="SmokeLog.cs" /></ItemGroup>
 </Project>

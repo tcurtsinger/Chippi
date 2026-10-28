@@ -46,3 +46,5 @@ These checks do not prove physical keyboard/focus behavior, visible animation, a
 transport, native shortcut registration, driver installation, real audio routing, packaged RNNoise
 or App.OnStartup registration. Those remain separate live/package checks. No new fake mode is
 added to the production app; its only test seam is an InternalsVisibleTo declaration.
+
+Smoke logging: the testhost redirects the static log to its own GUID dev profile before tests load. SmokeLogTests fails before writing if that logger points at production and verifies a unique marker appears only in the test log. The fake Install Driver test also checks its message in that log. Profile logs are removed when the testhost exits. No real driver setup runs.
