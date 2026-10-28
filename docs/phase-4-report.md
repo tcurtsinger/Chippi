@@ -1,6 +1,6 @@
 # Chippi Phase 4 report: System monitor
 
-Phase 4 (the System monitor) is built and on GitHub at `main` `763a619`. Every merge went through a second member's review first and merged only after both CI runs passed. The monitor lives in the island and the docked pages only, as Travis decided: one tile, one page and a Settings page, with five opt-in alerts. It reads everything as a standard user. CPU and board temperatures, motherboard fans and fan control wait for Hardware sensors (PLAN.md backlog). The installers are built from `763a619` (`pack/phase-4`, PR #64). Travis's live checks are task 26; results are below once he reports. ARM64 is built and packaged but never run.
+Phase 4 (the System monitor) is built and on GitHub at `main` `763a619`. Every merge went through a second member's review first and merged only after both CI runs passed. The monitor lives in the island and the docked pages only, as Travis decided: one tile, one page and a Settings page, with five opt-in alerts. It reads everything as a standard user. CPU and board temperatures, motherboard fans and fan control wait for Hardware sensors (PLAN.md backlog). The installers are built from `763a619` (`pack/phase-4`, PR #64). Travis ran the live checks (task 26) on that installer and reported "Pass" on 2026-10-27. ARM64 is built and packaged but never run.
 
 Brief: [phase-4-handoff.md](phase-4-handoff.md), with [phase-4/architecture.md](phase-4/architecture.md), [phase-4/behavior-spec.md](phase-4/behavior-spec.md) and the approved mockup in [phase-4/design/](phase-4/design/notes.md). Phase 4 is PRs #57 to #64.
 
@@ -37,11 +37,11 @@ At `main` `763a619` (CI run 40459651091, push):
 | Check | Status | Evidence |
 |---|---|---|
 | 0 warnings on both platforms; tests pass on x64; behavior covered on fakes (gaps, hotplug, identity, multi-GPU, filter adapters, sleep, alert sustain and cooldown) | Done, one gap | See Test results. `SamplerCoreTests` (`Resume_puts_a_gap_in_every_series`, `An_adapter_that_disappears_gets_a_gap`, `A_failed_read_is_Unavailable_a_gap_never_0_and_retried_after_10_s`, `Pending_after_a_value_ends_the_line`), `ModuleTests` (`The_page_picks_the_chosen_device_or_falls_back`: three GPUs and two adapters, a saved choice and a removed one), `WindowsSourcesTests` (real hardware as a standard user, Basic Render excluded). Gap: no test covers filter-copy adapters; the row filter (`NetworkSource.cs:43`, hardware rows that aren't filters) was checked on Travis's PC with the M0 check app and is live step 6.3. `AlertEvaluatorTests` (`Resume_restarts_sustain_even_after_a_short_sleep`, `Memory_repeats_after_cooldown_and_recovery_does_not_bypass_it`, `Volumes_have_separate_cooldowns_and_are_deduplicated`) |
-| Tile, page(s), docked version and Settings match the approved mockup and DESIGN.md §3 | Done | Offscreen renders against the mockup (M2, M3, dark and light Settings). Every new string checked by the reviewer and by Marge's Decide pass (52 strings; results in `chippi-scratch\phase-4\strings\`). M4 smoke: page under 550 DIP with no scrolling for a five-disk desktop (496) and a two-disk laptop with battery and thermal zone (502), processor strip open; card with round buttons inside 672 DIP on the top and a side edge. One deviation, below. Live: sections 2 and 3. Result: |
-| Readings agree in definition with Task Manager | Pending | Live: section 4 (CPU Processor Utility, memory in use and committed, GPU busiest engine, dedicated and shared, network, disk active time and speeds). Result: |
-| Alerts fire, repeat after the cooldown and respect Notifications settings, with controlled inputs | Done on fakes | `AlertSmokeTests` (notice, repeat after 2 min, stops when off), `AlertEvaluatorTests`, `ModuleTests`. Live: sections 7 and 8 (Memory in use at 50%, or GPU temperature at 40 °C; notice click opens the page). Result: |
+| Tile, page(s), docked version and Settings match the approved mockup and DESIGN.md §3 | Done | Offscreen renders against the mockup (M2, M3, dark and light Settings). Every new string checked by the reviewer and by Marge's Decide pass (52 strings; results in `chippi-scratch\phase-4\strings\`). M4 smoke: page under 550 DIP with no scrolling for a five-disk desktop (496) and a two-disk laptop with battery and thermal zone (502), processor strip open; card with round buttons inside 672 DIP on the top and a side edge. One deviation, below. Live: sections 2 and 3. Result: pass |
+| Readings agree in definition with Task Manager | Done | Live: section 4 (CPU Processor Utility, memory in use and committed, GPU busiest engine, dedicated and shared, network, disk active time and speeds). Result: pass |
+| Alerts fire, repeat after the cooldown and respect Notifications settings, with controlled inputs | Done | `AlertSmokeTests` (notice, repeat after 2 min, stops when off), `AlertEvaluatorTests`, `ModuleTests`. Live: sections 7 and 8 (Memory in use at 50%, or GPU temperature at 40 °C; notice click opens the page). Result: pass |
 | Polling cost near architecture.md §1; nothing polls when nothing is shown and no alert is on | Done | Full page at 2 s: 0.16% of one core on Travis's PC (estimate 0.24%); idle: 0 reads, 0 ms. `SensorSamplerTests.Nothing_is_read_while_nothing_watches`; M4 smoke checks the sampler's need is None after the island closes |
-| Installer installs, updates in place and uninstalls; Travis's live checks pass | Pending | `pack/phase-4` (`62dca8b`, PR #64): 12/12 hashes checked by Karl, Kayla and Marge; both rnnoise.dll files and the VB-CABLE zip match their pins in all four packages, and the app bundles System monitor. The x64 portable starts under a dev profile. Live: sections 1 and 10. Result: |
+| Installer installs, updates in place and uninstalls; Travis's live checks pass | Done | `pack/phase-4` (`62dca8b`, PR #64): 12/12 hashes checked by Karl, Kayla and Marge; both rnnoise.dll files and the VB-CABLE zip match their pins in all four packages, and the app bundles System monitor. The x64 portable starts under a dev profile. Live: sections 1 and 10. Result: pass |
 
 ## Deviations from DESIGN.md
 
@@ -69,21 +69,21 @@ At `main` `763a619` (CI run 40459651091, push):
 
 ## Live checks
 
-Steps: `chippi-scratch\phase-4\live-checks.md` (task 26), reviewed by Karl. Installer `X:\code\chippi\build\artifacts\releases\0.1.0\win-x64\ChippiApp-win-x64-Setup.exe`, built from `763a619`.
+Steps: `chippi-scratch\phase-4\live-checks.md` (task 26), reviewed by Karl. Travis reported "Pass" for every step on 2026-10-27. Installer `X:\code\chippi\build\artifacts\releases\0.1.0\win-x64\ChippiApp-win-x64-Setup.exe`, built from `763a619`.
 
 | Section | Result |
 |---|---|
-| 1. Install and turn it on | |
-| 2. Tile | |
-| 3. Page | |
-| 4. Readings against Task Manager | |
-| 5. Logical processors | |
-| 6. GPU and network adapter pickers | |
-| 7. Alerts | |
-| 8. Notice click | |
-| 9. Gap after sleep | |
-| 10. Update in place and uninstall | |
+| 1. Install and turn it on | Pass |
+| 2. Tile | Pass |
+| 3. Page | Pass |
+| 4. Readings against Task Manager | Pass |
+| 5. Logical processors | Pass |
+| 6. GPU and network adapter pickers | Pass |
+| 7. Alerts | Pass |
+| 8. Notice click | Pass |
+| 9. Gap after sleep | Pass |
+| 10. Update in place and uninstall | Pass |
 
 ## Cleanup
 
-Not done yet. Follows the [end-of-phase checklist](end-of-phase-checklist.md) after this report merges and Travis reports the live checks.
+Not done yet. Follows the [end-of-phase checklist](end-of-phase-checklist.md) after this report merges.
