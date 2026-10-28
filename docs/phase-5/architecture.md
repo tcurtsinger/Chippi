@@ -131,7 +131,7 @@ Spike in Sandbox (`sandbox-out\drag-*.log`): a transparent, topmost, `WS_EX_NOAC
 | Foreground | The tab never took focus while shown or during the drag |
 
 Design:
-- **Open on hover**: the island tab gets `AllowDrop`; `DragEnter` opens the island on the Shelf page; the page's drop zone accepts. If the drag leaves without a drop, close after the normal hover delay. Docked (island off): the tray icon can't be a drop target, so a drag can't open the page. Once the docked Shelf page is open (tray click), it accepts drops like the island page; a "Paste" action that takes the clipboard's files or text covers the rest.
+- **Open on hover**: the island tab gets `AllowDrop`; `DragEnter` opens the island on the Shelf page; the page's drop zone accepts. If the drag leaves without a drop, close after the normal hover delay. Docked (island off): the tray icon can't be a drop target, so a drag can't open the page. Once the docked Shelf page is open (tray click), it accepts drops like the island page; a "Paste" action that takes the clipboard's files or text covers the rest. (As built, a press in another app closes the docked pages before its drag starts, so the docked Shelf only drags out; Travis kept that as a known limit, 2026-10-28. No Paste action was built.)
 - **Accept**: `CF_HDROP` (paths, at most 100 per drop), text, links (text that parses as one URL), and images (`PNG`, `CF_DIBV5`) under History's caps. Always `DragDropEffects.Copy`; never Move, so Chippi can't delete the source.
 - **Files are references**: store the path and its size and time, never a copy. A cloud placeholder (`FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS` / `RECALL_ON_OPEN`) is listed by name without reading it, so nothing downloads. Missing files show as unavailable.
 - **Virtual files** (Outlook attachments, browser images as `FileGroupDescriptorW` + `FileContents`): out of scope for Phase 5 (Karl's B9); they'd need Chippi to write copies.
@@ -171,7 +171,7 @@ Numbered to line up with Karl's section 9 where they overlap.
 2. **(B2) Caps**: 16.6 MP decoded and 16 MiB PNG per image, 1 MiB UTF-8 per text (reading 1,000,000 characters took 1.9 ms, so the cap is about storage, not speed), 100 paths, 128 MiB total. The measurements above support them.
 3. **(B3) Clean URL on `CanIncludeInClipboardHistory = 0` copies**: skip (fail closed). A password manager that marks its copies shouldn't have them rewritten.
 4. **(B6) Plain paste promise**: "keeps your copy" for text, links, files and pictures only, as best effort (a target that reads late can get the original); elevated targets get "Copied" instead of a paste.
-5. **(B9) Shelf while docked**: a drag can't open the docked page (the tray icon isn't a drop target); the page takes drops once it's open, plus Paste.
+5. **(B9) Shelf while docked**: a drag can't open the docked page (the tray icon isn't a drop target); the page takes drops once it's open, plus Paste. As built: drag-out only, a known limit (2026-10-28).
 6. **New dependency**: none. Microsoft.Data.Sqlite is already in; AES-GCM is in the framework; DPAPI by P/Invoke.
 8. **Clean URL's manual surface**: a shortcut, a tile action or a small page, so it works without Clipboard history (section 1). For the design input.
 9. **Tests**: on fakes; the clipboard can't be isolated on Travis's PC as a standard user. Live checks in the eventual brief use test text Travis copies himself.
