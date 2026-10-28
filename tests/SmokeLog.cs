@@ -25,7 +25,15 @@ internal static class SmokeLog
         Assert.Contains(marker, File.ReadAllText(Log.Default.CurrentFile));
         if (Directory.Exists(RollingFileLog.DefaultDirectory))
             foreach (string file in Directory.EnumerateFiles(RollingFileLog.DefaultDirectory, "*.log"))
-                Assert.DoesNotContain(marker, File.ReadAllText(file));
+            {
+                try
+                {
+                    using var stream = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+                    using var reader = new StreamReader(stream);
+                    Assert.DoesNotContain(marker, reader.ReadToEnd());
+                }
+                catch (FileNotFoundException) { } // Installed Chippi may rotate between enumeration and open.
+            }
     }
 
     internal static void Check()
@@ -48,5 +56,3 @@ public sealed class SmokeLogTests
         SmokeLog.AssertOnlyHere(marker);
     }
 }
-
-
