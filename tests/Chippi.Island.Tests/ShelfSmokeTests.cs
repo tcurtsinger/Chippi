@@ -114,22 +114,28 @@ public sealed class ShelfSmokeTests
     {
         using var fixture = new Fixture();
         var window = fixture.Window;
+        var timers = Manual(window);
         window.Initialize();
         window.SetMonitor(IslandNative.MonitorAt(new Point(0, 0)));
         window.SetTiles(fixture.Tiles);
         window.CursorAt = () => new Point(-30000, -30000);
         var tab = (Button)window.FindName("Tab");
         Assert.Equal(DragDropEffects.None, Raise(tab, DragDrop.DragEnterEvent).Effects);
-        Pump(TimeSpan.FromMilliseconds(100)); Assert.False(window.IsIslandOpen);
-        Until(() => window.IsIslandOpen);
+        Assert.True(timers[IslandWindow.DragOpenDelay].Running);
+        Assert.False(window.IsIslandOpen);
+        timers[IslandWindow.DragOpenDelay].Fire();
+        Assert.True(window.IsIslandOpen);
         Assert.True(window.OpenedByDrag); Assert.False(window.Panel.HasKeyboard);
         Assert.Same(fixture.Page, fixture.Tile.Spec.CreateSection());
         Raise(window.Panel, DragDrop.DragLeaveEvent);
-        Pump(TimeSpan.FromMilliseconds(200)); Assert.True(window.IsIslandOpen);
+        Assert.True(timers[IslandWindow.DragCloseDelay].Running);
+        Assert.True(window.IsIslandOpen);
         Raise(window.Panel, DragDrop.DragOverEvent); // reentry cancels the pending close
-        Pump(TimeSpan.FromMilliseconds(600)); Assert.True(window.IsIslandOpen);
+        Assert.False(timers[IslandWindow.DragCloseDelay].Running);
+        Assert.True(window.IsIslandOpen);
         Raise(window.Panel, DragDrop.DragLeaveEvent);
-        Until(() => !window.IsIslandOpen);
+        timers[IslandWindow.DragCloseDelay].Fire();
+        Assert.False(window.IsIslandOpen);
     });
 
     [Fact]
@@ -137,18 +143,34 @@ public sealed class ShelfSmokeTests
     {
         using var fixture = new Fixture();
         var window = fixture.Window;
+        var timers = Manual(window);
         window.Initialize(); window.SetMonitor(IslandNative.MonitorAt(new Point(0, 0)));
         window.SetTiles(fixture.Tiles); window.CursorAt = () => new Point(-30000, -30000);
         Raise((Button)window.FindName("Tab"), DragDrop.DragEnterEvent);
-        Until(() => window.IsIslandOpen);
+        timers[IslandWindow.DragOpenDelay].Fire();
+        Assert.True(window.IsIslandOpen);
         Raise(fixture.Page, DragDrop.DragEnterEvent);
         Assert.Equal(DragDropEffects.Copy, Raise(fixture.Page, DragDrop.DropEvent).Effects);
         fixture.Idle(); Assert.Single(fixture.Shelf.Items);
         Assert.False(window.OpenedByDrag);
         Raise(window.Panel, DragDrop.DragLeaveEvent);
-        Pump(TimeSpan.FromMilliseconds(700)); Assert.True(window.IsIslandOpen);
+        Assert.False(timers[IslandWindow.DragCloseDelay].Running);
+        Assert.True(window.IsIslandOpen);
     });
 
+    private static Dictionary<TimeSpan, ManualTimer> Manual(IslandWindow window)
+    {
+        var timers = new Dictionary<TimeSpan, ManualTimer>();
+        window.CreateTimer = (interval, tick) => timers[interval] = new ManualTimer(tick);
+        return timers;
+    }
+    private sealed class ManualTimer(Action tick) : IIslandTimer
+    {
+        public bool Running { get; private set; }
+        public void Start() => Running = true;
+        public void Stop() => Running = false;
+        public void Fire() { Assert.True(Running); Running = false; tick(); }
+    }
     private sealed class Fixture : IDisposable
     {
         public string Directory { get; } = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "chippi-c6-shelf-" + Guid.NewGuid().ToString("N"));
@@ -204,4 +226,3 @@ public sealed class ShelfSmokeTests
         public void Beep() => throw new InvalidOperationException();
     }
 }
-
