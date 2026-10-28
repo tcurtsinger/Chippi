@@ -141,6 +141,7 @@ public sealed class MicProcessingModule : IFeatureModule
         {
             StopReason.NoDriver => "No driver",
             StopReason.DriverDisabled => "Driver disabled",
+            StopReason.MoreThanOneCable => "More than one cable",
             StopReason.NoMicrophone => "No microphone",
             _ => Status.Error ?? "Start failed",
         },

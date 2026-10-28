@@ -159,6 +159,17 @@ public sealed class ProcessingModuleTests
     }
 
     [Fact]
+    public async Task Two_cables_read_as_more_than_one_cable()
+    {
+        await using var f = new ProcessingFixture();
+        const string second = @"{2}.\\?\root#media#0001#{6994ad04-93ef-11d0-a3cc-00a0c9223196}";
+        f.System.With(Mic("Real"), CableInput(), CableOutput(), CableInput("In2", second), CableOutput("Out2", second));
+        f.Settings.Value = new() { Enabled = true };
+        await f.Start();
+        Assert.Equal("Stopped · More than one cable", f.Module.StatusText);
+    }
+
+    [Fact]
     public async Task No_microphone_reads_as_the_brief_says()
     {
         await using var f = new ProcessingFixture();

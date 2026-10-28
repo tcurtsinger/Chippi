@@ -22,8 +22,8 @@ public readonly record struct RoleKey(AudioFlow Flow, AudioRole Role);
 /// An endpoint as Windows lists it. <see cref="Id"/> is the endpoint ID string (compare it
 /// case-insensitively); <see cref="AdapterName"/> is the device it belongs to ("VB-Audio Virtual
 /// Cable", "Realtek(R) Audio") and is display data, never identity. <see cref="Filter"/> is the
-/// driver's KS filter the endpoint connects to (<c>{2}.\\?\usb#vid_...#{6994ad04-...}\global</c>): set by
-/// the driver's INF, not renameable, so it identifies a driver's endpoints (<see cref="VbCable"/>).
+/// driver's KS filter pin the endpoint connects to (<c>{2}.\\?\usb#vid_...#{6994ad04-...}\global/00010001</c>):
+/// set by the driver and its INF, not renameable, so it identifies a driver's endpoints (<see cref="VbCable"/>).
 /// </summary>
 public sealed record AudioEndpoint(string Id, string Name, AudioFlow Flow, EndpointState State, string AdapterName = "", string Filter = "")
 {

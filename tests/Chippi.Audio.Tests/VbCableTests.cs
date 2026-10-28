@@ -31,10 +31,19 @@ public class VbCableTests
     [Fact]
     public void The_16_channel_endpoint_is_cable_but_never_the_pair()
     {
-        var sixteen = Speaker("C16") with { Filter = CableDevice + @"\vbaudiovacwdm2022_out16_topo_e51a78a01fb100002" };
+        // Pack 45 puts CABLE In 16ch on CABLE Input's filter, one pin over (Travis's PC, 2026-10-28).
+        var sixteen = CableIn16();
         Assert.True(VbCable.IsCable(sixteen));
         Assert.False(VbCable.IsCableInput(sixteen));
         Assert.Equal(CableState.Disabled, VbCable.Find([sixteen, CableOutput()]).State);
+    }
+
+    [Fact]
+    public void All_three_endpoints_of_one_install_are_ready_with_cable_input()
+    {
+        var (state, pair) = VbCable.Find([CableIn16(), CableInput(), CableOutput(), Mic("Real")]);
+        Assert.Equal(CableState.Ready, state);
+        Assert.Equal(new CablePair("CableIn", "CableOut"), pair);
     }
 
     [Fact]
