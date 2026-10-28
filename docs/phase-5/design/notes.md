@@ -156,7 +156,7 @@ All eight, as drawn. The alternatives in the numbered notes were turned down.
 34. **Delete:** "Delete “Standup”?" with Cancel and Delete. Deleting the only note leaves an empty "Note 1".
 35. **Failures:**
     - Save failed: the text stays as typed. The next keystroke, a note switch and closing all try again.
-    - Can't open: "Can't open notes" in Caution with Retry. There are no tabs and no editor, so nothing can be saved over the notes.
+    - Load failed: "Load failed" in Caution with Retry. There are no tabs and no editor, so nothing can be saved over the notes.
 36. **No Settings page** (approved): nothing in scope to configure. A shortcut that opens Scratchpad would be the first row if one is ever wanted.
 
 ### Shelf
@@ -240,8 +240,8 @@ All eight, as drawn. The alternatives in the numbered notes were turned down.
 |---|---|
 | Clipboard | Clipboard · Clean URL · Search · Pinned · Recent · Recording off · Turn on · Paused · Pause · Resume · More · Paste · Copy · Pin · Unpin · Delete · Unavailable · 1 file unavailable · No matches · No recent copies · No items · Clipboard busy · Picture not saved · over 16 MiB · Text not saved · over 1 MiB · Not saved · over 100 files · History full · 128 MiB · Clear history · Erase all · Clear unpinned items? · Clear · Erase all items and pins? · Erase · Cancel |
 | Plain paste (screen-reader names only) | Plain text copied · No text copied · Clipboard busy |
-| Clean URL | Paste a link · Removed · si · Nothing to remove · Not a web link · Copy · Copied · Manual · Automatic |
-| Scratchpad | Saved · Save failed · New note · All notes · Note 5 · Edit · Preview · Rename · Export… · Delete · Delete “Standup”? · Can't open notes · Retry |
+| Clean URL | Link · Removed · si · Nothing to remove · Not a web link · Copy · Copied · Manual · Automatic |
+| Scratchpad | Saved · Save failed · New note · All notes · Note 5 · Edit · Preview · Rename · Export… · Delete · Delete “Standup”? · Load failed · Retry |
 | Shelf | No items · Copy · Pin · Unpin · Remove · Unavailable · Online only · Over 100 files · Picture over 16 MiB · Shelf full · 128 MiB |
 | Settings | Recording · Apps to skip · Add app · Browse… · No apps · Remove · Shortcut · Not set · Set · Change · New shortcut · Shortcut in use · Automatic cleaning · Sites to skip · Add site · Add · Uninstall and erase history? · Uninstall |
 

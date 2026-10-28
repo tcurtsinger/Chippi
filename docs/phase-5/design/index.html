@@ -462,7 +462,7 @@ function historyPage(o = {}) {
 
 // ---------------------------------------------------------------- Clean URL, inside the Clipboard page
 function cleanBody(o) {
-  const inner = o.input ? `<span class="url">${esc(o.input)}${o.foc ? caret : ''}</span>` : `${o.foc ? '<span class="caret" style="margin:0 -2px -4px 0"></span>' : ''}<span class="ph">Paste a link</span>`;
+  const inner = o.input ? `<span class="url">${esc(o.input)}${o.foc ? caret : ''}</span>` : `${o.foc ? '<span class="caret" style="margin:0 -2px -4px 0"></span>' : ''}<span class="ph">Link</span>`;
   const field = `<div class="fi ta ${o.foc ? 'foc' : ''}" role="textbox" aria-label="Link">${inner}</div>`;
   const invalid = o.invalid ? `<div style="margin-top:-2px">${st('Not a web link', true)}</div>` : '';
   const result = o.out ? `<div class="icard"><span class="url">${esc(o.out)}</span><span class="meta">Removed · ${o.removed}</span></div>`
@@ -489,7 +489,7 @@ const NOTE_MD = `<h3>Standup, Tue</h3><ul><li>Shipped: island fit fix</li><li>To
 function scratchPage(o = {}) {
   const tabs = o.tabs || TABS, sel = o.sel ?? 1, shown = o.shown ?? tabs.length;
   if (o.failed) {
-    return pg(440, hd('Scratchpad') + `<div class="icard row">${st("Can't open notes", true)}<span class="sp"></span><button class="btn">Retry</button></div>`);
+    return pg(440, hd('Scratchpad') + `<div class="icard row">${st("Load failed", true)}<span class="sp"></span><button class="btn">Retry</button></div>`);
   }
   const strip = tabs.slice(0, shown).map((n, i) => i === o.rename
     ? `<span class="fi foc" style="min-height:28px;height:28px;padding:3px 8px;flex:none"><span class="hl-sel">${n}</span>${caret}</span>`
