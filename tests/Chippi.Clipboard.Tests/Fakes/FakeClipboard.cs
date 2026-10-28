@@ -6,8 +6,8 @@ using Chippi.Clipboard;
 namespace Chippi.Clipboard.Tests;
 
 /// <summary>
-/// An in-memory clipboard with Windows' rules: a sequence number that moves with each new copy (not with a
-/// delayed render), owner tracking, delayed rendering and change events. Tests never touch the real one.
+/// An in-memory clipboard with Windows' rules: a sequence number that moves with each new copy (when it's
+/// written, not when it's closed, and not with a delayed render), owner tracking, delayed rendering and change events. Tests never touch the real one.
 /// </summary>
 public sealed class FakeClipboard : IClipboardSystem
 {
@@ -88,15 +88,16 @@ public sealed class FakeClipboard : IClipboardSystem
         if (session.Changed)
         {
             lock (_gate)
-            {
                 _owner = "Chippi";
-                _sequence++;
-            }
             if (Listening)
                 Changed?.Invoke();
         }
+        AfterClose?.Invoke();
         return Task.FromResult(result);
     }
+
+    /// <summary>Runs after the clipboard is closed and before the caller continues: another app's copy that raced in.</summary>
+    public Action? AfterClose { get; set; }
 
     public void Dispose() { }
 
@@ -113,7 +114,19 @@ public sealed class FakeClipboard : IClipboardSystem
 
     private sealed class Session(FakeClipboard owner) : IClipboardSession
     {
-        public bool Changed { get; private set; }
+        private bool _changed;
+
+        /// <summary>The first change in a transaction moves the sequence number, while the clipboard is still held.</summary>
+        public bool Changed
+        {
+            get => _changed;
+            private set
+            {
+                if (!_changed)
+                    owner._sequence++;
+                _changed = value;
+            }
+        }
 
         public uint Sequence => owner._sequence;
 

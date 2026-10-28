@@ -363,6 +363,91 @@ public sealed class HubTests : IDisposable
         Assert.Empty(_copies);
     }
 
+    [Fact]
+    public async Task A_plain_copy_keeps_the_history_and_cloud_markers()
+    {
+        (string, byte[])[] markers = [(ClipFormat.History, Zero), (ClipFormat.Cloud, Zero)];
+        void AssertMarked()
+        {
+            var data = _clipboard.Snapshot();
+            Assert.Equal(Zero, data[ClipFormat.History]);
+            Assert.Equal(Zero, data[ClipFormat.Cloud]);
+            Assert.False(data.ContainsKey(ClipFormat.Html));
+        }
+
+        CopyRich("for admin", markers);
+        _foreground.CanSend = false;
+        Assert.Equal(PasteOutcome.Copied, await _hub.PastePlainTextAsync());
+        AssertMarked();
+        Assert.Equal(ClipPrivacy.NoHistory, (await _hub.ReadAsync()).Privacy);
+
+        CopyRich("nothing in front", markers);
+        _foreground.Front = null;
+        Assert.Equal(PasteOutcome.Copied, await _hub.PastePlainTextAsync());
+        AssertMarked();
+        Assert.Equal("nothing in front", _clipboard.Text);
+    }
+
+    [Fact]
+    public async Task A_plain_copy_left_by_a_target_that_wont_come_forward_keeps_its_markers()
+    {
+        CopyRich("text", (ClipFormat.History, Zero));
+        _foreground.ComesToFront = false;
+        Assert.Equal(PasteOutcome.Copied, await _hub.PastePlainTextAsync());
+        Assert.Equal(Zero, _clipboard.Snapshot()[ClipFormat.History]);
+        Assert.False(_clipboard.IsAvailable(ClipFormat.Exclude));
+    }
+
+    [Fact]
+    public async Task A_history_entry_never_takes_the_markers_of_the_copy_it_replaces()
+    {
+        CopyRich("hunter2", (ClipFormat.Exclude, Zero), (ClipFormat.History, Zero));
+        var target = _hub.CaptureTarget()!;
+        _foreground.CanSend = false;
+        Assert.Equal(PasteOutcome.Copied, await _hub.PasteAsync(ClipContent.FromText("from History"), target));
+        Assert.False(_clipboard.IsAvailable(ClipFormat.Exclude));
+        Assert.False(_clipboard.IsAvailable(ClipFormat.History));
+    }
+
+    [Fact]
+    public async Task A_copy_landing_just_after_a_write_is_still_delivered()
+    {
+        using var lease = Listen();
+        _clipboard.AfterClose = () => { _clipboard.AfterClose = null; _clipboard.CopyText("theirs"); };
+        await _hub.WriteAsync(ClipContent.FromText("mine"));
+        await SettleAsync();
+        Assert.Equal("theirs", Assert.Single(_copies).Content!.Text);
+    }
+
+    [Fact]
+    public async Task A_copy_landing_just_after_the_temporary_copy_is_never_overwritten()
+    {
+        CopyRich("old");
+        int closes = 0;
+        // Lands after the paste's first transaction closes, before the hub continues.
+        _clipboard.AfterClose = () => { if (++closes == 1) _clipboard.CopyText("newer"); };
+        await PasteAndFinishAsync(_hub.PastePlainTextAsync(), ClipboardHub.RestoreWithoutRequest);
+        Assert.Equal("newer", _clipboard.Text);
+    }
+
+    [Fact]
+    public async Task An_on_demand_read_that_changes_during_a_delayed_render_is_dropped()
+    {
+        _clipboard.Copy(@"C:\Apps\Slow.exe");
+        await _clipboard.TransactAsync(s =>
+        {
+            s.SetDelayed(ClipFormat.UnicodeText, () =>
+            {
+                _clipboard.CopyText("newer", extra: (ClipFormat.Exclude, Zero));
+                return ClipCodec.EncodeText("hunter2");
+            });
+            return true;
+        });
+        var read = await _hub.ReadAsync();
+        Assert.Equal(ClipStatus.Busy, read.Status);
+        Assert.Null(read.Content);
+    }
+
     private static ClipImage Picture(int width, int height) =>
         new(width, height, [.. Enumerable.Range(0, width * height).SelectMany(i => new byte[] { (byte)i, 20, 30, 255 })]);
 }
