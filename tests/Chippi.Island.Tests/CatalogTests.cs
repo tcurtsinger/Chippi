@@ -24,7 +24,14 @@ public sealed class CatalogTests
     [InlineData("shelf", "Inbox", null)]
     public void Phase_5_features_use_their_approved_glyphs_and_badges(string id, string icon, string? overlap)
     {
-        var entry = Assert.Single(FeatureCatalog.Placeholders, e => e.Id == id);
+        // Shipped features have left the catalog; their modules carry the same descriptor.
+        Core.Modules.FeatureDescriptor[] shipped =
+        [
+            new Features.Clipboard.ClipboardHistoryModule(new Features.Clipboard.ClipboardFeatures()).Descriptor,
+            new Features.PlainPaste.PlainPasteModule().Descriptor,
+            new Features.Shelf.ShelfModule().Descriptor,
+        ];
+        var entry = Assert.Single(FeatureCatalog.Placeholders.Concat(shipped), e => e.Id == id);
         Assert.Equal(icon, entry.Icon);
         Assert.Equal(overlap, entry.Badges.SingleOrDefault()?.Text);
     }

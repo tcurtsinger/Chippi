@@ -197,6 +197,7 @@ public partial class App : Application
             System.IO.Path.Combine(shell.Services.DataRoot, Chippi.Features.Clipboard.ClipboardHistoryModule.Id)));
         shell.Registry.Register(new Chippi.Features.Clipboard.CleanUrlModule(clipboard));
         shell.Registry.Register(new Chippi.Features.PlainPaste.PlainPasteModule());
+        shell.Registry.Register(new Chippi.Features.Shelf.ShelfModule());
 
         // [WS2] "Coming soon" placeholders for the PLAN.md features.
         Settings.Features.FeatureCatalog.RegisterPlaceholders(shell.Registry);
