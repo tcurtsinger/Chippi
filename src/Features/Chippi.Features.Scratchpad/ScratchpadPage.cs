@@ -177,20 +177,42 @@ public sealed class ScratchpadPage : Grid, IDisposable
     private void ShowNotes()
     {
         if (_session.State.Document is not { } doc) return;
-        var menu = new ContextMenu();
-        foreach (var note in doc.Notes)
-        {
-            var item = new MenuItem { Header = note.Name, IsCheckable = true, IsChecked = note.Id == doc.SelectedId };
-            item.Click += async (_, _) => await SelectAsync(note.Id); menu.Items.Add(item);
-        }
-        menu.PlacementTarget = _overflow; menu.IsOpen = true;
+        OpenMenu(CreateNotesMenu(doc));
     }
-    private void ShowMenu(FrameworkElement anchor)
+    private Popup CreateNotesMenu(ScratchpadDocument doc) => Menu(_overflow,
+        [.. doc.Notes.Select(note => (note.Name + (note.Id == doc.SelectedId ? " \u2713" : ""),
+            (Action)(() => _ = SelectAsync(note.Id))))]);
+
+    private void ShowMenu(FrameworkElement anchor) => OpenMenu(CreateActionsMenu(anchor));
+
+    private Popup CreateActionsMenu(FrameworkElement anchor) => Menu(anchor,
+        ("Rename", BeginRename), ("Export\u2026", () => _ = ExportAsync()), ("Delete", () => ConfirmDelete(anchor)));
+
+    private void OpenMenu(Popup menu)
     {
-        var menu = new ContextMenu { PlacementTarget = anchor };
-        void Item(string label, Action action) { var item = new MenuItem { Header = label }; item.Click += (_, _) => action(); menu.Items.Add(item); }
-        Item("Rename", BeginRename); Item("Export�", () => _ = ExportAsync()); Item("Delete", () => ConfirmDelete(anchor));
+        if (_popup is not null) _popup.IsOpen = false;
+        _popup = menu;
         menu.IsOpen = true;
+    }
+
+    // Same popup surface and row style as the Clipboard page's More menu.
+    private static Popup Menu(FrameworkElement anchor, params (string Text, Action Click)[] items)
+    {
+        var popup = new Popup { PlacementTarget = anchor, Placement = PlacementMode.Bottom, StaysOpen = false, AllowsTransparency = true, PopupAnimation = PopupAnimation.None };
+        var list = new StackPanel { Margin = new Thickness(4) };
+        foreach (var (text, click) in items)
+        {
+            var item = new Button { Content = text };
+            item.SetResourceReference(StyleProperty, "IslandMenuItemStyle");
+            item.Click += (_, _) => { popup.IsOpen = false; click(); };
+            list.Children.Add(item);
+        }
+        var panel = new Border { MinWidth = 160, CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(1), Child = list };
+        panel.SetResourceReference(Border.BackgroundProperty, "IslandBrush");
+        panel.SetResourceReference(Border.BorderBrushProperty, "IslandBorderBrush");
+        popup.Child = panel;
+        popup.Opened += (_, _) => list.Children.OfType<Button>().FirstOrDefault()?.Focus();
+        return popup;
     }
     private void BeginRename()
     {
@@ -221,7 +243,7 @@ public sealed class ScratchpadPage : Grid, IDisposable
         long selected = doc.SelectedId;
         delete.Click += async (_, _) => { popup.IsOpen = false; await Run(_session.ChangeAsync(d => d.SelectedId == selected ? d.DeleteSelected() : d)); _shownId = 0; Paint(); };
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Children = { cancel, delete } };
-        var stack = new StackPanel { Children = { new TextBlock { Text = $"Delete �{doc.Selected.Name}�?", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 12) }, buttons } };
+        var stack = new StackPanel { Children = { new TextBlock { Text = $"Delete \u201c{doc.Selected.Name}\u201d?", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 12) }, buttons } };
         var border = new Border { Padding = new Thickness(16), CornerRadius = new CornerRadius(8), Width = 260, Child = stack };
         border.SetResourceReference(Border.BackgroundProperty, "FlyoutBrush"); popup.Child = border;
         popup.Opened += (_, _) => cancel.Focus(); popup.IsOpen = true;
