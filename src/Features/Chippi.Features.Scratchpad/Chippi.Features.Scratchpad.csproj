@@ -1,0 +1,12 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <UseWPF>true</UseWPF>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../Chippi.Clipboard/Chippi.Clipboard.csproj" />
+    <ProjectReference Include="../../Chippi.Core/Chippi.Core.csproj" />
+    <ProjectReference Include="../../Chippi.UI/Chippi.UI.csproj" />
+  </ItemGroup>
+</Project>
