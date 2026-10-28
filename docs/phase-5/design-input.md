@@ -1,5 +1,7 @@
 # Phase 5 Clipboard and everyday tools: design input
 
+Superseded by [design/notes.md](design/notes.md) where they differ: three tiles (Clipboard, Scratchpad, Shelf), Clean URL inside the Clipboard page, and Paste as plain text as a shortcut only.
+
 For Travis's UI/UX agent, 2026-10-27. Final: Travis answered tasks 27 to 32.
 
 Read [scope.md](scope.md), [behavior-spec.md](behavior-spec.md), and [architecture.md](architecture.md), then `X:\code\chippi\DESIGN.md` sections 3 and 5 and `PLAN.md` > Surfaces. The scope sheet is the approved feature set (task 29); research separates measured behavior, implementation proposals, and remaining limits. It does not approve extra screens or source-app features.

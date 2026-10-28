@@ -6,7 +6,7 @@ Draft for Marge and Kayla, 2026-10-27. Research only; no build or screen approva
 
 This covers Clipboard history, Paste as plain text, Clean URL, Scratchpad, and Shelf. Tasks 27 and 28 still decide the phase split. Source behavior below describes Vorssaint, not a decision already made for Chippi. Recommendations and questions are marked separately.
 
-Chippi baseline: main `015d939`; [PLAN.md](../../chippi/PLAN.md), [DESIGN.md](../../chippi/DESIGN.md), and [FeatureCatalog.cs](../../chippi/src/Chippi.App/Settings/Features/FeatureCatalog.cs). Surfaces already decides that daily controls live in island pages and the same pages dock by the tray. Settings holds configuration. A separate floating Scratchpad or cursor Shelf would need an explicit exception; the source app's windows do not authorize one.
+Chippi baseline: main `015d939`; [PLAN.md](../../PLAN.md), [DESIGN.md](../../DESIGN.md), and [FeatureCatalog.cs](../../src/Chippi.App/Settings/Features/FeatureCatalog.cs). Surfaces already decides that daily controls live in island pages and the same pages dock by the tray. Settings holds configuration. A separate floating Scratchpad or cursor Shelf would need an explicit exception; the source app's windows do not authorize one.
 
 Vorssaint was inspected at commit [`746239b0220571d6694ffacae79f3eb9dcd09193`](https://github.com/vorssaint/vorssaint-utils/tree/746239b0220571d6694ffacae79f3eb9dcd09193). Relevant files are saved verbatim under `research/`; `research/vorssaint-tree.json` records the tree SHA and paths. These are reference evidence, not code to port. Source was read, not run. No clipboard API, hotkey, mouse hook, installer, or app launch was used for this research.
 

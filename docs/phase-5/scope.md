@@ -1,5 +1,7 @@
 # Phase 5 scope (proposed, for Travis)
 
+Superseded by [design/notes.md](design/notes.md) where they differ: three tiles (Clipboard, Scratchpad, Shelf), Clean URL inside the Clipboard page, and Paste as plain text as a shortcut only.
+
 Phase 5: Clipboard history, Paste as plain text, Clean URL, Scratchpad, Shelf. Each lives on its island page (docked by the tray when the island is off), configured in Settings. Phase 5.5 (later): Quick toggles, Cleaning mode, Command bar, Radial menu, AI agent usage. Quick panel leaves the catalog; Keep awake already shipped.
 
 ## In
