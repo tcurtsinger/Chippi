@@ -96,9 +96,11 @@ Brief: [docs/phase-4-handoff.md](docs/phase-4-handoff.md). Approved 2026-10-26.
 CPU, GPU, memory, battery, network, disk activity and available GPU/thermal-zone temperatures, with opt-in alerts in the island and docked pages. CPU/board sensors and fan control are deferred to Hardware sensors.
 
 ### Phase 5: Clipboard and everyday tools
-Clipboard history, paste as plain text, clean URL, shelf, command bar, quick panel,
-quick toggles, radial menu, scratchpad, keep awake, cleaning mode, AI agent usage in
-the island.
+Design: [docs/phase-5/design/notes.md](docs/phase-5/design/notes.md). Approved 2026-10-28.
+Clipboard history, paste as plain text, clean URL, scratchpad and shelf, on three island tiles: Clipboard, Scratchpad and Shelf.
+
+### Phase 5.5: Everyday tools, continued
+Quick toggles, cleaning mode, command bar, radial menu, AI agent usage in the island (Travis, 2026-10-27, tasks 27 and 28). Quick panel leaves the catalog; keep awake already shipped.
 
 ### Phase 6: Windows and input
 Window layouts and snapping, app switcher with previews, quit and close protection,
