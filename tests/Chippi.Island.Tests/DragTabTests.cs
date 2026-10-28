@@ -72,21 +72,60 @@ public sealed class DragTabTests
             window.CursorAt = () => away;
             var tab = (Button)window.FindName("Tab");
 
+            var timers = Manual(window);
+
             Raise(tab, DragDrop.DragEnterEvent);
-            Pump(TimeSpan.FromMilliseconds(100));
+            var open = timers[IslandWindow.DragOpenDelay];
+            Assert.True(open.Running);
             Assert.False(window.IsIslandOpen); // passing over the tab doesn't open it
-            Until(() => window.IsIslandOpen, TimeSpan.FromSeconds(2));
+            open.Fire();
+            Assert.True(window.IsIslandOpen);
             Assert.True(window.OpenedByDrag);
             Assert.False(window.Panel.HasKeyboard);
 
-            // Over the panel the drag keeps it open; leaving starts the 500 ms close.
+            // Over the panel the drag keeps it open; leaving starts the 500 ms close, and coming back stops it.
             Raise(window.Panel, DragDrop.DragLeaveEvent);
-            Pump(TimeSpan.FromMilliseconds(200));
+            var close = timers[IslandWindow.DragCloseDelay];
+            Assert.True(close.Running);
             Raise(window.Panel, DragDrop.DragOverEvent);
-            Pump(TimeSpan.FromMilliseconds(600));
+            Assert.False(close.Running);
             Assert.True(window.IsIslandOpen);
             Raise(window.Panel, DragDrop.DragLeaveEvent);
-            Until(() => !window.IsIslandOpen, TimeSpan.FromSeconds(2));
+            close.Fire();
+            Assert.False(window.IsIslandOpen);
+        }
+        finally { window.Close(); }
+    });
+
+    [Fact]
+    public void A_drag_that_leaves_the_tab_before_250_ms_opens_nothing() => WpfTestThread.Run(() =>
+    {
+        var window = new IslandWindow();
+        try
+        {
+            window.SetTiles(Tiles(opensOnDrag: true));
+            var timers = Manual(window);
+            var tab = (Button)window.FindName("Tab");
+            Raise(tab, DragDrop.DragEnterEvent);
+            Raise(tab, DragDrop.DragLeaveEvent);
+            Assert.False(timers[IslandWindow.DragOpenDelay].Running);
+            Assert.False(window.IsIslandOpen);
+        }
+        finally { window.Close(); }
+    });
+
+    /// <summary>The window makes its drag timers through CreateTimer: bypassing it would leave this empty, and the timing tests fail.</summary>
+    [Fact]
+    public void The_drag_timers_come_from_the_injected_factory_with_the_approved_delays() => WpfTestThread.Run(() =>
+    {
+        var window = new IslandWindow();
+        try
+        {
+            window.SetTiles(Tiles(opensOnDrag: true));
+            var timers = Manual(window);
+            Raise((Button)window.FindName("Tab"), DragDrop.DragEnterEvent); // makes the open timer
+            window.ClosePages(); // makes the close timer, to stop it
+            Assert.Equal([TimeSpan.FromMilliseconds(250), TimeSpan.FromMilliseconds(500)], timers.Keys.Order());
         }
         finally { window.Close(); }
     });
@@ -101,12 +140,14 @@ public sealed class DragTabTests
             window.SetMonitor(IslandNative.MonitorAt(new Point(0, 0)));
             window.SetTiles(Tiles(opensOnDrag: true));
             window.CursorAt = () => new Point(-30000, -30000);
+            var timers = Manual(window);
             Raise((Button)window.FindName("Tab"), DragDrop.DragEnterEvent);
-            Until(() => window.IsIslandOpen, TimeSpan.FromSeconds(2));
+            timers[IslandWindow.DragOpenDelay].Fire();
+            Assert.True(window.IsIslandOpen);
             Raise(window.Panel, DragDrop.DropEvent);
             Assert.False(window.OpenedByDrag);
             Raise(window.Panel, DragDrop.DragLeaveEvent);
-            Pump(TimeSpan.FromMilliseconds(700));
+            Assert.False(timers.TryGetValue(IslandWindow.DragCloseDelay, out var close) && close.Running);
             Assert.True(window.IsIslandOpen); // normal closing: a click away or Esc
         }
         finally { window.Close(); }
@@ -123,24 +164,27 @@ public sealed class DragTabTests
         return args;
     }
 
-    private static void Pump(TimeSpan time)
+    /// <summary>Gives the window timers the test fires itself, by interval.</summary>
+    private static Dictionary<TimeSpan, ManualTimer> Manual(IslandWindow window)
     {
-        var frame = new DispatcherFrame();
-        var timer = new DispatcherTimer { Interval = time };
-        timer.Tick += (_, _) =>
-        {
-            timer.Stop();
-            frame.Continue = false;
-        };
-        timer.Start();
-        Dispatcher.PushFrame(frame);
+        var timers = new Dictionary<TimeSpan, ManualTimer>();
+        window.CreateTimer = (interval, tick) => timers[interval] = new ManualTimer(tick);
+        return timers;
     }
 
-    private static void Until(Func<bool> done, TimeSpan limit)
+    private sealed class ManualTimer(Action tick) : IIslandTimer
     {
-        var end = DateTime.UtcNow + limit;
-        while (!done() && DateTime.UtcNow < end)
-            Pump(TimeSpan.FromMilliseconds(20));
-        Assert.True(done());
+        public bool Running { get; private set; }
+
+        public void Start() => Running = true;
+
+        public void Stop() => Running = false;
+
+        public void Fire()
+        {
+            Assert.True(Running);
+            Running = false;
+            tick();
+        }
     }
 }
