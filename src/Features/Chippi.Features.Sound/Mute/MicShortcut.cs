@@ -13,9 +13,9 @@ public enum ShortcutModifiers : uint { Alt = 1, Control = 2, Shift = 4, Windows 
 
 public sealed record MicShortcut(ShortcutModifiers Modifiers = ShortcutModifiers.Control | ShortcutModifiers.Shift, uint Key = 0x4D)
 {
-    // Windows combinations and F12 belong to the OS/debugger; never register Win+Alt+K.
+    // Require Ctrl or Alt so Shift-only shortcuts cannot consume normal typing. Windows combinations and F12 stay reserved.
     public bool IsValid => (Modifiers & ShortcutModifiers.Windows) == 0
-        && Modifiers != 0 && ((uint)Modifiers & ~7u) == 0
+        && (Modifiers & (ShortcutModifiers.Control | ShortcutModifiers.Alt)) != 0 && ((uint)Modifiers & ~7u) == 0
         && (Key is >= 0x30 and <= 0x39 or >= 0x41 and <= 0x5A or >= 0x70 and <= 0x7A);
 
     public override string ToString() => string.Join("+", new[]

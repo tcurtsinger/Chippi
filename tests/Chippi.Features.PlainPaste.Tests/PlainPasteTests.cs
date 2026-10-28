@@ -102,6 +102,18 @@ public sealed class PlainPasteTests
         await f.Module.InvokeAsync(); Assert.Equal(0, f.Hub.Calls);
     }
     [Fact]
+    public async Task Shift_only_is_unavailable_and_keeps_the_old_shortcut()
+    {
+        await using var f = new Fixture(); await f.Start(); f.Configure();
+        foreach (uint key in new uint[] { 0x56, 0x31 })
+        {
+            Assert.False(f.Module.ChangeShortcut(new MicShortcut(ShortcutModifiers.Shift, key)));
+            Assert.Equal("Shortcut unavailable", f.Module.ShortcutError);
+            Assert.Equal(Fixture.Shortcut, f.Module.Settings.Shortcut);
+            Assert.Equal(Fixture.Shortcut, f.Hotkey.Registered);
+        }
+    }
+    [Fact]
     public async Task Capturing_suppresses_the_active_shortcut_without_losing_it()
     {
         await using var f = new Fixture(); await f.Start(); f.Configure();
