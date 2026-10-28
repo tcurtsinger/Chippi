@@ -47,6 +47,7 @@ public sealed class ShelfModule : IFeatureModule
         _tile = context.Ui.AddIslandTile(new IslandTileSpec(Id, "Shelf", nameof(LucideIcons.Inbox), Order: 90, SectionOrder: 0, () => Page())
         {
             InitialFocus = () => Page().InitialFocus, // the first item, or the empty zone (notes #58)
+            OpensOnDrag = true, // a drag over the closed tab opens the Shelf (notes #48)
         });
         UpdateStatus();
     }

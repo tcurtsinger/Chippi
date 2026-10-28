@@ -126,6 +126,38 @@ public partial class IslandWindow : Window
             TabMenu.IsOpen = true;
             e.Handled = true;
         };
+        // A drag over the closed tab (Phase 5 notes #48). The tab never takes the drop itself.
+        Tab.AllowDrop = true;
+        Tab.DragEnter += OnTabDrag;
+        Tab.DragOver += OnTabDrag;
+        Tab.DragLeave += (_, _) => DragLeft();
+        Tab.Drop += (_, e) =>
+        {
+            e.Effects = DragDropEffects.None;
+            e.Handled = true;
+            DragLeft();
+        };
+        _dragOpen.Tick += (_, _) => OpenForDrag();
+        _dragClose.Tick += (_, _) => CloseAfterDrag();
+        // The open island: a page that takes drops (the Shelf) handles them; elsewhere a drop does nothing.
+        // Seen even when the page handled them, which the Shelf's drop zone does.
+        _panel.AllowDrop = true;
+        _panel.AddHandler(DragEnterEvent, new DragEventHandler((_, e) => DragOverPanel(e)), handledEventsToo: true);
+        _panel.AddHandler(DragOverEvent, new DragEventHandler((_, e) => DragOverPanel(e)), handledEventsToo: true);
+        _panel.AddHandler(DragLeaveEvent, new DragEventHandler((_, _) => DragLeft()), handledEventsToo: true);
+        _panel.AddHandler(DropEvent, new DragEventHandler((_, e) =>
+        {
+            if (!e.Handled)
+            {
+                e.Effects = DragDropEffects.None;
+                e.Handled = true;
+            }
+            _openedByDrag = false;
+            _dragClose.Stop();
+        }), handledEventsToo: true);
+        // A press or a key on the island ends the drag-opened mode: normal closing resumes.
+        _panel.PreviewMouseDown += (_, _) => _openedByDrag = false;
+        _panel.PreviewKeyDown += (_, _) => _openedByDrag = false;
         DpiChanged += (_, _) => Dispatcher.BeginInvoke(DispatcherPriority.Render, Place);
 
         ApplyEdgeLayout(IslandEdge.Top);
@@ -224,7 +256,11 @@ public partial class IslandWindow : Window
     }
 
     /// <summary>The running features' island tiles, in grid order.</summary>
-    public void SetTiles(IReadOnlyList<IslandTileGroup> tiles) => _panel.SetTiles(tiles);
+    public void SetTiles(IReadOnlyList<IslandTileGroup> tiles)
+    {
+        _tiles = tiles;
+        _panel.SetTiles(tiles);
+    }
 
     /// <summary>A module reported success: Gumdrop celebrates for about 2.5s.</summary>
     public void Celebrate()
@@ -454,10 +490,94 @@ public partial class IslandWindow : Window
         _escapeHook = null;
         _clickHook?.Dispose();
         _clickHook = null;
+        _openedByDrag = false;
+        _dragClose.Stop();
         if (!_panel.IsOpen)
             return;
         _panel.CloseIsland(immediate);
         RefreshTab();
+    }
+
+    // ----- A drag from another app (Phase 5 notes #48) -----
+
+    private static readonly TimeSpan DragOpenDelay = TimeSpan.FromMilliseconds(250), DragCloseDelay = TimeSpan.FromMilliseconds(500);
+    private readonly DispatcherTimer _dragOpen = new() { Interval = DragOpenDelay };
+    private readonly DispatcherTimer _dragClose = new() { Interval = DragCloseDelay };
+    private IReadOnlyList<IslandTileGroup> _tiles = [];
+    private string? _dragKey; // the tile a drag over the closed tab is about to open
+    private bool _openedByDrag; // open because of a drag that hasn't dropped, been clicked into or typed into
+
+    /// <summary>The pointer in physical pixels; tests stand in for it.</summary>
+    internal Func<Point> CursorAt { get; set; } = IslandNative.Cursor;
+
+    /// <summary>Whether the island is open because of a drag that hasn't ended that mode (tests).</summary>
+    internal bool OpenedByDrag => _openedByDrag;
+
+    /// <summary>The tile a drag over the tab opens, if any feature set one.</summary>
+    private IslandTileGroup? DragTile => _tiles.FirstOrDefault(t => t.Parts.Any(p => p.Spec.OpensOnDrag));
+
+    private void OnTabDrag(object sender, DragEventArgs e)
+    {
+        e.Effects = DragDropEffects.None; // the tab never takes the drop
+        e.Handled = true;
+        _dragClose.Stop();
+        if (_panel.IsOpen || _dragKey is not null || _dragging || DragTile is not { } tile)
+            return;
+        _dragKey = tile.Key;
+        DropGlyph.Data = Chippi.UI.Controls.LucideIcons.Get(tile.Icon);
+        RefreshTab();
+        _dragOpen.Start();
+    }
+
+    /// <summary>250 ms over the tab: the island opens on that page, without the keyboard.</summary>
+    private void OpenForDrag()
+    {
+        _dragOpen.Stop();
+        if (_dragKey is not { } key)
+            return;
+        _dragKey = null;
+        if (!_panel.IsOpen)
+        {
+            ShowPage(null, key);
+            _openedByDrag = _panel.IsOpen;
+        }
+        RefreshTab();
+    }
+
+    private void DragOverPanel(DragEventArgs e)
+    {
+        _dragClose.Stop();
+        if (e.Handled)
+            return;
+        e.Effects = DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    /// <summary>
+    /// The drag left the tab or the panel (or moved between their parts). Before 250 ms it doesn't open
+    /// anything; once a drag opened the island, it closes 500 ms after the drag is off both.
+    /// </summary>
+    private void DragLeft()
+    {
+        if (_dragKey is not null)
+        {
+            _dragOpen.Stop();
+            _dragKey = null;
+            RefreshTab();
+        }
+        if (_openedByDrag)
+            _dragClose.Start();
+    }
+
+    private void CloseAfterDrag()
+    {
+        _dragClose.Stop();
+        if (!_openedByDrag)
+            return;
+        var at = CursorAt();
+        if (_panel.Covers(at) || (IsVisible && IslandNative.WindowRect(_hwnd).Contains(at)))
+            return; // still over the island: a later leave starts this again
+        CloseIsland();
     }
 
     private readonly Chippi.Core.Modules.IslandOpenHold _openHolds = new();
@@ -504,16 +624,19 @@ public partial class IslandWindow : Window
     {
         var feedback = _activities.FirstOrDefault(a => a.ModuleId == Chippi.Features.PlainPaste.PlainPasteModule.Id);
         var top = _activities.FirstOrDefault(a => a.ModuleId != Chippi.Features.PlainPaste.PlainPasteModule.Id);
-        bool hasGlyph = feedback is not null || top is not null;
-        bool swollen = _hovered || (_panel.IsVisible && !_panel.IsDocked);
+        // A drag over the tab swells it to its live size with the page's glyph in accent (notes #48).
+        bool dropping = _dragKey is not null;
+        bool hasGlyph = dropping || feedback is not null || top is not null;
+        bool swollen = dropping || _hovered || (_panel.IsVisible && !_panel.IsDocked);
         SwellTo(IslandGeometry.TabSize(_docked, hasGlyph, swollen));
         Pet.Size = hasGlyph ? 22 : 20;
         Pet.ShowMood(hasGlyph ? _mood : swollen ? PetMood.Idle : PetMood.Sleepy);
         Glyph.Visibility = Shown(hasGlyph);
-        PlainPasteGlyph.Visibility = Shown(feedback is not null);
+        DropGlyph.Visibility = Shown(dropping);
+        PlainPasteGlyph.Visibility = Shown(!dropping && feedback is not null);
         PlainPasteGlyph.SetResourceReference(Chippi.UI.Controls.LucideIcon.BrushProperty, feedback?.NeedsAttention == true ? "WarningBrush" : "IslandAccentBrush");
-        // Feedback uses the existing live-glyph slot, then restores the activity beneath it.
-        bool live = feedback is null;
+        // Feedback and a drag use the existing live-glyph slot, then restore the activity beneath it.
+        bool live = !dropping && feedback is null;
         Equalizer.Visibility = Shown(live && top?.Kind == IslandActivityKind.Media);
         Ring.Visibility = Shown(live && top?.Kind is IslandActivityKind.Timer or IslandActivityKind.Agent);
         bool folder = top?.Kind is IslandActivityKind.Download or IslandActivityKind.Stash;

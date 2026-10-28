@@ -55,6 +55,12 @@ public sealed record IslandTileSpec(string Key, string Name, string Icon, int Or
     /// clears its search or leaves Clean URL), and the island stays open. Null for the usual close.
     /// </summary>
     public Func<bool>? HandleEscape { get; init; }
+
+    /// <summary>
+    /// A drag over the closed tab opens this tile's page after 250 ms, without the keyboard, and the tab
+    /// shows the tile's glyph meanwhile (the Shelf, Phase 5 notes #48). The tab itself never takes the drop.
+    /// </summary>
+    public bool OpensOnDrag { get; init; }
 }
 
 /// <summary>A module's handle on its island tile.</summary>
