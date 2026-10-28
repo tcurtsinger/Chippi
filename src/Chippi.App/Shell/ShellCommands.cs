@@ -18,6 +18,9 @@ public sealed class ShellCommands
     private Action<string>? _showPage;
     private Func<TrayAnchor?>? _trayAnchor;
     private Action<string?>? _openSettings;
+    private Func<IDisposable> _holdIslandOpen = () => new Chippi.Core.Modules.IslandOpenHold().Hold();
+    public void RegisterIslandHold(Func<IDisposable> hold) => _holdIslandOpen = hold;
+    public IDisposable HoldIslandOpen() => _holdIslandOpen();
 
     /// <summary>Raised by <see cref="Quit"/>; the composition root stops modules and shuts down.</summary>
     public event EventHandler? QuitRequested;

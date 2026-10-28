@@ -1,0 +1,132 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) Chippi contributors
+using System.Windows;
+using System.Windows.Automation;
+using System.Windows.Controls;
+using System.Windows.Documents;
+using System.Windows.Media;
+using System.Windows.Threading;
+using Chippi.Core.Modules;
+using Chippi.Island.Tests;
+using Chippi.UI.Controls;
+
+namespace Chippi.Features.Scratchpad.Tests;
+
+public sealed class ScratchpadPageTests
+{
+    private sealed class Store : IScratchpadStore
+    {
+        public ScratchpadDocument Document = ScratchpadDocument.Empty();
+        public bool FailRead, FailWrite;
+        public ScratchpadDocument Load() => FailRead ? throw new System.IO.IOException() : Document;
+        public void Save(ScratchpadDocument value) { if (FailWrite) throw new System.IO.IOException(); Document = value; }
+        public void Dispose() { }
+    }
+    private static IEnumerable<T> Find<T>(DependencyObject root) where T : DependencyObject
+    {
+        if (root is T item) yield return item;
+        foreach (var child in LogicalTreeHelper.GetChildren(root).OfType<DependencyObject>())
+            foreach (var nested in Find<T>(child)) yield return nested;
+    }
+    private static void Pump() => Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.Background);
+    private static T Named<T>(DependencyObject root, string name) where T : DependencyObject => Find<T>(root).Single(x => AutomationProperties.GetName(x) == name);
+    private static void WithPage(Action<Store, ScratchpadSession, ScratchpadPage> test, bool failRead = false) => WpfTestThread.Run(() =>
+    {
+        var store = new Store { FailRead = failRead };
+        var session = new ScratchpadSession(() => store);
+        session.LoadAsync().GetAwaiter().GetResult();
+        using var page = new ScratchpadPage(session, new IslandOpenHold().Hold);
+        try { test(store, session, page); }
+        finally { page.Dispose(); session.DisposeAsync().AsTask().GetAwaiter().GetResult(); }
+    });
+
+    [Fact]
+    public void Typing_and_reopening_preserve_tabs_line_breaks_and_the_draft_after_a_save_failure() => WithPage((store, session, page) =>
+    {
+        var editor = Named<TextBox>(page, "Note");
+        store.FailWrite = true;
+        editor.Text = "Invented\ttext\r\nnext";
+        session.FlushAsync().GetAwaiter().GetResult(); Pump();
+        Assert.True(session.State.SaveFailed);
+        Assert.Equal("Invented\ttext\r\nnext", editor.Text);
+        Assert.Contains(Find<TextBlock>(page.Header), b => b.Text == "Save failed");
+        store.FailWrite = false;
+        editor.Text += " again";
+        session.FlushAsync().GetAwaiter().GetResult(); Pump();
+        Assert.False(session.State.SaveFailed);
+        Assert.Equal(editor.Text, store.Document.Selected.Text);
+        using var reopened = new ScratchpadPage(session, new IslandOpenHold().Hold);
+        Assert.Equal(editor.Text, Named<TextBox>(reopened, "Note").Text);
+        Assert.False(editor.AcceptsTab);
+        Assert.Equal(13, editor.FontSize);
+    });
+
+    [Fact]
+    public void Load_failure_hides_the_editor_and_retry_loads_without_overwriting_notes() => WithPage((store, session, page) =>
+    {
+        Assert.Contains(Find<TextBlock>(page.Header), b => b.Text == "Load failed");
+        Assert.Equal(Visibility.Collapsed, ((StackPanel)page.Children[0]).Visibility);
+        store.FailRead = false;
+        store.Document = ScratchpadDocument.Empty().Edit("Preserved note");
+        Named<Button>(page.Header, "Retry").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        session.FlushAsync().GetAwaiter().GetResult(); Pump();
+        Assert.Equal("Preserved note", Named<TextBox>(page, "Note").Text);
+        Assert.Equal(Visibility.Visible, ((StackPanel)page.Children[0]).Visibility);
+    }, failRead: true);
+
+    [Fact]
+    public void New_note_opens_an_empty_editor_and_the_twelfth_disables_new() => WithPage((store, session, page) =>
+    {
+        Named<Button>(page, "New note").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        session.FlushAsync().GetAwaiter().GetResult(); Pump();
+        Assert.Equal("Note 2", session.State.Document!.Selected.Name);
+        Assert.Equal("", Named<TextBox>(page, "Note").Text);
+        session.ChangeAsync(d => { while (d.Notes.Count < 12) d = d.Add(); return d; }).GetAwaiter().GetResult(); Pump();
+        Assert.False(Named<Button>(page, "New note").IsEnabled);
+        Assert.Equal(12, int.Parse(((string)Named<Button>(page, "More notes").Content)[1..]) + Named<SegmentedControl>(page, "Notes").Items.Count);
+    });
+
+    [Fact]
+    public void Export_holds_the_island_and_flushes_then_releases_even_on_failure() => WpfTestThread.Run(() =>
+    {
+        var store = new Store(); var session = new ScratchpadSession(() => store);
+        session.LoadAsync().GetAwaiter().GetResult();
+        var holds = new IslandOpenHold();
+        using var page = new ScratchpadPage(session, holds.Hold, (_, note) =>
+        {
+            Assert.True(holds.IsHeld); Assert.Equal("Latest export", note.Text);
+            Assert.Equal(note.Text, store.Document.Selected.Text);
+            throw new System.IO.IOException("Invented failure");
+        });
+        Named<TextBox>(page, "Note").Text = "Latest export";
+        var export = page.ExportAsync();
+        while (!export.IsCompleted) Pump();
+        export.GetAwaiter().GetResult(); Assert.False(holds.IsHeld);
+        Assert.Contains(Find<TextBlock>(page.Header), b => b.Text == "Export failed");
+        page.Dispose(); session.DisposeAsync().AsTask().GetAwaiter().GetResult();
+    });
+
+    [Fact]
+    public void Preview_has_no_navigation_or_download_controls_and_shows_read_only_checkboxes() => WpfTestThread.Run(() =>
+    {
+        var rendered = ScratchpadMarkdown.Render("# Title\n- [x] Done\n**bold** and `code`\n[Link](https://invalid.example/)\n![Invented image](https://invalid.example/a.png)");
+        Assert.Empty(Find<Hyperlink>(rendered));
+        Assert.Empty(Find<Image>(rendered));
+        var box = Find<CheckBox>(rendered).Single();
+        Assert.True(box.IsChecked); Assert.False(box.IsHitTestVisible); Assert.False(box.Focusable);
+        Assert.Contains(Find<TextBlock>(rendered), b => b.Text == "Invented image");
+        var runs = Find<Run>(rendered).ToList();
+        Assert.Contains(runs, r => r.Text == "bold" && r.FontWeight == FontWeights.SemiBold);
+        Assert.Contains(runs, r => r.Text == "Link" && r.TextDecorations.Count > 0);
+    });
+
+    [Fact]
+    public void Page_and_header_fit_the_approved_height_without_showing_a_window() => WithPage((store, session, page) =>
+    {
+        var host = new StackPanel { Children = { page.Header, page } };
+        host.Measure(new Size(416, double.PositiveInfinity)); host.Arrange(new Rect(0, 0, 416, host.DesiredSize.Height));
+        Assert.Equal(376, host.DesiredSize.Height);
+        Assert.Equal(236, Find<Grid>(page).Single(g => g.Height == 236).ActualHeight);
+        Assert.Same(Named<TextBox>(page, "Note"), page.InitialFocus);
+    });
+}

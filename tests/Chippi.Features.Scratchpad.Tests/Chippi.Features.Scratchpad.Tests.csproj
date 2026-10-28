@@ -11,6 +11,7 @@
     <PackageReference Include="xunit.runner.visualstudio" />
     <Using Include="Xunit" />
     <Compile Include="../Chippi.Clipboard.Tests/Fakes/ManualTime.cs" Link="ManualTime.cs" />
+    <Compile Include="../Chippi.Island.Tests/WpfTestThread.cs" Link="WpfTestThread.cs" />
     <ProjectReference Include="../../src/Features/Chippi.Features.Scratchpad/Chippi.Features.Scratchpad.csproj" />
   </ItemGroup>
 </Project>

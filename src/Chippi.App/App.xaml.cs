@@ -190,6 +190,7 @@ public partial class App : Application
         shell.Registry.Register(new Chippi.Features.Sound.Mute.MicMuteModule());
         // [Phase 4] System monitor: replaces its catalog placeholder.
         shell.Registry.Register(new Chippi.Features.SystemMonitor.SystemMonitorModule());
+        shell.Registry.Register(new Chippi.Features.Scratchpad.ScratchpadModule());
 
         // [WS2] "Coming soon" placeholders for the PLAN.md features.
         Settings.Features.FeatureCatalog.RegisterPlaceholders(shell.Registry);

@@ -47,6 +47,9 @@ public sealed class ModuleContext(
 
     /// <summary>The shared clipboard service; no module opens the clipboard itself. Null when the shell has none (tests pass a fake).</summary>
     public Clipboard.IClipboardHub? Clipboard { get; init; }
+
+    /// <summary>Keep the island open during a dialog or drag. Dispose the scope when it ends.</summary>
+    public Func<IDisposable> HoldIslandOpen { get; init; } = () => new IslandOpenHold().Hold();
 }
 
 /// <summary>Typed access to a module's config section (<c>modules.&lt;id&gt;</c> in settings.json).</summary>
