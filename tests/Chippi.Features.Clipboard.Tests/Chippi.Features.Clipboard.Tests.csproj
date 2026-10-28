@@ -1,0 +1,20 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Clipboard history and Clean URL on FakeClipboard and FakeForeground only: no test opens the real clipboard. -->
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <IsTestProject>true</IsTestProject>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <Using Include="Xunit" />
+    <Using Include="System.IO" />
+    <Compile Include="../Chippi.Island.Tests/WpfTestThread.cs" Link="WpfTestThread.cs" />
+    <Compile Include="../Chippi.Clipboard.Tests/Fakes/*.cs" Link="Fakes/%(Filename)%(Extension)" />
+    <ProjectReference Include="../../src/Features/Chippi.Features.Clipboard/Chippi.Features.Clipboard.csproj" />
+  </ItemGroup>
+</Project>
