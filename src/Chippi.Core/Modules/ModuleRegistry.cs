@@ -41,6 +41,9 @@ public sealed class FeatureEntry
 
     internal IFeatureModule? Module { get; }
 
+    /// <summary>What to ask before uninstalling, or null to uninstall at once (<see cref="IFeatureModule.UninstallQuestion"/>).</summary>
+    public string? UninstallQuestion() => Module?.UninstallQuestion();
+
     internal ModuleUi? Ui { get; set; }
 
     /// <summary>
@@ -336,6 +339,8 @@ public sealed class ModuleRegistry(ConfigStore config, IslandActivityHub island,
             OpenIslandPage = key => _services.OpenIslandPage?.Invoke(key),
             Clipboard = _services.Clipboard,
             HoldIslandOpen = _services.HoldIslandOpen,
+            IslandPasteTarget = () => _services.IslandPasteTarget?.Invoke(),
+            CloseIsland = () => _services.CloseIsland?.Invoke(),
         };
 
         entry.Ui = ui;

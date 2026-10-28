@@ -20,10 +20,21 @@ public sealed class WindowsForeground : IForeground
     public PasteTarget? Current()
     {
         nint hwnd = GetForegroundWindow();
-        if (hwnd == 0 || GetWindowThreadProcessId(hwnd, out uint pid) == 0 || pid == _self)
+        if (hwnd == 0 || GetWindowThreadProcessId(hwnd, out uint pid) == 0 || pid == _self || IsTaskbar(hwnd))
             return null;
         return new PasteTarget(hwnd, pid);
     }
+
+    // The taskbar is in front right after a tray click: nothing to paste into.
+    private static unsafe bool IsTaskbar(nint hwnd)
+    {
+        char* name = stackalloc char[32];
+        int length = GetClassNameW(hwnd, name, 32);
+        var cls = new ReadOnlySpan<char>(name, Math.Max(0, length));
+        return cls.SequenceEqual("Shell_TrayWnd") || cls.SequenceEqual("Shell_SecondaryTrayWnd");
+    }
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern unsafe int GetClassNameW(nint hwnd, char* name, int max);
 
     public bool IsAlive(PasteTarget target) =>
         IsWindow(target.Window) && GetWindowThreadProcessId(target.Window, out uint pid) != 0 && pid == target.ProcessId;
