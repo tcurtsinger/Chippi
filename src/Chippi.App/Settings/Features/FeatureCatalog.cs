@@ -20,13 +20,6 @@ public static class FeatureCatalog
 
     public static IReadOnlyList<FeatureDescriptor> Placeholders { get; } =
     [
-        // Files (File organizer is a real module since Phase 2: Chippi.Features.Downloads)
-        new("shelf", "Shelf", "Holds dragged files and text while you move between apps", FeatureGroup.Files)
-        {
-            Icon = "Inbox",
-            Presets = PowerUser,
-        },
-
         // Phase 3: Sound
         new("volume-boost", "Volume boost", "App volume past 100%", FeatureGroup.Sound)
         {
@@ -75,18 +68,6 @@ public static class FeatureCatalog
         },
 
         // Phase 5: Clipboard and text
-        new("clipboard-history", "Clipboard history", "Searchable history of what you copied, with pinned items", FeatureGroup.ClipboardText)
-        {
-            Icon = "ClipboardList",
-            Badges = [FeatureBadge.Overlap("Overlaps Win+V")],
-            Presets = Essentials | PowerUser,
-        },
-        new("paste-plain-text", "Paste as plain text", "Pastes without the source formatting", FeatureGroup.ClipboardText)
-        {
-            Icon = "ClipboardType",
-            Badges = [FeatureBadge.Overlap("Overlaps PowerToys")],
-            Presets = Essentials | PowerUser,
-        },
         new("clean-url", "Clean URL", "Strips tracking parameters from links you copy", FeatureGroup.ClipboardText)
         {
             Icon = "Link",

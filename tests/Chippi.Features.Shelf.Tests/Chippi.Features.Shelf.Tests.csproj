@@ -1,0 +1,20 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Shelf on FakeHub only: no test opens the real clipboard, shows a window or starts a real drag. -->
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <IsTestProject>true</IsTestProject>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <Using Include="Xunit" />
+    <Using Include="System.IO" />
+    <Compile Include="../Chippi.Island.Tests/WpfTestThread.cs" Link="WpfTestThread.cs" />
+    <Compile Include="../Chippi.Features.Clipboard.Tests/FakeHub.cs" Link="FakeHub.cs" />
+    <ProjectReference Include="../../src/Features/Chippi.Features.Shelf/Chippi.Features.Shelf.csproj" />
+  </ItemGroup>
+</Project>
