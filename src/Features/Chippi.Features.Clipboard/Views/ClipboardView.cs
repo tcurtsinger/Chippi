@@ -30,6 +30,7 @@ internal sealed class ClipboardView : UserControl
     private readonly IconButton _pause = Ui.Icon(LucideIcons.Pause, "Pause");
     private readonly IconButton _more = Ui.Icon(LucideIcons.Ellipsis, "More");
     private readonly Border _firstUse = new();
+    private readonly Button _turnOn = Ui.Button("Turn on", "PrimaryButtonStyle");
     private readonly SearchBox _search = new() { Placeholder = "Search", Margin = new Thickness(0, 0, 0, 8) };
     private readonly StackPanel _caution = Ui.Caution();
     private readonly StackPanel _rows = new();
@@ -60,11 +61,10 @@ internal sealed class ClipboardView : UserControl
         Header = new DockPanel { Height = 32, Margin = new Thickness(0, 0, 0, 8), Children = { commands, new TextBlock { Text = "Clipboard", FontSize = 13, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center } } };
 
         // First use (notes #10): "Recording off" and Turn on.
-        var turnOn = Ui.Button("Turn on", "PrimaryButtonStyle");
-        turnOn.Click += (_, _) => _module?.SetRecording(true);
-        DockPanel.SetDock(turnOn, Dock.Right);
+        _turnOn.Click += (_, _) => _module?.SetRecording(true);
+        DockPanel.SetDock(_turnOn, Dock.Right);
         _firstUse.SetResourceReference(StyleProperty, "IslandCardStyle");
-        _firstUse.Child = new DockPanel { Children = { turnOn, Ui.Text("Recording off") } };
+        _firstUse.Child = new DockPanel { Children = { _turnOn, Ui.Text("Recording off") } };
 
         _search.TextChanged += (_, _) => Refresh(keepScroll: false);
         _search.PreviewKeyDown += OnSearchKey;
@@ -103,8 +103,8 @@ internal sealed class ClipboardView : UserControl
     /// <summary>The page's header: its name, "Paused", then Clean URL, Pause and More (notes #8, #10).</summary>
     public DockPanel Header { get; }
 
-    /// <summary>Where the keyboard lands when the page opens: Search, or the link field in Clean URL (notes #58).</summary>
-    public UIElement InitialFocus => _cleaning ? _clean.Field : _search;
+    /// <summary>Where the keyboard lands when the page opens: Search, the link field in Clean URL, or Turn on (notes #58).</summary>
+    public UIElement InitialFocus => _cleaning ? _clean.Field : _history.Visibility == Visibility.Visible ? _search : _turnOn;
 
     /// <summary>The first Esc: clears a search or leaves Clean URL; true when it did (notes #59).</summary>
     public bool HandleEscape()

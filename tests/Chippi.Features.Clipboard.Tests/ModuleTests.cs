@@ -225,6 +225,33 @@ public sealed class ModuleTests : IDisposable
     }
 
     [Fact]
+    public async Task The_header_holds_the_commands_and_paused_and_focus_follows_the_view()
+    {
+        await StartHistoryAsync();
+        await StartCleanAsync();
+        WpfTestThread.Run(() =>
+        {
+            var spec = _historyUi.Spec!;
+            var view = (ClipboardView)spec.CreateSection();
+            var header = (FrameworkElement)spec.CreateHeader!();
+            Load(view);
+            Assert.Same(view.Header, header);
+            Assert.Empty(Find<IconButton>(view));
+            Assert.Equal("Turn on", Assert.IsType<Button>(spec.InitialFocus!()).Content);
+
+            _history.SetRecording(true);
+            _history.SetPaused(true);
+            Flush(view);
+            Assert.True(Shows(header, "Paused"));
+            Assert.IsType<SearchBox>(spec.InitialFocus!());
+
+            Find<IconButton>(header).Single(b => System.Windows.Automation.AutomationProperties.GetName(b) == "Clean URL").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Assert.Equal("Link", System.Windows.Automation.AutomationProperties.GetName((DependencyObject)spec.InitialFocus!()!));
+            Assert.Null(_cleanUi.Spec!.InitialFocus!());
+        });
+    }
+
+    [Fact]
     public async Task Without_history_the_page_is_clean_url_and_cleans_as_you_type()
     {
         await StartCleanAsync();
@@ -234,6 +261,7 @@ public sealed class ModuleTests : IDisposable
             Load(section);
             Assert.Equal(Visibility.Visible, section.Visibility);
             var field = Find<TextBox>(section).Single(t => System.Windows.Automation.AutomationProperties.GetName(t) == "Link");
+            Assert.Same(field, _cleanUi.Spec.InitialFocus!());
             field.Text = "https://youtu.be/abc?si=share&t=30";
             Assert.True(Shows(section, "https://youtu.be/abc?t=30"));
             Assert.True(Shows(section, "Removed · si"));
