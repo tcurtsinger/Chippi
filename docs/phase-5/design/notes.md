@@ -20,7 +20,7 @@ Phase 5 inside the Surfaces model: Clipboard history, Paste as plain text, Clean
 | `scratch-states` | Preview, renaming, the note's menu, a new note, 12 notes, save failed, notes that can't be opened |
 | `shelf-states` | Empty, a drag over it, mixed items, pinned, missing file, full, the two limits |
 | `shelf-drag` | Seven frames: over the closed tab, opening, into the page, dropped, dragging out, accepted, canceled |
-| `docked` | Docked by the tray: Clipboard; the grid and Clean URL with History uninstalled; the Shelf taking a drop |
+| `docked` | Docked by the tray: Clipboard; the grid and Clean URL with History uninstalled; the Shelf taking a drop (since 2026-10-28 the docked Shelf only drags out; see #50) |
 | `fit` | A 1280×720 screen: History on the right edge, Scratchpad on the top edge, footprints outlined |
 | `keyboard` | Focus on opening each page, the keys each page adds, the paste handoff before and after |
 | `destructive` | History's menu, Clear and Erase confirmations and results, deleting a note, removing a Shelf item |
@@ -129,10 +129,11 @@ All eight, as drawn. The alternatives in the numbered notes were turned down.
 22. **Dropped:** the plain-paste page and the "Plain paste" tile name. The previous version's page showed the copy and the target app before pasting; Vorssaint has nothing like it, and the shortcut covers the daily use.
 
 ### Clean URL
-23. **In the Clipboard page** (approved): the header's link button swaps the list for one link field (it wraps to 3 lines), a result card with the clean link over "Removed · si", and Copy (accent). The button shows pressed, and the header drops Pause and More. The button again, or Esc, goes back to the list. Without Clipboard history the page is Clean URL alone, and the header shows "Manual" or "Automatic" (the tile's status).
+23. **In the Clipboard page** (approved): the header's link button swaps the list for one link field, a result card with the clean link, and Copy (accent). Changed by Travis, 2026-10-28: the field is one line the page's width, and a long link scrolls inside it instead of wrapping to 3 lines; the card shows only the clean link, without "Removed · si". The button shows pressed, and the header drops Pause and More. The button again, or Esc, goes back to the list. Without Clipboard history the page is Clean URL alone, and the header shows "Manual" or "Automatic" (the tile's status).
 24. **Filled from the copy:** when Clean URL opens and the copy is one web link with no private marker, the field holds it. Otherwise the field is empty and has the keyboard.
 25. **Result as you type** (approved). The page is the manual Clean, and Copy puts the result on the clipboard. The alternative is a Clean button that replaces the copy in place; it hides the result until the click, and if nothing changes it's a click for nothing.
 26. **States:**
+    - The clean link alone, with Copy enabled. Nothing lists what was removed (Travis, 2026-10-28).
     - "Nothing to remove", with Copy disabled.
     - "Not a web link", in Caution under the field: only `http` and `https` count, one link, no spaces inside.
     - "Copied", with a Success check.
@@ -188,7 +189,7 @@ All eight, as drawn. The alternatives in the numbered notes were turned down.
     - Accepted: an unpinned item leaves the Shelf and a pinned one stays.
     - Canceled (Esc, or a drop nowhere): the item stays.
     - The island stays open either way.
-50. **Docked:** the tray icon never takes a drop. Once the docked Shelf is open from the tray, it takes drops the same way.
+50. **Docked:** the tray icon never takes a drop, and the docked Shelf only drags items out (changed 2026-10-28; it was meant to take drops once open from the tray). Pressing in another app closes the docked pages before its drag can start, and Travis chose to leave that as a known limit rather than close the pages on release. Drops go through the island tab.
 
 ### Settings
 51. **Sidebar:** Clipboard & text holds Clipboard history, Paste as plain text and Clean URL. Scratchpad and Shelf have no page (#36, #47).
@@ -240,7 +241,7 @@ All eight, as drawn. The alternatives in the numbered notes were turned down.
 |---|---|
 | Clipboard | Clipboard · Clean URL · Search · Pinned · Recent · Recording off · Turn on · Paused · Pause · Resume · More · Paste · Copy · Pin · Unpin · Delete · Unavailable · 1 file unavailable · No matches · No recent copies · No items · Clipboard busy · Picture not saved · over 16 MiB · Text not saved · over 1 MiB · Not saved · over 100 files · History full · 128 MiB · Clear history · Erase all · Clear unpinned items? · Clear · Erase all items and pins? · Erase · Cancel |
 | Plain paste (screen-reader names only) | Plain text copied · No text copied · Clipboard busy |
-| Clean URL | Link · Removed · si · Nothing to remove · Not a web link · Copy · Copied · Manual · Automatic |
+| Clean URL | Link · Nothing to remove · Not a web link · Copy · Copied · Manual · Automatic |
 | Scratchpad | Saved · Save failed · New note · All notes · Note 5 · Edit · Preview · Rename · Export… · Delete · Delete “Standup”? · Load failed · Retry |
 | Shelf | No items · Copy · Pin · Unpin · Remove · Unavailable · Online only · Over 100 files · Picture over 16 MiB · Shelf full · 128 MiB |
 | Settings | Recording · Apps to skip · Add app · Browse… · No apps · Remove · Shortcut · Not set · Set · Change · New shortcut · Shortcut in use · Automatic cleaning · Sites to skip · Add site · Add · Uninstall and erase history? · Uninstall |

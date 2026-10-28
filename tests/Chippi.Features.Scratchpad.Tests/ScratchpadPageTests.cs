@@ -129,4 +129,46 @@ public sealed class ScratchpadPageTests
         Assert.Equal(236, Find<Grid>(page).Single(g => g.Height == 236).ActualHeight);
         Assert.Same(Named<TextBox>(page, "Note"), page.InitialFocus);
     });
+
+    // Build menus without opening their popup windows on the user's desktop.
+    private static System.Windows.Controls.Primitives.Popup Menu(ScratchpadPage page, string factory, params object[] args) =>
+        (System.Windows.Controls.Primitives.Popup)typeof(ScratchpadPage).GetMethod(factory,
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.Invoke(page, args)!;
+
+    [Fact]
+    public void More_and_tab_actions_use_the_island_menu_and_the_exact_export_label() => WithPage((store, session, page) =>
+    {
+        var style = new Style(typeof(Button));
+        var resources = Application.Current.Resources;
+        var previous = resources["IslandMenuItemStyle"];
+        resources["IslandMenuItemStyle"] = style;
+        try
+        {
+            foreach (FrameworkElement anchor in new FrameworkElement[] { Named<IconButton>(page, "More"), Named<SegmentedControl>(page, "Notes") })
+            {
+                var menu = Menu(page, "CreateActionsMenu", anchor);
+                Assert.Same(anchor, menu.PlacementTarget);
+                Assert.False(menu.IsOpen);
+                var surface = Assert.IsType<Border>(menu.Child);
+                Assert.Equal(new CornerRadius(8), surface.CornerRadius);
+                var rows = Find<Button>(surface).ToArray();
+                Assert.Equal(new[] { "Rename", "Export\u2026", "Delete" }, rows.Select(b => b.Content));
+                Assert.All(rows, row => Assert.Same(style, row.Style));
+            }
+        }
+        finally { if (previous is null) resources.Remove("IslandMenuItemStyle"); else resources["IslandMenuItemStyle"] = previous; }
+    });
+
+    [Fact]
+    public void All_notes_uses_the_island_menu_and_selects_the_clicked_note() => WithPage((store, session, page) =>
+    {
+        session.ChangeAsync(d => d.Add()).GetAwaiter().GetResult(); Pump();
+        var menu = Menu(page, "CreateNotesMenu", session.State.Document!);
+        Assert.False(menu.IsOpen);
+        var rows = Find<Button>(menu.Child).ToArray();
+        Assert.Equal(new[] { "Note 1", "Note 2 \u2713" }, rows.Select(b => b.Content));
+        rows[0].RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        session.FlushAsync().GetAwaiter().GetResult(); Pump();
+        Assert.Equal("Note 1", session.State.Document!.Selected.Name);
+    });
 }

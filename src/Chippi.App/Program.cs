@@ -2,6 +2,7 @@
 // Copyright (C) Chippi contributors
 
 using Chippi.Core.Diagnostics;
+using System.IO;
 using Chippi.Core.SystemIntegration;
 using Velopack;
 
@@ -13,9 +14,21 @@ namespace Chippi.App;
 /// </summary>
 public static class Program
 {
+    // Notification activation and test cleanup can log before App.OnStartup.
+    internal static void ConfigureLog(string[] arguments)
+    {
+        var profile = ExplorerRegistration.EnvironmentProfile();
+        try { profile = ExplorerRegistration.ResolveDevProfile(arguments); }
+        catch (ArgumentException) { } // App.OnStartup reports malformed arguments and keeps the environment profile.
+        Log.Default = new RollingFileLog(string.IsNullOrWhiteSpace(profile) ? RollingFileLog.DefaultDirectory : Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Chippi-dev", profile, "logs"));
+    }
     [STAThread]
     public static int Main()
     {
+        try { ConfigureLog(Environment.GetCommandLineArgs()[1..]); }
+        catch (ArgumentException ex) { Console.Error.WriteLine(ex.Message); return 1; }
+
         // Before Velopack too: the processes it starts can arrive without %windir%.
         App.EnsureWindowsDirectoryEnvironment();
 

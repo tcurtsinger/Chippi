@@ -14,4 +14,5 @@
     <ProjectReference Include="../../src/Chippi.App/Chippi.App.csproj" />
     <Compile Include="../Chippi.Audio.Tests/AudioFakes.cs" Link="AudioFakes.cs" />
   </ItemGroup>
+
 </Project>

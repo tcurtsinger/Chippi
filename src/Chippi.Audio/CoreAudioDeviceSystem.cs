@@ -267,7 +267,7 @@ public sealed class CoreAudioDeviceSystem : IDeviceSystem, IMMNotificationClient
             {
                 var connector = topology.GetConnector(i);
                 if (connector.IsConnected)
-                    return connector.ConnectedToDeviceId;
+                    return connector.ConnectedToConnectorId;
             }
         }
         catch (Exception ex) when (ex is COMException or InvalidCastException) { }

@@ -68,11 +68,20 @@ internal sealed class DesktopSession : IDisposable
     }
 
     private string ProfileDirectory(Environment.SpecialFolder folder) => Path.Combine(Environment.GetFolderPath(folder), "Chippi-dev", _profile);
+    internal static ProcessStartInfo StartInfo(string executable, string profile)
+    {
+        if (string.IsNullOrWhiteSpace(profile) || profile.Any(c => !char.IsAsciiLetterOrDigit(c) && c is not '-' and not '_'))
+            throw new ArgumentException("Dev profile required", nameof(profile));
+        var info = new ProcessStartInfo(executable) { UseShellExecute = false, WorkingDirectory = Path.GetDirectoryName(executable)! };
+        info.Environment["CHIPPI_DEV_PROFILE"] = profile;
+        info.Environment.Remove("CHIPPI_DEBUG");
+        return info;
+    }
+
     private Process Start()
     {
-        var info = new ProcessStartInfo(Executable) { UseShellExecute = false, WorkingDirectory = Path.GetDirectoryName(Executable)! };
-        info.Environment["CHIPPI_DEV_PROFILE"] = _profile;
-        info.Environment.Remove("CHIPPI_DEBUG");
+        Chippi.SmokeTests.SmokeLog.Check();
+        var info = StartInfo(Executable, _profile);
         var process = System.Diagnostics.Process.Start(info) ?? throw new InvalidOperationException("Launch failed");
         _children.Add(process);
         return process;
@@ -210,7 +219,8 @@ internal sealed class DesktopSession : IDisposable
         bool notificationsCleaned = false;
         try
         {
-            var info = new ProcessStartInfo(Executable) { UseShellExecute = false, CreateNoWindow = true };
+            var info = StartInfo(Executable, _profile);
+            info.CreateNoWindow = true;
             info.ArgumentList.Add("--cleanup-dev-notifications");
             info.ArgumentList.Add("--dev-profile");
             info.ArgumentList.Add(_profile);
