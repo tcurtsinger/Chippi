@@ -302,9 +302,14 @@ public sealed class ModuleTests : IDisposable
             Assert.Equal(Visibility.Visible, section.Visibility);
             var field = Find<TextBox>(section).Single(t => System.Windows.Automation.AutomationProperties.GetName(t) == "Link");
             Assert.Same(field, _cleanUi.Spec.InitialFocus!());
+            // One line the page's width: a long link scrolls, never wraps (Travis, 2026-10-28).
+            Assert.Equal(TextWrapping.NoWrap, field.TextWrapping);
+            Assert.Equal(1, field.MaxLines);
+            Assert.Equal(HorizontalAlignment.Stretch, field.HorizontalAlignment);
             field.Text = "https://youtu.be/abc?si=share&t=30";
             Assert.True(Shows(section, "https://youtu.be/abc?t=30"));
-            Assert.True(Shows(section, "Removed · si"));
+            // Only the clean link: nothing lists what was removed.
+            Assert.DoesNotContain(Find<TextBlock>(section), t => IsShown(t) && t.Text.StartsWith("Removed", StringComparison.Ordinal));
             field.Text = "https://example.org/?si=keep&ref=keep";
             Assert.True(Shows(section, "Nothing to remove"));
             field.Text = "ftp://files.example.org/a.zip";

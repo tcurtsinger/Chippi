@@ -20,9 +20,9 @@ namespace Chippi.Features.Clipboard.Views;
 internal sealed class CleanUrlView : UserControl
 {
     private readonly ClipboardFeatures _features;
-    private readonly TextBox _field = new() { TextWrapping = TextWrapping.Wrap, AcceptsReturn = false, MaxLines = 3, Tag = "Link" };
+    // One line the width of the page: a long link scrolls inside it, never wraps (Travis, 2026-10-28).
+    private readonly TextBox _field = new() { TextWrapping = TextWrapping.NoWrap, AcceptsReturn = false, MaxLines = 1, HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalScrollBarVisibility = ScrollBarVisibility.Hidden, Tag = "Link" };
     private readonly TextBlock _clean = Ui.Text("", 13);
-    private readonly TextBlock _removed = Ui.Muted();
     private readonly Border _result = new() { Margin = new Thickness(0, 8, 0, 0) };
     private readonly StackPanel _caution = Ui.Caution();
     private readonly StackPanel _copied = new() { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Visibility = Visibility.Collapsed };
@@ -45,9 +45,8 @@ internal sealed class CleanUrlView : UserControl
         };
         _clean.TextWrapping = TextWrapping.Wrap;
         _clean.TextTrimming = TextTrimming.None;
-        _removed.Margin = new Thickness(0, 4, 0, 0);
         _result.SetResourceReference(StyleProperty, "IslandCardStyle");
-        _result.Child = new StackPanel { Children = { _clean, _removed } };
+        _result.Child = _clean;
         _caution.Margin = new Thickness(0, 8, 0, 0);
 
         var check = Ui.Glyph(LucideIcons.Check, 14, "SuccessBrush");
@@ -89,6 +88,7 @@ internal sealed class CleanUrlView : UserControl
         {
             _field.Text = text.Trim();
             _field.CaretIndex = _field.Text.Length;
+            _field.ScrollToHorizontalOffset(double.MaxValue); // the caret, at the end, in view
         }
     }
 
@@ -103,14 +103,11 @@ internal sealed class CleanUrlView : UserControl
         {
             _clean.Text = result.Url;
             _clean.SetResourceReference(TextBlock.ForegroundProperty, "IslandTextBrush");
-            _removed.Text = "Removed · " + string.Join(", ", result.RemovedParameters);
-            _removed.Visibility = Visibility.Visible;
         }
         else if (result is not null)
         {
             _clean.Text = "Nothing to remove";
             _clean.SetResourceReference(TextBlock.ForegroundProperty, "IslandTextTertiaryBrush");
-            _removed.Visibility = Visibility.Collapsed;
         }
         _copy.IsEnabled = result is { RemovedParameters.Count: > 0 };
     }
