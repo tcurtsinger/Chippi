@@ -13,6 +13,22 @@ public sealed class UrlCleanerTests
     [InlineData("https://example.org/?%75tm_source=a&x=a%2Fb", "https://example.org/?x=a%2Fb")]
     public void Approved_examples(string input, string expected) => Assert.Equal(expected, UrlCleaner.Clean(input)?.Url);
 
+    [Theory]
+    [InlineData("https://www.google.com/maps/dir/?api=1&waypoints=a|b&utm_source=x", "https://www.google.com/maps/dir/?api=1&waypoints=a|b")]
+    [InlineData("https://example.org/a?tags[]=1&utm_source=x", "https://example.org/a?tags[]=1")]
+    [InlineData("https://example.org/?v=a|b&utm_source=x", "https://example.org/?v=a|b")]
+    [InlineData("https://example.org/?v=[a&utm_source=x", "https://example.org/?v=[a")]
+    [InlineData("https://example.org/?v=a]&utm_source=x", "https://example.org/?v=a]")]
+    [InlineData("https://example.org/?v={a&utm_source=x", "https://example.org/?v={a")]
+    [InlineData("https://example.org/?v=a}&utm_source=x", "https://example.org/?v=a}")]
+    [InlineData("https://example.org/?v=a^b&utm_source=x", "https://example.org/?v=a^b")]
+    [InlineData("https://example.org/?v=\"a\"&utm_source=x", "https://example.org/?v=\"a\"")]
+    public void Cleans_browser_copied_queries_without_reencoding_kept_characters(string input, string expected)
+    {
+        var result = Assert.IsType<CleanUrlResult>(UrlCleaner.Clean(input));
+        Assert.Equal(expected, result.Url);
+        Assert.Equal(new[] { "utm_source" }, result.RemovedParameters);
+    }
     // Independent inventory from behavior-spec section 5; every named rule is exercised on its own.
     public static TheoryData<string, string> EveryRule
     {

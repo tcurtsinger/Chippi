@@ -46,7 +46,7 @@ public static class UrlCleaner
         if (text.Length == 0 || text.Any(char.IsWhiteSpace) || text.Contains('\\') ||
             !Uri.TryCreate(text, UriKind.Absolute, out var uri) ||
             (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps) ||
-            uri.Host.Length == 0 || !uri.IsWellFormedOriginalString())
+            uri.Host.Length == 0)
             return null;
 
         var fragment = text.IndexOf('#');
