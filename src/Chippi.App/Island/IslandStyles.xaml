@@ -79,6 +79,74 @@
         <Setter Property="Padding" Value="10,0" />
     </Style>
 
+    <!-- The island's slider (Sound's system volume, App volume): a 4px track in the island accent and a
+         16 thumb, the dark theme's thumb whatever the app's theme. -->
+    <SolidColorBrush x:Key="IslandThumbBrush" Color="#454545" />
+    <Style x:Key="IslandSliderStyle" TargetType="{x:Type Slider}">
+        <Setter Property="Height" Value="24" />
+        <Setter Property="IsMoveToPointEnabled" Value="True" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource IslandFocusVisual}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type Slider}">
+                    <Grid Background="Transparent">
+                        <Track x:Name="PART_Track" VerticalAlignment="Center">
+                            <Track.DecreaseRepeatButton>
+                                <RepeatButton Command="Slider.DecreaseLarge" Focusable="False" IsTabStop="False">
+                                    <RepeatButton.Template>
+                                        <ControlTemplate TargetType="{x:Type RepeatButton}">
+                                            <Border Background="Transparent">
+                                                <Border Height="4" Background="{DynamicResource IslandAccentBrush}" CornerRadius="2" />
+                                            </Border>
+                                        </ControlTemplate>
+                                    </RepeatButton.Template>
+                                </RepeatButton>
+                            </Track.DecreaseRepeatButton>
+                            <Track.IncreaseRepeatButton>
+                                <RepeatButton Command="Slider.IncreaseLarge" Focusable="False" IsTabStop="False">
+                                    <RepeatButton.Template>
+                                        <ControlTemplate TargetType="{x:Type RepeatButton}">
+                                            <Border Background="Transparent">
+                                                <Border Height="4" Background="{StaticResource IslandTrackBrush}" CornerRadius="2" />
+                                            </Border>
+                                        </ControlTemplate>
+                                    </RepeatButton.Template>
+                                </RepeatButton>
+                            </Track.IncreaseRepeatButton>
+                            <Track.Thumb>
+                                <Thumb Width="16" Height="16" Focusable="False">
+                                    <Thumb.Template>
+                                        <ControlTemplate TargetType="{x:Type Thumb}">
+                                            <Grid>
+                                                <Ellipse Fill="{StaticResource IslandThumbBrush}" />
+                                                <Ellipse x:Name="Center" Width="10" Height="10" Fill="{DynamicResource IslandAccentBrush}" />
+                                            </Grid>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="Center" Property="Width" Value="12" />
+                                                    <Setter TargetName="Center" Property="Height" Value="12" />
+                                                </Trigger>
+                                                <Trigger Property="IsDragging" Value="True">
+                                                    <Setter TargetName="Center" Property="Width" Value="8" />
+                                                    <Setter TargetName="Center" Property="Height" Value="8" />
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Thumb.Template>
+                                </Thumb>
+                            </Track.Thumb>
+                        </Track>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.45" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- Text buttons: 28 tall, 10 sides, 12 text, at least 64 wide, 4px corners; a neutral white wash. -->
     <Style x:Key="IslandButtonStyle" TargetType="{x:Type Button}">
         <Setter Property="Height" Value="28" />

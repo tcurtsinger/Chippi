@@ -18,11 +18,12 @@ internal sealed class LevelBar : Grid
 {
     private readonly Border _fill = new() { Height = 4, CornerRadius = new CornerRadius(2), HorizontalAlignment = HorizontalAlignment.Left, Width = 0 };
 
-    public LevelBar()
+    /// <param name="island">In the island's colors, like its slider.</param>
+    public LevelBar(bool island = false)
     {
         var track = new Border { Height = 4, CornerRadius = new CornerRadius(2) };
-        track.SetResourceReference(Border.BackgroundProperty, "TrackRemainderBrush");
-        _fill.SetResourceReference(Border.BackgroundProperty, "AccentBrush");
+        track.SetResourceReference(Border.BackgroundProperty, island ? "IslandTrackBrush" : "TrackRemainderBrush");
+        _fill.SetResourceReference(Border.BackgroundProperty, island ? "IslandAccentBrush" : "AccentBrush");
         VerticalAlignment = VerticalAlignment.Center;
         Children.Add(track);
         Children.Add(_fill);
@@ -110,7 +111,7 @@ internal static class ProcessingUi
 
 /// <summary>Settings › Mic processing (mockup settings-mic-processing). Switches apply at once; levels are heard at once and saved after a pause.</summary>
 /// <summary>
-/// The Clean-up section of Settings › Microphone: the switch and levels, then each stage with its
+/// The Mic processing section of Settings › Microphone: the switch and levels, then each stage with its
 /// tuning dimmed while the stage is off. The mic is the one in use, picked above; a mic chosen here
 /// before shows until it is set back to that.
 /// </summary>
@@ -163,7 +164,7 @@ public sealed class ProcessingPage : UserControl
         var s = _module.Settings;
 
         var cleanup = RoutingUi.Card(
-            new SettingRow { Header = "Clean-up", Content = RoutingUi.Switch("Clean-up", s.Enabled, on => Run(_module.SetEnabledAsync(on))) },
+            new SettingRow { Header = "Mic processing", Content = RoutingUi.Switch("Mic processing", s.Enabled, on => Run(_module.SetEnabledAsync(on))) },
             new SettingRow { Header = "Level", Content = Meters() },
             new SettingRow { Header = "Noise suppression", Content = RoutingUi.Switch("Noise suppression", s.Suppression, on => Stages(x => x with { Suppression = on })) },
             new SettingRow { Header = "Noise gate", Content = RoutingUi.Switch("Noise gate", s.Gate, on => Stages(x => x with { Gate = on })) },
@@ -175,7 +176,7 @@ public sealed class ProcessingPage : UserControl
         if (s.Source != ProcessingSettings.PinnedSource)
             cleanup.Children.Add(new SettingRow { Header = "Input device", Content = SourcePicker() });
         _body.Children.Add(cleanup);
-        // Only what needs attention: a failure, or clean-up that stopped.
+        // Only what needs attention: a failure, or processing that stopped.
         if ((_module.Error ?? (_module.Status.State == ProcessingState.Stopped ? _module.StatusText : null)) is { } problem)
         {
             var text = RoutingUi.Text(problem, "CaptionTextStyle", "WarningTextBrush");
@@ -245,33 +246,35 @@ public sealed class ProcessingPage : UserControl
 }
 
 /// <summary>
-/// Mic processing's section of the Sound page (DESIGN.md §5 Island): the Clean-up switch, and while
-/// it runs a meter of the cleaned-up mic. A warning shows only when it failed or stopped.
+/// Mic processing's card on the Sound page (DESIGN.md §5 Island, revised 2026-10-28): one 44 row with
+/// the switch, and while it runs a meter of the processed mic after the label. A warning shows below
+/// the card only when it failed or stopped.
 /// </summary>
 public sealed class ProcessingQuickView : UserControl
 {
     private readonly MicProcessingModule _module;
-    private readonly ToggleButton _switch = new() { VerticalAlignment = VerticalAlignment.Center };
+    private readonly ToggleButton _switch = new();
     private readonly TextBlock _warning = RoutingUi.Text("", "CaptionTextStyle", "WarningTextBrush");
-    private readonly LevelBar _meter = new() { Margin = new Thickness(0, 10, 0, 0) };
+    private readonly LevelBar _meter = new(island: true) { Margin = new Thickness(10, 0, 10, 0) };
     private bool _refreshing;
 
     public ProcessingQuickView(MicProcessingModule module)
     {
         _module = module;
         _switch.SetResourceReference(StyleProperty, "SwitchStyle");
-        AutomationProperties.SetName(_switch, "Clean-up");
+        _switch.LayoutTransform = new System.Windows.Media.ScaleTransform(34 / 40d, 18 / 20d); // the island's 34 x 18 switch, from the 40 x 20 template
+        AutomationProperties.SetName(_switch, "Mic processing");
         _switch.Checked += (_, _) => Flip(true);
         _switch.Unchecked += (_, _) => Flip(false);
-        var label = RoutingUi.Text("Clean-up");
-        label.FontSize = 13;
-        label.VerticalAlignment = VerticalAlignment.Center;
-        DockPanel.SetDock(_switch, Dock.Right);
-        var row = new DockPanel { MinHeight = 36, Margin = new Thickness(10, 0, 6, 0), Children = { _switch, label } };
-        _warning.Margin = new Thickness(10, 2, 0, 0);
+        var label = RoutingUi.Text("Mic processing");
+        label.FontSize = 12;
+        DockPanel.SetDock(label, Dock.Left);
+        var glyph = new LucideIcon { Data = LucideIcons.AudioWaveform };
+        glyph.SetResourceReference(LucideIcon.BrushProperty, "IslandAccentBrush");
+        var card = RoutingUi.IslandCard(glyph, new DockPanel { Children = { label, _meter } }, _switch);
+        _warning.Margin = new Thickness(10, 4, 0, 0);
         AutomationProperties.SetLiveSetting(_warning, AutomationLiveSetting.Polite);
-        _meter.Margin = new Thickness(10, 6, 10, 0);
-        Content = new StackPanel { Children = { row, _warning, _meter } };
+        Content = new StackPanel { Children = { card, _warning } };
         ProcessingUi.Meter(this, module, readings => _meter.Level = ProcessingUi.MeterFill(readings.ProcessingOutput));
         Loaded += (_, _) => { _module.Changed += Refresh; Refresh(); };
         Unloaded += (_, _) => _module.Changed -= Refresh;
@@ -293,6 +296,7 @@ public sealed class ProcessingQuickView : UserControl
             _switch.IsChecked = _module.Settings.Enabled;
             _warning.Text = _module.Error ?? (_module.Status.State == ProcessingState.Stopped ? _module.StatusText : "");
             _warning.Visibility = _warning.Text.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
+            SoundColumn.SetWarning(this, _warning.Text.Length > 0);
             _meter.Visibility = _module.Status.State == ProcessingState.Live ? Visibility.Visible : Visibility.Collapsed;
         }
         finally { _refreshing = false; }
