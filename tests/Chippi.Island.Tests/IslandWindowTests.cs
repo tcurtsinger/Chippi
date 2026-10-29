@@ -78,18 +78,6 @@ public sealed class IslandWindowTests
             Hover(window, Mouse.MouseLeaveEvent);
             Assert.Same(fade, window.Song.OpacityMask);
 
-            // Reduced motion turned on while it scrolls: it holds at once.
-            var motion = Chippi.UI.Themes.Motion.Override;
-            try
-            {
-                Chippi.UI.Themes.Motion.Override = true;
-                Assert.Equal(Visibility.Collapsed, window.SongCopy.Visibility);
-            }
-            finally
-            {
-                Chippi.UI.Themes.Motion.Override = motion;
-            }
-
             media.Sessions = [Track("Creep")];
             media.Raise();
             Assert.Equal(Visibility.Collapsed, window.SongCopy.Visibility); // fits: holds still
@@ -264,7 +252,7 @@ public sealed class IslandWindowTests
         }));
     }
     /// <summary>A real tab window on the primary display (no-activate, so it takes no focus), closed afterwards.</summary>
-    private static void WithShownIsland(Action<IslandWindow> test)
+    internal static void WithShownIsland(Action<IslandWindow> test)
     {
         var window = new IslandWindow();
         try
@@ -305,5 +293,44 @@ public sealed class IslandWindowTests
                 Thread.Sleep(10);
         }
         while (DateTime.UtcNow < until);
+    }
+}
+
+/// <summary>
+/// Tests that change reduced motion, a process-wide setting, run alone after the rest: island tests
+/// share one UI thread and interleave, and the change reaches every window and Settings page open.
+/// </summary>
+[CollectionDefinition("ReducedMotion", DisableParallelization = true)]
+public sealed class ReducedMotionCollection;
+
+[Collection("ReducedMotion")]
+public sealed class IslandMotionTests
+{
+    [Fact]
+    public void Reduced_motion_turned_on_while_a_song_scrolls_holds_it_at_once()
+    {
+        var motion = Chippi.UI.Themes.Motion.Override;
+        WpfTestThread.Run(() => IslandWindowTests.WithShownIsland(window =>
+        {
+            try
+            {
+                Chippi.UI.Themes.Motion.Override = false;
+                window.SetMedia(new IslandPanelTests.FakeMedia
+                {
+                    Sessions = [new("spotify", "Spotify", "Everything In Its Right Place (Live at the Ancient Theatre)", "Radiohead",
+                        true, true, true, true, true, true, TimeSpan.Zero, TimeSpan.FromMinutes(4), DateTimeOffset.Now, null)],
+                });
+                window.SetActivities([new Chippi.Core.Island.IslandActivity("track", Chippi.Core.Island.IslandActivityKind.Media, "Everything", "Spotify")], Chippi.App.Pet.PetMood.Idle);
+                Assert.Equal(Visibility.Visible, window.SongCopy.Visibility); // too long: it scrolls
+                Chippi.UI.Themes.Motion.Override = true;
+                Assert.Equal(Visibility.Collapsed, window.SongCopy.Visibility); // holds at once
+                Chippi.UI.Themes.Motion.Override = false;
+                Assert.Equal(Visibility.Visible, window.SongCopy.Visibility); // and scrolls again
+            }
+            finally
+            {
+                Chippi.UI.Themes.Motion.Override = motion;
+            }
+        }));
     }
 }
