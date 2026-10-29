@@ -116,7 +116,7 @@ public sealed class SettingsPageTests
     });
 
     [Fact]
-    public void Capability_discovery_releases_its_watch_and_settings_unload_detaches() => WpfTestThread.Run(() =>
+    public void Capability_discovery_keeps_only_disks_live_and_settings_unload_detaches() => WpfTestThread.Run(() =>
     {
         string root = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "chippi-settings-" + Guid.NewGuid().ToString("N"));
         var config = new Chippi.Core.Config.ConfigStore(System.IO.Path.Combine(root, "settings.json"));
@@ -139,14 +139,14 @@ public sealed class SettingsPageTests
             timer.Tick += (_, _) =>
             {
                 timedOut = elapsed.Elapsed > TimeSpan.FromSeconds(5);
-                if (module.Sampler!.Need == SensorNeed.None || timedOut) frame.Continue = false;
+                if (module.Sampler!.Need == SensorNeed.Disks || timedOut) frame.Continue = false;
             };
             page.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));
             timer.Start();
             System.Windows.Threading.Dispatcher.PushFrame(frame);
             timer.Stop();
             Assert.False(timedOut);
-            Assert.Equal(SensorNeed.None, module.Sampler!.Need);
+            Assert.Equal(SensorNeed.Disks, module.Sampler!.Need);
             Assert.Equal(0, fake.CpuReads);
             Assert.Equal(0, fake.NetworkReads);
             Assert.False(Control<ToggleButton>(page, "GPU temperature").IsEnabled);

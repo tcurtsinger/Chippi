@@ -34,11 +34,11 @@ public sealed class PageTests
             Battery = new(ReadingStatus.Ok, battery, At),
         };
 
-    // Headline values use the Reading role, 20 DIP.
+    // The table values use 12 DIP semibold tabular figures.
     private static List<string> Headlines(DependencyObject root)
     {
         var found = new List<string>();
-        if (root is TextBlock { FontSize: 20, Text.Length: > 0 } text)
+        if (root is TextBlock { FontSize: 12, FontWeight: var weight, Text.Length: > 0 } text && weight == FontWeights.SemiBold)
             found.Add(text.Text);
         foreach (var child in LogicalTreeHelper.GetChildren(root).OfType<DependencyObject>())
             found.AddRange(Headlines(child));
@@ -59,7 +59,7 @@ public sealed class PageTests
                 {
                     view.Show(Snapshot(ReadingStatus.Ok, new CpuReading(25, 4, null), new GpuReading("dGPU", "RTX", Load: 31),
                         new BatteryReading(BatteryState.OnBattery, 50, null, null)));
-                    Assert.Equal(["25%", "50%", "31%"], Headlines(view));
+                    Assert.Equal(["25%", "31%", "50%"], Headlines(view));
 
                     view.Show(Snapshot(ReadingStatus.Pending, null, new GpuReading("dGPU", "RTX", TemperatureC: 50),
                         new BatteryReading(BatteryState.OnBattery, null, null, null)));
@@ -67,7 +67,7 @@ public sealed class PageTests
 
                     view.Show(Snapshot(ReadingStatus.Unavailable, null, new GpuReading("dGPU", "RTX", Load: 7),
                         new BatteryReading(BatteryState.Charging, 51, null, null)));
-                    Assert.Equal(["51%", "7%"], Headlines(view));
+                    Assert.Equal(["7%", "51%"], Headlines(view));
                 }
                 finally { module.StopAsync(default).GetAwaiter().GetResult(); }
             });

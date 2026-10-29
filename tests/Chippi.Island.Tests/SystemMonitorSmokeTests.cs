@@ -66,14 +66,9 @@ public sealed class SystemMonitorSmokeTests(ITestOutputHelper output)
             Until(() => AutomationProperties.GetName(Assert.IsType<IslandGrid>(((ContentControl)panel.FindName("Page")).Content).Buttons().Single(b => (string)b.Tag == "system-monitor")).Contains("CPU 25%"));
             button = Assert.IsType<IslandGrid>(((ContentControl)panel.FindName("Page")).Content).Buttons().Single(b => (string)b.Tag == "system-monitor");
             button.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
-            Until(() => Find<Button>((DependencyObject)((ContentControl)panel.FindName("Page")).Content)
-                .Any(b => AutomationProperties.GetName(b) == "32 logical processors"));
             Assert.Equal("system-monitor", panel.CurrentPage);
             Assert.False(tile.OnScreen);
             var page = (FrameworkElement)((ContentControl)panel.FindName("Page")).Content;
-            var processors = Find<Button>(page).Single(b => AutomationProperties.GetName(b) == "32 logical processors");
-            processors.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
-            Until(() => module.Sampler!.Latest.Cpu.Value?.PerProcessor?.Count == 32);
             IslandPanelTests.Pump(TimeSpan.FromMilliseconds(400));
             var shape = (FrameworkElement)panel.FindName("Shape");
             Assert.Equal((520, 360), (shape.Width, shape.Height)); // one size, whatever the page holds
@@ -90,7 +85,7 @@ public sealed class SystemMonitorSmokeTests(ITestOutputHelper output)
             Assert.InRange(footprint.Bottom, 0, 672);
 
             Assert.Contains(Find<TextBlock>(page), b => b.Text.Contains("C:"));
-            if (disks == 5) Assert.Contains(Find<TextBlock>(page), b => b.Text.Contains("G:"));
+            if (disks == 5 && !laptop) Assert.Contains(Find<TextBlock>(page), b => b.Text.Contains("G:"));
 
             // Use the actual Settings factory and controls, then return to the grid.
             config = Assert.IsAssignableFrom<FrameworkElement>(ui.SettingsFactory!(null));
@@ -101,7 +96,7 @@ public sealed class SystemMonitorSmokeTests(ITestOutputHelper output)
             var status = Find<ComboBox>(config).Single(c => AutomationProperties.GetName(c) == "Tile status");
             status.SelectedIndex = 1;
             Assert.Equal((5, TileStatus.Memory), (settings.Value.UpdateSeconds, settings.Value.TileStatus));
-            Assert.Equal("Last 10 min", tile.PageNote);
+            Assert.Equal("", tile.PageNote);
             config.RaiseEvent(new RoutedEventArgs(FrameworkElement.UnloadedEvent));
             config = null;
             panel.ShowPage(null);

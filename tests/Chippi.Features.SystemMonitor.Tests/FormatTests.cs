@@ -44,21 +44,8 @@ public sealed class FormatTests : IDisposable
         Assert.Equal("9.6 Mbps", Format.Rate(9_600_000 / 8.0, NetworkUnit.Bits));
     }
 
-    [Theory]
-    [InlineData(1.5 * 1024 * 1024, "2 MiB/s")]
-    [InlineData(300 * 1024, "500 KiB/s")]
-    [InlineData(0, "1 KiB/s")]
-    [InlineData(40 * 1024 * 1024, "50 MiB/s")]
-    public void A_network_graph_scales_to_a_round_maximum(double peak, string label)
-    {
-        double max = Format.RateScale(peak, NetworkUnit.Bytes);
-
-        Assert.True(max >= peak);
-        Assert.Equal(label, Format.RateLabel(max, NetworkUnit.Bytes));
-    }
-
     [Fact]
-    public void Temperatures_clock_fan_battery_and_span()
+    public void Temperatures_clock_fan_and_battery()
     {
         Assert.Equal("58 °C", Format.Temperature(58.2, TemperatureUnit.Celsius));
         Assert.Equal("136 °F", Format.Temperature(58, TemperatureUnit.Fahrenheit));
@@ -67,8 +54,5 @@ public sealed class FormatTests : IDisposable
         Assert.Equal("11.8 W", Format.Watts(-11.8));
         Assert.Equal("2 hr 40 min left", Format.TimeLeft(TimeSpan.FromMinutes(160)));
         Assert.Equal("35 min left", Format.TimeLeft(TimeSpan.FromMinutes(35)));
-        Assert.Equal("Last 4 min", Format.Span(TimeSpan.FromSeconds(2)));
-        Assert.Equal("Last 2 min", Format.Span(TimeSpan.FromSeconds(1)));
-        Assert.Equal("Last 10 min", Format.Span(TimeSpan.FromSeconds(5)));
     }
 }
