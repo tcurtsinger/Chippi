@@ -85,13 +85,17 @@ public partial class SettingsWindow : Window
     private FrameworkElement? _pageView; // the current page's view, kept while search results show
     private const string ModulePrefix = "module:";
 
-    public SettingsWindow(ShellContext shell, string page)
+    /// <param name="remembered">The page is the one Settings last closed on: if it has gone since, open the first page.</param>
+    public SettingsWindow(ShellContext shell, string page, bool remembered = false)
     {
         _shell = shell;
         _logger = shell.LoggerFactory.CreateLogger<SettingsWindow>();
         InitializeComponent();
         RestorePlacement(SettingsUi.ReadApp(shell.Config).SettingsWindow);
         RefreshFeatures();
+        string request = page;
+        if (remembered && Find(ref request) is null)
+            page = "";
         Navigate(page);
         _shell.Registry.Changed += OnRegistryChanged;
         SourceInitialized += (_, _) =>
@@ -197,17 +201,23 @@ public partial class SettingsWindow : Window
         NavigateNow(page);
     }
 
-    private void NavigateNow(string page)
+    /// <summary>The sidebar page a request opens, or null when it isn't there; a feature on a shared page (Sound's) is opened there.</summary>
+    private SettingsPageInfo? Find(ref string page)
     {
         string baseId = page.Split('/')[0];
         var target = NavigationPages.FirstOrDefault(p => p.Id.Equals(baseId, StringComparison.OrdinalIgnoreCase));
-        // A feature on a shared page (Sound's) is opened there.
         if (target is null && baseId.StartsWith(ModulePrefix, StringComparison.OrdinalIgnoreCase)
             && SharedFor(baseId[ModulePrefix.Length..], page.Contains('/') ? page[(page.IndexOf('/') + 1)..] : null) is { } sharedId)
         {
             target = NavigationPages.FirstOrDefault(p => p.Id == sharedId);
             page = sharedId;
         }
+        return target;
+    }
+
+    private void NavigateNow(string page)
+    {
+        var target = Find(ref page);
         if (target is null)
         {
             if (page.Length > 0)
@@ -509,12 +519,13 @@ public partial class SettingsWindow : Window
     private void SavePlacement()
     {
         var bounds = RestoreBounds;
-        if (bounds.IsEmpty)
-            return;
         bool maximized = WindowState == WindowState.Maximized;
-        SettingsUi.SaveApp(_shell.Config, s => s.SettingsWindow = new WindowPlacement
+        SettingsUi.SaveApp(_shell.Config, s =>
         {
-            Left = bounds.Left, Top = bounds.Top, Width = bounds.Width, Height = bounds.Height, Maximized = maximized,
+            var saved = s.SettingsWindow ??= new WindowPlacement();
+            saved.Page = _currentPage;
+            if (!bounds.IsEmpty) // a window never shown keeps the bounds saved before
+                (saved.Left, saved.Top, saved.Width, saved.Height, saved.Maximized) = (bounds.Left, bounds.Top, bounds.Width, bounds.Height, maximized);
         });
     }
 
