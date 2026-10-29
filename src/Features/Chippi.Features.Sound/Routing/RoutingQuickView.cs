@@ -5,6 +5,7 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using System.Windows.Media;
 using System.Windows.Shapes;
 using Chippi.Audio;
@@ -13,21 +14,26 @@ using Chippi.UI.Controls;
 namespace Chippi.Features.Sound.Routing;
 
 /// <summary>
-/// Routing's sections of the Sound page (DESIGN.md §5 Island). Output: the device in use with the
-/// system volume and mute, then every connected output. Microphone: every connected mic. A pick
-/// always works and moves the device to the top of its priority list; unplugged devices are only in
-/// Settings.
+/// Routing's sections of the Sound page (DESIGN.md §5 Island, revised 2026-10-28). Output: the system
+/// volume and mute, then the connected outputs. Microphone: the connected mics. Rows are one line; a
+/// pick always works and moves the device to the top of its priority list. Rows that don't fit the
+/// column, and unplugged devices, are only in Settings.
 /// </summary>
 public sealed class RoutingQuickView : UserControl
 {
+    /// <summary>The rows that fit under the Output card, and above the Mic processing card (fixed-size f1).</summary>
+    internal const int OutputRows = 7, MicrophoneRows = 5;
+
     private readonly AudioRoutingModule _module;
     private readonly AudioFlow _flow;
     private readonly StackPanel _rows = new();
     private readonly TextBlock _error = RoutingUi.Text("", "CaptionTextStyle", "WarningTextBrush");
-    private readonly TextBlock _output = new() { FontSize = 13, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center };
-    private readonly IconButton _mute = new() { Width = 28, Height = 28 };
+    private readonly LucideIcon _glyph = new();
+    private readonly TextBlock _none = new() { Text = "No output", FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
+    private readonly Button _mute;
     private readonly Slider _volume = new() { Minimum = 0, Maximum = 100, SmallChange = 5, LargeChange = 10, IsMoveToPointEnabled = true, VerticalAlignment = VerticalAlignment.Center };
-    private readonly TextBlock _percent = new() { FontSize = 12, Width = 40, TextAlignment = TextAlignment.Right, VerticalAlignment = VerticalAlignment.Center };
+    private readonly TextBlock _percent = new() { FontSize = 12, Width = 34, TextAlignment = TextAlignment.Right, VerticalAlignment = VerticalAlignment.Center };
+    private readonly DockPanel _levels = new();
     private string _shape = "";
     private bool _refreshing;
 
@@ -35,11 +41,19 @@ public sealed class RoutingQuickView : UserControl
     {
         _module = module;
         _flow = flow;
+        _mute = RoutingUi.IslandButton("Mute", () =>
+        {
+            if (_module.InUse(AudioFlow.Render) is { } id)
+                Run(_module.SetOutputMutedAsync(id, !Level(id).Muted));
+        });
         var root = new StackPanel();
         if (flow == AudioFlow.Render)
+        {
             root.Children.Add(OutputCard());
+            _rows.Margin = new Thickness(0, 8, 0, 0);
+        }
         root.Children.Add(_rows);
-        _error.Margin = new Thickness(2, 6, 0, 0);
+        _error.Margin = new Thickness(10, 4, 0, 0);
         AutomationProperties.SetLiveSetting(_error, AutomationLiveSetting.Polite);
         root.Children.Add(_error);
         Content = root;
@@ -48,20 +62,9 @@ public sealed class RoutingQuickView : UserControl
         Refresh();
     }
 
-    /// <summary>The output in use, its mute and the system volume, which sets that output.</summary>
+    /// <summary>One 44 row, like the mic card: the speaker, the system volume of the output in use, and Mute.</summary>
     private Border OutputCard()
     {
-        var glyph = new LucideIcon { Data = LucideIcons.Speaker, Size = 16, Margin = new Thickness(0, 0, 10, 0), VerticalAlignment = VerticalAlignment.Center };
-        glyph.SetResourceReference(LucideIcon.BrushProperty, "IslandAccentBrush");
-        _mute.Click += (_, _) =>
-        {
-            if (_module.InUse(AudioFlow.Render) is { } id)
-                Run(_module.SetOutputMutedAsync(id, !Level(id).Muted));
-        };
-        DockPanel.SetDock(glyph, Dock.Left);
-        DockPanel.SetDock(_mute, Dock.Right);
-        var top = new DockPanel { Children = { glyph, _mute, _output } };
-
         _volume.SetResourceReference(StyleProperty, "HopperSliderStyle");
         AutomationProperties.SetName(_volume, "System volume");
         _volume.ValueChanged += (_, e) =>
@@ -71,19 +74,26 @@ public sealed class RoutingQuickView : UserControl
                 Run(_module.SetOutputVolumeAsync(id, (float)e.NewValue / 100));
         };
         _percent.SetResourceReference(TextBlock.ForegroundProperty, "IslandTextTertiaryBrush");
+        Typography.SetNumeralAlignment(_percent, FontNumeralAlignment.Tabular);
+        _percent.Margin = new Thickness(6, 0, 0, 0);
         DockPanel.SetDock(_percent, Dock.Right);
-        var levels = new DockPanel { Margin = new Thickness(0, 8, 0, 0), Children = { _percent, _volume } };
-
-        var card = new Border { Child = new StackPanel { Children = { top, levels } }, Margin = new Thickness(0, 0, 0, 6) };
-        card.SetResourceReference(StyleProperty, "IslandCardStyle");
-        return card;
+        _levels.Children.Add(_percent);
+        _levels.Children.Add(_volume);
+        _none.SetResourceReference(TextBlock.ForegroundProperty, "IslandTextTertiaryBrush");
+        return RoutingUi.IslandCard(_glyph, new Grid { Children = { _levels, _none } }, _mute);
     }
 
     private (float Volume, bool Muted) Level(string id) =>
         _module.Snapshot.Levels.TryGetValue(id, out var level) ? (level.Volume, level.Muted) : (0, false);
 
-    private void ShowPercent() =>
-        _percent.Text = _module.InUse(AudioFlow.Render) is { } id && Level(id).Muted ? "Muted" : $"{Math.Round(_volume.Value).ToString(CultureInfo.CurrentCulture)}%";
+    private bool OutputMuted() => _module.InUse(AudioFlow.Render) is { } id && Level(id).Muted;
+
+    private void ShowPercent()
+    {
+        bool muted = OutputMuted();
+        _percent.Text = muted ? "Muted" : $"{Math.Round(_volume.Value).ToString(CultureInfo.CurrentCulture)}%";
+        _percent.SetResourceReference(TextBlock.ForegroundProperty, muted ? "WarningTextBrush" : "IslandTextTertiaryBrush");
+    }
 
     private void Refresh()
     {
@@ -93,54 +103,58 @@ public sealed class RoutingQuickView : UserControl
         {
             var inUse = _module.InUse(_flow);
             var connected = _module.Settings.For(_flow).Devices.Where(e => _module.Snapshot.Find(e.Id)?.IsActive == true).ToList();
-            var shape = string.Join("|", connected.Select(e => e.Id + e.Name)) + ":" + inUse;
+            _error.Text = _module.Error ?? "";
+            _error.Visibility = _error.Text.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
+            // Whole rows only: an error line takes one row's place.
+            int fit = (_flow == AudioFlow.Render ? OutputRows : MicrophoneRows) - (_error.Text.Length == 0 ? 0 : 1);
+            var shown = connected.Take(fit).ToList();
+            var shape = string.Join("|", shown.Select(e => e.Id + e.Name)) + ":" + inUse;
             if (shape != _shape)
             {
                 _shape = shape;
                 _rows.Children.Clear();
-                foreach (var entry in connected)
+                foreach (var entry in shown)
                     _rows.Children.Add(Row(entry, string.Equals(entry.Id, inUse, StringComparison.OrdinalIgnoreCase)));
-                if (connected.Count == 0)
-                {
-                    var none = RoutingUi.Text("None connected", "CaptionTextStyle", "IslandTextTertiaryBrush");
-                    none.Margin = new Thickness(2, 4, 0, 4);
-                    _rows.Children.Add(none);
-                }
             }
+            _rows.Visibility = shown.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
             if (_flow == AudioFlow.Render)
-            {
-                _output.Text = _module.CurrentName(AudioFlow.Render);
-                bool known = inUse is not null && _module.Snapshot.Levels.ContainsKey(inUse);
-                var (volume, muted) = inUse is null ? (0f, false) : Level(inUse);
-                _volume.IsEnabled = _mute.IsEnabled = known;
-                if (!_volume.IsMouseCaptureWithin && !_volume.IsKeyboardFocusWithin)
-                    _volume.Value = volume * 100;
-                ShowPercent();
-                _mute.Icon = muted ? LucideIcons.VolumeMuted : LucideIcons.Volume;
-                _mute.ToolTip = muted ? "Unmute" : "Mute";
-                AutomationProperties.SetName(_mute, muted ? "Unmute system volume" : "Mute system volume");
-            }
-            _error.Text = _module.Error ?? "";
-            _error.Visibility = _error.Text.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
+                RefreshOutput(inUse);
+            else // the mic card above says when there's no microphone; nothing shows here then
+                Visibility = shown.Count == 0 && _error.Text.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
         }
         finally { _refreshing = false; }
     }
 
-    /// <summary>A connected device: a radio, its name and state. Picking it makes it the one in use.</summary>
+    private void RefreshOutput(string? inUse)
+    {
+        bool none = _module.Snapshot.Find(inUse ?? "") is null;
+        bool known = inUse is not null && _module.Snapshot.Levels.ContainsKey(inUse);
+        var (volume, muted) = inUse is null ? (0f, false) : Level(inUse);
+        _levels.Visibility = none ? Visibility.Collapsed : Visibility.Visible;
+        _none.Visibility = none ? Visibility.Visible : Visibility.Collapsed;
+        _volume.IsEnabled = _mute.IsEnabled = known && !none;
+        if (!_volume.IsMouseCaptureWithin && !_volume.IsKeyboardFocusWithin)
+            _volume.Value = volume * 100;
+        ShowPercent();
+        _glyph.Data = muted || none ? LucideIcons.VolumeMuted : LucideIcons.Speaker;
+        _glyph.SetResourceReference(LucideIcon.BrushProperty, none ? "IslandTextTertiaryBrush" : muted ? "WarningBrush" : "IslandAccentBrush");
+        _mute.Content = muted ? "Unmute" : "Mute";
+        AutomationProperties.SetName(_mute, muted ? "Unmute system volume" : "Mute system volume");
+    }
+
+    /// <summary>A connected device on one line: a radio and its name. Picking it makes it the one in use.</summary>
     private Button Row(PriorityEntry entry, bool selected)
     {
         var radio = new Ellipse
         {
-            Width = 16, Height = 16, StrokeThickness = selected ? 5 : 1, Margin = new Thickness(0, 0, 10, 0),
+            Width = 14, Height = 14, StrokeThickness = selected ? 4 : 1, Margin = new Thickness(1, 0, 11, 0),
             VerticalAlignment = VerticalAlignment.Center, Fill = selected ? Brushes.Black : Brushes.Transparent,
         };
         radio.SetResourceReference(Shape.StrokeProperty, selected ? "IslandAccentBrush" : "IslandTextTertiaryBrush");
-        var name = new TextBlock { Text = entry.Name, FontSize = 13, TextTrimming = TextTrimming.CharacterEllipsis };
-        var state = RoutingUi.Text(_module.Status(_flow, entry), "CaptionTextStyle", "IslandTextTertiaryBrush");
+        var name = new TextBlock { Text = entry.Name, FontSize = 12, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center };
         DockPanel.SetDock(radio, Dock.Left);
-        var content = new DockPanel { Children = { radio, new StackPanel { VerticalAlignment = VerticalAlignment.Center, Children = { name, state } } } };
-        var button = new Button { Content = content, ToolTip = entry.Name, Tag = selected ? "Selected" : null };
-        button.SetResourceReference(StyleProperty, "IslandRowButtonStyle");
+        var button = new Button { Content = new DockPanel { Children = { radio, name } }, ToolTip = entry.Name, Tag = selected ? "Selected" : null };
+        button.SetResourceReference(StyleProperty, "IslandListRowStyle");
         AutomationProperties.SetName(button, selected ? $"{entry.Name}, in use" : $"Use {entry.Name}");
         button.Click += (_, _) =>
         {

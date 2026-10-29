@@ -95,6 +95,40 @@ public sealed class RoutingUiTests
         await f.Audio.RefreshAsync();
         Assert.Equal("A", f.System.DefaultOf(AudioFlow.Render, AudioRole.Multimedia));
     }
+    [Fact]
+    public async Task Sound_rows_are_one_line_and_only_the_rows_that_fit_show()
+    {
+        await using var f = new RoutingFixture();
+        f.System.With([.. Enumerable.Range(1, 9).Select(i => Speaker($"S{i}")), .. Enumerable.Range(1, 7).Select(i => Mic($"M{i}"))]).WithDefault("S1").WithDefault("M1");
+        await f.Start();
+        await Sta(() =>
+        {
+            foreach (var (flow, fit) in new[] { (AudioFlow.Render, 7), (AudioFlow.Capture, 5) })
+            {
+                var view = new RoutingQuickView(f.Module, flow);
+                var rows = Descendants(view).OfType<System.Windows.Controls.Button>().Where(b => b.Tag is "Selected" || AutomationProperties.GetName(b).StartsWith("Use ", StringComparison.Ordinal)).ToList();
+                Assert.Equal(fit, rows.Count); // the rest are in Settings
+                Assert.All(rows, row => Assert.Single(Descendants(row).OfType<System.Windows.Controls.TextBlock>())); // the name only, no state line
+            }
+        });
+    }
+
+    [Fact]
+    public async Task No_output_hides_the_slider_and_disables_mute()
+    {
+        await using var f = new RoutingFixture();
+        f.System.With(Mic("M")).WithDefault("M");
+        await f.Start();
+        await Sta(() =>
+        {
+            var view = new RoutingQuickView(f.Module, AudioFlow.Render);
+            Assert.Equal(Visibility.Visible, Descendants(view).OfType<System.Windows.Controls.TextBlock>().Single(t => t.Text == "No output").Visibility);
+            Assert.Equal(Visibility.Collapsed, ((FrameworkElement)Descendants(view).OfType<System.Windows.Controls.Slider>().Single().Parent).Visibility);
+            Assert.False(Descendants(view).OfType<System.Windows.Controls.Button>().Single(b => AutomationProperties.GetName(b) == "Mute system volume").IsEnabled);
+            Assert.DoesNotContain(Descendants(view).OfType<System.Windows.Controls.Button>(), b => AutomationProperties.GetName(b).StartsWith("Use ", StringComparison.Ordinal));
+        });
+    }
+
     private static IEnumerable<DependencyObject> Descendants(DependencyObject root)
     {
         yield return root;

@@ -12,6 +12,7 @@ using Chippi.App.Pet;
 using Chippi.Core.Config;
 using Chippi.Features.Sound;
 using Chippi.Features.Sound.Volume;
+using static Chippi.Audio.Tests.FakeDeviceSystem;
 
 namespace Chippi.SoundSmoke;
 
@@ -56,6 +57,59 @@ public sealed class SoundPageShots
                     await Task.Delay(500);
                     Save(panel, work, Path.Combine(folder, $"sound-{name}-{key}.png"));
                 }
+            }
+            finally { panel.Close(); }
+        }
+    });
+
+    /// <summary>The Sound page's states (fixed-size f1 and ps2, sound-monitor sound.png) on the top edge.</summary>
+    [Fact]
+    public Task RenderStates() => SmokeDispatcher.Run(async () =>
+    {
+        if (Environment.GetEnvironmentVariable("CHIPPI_ISLAND_SHOTS") is not { Length: > 0 } folder)
+            return;
+        Directory.CreateDirectory(folder);
+        string[] outputs = ["Speakers (INZONE Buds - Game)", "Headphones (RØDE VideoMic GO II)", "LG ULTRAGEAR (NVIDIA High Definition Audio)", "Speakers (Steam Streaming Speakers)", "Digital Output (S/PDIF)", "Headphones (Xbox Wireless Headset)", "Speakers (Realtek USB2.0 Audio)"];
+        string[] mics = ["Headset Microphone (INZONE Buds - Chat)", "Microphone (Steam Streaming Microphone)", "Microphone (Xbox Wireless Headset)", "Line In (Realtek USB2.0 Audio)", "Microphone (Webcam)"];
+        foreach (var (name, arrange) in new (string, Func<SoundScene, Task>)[]
+        {
+            ("muted", async s =>
+            {
+                await s.Routing.SetOutputMutedAsync("speakers", true);
+                await s.Mute.ToggleAsync();
+                await s.Processing.SetEnabledAsync(true);
+            }),
+            ("crowded", s =>
+            {
+                s.Devices.With([.. outputs.Select((n, i) => Speaker($"out{i}", n)), .. mics.Select((n, i) => Mic($"mic{i}", n))]);
+                return s.Audio.RefreshAsync();
+            }),
+            ("no-mic", s =>
+            {
+                s.Devices.Remove("desk", "CableOut");
+                return s.Audio.RefreshAsync();
+            }),
+        })
+        {
+            await using var scene = new SoundScene();
+            await scene.Start();
+            await arrange(scene);
+            await Task.Delay(300);
+            var work = new Rect(-20000, 0, 1920, 1032);
+            var panel = new IslandPanelWindow();
+            try
+            {
+                panel.Initialize();
+                panel.SetMedia(new FakeMedia());
+                panel.SetTiles(Chippi.Core.Modules.IslandTileContribution.Group(scene.Shell.Registry.Features.SelectMany(e => e.IslandTiles)));
+                panel.SetActivities(scene.Shell.Island.Activities, PetMood.Idle);
+                panel.SetLastPage(null);
+                panel.Open(IslandEdge.Top, new Rect(-20000 + 960 - 68, 0, 136, 36), new MonitorArea(default, new Rect(-20000, 0, 1920, 1080), work, 1));
+                await Task.Delay(500);
+                Save(panel, work, Path.Combine(folder, $"sound-top-grid-{name}.png"));
+                panel.ShowPage(SoundTile.Key);
+                await Task.Delay(500);
+                Save(panel, work, Path.Combine(folder, $"sound-top-sound-{name}.png"));
             }
             finally { panel.Close(); }
         }

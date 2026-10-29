@@ -30,6 +30,29 @@ internal static class RoutingUi
         return button;
     }
 
+    /// <summary>A text button on the Sound page: 28 tall and at least 64 wide, so the cards' buttons line up.</summary>
+    public static Button IslandButton(string text, Action clicked)
+    {
+        var button = Button(text, clicked);
+        button.SetResourceReference(FrameworkElement.StyleProperty, "IslandButtonStyle");
+        button.Margin = new Thickness(8, 0, 0, 0);
+        return button;
+    }
+
+    /// <summary>A 44 tall card on the Sound page: a 16 glyph, then <paramref name="middle"/>, then <paramref name="right"/>.</summary>
+    public static Border IslandCard(LucideIcon glyph, UIElement middle, FrameworkElement right)
+    {
+        glyph.Size = 16;
+        glyph.Margin = new Thickness(0, 0, 10, 0);
+        glyph.VerticalAlignment = VerticalAlignment.Center;
+        right.VerticalAlignment = VerticalAlignment.Center;
+        DockPanel.SetDock(glyph, Dock.Left);
+        DockPanel.SetDock(right, Dock.Right);
+        var card = new Border { Child = new DockPanel { Children = { glyph, right, middle } } };
+        card.SetResourceReference(FrameworkElement.StyleProperty, "IslandControlCardStyle");
+        return card;
+    }
+
     public static ToggleButton Switch(string name, bool on, Action<bool> changed)
     {
         var toggle = new ToggleButton { IsChecked = on, Content = on ? "On" : "Off" };

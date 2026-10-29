@@ -27,6 +27,7 @@ public sealed class ProcessingFixture : IAsyncDisposable
     public MemorySettings<ProcessingSettings> Settings { get; } = new();
     public RoutingNotifier Notices { get; } = new();
     public RoutingUiFake Ui { get; } = new();
+    public IslandActivityHub Hub { get; } = new();
     public FakeSetup Setup { get; } = new();
     public string Data { get; } = Path.Combine(Path.GetTempPath(), "chippi-s3-tests", Guid.NewGuid().ToString("N"));
     public List<PriorityEntry> Pinned { get; } = [];
@@ -40,7 +41,7 @@ public sealed class ProcessingFixture : IAsyncDisposable
     public string MarkerPath => Path.Combine(Data, MicProcessingModule.MarkerFile);
 
     public Task Start() => Module.StartAsync(new ModuleContext(MicProcessingModule.Id, Settings, NullLogger.Instance,
-        new IslandActivityHub().CreatePublisher(MicProcessingModule.Id), Ui) { Notifier = Notices, DataDirectory = Data }, CancellationToken.None);
+        Hub.CreatePublisher(MicProcessingModule.Id), Ui) { Notifier = Notices, DataDirectory = Data }, CancellationToken.None);
 
     public async ValueTask DisposeAsync()
     {
@@ -84,7 +85,7 @@ public sealed class ProcessingModuleTests
         Assert.Equal("Real", f.System.DefaultOf(AudioFlow.Capture, AudioRole.Multimedia));
         var tile = Assert.Single(f.Ui.Tiles);
         Assert.Equal((SoundTile.Key, SoundTile.Microphone, 30, 10), (tile.Spec.Key, tile.Spec.Column, tile.Spec.SectionOrder, tile.Spec.StatusPriority));
-        Assert.Equal("", tile.Status); // the Sound tile shows the output until clean-up stops
+        Assert.Equal("", tile.Status); // the Sound tile shows the output until Mic processing stops
     }
 
     [Fact]
@@ -156,6 +157,13 @@ public sealed class ProcessingModuleTests
         Assert.Equal("Stopped · No driver", f.Module.StatusText);
         Assert.Equal("Real", f.System.DefaultOf(AudioFlow.Capture, AudioRole.Multimedia));
         Assert.True(f.Settings.Value.Enabled); // the switch stays; status says what's real
+        Assert.Equal("Mic stopped", f.Ui.Tiles[0].Status);
+        var stopped = Assert.Single(f.Hub.Activities); // the Sound tile shows it in Caution
+        Assert.Equal((true, SoundTile.Key), (stopped.NeedsAttention, stopped.TileKey));
+
+        await f.Module.SetEnabledAsync(false);
+        Assert.Equal("", f.Ui.Tiles[0].Status);
+        Assert.Empty(f.Hub.Activities);
     }
 
     [Fact]

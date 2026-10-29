@@ -58,24 +58,20 @@ public sealed class MicMuteView : UserControl
         if (_module.Error is { } error) Error(error);
     }
 
-    /// <summary>The Sound page's mic card: whether the mics are live, and Mute or Unmute.</summary>
+    /// <summary>The Sound page's mic card, one 44 row like the Output card: whether the mics are live, and Mute or Unmute.</summary>
     private Border MicCard(bool muted)
     {
         bool warning = _module.Status.State is MicrophoneMuteState.Muted or MicrophoneMuteState.Mixed;
-        var glyph = new LucideIcon { Data = warning ? LucideIcons.MicOff : LucideIcons.Mic, Size = 16, Margin = new Thickness(0, 0, 10, 0), VerticalAlignment = VerticalAlignment.Center };
-        glyph.SetResourceReference(LucideIcon.BrushProperty, warning ? "WarningBrush" : "IslandAccentBrush");
-        var state = new TextBlock { Text = muted ? "Muted" : _module.StatusText, FontSize = 13, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
-        if (warning) state.SetResourceReference(TextBlock.ForegroundProperty, "WarningTextBrush");
+        bool none = _module.Status.State == MicrophoneMuteState.NoMicrophone;
+        var glyph = new LucideIcon { Data = warning || none ? LucideIcons.MicOff : LucideIcons.Mic };
+        glyph.SetResourceReference(LucideIcon.BrushProperty, warning ? "WarningBrush" : none ? "IslandTextTertiaryBrush" : "IslandAccentBrush");
+        var state = new TextBlock { Text = muted ? "Muted" : _module.StatusText, FontSize = 12, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
+        if (warning || none) state.SetResourceReference(TextBlock.ForegroundProperty, warning ? "WarningTextBrush" : "IslandTextTertiaryBrush");
         AutomationProperties.SetLiveSetting(state, AutomationLiveSetting.Polite);
-        var action = RoutingUi.Button(muted ? "Unmute" : "Mute", Toggle);
+        var action = RoutingUi.IslandButton(muted ? "Unmute" : "Mute", Toggle);
         AutomationProperties.SetName(action, muted ? "Unmute all microphones" : "Mute all microphones");
-        action.IsEnabled = _module.Status.State != MicrophoneMuteState.NoMicrophone;
-        action.Margin = new Thickness(8, 0, 0, 0);
-        DockPanel.SetDock(glyph, Dock.Left);
-        DockPanel.SetDock(action, Dock.Right);
-        var card = new Border { Child = new DockPanel { Children = { glyph, action, state } }, Margin = new Thickness(0, 0, 0, 6) };
-        card.SetResourceReference(StyleProperty, "IslandCardStyle");
-        return card;
+        action.IsEnabled = !none;
+        return RoutingUi.IslandCard(glyph, state, action);
     }
 
     private void BeginCapture()
