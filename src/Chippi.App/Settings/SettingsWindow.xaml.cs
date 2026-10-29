@@ -104,6 +104,7 @@ public partial class SettingsWindow : Window
             HwndSource.FromHwnd(new WindowInteropHelper(this).Handle)?.AddHook(OnHook);
         };
         StateChanged += (_, _) => OnStateChanged();
+        OnStateChanged(); // a window restored maximized gets its inset and Restore glyph without a change to raise it
         SizeChanged += (_, e) => UpdateRail(e.NewSize.Width);
         // A row selected before the list was laid out scrolls into view once it is.
         Loaded += (_, _) =>

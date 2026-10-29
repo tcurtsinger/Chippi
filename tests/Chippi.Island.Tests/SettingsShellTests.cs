@@ -130,6 +130,8 @@ public sealed class SettingsShellTests
         SettingsUi.SaveApp(scene.Shell.Config, s => s.SettingsWindow!.Maximized = true);
         var maximized = new SettingsWindow(scene.Shell, "general");
         Assert.Equal(WindowState.Maximized, maximized.WindowState);
+        Assert.Equal("Restore", System.Windows.Automation.AutomationProperties.GetName(maximized.MaximizeButton));
+        Assert.NotEqual(new Thickness(0), maximized.Root.Margin); // pulled in from the monitor's edge
         maximized.Close();
 
         // Closing saves where it is: here off every monitor, so the next one centers on the main display.
