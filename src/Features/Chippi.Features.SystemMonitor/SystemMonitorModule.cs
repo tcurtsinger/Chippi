@@ -8,6 +8,7 @@ using Chippi.Features.SystemMonitor.Sensors.Platform;
 using Chippi.Features.SystemMonitor.Views;
 using Chippi.UI.Controls;
 using Microsoft.Win32;
+using Microsoft.Extensions.Logging;
 
 namespace Chippi.Features.SystemMonitor;
 
@@ -32,7 +33,7 @@ public sealed class SystemMonitorModule : IFeatureModule
 
     public SystemMonitorModule() : this(WindowsSources.Create) { }
 
-    /// <param name="createSources">Called on each start; tests pass fakes.</param>
+    /// <param name="createSources">Called on each start and one-time notification discovery; each call must return fresh sources. Tests pass fakes.</param>
     public SystemMonitorModule(Func<SensorSources> createSources) => _createSources = createSources;
 
     public FeatureDescriptor Descriptor { get; } = new("system-monitor", "System monitor", "CPU, GPU, memory, network and battery, with alerts", FeatureGroup.System)
@@ -40,6 +41,21 @@ public sealed class SystemMonitorModule : IFeatureModule
         Icon = nameof(LucideIcons.Activity),
         Presets = PresetMembership.Essentials | PresetMembership.PowerUser,
     };
+
+    /// <summary>Fresh, read-only discovery for Notifications. No watch or sampler state is retained.</summary>
+    public IReadOnlySet<string> AvailableNoticeKinds
+    {
+        get
+        {
+            var available = AlertEvaluator.Kinds.Select(k => k.Id).ToHashSet(StringComparer.Ordinal);
+            using var sources = _createSources();
+            try { if (sources.Battery.Read() is null) available.Remove("low-battery"); }
+            catch (Exception error) { _context?.Logger.LogWarning(error, "Battery availability check failed"); }
+            try { if (!sources.Gpu.Read(load: false).Any(gpu => gpu.TemperatureC is not null)) available.Remove("gpu-temperature"); }
+            catch (Exception error) { _context?.Logger.LogWarning(error, "GPU availability check failed"); }
+            return available;
+        }
+    }
 
     /// <summary>The settings in use, normalized.</summary>
     public SystemMonitorSettings Settings { get; private set; } = new();

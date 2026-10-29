@@ -20,6 +20,9 @@ public interface IFeatureModule
 {
     FeatureDescriptor Descriptor { get; }
 
+    /// <summary>Notice kinds supported by this PC; null leaves all declared kinds visible. Read once when Notifications opens.</summary>
+    IReadOnlySet<string>? AvailableNoticeKinds => null;
+
     Task StartAsync(ModuleContext context, CancellationToken ct);
 
     Task StopAsync(CancellationToken ct);
