@@ -828,8 +828,10 @@ public partial class IslandPanelWindow : Window
         // Mid-morph the content already sits at its final place; only what's inside the shape shows.
         var inside = new Rect(_drawn.X - Canvas.GetLeft(Card), _drawn.Y - Canvas.GetTop(Card), Math.Max(0, _drawn.Width), Math.Max(0, _drawn.Height));
         Card.Clip = new RectangleGeometry(inside, _radius, _radius);
-        bool settled = Card.Opacity >= 1;
-        Card.IsHitTestVisible = settled; // nothing half-faded takes a click
+        // Nothing half-faded takes a click, nor a page still under the old one's picture (a double-click
+        // on a tile would reach a control on the new page that can't be seen yet).
+        bool settled = Card.Opacity >= 1 && Leaving.Opacity <= 0;
+        Card.IsHitTestVisible = settled;
         Leaving.Clip = Card.Clip;
         // Opening and closing fade the buttons with the content; between pages they stay.
         Orbit.Opacity = _morph == Morph.Page ? 1 : Card.Opacity;

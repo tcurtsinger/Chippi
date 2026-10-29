@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -166,10 +167,20 @@ public sealed class SensorSampler : IDisposable
                             // pause of over 10s starts them over: a short unpublished first sample means a page
                             // that just opened shows every reading at once, not 2s later.
                             _core.Tick(now, need, interval);
-                            if (_wake.WaitOne(PrimeDelay) && _stopping)
+                            // The whole delay: opening a page also lets go of the tile's watch, and that wake
+                            // must not cut it short (rates over a fraction of a millisecond come back empty).
+                            long primed = Stopwatch.GetTimestamp();
+                            for (var left = PrimeDelay; left > TimeSpan.Zero && !_stopping; left = PrimeDelay - Stopwatch.GetElapsedTime(primed))
+                                _wake.WaitOne(left);
+                            if (_stopping)
                                 break;
                             need = Need;
                             now = _time.GetUtcNow();
+                            if (need == SensorNeed.None)
+                            {
+                                last = SensorNeed.None;
+                                continue; // every watch let go meanwhile
+                            }
                         }
                         var snapshot = _core.Tick(now, need, interval);
                         Updated?.Invoke(snapshot);

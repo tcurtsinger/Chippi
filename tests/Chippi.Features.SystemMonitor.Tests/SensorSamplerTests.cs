@@ -97,6 +97,26 @@ public sealed class SensorSamplerTests
         Assert.True(started.Elapsed >= SensorSampler.PrimeDelay - TimeSpan.FromMilliseconds(20));
     }
 
+    // Opening the page adds its watch and lets go of the tile's: that second wake mustn't cut the first sample's wait short.
+    [Fact]
+    public void Another_watch_changing_during_the_first_sample_keeps_the_whole_delay()
+    {
+        var fake = new FakeSources();
+        using var sampler = new SensorSampler(fake.Sources) { Interval = TimeSpan.FromHours(1) };
+        using var updated = new SemaphoreSlim(0);
+        sampler.Updated += _ => updated.Release();
+        var tile = sampler.Watch(SensorNeed.Cpu);
+        Assert.True(updated.Wait(Wait));
+
+        var started = System.Diagnostics.Stopwatch.StartNew();
+        using var page = sampler.Watch(SensorNeed.Cpu | SensorNeed.Network);
+        Thread.Sleep(10);
+        tile.Dispose();
+        Assert.True(updated.Wait(Wait));
+
+        Assert.True(started.Elapsed >= SensorSampler.PrimeDelay - TimeSpan.FromMilliseconds(20), $"published after {started.Elapsed.TotalMilliseconds:F1} ms");
+    }
+
     [Fact]
     public void Watching_ticks_at_the_interval()
     {

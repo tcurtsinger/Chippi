@@ -213,6 +213,20 @@ public sealed class VolumeTests
     }
 
     [Fact]
+    public async Task Volume_steps_skip_reading_outputs_and_a_new_app_reads_them()
+    {
+        await using var f = new VolumeFixture(); await f.Start();
+        int reads = f.System.AppOutputReads;
+        for (int i = 1; i <= 10; i++)
+            await f.Module.SetVolumeAsync(VolumeFixture.Key, i / 10f);
+        await Task.Delay(200); // each step's snapshot reaches OnSnapshot
+        Assert.Equal(reads, f.System.AppOutputReads);
+
+        f.System.WithSession(VolumeFixture.Session("two", "A", 456)); await f.Audio.RefreshAsync();
+        Assert.True(SpinWait.SpinUntil(() => f.System.AppOutputReads > reads, TimeSpan.FromSeconds(5)));
+    }
+
+    [Fact]
     public void A_drag_writes_the_first_step_then_only_the_newest()
     {
         var written = new List<int>();

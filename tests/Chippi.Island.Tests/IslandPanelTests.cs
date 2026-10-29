@@ -128,10 +128,12 @@ public sealed class IslandPanelTests
             Assert.NotNull(leaving.Source); // a picture of the grid, held over the new page
             Assert.Equal(1, leaving.Opacity, 3);
             Assert.Equal(1, card.Opacity, 3); // the new page draws at once, under the picture: no blank gap
+            Assert.False(card.IsHitTestVisible); // and takes no click while it can't be seen
             Pump(TimeSpan.FromMilliseconds(400));
             Assert.Null(leaving.Source);
             Assert.Equal(0, leaving.Opacity);
             Assert.Equal(1, card.Opacity);
+            Assert.True(card.IsHitTestVisible);
         }));
     }
 
