@@ -81,6 +81,8 @@ public sealed class IslandWindowTests
             media.Sessions = [Track("Creep")];
             media.Raise();
             Assert.Equal(Visibility.Collapsed, window.SongCopy.Visibility); // fits: holds still
+            Assert.Equal(Math.Round((window.Song.Width - window.SongText.DesiredSize.Width) / 2), window.SongStrip.Margin.Left); // centered
+            Assert.True(window.SongStrip.Margin.Left > 0);
 
             window.SetActivities([], Chippi.App.Pet.PetMood.Idle); // paused: the activity goes
             Assert.Equal(IslandGeometry.TabSize(IslandEdge.Top, live: false), window.TabTarget);
