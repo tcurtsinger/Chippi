@@ -124,6 +124,14 @@
                             <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource HoverBrush}" />
                             <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
                         </Trigger>
+                        <!-- A maximize button Windows hit-tests for snap layouts gets no WPF mouse input: its window sets Tag instead. -->
+                        <Trigger Property="Tag" Value="Hover">
+                            <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource SurfaceSelectedBrush}" />
+                        </Trigger>
+                        <Trigger Property="Tag" Value="Pressed">
+                            <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource HoverBrush}" />
+                            <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+                        </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Opacity" Value="0.45" />
                         </Trigger>
