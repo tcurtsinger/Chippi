@@ -17,6 +17,7 @@ namespace Chippi.Features.Downloads.Tests;
 public sealed class CompactSettingsTests
 {
     [Theory]
+    [InlineData(0)]
     [InlineData(1)]
     [InlineData(19)]
     public void Unmatched_files_fold_and_Add_rule_opens_a_draft_without_approval(int count) => WpfTestThread.Run(() =>
@@ -28,11 +29,16 @@ public sealed class CompactSettingsTests
         var view = new PreviewView(new DownloadsModule(), () => Task.FromResult(plan), false, () => { }, () => add = true);
         typeof(PreviewView).GetField("_preview", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(view, plan);
         typeof(PreviewView).GetMethod("RenderPlan", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(view, null);
-        var fold = Find<ExpanderRow>(view).Single();
-        Assert.Equal($"{count} {(count == 1 ? "file" : "files")} \u00b7 no rule matches", fold.Header);
-        Assert.False(fold.IsExpanded);
-        Assert.Equal(count, Find<TextBlock>((DependencyObject)fold.Content).Count(t => t.Text.StartsWith("file")));
-        Assert.Contains(Find<TextBlock>(view), t => t.Text == "Nothing to organize");
+        if (count == 0)
+            Assert.Empty(Find<ExpanderRow>(view));
+        else
+        {
+            var fold = Find<ExpanderRow>(view).Single();
+            Assert.Equal($"{count} {(count == 1 ? "file" : "files")} \u00b7 no rule matches", fold.Header);
+            Assert.False(fold.IsExpanded);
+            Assert.Equal(count, Find<TextBlock>((DependencyObject)fold.Content).Count(t => t.Text.StartsWith("file")));
+        }
+        Assert.Single(Find<TextBlock>(view), t => t.Text == "Nothing to organize"); // the footer only (c4)
         Assert.DoesNotContain(Find<Button>(view), b => Equals(b.Content, "Approve"));
         var action = Find<Button>(view).Single(b => AutomationProperties.GetName(b) == "Add rule");
         Assert.True(action.IsEnabled);

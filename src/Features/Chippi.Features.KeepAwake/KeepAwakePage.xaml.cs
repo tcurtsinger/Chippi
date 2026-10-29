@@ -88,7 +88,7 @@ public partial class KeepAwakePage : UserControl
     private void Refresh()
     {
         if (!Dispatcher.CheckAccess()) { Dispatcher.BeginInvoke(Refresh); return; }
-        _status.Description = _module.Error is null ? KeepAwakeText.Status(_module, DateTimeOffset.Now) : "Couldn't change Keep awake";
+        _status.Description = _module.Error is null ? KeepAwakeText.Status(_module, DateTimeOffset.Now) : "Keep awake failed";
         _stop.Visibility = _module.IsOn ? Visibility.Visible : Visibility.Collapsed;
         foreach (var (button, length) in _choices)
             button.IsChecked = _module.Active is { } active && (length is null ? active.Mode == AwakeMode.UntilTime : KeepAwakeText.SameLength(active, length));
@@ -99,7 +99,7 @@ public partial class KeepAwakePage : UserControl
     private async void Run(Task change)
     {
         try { await change; }
-        catch (Exception ex) { Log.Error("Keep awake: Settings change failed", ex); _status.Description = "Couldn't change Keep awake"; return; }
+        catch (Exception ex) { Log.Error("Keep awake: Settings change failed", ex); _status.Description = "Keep awake failed"; return; }
         Refresh();
     }
 }

@@ -252,7 +252,7 @@ internal sealed class SettingsSection : UserControl
         }
         catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException or System.Security.SecurityException)
         {
-            ShowError(ex is UnauthorizedAccessException ? "Access denied" : "Couldn't save settings");
+            ShowError(ex is UnauthorizedAccessException ? "Access denied" : "Save failed");
         }
         Dispatcher.BeginInvoke(Render); // not inside the control's own event
     }
