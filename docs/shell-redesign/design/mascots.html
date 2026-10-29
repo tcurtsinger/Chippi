@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>Blob Options</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;padding:32px;width:1560px;background:#ECE9E4;color:#1A1A1A;font-family:'Segoe UI Variable Text','Segoe UI',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+h1.doc{font:700 26px 'Segoe UI Variable Display','Segoe UI';margin:0 0 6px}
+p.cap{margin:0 0 22px;max-width:1150px;font-size:14px;line-height:1.5;color:#444}
+.head,.rowm{display:grid;grid-template-columns:230px 128px 128px 128px 150px 170px 1fr;gap:12px;align-items:center}
+.head{font:600 11px 'Segoe UI';text-transform:uppercase;letter-spacing:.06em;color:#6B6B6B;padding:0 16px 8px}
+.rowm{background:#F7F5F2;border-radius:12px;padding:14px 16px;margin-bottom:12px}
+.who h2{font:700 20px 'Segoe UI Variable Display','Segoe UI';margin:0 0 4px}
+.who p{margin:0;font-size:12.5px;line-height:1.45;color:#4A4A4A}
+.cell{display:grid;place-items:center}
+.sizes,.colors{display:flex;align-items:flex-end;gap:12px;justify-content:center}
+.desk{height:96px;border-radius:10px;position:relative;overflow:hidden;
+  background:radial-gradient(ellipse 60% 70% at 80% 120%,rgba(238,146,66,.5),transparent 70%),linear-gradient(180deg,#F5F3F0,#E5DFD8);display:flex;align-items:center;padding:0 16px;gap:6px}
+.puck{width:50px;height:50px;border-radius:50%;background:rgba(250,250,250,.82);border:1px solid rgba(0,0,0,.07);box-shadow:0 4px 14px rgba(0,0,0,.16);display:grid;place-items:center;flex:none}
+.chip{height:36px;padding:0 12px 0 6px;border-radius:8px;background:rgba(250,250,250,.85);border:1px solid rgba(0,0,0,.07);box-shadow:0 4px 14px rgba(0,0,0,.14);display:flex;align-items:center;gap:8px;font-size:12px;white-space:nowrap}
+.chip b{font-weight:600}.chip span{color:#5C5C5C}
+.bars{display:flex;align-items:flex-end;gap:2px;height:14px}
+.bars i{display:block;width:3px;border-radius:2px;background:linear-gradient(#B15CF0,#4D9BFF)}
+.foot{margin-top:18px;font-size:12px;color:#6B6B6B}
+</style></head>
+<body>
+<svg width="0" height="0" style="position:absolute"><defs id="defs">
+  <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0B2236"/><stop offset=".58" stop-color="#3F86AC"/><stop offset=".6" stop-color="#9FC6D6"/></linearGradient>
+</defs></svg>
+
+<h1 class="doc">A new blob for Chippi</h1>
+<p class="cap">Five little blob characters to replace Gumdrop. Each is shown idle, asleep (nothing going on), and listening (music playing: headphones on), then at the sizes the widget really uses, in three of the colors you can pick in Settings, and sitting in look A's widget with a song. They're all one flat color with soft shading, so any pet color works.</p>
+
+<div class="head"><div>Character</div><div style="text-align:center">Idle</div><div style="text-align:center">Asleep</div><div style="text-align:center">Listening</div><div style="text-align:center">24 · 32 · 48</div><div style="text-align:center">Colors</div><div>In the widget</div></div>
+<div id="rows"></div>
+<p class="foot">Drawn for the mock; the final character would be redrawn cleanly. Cover is a stand-in.</p>
+
+<script>
+const INK = '#1B1530';
+const COLORS = {
+  violet: { light: '#D2BEFF', base: '#9C6CFF', dark: '#6A3FD9' },
+  blue:   { light: '#BFE0FF', base: '#4D9BFF', dark: '#2A6AD1' },
+  mint:   { light: '#C6F5E2', base: '#3FCF9A', dark: '#1F9A6E' },
+};
+// One soft-shading gradient per color, plus a glossier one for the jelly.
+const defs = document.getElementById('defs');
+for (const [k, c] of Object.entries(COLORS)) {
+  defs.insertAdjacentHTML('beforeend',
+    `<radialGradient id="g-${k}" cx=".36" cy=".28" r=".85"><stop offset="0" stop-color="${c.light}"/><stop offset=".55" stop-color="${c.base}"/><stop offset="1" stop-color="${c.dark}"/></radialGradient>` +
+    `<linearGradient id="j-${k}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${c.light}" stop-opacity=".95"/><stop offset="1" stop-color="${c.dark}" stop-opacity=".92"/></linearGradient>`);
+}
+
+const stroke = (d, w = 3.2) => `<path d="${d}" fill="none" stroke="${INK}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round"/>`;
+const dot = (x, y, r) => `<circle cx="${x}" cy="${y}" r="${r}" fill="${INK}"/><circle cx="${x + r * .35}" cy="${y - r * .4}" r="${r * .32}" fill="#fff"/>`;
+const happy = (x, y, w = 5) => stroke(`M${x - w} ${y + 2} Q${x} ${y - 5} ${x + w} ${y + 2}`);
+const shut = (x, y, w = 5) => stroke(`M${x - w} ${y - 1} Q${x} ${y + 4} ${x + w} ${y - 1}`);
+const zz = (x, y) => `<text x="${x}" y="${y}" font-family="Segoe UI Variable Display,Segoe UI" font-weight="700" font-size="17" fill="#8A82A8">z</text><text x="${x + 11}" y="${y - 12}" font-family="Segoe UI Variable Display,Segoe UI" font-weight="700" font-size="11" fill="#8A82A8">z</text>`;
+const phones = (l, r, top, ey, c) =>
+  `<path d="M${l} ${ey} C${l} ${top - 12} ${r} ${top - 12} ${r} ${ey}" fill="none" stroke="#2A2440" stroke-width="5" stroke-linecap="round"/>` +
+  `<rect x="${l - 7}" y="${ey - 11}" width="13" height="23" rx="5.5" fill="#2A2440"/><rect x="${l - 4}" y="${ey - 7}" width="5" height="15" rx="2.5" fill="${c.light}"/>` +
+  `<rect x="${r - 6}" y="${ey - 11}" width="13" height="23" rx="5.5" fill="#2A2440"/><rect x="${r + 1}" y="${ey - 7}" width="5" height="15" rx="2.5" fill="${c.light}"/>`;
+const blush = (x1, x2, y) => `<ellipse cx="${x1}" cy="${y}" rx="6.5" ry="3.6" fill="#FF8FB3" opacity=".55"/><ellipse cx="${x2}" cy="${y}" rx="6.5" ry="3.6" fill="#FF8FB3" opacity=".55"/>`;
+const shadow = (w = 32) => `<ellipse cx="60" cy="111" rx="${w}" ry="4.5" fill="rgba(0,0,0,.16)"/>`;
+const note = (x, y, c) => `<g transform="translate(${x} ${y})"><path d="M6 0 V14" stroke="${c.dark}" stroke-width="3" stroke-linecap="round"/><path d="M6 0 Q12 2 13 7" fill="none" stroke="${c.dark}" stroke-width="3" stroke-linecap="round"/><ellipse cx="3" cy="15" rx="4.5" ry="3.5" fill="${c.dark}"/></g>`;
+
+const KINDS = {
+  mochi: {
+    name: 'Mochi', about: 'A soft, squishy rice-cake blob. Dot eyes, rosy cheeks, a little cat mouth. Calm and cosy.',
+    draw(m, c, k) {
+      const body = `<path d="M17 76 C17 45 36 31 60 31 C84 31 103 45 103 76 C103 98 87 106 60 106 C33 106 17 98 17 76 Z" fill="url(#g-${k})"/>`;
+      const eyes = m === 'idle' ? dot(45, 68, 4.6) + dot(75, 68, 4.6) : m === 'sleepy' ? shut(45, 69) + shut(75, 69) : happy(45, 69) + happy(75, 69);
+      const mouth = m === 'music' ? `<path d="M54 79 Q60 88 66 79 Z" fill="${INK}"/>` : stroke('M54 79 Q57 83 60 79 Q63 83 66 79', 2.8);
+      return shadow(36) + body + blush(34, 86, 81) + eyes + mouth + (m === 'sleepy' ? zz(90, 30) : '') + (m === 'music' ? phones(19, 101, 31, 70, c) : '');
+    },
+  },
+  jelly: {
+    name: 'Jelly', about: 'A glossy slime that drips a little at the bottom. Big shiny eyes and an open grin. Goofy and lively.',
+    draw(m, c, k) {
+      const body = `<path d="M16 84 C14 50 34 28 60 28 C86 28 106 50 104 84 C104 92 100 96 96 96 C92 96 92 104 87 104 C82 104 83 96 77 96 L45 96 C39 96 39 106 33.5 106 C28 106 29 96 24 96 C19 96 16 92 16 84 Z" fill="url(#j-${k})"/>
+        <path d="M33 52 Q40 40 53 37" fill="none" stroke="#fff" stroke-opacity=".75" stroke-width="4.5" stroke-linecap="round"/><circle cx="31" cy="60" r="2.6" fill="#fff" fill-opacity=".7"/>`;
+      const big = (x) => `<ellipse cx="${x}" cy="64" rx="9" ry="10.5" fill="#fff"/><circle cx="${x + 2}" cy="66" r="5" fill="${INK}"/><circle cx="${x + 3.6}" cy="63.6" r="1.7" fill="#fff"/>`;
+      const eyes = m === 'idle' ? big(47) + big(73) : m === 'sleepy' ? shut(47, 66, 7) + shut(73, 66, 7) : happy(47, 66, 7) + happy(73, 66, 7);
+      const mouth = m === 'sleepy' ? `<ellipse cx="60" cy="82" rx="3.5" ry="3" fill="${INK}"/>` : `<path d="M50 79 Q60 91 70 79 Z" fill="${INK}"/><path d="M55 84 Q60 88 65 84" fill="#FF7FA8"/>`;
+      return shadow(38) + body + eyes + mouth + (m === 'sleepy' ? zz(92, 28) : '') + (m === 'music' ? phones(17, 103, 28, 66, c) : '');
+    },
+  },
+  pip: {
+    name: 'Pip', about: 'A round pebble with a sprout on top that changes with the moment: a leaf, a droop when asleep, a music note when listening. Quiet line eyes.',
+    draw(m, c, k) {
+      const body = `<path d="M24 76 C20 50 40 34 62 36 C86 38 100 56 98 78 C96 98 80 106 58 105 C38 104 26 95 24 76 Z" fill="url(#g-${k})"/>`;
+      const sprout = m === 'music' ? note(64, 6, c)
+        : m === 'sleepy' ? `<path d="M61 37 C61 31 64 27 70 26" fill="none" stroke="${c.dark}" stroke-width="3" stroke-linecap="round"/><path d="M70 26 C76 28 80 33 79 38 C73 37 70 33 70 26 Z" fill="#7BD8A8"/>`
+        : `<path d="M61 37 C61 28 58 21 54 17" fill="none" stroke="${c.dark}" stroke-width="3" stroke-linecap="round"/><path d="M54 17 C46 12 39 16 39 23 C47 25 52 22 54 17 Z" fill="#7BD8A8"/><path d="M57 24 C62 18 69 18 72 22 C67 27 61 27 57 24 Z" fill="#9BE6BF"/>`;
+      const eyes = m === 'idle' ? stroke('M49 66 V74', 4.5) + stroke('M71 66 V74', 4.5) : m === 'sleepy' ? stroke('M45 72 H53', 3.6) + stroke('M67 72 H75', 3.6) : happy(49, 71) + happy(71, 71);
+      const mouth = m === 'music' ? `<path d="M55 81 Q60 88 65 81 Z" fill="${INK}"/>` : stroke('M56 83 Q60 86 64 83', 2.8);
+      return shadow(34) + body + sprout + eyes + mouth + (m === 'sleepy' ? zz(88, 40) : '') + (m === 'music' ? phones(23, 98, 37, 72, c) : '');
+    },
+  },
+  bloop: {
+    name: 'Bloop', about: 'A wobbly little guy with stubby arms and a wavy hem, as if mid-bounce. Oval eyes and an "o" mouth. The most expressive.',
+    draw(m, c, k) {
+      const body = `<path d="M30 98 C26 98 24 92 24 86 L24 62 C24 40 40 27 60 27 C80 27 96 40 96 62 L96 86 C96 92 94 98 90 98 C86 98 84 92 80 92 C76 92 74 98 70 98 C66 98 64 92 60 92 C56 92 54 98 50 98 C46 98 44 92 40 92 C36 92 34 98 30 98 Z" fill="url(#g-${k})"/>`;
+      const arms = m === 'music'
+        ? `<ellipse cx="18" cy="56" rx="6.5" ry="10" fill="url(#g-${k})" transform="rotate(-35 18 56)"/><ellipse cx="102" cy="56" rx="6.5" ry="10" fill="url(#g-${k})" transform="rotate(35 102 56)"/>`
+        : `<ellipse cx="19" cy="72" rx="6.5" ry="10" fill="url(#g-${k})" transform="rotate(20 19 72)"/><ellipse cx="101" cy="72" rx="6.5" ry="10" fill="url(#g-${k})" transform="rotate(-20 101 72)"/>`;
+      const eyes = m === 'idle' ? `<ellipse cx="47" cy="60" rx="4.6" ry="6.4" fill="${INK}"/><ellipse cx="73" cy="60" rx="4.6" ry="6.4" fill="${INK}"/><circle cx="48.6" cy="57.6" r="1.6" fill="#fff"/><circle cx="74.6" cy="57.6" r="1.6" fill="#fff"/>`
+        : m === 'sleepy' ? shut(47, 61) + shut(73, 61) : happy(47, 61) + happy(73, 61);
+      const mouth = m === 'sleepy' ? stroke('M57 76 H63', 2.8) : m === 'music' ? `<path d="M53 72 Q60 82 67 72 Z" fill="${INK}"/>` : `<ellipse cx="60" cy="75" rx="3.6" ry="4.2" fill="${INK}"/>`;
+      return shadow(34) + arms + body + blush(37, 83, 70) + eyes + mouth + (m === 'sleepy' ? zz(88, 26) : '') + (m === 'music' ? phones(24, 96, 27, 60, c) : '');
+    },
+  },
+  mojelly: {
+    name: 'Mochi + Jelly', about: "Mochi's soft rice-cake body with Jelly's big shiny eyes and open grin. Rosy cheeks kept.",
+    draw(m, c, k) { return mojelly(m, c, k, { blush: true }); },
+  },
+  mojellyPlain: {
+    name: 'No blush', about: 'The same, without the cheeks: a little cleaner at small sizes.',
+    draw(m, c, k) { return mojelly(m, c, k, {}); },
+  },
+  mojellyGloss: {
+    name: 'With gloss', about: "The same with Jelly's shine on the body too: a little more candy, a little less soft.",
+    draw(m, c, k) { return mojelly(m, c, k, { blush: true, gloss: true }); },
+  },
+  bean: {
+    name: 'Bean', about: 'A lazy jellybean that lies down. Wide and low, so it sits neatly beside the song chip. Lies flat asleep, perks up when music plays.',
+    draw(m, c, k) {
+      const up = m === 'music' ? -8 : 0;
+      const body = m === 'sleepy'
+        ? `<path d="M12 92 C12 76 26 70 44 72 C56 73 64 70 76 68 C96 65 110 74 108 88 C106 102 90 106 62 105 C36 104 12 104 12 92 Z" fill="url(#g-${k})"/>`
+        : `<path d="M14 86 C14 64 30 56 46 60 C56 62 62 58 72 ${54 + up} C90 ${48 + up} 108 ${60 + up} 106 ${80 + up / 2} C104 98 88 105 64 104 C40 103 14 102 14 86 Z" fill="url(#g-${k})"/>`;
+      const fy = m === 'sleepy' ? 84 : 74 + up;
+      const eyes = m === 'idle' ? dot(78, fy, 4) + dot(94, fy, 4) : m === 'sleepy' ? shut(78, fy, 4.5) + shut(94, fy, 4.5) : happy(78, fy, 4.5) + happy(94, fy, 4.5);
+      const mouth = m === 'music' ? `<path d="M82 ${fy + 8} Q86 ${fy + 14} 90 ${fy + 8} Z" fill="${INK}"/>` : stroke(`M83 ${fy + 9} Q86 ${fy + 11.5} 89 ${fy + 9}`, 2.6);
+      const feet = m === 'sleepy' ? '' : `<ellipse cx="44" cy="104" rx="7" ry="3.5" fill="${c.dark}"/><ellipse cx="80" cy="104" rx="7" ry="3.5" fill="${c.dark}"/>`;
+      return shadow(42) + feet + body + `<ellipse cx="72" cy="${fy + 7}" rx="5" ry="3" fill="#FF8FB3" opacity=".5"/><ellipse cx="100" cy="${fy + 7}" rx="4.5" ry="3" fill="#FF8FB3" opacity=".5"/>` + eyes + mouth +
+        (m === 'sleepy' ? zz(98, 58) : '') + (m === 'music' ? phones(70, 104, 50 + up, 70 + up, c) : '');
+    },
+  },
+};
+
+// Mochi's body, Jelly's face.
+function mojelly(m, c, k, { blush: cheeks = false, gloss = false }) {
+  const body = `<path d="M17 76 C17 45 36 31 60 31 C84 31 103 45 103 76 C103 98 87 106 60 106 C33 106 17 98 17 76 Z" fill="url(#g-${k})"/>` +
+    (gloss ? `<path d="M31 56 Q37 44 50 40" fill="none" stroke="#fff" stroke-opacity=".7" stroke-width="4.5" stroke-linecap="round"/><circle cx="29" cy="64" r="2.4" fill="#fff" fill-opacity=".65"/>` : '');
+  const big = (x) => `<ellipse cx="${x}" cy="66" rx="9" ry="10.5" fill="#fff"/><circle cx="${x + 2}" cy="68" r="5" fill="${INK}"/><circle cx="${x + 3.6}" cy="65.6" r="1.7" fill="#fff"/>`;
+  const eyes = m === 'idle' ? big(46) + big(74) : m === 'sleepy' ? shut(46, 68, 7) + shut(74, 68, 7) : happy(46, 68, 7) + happy(74, 68, 7);
+  const mouth = m === 'sleepy' ? `<ellipse cx="60" cy="85" rx="3.5" ry="3" fill="${INK}"/>` : `<path d="M50 82 Q60 94 70 82 Z" fill="${INK}"/><path d="M55 87 Q60 91 65 87" fill="#FF7FA8"/>`;
+  return shadow(36) + body + (cheeks ? blush(30, 90, 82) : '') + eyes + mouth + (m === 'sleepy' ? zz(90, 30) : '') + (m === 'music' ? phones(19, 101, 31, 70, c) : '');
+}
+
+const svg = (kind, mood, size, color = 'violet') => `<svg width="${size}" height="${size}" viewBox="0 0 120 120" style="display:block;overflow:visible">${KINDS[kind].draw(mood, COLORS[color], color)}</svg>`;
+const cover = (s, r) => `<svg width="${s}" height="${s}" viewBox="0 0 100 100" style="display:block;border-radius:${r}px;flex:none"><rect width="100" height="100" fill="url(#sky)"/><path d="M0 64 L18 58 L34 66 L52 60 L70 68 L100 62 V100 H0Z" fill="#1E2226"/><rect x="22" y="58.6" width="60" height="1.2" fill="#FF9A5A"/><path d="M50 30 l9 5.2 v10.4 l-9 5.2 l-9 -5.2 v-10.4z" fill="none" stroke="rgba(255,255,255,.75)" stroke-width="1"/></svg>`;
+const bars = `<div class="bars"><i style="height:8px"></i><i style="height:14px"></i><i style="height:10px"></i></div>`;
+
+// ?only=a,b shows just those characters, under an optional ?title=.
+const params = new URLSearchParams(location.search);
+const only = params.get('only')?.split(',');
+if (params.get('title')) { document.querySelector('h1.doc').textContent = params.get('title'); document.querySelector('p.cap').textContent = params.get('cap') ?? ''; }
+document.getElementById('rows').innerHTML = Object.keys(KINDS).filter(k => !only || only.includes(k)).map(k => `<div class="rowm">
+  <div class="who"><h2>${KINDS[k].name}</h2><p>${KINDS[k].about}</p></div>
+  <div class="cell">${svg(k, 'idle', 112)}</div><div class="cell">${svg(k, 'sleepy', 112)}</div><div class="cell">${svg(k, 'music', 112)}</div>
+  <div class="sizes">${svg(k, 'idle', 24)}${svg(k, 'idle', 32)}${svg(k, 'idle', 48)}</div>
+  <div class="colors">${svg(k, 'idle', 44, 'violet')}${svg(k, 'idle', 44, 'blue')}${svg(k, 'idle', 44, 'mint')}</div>
+  <div class="desk"><div class="puck">${svg(k, 'music', 38)}</div><div class="chip">${cover(24, 4)}<b>A Moment Apart</b> <span>· ODESZA</span>${bars}</div></div>
+</div>`).join('');
+addEventListener('load', () => { document.body.dataset.size = `${Math.ceil(document.body.scrollWidth)},${Math.ceil(document.body.scrollHeight) + 8}`; });
+</script>
+</body></html>

@@ -99,6 +99,10 @@ CPU, GPU, memory, battery, network, disk activity and available GPU/thermal-zone
 Brief: [docs/phase-5-handoff.md](docs/phase-5-handoff.md). Design: [docs/phase-5/design/notes.md](docs/phase-5/design/notes.md). Approved 2026-10-28.
 Clipboard history, paste as plain text, clean URL, scratchpad and shelf, on three island tiles: Clipboard, Scratchpad and Shelf.
 
+### Phase 5.1: Shell redesign
+Brief: [docs/shell-redesign-handoff.md](docs/shell-redesign-handoff.md). Design: [docs/shell-redesign/design/](docs/shell-redesign/design/). Approved 2026-10-29.
+The island at the top of the screen becomes a blob widget you drag anywhere, opening a Windows 11–style panel with a Quick Settings home and the pet's violet as the accent. A new blob replaces Gumdrop.
+
 ### Phase 5.5: Everyday tools, continued
 Quick toggles, cleaning mode, command bar, radial menu, AI agent usage in the island (Travis, 2026-10-27, tasks 27 and 28). Quick panel leaves the catalog; keep awake already shipped.
 
