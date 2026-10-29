@@ -380,15 +380,16 @@ Every interactive control is custom-templated with the full state set: rest, hov
 - **Icon button:** 32×32, 4px radius, transparent, a 16px glyph in Secondary. Hover: control fill and Text. Always has an accessible name.
 - **Subtle button:** the flyout footer and link buttons. Transparent until hover.
 - **Switch:** 40×20, 10px radius. Off: transparent with a 1px switch-off stroke and a 12px switch-off knob, 4px from the left. On: accent fill and stroke with a 14px on-accent knob at 22px. The knob slides in 150ms. Settings rows show On/Off text to its left; flyout rows don't.
-- **Segmented control:** a 2px-padded trough (segment-trough fill, segment stroke, 6px radius). Items are 28px with 13px labels in Secondary, 4px radius; the selected item gets segment-selected fill and Text (plus the light-theme shadow). In Settings items size to their labels with 14px padding; in the flyout they split the width equally.
+- **Segmented control (revised 2026-10-28):** a 2px-padded trough (segment-trough fill, segment stroke, 6px radius). Items are 26px (32px for the whole control) with 13px labels in Secondary, 4px radius; the selected item gets segment-selected fill and Text (plus the light-theme shadow). In Settings items size to their labels with 14px padding; in the flyout they split the width equally.
 - **SelectorBar:** text tabs under a page title, 40px tall, 12px padding, body text in Secondary. The selected tab is Text, Semibold, with a 16×3 accent bar 3px from the bottom.
 - **Nav item:** see Settings window. The pill is 3×16, 2px radius.
 - **Text field and search field:** 32–34px, 10px padding, 4px radius, input fill, 1px stroke with a stronger bottom stroke (input-stroke-bottom). Focus: input-focus fill and a bottom stroke in Text. Placeholders are Muted. Search fields lead with a 16px search glyph.
-- **Combo box:** a Button with its value on the left and a chevron on the right, at least 150 wide.
+- **Combo box:** a Button with its value on the left and a chevron on the right, 180 wide in Settings (revised 2026-10-28).
 - **Checkbox:** 20px, 4px radius. Off: a 1px switch-off stroke on `rgba(0,0,0,.1)` (light `#FFFFFF`). On and mixed: accent fill and stroke with an on-accent glyph (2.2 stroke). Use it for multi-select lists and grids; a single setting uses a switch.
 - **Card:** card fill, 1px card stroke, 8px radius, clipping its rows. Rows inside are divided by 1px dividers; the first row has none. Never a card inside a card.
 - **Flyout card:** flyout-card fill and stroke, 8px radius. Rows are 12 / 16 padded; divided rows are 48px; file rows are 52px.
-- **Expander row:** a row that is a button, with a chevron down (closed) or up (open) at its right. Sub-rows sit in the same card, indented 50px.
+- **Settings layout (revised 2026-10-28):** one shared toolkit in `Chippi.UI.Controls.SettingsLayout`: sections have 24 above their 20-high header and 8 below, so cards sit 52 apart. A header action does not add height. Rows use 16,8 padding and are 48 high, or 60 with a caption. Empty states are one caption-color row inside the card. Add buttons use the Plus glyph and "Add <thing>".
+- **Expander row (revised 2026-10-28):** the header holds the name, current value in secondary text, On/Off switch and chevron. Sub-rows sit in the same card, indented 50px; folding retains their values.
 - **Icon chip:** 32×32, 6px radius, control fill, a 16px glyph in the accent when on and Muted when off. For feature rows, the folder row and the Tidy card.
 - **Duration chip:** 32px, control fill and stroke, 4px radius, 13px label with tabular figures, in a 3-column grid with 8px gaps. Selected: accent fill and stroke, on-accent text.
 - **Swatch:** a 24px circle. The "Windows" accent choice is a 24px pill with a 12px label. Selection: §5 Settings window.
