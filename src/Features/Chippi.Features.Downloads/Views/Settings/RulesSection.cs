@@ -279,7 +279,7 @@ internal sealed class RulesSection : UserControl, ISettingsLeaveGuard
     }
 
     /// <summary>A new rule is a draft until its Save; Cancel removes it.</summary>
-    private void AddRule()
+    internal void AddRule()
     {
         var rule = new RuleSetting
         {

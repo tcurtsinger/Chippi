@@ -20,7 +20,7 @@ internal static class DiskTable
     {
         var volumes = Volumes(disks);
         bool tight = 24 + volumes.Count * 28 > available;
-        double header = tight ? 22 : 24, height = tight ? 22 : 28;
+        double header = !island ? 40 : tight ? 22 : 24, height = !island ? 48 : tight ? 22 : 28;
         int count = double.IsPositiveInfinity(available) ? volumes.Count : Math.Max(0, (int)Math.Floor((available - header) / height));
         var grid = new Grid();
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(80) });
@@ -37,7 +37,7 @@ internal static class DiskTable
             }
             for (int column = 0; column < values.Length; column++)
             {
-                var cell = SystemMonitorView.Text(values[column], heading ? 11 : 12, heading || column == 0);
+                var cell = SystemMonitorView.Text(values[column], island ? heading ? 11 : 12 : heading ? 12 : 14, heading || column == 0);
                 if (heading && column == 0) cell.FontWeight = FontWeights.SemiBold;
                 cell.TextAlignment = column == 0 ? TextAlignment.Left : TextAlignment.Right;
                 cell.Margin = new Thickness(0, 0, column == 3 ? 0 : 8, 0);

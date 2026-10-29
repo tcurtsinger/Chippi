@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
+﻿// SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
 using System.Windows;
@@ -18,6 +18,8 @@ public sealed class SettingsPageTests
     private static IEnumerable<T> Find<T>(DependencyObject root) where T : DependencyObject
     {
         if (root is T item) yield return item;
+        if (root is ExpanderRow { Value: DependencyObject header })
+            foreach (var nested in Find<T>(header)) yield return nested;
         foreach (var child in LogicalTreeHelper.GetChildren(root).OfType<DependencyObject>())
             foreach (var nested in Find<T>(child)) yield return nested;
     }
@@ -65,6 +67,7 @@ public sealed class SettingsPageTests
         page.Measure(new Size(700, double.PositiveInfinity));
         var slider = Control<Slider>(page, "CPU load threshold");
         Assert.False(slider.IsEnabled);
+        Assert.All(Find<SettingRow>(page).Where(r => r.Header is "Threshold"), r => Assert.Equal(new Thickness(0), r.Margin));
         Control<ToggleButton>(page, "CPU load").IsChecked = true;
         Assert.True(slider.IsEnabled);
         slider.Value = 95;

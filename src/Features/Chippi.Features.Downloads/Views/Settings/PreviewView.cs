@@ -24,6 +24,7 @@ internal sealed class PreviewView : UserControl
     private readonly Func<Task<PreviewPlan>> _plan;
     private readonly bool _canPreviewAgain;
     private readonly Action _close;
+    private readonly Action? _addRule;
     private readonly TextBlock _subtitle = Ui.Text("", "CaptionTextStyle", "TextTertiaryBrush");
     private readonly ContentControl _rows = new() { Focusable = false };
     private readonly Grid _columns = Columns();
@@ -38,12 +39,13 @@ internal sealed class PreviewView : UserControl
     private bool _started;
     private bool _released;
 
-    public PreviewView(DownloadsModule module, Func<Task<PreviewPlan>> plan, bool canPreviewAgain, Action close)
+    public PreviewView(DownloadsModule module, Func<Task<PreviewPlan>> plan, bool canPreviewAgain, Action close, Action? addRule = null)
     {
         _module = module;
         _plan = plan;
         _canPreviewAgain = canPreviewAgain;
         _close = close;
+        _addRule = addRule;
 
         // The shell has no back button, so Preview has its own; Cancel and Done also return.
         var back = Ui.Icon(LucideIcons.ChevronLeft, "Back");
@@ -110,7 +112,7 @@ internal sealed class PreviewView : UserControl
         _all.Visibility = Visibility.Visible;
         if (preview.Items.Count == 0)
             card.Children.Add(Ui.Pad(Ui.Text("Nothing to organize", "BodyTextStyle", "TextTertiaryBrush")));
-        foreach (var item in preview.Items)
+        foreach (var item in preview.Items.Where(i => i.Kind != OperationKind.NoMatch))
         {
             bool actionable = item.Kind is OperationKind.Move or OperationKind.Rename && item.Destination is not null;
             var check = Ui.Check($"Include {item.Name}", actionable && item.Selected);
@@ -121,6 +123,13 @@ internal sealed class PreviewView : UserControl
             if (actionable)
                 _checks[item.Id] = check;
             card.Children.Add(Row(item, check, null));
+        }
+        var unmatched = preview.Items.Where(i => i.Kind == OperationKind.NoMatch).ToList();
+        if (unmatched.Count > 0)
+        {
+            var names = SettingsLayout.Card([.. unmatched.Select(i => SettingsLayout.Empty(i.Name))]);
+            names.SetResourceReference(StyleProperty, "CardRowsStyle");
+            card.Children.Add(new ExpanderRow { Header = $"{unmatched.Count} files \u00b7 no rule matches", Description = $"They stay in {Ui.FolderName(preview.Folder)}", Content = names });
         }
         RenderPlanFooter();
         Sync();
@@ -133,6 +142,13 @@ internal sealed class PreviewView : UserControl
         cancel.Click += (_, _) => Leave();
         var approve = Ui.Button("Approve", "PrimaryButtonStyle");
         approve.Click += async (_, _) => await ApproveAsync(approve);
+        bool nothing = _checks.Count == 0;
+        _summary.Text = nothing ? "Nothing to organize" : _summary.Text;
+        if (nothing && _addRule is not null)
+        {
+            approve = SettingsLayout.AddButton("rule", () => { Release(); _addRule(); });
+            approve.SetResourceReference(StyleProperty, "PrimaryButtonStyle");
+        }
         _footer.Children.Add(_summary.At(0));
         _footer.Children.Add(cancel.Margin(0, 0, 8, 0).At(1));
         _footer.Children.Add(approve.At(2));
@@ -147,9 +163,9 @@ internal sealed class PreviewView : UserControl
         _all.IsThreeState = true;
         _all.IsChecked = chosen.Count == 0 ? false : chosen.Count == _checks.Count ? true : null;
         _all.IsEnabled = _checks.Count > 0;
-        _summary.Text = $"{chosen.Count} of {_checks.Count} selected · {Ui.Size(chosen.Sum(i => i.Bytes))}";
+        _summary.Text = _checks.Count == 0 ? "Nothing to organize" : $"{chosen.Count} of {_checks.Count} selected · {Ui.Size(chosen.Sum(i => i.Bytes))}";
         if (_footer.Children.OfType<Button>().LastOrDefault() is { } approve)
-            approve.IsEnabled = chosen.Count > 0;
+            approve.IsEnabled = chosen.Count > 0 || _checks.Count == 0 && _addRule is not null;
         _syncing = false;
     }
 

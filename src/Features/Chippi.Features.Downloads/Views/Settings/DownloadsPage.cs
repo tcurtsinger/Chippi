@@ -114,7 +114,7 @@ public sealed class DownloadsPage : UserControl
         {
             "rules" => new RulesSection(_module),
             "history" => new HistorySection(_module, runId, confirmUndo),
-            _ => new SettingsSection(_module, ShowImport),
+            _ => new SettingsSection(_module, ShowImport, folder => Preview(folder)),
         };
     }
 
@@ -127,13 +127,19 @@ public sealed class DownloadsPage : UserControl
             return;
         }
         string back = CurrentSection();
-        ShowPreview(new PreviewView(_module, () => engine.CreatePreviewAsync(folder, trigger), canPreviewAgain: true, () => Show(back)));
+        ShowPreview(new PreviewView(_module, () => engine.CreatePreviewAsync(folder, trigger), canPreviewAgain: true, () => Show(back), AddRule));
     }
 
     private void ShowImport(Task<PreviewPlan> plan)
     {
         string back = CurrentSection();
-        ShowPreview(new PreviewView(_module, () => plan, canPreviewAgain: false, () => Show(back)));
+        ShowPreview(new PreviewView(_module, () => plan, canPreviewAgain: false, () => Show(back), AddRule));
+    }
+
+    private void AddRule()
+    {
+        Show("rules");
+        if (_host.Content is RulesSection rules) rules.AddRule();
     }
 
     private void ShowPreview(PreviewView view)

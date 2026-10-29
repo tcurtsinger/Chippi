@@ -32,7 +32,7 @@ public sealed class KeepAwakeViewTests
             await registry.StartAsync();
             await OnSta(async () =>
             {
-                var button = view == "island" ? Chip(new KeepAwakeIslandView(module), "1 hr")! : (ToggleButton)new KeepAwakePage(module).FindName("Switch");
+                var button = view == "island" ? Chip(new KeepAwakeIslandView(module), "1 hr")! : Chip(new KeepAwakePage(module), "1 hr")!;
                 var toggle = (IToggleProvider)new ToggleButtonAutomationPeer(button);
                 toggle.Toggle();
                 await Until(() => module.IsOn && button.IsChecked == true); // the view shows it on, as a user would see
