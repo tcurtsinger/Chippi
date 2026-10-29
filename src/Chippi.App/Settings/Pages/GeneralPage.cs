@@ -104,7 +104,7 @@ internal sealed class GeneralPage : UserControl
             {
                 Log.Warn("Run at startup could not be changed", ex);
                 toggle.IsChecked = !want;
-                SettingsUi.Show(message, "Couldn't change startup entry", problem: true);
+                SettingsUi.Show(message, "Startup failed", problem: true);
             }
         });
         return SettingsUi.Row("Run at startup", "", toggle, message);

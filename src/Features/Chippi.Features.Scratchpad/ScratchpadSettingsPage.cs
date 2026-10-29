@@ -161,7 +161,7 @@ public sealed class ScratchpadSettingsPage : UserControl
             _shownId = 0;
             Paint();
         };
-        var question = new TextBlock { Text = $"Delete “{doc.Selected.Name}”?", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 12) };
+        var question = new TextBlock { Text = $"Delete \"{doc.Selected.Name}\"?", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 12) };
         question.SetResourceReference(StyleProperty, "BodyTextStyle");
         var border = new Border
         {

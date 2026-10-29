@@ -64,7 +64,6 @@ internal sealed class PermissionsPage : UserControl
         else if (usage.IsUnused)
         {
             var dismiss = SettingsUi.Button("Dismiss");
-            dismiss.ToolTip = "Stop flagging";
             System.Windows.Automation.AutomationProperties.SetName(dismiss, $"Dismiss unused {capability.Name}");
             dismiss.Click += (_, _) => _shell.Registry.DismissUnusedCapability(capability.Id);
             var panel = new StackPanel { Orientation = Orientation.Horizontal };
