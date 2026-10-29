@@ -79,7 +79,6 @@ public static class FeatureCatalog
         new("command-bar", "Command bar", "Type to launch apps, run commands and reach any Chippi feature", FeatureGroup.Windows)
         {
             Icon = "Search",
-            Badges = [FeatureBadge.Overlap("Overlaps PowerToys Run")],
             Presets = PowerUser,
         },
         new("radial-menu", "Radial menu", "Hold a mouse button for a ring of actions under the pointer", FeatureGroup.Windows)
@@ -91,13 +90,11 @@ public static class FeatureCatalog
         new("window-layouts", "Window layouts", "Snap windows into saved layouts with a shortcut or a drag", FeatureGroup.Windows)
         {
             Icon = "LayoutGrid",
-            Badges = [FeatureBadge.Overlap("Overlaps FancyZones")],
             Presets = PowerUser,
         },
         new("app-switcher", "App switcher", "Switch apps with large live previews", FeatureGroup.Windows)
         {
             Icon = "AppWindow",
-            Badges = [FeatureBadge.Overlap("Overlaps Alt+Tab")],
             Presets = PowerUser,
         },
         new("close-protection", "Close protection", "Hold Alt+F4 to close, so a slip never loses your work", FeatureGroup.Windows)
@@ -110,7 +107,6 @@ public static class FeatureCatalog
         {
             Icon = "Eye",
             Requires = [Capability.InputHooks],
-            Badges = [FeatureBadge.Overlap("Overlaps a Windows setting")],
         },
         new("smooth-scrolling", "Smooth scrolling", "Smooth or linear wheel scrolling for mice that step", FeatureGroup.Windows)
         {
@@ -128,19 +124,16 @@ public static class FeatureCatalog
         {
             Icon = "Keyboard",
             Requires = [Capability.InputHooks],
-            Badges = [FeatureBadge.Overlap("Overlaps Filter Keys")],
         },
         new("super-key", "Super key", "Turns Caps Lock into a modifier for your own shortcuts", FeatureGroup.Windows)
         {
             Icon = "Keyboard",
             Requires = [Capability.InputHooks],
-            Badges = [FeatureBadge.Overlap("Overlaps PowerToys")],
             Presets = PowerUser,
         },
         new("shortcut-manager", "Shortcut manager", "Every shortcut Chippi and your apps use, with clashes flagged", FeatureGroup.Windows)
         {
             Icon = "Keyboard",
-            Badges = [FeatureBadge.Overlap("Overlaps PowerToys")],
             Presets = PowerUser,
         },
 
@@ -149,28 +142,24 @@ public static class FeatureCatalog
         {
             Icon = "Camera",
             Requires = [Capability.ScreenCapture],
-            Badges = [FeatureBadge.Overlap("Overlaps Snipping Tool")],
             Presets = PowerUser,
         },
         new("screen-recording", "Screen recording", "Record a region or window to video or GIF", FeatureGroup.Capture)
         {
             Icon = "Video",
             Requires = [Capability.ScreenCapture],
-            Badges = [FeatureBadge.Overlap("Overlaps Snipping Tool")],
             Presets = PowerUser,
         },
         new("screen-text", "Text and QR from screen", "Copies text or reads a QR code from anything on screen", FeatureGroup.Capture)
         {
             Icon = "Eye",
             Requires = [Capability.ScreenCapture],
-            Badges = [FeatureBadge.Overlap("Overlaps PowerToys")],
             Presets = PowerUser,
         },
         new("color-picker", "Color picker", "Picks a color from anywhere on screen and copies it", FeatureGroup.Capture)
         {
             Icon = "Droplet",
             Requires = [Capability.ScreenCapture],
-            Badges = [FeatureBadge.Overlap("Overlaps PowerToys")],
             Presets = PowerUser,
         },
         new("media-tools", "Media tools", "Quick convert, resize and compress for images and video", FeatureGroup.Capture)
@@ -196,7 +185,6 @@ public static class FeatureCatalog
         new("cleaner", "Cleaner", "Clears temp files, caches and other space hogs", FeatureGroup.Apps)
         {
             Icon = "Trash",
-            Badges = [FeatureBadge.Overlap("Overlaps Storage Sense")],
         },
     ];
 

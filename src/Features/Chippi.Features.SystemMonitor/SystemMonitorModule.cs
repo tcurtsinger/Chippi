@@ -39,7 +39,6 @@ public sealed class SystemMonitorModule : IFeatureModule
     {
         Icon = nameof(LucideIcons.Activity),
         Presets = PresetMembership.Essentials | PresetMembership.PowerUser,
-        Badges = [FeatureBadge.Overlap("Overlaps Task Manager")],
     };
 
     /// <summary>The settings in use, normalized.</summary>

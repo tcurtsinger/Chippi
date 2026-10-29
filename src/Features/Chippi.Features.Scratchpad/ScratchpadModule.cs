@@ -17,7 +17,6 @@ public sealed class ScratchpadModule : IFeatureModule
     public FeatureDescriptor Descriptor { get; } = new("scratchpad", "Scratchpad", "A quick notes pad that saves as you type", FeatureGroup.ClipboardText)
     {
         Icon = "NotebookPen", Presets = PresetMembership.PowerUser,
-        Badges = [FeatureBadge.Overlap("Overlaps Notepad")],
     };
     public Task StartAsync(ModuleContext context, CancellationToken ct)
     {

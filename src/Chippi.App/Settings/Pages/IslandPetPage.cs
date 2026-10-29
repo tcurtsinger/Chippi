@@ -305,12 +305,14 @@ internal sealed class IslandPetPage : UserControl
     /// </summary>
     private void RefreshPreview()
     {
-        const double width = 184, inset = 7, tile = 44, gap = 4, header = 14, button = 24, buttonGap = 6, room = 30;
+        const double width = 260, inset = 6, gap = 4, header = 12, button = 20, buttonGap = 6, room = 30;
         var all = AllTiles();
         var layout = Layout();
         var shown = layout.Shown(all.Select(t => t.Key)).Select(k => all.First(t => t.Key == k)).ToList();
-        int rows = Math.Max(1, (shown.Count + 2) / 3);
-        double height = inset + header + 5 + rows * tile + (rows - 1) * gap + inset;
+        int columns = shown.Count <= 3 ? Math.Max(1, shown.Count) : shown.Count == 4 ? 2 : 3;
+        int rows = Math.Max(1, (shown.Count + columns - 1) / columns);
+        const double height = 180;
+        double tile = (152 - (rows - 1) * gap) / rows;
         var canvas = new Canvas { Width = width + 2 * room, Height = height + (layout.Live ? buttonGap + button : 0) };
 
         var shape = new Border { Width = width, Height = height, CornerRadius = new CornerRadius(0, 0, 12, 12), BorderThickness = new Thickness(1, 0, 1, 1) };
@@ -318,7 +320,7 @@ internal sealed class IslandPetPage : UserControl
         shape.SetResourceReference(Border.BorderBrushProperty, "IslandBorderBrush");
         var title = new TextBlock { Text = "Chippi", FontSize = 9, FontWeight = FontWeights.SemiBold, Height = header, Margin = new Thickness(0, 0, 0, 5) };
         title.SetResourceReference(TextBlock.ForegroundProperty, "IslandTextBrush");
-        var grid = new UniformGrid { Columns = 3, Margin = new Thickness(0, 0, -gap, 0) };
+        var grid = new UniformGrid { Columns = columns, Margin = new Thickness(0, 0, -gap, 0) };
         foreach (var t in shown)
         {
             var glyph = new LucideIcon { Data = t.Icon, Size = 14, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };

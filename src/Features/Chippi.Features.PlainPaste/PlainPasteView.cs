@@ -15,9 +15,10 @@ public sealed class PlainPasteView : UserControl
     private readonly PlainPasteModule _module;
     private readonly StackPanel _body = new();
     private bool _capturing;
-    public PlainPasteView(PlainPasteModule module)
+    private readonly string _title;
+    public PlainPasteView(PlainPasteModule module, string title = "Shortcut")
     {
-        _module = module; Content = _body;
+        _module = module; _title = title; Content = _body;
         Loaded += (_, _) => { _module.Changed += Refresh; Refresh(); };
         Unloaded += (_, _) => { _module.Changed -= Refresh; CancelCapture(); };
         PreviewKeyDown += Capture;
@@ -41,7 +42,9 @@ public sealed class PlainPasteView : UserControl
         row.Children.Add(keys);
         row.Children.Add(Button(_module.Settings.Shortcut is null ? "Set" : "Change", BeginCapture));
         if (_module.Settings.Shortcut is not null) row.Children.Add(Button("Remove", () => { _module.RemoveShortcut(); Refresh(); }));
-        _body.Children.Add(SettingsLayout.Card(SettingsLayout.Row("Shortcut", row)));
+        var card = SettingsLayout.Card(SettingsLayout.Row(_title, row));
+        if (_title != "Shortcut") card.SetResourceReference(StyleProperty, "CardRowsStyle");
+        _body.Children.Add(card);
         if (_module.ShortcutError is { } error)
         {
             var line = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 8, 0, 0) };

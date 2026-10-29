@@ -58,7 +58,7 @@ internal static class SettingsUi
     /// <summary>A setting: title and caption on the left, its control on the right, on a Surface row.</summary>
     public static Border Row(string title, string caption, FrameworkElement control, FrameworkElement? below = null)
     {
-        var row = new SettingRow { Header = title, Description = caption, Content = control };
+        var row = SettingsLayout.Row(title, control, caption);
         if (below is null)
             return new Border { Child = row };
         var stack = new StackPanel();
@@ -68,7 +68,7 @@ internal static class SettingsUi
         return new Border { Child = stack };
     }
 
-    public static FrameworkElement Section(string text) => Styled(new TextBlock { Text = text, Margin = new Thickness(0, 24, 0, 8) }, "HeadlineTextStyle");
+    public static FrameworkElement Section(string text) => SettingsLayout.Section(text);
 
     public static Card Group(params UIElement[] rows)
     {
@@ -83,7 +83,7 @@ internal static class SettingsUi
     public static void Show(TextBlock message, string text, bool problem)
     {
         message.Text = text;
-        message.SetResourceReference(TextBlock.ForegroundProperty, problem ? "WarningBrush" : "TextTertiaryBrush");
+        message.SetResourceReference(TextBlock.ForegroundProperty, problem ? "WarningTextBrush" : "TextTertiaryBrush");
         message.Visibility = Visibility.Visible;
         AutomationProperties.SetLiveSetting(message, AutomationLiveSetting.Polite);
     }

@@ -19,7 +19,7 @@ internal sealed class AddFeaturesPage : UserControl
     private readonly TextBlock _count = SettingsUi.Styled(new TextBlock { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(16, 0, 0, 0) }, "NumberTextStyle");
     private readonly TextBlock _message = SettingsUi.Message();
     private readonly TextBlock _empty = SettingsUi.Styled(new TextBlock { Text = "No features match", Visibility = Visibility.Collapsed, Margin = new Thickness(0, 16, 0, 0) }, "CaptionTextStyle");
-    private readonly List<(FeatureEntry Entry, Grid Row, TextBlock Caption, IconChip Chip, ToggleButton Switch, ContentControl Action)> _rows = [];
+    private readonly List<(FeatureEntry Entry, SettingRow Row, ToggleButton Switch, ContentControl Action)> _rows = [];
     private readonly Dictionary<string, IFeatureRequirement> _requirements = [];
     private readonly List<(FeatureEntry Entry, TextBlock Label, FrameworkElement Heading)> _later = [];
     private readonly ExpanderRow _coming;
@@ -47,29 +47,17 @@ internal sealed class AddFeaturesPage : UserControl
         foreach (var entry in shell.Registry.Features.Where(f => !f.IsComingSoon))
         {
             var toggle = SettingsUi.Switch(entry.IsInstalled);
-            var chip = new IconChip { Icon = LucideIcons.Get(entry.Descriptor.Icon), IsOn = entry.IsInstalled, Margin = new Thickness(0, 0, 14, 0) };
-            var heading = new WrapPanel();
-            heading.Children.Add(SettingsUi.Styled(new TextBlock { Text = entry.Descriptor.Name, VerticalAlignment = VerticalAlignment.Center }, "BodyTextStyle"));
-            foreach (var badge in entry.Descriptor.Badges.Where(b => b.Kind != BadgeKind.Source))
-                heading.Children.Add(new Badge { Text = badge.Text, Kind = badge.Kind, Margin = new Thickness(8, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center });
-            var caption = SettingsUi.Styled(new TextBlock { Text = entry.Descriptor.Description, TextWrapping = TextWrapping.Wrap }, "CaptionTextStyle");
-            var labels = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 16, 0), Children = { heading, caption } };
-            var row = new Grid { Margin = new Thickness(0, 10, 16, 10) };
-            row.ColumnDefinitions.Add(new ColumnDefinition());
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            // The switch, or what a feature with an outside requirement shows instead (Install Driver).
             var action = new ContentControl { Content = toggle, VerticalAlignment = VerticalAlignment.Center, Focusable = false };
-            Grid.SetColumn(action, 1);
-            row.Children.Add(labels);
-            row.Children.Add(action);
+            var controls = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+            foreach (var badge in entry.Descriptor.Badges.Where(b => b.Kind != BadgeKind.Source))
+                controls.Children.Add(new Badge { Text = badge.Text, Kind = badge.Kind, Margin = new Thickness(0, 0, 12, 0), VerticalAlignment = VerticalAlignment.Center });
+            controls.Children.Add(action);
+            var row = SettingsLayout.Row(entry.Descriptor.Name, controls, entry.Descriptor.Description);
+            row.Icon = LucideIcons.Get(entry.Descriptor.Icon);
             AutomationProperties.SetName(toggle, entry.Descriptor.Name);
             AutomationProperties.SetHelpText(toggle, entry.Descriptor.Description);
-            var layout = new DockPanel { Margin = new Thickness(16, 0, 0, 0) };
-            DockPanel.SetDock(chip, Dock.Left);
-            layout.Children.Add(chip);
-            layout.Children.Add(row);
-            _available.Children.Add(layout);
-            _rows.Add((entry, row, caption, chip, toggle, action));
+            _available.Children.Add(row);
+            _rows.Add((entry, row, toggle, action));
             SettingsUi.OnSwitched(toggle, on => SetInstalled(entry, toggle, on));
         }
         var names = new StackPanel();
@@ -159,16 +147,25 @@ internal sealed class AddFeaturesPage : UserControl
 
     private void OnRegistryChanged(object? sender, EventArgs e) => Dispatcher.BeginInvoke(Refresh);
 
+    private static string? FailureReason(Exception error) => error switch
+    {
+        UnauthorizedAccessException => "Access denied",
+        System.IO.IOException => "File unavailable",
+        _ => null,
+    };
+
     private void Refresh()
     {
         _syncing = true;
-        foreach (var (entry, _, caption, chip, toggle, action) in _rows)
+        foreach (var (entry, row, toggle, action) in _rows)
         {
             toggle.IsChecked = entry.IsInstalled;
             toggle.Content = entry.IsInstalled ? "On" : "Off";
-            chip.IsOn = entry.IsInstalled;
-            caption.Text = entry.LastError is not null ? "Start failed" : entry.Descriptor.Description;
-            ShowRequirement(entry, caption, toggle, action);
+            row.Description = entry.LastError is { } error ? FailureReason(error) is { } reason ? "Start failed \u00b7 " + reason : "Start failed" : entry.Descriptor.Description;
+            ShowRequirement(entry, row, toggle, action);
+            row.ApplyTemplate();
+            if (row.Template?.FindName("Caption", row) is TextBlock caption)
+                caption.SetResourceReference(TextBlock.ForegroundProperty, entry.LastError is not null || _requirements.TryGetValue(entry.Id, out var requirement) && requirement.State == RequirementState.Disabled ? "WarningTextBrush" : "TextSecondaryBrush");
         }
         _count.Text = $"{_shell.Registry.InstalledCount} on";
         _syncing = false;
@@ -178,7 +175,7 @@ internal sealed class AddFeaturesPage : UserControl
     // A requirement watches devices only while this page is shown (architecture §6).
     private void WatchRequirements()
     {
-        foreach (var (entry, _, _, _, _, _) in _rows)
+        foreach (var (entry, _, _, _) in _rows)
         {
             if (entry.Descriptor.Requirement is not { } create || _requirements.ContainsKey(entry.Id))
                 continue;
@@ -212,7 +209,7 @@ internal sealed class AddFeaturesPage : UserControl
     /// offers Install Driver, shows it busy, asks for a restart, or offers Sound settings when the
     /// driver is there but disabled.
     /// </summary>
-    private void ShowRequirement(FeatureEntry entry, TextBlock caption, ToggleButton toggle, ContentControl action)
+    private void ShowRequirement(FeatureEntry entry, SettingRow row, ToggleButton toggle, ContentControl action)
     {
         if (!_requirements.TryGetValue(entry.Id, out var requirement) || requirement.State == RequirementState.Ready)
         {
@@ -222,7 +219,7 @@ internal sealed class AddFeaturesPage : UserControl
         switch (requirement.State)
         {
             case RequirementState.Missing:
-                action.Content = RequirementButton("Install Driver", entry, () => InstallAsync(entry, requirement), primary: true);
+                action.Content = RequirementButton("Install driver", entry, () => InstallAsync(entry, requirement), primary: true);
                 break;
             case RequirementState.Installing:
                 var busy = SettingsUi.Button("Installing");
@@ -233,7 +230,7 @@ internal sealed class AddFeaturesPage : UserControl
                 action.Content = SettingsUi.Styled(new TextBlock { Text = "Restart to finish", VerticalAlignment = VerticalAlignment.Center }, "CaptionTextStyle");
                 break;
             case RequirementState.Disabled:
-                caption.Text = "Driver disabled";
+                row.Description = "Driver disabled";
                 action.Content = RequirementButton("Sound settings", entry, () => { requirement.OpenSettings(); return Task.CompletedTask; });
                 break;
             default:
@@ -301,11 +298,11 @@ internal sealed class AddFeaturesPage : UserControl
     {
         string query = _search.Text.Trim();
         int visible = 0;
-        foreach (var (entry, row, _, _, _, _) in _rows)
+        foreach (var (entry, row, _, _) in _rows)
         {
             bool match = entry.Descriptor.Name.Contains(query, StringComparison.CurrentCultureIgnoreCase)
                 || entry.Descriptor.Description.Contains(query, StringComparison.CurrentCultureIgnoreCase);
-            ((FrameworkElement)row.Parent).Visibility = match ? Visibility.Visible : Visibility.Collapsed;
+            row.Visibility = match ? Visibility.Visible : Visibility.Collapsed;
             if (match) visible++;
         }
         _available.Visibility = _availableHeading.Visibility = visible > 0 ? Visibility.Visible : Visibility.Collapsed;

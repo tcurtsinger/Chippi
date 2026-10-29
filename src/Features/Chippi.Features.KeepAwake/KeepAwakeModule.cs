@@ -45,7 +45,6 @@ public sealed class KeepAwakeModule : IFeatureModule
     {
         Icon = nameof(LucideIcons.Coffee),
         Presets = PresetMembership.Essentials | PresetMembership.PowerUser,
-        Badges = [FeatureBadge.Overlap("Overlaps PowerToys")],
     };
 
     public Task StartAsync(ModuleContext context, CancellationToken ct)

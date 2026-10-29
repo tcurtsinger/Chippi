@@ -34,7 +34,6 @@ public sealed class ClipboardHistoryModule : IFeatureModule
     public FeatureDescriptor Descriptor { get; } = new(Id, "Clipboard history", "Searchable history of what you copied, with pinned items", FeatureGroup.ClipboardText)
     {
         Icon = nameof(LucideIcons.ClipboardList),
-        Badges = [FeatureBadge.Overlap("Overlaps Win+V")],
         Presets = PresetMembership.Essentials | PresetMembership.PowerUser,
     };
 

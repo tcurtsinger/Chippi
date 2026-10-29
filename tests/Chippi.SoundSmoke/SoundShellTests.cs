@@ -124,8 +124,8 @@ public sealed class SoundShellTests
         try
         {
             scene.Requirement.Change(RequirementState.Missing);
-            await SmokeDispatcher.Until(() => All<Button>(page).Any(b => AutomationProperties.GetName(b) == "Install Driver, Mic processing"));
-            Invoke(Named<Button>(page, "Install Driver, Mic processing"));
+            await SmokeDispatcher.Until(() => All<Button>(page).Any(b => AutomationProperties.GetName(b) == "Install driver, Mic processing"));
+            Invoke(Named<Button>(page, "Install driver, Mic processing"));
             await SmokeDispatcher.Until(() => scene.Requirement.Installs == 1 && Texts(page).Contains("Restart to finish"));
             Chippi.SmokeTests.SmokeLog.Check();
             Assert.Contains("Install Driver for mic-processing", System.IO.File.ReadAllText(Chippi.Core.Diagnostics.Log.Default.CurrentFile));
@@ -138,7 +138,7 @@ public sealed class SoundShellTests
             await SmokeDispatcher.Until(() => All<Button>(page).Any(b => AutomationProperties.GetName(b) == "Sound settings, Mic processing"));
             Invoke(Named<Button>(page, "Sound settings, Mic processing"));
             await SmokeDispatcher.Until(() => scene.Requirement.SettingsOpened == 1);
-            Assert.Contains("Driver disabled", Texts(page));
+            Assert.Contains(All<Chippi.UI.Controls.SettingRow>(page), r => r.Description == "Driver disabled");
             scene.Requirement.Change(RequirementState.Unsupported);
             await SmokeDispatcher.Until(() => Texts(page).Contains("Not supported"));
             scene.Requirement.Change(RequirementState.Ready);

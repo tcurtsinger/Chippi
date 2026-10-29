@@ -16,7 +16,7 @@ namespace Chippi.App.Settings.Pages;
 internal sealed class PermissionsPage : UserControl
 {
     private readonly ShellContext _shell;
-    private readonly StackPanel _list = new();
+    private readonly Card _list = new();
 
     public PermissionsPage(ShellContext shell)
     {
@@ -41,10 +41,10 @@ internal sealed class PermissionsPage : UserControl
     private void Build()
     {
         _list.Children.Clear();
-        var usages = _shell.Registry.GetPermissions();
+        var usages = _shell.Registry.GetPermissions().Where(u => u.UsedBy.Count > 0 || u.IsUnused).ToList();
         if (usages.Count == 0)
         {
-            _list.Children.Add(SettingsUi.Styled(new TextBlock { Text = "Nothing needed" }, "CaptionTextStyle"));
+            _list.Children.Add(SettingsLayout.Empty("Nothing needed"));
             return;
         }
         foreach (var usage in usages)
@@ -54,16 +54,7 @@ internal sealed class PermissionsPage : UserControl
     private Border Row(CapabilityUsage usage)
     {
         var capability = usage.Capability;
-        var later = _shell.Registry.Features
-            .Where(f => !f.IsInstalled && f.Descriptor.Requires.Contains(capability))
-            .Select(f => f.Descriptor.Name)
-            .ToList();
-
-        string status = usage.UsedBy.Count > 0
-            ? "Used by " + string.Join(", ", usage.UsedBy.Select(d => d.Name))
-            : usage.IsUnused ? "Unused: no installed feature needs this anymore" : "Not in use";
-        string caption = capability.Description + ". " + status + "."
-            + (later.Count > 0 ? " Also needed by " + string.Join(", ", later) + "." : "");
+        string caption = string.Join(", ", usage.UsedBy.Select(d => d.Name));
 
         FrameworkElement side;
         if (usage.UsedBy.Count > 0)
@@ -85,7 +76,9 @@ internal sealed class PermissionsPage : UserControl
         {
             side = State(StatusKind.Offline, "Not in use");
         }
-        return SettingsUi.Row(capability.Name, caption, side);
+        var row = SettingsUi.Row(capability.Name, caption, side);
+        row.MinHeight = SettingsLayout.CaptionRowHeight;
+        return row;
     }
 
     private static StackPanel State(StatusKind kind, string text)

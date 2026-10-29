@@ -35,7 +35,6 @@ public sealed class PlainPasteModule : IFeatureModule
     {
         Icon = "ClipboardType", Requires = [Capability.InputHooks],
         Presets = PresetMembership.Essentials | PresetMembership.PowerUser,
-        Badges = [FeatureBadge.Overlap("Overlaps PowerToys")],
     };
     public PlainPasteSettings Settings { get; private set; } = new();
     public string? ShortcutError { get; private set; }
@@ -50,7 +49,7 @@ public sealed class PlainPasteModule : IFeatureModule
         if (Settings.Shortcut is { IsValid: false }) Settings = new();
         _timer = _time.CreateTimer(_ => Expire(), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
         if (Settings.Shortcut is { } shortcut) TryRegister(shortcut);
-        context.Ui.SetSettingsPage(() => new PlainPasteView(this));
+        context.Ui.SetSettingsPage(section => new PlainPasteView(this, section == "shortcut-list" ? Descriptor.Name : "Shortcut"));
         return Task.CompletedTask;
     }
     private bool TryRegister(MicShortcut shortcut)
