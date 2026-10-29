@@ -28,12 +28,12 @@
             <Border x:Name="ShapeShadow" Background="{StaticResource IslandBrush}" Effect="{StaticResource IslandExpandedShadow}" />
             <Border x:Name="ShapeFill" Background="{StaticResource IslandBrush}" BorderBrush="{StaticResource IslandBorderBrush}" />
         </Grid>
-        <!-- The content that was showing, fading out while a new page fades in (IslandPanelWindow.HoldLeaving). -->
-        <Image x:Name="Leaving" Opacity="0" IsHitTestVisible="False" />
         <!-- The grid or a page, 520 × 360, placed where the shape is heading. -->
         <Border x:Name="Card" Padding="12" Opacity="0" TextElement.Foreground="{StaticResource IslandTextBrush}">
             <ContentControl x:Name="Page" Focusable="False" />
         </Border>
+        <!-- A still picture of the page that was showing, over the new one until it has drawn, then fading out (IslandPanelWindow.HoldLeaving). -->
+        <Image x:Name="Leaving" Opacity="0" IsHitTestVisible="False" />
         <!-- The round buttons around the shape (IslandGeometry.OrbitLayout). -->
         <Canvas x:Name="Orbit" />
     </Canvas>

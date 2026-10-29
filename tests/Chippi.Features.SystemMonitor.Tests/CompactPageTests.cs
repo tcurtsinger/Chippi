@@ -28,6 +28,23 @@ public sealed class CompactPageTests
             ThermalZones = new(laptop ? ReadingStatus.Ok : ReadingStatus.NotSupported, laptop ? [new("zone", 45)] : [], at)
         };
     }
+
+    // The tile keeps CPU and memory current; the last page's GPU, network and disks fill the rest until the page's own arrive.
+    [Fact]
+    public void A_page_opens_with_the_last_pages_readings_and_the_tiles_current_cpu()
+    {
+        var at = DateTimeOffset.UtcNow;
+        var tile = SystemSnapshot.Empty(at) with { Cpu = new(ReadingStatus.Ok, new(61, 8, 4000), at) };
+        var last = Snapshot();
+
+        Assert.Same(tile, SystemMonitorView.Opening(tile, null));
+        var opening = SystemMonitorView.Opening(tile, last);
+        Assert.Same(tile.Cpu, opening.Cpu);
+        Assert.Same(last.Memory, opening.Memory); // the tile didn't read it
+        Assert.Same(last.Disks, opening.Disks);
+        Assert.Same(last.Network, opening.Network);
+        Assert.Same(last.Gpus, opening.Gpus);
+    }
     private static IEnumerable<T> Find<T>(DependencyObject root) where T : DependencyObject
     {
         if (root is T item) yield return item;

@@ -34,6 +34,7 @@ public sealed class RoutingQuickView : UserControl
     private readonly Slider _volume = new() { Minimum = 0, Maximum = 100, SmallChange = 5, LargeChange = 10, IsMoveToPointEnabled = true, VerticalAlignment = VerticalAlignment.Center };
     private readonly TextBlock _percent = new() { FontSize = 12, Width = 34, TextAlignment = TextAlignment.Right, VerticalAlignment = VerticalAlignment.Center };
     private readonly DockPanel _levels = new();
+    private readonly LatestWrite _volumeWrite = new();
     private string _shape = "";
     private bool _refreshing;
 
@@ -71,7 +72,7 @@ public sealed class RoutingQuickView : UserControl
         {
             ShowPercent();
             if (!_refreshing && _module.InUse(AudioFlow.Render) is { } id)
-                Run(_module.SetOutputVolumeAsync(id, (float)e.NewValue / 100));
+                _volumeWrite.Send(() => _module.SetOutputVolumeAsync(id, (float)e.NewValue / 100));
         };
         _percent.SetResourceReference(TextBlock.ForegroundProperty, "IslandTextTertiaryBrush");
         Typography.SetNumeralAlignment(_percent, FontNumeralAlignment.Tabular);

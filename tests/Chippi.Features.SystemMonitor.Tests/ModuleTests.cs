@@ -146,7 +146,8 @@ public sealed class ModuleTests : IDisposable
     public async Task A_failed_read_clears_the_tile_status_rather_than_keep_the_old_number()
     {
         int reads = 0;
-        var fake = new FakeSources { Cpu = _ => Interlocked.Increment(ref reads) == 1 ? new CpuReading(25, 4, null) : throw new InvalidOperationException("PDH failed") };
+        // A new need's first two reads are the unpublished first sample and the published one.
+        var fake = new FakeSources { Cpu = _ => Interlocked.Increment(ref reads) <= 2 ? new CpuReading(25, 4, null) : throw new InvalidOperationException("PDH failed") };
         var module = new SystemMonitorModule(() => fake.Sources);
         var config = new ConfigStore(Path.Combine(_root, "settings.json"));
         config.Load();

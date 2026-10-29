@@ -50,8 +50,18 @@ internal sealed class SystemMonitorView : UserControl
         _module.Changed += OnSettingsChanged;
         sampler.Updated += OnUpdated;
         _watch = sampler.Watch(Need(_module.Settings));
-        Show(sampler.Latest);
+        Show(Opening(sampler.Latest, _module.PageSnapshot));
     }
+
+    /// <summary>
+    /// What a page opens with: the last page's GPU, network and disks with the tile's current CPU and
+    /// memory, so it opens whole and its first update changes values in place, not the layout.
+    /// </summary>
+    internal static SystemSnapshot Opening(SystemSnapshot latest, SystemSnapshot? page) => page is null ? latest : page with
+    {
+        Cpu = latest.Cpu.Status == ReadingStatus.NotRead ? page.Cpu : latest.Cpu,
+        Memory = latest.Memory.Status == ReadingStatus.NotRead ? page.Memory : latest.Memory,
+    };
 
     private void Stop()
     {
@@ -80,7 +90,13 @@ internal sealed class SystemMonitorView : UserControl
         if (_shown is not null) Show(_shown);
     }
 
-    private void OnUpdated(SystemSnapshot snapshot) => Dispatcher.BeginInvoke(() => { if (_sampler is not null) Show(snapshot); });
+    private void OnUpdated(SystemSnapshot snapshot) => Dispatcher.BeginInvoke(() =>
+    {
+        if (_sampler is null) return;
+        if (snapshot.Gpus.Status != ReadingStatus.NotRead || snapshot.Network.Status != ReadingStatus.NotRead || snapshot.Disks.Status != ReadingStatus.NotRead)
+            _module.PageSnapshot = snapshot;
+        Show(snapshot);
+    });
 
     internal void Show(SystemSnapshot s)
     {

@@ -26,7 +26,13 @@ public sealed class FakeDeviceSystem : IDeviceSystem, IPerAppDeviceSystem
     public bool AppPolicyFailsWrite { get; set; }
     public Dictionary<int, string?> AppOutputs { get; } = [];
     public List<(int Pid, string? Output)> AppOutputWrites { get; } = [];
-    public AppDeviceChoice GetAppOutput(int processId) => new(AppPolicyAvailable, AppOutputs.GetValueOrDefault(processId));
+    private int _appOutputReads;
+    public int AppOutputReads => Volatile.Read(ref _appOutputReads);
+    public AppDeviceChoice GetAppOutput(int processId)
+    {
+        Interlocked.Increment(ref _appOutputReads);
+        return new(AppPolicyAvailable, AppOutputs.GetValueOrDefault(processId));
+    }
     public bool SetAppOutput(int processId, string? endpointId)
     {
         if (!AppPolicyAvailable || AppPolicyFailsWrite) return false;

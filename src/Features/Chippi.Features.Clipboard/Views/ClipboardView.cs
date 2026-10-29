@@ -10,6 +10,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Chippi.Core.Clipboard;
+using Chippi.Core.Modules;
 using Chippi.Features.Clipboard.History;
 using Chippi.UI.Controls;
 
@@ -23,6 +24,9 @@ namespace Chippi.Features.Clipboard.Views;
 /// </summary>
 internal sealed class ClipboardView : UserControl
 {
+    /// <summary>More rows than the 268 under Search can show, even at a heading's 22: the list never needs the rest.</summary>
+    internal const int BuiltRows = 16;
+
     private readonly ClipboardFeatures _features;
     private readonly TextBlock _note = new() { FontSize = 11, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 8, 0) };
     private readonly Button _cleanButton = Ui.Icon(LucideIcons.Link, "Clean URL");
@@ -86,6 +90,9 @@ internal sealed class ClipboardView : UserControl
         _history.Children.Add(new Grid { Children = { _rows, _empty } });
 
         Content = new Grid { Children = { _firstUse, _history, _clean } };
+        // The page's whole body, so first use centers in it: the page stacks Clean URL's section under
+        // this one, collapsed while History runs, which leaves this one no height of its own.
+        Height = IslandPage.BodyHeight;
         AutomationProperties.SetName(this, "Clipboard");
 
         _clock.Tick += (_, _) => Refresh(keepScroll: true);
@@ -231,22 +238,24 @@ internal sealed class ClipboardView : UserControl
             _selected = null;
 
         // Pinned first, then Recent, as many whole rows as fit; the selected entry stays in view, and a
-        // search shows its best matches that fit, newest first (brief Part D #5).
+        // search shows its best matches that fit, newest first (brief Part D #5). Only the rows that can
+        // show are built, up to the selected one: building every copy made each key and click slow.
         _rows.Children.Clear();
         _rows.Keep = null;
         var now = DateTimeOffset.Now;
-        if (pinned.Count > 0)
+        int selectedAt = _selected is { } kept ? _shown.FindIndex(e => e.Id == kept) : -1;
+        int from = Math.Max(0, selectedAt - BuiltRows + 1), to = Math.Min(_shown.Count, Math.Max(selectedAt + 1, from + BuiltRows));
+        for (int i = from; i < to; i++)
         {
-            _rows.Children.Add(Label("Pinned"));
-            foreach (var entry in pinned)
-                _rows.Children.Add(Row(entry, now));
+            if (i == 0 && pinned.Count > 0)
+                _rows.Children.Add(Label("Pinned"));
+            if (i == pinned.Count && search.Length == 0 && pinned.Count > 0)
+                _rows.Children.Add(Label("Recent"));
+            _rows.Children.Add(Row(_shown[i], now));
         }
-        if (search.Length == 0 && pinned.Count > 0)
-            _rows.Children.Add(Label("Recent"));
-        foreach (var entry in recent)
-            _rows.Children.Add(Row(entry, now));
-        if (search.Length == 0 && pinned.Count > 0 && recent.Count == 0)
+        if (search.Length == 0 && pinned.Count > 0 && recent.Count == 0 && to == _shown.Count)
         {
+            _rows.Children.Add(Label("Recent"));
             var none = Ui.Muted("No recent copies");
             none.Height = 30;
             none.Padding = new Thickness(10, 0, 0, 0);
