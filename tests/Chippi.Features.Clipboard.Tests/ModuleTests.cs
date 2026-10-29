@@ -260,6 +260,64 @@ public sealed class ModuleTests : IDisposable
     }
 
     [Fact]
+    public async Task The_list_shows_whole_rows_only_keeps_the_open_entry_in_view_and_never_scrolls()
+    {
+        await StartHistoryAsync();
+        _history.SetRecording(true);
+        for (int i = 0; i < 15; i++)
+        {
+            _hub.CopyText($"copy {i}\nsecond line\nthird line\nfourth line");
+            await _history.History!.IdleAsync();
+        }
+        WpfTestThread.Run(() =>
+        {
+            var view = (ClipboardView)_historyUi.Spec!.CreateSection();
+            Load(view);
+            Flush(view);
+            void Fit() { view.Measure(new Size(496, 304)); view.Arrange(new Rect(0, 0, 496, 304)); view.UpdateLayout(); }
+            Fit();
+            var rows = Find<WholeRows>(view).Single();
+            // Whole rows only: the shown rows fit, and the first one left out wouldn't have.
+            var all = rows.Children.OfType<FrameworkElement>().ToList();
+            var shown = all.Where(rows.Shows).ToList();
+            double room = 304 - 28 - 8;
+            Assert.InRange(shown.Count, 1, all.Count - 1);
+            Assert.True(shown.Sum(r => r.DesiredSize.Height) <= room);
+            Assert.True(shown.Sum(r => r.DesiredSize.Height) + all[shown.Count].DesiredSize.Height > room);
+            Assert.Empty(Find<ScrollViewer>(view));
+
+            // Down past the last whole row opens copy 6, the 9th newest; rows above leave instead.
+            var search = Find<SearchBox>(view).Single();
+            for (int i = 0; i < 9; i++)
+                search.RaiseEvent(new System.Windows.Input.KeyEventArgs(System.Windows.Input.Keyboard.PrimaryDevice, new FakeSource(view), 0, System.Windows.Input.Key.Down) { RoutedEvent = System.Windows.Input.Keyboard.PreviewKeyDownEvent });
+            Fit();
+            var open = rows.Children.OfType<Border>().Single();
+            Assert.True(rows.Shows(open));
+            Assert.True(rows.ActualHeight <= 304 - 28 - 8);
+            var preview = Find<TextBlock>(open).Single(t => t.Text.StartsWith("copy 6", StringComparison.Ordinal));
+            Assert.Equal(3 * 18, preview.MaxHeight); // at most 3 lines, the last trimmed
+            Assert.Equal(TextTrimming.CharacterEllipsis, preview.TextTrimming);
+            Assert.Equal("copy 6\nsecond line\nthird line…", preview.Text); // the hidden fourth line shows as "…"
+        });
+    }
+
+    [Theory]
+    [InlineData("one", "one")]
+    [InlineData("one\ntwo\nthree", "one\ntwo\nthree")]
+    [InlineData("one\ntwo\nthree\n", "one\ntwo\nthree")]
+    [InlineData("one\r\ntwo\r\nthree\r\nfour", "one\ntwo\nthree…")]
+    [InlineData("one\ntwo\nthree\nfour\nfive", "one\ntwo\nthree…")]
+    public void A_preview_past_three_lines_ends_its_third_with_an_ellipsis(string text, string shown) =>
+        Assert.Equal(shown, ClipboardView.PreviewText(text, 3));
+
+    private sealed class FakeSource(System.Windows.Media.Visual root) : PresentationSource
+    {
+        public override System.Windows.Media.Visual RootVisual { get => root; set { } }
+        public override bool IsDisposed => false;
+        protected override System.Windows.Media.CompositionTarget GetCompositionTargetCore() => null!;
+    }
+
+    [Fact]
     public async Task The_header_holds_the_commands_and_paused_and_focus_follows_the_view()
     {
         await StartHistoryAsync();
@@ -271,7 +329,7 @@ public sealed class ModuleTests : IDisposable
             var header = (FrameworkElement)spec.CreateHeader!();
             Load(view);
             Assert.Same(view.Header, header);
-            Assert.Empty(Find<IconButton>(view));
+            Assert.DoesNotContain(Find<Button>(view), b => System.Windows.Automation.AutomationProperties.GetName(b) is "Clean URL" or "Pause" or "More"); // the commands are the header's
             Assert.Equal("Turn on", Assert.IsType<Button>(spec.InitialFocus!()).Content);
 
             _history.SetRecording(true);
@@ -280,7 +338,7 @@ public sealed class ModuleTests : IDisposable
             Assert.True(Shows(header, "Paused"));
             Assert.IsType<SearchBox>(spec.InitialFocus!());
 
-            Find<IconButton>(header).Single(b => System.Windows.Automation.AutomationProperties.GetName(b) == "Clean URL").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Find<Button>(header).Single(b => System.Windows.Automation.AutomationProperties.GetName(b) == "Clean URL").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             Assert.Equal("Link", System.Windows.Automation.AutomationProperties.GetName((DependencyObject)spec.InitialFocus!()!));
             Assert.Null(_cleanUi.Spec!.InitialFocus!());
         });

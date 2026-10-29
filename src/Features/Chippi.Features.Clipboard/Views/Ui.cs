@@ -48,21 +48,24 @@ internal static class Ui
         AutomationProperties.SetName(caution, text ?? "");
     }
 
-    /// <summary>A text button: "Paste" (accent), "Copy", "Clear" (Critical).</summary>
-    public static Button Button(string text, string style = "SecondaryButtonStyle")
+    /// <summary>A text button: "Paste" (IslandAccentButtonStyle), "Copy", "Clear" (Critical). 28 tall, at least 64 wide.</summary>
+    public static Button Button(string text, string style = "IslandButtonStyle")
     {
         var button = new Button { Content = text };
         button.SetResourceReference(FrameworkElement.StyleProperty, style);
         return button;
     }
 
-    /// <summary>A 32px icon button with its name for Narrator.</summary>
-    public static IconButton Icon(Geometry icon, string name)
+    /// <summary>The island's icon button, 28 × 24 with a 14 glyph, with its name for Narrator.</summary>
+    public static Button Icon(Geometry icon, string name)
     {
-        var button = new IconButton { Icon = icon, ToolTip = name };
+        var button = new Button { Content = Glyph(icon, 14), ToolTip = name };
+        button.SetResourceReference(FrameworkElement.StyleProperty, "IslandIconButtonStyle");
         AutomationProperties.SetName(button, name);
         return button;
     }
+
+    public static void SetIcon(Button button, Geometry icon) => ((LucideIcon)button.Content).Data = icon;
 
     /// <summary>The island's menu: one row per item, under <paramref name="anchor"/>.</summary>
     public static Popup Menu(UIElement anchor, params (string Text, bool Enabled, Action Click)[] items)

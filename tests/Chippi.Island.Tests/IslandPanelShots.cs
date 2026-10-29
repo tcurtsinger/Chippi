@@ -110,7 +110,7 @@ public sealed class IslandPanelShots
     };
 
     // The island over a dark desktop, with the work area's edge drawn so the dock shows.
-    private static void Save(IslandPanelWindow panel, string path)
+    internal static void Save(IslandPanelWindow panel, string path)
     {
         var window = IslandNative.WindowRect(panel.Handle);
         var region = panel.Footprint;

@@ -34,6 +34,9 @@ public sealed class ShelfService : IDisposable
         _log = log ?? NullLogger.Instance;
     }
 
+    /// <summary>The items the page shows at once, 8 × 5 (refresh brief Part D #7). At this many, drops are refused; nothing is thrown away.</summary>
+    public const int MaxItems = 40;
+
     /// <summary>Raised after the items or the limit line change.</summary>
     public event Action? Changed;
 
@@ -76,7 +79,7 @@ public sealed class ShelfService : IDisposable
         store.Remove(id);
         lock (_gate)
         {
-            if (_limit == ShelfLimit.Full)
+            if (_limit is ShelfLimit.Full or ShelfLimit.Items)
                 _limit = ShelfLimit.None;
         }
         Publish(store);
@@ -145,6 +148,12 @@ public sealed class ShelfService : IDisposable
 
     private void Keep(ShelfStore store, ShelfDrop drop)
     {
+        if (Items.Count >= MaxItems)
+        {
+            SetLimit(ShelfLimit.Items);
+            Publish(store);
+            return;
+        }
         SetLimit(store.Add(drop, _time.GetUtcNow()) is null ? ShelfLimit.Full : ShelfLimit.None);
         Publish(store);
     }

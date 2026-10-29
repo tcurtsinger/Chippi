@@ -7,6 +7,7 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Threading;
+using Chippi.Core.Modules;
 using Chippi.UI.Controls;
 using Microsoft.Win32;
 
@@ -17,17 +18,19 @@ public sealed class ScratchpadPage : Grid, IDisposable
     private readonly ScratchpadSession _session;
     private readonly Func<IDisposable> _hold;
     private readonly Action<Window?, ScratchpadNote> _export;
-    private readonly TextBlock _status = new() { FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
+    private readonly TextBlock _status = new() { FontSize = 11, VerticalAlignment = VerticalAlignment.Center };
     private readonly Button _retry;
-    private readonly StackPanel _body = new();
-    private readonly SegmentedControl _tabs = new() { Width = 308, FontSize = 13 };
+    private readonly DockPanel _body = new();
+    private const double TabsWidth = IslandPage.BodyWidth - 28 - 52; // beside New note and the "+N" menu
+    private readonly SegmentedControl _tabs = new() { FontSize = 12, HorizontalAlignment = HorizontalAlignment.Left };
     private readonly SegmentedControl _mode = new();
-    private readonly TextBox _editor = new() { AcceptsReturn = true, AcceptsTab = false, TextWrapping = TextWrapping.Wrap, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, FontSize = 13, Padding = new Thickness(12), BorderThickness = new Thickness(0) };
-    private readonly ScrollViewer _preview = new() { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Padding = new Thickness(12), Visibility = Visibility.Collapsed };
-    private readonly IconButton _add = Icon(LucideIcons.Plus, "New note");
-    private readonly Button _overflow = Button("All notes");
-    private readonly IconButton _more = Icon(LucideIcons.Ellipsis, "More");
-    private readonly Grid _surface = new() { Height = 236 };
+    private readonly TextBox _editor = new() { AcceptsReturn = true, AcceptsTab = false, TextWrapping = TextWrapping.Wrap, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, FontSize = 12, Padding = new Thickness(8, 6, 8, 6), BorderThickness = new Thickness(0) };
+    private readonly ScrollViewer _preview = new() { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Padding = new Thickness(10, 8, 10, 8), Visibility = Visibility.Collapsed };
+    private readonly Button _add = Icon(LucideIcons.Plus, "New note");
+    private readonly TextBlock _overflowCount = new() { FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
+    private readonly Button _overflow;
+    private readonly Button _more = Icon(LucideIcons.Ellipsis, "More");
+    private readonly Grid _surface = new();
     private readonly Grid _tabHost = new();
     private bool _painting, _disposed, _listening, _previewing, _exportFailed;
     private long _shownId;
@@ -40,10 +43,10 @@ public sealed class ScratchpadPage : Grid, IDisposable
     public ScratchpadPage(ScratchpadSession session, Func<IDisposable> hold, Action<Window?, ScratchpadNote>? export = null)
     {
         _session = session; _hold = hold; _export = export ?? ExportFile;
-        Height = 340;
+        _overflow = Overflow(_overflowCount);
         Header = new DockPanel { Height = 28, Margin = new Thickness(0, 0, 0, 8) };
         var right = new StackPanel { Orientation = Orientation.Horizontal };
-        _retry = Button("Retry"); _retry.Margin = new Thickness(8, 0, 0, 0);
+        _retry = Button("Retry"); _retry.Margin = new Thickness(8, 0, 0, 0); _retry.SetResourceReference(StyleProperty, "IslandButtonStyle");
         _retry.Click += async (_, _) => await Run(_session.LoadAsync());
         right.Children.Add(_status); right.Children.Add(_retry);
         DockPanel.SetDock(right, Dock.Right); Header.Children.Add(right);
@@ -53,9 +56,11 @@ public sealed class ScratchpadPage : Grid, IDisposable
         tabText.SetBinding(TextBlock.TextProperty, new System.Windows.Data.Binding("Label"));
         tabText.SetBinding(TextBlock.ToolTipProperty, new System.Windows.Data.Binding("Label"));
         tabText.SetValue(TextBlock.TextTrimmingProperty, TextTrimming.CharacterEllipsis);
-        tabText.SetValue(TextBlock.MaxWidthProperty, 76.0);
+        tabText.SetValue(TextBlock.MaxWidthProperty, 96.0);
         _tabs.ItemTemplate = new DataTemplate { VisualTree = tabText };
         var tabStyle = new Style(typeof(ListBoxItem), (Style)FindResource("SelectorBarItemStyle"));
+        tabStyle.Setters.Add(new Setter(HeightProperty, 30.0));
+        tabStyle.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(10, 0, 10, 0)));
         tabStyle.Setters.Add(new Setter(AutomationProperties.NameProperty, new System.Windows.Data.Binding("Label")));
         _tabs.ItemContainerStyle = tabStyle;
         AutomationProperties.SetName(_tabs, "Notes");
@@ -66,9 +71,11 @@ public sealed class ScratchpadPage : Grid, IDisposable
             if (e.OriginalSource is DependencyObject source && ItemsControl.ContainerFromElement(_tabs, source) is ListBoxItem { Content: SegmentItem { Value: long id } }) await SelectAsync(id);
             ShowMenu(_tabs);
         };
-        var row = new DockPanel { Height = 36, Margin = new Thickness(0, 0, 0, 8) };
-        var actions = new StackPanel { Orientation = Orientation.Horizontal };
-        actions.Children.Add(_add); actions.Children.Add(_overflow); DockPanel.SetDock(actions, Dock.Right);
+        // The tabs row (30); the note fills the body under it; Edit / Preview and More sit at the bottom edge.
+        var row = new DockPanel { Height = 30, Margin = new Thickness(0, 0, 0, 8) };
+        var actions = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+        _add.SetResourceReference(MarginProperty, "IslandLastIconButtonMargin");
+        actions.Children.Add(_overflow); actions.Children.Add(_add); DockPanel.SetDock(actions, Dock.Right);
         row.Children.Add(actions); _tabHost.Children.Add(_tabs); row.Children.Add(_tabHost);
         _overflow.Click += (_, _) => ShowNotes();
         _add.Click += async (_, _) => await NewAsync();
@@ -78,19 +85,27 @@ public sealed class ScratchpadPage : Grid, IDisposable
         _editor.SetResourceReference(TextBoxBase.SelectionBrushProperty, "IslandAccentBrush");
         _editor.SetResourceReference(Control.ForegroundProperty, "IslandTextBrush");
         _editor.Background = System.Windows.Media.Brushes.Transparent;
-        TextBlock.SetLineHeight(_editor, 20);
+        TextBlock.SetLineHeight(_editor, 18);
         AutomationProperties.SetName(_editor, "Note");
         _surface.Children.Add(_editor); _surface.Children.Add(_preview);
-        var frame = new Border { CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(1), Child = _surface };
-        frame.SetResourceReference(Border.BorderBrushProperty, "IslandBorderBrush");
+        var frame = new Border { CornerRadius = new CornerRadius(8), Child = _surface };
         frame.SetResourceReference(Border.BackgroundProperty, "IslandPanelBrush");
+        // Edit / Preview at the island's size: 22 items in the 2 padding and 1 border, 28 in all.
+        var modeStyle = new Style(typeof(ListBoxItem), (Style)FindResource("SegmentItemStyle"));
+        modeStyle.Setters.Add(new Setter(HeightProperty, 22.0));
+        modeStyle.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(10, 0, 10, 0)));
+        modeStyle.Setters.Add(new Setter(Control.FontSizeProperty, 12.0));
+        _mode.ItemContainerStyle = modeStyle;
         _mode.Items.Add("Edit"); _mode.Items.Add("Preview"); _mode.SelectedIndex = 0;
         AutomationProperties.SetName(_mode, "View");
         _mode.SelectionChanged += (_, _) => SetPreview(_mode.SelectedIndex == 1);
-        var footer = new DockPanel { Height = 36, Margin = new Thickness(0, 8, 0, 0) };
+        var footer = new DockPanel { Height = 28, Margin = new Thickness(0, 8, 0, 0) };
+        _more.SetResourceReference(MarginProperty, "IslandLastIconButtonMargin");
+        _mode.HorizontalAlignment = HorizontalAlignment.Left;
         DockPanel.SetDock(_more, Dock.Right); footer.Children.Add(_more); footer.Children.Add(_mode);
         _more.Click += (_, _) => ShowMenu(_more);
-        _body.Children.Add(row); _body.Children.Add(frame); _body.Children.Add(footer); Children.Add(_body);
+        DockPanel.SetDock(row, Dock.Top); DockPanel.SetDock(footer, Dock.Bottom);
+        _body.Children.Add(row); _body.Children.Add(footer); _body.Children.Add(frame); Children.Add(_body);
         AddHandler(PreviewKeyDownEvent, new KeyEventHandler(OnKey), handledEventsToo: true);
         Loaded += async (_, _) => { Subscribe(); await Run(_session.LoadAsync()); Paint(); };
         Unloaded += async (_, _) => { CloseTransient(); Unsubscribe(); await Run(_session.FlushAsync()); };
@@ -114,7 +129,6 @@ public sealed class ScratchpadPage : Grid, IDisposable
             _status.Text = _exportFailed ? "Export failed" : state.LoadFailed ? "Load failed" : state.SaveFailed ? "Save failed" : state.Document is null ? "" : "Saved";
             _status.SetResourceReference(TextBlock.ForegroundProperty, _exportFailed || state.LoadFailed || state.SaveFailed ? "WarningTextBrush" : "IslandTextTertiaryBrush");
             _retry.Visibility = state.LoadFailed ? Visibility.Visible : Visibility.Collapsed;
-            Height = state.LoadFailed ? 44 : 340;
             _body.Visibility = state.Document is null ? Visibility.Collapsed : Visibility.Visible;
             if (state.Document is not { } doc) { if (state.LoadFailed && IsLoaded && Window.GetWindow(this)?.IsActive == true) _retry.Focus(); return; }
             bool firstDocument = _shownId == 0;
@@ -129,26 +143,26 @@ public sealed class ScratchpadPage : Grid, IDisposable
                 _tabs.Items.Clear();
                 double NoteWidth(ScratchpadNote note)
                 {
-                    var label = new TextBlock { Text = note.Name, FontSize = 13, FontFamily = _tabs.FontFamily };
-                    label.Measure(new Size(double.PositiveInfinity, 40));
-                    return Math.Min(76, label.DesiredSize.Width) + 24;
+                    var label = new TextBlock { Text = note.Name, FontSize = 12, FontWeight = FontWeights.SemiBold, FontFamily = _tabs.FontFamily };
+                    label.Measure(new Size(double.PositiveInfinity, 30));
+                    return Math.Min(96, label.DesiredSize.Width) + 20;
                 }
                 var visible = new List<ScratchpadNote>();
                 double width = 0;
                 foreach (var note in doc.Notes)
                 {
                     var next = NoteWidth(note);
-                    if (visible.Count > 0 && width + next > _tabs.Width) break;
+                    if (visible.Count > 0 && width + next > TabsWidth) break;
                     visible.Add(note); width += next;
                 }
                 if (!visible.Any(n => n.Id == doc.SelectedId))
                 {
                     visible[^1] = doc.Selected;
-                    while (visible.Count > 1 && visible.Sum(NoteWidth) > _tabs.Width) visible.RemoveAt(visible.Count - 2);
+                    while (visible.Count > 1 && visible.Sum(NoteWidth) > TabsWidth) visible.RemoveAt(visible.Count - 2);
                 }
                 foreach (var note in visible) _tabs.Items.Add(new SegmentItem { Label = note.Name, Value = note.Id });
                 _tabs.SelectedItem = _tabs.Items.Cast<SegmentItem>().First(n => (long)n.Value! == doc.SelectedId);
-                _overflow.Content = "+" + (doc.Notes.Count - visible.Count);
+                _overflowCount.Text = "+" + (doc.Notes.Count - visible.Count);
                 _overflow.Visibility = doc.Notes.Count > visible.Count ? Visibility.Visible : Visibility.Collapsed;
             }
             _add.IsEnabled = doc.Notes.Count < ScratchpadDocument.MaximumNotes;
@@ -220,7 +234,7 @@ public sealed class ScratchpadPage : Grid, IDisposable
         EndRename(false);
         _renameId = doc.SelectedId;
         _renameHold = _hold();
-        _rename = new TextBox { Text = doc.Selected.Name, MaxLength = 40, FontSize = 13, VerticalAlignment = VerticalAlignment.Center };
+        _rename = new TextBox { Text = doc.Selected.Name, MaxLength = 40, FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
         AutomationProperties.SetName(_rename, "Name");
         _tabs.Visibility = Visibility.Hidden; _tabHost.Children.Add(_rename);
         _rename.LostKeyboardFocus += (_, _) => EndRename(true);
@@ -284,8 +298,24 @@ public sealed class ScratchpadPage : Grid, IDisposable
         var button = new Button { Content = label, MinHeight = 28, Padding = new Thickness(8, 2, 8, 2) };
         AutomationProperties.SetName(button, label); return button;
     }
-    private static IconButton Icon(System.Windows.Media.Geometry icon, string label)
+    // The island's icon button: 28 × 24 with a 14 glyph.
+    private static Button Icon(System.Windows.Media.Geometry icon, string label)
     {
-        var button = new IconButton { Icon = icon, ToolTip = label }; AutomationProperties.SetName(button, label); return button;
+        var glyph = new LucideIcon { Data = icon, Size = 14 };
+        glyph.SetResourceReference(LucideIcon.BrushProperty, "IslandTextTertiaryBrush");
+        var button = new Button { Content = glyph, ToolTip = label };
+        button.SetResourceReference(StyleProperty, "IslandIconButtonStyle");
+        AutomationProperties.SetName(button, label); return button;
+    }
+
+    // "+N ⌄": the notes that don't fit the tabs row.
+    private static Button Overflow(TextBlock count)
+    {
+        var chevron = new LucideIcon { Data = LucideIcons.ChevronDown, Size = 12, Margin = new Thickness(2, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+        chevron.SetResourceReference(LucideIcon.BrushProperty, "IslandTextTertiaryBrush");
+        count.SetResourceReference(TextBlock.ForegroundProperty, "IslandTextTertiaryBrush");
+        var button = new Button { Content = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(6, 0, 6, 0), Children = { count, chevron } }, Width = double.NaN };
+        button.SetResourceReference(StyleProperty, "IslandIconButtonStyle");
+        AutomationProperties.SetName(button, "All notes"); return button;
     }
 }

@@ -26,7 +26,7 @@ internal sealed class CleanUrlView : UserControl
     private readonly Border _result = new() { Margin = new Thickness(0, 8, 0, 0) };
     private readonly StackPanel _caution = Ui.Caution();
     private readonly StackPanel _copied = new() { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Visibility = Visibility.Collapsed };
-    private readonly Button _copy = Ui.Button("Copy", "PrimaryButtonStyle");
+    private readonly Button _copy = Ui.Button("Copy", "IslandAccentButtonStyle");
     private int _opening;
 
     public CleanUrlView(ClipboardFeatures features)

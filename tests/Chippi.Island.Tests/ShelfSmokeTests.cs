@@ -50,8 +50,8 @@ public sealed class ShelfSmokeTests
             Assert.False(Get<IslandOpenHold>(fixture.Window, "_openHolds").IsHeld);
             Assert.Equal("Invented dropped text", Assert.Single(fixture.Shelf.Items).Text);
             Assert.Equal("1 item", fixture.Tile.Status);
-            // Fill past three rows to exercise the scroll budget as well as the empty drop zone.
-            for (int i = 0; i < 10; i++) fixture.Shelf.AddTextAsync($"Invented item {i}").GetAwaiter().GetResult();
+            // Fill past one 6 x 3 page so the tiles shrink to 7 x 4, as well as the empty drop zone.
+            for (int i = 0; i < 20; i++) fixture.Shelf.AddTextAsync($"Invented item {i}").GetAwaiter().GetResult();
             Call(page, "Refresh");
             Assert.IsType<Button>(fixture.Tile.Spec.InitialFocus!());
             IslandBounds.Place(panel, edge, 960, 540);
@@ -157,7 +157,7 @@ public sealed class ShelfSmokeTests
         public void Stop() => Running = false;
         public void Fire() { Assert.True(Running); Running = false; tick(); }
     }
-    private sealed class Fixture : IDisposable
+    internal sealed class Fixture : IDisposable
     {
         public string Directory { get; } = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "chippi-c6-shelf-" + Guid.NewGuid().ToString("N"));
         public IslandWindow Window { get; } = new();

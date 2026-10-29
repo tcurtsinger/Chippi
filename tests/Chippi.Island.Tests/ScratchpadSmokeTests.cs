@@ -81,7 +81,7 @@ public sealed class ScratchpadSmokeTests(ITestOutputHelper output)
     private static void Set(object value, string name, object field) => value.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(value, field);
     private static T Get<T>(object value, string name) => (T)value.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(value)!;
     private static void Invoke(object value, string name, params object?[] args) => value.GetType().GetMethod(name, BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(value, args);
-    private sealed class Store : IScratchpadStore
+    internal sealed class Store : IScratchpadStore
     {
         public ScratchpadDocument Document = Make();
         private static ScratchpadDocument Make() { var doc = ScratchpadDocument.Empty(); while (doc.Notes.Count < 12) doc = doc.Add(); return doc.Rename("Invented long note title").Edit(string.Join("\n", Enumerable.Repeat("Invented text\twith a tab", 100))); }
@@ -89,8 +89,8 @@ public sealed class ScratchpadSmokeTests(ITestOutputHelper output)
         public void Save(ScratchpadDocument document) => Document = document;
         public void Dispose() { }
     }
-    private sealed class Settings : IModuleSettings { public T Get<T>() where T : class, new() => new(); public void Save<T>(T value) where T : class { } }
-    private sealed class Ui : IModuleUi { public IslandTileContribution? Tile; public IIslandTile AddIslandTile(IslandTileSpec spec) => Tile = new("scratchpad", spec); public void SetSettingsPage(Func<string?, object> createView) => throw new InvalidOperationException("Scratchpad has no Settings page."); }
-    private sealed class Island : IIslandPublisher { public void Publish(IslandActivity activity) => throw new InvalidOperationException(); public void Clear(string key) { } public void ReportSuccess(string? message = null) => throw new InvalidOperationException(); }
+    internal sealed class Settings : IModuleSettings { public T Get<T>() where T : class, new() => new(); public void Save<T>(T value) where T : class { } }
+    internal sealed class Ui : IModuleUi { public IslandTileContribution? Tile; public IIslandTile AddIslandTile(IslandTileSpec spec) => Tile = new("scratchpad", spec); public void SetSettingsPage(Func<string?, object> createView) => throw new InvalidOperationException("Scratchpad has no Settings page."); }
+    internal sealed class Island : IIslandPublisher { public void Publish(IslandActivity activity) => throw new InvalidOperationException(); public void Clear(string key) { } public void ReportSuccess(string? message = null) => throw new InvalidOperationException(); }
 }
 

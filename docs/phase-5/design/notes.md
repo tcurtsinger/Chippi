@@ -175,7 +175,7 @@ All eight, as drawn. The alternatives in the numbered notes were turned down.
 42. **A missing file:** FileX, a muted name and "Unavailable". Copy and dragging out are off; Pin and Remove work.
 43. **An online-only file:** the Cloud glyph and "Online only". It's never opened for a preview.
 44. **Limits:** after a refused drop, a Caution line beside the actions: "Over 100 files" or "Picture over 16 MiB".
-45. **Storage cap** (approved): 128 MiB for the text and pictures the Shelf keeps, in its own store apart from History's. When full: "Shelf full · 128 MiB". Files are references, so they don't count. There's no item-count cap; a full Shelf scrolls (#7).
+45. **Storage cap** (approved): 128 MiB for the text and pictures the Shelf keeps, in its own store apart from History's. When full: "Shelf full · 128 MiB". Files are references, so they don't count. There's no item-count cap; a full Shelf scrolls (#7). Revised 2026-10-28 (refresh brief Part D #7): 40 items at most, "Shelf full", nothing scrolls.
 46. **Remove has no confirmation:** a file item is only a reference, and nothing outside Chippi changes. The verb is Remove, never Delete.
 47. **No Settings page** (approved): what happens after a drop and Copy-only are fixed, so there's nothing to set. The Files group keeps File organizer only.
 
@@ -243,7 +243,7 @@ All eight, as drawn. The alternatives in the numbered notes were turned down.
 | Plain paste (screen-reader names only) | Plain text copied · No text copied · Clipboard busy |
 | Clean URL | Link · Nothing to remove · Not a web link · Copy · Copied · Manual · Automatic |
 | Scratchpad | Saved · Save failed · New note · All notes · Note 5 · Edit · Preview · Rename · Export… · Delete · Delete “Standup”? · Load failed · Retry |
-| Shelf | No items · Copy · Pin · Unpin · Remove · Unavailable · Online only · Over 100 files · Picture over 16 MiB · Shelf full · 128 MiB |
+| Shelf | No items · Copy · Pin · Unpin · Remove · Unavailable · Online only · Over 100 files · Picture over 16 MiB · Shelf full · 128 MiB · Shelf full |
 | Settings | Recording · Apps to skip · Add app · Browse… · No apps · Remove · Shortcut · Not set · Set · Change · New shortcut · Shortcut in use · Automatic cleaning · Sites to skip · No sites · Add site · Add · Uninstall and erase history? · Uninstall |
 
 ## Not drawn, on purpose

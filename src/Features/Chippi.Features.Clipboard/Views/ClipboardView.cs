@@ -16,27 +16,25 @@ using Chippi.UI.Controls;
 namespace Chippi.Features.Clipboard.Views;
 
 /// <summary>
-/// The Clipboard page with Clipboard history (design notes #8 to #16, #23, #59): the header's Clean URL,
-/// Pause and More; first use; Search; the Pinned and Recent list, whose selected row opens in place with
-/// Paste, Copy, Pin and Delete; the Clean URL view behind the link button.
+/// The Clipboard page with Clipboard history (design notes #8 to #16, #23, #59; refresh brief Part D #5):
+/// the header's Clean URL, Pause and More; first use; Search; the Pinned and Recent list, as many whole
+/// rows as fit, whose selected row opens in place with Paste, Copy, Pin and Delete; the Clean URL view
+/// behind the link button. Nothing scrolls.
 /// </summary>
 internal sealed class ClipboardView : UserControl
 {
-    private const double ListHeight = 336; // about 8 rows (notes #7)
-
     private readonly ClipboardFeatures _features;
-    private readonly TextBlock _note = new() { FontSize = 12, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 8, 0) };
-    private readonly IconButton _cleanButton = Ui.Icon(LucideIcons.Link, "Clean URL");
-    private readonly IconButton _pause = Ui.Icon(LucideIcons.Pause, "Pause");
-    private readonly IconButton _more = Ui.Icon(LucideIcons.Ellipsis, "More");
-    private readonly Border _firstUse = new();
-    private readonly Button _turnOn = Ui.Button("Turn on", "PrimaryButtonStyle");
-    private readonly SearchBox _search = new() { Placeholder = "Search", Margin = new Thickness(0, 0, 0, 8) };
+    private readonly TextBlock _note = new() { FontSize = 11, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 8, 0) };
+    private readonly Button _cleanButton = Ui.Icon(LucideIcons.Link, "Clean URL");
+    private readonly Button _pause = Ui.Icon(LucideIcons.Pause, "Pause");
+    private readonly Button _more = Ui.Icon(LucideIcons.Ellipsis, "More");
+    private readonly StackPanel _firstUse = new() { VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center };
+    private readonly Button _turnOn = Ui.Button("Turn on", "IslandAccentButtonStyle");
+    private readonly SearchBox _search = new() { Placeholder = "Search", Height = 28, FontSize = 12, Margin = new Thickness(0, 0, 0, 8) };
     private readonly StackPanel _caution = Ui.Caution();
-    private readonly StackPanel _rows = new();
-    private readonly ScrollViewer _scroller = new() { MaxHeight = ListHeight, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Focusable = false };
-    private readonly TextBlock _empty = Ui.Muted("", 13);
-    private readonly StackPanel _history = new();
+    private readonly WholeRows _rows = new();
+    private readonly TextBlock _empty = Ui.Muted("", 12);
+    private readonly DockPanel _history = new();
     private readonly CleanUrlView _clean;
     private readonly Dictionary<long, (byte[] Png, BitmapSource Image)> _thumbnails = []; // by row, checked against its bytes: ids come back after a delete
     private readonly Dictionary<long, (string Path, BitmapSource? Image)> _fileThumbnails = []; // the same, checked against the path; null while reading or unreadable
@@ -59,27 +57,35 @@ internal sealed class ClipboardView : UserControl
         _note.SetResourceReference(TextBlock.ForegroundProperty, "IslandTextTertiaryBrush");
         var commands = new StackPanel { Orientation = Orientation.Horizontal, Children = { _note, _cleanButton, _pause, _more } };
         DockPanel.SetDock(commands, Dock.Right);
-        Header = new DockPanel { Height = 32, Margin = new Thickness(0, 0, 0, 8), Children = { commands, new TextBlock { Text = "Clipboard", FontSize = 13, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center } } };
+        Header = new DockPanel { Height = 24, Margin = new Thickness(0, 0, 0, 8), Children = { commands, new TextBlock { Text = "Clipboard", FontSize = 13, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center } } };
 
-        // First use (notes #10): "Recording off" and Turn on.
+        // First use (notes #10): the glyph, "Recording off" and Turn on, in the middle of the body.
         _turnOn.Click += (_, _) => _module?.SetRecording(true);
-        DockPanel.SetDock(_turnOn, Dock.Right);
-        _firstUse.SetResourceReference(StyleProperty, "IslandCardStyle");
-        _firstUse.Child = new DockPanel { Children = { _turnOn, Ui.Text("Recording off") } };
+        _turnOn.HorizontalAlignment = HorizontalAlignment.Center;
+        _turnOn.Margin = new Thickness(0, 6, 0, 0);
+        var off = Ui.Muted("Recording off");
+        off.HorizontalAlignment = HorizontalAlignment.Center;
+        var glyph = Ui.Glyph(LucideIcons.ClipboardList, 20, "IslandTextTertiaryBrush");
+        glyph.HorizontalAlignment = HorizontalAlignment.Center;
+        glyph.Margin = new Thickness(0, 0, 0, 6);
+        _firstUse.Children.Add(glyph);
+        _firstUse.Children.Add(off);
+        _firstUse.Children.Add(_turnOn);
 
         _search.TextChanged += (_, _) => Refresh(keepScroll: false);
         _search.PreviewKeyDown += OnSearchKey;
         AutomationProperties.SetName(_search, "Search");
-        _caution.Margin = new Thickness(0, 0, 0, 8);
+        _caution.Margin = new Thickness(10, 0, 0, 8);
         _empty.HorizontalAlignment = HorizontalAlignment.Center;
-        _empty.Margin = new Thickness(0, 24, 0, 24);
-        _scroller.Content = _rows;
+        _empty.VerticalAlignment = VerticalAlignment.Center;
+        _rows.VerticalAlignment = VerticalAlignment.Top;
+        DockPanel.SetDock(_search, Dock.Top);
+        DockPanel.SetDock(_caution, Dock.Top);
         _history.Children.Add(_search);
         _history.Children.Add(_caution);
-        _history.Children.Add(_scroller);
-        _history.Children.Add(_empty);
+        _history.Children.Add(new Grid { Children = { _rows, _empty } });
 
-        Content = new StackPanel { Children = { _firstUse, _history, _clean } };
+        Content = new Grid { Children = { _firstUse, _history, _clean } };
         AutomationProperties.SetName(this, "Clipboard");
 
         _clock.Tick += (_, _) => Refresh(keepScroll: true);
@@ -194,10 +200,14 @@ internal sealed class ClipboardView : UserControl
         _cleanButton.Visibility = _features.CleanUrl is null ? Visibility.Collapsed : Visibility.Visible;
         // With recording off, only Clean URL shows; in Clean URL, Pause and More go (notes #8, #23).
         _pause.Visibility = _more.Visibility = recording && !_cleaning ? Visibility.Visible : Visibility.Collapsed;
-        _pause.Icon = settings.Paused ? LucideIcons.Play : LucideIcons.Pause;
+        Ui.SetIcon(_pause, settings.Paused ? LucideIcons.Play : LucideIcons.Pause);
         AutomationProperties.SetName(_pause, settings.Paused ? "Resume" : "Pause");
         _pause.ToolTip = settings.Paused ? "Resume" : "Pause";
         _note.Text = recording && settings.Paused ? "Paused" : "";
+        // The last icon button's glyph lines up with the body's right edge.
+        foreach (var command in new[] { _cleanButton, _pause, _more })
+            command.ClearValue(MarginProperty);
+        (_more.Visibility == Visibility.Visible ? _more : _cleanButton).SetResourceReference(MarginProperty, "IslandLastIconButtonMargin");
 
         _clean.Visibility = _cleaning ? Visibility.Visible : Visibility.Collapsed;
         _firstUse.Visibility = !_cleaning && !recording ? Visibility.Visible : Visibility.Collapsed;
@@ -220,8 +230,10 @@ internal sealed class ClipboardView : UserControl
         if (_selected is { } id && !_shown.Any(e => e.Id == id))
             _selected = null;
 
-        double offset = _scroller.VerticalOffset;
+        // Pinned first, then Recent, as many whole rows as fit; the selected entry stays in view, and a
+        // search shows its best matches that fit, newest first (brief Part D #5).
         _rows.Children.Clear();
+        _rows.Keep = null;
         var now = DateTimeOffset.Now;
         if (pinned.Count > 0)
         {
@@ -235,42 +247,44 @@ internal sealed class ClipboardView : UserControl
             _rows.Children.Add(Row(entry, now));
         if (search.Length == 0 && pinned.Count > 0 && recent.Count == 0)
         {
-            var none = Ui.Muted("No recent copies", 13);
-            none.Margin = new Thickness(10, 4, 0, 8);
+            var none = Ui.Muted("No recent copies");
+            none.Height = 30;
+            none.Padding = new Thickness(10, 0, 0, 0);
             _rows.Children.Add(none);
         }
         _empty.Text = entries.Count == 0 ? "No items" : _shown.Count == 0 ? "No matches" : "";
         _empty.Visibility = _empty.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
-        _scroller.Visibility = _shown.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
-        if (keepScroll)
-            _scroller.ScrollToVerticalOffset(offset);
-        else
-            _scroller.ScrollToTop();
+        _rows.Visibility = _shown.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
     }
 
+    /// <summary>"Pinned" or "Recent": 22 tall, 11 / 600, 10 in.</summary>
     private static TextBlock Label(string text)
     {
-        var label = Ui.Muted(text, 12);
+        var label = Ui.Muted(text, 11);
         label.FontWeight = FontWeights.SemiBold;
-        label.Margin = new Thickness(10, 8, 0, 4);
+        label.Height = 22;
+        label.VerticalAlignment = VerticalAlignment.Bottom;
+        label.Padding = new Thickness(10, 4, 0, 3);
+        WholeRows.SetIsHeading(label, true);
         return label;
     }
 
+    /// <summary>A copy on one 30 row: its glyph or picture, the line and when. Selected, it opens in place.</summary>
     private FrameworkElement Row(HistoryEntry entry, DateTimeOffset now)
     {
         bool selected = entry.Id == _selected;
-        var head = new DockPanel { Height = 24 };
-        var when = Ui.Muted(Format.When(entry.Recent, now), 12);
-        when.Margin = new Thickness(12, 0, 0, 0);
+        var head = new DockPanel();
+        var when = Ui.Muted(Format.When(entry.Recent, now), 11);
+        when.Margin = new Thickness(10, 0, 0, 0);
         DockPanel.SetDock(when, Dock.Right);
         head.Children.Add(when);
         var kind = Kind(entry);
-        kind.Margin = new Thickness(0, 0, 10, 0);
+        kind.Margin = new Thickness(0, 0, 8, 0);
         head.Children.Add(kind);
-        head.Children.Add(selected ? Ui.Muted(Format.Details(entry), 12) : Ui.Text(Format.Line(entry)));
+        head.Children.Add(selected ? Ui.Muted(Format.Details(entry), 11) : Ui.Text(Format.Line(entry), 12));
 
-        var button = new Button { Content = head, Tag = selected ? "Selected" : null };
-        button.SetResourceReference(StyleProperty, "IslandRowButtonStyle");
+        var button = new Button { Content = head }; // an open row's fill is its card's
+        button.SetResourceReference(StyleProperty, "IslandListRowStyle");
         AutomationProperties.SetName(button, $"{Format.Details(entry)}, {Format.When(entry.Recent, now)}{(entry.Pinned ? ", pinned" : "")}");
         button.Click += (_, _) => Select(entry.Id);
         button.MouseDoubleClick += (_, e) =>
@@ -281,10 +295,11 @@ internal sealed class ClipboardView : UserControl
         if (!selected)
             return button;
 
+        // Open: the row, at most 3 lines of preview, then the actions. It counts at its full height.
         var open = new StackPanel { Children = { button, Preview(entry), Actions(entry) } };
-        var card = new Border { Child = open, CornerRadius = new CornerRadius(6), Padding = new Thickness(0, 0, 0, 10), Margin = new Thickness(0, 2, 0, 2) };
+        var card = new Border { Child = open, CornerRadius = new CornerRadius(8), Padding = new Thickness(0, 0, 0, 8), Margin = new Thickness(0, 2, 0, 2) };
         card.SetResourceReference(Border.BackgroundProperty, "IslandPanelBrush");
-        card.Loaded += (_, _) => card.BringIntoView();
+        _rows.Keep = card;
         return card;
     }
 
@@ -346,41 +361,64 @@ internal sealed class ClipboardView : UserControl
         return null;
     }
 
-    /// <summary>Up to 4 lines of text, the picture 208 wide, or the files with their sizes (notes #9, #12).</summary>
+    /// <summary>
+    /// At most 3 lines (brief Part D #5): the text with the last line trimmed, the picture 3 lines tall,
+    /// or 3 files with their sizes, the third saying how many more when there are (notes #9, #12).
+    /// </summary>
     private FrameworkElement Preview(HistoryEntry entry)
     {
-        var margin = new Thickness(10, 4, 10, 10);
+        const double Line = 18, Lines = 3;
+        var margin = new Thickness(10, 0, 10, 8);
         switch (entry.Kind)
         {
             case EntryKind.Picture:
-                var image = new Image { Width = 208, Stretch = Stretch.Uniform, HorizontalAlignment = HorizontalAlignment.Left, Margin = margin, Source = Thumbnail(entry) };
+                var image = new Image { MaxWidth = 208, Height = Lines * Line, Stretch = Stretch.Uniform, HorizontalAlignment = HorizontalAlignment.Left, Margin = margin, Source = Thumbnail(entry) };
                 _ = LoadPictureAsync(entry.Id, image);
                 return image;
             case EntryKind.Files:
                 var files = new StackPanel { Margin = margin };
-                foreach (var path in entry.Files ?? [])
+                var paths = entry.Files ?? [];
+                foreach (var (path, at) in paths.Select((p, i) => (p, i)).Take((int)Lines))
                 {
+                    var line = new DockPanel { Height = Line };
+                    if (at == Lines - 1 && paths.Count > Lines)
+                    {
+                        line.Children.Add(Ui.Muted($"{paths.Count - at} more files", 12));
+                        files.Children.Add(line);
+                        break;
+                    }
                     bool there = HistoryFiles.Exists(path);
-                    var line = new DockPanel { Height = 24 };
-                    var size = Ui.Muted(there ? HistoryFiles.Size(path) : "Unavailable", 12);
+                    var size = Ui.Muted(there ? HistoryFiles.Size(path) : "Unavailable", 11);
                     DockPanel.SetDock(size, Dock.Right);
                     line.Children.Add(size);
                     var glyph = Ui.Glyph(there ? LucideIcons.File : LucideIcons.FileX, 14, "IslandTextTertiaryBrush");
                     glyph.Margin = new Thickness(0, 0, 8, 0);
                     line.Children.Add(glyph);
-                    line.Children.Add(there ? Ui.Text(Path.GetFileName(path)) : Ui.Muted(Path.GetFileName(path), 13));
+                    line.Children.Add(there ? Ui.Text(Path.GetFileName(path), 12) : Ui.Muted(Path.GetFileName(path), 12));
                     files.Children.Add(line);
                 }
                 return files;
             default:
-                var text = Ui.Text(entry.Text ?? "");
+                // Trimming only marks a line cut at its width, so lines past the third end the third with "…";
+                // a wrapped line past the 3 lines is trimmed by the TextBlock itself.
+                var text = Ui.Text(PreviewText(entry.Text ?? "", (int)Lines), 12);
                 text.TextWrapping = TextWrapping.Wrap;
                 text.TextTrimming = TextTrimming.CharacterEllipsis;
-                text.MaxHeight = 4 * 20;
-                text.LineHeight = 20;
+                text.LineHeight = Line;
+                text.LineStackingStrategy = LineStackingStrategy.BlockLineHeight;
+                text.MaxHeight = Lines * Line;
                 text.Margin = margin;
                 return text;
         }
+    }
+
+    /// <summary>The first <paramref name="lines"/> lines of <paramref name="text"/>, the last ending in "…" when more follow.</summary>
+    internal static string PreviewText(string text, int lines)
+    {
+        var all = text.TrimEnd('\r', '\n').Split('\n');
+        if (all.Length <= lines)
+            return string.Join("\n", all.Select(line => line.TrimEnd('\r')));
+        return string.Join("\n", all.Take(lines).Select(line => line.TrimEnd('\r'))) + "…";
     }
 
     private async Task LoadPictureAsync(long id, Image image)
@@ -401,23 +439,24 @@ internal sealed class ClipboardView : UserControl
     private FrameworkElement Actions(HistoryEntry entry)
     {
         int missing = HistoryFiles.Missing(entry);
-        var paste = Ui.Button("Paste", "PrimaryButtonStyle");
+        var paste = Ui.Button("Paste", "IslandAccentButtonStyle");
         var copy = Ui.Button("Copy");
         copy.Margin = new Thickness(8, 0, 0, 0);
         paste.IsEnabled = copy.IsEnabled = missing == 0;
         paste.Click += (_, _) => Paste(entry);
         copy.Click += (_, _) => Copy(entry);
 
+        // Pin and Delete: icon buttons 2 apart; Delete's glyph lines up with the content's right edge.
         var pin = Ui.Icon(entry.Pinned ? LucideIcons.PinOff : LucideIcons.Pin, entry.Pinned ? "Unpin" : "Pin");
         pin.Click += (_, _) => Pin(entry);
         var delete = Ui.Icon(LucideIcons.Trash, "Delete");
-        delete.Margin = new Thickness(4, 0, 0, 0);
+        delete.Margin = new Thickness(2, 0, -7, 0);
         delete.Click += (_, _) => Delete(entry);
-        var icons = new StackPanel { Orientation = Orientation.Horizontal, Children = { pin, delete } };
+        var icons = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Children = { pin, delete } };
         DockPanel.SetDock(icons, Dock.Right);
 
         string? status = missing > 0 ? Format.Unavailable(missing) : _status;
-        var line = new DockPanel { Margin = new Thickness(10, 0, 6, 0), Children = { icons } };
+        var line = new DockPanel { Margin = new Thickness(10, 0, 10, 0), Children = { icons } };
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, Children = { paste, copy } };
         if (status is not null)
         {
