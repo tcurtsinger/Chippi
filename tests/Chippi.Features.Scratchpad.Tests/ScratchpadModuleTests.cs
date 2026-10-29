@@ -65,7 +65,7 @@ public sealed class ScratchpadModuleTests
         module.StartAsync(context, default).GetAwaiter().GetResult();
         Assert.Equal(1, opens);
         Assert.Equal("1 note", ui.Tile.Status);
-        Assert.Equal(440, ui.Spec.PageWidth); Assert.Equal(80, ui.Spec.Order);
+        Assert.Equal(80, ui.Spec.Order);
         var page = Assert.IsType<ScratchpadPage>(ui.Spec.CreateSection());
         Assert.Same(page.Header, ui.Spec.CreateHeader!()); Assert.Same(page.InitialFocus, ui.Spec.InitialFocus!());
         Assert.Same(page, ui.Spec.CreateSection());

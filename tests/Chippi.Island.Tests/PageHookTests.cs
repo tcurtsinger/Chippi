@@ -24,12 +24,19 @@ public sealed class PageHookTests
             panel.SetTiles(IslandTileContribution.Group(parts));
             var attach = typeof(IslandPanelWindow).GetMethod("Attach", BindingFlags.Instance | BindingFlags.NonPublic)!;
             attach.Invoke(panel, ["shared"]);
-            var page = (StackPanel)((ContentControl)panel.FindName("Page")).Content;
-            Assert.Equal(3, page.Children.Count); Assert.Same(header, page.Children[0]);
-            Assert.Same(first, page.Children[1]); Assert.Same(second, page.Children[2]);
+            // The header in the 24 row, then the body holding both sections, stacked.
+            void Check()
+            {
+                var page = (DockPanel)((ContentControl)panel.FindName("Page")).Content;
+                Assert.Equal(2, page.Children.Count);
+                Assert.Same(header, Assert.Single(((Grid)page.Children[0]).Children.Cast<UIElement>()));
+                var stack = (StackPanel)Assert.Single(((Grid)page.Children[1]).Children.Cast<UIElement>());
+                Assert.Equal([first, second], stack.Children.Cast<UIElement>());
+                Assert.Same(page.Children[1], panel.PageBody);
+            }
+            Check();
             attach.Invoke(panel, [null]); attach.Invoke(panel, ["shared"]);
-            page = (StackPanel)((ContentControl)panel.FindName("Page")).Content;
-            Assert.Equal(3, page.Children.Count); Assert.Same(header, page.Children[0]);
+            Check();
         }
         finally { panel.Close(); }
     });

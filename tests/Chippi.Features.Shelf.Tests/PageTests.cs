@@ -50,7 +50,6 @@ public sealed class PageTests : IDisposable
         Assert.Equal("1 item", _ui.Tile.Status);
         await _module.Shelf.AddTextAsync("two");
         Assert.Equal("2 items", _ui.Tile.Status);
-        Assert.Equal(IslandTileSpec.DefaultPageWidth, _ui.Spec!.PageWidth); // 328 (notes #6)
     }
 
     [Fact]

@@ -77,10 +77,7 @@ public sealed class SystemMonitorModule : IFeatureModule
         _alerts = new MonitorAlerts(Sampler, context.Notifier, context.Island, Settings);
         _alerts.Changed += OnAlertsChanged;
         _tile = context.Ui.AddIslandTile(new IslandTileSpec(TileKey, Descriptor.Name, nameof(LucideIcons.Activity), Order: 60, SectionOrder: 0,
-            () => new SystemMonitorView(this))
-        {
-            PageWidth = SystemMonitorView.PageWidth,
-        });
+            () => new SystemMonitorView(this)));
         _tile.OnScreenChanged += OnTileScreen;
         _tile.SetPageNote(Format.Span(Settings.UpdateInterval));
         context.Activation.Register(OpenVerb, _ => context.OpenIslandPage(TileKey));

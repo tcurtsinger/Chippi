@@ -165,16 +165,16 @@ public static class IslandGeometry
     }
 
     /// <summary>An orbit button's diameter (DIPs).</summary>
-    public const double OrbitSize = 40;
+    public const double OrbitSize = 32;
 
     /// <summary>The gap between the shape and its orbit buttons (DIPs).</summary>
-    public const double OrbitGap = 12;
+    public const double OrbitGap = 10;
 
-    /// <summary>From one orbit button's top to the next one's: 40 plus the 8px gap (DIPs).</summary>
-    public const double OrbitStep = 48;
+    /// <summary>From one orbit button's top to the next one's: 32 plus the 6px between a pair (DIPs).</summary>
+    public const double OrbitStep = 38;
 
     /// <summary>
-    /// The orbit buttons around an open shape (DIPs, any origin), DESIGN.md §5 Island: two pairs 12px
+    /// The orbit buttons around an open shape (DIPs, any origin), DESIGN.md §5 Island: two pairs 10px
     /// off the shape, beside it along its edge, each pair centered on it. On the top edge
     /// <see cref="OrbitSlot.Back"/> over <see cref="OrbitSlot.Left"/> sit left of the shape and Settings
     /// over <see cref="OrbitSlot.Right"/> right of it, never closer than 8px to its top. On a side edge
@@ -185,7 +185,7 @@ public static class IslandGeometry
     public static IReadOnlyList<(OrbitSlot Slot, Rect Rect)> OrbitLayout(IslandEdge edge, Rect shape, IReadOnlyCollection<OrbitSlot> slots)
     {
         var placed = new List<(OrbitSlot, Rect)>();
-        const double pair = OrbitStep + OrbitSize; // two buttons and the 8px between them
+        const double pair = OrbitStep + OrbitSize; // two buttons and the 6px between them
         void Place(OrbitSlot slot, double x, double y)
         {
             if (slots.Contains(slot))

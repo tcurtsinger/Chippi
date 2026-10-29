@@ -23,13 +23,13 @@ namespace Chippi.Island.Tests;
 public sealed class SystemMonitorSmokeTests(ITestOutputHelper output)
 {
     [Theory]
-    [InlineData(false, false, false, 5)]
-    [InlineData(false, true, false, 5)]
-    [InlineData(true, false, false, 5)]
-    [InlineData(false, false, true, 2)]
-    [InlineData(false, true, true, 2)]
-    [InlineData(true, false, true, 2)]
-    public void Tile_page_settings_and_close_share_one_module_on_a_short_screen(bool docked, bool side, bool laptop, int disks) => WpfTestThread.Run(() =>
+    [InlineData(IslandEdge.Top, false, 5)]
+    [InlineData(IslandEdge.Left, false, 5)]
+    [InlineData(IslandEdge.Right, false, 5)]
+    [InlineData(IslandEdge.Top, true, 2)]
+    [InlineData(IslandEdge.Left, true, 2)]
+    [InlineData(IslandEdge.Right, true, 2)]
+    public void Tile_page_settings_and_close_share_one_module_on_a_short_screen(IslandEdge edge, bool laptop, int disks) => WpfTestThread.Run(() =>
     {
         var fake = new FakeSources
         {
@@ -52,15 +52,12 @@ public sealed class SystemMonitorSmokeTests(ITestOutputHelper output)
             panel.SetMedia(new IslandPanelTests.FakeMedia());
             panel.SetTiles(IslandTileContribution.Group([tile]));
             var area = new MonitorArea(default, new Rect(-20000, 0, 1280, 720), new Rect(-20000, 0, 1280, 672), 1);
-            void Open()
+            void Open() => panel.Open(edge, edge switch
             {
-                if (docked)
-                    panel.OpenDocked(new TrayDisplay(new PixelRect(-20000, 0, -18720, 720),
-                        new PixelRect(-20000, 0, -18720, 672), TaskbarEdge.Bottom, 672, -18760, 96));
-                else
-                    panel.Open(side ? IslandEdge.Left : IslandEdge.Top,
-                        side ? new Rect(-20000, 280, 32, 112) : new Rect(-19416, 0, 112, 32), area);
-            }
+                IslandEdge.Left => new Rect(-20000, 280, 32, 112),
+                IslandEdge.Right => new Rect(-18752, 280, 32, 112),
+                _ => new Rect(-19416, 0, 112, 32),
+            }, area);
             Open();
             Until(() => tile.Status == "CPU 25%");
             Assert.True(tile.OnScreen);
@@ -73,34 +70,25 @@ public sealed class SystemMonitorSmokeTests(ITestOutputHelper output)
                 .Any(b => AutomationProperties.GetName(b) == "32 logical processors"));
             Assert.Equal("system-monitor", panel.CurrentPage);
             Assert.False(tile.OnScreen);
-            Assert.Equal(docked, panel.IsDocked);
             var page = (FrameworkElement)((ContentControl)panel.FindName("Page")).Content;
             var processors = Find<Button>(page).Single(b => AutomationProperties.GetName(b) == "32 logical processors");
             processors.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
             Until(() => module.Sampler!.Latest.Cpu.Value?.PerProcessor?.Count == 32);
             IslandPanelTests.Pump(TimeSpan.FromMilliseconds(400));
             var shape = (FrameworkElement)panel.FindName("Shape");
-            Assert.Equal(640, shape.Width, 3);
-            // Budget: five-disk desktop or two-disk laptop, both with the processor strip open.
-            Assert.InRange(page.DesiredSize.Height, 1, 549.999);
+            Assert.Equal((520, 360), (shape.Width, shape.Height)); // one size, whatever the page holds
             Assert.Empty(Find<ScrollViewer>(page));
             var card = (FrameworkElement)panel.FindName("Card");
             var footprint = new Rect(Canvas.GetLeft(card), Canvas.GetTop(card), card.ActualWidth, card.ActualHeight);
-            if (!docked)
-                foreach (var orbit in ((Canvas)panel.FindName("Orbit")).Children.OfType<Button>().Where(b => b.Visibility == Visibility.Visible))
+            foreach (var orbit in ((Canvas)panel.FindName("Orbit")).Children.OfType<Button>().Where(b => b.Visibility == Visibility.Visible))
                 {
                     footprint.Union(new Rect(Canvas.GetLeft(orbit), Canvas.GetTop(orbit), orbit.Width, orbit.Height));
                 }
-            output.WriteLine($"laptop={laptop}, disks={disks}, docked={docked}, side={side}: page={page.DesiredSize.Height:F2} DIP; card={card.ActualHeight:F2} DIP; card + buttons={footprint.Height:F2} DIP; top={footprint.Top:F2}, bottom={footprint.Bottom:F2} (672 DIP work area).");
+            output.WriteLine($"laptop={laptop}, disks={disks}, edge={edge}: page={page.DesiredSize.Height:F2} DIP; card={card.ActualHeight:F2} DIP; card + buttons={footprint.Height:F2} DIP; top={footprint.Top:F2}, bottom={footprint.Bottom:F2} (672 DIP work area).");
             Assert.InRange(footprint.Height, 1, 672);
             Assert.InRange(footprint.Top, 0, 672);
             Assert.InRange(footprint.Bottom, 0, 672);
 
-            if (docked)
-            {
-                Assert.Equal(Visibility.Visible, ((FrameworkElement)panel.FindName("Footer")).Visibility);
-                Assert.Contains(Find<Button>((DependencyObject)panel.FindName("FooterButtons")), b => AutomationProperties.GetName(b) == "All features");
-            }
             Assert.Contains(Find<TextBlock>(page), b => b.Text.Contains("C:"));
             if (disks == 5) Assert.Contains(Find<TextBlock>(page), b => b.Text.Contains("G:"));
 

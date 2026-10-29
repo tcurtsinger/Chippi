@@ -22,10 +22,10 @@ namespace Chippi.Island.Tests;
 public sealed class ClipboardSmokeTests
 {
     [Theory]
-    [InlineData(false, false)]
-    [InlineData(false, true)]
-    [InlineData(true, false)]
-    public void Clipboard_page_header_search_and_clean_url_share_the_short_screen_budget(bool docked, bool side) => WpfTestThread.Run(() =>
+    [InlineData(IslandEdge.Top)]
+    [InlineData(IslandEdge.Left)]
+    [InlineData(IslandEdge.Right)]
+    public void Clipboard_page_header_search_and_clean_url_fit_the_island_on_a_960_by_540_screen(IslandEdge edge) => WpfTestThread.Run(() =>
     {
         var directory = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "chippi-c6-" + Guid.NewGuid().ToString("N"));
         var hub = new Hub(); var features = new ClipboardFeatures();
@@ -53,8 +53,8 @@ public sealed class ClipboardSmokeTests
             Assert.Single(Find<IconButton>(header), b => AutomationProperties.GetName(b) == "Pause");
             var search = Assert.IsType<SearchBox>(historyUi.Tile.Spec.InitialFocus!());
             Assert.Contains(Find<TextBlock>(page), text => text.Text == "Invented first copy");
-            Configure(panel, docked, side);
-            CheckBounds(panel, docked, side);
+            IslandBounds.Place(panel, edge, 960, 540);
+            IslandBounds.Check(panel, edge, 960, 540);
 
             search.Text = "no matching invented text";
             Assert.Contains(Find<TextBlock>(page), text => text.Text == "No matches");
@@ -66,7 +66,7 @@ public sealed class ClipboardSmokeTests
             var link = Assert.IsType<TextBox>(historyUi.Tile.Spec.InitialFocus!());
             Assert.Equal("Link", AutomationProperties.GetName(link));
             Assert.Equal("https://example.org/?utm_source=invented", link.Text);
-            CheckBounds(panel, docked, side);
+            IslandBounds.Check(panel, edge, 960, 540);
             Assert.True(historyUi.Tile.Spec.HandleEscape!());
             Assert.Same(search, historyUi.Tile.Spec.InitialFocus!());
             Assert.False(panel.IsVisible);
@@ -80,34 +80,12 @@ public sealed class ClipboardSmokeTests
         }
     });
 
-    private static void Configure(IslandPanelWindow panel, bool docked, bool side)
-    {
-        Set(panel, "_edge", side ? IslandEdge.Left : IslandEdge.Top);
-        Set(panel, "_area", new MonitorArea(default, new Rect(0, 0, 1280, 720), new Rect(0, 0, 1280, 672), 1));
-        Set(panel, "_window", new Rect(0, 0, 1280, 672));
-        Set(panel, "_tab", side ? new Rect(0, 280, 32, 112) : new Rect(584, 0, 112, 32));
-        if (docked)
-        {
-            Set(panel, "_dock", new TrayDisplay(new PixelRect(0, 0, 1280, 720), new PixelRect(0, 0, 1280, 672), TaskbarEdge.Bottom, 672, 1240, 96));
-            ((FrameworkElement)panel.FindName("Footer")).Visibility = Visibility.Visible;
-        }
-    }
-    private static void CheckBounds(IslandPanelWindow panel, bool docked, bool side)
-    {
-        Invoke(panel, "Reshape", true);
-        var footprint = Get<Rect>(panel, "_target"); Assert.Equal(440, footprint.Width);
-        if (!docked)
-            foreach (var (_, rect) in IslandGeometry.OrbitLayout(side ? IslandEdge.Left : IslandEdge.Top, footprint, Get<List<OrbitSlot>>(panel, "_placedSlots"))) footprint.Union(rect);
-        Assert.InRange(footprint.Left, 0, 1280); Assert.InRange(footprint.Right, 0, 1280);
-        Assert.InRange(footprint.Top, 0, 672); Assert.InRange(footprint.Bottom, 0, 672);
-    }
     private static IEnumerable<T> Find<T>(DependencyObject root) where T : DependencyObject
     {
         if (root is T value) yield return value;
         foreach (var child in LogicalTreeHelper.GetChildren(root).OfType<DependencyObject>()) foreach (var nested in Find<T>(child)) yield return nested;
     }
     private static void Set(object value, string name, object field) => value.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(value, field);
-    private static T Get<T>(object value, string name) => (T)value.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(value)!;
     private static void Invoke(object value, string name, params object?[] args) => value.GetType().GetMethod(name, BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(value, args);
     private sealed class Keys : IKeyProtector { public byte[] Protect(byte[] key) => key.ToArray(); public byte[] Unprotect(byte[] key) => key.ToArray(); }
     private sealed class Settings : IModuleSettings { public T Get<T>() where T : class, new() => typeof(T) == typeof(ClipboardHistorySettings) ? (T)(object)new ClipboardHistorySettings { Recording = true } : new(); public void Save<T>(T value) where T : class { } }

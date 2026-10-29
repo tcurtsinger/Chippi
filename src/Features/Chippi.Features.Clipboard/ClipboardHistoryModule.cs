@@ -65,7 +65,6 @@ public sealed class ClipboardHistoryModule : IFeatureModule
         {
             CreateHeader = () => View().Header,
             InitialFocus = () => View().InitialFocus, // Search, or the link field in Clean URL (notes #58)
-            PageWidth = ClipboardFeatures.PageWidth,
             StatusPriority = 1, // History's status over Clean URL's (notes #4)
             HandleEscape = () => _view?.HandleEscape() == true, // the first Esc clears a search or leaves Clean URL (notes #59)
         });

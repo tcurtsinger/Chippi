@@ -19,7 +19,6 @@ namespace Chippi.Features.SystemMonitor.Views;
 /// </summary>
 internal sealed class SystemMonitorView : UserControl
 {
-    public const double PageWidth = 640;
     private const double ColumnGap = 16; // the cards above Disks keep 8 below them
 
     private readonly SystemMonitorModule _module;

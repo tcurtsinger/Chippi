@@ -22,24 +22,20 @@ using Windows.Win32.Foundation;
 namespace Chippi.App.Island;
 
 /// <summary>
-/// The open island (DESIGN.md §5 Island): the tile grid or one tile's page, in one shape that grows
-/// out of the tab and morphs from page to page, with the orbit buttons around it. Docked by the tray
-/// (the island off, or hidden for a fullscreen app) the same pages show in a card above the tray,
-/// with a footer instead of the orbit buttons. <see cref="IslandWindow"/> opens, places and closes it.
+/// The open island (DESIGN.md §5 Island, revised 2026-10-28): the tile grid or one tile's page, in
+/// one 520 × 360 shape that grows out of the tab, with the orbit buttons around it. Between pages the
+/// shape stays and the content crossfades. <see cref="IslandWindow"/> opens, places and closes it.
 /// </summary>
 public partial class IslandPanelWindow : Window
 {
     /// <summary>The shell's Now Playing tile, always on the grid.</summary>
     public const string NowPlayingKey = "now-playing";
 
-    private const double GridWidth = 328;
-    private const double NowPlayingWidth = 440;
     private const double OpenRadius = 20;
     private const double ShadowRoom = 40; // beside the shape, for its shadow
-    private const double ShadowBelow = 56;
     private static readonly TimeSpan GrowTime = TimeSpan.FromMilliseconds(220);
     private static readonly TimeSpan ShrinkTime = TimeSpan.FromMilliseconds(160);
-    private static readonly TimeSpan PageFadeDelay = TimeSpan.FromMilliseconds(60);
+    private static readonly TimeSpan PageFadeOutTime = TimeSpan.FromMilliseconds(90);
     private static readonly TimeSpan PageFadeTime = TimeSpan.FromMilliseconds(180);
 
     private enum Morph { Open, Page, Close }
@@ -48,10 +44,8 @@ public partial class IslandPanelWindow : Window
     private readonly IslandGrid _grid = new();
     private readonly Dictionary<IslandTileContribution, FrameworkElement> _views = [];
     private readonly Dictionary<OrbitSlot, Button> _orbit = [];
-    private readonly Button _footerGrid;
     private readonly List<Panel> _attached = []; // the page's panels, which hold reused section views
     private readonly TextBlock _pageStatus = new() { FontSize = 12, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
-    private TrayDisplay? _dock; // set while docked by the tray
     private IslandLayout _layout = IslandLayout.Default;
     private IReadOnlyList<IslandTileGroup> _groups = [];
     private IReadOnlyList<IslandActivity> _activities = [];
@@ -86,17 +80,14 @@ public partial class IslandPanelWindow : Window
         _grid.TileOpened += (_, key) => ShowPage(key);
         foreach (var slot in Enum.GetValues<OrbitSlot>())
             Orbit.Children.Add(_orbit[slot] = OrbitButton(slot));
-        _footerGrid = FooterButton(LucideIcons.LayoutGrid, "All features", () => ShowPage(null, remember: false));
-        var settings = FooterButton(LucideIcons.Settings, "Settings", () => SettingsRequested?.Invoke(this, EventArgs.Empty));
-        DockPanel.SetDock(settings, Dock.Right);
-        FooterButtons.Children.Add(_footerGrid);
-        FooterButtons.Children.Add(settings);
+        Card.Width = IslandPage.Width;
+        Card.Height = IslandPage.Height;
 
         // The island grows over the tab: a press where the tab sits is the tab's (click or drag).
         // Any other press is the user clicking into the island: from then on it takes the keyboard.
         PreviewMouseLeftButtonDown += (_, e) =>
         {
-            if (_dock is null && _tabLocal.Contains(e.GetPosition(Root)))
+            if (_tabLocal.Contains(e.GetPosition(Root)))
                 TabPressed?.Invoke(this, e);
             else
                 TakeKeyboard(e.OriginalSource as DependencyObject);
@@ -109,12 +100,6 @@ public partial class IslandPanelWindow : Window
             e.Handled = true;
             if (!PageHandlesEscape())
                 EscapePressed?.Invoke(this, EventArgs.Empty);
-        };
-        // Content that grows or shrinks (a module's view refreshing) reshapes the island around it.
-        Card.SizeChanged += (_, _) =>
-        {
-            if (IsOpen)
-                Reshape(snap: _frame is null);
         };
         DpiChanged += (_, _) => Dispatcher.BeginInvoke(DispatcherPriority.Render, () =>
         {
@@ -129,16 +114,13 @@ public partial class IslandPanelWindow : Window
     /// <summary>Esc while the island has the keyboard (the user clicked into it).</summary>
     internal event EventHandler? EscapePressed;
 
-    /// <summary>The Settings orbit button, or the docked footer's.</summary>
+    /// <summary>The Settings orbit button.</summary>
     internal event EventHandler? SettingsRequested;
 
     /// <summary>The user opened a page (a tile key) to restore next time.</summary>
     internal event EventHandler<string>? LastPageChanged;
 
     public bool IsOpen { get; private set; }
-
-    /// <summary>Open, or closing, docked by the tray rather than grown out of the tab.</summary>
-    internal bool IsDocked => _dock is not null && IsVisible;
 
     internal HWND Handle => _hwnd;
 
@@ -254,29 +236,9 @@ public partial class IslandPanelWindow : Window
     /// <summary>Grows out of <paramref name="tab"/> (physical pixels) on <paramref name="edge"/>, or moves there when already open.</summary>
     internal void Open(IslandEdge edge, Rect tab, MonitorArea area)
     {
-        if (_dock is not null && IsVisible)
-            Collapse(); // a docked card still fading out
-        _dock = null;
         _edge = edge;
         _tab = tab;
         _area = area;
-        Grow();
-    }
-
-    /// <summary>Opens the pages in a card above the tray on <paramref name="display"/>, or moves it there when already open.</summary>
-    internal void OpenDocked(TrayDisplay display)
-    {
-        if (_dock is null && IsVisible)
-            Collapse(); // the island still shrinking into its tab
-        _dock = display;
-        PasteTarget = CaptureTarget?.Invoke() ?? PasteTarget; // after a tray click, the taskbar: counts as none
-        static Rect Pixels(PixelRect r) => new(r.Left, r.Top, r.Width, r.Height);
-        _area = new MonitorArea(default, Pixels(display.Monitor), Pixels(display.Work), display.Scale);
-        Grow();
-    }
-
-    private void Grow()
-    {
         if (IsOpen)
         {
             Place();
@@ -323,13 +285,13 @@ public partial class IslandPanelWindow : Window
         if (!IsOpen)
             return false;
         var local = new Point((physical.X - _window.X) / _area.Scale, (physical.Y - _window.Y) / _area.Scale);
-        return _target.Contains(local) || (_dock is null && IslandGeometry.OrbitLayout(_edge, _target, Slots()).Any(o => o.Rect.Contains(local)));
+        return _target.Contains(local) || IslandGeometry.OrbitLayout(_edge, _target, Slots()).Any(o => o.Rect.Contains(local));
     }
 
     /// <summary>Takes the keyboard without a click (the tray icon chosen with the keyboard, or a second launch).</summary>
     internal void TakeKeyboard() => TakeKeyboard(null);
 
-    /// <summary>Shows <paramref name="key"/>'s page, or the grid for null, morphing the shape to fit.</summary>
+    /// <summary>Shows <paramref name="key"/>'s page, or the grid for null; the old content fades out as the new one fades in.</summary>
     internal void ShowPage(string? key, bool remember = true)
     {
         if (key is not null && !Exists(key))
@@ -344,9 +306,10 @@ public partial class IslandPanelWindow : Window
         _page = key;
         if (!IsOpen)
             return;
+        HoldLeaving();
         Attach(key);
         RefreshOrbit(place: false);
-        Reshape(snap: false); // sets the target; the morph below animates to it from what is drawn
+        Reshape(snap: false); // the same shape; a changed set of orbit buttons may still move it along the edge
         Begin(Morph.Page);
         if (_keyboard)
             Dispatcher.BeginInvoke(DispatcherPriority.Input, FocusFirst);
@@ -361,41 +324,39 @@ public partial class IslandPanelWindow : Window
 
     private IslandTileGroup? Group(string? key) => _groups.FirstOrDefault(g => g.Key == key);
 
-    private double PageWidth(string? key) => key switch
-    {
-        null => GridWidth,
-        NowPlayingKey => Math.Max(NowPlayingWidth, Group(key)?.PageWidth ?? 0),
-        _ => Group(key)?.PageWidth ?? GridWidth,
-    };
+    /// <summary>The open feature page's body, below its header (496 × 304 once laid out); null on the grid and Now Playing.</summary>
+    internal FrameworkElement? PageBody { get; private set; }
 
     private void Attach(string? key)
     {
         Detach();
-        Footer.Visibility = _dock is null ? Visibility.Collapsed : Visibility.Visible;
-        _footerGrid.Visibility = key is null ? Visibility.Collapsed : Visibility.Visible;
+        PageBody = null;
         if (key is null)
         {
             Page.Content = _grid;
             MarkOnScreen();
             return;
         }
-        var page = new StackPanel();
+        // The header docks on top; the sections fill the 496 × 304 body below it.
+        var page = new DockPanel { LastChildFill = true };
         _attached.Add(page);
         if (key == NowPlayingKey && _media is not null)
-            page.Children.Add(_nowPlaying ??= new NowPlayingView(_media));
+            page.Children.Add(_nowPlaying ??= new NowPlayingView(_media)); // its own header and body
         else
         {
             // Construct sections first: a module may expose its header and focus through its view.
             foreach (var part in Group(key)?.Parts ?? []) _ = View(part);
             var factory = Group(key)?.Parts.Select(p => p.Spec.CreateHeader).FirstOrDefault(f => f is not null);
-            page.Children.Add(factory?.Invoke() as FrameworkElement ?? PageHeader(key));
+            var header = factory?.Invoke() as FrameworkElement ?? PageHeader(key);
+            header.Margin = new Thickness(0);
+            header.VerticalAlignment = VerticalAlignment.Center;
+            // Every header gets the same 24 row and the 8 gap below it, so every body is 496 × 304.
+            var row = new Grid { Height = IslandPage.HeaderHeight, Margin = new Thickness(0, 0, 0, IslandPage.Gap), Children = { header } };
+            DockPanel.SetDock(row, Dock.Top);
+            _attached.Add(row);
+            page.Children.Add(row);
+            page.Children.Add(Body(Group(key)?.Parts ?? []));
         }
-        var parts = Group(key)?.Parts ?? [];
-        var columns = parts.GroupBy(p => p.Spec.Column).ToList(); // parts are in section order, so columns are too
-        if (columns.Any(c => c.Key is not null))
-            page.Children.Add(Columns(columns));
-        else
-            AddSections(page, parts);
         Page.Content = page;
         RefreshPageStatus();
         MarkOnScreen();
@@ -407,19 +368,50 @@ public partial class IslandPanelWindow : Window
         var name = new TextBlock { Text = TileName(key), FontSize = 13, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center };
         _pageStatus.Margin = new Thickness(12, 0, 0, 0);
         DockPanel.SetDock(_pageStatus, Dock.Right);
-        var header = new DockPanel { Height = 28, Margin = new Thickness(0, 0, 0, 8), Children = { _pageStatus, name } };
+        var header = new DockPanel { Children = { _pageStatus, name } };
         _attached.Add(header);
         return header;
     }
 
-    /// <summary>Side-by-side columns, 16px apart, each under its name.</summary>
+    /// <summary>
+    /// The page's 496 × 304 body. One section fills it; several stack 8 apart; sections in columns sit
+    /// side by side. It never scrolls and never grows the island: what doesn't fit is cut off here, so
+    /// each page fits its content to the body (DESIGN.md §5 Island, revised 2026-10-28).
+    /// </summary>
+    private Grid Body(IReadOnlyList<IslandTileContribution> parts)
+    {
+        var body = new Grid { ClipToBounds = true };
+        _attached.Add(body);
+        PageBody = body;
+        var columns = parts.GroupBy(p => p.Spec.Column).ToList(); // parts are in section order, so columns are too
+        if (columns.Any(c => c.Key is not null))
+            body.Children.Add(Columns(columns));
+        else if (parts.Count == 1)
+        {
+            if (View(parts[0]) is { } view)
+            {
+                view.Margin = new Thickness(0);
+                body.Children.Add(view);
+            }
+        }
+        else
+        {
+            var stack = new StackPanel();
+            _attached.Add(stack);
+            AddSections(stack, parts);
+            body.Children.Add(stack);
+        }
+        return body;
+    }
+
+    /// <summary>Side-by-side columns, 8px apart, each under its name.</summary>
     private Grid Columns(IReadOnlyList<IGrouping<string?, IslandTileContribution>> columns)
     {
         var grid = new Grid();
         foreach (var column in columns)
         {
             if (grid.ColumnDefinitions.Count > 0)
-                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(16) });
+                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(IslandPage.Gap) });
             grid.ColumnDefinitions.Add(new ColumnDefinition());
             var stack = new StackPanel();
             _attached.Add(stack);
@@ -503,7 +495,7 @@ public partial class IslandPanelWindow : Window
         {
             var live = LiveOn(group.Key);
             bool muted = Muted(group.Key);
-            tiles.Add(new(group.Key, group.Name, muted ? LucideIcons.MicOff : LucideIcons.Get(group.Icon), group.Status, live is not null, live?.NeedsAttention == true || muted, muted));
+            tiles.Add(new(group.Key, group.Name, muted ? LucideIcons.MicOff : LucideIcons.Get(group.Icon), group.Status, live is not null, live?.NeedsAttention == true || muted));
         }
         var shown = _layout.Shown(tiles.Select(t => t.Key));
         _grid.SetTiles([.. shown.Select(key => tiles.First(t => t.Key == key))]);
@@ -541,7 +533,7 @@ public partial class IslandPanelWindow : Window
 
     private Button OrbitButton(OrbitSlot slot)
     {
-        var glyph = new LucideIcon { Size = 16 };
+        var glyph = new LucideIcon { Size = 14 };
         glyph.SetResourceReference(LucideIcon.BrushProperty, "IslandTextBrush");
         var button = new Button { Content = glyph, Visibility = Visibility.Collapsed };
         button.SetResourceReference(StyleProperty, "IslandOrbitButtonStyle");
@@ -625,20 +617,6 @@ public partial class IslandPanelWindow : Window
 
     private string TileName(string? key) => key == NowPlayingKey ? "Now Playing" : Group(key)?.Name ?? "";
 
-    private static Button FooterButton(Geometry icon, string name, Action click)
-    {
-        var glyph = new LucideIcon { Data = icon, Size = 16, Margin = new Thickness(0, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center };
-        glyph.SetResourceReference(LucideIcon.BrushProperty, "IslandTextBrush");
-        var button = new Button
-        {
-            Content = new StackPanel { Orientation = Orientation.Horizontal, Children = { glyph, new TextBlock { Text = name, VerticalAlignment = VerticalAlignment.Center } } },
-        };
-        button.SetResourceReference(StyleProperty, "IslandFooterButtonStyle");
-        AutomationProperties.SetName(button, name);
-        button.Click += (_, _) => click();
-        return button;
-    }
-
     // ----- Keyboard -----
 
     /// <summary>
@@ -680,19 +658,14 @@ public partial class IslandPanelWindow : Window
 
     /// <summary>
     /// Covers a fixed area around the tab while open, so the morph never moves the window: on the top
-    /// edge the widest page plus both orbit pairs, centered on the tab; on a side edge the widest page
-    /// plus the live button beside it; the work area's full height either way.
+    /// edge the island plus both orbit pairs, centered on the tab; on a side edge the island plus the
+    /// live button beside it; the work area's full height either way.
     /// </summary>
     private void Place()
     {
-        if (_dock is { } dock)
-        {
-            PlaceDocked(dock);
-            return;
-        }
         double s = _area.Scale;
         var work = _area.Work;
-        double widest = Widest();
+        double widest = IslandPage.Width;
         double reach = IslandGeometry.OrbitGap + IslandGeometry.OrbitSize;
         double width = (_edge == IslandEdge.Top ? widest + 2 * (reach + ShadowRoom) : widest + reach + ShadowRoom) * s;
         double left = _edge switch
@@ -715,56 +688,21 @@ public partial class IslandPanelWindow : Window
         Reshape(snap: _frame is null);
     }
 
-    /// <summary>Docked by the tray: the widest page plus its shadow, the work area's full height, at the tray's end.</summary>
-    private void PlaceDocked(TrayDisplay dock)
-    {
-        double s = _area.Scale;
-        var work = _area.Work;
-        double width = (Widest() + 2 * ShadowRoom) * s;
-        double left = dock.Edge switch
-        {
-            TaskbarEdge.Left => work.Left,
-            TaskbarEdge.Right => work.Right - width,
-            _ => dock.AnchorAlong >= (dock.Monitor.Left + dock.Monitor.Right) / 2 ? work.Right - width : work.Left,
-        };
-        _window = new Rect(left, work.Top, width, work.Height);
-        IslandNative.Move(_hwnd, _window);
-        Root.Width = _window.Width / s;
-        Root.Height = _window.Height / s;
-        ShapeFill.BorderThickness = new Thickness(1);
-        Reshape(snap: _frame is null);
-    }
-
-    private double Widest() => Math.Max(Math.Max(GridWidth, NowPlayingWidth), _groups.Select(g => g.PageWidth).DefaultIfEmpty(0).Max());
-
     private Rect Local(Rect physical) =>
         new((physical.X - _window.X) / _area.Scale, (physical.Y - _window.Y) / _area.Scale, physical.Width / _area.Scale, physical.Height / _area.Scale);
 
     /// <summary>
-    /// Measures the page at its width and centers it on the tab, keeping it and its orbit buttons in
-    /// the work area. <paramref name="snap"/> also draws it there at once (no morph running).
+    /// Centers the 520 × 360 island on the tab, keeping it and its orbit buttons in the work area.
+    /// <paramref name="snap"/> also draws it there at once (no morph running).
     /// </summary>
     private void Reshape(bool snap)
     {
         double s = _area.Scale;
-        double width = PageWidth(_page);
-        Card.Width = width;
-        Card.Measure(new Size(width, double.PositiveInfinity));
-        double height = Card.DesiredSize.Height;
+        const double width = IslandPage.Width, height = IslandPage.Height;
         _placedSlots = Slots();
-        if (_dock is { } dock)
-        {
-            // The card's corner by the tray stays put; a new page grows it away from the taskbar.
-            var (x, y) = FlyoutPlacement.Place(dock, width, height);
-            _target = Local(new Rect(x, y, width * s, height * s));
-            _tabLocal = _target; // it opens and closes in place, fading
-        }
-        else
-        {
-            var reach = IslandGeometry.OrbitReach(_edge, new Size(width, height), _placedSlots);
-            var origin = IslandGeometry.PanelOrigin(_edge, _tab, new Size(width * s, height * s), _area.Work, s, reach);
-            _target = Local(new Rect(origin.X, origin.Y, width * s, height * s));
-        }
+        var reach = IslandGeometry.OrbitReach(_edge, new Size(width, height), _placedSlots);
+        var origin = IslandGeometry.PanelOrigin(_edge, _tab, new Size(width * s, height * s), _area.Work, s, reach);
+        _target = Local(new Rect(origin.X, origin.Y, width * s, height * s));
         Canvas.SetLeft(Card, _target.X);
         Canvas.SetTop(Card, _target.Y);
         if (snap && _morph != Morph.Close)
@@ -776,8 +714,9 @@ public partial class IslandPanelWindow : Window
 
     /// <summary>
     /// Starts a morph from what is drawn now: open (tab to page, 220ms, content fading in over the
-    /// second half), page (page to page, 220ms, the new content fading in over 180ms after 60ms) or
-    /// close (back to the swollen tab, 160ms, content fading out). Reduced motion snaps.
+    /// second half), page (the shape stays; the old content fades out over 90ms while the new one
+    /// fades in over 180ms, with no blank gap) or close (back to the swollen tab, 160ms, content
+    /// fading out). Reduced motion snaps.
     /// </summary>
     private void Begin(Morph morph)
     {
@@ -800,7 +739,7 @@ public partial class IslandPanelWindow : Window
             return;
         }
         if (morph == Morph.Page)
-            Card.Opacity = 0;
+            Card.Opacity = 0; // Leaving shows the old content meanwhile
         if (_frame is not null)
             return;
         _lastFrame = 0;
@@ -827,24 +766,25 @@ public partial class IslandPanelWindow : Window
         Card.Opacity = _morph switch
         {
             Morph.Open => Math.Max(_fadeFrom, Math.Clamp(t * 2 - 1, 0, 1)),
-            Morph.Page => Math.Clamp((_elapsed - PageFadeDelay) / PageFadeTime, 0, 1),
+            Morph.Page => Math.Clamp(_elapsed / PageFadeTime, 0, 1),
             _ => _fadeFrom * Math.Clamp(1 - t * 2, 0, 1),
         };
+        Leaving.Opacity = _morph == Morph.Page ? _leavingFrom * (1 - Math.Clamp(_elapsed / PageFadeOutTime, 0, 1)) : 0;
         Draw();
-        bool done = _morph == Morph.Page ? _elapsed >= PageFadeDelay + PageFadeTime && t >= 1 : t >= 1;
+        bool done = _morph == Morph.Page ? _elapsed >= PageFadeTime && t >= 1 : t >= 1;
         if (!done)
             return;
         StopFrames();
+        Leaving.Source = null;
         if (_morph == Morph.Close)
             Collapse();
     }
 
     private double _radius = OpenRadius;
 
-    // The tab's corners are as round as it is deep. Docked by the tray there is no tab.
+    // The tab's corners are as round as it is deep.
     private double TabRadius() =>
-        _dock is not null ? OpenRadius
-        : _edge == IslandEdge.Top ? Math.Min(_tabLocal.Height, _tabLocal.Width / 2) : Math.Min(_tabLocal.Width, _tabLocal.Height / 2);
+        _edge == IslandEdge.Top ? Math.Min(_tabLocal.Height, _tabLocal.Width / 2) : Math.Min(_tabLocal.Width, _tabLocal.Height / 2);
 
     private void StopFrames()
     {
@@ -861,6 +801,7 @@ public partial class IslandPanelWindow : Window
         _radius = OpenRadius;
         Hide();
         Card.Opacity = 0;
+        Leaving.Source = null;
         // Unparented views get Unloaded and stop listening until the island opens again.
         Detach();
         MarkOnScreen();
@@ -873,7 +814,7 @@ public partial class IslandPanelWindow : Window
         Canvas.SetTop(Shape, _drawn.Y);
         Shape.Width = Math.Max(0, _drawn.Width);
         Shape.Height = Math.Max(0, _drawn.Height);
-        ShapeShadow.CornerRadius = ShapeFill.CornerRadius = _dock is not null ? new CornerRadius(_radius) : _edge switch
+        ShapeShadow.CornerRadius = ShapeFill.CornerRadius = _edge switch
         {
             IslandEdge.Left => new CornerRadius(0, _radius, _radius, 0),
             IslandEdge.Right => new CornerRadius(_radius, 0, 0, _radius),
@@ -884,14 +825,10 @@ public partial class IslandPanelWindow : Window
         Card.Clip = new RectangleGeometry(inside, _radius, _radius);
         bool settled = Card.Opacity >= 1;
         Card.IsHitTestVisible = settled; // nothing half-faded takes a click
-        // Opening and closing fade the buttons with the content; between pages they stay. Docked by
-        // the tray there is no tab to grow out of, so the whole card fades with its content.
+        Leaving.Clip = Card.Clip;
+        // Opening and closing fade the buttons with the content; between pages they stay.
         Orbit.Opacity = _morph == Morph.Page ? 1 : Card.Opacity;
         Orbit.IsHitTestVisible = IsOpen && Orbit.Opacity >= 1;
-        Orbit.Visibility = _dock is null ? Visibility.Visible : Visibility.Collapsed;
-        Shape.Opacity = _dock is not null && _morph != Morph.Page ? Card.Opacity : 1;
-        if (_dock is not null)
-            return;
         foreach (var (slot, rect) in IslandGeometry.OrbitLayout(_edge, _drawn, Slots()))
         {
             Canvas.SetLeft(_orbit[slot], rect.X);
@@ -900,6 +837,34 @@ public partial class IslandPanelWindow : Window
     }
 
     private static double Lerp(double from, double to, double t) => from + (to - from) * t;
+
+    private double _leavingFrom;
+
+    /// <summary>
+    /// Before a page change: a picture of the content showing now, laid over the new page, which
+    /// <see cref="Step"/> fades out over 90ms while the new content fades in. Nothing while hidden.
+    /// </summary>
+    private void HoldLeaving()
+    {
+        Leaving.Source = null;
+        Leaving.Opacity = _leavingFrom = 0;
+        if (!IsVisible || Card.Opacity <= 0 || Card.ActualWidth <= 0 || Motion.IsReduced)
+            return;
+        double s = Math.Max(1, _area.Scale);
+        var picture = new System.Windows.Media.Imaging.RenderTargetBitmap((int)Math.Ceiling(Card.ActualWidth * s), (int)Math.Ceiling(Card.ActualHeight * s),
+            96 * s, 96 * s, PixelFormats.Pbgra32);
+        var copy = new DrawingVisual();
+        using (var dc = copy.RenderOpen())
+            dc.DrawRectangle(new VisualBrush(Card), null, new Rect(0, 0, Card.ActualWidth, Card.ActualHeight));
+        picture.Render(copy);
+        picture.Freeze();
+        Leaving.Source = picture;
+        Leaving.Width = Card.ActualWidth;
+        Leaving.Height = Card.ActualHeight;
+        Canvas.SetLeft(Leaving, Canvas.GetLeft(Card));
+        Canvas.SetTop(Leaving, Canvas.GetTop(Card));
+        Leaving.Opacity = _leavingFrom = Card.Opacity;
+    }
 
     private void UpdateClock()
     {
