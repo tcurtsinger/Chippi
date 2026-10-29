@@ -64,8 +64,17 @@ public sealed class SettingsShellTests
         Assert.Equal(36 + 16 + 12, Top(rows[3]) - Top(rows[2]), 0.5); // across one: the label and 12 above it
         Assert.Equal(16 + 2 + 2, Top(rows[0]), 0.5); // the first label has nothing above it
 
-        // With Now Playing always in Sound, seven features at 1120 x 720 scroll the list 12 (as the c shots do); the open row scrolls into view.
         Assert.Equal(32, window.SettingsSearch.ActualHeight);
+    });
+
+    [Fact]
+    public void At_1120_x_720_s1_s_seven_features_and_Now_Playing_fit_without_scrolling() => WpfTestThread.Run(() =>
+    {
+        // s1's seven have no Scratchpad page; with it (Seven) the list scrolls 12, as the mockup's fuller sidebars do.
+        using var scene = new SettingsScene(Seven.Where(f => f.Id != "scratchpad").ToArray());
+        var window = scene.Show("general");
+        Assert.Equal(13, window.Nav.Items.Count);
+        Assert.Equal(0, Scroller(window.Nav).ScrollableHeight);
     });
 
     [Fact]
