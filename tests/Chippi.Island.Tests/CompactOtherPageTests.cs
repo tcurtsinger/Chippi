@@ -23,6 +23,14 @@ public sealed class CompactOtherPageTests
         var art = Find<Border>(playing).Single(b => b.Width == 168);
         Assert.Equal(168, art.ActualHeight);
         Assert.IsType<Chippi.App.Pet.Gumdrop>(art.Child); // no artwork: Gumdrop in its place
+        Assert.Equal(new Thickness(0), art.BorderThickness);
+        var cover = System.Windows.Media.Imaging.BitmapSource.Create(1, 1, 96, 96, System.Windows.Media.PixelFormats.Bgra32, null, new byte[4], 4);
+        var covered = new NowPlayingView(new IslandPanelTests.FakeMedia { Sessions = [new("spotify", "Spotify", "Weekend Mix", "Various Artists", true, true, true, true, true, true,
+            TimeSpan.FromSeconds(72), TimeSpan.FromSeconds(232), DateTimeOffset.Now, cover)] });
+        Fit(covered, 496, 336);
+        var coverArt = Find<Border>(covered).Single(b => b.Width == 168);
+        Assert.Null(coverArt.Child);
+        Assert.Equal(new Thickness(1), coverArt.BorderThickness); // a hairline, so a dark cover keeps its edge
         var transport = Find<Button>(playing).Where(b => b.Content is Chippi.UI.Controls.LucideIcon).ToArray();
         Assert.Equal([false, true, true], transport.Select(b => b.IsEnabled)); // the app offers no previous
         Assert.Equal(52, transport[1].ActualHeight);

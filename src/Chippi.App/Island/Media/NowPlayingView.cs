@@ -74,16 +74,18 @@ internal sealed class NowPlayingView : UserControl
         var header = new DockPanel { Height = IslandPage.HeaderHeight, Margin = new Thickness(0, 0, 0, IslandPage.Gap), LastChildFill = true, Children = { _source, heading } };
 
         // The card: artwork, then the title and artist over the transport; the progress under both.
+        // Optically level with the art: the title's capitals with its top, the solid glyphs with its bottom.
         RenderOptions.SetBitmapScalingMode(_art, BitmapScalingMode.HighQuality);
+        _art.SetResourceReference(Border.BorderBrushProperty, "IslandBorderBrush");
         _artist.SetResourceReference(TextBlock.ForegroundProperty, "IslandTextTertiaryBrush");
         _title.SizeChanged += (_, _) => Tip(_title);
         _artist.SizeChanged += (_, _) => Tip(_artist);
         _previous = Transport(Glyph(LucideIcons.SkipBack, 28), 48, "Previous track", () => _media.PreviousAsync());
         _playPause = Transport(_playGlyph, 52, "Play", () => _media.PlayPauseAsync());
         _next = Transport(Glyph(LucideIcons.SkipForward, 28), 48, "Next track", () => _media.NextAsync());
-        var transport = new UniformGrid { Rows = 1, Columns = 3, Height = 52, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(4, 0, 4, 0),
+        var transport = new UniformGrid { Rows = 1, Columns = 3, Height = 52, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(4, 0, 4, -14),
             Children = { _previous, _playPause, _next } };
-        var meta = new Grid { Children = { new StackPanel { Margin = new Thickness(0, 4, 0, 0), Children = { _title, _artist } }, transport } };
+        var meta = new Grid { Children = { new StackPanel { Margin = new Thickness(0, -6, 0, 0), Children = { _title, _artist } }, transport } };
         Grid.SetColumn(meta, 2);
         var row = new Grid { Height = Art, ColumnDefinitions = { new() { Width = new GridLength(Art) }, new() { Width = new GridLength(16) }, new() }, Children = { _art, meta } };
 
@@ -189,15 +191,19 @@ internal sealed class NowPlayingView : UserControl
     private static void Tip(TextBlock block) =>
         block.ToolTip = block.ActualWidth > 0 && IslandGrid.Cut(block, block.Text) ? block.Text : null;
 
+    // A cover keeps a hairline edge, so a dark one doesn't sink into the island.
     private void ShowArt(ImageSource? image)
     {
         if (image is not null)
         {
-            _art.Background = new ImageBrush(image) { Stretch = Stretch.UniformToFill };
+            if (_art.Background is not ImageBrush { ImageSource: var shown } || shown != image)
+                _art.Background = new ImageBrush(image) { Stretch = Stretch.UniformToFill };
+            _art.BorderThickness = new Thickness(1);
             _art.Child = null;
             return;
         }
         _art.SetResourceReference(Border.BackgroundProperty, "IslandPanelBrush");
+        _art.BorderThickness = new Thickness(0);
         _art.Child = _artPet;
     }
 
