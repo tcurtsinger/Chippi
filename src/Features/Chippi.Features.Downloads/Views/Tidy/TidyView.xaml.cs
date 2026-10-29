@@ -29,6 +29,7 @@ public partial class TidyView : UserControl
         _request = request;
         InitializeComponent();
         _ages.Tick += OnRefresh;
+        Recent.SizeChanged += (_, _) => { if (!_refreshing) Refresh(); };
         Refresh();
     }
 
@@ -73,7 +74,7 @@ public partial class TidyView : UserControl
             var folders = _module.Settings.Folders;
             if (_selected is null || !folders.Any(f => Same(f.Path, _selected)))
                 _selected = folders.FirstOrDefault()?.Path;
-            var choices = folders.Select(f => new FolderChoice(TidyProjection.FolderName(f.Path), f.Mode.ToString(), f.Path)).ToList();
+            var choices = folders.Select(f => new FolderChoice(TidyProjection.FolderName(f.Path), f.Mode.DisplayName(), f.Path)).ToList();
             choices.Add(new FolderChoice("Add folder", "", null));
             Folders.ItemsSource = choices;
             Folders.SelectedItem = choices.FirstOrDefault(f => f.Path is not null && Same(f.Path, _selected));
@@ -88,11 +89,11 @@ public partial class TidyView : UserControl
             {
                 Folders.ToolTip = current.Path;
                 Modes.SelectedIndex = current.Mode switch { FolderMode.Silent => 0, FolderMode.Manual => 1, _ => 2 };
-                FolderChip.IsOn = current.Mode != FolderMode.Paused;
+                FolderChip.SetResourceReference(Chippi.UI.Controls.LucideIcon.BrushProperty, current.Mode == FolderMode.Paused ? "IslandTextTertiaryBrush" : "IslandAccentBrush");
             }
             var history = engine?.History.Query(new HistoryQuery { Take = 24, From = _module.Settings.HistoryClearedUtc }) ?? [];
             var rows = TidyProjection.Rows(pending, history, DateTimeOffset.UtcNow);
-            Rows.ItemsSource = rows;
+            Rows.ItemsSource = rows.Take(Math.Max(0, (int)(Recent.ActualHeight / 30))).ToList();
             NoRecent.Visibility = rows.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
             FolderCard.IsEnabled = Actions.IsEnabled = engine is not null;
         }

@@ -18,6 +18,11 @@ public enum FolderMode
     Paused,
 }
 
+public static class FolderModeText
+{
+    public static string DisplayName(this FolderMode mode) => mode == FolderMode.Silent ? "Auto" : mode.ToString();
+}
+
 public sealed class WatchedFolder
 {
     public string Path { get; set; } = "";

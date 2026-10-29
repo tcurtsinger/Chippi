@@ -28,12 +28,25 @@ public sealed class KeepAwakeIslandView : UserControl
     public KeepAwakeIslandView(KeepAwakeModule module)
     {
         _module = module;
+        Resources["ChoiceStyle"] = System.Windows.Markup.XamlReader.Parse("""
+            <Style xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" TargetType="ToggleButton">
+             <Setter Property="Foreground" Value="{DynamicResource IslandTextBrush}"/>
+             <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ToggleButton">
+              <Border Name="Card" CornerRadius="8" Background="{DynamicResource IslandPanelBrush}"><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
+              <ControlTemplate.Triggers>
+               <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Card" Property="Background" Value="{DynamicResource IslandHoverBrush}"/></Trigger>
+               <Trigger Property="IsChecked" Value="True"><Setter TargetName="Card" Property="Background" Value="{DynamicResource IslandAccentBrush}"/><Setter Property="Foreground" Value="Black"/></Trigger>
+               <MultiTrigger><MultiTrigger.Conditions><Condition Property="IsChecked" Value="True"/><Condition Property="IsMouseOver" Value="True"/></MultiTrigger.Conditions><Setter TargetName="Card" Property="Opacity" Value="0.9"/></MultiTrigger>
+              </ControlTemplate.Triggers>
+             </ControlTemplate></Setter.Value></Setter>
+            </Style>
+            """);
         _error.SetResourceReference(StyleProperty, "CaptionTextStyle");
         _error.SetResourceReference(TextBlock.ForegroundProperty, "WarningTextBrush");
         System.Windows.Automation.AutomationProperties.SetLiveSetting(_error, System.Windows.Automation.AutomationLiveSetting.Polite);
 
-        // Three columns with 6px gaps: each chip carries 6px right and below, the grid takes them back.
-        var chips = new UniformGrid { Columns = 3, Margin = new Thickness(0, 0, -6, -6) };
+        // Six compact cards, with an 8 DIP gap in each direction.
+        var chips = new UniformGrid { Columns = 3, Margin = new Thickness(0, 0, -8, -8) };
         foreach (var (label, length) in KeepAwakeText.Lengths)
             chips.Children.Add(Chip(label, length));
         chips.Children.Add(Chip(UntilLabel, null));
@@ -60,7 +73,7 @@ public sealed class KeepAwakeIslandView : UserControl
         picker.SetResourceReference(Border.BorderBrushProperty, "IslandBorderBrush");
         _untilPopup.Child = picker;
 
-        Content = new StackPanel { Children = { chips, _error, _untilPopup } };
+        Content = new Grid { Children = { new StackPanel { VerticalAlignment = VerticalAlignment.Center, Children = { chips, _error } }, _untilPopup } };
         System.Windows.Automation.AutomationProperties.SetName(this, "Keep awake");
 
         _tick.Tick += (_, _) => Refresh();
@@ -71,8 +84,10 @@ public sealed class KeepAwakeIslandView : UserControl
 
     private ToggleButton Chip(string label, KeepAwakeSettings? length)
     {
-        var chip = new ToggleButton { Content = label, Margin = new Thickness(0, 0, 6, 6) };
-        chip.SetResourceReference(StyleProperty, "DurationChipStyle");
+        var chip = new ToggleButton { Content = label, Height = 96, FontSize = 14, Margin = new Thickness(0, 0, 8, 8) };
+        chip.SetResourceReference(StyleProperty, "ChoiceStyle");
+        chip.MouseEnter += (_, _) => { if (IsSelected(length)) chip.Content = "Stop"; };
+        chip.MouseLeave += (_, _) => { chip.Content = label; Refresh(); };
         OnFlip(chip, () => OnChip(chip, length));
         _chips.Add((chip, length));
         return chip;

@@ -62,7 +62,7 @@ internal sealed class SettingsSection : UserControl
         bool paused = folder.Mode == FolderMode.Paused;
         bool exists = Directory.Exists(folder.Path);
 
-        var mode = Ui.Segment($"{name} mode", "Silent", "Manual", "Paused");
+        var mode = Ui.Segment($"{name} mode", "Auto", "Manual", "Paused");
         mode.SelectedIndex = folder.Mode switch { FolderMode.Silent => 0, FolderMode.Manual => 1, _ => 2 };
         mode.SelectionChanged += (_, _) => Edit(folder, f => f.Mode = mode.SelectedIndex switch { 0 => FolderMode.Silent, 1 => FolderMode.Manual, _ => FolderMode.Paused });
 
@@ -100,7 +100,7 @@ internal sealed class SettingsSection : UserControl
             Header = name,
             Description = where,
             Icon = LucideIcons.Folder,
-            Value = folder.Mode.ToString(),
+            Value = folder.Mode.DisplayName(),
             Content = options,
             IsExpanded = _expanded.Contains(folder.Path),
             ToolTip = folder.Path,

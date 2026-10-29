@@ -176,7 +176,7 @@ public sealed class DownloadsModule : IFeatureModule
 
     /// <summary>
     /// The island tile's status, for the first watched folder (the one the island page shows): files to
-    /// review in Manual, else its mode ("Silent", "Manual", "Paused"); empty with no folder.
+    /// review in Manual, else its mode ("Auto", "Manual", "Paused"); empty with no folder.
     /// </summary>
     public static string TileStatus(WatchedFolder? folder, IReadOnlyList<PendingFile> pending)
     {
@@ -184,7 +184,7 @@ public sealed class DownloadsModule : IFeatureModule
             return "";
         int ready = pending.Count(p => p.Status == PendingStatus.Ready
             && string.Equals(Path.TrimEndingDirectorySeparator(p.Folder), Path.TrimEndingDirectorySeparator(folder.Path), StringComparison.OrdinalIgnoreCase));
-        return folder.Mode == FolderMode.Manual && ready > 0 ? $"{ready} to review" : folder.Mode.ToString();
+        return folder.Mode == FolderMode.Manual && ready > 0 ? $"{ready} to review" : folder.Mode.DisplayName();
     }
 
     private void OnPendingChanged(object? sender, EventArgs e) => UpdateTile();

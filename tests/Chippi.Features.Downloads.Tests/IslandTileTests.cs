@@ -34,7 +34,7 @@ public sealed class IslandTileTests : IDisposable
         Assert.Equal("Manual", DownloadsModule.TileStatus(folder, []));
         Assert.Equal("2 to review", DownloadsModule.TileStatus(folder, [Ready("a.pdf"), Ready("b.zip")]));
         folder.Mode = FolderMode.Silent;
-        Assert.Equal("Silent", DownloadsModule.TileStatus(folder, []));
+        Assert.Equal("Auto", DownloadsModule.TileStatus(folder, []));
         folder.Mode = FolderMode.Paused;
         Assert.Equal("Paused", DownloadsModule.TileStatus(folder, [Ready("a.pdf")]));
     }
@@ -60,7 +60,7 @@ public sealed class IslandTileTests : IDisposable
         {
             await registry.StartAsync();
             var tile = Assert.Single(registry.Find("downloads-organizer")!.IslandTiles);
-            Assert.Equal("Silent", tile.Status);
+            Assert.Equal("Auto", tile.Status);
 
             var paused = module.Settings.Clone();
             paused.Folders[0].Mode = FolderMode.Paused;

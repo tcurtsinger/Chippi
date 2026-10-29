@@ -1,11 +1,11 @@
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
 <!-- File organizer's island page (DESIGN.md §5 Island): the folder card with its picker and mode
-     segment, the latest 3 moves or files waiting, then History and Organize now. The page's header
+     segment, the latest whole rows of moves or files waiting, then History and Organize now. The page's header
      shows the status. -->
 <UserControl x:Class="Chippi.Features.Downloads.Views.Tidy.TidyView"
  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:c="urn:chippi-ui"
- AutomationProperties.Name="File organizer" Loaded="OnLoaded" Unloaded="OnUnloaded">
+ Foreground="{DynamicResource IslandTextBrush}" FontSize="12" AutomationProperties.Name="File organizer" Loaded="OnLoaded" Unloaded="OnUnloaded">
  <UserControl.Resources>
   <BooleanToVisibilityConverter x:Key="Visible" />
   <!-- The folder name as a picker: name and a small chevron, opening a flyout-colored list. -->
@@ -19,7 +19,7 @@
        <ToggleButton.Template><ControlTemplate TargetType="ToggleButton">
         <Border x:Name="Chrome" Background="Transparent" CornerRadius="4" Padding="2,0">
          <StackPanel Orientation="Horizontal">
-          <TextBlock Text="{Binding SelectedItem.Name, RelativeSource={RelativeSource AncestorType=ComboBox}}" TextTrimming="CharacterEllipsis" MaxWidth="220" VerticalAlignment="Center" Foreground="{DynamicResource TextPrimaryBrush}"/>
+          <TextBlock Text="{Binding SelectedItem.Name, RelativeSource={RelativeSource AncestorType=ComboBox}}" TextTrimming="CharacterEllipsis" MaxWidth="180" VerticalAlignment="Center" Foreground="{DynamicResource TextPrimaryBrush}"/>
           <c:LucideIcon Data="{x:Static c:LucideIcons.ChevronDown}" Size="12" Thickness="2" Margin="6,0,0,0" VerticalAlignment="Center" Brush="{DynamicResource TextSecondaryBrush}"/>
          </StackPanel>
         </Border>
@@ -36,48 +36,58 @@
    </Setter.Value></Setter>
   </Style>
  </UserControl.Resources>
- <StackPanel>
-  <Border x:Name="FolderCard" Style="{DynamicResource IslandCardStyle}">
-   <StackPanel>
-    <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="32"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-     <c:IconChip x:Name="FolderChip" Icon="{x:Static c:LucideIcons.Folder}" IsOn="True" VerticalAlignment="Center"/>
-     <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
-      <ComboBox x:Name="Folders" Style="{StaticResource FolderPickerStyle}" SelectionChanged="OnFolderChanged" AutomationProperties.Name="Watched folder">
-       <ComboBox.ItemTemplate><DataTemplate><Grid ToolTip="{Binding Path}" Margin="0,4"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis"/><TextBlock Grid.Column="1" Text="{Binding Mode}" Foreground="{DynamicResource TextTertiaryBrush}" Margin="16,0,0,0"/></Grid></DataTemplate></ComboBox.ItemTemplate>
-      </ComboBox>
-     </StackPanel>
-    </Grid>
-    <c:SegmentedControl x:Name="Modes" Margin="0,12,0,0" Style="{StaticResource FlyoutSegmentedControlStyle}" SelectionChanged="OnModeChanged" AutomationProperties.Name="Folder mode">
-     <c:SegmentItem Label="Silent"/><c:SegmentItem Label="Manual"/><c:SegmentItem Label="Paused"/>
+ <DockPanel>
+  <Border x:Name="FolderCard" DockPanel.Dock="Top" Style="{DynamicResource IslandCardStyle}" Height="44" Padding="10">
+   <DockPanel>
+    <c:SegmentedControl x:Name="Modes" DockPanel.Dock="Right" Width="220" FontSize="12" SelectionChanged="OnModeChanged" AutomationProperties.Name="Folder mode">
+     <c:SegmentedControl.ItemContainerStyle><Style TargetType="ListBoxItem" BasedOn="{StaticResource SegmentItemStyle}"><Setter Property="Height" Value="18"/><Setter Property="Padding" Value="8,0"/><Setter Property="FontSize" Value="12"/></Style></c:SegmentedControl.ItemContainerStyle>
+     <c:SegmentItem Label="Auto"/><c:SegmentItem Label="Manual"/><c:SegmentItem Label="Paused"/>
     </c:SegmentedControl>
-   </StackPanel>
+    <c:LucideIcon x:Name="FolderChip" Data="{x:Static c:LucideIcons.Folder}" Size="16" Brush="{DynamicResource IslandAccentBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
+    <ComboBox x:Name="Folders" MaxWidth="200" Style="{StaticResource FolderPickerStyle}" SelectionChanged="OnFolderChanged" AutomationProperties.Name="Watched folder">
+     <ComboBox.ItemTemplate><DataTemplate><Grid ToolTip="{Binding Path}" Margin="0,4"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis"/><TextBlock Grid.Column="1" Text="{Binding Mode}" Foreground="{DynamicResource TextTertiaryBrush}" Margin="16,0,0,0"/></Grid></DataTemplate></ComboBox.ItemTemplate>
+    </ComboBox>
+   </DockPanel>
   </Border>
-
-  <StackPanel x:Name="Empty" Visibility="Collapsed" Margin="0,24,0,24">
-   <c:LucideIcon Data="{x:Static c:LucideIcons.Folder}" Size="24" Brush="{DynamicResource TextTertiaryBrush}" HorizontalAlignment="Center"/>
+  <StackPanel x:Name="Empty" Visibility="Collapsed" VerticalAlignment="Center">
+   <c:LucideIcon Data="{x:Static c:LucideIcons.Folder}" Size="20" Brush="{DynamicResource TextTertiaryBrush}" HorizontalAlignment="Center"/>
    <TextBlock Text="No folders yet" HorizontalAlignment="Center" Margin="0,12,0,0"/>
    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,16,0,0">
-    <Button Content="Add Downloads" Style="{StaticResource PrimaryButtonStyle}" Click="OnAddDownloads" AutomationProperties.Name="Add Downloads"/>
-    <Button Content="Choose folder…" Style="{StaticResource SecondaryButtonStyle}" Margin="8,0,0,0" Click="OnChooseFolder" AutomationProperties.Name="Choose folder"/>
+    <Button Content="Add Downloads" Style="{DynamicResource IslandAccentButtonStyle}" Click="OnAddDownloads" AutomationProperties.Name="Add Downloads"/>
+    <Button Content="Choose folder…" Style="{DynamicResource IslandButtonStyle}" Margin="8,0,0,0" Click="OnChooseFolder" AutomationProperties.Name="Choose folder"/>
    </StackPanel>
   </StackPanel>
 
+  <!-- History on the left, Organize now on the right. -->
+  <DockPanel DockPanel.Dock="Bottom" Height="28" x:Name="Actions" Margin="0,8,0,0" LastChildFill="False">
+   <Button DockPanel.Dock="Right" Content="Organize now" Style="{DynamicResource IslandButtonStyle}" Click="OnOrganize" AutomationProperties.Name="Organize now"/>
+   <Button Style="{StaticResource SubtleButtonStyle}" Padding="10,0" Click="OnHistory" AutomationProperties.Name="History">
+    <StackPanel Orientation="Horizontal">
+     <TextBlock Text="History" VerticalAlignment="Center"/>
+     <c:LucideIcon Data="{x:Static c:LucideIcons.ChevronRight}" Size="12" Thickness="2" Margin="4,0,0,0" VerticalAlignment="Center" Brush="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+    </StackPanel>
+   </Button>
+  </DockPanel>
+  <TextBlock DockPanel.Dock="Bottom" x:Name="Error" Visibility="Collapsed" TextWrapping="Wrap" Foreground="{DynamicResource WarningTextBrush}" Style="{StaticResource CaptionTextStyle}" Margin="0,8,0,0" AutomationProperties.LiveSetting="Polite"/>
   <Border x:Name="Recent" Style="{DynamicResource IslandCardStyle}" Padding="0" Margin="0,8,0,0">
-   <StackPanel>
-    <TextBlock x:Name="NoRecent" Text="No recent files" Style="{StaticResource CaptionTextStyle}" Margin="12"/>
-    <ItemsControl x:Name="Rows" Focusable="False">
-     <ItemsControl.ItemsPanel><ItemsPanelTemplate><c:Card Style="{StaticResource CardRowsStyle}"/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+   <Grid>
+    <StackPanel x:Name="NoRecent" VerticalAlignment="Center" HorizontalAlignment="Center">
+     <c:LucideIcon Data="{x:Static c:LucideIcons.File}" Size="20" Brush="{DynamicResource IslandTextTertiaryBrush}" HorizontalAlignment="Center"/>
+     <TextBlock Text="No recent files" FontSize="12" Foreground="{DynamicResource IslandTextTertiaryBrush}" Margin="0,6,0,0"/>
+    </StackPanel>
+    <ItemsControl x:Name="Rows" Focusable="False" VerticalAlignment="Top">
+     <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
      <ItemsControl.ItemTemplate><DataTemplate>
-      <Grid MinHeight="36" Margin="12,8,8,8">
+      <Grid Height="30" Margin="10,0">
        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
        <c:LucideIcon x:Name="Lead" Data="{Binding Lead}" Size="16" Brush="{DynamicResource TextMutedBrush}" Margin="0,0,12,0" VerticalAlignment="Center"/>
-       <StackPanel Grid.Column="1" VerticalAlignment="Center">
-        <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Name}"/>
-        <TextBlock x:Name="Detail" Text="{Binding Detail}" Style="{StaticResource CaptionTextStyle}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Detail}"/>
-       </StackPanel>
-       <Button Grid.Column="2" Content="Review" Style="{StaticResource SecondaryButtonStyle}" Margin="8,0,0,0" VerticalAlignment="Center"
+       <DockPanel Grid.Column="1" VerticalAlignment="Center">
+        <TextBlock x:Name="Detail" DockPanel.Dock="Right" MaxWidth="180" Margin="8,0,0,0" Text="{Binding Detail}" FontSize="11" Foreground="{DynamicResource IslandTextTertiaryBrush}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Detail}"/>
+        <TextBlock Text="{Binding Name}" FontSize="12" TextTrimming="CharacterEllipsis" ToolTip="{Binding Name}"/>
+       </DockPanel>
+       <Button Grid.Column="2" Content="Review" Style="{DynamicResource IslandButtonStyle}" Margin="8,0,0,0" VerticalAlignment="Center"
                Visibility="{Binding IsReview, Converter={StaticResource Visible}}" AutomationProperties.Name="{Binding AccessibleAction}" Click="OnRowAction"/>
-       <c:IconButton Grid.Column="2" Icon="{Binding ActionIcon}" Margin="8,0,0,0" Visibility="{Binding HasIconAction, Converter={StaticResource Visible}}"
+       <c:IconButton Height="24" Width="28" Grid.Column="2" Icon="{Binding ActionIcon}" Margin="8,0,0,0" Visibility="{Binding HasIconAction, Converter={StaticResource Visible}}"
                      ToolTip="{Binding ActionLabel}" AutomationProperties.Name="{Binding AccessibleAction}" Click="OnRowAction"/>
       </Grid>
       <DataTemplate.Triggers>
@@ -86,19 +96,9 @@
       </DataTemplate.Triggers>
      </DataTemplate></ItemsControl.ItemTemplate>
     </ItemsControl>
-   </StackPanel>
+   </Grid>
   </Border>
 
-  <!-- History on the left, Organize now on the right. -->
-  <DockPanel x:Name="Actions" Margin="0,8,0,0" LastChildFill="False">
-   <Button DockPanel.Dock="Right" Content="Organize now" Style="{StaticResource SecondaryButtonStyle}" Click="OnOrganize" AutomationProperties.Name="Organize now"/>
-   <Button Style="{StaticResource SubtleButtonStyle}" Padding="8,0" Click="OnHistory" AutomationProperties.Name="History">
-    <StackPanel Orientation="Horizontal">
-     <TextBlock Text="History" VerticalAlignment="Center"/>
-     <c:LucideIcon Data="{x:Static c:LucideIcons.ChevronRight}" Size="12" Thickness="2" Margin="4,0,0,0" VerticalAlignment="Center" Brush="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
-    </StackPanel>
-   </Button>
-  </DockPanel>
-  <TextBlock x:Name="Error" Visibility="Collapsed" TextWrapping="Wrap" Foreground="{DynamicResource WarningTextBrush}" Style="{StaticResource CaptionTextStyle}" Margin="0,8,0,0" AutomationProperties.LiveSetting="Polite"/>
- </StackPanel>
+
+ </DockPanel>
 </UserControl>

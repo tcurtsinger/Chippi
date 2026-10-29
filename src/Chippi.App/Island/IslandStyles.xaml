@@ -90,7 +90,7 @@
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type Slider}">
                     <Grid Background="Transparent">
-                        <Track x:Name="PART_Track" VerticalAlignment="Center">
+                        <Track x:Name="PART_Track" Orientation="{TemplateBinding Orientation}" VerticalAlignment="Stretch">
                             <Track.DecreaseRepeatButton>
                                 <RepeatButton Command="Slider.DecreaseLarge" Focusable="False" IsTabStop="False">
                                     <RepeatButton.Template>

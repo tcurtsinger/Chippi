@@ -1,4 +1,4 @@
-﻿// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
 using Chippi.Features.Downloads.Engine;
@@ -62,7 +62,7 @@ public sealed class TidyRow(string name, string detail, string folder, string so
 internal static class TidyProjection
 {
     /// <summary>The page's recent card holds this many rows (DESIGN.md §5 Island).</summary>
-    public const int RecentRows = 3;
+    public const int RecentRows = 7;
 
     public static string FolderName(string path) => Path.GetFileName(Path.TrimEndingDirectorySeparator(path)) is { Length: > 0 } name ? name : path;
 
