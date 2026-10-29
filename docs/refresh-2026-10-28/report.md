@@ -54,6 +54,16 @@ Offscreen before/after renders are under this folder's part directories. Chippi 
 | Update in place and installed user flows | Pending | Travis's task 123 |
 | End-of-refresh cleanup | Pending | After live results and report integration |
 
+## Decisions
+
+- Travis (task 65): Settings Clean URL shows the cleaned link and Copy only, with no "Removed" caption.
+- Sidebar order follows Part F1 where Part E's differed; Now Playing is always first under Sound.
+- Settings remembers its last page, size and position across restarts.
+- Settings Paste goes to the window Settings was switched from, otherwise Copy and "Copied".
+- The island Shelf shows up to 40 items ("Shelf full"); Settings lists them all. System monitor Settings lists every thermal zone and drive the island leaves out.
+- Notifications reads which notice kinds the PC supports once per opening, through a read-only property, with no watch API.
+- Wording: errors are short "… failed" fragments (no "Couldn't …" remains), no explaining tooltips, straight apostrophes and quotes.
+
 ## Deviations from DESIGN.md
 
 No unapproved design deviations recorded. Tray-based Paste behavior is an observation in live step 5.3, not a predetermined pass/fail: the window Windows reports during activation determines whether Chippi pastes or falls back to Copy.
