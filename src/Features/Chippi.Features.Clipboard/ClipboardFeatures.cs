@@ -45,8 +45,8 @@ public sealed class ClipboardFeatures
     public Func<Core.Clipboard.PasteTarget?>? PasteTarget { get; set; }
 
     /// <summary>
-    /// The app that was in front when Settings opened, for the Settings list's Paste; null when there was
-    /// none (opened from the tray), and Paste copies instead.
+    /// The app Settings was last switched from, for the Settings list's Paste; null when there was none
+    /// (Chippi's own window or the taskbar), and Paste copies instead.
     /// </summary>
     public Func<Core.Clipboard.PasteTarget?>? SettingsPasteTarget { get; set; }
 

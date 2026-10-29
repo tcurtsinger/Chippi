@@ -14,13 +14,15 @@ namespace Chippi.Clipboard.Windows;
 public sealed class WindowsForeground : IForeground
 {
     private static readonly TimeSpan Poll = TimeSpan.FromMilliseconds(10);
-    private readonly uint _self = (uint)Environment.ProcessId;
+    private static readonly uint Self = (uint)Environment.ProcessId;
     private readonly Lazy<int?> _selfLevel = new(() => Integrity((uint)Environment.ProcessId));
 
-    public PasteTarget? Current()
+    public PasteTarget? Current() => Of(GetForegroundWindow());
+
+    /// <summary>A window to paste into, unless it's Chippi's own, the taskbar or none.</summary>
+    public static PasteTarget? Of(nint hwnd)
     {
-        nint hwnd = GetForegroundWindow();
-        if (hwnd == 0 || GetWindowThreadProcessId(hwnd, out uint pid) == 0 || pid == _self || IsTaskbar(hwnd))
+        if (hwnd == 0 || GetWindowThreadProcessId(hwnd, out uint pid) == 0 || pid == Self || IsTaskbar(hwnd))
             return null;
         return new PasteTarget(hwnd, pid);
     }

@@ -54,6 +54,9 @@ public sealed class ModuleContext(
     /// <summary>The app that was in front before the island took the keyboard or opened docked, for a page's Paste; null when there was none.</summary>
     public Func<Clipboard.PasteTarget?> IslandPasteTarget { get; init; } = () => null;
 
+    /// <summary>The app Settings was last switched from, for a Settings page's Paste; null when there was none.</summary>
+    public Func<Clipboard.PasteTarget?> SettingsPasteTarget { get; init; } = () => null;
+
     /// <summary>Closes the island, after a page's paste was sent.</summary>
     public Action CloseIsland { get; init; } = () => { };
 }

@@ -174,7 +174,7 @@ public sealed class ClipboardHistorySettingsPage : UserControl
     }
 
     /// <summary>
-    /// Hands the copy to the app that was in front when Settings opened; with none, it becomes the copy and
+    /// Hands the copy to the app Settings was last switched from; with none, it becomes the copy and
     /// the row says "Copied", as the island's Paste does (notes #62).
     /// </summary>
     private async void Paste(HistoryEntry entry)

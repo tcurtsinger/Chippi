@@ -103,16 +103,18 @@ public sealed class ModuleTests : IDisposable
     public async Task The_page_sees_esc_first_and_paste_goes_to_the_shells_target()
     {
         var target = new Core.Clipboard.PasteTarget(42, 7);
+        var settingsTarget = new Core.Clipboard.PasteTarget(43, 8);
         bool closed = false;
         var context = new ModuleContext(ClipboardHistoryModule.Id, _settings, NullLogger.Instance, new Island(), _historyUi)
         {
-            Clipboard = _hub, DataDirectory = _folder.Path, IslandPasteTarget = () => target, CloseIsland = () => closed = true,
+            Clipboard = _hub, DataDirectory = _folder.Path, IslandPasteTarget = () => target, SettingsPasteTarget = () => settingsTarget, CloseIsland = () => closed = true,
         };
         await _history.StartAsync(context, default);
         _history.SetRecording(true);
         _hub.CopyText("to paste");
         await _history.History!.IdleAsync();
         Assert.Same(target, _features.PasteTarget!());
+        Assert.Same(settingsTarget, _features.SettingsPasteTarget!());
         WpfTestThread.Run(() =>
         {
             var view = (ClipboardView)_historyUi.Spec!.CreateSection();

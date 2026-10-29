@@ -35,6 +35,7 @@ internal sealed class SettingsController
     {
         var controller = new SettingsController(shell);
         shell.Commands.RegisterSettings(controller.Open);
+        shell.Services.SettingsPasteTarget = () => controller.Window?.PasteTarget;
 #if DEBUG
         controller.SnapshotIfRequested();
 #endif

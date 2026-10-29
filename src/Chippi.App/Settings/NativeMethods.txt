@@ -9,3 +9,4 @@ WM_NCMOUSELEAVE
 HTMAXBUTTON
 TrackMouseEvent
 GetDpiForSystem
+WM_ACTIVATE
