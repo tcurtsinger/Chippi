@@ -25,8 +25,8 @@ public static class ScratchpadMarkdown
             { value = value[(heading + 1)..]; block.FontSize = heading == 1 ? 18 : 15; block.FontWeight = FontWeights.SemiBold; block.Margin = new Thickness(0, 4, 0, 4); }
             else if (value.StartsWith("- [ ] ") || value.StartsWith("- [x] ", StringComparison.OrdinalIgnoreCase))
             {
-                var box = new CheckBox { IsChecked = char.ToLowerInvariant(value[3]) == 'x', IsHitTestVisible = false, Focusable = false, VerticalAlignment = VerticalAlignment.Center };
-                block.Inlines.Add(new InlineUIContainer(box)); value = " " + value[6..];
+                var box = new CheckBox { IsChecked = char.ToLowerInvariant(value[3]) == 'x', IsHitTestVisible = false, Focusable = false, Width = 20, Height = 20, LayoutTransform = new ScaleTransform(0.7, 0.7), VerticalAlignment = VerticalAlignment.Center };
+                block.Inlines.Add(new InlineUIContainer(box) { BaselineAlignment = BaselineAlignment.Center }); value = " " + value[6..];
             }
             else if (value.StartsWith("- ") || value.StartsWith("* ")) value = "\u2022 " + value[2..];
             try { AddInline(block, value); }

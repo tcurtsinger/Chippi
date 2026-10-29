@@ -77,7 +77,12 @@ public sealed class CleanUrlSettingsPage : UserControl
             _sites.Children.Add(AddRow());
         foreach (var site in _module.Settings.SitesToSkip)
             _sites.Children.Add(SettingsUi.ListRow(null, site, null, () => Save(_module.Settings.SitesToSkip.Where(s => s != site))));
-        _sites.Visibility = _sites.Children.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        if (_sites.Children.Count == 0)
+        {
+            var empty = SettingsUi.Text("No sites");
+            empty.SetResourceReference(TextBlock.ForegroundProperty, "TextSecondaryBrush");
+            _sites.Children.Add(new Border { MinHeight = 48, Padding = new Thickness(16, 0, 16, 0), Child = empty });
+        }
         _sites.Opacity = _module.Settings.Automatic ? 1 : 0.6;
     }
 

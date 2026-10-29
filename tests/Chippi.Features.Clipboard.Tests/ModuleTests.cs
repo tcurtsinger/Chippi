@@ -313,9 +313,11 @@ public sealed class ModuleTests : IDisposable
         WpfTestThread.Run(() =>
         {
             var page = new CleanUrlSettingsPage(_clean);
+            Assert.True(Shows(page, "No sites"));
             Button Named(string text) => Find<Button>(page).First(b => b.Content as string == text && IsShown(b));
             Named("Add site").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             Named("Cancel").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Assert.True(Shows(page, "No sites"));
             Named("Add site").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             _clean.Save(_clean.Settings with { Automatic = true });
             Flush(page);
@@ -337,9 +339,9 @@ public sealed class ModuleTests : IDisposable
             Assert.Equal(Visibility.Visible, section.Visibility);
             var field = Find<TextBox>(section).Single(t => System.Windows.Automation.AutomationProperties.GetName(t) == "Link");
             Assert.Same(field, _cleanUi.Spec.InitialFocus!());
-            // One line the page's width: a long link scrolls, never wraps (Travis, 2026-10-28).
-            Assert.Equal(TextWrapping.NoWrap, field.TextWrapping);
-            Assert.Equal(1, field.MaxLines);
+            // The refresh allows three padded lines without scrolling.
+            Assert.Equal(TextWrapping.Wrap, field.TextWrapping);
+            Assert.Equal(3, field.MaxLines);
             Assert.Equal(HorizontalAlignment.Stretch, field.HorizontalAlignment);
             field.Text = "https://youtu.be/abc?si=share&t=30";
             Assert.True(Shows(section, "https://youtu.be/abc?t=30"));
@@ -352,6 +354,78 @@ public sealed class ModuleTests : IDisposable
         });
     }
 
+    [Fact]
+    public async Task Long_links_keep_both_ends_and_copy_the_full_cleaned_value()
+    {
+        await StartCleanAsync();
+        WpfTestThread.Run(() =>
+        {
+            var view = new CleanUrlView(_features);
+            string clean = "https://example.org/" + string.Concat(Enumerable.Repeat("long-path-segment/", 60)) + "?id=7";
+            view.Field.Text = clean + "&utm_source=test";
+            view.Measure(new Size(496, 304));
+            view.Arrange(new Rect(0, 0, 496, view.DesiredSize.Height));
+            view.UpdateLayout();
+            var displays = Find<MiddleTrimmedText>(view).ToArray();
+            Assert.Equal(2, displays.Length);
+            foreach (var display in displays)
+            {
+                var text = Find<TextBlock>(display).Single();
+                Assert.Contains("\u2026", text.Text);
+                Assert.StartsWith("https://example.org/", text.Text);
+                Assert.EndsWith(display.FullText.EndsWith("test", StringComparison.Ordinal) ? "test" : "?id=7", text.Text);
+                Assert.True(display.ActualHeight <= 48);
+                Assert.True(text.ActualHeight <= 48);
+            }
+            Assert.Equal(clean + "&utm_source=test", view.Field.Text);
+            view.Field.RaiseEvent(new System.Windows.Input.KeyboardFocusChangedEventArgs(
+                System.Windows.Input.Keyboard.PrimaryDevice, 0, null, view.Field)
+                { RoutedEvent = System.Windows.Input.Keyboard.GotKeyboardFocusEvent });
+            Assert.Equal(view.Field.Text, view.Field.SelectedText);
+            Find<Button>(view).Single(b => Equals(b.Content, "Copy")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Assert.Equal(clean, Assert.Single(_hub.Written).Text);
+        });
+    }
+    [Fact]
+    public void Link_field_grows_from_one_to_three_lines_with_the_same_padding() => WpfTestThread.Run(() =>
+    {
+        var view = new CleanUrlView(_features);
+        double Height(string link)
+        {
+            view.Field.Text = link;
+            view.Measure(new Size(496, 304));
+            view.Arrange(new Rect(0, 0, 496, view.DesiredSize.Height));
+            view.UpdateLayout();
+            return view.Field.ActualHeight;
+        }
+        Assert.Equal(28, Height("https://example.org/"));
+        Assert.Equal(60, Height("https://example.org/" + new string('a', 700)));
+        var host = (ScrollViewer)view.Field.Template.FindName("PART_ContentHost", view.Field);
+        Assert.Equal(new Thickness(9, 5, 9, 5), host.Padding);
+        Assert.Equal(new Thickness(0), host.Margin); // TextBox already forwards Padding to its host.
+        Assert.Equal(ScrollBarVisibility.Disabled, host.HorizontalScrollBarVisibility);
+        Assert.Equal(ScrollBarVisibility.Disabled, host.VerticalScrollBarVisibility);
+        Assert.Equal(28, Height("https://example.org/"));
+    });
+    [Fact]
+    public async Task Sites_empty_row_returns_when_the_last_site_is_removed()
+    {
+        await StartCleanAsync();
+        WpfTestThread.Run(() =>
+        {
+            var page = new CleanUrlSettingsPage(_clean);
+            Load(page);
+            _clean.Save(_clean.Settings with { SitesToSkip = ["example.org"] });
+            Flush(page);
+            Assert.False(Shows(page, "No sites"));
+            Assert.True(Shows(page, "example.org"));
+            _clean.Save(_clean.Settings with { SitesToSkip = [] });
+            Flush(page);
+            Assert.True(Shows(page, "No sites"));
+            Assert.False(Shows(page, "example.org"));
+            page.RaiseEvent(new RoutedEventArgs(FrameworkElement.UnloadedEvent));
+        });
+    }
     private static void Flush(System.Windows.Threading.DispatcherObject on) =>
         on.Dispatcher.Invoke(System.Windows.Threading.DispatcherPriority.Background, () => { });
 

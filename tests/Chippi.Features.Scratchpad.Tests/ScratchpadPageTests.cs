@@ -114,6 +114,10 @@ public sealed class ScratchpadPageTests
         Assert.Empty(Find<Image>(rendered));
         var box = Find<CheckBox>(rendered).Single();
         Assert.True(box.IsChecked); Assert.False(box.IsHitTestVisible); Assert.False(box.Focusable);
+        box.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        Assert.Equal(14, box.DesiredSize.Width, 3);
+        Assert.Equal(14, box.DesiredSize.Height, 3);
+        Assert.Equal(BaselineAlignment.Center, Find<InlineUIContainer>(rendered).Single(i => ReferenceEquals(i.Child, box)).BaselineAlignment);
         Assert.Contains(Find<TextBlock>(rendered), b => b.Text == "Invented image");
         var runs = Find<Run>(rendered).ToList();
         Assert.Contains(runs, r => r.Text == "bold" && r.FontWeight == FontWeights.SemiBold);

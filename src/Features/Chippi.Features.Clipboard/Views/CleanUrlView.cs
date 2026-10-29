@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Threading;
 using Chippi.Core.Clipboard;
 using Chippi.UI.Controls;
@@ -13,16 +14,15 @@ using Chippi.UrlCleaning;
 namespace Chippi.Features.Clipboard.Views;
 
 /// <summary>
-/// The manual Clean (design notes #23 to #26): one link field, the clean link as you type with what was
-/// removed, and Copy. Opening fills the field from the copy when it's one web link not marked private;
+/// The manual Clean (design notes #23 to #26): a padded link field, the clean link as you type, and Copy. Opening fills the field from the copy when it's one web link not marked private;
 /// otherwise the field is empty and has the keyboard. Sites to skip don't apply here (notes #27).
 /// </summary>
 internal sealed class CleanUrlView : UserControl
 {
     private readonly ClipboardFeatures _features;
-    // One line the width of the page: a long link scrolls inside it, never wraps (Travis, 2026-10-28).
-    private readonly TextBox _field = new() { TextWrapping = TextWrapping.NoWrap, AcceptsReturn = false, MaxLines = 1, HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalScrollBarVisibility = ScrollBarVisibility.Hidden, Tag = "Link" };
-    private readonly TextBlock _clean = Ui.Text("", 13);
+    private readonly TextBox _field = new() { TextWrapping = TextWrapping.Wrap, AcceptsReturn = false, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled, MaxLines = 3, MaxHeight = 60, FontSize = 12, HorizontalAlignment = HorizontalAlignment.Stretch, Tag = "Link" };
+    private readonly MiddleTrimmedText _display = new() { IsHitTestVisible = false, Margin = new Thickness(10, 6, 10, 6) };
+    private readonly MiddleTrimmedText _clean = new();
     private readonly Border _result = new() { Margin = new Thickness(0, 8, 0, 0) };
     private readonly StackPanel _caution = Ui.Caution();
     private readonly StackPanel _copied = new() { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Visibility = Visibility.Collapsed };
@@ -32,7 +32,25 @@ internal sealed class CleanUrlView : UserControl
     public CleanUrlView(ClipboardFeatures features)
     {
         _features = features;
-        _field.SetResourceReference(StyleProperty, "TextFieldStyle");
+        Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri("pack://application:,,,/Chippi.Features.Clipboard;component/Views/CleanUrlStyles.xaml") });
+        _field.Style = (Style)Resources["CleanUrlFieldStyle"];
+        TextBlock.SetLineHeight(_field, 16);
+        _field.Foreground = Brushes.Transparent;
+        _display.SetResourceReference(TextBlock.ForegroundProperty, "TextPrimaryBrush");
+        _field.GotKeyboardFocus += (_, _) =>
+        {
+            _display.Visibility = Visibility.Collapsed;
+            _field.SetResourceReference(Control.ForegroundProperty, "TextPrimaryBrush");
+            _field.SelectAll();
+            _field.ScrollToHome();
+        };
+        _field.PreviewMouseLeftButtonDown += (_, e) =>
+        {
+            if (_field.IsKeyboardFocusWithin) return;
+            _field.Focus();
+            e.Handled = true; // Keep SelectAll when the first click gives the field focus.
+        };
+        _field.LostKeyboardFocus += (_, _) => { _field.Foreground = Brushes.Transparent; _display.Visibility = Visibility.Visible; };
         AutomationProperties.SetName(_field, "Link");
         _field.TextChanged += (_, _) => Refresh();
         _field.KeyDown += (_, e) =>
@@ -43,8 +61,6 @@ internal sealed class CleanUrlView : UserControl
                 e.Handled = true;
             }
         };
-        _clean.TextWrapping = TextWrapping.Wrap;
-        _clean.TextTrimming = TextTrimming.None;
         _result.SetResourceReference(StyleProperty, "IslandCardStyle");
         _result.Child = _clean;
         _caution.Margin = new Thickness(0, 8, 0, 0);
@@ -58,7 +74,8 @@ internal sealed class CleanUrlView : UserControl
         DockPanel.SetDock(_copy, Dock.Right);
         var footer = new DockPanel { Margin = new Thickness(0, 8, 0, 0), LastChildFill = true, Children = { _copy, _copied } };
 
-        Content = new StackPanel { Children = { _field, _caution, _result, footer } };
+        var input = new Grid { ClipToBounds = true, Children = { _field, _display } };
+        Content = new StackPanel { Children = { input, _caution, _result, footer } };
         Refresh();
     }
 
@@ -87,8 +104,8 @@ internal sealed class CleanUrlView : UserControl
         if (read is { Status: ClipStatus.Ok, Privacy: ClipPrivacy.None, Content: { Text: { } text, Files: null, Image: null } } && UrlCleaner.Clean(text) is not null)
         {
             _field.Text = text.Trim();
-            _field.CaretIndex = _field.Text.Length;
-            _field.ScrollToHorizontalOffset(double.MaxValue); // the caret, at the end, in view
+            _field.SelectAll();
+            _field.ScrollToHome();
         }
     }
 
@@ -96,17 +113,18 @@ internal sealed class CleanUrlView : UserControl
     {
         _copied.Visibility = Visibility.Collapsed;
         string text = _field.Text;
+        _display.FullText = text;
         var result = UrlCleaner.Clean(text);
         Ui.Show(_caution, text.Trim().Length > 0 && result is null ? "Not a web link" : null);
         _result.Visibility = result is null ? Visibility.Collapsed : Visibility.Visible;
         if (result is not null && result.RemovedParameters.Count > 0)
         {
-            _clean.Text = result.Url;
+            _clean.FullText = result.Url;
             _clean.SetResourceReference(TextBlock.ForegroundProperty, "IslandTextBrush");
         }
         else if (result is not null)
         {
-            _clean.Text = "Nothing to remove";
+            _clean.FullText = "Nothing to remove";
             _clean.SetResourceReference(TextBlock.ForegroundProperty, "IslandTextTertiaryBrush");
         }
         _copy.IsEnabled = result is { RemovedParameters.Count: > 0 };
