@@ -65,19 +65,26 @@ public sealed class NotificationsPageTests
             var notifier = shell.Registry.Find("hardware-test")!.Notifier!;
             notifier.SetPlaces("low-battery", NoticePlaces.Windows);
             var page = new NotificationsPage(shell);
+            module.Gate.Reset();
             page.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));
+            Assert.DoesNotContain("Low battery", VisibleTexts(page));
+            module.Gate.Set();
             PumpUntil(() => !Texts(page).Contains("Low battery"));
             Assert.Equal(1, module.Reads);
             Assert.Contains("Ping", Texts(page));
             Assert.Equal(NoticePlaces.Windows, notifier.PlacesFor("low-battery"));
             page.RaiseEvent(new RoutedEventArgs(FrameworkElement.UnloadedEvent));
             module.Present = true;
+            module.Gate.Reset();
             page.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));
+            Assert.DoesNotContain("Low battery", VisibleTexts(page));
+            Assert.Contains("Ping", VisibleTexts(page)); // cached rows show while the fresh check waits
+            module.Gate.Set();
             PumpUntil(() => module.Reads == 2 && Texts(page).Contains("Low battery"));
             Assert.Equal(NoticePlaces.Windows, notifier.PlacesFor("low-battery"));
             page.RaiseEvent(new RoutedEventArgs(FrameworkElement.UnloadedEvent));
         }
-        finally { shell.Registry.StopAllAsync().GetAwaiter().GetResult(); shell.Clipboard.Dispose(); Directory.Delete(root, true); }
+        finally { module.Gate.Set(); shell.Registry.StopAllAsync().GetAwaiter().GetResult(); shell.Clipboard.Dispose(); Directory.Delete(root, true); }
     });
 
     private static void PumpUntil(Func<bool> ready)
@@ -94,15 +101,24 @@ public sealed class NotificationsPageTests
     private sealed class HardwareNotices : IFeatureModule
     {
         public int Reads;
+        public ManualResetEventSlim Gate { get; } = new(true);
         public bool Present;
         public FeatureDescriptor Descriptor { get; } = new("hardware-test", "Hardware", "Test", FeatureGroup.System);
-        public IReadOnlySet<string>? AvailableNoticeKinds { get { Interlocked.Increment(ref Reads); return Present ? new HashSet<string> { "ping", "low-battery" } : new HashSet<string> { "ping" }; } }
+        public IReadOnlySet<string>? AvailableNoticeKinds { get { Interlocked.Increment(ref Reads); if (!Gate.Wait(TimeSpan.FromSeconds(5))) throw new TimeoutException(); return Present ? new HashSet<string> { "ping", "low-battery" } : new HashSet<string> { "ping" }; } }
         public Task StartAsync(ModuleContext context, CancellationToken ct)
         {
             context.Notifier.Declare([new("ping", "Ping", NoticePlaces.Island), new("low-battery", "Low battery", NoticePlaces.Island)]);
             return Task.CompletedTask;
         }
         public Task StopAsync(CancellationToken ct) => Task.CompletedTask;
+    }
+
+    private static IEnumerable<string> VisibleTexts(DependencyObject root)
+    {
+        if (root is UIElement { Visibility: Visibility.Collapsed or Visibility.Hidden }) yield break;
+        if (root is TextBlock text) yield return text.Text;
+        foreach (var child in LogicalTreeHelper.GetChildren(root).OfType<DependencyObject>())
+            foreach (var item in VisibleTexts(child)) yield return item;
     }
 
     private static IEnumerable<string> Texts(DependencyObject root)

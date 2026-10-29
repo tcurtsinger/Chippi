@@ -67,7 +67,6 @@ internal sealed class NotificationsPage : UserControl
         {
             shell.Registry.Changed += OnRegistryChanged;
             int version = ++_openVersion;
-            _available.Clear();
             Rebuild();
             foreach (var feature in shell.Registry.Features.Where(f => f.Notifier is { Kinds.Count: > 0 }).ToList())
             {
@@ -135,7 +134,9 @@ internal sealed class NotificationsPage : UserControl
             row.Margin = new Thickness(16, 0, 16, 0);
             rows.Children.Add(row);
         }
-        var group = new StackPanel();
+        // Keep the previous opening's result while refreshing. On the first check, wait rather
+        // than briefly showing unsupported hardware rows.
+        var group = new StackPanel { Visibility = _available.ContainsKey(feature.Id) ? Visibility.Visible : Visibility.Collapsed };
         group.Children.Add(header);
         group.Children.Add(rows);
         AutomationProperties.SetName(group, feature.Descriptor.Name);
