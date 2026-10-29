@@ -129,11 +129,11 @@ All eight, as drawn. The alternatives in the numbered notes were turned down.
 22. **Dropped:** the plain-paste page and the "Plain paste" tile name. The previous version's page showed the copy and the target app before pasting; Vorssaint has nothing like it, and the shortcut covers the daily use.
 
 ### Clean URL
-23. **In the Clipboard page** (approved): the header's link button swaps the list for one link field, a result card with the clean link, and Copy (accent). Changed by Travis, 2026-10-28: the field is one line the page's width, and a long link scrolls inside it instead of wrapping to 3 lines; the card shows only the clean link, without "Removed · si". The button shows pressed, and the header drops Pause and More. The button again, or Esc, goes back to the list. Without Clipboard history the page is Clean URL alone, and the header shows "Manual" or "Automatic" (the tile's status).
+23. **In the Clipboard page** (approved): the header's link button swaps the list for one link field, a result card with the clean link, and Copy (accent). Changed by Travis, 2026-10-28: the full-width field grows to three padded lines; longer links keep their start and end with a middle ellipsis while unfocused, and focus selects the full link; nothing scrolls; the card shows only the clean link, without "Removed · si". The button shows pressed, and the header drops Pause and More. The button again, or Esc, goes back to the list. Without Clipboard history the page is Clean URL alone, and the header shows "Manual" or "Automatic" (the tile's status).
 24. **Filled from the copy:** when Clean URL opens and the copy is one web link with no private marker, the field holds it. Otherwise the field is empty and has the keyboard.
 25. **Result as you type** (approved). The page is the manual Clean, and Copy puts the result on the clipboard. The alternative is a Clean button that replaces the copy in place; it hides the result until the click, and if nothing changes it's a click for nothing.
 26. **States:**
-    - The clean link alone, with Copy enabled. Nothing lists what was removed (Travis, 2026-10-28).
+    - The clean link alone, trimmed like the field while Copy uses the whole link (refresh, 2026-10-28), with Copy enabled. Nothing lists what was removed (Travis, 2026-10-28).
     - "Nothing to remove", with Copy disabled.
     - "Not a web link", in Caution under the field: only `http` and `https` count, one link, no spaces inside.
     - "Copied", with a Success check.
@@ -244,7 +244,7 @@ All eight, as drawn. The alternatives in the numbered notes were turned down.
 | Clean URL | Link · Nothing to remove · Not a web link · Copy · Copied · Manual · Automatic |
 | Scratchpad | Saved · Save failed · New note · All notes · Note 5 · Edit · Preview · Rename · Export… · Delete · Delete “Standup”? · Load failed · Retry |
 | Shelf | No items · Copy · Pin · Unpin · Remove · Unavailable · Online only · Over 100 files · Picture over 16 MiB · Shelf full · 128 MiB |
-| Settings | Recording · Apps to skip · Add app · Browse… · No apps · Remove · Shortcut · Not set · Set · Change · New shortcut · Shortcut in use · Automatic cleaning · Sites to skip · Add site · Add · Uninstall and erase history? · Uninstall |
+| Settings | Recording · Apps to skip · Add app · Browse… · No apps · Remove · Shortcut · Not set · Set · Change · New shortcut · Shortcut in use · Automatic cleaning · Sites to skip · No sites · Add site · Add · Uninstall and erase history? · Uninstall |
 
 ## Not drawn, on purpose
 - Out of scope: editing saved copies, pasting several at once, OCR, picture editing, manual reordering, unlimited history, guessing passwords, a sensitive-text switch, a custom rule editor, deleting old notes, a floating Scratchpad, grouped piles, mail attachments, Share, shake to open, moving files, clearing the clipboard on a timer.
