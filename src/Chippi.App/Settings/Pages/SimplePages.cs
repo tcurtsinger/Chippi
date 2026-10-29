@@ -128,7 +128,7 @@ internal sealed class ModulePageHost : UserControl
     public ModulePageHost(string title, FrameworkElement view)
     {
         var page = new StackPanel();
-        page.Children.Add(SettingsUi.Header(title, ""));
+        page.Children.Add(SettingsUi.Header(title, "", SettingsLayout.GetTitleAside(view)));
         page.Children.Add(view);
         Content = page;
     }

@@ -90,7 +90,7 @@ public sealed class ScratchpadSmokeTests(ITestOutputHelper output)
         public void Dispose() { }
     }
     internal sealed class Settings : IModuleSettings { public T Get<T>() where T : class, new() => new(); public void Save<T>(T value) where T : class { } }
-    internal sealed class Ui : IModuleUi { public IslandTileContribution? Tile; public IIslandTile AddIslandTile(IslandTileSpec spec) => Tile = new("scratchpad", spec); public void SetSettingsPage(Func<string?, object> createView) => throw new InvalidOperationException("Scratchpad has no Settings page."); }
+    internal sealed class Ui : IModuleUi { public IslandTileContribution? Tile; public IIslandTile AddIslandTile(IslandTileSpec spec) => Tile = new("scratchpad", spec); public Func<string?, object>? Page; public void SetSettingsPage(Func<string?, object> createView) => Page = createView; }
     internal sealed class Island : IIslandPublisher { public void Publish(IslandActivity activity) => throw new InvalidOperationException(); public void Clear(string key) { } public void ReportSuccess(string? message = null) => throw new InvalidOperationException(); }
 }
 

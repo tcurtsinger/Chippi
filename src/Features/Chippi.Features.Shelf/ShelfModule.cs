@@ -49,6 +49,7 @@ public sealed class ShelfModule : IFeatureModule
             InitialFocus = () => Page().InitialFocus, // the first item, or the empty zone (notes #58)
             OpensOnDrag = true, // a drag over the closed tab opens the Shelf (notes #48)
         });
+        context.Ui.SetSettingsPage(() => new ShelfSettingsPage(shelf));
         UpdateStatus();
     }
 

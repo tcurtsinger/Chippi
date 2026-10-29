@@ -20,7 +20,8 @@ public sealed class ScratchpadModuleTests
         public IslandTileSpec Spec = null!;
         public IslandTileContribution Tile = null!;
         public IIslandTile AddIslandTile(IslandTileSpec spec) { Spec = spec; return Tile = new IslandTileContribution("scratchpad", spec); }
-        public void SetSettingsPage(Func<string?, object> view) => throw new InvalidOperationException("No Scratchpad Settings page");
+        public Func<string?, object>? Page;
+        public void SetSettingsPage(Func<string?, object> view) => Page = view; // Settings › Scratchpad (brief F3 #10)
     }
     private sealed class Store : IScratchpadStore
     {
@@ -50,6 +51,51 @@ public sealed class ScratchpadModuleTests
         }
         finally { module.StopAsync(default).GetAwaiter().GetResult(); }
     });
+    [Fact]
+    public void Settings_page_shares_the_islands_notes_so_an_edit_shows_in_both() => WpfTestThread.Run(() =>
+    {
+        var store = new Store();
+        var ui = new Ui();
+        var module = new ScratchpadModule(_ => store);
+        var context = new ModuleContext("scratchpad", new Settings(), NullLogger.Instance, new IslandActivityHub().CreatePublisher("scratchpad"), ui);
+        module.StartAsync(context, default).GetAwaiter().GetResult();
+        try
+        {
+            var island = Assert.IsType<ScratchpadPage>(ui.Spec.CreateSection());
+            var settings = Assert.IsType<ScratchpadSettingsPage>(ui.Page!(null));
+            island.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));
+            settings.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));
+            Flush();
+            Assert.Equal("Saved", Assert.IsType<System.Windows.Controls.TextBlock>(Chippi.UI.Controls.SettingsLayout.GetTitleAside(settings)).Text);
+            Editor(settings).Text = "Book a room for Thursday";
+            Flush();
+            Assert.Equal("Book a room for Thursday", Editor(island).Text);
+            Editor(island).Text = "Book a room for Friday";
+            Flush();
+            Assert.Equal("Book a room for Friday", Editor(settings).Text);
+
+            var add = Descendants(settings).OfType<System.Windows.Controls.Button>().Single(b => System.Windows.Automation.AutomationProperties.GetName(b) == "New note");
+            add.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
+            Flush();
+            Assert.Equal(2, Descendants(settings).OfType<Chippi.UI.Controls.SegmentedControl>().First().Items.Count);
+            var popup = settings.ConfirmDelete();
+            Assert.False(popup.IsOpen); // never a popup window on the desktop in tests
+            Assert.Equal("Delete “Note 2”?", Descendants(popup.Child).OfType<System.Windows.Controls.TextBlock>().First().Text);
+        }
+        finally { module.StopAsync(default).GetAwaiter().GetResult(); }
+
+        static System.Windows.Controls.TextBox Editor(DependencyObject page) =>
+            Descendants(page).OfType<System.Windows.Controls.TextBox>().Single(t => System.Windows.Automation.AutomationProperties.GetName(t) == "Note");
+        static void Flush()
+        {
+            for (int i = 0; i < 20; i++)
+            {
+                System.Windows.Threading.Dispatcher.CurrentDispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.Background);
+                Thread.Sleep(10);
+            }
+        }
+    });
+
     private static IEnumerable<DependencyObject> Descendants(DependencyObject root)
     {
         yield return root;

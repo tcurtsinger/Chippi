@@ -40,6 +40,9 @@ public sealed class ClipboardHistoryModule : IFeatureModule
 
     public ClipboardHistorySettings Settings { get; private set; } = new();
 
+    /// <summary>What it shares with Clean URL, for the Settings page's Paste.</summary>
+    internal ClipboardFeatures Features => _features;
+
     /// <summary>The saved copies; null while stopped.</summary>
     public ClipboardHistory? History { get; private set; }
 

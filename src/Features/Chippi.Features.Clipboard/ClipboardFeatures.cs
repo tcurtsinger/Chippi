@@ -44,6 +44,12 @@ public sealed class ClipboardFeatures
     /// </summary>
     public Func<Core.Clipboard.PasteTarget?>? PasteTarget { get; set; }
 
+    /// <summary>
+    /// The app that was in front when Settings opened, for the Settings list's Paste; null when there was
+    /// none (opened from the tray), and Paste copies instead.
+    /// </summary>
+    public Func<Core.Clipboard.PasteTarget?>? SettingsPasteTarget { get; set; }
+
     /// <summary>Closes the island after a paste was sent (notes #62).</summary>
     public Action? CloseIsland { get; set; }
 

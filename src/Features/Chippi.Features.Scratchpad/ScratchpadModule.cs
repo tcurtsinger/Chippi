@@ -28,6 +28,8 @@ public sealed class ScratchpadModule : IFeatureModule
         {
             CreateHeader = () => Page().Header, InitialFocus = () => Page().InitialFocus,
         });
+        var shared = _session; // Settings and the island page edit the same notes
+        context.Ui.SetSettingsPage(() => new ScratchpadSettingsPage(shared));
         _session.Changed += UpdateTile;
         return _session.LoadAsync();
     }

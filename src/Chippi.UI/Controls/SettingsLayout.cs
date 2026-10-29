@@ -20,6 +20,17 @@ public static class SettingsLayout
     public static Thickness RowPadding { get; } = new(16, 8, 16, 8);
     public static Thickness DependentPadding { get; } = new(50, 8, 16, 8);
 
+    /// <summary>
+    /// What a feature's page shows at the right of its page title, such as Scratchpad's "Saved". Set it on the
+    /// view the feature gives Settings; the shell puts it in the title row.
+    /// </summary>
+    public static readonly DependencyProperty TitleAsideProperty = DependencyProperty.RegisterAttached(
+        "TitleAside", typeof(FrameworkElement), typeof(SettingsLayout), new PropertyMetadata(null));
+
+    public static FrameworkElement? GetTitleAside(DependencyObject view) => (FrameworkElement?)view.GetValue(TitleAsideProperty);
+
+    public static void SetTitleAside(DependencyObject view, FrameworkElement? aside) => view.SetValue(TitleAsideProperty, aside);
+
     /// <summary>A 20-high heading, 24 above and 8 below; a header action does not add height.</summary>
     public static Grid Section(string title, FrameworkElement? action = null, bool first = false)
     {
