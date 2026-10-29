@@ -122,7 +122,7 @@ internal sealed class SystemMonitorView : UserControl
             if (key != _networkKey)
             {
                 _networkKey = key;
-                _networkPicker = adapters.Count > 1 ? PickerButton(adapter!.Name, "Network adapter", [.. adapters.Select(a => (a.Id,a.Name))], adapter.Id,
+                _networkPicker = adapters.Count > 1 ? PickerButton(adapter!.Name, "Network adapter", [.. adapters.Select(a => (a.Id, a.Name))], adapter.Id,
                     id => _module.Save(_module.Settings with { NetworkAdapterId = id })) : null;
             }
             var row = Row("Network", s.Network.Status == ReadingStatus.Unavailable ? "Unavailable" : "", "", picker: _networkPicker);
@@ -148,17 +148,20 @@ internal sealed class SystemMonitorView : UserControl
             if (s.ThermalZones.Status == ReadingStatus.Ok) _zoneCount = zones.Count;
             int count = s.ThermalZones.Status is ReadingStatus.Unavailable or ReadingStatus.Pending ? _zoneCount : zones.Count;
             for (int i = 0; i < count; i++)
-                Row(count > 1 ? $"Thermal zone {i+1}" : "Thermal zone", s.ThermalZones.Status == ReadingStatus.Unavailable ? "Unavailable" : "",
+                Row(count > 1 ? $"Thermal zone {i + 1}" : "Thermal zone", s.ThermalZones.Status == ReadingStatus.Unavailable ? "Unavailable" : "",
                     i < zones.Count ? Format.Temperature(zones[i].TemperatureC, settings.Temperature) : "");
         }
+        // Unusually many thermal zones still show whole rows only. Settings owns overflow.
+        int capacity = (int)((IslandPage.BodyHeight - 4) / 28);
+        if (visible.Count > capacity) visible.RemoveRange(capacity, visible.Count - capacity);
         // Keep existing controls parented when only their readings change.
         foreach (var old in _readings.Children.OfType<ReadingRow>().Where(r => !visible.Contains(r)).ToList()) _readings.Children.Remove(old);
         for (int i = 0; i < visible.Count; i++)
             if (i >= _readings.Children.Count || _readings.Children[i] != visible[i])
-            { _readings.Children.Remove(visible[i]); _readings.Children.Insert(i,visible[i]); }
+            { _readings.Children.Remove(visible[i]); _readings.Children.Insert(i, visible[i]); }
         _readingsCard.Visibility = visible.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
         double remaining = IslandPage.BodyHeight - (visible.Count == 0 ? 0 : visible.Count * 28 + 4 + 8);
-        _disks.Visibility = settings.IsOn(Reading.Disks) ? Visibility.Visible : Visibility.Collapsed;
+        _disks.Visibility = settings.IsOn(Reading.Disks) && remaining >= 26 ? Visibility.Visible : Visibility.Collapsed;
         _disks.Margin = new Thickness(0, visible.Count == 0 ? 0 : 8, 0, 0);
         _disks.Child = s.Disks.Status == ReadingStatus.Unavailable ? DiskTable.Unavailable()
             : DiskTable.Build(s.Disks.Value ?? [], id => _module.Alerting("low-disk", id), Math.Max(0, remaining - 4));
@@ -166,53 +169,53 @@ internal sealed class SystemMonitorView : UserControl
 
     internal static Border Card()
     {
-        var card = new Border { Padding = new Thickness(10,2,10,2) };
-        card.SetResourceReference(StyleProperty,"IslandCardStyle");
+        var card = new Border { Padding = new Thickness(10, 2, 10, 2) };
+        card.SetResourceReference(StyleProperty, "IslandCardStyle");
         return card;
     }
 
     internal static TextBlock Text(string text, double size = 12, bool secondary = false)
     {
-        var block = new TextBlock { Text=text, FontSize=size, VerticalAlignment=VerticalAlignment.Center, TextTrimming=TextTrimming.CharacterEllipsis };
-        block.SetResourceReference(TextBlock.ForegroundProperty,secondary ? "IslandTextTertiaryBrush" : "IslandTextBrush");
-        Typography.SetNumeralAlignment(block,FontNumeralAlignment.Tabular);
+        var block = new TextBlock { Text = text, FontSize = size, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
+        block.SetResourceReference(TextBlock.ForegroundProperty, secondary ? "IslandTextTertiaryBrush" : "IslandTextBrush");
+        Typography.SetNumeralAlignment(block, FontNumeralAlignment.Tabular);
         return block;
     }
 
     private sealed class ReadingRow : Grid
     {
         private readonly ContentControl _name = new();
-        public TextBlock Detail { get; } = Text("",11,true);
+        public TextBlock Detail { get; } = Text("", 11, true);
         private readonly TextBlock _value = Text("");
         public ReadingRow(string name)
         {
-            Height=28;
-            ColumnDefinitions.Add(new ColumnDefinition { Width=new GridLength(80) });
+            Height = 28;
+            ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(80) });
             ColumnDefinitions.Add(new ColumnDefinition());
-            ColumnDefinitions.Add(new ColumnDefinition { Width=GridLength.Auto });
-            _name.Content=Text(name,12,true); _name.Tag=name;
-            _value.FontWeight=FontWeights.SemiBold; _value.TextAlignment=TextAlignment.Right;
-            Grid.SetColumn(Detail,1); Grid.SetColumn(_value,2);
-            var divider=new Border { Height=1,VerticalAlignment=VerticalAlignment.Bottom };
-            divider.SetResourceReference(BackgroundProperty,"IslandPanelBrush"); Grid.SetColumnSpan(divider,3);
+            ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            _name.Content = Text(name, 12, true); _name.Tag = name;
+            _value.FontWeight = FontWeights.SemiBold; _value.TextAlignment = TextAlignment.Right;
+            Grid.SetColumn(Detail, 1); Grid.SetColumn(_value, 2);
+            var divider = new Border { Height = 1, VerticalAlignment = VerticalAlignment.Bottom };
+            divider.SetResourceReference(BackgroundProperty, "IslandPanelBrush"); Grid.SetColumnSpan(divider, 3);
             Children.Add(divider); Children.Add(_name); Children.Add(Detail); Children.Add(_value);
         }
-        public void Set(string detail,string value,bool caution,FrameworkElement? picker)
+        public void Set(string detail, string value, bool caution, FrameworkElement? picker)
         {
-            _name.Content=picker ?? (object)Text((string)_name.Tag,12,true);
-            Detail.Text=detail; _value.Inlines.Clear(); _value.Text=value;
-            _value.SetResourceReference(TextBlock.ForegroundProperty,caution ? "WarningTextBrush" : "IslandTextBrush");
+            _name.Content = picker ?? (object)Text((string)_name.Tag, 12, true);
+            Detail.Text = detail; _value.Inlines.Clear(); _value.Text = value;
+            _value.SetResourceReference(TextBlock.ForegroundProperty, caution ? "WarningTextBrush" : "IslandTextBrush");
         }
-        public void Network(string down,string up)
+        public void Network(string down, string up)
         {
             void Arrow(Geometry geometry)
             {
-                var glyph=new LucideIcon { Data=geometry,Size=12,Margin=new Thickness(0,0,4,0) };
-                glyph.SetResourceReference(LucideIcon.BrushProperty,"IslandTextTertiaryBrush");
-                _value.Inlines.Add(new InlineUIContainer(glyph) { BaselineAlignment=BaselineAlignment.Center });
+                var glyph = new LucideIcon { Data = geometry, Size = 12, Margin = new Thickness(0, 0, 4, 0) };
+                glyph.SetResourceReference(LucideIcon.BrushProperty, "IslandTextTertiaryBrush");
+                _value.Inlines.Add(new InlineUIContainer(glyph) { BaselineAlignment = BaselineAlignment.Center });
             }
-            _value.FontWeight=FontWeights.Normal;
-            Arrow(LucideIcons.ArrowDown); _value.Inlines.Add(new Run(down+"   "));
+            _value.FontWeight = FontWeights.Normal;
+            Arrow(LucideIcons.ArrowDown); _value.Inlines.Add(new Run(down + "   "));
             Arrow(LucideIcons.ArrowUp); _value.Inlines.Add(new Run(up));
         }
     }

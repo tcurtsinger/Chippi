@@ -22,7 +22,8 @@ The sampler, alerts and configurable tile status retain their behavior. The page
 - [Crowded before](screens/part-c/before-crowded.png) / [after](screens/part-c/after-crowded.png).
 - [Laptop before](screens/part-c/before-laptop.png) / [after](screens/part-c/after-laptop.png).
 - Five new regressions cover exact seven-drive fit in 304 DIP, fewer whole rows with Battery/Thermal zone, sorted volumes and Used = Total - Free, failed/pending values, and the full Settings drive list.
-- Full Release suite: 1,274 passed, 0 failed, 16 desktop-input tests skipped. System monitor: 81; Island: 160. Four obsolete graph-scale cases were removed with their page-only implementation.
+- After review: table code formatted, Settings watch comment corrected, and the island caps readings at ten whole rows and hides Disks when its header cannot fit. Two high-zone-count cases pass; final monitor suite 83/83 and both Release builds remain warning-free.
+- Full Release suite before that follow-up: 1,274 passed, 0 failed, 16 desktop-input tests skipped. System monitor: 81; Island: 160. Four obsolete graph-scale cases were removed with their page-only implementation.
 - Release x64 and ARM64, and Debug x64: 0 warnings, 0 errors.
 - Actual Debug --island-pages completed on a disposable dev profile with only System monitor installed: 13 images on top, left and right, success recorded in the log. Readings were read-only; Clipboard recording was off and File organizer was not installed.
 - Owned snapshot process stopped and profile/notification registration removed. Production settings hash unchanged. No Setup or keyboard/mouse injection.
@@ -36,4 +37,4 @@ No saved-settings format changes.
 
 **Blast Radius:** UI
 
-Settings now polls disk space while its page is open. The island leaves overflow drives out, with every drive available in Settings. No real alert was triggered; fake-data regressions cover the warning color.
+Settings now polls disk space while its page is open. The island leaves overflow drives out, with every drive available in Settings. No real alert was triggered; fake-data regressions cover the warning color. Part F must expose thermal readings beyond the island limit, as required by the shared overflow rule.

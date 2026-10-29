@@ -44,7 +44,7 @@ public sealed class SystemMonitorSettingsPage : UserControl
         {
             _sampler.Updated += Updated;
             Hardware(_sampler.Latest);
-            // Discover conditional rows once, then release the watch. Settings does not poll levels.
+            // Discover conditional rows once, then keep only disk space live while Settings is open.
             _discovery = _sampler.Watch(SensorNeed.Disks | SensorNeed.Battery | SensorNeed.ThermalZones | SensorNeed.GpuSensors);
         }
         Refresh();
