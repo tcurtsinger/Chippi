@@ -8,14 +8,25 @@ namespace Chippi.App.Settings;
 
 /// <summary>
 /// WS2's composition: one settings window at a time. <see cref="ShellCommands.OpenSettings"/> opens
-/// it on a page, or brings the open one forward (restoring it if minimized) and switches page.
+/// it on a page (or the last page used), or brings the open one forward (restoring it if minimized)
+/// and switches page.
 /// </summary>
 internal sealed class SettingsController
 {
     private readonly ShellContext _shell;
+    private readonly Action<SettingsWindow>? _beforeShow;
     private SettingsWindow? _window;
+    private string _lastPage = "";
 
-    private SettingsController(ShellContext shell) => _shell = shell;
+    /// <param name="beforeShow">Tests: places the window before it shows (off screen, not activated).</param>
+    internal SettingsController(ShellContext shell, Action<SettingsWindow>? beforeShow = null)
+    {
+        _shell = shell;
+        _beforeShow = beforeShow;
+    }
+
+    /// <summary>The open window, or null.</summary>
+    internal SettingsWindow? Window => _window;
 
     /// <summary>The [WS2] settings slot.</summary>
     public static void Compose(ShellContext shell)
@@ -27,25 +38,31 @@ internal sealed class SettingsController
 #endif
     }
 
-    private void Open(string? page)
+    /// <summary>
+    /// Opens <paramref name="page"/>, or for null (the tray icon) the last page used: the open window
+    /// stays where it is, and a new one opens on the page showing when Settings last closed.
+    /// </summary>
+    internal void Open(string? page)
     {
         if (_window is null)
         {
-            _window = new SettingsWindow(_shell, page ?? "");
-            _window.Closed += (_, _) =>
+            var window = _window = new SettingsWindow(_shell, page ?? _lastPage);
+            window.Closed += (_, _) =>
             {
+                _lastPage = window.CurrentPage;
                 _window = null;
             };
-            _window.Show();
+            _beforeShow?.Invoke(window);
+            window.Show();
         }
-        else
+        else if (page is not null)
         {
-            _window.Navigate(page ?? "");
+            _window.Navigate(page);
         }
 
         if (_window.WindowState == WindowState.Minimized)
             _window.WindowState = WindowState.Normal;
-        if (!_window.Activate())
+        if (_beforeShow is null && !_window.Activate()) // tests never take the foreground
             Core.Diagnostics.Log.Warn($"Settings request '{page}' was shown, but Windows did not bring Settings to the foreground.");
     }
 
