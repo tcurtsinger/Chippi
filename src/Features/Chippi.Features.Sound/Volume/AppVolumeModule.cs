@@ -22,6 +22,7 @@ public sealed class AppVolumeModule(AudioService? audio = null) : IFeatureModule
     private IIslandTile? _tile;
     private volatile bool _stopping;
     private bool _routingFailed;
+    private string? _outputsRead; // the apps and outputs RefreshOutputsAsync last read (OutputsShape)
 
     public FeatureDescriptor Descriptor { get; } = new("app-volume", "App volume", "Volume and output device per app", FeatureGroup.Sound)
     {
@@ -53,6 +54,7 @@ public sealed class AppVolumeModule(AudioService? audio = null) : IFeatureModule
             _lease = _audio.Acquire();
             await _audio.RefreshAsync();
             await RefreshOutputsAsync();
+            _outputsRead = OutputsShape(Snapshot);
             _tile = context.Ui.AddIslandTile(new(TileKey, Descriptor.Name, "Sliders", 20, 0, () => new VolumeView(this, VolumeSurface.Island))
             { Orbit = IslandOrbit.Right });
             context.Ui.SetSettingsPage(_ => new VolumeView(this, VolumeSurface.Settings));
@@ -80,6 +82,7 @@ public sealed class AppVolumeModule(AudioService? audio = null) : IFeatureModule
             _context = null;
             _tile = null;
             _current.Clear(); _seen.Clear();
+            _outputsRead = null;
         }
         finally { _gate.Release(); }
     }
@@ -128,7 +131,14 @@ public sealed class AppVolumeModule(AudioService? audio = null) : IFeatureModule
         try
         {
             if (_stopping || _context is null) return;
-            await RefreshOutputsAsync();
+            // A volume or mute change doesn't move an app to another output, and a slider drag publishes
+            // one per step: outputs are read again only when the apps or the outputs changed.
+            var shape = OutputsShape(snapshot);
+            if (shape != _outputsRead)
+            {
+                await RefreshOutputsAsync();
+                _outputsRead = shape;
+            }
             UpdateTile();
         }
         catch (Exception ex) { Error = AudioErrors.Reason(ex); }
@@ -172,6 +182,11 @@ public sealed class AppVolumeModule(AudioService? audio = null) : IFeatureModule
             _seen[app.Key] = signature;
         }
     }
+
+    /// <summary>Each app's processes and the outputs its sessions play on, and the outputs there are.</summary>
+    internal static string OutputsShape(AudioSnapshot snapshot) =>
+        string.Join("|", snapshot.Apps.Select(a => $"{a.Key}:{string.Join(",", a.ProcessIds.Order())}:{string.Join(",", a.EndpointIds)}"))
+        + "#" + string.Join("|", snapshot.Active(AudioFlow.Render).Select(e => e.Id));
 
     private void UpdateTile() => _tile?.SetStatus(Apps.Count() is var count && count == 1 ? "1 app" : $"{count} apps");
 }

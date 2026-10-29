@@ -199,4 +199,30 @@ public sealed class VolumeTests
         Assert.False(f.Settings.Value.ShowQuietApps); Assert.False(f.Settings.Value.RememberOutputs);
         Assert.Empty(f.System.AppOutputWrites);
     }
+
+    // A slider drag publishes a snapshot per step; only a new app, process or output reads outputs again.
+    [Fact]
+    public async Task Outputs_are_read_again_for_new_apps_and_outputs_not_for_volume_steps()
+    {
+        await using var f = new VolumeFixture(); await f.Start();
+        var before = AppVolumeModule.OutputsShape(f.Module.Snapshot);
+        await f.Module.SetVolumeAsync(VolumeFixture.Key, 0.2f);
+        Assert.Equal(before, AppVolumeModule.OutputsShape(f.Module.Snapshot));
+        f.System.WithSession(VolumeFixture.Session("two", "A", 456)); await f.Audio.RefreshAsync();
+        Assert.NotEqual(before, AppVolumeModule.OutputsShape(f.Module.Snapshot));
+    }
+
+    [Fact]
+    public void A_drag_writes_the_first_step_then_only_the_newest()
+    {
+        var written = new List<int>();
+        var first = new TaskCompletionSource();
+        var write = new LatestWrite();
+        write.Send(() => { written.Add(1); return first.Task; });
+        write.Send(() => { written.Add(2); return Task.CompletedTask; });
+        write.Send(() => { written.Add(3); return Task.CompletedTask; });
+        first.SetResult();
+        Assert.True(SpinWait.SpinUntil(() => written.Count == 2, TimeSpan.FromSeconds(5)));
+        Assert.Equal([1, 3], written);
+    }
 }
