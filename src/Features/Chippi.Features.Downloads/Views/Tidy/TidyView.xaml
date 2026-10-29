@@ -36,6 +36,7 @@
    </Setter.Value></Setter>
   </Style>
  </UserControl.Resources>
+ <Grid>
  <DockPanel>
   <Border x:Name="FolderCard" DockPanel.Dock="Top" Style="{DynamicResource IslandCardStyle}" Height="44" Padding="10">
    <DockPanel>
@@ -49,14 +50,7 @@
     </ComboBox>
    </DockPanel>
   </Border>
-  <StackPanel x:Name="Empty" Visibility="Collapsed" VerticalAlignment="Center">
-   <c:LucideIcon Data="{x:Static c:LucideIcons.Folder}" Size="20" Brush="{DynamicResource TextTertiaryBrush}" HorizontalAlignment="Center"/>
-   <TextBlock Text="No folders yet" HorizontalAlignment="Center" Margin="0,12,0,0"/>
-   <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,16,0,0">
-    <Button Content="Add Downloads" Style="{DynamicResource IslandAccentButtonStyle}" Click="OnAddDownloads" AutomationProperties.Name="Add Downloads"/>
-    <Button Content="Choose folder…" Style="{DynamicResource IslandButtonStyle}" Margin="8,0,0,0" Click="OnChooseFolder" AutomationProperties.Name="Choose folder"/>
-   </StackPanel>
-  </StackPanel>
+
 
   <!-- History on the left, Organize now on the right. -->
   <DockPanel DockPanel.Dock="Bottom" Height="28" x:Name="Actions" Margin="0,8,0,0" LastChildFill="False">
@@ -101,4 +95,13 @@
 
 
  </DockPanel>
+  <StackPanel x:Name="Empty" Visibility="Collapsed" VerticalAlignment="Center">
+   <c:LucideIcon Data="{x:Static c:LucideIcons.Folder}" Size="20" Brush="{DynamicResource TextTertiaryBrush}" HorizontalAlignment="Center"/>
+   <TextBlock Text="No folders yet" HorizontalAlignment="Center" Margin="0,12,0,0"/>
+   <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,16,0,0">
+    <Button Content="Add Downloads" Style="{DynamicResource IslandAccentButtonStyle}" Click="OnAddDownloads" AutomationProperties.Name="Add Downloads"/>
+    <Button Content="Choose folder…" Style="{DynamicResource IslandButtonStyle}" Margin="8,0,0,0" Click="OnChooseFolder" AutomationProperties.Name="Choose folder"/>
+   </StackPanel>
+  </StackPanel>
+ </Grid>
 </UserControl>

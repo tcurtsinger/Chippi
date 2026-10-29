@@ -1,4 +1,4 @@
-﻿## Summary
+## Summary
 
 Four more island pages fit the fixed body: Now Playing, App volume, Keep awake and File organizer.
 
@@ -43,3 +43,7 @@ No saved-settings migration. `FolderMode.Silent`, `RunTrigger.Silent` and serial
 **Blast Radius:** UI
 
 The shared island slider track now follows Orientation and stretches vertically for App volume; Output keeps the horizontal slider. Program-file icons are cached, frozen and release their native handles. Overflow apps wait for Part F3's full Settings list. Physical pointer hover, real app sessions and device output picks remain for the final live check.
+
+Review follow-up: the stale Stop label and no-folders alignment both reproduced before the fix. Refresh now sets every choice label from the current session and hover state, and the no-folders view sits in an overlay Grid. Three added regression cases pass, including Until staying Stop across a timer refresh and a stopped duration returning to its label. Island 166/166, Keep awake 32/32 and Sound 81/81 pass; both Release targets remain warning-free. Hover is simulated inside WPF without native input. [No folders](part-d1-d4/after-organizer-no-folders.png), [lit hover](part-d1-d4/after-keep-awake-hover.png).
+
+The selected hover now lightens with white over the accent, and native icons are read large then reduced to 20. Long app names keep their full tooltip; no extra text-rendering control was added solely to mark a third wrapped line with an ellipsis.

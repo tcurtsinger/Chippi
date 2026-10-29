@@ -1,4 +1,4 @@
-﻿// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
 using System.Runtime.InteropServices;
@@ -8,7 +8,7 @@ using System.Windows.Media.Imaging;
 
 namespace Chippi.Features.Sound.Volume;
 
-/// <summary>Reads the program file's small icon. Handles never outlive the conversion.</summary>
+/// <summary>Reads the program file's large icon. Handles never outlive the conversion.</summary>
 internal static class AppIcon
 {
     private static readonly Dictionary<string, BitmapSource?> Cache = new(StringComparer.OrdinalIgnoreCase);
@@ -21,7 +21,7 @@ internal static class AppIcon
         BitmapSource? image = null;
         try
         {
-            if (ExtractIconEx(path, 0, IntPtr.Zero, out handle, 1) > 0 && handle != IntPtr.Zero)
+            if (ExtractIconEx(path, 0, out handle, IntPtr.Zero, 1) > 0 && handle != IntPtr.Zero)
             {
                 image = Imaging.CreateBitmapSourceFromHIcon(handle, Int32Rect.Empty, BitmapSizeOptions.FromWidthAndHeight(20, 20));
                 image.Freeze();
@@ -36,7 +36,7 @@ internal static class AppIcon
     }
 
     [DllImport("shell32.dll", CharSet = CharSet.Unicode, EntryPoint = "ExtractIconExW")]
-    private static extern uint ExtractIconEx(string file, int index, IntPtr large, out IntPtr small, uint count);
+    private static extern uint ExtractIconEx(string file, int index, out IntPtr large, IntPtr small, uint count);
 
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]

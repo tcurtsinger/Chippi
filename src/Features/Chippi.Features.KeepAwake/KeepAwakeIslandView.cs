@@ -20,7 +20,7 @@ public sealed class KeepAwakeIslandView : UserControl
 
     private readonly KeepAwakeModule _module;
     private readonly TextBlock _error = new() { TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 4, 0, 0), Visibility = Visibility.Collapsed };
-    private readonly List<(ToggleButton Chip, KeepAwakeSettings? Length)> _chips = [];
+    private readonly List<(ToggleButton Chip, KeepAwakeSettings? Length, string Label)> _chips = [];
     private readonly ComboBox _until = new() { Width = 140 };
     private readonly Popup _untilPopup = new() { StaysOpen = false, Placement = PlacementMode.Bottom, AllowsTransparency = true, PopupAnimation = PopupAnimation.None };
     private readonly DispatcherTimer _tick = new() { Interval = TimeSpan.FromSeconds(15) };
@@ -32,11 +32,11 @@ public sealed class KeepAwakeIslandView : UserControl
             <Style xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" TargetType="ToggleButton">
              <Setter Property="Foreground" Value="{DynamicResource IslandTextBrush}"/>
              <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ToggleButton">
-              <Border Name="Card" CornerRadius="8" Background="{DynamicResource IslandPanelBrush}"><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
+              <Border Name="Card" CornerRadius="8" Background="{DynamicResource IslandPanelBrush}"><Grid><Border Name="Hover" CornerRadius="8" Background="White" Opacity="0" IsHitTestVisible="False"/><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/></Grid></Border>
               <ControlTemplate.Triggers>
                <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Card" Property="Background" Value="{DynamicResource IslandHoverBrush}"/></Trigger>
                <Trigger Property="IsChecked" Value="True"><Setter TargetName="Card" Property="Background" Value="{DynamicResource IslandAccentBrush}"/><Setter Property="Foreground" Value="Black"/></Trigger>
-               <MultiTrigger><MultiTrigger.Conditions><Condition Property="IsChecked" Value="True"/><Condition Property="IsMouseOver" Value="True"/></MultiTrigger.Conditions><Setter TargetName="Card" Property="Opacity" Value="0.9"/></MultiTrigger>
+               <MultiTrigger><MultiTrigger.Conditions><Condition Property="IsChecked" Value="True"/><Condition Property="IsMouseOver" Value="True"/></MultiTrigger.Conditions><Setter TargetName="Hover" Property="Opacity" Value="0.12"/></MultiTrigger>
               </ControlTemplate.Triggers>
              </ControlTemplate></Setter.Value></Setter>
             </Style>
@@ -86,10 +86,10 @@ public sealed class KeepAwakeIslandView : UserControl
     {
         var chip = new ToggleButton { Content = label, Height = 96, FontSize = 14, Margin = new Thickness(0, 0, 8, 8) };
         chip.SetResourceReference(StyleProperty, "ChoiceStyle");
-        chip.MouseEnter += (_, _) => { if (IsSelected(length)) chip.Content = "Stop"; };
-        chip.MouseLeave += (_, _) => { chip.Content = label; Refresh(); };
+        chip.MouseEnter += (_, _) => Refresh();
+        chip.MouseLeave += (_, _) => Refresh();
         OnFlip(chip, () => OnChip(chip, length));
-        _chips.Add((chip, length));
+        _chips.Add((chip, length, label));
         return chip;
     }
 
@@ -113,12 +113,12 @@ public sealed class KeepAwakeIslandView : UserControl
         if (!Dispatcher.CheckAccess()) { Dispatcher.BeginInvoke(Refresh); return; }
         _error.Text = _module.Error ?? "";
         _error.Visibility = _error.Text.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
-        foreach (var (chip, length) in _chips)
+        foreach (var (chip, length, label) in _chips)
         {
             bool selected = IsSelected(length);
             chip.IsChecked = selected;
-            if (length is null)
-                chip.Content = selected ? $"Until {KeepAwakeText.Until(_module.Active!.UntilMinute)}" : UntilLabel;
+            chip.Content = selected && chip.IsMouseOver ? "Stop" : length is null && selected
+                ? $"Until {KeepAwakeText.Until(_module.Active!.UntilMinute)}" : label;
         }
     }
 
