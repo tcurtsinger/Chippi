@@ -96,14 +96,16 @@ internal sealed class SettingsController
                         _window?.Close();
                         SettingsUi.SaveApp(_shell.Config, s => s.Theme = theme);
                         UI.Themes.ThemeManager.Apply(theme);
+                        // The tray's open (null): the page showing when Settings closed, or the first one.
+                        string last = _lastPage;
                         Open(null);
-                        string first = _window!.NavigationPages.First().Id;
-                        if (_window.CurrentPage != first)
-                            throw new InvalidOperationException("Settings did not open on its first sidebar item.");
+                        string expected = last.Length > 0 ? last : _window!.NavigationPages.First().Id;
+                        if (_window!.CurrentPage != expected)
+                            throw new InvalidOperationException($"Settings opened on '{_window.CurrentPage}', not the last page used ('{expected}').");
                         Open("island");
                         Open(null);
-                        if (_window.CurrentPage != first)
-                            throw new InvalidOperationException("Settings remembered the previous page.");
+                        if (_window.CurrentPage != "island")
+                            throw new InvalidOperationException("Settings left the page it was showing.");
                         foreach (var page in _window.NavigationPages.ToList())
                         {
                             Open(page.Id);
