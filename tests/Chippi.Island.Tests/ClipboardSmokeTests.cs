@@ -49,10 +49,11 @@ public sealed class ClipboardSmokeTests
             page = Assert.IsAssignableFrom<FrameworkElement>(historyUi.Tile!.Spec.CreateSection());
             page.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));
             var header = Assert.IsAssignableFrom<FrameworkElement>(historyUi.Tile.Spec.CreateHeader!());
-            Assert.Single(Find<IconButton>(header), b => AutomationProperties.GetName(b) == "Clean URL");
-            Assert.Single(Find<IconButton>(header), b => AutomationProperties.GetName(b) == "Pause");
+            Assert.Single(Find<Button>(header), b => AutomationProperties.GetName(b) == "Clean URL");
+            Assert.Single(Find<Button>(header), b => AutomationProperties.GetName(b) == "Pause");
             var search = Assert.IsType<SearchBox>(historyUi.Tile.Spec.InitialFocus!());
             Assert.Contains(Find<TextBlock>(page), text => text.Text == "Invented first copy");
+            Assert.Empty(Find<ScrollViewer>(page)); // nothing scrolls; the list shows whole rows
             IslandBounds.Place(panel, edge, 960, 540);
             IslandBounds.Check(panel, edge, 960, 540);
 
@@ -61,7 +62,7 @@ public sealed class ClipboardSmokeTests
             Assert.True(historyUi.Tile.Spec.HandleEscape!());
             Assert.Equal("", search.Text);
             Assert.False(historyUi.Tile.Spec.HandleEscape!());
-            var clean = Find<IconButton>(header).Single(b => AutomationProperties.GetName(b) == "Clean URL");
+            var clean = Find<Button>(header).Single(b => AutomationProperties.GetName(b) == "Clean URL");
             clean.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             var link = Assert.IsType<TextBox>(historyUi.Tile.Spec.InitialFocus!());
             Assert.Equal("Link", AutomationProperties.GetName(link));
@@ -87,11 +88,11 @@ public sealed class ClipboardSmokeTests
     }
     private static void Set(object value, string name, object field) => value.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(value, field);
     private static void Invoke(object value, string name, params object?[] args) => value.GetType().GetMethod(name, BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(value, args);
-    private sealed class Keys : IKeyProtector { public byte[] Protect(byte[] key) => key.ToArray(); public byte[] Unprotect(byte[] key) => key.ToArray(); }
-    private sealed class Settings : IModuleSettings { public T Get<T>() where T : class, new() => typeof(T) == typeof(ClipboardHistorySettings) ? (T)(object)new ClipboardHistorySettings { Recording = true } : new(); public void Save<T>(T value) where T : class { } }
-    private sealed class Ui(string id) : IModuleUi { public IslandTileContribution? Tile; public IIslandTile AddIslandTile(IslandTileSpec spec) => Tile = new(id, spec); public void SetSettingsPage(Func<string?, object> factory) { } }
-    private sealed class Island : IIslandPublisher { public void Publish(IslandActivity activity) => throw new InvalidOperationException(); public void Clear(string key) { } public void ReportSuccess(string? message = null) => throw new InvalidOperationException(); }
-    private sealed class Hub : IClipboardHub
+    internal sealed class Keys : IKeyProtector { public byte[] Protect(byte[] key) => key.ToArray(); public byte[] Unprotect(byte[] key) => key.ToArray(); }
+    internal sealed class Settings : IModuleSettings { public T Get<T>() where T : class, new() => typeof(T) == typeof(ClipboardHistorySettings) ? (T)(object)new ClipboardHistorySettings { Recording = true } : new(); public void Save<T>(T value) where T : class { } }
+    internal sealed class Ui(string id) : IModuleUi { public IslandTileContribution? Tile; public IIslandTile AddIslandTile(IslandTileSpec spec) => Tile = new(id, spec); public void SetSettingsPage(Func<string?, object> factory) { } }
+    internal sealed class Island : IIslandPublisher { public void Publish(IslandActivity activity) => throw new InvalidOperationException(); public void Clear(string key) { } public void ReportSuccess(string? message = null) => throw new InvalidOperationException(); }
+    internal sealed class Hub : IClipboardHub
     {
         public IDisposable Listen(Action<ClipCopy> copied, Func<string, bool>? skip = null) => new Lease();
         public Task<ClipRead> ReadAsync(CancellationToken cancel = default) => Task.FromResult(new ClipRead(ClipStatus.Ok, ClipContent.FromText("https://example.org/?utm_source=invented")));

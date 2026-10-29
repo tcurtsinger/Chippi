@@ -11,32 +11,34 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
 using Chippi.Core.Clipboard;
+using Chippi.Core.Modules;
 using Chippi.UI.Controls;
 
 namespace Chippi.Features.Shelf;
 
 /// <summary>
-/// The Shelf page (design notes #37 to #50, #61): a three-column grid of items, newest first, with Copy,
-/// Pin and Remove under it. The whole page takes a drop; an item drags out, Copy only. The island stays
-/// open while a drag is over the page or an item is being dragged out.
+/// The Shelf page (design notes #37 to #50, #61; refresh brief Part D #7): tiles fill the body above
+/// Copy, Pin and Remove, newest first, and shrink as items pile up; at <see cref="ShelfService.MaxItems"/>
+/// the Shelf is full. Nothing scrolls. The whole page takes a drop; an item drags out, Copy only. The
+/// island stays open while a drag is over the page or an item is being dragged out.
 /// </summary>
 internal sealed class ShelfPage : UserControl
 {
-    private const double ItemWidth = 96, ItemHeight = 84, Gap = 8, Columns = 3;
-    private const double GridHeight = 3 * ItemHeight + 2 * Gap; // 268: three rows, then it scrolls (notes #7)
+    private const double Gap = 8, ActionsHeight = 28;
+    private const double GridHeight = IslandPage.BodyHeight - ActionsHeight - Gap; // 268
 
     private readonly ShelfService _shelf;
     private readonly Func<IDisposable> _hold;
-    private readonly Border _zone = new() { Height = 148, Focusable = true }; // empty: the dashed zone
+    private readonly Border _zone = new() { Focusable = true }; // empty: the dashed zone, filling the body
     private readonly Rectangle _zoneStroke = Dashed(8);
     private readonly LucideIcon _zoneGlyph = Glyph(LucideIcons.Inbox, 20, "IslandTextTertiaryBrush");
-    private readonly WrapPanel _items = new() { Width = Columns * ItemWidth + (Columns - 1) * Gap };
-    private readonly ScrollViewer _scroller = new() { MaxHeight = GridHeight, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Focusable = false };
-    private readonly Grid _grid = new();
+    private readonly WrapPanel _items = new() { Width = IslandPage.BodyWidth };
+    private readonly Grid _grid = new() { VerticalAlignment = VerticalAlignment.Top };
     private readonly Rectangle _gridStroke = Dashed(8);
     private readonly Button _copy = Button("Copy"), _pin = Button("Pin"), _remove = Button("Remove");
     private readonly StackPanel _caution = Caution();
-    private readonly DockPanel _actions = new() { Margin = new Thickness(0, 8, 0, 0) };
+    private readonly DockPanel _actions = new() { Height = ActionsHeight, Margin = new Thickness(0, Gap, 0, 0) };
+    private int _columns = 6;
     private readonly Dictionary<long, (byte[] Png, BitmapSource Image)> _thumbnails = []; // by item, checked against its bytes
     private IReadOnlyList<ShelfItem> _shown = [];
     private long? _selected;
@@ -53,10 +55,10 @@ internal sealed class ShelfPage : UserControl
         _hold = hold;
 
         // Empty (notes #41): a dashed zone with Inbox and "No items"; during a drag its stroke and glyph turn accent.
-        var empty = Text("No items", 13, "IslandTextTertiaryBrush");
+        var empty = Text("No items", 12, "IslandTextTertiaryBrush");
         empty.HorizontalAlignment = HorizontalAlignment.Center;
         _zoneGlyph.HorizontalAlignment = HorizontalAlignment.Center;
-        _zoneGlyph.Margin = new Thickness(0, 0, 0, 8);
+        _zoneGlyph.Margin = new Thickness(0, 0, 0, 6);
         _zone.Child = new Grid { Children = { _zoneStroke, new StackPanel { VerticalAlignment = VerticalAlignment.Center, Children = { _zoneGlyph, empty } } } };
         _zone.FocusVisualStyle = null;
         _zone.GotKeyboardFocus += (_, _) => _zoneStroke.StrokeThickness = 2;
@@ -67,11 +69,9 @@ internal sealed class ShelfPage : UserControl
         _gridStroke.Margin = new Thickness(-4);
         _gridStroke.SetResourceReference(Shape.StrokeProperty, "IslandAccentBrush");
         _gridStroke.Visibility = Visibility.Collapsed;
-        _scroller.Content = _items;
-        _scroller.Margin = new Thickness(0, 0, -8, 0); // the bar sits in the page's padding, not over the third column
         _items.HorizontalAlignment = HorizontalAlignment.Left;
         _grid.Children.Add(_gridStroke);
-        _grid.Children.Add(_scroller);
+        _grid.Children.Add(_items);
         AutomationProperties.SetName(_items, "Shelf");
 
         _copy.Click += (_, _) => Copy();
@@ -84,7 +84,8 @@ internal sealed class ShelfPage : UserControl
         _actions.Children.Add(buttons);
         _actions.Children.Add(_caution);
 
-        Content = new StackPanel { Children = { _zone, _grid, _actions } };
+        DockPanel.SetDock(_actions, Dock.Bottom);
+        Content = new DockPanel { Children = { _actions, new Grid { Children = { _zone, _grid } } } };
         AutomationProperties.SetName(this, "Shelf");
 
         AllowDrop = true;
@@ -137,17 +138,21 @@ internal sealed class ShelfPage : UserControl
 
         bool hadFocus = _items.IsKeyboardFocusWithin;
         _items.Children.Clear();
+        bool slot = _over && !empty;
+        var shown = _shown.Take(ShelfService.MaxItems - (slot ? 1 : 0)).ToList(); // more only from before the limit; they stay kept
+        var layout = Layout(shown.Count + (slot ? 1 : 0));
+        _columns = layout.Columns;
         int index = 0;
-        if (_over && !empty)
-            _items.Children.Add(Cell(Slot(), index++)); // where the drop will land: first, newest first
-        foreach (var item in _shown)
-            _items.Children.Add(Cell(Item(item), index++));
+        if (slot)
+            _items.Children.Add(Cell(Slot(), index++, layout)); // where the drop will land: first, newest first
+        foreach (var item in shown)
+            _items.Children.Add(Cell(Item(item, layout.Columns), index++, layout));
         if (hadFocus)
             Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Input, () => InitialFocus.Focus());
 
         // Actions (notes #38, #42, #44): hidden when the Shelf is empty, disabled with nothing selected.
         var selected = Selected;
-        string limit = _status ?? ShelfFormat.Limit(_shelf.Limit);
+        string limit = _status ?? (Full ? ShelfFormat.Limit(ShelfLimit.Items) : ShelfFormat.Limit(_shelf.Limit));
         _actions.Visibility = empty && limit.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
         ((Panel)_copy.Parent).Visibility = empty ? Visibility.Collapsed : Visibility.Visible;
         _copy.IsEnabled = selected is not null && ShelfFormat.State(selected) != ShelfFormat.FileState.Missing;
@@ -156,11 +161,25 @@ internal sealed class ShelfPage : UserControl
         ShowCaution(limit);
     }
 
-    private static FrameworkElement Cell(FrameworkElement content, int index)
+    private bool Full => _shown.Count >= ShelfService.MaxItems;
+
+    /// <summary>
+    /// Columns, rows and tile size for <paramref name="cells"/> tiles (brief Part D #7): 6 × 3 at 76 × 66
+    /// from the top, then 7 × 4 and 8 × 5 filling the space above the actions.
+    /// </summary>
+    internal static (int Columns, int Rows, double Width, double Height) Layout(int cells)
     {
-        content.Width = ItemWidth;
-        content.Height = ItemHeight;
-        content.Margin = new Thickness(0, 0, index % Columns == Columns - 1 ? 0 : Gap, Gap);
+        var (columns, rows) = cells <= 18 ? (6, 3) : cells <= 28 ? (7, 4) : (8, 5);
+        double width = (IslandPage.BodyWidth - (columns - 1) * Gap) / columns;
+        double height = columns == 6 ? 66 : (GridHeight - (rows - 1) * Gap) / rows;
+        return (columns, rows, width, height);
+    }
+
+    private static FrameworkElement Cell(FrameworkElement content, int index, (int Columns, int Rows, double Width, double Height) layout)
+    {
+        content.Width = layout.Width;
+        content.Height = layout.Height;
+        content.Margin = new Thickness(0, 0, index % layout.Columns == layout.Columns - 1 ? 0 : Gap, Gap);
         return content;
     }
 
@@ -171,20 +190,41 @@ internal sealed class ShelfPage : UserControl
         return new Grid { Children = { slot } };
     }
 
-    private Button Item(ShelfItem item)
+    /// <summary>
+    /// A tile: from 7 down, a 20 slot for the glyph (16) or the picture (36 × 20), then 4 below it the name
+    /// on up to 2 lines, or 1 above a state line. At 8 across, the glyph alone, centered. The size and
+    /// type are in the tooltip with the full name.
+    /// </summary>
+    private Button Item(ShelfItem item, int columns)
     {
         bool selected = item.Id == _selected;
         bool missing = ShelfFormat.State(item) == ShelfFormat.FileState.Missing;
         FrameworkElement visual = item.Kind == ShelfKind.Picture && Thumbnail(item) is { } thumbnail
-            ? new Image { Source = thumbnail, Width = 48, Height = 28, Stretch = Stretch.UniformToFill }
-            : Glyph(ShelfFormat.Glyph(item), 20, missing ? "IslandTextTertiaryBrush" : "IslandTextTertiaryBrush");
+            ? new Image { Source = thumbnail, Width = 36, Height = 20, Stretch = Stretch.UniformToFill }
+            : Glyph(ShelfFormat.Glyph(item), 16, "IslandTextTertiaryBrush");
         visual.HorizontalAlignment = HorizontalAlignment.Center;
         visual.VerticalAlignment = VerticalAlignment.Center;
-        var glyphSlot = new Grid { Height = 32, Margin = new Thickness(0, 0, 0, 4), Children = { visual } };
-        var name = Text(ShelfFormat.Name(item), 12, missing ? "IslandTextTertiaryBrush" : "IslandTextBrush");
-        var caption = Text(ShelfFormat.Caption(item), 12, "IslandTextTertiaryBrush");
-        name.HorizontalAlignment = caption.HorizontalAlignment = HorizontalAlignment.Center;
-        var body = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 6, 0), Children = { glyphSlot, name, caption } };
+        var glyphSlot = new Grid { Height = 20, Children = { visual } };
+        var body = new StackPanel { Margin = new Thickness(4, 7, 4, 0), Children = { glyphSlot } };
+        if (columns == 8)
+        {
+            body.Margin = new Thickness(4, 0, 4, 0);
+            body.VerticalAlignment = VerticalAlignment.Center;
+        }
+        else
+        {
+            string? state = columns == 6 ? ShelfFormat.StateLine(item) : null;
+            var name = NameText(ShelfFormat.Name(item), state is null ? 2 : 1, missing ? "IslandTextTertiaryBrush" : "IslandTextBrush");
+            name.Margin = new Thickness(0, 4, 0, 0);
+            body.Children.Add(name);
+            if (state is not null)
+            {
+                var line = Text(state, 10, "IslandTextTertiaryBrush");
+                line.LineHeight = 13;
+                line.HorizontalAlignment = HorizontalAlignment.Center;
+                body.Children.Add(line);
+            }
+        }
 
         // Selected: a 1px accent stroke over a .10 fill (the tile's .06 plus .04).
         var mark = new Border { CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(1) };
@@ -199,11 +239,11 @@ internal sealed class ShelfPage : UserControl
             var pin = Glyph(LucideIcons.Pin, 12, "IslandTextTertiaryBrush");
             pin.HorizontalAlignment = HorizontalAlignment.Right;
             pin.VerticalAlignment = VerticalAlignment.Top;
-            pin.Margin = new Thickness(0, 6, 6, 0);
+            pin.Margin = new Thickness(0, 5, 5, 0);
             content.Children.Add(pin);
         }
 
-        var button = new Button { Content = content, Tag = item.Id, Opacity = item.Id == _dragging ? 0.4 : 1 };
+        var button = new Button { Content = content, Tag = item.Id, Opacity = item.Id == _dragging ? 0.4 : 1, ToolTip = $"{ShelfFormat.Name(item)}\n{ShelfFormat.Caption(item)}" };
         button.SetResourceReference(StyleProperty, "IslandTileStyle");
         button.HorizontalContentAlignment = HorizontalAlignment.Stretch;
         AutomationProperties.SetName(button, $"{ShelfFormat.Name(item)}, {ShelfFormat.Caption(item)}{(item.Pinned ? ", pinned" : "")}");
@@ -279,7 +319,7 @@ internal sealed class ShelfPage : UserControl
     private void OnKey(object sender, KeyEventArgs e)
     {
         bool ctrl = Keyboard.Modifiers == ModifierKeys.Control;
-        int by = e.Key switch { Key.Left => -1, Key.Right => 1, Key.Up => -(int)Columns, Key.Down => (int)Columns, _ => 0 };
+        int by = e.Key switch { Key.Left => -1, Key.Right => 1, Key.Up => -_columns, Key.Down => _columns, _ => 0 };
         if (by != 0 && _items.IsKeyboardFocusWithin)
         {
             Move(by);
@@ -318,7 +358,7 @@ internal sealed class ShelfPage : UserControl
         if (_shown.Count == 0)
             return;
         int at = _selected is { } id ? _shown.ToList().FindIndex(i => i.Id == id) : -1;
-        int next = at < 0 ? 0 : Math.Clamp(at + by, 0, _shown.Count - 1);
+        int next = at < 0 ? 0 : Math.Clamp(at + by, 0, Math.Min(_shown.Count, ShelfService.MaxItems) - 1);
         Select(_shown[next].Id);
         Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Input, () => InitialFocus.Focus());
     }
@@ -363,7 +403,7 @@ internal sealed class ShelfPage : UserControl
 
     private void OnDragOver(object sender, DragEventArgs e)
     {
-        bool take = _dragging is null && CanTake(e.Data);
+        bool take = _dragging is null && !Full && CanTake(e.Data);
         e.Effects = take ? DragDropEffects.Copy : DragDropEffects.None; // never Move: Chippi can't delete the source
         e.Handled = true;
         if (!take || _over)
@@ -386,7 +426,7 @@ internal sealed class ShelfPage : UserControl
     private void OnDrop(object sender, DragEventArgs e)
     {
         e.Handled = true;
-        bool take = _dragging is null && CanTake(e.Data);
+        bool take = _dragging is null && !Full && CanTake(e.Data);
         e.Effects = take ? DragDropEffects.Copy : DragDropEffects.None;
         EndDrop();
         _status = null;
@@ -517,6 +557,18 @@ internal sealed class ShelfPage : UserControl
         return block;
     }
 
+    /// <summary>A name on up to <paramref name="lines"/> lines of 14, wrapping at spaces and hyphens; one long word trims.</summary>
+    private static TextBlock NameText(string text, int lines, string brush)
+    {
+        var block = new TextBlock
+        {
+            Text = text, FontSize = 11, LineHeight = 14, LineStackingStrategy = LineStackingStrategy.BlockLineHeight, MaxHeight = 14 * lines,
+            TextWrapping = lines > 1 ? TextWrapping.WrapWithOverflow : TextWrapping.NoWrap, TextTrimming = TextTrimming.CharacterEllipsis, TextAlignment = TextAlignment.Center,
+        };
+        block.SetResourceReference(TextBlock.ForegroundProperty, brush);
+        return block;
+    }
+
     private static LucideIcon Glyph(Geometry data, double size, string brush)
     {
         var glyph = new LucideIcon { Data = data, Size = size, VerticalAlignment = VerticalAlignment.Center };
@@ -527,7 +579,7 @@ internal sealed class ShelfPage : UserControl
     private static Button Button(string text)
     {
         var button = new Button { Content = text };
-        button.SetResourceReference(StyleProperty, "SecondaryButtonStyle");
+        button.SetResourceReference(StyleProperty, "IslandButtonStyle");
         return button;
     }
 }

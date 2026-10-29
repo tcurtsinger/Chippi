@@ -62,4 +62,7 @@ public enum ShelfLimit
 
     /// <summary>"Shelf full · 128 MiB".</summary>
     Full,
+
+    /// <summary>"Shelf full": <see cref="ShelfService.MaxItems"/> items, all the page shows.</summary>
+    Items,
 }

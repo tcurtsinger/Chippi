@@ -58,20 +58,20 @@ public sealed class ScratchpadPageTests
         using var reopened = new ScratchpadPage(session, new IslandOpenHold().Hold);
         Assert.Equal(editor.Text, Named<TextBox>(reopened, "Note").Text);
         Assert.False(editor.AcceptsTab);
-        Assert.Equal(13, editor.FontSize);
+        Assert.Equal(12, editor.FontSize);
     });
 
     [Fact]
     public void Load_failure_hides_the_editor_and_retry_loads_without_overwriting_notes() => WithPage((store, session, page) =>
     {
         Assert.Contains(Find<TextBlock>(page.Header), b => b.Text == "Load failed");
-        Assert.Equal(Visibility.Collapsed, ((StackPanel)page.Children[0]).Visibility);
+        Assert.Equal(Visibility.Collapsed, ((DockPanel)page.Children[0]).Visibility);
         store.FailRead = false;
         store.Document = ScratchpadDocument.Empty().Edit("Preserved note");
         Named<Button>(page.Header, "Retry").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         session.FlushAsync().GetAwaiter().GetResult(); Pump();
         Assert.Equal("Preserved note", Named<TextBox>(page, "Note").Text);
-        Assert.Equal(Visibility.Visible, ((StackPanel)page.Children[0]).Visibility);
+        Assert.Equal(Visibility.Visible, ((DockPanel)page.Children[0]).Visibility);
     }, failRead: true);
 
     [Fact]
@@ -83,7 +83,7 @@ public sealed class ScratchpadPageTests
         Assert.Equal("", Named<TextBox>(page, "Note").Text);
         session.ChangeAsync(d => { while (d.Notes.Count < 12) d = d.Add(); return d; }).GetAwaiter().GetResult(); Pump();
         Assert.False(Named<Button>(page, "New note").IsEnabled);
-        Assert.Equal(12, int.Parse(((string)Named<Button>(page, "All notes").Content)[1..]) + Named<SegmentedControl>(page, "Notes").Items.Count);
+        Assert.Equal(12, int.Parse(Find<TextBlock>(Named<Button>(page, "All notes")).Single().Text[1..]) + Named<SegmentedControl>(page, "Notes").Items.Count);
     });
 
     [Fact]
@@ -125,13 +125,14 @@ public sealed class ScratchpadPageTests
     });
 
     [Fact]
-    public void Page_and_header_fit_the_approved_height_without_showing_a_window() => WithPage((store, session, page) =>
+    public void The_note_fills_the_body_between_the_tabs_row_and_the_bottom_edge_without_showing_a_window() => WithPage((store, session, page) =>
     {
-        var host = new StackPanel { Children = { page.Header, page } };
-        host.Measure(new Size(416, double.PositiveInfinity)); host.Arrange(new Rect(0, 0, 416, host.DesiredSize.Height));
-        Assert.Equal(376, host.DesiredSize.Height);
-        Assert.Equal(236, Find<Grid>(page).Single(g => g.Height == 236).ActualHeight);
-        Assert.Same(Named<TextBox>(page, "Note"), page.InitialFocus);
+        page.Measure(new Size(496, 304)); page.Arrange(new Rect(0, 0, 496, 304)); page.UpdateLayout();
+        var note = Named<TextBox>(page, "Note");
+        Assert.Equal(304 - 30 - 8 - 8 - 28, ((FrameworkElement)((FrameworkElement)note.Parent).Parent).ActualHeight); // 230
+        Assert.Equal(304, ((FrameworkElement)Named<Button>(page, "More").Parent).TranslatePoint(new Point(0, 28), page).Y, 3);
+        Assert.DoesNotContain(Find<ScrollViewer>(page), s => s.Visibility == Visibility.Visible); // only a note scrolls, inside the editor or its preview
+        Assert.Same(note, page.InitialFocus);
     });
 
     // Build menus without opening their popup windows on the user's desktop.
@@ -148,7 +149,7 @@ public sealed class ScratchpadPageTests
         resources["IslandMenuItemStyle"] = style;
         try
         {
-            foreach (FrameworkElement anchor in new FrameworkElement[] { Named<IconButton>(page, "More"), Named<SegmentedControl>(page, "Notes") })
+            foreach (FrameworkElement anchor in new FrameworkElement[] { Named<Button>(page, "More"), Named<SegmentedControl>(page, "Notes") })
             {
                 var menu = Menu(page, "CreateActionsMenu", anchor);
                 Assert.Same(anchor, menu.PlacementTarget);

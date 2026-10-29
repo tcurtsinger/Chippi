@@ -69,9 +69,10 @@ public sealed class PageTests : IDisposable
             Wait(page.Take(Data(DataFormats.UnicodeText, "Call Dana about the venue\nBring the plan")));
             Wait(page.Take(Data(DataFormats.UnicodeText, "https://example.org/docs/setup/")));
             page.Refresh();
-            Assert.True(Shows(page, "invoice-0412.pdf") && Shows(page, "PDF · 2.1 MB"));
-            Assert.True(Shows(page, "Call Dana about the venue") && Shows(page, "Text · 2 lines"));
-            Assert.True(Shows(page, "example.org/docs/setup") && Shows(page, "Link"));
+            Assert.True(Shows(page, "invoice-0412.pdf") && !Shows(page, "PDF · 2.1 MB")); // size and type are in the tooltip
+            Assert.Contains(Find<Button>(page), b => b.ToolTip as string == "invoice-0412.pdf\nPDF · 2.1 MB");
+            Assert.True(Shows(page, "Call Dana about the venue"));
+            Assert.True(Shows(page, "example.org/docs/setup"));
             Assert.Equal("example.org/docs/setup, Link", AutomationProperties.GetName((DependencyObject)_ui.Spec.InitialFocus!()!));
         });
     }
@@ -91,7 +92,7 @@ public sealed class PageTests : IDisposable
             Assert.False(Action("Remove").IsEnabled);
             page.Move(1); // nothing selected: the first item
             Assert.Equal("Selected", AutomationProperties.GetItemStatus(Find<Button>(page).First(b => AutomationProperties.GetName(b) == "d, Text")));
-            page.Move(3); // down a row
+            page.Move(6); // down a row, six across
             Assert.Equal("Selected", AutomationProperties.GetItemStatus(Find<Button>(page).First(b => AutomationProperties.GetName(b) == "a, Text")));
             Assert.True(Action("Copy").IsEnabled);
             Action("Pin").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
@@ -172,6 +173,39 @@ public sealed class PageTests : IDisposable
             data.SetData("FileGroupDescriptorW", new MemoryStream([0]));
             Assert.False(ShelfPage.CanTake(data));
             Assert.True(ShelfPage.CanTake(Data(DataFormats.FileDrop, new[] { @"C:\a.txt" })));
+        });
+    }
+
+    [Theory]
+    [InlineData(1, 6, 3, 66)]
+    [InlineData(18, 6, 3, 66)]
+    [InlineData(19, 7, 4, 61)]
+    [InlineData(28, 7, 4, 61)]
+    [InlineData(29, 8, 5, 47.2)]
+    [InlineData(40, 8, 5, 47.2)]
+    public void Tiles_shrink_as_items_pile_up_and_fill_the_space_above_the_actions(int items, int columns, int rows, double height)
+    {
+        var layout = ShelfPage.Layout(items);
+        Assert.Equal((columns, rows), (layout.Columns, layout.Rows));
+        Assert.Equal(height, layout.Height, 3);
+        Assert.Equal(496, columns * layout.Width + (columns - 1) * 8, 3);
+        Assert.True(rows * layout.Height + (rows - 1) * 8 <= 268 + 0.001); // above the 28 action row and its 8 gap
+    }
+
+    [Fact]
+    public async Task Forty_items_show_shelf_full_glyphs_only_and_refuse_a_drag()
+    {
+        await StartAsync();
+        for (int i = 0; i < 40; i++)
+            await _module.Shelf!.AddTextAsync($"note {i}");
+        WpfTestThread.Run(() =>
+        {
+            var page = (ShelfPage)_ui.Spec!.CreateSection();
+            Load(page);
+            Assert.True(Shows(page, "Shelf full"));
+            Assert.False(Shows(page, "note 39")); // 8 across: the glyph alone, the name in the tooltip
+            Assert.Contains(Find<Button>(page), b => b.ToolTip as string == "note 39\nText");
+            Assert.Empty(Find<ScrollViewer>(page));
         });
     }
 

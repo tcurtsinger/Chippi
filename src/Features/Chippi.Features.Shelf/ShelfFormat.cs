@@ -87,7 +87,16 @@ internal static class ShelfFormat
         ShelfLimit.Files => "Over 100 files",
         ShelfLimit.Picture => "Picture over 16 MiB",
         ShelfLimit.Full => "Shelf full · 128 MiB",
+        ShelfLimit.Items => "Shelf full",
         _ => "",
+    };
+
+    /// <summary>The tile's state line, "Unavailable" or "Online only", or null for none.</summary>
+    public static string? StateLine(ShelfItem item) => State(item) switch
+    {
+        FileState.Missing => "Unavailable",
+        FileState.OnlineOnly => "Online only",
+        _ => null,
     };
 
     public static string Size(long bytes) => bytes switch

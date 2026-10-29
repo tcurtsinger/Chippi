@@ -100,6 +100,21 @@ public sealed class ShelfTests : IDisposable
     }
 
     [Fact]
+    public async Task At_40_items_the_shelf_is_full_and_refuses_drops_until_one_is_removed()
+    {
+        for (int i = 0; i < ShelfService.MaxItems; i++)
+            await _shelf.AddTextAsync($"item {i}");
+        await _shelf.AddTextAsync("one more");
+        Assert.Equal(40, _shelf.Items.Count); // nothing thrown away
+        Assert.DoesNotContain(_shelf.Items, i => i.Text == "one more");
+        Assert.Equal("Shelf full", ShelfFormat.Limit(_shelf.Limit));
+        await _shelf.RemoveAsync(_shelf.Items[^1].Id);
+        Assert.Equal(ShelfLimit.None, _shelf.Limit);
+        await _shelf.AddTextAsync("one more");
+        Assert.Equal("one more", _shelf.Items[0].Text);
+    }
+
+    [Fact]
     public async Task Pin_and_remove()
     {
         await _shelf.AddTextAsync("keep");
