@@ -299,8 +299,14 @@ public sealed class MicProcessingModule : IFeatureModule
     private void UpdateTile(ProcessingStatus status)
     {
         _lastState = status.State;
-        // The Sound tile shows the output; clean-up speaks up only when it stopped.
-        _tile?.SetStatus(status.State == ProcessingState.Stopped ? "Clean-up stopped" : "");
+        // The Sound tile shows the output; Mic processing speaks up only when it stopped, in Caution.
+        // "Mic stopped" fits a tile; the page's warning line has the full text.
+        bool stopped = status.State == ProcessingState.Stopped;
+        _tile?.SetStatus(stopped ? "Mic stopped" : "");
+        if (stopped)
+            _context?.Island.Publish(new("stopped", IslandActivityKind.Status, "Mic processing stopped", "Microphone")
+                { NeedsAttention = true, TileKey = SoundTile.Key });
+        else _context?.Island.Clear("stopped");
     }
 
     private void ScheduleSave()

@@ -38,6 +38,15 @@ public sealed class SoundShellTests
             Assert.Single(All<ProcessingQuickView>(host));
             Assert.Single(All<MicMuteView>(host));
             Assert.Empty(All<VolumeView>(host)); // App volume has its own page
+            // Two 244 columns inside the 496 x 304 body, nothing to scroll (DESIGN.md §5, revised 2026-10-28).
+            panel.UpdateLayout();
+            var body = panel.PageBody!;
+            Assert.Empty(All<ScrollViewer>(host));
+            Assert.All(All<RoutingQuickView>(host), v => Assert.Equal(244, v.ActualWidth));
+            var processing = Assert.Single(All<ProcessingQuickView>(host));
+            Assert.InRange(processing.TranslatePoint(new Point(0, processing.ActualHeight), body).Y, 0, body.ActualHeight);
+            Assert.Equal(44, Assert.IsType<Border>(((StackPanel)processing.Content).Children[0]).ActualHeight);
+            Assert.Contains("Mic processing", Texts(processing));
             Invoke(Named<Button>(host, "Mute all microphones"));
             await SmokeDispatcher.Until(() => scene.Mute.StatusText == "Muted");
             Assert.True(scene.Devices.GetLevel("desk").Muted);
@@ -73,15 +82,15 @@ public sealed class SoundShellTests
             await SmokeDispatcher.Until(() => scene.Routing.Settings.Output.Calls != calls);
             Assert.NotNull(Named<ToggleButton>(settings.PageContent, "Priority switching"));
 
-            // The mic is set once, for routing, clean-up and the mute shortcut.
+            // The mic is set once, for routing, Mic processing and the mute shortcut.
             settings.Navigate("module:audio-routing/microphone");
             Assert.Equal("page:sound-microphone", settings.CurrentPage);
             Assert.Single(All<RoutingPage>(settings.PageContent));
             Assert.Single(All<ProcessingPage>(settings.PageContent));
             Assert.Single(All<MicMuteView>(settings.PageContent));
-            Assert.Equal(["Mic in use", "Clean-up", "Mute shortcut"], Texts(settings.PageContent).Where(t => t is "Mic in use" or "Clean-up" or "Mute shortcut").Distinct());
+            Assert.Equal(["Mic in use", "Mic processing", "Mute shortcut"], Texts(settings.PageContent).Where(t => t is "Mic in use" or "Mic processing" or "Mute shortcut").Distinct());
             Assert.NotNull(Named<ToggleButton>(settings.PageContent, "Priority switching"));
-            Toggle(Named<ToggleButton>(settings.PageContent, "Clean-up"));
+            Toggle(Named<ToggleButton>(settings.PageContent, "Mic processing"));
             await SmokeDispatcher.Until(() => scene.Pipelines.Live is not null);
             Assert.Equal("desk", scene.Pipelines.Live!.Source);
             Assert.DoesNotContain(All<Button>(settings.PageContent), b => AutomationProperties.GetName(b) == "Mute all microphones"); // muting is the Sound page's
@@ -198,8 +207,9 @@ public sealed class SoundShellTests
             var volume = Named<Slider>(host, "System volume");
             ((IRangeValueProvider)new SliderAutomationPeer(volume).GetPattern(PatternInterface.RangeValue)).SetValue(40);
             await SmokeDispatcher.Until(() => Math.Abs(scene.Devices.GetLevel("speakers").Volume - .4f) < .001);
-            Invoke(Named<IconButton>(host, "Mute system volume"));
+            Invoke(Named<Button>(host, "Mute system volume"));
             await SmokeDispatcher.Until(() => scene.Devices.GetLevel("speakers").Muted);
+            await SmokeDispatcher.Until(() => Texts(host).Contains("Muted") && All<Button>(host).Any(b => b.Content is "Unmute" && AutomationProperties.GetName(b) == "Unmute system volume"));
             Assert.Equal(headphones, scene.Devices.GetLevel("headphones"));
 
             // Picking another output uses it now and puts it first in routing's list.

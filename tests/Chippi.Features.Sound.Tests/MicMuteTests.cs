@@ -74,10 +74,10 @@ public sealed class MicMuteTests
         await f.Start();
         var mute = Assert.Single(f.Ui.Tiles);
         var processing = new IslandTileContribution("mic-processing", SoundTile.Section(30, SoundTile.Microphone, () => new object()) with { StatusPriority = 10 });
-        processing.SetStatus("Clean-up stopped");
+        processing.SetStatus("Mic stopped");
         var group = Assert.Single(IslandTileContribution.Group([processing, mute]));
 
-        Assert.Equal("Clean-up stopped", group.Status);
+        Assert.Equal("Mic stopped", group.Status);
         await f.Module.ToggleAsync();
         Assert.Equal("Mic muted", group.Status);
         f.System.ChangeLevel("B", new(.5f, false));
@@ -85,12 +85,12 @@ public sealed class MicMuteTests
         Assert.Equal("Some microphones muted", group.Status);
         f.System.ChangeLevel("A", new(.5f, false));
         await f.Audio.RefreshAsync();
-        Assert.Equal("Clean-up stopped", group.Status);
+        Assert.Equal("Mic stopped", group.Status);
         Assert.Equal("", mute.Status);
 
         f.System.Remove("A", "B");
         await f.Audio.RefreshAsync();
-        Assert.Equal("Clean-up stopped", group.Status);
+        Assert.Equal("Mic stopped", group.Status);
     }
     [Fact]
     public async Task Shortcut_changes_persist_only_on_success_and_reject_OS_shortcuts()
