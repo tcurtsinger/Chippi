@@ -115,7 +115,7 @@ public sealed class IslandPanelTests
     }
 
     [Fact]
-    public void A_page_change_draws_the_new_page_under_the_old_one_then_fades_the_old_one_out()
+    public void A_page_change_fades_the_new_page_in()
     {
         if (Chippi.UI.Themes.Motion.IsReduced)
             return; // reduced motion snaps
@@ -123,15 +123,10 @@ public sealed class IslandPanelTests
         {
             Open(panel);
             panel.ShowPage("keep-awake");
-            var leaving = (Image)panel.FindName("Leaving");
             var card = (FrameworkElement)panel.FindName("Card");
-            Assert.NotNull(leaving.Source); // a picture of the grid, held over the new page
-            Assert.Equal(1, leaving.Opacity, 3);
-            Assert.Equal(1, card.Opacity, 3); // the new page draws at once, under the picture: no blank gap
-            Assert.False(card.IsHitTestVisible); // and takes no click while it can't be seen
+            Assert.Equal(0, card.Opacity, 3);
+            Assert.False(card.IsHitTestVisible); // no click while it can't be seen
             Pump(TimeSpan.FromMilliseconds(400));
-            Assert.Null(leaving.Source);
-            Assert.Equal(0, leaving.Opacity);
             Assert.Equal(1, card.Opacity);
             Assert.True(card.IsHitTestVisible);
         }));
