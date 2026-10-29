@@ -297,8 +297,18 @@ public sealed class ModuleTests : IDisposable
             var preview = Find<TextBlock>(open).Single(t => t.Text.StartsWith("copy 6", StringComparison.Ordinal));
             Assert.Equal(3 * 18, preview.MaxHeight); // at most 3 lines, the last trimmed
             Assert.Equal(TextTrimming.CharacterEllipsis, preview.TextTrimming);
+            Assert.Equal("copy 6\nsecond line\nthird line…", preview.Text); // the hidden fourth line shows as "…"
         });
     }
+
+    [Theory]
+    [InlineData("one", "one")]
+    [InlineData("one\ntwo\nthree", "one\ntwo\nthree")]
+    [InlineData("one\ntwo\nthree\n", "one\ntwo\nthree")]
+    [InlineData("one\r\ntwo\r\nthree\r\nfour", "one\ntwo\nthree…")]
+    [InlineData("one\ntwo\nthree\nfour\nfive", "one\ntwo\nthree…")]
+    public void A_preview_past_three_lines_ends_its_third_with_an_ellipsis(string text, string shown) =>
+        Assert.Equal(shown, ClipboardView.PreviewText(text, 3));
 
     private sealed class FakeSource(System.Windows.Media.Visual root) : PresentationSource
     {

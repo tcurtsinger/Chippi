@@ -399,7 +399,9 @@ internal sealed class ClipboardView : UserControl
                 }
                 return files;
             default:
-                var text = Ui.Text(entry.Text ?? "", 12);
+                // Trimming only marks a line cut at its width, so lines past the third end the third with "…";
+                // a wrapped line past the 3 lines is trimmed by the TextBlock itself.
+                var text = Ui.Text(PreviewText(entry.Text ?? "", (int)Lines), 12);
                 text.TextWrapping = TextWrapping.Wrap;
                 text.TextTrimming = TextTrimming.CharacterEllipsis;
                 text.LineHeight = Line;
@@ -408,6 +410,15 @@ internal sealed class ClipboardView : UserControl
                 text.Margin = margin;
                 return text;
         }
+    }
+
+    /// <summary>The first <paramref name="lines"/> lines of <paramref name="text"/>, the last ending in "…" when more follow.</summary>
+    internal static string PreviewText(string text, int lines)
+    {
+        var all = text.TrimEnd('\r', '\n').Split('\n');
+        if (all.Length <= lines)
+            return string.Join("\n", all.Select(line => line.TrimEnd('\r')));
+        return string.Join("\n", all.Take(lines).Select(line => line.TrimEnd('\r'))) + "…";
     }
 
     private async Task LoadPictureAsync(long id, Image image)
