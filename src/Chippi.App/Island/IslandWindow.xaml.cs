@@ -109,6 +109,8 @@ public partial class IslandWindow : Window
         };
         // Hidden (a fullscreen app in front), the song stops scrolling; shown again, it starts over.
         IsVisibleChanged += (_, _) => RefreshTab();
+        // Reduced motion turned on or off: the song holds or scrolls, and the bars stop or follow, at once.
+        Motion.Changed += OnMotionChanged;
         // The tab stays swollen until the island has shrunk back into it.
         _panel.IsVisibleChanged += (_, _) =>
         {
@@ -235,10 +237,11 @@ public partial class IslandWindow : Window
         ApplyVisibility();
     }
 
-    /// <summary>AppSettings.IslandEdge and IslandPlace. Only the top edge docks for now (side edges retired 2026-10-29), so a saved side edge shows on top.</summary>
+    /// <summary>AppSettings.IslandEdge and IslandPlace. Only the top edge docks for now (side edges retired 2026-10-29), so a saved side edge shows at top center.</summary>
     public void SetPlacement(IslandEdge edge, double place)
     {
-        edge = IslandEdge.Top;
+        if (edge != IslandEdge.Top)
+            (edge, place) = (IslandEdge.Top, 0.5); // a place along a side means nothing on top
         if (edge == _edge && Math.Abs(place - _place) < 1e-6)
             return; // the drop already put it there
         _edge = edge;
@@ -661,7 +664,8 @@ public partial class IslandWindow : Window
         bool micMuted = mic is not null;
         MutedMicGlyph.Visibility = Shown(micMuted);
         MutedMicGlyph.Margin = _docked == IslandEdge.Top ? new Thickness(4, 0, 0, 0) : new Thickness(0, 4, 0, 0);
-        ShowSong(song, IslandGeometry.TabSize(IslandEdge.Top, true, swollen, song: true).Width - SongChrome - (micMuted ? MicRoom : 0));
+        // Sized at rest: a swell only adds room around the song, so hovering never starts it over.
+        ShowSong(song, IslandGeometry.TabSize(IslandEdge.Top, true, swollen: false, song: true).Width - SongChrome - (micMuted ? MicRoom : 0));
         if (_docked == IslandEdge.Top)
             Glyph.Margin = new Thickness(song is null ? GlyphGap : 0, 0, 0, 0); // the song's own margin is the gap
         // The bars follow the output's real level while the song shows and can be seen.
@@ -1087,8 +1091,11 @@ public partial class IslandWindow : Window
     }
 #endif
 
+    private void OnMotionChanged(object? sender, EventArgs e) => RefreshTab();
+
     protected override void OnClosed(EventArgs e)
     {
+        Motion.Changed -= OnMotionChanged;
         StopSlide();
         StopSwell();
         _level?.Stop();

@@ -70,6 +70,26 @@ public sealed class IslandWindowTests
             if (!Chippi.UI.Themes.Motion.IsReduced)
                 Assert.Equal(Visibility.Visible, window.SongCopy.Visibility); // too long: a second copy follows it round
 
+            // Hovering swells the tab around the song without starting it over (a restart sets a new fade).
+            var fade = window.Song.OpacityMask;
+            Hover(window, Mouse.MouseEnterEvent);
+            Assert.Equal(new Size(236, 36), window.TabTarget);
+            Assert.Same(fade, window.Song.OpacityMask);
+            Hover(window, Mouse.MouseLeaveEvent);
+            Assert.Same(fade, window.Song.OpacityMask);
+
+            // Reduced motion turned on while it scrolls: it holds at once.
+            var motion = Chippi.UI.Themes.Motion.Override;
+            try
+            {
+                Chippi.UI.Themes.Motion.Override = true;
+                Assert.Equal(Visibility.Collapsed, window.SongCopy.Visibility);
+            }
+            finally
+            {
+                Chippi.UI.Themes.Motion.Override = motion;
+            }
+
             media.Sessions = [Track("Creep")];
             media.Raise();
             Assert.Equal(Visibility.Collapsed, window.SongCopy.Visibility); // fits: holds still
@@ -77,6 +97,20 @@ public sealed class IslandWindowTests
             window.SetActivities([], Chippi.App.Pet.PetMood.Idle); // paused: the activity goes
             Assert.Equal(IslandGeometry.TabSize(IslandEdge.Top, live: false), window.TabTarget);
             Assert.Equal(Visibility.Collapsed, window.Song.Visibility);
+        }));
+    }
+
+    [Fact]
+    public void A_saved_side_edge_shows_at_top_center()
+    {
+        WpfTestThread.Run(() => WithShownIsland(window =>
+        {
+            window.SetPlacement(IslandEdge.Top, 0.5);
+            var center = IslandNative.WindowRect(window.Handle);
+            window.SetPlacement(IslandEdge.Top, 0.2);
+            Assert.NotEqual(center, IslandNative.WindowRect(window.Handle));
+            window.SetPlacement(IslandEdge.Left, 0.9); // docked low on the left before side edges were retired
+            Assert.Equal(center, IslandNative.WindowRect(window.Handle));
         }));
     }
 

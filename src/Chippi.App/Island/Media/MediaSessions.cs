@@ -67,7 +67,7 @@ public interface IMediaSessions : IDisposable
 public sealed class SystemMediaSessions : IMediaSessions
 {
     private readonly Dispatcher _dispatcher = Dispatcher.CurrentDispatcher;
-    private readonly Dictionary<string, (string Key, ImageSource? Image)> _art = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, (string Key, ImageSource? Image, bool Sent)> _art = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<GlobalSystemMediaTransportControlsSession> _watched = [];
     private GlobalSystemMediaTransportControlsSessionManager? _manager;
     private IReadOnlyList<MediaTrack> _sessions = [];
@@ -228,10 +228,11 @@ public sealed class SystemMediaSessions : IMediaSessions
     }
 
     // Decoded once per track. Apps send the track first and its cover a moment later (another
-    // properties change), so a track still without one is read again rather than kept bare.
+    // properties change), so a track whose cover hasn't come yet is read again; one that came but
+    // won't decode isn't, so it's logged once.
     private async Task<ImageSource?> Artwork(string id, string key, GlobalSystemMediaTransportControlsSessionMediaProperties? properties)
     {
-        if (_art.TryGetValue(id, out var cached) && cached.Key == key && cached.Image is not null)
+        if (_art.TryGetValue(id, out var cached) && cached.Key == key && cached.Sent)
             return cached.Image;
         ImageSource? image = null;
         if (properties?.Thumbnail is { } thumbnail)
@@ -254,7 +255,7 @@ public sealed class SystemMediaSessions : IMediaSessions
                 Log.Warn("Now Playing: artwork unreadable", ex);
             }
         }
-        _art[id] = (key, image);
+        _art[id] = (key, image, properties?.Thumbnail is not null);
         return image;
     }
 
