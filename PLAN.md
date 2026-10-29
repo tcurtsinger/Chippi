@@ -68,7 +68,7 @@ build brief is [docs/phase-1-handoff.md](docs/phase-1-handoff.md).
 
 ### Phase 2: Downloads organizer (Mouzi-style)
 Brief: [docs/phase-2-handoff.md](docs/phase-2-handoff.md). In progress since 2026-10-22.
-- Watched folders with Silent / Manual / Paused modes
+- Watched folders with Auto / Manual / Paused modes
 - Rules: extensions, regex, size and date conditions, first match wins, reorderable
 - Destination placeholders: `{year}`, `{month}`, `{day}`, `{extension}`, `{filename}`
 - Ignore file per folder, system and browser temp files skipped, grace period and

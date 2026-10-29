@@ -13,13 +13,13 @@ using Chippi.UI.Controls;
 namespace Chippi.App.Island.Media;
 
 /// <summary>
-/// The Now Playing page (DESIGN.md §5 Island): source picker, 112px artwork (a neutral placeholder
+/// The Now Playing page (DESIGN.md §5 Island): source picker, 304px artwork (a neutral placeholder
 /// without one), title and source, the progress bar with elapsed and remaining time, and previous /
 /// play-pause / next, each disabled when the app doesn't offer it. Nothing playing shows an empty state.
 /// </summary>
 internal sealed class NowPlayingView : UserControl
 {
-    private const double Art = 112;
+    private const double Art = 304;
 
     private readonly IMediaSessions _media;
     private readonly DispatcherTimer _tick = new() { Interval = TimeSpan.FromMilliseconds(500) };
@@ -27,8 +27,8 @@ internal sealed class NowPlayingView : UserControl
     private readonly TextBlock _sourceText = new() { FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
     private readonly Popup _sources = new() { StaysOpen = false, AllowsTransparency = true, Placement = PlacementMode.Bottom };
     private readonly Border _art = new() { Width = Art, Height = Art, CornerRadius = new CornerRadius(8), ClipToBounds = true };
-    private readonly TextBlock _title = new() { FontSize = 17, FontWeight = FontWeights.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis };
-    private readonly TextBlock _artist = new() { FontSize = 13, TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(0, 2, 0, 0) };
+    private readonly TextBlock _title = new() { FontSize = 16, FontWeight = FontWeights.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis };
+    private readonly TextBlock _artist = new() { FontSize = 12, TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(0, 2, 0, 0) };
     private readonly Grid _progress = new() { Height = 4, Margin = new Thickness(0, 12, 0, 0) };
     private readonly TextBlock _elapsed = new() { FontSize = 12 };
     private readonly TextBlock _remaining = new() { FontSize = 12, HorizontalAlignment = HorizontalAlignment.Right };
@@ -41,6 +41,7 @@ internal sealed class NowPlayingView : UserControl
     public NowPlayingView(IMediaSessions media)
     {
         _media = media;
+        SetResourceReference(ForegroundProperty, "IslandTextBrush");
         _tick.Tick += (_, _) => ShowTime();
 
         var heading = new TextBlock { Text = "Now Playing", FontSize = 13, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center };
@@ -55,7 +56,7 @@ internal sealed class NowPlayingView : UserControl
         _source.Click += (_, _) => OpenSources();
         _sources.PlacementTarget = _source;
         DockPanel.SetDock(_source, Dock.Right);
-        var header = new DockPanel { Height = 28, LastChildFill = true, Children = { _source, heading } };
+        var header = new DockPanel { Height = 24, LastChildFill = true, Children = { heading } };
 
         _artist.SetResourceReference(TextBlock.ForegroundProperty, "IslandTextTertiaryBrush");
         _elapsed.SetResourceReference(TextBlock.ForegroundProperty, "IslandTextTertiaryBrush");
@@ -74,16 +75,17 @@ internal sealed class NowPlayingView : UserControl
 
         _previous = Transport(LucideIcons.SkipBack, "Previous track", () => _media.PreviousAsync());
         _next = Transport(LucideIcons.SkipForward, "Next track", () => _media.NextAsync());
-        _playPause = new Button { Content = _playGlyph, Margin = new Thickness(16, 0, 16, 0) };
+        _playPause = new Button { Content = _playGlyph, Margin = new Thickness(8, 0, 8, 0), Width = 40, Height = 40 };
         _playPause.SetResourceReference(StyleProperty, "IslandPlayLargeButtonStyle");
         _playPause.Click += async (_, _) => await _media.PlayPauseAsync();
         var transport = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 8, 0, 0),
             Children = { _previous, _playPause, _next } };
 
-        var info = new StackPanel { Margin = new Thickness(16, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center,
-            Children = { _title, _artist, _progress, _times, transport } };
+        var top = new StackPanel { Children = { _source, _title, _artist } };
+        var bottom = new StackPanel { VerticalAlignment = VerticalAlignment.Bottom, Children = { _progress, _times, transport } };
+        var info = new Grid { Margin = new Thickness(8, 0, 0, 0), Children = { top, bottom } };
         Grid.SetColumn(info, 1);
-        var body = new Grid { Margin = new Thickness(0, 8, 0, 0), ColumnDefinitions = { new() { Width = new GridLength(Art) }, new() }, Children = { _art, info } };
+        var body = new Grid { Height = Art, Margin = new Thickness(0, 8, 0, 0), ColumnDefinitions = { new() { Width = new GridLength(Art) }, new() }, Children = { _art, info } };
 
         Content = new StackPanel { Children = { header, body } };
         Loaded += (_, _) =>
@@ -148,7 +150,7 @@ internal sealed class NowPlayingView : UserControl
             return;
         }
         _art.SetResourceReference(Border.BackgroundProperty, "IslandPanelBrush");
-        var glyph = new LucideIcon { Data = LucideIcons.Music, Size = 32, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+        var glyph = new LucideIcon { Data = LucideIcons.Music, Size = 20, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
         glyph.SetResourceReference(LucideIcon.BrushProperty, "IslandTextTertiaryBrush");
         _art.Child = glyph;
     }

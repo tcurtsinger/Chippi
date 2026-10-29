@@ -42,7 +42,7 @@ public sealed class IslandPanelShots
                 Section("sound", "Sound", 10, 220, status: "Mic muted"),
                 Section("sound.mixer", "App volume", 20, 200, IslandOrbit.Right, status: "4 apps"),
                 Section("keep-awake", "Keep awake", 40, 96, IslandOrbit.Left, status: "1 hr left"),
-                Section("downloads", "File organizer", 50, 120, status: "Silent"));
+                Section("downloads", "File organizer", 50, 120, status: "Auto"));
             var muted = new IslandActivity("muted", IslandActivityKind.Status, "Microphone", "Muted") { NeedsAttention = true, TileKey = "sound" };
             foreach (var (edge, tab) in new[]
             {

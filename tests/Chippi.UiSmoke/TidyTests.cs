@@ -46,7 +46,7 @@ public sealed class TidyTests(ITestOutputHelper output)
         DesktopSession.Select(mode, "Paused");
         DesktopSession.Until(() => Mode(app, "Inbox") == "paused", "Inbox Paused persisted");
         Assert.Equal("manual", Mode(app, "Downloads"));
-        DesktopSession.Select(mode, "Silent");
+        DesktopSession.Select(mode, "Auto");
         DesktopSession.Until(() => Mode(app, "Inbox") == "silent", "Inbox Silent persisted");
         Assert.True(app.DownloadsSettings.GetProperty("folders")[1].GetProperty("baselineUtc").GetDateTimeOffset() > DateTimeOffset.UtcNow.AddMinutes(-1));
         // Rules are in Settings; the page's History link opens File organizer's Settings.

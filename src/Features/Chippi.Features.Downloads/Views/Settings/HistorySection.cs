@@ -132,7 +132,7 @@ internal sealed class HistorySection : UserControl
 
         string trigger = run?.Trigger switch
         {
-            RunTrigger.Silent => "Silent",
+            RunTrigger.Silent => "Auto",
             RunTrigger.Explorer => "Explorer",
             RunTrigger.ArchiveImport => "Archive import",
             RunTrigger.Undo => "Undo",
