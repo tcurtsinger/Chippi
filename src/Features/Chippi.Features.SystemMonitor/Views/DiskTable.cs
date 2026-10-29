@@ -2,122 +2,64 @@
 // Copyright (C) Chippi contributors
 
 using System.Windows;
-using System.Windows.Automation;
 using System.Windows.Controls;
-using System.Windows.Documents;
 using System.Windows.Media;
 using Chippi.Features.SystemMonitor.Sensors;
 
 namespace Chippi.Features.SystemMonitor.Views;
 
-/// <summary>
-/// The Disks card (design notes #15): one 24 DIP row per physical disk with its active time and
-/// transfer rates, and a line per volume under Free space: the letter, a used-space bar, the amount
-/// free. The total size is only in the volume's accessible name. No graphs.
-/// </summary>
+/// <summary>Volume space, sorted by letter. Tight mode has 22 DIP header and data rows, as in fixed-size f1.</summary>
 internal static class DiskTable
 {
-    private const double RowHeight = 24;
-    private static readonly double[] Widths = [150, 92, 104, 104];
+    internal static IReadOnlyList<VolumeReading> Volumes(IReadOnlyList<DiskReading> disks) =>
+        [.. disks.SelectMany(d => d.Volumes).DistinctBy(v => v.Id, StringComparer.OrdinalIgnoreCase)
+            .OrderBy(v => v.Letter.Length == 0).ThenBy(v => v.Letter, StringComparer.OrdinalIgnoreCase)];
 
-    /// <param name="alerting">Whether a volume (by ID) is past its low disk space alert: its bar and free amount turn Caution.</param>
-    public static Grid Build(IReadOnlyList<DiskReading> disks, Func<string, bool> alerting)
+    public static Grid Build(IReadOnlyList<DiskReading> disks, Func<string, bool> alerting,
+        double available = double.PositiveInfinity, bool island = true)
     {
+        var volumes = Volumes(disks);
+        bool tight = 24 + volumes.Count * 28 > available;
+        double header = tight ? 22 : 24, height = tight ? 22 : 28;
+        int count = double.IsPositiveInfinity(available) ? volumes.Count : Math.Max(0, (int)Math.Floor((available - header) / height));
         var grid = new Grid();
-        foreach (double width in Widths)
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(width) });
-        grid.ColumnDefinitions.Add(new ColumnDefinition());
-        Typography.SetNumeralAlignment(grid, FontNumeralAlignment.Tabular);
-
-        AddRow(grid, RowHeight, divider: false);
-        Add(grid, 0, 0, SystemMonitorView.Header("Disks"));
-        string[] headings = ["Active time", "Read speed", "Write speed", "Free space"];
-        for (int i = 0; i < headings.Length; i++)
-            Add(grid, 0, i + 1, Heading(headings[i]));
-
-        foreach (var disk in disks)
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(80) });
+        for (int i = 0; i < 3; i++) grid.ColumnDefinitions.Add(new ColumnDefinition());
+        void AddRow(string[] values, double rowHeight, bool heading = false, bool caution = false)
         {
-            int volumes = Math.Max(disk.Volumes.Count, 1);
-            int row = AddRow(grid, RowHeight * volumes, divider: true);
-            Add(grid, row, 0, Cell(disk.Name));
-            Add(grid, row, 1, Cell(disk.ActivePercent is { } active ? Format.Percent(active) : ""));
-            Add(grid, row, 2, Cell(disk.ReadBytesPerSecond is { } read ? Format.Rate(read, NetworkUnit.Bytes) : ""));
-            Add(grid, row, 3, Cell(disk.WriteBytesPerSecond is { } write ? Format.Rate(write, NetworkUnit.Bytes) : ""));
-            var free = new StackPanel();
-            foreach (var volume in disk.Volumes)
-                free.Children.Add(Volume(volume, alerting(volume.Id)));
-            Add(grid, row, 4, free);
+            int row = grid.RowDefinitions.Count;
+            grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(rowHeight) });
+            if (row > 0)
+            {
+                var line = new Border { Height = 1, VerticalAlignment = VerticalAlignment.Top };
+                line.SetResourceReference(Border.BackgroundProperty, island ? "IslandPanelBrush" : "BorderBrush");
+                Grid.SetRow(line, row); Grid.SetColumnSpan(line, 4); grid.Children.Add(line);
+            }
+            for (int column = 0; column < values.Length; column++)
+            {
+                var cell = SystemMonitorView.Text(values[column], heading ? 11 : 12, heading || column == 0);
+                if (heading && column == 0) cell.FontWeight = FontWeights.SemiBold;
+                cell.TextAlignment = column == 0 ? TextAlignment.Left : TextAlignment.Right;
+                cell.Margin = new Thickness(0, 0, column == 3 ? 0 : 8, 0);
+                if (!island) cell.SetResourceReference(TextBlock.ForegroundProperty, heading || column == 0 ? "TextSecondaryBrush" : "TextPrimaryBrush");
+                if (caution && column == 2) cell.SetResourceReference(TextBlock.ForegroundProperty, "WarningTextBrush");
+                Grid.SetRow(cell, row); Grid.SetColumn(cell, column); grid.Children.Add(cell);
+            }
         }
+        if (available < header) return grid;
+        AddRow(["Disks", "Used", "Free", "Total"], header, true);
+        foreach (var volume in volumes.Take(count))
+            AddRow([volume.Letter,Format.Size(volume.TotalBytes>=volume.FreeBytes ? volume.TotalBytes-volume.FreeBytes : 0),
+                Format.Size(volume.FreeBytes),Format.Size(volume.TotalBytes)], height, caution: alerting(volume.Id));
         return grid;
     }
 
-    private static int AddRow(Grid grid, double height, bool divider)
+    internal static FrameworkElement Unavailable(bool island = true)
     {
-        grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(height) });
-        int row = grid.RowDefinitions.Count - 1;
-        if (divider)
-        {
-            var line = new Border { Height = 1, VerticalAlignment = VerticalAlignment.Top };
-            line.SetResourceReference(Border.BackgroundProperty, "IslandBorderBrush");
-            Grid.SetRow(line, row);
-            Grid.SetColumnSpan(line, Widths.Length + 1);
-            grid.Children.Add(line);
-        }
+        var row = new Grid { Height = 28 };
+        var text = SystemMonitorView.Text("Unavailable", 12, true);
+        if (!island) text.SetResourceReference(TextBlock.ForegroundProperty, "TextSecondaryBrush");
+        row.Children.Add(text);
         return row;
-    }
-
-    private static void Add(Grid grid, int row, int column, FrameworkElement element)
-    {
-        Grid.SetRow(element, row);
-        Grid.SetColumn(element, column);
-        grid.Children.Add(element);
-    }
-
-    private static TextBlock Heading(string text)
-    {
-        var heading = SystemMonitorView.Status(text);
-        heading.VerticalAlignment = VerticalAlignment.Center;
-        return heading;
-    }
-
-    private static TextBlock Cell(string text)
-    {
-        var cell = SystemMonitorView.Line();
-        cell.Text = text;
-        cell.Height = RowHeight;
-        cell.Padding = new Thickness(0, 4, 8, 0);
-        cell.VerticalAlignment = VerticalAlignment.Top;
-        return cell;
-    }
-
-    // "C:", a bar of the used share, then "612 GiB" right-aligned.
-    private static Grid Volume(VolumeReading volume, bool caution)
-    {
-        var letter = SystemMonitorView.Line();
-        letter.Text = volume.Letter;
-        letter.SetResourceReference(TextBlock.ForegroundProperty, "IslandTextTertiaryBrush");
-        letter.VerticalAlignment = VerticalAlignment.Center;
-        double used = volume.TotalBytes == 0 ? 0 : 1 - (double)volume.FreeBytes / volume.TotalBytes;
-        var fill = new Border { HorizontalAlignment = HorizontalAlignment.Left, CornerRadius = new CornerRadius(2) };
-        fill.SetResourceReference(Border.BackgroundProperty, caution ? "WarningBrush" : "AccentBrush");
-        var track = new Border { Height = 4, CornerRadius = new CornerRadius(2), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0), Child = fill };
-        track.SetResourceReference(Border.BackgroundProperty, "IslandBorderBrush");
-        track.SizeChanged += (_, e) => fill.Width = e.NewSize.Width * Math.Clamp(used, 0, 1);
-        var amount = SystemMonitorView.Line();
-        amount.Text = Format.Size(volume.FreeBytes);
-        amount.HorizontalAlignment = HorizontalAlignment.Right;
-        amount.VerticalAlignment = VerticalAlignment.Center;
-        if (caution)
-            amount.SetResourceReference(TextBlock.ForegroundProperty, "WarningTextBrush");
-        var line = new Grid
-        {
-            Height = RowHeight,
-            ColumnDefinitions = { new ColumnDefinition { Width = new GridLength(24) }, new ColumnDefinition(), new ColumnDefinition { Width = new GridLength(58) } },
-            Children = { letter, track, amount },
-        };
-        Grid.SetColumn(track, 1);
-        Grid.SetColumn(amount, 2);
-        AutomationProperties.SetName(line, $"{volume.Letter} {Format.Size(volume.FreeBytes)} free of {Format.Size(volume.TotalBytes)}");
-        return line;
     }
 }

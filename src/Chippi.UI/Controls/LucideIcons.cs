@@ -21,6 +21,9 @@ public static class LucideIcons
         return g;
     }
 
+    public static Geometry ArrowDown { get; } = G("M12,5 V19 M5,12 L12,19 L19,12");
+    public static Geometry ArrowUp { get; } = G("M12,19 V5 M5,12 L12,5 L19,12");
+
     // Devices (from Hopper).
     public static Geometry Monitor { get; } = G("M4,3 H20 A2,2 0 0 1 22,5 V15 A2,2 0 0 1 20,17 H4 A2,2 0 0 1 2,15 V5 A2,2 0 0 1 4,3 Z M8,21 H16 M12,17 V21");
     public static Geometry AudioLines { get; } = G("M2,10 v4 M6,6 v12 M10,3 v18 M14,8 v8 M18,5 v14 M22,10 v4");

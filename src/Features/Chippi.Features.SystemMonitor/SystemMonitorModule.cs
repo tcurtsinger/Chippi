@@ -48,8 +48,6 @@ public sealed class SystemMonitorModule : IFeatureModule
     /// <summary>The running sampler; null while stopped.</summary>
     public SensorSampler? Sampler { get; private set; }
 
-    /// <summary>Whether the page's logical processor strip is open: for the session only (design notes #12).</summary>
-    internal bool ProcessorsOpen { get; set; }
 
     /// <summary>GPUs that have reported load this session; the GPU card lists only these (design notes #13).</summary>
     internal HashSet<string> GpusWithLoad { get; } = new(StringComparer.OrdinalIgnoreCase);
@@ -79,7 +77,6 @@ public sealed class SystemMonitorModule : IFeatureModule
         _tile = context.Ui.AddIslandTile(new IslandTileSpec(TileKey, Descriptor.Name, nameof(LucideIcons.Activity), Order: 60, SectionOrder: 0,
             () => new SystemMonitorView(this)));
         _tile.OnScreenChanged += OnTileScreen;
-        _tile.SetPageNote(Format.Span(Settings.UpdateInterval));
         context.Activation.Register(OpenVerb, _ => context.OpenIslandPage(TileKey));
         SystemEvents.PowerModeChanged += OnPowerModeChanged;
         return Task.CompletedTask;
@@ -119,7 +116,6 @@ public sealed class SystemMonitorModule : IFeatureModule
         _context?.Settings.Save(Settings);
         if (Sampler is { } sampler)
             sampler.Interval = Settings.UpdateInterval;
-        _tile?.SetPageNote(Format.Span(Settings.UpdateInterval));
         _alerts?.Configure(Settings);
         lock (_gate)
         {

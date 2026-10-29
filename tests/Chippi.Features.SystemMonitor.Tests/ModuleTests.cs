@@ -76,9 +76,9 @@ public sealed class ModuleTests : IDisposable
         Assert.Equal(SensorNeed.Cpu, SystemMonitorModule.TileNeed(settings));
         Assert.Equal(SensorNeed.GpuLoad, SystemMonitorModule.TileNeed(settings with { TileStatus = TileStatus.Gpu }));
         Assert.Equal(SensorNeed.None, SystemMonitorModule.TileNeed(settings with { Off = [Reading.Cpu, Reading.Memory, Reading.Gpu, Reading.Network] }));
-        Assert.Equal((SensorNeed)0b1_1111_1101, SystemMonitorView.Need(settings, processorsOpen: false));
-        Assert.True(SystemMonitorView.Need(settings, processorsOpen: true).HasFlag(SensorNeed.PerProcessor));
-        var some = SystemMonitorView.Need(settings with { Off = [Reading.Gpu, Reading.Battery] }, processorsOpen: true);
+        Assert.Equal((SensorNeed)0b1_1111_1101, SystemMonitorView.Need(settings));
+        Assert.False(SystemMonitorView.Need(settings).HasFlag(SensorNeed.PerProcessor));
+        var some = SystemMonitorView.Need(settings with { Off = [Reading.Gpu, Reading.Battery] });
         Assert.False(some.HasFlag(SensorNeed.GpuLoad) || some.HasFlag(SensorNeed.GpuSensors) || some.HasFlag(SensorNeed.Battery));
     }
 
@@ -99,7 +99,7 @@ public sealed class ModuleTests : IDisposable
     }
 
     [Fact]
-    public async Task The_tile_reads_only_while_on_screen_and_the_page_note_follows_the_speed()
+    public async Task The_tile_reads_only_while_on_screen_and_the_page_has_no_note()
     {
         var fake = new FakeSources();
         var module = new SystemMonitorModule(() => fake.Sources);
@@ -116,7 +116,7 @@ public sealed class ModuleTests : IDisposable
             var tile = Assert.Single(registry.Find("system-monitor")!.IslandTiles);
 
             Assert.Equal(("system-monitor", "System monitor", "Activity", 60), (tile.Spec.Key, tile.Spec.Name, tile.Spec.Icon, tile.Spec.Order));
-            Assert.Equal("Last 4 min", tile.PageNote);
+            Assert.Equal("", tile.PageNote);
             Assert.Equal(SensorNeed.None, module.Sampler!.Need);
             Assert.Equal(0, fake.CpuReads);
 
@@ -131,7 +131,7 @@ public sealed class ModuleTests : IDisposable
             Assert.Equal(SensorNeed.None, module.Sampler.Need);
 
             module.Save(module.Settings with { UpdateSeconds = 5, TileStatus = TileStatus.Memory });
-            Assert.Equal("Last 10 min", tile.PageNote);
+            Assert.Equal("", tile.PageNote);
             Assert.Equal(TimeSpan.FromSeconds(5), module.Sampler.Interval);
             Assert.Equal(5, config.GetModuleSettings<SystemMonitorSettings>("system-monitor").UpdateSeconds);
 

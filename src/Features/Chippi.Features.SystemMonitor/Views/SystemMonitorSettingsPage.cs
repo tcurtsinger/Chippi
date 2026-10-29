@@ -17,6 +17,7 @@ public sealed class SystemMonitorSettingsPage : UserControl
 {
     private readonly SystemMonitorModule _module;
     private readonly StackPanel _body = new();
+    private readonly Border _disks = new() { Padding = new Thickness(16, 2, 16, 2) };
     private readonly List<Action<SystemMonitorSettings>> _sync = [];
     private readonly Dictionary<string, string> _gpus = new(StringComparer.OrdinalIgnoreCase);
     private SensorWatch? _discovery;
@@ -43,8 +44,8 @@ public sealed class SystemMonitorSettingsPage : UserControl
         {
             _sampler.Updated += Updated;
             Hardware(_sampler.Latest);
-            // Discover conditional rows once, then release the watch. Settings does not poll levels.
-            _discovery = _sampler.Watch(SensorNeed.Battery | SensorNeed.ThermalZones | SensorNeed.GpuSensors);
+            // Discover conditional rows once, then keep only disk space live while Settings is open.
+            _discovery = _sampler.Watch(SensorNeed.Disks | SensorNeed.Battery | SensorNeed.ThermalZones | SensorNeed.GpuSensors);
         }
         Refresh();
     }
@@ -65,8 +66,7 @@ public sealed class SystemMonitorSettingsPage : UserControl
         Hardware(snapshot);
         if (Resolved(snapshot.Battery.Status) && Resolved(snapshot.ThermalZones.Status) && Resolved(snapshot.Gpus.Status))
         {
-            _discovery?.Dispose();
-            _discovery = null;
+            if (_discovery is not null) _discovery.Need = SensorNeed.Disks;
         }
     });
 
@@ -75,6 +75,8 @@ public sealed class SystemMonitorSettingsPage : UserControl
     // Remember discovered capability across NotRead/temporary failures, without keeping stale values on screen.
     internal void Hardware(SystemSnapshot snapshot)
     {
+        _disks.Child = snapshot.Disks.Status == ReadingStatus.Unavailable ? DiskTable.Unavailable(island: false)
+            : DiskTable.Build(snapshot.Disks.Value ?? [], id => _module.Alerting("low-disk", id), island: false);
         bool changed = false;
         if (!_battery && snapshot.Battery.Value is not null) { _battery = true; changed = true; }
         if (!_zones && snapshot.ThermalZones.Value is { Count: > 0 }) { _zones = true; changed = true; }
@@ -113,8 +115,10 @@ public sealed class SystemMonitorSettingsPage : UserControl
     private void Build()
     {
         _updating = true;
+        if (_disks.Parent is Panel prior) prior.Children.Remove(_disks);
         _body.Children.Clear();
         _sync.Clear();
+        Section("Disks").Children.Add(_disks);
         var first = NewCard();
         first.Children.Add(Row("Update speed", Choice("Update speed", SystemMonitorSettings.UpdateChoices,
             n => n == 1 ? "1 second" : $"{n} seconds", s => s.UpdateSeconds, (s, n) => s with { UpdateSeconds = n })));

@@ -49,29 +49,6 @@ internal static class Format
             : Number(bytesPerSecond / MiB, false) + " MiB/s";
     }
 
-    /// <summary>A graph's rounded maximum for <paramref name="peak"/> bytes per second, in bytes per second: 1, 2 or 5 × a power of ten of the shown unit.</summary>
-    public static double RateScale(double peak, NetworkUnit unit)
-    {
-        double factor = unit == NetworkUnit.Bits ? 1 / 8.0 : 1;
-        double small = unit == NetworkUnit.Bits ? 1000 * factor : KiB, large = unit == NetworkUnit.Bits ? 1_000_000 * factor : MiB;
-        double unitSize = peak * 1.1 < large ? small : large;
-        double shown = Math.Max(peak * 1.1 / unitSize, 1);
-        double power = Math.Pow(10, Math.Floor(Math.Log10(shown)));
-        double step = shown / power <= 1 ? 1 : shown / power <= 2 ? 2 : shown / power <= 5 ? 5 : 10;
-        return step * power * unitSize;
-    }
-
-    /// <summary>"2 MiB/s": a graph's maximum, which <see cref="RateScale"/> keeps round.</summary>
-    public static string RateLabel(double bytesPerSecond, NetworkUnit unit)
-    {
-        if (unit == NetworkUnit.Bits)
-        {
-            double bits = bytesPerSecond * 8;
-            return bits < 1_000_000 ? (bits / 1000).ToString("0", Culture) + " Kbps" : (bits / 1_000_000).ToString("0", Culture) + " Mbps";
-        }
-        return bytesPerSecond < MiB ? (bytesPerSecond / KiB).ToString("0", Culture) + " KiB/s" : (bytesPerSecond / MiB).ToString("0", Culture) + " MiB/s";
-    }
-
     /// <summary>"58 °C" or "136 °F".</summary>
     public static string Temperature(double celsius, TemperatureUnit unit) =>
         unit == TemperatureUnit.Fahrenheit
@@ -95,10 +72,6 @@ internal static class Format
         minutes %= 60;
         return (hours > 0 ? $"{hours} hr {minutes} min" : $"{minutes} min") + " left";
     }
-
-    /// <summary>"Last 4 min": what 120 samples at the update interval cover.</summary>
-    public static string Span(TimeSpan interval) =>
-        "Last " + ((int)Math.Round(interval.TotalSeconds * Sensors.SamplerCore.HistoryLength / 60)).ToString(Culture) + " min";
 
     private static (double Divisor, string Unit) SizeUnit(ulong bytes) =>
         bytes >= 1024 * GiB ? (TiB, "TiB") : bytes >= GiB ? (GiB, "GiB") : bytes >= MiB ? (MiB, "MiB") : (KiB, "KiB");
