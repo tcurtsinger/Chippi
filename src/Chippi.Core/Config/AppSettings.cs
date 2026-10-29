@@ -129,4 +129,24 @@ public sealed class AppSettings
 
     /// <summary>Settings › Island &amp; pet › Live button: the round button for music or a muted mic.</summary>
     public bool IslandLiveButton { get; set; } = true;
+
+    /// <summary>Where the Settings window was and the page it showed when it last closed, which the next one reopens at; null until then.</summary>
+    public WindowPlacement? SettingsWindow { get; set; }
+}
+
+/// <summary>A window's restored bounds in DIPs, whether it was maximized, and the page it showed.</summary>
+public sealed class WindowPlacement
+{
+    /// <summary>The page id (a Settings route such as "about" or "module:shelf"); empty or null for none.</summary>
+    public string? Page { get; set; }
+
+    public double Left { get; set; }
+
+    public double Top { get; set; }
+
+    public double Width { get; set; }
+
+    public double Height { get; set; }
+
+    public bool Maximized { get; set; }
 }
