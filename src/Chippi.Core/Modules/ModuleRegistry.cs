@@ -39,6 +39,9 @@ public sealed class FeatureEntry
 
     public SettingsPageContribution? SettingsPage => Ui?.SettingsPage;
 
+    /// <summary>A one-time hardware check for Notifications, independent of saved notice choices.</summary>
+    public IReadOnlySet<string>? AvailableNoticeKinds => Module?.AvailableNoticeKinds;
+
     internal IFeatureModule? Module { get; }
 
     /// <summary>What to ask before uninstalling, or null to uninstall at once (<see cref="IFeatureModule.UninstallQuestion"/>).</summary>

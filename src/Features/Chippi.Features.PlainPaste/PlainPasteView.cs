@@ -57,7 +57,9 @@ public sealed class PlainPasteView : UserControl
     {
         _capturing = true; _module.CaptureShortcut(true); Focusable = true;
         _body.Children.Clear();
-        _body.Children.Add(SettingsLayout.Card(SettingsLayout.Row("New shortcut", Button("Cancel", CancelCapture))));
+        var card = SettingsLayout.Card(SettingsLayout.Row("New shortcut", Button("Cancel", CancelCapture)));
+        if (_title != "Shortcut") card.SetResourceReference(StyleProperty, "CardRowsStyle");
+        _body.Children.Add(card);
         Focus();
     }
     private void CancelCapture() { _capturing = false; _module.CaptureShortcut(false); Refresh(); }
