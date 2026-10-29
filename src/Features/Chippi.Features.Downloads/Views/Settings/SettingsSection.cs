@@ -230,7 +230,7 @@ internal sealed class SettingsSection : UserControl
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception)
         {
-            ShowError($"Couldn't open {EngineOptions.IgnoreFileName}");
+            ShowError("Ignore list failed");
         }
     }
 

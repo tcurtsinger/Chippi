@@ -321,7 +321,7 @@ internal sealed class PreviewView : UserControl
         else
         {
             undo.IsEnabled = true;
-            ShowError(result.Error ?? "Couldn't undo");
+            ShowError(result.Error ?? "Undo failed");
         }
     }
 

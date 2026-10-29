@@ -89,7 +89,7 @@ internal sealed class GeneralPage : UserControl
         catch (Exception ex) when (ex is UnauthorizedAccessException or System.Security.SecurityException or IOException)
         {
             enabled = false;
-            SettingsUi.Show(message, "Couldn't read startup entry", problem: true);
+            SettingsUi.Show(message, "Startup check failed", problem: true);
         }
 
         var toggle = SettingsUi.Switch(enabled);

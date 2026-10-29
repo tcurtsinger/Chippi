@@ -179,7 +179,7 @@ public sealed class SettingsWindowTests
                 Assert.Contains(logs.Messages, m => m.Contains("module:missing/rules") && m.Contains("unavailable"));
                 window.Navigate("module:failing-page/rules");
                 Assert.Contains(logs.Messages, m => m.Contains("module:failing-page/rules") && m.Contains("failed to load"));
-                Assert.Contains(Descendants(window.PageContent).OfType<TextBlock>(), t => t.Text.StartsWith("Couldn't open", StringComparison.Ordinal));
+                Assert.Contains(Descendants(window.PageContent).OfType<TextBlock>(), t => t.Text == "Page load failed");
                 window.Navigate("module:failing-page/rules");
                 Assert.Contains(Descendants(window.PageContent).OfType<TextBlock>(), t => t.Text == "Recovered rules");
             }

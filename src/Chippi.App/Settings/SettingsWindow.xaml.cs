@@ -341,7 +341,7 @@ public partial class SettingsWindow : Window
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Settings request '{Page}' could not be shown: the page failed to load", id);
-            view = new TextBlock { Text = "Couldn't open this page", TextWrapping = TextWrapping.Wrap };
+            view = new TextBlock { Text = "Page load failed", TextWrapping = TextWrapping.Wrap };
         }
         if (!module)
             _views[id] = view;
