@@ -23,6 +23,7 @@ public sealed class RoutingPage : UserControl
     private readonly AudioFlow _flow;
     private readonly Dictionary<string, DragHandle> _handles = new(StringComparer.OrdinalIgnoreCase);
     private readonly Slider _volume = new() { Minimum = 0, Maximum = 100, SmallChange = 5, LargeChange = 10, IsMoveToPointEnabled = true, Width = 200, VerticalAlignment = VerticalAlignment.Center };
+    private readonly LatestWrite _volumeWrite = new();
     private readonly TextBlock _percent = RoutingUi.Text("", "BodyTextStyle", "TextSecondaryBrush");
     private readonly Button _mute;
     private readonly StackPanel _levels = new() { Orientation = Orientation.Horizontal };
@@ -126,7 +127,7 @@ public sealed class RoutingPage : UserControl
         {
             ShowPercent();
             if (!_refreshing && _module.InUse(AudioFlow.Render) is { } id)
-                Run(_module.SetOutputVolumeAsync(id, (float)e.NewValue / 100));
+                _volumeWrite.Send(() => _module.SetOutputVolumeAsync(id, (float)e.NewValue / 100));
         };
         _percent.MinWidth = 52;
         _percent.TextAlignment = TextAlignment.Right;

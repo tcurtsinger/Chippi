@@ -183,7 +183,8 @@ public sealed class VolumeView : UserControl
             mute.ToolTip = muted ? "Unmute" : "Mute";
             AutomationProperties.SetName(mute, $"{mute.ToolTip} {AppName(key)}");
         }
-        slider.ValueChanged += (_, _) => { Paint(); if (!_refreshing) Run(_module.SetVolumeAsync(key, (float)slider.Value / 100)); };
+        var write = new LatestWrite();
+        slider.ValueChanged += (_, _) => { Paint(); if (!_refreshing) write.Send(() => _module.SetVolumeAsync(key, (float)slider.Value / 100)); };
         _updates.Add(() => { if (!slider.IsMouseCaptureWithin && !slider.IsKeyboardFocusWithin) slider.Value = Level(key).Volume * 100; Paint(); });
         return new Border { Child = grid, MinHeight = SettingsLayout.RowHeight, Padding = SettingsLayout.RowPadding };
     }
@@ -251,7 +252,8 @@ public sealed class VolumeView : UserControl
             else fill.SetResourceReference(Border.BackgroundProperty, "IslandAccentBrush");
             fill.Height = Math.Max(0, bar.ActualHeight) * slider.Value / 100;
         }
-        slider.ValueChanged += (_, _) => { Paint(); if (!_refreshing) Run(_module.SetVolumeAsync(key, (float)slider.Value / 100)); };
+        var write = new LatestWrite();
+        slider.ValueChanged += (_, _) => { Paint(); if (!_refreshing) write.Send(() => _module.SetVolumeAsync(key, (float)slider.Value / 100)); };
         bar.SizeChanged += (_, _) => Paint();
         _updates.Add(() => { if (!slider.IsMouseCaptureWithin && !slider.IsKeyboardFocusWithin) slider.Value = Level(key).Volume * 100; Paint(); });
         var name = new TextBlock { Text = AppName(key), FontSize = 11, Width = width, Height = 28, LineHeight = 14, LineStackingStrategy = LineStackingStrategy.BlockLineHeight, MaxHeight = 28, TextWrapping = TextWrapping.WrapWithOverflow, TextTrimming = TextTrimming.CharacterEllipsis, TextAlignment = TextAlignment.Center, ToolTip = AppName(key), Visibility = count <= 7 ? Visibility.Visible : Visibility.Collapsed };

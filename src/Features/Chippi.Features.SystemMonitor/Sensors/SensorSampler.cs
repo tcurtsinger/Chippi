@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -45,6 +46,9 @@ public static class Series
 /// </summary>
 public sealed class SensorSampler : IDisposable
 {
+    /// <summary>Between the unpublished first sample of a new need and the one that's published.</summary>
+    internal static readonly TimeSpan PrimeDelay = TimeSpan.FromMilliseconds(100);
+
     private readonly SamplerCore _core;
     private readonly TimeProvider _time;
     private readonly ILogger _log;
@@ -152,10 +156,32 @@ public sealed class SensorSampler : IDisposable
                 var interval = Interval;
                 var now = _time.GetUtcNow();
                 // A newly added need is read at once rather than at the next tick.
-                if (need != SensorNeed.None && (now >= next || (need & ~last) != 0))
+                bool added = (need & ~last) != 0;
+                if (need != SensorNeed.None && (now >= next || added))
                 {
                     try
                     {
+                        if (added)
+                        {
+                            // Rates (CPU, GPU load, network, and the disk list itself) need two samples, and a
+                            // pause of over 10s starts them over: a short unpublished first sample means a page
+                            // that just opened shows every reading at once, not 2s later.
+                            _core.Tick(now, need, interval);
+                            // The whole delay: opening a page also lets go of the tile's watch, and that wake
+                            // must not cut it short (rates over a fraction of a millisecond come back empty).
+                            long primed = Stopwatch.GetTimestamp();
+                            for (var left = PrimeDelay; left > TimeSpan.Zero && !_stopping; left = PrimeDelay - Stopwatch.GetElapsedTime(primed))
+                                _wake.WaitOne(left);
+                            if (_stopping)
+                                break;
+                            need = Need;
+                            now = _time.GetUtcNow();
+                            if (need == SensorNeed.None)
+                            {
+                                last = SensorNeed.None;
+                                continue; // every watch let go meanwhile
+                            }
+                        }
                         var snapshot = _core.Tick(now, need, interval);
                         Updated?.Invoke(snapshot);
                     }
