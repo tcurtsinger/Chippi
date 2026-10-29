@@ -1,3 +1,5 @@
+> Amendment: F3 #5: no 'Removed · …' caption (Travis, task 65, 2026-10-28).
+
 Build Travis's approved island refresh. Every page and the All features grid share one compact fixed size, 520 × 360, so the island never changes size between pages. Sound is made uniform, System monitor is cut down to two tables, and six issues from the Phase 5 review get fixed. The Settings window gets its approved redesign, and Settings can now do everything the island can (Part F). Repo: X:\code\chippi, branch from main.
 
 Travis's priorities: a smaller island with smaller elements over a bigger one. Accessibility is not a goal. Don't add accessibility work, and leave existing accessible names as they are.
