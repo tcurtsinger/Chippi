@@ -61,6 +61,30 @@ public sealed class VolumeUiTests
     public void Fallback_distinguishes_apps_sharing_the_first_letter(string name, string expected) =>
         Assert.Equal(expected, VolumeView.Initials(name));
 
+    [Fact]
+    public async Task A_name_past_two_lines_marks_the_second_and_keeps_its_tooltip()
+    {
+        const string full = "Microsoft Edge WebView2 Runtime";
+        await using var f = new VolumeFixture();
+        f.System.EndSession("one");
+        f.System.WithSession(VolumeFixture.Session("edge", "A", 222) with { AppName = full });
+        await f.Start();
+        await Sta(() =>
+        {
+            var view = new VolumeView(f.Module, VolumeSurface.Island);
+            view.Measure(new Size(496, 304)); view.Arrange(new Rect(0, 0, 496, 304)); view.UpdateLayout();
+            var name = Descendants(view).OfType<TextBlock>().Single(t => Equals(t.ToolTip, full));
+            Assert.EndsWith("\u2026", name.Text);
+            Assert.NotEqual(full, name.Text);
+            Assert.Equal(TextWrapping.WrapWithOverflow, name.TextWrapping);
+            Assert.Equal(TextTrimming.CharacterEllipsis, name.TextTrimming);
+            var measured = new TextBlock { Text = name.Text, FontSize = name.FontSize, FontFamily = name.FontFamily, LineHeight = 14, LineStackingStrategy = LineStackingStrategy.BlockLineHeight, TextWrapping = name.TextWrapping };
+            measured.Measure(new Size(56, double.PositiveInfinity));
+            Assert.Equal(28, measured.DesiredSize.Height);
+            return Task.CompletedTask;
+        });
+    }
+
     private static IEnumerable<DependencyObject> Descendants(DependencyObject root)
     {
         yield return root;

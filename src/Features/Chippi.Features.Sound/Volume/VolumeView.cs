@@ -166,11 +166,37 @@ public sealed class VolumeView : UserControl
         bar.SizeChanged += (_, _) => Paint();
         _updates.Add(() => { if (!slider.IsMouseCaptureWithin && !slider.IsKeyboardFocusWithin) slider.Value = Level(key).Volume * 100; Paint(); });
         var name = new TextBlock { Text = AppName(key), FontSize = 11, Width = width, Height = 28, LineHeight = 14, LineStackingStrategy = LineStackingStrategy.BlockLineHeight, MaxHeight = 28, TextWrapping = TextWrapping.WrapWithOverflow, TextTrimming = TextTrimming.CharacterEllipsis, TextAlignment = TextAlignment.Center, ToolTip = AppName(key), Visibility = count <= 7 ? Visibility.Visible : Visibility.Collapsed };
+        name.Text = FitName(AppName(key), name);
         name.SetResourceReference(TextBlock.ForegroundProperty, "IslandTextTertiaryBrush");
         Grid.SetRow(name, 3); strip.Children.Add(name);
         var menu = OutputMenu(key); menu.IsEnabled = _module.CanPickOutput(key);
         Grid.SetRow(menu, 4); strip.Children.Add(menu);
         return strip;
+    }
+
+    // TextBlock trims a long word at its width, but MaxHeight alone silently hides later lines.
+    // Measure with the same wrapping/font and mark the last visible line when more would follow.
+    private static string FitName(string full, TextBlock target)
+    {
+        var measure = new TextBlock
+        {
+            FontFamily = target.FontFamily, FontSize = target.FontSize, FontWeight = target.FontWeight,
+            LineHeight = target.LineHeight, LineStackingStrategy = target.LineStackingStrategy,
+            TextWrapping = target.TextWrapping,
+        };
+        bool Fits(string text)
+        {
+            measure.Text = text;
+            measure.Measure(new Size(target.Width, double.PositiveInfinity));
+            return measure.DesiredSize.Height <= target.Height + 0.01;
+        }
+        if (Fits(full)) return full;
+        for (int length = full.Length - 1; length > 0; length--)
+        {
+            var candidate = full[..length].TrimEnd() + "\u2026";
+            if (Fits(candidate)) return candidate;
+        }
+        return "\u2026";
     }
 
     /// <summary>The strip's ⋯: where the app plays, Default or one of the connected outputs.</summary>
