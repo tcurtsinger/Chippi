@@ -709,7 +709,8 @@ public partial class IslandWindow : Window
         _songState = state;
         Song.Width = width;
         Song.OpacityMask = full > width ? Fade(width, start: scroll) : null;
-        SongStrip.Margin = new Thickness(scroll ? 8 : 0, 0, 0, 0); // clear of the start's fade
+        // Centered between Gumdrop and the bars when it fits; clear of the start's fade while it scrolls.
+        SongStrip.Margin = new Thickness(scroll ? 8 : full < width ? Math.Round((width - full) / 2) : 0, 0, 0, 0);
         SongCopy.Visibility = Shown(scroll);
         if (!scroll)
         {
