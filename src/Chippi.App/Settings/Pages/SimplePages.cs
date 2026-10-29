@@ -29,7 +29,7 @@ internal sealed class AboutPage : UserControl
     public AboutPage()
     {
         _page.Children.Add(SettingsUi.Header("About", ""));
-        var product = new DockPanel { Margin = new Thickness(16, 10, 16, 10) };
+        var product = new DockPanel { Margin = SettingsLayout.RowPadding };
         var version = SettingsUi.Styled(new TextBlock { Text = "Version " + AppInfo.Version, VerticalAlignment = VerticalAlignment.Center }, "BodyTextStyle");
         DockPanel.SetDock(version, Dock.Right);
         product.Children.Add(version);
@@ -47,11 +47,11 @@ internal sealed class AboutPage : UserControl
         var donate = SettingsUi.Button("Donate");
         AutomationProperties.SetName(donate, "Donate to VB-Audio");
         donate.Click += (_, _) => System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("https://vb-audio.com/Cable/") { UseShellExecute = true })?.Dispose();
-        _page.Children.Add(SettingsUi.Group(product,
-            SettingsUi.Row("License", AppInfo.License, license),
-            SettingsUi.Row("Privacy", "No telemetry", new FrameworkElement()),
-            SettingsUi.Row("Third-party notices", "", notices),
-            SettingsUi.Row("VB-CABLE", "Donationware from www.vb-cable.com", donate)));
+        _page.Children.Add(SettingsLayout.Card(product,
+            SettingsLayout.Row("License", license, AppInfo.License),
+            SettingsLayout.Row("Privacy", new FrameworkElement(), "No telemetry"),
+            SettingsLayout.Row("Third-party notices", notices),
+            SettingsLayout.Row("VB-CABLE", donate, "Donationware from www.vb-cable.com")));
         Content = _page;
     }
 
