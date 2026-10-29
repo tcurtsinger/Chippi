@@ -34,10 +34,34 @@ public sealed class GeneralImportTests
             Assert.Equal(ThemePreference.Dark, config.GetSection<AppSettings>(AppSettings.SectionName).Theme);
             page.ConfirmImport(path);
             Find<Button>(page).Single(b => Equals(b.Content, "Replace")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-            Assert.Contains(Find<TextBlock>(page), t => t.Text == "Not imported \u00b7 Invalid settings file");
+            Assert.Contains(Find<TextBlock>(page), t => t.Text == "Import failed \u00b7 Invalid settings file");
             Assert.Equal(ThemePreference.Dark, config.GetSection<AppSettings>(AppSettings.SectionName).Theme);
         }
         finally { shell.Clipboard.Dispose(); Directory.Delete(root, true); }
+    });
+
+    [Fact]
+    public void A_valid_export_import_rebuilds_the_page_and_reports_success() => WpfTestThread.Run(() =>
+    {
+        string root = Path.Combine(Path.GetTempPath(), "chippi-valid-import-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var config = new ConfigStore(Path.Combine(root, "settings.json"));
+        config.SetSection(AppSettings.SectionName, new AppSettings { Theme = ThemePreference.Dark, ReduceMotion = true });
+        string path = Path.Combine(root, "export.json");
+        config.Export(path);
+        config.SetSection(AppSettings.SectionName, new AppSettings { Theme = ThemePreference.Dark });
+        var shell = new ShellContext(config, NullLoggerFactory.Instance, false, "valid-import-test");
+        try
+        {
+            var page = new GeneralPage(shell);
+            var oldContent = page.Content;
+            var operation = (Task)typeof(GeneralPage).GetMethod("ImportAsync", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.Invoke(page, [path])!;
+            operation.GetAwaiter().GetResult();
+            Assert.True(config.GetSection<AppSettings>(AppSettings.SectionName).ReduceMotion);
+            Assert.NotSame(oldContent, page.Content);
+            Assert.Contains(Find<TextBlock>(page), t => t.Text == $"Imported from {path}");
+        }
+        finally { shell.Clipboard.Dispose(); Chippi.UI.Themes.Motion.Override = null; Directory.Delete(root, true); }
     });
 
     private static IEnumerable<T> Find<T>(DependencyObject root) where T : DependencyObject

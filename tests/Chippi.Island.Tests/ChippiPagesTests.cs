@@ -30,9 +30,29 @@ public sealed class ChippiPagesTests
             shell.Registry.SetInstalledAsync("failed-test", true).GetAwaiter().GetResult();
             var shortcuts = new ShortcutsPage(shell);
             Assert.Equal("shortcut-list", shortcut.Section);
+            Assert.Single(Find<Card>(shortcuts));
             Assert.Contains(Find<TextBlock>(shortcuts), t => t.Text == "Existing shortcut editor");
             var features = new AddFeaturesPage(shell);
             Assert.Contains(Find<SettingRow>(features), r => r.Header == "Failed feature" && r.Description == "Start failed \u00b7 Access denied");
+        }
+        finally { shell.Registry.StopAllAsync().GetAwaiter().GetResult(); shell.Clipboard.Dispose(); Directory.Delete(root, true); }
+    });
+
+    [Fact]
+    public void A_failed_shortcut_feature_has_no_sidebar_entry_and_unknown_errors_have_no_invented_reason() => WpfTestThread.Run(() =>
+    {
+        string root = Path.Combine(Path.GetTempPath(), "chippi-failed-shortcut-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var shell = new ShellContext(new ConfigStore(Path.Combine(root, "settings.json")), NullLoggerFactory.Instance, false, "failed-shortcut-test");
+        try
+        {
+            shell.Registry.Register(new FailedFeature("mic-mute", unknown: true));
+            shell.Registry.SetInstalledAsync("mic-mute", true).GetAwaiter().GetResult();
+            var window = new Chippi.App.Settings.SettingsWindow(shell, "general");
+            try { Assert.DoesNotContain(window.NavigationPages, p => p.Id == "shortcuts"); }
+            finally { window.Close(); }
+            var features = new AddFeaturesPage(shell);
+            Assert.Contains(Find<SettingRow>(features), r => r.Header == "Failed feature" && r.Description == "Start failed");
         }
         finally { shell.Registry.StopAllAsync().GetAwaiter().GetResult(); shell.Clipboard.Dispose(); Directory.Delete(root, true); }
     });
@@ -48,10 +68,10 @@ public sealed class ChippiPagesTests
         }
         public Task StopAsync(CancellationToken ct) => Task.CompletedTask;
     }
-    private sealed class FailedFeature : IFeatureModule
+    private sealed class FailedFeature(string id = "failed-test", bool unknown = false) : IFeatureModule
     {
-        public FeatureDescriptor Descriptor { get; } = new("failed-test", "Failed feature", "Description", FeatureGroup.System);
-        public Task StartAsync(ModuleContext context, CancellationToken ct) => Task.FromException(new UnauthorizedAccessException("Raw sensitive path"));
+        public FeatureDescriptor Descriptor { get; } = new(id, "Failed feature", "Description", FeatureGroup.System);
+        public Task StartAsync(ModuleContext context, CancellationToken ct) => Task.FromException(unknown ? new InvalidOperationException("Not about a device") : new UnauthorizedAccessException("Raw sensitive path"));
         public Task StopAsync(CancellationToken ct) => Task.CompletedTask;
     }
     private static IEnumerable<T> Find<T>(DependencyObject root) where T : DependencyObject

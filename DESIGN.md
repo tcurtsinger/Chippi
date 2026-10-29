@@ -470,7 +470,6 @@ In the island and flyout header, the pet is decorative (`AutomationProperties.Ac
 - **Do** check every screen in dark and light, and with at least one non-blue accent.
 - **Do** give every custom control a visible focus ring and an accessible name.
 - **Do** keep status visible at rest: folder mode, held files and Keep awake time show without hovering.
-- Feature rows do not show overlap badges.
 - **Do** list only features that work. Coming soon stays folded away.
 
 ### Don't

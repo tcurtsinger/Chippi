@@ -147,12 +147,11 @@ internal sealed class AddFeaturesPage : UserControl
 
     private void OnRegistryChanged(object? sender, EventArgs e) => Dispatcher.BeginInvoke(Refresh);
 
-    private static string FailureReason(Exception error) => error switch
+    private static string? FailureReason(Exception error) => error switch
     {
         UnauthorizedAccessException => "Access denied",
         System.IO.IOException => "File unavailable",
-        InvalidOperationException => "Device unavailable",
-        _ => "Unavailable",
+        _ => null,
     };
 
     private void Refresh()
@@ -162,7 +161,7 @@ internal sealed class AddFeaturesPage : UserControl
         {
             toggle.IsChecked = entry.IsInstalled;
             toggle.Content = entry.IsInstalled ? "On" : "Off";
-            row.Description = entry.LastError is { } error ? "Start failed \u00b7 " + FailureReason(error) : entry.Descriptor.Description;
+            row.Description = entry.LastError is { } error ? FailureReason(error) is { } reason ? "Start failed \u00b7 " + reason : "Start failed" : entry.Descriptor.Description;
             ShowRequirement(entry, row, toggle, action);
             row.ApplyTemplate();
             if (row.Template?.FindName("Caption", row) is TextBlock caption)

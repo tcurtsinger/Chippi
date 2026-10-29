@@ -67,7 +67,9 @@ public sealed class MicMuteView : UserControl
         }
         if (_surface == MicMuteSurface.ShortcutList)
         {
-            _body.Children.Add(SettingsLayout.Card(SettingsLayout.Row(_module.Descriptor.Name, ShortcutControls())));
+            var card = SettingsLayout.Card(SettingsLayout.Row(_module.Descriptor.Name, ShortcutControls()));
+            card.SetResourceReference(StyleProperty, "CardRowsStyle");
+            _body.Children.Add(card);
             if (_module.ShortcutError is { } error) Error(error);
             return;
         }

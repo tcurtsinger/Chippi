@@ -20,10 +20,12 @@ internal sealed class ShortcutsPage : UserControl
         void Build()
         {
             while (page.Children.Count > 1) page.Children.RemoveAt(1);
+            var card = new Card();
             foreach (var entry in shell.Registry.Features.Where(f => f.IsRunning && f.Id is "mic-mute" or "paste-plain-text"))
                 if (entry.SettingsPage?.CreateView("shortcut-list") is FrameworkElement view)
-                    page.Children.Add(view);
-            if (page.Children.Count == 1) page.Children.Add(SettingsLayout.Card(SettingsLayout.Empty("No shortcuts")));
+                    card.Children.Add(view);
+            if (card.Children.Count == 0) card.Children.Add(SettingsLayout.Empty("No shortcuts"));
+            page.Children.Add(card);
         }
         void Changed(object? sender, EventArgs e) => Dispatcher.BeginInvoke(Build);
         Loaded += (_, _) => { shell.Registry.Changed += Changed; Build(); };

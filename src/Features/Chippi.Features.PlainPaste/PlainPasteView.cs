@@ -42,7 +42,9 @@ public sealed class PlainPasteView : UserControl
         row.Children.Add(keys);
         row.Children.Add(Button(_module.Settings.Shortcut is null ? "Set" : "Change", BeginCapture));
         if (_module.Settings.Shortcut is not null) row.Children.Add(Button("Remove", () => { _module.RemoveShortcut(); Refresh(); }));
-        _body.Children.Add(SettingsLayout.Card(SettingsLayout.Row(_title, row)));
+        var card = SettingsLayout.Card(SettingsLayout.Row(_title, row));
+        if (_title != "Shortcut") card.SetResourceReference(StyleProperty, "CardRowsStyle");
+        _body.Children.Add(card);
         if (_module.ShortcutError is { } error)
         {
             var line = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 8, 0, 0) };

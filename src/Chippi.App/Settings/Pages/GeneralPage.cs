@@ -18,7 +18,7 @@ internal sealed class GeneralPage : UserControl
 {
     private readonly ShellContext _shell;
     private TextBlock _transferMessage = null!;
-    private readonly StackPanel _importConfirm = new();
+    private StackPanel _importConfirm = null!;
 
     public GeneralPage(ShellContext shell)
     {
@@ -28,6 +28,7 @@ internal sealed class GeneralPage : UserControl
 
     private void Build()
     {
+        _importConfirm = new StackPanel();
         var page = new StackPanel();
         page.Children.Add(SettingsUi.Header("General", ""));
 
@@ -141,7 +142,7 @@ internal sealed class GeneralPage : UserControl
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             Log.Warn("Settings export failed", ex);
-            SettingsUi.Show(message, ex is UnauthorizedAccessException ? "Couldn't export · Access denied" : "Couldn't export · File unavailable", problem: true);
+            SettingsUi.Show(message, ex is UnauthorizedAccessException ? "Export failed · Access denied" : "Export failed · File unavailable", problem: true);
         }
     }
 
@@ -184,13 +185,13 @@ internal sealed class GeneralPage : UserControl
         catch (InvalidDataException ex)
         {
             Log.Warn("Settings import rejected", ex);
-            SettingsUi.Show(message, "Not imported · Invalid settings file", problem: true);
+            SettingsUi.Show(message, "Import failed · Invalid settings file", problem: true);
             return;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             Log.Warn("Settings import failed", ex);
-            SettingsUi.Show(message, ex is UnauthorizedAccessException ? "Not imported · Access denied" : "Not imported · File unavailable", problem: true);
+            SettingsUi.Show(message, ex is UnauthorizedAccessException ? "Import failed · Access denied" : "Import failed · File unavailable", problem: true);
             return;
         }
 

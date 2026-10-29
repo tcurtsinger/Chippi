@@ -125,7 +125,7 @@ public partial class SettingsWindow : Window
     internal FrameworkElement PageContent => PageHost;
     private IEnumerable<SettingsPageInfo> ChippiPages => Pages.Where(p =>
         p.Id != "shortcuts" && p.Id != "permissions"
-        || p.Id == "shortcuts" && _shell.Registry.Features.Any(f => f.IsInstalled && f.Id is "mic-mute" or "paste-plain-text")
+        || p.Id == "shortcuts" && _shell.Registry.Features.Any(f => f.IsRunning && f.SettingsPage is not null && f.Id is "mic-mute" or "paste-plain-text")
         || p.Id == "permissions" && _shell.Registry.GetPermissions().Any(u => u.UsedBy.Count > 0 || u.IsUnused));
 
     internal IEnumerable<SettingsPageInfo> NavigationPages => _featurePages.Concat(ChippiPages);
