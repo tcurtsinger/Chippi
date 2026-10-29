@@ -38,7 +38,7 @@ internal sealed class IslandPetPage : UserControl
         var app = SettingsUi.ReadApp(shell.Config);
         var page = new StackPanel();
         page.Children.Add(SettingsUi.Header("Island & pet", ""));
-        page.Children.Add(SettingsUi.Group([.. DoorRows(app), OpensOnRow(app), PositionRow(app), DisplayRow(app)]));
+        page.Children.Add(SettingsUi.Group([.. DoorRows(app), OpensOnRow(app), PositionRow(), DisplayRow(app)]));
 
         page.Children.Add(SettingsUi.Section("Tiles"));
         var tiles = new Grid { ColumnDefinitions = { new(), new() { Width = new GridLength(8) }, new() { Width = GridLength.Auto } } };
@@ -115,24 +115,12 @@ internal sealed class IslandPetPage : UserControl
         return SettingsUi.Row("Opens on", "", picker);
     }
 
-    private Border PositionRow(AppSettings app)
+    // Only the top edge docks for now (side edges retired 2026-10-29); dragging the tab moves it along it.
+    private Border PositionRow()
     {
-        var picker = Combo("Position", new[] { ("Top", IslandEdge.Top), ("Left edge", IslandEdge.Left), ("Right edge", IslandEdge.Right) }, app.IslandEdge);
-        picker.SelectionChanged += (_, _) =>
-        {
-            if (picker.SelectedItem is ComboBoxItem { Tag: IslandEdge edge })
-                SettingsUi.SaveApp(_shell.Config, s => s.IslandEdge = edge);
-        };
         var reset = SettingsUi.Button("Reset");
-        reset.Click += (_, _) =>
-        {
-            picker.SelectedIndex = 0;
-            SettingsUi.SaveApp(_shell.Config, s => { s.IslandEdge = IslandEdge.Top; s.IslandPlace = 0.5; });
-        };
-        var controls = new StackPanel { Orientation = Orientation.Horizontal };
-        controls.Children.Add(picker);
-        controls.Children.Add(reset);
-        return SettingsUi.Row("Position", "", controls);
+        reset.Click += (_, _) => SettingsUi.SaveApp(_shell.Config, s => { s.IslandEdge = IslandEdge.Top; s.IslandPlace = 0.5; });
+        return SettingsUi.Row("Position", "", reset);
     }
 
     private Border DisplayRow(AppSettings app)

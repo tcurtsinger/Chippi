@@ -297,8 +297,8 @@ public sealed class IslandHost : IDisposable
             ("Top-left corner", new(w.Left + 4, w.Top + 4), false),
             ("Top-right corner", new(w.Right - 4, w.Top + 4), false),
             ("Top edge, 100 DIPs from the left end (inside the 160 margin)", new(w.Left + 100 * s, w.Top + 2), false),
-            ("Left edge, 30 DIPs from the bottom end (inside the 64 margin)", new(w.Left + 2, w.Bottom - 30 * s), false),
-            ("Right edge, 30 DIPs from the top end (inside the 64 margin)", new(w.Right - 2, w.Top + 30 * s), false),
+            ("Left edge, lower half", new(w.Left + 2, w.Bottom - 30 * s), false),
+            ("Right edge, by the top end (inside the 160 margin)", new(w.Right - 2, w.Top + 30 * s), false),
         };
         if (taskbar is { } bar && bar != ScreenEdge.Bottom)
             cases.Add(("Taskbar edge, center", bar switch
@@ -306,8 +306,8 @@ public sealed class IslandHost : IDisposable
                 ScreenEdge.Top => new(w.Left + w.Width / 2, w.Top + 2),
                 ScreenEdge.Left => new(w.Left + 2, w.Top + w.Height / 2),
                 _ => new(w.Right - 2, w.Top + w.Height / 2),
-            }, false));
-        cases.Add(("Top edge, center (control)", new(w.Left + w.Width / 2, w.Top + 2), taskbar != ScreenEdge.Top));
+            }, bar == ScreenEdge.Top)); // a taskbar on top leaves the tab just under it
+        cases.Add(("Top edge, center (control)", new(w.Left + w.Width / 2, w.Top + 2), true));
         foreach (var (name, pointer, expected) in cases)
         {
             bool taken = _window.DropAt(pointer);
@@ -339,6 +339,7 @@ public sealed class IslandHost : IDisposable
                 publisher.Clear("track");
         };
         _window.SetMedia(media);
+        _window.SetLevel(new TabLevel(Chippi.Features.Sound.SoundAudio.Get(_logger)));
         _ = media.StartAsync();
     }
 

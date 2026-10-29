@@ -55,6 +55,32 @@ public sealed class IslandWindowTests
     }
 
     [Fact]
+    public void Music_playing_names_the_song_on_a_220_tab_scrolling_only_when_it_does_not_fit()
+    {
+        static Chippi.App.Island.Media.MediaTrack Track(string title) =>
+            new("spotify", "Spotify", title, "Radiohead", true, true, true, true, true, true, TimeSpan.Zero, TimeSpan.FromMinutes(4), DateTimeOffset.Now, null);
+        WpfTestThread.Run(() => WithShownIsland(window =>
+        {
+            var media = new IslandPanelTests.FakeMedia { Sessions = [Track("Everything In Its Right Place (Live at the Ancient Theatre)")] };
+            window.SetMedia(media);
+            var playing = new Chippi.Core.Island.IslandActivity("track", Chippi.Core.Island.IslandActivityKind.Media, "Everything", "Spotify");
+            window.SetActivities([playing], Chippi.App.Pet.PetMood.Idle);
+            Assert.Equal(new Size(220, 32), window.TabTarget);
+            Assert.Equal(Visibility.Visible, window.Song.Visibility);
+            if (!Chippi.UI.Themes.Motion.IsReduced)
+                Assert.Equal(Visibility.Visible, window.SongCopy.Visibility); // too long: a second copy follows it round
+
+            media.Sessions = [Track("Creep")];
+            media.Raise();
+            Assert.Equal(Visibility.Collapsed, window.SongCopy.Visibility); // fits: holds still
+
+            window.SetActivities([], Chippi.App.Pet.PetMood.Idle); // paused: the activity goes
+            Assert.Equal(IslandGeometry.TabSize(IslandEdge.Top, live: false), window.TabTarget);
+            Assert.Equal(Visibility.Collapsed, window.Song.Visibility);
+        }));
+    }
+
+    [Fact]
     public void Hovering_never_opens_the_island()
     {
         WpfTestThread.Run(() => WithShownIsland(window =>

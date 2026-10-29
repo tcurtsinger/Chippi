@@ -204,19 +204,21 @@ public sealed class SystemMediaSessions : IMediaSessions
     {
         try
         {
-            var id = session.SourceAppUserModelId;
+            // An app mid-start or mid-close can leave any of these unset: read what's there.
+            var id = session.SourceAppUserModelId ?? "";
             var properties = await session.TryGetMediaPropertiesAsync();
             var playback = session.GetPlaybackInfo();
             var timeline = session.GetTimelineProperties();
-            var controls = playback.Controls;
+            var controls = playback?.Controls;
             string title = properties?.Title ?? "";
             string artist = properties?.Artist ?? "";
-            var duration = timeline.EndTime - timeline.StartTime;
+            var duration = timeline is null ? TimeSpan.Zero : timeline.EndTime - timeline.StartTime;
             return new MediaTrack(id, AppName(id), title, artist,
-                playback.PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing,
-                controls.IsPreviousEnabled, controls.IsPlayEnabled, controls.IsPauseEnabled, controls.IsPlayPauseToggleEnabled, controls.IsNextEnabled,
-                timeline.Position - timeline.StartTime, duration > TimeSpan.Zero ? duration : TimeSpan.Zero, timeline.LastUpdatedTime,
-                await Artwork(id, title + "\n" + artist, properties));
+                playback?.PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing,
+                controls?.IsPreviousEnabled == true, controls?.IsPlayEnabled == true, controls?.IsPauseEnabled == true,
+                controls?.IsPlayPauseToggleEnabled == true, controls?.IsNextEnabled == true,
+                timeline is null ? TimeSpan.Zero : timeline.Position - timeline.StartTime, duration > TimeSpan.Zero ? duration : TimeSpan.Zero,
+                timeline?.LastUpdatedTime ?? DateTimeOffset.Now, await Artwork(id, title + "\n" + artist, properties));
         }
         catch (Exception ex)
         {
@@ -225,10 +227,11 @@ public sealed class SystemMediaSessions : IMediaSessions
         }
     }
 
-    // Decoded once per track; a session without a thumbnail shows the neutral placeholder.
+    // Decoded once per track. Apps send the track first and its cover a moment later (another
+    // properties change), so a track still without one is read again rather than kept bare.
     private async Task<ImageSource?> Artwork(string id, string key, GlobalSystemMediaTransportControlsSessionMediaProperties? properties)
     {
-        if (_art.TryGetValue(id, out var cached) && cached.Key == key)
+        if (_art.TryGetValue(id, out var cached) && cached.Key == key && cached.Image is not null)
             return cached.Image;
         ImageSource? image = null;
         if (properties?.Thumbnail is { } thumbnail)

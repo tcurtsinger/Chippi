@@ -5,8 +5,10 @@ using System.Diagnostics;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using Chippi.App.Pet;
 using Chippi.App.Tray;
@@ -48,10 +50,15 @@ public partial class IslandWindow : Window
     private const double LineLength = 84;
     private const double LineThickness = 3;
     private const double GlyphGap = 4;
+    private const double MicRoom = 18; // the muted-mic glyph and its gap
+    private const double SongChrome = 80; // around the song: the tab's 14 at each end, Gumdrop's 22, the song's 8 each side, the glyph's 14
+    private const double SongGap = 40; // between one pass and the next
+    private const double SongSpeed = 30; // DIPs a second
     private const uint VK_ESCAPE = 0x1B;
 
     private static readonly TimeSpan SwellTime = TimeSpan.FromMilliseconds(120);
     private static readonly TimeSpan SlideTime = TimeSpan.FromMilliseconds(180);
+    private static readonly TimeSpan SongHold = TimeSpan.FromSeconds(2);
 
     private readonly IslandPanelWindow _panel = new();
     private readonly IslandOverlay _bubble = IslandOverlay.Bubble();
@@ -77,6 +84,12 @@ public partial class IslandWindow : Window
     private Size _tabSize; // drawn now
     private IslandEdge _tabEdge; // the edge it was drawn for
     private Size _tabTarget; // where the swell is heading
+    private Media.IMediaSessions? _media;
+    private bool _singing; // the tab names the song playing
+    private string _songText = "";
+    private string _songState = "";
+    private TabLevel? _level;
+    private EqualizerBars _bars = new();
 
     public IslandWindow()
     {
@@ -94,6 +107,8 @@ public partial class IslandWindow : Window
             _hovered = false;
             RefreshTab();
         };
+        // Hidden (a fullscreen app in front), the song stops scrolling; shown again, it starts over.
+        IsVisibleChanged += (_, _) => RefreshTab();
         // The tab stays swollen until the island has shrunk back into it.
         _panel.IsVisibleChanged += (_, _) =>
         {
@@ -187,7 +202,19 @@ public partial class IslandWindow : Window
     internal void SetLayout(IslandLayout layout) => _panel.SetLayout(layout);
 
     /// <summary>Now Playing's media sessions.</summary>
-    internal void SetMedia(Media.IMediaSessions media) => _panel.SetMedia(media);
+    /// <summary>The output's live level for the equalizer while the tab names a song.</summary>
+    internal void SetLevel(TabLevel level)
+    {
+        _level = level;
+        level.Level += (_, peak) => ShowLevel(peak);
+    }
+
+    internal void SetMedia(Media.IMediaSessions media)
+    {
+        _media = media;
+        media.Changed += (_, _) => RefreshTab(); // a new track, or its artist arriving
+        _panel.SetMedia(media);
+    }
 
     /// <summary>Creates the window handles with the no-activate tool-window styles, before anything is shown.</summary>
     public void Initialize()
@@ -208,9 +235,10 @@ public partial class IslandWindow : Window
         ApplyVisibility();
     }
 
-    /// <summary>AppSettings.IslandEdge and IslandPlace.</summary>
+    /// <summary>AppSettings.IslandEdge and IslandPlace. Only the top edge docks for now (side edges retired 2026-10-29), so a saved side edge shows on top.</summary>
     public void SetPlacement(IslandEdge edge, double place)
     {
+        edge = IslandEdge.Top;
         if (edge == _edge && Math.Abs(place - _place) < 1e-6)
             return; // the drop already put it there
         _edge = edge;
@@ -308,16 +336,16 @@ public partial class IslandWindow : Window
     private MonitorArea? Area => IslandNative.Area(_monitor);
 
     /// <summary>The tab window's rectangle at its saved edge and place: sized to the swollen live tab, flat side on the edge.</summary>
-    private Rect Home(MonitorArea area) => TabAt(area, live: true);
+    private Rect Home(MonitorArea area) => TabAt(area, live: true, song: true);
 
     /// <summary>The swollen tab as it is drawn now, in physical pixels: what the island grows out of and shrinks back into.</summary>
-    private Rect Grown(MonitorArea area) => TabAt(area, live: _activities.Count > 0);
+    private Rect Grown(MonitorArea area) => TabAt(area, live: _activities.Count > 0, song: _singing);
 
-    private Rect TabAt(MonitorArea area, bool live)
+    private Rect TabAt(MonitorArea area, bool live, bool song)
     {
         var edge = IslandGeometry.Docked(_edge, area.Monitor, area.Work);
         var anchor = IslandGeometry.Anchor(edge, _place, area.Monitor, area.Work, area.Scale);
-        var size = IslandGeometry.TabSize(edge, live, swollen: true);
+        var size = IslandGeometry.TabSize(edge, live, swollen: true, song);
         return IslandGeometry.TabRect(edge, anchor, new Size(size.Width * area.Scale, size.Height * area.Scale));
     }
 
@@ -600,7 +628,8 @@ public partial class IslandWindow : Window
 
     /// <summary>
     /// Sizes and fills the tab: 20px sleepy Gumdrop at rest; 22px with the highest activity's 14px glyph
-    /// when something is live. Hovered or open it swells, and Gumdrop wakes.
+    /// when something is live, and the song between them while music plays. Hovered or open it swells,
+    /// and Gumdrop wakes.
     /// </summary>
     private void RefreshTab()
     {
@@ -610,15 +639,17 @@ public partial class IslandWindow : Window
         bool dropping = _dragKey is not null;
         bool hasGlyph = dropping || feedback is not null || top is not null;
         bool swollen = dropping || _hovered || _panel.IsVisible;
-        SwellTo(IslandGeometry.TabSize(_docked, hasGlyph, swollen));
+        // Feedback and a drag use the existing live-glyph slot, then restore the activity beneath it.
+        bool live = !dropping && feedback is null;
+        var song = live && top?.Kind == IslandActivityKind.Media && _docked == IslandEdge.Top && _media?.Current is { Playing: true } track ? track : null;
+        _singing = song is not null;
+        SwellTo(IslandGeometry.TabSize(_docked, hasGlyph, swollen, _singing));
         Pet.Size = hasGlyph ? 22 : 20;
         Pet.ShowMood(hasGlyph ? _mood : swollen ? PetMood.Idle : PetMood.Sleepy);
         Glyph.Visibility = Shown(hasGlyph);
         DropGlyph.Visibility = Shown(dropping);
         PlainPasteGlyph.Visibility = Shown(!dropping && feedback is not null);
         PlainPasteGlyph.SetResourceReference(Chippi.UI.Controls.LucideIcon.BrushProperty, feedback?.NeedsAttention == true ? "WarningBrush" : "IslandAccentBrush");
-        // Feedback and a drag use the existing live-glyph slot, then restore the activity beneath it.
-        bool live = !dropping && feedback is null;
         Equalizer.Visibility = Shown(live && top?.Kind == IslandActivityKind.Media);
         Ring.Visibility = Shown(live && top?.Kind is IslandActivityKind.Timer or IslandActivityKind.Agent);
         bool folder = top?.Kind is IslandActivityKind.Download or IslandActivityKind.Stash;
@@ -630,11 +661,107 @@ public partial class IslandWindow : Window
         bool micMuted = mic is not null;
         MutedMicGlyph.Visibility = Shown(micMuted);
         MutedMicGlyph.Margin = _docked == IslandEdge.Top ? new Thickness(4, 0, 0, 0) : new Thickness(0, 4, 0, 0);
+        ShowSong(song, IslandGeometry.TabSize(IslandEdge.Top, true, swollen, song: true).Width - SongChrome - (micMuted ? MicRoom : 0));
+        if (_docked == IslandEdge.Top)
+            Glyph.Margin = new Thickness(song is null ? GlyphGap : 0, 0, 0, 0); // the song's own margin is the gap
+        // The bars follow the output's real level while the song shows and can be seen.
+        if (song is not null && IsVisible && !_panel.IsVisible && !Motion.IsReduced)
+            _level?.Start();
+        else
+            StopLevel();
         AutomationProperties.SetName(Tab, feedback?.Title ?? "Chippi");
         AutomationProperties.SetLiveSetting(Tab, System.Windows.Automation.AutomationLiveSetting.Polite);
         AutomationProperties.SetHelpText(Tab, feedback is not null ? "" : (micMuted ? (mic!.Title == "Muted" ? "Microphone muted" : mic.Title) : top is null ? "" : string.IsNullOrWhiteSpace(top.Source) ? top.Title : $"{top.Title}, {top.Source}"));
     }
     private static Visibility Shown(bool shown) => shown ? Visibility.Visible : Visibility.Collapsed;
+
+    /// <summary>
+    /// The song on the top tab: the title, then " · artist" in tertiary. It holds still when it fits;
+    /// otherwise it scrolls 30 a second after a 2s hold, a copy following 40 behind so it loops
+    /// seamlessly. It stops while the tab is hidden, the island is open, or motion is reduced.
+    /// </summary>
+    private void ShowSong(Media.MediaTrack? track, double width)
+    {
+        Song.Visibility = Shown(track is not null);
+        if (track is null)
+        {
+            _songText = _songState = "";
+            SongMove.BeginAnimation(TranslateTransform.XProperty, null);
+            return;
+        }
+        string title = track.Title.Length > 0 ? track.Title : track.Source;
+        if (_songText != title + "\n" + track.Artist)
+        {
+            _songText = title + "\n" + track.Artist;
+            Fill(SongText, title, track.Artist);
+            Fill(SongCopy, title, track.Artist);
+        }
+        SongText.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        double full = SongText.DesiredSize.Width;
+        bool scroll = full > width && !Motion.IsReduced && IsVisible && !_panel.IsVisible;
+        string state = $"{_songText}\n{width}\n{scroll}";
+        if (state == _songState)
+            return; // still on its way: a timeline or play-state update doesn't start it over
+        _songState = state;
+        Song.Width = width;
+        Song.OpacityMask = full > width ? Fade(width, start: scroll) : null;
+        SongStrip.Margin = new Thickness(scroll ? 8 : 0, 0, 0, 0); // clear of the start's fade
+        SongCopy.Visibility = Shown(scroll);
+        if (!scroll)
+        {
+            SongMove.BeginAnimation(TranslateTransform.XProperty, null);
+            return;
+        }
+        double cycle = full + SongGap;
+        var run = TimeSpan.FromSeconds(cycle / SongSpeed);
+        var move = new DoubleAnimationUsingKeyFrames { Duration = SongHold + run, RepeatBehavior = RepeatBehavior.Forever };
+        move.KeyFrames.Add(new LinearDoubleKeyFrame(0, KeyTime.FromTimeSpan(SongHold)));
+        move.KeyFrames.Add(new LinearDoubleKeyFrame(-cycle, KeyTime.FromTimeSpan(SongHold + run)));
+        Timeline.SetDesiredFrameRate(move, 60); // half a DIP a frame is smooth; no need to draw at the screen's 165
+        SongMove.BeginAnimation(TranslateTransform.XProperty, move);
+    }
+
+    private void ShowLevel(float peak)
+    {
+        var heights = _bars.Next(peak);
+        for (int i = 0; i < heights.Count; i++)
+            ((FrameworkElement)Equalizer.Children[i]).Height = 2 + Math.Round(12 * heights[i]);
+    }
+
+    // Still, the bars take their resting shape again (8, 14, 10).
+    private void StopLevel()
+    {
+        _level?.Stop();
+        _bars = new EqualizerBars();
+        double[] rest = [8, 14, 10];
+        for (int i = 0; i < rest.Length; i++)
+            ((FrameworkElement)Equalizer.Children[i]).Height = rest[i];
+    }
+
+    private static void Fill(TextBlock block, string title, string artist)
+    {
+        block.Inlines.Clear();
+        block.Inlines.Add(new Run(title));
+        if (artist.Length == 0)
+            return;
+        var by = new Run(" · " + artist);
+        by.SetResourceReference(TextElement.ForegroundProperty, "IslandTextTertiaryBrush");
+        block.Inlines.Add(by);
+    }
+
+    // The song fades over its last 8, and its first 8 while scrolling (a held line starts at the edge).
+    // In the window's own DIPs: relative units would follow the whole strip, which runs far past it.
+    private static LinearGradientBrush Fade(double width, bool start)
+    {
+        double f = 8 / width;
+        var fade = new LinearGradientBrush { MappingMode = BrushMappingMode.Absolute, StartPoint = new Point(0, 0), EndPoint = new Point(width, 0) };
+        fade.GradientStops.Add(new GradientStop(start ? Colors.Transparent : Colors.Black, 0));
+        fade.GradientStops.Add(new GradientStop(Colors.Black, f));
+        fade.GradientStops.Add(new GradientStop(Colors.Black, 1 - f));
+        fade.GradientStops.Add(new GradientStop(Colors.Transparent, 1));
+        fade.Freeze();
+        return fade;
+    }
 
     /// <summary>
     /// Grows or shrinks the tab to <paramref name="target"/> DIPs over 120ms, easing out, around its
@@ -809,7 +936,7 @@ public partial class IslandWindow : Window
             return;
         double bubble = IslandOverlay.BubbleWindow * area.Scale;
         _bubble.ShowAt(new Rect(pointer.X - bubble / 2, pointer.Y - bubble / 2, bubble, bubble));
-        if (IslandGeometry.Snap(pointer, area.Monitor, area.Work, area.Scale) is { } target)
+        if (IslandGeometry.Snap(pointer, area.Work, area.Scale) is { } target)
             _line.ShowAt(LineRect(target.Edge, IslandGeometry.Anchor(target.Edge, target.Place, area.Monitor, area.Work, area.Scale), area.Scale));
         else
             _line.Hide();
@@ -842,7 +969,7 @@ public partial class IslandWindow : Window
     {
         EndDragVisuals();
         var monitor = IslandNative.MonitorAt(pointer);
-        if (IslandNative.Area(monitor) is not { } area || IslandGeometry.Snap(pointer, area.Monitor, area.Work, area.Scale) is not { } target)
+        if (IslandNative.Area(monitor) is not { } area || IslandGeometry.Snap(pointer, area.Work, area.Scale) is not { } target)
         {
             Return(pointer);
             DropRefused?.Invoke(this, EventArgs.Empty);
@@ -964,6 +1091,7 @@ public partial class IslandWindow : Window
     {
         StopSlide();
         StopSwell();
+        _level?.Stop();
         CloseIsland();
         _panel.Close();
         _bubble.Close();
