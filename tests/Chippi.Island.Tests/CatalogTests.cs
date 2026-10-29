@@ -17,12 +17,12 @@ public sealed class CatalogTests
     }
 
     [Theory]
-    [InlineData("clipboard-history", "ClipboardList", "Overlaps Win+V")]
-    [InlineData("paste-plain-text", "ClipboardType", "Overlaps PowerToys")]
+    [InlineData("clipboard-history", "ClipboardList", null)]
+    [InlineData("paste-plain-text", "ClipboardType", null)]
     [InlineData("clean-url", "Link", null)]
-    [InlineData("scratchpad", "NotebookPen", "Overlaps Notepad")]
+    [InlineData("scratchpad", "NotebookPen", null)]
     [InlineData("shelf", "Inbox", null)]
-    public void Phase_5_features_use_their_approved_glyphs_and_badges(string id, string icon, string? overlap)
+    public void Shipped_features_keep_their_glyphs_without_overlap_badges(string id, string icon, string? overlap)
     {
         // Shipped features have left the catalog; their modules carry the same descriptor.
         Core.Modules.FeatureDescriptor[] shipped =

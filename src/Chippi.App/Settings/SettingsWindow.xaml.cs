@@ -46,6 +46,8 @@ public partial class SettingsWindow : Window
         new("general", "General", LucideIcons.Settings),
         new("island", "Island & pet", LucideIcons.Droplet),
         new("notifications", "Notifications", LucideIcons.Bell),
+        new("shortcuts", "Shortcuts", LucideIcons.Keyboard),
+        new("permissions", "Permissions", LucideIcons.Shield),
         new("features", "Add features", LucideIcons.Plus),
         new("about", "About", LucideIcons.Info),
     ];
@@ -121,7 +123,12 @@ public partial class SettingsWindow : Window
     }
 
     internal FrameworkElement PageContent => PageHost;
-    internal IEnumerable<SettingsPageInfo> NavigationPages => _featurePages.Concat(Pages);
+    private IEnumerable<SettingsPageInfo> ChippiPages => Pages.Where(p =>
+        p.Id != "shortcuts" && p.Id != "permissions"
+        || p.Id == "shortcuts" && _shell.Registry.Features.Any(f => f.IsInstalled && f.Id is "mic-mute" or "paste-plain-text")
+        || p.Id == "permissions" && _shell.Registry.GetPermissions().Any(u => u.UsedBy.Count > 0 || u.IsUnused));
+
+    internal IEnumerable<SettingsPageInfo> NavigationPages => _featurePages.Concat(ChippiPages);
     public string CurrentPage => _currentPage;
 
     private void RefreshFeatures()
@@ -158,7 +165,7 @@ public partial class SettingsWindow : Window
             _featurePages.AddRange(pages);
             AddGroup(group.DisplayName(), pages);
         }
-        AddGroup("Chippi", Pages);
+        AddGroup("Chippi", ChippiPages.ToList());
 
         _selecting = true;
         Nav.ItemsSource = Grouped(rows);
@@ -324,6 +331,8 @@ public partial class SettingsWindow : Window
                     "features" => new AddFeaturesPage(_shell),
                     "island" => new IslandPetPage(_shell),
                     "notifications" => new NotificationsPage(_shell),
+                    "shortcuts" => new ShortcutsPage(_shell),
+                    "permissions" => new PermissionsPage(_shell),
                     "about" => new AboutPage(),
                     "now-playing" => new NowPlayingPage(_shell.Media),
                     _ => new GeneralPage(_shell),

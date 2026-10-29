@@ -18,6 +18,7 @@ internal sealed class GeneralPage : UserControl
 {
     private readonly ShellContext _shell;
     private TextBlock _transferMessage = null!;
+    private readonly StackPanel _importConfirm = new();
 
     public GeneralPage(ShellContext shell)
     {
@@ -46,6 +47,7 @@ internal sealed class GeneralPage : UserControl
 
         page.Children.Add(SettingsUi.Section("Settings file"));
         page.Children.Add(SettingsUi.Group(TransferRow()));
+        page.Children.Add(_importConfirm);
         Content = page;
     }
 
@@ -113,7 +115,7 @@ internal sealed class GeneralPage : UserControl
         var export = SettingsUi.Button("Export…");
         var import = SettingsUi.Button("Import…");
         export.Click += (_, _) => Export(message);
-        import.Click += async (_, _) => await ImportAsync(message);
+        import.Click += (_, _) => ChooseImport();
         var buttons = new StackPanel { Orientation = Orientation.Horizontal };
         buttons.Children.Add(export);
         buttons.Children.Add(import);
@@ -139,11 +141,11 @@ internal sealed class GeneralPage : UserControl
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             Log.Warn("Settings export failed", ex);
-            SettingsUi.Show(message, $"Couldn't export · {ex.Message}", problem: true);
+            SettingsUi.Show(message, ex is UnauthorizedAccessException ? "Couldn't export · Access denied" : "Couldn't export · File unavailable", problem: true);
         }
     }
 
-    private async Task ImportAsync(TextBlock message)
+    private void ChooseImport()
     {
         var dialog = new OpenFileDialog
         {
@@ -152,19 +154,43 @@ internal sealed class GeneralPage : UserControl
         };
         if (dialog.ShowDialog(Window.GetWindow(this)) != true)
             return;
+        ConfirmImport(dialog.FileName);
+    }
+
+    internal void ConfirmImport(string path)
+    {
+        _importConfirm.Children.Clear();
+        var replace = SettingsUi.Button("Replace", primary: true);
+        var cancel = SettingsUi.Button("Cancel");
+        cancel.Click += (_, _) => _importConfirm.Children.Clear();
+        replace.Click += async (_, _) =>
+        {
+            replace.IsEnabled = cancel.IsEnabled = false;
+            try { await ImportAsync(path); }
+            finally { _importConfirm.Children.Clear(); }
+        };
+        var buttons = new StackPanel { Orientation = Orientation.Horizontal, Children = { replace, cancel } };
+        _importConfirm.Margin = new Thickness(0, 8, 0, 0);
+        _importConfirm.Children.Add(SettingsLayout.Card(SettingsLayout.Row($"Replace every setting with {Path.GetFileName(path)}?", buttons)));
+    }
+
+    private async Task ImportAsync(string path)
+    {
+        var message = _transferMessage;
         try
         {
-            _shell.Config.Import(dialog.FileName);
+            _shell.Config.Import(path);
         }
         catch (InvalidDataException ex)
         {
-            SettingsUi.Show(message, $"Not imported · {ex.Message}", problem: true);
+            Log.Warn("Settings import rejected", ex);
+            SettingsUi.Show(message, "Not imported · Invalid settings file", problem: true);
             return;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             Log.Warn("Settings import failed", ex);
-            SettingsUi.Show(message, $"Not imported · {ex.Message}", problem: true);
+            SettingsUi.Show(message, ex is UnauthorizedAccessException ? "Not imported · Access denied" : "Not imported · File unavailable", problem: true);
             return;
         }
 
@@ -175,6 +201,6 @@ internal sealed class GeneralPage : UserControl
         await _shell.Registry.ReloadAsync();
         Build(); // the rows show the imported values
         (Window.GetWindow(this) as SettingsWindow)?.RefreshImportedSettings();
-        SettingsUi.Show(_transferMessage, $"Imported from {dialog.FileName}", problem: false);
+        SettingsUi.Show(_transferMessage, $"Imported from {path}", problem: false);
     }
 }

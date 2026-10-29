@@ -13,11 +13,22 @@ namespace Chippi.App.Settings.Pages;
 
 internal sealed class ShortcutsPage : UserControl
 {
-    public ShortcutsPage()
+    public ShortcutsPage(Chippi.App.Shell.ShellContext shell)
     {
         var page = new StackPanel();
         page.Children.Add(SettingsUi.Header("Shortcuts", ""));
-        page.Children.Add(EmptyState.Create(LucideIcons.Keyboard, "No shortcuts yet", ""));
+        void Build()
+        {
+            while (page.Children.Count > 1) page.Children.RemoveAt(1);
+            foreach (var entry in shell.Registry.Features.Where(f => f.IsRunning && f.Id is "mic-mute" or "paste-plain-text"))
+                if (entry.SettingsPage?.CreateView("shortcut-list") is FrameworkElement view)
+                    page.Children.Add(view);
+            if (page.Children.Count == 1) page.Children.Add(SettingsLayout.Card(SettingsLayout.Empty("No shortcuts")));
+        }
+        void Changed(object? sender, EventArgs e) => Dispatcher.BeginInvoke(Build);
+        Loaded += (_, _) => { shell.Registry.Changed += Changed; Build(); };
+        Unloaded += (_, _) => shell.Registry.Changed -= Changed;
+        Build();
         Content = page;
     }
 }
@@ -51,7 +62,7 @@ internal sealed class AboutPage : UserControl
             SettingsLayout.Row("License", license, AppInfo.License),
             SettingsLayout.Row("Privacy", new FrameworkElement(), "No telemetry"),
             SettingsLayout.Row("Third-party notices", notices),
-            SettingsLayout.Row("VB-CABLE", donate, "Donationware from www.vb-cable.com")));
+            SettingsLayout.Row("VB-CABLE", donate, "Donationware from vb-audio.com")));
         Content = _page;
     }
 

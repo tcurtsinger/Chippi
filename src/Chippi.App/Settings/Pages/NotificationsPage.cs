@@ -34,7 +34,7 @@ internal sealed class NotificationsPage : UserControl
         var app = SettingsUi.ReadApp(shell.Config);
 
         var page = new StackPanel();
-        page.Children.Add(SettingsUi.Styled(new TextBlock { Text = "Notifications", Margin = new Thickness(0, 0, 0, 18) }, "PageTitleStyle"));
+        page.Children.Add(SettingsUi.Header("Notifications", ""));
 
         var windows = Destination("Windows notifications", app.WindowsNotices, on =>
         {
@@ -100,7 +100,7 @@ internal sealed class NotificationsPage : UserControl
     {
         var notifier = feature.Notifier!;
         var header = Columns();
-        header.Margin = new Thickness(15, 22, 15, 8);
+        header.Margin = new Thickness(0, 24, 0, 8);
         var eyebrow = SettingsUi.Section(feature.Descriptor.Name);
         eyebrow.Margin = new Thickness(0);
         eyebrow.VerticalAlignment = VerticalAlignment.Center;

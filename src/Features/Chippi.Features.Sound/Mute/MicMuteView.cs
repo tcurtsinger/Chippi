@@ -20,6 +20,8 @@ public enum MicMuteSurface
     Microphone,
     /// <summary>The Mute shortcut section of Settings › Microphone.</summary>
     Shortcut,
+    /// <summary>The app-wide Shortcuts list.</summary>
+    ShortcutList,
 }
 
 public sealed class MicMuteView : UserControl
@@ -61,6 +63,12 @@ public sealed class MicMuteView : UserControl
         {
             _body.Children.Add(SettingsLayout.Card(MicrophoneRow(muted)));
             if (_module.Error is { } failed) Error(failed);
+            return;
+        }
+        if (_surface == MicMuteSurface.ShortcutList)
+        {
+            _body.Children.Add(SettingsLayout.Card(SettingsLayout.Row(_module.Descriptor.Name, ShortcutControls())));
+            if (_module.ShortcutError is { } error) Error(error);
             return;
         }
         _body.Children.Add(SettingsLayout.Card(

@@ -27,7 +27,6 @@ public sealed class AppVolumeModule(AudioService? audio = null) : IFeatureModule
     {
         Icon = "Sliders",
         Presets = PresetMembership.Essentials | PresetMembership.Audio | PresetMembership.PowerUser,
-        Badges = [FeatureBadge.Overlap("Overlaps Volume mixer")],
     };
     public AppVolumeSettings Settings { get; private set; } = new();
     public AudioSnapshot Snapshot => _audio?.Snapshot ?? AudioSnapshot.Empty;

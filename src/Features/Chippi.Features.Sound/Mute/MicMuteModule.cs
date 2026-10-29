@@ -40,7 +40,6 @@ public sealed class MicMuteModule : IFeatureModule
     public FeatureDescriptor Descriptor { get; } = new(Id, "Mic mute shortcut", "Hotkey for all microphones", FeatureGroup.Sound)
     {
         Icon = "MicOff", Requires = [Capability.InputHooks], Presets = PresetMembership.Audio | PresetMembership.PowerUser,
-        Badges = [FeatureBadge.Overlap("Overlaps Win+Alt+K")],
     };
 
     public MicMuteSettings Settings { get; private set; } = new();
@@ -73,7 +72,7 @@ public sealed class MicMuteModule : IFeatureModule
             ShortcutError = Settings.Shortcut is null || _hotkey.Register(Settings.Shortcut, OnHotkey) ? null : "Shortcut in use";
             _tile = context.Ui.AddIslandTile(SoundTile.Section(10, SoundTile.Microphone, () => new MicMuteView(this, MicMuteSurface.Island)) with { StatusPriority = 100 });
             // Settings › Microphone: "mute" is the Microphone row at the top, the rest the Mute shortcut section.
-            context.Ui.SetSettingsPage(section => new MicMuteView(this, section == "mute" ? MicMuteSurface.Microphone : MicMuteSurface.Shortcut));
+            context.Ui.SetSettingsPage(section => new MicMuteView(this, section == "mute" ? MicMuteSurface.Microphone : section == "shortcut-list" ? MicMuteSurface.ShortcutList : MicMuteSurface.Shortcut));
             _audio.SnapshotChanged += OnSnapshot;
             UpdateState();
         }

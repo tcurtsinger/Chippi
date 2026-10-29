@@ -51,7 +51,7 @@ public sealed class SettingsShellTests
         [
             "module:downloads-organizer", "now-playing", "module:app-volume", "module:keep-awake", "module:system-monitor",
             "module:clipboard-history", "module:clean-url", "module:paste-plain-text", "module:scratchpad",
-            "general", "island", "notifications", "features", "about",
+            "general", "island", "notifications", "shortcuts", "features", "about",
         ];
         Assert.Equal(expected, window.Nav.Items.OfType<NavItem>().Select(i => i.Id));
         Assert.Equal(["Files", "Sound", "System", "Clipboard & text", "Chippi"],
@@ -68,13 +68,13 @@ public sealed class SettingsShellTests
     });
 
     [Fact]
-    public void At_1120_x_720_s1_s_seven_features_and_Now_Playing_fit_without_scrolling() => WpfTestThread.Run(() =>
+    public void The_new_Shortcuts_page_adds_a_row_without_compressing_sidebar_rows() => WpfTestThread.Run(() =>
     {
-        // s1's seven have no Scratchpad page; with it (Seven) the list scrolls 12, as the mockup's fuller sidebars do.
+        // F2 adds Shortcuts for Paste as plain text; the fixed 32/36 rows now need scrolling.
         using var scene = new SettingsScene(Seven.Where(f => f.Id != "scratchpad").ToArray());
         var window = scene.Show("general");
-        Assert.Equal(13, window.Nav.Items.Count);
-        Assert.Equal(0, Scroller(window.Nav).ScrollableHeight);
+        Assert.Equal(14, window.Nav.Items.Count);
+        Assert.True(Scroller(window.Nav).ScrollableHeight > 0);
     });
 
     [Fact]

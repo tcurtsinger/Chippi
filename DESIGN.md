@@ -299,7 +299,7 @@ Reference: the offline Sound mockup at `X:\code\chippi-scratch\phase-3-prep\mock
 - **Keep awake (revised 2026-10-28):** a Keep awake row with the state caption and Stop while on, then Length with the six island choices (30 min, 1 hr, 2 hr, 4 hr, No limit, Until...), with the active choice lit. Until opens the time picker. Keep screen on follows. There is no session switch, Default length or After a restart row.
 - **System monitor Settings (revised 2026-10-28):** the live readings first, including every thermal zone, then Disks with every drive, General (Update speed, Tile status), Readings, Units and Alerts. Alert switches and current thresholds sit in expandable headers; their tuning folds inside at the shared 50px inset. Repeat interval uses hour-style values.
 
-- **Add features** (replaces the Features hub): a search field with the "2 on" count beside it. **Available** lists the features that work, each a row with a 32px icon chip (accent glyph when on, muted when off), name, one-line description and a switch; Overlap badges sit after the name. One collapsed **Coming later** row ("39 features") expands into one row per group listing the names. Presets are hidden until enough features exist for them to matter. Toggling a feature installs or uninstalls it, and an installed feature appears in the sidebar at once.
+- **Add features** (replaces the Features hub): a search field with the "2 on" count beside it. **Available** lists the features that work, each a row with a 32px icon chip (accent glyph when on, muted when off), name, one-line description and a switch. One collapsed **Coming later** row ("39 features") expands into one row per group listing the names. Presets are hidden until enough features exist for them to matter. Toggling a feature installs or uninstalls it, and an installed feature appears in the sidebar at once.
 - **General:** Theme (Dark · Light · Follow Windows segment, default Follow Windows), Accent color (a "Windows" pill and four 24px swatches; the caption reads "Follow Windows" or the color's name), Run at startup (switch). A Settings file section with one row, "Location", captioned with the path, and Export… and Import… on the right.
 - **Island & pet:** Island (switch), Position (Top · Left edge · Right edge combo plus a Reset button; dragging the island also sets it), Display (combo). A Gumdrop section: a Color row with a 48px Gumdrop preview, the color's name as caption and six swatches; Reduce motion (combo: Follow Windows · On · Off).
 - **Notifications:** see below.
@@ -411,7 +411,7 @@ Every interactive control is custom-templated with the full state set: rest, hov
   - Normal range 0 to 100%. With validated Volume boost, app range 0 to 200% in 5-point steps, with a 1px `.45` white line at 100% (halfway, inset 8px). Above 100%, fill and percentage are Caution; System remains 0 to 100%. The gate failing disables the above-100 range, not ordinary volume/mute.
   - Pointer drag changes volume; keyboard arrows adjust a step, Home/End select bounds. Accessible name identifies app/output, and RangeValue exposes the actual percentage. Focus is a 2px white outline with 2px gap on the island. Mute is a separate named button and does not discard the stored level.
 - **Badges:** 18px, 6px side padding, 4px radius, 11 / 600.
-  - **Overlap:** caution text on caution tint, for example "Overlaps PowerToys", for features Windows or PowerToys already cover.
+  - **Caution:** caution text on caution tint, for example "Unsaved changes" in the rule editor. Feature rows omit overlap badges.
   - **Neutral:** Secondary text on control fill, for example "Other drive" or "Needs VB-CABLE".
 - **Status dot:** 7px. Success for active, caution for attention, Muted for offline. No glow.
 - **Drag handle:** a 16px six-dot grip in Muted. Alt+Up/Down moves the row.
@@ -470,7 +470,7 @@ In the island and flyout header, the pet is decorative (`AutomationProperties.Ac
 - **Do** check every screen in dark and light, and with at least one non-blue accent.
 - **Do** give every custom control a visible focus ring and an accessible name.
 - **Do** keep status visible at rest: folder mode, held files and Keep awake time show without hovering.
-- **Do** flag overlaps with Windows or PowerToys with an Overlap badge rather than hiding the feature.
+- Feature rows do not show overlap badges.
 - **Do** list only features that work. Coming soon stays folded away.
 
 ### Don't
