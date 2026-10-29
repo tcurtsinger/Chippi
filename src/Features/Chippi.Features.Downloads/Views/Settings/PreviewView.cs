@@ -110,8 +110,6 @@ internal sealed class PreviewView : UserControl
         var card = NewCard();
         _checks.Clear();
         _all.Visibility = Visibility.Visible;
-        if (preview.Items.Count == 0)
-            card.Children.Add(Ui.Pad(Ui.Text("Nothing to organize", "BodyTextStyle", "TextTertiaryBrush")));
         foreach (var item in preview.Items.Where(i => i.Kind != OperationKind.NoMatch))
         {
             bool actionable = item.Kind is OperationKind.Move or OperationKind.Rename && item.Destination is not null;
