@@ -39,6 +39,7 @@ public sealed class MicMuteView : UserControl
         {
             _body.Children.Add(MicCard(muted));
             if (_module.Error is { } failed) Error(failed);
+            SoundColumn.SetWarning(this, _module.Error is not null);
             return;
         }
         // The Mute shortcut section of Settings › Microphone: the keys, and the sound it plays. Muting

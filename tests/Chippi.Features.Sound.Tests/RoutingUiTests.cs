@@ -114,6 +114,27 @@ public sealed class RoutingUiTests
     }
 
     [Fact]
+    public async Task A_warning_line_in_the_microphone_column_leaves_out_the_fifth_row()
+    {
+        await using var f = new RoutingFixture();
+        f.System.With([.. Enumerable.Range(1, 7).Select(i => Mic($"M{i}"))]).WithDefault("M1");
+        await f.Start();
+        await Sta(() =>
+        {
+            var mics = new RoutingQuickView(f.Module, AudioFlow.Capture);
+            var processing = new System.Windows.Controls.Border(); // stands in for the Mic processing card below the rows
+            _ = new System.Windows.Controls.StackPanel { Children = { mics, processing } };
+            int Rows() => Descendants(mics).OfType<System.Windows.Controls.Button>().Count();
+
+            Assert.Equal(5, Rows());
+            SoundColumn.SetWarning(processing, true); // its warning line shows under the card
+            Assert.Equal(4, Rows());
+            SoundColumn.SetWarning(processing, false);
+            Assert.Equal(5, Rows());
+        });
+    }
+
+    [Fact]
     public async Task No_output_hides_the_slider_and_disables_mute()
     {
         await using var f = new RoutingFixture();

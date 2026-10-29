@@ -296,6 +296,7 @@ public sealed class ProcessingQuickView : UserControl
             _switch.IsChecked = _module.Settings.Enabled;
             _warning.Text = _module.Error ?? (_module.Status.State == ProcessingState.Stopped ? _module.StatusText : "");
             _warning.Visibility = _warning.Text.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
+            SoundColumn.SetWarning(this, _warning.Text.Length > 0);
             _meter.Visibility = _module.Status.State == ProcessingState.Live ? Visibility.Visible : Visibility.Collapsed;
         }
         finally { _refreshing = false; }

@@ -65,7 +65,7 @@ public sealed class RoutingQuickView : UserControl
     /// <summary>One 44 row, like the mic card: the speaker, the system volume of the output in use, and Mute.</summary>
     private Border OutputCard()
     {
-        _volume.SetResourceReference(StyleProperty, "HopperSliderStyle");
+        _volume.SetResourceReference(StyleProperty, "IslandSliderStyle");
         AutomationProperties.SetName(_volume, "System volume");
         _volume.ValueChanged += (_, e) =>
         {
@@ -95,6 +95,9 @@ public sealed class RoutingQuickView : UserControl
         _percent.SetResourceReference(TextBlock.ForegroundProperty, muted ? "WarningTextBrush" : "IslandTextTertiaryBrush");
     }
 
+    /// <summary>A warning line in the column came or went.</summary>
+    internal void Refit() => Refresh();
+
     private void Refresh()
     {
         if (!Dispatcher.CheckAccess()) { Dispatcher.BeginInvoke(Refresh); return; }
@@ -105,8 +108,8 @@ public sealed class RoutingQuickView : UserControl
             var connected = _module.Settings.For(_flow).Devices.Where(e => _module.Snapshot.Find(e.Id)?.IsActive == true).ToList();
             _error.Text = _module.Error ?? "";
             _error.Visibility = _error.Text.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
-            // Whole rows only: an error line takes one row's place.
-            int fit = (_flow == AudioFlow.Render ? OutputRows : MicrophoneRows) - (_error.Text.Length == 0 ? 0 : 1);
+            // Whole rows only: each warning line in the column, this one's or a card's below, takes one row's place.
+            int fit = (_flow == AudioFlow.Render ? OutputRows : MicrophoneRows) - (_error.Text.Length == 0 ? 0 : 1) - SoundColumn.WarningsBeside(this);
             var shown = connected.Take(fit).ToList();
             var shape = string.Join("|", shown.Select(e => e.Id + e.Name)) + ":" + inUse;
             if (shape != _shape)
