@@ -25,6 +25,8 @@ internal sealed class NotificationsPage : UserControl
 
     private readonly ShellContext _shell;
     private readonly StackPanel _groups = new();
+    private readonly Dictionary<string, IReadOnlySet<string>?> _available = [];
+    private int _openVersion;
     private readonly List<FrameworkElement> _windowsColumn = [];
     private readonly List<FrameworkElement> _islandColumn = [];
 
@@ -61,12 +63,23 @@ internal sealed class NotificationsPage : UserControl
 
         // Features installed or removed while the page is open change the groups. Settings keeps this
         // page, so it also rebuilds each time it shows: features installed elsewhere meanwhile appear.
-        Loaded += (_, _) =>
+        Loaded += async (_, _) =>
         {
             shell.Registry.Changed += OnRegistryChanged;
+            int version = ++_openVersion;
+            _available.Clear();
+            Rebuild();
+            foreach (var feature in shell.Registry.Features.Where(f => f.Notifier is { Kinds.Count: > 0 }).ToList())
+            {
+                IReadOnlySet<string>? available = null;
+                try { available = await Task.Run(() => feature.AvailableNoticeKinds); }
+                catch (Exception error) { Core.Diagnostics.Log.Warn($"Notice availability check failed for {feature.Id}", error); }
+                if (version != _openVersion) return;
+                _available[feature.Id] = available;
+            }
             Rebuild();
         };
-        Unloaded += (_, _) => shell.Registry.Changed -= OnRegistryChanged;
+        Unloaded += (_, _) => { ++_openVersion; shell.Registry.Changed -= OnRegistryChanged; };
     }
 
     private void OnRegistryChanged(object? sender, EventArgs e) => Dispatcher.BeginInvoke(Rebuild);
@@ -109,7 +122,7 @@ internal sealed class NotificationsPage : UserControl
         header.Children.Add(Column(ColumnHeader("Island"), 2, _islandColumn));
 
         var rows = new Card();
-        var kinds = notifier.Kinds;
+        var kinds = notifier.Kinds.Where(k => !_available.TryGetValue(feature.Id, out var supported) || supported is null || supported.Contains(k.Id)).ToList();
         for (int i = 0; i < kinds.Count; i++)
         {
             var kind = kinds[i];

@@ -140,7 +140,9 @@ public sealed class MicMuteView : UserControl
         _module.CaptureShortcut(true);
         Focusable = true;
         _body.Children.Clear();
-        _body.Children.Add(SettingsLayout.Card(SettingsLayout.Row("New shortcut", RoutingUi.Button("Cancel", CancelCapture))));
+        var card = SettingsLayout.Card(SettingsLayout.Row("New shortcut", RoutingUi.Button("Cancel", CancelCapture)));
+        if (_surface == MicMuteSurface.ShortcutList) card.SetResourceReference(StyleProperty, "CardRowsStyle");
+        _body.Children.Add(card);
         Focus();
     }
 

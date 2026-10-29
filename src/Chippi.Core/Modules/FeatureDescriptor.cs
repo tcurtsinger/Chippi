@@ -42,7 +42,6 @@ public sealed record FeatureBadge(BadgeKind Kind, string Text)
 {
     public static FeatureBadge Source(string text) => new(BadgeKind.Source, text);
 
-
     public static FeatureBadge Needs(string text) => new(BadgeKind.Needs, text);
 }
 

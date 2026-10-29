@@ -51,6 +51,60 @@ public sealed class NotificationsPageTests
         }
     }
 
+    [Fact]
+    public void Hardware_filter_is_checked_on_open_and_keeps_saved_places() => WpfTestThread.Run(() =>
+    {
+        string root = Path.Combine(Path.GetTempPath(), "chippi-notice-filter-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var shell = new ShellContext(new ConfigStore(Path.Combine(root, "settings.json")), NullLoggerFactory.Instance, false, "notice-filter-test");
+        var module = new HardwareNotices();
+        try
+        {
+            shell.Registry.Register(module);
+            shell.Registry.SetInstalledAsync("hardware-test", true).GetAwaiter().GetResult();
+            var notifier = shell.Registry.Find("hardware-test")!.Notifier!;
+            notifier.SetPlaces("low-battery", NoticePlaces.Windows);
+            var page = new NotificationsPage(shell);
+            page.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));
+            PumpUntil(() => !Texts(page).Contains("Low battery"));
+            Assert.Equal(1, module.Reads);
+            Assert.Contains("Ping", Texts(page));
+            Assert.Equal(NoticePlaces.Windows, notifier.PlacesFor("low-battery"));
+            page.RaiseEvent(new RoutedEventArgs(FrameworkElement.UnloadedEvent));
+            module.Present = true;
+            page.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));
+            PumpUntil(() => module.Reads == 2 && Texts(page).Contains("Low battery"));
+            Assert.Equal(NoticePlaces.Windows, notifier.PlacesFor("low-battery"));
+            page.RaiseEvent(new RoutedEventArgs(FrameworkElement.UnloadedEvent));
+        }
+        finally { shell.Registry.StopAllAsync().GetAwaiter().GetResult(); shell.Clipboard.Dispose(); Directory.Delete(root, true); }
+    });
+
+    private static void PumpUntil(Func<bool> ready)
+    {
+        var until = DateTime.UtcNow.AddSeconds(5);
+        while (!ready() && DateTime.UtcNow < until)
+        {
+            System.Windows.Threading.Dispatcher.CurrentDispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.Background);
+            Thread.Sleep(5);
+        }
+        Assert.True(ready());
+    }
+
+    private sealed class HardwareNotices : IFeatureModule
+    {
+        public int Reads;
+        public bool Present;
+        public FeatureDescriptor Descriptor { get; } = new("hardware-test", "Hardware", "Test", FeatureGroup.System);
+        public IReadOnlySet<string>? AvailableNoticeKinds { get { Interlocked.Increment(ref Reads); return Present ? new HashSet<string> { "ping", "low-battery" } : new HashSet<string> { "ping" }; } }
+        public Task StartAsync(ModuleContext context, CancellationToken ct)
+        {
+            context.Notifier.Declare([new("ping", "Ping", NoticePlaces.Island), new("low-battery", "Low battery", NoticePlaces.Island)]);
+            return Task.CompletedTask;
+        }
+        public Task StopAsync(CancellationToken ct) => Task.CompletedTask;
+    }
+
     private static IEnumerable<string> Texts(DependencyObject root)
     {
         if (root is TextBlock text)
