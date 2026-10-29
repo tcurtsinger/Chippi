@@ -112,11 +112,13 @@ public sealed class SettingsShellTests
     {
         using var scene = new SettingsScene([]);
         var area = SystemParameters.WorkArea;
+        // Centered, but never above or left of the work area (CI's display is smaller than the window).
+        double Center(double start, double span, double size) => start + Math.Max(0, (span - size) / 2);
 
         var first = new SettingsWindow(scene.Shell, "general");
         Assert.Equal((1120, 720), (first.Width, first.Height));
-        Assert.Equal(area.Left + (area.Width - 1120) / 2, first.Left, 0.5);
-        Assert.Equal(area.Top + (area.Height - 720) / 2, first.Top, 0.5);
+        Assert.Equal(Center(area.Left, area.Width, 1120), first.Left, 0.5);
+        Assert.Equal(Center(area.Top, area.Height, 720), first.Top, 0.5);
         first.Close();
 
         SettingsUi.SaveApp(scene.Shell.Config, s => s.SettingsWindow = new WindowPlacement { Left = area.Left + 20, Top = area.Top + 30, Width = 1000, Height = 600 });
@@ -138,7 +140,7 @@ public sealed class SettingsShellTests
         Assert.Equal((-20000d, 900d, 600d, false), (placement.Left, placement.Width, placement.Height, placement.Maximized));
         var moved = new SettingsWindow(scene.Shell, "general");
         Assert.Equal((900d, 600d), (moved.Width, moved.Height));
-        Assert.Equal(area.Left + (area.Width - 900) / 2, moved.Left, 0.5);
+        Assert.Equal(Center(area.Left, area.Width, 900), moved.Left, 0.5);
         moved.Close();
     });
 
@@ -146,16 +148,21 @@ public sealed class SettingsShellTests
     public void Page_content_stops_at_1000_aligned_left_and_cards_keep_their_width_when_the_page_scrolls() => WpfTestThread.Run(() =>
     {
         using var scene = new SettingsScene([.. Seven, new("tall", "Tall page", FeatureGroup.Apps, "Info", Tall: true)]);
+        // Windows caps a window at about its display's size, so the widths come from the window it got
+        // (1120 here gives 768; CI's smaller display gives less).
         var window = scene.Show("general");
-        Assert.Equal(1120 - 272 - 80, window.PageHost.ActualWidth);
+        double Expected() => Math.Min(1000, window.Scroller.ActualWidth - 80);
+        Assert.Equal(window.ActualWidth - 272 - 80, window.PageHost.ActualWidth);
+        double shortPage = window.PageHost.ActualWidth;
         window.Navigate("module:tall");
         window.UpdateLayout();
         Assert.True(window.Scroller.ScrollableHeight > 0);
-        Assert.Equal(1120 - 272 - 80, window.PageHost.ActualWidth); // the floating scrollbar takes no width
+        Assert.Equal(shortPage, window.PageHost.ActualWidth); // the floating scrollbar takes no width
 
         window.Width = 1800;
         window.UpdateLayout();
-        Assert.Equal(1000, window.PageHost.ActualWidth);
+        Assert.Equal(1000, window.PageHost.MaxWidth);
+        Assert.Equal(Expected(), window.PageHost.ActualWidth); // 1000 wherever the display lets the window past 1080 + 272
         Assert.Equal(40, window.PageHost.TranslatePoint(default, window.Scroller).X);
     });
 
