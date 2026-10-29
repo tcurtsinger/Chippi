@@ -133,12 +133,18 @@ internal sealed class IslandGrid : UserControl
         return button;
     }
 
-    private static bool Cut(TextBlock block, string text)
+    /// <summary>Whether <paramref name="text"/> is cut off in <paramref name="block"/>: wider than one line, or taller than a wrapping block's MaxHeight.</summary>
+    internal static bool Cut(TextBlock block, string text)
     {
         var full = new FormattedText(text, CultureInfo.CurrentCulture, block.FlowDirection,
             new Typeface(block.FontFamily, block.FontStyle, block.FontWeight, block.FontStretch), block.FontSize, Brushes.White,
             VisualTreeHelper.GetDpi(block).PixelsPerDip);
-        return full.Width > block.ActualWidth + 0.5;
+        if (block.TextWrapping == TextWrapping.NoWrap)
+            return full.Width > block.ActualWidth + 0.5;
+        full.MaxTextWidth = block.ActualWidth;
+        if (!double.IsNaN(block.LineHeight))
+            full.LineHeight = block.LineHeight;
+        return full.Height > block.MaxHeight + 0.5;
     }
 
     // Arrows move through whatever columns are showing; Enter opens the focused tile. Tab still leaves the grid.

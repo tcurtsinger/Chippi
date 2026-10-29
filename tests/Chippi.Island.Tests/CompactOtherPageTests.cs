@@ -1,6 +1,7 @@
 ﻿// SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using Chippi.App.Island.Media;
@@ -14,16 +15,50 @@ namespace Chippi.Island.Tests;
 public sealed class CompactOtherPageTests
 {
     [Fact]
-    public void Now_playing_uses_full_body_art_and_an_empty_track_disables_transport() => WpfTestThread.Run(() =>
+    public void Now_playing_is_a_168_art_card_and_nothing_playing_is_gumdrop_asleep() => WpfTestThread.Run(() =>
     {
-        var view = new NowPlayingView(new IslandPanelTests.FakeMedia());
-        Fit(view, 496, 336);
-        var art = Find<Border>(view).Single(b => b.Width == 304);
-        Assert.Equal(304, art.ActualHeight);
-        Assert.All(Find<Button>(view).Where(b => b.Content is Chippi.UI.Controls.LucideIcon), b => Assert.False(b.IsEnabled));
-        Assert.Empty(Find<ScrollViewer>(view));
-        Assert.True(view.DesiredSize.Width <= 496);
-        Assert.True(view.DesiredSize.Height <= 336);
+        var playing = new NowPlayingView(new IslandPanelTests.FakeMedia { Sessions = [new("spotify", "Spotify", "Weekend Mix", "Various Artists", true, false, true, true, true, true,
+            TimeSpan.FromSeconds(72), TimeSpan.FromSeconds(232), DateTimeOffset.Now, null)] });
+        Fit(playing, 496, 336);
+        var art = Find<Border>(playing).Single(b => b.Width == 168);
+        Assert.Equal(168, art.ActualHeight);
+        Assert.IsType<Chippi.App.Pet.Gumdrop>(art.Child); // no artwork: Gumdrop in its place
+        var transport = Find<Button>(playing).Where(b => b.Content is Chippi.UI.Controls.LucideIcon).ToArray();
+        Assert.Equal([false, true, true], transport.Select(b => b.IsEnabled)); // the app offers no previous
+        Assert.Equal(52, transport[1].ActualHeight);
+        Assert.Empty(Find<ScrollViewer>(playing));
+        Assert.True(playing.DesiredSize.Width <= 496);
+        Assert.True(playing.DesiredSize.Height <= 336);
+
+        var nothing = new NowPlayingView(new IslandPanelTests.FakeMedia());
+        Fit(nothing, 496, 336);
+        // Off screen IsVisible is always false: shown means nothing up the tree is hidden or collapsed.
+        static bool Shown(DependencyObject? at)
+        {
+            for (; at is not null; at = LogicalTreeHelper.GetParent(at))
+                if (at is UIElement { Visibility: not Visibility.Visible })
+                    return false;
+            return true;
+        }
+        var asleep = Find<Chippi.App.Pet.Gumdrop>(nothing).Single(Shown);
+        Assert.Equal(Chippi.App.Pet.PetMood.Sleepy, asleep.Mood);
+        Assert.Contains(Find<TextBlock>(nothing), t => t.Text == "Nothing playing" && Shown(t));
+        Assert.DoesNotContain(Find<Button>(nothing), Shown); // no dead controls
+    });
+
+    [Fact]
+    public void The_source_opens_a_choice_only_when_two_apps_have_sessions() => WpfTestThread.Run(() =>
+    {
+        static MediaTrack Track(string id) => new(id, id, "Title", "Artist", true, true, true, true, true, true, TimeSpan.Zero, TimeSpan.FromMinutes(3), DateTimeOffset.Now, null);
+        foreach (var (sessions, choice) in new[] { (new[] { Track("spotify") }, false), ([Track("spotify"), Track("firefox")], true) })
+        {
+            var view = new NowPlayingView(new IslandPanelTests.FakeMedia { Sessions = sessions });
+            Fit(view, 496, 336);
+            var source = Find<Button>(view).Single(b => AutomationProperties.GetName(b) == "Media source");
+            Assert.Equal(Visibility.Visible, source.Visibility);
+            Assert.Equal(choice, source.IsHitTestVisible);
+            Assert.Equal(choice, source.Focusable);
+        }
     });
 
     [Fact]

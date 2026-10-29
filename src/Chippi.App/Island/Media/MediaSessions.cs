@@ -135,6 +135,15 @@ public sealed class SystemMediaSessions : IMediaSessions
         }
     }
 
+    /// <summary>
+    /// A pick lasts until another app starts playing or the picked app goes; then Now Playing follows
+    /// Windows' current session again, so play/pause never stays on an app the user moved away from.
+    /// </summary>
+    internal static string? KeepPick(string? picked, IReadOnlyList<MediaTrack> before, IReadOnlyList<MediaTrack> now) =>
+        picked is not null && now.Any(t => t.Id == picked)
+            && !now.Any(t => t.Playing && t.Id != picked && before.FirstOrDefault(b => b.Id == t.Id) is not { Playing: true })
+            ? picked : null;
+
     private GlobalSystemMediaTransportControlsSession? Session(string? id) =>
         id is null ? null : _manager?.GetSessions().FirstOrDefault(s => s.SourceAppUserModelId == id);
 
@@ -181,6 +190,7 @@ public sealed class SystemMediaSessions : IMediaSessions
                 return;
             foreach (var gone in _art.Keys.Where(id => tracks.All(t => t.Id != id)).ToList())
                 _art.Remove(gone);
+            _selected = KeepPick(_selected, _sessions, tracks);
             _sessions = tracks;
             Changed?.Invoke(this, EventArgs.Empty);
         }
@@ -230,7 +240,7 @@ public sealed class SystemMediaSessions : IMediaSessions
                 var bitmap = new BitmapImage();
                 bitmap.BeginInit();
                 bitmap.CacheOption = BitmapCacheOption.OnLoad;
-                bitmap.DecodePixelWidth = 224;
+                bitmap.DecodePixelWidth = 336; // the 168 cover, sharp up to 200% scaling
                 bitmap.StreamSource = source;
                 bitmap.EndInit();
                 bitmap.Freeze();
