@@ -257,7 +257,7 @@ public sealed class ScratchpadPage : Grid, IDisposable
         long selected = doc.SelectedId;
         delete.Click += async (_, _) => { popup.IsOpen = false; await Run(_session.ChangeAsync(d => d.SelectedId == selected ? d.DeleteSelected() : d)); _shownId = 0; Paint(); };
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Children = { cancel, delete } };
-        var stack = new StackPanel { Children = { new TextBlock { Text = $"Delete \u201c{doc.Selected.Name}\u201d?", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 12) }, buttons } };
+        var stack = new StackPanel { Children = { new TextBlock { Text = $"Delete \"{doc.Selected.Name}\"?", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 12) }, buttons } };
         var border = new Border { Padding = new Thickness(16), CornerRadius = new CornerRadius(8), Width = 260, Child = stack };
         border.SetResourceReference(Border.BackgroundProperty, "FlyoutBrush"); popup.Child = border;
         popup.Opened += (_, _) => cancel.Focus(); popup.IsOpen = true;

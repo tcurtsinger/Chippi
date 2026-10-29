@@ -158,7 +158,7 @@ public partial class TidyView : UserControl
         try
         {
             var result = await engine.UndoAsync(operation);
-            if (!result.Succeeded) ShowError(result.Error ?? "Couldn't undo");
+            if (!result.Succeeded) ShowError(result.Error ?? "Undo failed");
         }
         catch (Exception ex) { ShowError(ex.Message); }
         finally

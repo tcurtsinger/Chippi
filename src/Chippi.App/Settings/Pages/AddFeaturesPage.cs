@@ -104,7 +104,7 @@ internal sealed class AddFeaturesPage : UserControl
         catch (Exception ex)
         {
             Log.Error($"Changing {entry.Id} install state failed", ex);
-            SettingsUi.Show(_message, $"Couldn't change {entry.Descriptor.Name}", problem: true);
+            SettingsUi.Show(_message, $"{entry.Descriptor.Name} failed", problem: true);
         }
         finally
         {
@@ -254,7 +254,7 @@ internal sealed class AddFeaturesPage : UserControl
             catch (Exception ex)
             {
                 Log.Error($"{text} for {entry.Id} failed", ex);
-                SettingsUi.Show(_message, ex is InvalidOperationException or Chippi.Features.Sound.Processing.DriverPackageException ? ex.Message : $"Couldn't run {text}", problem: true);
+                SettingsUi.Show(_message, ex is InvalidOperationException or Chippi.Features.Sound.Processing.DriverPackageException ? ex.Message : $"{text} failed", problem: true);
             }
             finally
             {

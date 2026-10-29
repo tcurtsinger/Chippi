@@ -80,7 +80,7 @@ public sealed class ScratchpadModuleTests
             Assert.Equal(2, Descendants(settings).OfType<Chippi.UI.Controls.SegmentedControl>().First().Items.Count);
             var popup = settings.ConfirmDelete();
             Assert.False(popup.IsOpen); // never a popup window on the desktop in tests
-            Assert.Equal("Delete “Note 2”?", Descendants(popup.Child).OfType<System.Windows.Controls.TextBlock>().First().Text);
+            Assert.Equal("Delete \"Note 2\"?", Descendants(popup.Child).OfType<System.Windows.Controls.TextBlock>().First().Text);
         }
         finally { module.StopAsync(default).GetAwaiter().GetResult(); }
 
