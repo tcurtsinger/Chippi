@@ -59,6 +59,9 @@ public sealed class ShellContext
     /// <summary>The shared clipboard service. Disposed at exit, after the modules stop.</summary>
     public ClipboardHub Clipboard { get; }
 
+    /// <summary>Windows' media sessions, set by the island at start; Settings › Now Playing shares them.</summary>
+    public Island.Media.IMediaSessions? Media { get; internal set; }
+
     /// <summary>
     /// Module data folders, activation verbs and notices. P2-D sets <see cref="ModuleServices.Toasts"/>
     /// when the Windows notification backend exists.

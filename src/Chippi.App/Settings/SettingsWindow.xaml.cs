@@ -49,7 +49,7 @@ public partial class SettingsWindow : Window
     [
         new("page:sound-output", "Output", LucideIcons.Speaker, FeatureGroup.Sound, [new("audio-routing", "output", null)]),
         new("page:sound-microphone", "Microphone", LucideIcons.Mic, FeatureGroup.Sound,
-            [new("audio-routing", "microphone", "Mic in use"), new("mic-processing", null, "Mic processing"), new("mic-mute", null, "Mute shortcut")]),
+            [new("mic-mute", "mute", null), new("audio-routing", "microphone", null), new("mic-processing", null, "Mic processing"), new("mic-mute", null, "Mute shortcut")]),
     ];
 
     private readonly ShellContext _shell;
