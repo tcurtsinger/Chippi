@@ -39,7 +39,7 @@ public sealed class IslandPanelShots
                     TimeSpan.FromSeconds(72), TimeSpan.FromSeconds(232), DateTimeOffset.Now, null)],
             };
             var tiles = Tiles(
-                Section("sound", "Sound", 10, 220, width: 640, status: "Mic muted"),
+                Section("sound", "Sound", 10, 220, status: "Mic muted"),
                 Section("sound.mixer", "App volume", 20, 200, IslandOrbit.Right, status: "4 apps"),
                 Section("keep-awake", "Keep awake", 40, 96, IslandOrbit.Left, status: "1 hr left"),
                 Section("downloads", "File organizer", 50, 120, status: "Silent"));
@@ -87,7 +87,7 @@ public sealed class IslandPanelShots
     }
 
     // A stand-in section: a card of the given height (the island draws the page's name above it).
-    private static IslandTileContribution Section(string key, string name, int order, double height, IslandOrbit orbit = IslandOrbit.None, double width = 328, string status = "")
+    private static IslandTileContribution Section(string key, string name, int order, double height, IslandOrbit orbit = IslandOrbit.None, string status = "")
     {
         var part = new IslandTileContribution(key, new IslandTileSpec(key, name, Icon(key), order, 0, () =>
         {
@@ -96,7 +96,6 @@ public sealed class IslandPanelShots
         })
         {
             Orbit = orbit,
-            PageWidth = width,
         });
         part.SetStatus(status);
         return part;

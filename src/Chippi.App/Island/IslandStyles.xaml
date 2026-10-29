@@ -3,13 +3,46 @@
      theme-invariant Island* and Palette keys only. -->
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-                    xmlns:c="urn:chippi-ui">
+                    xmlns:c="urn:chippi-ui"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
 
     <!-- Hover wash on the island: white at 9%, the dark theme's HoverBrush. -->
     <SolidColorBrush x:Key="IslandHoverBrush" Color="#17FFFFFF" />
     <SolidColorBrush x:Key="IslandTrackBrush" Color="#24FFFFFF" />
+    <!-- A neutral button's fill: white at 8%, 12% hovered, 4% pressed. -->
+    <SolidColorBrush x:Key="IslandButtonBrush" Color="#14FFFFFF" />
+    <SolidColorBrush x:Key="IslandButtonHoverBrush" Color="#1FFFFFFF" />
+    <SolidColorBrush x:Key="IslandPressedBrush" Color="#0AFFFFFF" />
 
-    <!-- The docked tab: only its content draws (the half-oval paths), so transparent pixels click through.
+    <!-- ===== Compact sizes (DESIGN.md §5 Island, revised 2026-10-28): every page uses these. The open
+         island is 520 × 360 (Chippi.Core IslandPage): a 12 inset, a 24 header with 8 below, and a
+         496 × 304 body of six 76 columns with 8 gaps. ===== -->
+    <sys:Double x:Key="IslandTextSize">12</sys:Double>
+    <sys:Double x:Key="IslandCaptionSize">11</sys:Double>
+    <sys:Double x:Key="IslandTitleSize">13</sys:Double>
+    <sys:Double x:Key="IslandGap">8</sys:Double>
+    <sys:Double x:Key="IslandHeaderHeight">24</sys:Double>
+    <sys:Double x:Key="IslandButtonHeight">28</sys:Double>
+    <sys:Double x:Key="IslandButtonMinWidth">64</sys:Double>
+    <sys:Double x:Key="IslandIconButtonWidth">28</sys:Double>
+    <sys:Double x:Key="IslandIconButtonHeight">24</sys:Double>
+    <sys:Double x:Key="IslandIconButtonGlyph">14</sys:Double>
+    <sys:Double x:Key="IslandControlCardHeight">44</sys:Double>
+    <sys:Double x:Key="IslandListRowHeight">30</sys:Double>
+    <sys:Double x:Key="IslandTableRowHeight">28</sys:Double>
+    <sys:Double x:Key="IslandSwitchWidth">34</sys:Double>
+    <sys:Double x:Key="IslandSwitchHeight">18</sys:Double>
+    <sys:Double x:Key="IslandSliderThumb">16</sys:Double>
+    <!-- Filled surfaces (cards, selected rows, expanded entries, tiles) and controls (buttons, fields, search). -->
+    <CornerRadius x:Key="IslandSurfaceRadius">8</CornerRadius>
+    <CornerRadius x:Key="IslandControlRadius">4</CornerRadius>
+    <!-- Content inside every row and card starts 10 in; a field counts its 1px border. -->
+    <Thickness x:Key="IslandContentInset">10,0</Thickness>
+    <Thickness x:Key="IslandFieldPadding">9,0</Thickness>
+    <!-- The last icon button in a header or action row: its glyph lines up with the cards' right edge. -->
+    <Thickness x:Key="IslandLastIconButtonMargin">0,0,-7,0</Thickness>
+
+    <!-- The tab: only its content draws (the half-oval paths), so transparent pixels click through.
          A Button for Enter, Space and UI Automation's Invoke; the window handles the mouse itself. -->
     <Style x:Key="IslandTabStyle" TargetType="{x:Type Button}">
         <Setter Property="FocusVisualStyle" Value="{x:Null}" />
@@ -20,13 +53,6 @@
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
-    </Style>
-
-    <!-- Inner cards: white at 6%, 8px radius, 12px padding. -->
-    <Style x:Key="IslandCardStyle" TargetType="{x:Type Border}">
-        <Setter Property="Background" Value="{StaticResource IslandPanelBrush}" />
-        <Setter Property="CornerRadius" Value="8" />
-        <Setter Property="Padding" Value="12" />
     </Style>
 
     <!-- Keyboard focus on the island, after the user clicked into it: a 2px white ring. -->
@@ -40,12 +66,139 @@
         </Setter>
     </Style>
 
-    <!-- Orbit buttons (DESIGN.md §5 Island): 40px circles in Island fill with a .14 stroke and a 16px glyph;
+    <!-- Inner cards: white at 6%, 8px radius (20 outer less the 12 inset), content 10 in. -->
+    <Style x:Key="IslandCardStyle" TargetType="{x:Type Border}">
+        <Setter Property="Background" Value="{StaticResource IslandPanelBrush}" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="Padding" Value="10" />
+    </Style>
+
+    <!-- A control card (a device's volume, the mic): 44 tall, 10 in. -->
+    <Style x:Key="IslandControlCardStyle" TargetType="{x:Type Border}" BasedOn="{StaticResource IslandCardStyle}">
+        <Setter Property="Height" Value="44" />
+        <Setter Property="Padding" Value="10,0" />
+    </Style>
+
+    <!-- Text buttons: 28 tall, 10 sides, 12 text, at least 64 wide, 4px corners; a neutral white wash. -->
+    <Style x:Key="IslandButtonStyle" TargetType="{x:Type Button}">
+        <Setter Property="Height" Value="28" />
+        <Setter Property="MinWidth" Value="64" />
+        <Setter Property="Padding" Value="10,0" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Foreground" Value="{StaticResource IslandTextBrush}" />
+        <Setter Property="Background" Value="{StaticResource IslandButtonBrush}" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource IslandFocusVisual}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type Button}">
+                    <Border x:Name="Chrome" Background="{TemplateBinding Background}" CornerRadius="4">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="{TemplateBinding Padding}" RecognizesAccessKey="True" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Chrome" Property="Background" Value="{StaticResource IslandButtonHoverBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Chrome" Property="Background" Value="{StaticResource IslandPressedBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="Chrome" Property="Opacity" Value="0.36" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- The page's one accent button (Paste, Organize now): the island accent with black text. -->
+    <Style x:Key="IslandAccentButtonStyle" TargetType="{x:Type Button}" BasedOn="{StaticResource IslandButtonStyle}">
+        <Setter Property="Foreground" Value="#000000" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type Button}">
+                    <Grid x:Name="Root">
+                        <Border x:Name="Chrome" Background="{DynamicResource IslandAccentBrush}" CornerRadius="4" />
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="{TemplateBinding Padding}" RecognizesAccessKey="True" />
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Chrome" Property="Opacity" Value="0.88" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Chrome" Property="Opacity" Value="0.76" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="Root" Property="Opacity" Value="0.36" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Icon buttons: 28 × 24 with a 14 glyph, no fill until hovered. The last one in a row takes
+         IslandLastIconButtonMargin. -->
+    <Style x:Key="IslandIconButtonStyle" TargetType="{x:Type Button}">
+        <Setter Property="Width" Value="28" />
+        <Setter Property="Height" Value="24" />
+        <Setter Property="Foreground" Value="{StaticResource IslandTextBrush}" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource IslandFocusVisual}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type Button}">
+                    <Border x:Name="Chrome" Background="Transparent" CornerRadius="4">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Chrome" Property="Background" Value="{StaticResource IslandHoverBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Chrome" Property="Background" Value="{StaticResource IslandPressedBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="Chrome" Property="Opacity" Value="0.36" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- A one-line list row to pick or act on (Clipboard, File organizer): 30 tall, content 10 in,
+         8px corners, hover wash; Tag "Selected" fills it. -->
+    <Style x:Key="IslandListRowStyle" TargetType="{x:Type Button}">
+        <Setter Property="Height" Value="30" />
+        <Setter Property="Padding" Value="10,0" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Foreground" Value="{StaticResource IslandTextBrush}" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource IslandFocusVisual}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type Button}">
+                    <Border x:Name="Chrome" Background="Transparent" CornerRadius="8" Padding="{TemplateBinding Padding}">
+                        <ContentPresenter VerticalAlignment="Center" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="Tag" Value="Selected">
+                            <Setter TargetName="Chrome" Property="Background" Value="{StaticResource IslandPanelBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Chrome" Property="Background" Value="{StaticResource IslandHoverBrush}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Orbit buttons (DESIGN.md §5 Island): 32px circles in Island fill with a .14 stroke and a 14px glyph;
          hover #1F1F1F, pressed #000000; the active page's button (Tag "Active") gets a .5 white stroke. -->
     <DropShadowEffect x:Key="IslandOrbitShadow" Color="#000000" BlurRadius="20" ShadowDepth="8" Direction="270" Opacity="0.3" />
     <Style x:Key="IslandOrbitButtonStyle" TargetType="{x:Type Button}">
-        <Setter Property="Width" Value="40" />
-        <Setter Property="Height" Value="40" />
+        <Setter Property="Width" Value="32" />
+        <Setter Property="Height" Value="32" />
         <Setter Property="Foreground" Value="{StaticResource IslandTextBrush}" />
         <Setter Property="FocusVisualStyle" Value="{StaticResource IslandFocusVisual}" />
         <Setter Property="Template">
@@ -72,9 +225,8 @@
         </Setter>
     </Style>
 
-    <!-- Grid tiles: 84px high, 8px radius, white at .06; hover .10, pressed .04. -->
+    <!-- Grid tiles: they fill the body (IslandGrid), 8px radius, white at .06; hover .10, pressed .04. -->
     <Style x:Key="IslandTileStyle" TargetType="{x:Type Button}">
-        <Setter Property="Height" Value="84" />
         <Setter Property="Foreground" Value="{StaticResource IslandTextBrush}" />
         <Setter Property="FocusVisualStyle" Value="{StaticResource IslandFocusVisual}" />
         <Setter Property="Template">
@@ -138,31 +290,6 @@
                         </Trigger>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="Chrome" Property="Background" Value="{StaticResource IslandHoverBrush}" />
-                        </Trigger>
-                    </ControlTemplate.Triggers>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
-    </Style>
-
-    <!-- The docked island's footer buttons: a 16px glyph and a 13px label, hover wash. -->
-    <Style x:Key="IslandFooterButtonStyle" TargetType="{x:Type Button}">
-        <Setter Property="Height" Value="32" />
-        <Setter Property="FontSize" Value="13" />
-        <Setter Property="Foreground" Value="{StaticResource IslandTextBrush}" />
-        <Setter Property="FocusVisualStyle" Value="{StaticResource IslandFocusVisual}" />
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="{x:Type Button}">
-                    <Border x:Name="Chrome" CornerRadius="16" Background="Transparent" Padding="10,0,12,0">
-                        <ContentPresenter VerticalAlignment="Center" />
-                    </Border>
-                    <ControlTemplate.Triggers>
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Chrome" Property="Background" Value="{StaticResource IslandHoverBrush}" />
-                        </Trigger>
-                        <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="Chrome" Property="Background" Value="#0AFFFFFF" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>

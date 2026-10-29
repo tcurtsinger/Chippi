@@ -28,16 +28,11 @@
             <Border x:Name="ShapeShadow" Background="{StaticResource IslandBrush}" Effect="{StaticResource IslandExpandedShadow}" />
             <Border x:Name="ShapeFill" Background="{StaticResource IslandBrush}" BorderBrush="{StaticResource IslandBorderBrush}" />
         </Grid>
-        <!-- The grid or a page, placed where the shape is heading. Docked by the tray, a footer takes the
-             round buttons' place: All features (on a page) and Settings. -->
+        <!-- The content that was showing, fading out while a new page fades in (IslandPanelWindow.HoldLeaving). -->
+        <Image x:Name="Leaving" Opacity="0" IsHitTestVisible="False" />
+        <!-- The grid or a page, 520 × 360, placed where the shape is heading. -->
         <Border x:Name="Card" Padding="12" Opacity="0" TextElement.Foreground="{StaticResource IslandTextBrush}">
-            <DockPanel>
-                <Border x:Name="Footer" DockPanel.Dock="Bottom" Visibility="Collapsed" Margin="-4,12,-4,-4" Padding="0,8,0,0"
-                        BorderBrush="{StaticResource IslandBorderBrush}" BorderThickness="0,1,0,0">
-                    <DockPanel x:Name="FooterButtons" LastChildFill="False" />
-                </Border>
-                <ContentControl x:Name="Page" Focusable="False" />
-            </DockPanel>
+            <ContentControl x:Name="Page" Focusable="False" />
         </Border>
         <!-- The round buttons around the shape (IslandGeometry.OrbitLayout). -->
         <Canvas x:Name="Orbit" />

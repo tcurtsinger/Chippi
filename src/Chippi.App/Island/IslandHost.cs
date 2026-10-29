@@ -62,13 +62,9 @@ public sealed class IslandHost : IDisposable
         _window.CaptureTarget = () => _shell.Clipboard.CaptureTarget();
         _shell.Services.IslandPasteTarget = () => _window.PasteTarget;
         _shell.Services.CloseIsland = _window.ClosePages;
-        // The tray icon and a second launch open these same pages: in the island, or docked by the tray.
-        _window.TrayIconRect = () => _shell.Commands.TrayAnchor()?.Icon;
         _shell.Commands.RegisterIslandHold(_window.HoldIslandOpen);
-        _shell.Commands.RegisterPages(
-            keyboard => _window.TogglePages(_shell.Commands.TrayAnchor(), keyboard),
-            () => _window.ShowPages(_shell.Commands.TrayAnchor(), keyboard: true),
-            key => _window.ShowPage(_shell.Commands.TrayAnchor(), key));
+        // A second launch and a notice click open the island; with it off or hidden, ShellCommands opens Settings.
+        _shell.Commands.RegisterPages(_window.ShowPages, _window.ShowPage);
         _window.IsVisibleChanged += (_, _) => _shell.Commands.SetIslandShowing(_window.IsVisible);
         StartMedia();
         _tracker.Changed += (_, _) =>
@@ -219,7 +215,7 @@ public sealed class IslandHost : IDisposable
     /// <summary>
     /// Debug builds (<c>--island-pages &lt;dir&gt;</c>): with a fake media activity live, the island open on
     /// Top, Left and Right, on the grid and on every page, plus a page-to-page morph caught midway,
-    /// then with the island off the same pages docked by the tray (s6-*.png). Use a
+    /// (s6-*.png). Use a
     /// CHIPPI_DEV_PROFILE: the island settings it moves through are put back.
     /// </summary>
     private async Task SaveIslandPagesAsync(string directory)
@@ -260,18 +256,6 @@ public sealed class IslandHost : IDisposable
                 _window.ForceOpen(false);
                 await Task.Delay(settle);
             }
-            UpdateSettings(s => s.IslandEnabled = false);
-            await Task.Delay(settle);
-            _window.ShowPages(_shell.Commands.TrayAnchor(), keyboard: false);
-            await Task.Delay(settle);
-            _window.SaveScene(Path.Combine(directory, "s6-docked-grid.png"), color);
-            foreach (var key in _window.Panel.PageKeys())
-            {
-                _window.Panel.ShowPage(key);
-                await Task.Delay(settle);
-                _window.SaveScene(Path.Combine(directory, $"s6-docked-{key}".ToLowerInvariant() + ".png"), color);
-            }
-            _window.TogglePages(null, keyboard: false);
             _logger.LogInformation("Island page snapshots saved to {Directory}", directory);
         }
         catch (Exception ex)
@@ -281,7 +265,7 @@ public sealed class IslandHost : IDisposable
         finally
         {
             _shell.Island.ClearModule(DebugModuleId);
-            UpdateSettings(s => (s.IslandEdge, s.IslandPlace, s.IslandLastPage, s.IslandEnabled) = (original.IslandEdge, original.IslandPlace, original.IslandLastPage, original.IslandEnabled));
+            UpdateSettings(s => (s.IslandEdge, s.IslandPlace, s.IslandLastPage) = (original.IslandEdge, original.IslandPlace, original.IslandLastPage));
         }
     }
 

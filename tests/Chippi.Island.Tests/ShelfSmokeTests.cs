@@ -22,10 +22,10 @@ namespace Chippi.Island.Tests;
 public sealed class ShelfSmokeTests
 {
     [Theory]
-    [InlineData(false, false)]
-    [InlineData(false, true)]
-    [InlineData(true, false)]
-    public void Shelf_drop_routes_through_the_panel_releases_the_hold_and_fits_1280_by_720(bool docked, bool side) => WpfTestThread.Run(() =>
+    [InlineData(IslandEdge.Top)]
+    [InlineData(IslandEdge.Left)]
+    [InlineData(IslandEdge.Right)]
+    public void Shelf_drop_routes_through_the_panel_releases_the_hold_and_fits_the_island_on_a_960_by_540_screen(IslandEdge edge) => WpfTestThread.Run(() =>
     {
         using var fixture = new Fixture();
         var panel = fixture.Window.Panel;
@@ -54,22 +54,8 @@ public sealed class ShelfSmokeTests
             for (int i = 0; i < 10; i++) fixture.Shelf.AddTextAsync($"Invented item {i}").GetAwaiter().GetResult();
             Call(page, "Refresh");
             Assert.IsType<Button>(fixture.Tile.Spec.InitialFocus!());
-            Set(panel, "_edge", side ? IslandEdge.Left : IslandEdge.Top);
-            Set(panel, "_area", new MonitorArea(default, new Rect(0, 0, 1280, 720), new Rect(0, 0, 1280, 672), 1));
-            Set(panel, "_window", new Rect(0, 0, 1280, 672));
-            Set(panel, "_tab", side ? new Rect(0, 280, 32, 112) : new Rect(584, 0, 112, 32));
-            if (docked)
-            {
-                Set(panel, "_dock", new TrayDisplay(new PixelRect(0, 0, 1280, 720), new PixelRect(0, 0, 1280, 672), TaskbarEdge.Bottom, 672, 1240, 96));
-                ((FrameworkElement)panel.FindName("Footer")).Visibility = Visibility.Visible;
-            }
-            Call(panel, "Reshape", true);
-            var footprint = Get<Rect>(panel, "_target");
-            Assert.Equal(328, footprint.Width);
-            if (!docked)
-                foreach (var (_, rect) in IslandGeometry.OrbitLayout(side ? IslandEdge.Left : IslandEdge.Top, footprint, Get<List<OrbitSlot>>(panel, "_placedSlots"))) footprint.Union(rect);
-            Assert.InRange(footprint.Left, 0, 1280); Assert.InRange(footprint.Right, 0, 1280);
-            Assert.InRange(footprint.Top, 0, 672); Assert.InRange(footprint.Bottom, 0, 672);
+            IslandBounds.Place(panel, edge, 960, 540);
+            IslandBounds.Check(panel, edge, 960, 540);
             Assert.False(panel.IsVisible);
             Assert.Equal(IntPtr.Zero, new System.Windows.Interop.WindowInteropHelper(panel).Handle);
         }

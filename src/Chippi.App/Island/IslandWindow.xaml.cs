@@ -38,7 +38,7 @@ internal sealed class IslandPlacementEventArgs(IslandEdge edge, double place, HM
 /// shows in Alt+Tab or the taskbar, and is placed in physical pixels on the monitor it is given.
 /// Hovering only swells the tab; a click opens the island, and it stays open until a click outside
 /// it, Esc or another click on the tab. A press that moves 4px drags the tab to another edge. The
-/// tray icon opens the same pages: in the island while it shows, otherwise docked by the tray.
+/// tray icon opens Settings.
 /// <see cref="IslandHost"/> feeds it activities, the mood, the monitor, the saved edge and place,
 /// and whether to hide.
 /// </summary>
@@ -71,7 +71,6 @@ public partial class IslandWindow : Window
     private HWND _hwnd;
     private HMONITOR _monitor;
     private Point? _pressAt;
-    private Rect? _trayIcon; // physical pixels, read when the pages open
     private bool _dragging;
     private EventHandler? _slideFrame;
     private EventHandler? _swellFrame;
@@ -177,9 +176,6 @@ public partial class IslandWindow : Window
     public event EventHandler<string>? LastPageChanged;
 
     internal HWND Handle => _hwnd;
-
-    /// <summary>The tray icon's rectangle in physical pixels, or null without one. A press on it is the tray's click, not a click away.</summary>
-    internal Func<Rect?>? TrayIconRect { get; set; }
 
     /// <summary>The open island's window.</summary>
     internal HWND PanelHandle => _panel.Handle;
@@ -333,7 +329,7 @@ public partial class IslandWindow : Window
         StopSlide();
         ApplyEdgeLayout(IslandGeometry.Docked(_edge, area.Monitor, area.Work));
         IslandNative.Move(_hwnd, Home(area));
-        if (_panel.IsOpen && !_panel.IsDocked)
+        if (_panel.IsOpen)
             _panel.Open(_docked, Grown(area), area);
     }
 
@@ -386,20 +382,18 @@ public partial class IslandWindow : Window
         if (code >= 0 && message is PInvoke.WM_LBUTTONDOWN or PInvoke.WM_RBUTTONDOWN or PInvoke.WM_MBUTTONDOWN or PInvoke.WM_XBUTTONDOWN)
         {
             var at = ((MSLLHOOKSTRUCT*)lParam.Value)->pt;
-            PressedAt(new Point(at.X, at.Y), left: message == PInvoke.WM_LBUTTONDOWN);
+            PressedAt(new Point(at.X, at.Y));
         }
         return PInvoke.CallNextHookEx(_clickHook, code, wParam, lParam);
     }
 
     /// <summary>
     /// A press at <paramref name="physical"/> while the island is open: off the island and the tab it
-    /// closes the island, unless a list or menu the island opened has the mouse. A left press on the
-    /// tray icon is left to the tray, whose click toggles the pages.
+    /// closes the island, unless a list or menu the island opened has the mouse.
     /// </summary>
-    internal void PressedAt(Point physical, bool left = true)
+    internal void PressedAt(Point physical)
     {
         if (!_panel.IsOpen || _panel.Covers(physical) || (IsVisible && IslandNative.WindowRect(_hwnd).Contains(physical))
-            || (left && _trayIcon is { } tray && tray.Contains(physical))
             || TabMenu.IsOpen || Mouse.Captured is not null)
             return;
         Dispatcher.BeginInvoke(() => CloseIsland());
@@ -416,42 +410,33 @@ public partial class IslandWindow : Window
     }
 
     /// <summary>
-    /// The tray icon's click, or a second launch: the pages close if open, and otherwise open in the
-    /// island while its tab shows, or docked by <paramref name="tray"/>. From the keyboard they take it.
+    /// A second launch: opens the island while its tab shows; from the keyboard it takes the keyboard.
+    /// False when the island is off or hidden for a fullscreen app, so nothing opened.
     /// </summary>
-    internal void TogglePages(TrayAnchor? tray, bool keyboard)
-    {
-        if (_panel.IsOpen)
-            CloseIsland();
-        else
-            ShowPages(tray, keyboard);
-    }
-
-    /// <inheritdoc cref="TogglePages"/>
-    internal void ShowPages(TrayAnchor? tray, bool keyboard)
+    internal bool ShowPages(bool keyboard)
     {
         if (!_panel.IsOpen)
-        {
-            if (IsVisible)
-                OpenIsland();
-            else if (tray is not null)
-                OpenDocked(tray);
-        }
+            OpenIsland();
         if (keyboard && _panel.IsOpen)
             _panel.TakeKeyboard();
+        return _panel.IsOpen;
     }
 
-    /// <summary>The pages on <paramref name="key"/>'s page (a notice click): moved there when open, otherwise opened on it.</summary>
-    internal void ShowPage(TrayAnchor? tray, string key)
+    /// <summary>
+    /// The island on <paramref name="key"/>'s page (a notice click): moved there when open, otherwise
+    /// opened on it. False when the island can't show.
+    /// </summary>
+    internal bool ShowPage(string key)
     {
         if (_panel.IsOpen)
         {
             _panel.ShowPage(key);
-            return;
+            return true;
         }
         _panel.OpenOn(key);
-        ShowPages(tray, keyboard: false);
+        bool opened = ShowPages(keyboard: false);
         _panel.OpenOn(null); // unused when nothing could open
+        return opened;
     }
 
     private void OpenIsland()
@@ -462,16 +447,9 @@ public partial class IslandWindow : Window
         Hook();
     }
 
-    private void OpenDocked(TrayAnchor tray)
-    {
-        _panel.OpenDocked(tray.Display);
-        Hook();
-    }
-
     /// <summary>Watches for Esc and clicks away while the pages are open.</summary>
     private void Hook()
     {
-        _trayIcon = TrayIconRect?.Invoke();
         var module = PInvoke.GetModuleHandle((string?)null);
         if (_escapeHook is null || _escapeHook.IsInvalid)
             _escapeHook = PInvoke.SetWindowsHookEx(WINDOWS_HOOK_ID.WH_KEYBOARD_LL, _onKeyboard, module, 0);
@@ -542,7 +520,7 @@ public partial class IslandWindow : Window
         _dragKey = null;
         if (!_panel.IsOpen)
         {
-            ShowPage(null, key);
+            ShowPage(key);
             _openedByDrag = _panel.IsOpen;
         }
         RefreshTab();
@@ -631,7 +609,7 @@ public partial class IslandWindow : Window
         // A drag over the tab swells it to its live size with the page's glyph in accent (notes #48).
         bool dropping = _dragKey is not null;
         bool hasGlyph = dropping || feedback is not null || top is not null;
-        bool swollen = dropping || _hovered || (_panel.IsVisible && !_panel.IsDocked);
+        bool swollen = dropping || _hovered || _panel.IsVisible;
         SwellTo(IslandGeometry.TabSize(_docked, hasGlyph, swollen));
         Pet.Size = hasGlyph ? 22 : 20;
         Pet.ShowMood(hasGlyph ? _mood : swollen ? PetMood.Idle : PetMood.Sleepy);
@@ -946,11 +924,9 @@ public partial class IslandWindow : Window
     {
         if (Area is not { } area)
             return;
-        // Docked by the tray, the pages are all there is: the tab is hidden with the island off.
-        bool docked = _panel.IsDocked;
         var tab = IslandNative.WindowRect(_hwnd);
-        var region = docked ? _panel.Footprint : tab;
-        if (_panel.IsVisible && !docked)
+        var region = tab;
+        if (_panel.IsVisible)
             region.Union(_panel.Footprint);
         region.Inflate(48 * area.Scale, 48 * area.Scale);
         region.Intersect(area.Monitor);
@@ -963,8 +939,7 @@ public partial class IslandWindow : Window
             var work = area.Work;
             work.Offset(-region.X, -region.Y);
             dc.DrawRectangle(null, new Pen(new SolidColorBrush(Color.FromArgb(0x80, 0x80, 0x80, 0x80)), 1), work);
-            if (!docked)
-                Draw(dc, Root, tab, region, area.Scale);
+            Draw(dc, Root, tab, region, area.Scale);
             if (_panel.IsVisible)
                 Draw(dc, _panel.Visual, IslandNative.WindowRect(_panel.Handle), region, area.Scale);
         }

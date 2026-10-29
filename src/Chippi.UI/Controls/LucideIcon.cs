@@ -11,7 +11,8 @@ namespace Chippi.UI.Controls;
 /// <summary>
 /// Renders a <see cref="Geometry"/> as a stroke icon. The geometry is authored in a 24x24 box
 /// (see <see cref="LucideIcons"/>); a Viewbox scales everything, stroke included, so icons keep
-/// their weight at any size. Ported from Hopper; the default stroke is DESIGN.md's 1.6.
+/// their weight at any size. Ported from Hopper. Unless <see cref="Thickness"/> is set, the stroke
+/// is 30 / Size in the 24px grid, so every size draws the same 1.25px line.
 /// </summary>
 public sealed class LucideIcon : Viewbox
 {
@@ -21,7 +22,7 @@ public sealed class LucideIcon : Viewbox
     {
         _path = new Path
         {
-            StrokeThickness = 1.6,
+            StrokeThickness = StrokeFor(16),
             StrokeLineJoin = PenLineJoin.Round,
             StrokeStartLineCap = PenLineCap.Round,
             StrokeEndLineCap = PenLineCap.Round,
@@ -64,6 +65,8 @@ public sealed class LucideIcon : Viewbox
             var icon = (LucideIcon)d;
             icon.Width = (double)e.NewValue;
             icon.Height = (double)e.NewValue;
+            if (icon.ReadLocalValue(ThicknessProperty) == DependencyProperty.UnsetValue)
+                icon._path.StrokeThickness = StrokeFor((double)e.NewValue);
         }));
 
     /// <summary>Drawn size in DIPs. DESIGN.md draws icons at 16px (20px for a Settings row lead glyph).</summary>
@@ -75,12 +78,15 @@ public sealed class LucideIcon : Viewbox
 
     public static readonly DependencyProperty ThicknessProperty = DependencyProperty.Register(
         nameof(Thickness), typeof(double), typeof(LucideIcon),
-        new PropertyMetadata(1.6, (d, e) => ((LucideIcon)d)._path.StrokeThickness = (double)e.NewValue));
+        new PropertyMetadata(StrokeFor(16), (d, e) => ((LucideIcon)d)._path.StrokeThickness = (double)e.NewValue));
 
-    /// <summary>Stroke width in the 24px design grid.</summary>
+    /// <summary>Stroke width in the 24px design grid; unset, 30 / Size.</summary>
     public double Thickness
     {
         get => (double)GetValue(ThicknessProperty);
         set => SetValue(ThicknessProperty, value);
     }
+
+    /// <summary>The stroke in the 24px grid that draws 1.25px at <paramref name="size"/>.</summary>
+    public static double StrokeFor(double size) => size > 0 ? 30 / size : 1.875;
 }

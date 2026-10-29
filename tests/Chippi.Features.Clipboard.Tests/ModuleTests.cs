@@ -138,7 +138,6 @@ public sealed class ModuleTests : IDisposable
         Assert.Equal("", _cleanUi.Tile.PageNote);
         var tile = Assert.Single(IslandTileContribution.Group([_historyUi.Tile!, _cleanUi.Tile]));
         Assert.Equal("Off", tile.Status);
-        Assert.Equal(ClipboardFeatures.PageWidth, tile.PageWidth);
     }
 
     [Fact]

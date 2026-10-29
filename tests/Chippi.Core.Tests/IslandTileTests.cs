@@ -12,8 +12,8 @@ public sealed class IslandTileTests : IDisposable
 
     public void Dispose() => _f.Dispose();
 
-    private static IslandTileSpec Spec(string key, string name, int order, int section, double width = IslandTileSpec.DefaultPageWidth) =>
-        new(key, name, "Mic", order, section, () => new object()) { PageWidth = width };
+    private static IslandTileSpec Spec(string key, string name, int order, int section) =>
+        new(key, name, "Mic", order, section, () => new object());
 
     [Fact]
     public async Task A_running_module_s_tiles_are_removed_when_it_stops()
@@ -36,8 +36,8 @@ public sealed class IslandTileTests : IDisposable
     {
         var mute = new IslandTileContribution("mic-mute", Spec("sound.microphone", "Mic mute", 30, 2));
         var routing = new IslandTileContribution("audio-routing", Spec("sound.microphone", "Microphone", 30, 0));
-        var mixer = new IslandTileContribution("app-volume", Spec("sound.mixer", "Volume mixer", 10, 0, width: 344));
-        var processing = new IslandTileContribution("mic-processing", Spec("sound.microphone", "Processing", 30, 1, width: 300));
+        var mixer = new IslandTileContribution("app-volume", Spec("sound.mixer", "Volume mixer", 10, 0));
+        var processing = new IslandTileContribution("mic-processing", Spec("sound.microphone", "Processing", 30, 1));
 
         var tiles = IslandTileContribution.Group([mute, routing, mixer, processing]);
 
@@ -45,8 +45,6 @@ public sealed class IslandTileTests : IDisposable
         var microphone = tiles[1];
         Assert.Equal([routing, processing, mute], microphone.Parts);
         Assert.Equal("Microphone", microphone.Name);
-        Assert.Equal(IslandTileSpec.DefaultPageWidth, microphone.PageWidth);
-        Assert.Equal(344, tiles[0].PageWidth);
     }
 
     [Fact]

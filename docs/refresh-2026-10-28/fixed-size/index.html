@@ -1,0 +1,555 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Compact Island Size</title>
+<style>
+:root{--acc:#B79CFF;--cau:#FCE100;--isl:#0A0A0A;--card:rgba(255,255,255,.06);--track:rgba(255,255,255,.14);--t3:#ABABAB;--line:rgba(255,255,255,.10);--div:rgba(255,255,255,.06)}
+*{box-sizing:border-box}
+body{margin:0;padding:32px;background:#E4E4E4;color:#1A1A1A;font-family:'Segoe UI Variable Text','Segoe UI',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+body.solo{padding:0}
+.doc{margin:0 0 4px;font:600 22px/28px 'Segoe UI Variable Display','Segoe UI',sans-serif}
+.cap{margin:0 0 16px;font-size:13px;line-height:20px;color:#404040;max-width:1100px}
+body.solo .doc,body.solo .cap{display:none}
+.board{display:flex;gap:28px;align-items:flex-start;padding:0 24px 24px;margin:0 0 40px;width:max-content}
+body.solo .board{margin:0}
+body.solo .board.off{display:none}
+.lab{font-size:12px;line-height:16px;color:#5D5D5D;margin:8px 0 6px}
+button{font:inherit;color:inherit}
+
+/* The island: 520 x 360 for every page. 12 inset, 20 outer corners, 8 inner (20 - 12). Body 496 x 304: six 76 columns, 8 gaps. */
+.isl{width:520px;height:360px;display:flex;flex-direction:column;background:var(--isl);color:#FFF;border:1px solid var(--line);border-top:0;border-radius:0 0 20px 20px;box-shadow:0 16px 40px rgba(0,0,0,.35);padding:12px;font-size:12px;line-height:16px;overflow:hidden}
+.hd{height:24px;flex:none;display:flex;align-items:center;gap:2px;margin-bottom:8px}
+.hd .t{flex:1;font-size:13px;font-weight:600}
+.hd .s{font-size:11px;color:var(--t3);font-variant-numeric:tabular-nums;padding-left:8px}
+.hd .ib:last-child,.tabs .ib:last-child,.acts .ib:last-child,.ex .a .ib:last-child{margin-right:-7px}
+.bd{flex:1;min-height:0;display:flex;flex-direction:column}
+.card{background:var(--card);border-radius:8px}
+.ico{width:14px;height:14px;flex:none;fill:none;stroke:currentColor;stroke-width:2.14;stroke-linecap:round;stroke-linejoin:round}
+.ico12{width:12px;height:12px;flex:none;fill:none;stroke:currentColor;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
+.ico20{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.875;stroke-linecap:round;stroke-linejoin:round}
+.ico24{width:20px;height:20px;flex:none;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.num{font-variant-numeric:tabular-nums}
+.t3{color:var(--t3)}
+.sm{font-size:11px;line-height:14px}
+.ib{width:28px;height:24px;display:inline-flex;align-items:center;justify-content:center;border:0;border-radius:4px;background:transparent;padding:0}
+.ib.on{background:rgba(255,255,255,.12)}
+.btn{height:28px;padding:0 10px;border:1px solid rgba(255,255,255,.07);border-bottom-color:rgba(255,255,255,.04);border-radius:4px;background:rgba(255,255,255,.06);color:#FFF;font-size:12px;flex:none;min-width:64px}
+.btn.acc{background:var(--acc);color:#000;border-color:transparent}
+.acts{flex:none;display:flex;align-items:center;gap:8px;margin-top:auto;padding-top:8px}
+.grow{flex:1}
+.trim{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+
+/* Grid */
+.grid{flex:1;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);gap:8px}
+.gt{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px}
+.gt .ico24{margin-bottom:6px}
+.gt b{font-weight:600}
+.gum{width:18px;height:16px;border-radius:9px 9px 7px 7px;background:linear-gradient(160deg,#C9B6FF,#8C6CF0);position:relative;margin-right:6px;flex:none}
+.gum::before,.gum::after{content:'';position:absolute;top:6px;width:3px;height:3px;border-radius:50%;background:#1A1033}
+.gum::before{left:5px}.gum::after{right:5px}
+
+/* Sound */
+.cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:0 8px;align-items:start}
+.clab{height:20px;padding:2px 0 0;font-size:11px;line-height:14px;font-weight:600;color:var(--t3)}
+.ctl{height:44px;flex:none;display:flex;align-items:center;gap:8px;padding:0 10px}
+.ctl .g{color:var(--acc);display:flex}
+.ctl .mid{flex:1;min-width:0;display:flex;align-items:center;gap:8px}
+.sl{flex:1;position:relative;height:16px}
+.sl i{position:absolute;left:0;right:0;top:6px;height:4px;border-radius:2px;background:var(--track)}
+.sl b{position:absolute;left:0;top:6px;height:4px;border-radius:2px;background:var(--acc)}
+.sl s{position:absolute;top:0;width:16px;height:16px;margin-left:-8px;border-radius:50%;background:#454545;border:1px solid rgba(255,255,255,.08)}
+.sl s::after{content:'';position:absolute;left:3px;top:3px;width:8px;height:8px;border-radius:50%;background:var(--acc)}
+.pct{width:34px;text-align:right}
+.sw{width:34px;height:18px;border-radius:9px;border:1px solid #9E9E9E;position:relative;flex:none}
+.sw::after{content:'';position:absolute;left:3px;top:3px;width:10px;height:10px;border-radius:50%;background:#CFCFCF}
+.rows{margin-top:8px}
+.row{height:30px;display:flex;align-items:center;gap:8px;padding:0 10px;border-radius:8px}
+.row.sel{background:var(--card)}
+.rad{width:14px;height:14px;border-radius:50%;border:1px solid var(--t3);flex:none}
+.rad.on{border:4px solid var(--acc);background:#000}
+
+/* Monitor */
+.mon{display:flex;flex-direction:column;gap:8px}
+.tbl{background:var(--card);border-radius:8px;padding:2px 10px}
+.tr{display:grid;grid-template-columns:80px 1fr auto;align-items:center;height:28px;gap:10px}
+.tr+.tr{border-top:1px solid var(--div)}
+.tr .n{display:flex;align-items:center;gap:4px;color:var(--t3)}
+.tr .d{font-size:11px;color:var(--t3)}
+.tr .v{font-weight:600;text-align:right;min-width:32px}
+.tr .r{display:flex;gap:12px;justify-content:flex-end;grid-column:2/-1}
+.tr .r span{display:inline-flex;align-items:center;gap:3px}
+.tr .r .ico12{color:var(--t3)}
+.dk .tr{grid-template-columns:80px repeat(3,1fr);gap:0}
+.dk .tr>span:not(:first-child){text-align:right}
+.dk .tr.h{height:24px;font-size:11px;color:var(--t3)}
+.dk .tr.h>span:first-child{font-weight:600}
+
+/* Clipboard */
+.search{flex:none;height:28px;display:flex;align-items:center;gap:6px;padding:0 9px;border-radius:4px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-bottom-color:rgba(255,255,255,.16);color:var(--t3)}
+.list{flex:1;min-height:0;overflow:hidden;margin-top:8px}
+.sec{height:22px;display:flex;align-items:flex-end;padding:0 10px 3px;font-size:11px;font-weight:600;color:var(--t3)}
+.cr{height:30px;display:flex;align-items:center;gap:8px;padding:0 10px;border-radius:8px}
+.cr .ico{color:var(--t3)}
+.cr .w{margin-left:auto;padding-left:10px;font-size:11px;color:var(--t3);flex:none}
+.ex{padding:8px 10px;border-radius:8px;background:var(--card);margin:2px 0}
+.ex .top{display:flex;justify-content:space-between;font-size:11px;color:var(--t3)}
+.ex .body{margin:4px 0 8px;white-space:pre-line}
+.ex .a{display:flex;gap:8px;align-items:center}
+.ex .a .ib+.ib{margin-left:-6px}
+.empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:var(--t3)}
+.field{flex:none;min-height:28px;padding:5px 9px;border-radius:4px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-bottom:2px solid var(--acc)}
+.res{margin-top:8px;padding:8px 10px}
+.res .sm{margin-top:2px}
+
+/* Scratchpad */
+.tabs{flex:none;height:30px;display:flex;align-items:center;gap:0}
+.tab{padding:0 10px;height:28px;display:flex;align-items:center;position:relative;color:var(--t3)}
+.tab.on{color:#FFF;font-weight:600}
+.tab.on::after{content:'';position:absolute;left:50%;bottom:1px;width:14px;margin-left:-7px;height:3px;border-radius:2px;background:var(--acc)}
+.editor{flex:1;min-height:0;margin-top:8px;padding:8px 10px;white-space:pre-line;line-height:18px}
+.seg{display:flex;padding:2px;border-radius:6px;border:1px solid rgba(255,255,255,.08)}
+.seg span{height:22px;padding:0 10px;display:flex;align-items:center;border-radius:4px;color:var(--t3)}
+.seg span.on{background:rgba(255,255,255,.08);color:#FFF}
+
+/* Shelf */
+.shelf{display:grid;grid-template-columns:repeat(6,76px);grid-auto-rows:66px;gap:8px}
+.si{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:7px 4px 0;text-align:center}
+.si .ico20{color:var(--t3);margin:2px 0 6px}
+.si .nm{width:100%;font-size:11px;line-height:14px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.si .nm.one{display:block}
+.si .k{width:100%;font-size:10px;line-height:13px;color:var(--t3)}
+.si.sel{outline:1px solid var(--acc);outline-offset:-1px}
+.si .pin{position:absolute;right:5px;top:5px;color:var(--t3);display:flex}
+.si.gone .nm{color:var(--t3)}
+.thumb{width:36px;height:20px;flex:none;border-radius:3px;margin-bottom:4px;background:linear-gradient(90deg,#8B5A2B 0 70%,#CFCFCF 70%);border-top:4px solid #CFCFCF}
+
+/* Now Playing */
+.np{display:flex;gap:8px;flex:1;min-height:0}
+.art{width:304px;height:304px;flex:none;border-radius:8px;background:#2A2A2A;display:flex;align-items:center;justify-content:center;color:#6A6A6A}
+.npr{flex:1;min-width:0;display:flex;flex-direction:column;padding-top:2px}
+.src{display:inline-flex;align-items:center;gap:3px;font-size:11px;color:var(--t3)}
+.ttl{font:600 16px/22px 'Segoe UI Variable Display','Segoe UI',sans-serif;margin-top:8px}
+.prog{margin-top:auto}
+.bar{height:4px;border-radius:2px;background:var(--track);position:relative}
+.bar b{position:absolute;left:0;top:0;bottom:0;border-radius:2px;background:var(--acc)}
+.times{display:flex;justify-content:space-between;margin-top:4px}
+.trans{display:flex;align-items:center;justify-content:center;gap:20px;margin:12px 0 0}
+.play{width:40px;height:40px;border-radius:50%;background:var(--acc);color:#000;display:flex;align-items:center;justify-content:center}
+
+/* Keep awake */
+.ka{display:grid;grid-template-columns:repeat(3,1fr);grid-auto-rows:96px;gap:8px;margin:auto 0}
+.ka div{display:flex;align-items:center;justify-content:center;font-size:14px}
+
+/* File organizer */
+.recent{flex:1;min-height:0;margin-top:8px;padding:2px 0;overflow:hidden}
+.recent .cr{padding:0 10px}
+
+/* App volume */
+.apps{flex:1;display:flex;gap:8px;align-items:stretch;justify-content:center}
+.app{width:56px;display:flex;flex-direction:column;align-items:center}
+.aico{width:20px;height:20px;margin:1px 0;border-radius:4px;flex:none;display:flex;align-items:center;justify-content:center;color:#FFF}
+.aico.fb{background:rgba(255,255,255,.12);font-size:10px;font-weight:600}
+.aico.mut{color:var(--cau)}
+.vb.m b{background:rgba(255,255,255,.28)}
+.ct{color:var(--cau)}
+.vb{flex:1;width:32px;margin:6px 0;border-radius:8px;background:var(--track);position:relative;overflow:hidden}
+.vb b{position:absolute;left:0;right:0;bottom:0;background:var(--acc)}
+.app .p{font-size:11px;line-height:14px}
+.app .nm{width:100%;height:28px;text-align:center;font-size:11px;line-height:14px;color:var(--t3);margin-top:2px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.app .more{height:16px;color:var(--t3);display:flex}
+
+/* Shell on a screen, drawn at half size */
+.wrap{width:640px;height:360px;overflow:hidden;border-radius:6px}
+.wrap.sm{width:512px;height:288px}
+.desk{position:relative;width:1280px;height:720px;background:#202020;overflow:hidden;transform:scale(.5);transform-origin:0 0}
+.desk.sm{width:1024px;height:576px}
+.desk .isl{position:absolute}
+.tbar{position:absolute;left:0;right:0;bottom:0;height:48px;background:#1C1C1C;border-top:1px solid rgba(255,255,255,.08)}
+.orb{position:absolute;width:32px;height:32px;border-radius:16px;background:#0A0A0A;border:1px solid rgba(255,255,255,.14);display:flex;align-items:center;justify-content:center;color:#FFF;box-shadow:0 6px 16px rgba(0,0,0,.3)}
+.isl.left{border:1px solid var(--line);border-left:0;border-radius:0 20px 20px 0}
+.isl.dock{border:1px solid var(--line);border-radius:20px;height:400px}
+.isl.dock .bd{flex:none;height:304px}
+.dfoot{flex:none;height:40px;margin:12px -12px -12px;padding:0 6px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid rgba(255,255,255,.08)}
+.dfoot span{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 8px}
+.over{position:absolute;border:3px dashed #FF5A5A;pointer-events:none}
+.work{position:absolute;left:0;right:0;top:0;border-bottom:2px dashed rgba(255,255,255,.25)}
+
+/* Grid ladder: tiles always fill the body; fewer tiles get bigger, more get smaller. */
+.gt.l2 .ico24{width:16px;height:16px;stroke-width:1.875;margin-bottom:4px}
+.gt.l2 b{font-size:11px;line-height:14px}
+.gt.l2 .sm{font-size:10px;line-height:13px}
+.gt.l3 .ico24{width:14px;height:14px;stroke-width:2.14;margin-bottom:3px}
+.gt.l3 b{font-size:10px;line-height:13px}
+.gt.l3 .sm{display:none}
+.gt b,.gt .sm{max-width:100%;padding:0 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* Fit, never scroll: rows, strips and tiles shrink as content grows. */
+.app.n{width:34px}
+.app.n .nm{display:none}
+.app.n .vb{width:24px}
+.app.n .p{font-size:10px}
+.dk.tight .tr{height:22px}
+.si.s2 .k{display:none}
+.si.s3 .k,.si.s3 .nm{display:none}
+.si.s3{justify-content:center;padding-top:0}
+.si.s3 .ico20,.si.s3 .thumb{margin:0}
+.cau{color:var(--cau);display:inline-flex;align-items:center;gap:5px}
+.cau::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--cau)}
+
+/* 5. Shell states: hover and pressed tiles, a live dot (accent) and a needs-attention dot and status (Caution), the open page's orbit ring. */
+.gt{position:relative}
+.gt.hov{background:rgba(255,255,255,.10)}
+.gt.prs{background:rgba(255,255,255,.04)}
+.gt .dot{position:absolute;top:8px;right:8px;width:6px;height:6px;border-radius:50%;background:var(--acc)}
+.gt .dot.c{background:var(--cau)}
+.gt .sm.c{color:var(--cau)}
+.gt .ico24.c{color:var(--cau)}
+.orb.on{border-color:rgba(255,255,255,.5)}
+
+/* Page states: Keep awake's lit choice, empty pages, a long link. */
+.ka .lit{background:var(--acc);color:#000;font-weight:600}
+.ka .lit.hv{background:#CBB8FF}
+.zone{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:var(--t3);border:1px dashed rgba(255,255,255,.2);border-radius:8px}
+.off{opacity:.4}
+.field,.res>div:first-child{word-break:break-all}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="vol" viewBox="0 0 24 24"><path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"/><path d="M16 9a5 5 0 0 1 0 6"/><path d="M19.364 18.364a9 9 0 0 0 0-12.728"/></symbol>
+  <symbol id="mic" viewBox="0 0 24 24"><path d="M12 19v3"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><rect x="9" y="2" width="6" height="13" rx="3"/></symbol>
+  <symbol id="sliders" viewBox="0 0 24 24"><line x1="21" x2="14" y1="4" y2="4"/><line x1="10" x2="3" y1="4" y2="4"/><line x1="21" x2="12" y1="12" y2="12"/><line x1="8" x2="3" y1="12" y2="12"/><line x1="21" x2="16" y1="20" y2="20"/><line x1="12" x2="3" y1="20" y2="20"/><line x1="14" x2="14" y1="2" y2="6"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="16" x2="16" y1="18" y2="22"/></symbol>
+  <symbol id="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+  <symbol id="down" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></symbol>
+  <symbol id="up" viewBox="0 0 24 24"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></symbol>
+  <symbol id="lines" viewBox="0 0 24 24"><path d="M2 10v3"/><path d="M6 6v11"/><path d="M10 3v18"/><path d="M14 8v7"/><path d="M18 5v13"/><path d="M22 10v3"/></symbol>
+  <symbol id="folder" viewBox="0 0 24 24"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></symbol>
+  <symbol id="coffee" viewBox="0 0 24 24"><path d="M10 2v2"/><path d="M14 2v2"/><path d="M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1"/><path d="M6 2v2"/></symbol>
+  <symbol id="music" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></symbol>
+  <symbol id="activity" viewBox="0 0 24 24"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"/></symbol>
+  <symbol id="clip" viewBox="0 0 24 24"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></symbol>
+  <symbol id="note" viewBox="0 0 24 24"><path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4"/><path d="M2 6h4"/><path d="M2 10h4"/><path d="M2 14h4"/><path d="M2 18h4"/><path d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/></symbol>
+  <symbol id="inbox" viewBox="0 0 24 24"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></symbol>
+  <symbol id="link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></symbol>
+  <symbol id="pause" viewBox="0 0 24 24"><rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/></symbol>
+  <symbol id="more" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></symbol>
+  <symbol id="search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+  <symbol id="text" viewBox="0 0 24 24"><path d="M15 12H3"/><path d="M17 18H3"/><path d="M21 6H3"/></symbol>
+  <symbol id="globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></symbol>
+  <symbol id="plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+  <symbol id="back" viewBox="0 0 24 24"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" x2="5" y1="19" y2="5"/></symbol>
+  <symbol id="fwd" viewBox="0 0 24 24"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" x2="19" y1="5" y2="19"/></symbol>
+  <symbol id="file" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></symbol>
+  <symbol id="filex" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="m14.5 12.5-5 5"/><path d="m9.5 12.5 5 5"/></symbol>
+  <symbol id="files" viewBox="0 0 24 24"><path d="M20 7h-3a2 2 0 0 1-2-2V2"/><path d="M9 18a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h7l4 4v10a2 2 0 0 1-2 2Z"/><path d="M3 7.6v12.8A1.6 1.6 0 0 0 4.6 22h9.8"/></symbol>
+  <symbol id="cloud" viewBox="0 0 24 24"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></symbol>
+  <symbol id="grid" viewBox="0 0 24 24"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></symbol>
+  <symbol id="gear" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="monitor" viewBox="0 0 24 24"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></symbol>
+  <symbol id="camera" viewBox="0 0 24 24"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></symbol>
+  <symbol id="pipette" viewBox="0 0 24 24"><path d="m2 22 1-1h3l9-9"/><path d="M3 21v-3l9-9"/><path d="m15 6 3.4-3.4a2.1 2.1 0 1 1 3 3L18 9l.4.4a2.1 2.1 0 1 1-3 3l-3.8-3.8a2.1 2.1 0 1 1 3-3l.4.4Z"/></symbol>
+  <symbol id="keyboard" viewBox="0 0 24 24"><path d="M10 8h.01"/><path d="M12 12h.01"/><path d="M14 8h.01"/><path d="M16 12h.01"/><path d="M18 8h.01"/><path d="M6 8h.01"/><path d="M7 16h10"/><path d="M8 12h.01"/><rect width="20" height="16" x="2" y="4" rx="2"/></symbol>
+  <symbol id="download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></symbol>
+  <symbol id="toggle" viewBox="0 0 24 24"><rect width="20" height="12" x="2" y="6" rx="6" ry="6"/><circle cx="8" cy="12" r="2"/></symbol>
+  <symbol id="package" viewBox="0 0 24 24"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><path d="m3.3 7 7.703 4.734a2 2 0 0 0 1.994 0L20.7 7"/></symbol>
+  <symbol id="bot" viewBox="0 0 24 24"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></symbol>
+  <symbol id="micx" viewBox="0 0 24 24"><path d="M12 19v3"/><path d="M15 9.34V5a3 3 0 0 0-5.68-1.33"/><path d="M16.95 16.95A7 7 0 0 1 5 12v-2"/><path d="M18.89 13.23A7 7 0 0 0 19 12v-2"/><path d="m2 2 20 20"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12"/></symbol>
+  <symbol id="pin" viewBox="0 0 24 24"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></symbol>
+  <symbol id="trash" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></symbol>
+  <symbol id="volx" viewBox="0 0 24 24"><path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"/><line x1="22" x2="16" y1="9" y2="15"/><line x1="16" x2="22" y1="9" y2="15"/></symbol>
+  <symbol id="wave" viewBox="0 0 24 24"><path d="M2 13a2 2 0 0 0 2-2V7a2 2 0 0 1 4 0v13a2 2 0 0 0 4 0V4a2 2 0 0 1 4 0v13a2 2 0 0 0 4 0v-4a2 2 0 0 1 2-2"/></symbol>
+  <symbol id="video" viewBox="0 0 24 24"><path d="m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5"/><rect x="2" y="6" width="14" height="12" rx="2"/></symbol>
+  <symbol id="gamepad" viewBox="0 0 24 24"><line x1="6" x2="10" y1="11" y2="11"/><line x1="8" x2="8" y1="9" y2="13"/><line x1="15" x2="15.01" y1="12" y2="12"/><line x1="18" x2="18.01" y1="10" y2="10"/><path d="M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.151A4 4 0 0 0 17.32 5z"/></symbol>
+  <symbol id="message" viewBox="0 0 24 24"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></symbol>
+  <symbol id="play" viewBox="0 0 24 24"><polygon points="6 3 20 12 6 21 6 3"/></symbol>
+</svg>
+
+<h1 class="doc">One island size: 520 × 360</h1>
+<p class="cap">Every page and the All features grid share one size, so the island never changes size between pages; only opening and closing animate. Compact throughout: 12px text (11 for captions), 28 to 36px rows, 28px buttons, 12px inset, 20px outer and 8px inner corners, one 8px gap between every card, tile and column, 32px orbit buttons. Every page sits on six 76px columns. The rules: nothing scrolls except the text inside a Scratchpad note. Pages adapt to fit: the grid adds columns, rows shorten, strips narrow and Shelf tiles shrink, and whatever still doesn’t fit is in Settings. Lists start at the top and show whole rows only; page action rows sit at the bottom edge; Keep awake's choices use the grid's tile size and sit in the vertical middle, as empty states do; App volume's strips are centered; an empty page centers its message; System monitor stacks its two tables. Invented content throughout.</p>
+<div class="board" id="a"></div>
+<div class="board" id="b"></div>
+<div class="board" id="c"></div>
+<div class="board" id="d"></div>
+<div class="board" id="shell"></div>
+<div class="board" id="g1"></div>
+<div class="board" id="g2"></div>
+<div class="board" id="f1"></div>
+<div class="board" id="f2"></div>
+<div class="board" id="st"></div>
+<div class="board" id="ps1"></div>
+<div class="board" id="ps2"></div>
+<div class="board" id="ps3"></div>
+
+<script>
+const ico = (id, cls = 'ico') => `<svg class="${cls}"><use href="#${id}"/></svg>`;
+const page = (title, right, body) => `<div class="isl"><div class="hd"><span class="t">${title}</span>${right || ''}</div><div class="bd">${body}</div></div>`;
+const pane = (label, html) => `<div><div class="lab">${label}</div>${html}</div>`;
+
+function grid() {
+  const tiles = [['lines', 'Sound', 'Speakers (Realtek…'], ['folder', 'File organizer', 'Auto'], ['sliders', 'App volume', '3 apps'],
+    ['coffee', 'Keep awake', 'Off'], ['music', 'Now Playing', 'Weekend Mix'], ['activity', 'System monitor', 'CPU 18%'],
+    ['clip', 'Clipboard', '23 items'], ['note', 'Scratchpad', '4 notes'], ['inbox', 'Shelf', '5 items']];
+  return `<div class="isl"><div class="hd"><span class="gum"></span><span class="t">Chippi</span><span class="s">3:45 PM</span></div><div class="bd"><div class="grid">${
+    tiles.map(([g, n, s]) => `<div class="card gt">${ico(g, 'ico24')}<b>${n}</b><span class="sm t3">${s}</span></div>`).join('')}</div></div></div>`;
+}
+
+function nowPlaying() {
+  return page('Now Playing', '', `<div class="np"><div class="art">${ico('music', 'ico24')}</div><div class="npr">
+    <span class="src">Spotify ${ico('chev', 'ico12')}</span>
+    <div class="ttl trim">Weekend Mix</div><div class="t3">Various Artists</div>
+    <div class="prog"><div class="bar"><b style="width:31%"></b></div><div class="times sm t3 num"><span>1:12</span><span>3:52</span></div></div>
+    <div class="trans"><span class="t3">${ico('back', 'ico20')}</span><span class="play">${ico('pause', 'ico20')}</span><span class="t3">${ico('fwd', 'ico20')}</span></div>
+  </div></div>`);
+}
+
+function sound() {
+  const row = (name, on) => `<div class="row ${on ? 'sel' : ''}"><span class="rad ${on ? 'on' : ''}"></span><span class="trim">${name}</span></div>`;
+  return page('Sound', '', `<div class="cols">
+    <div><div class="clab">Output</div><div class="card ctl"><span class="g">${ico('vol')}</span><div class="mid"><div class="sl"><i></i><b style="width:36%"></b><s style="left:36%"></s></div><span class="pct num">36%</span></div><button class="btn">Mute</button></div>
+      <div class="rows">${row('Speakers (INZONE Buds - Game)')}${row('Speakers (Realtek USB2.0 Audio)', true)}${row('Headphones (RØDE VideoMic GO II)')}</div></div>
+    <div><div class="clab">Microphone</div><div class="card ctl"><span class="g">${ico('mic')}</span><div class="mid"><span>Live</span></div><button class="btn">Mute</button></div>
+      <div class="rows">${row('Microphone (RØDE VideoMic GO II)', true)}${row('Headset Microphone (INZONE Buds - Chat)')}</div>
+      <div style="height:8px"></div><div class="card ctl"><span class="g">${ico('wave')}</span><div class="mid"><span>Mic processing</span></div><span class="sw"></span></div></div>
+  </div>`);
+}
+
+// An app's icon: colored squares stand in for each app's own icon; two letters when it has none.
+const appIcon = (g, c) => g.length === 2 ? `<span class="aico fb">${g}</span>` : `<span class="aico" style="background:${c}">${ico(g, 'ico12')}</span>`;
+function appVolume() {
+  const apps = [['video', '#3B6FD6', 'Zoom Meetings', 100], ['vol', '#555555', 'System sounds', 64, true], ['gamepad', '#2B4466', 'Steam', 80], ['music', '#2F9A5C', 'Spotify', 45], ['message', '#5B63D9', 'Discord', 72]];
+  return page('App volume', '', `<div class="apps">${apps.map(([g, c, n, v, m]) => `<div class="app">${m ? `<span class="aico mut">${ico('volx')}</span>` : appIcon(g, c)}<div class="vb ${m ? 'm' : ''}"><b style="height:${v}%"></b></div><span class="p num ${m ? 'ct' : ''}">${m ? 'Muted' : v + '%'}</span><span class="nm">${n}</span><span class="more">${ico('more')}</span></div>`).join('')}</div>`);
+}
+
+function keepAwake() {
+  return page('Keep awake', '<span class="s">Off</span>', `<div class="ka">${['30 min', '1 hr', '2 hr', '4 hr', 'No limit', 'Until…'].map(c => `<div class="card">${c}</div>`).join('')}</div>`);
+}
+
+function organizer() {
+  const files = [['file', 'invoice-0412.pdf', 'Invoices', '2 min'], ['file', 'setup-2.4.1.exe', 'Installers', '14 min'], ['file', 'IMG_2231.jpg', 'Pictures', '1 hr'],
+    ['file', 'meeting-notes.docx', 'Documents', '3 hr'], ['file', 'budget-2027.xlsx', 'Documents', 'Yesterday'], ['files', 'photos-export.zip', 'Archives', 'Yesterday']];
+  return page('File organizer', '', `<div class="card ctl"><span class="g">${ico('folder')}</span><span>Downloads</span><span class="t3">${ico('chev', 'ico12')}</span><span class="grow"></span>
+      <div class="seg"><span class="on">Auto</span><span>Manual</span><span>Paused</span></div></div>
+    <div class="card recent">${files.map(([g, n, to, w]) => `<div class="cr">${ico(g)}<span class="trim">${n}</span><span class="sm t3 trim">${to}</span><span class="w">${w}</span></div>`).join('')}</div>
+    <div class="acts"><button class="btn" style="background:transparent;border-color:transparent;padding:0 10px;min-width:0;display:inline-flex;align-items:center;gap:3px">History ${ico('right', 'ico12')}</button><span class="grow"></span><button class="btn">Organize now</button></div>`);
+}
+
+function monitor() {
+  const row = (name, detail, value, pick) => `<div class="tr num"><span class="n">${name}${pick ? ico('chev', 'ico12') : ''}</span><span class="d trim">${detail}</span><span class="v">${value}</span></div>`;
+  const vols = [['C:', '214 GiB', '717 GiB', '931 GiB'], ['D:', '0.2 GiB', '477 GiB', '477 GiB'], ['E:', '0.4 GiB', '954 GiB', '954 GiB'], ['F:', '1.19 TiB', '2.45 TiB', '3.64 TiB'], ['X:', '23.6 GiB', '954 GiB', '978 GiB']];
+  return page('System monitor', '', `<div class="mon">
+    <div class="tbl">${row('CPU', '5.29 GHz', '18%')}${row('GPU', '125 °F · 2.0 of 15.7 GiB', '4%', true)}${row('Memory', '29.0 of 61.7 GiB', '47%')}
+      <div class="tr num"><span class="n">Network</span><span class="r"><span>${ico('down', 'ico12')}1 KiB/s</span><span>${ico('up', 'ico12')}0 KiB/s</span></span></div></div>
+    <div class="tbl dk"><div class="tr h"><span>Disks</span><span>Used</span><span>Free</span><span>Total</span></div>${vols.map(([l, u, f, t]) => `<div class="tr num"><span class="t3">${l}</span><span>${u}</span><span>${f}</span><span>${t}</span></div>`).join('')}</div>
+  </div>`);
+}
+
+const clipHeader = on => `<button class="ib ${on ? 'on' : ''}">${ico('link')}</button>${on ? '' : `<button class="ib">${ico('pause')}</button><button class="ib">${ico('more')}</button>`}`;
+function clipboard() {
+  const r = (g, t, w) => `<div class="cr">${ico(g)}<span class="trim">${t}</span><span class="w num">${w}</span></div>`;
+  return page('Clipboard', clipHeader(false), `<div class="search">${ico('search')}<span>Search</span></div><div class="list">
+    <div class="sec">Pinned</div>${r('text', 'Thanks, I’ll review the draft by Friday and send notes.', 'Oct 21')}${r('text', 'git log --oneline --graph -20', 'Oct 19')}
+    <div class="sec">Recent</div>${r('globe', 'https://example.org/docs/setup?ref=nav#install', 'Now')}
+    <div class="ex"><div class="top"><span style="display:inline-flex;gap:8px;align-items:center">${ico('text')}Text · 4 lines</span><span>2 min</span></div>
+      <div class="body">Meeting moved to 3:30 PM, Room 2B.
+Agenda: Q3 numbers, launch checklist
+Bring: laptops, the Q3 deck and the…</div>
+      <div class="a"><button class="btn acc">Paste</button><button class="btn">Copy</button><span class="grow"></span><button class="ib t3">${ico('pin')}</button><button class="ib t3">${ico('trash')}</button></div></div>
+  </div>`);
+}
+function cleanUrl() {
+  return page('Clipboard', clipHeader(true), `<div class="field">https://example.org/p?utm_source=news&amp;utm_medium=email&amp;item=7#part</div>
+    <div class="card res"><div>https://example.org/p?item=7#part</div><div class="sm t3">Removed · utm_source, utm_medium</div></div>
+    <div class="acts" style="margin-top:0"><span class="grow"></span><button class="btn acc">Copy</button></div>`);
+}
+function clipboardOff() {
+  return page('Clipboard', `<button class="ib">${ico('link')}</button>`, `<div class="empty">${ico('clip', 'ico24')}<span>Recording off</span><button class="btn acc">Turn on</button></div>`);
+}
+
+function scratchpad() {
+  return page('Scratchpad', '<span class="s">Saved</span>', `<div class="tabs"><span class="tab">Groceries</span><span class="tab on">Standup</span><span class="tab">Ideas</span><span class="tab">Draft reply</span><span class="grow"></span><button class="ib t3">${ico('plus')}</button></div>
+    <div class="card editor">## Standup, Tue
+- Shipped: island fit fix
+- Today: **Shelf** drag-out
+- Blocked: none
+
+- [ ] Book a room for Thursday
+Branch: \`release/0.6\`</div>
+    <div class="acts"><div class="seg"><span class="on">Edit</span><span>Preview</span></div><span class="grow"></span><button class="ib t3">${ico('more')}</button></div>`);
+}
+
+// A Shelf name wraps at spaces and hyphens, up to two lines; one long word stays on one line and trims.
+const shelfName = n => /[\s-]/.test(n) ? `<span class="nm">${n}</span>` : `<span class="nm one trim">${n}</span>`;
+function shelf() {
+  const items = [['file', 'invoice-0412.pdf', 'PDF · 2.1 MB', 'sel'], ['thumb', 'Picture', '1280 × 720', 'pin'], ['text', 'Call Dana about the venue', 'Text · 2 lines'],
+    ['globe', 'example.org/launch', 'Link'], ['files', '3 files', 'Files · 4.8 MB'], ['filex', 'old-logo.svg', 'Unavailable', 'gone'],
+    ['cloud', 'Budget 2027.xlsx', 'Online only'], ['text', 'Gate 14, boarding 6:10', 'Text'], ['globe', 'shop.example.org/cart', 'Link']];
+  return page('Shelf', '', `<div class="shelf">${items.map(([g, n, k, f]) => `<div class="card si ${f === 'sel' ? 'sel' : ''} ${f === 'gone' ? 'gone' : ''}">${f === 'pin' ? `<span class="pin">${ico('pin', 'ico12')}</span>` : ''}${g === 'thumb' ? '<span class="thumb"></span>' : ico(g, 'ico20')}${/^(Unavailable|Online only)$/.test(k) ? `<span class="nm one trim">${n}</span><span class="k trim">${k}</span>` : shelfName(n)}</div>`).join('')}</div>
+    <div class="acts"><span class="grow"></span><button class="btn">Copy</button><button class="btn">Pin</button><button class="btn">Remove</button></div>`);
+}
+
+// The shell on a screen: the shape, its orbit pairs (32 circles, 10 off, 6 between) and the live button.
+const orb = (x, y, g) => `<span class="orb" style="left:${x}px;top:${y}px">${ico(g)}</span>`;
+function onScreen(edge, inner, w = 1280, h = 720) {
+  const work = h - 48, W = 520, H = 360, O = 32, G = 10, B = 6;
+  let html = '', x, y;
+  if (edge === 'top') {
+    x = (w - W) / 2; y = 0;
+    const py = y + H / 2 - (O * 2 + B) / 2;
+    html = orb(x - G - O, py, 'grid') + orb(x - G - O, py + O + B, 'coffee') + orb(x + W + G, py, 'gear') + orb(x + W + G, py + O + B, 'sliders') + orb(x + W / 2 - O / 2, y + H + G, 'music');
+  } else if (edge === 'left') {
+    x = 0; y = Math.round((work - H) / 2);
+    const px = x + W / 2 - (O * 2 + B) / 2;
+    html = orb(px, y - G - O, 'grid') + orb(px + O + B, y - G - O, 'coffee') + orb(px, y + H + G, 'gear') + orb(px + O + B, y + H + G, 'sliders') + orb(x + W + G, y + H / 2 - O / 2, 'music');
+    const top = y - G - O, bottom = y + H + G + O;
+    if (top < 0 || bottom > work) html += `<span class="over" style="left:${x}px;top:${Math.max(top, 0)}px;width:${W + 4}px;height:${Math.min(bottom, h) - Math.max(top, 0)}px"></span>`;
+  } else {
+    x = w - 16 - W; y = work - 12 - 400;
+  }
+  const cls = edge === 'top' ? '' : edge === 'left' ? 'left' : 'dock';
+  let shape = inner.replace('<div class="isl">', `<div class="isl ${cls}" style="left:${x}px;top:${y}px">`);
+  if (edge === 'dock')
+    shape = shape.replace(/<\/div><\/div>$/, `</div><div class="dfoot"><span>${ico('grid')}All features</span><span>${ico('gear')}Settings</span></div></div>`);
+  const sm = w < 1280 ? 'sm' : '';
+  return `<div class="wrap ${sm}"><div class="desk ${sm}"><span class="work" style="height:${work}px"></span>${shape}${html}<span class="tbar"></span></div></div>`;
+}
+
+document.getElementById('a').innerHTML = pane('All features', grid()) + pane('Now Playing', nowPlaying()) + pane('Sound', sound());
+document.getElementById('b').innerHTML = pane('App volume (colored squares stand in for each app’s own icon; System sounds muted)', appVolume()) + pane('Keep awake', keepAwake()) + pane('File organizer', organizer());
+document.getElementById('c').innerHTML = pane('System monitor', monitor()) + pane('Clipboard: the newest copies that fit, whole rows only', clipboard()) + pane('Clipboard: Clean URL', cleanUrl());
+document.getElementById('d').innerHTML = pane('Clipboard: recording off', clipboardOff()) + pane('Scratchpad', scratchpad()) + pane('Shelf: up to 18 items, six across, names on two lines', shelf());
+document.getElementById('shell').innerHTML =
+  pane('1280 × 720, top edge', onScreen('top', grid())) +
+  pane('1280 × 720, left edge', onScreen('left', clipboard())) +
+  pane('1024 × 576 (1280 × 720 at 125%), left edge', onScreen('left', monitor(), 1024, 576));
+
+// The grid ladder: the fewest tiles per row that fit, filling the body; small tiles drop the status, then shrink.
+const ALL_TILES = [['lines', 'Sound', 'Speakers (Realtek…'], ['folder', 'File organizer', 'Auto'], ['sliders', 'App volume', '3 apps'],
+  ['coffee', 'Keep awake', 'Off'], ['music', 'Now Playing', 'Weekend Mix'], ['activity', 'System monitor', 'CPU 18%'],
+  ['clip', 'Clipboard', '23 items'], ['note', 'Scratchpad', '4 notes'], ['inbox', 'Shelf', '5 items'],
+  ['toggle', 'Quick toggles', '3 on'], ['grid', 'Window layouts', '2 layouts'], ['search', 'Command bar', 'Ready'],
+  ['camera', 'Screen capture', 'Ready'], ['pipette', 'Color picker', '#B79CFF'], ['monitor', 'Displays', '2 displays'],
+  ['download', 'Updates', '4 updates'], ['package', 'Uninstaller', '86 apps'], ['keyboard', 'Shortcuts', '12 set'],
+  ['bot', 'AI usage', '41% used'], ['trash', 'Cleaner', '2.1 GB']];
+const LADDER = [[1, 1, 1, 'l1'], [2, 2, 1, 'l1'], [3, 3, 1, 'l1'], [4, 2, 2, 'l1'], [6, 3, 2, 'l1'], [9, 3, 3, 'l1'], [12, 4, 3, 'l1'], [15, 5, 3, 'l2'], [20, 5, 4, 'l2'], [24, 6, 4, 'l3'], [30, 6, 5, 'l3']];
+function gridOf(n) {
+  const [, cols, rows, level] = LADDER.find(([max]) => n <= max);
+  const tiles = ALL_TILES.slice(0, n);
+  return `<div class="isl"><div class="hd"><span class="gum"></span><span class="t">Chippi</span><span class="s">3:45 PM</span></div><div class="bd"><div class="grid" style="grid-template-columns:repeat(${cols},minmax(0,1fr));grid-template-rows:repeat(${rows},1fr)">${
+    tiles.map(([g, nm, st]) => `<div class="card gt ${level}">${ico(g, 'ico24')}<b>${nm}</b><span class="sm t3">${st}</span></div>`).join('')}</div></div></div>`;
+}
+document.getElementById('g1').innerHTML = pane('4 tiles: 2 × 2', gridOf(4)) + pane('6 tiles (Essentials): 3 × 2', gridOf(6)) + pane('9 tiles (today): 3 × 3', gridOf(9));
+document.getElementById('g2').innerHTML = pane('12 tiles: 4 × 3 (tiles 10 on are sample future features)', gridOf(12)) + pane('15 tiles: 5 × 3, smaller text', gridOf(15)) + pane('20 tiles: 5 × 4, smaller text', gridOf(20));
+
+// Fit rules in action: the same pages with more content than today.
+function soundMany() {
+  const one = (name, on) => `<div class="row ${on ? 'sel' : ''}"><span class="rad ${on ? 'on' : ''}"></span><span class="trim">${name}</span></div>`;
+  const outs = ['Speakers (INZONE Buds - Game)', 'Speakers (Realtek USB2.0 Audio)', 'Headphones (RØDE VideoMic GO II)', 'LG ULTRAGEAR (NVIDIA High Definition Audio)', 'Speakers (Steam Streaming Speakers)', 'Digital Output (S/PDIF)', 'Headphones (Xbox Wireless Headset)'];
+  const mics = ['Microphone (RØDE VideoMic GO II)', 'Headset Microphone (INZONE Buds - Chat)', 'Microphone (Steam Streaming Microphone)', 'Microphone (Xbox Wireless Headset)', 'Line In (Realtek USB2.0 Audio)'];
+  return page('Sound', '', `<div class="cols">
+    <div><div class="clab">Output</div><div class="card ctl"><span class="g">${ico('vol')}</span><div class="mid"><div class="sl"><i></i><b style="width:36%"></b><s style="left:36%"></s></div><span class="pct num">36%</span></div><button class="btn">Mute</button></div>
+      <div class="rows">${outs.map((n, i) => one(n, i === 1)).join('')}</div></div>
+    <div><div class="clab">Microphone</div><div class="card ctl"><span class="g">${ico('mic')}</span><div class="mid"><span>Live</span></div><button class="btn">Mute</button></div>
+      <div class="rows">${mics.map((n, i) => one(n, i === 0)).join('')}</div>
+      <div style="height:8px"></div><div class="card ctl"><span class="g">${ico('wave')}</span><div class="mid"><span>Mic processing</span></div><span class="sw"></span></div></div>
+  </div>`);
+}
+function appsMany() {
+  const apps = [['video', '#3B6FD6', 100], ['vol', '#555555', 64], ['gamepad', '#2B4466', 80], ['music', '#2F9A5C', 45], ['message', '#5B63D9', 72], ['globe', '#C2573A', 90],
+    ['camera', '#8A4FC7', 55], ['note', '#B8862B', 100], ['Py', '', 30], ['download', '#2E8C99', 85], ['monitor', '#4A6A3A', 60], ['bot', '#9A3F6A', 75]];
+  return page('App volume', '', `<div class="apps">${apps.map(([g, c, v]) => `<div class="app n">${appIcon(g, c)}<div class="vb"><b style="height:${v}%"></b></div><span class="p num">${v}%</span><span class="more">${ico('more')}</span></div>`).join('')}</div>`);
+}
+function monitorMany() {
+  const row = (name, detail, value, pick) => `<div class="tr num"><span class="n">${name}${pick ? ico('chev', 'ico12') : ''}</span><span class="d trim">${detail}</span><span class="v">${value}</span></div>`;
+  const vols = [['C:', '214 GiB', '717 GiB', '931 GiB'], ['D:', '0.2 GiB', '477 GiB', '477 GiB'], ['E:', '0.4 GiB', '954 GiB', '954 GiB'], ['F:', '1.19 TiB', '2.45 TiB', '3.64 TiB'],
+    ['G:', '410 GiB', '521 GiB', '931 GiB'], ['H:', '12.0 GiB', '107 GiB', '119 GiB'], ['X:', '23.6 GiB', '954 GiB', '978 GiB']];
+  return page('System monitor', '', `<div class="mon">
+    <div class="tbl">${row('CPU', '5.29 GHz', '18%')}${row('GPU', '125 °F · 2.0 of 15.7 GiB', '4%', true)}${row('Memory', '29.0 of 61.7 GiB', '47%')}
+      <div class="tr num"><span class="n">Network</span><span class="r"><span>${ico('down', 'ico12')}1 KiB/s</span><span>${ico('up', 'ico12')}0 KiB/s</span></span></div></div>
+    <div class="tbl dk tight"><div class="tr h"><span>Disks</span><span>Used</span><span>Free</span><span>Total</span></div>${vols.map(([l, u, f, t]) => `<div class="tr num"><span class="t3">${l}</span><span>${u}</span><span>${f}</span><span>${t}</span></div>`).join('')}</div>
+  </div>`);
+}
+function shelfMany(n) {
+  const kinds = [['file', 'invoice-0412.pdf'], ['thumb', 'Picture'], ['text', 'Call Dana'], ['globe', 'example.org'], ['files', '3 files'], ['file', 'report.docx'], ['cloud', 'Budget.xlsx'], ['text', 'Gate 14']];
+  const [cols, rows, level] = n <= 18 ? [6, 3, ''] : n <= 28 ? [7, 4, 's2'] : [8, 5, 's3'];
+  const items = Array.from({ length: n }, (_, i) => kinds[i % kinds.length]);
+  const full = n >= 40;
+  return page('Shelf', '', `<div class="shelf" style="grid-template-columns:repeat(${cols},minmax(0,1fr));grid-template-rows:repeat(${rows},1fr);grid-auto-rows:unset;flex:1;gap:8px">${
+    items.map(([g, nm]) => `<div class="card si ${level}">${g === 'thumb' ? '<span class="thumb"></span>' : ico(g, 'ico20')}${shelfName(nm)}</div>`).join('')}</div>
+    <div class="acts">${full ? '<span class="cau sm">Shelf full</span>' : ''}<span class="grow"></span><button class="btn">Copy</button><button class="btn">Pin</button><button class="btn">Remove</button></div>`);
+}
+document.getElementById('f1').innerHTML = pane('Sound, 7 outputs and 5 mics: one-line rows', soundMany()) + pane('App volume, 12 apps: narrow strips, ⋯ kept (“Py” has no icon)', appsMany()) + pane('System monitor, 7 drives: shorter rows', monitorMany());
+document.getElementById('f2').innerHTML = pane('Shelf, 28 items: 7 × 4, names on two lines', shelfMany(28)) + pane('Shelf, 40 items: 8 × 5, glyphs only, full', shelfMany(40));
+
+// Shell states on the grid, and the open page's orbit button on a screen.
+function gridStates() {
+  const t = (g, n, st, cls = '', extra = '') => `<div class="card gt ${cls}">${extra}${g}<b>${n}</b>${st}</div>`;
+  const tiles = [
+    t(ico('micx', 'ico24 c'), 'Sound', '<span class="sm c">Mic muted</span>', '', '<span class="dot c"></span>'),
+    t(ico('folder', 'ico24'), 'File organizer', '<span class="sm t3">Auto</span>'),
+    t(ico('sliders', 'ico24'), 'App volume', '<span class="sm t3">3 apps</span>'),
+    t(ico('coffee', 'ico24'), 'Keep awake', '<span class="sm t3">52 min left</span>', '', '<span class="dot"></span>'),
+    t(ico('music', 'ico24'), 'Now Playing', '<span class="sm t3">Weekend Mix</span>', '', '<span class="dot"></span>'),
+    t(ico('activity', 'ico24'), 'System monitor', '<span class="sm t3">CPU 18%</span>', 'prs'),
+    t(ico('clip', 'ico24'), 'Clipboard', '<span class="sm t3">23 items</span>', 'hov'),
+    t(ico('note', 'ico24'), 'Scratchpad', '<span class="sm t3">4 notes</span>'),
+    t(ico('inbox', 'ico24'), 'Shelf', '<span class="sm t3">5 items</span>')];
+  return `<div class="isl"><div class="hd"><span class="gum"></span><span class="t">Chippi</span><span class="s">3:45 PM</span></div><div class="bd"><div class="grid">${tiles.join('')}</div></div></div>`;
+}
+function openPageOnScreen() {
+  // Keep awake is open from its orbit button, so that button carries the ring.
+  return onScreen('top', keepAwake()).replace(/(<span class="orb" style="[^"]*">)(<svg class="ico"><use href="#coffee"\/><\/svg>)/, (m, a, b) => a.replace('class="orb"', 'class="orb on"') + b);
+}
+document.getElementById('st').innerHTML = pane('Grid states: muted (Caution), live dots, pressed (System monitor), hover (Clipboard)', gridStates()) +
+  pane('Keep awake open from its round button: that button is ringed', openPageOnScreen());
+
+// Page states: Keep awake on, the empty pages, and a long link in Clean URL.
+function keepAwakeOn(hover) {
+  return page('Keep awake', '<span class="s">52 min left</span>', `<div class="ka">${['30 min', '1 hr', '2 hr', '4 hr', 'No limit', 'Until…'].map(c => c === '1 hr' ? `<div class="card lit ${hover ? 'hv' : ''}">${hover ? 'Stop' : c}</div>` : `<div class="card">${c}</div>`).join('')}</div>`);
+}
+function appsEmpty() {
+  return page('App volume', '', `<div class="empty">${ico('sliders', 'ico24')}<span>No apps playing</span></div>`);
+}
+function soundNoMic() {
+  const s = sound();
+  const mic = `<div><div class="clab">Microphone</div><div class="card ctl"><span class="g" style="color:var(--t3)">${ico('micx')}</span><div class="mid t3"><span>No microphone</span></div><button class="btn off">Mute</button></div>
+      <div style="height:8px"></div><div class="card ctl"><span class="g">${ico('wave')}</span><div class="mid"><span>Mic processing</span></div><span class="sw"></span></div></div>`;
+  return s.slice(0, s.indexOf('<div><div class="clab">Microphone</div>')) + mic + '\n  </div></div></div>';
+}
+function nowPlayingNone() {
+  return page('Now Playing', '', `<div class="np"><div class="art">${ico('music', 'ico24')}</div><div class="npr">
+    <div class="ttl trim" style="margin-top:0">Nothing playing</div>
+    <div class="trans off" style="margin-top:auto"><span class="t3">${ico('back', 'ico20')}</span><span class="play" style="background:rgba(255,255,255,.12);color:#FFF">${ico('play', 'ico20')}</span><span class="t3">${ico('fwd', 'ico20')}</span></div>
+  </div></div>`);
+}
+function shelfEmpty() {
+  return page('Shelf', '', `<div class="zone">${ico('inbox', 'ico24')}<span>No items</span></div>`);
+}
+function organizerEmpty() {
+  return organizer().replace(/<div class="card recent">[\s\S]*?(?=\n    <div class="acts">)/, `<div class="card recent" style="display:flex"><div class="empty">${ico('file', 'ico24')}<span>No recent files</span></div></div>`);
+}
+function cleanUrlLong() {
+  const start = 'https://shop.example.org/products/outdoor/tents/ultralight-two-person-backpacking-tent-green?variant=48213&amp;utm_source=newsletter&amp;utm_medium=email&amp;utm_campaign=fall-sale-2026&amp;utm_con';
+  const end = 'ign=7731&amp;ref=footer-link&amp;color=green#reviews';
+  const clean = 'https://shop.example.org/products/outdoor/tents/ultralight-two-person-backpacking-tent-green?variant=48213&amp;ref=footer-link&amp;color=green#reviews';
+  return page('Clipboard', clipHeader(true), `<div class="field">${start}…${end}</div>
+    <div class="card res"><div>${clean}</div><div class="sm t3 trim">Removed · utm_source, utm_medium, utm_campaign, utm_content, fbclid, mc_eid</div></div>
+    <div class="acts" style="margin-top:0"><span class="grow"></span><button class="btn acc">Copy</button></div>`);
+}
+document.getElementById('ps1').innerHTML = pane('Keep awake on: 1 hr lit, the header counts down', keepAwakeOn(false)) + pane('Keep awake: the pointer on the lit choice', keepAwakeOn(true)) + pane('App volume: no apps playing', appsEmpty());
+document.getElementById('ps2').innerHTML = pane('Sound: no microphone', soundNoMic()) + pane('Now Playing: nothing playing', nowPlayingNone()) + pane('Shelf: empty', shelfEmpty());
+document.getElementById('ps3').innerHTML = pane('File organizer: no recent files', organizerEmpty()) + pane('Clean URL: a link past 3 lines, middle trimmed', cleanUrlLong()) +
+  pane('Scratchpad: a save failed', scratchpad().replace('<span class="s">Saved</span>', '<span class="s" style="color:var(--cau)">Save failed</span>'));
+
+const board = new URLSearchParams(location.search).get('board');
+if (board) {
+  document.body.classList.add('solo');
+  document.querySelectorAll('.board').forEach(b => b.classList.toggle('off', b.id !== board));
+  const r = document.getElementById(board).getBoundingClientRect();
+  document.body.dataset.size = `${Math.ceil(r.width)},${Math.ceil(r.height)}`;
+}
+</script>
+</body>
+</html>

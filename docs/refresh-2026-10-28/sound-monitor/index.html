@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sound and Monitor Refresh</title>
+<style>
+:root{--acc:#B79CFF;--cau:#FCE100;--isl:#0A0A0A;--card:rgba(255,255,255,.06);--track:rgba(255,255,255,.14);--t3:#ABABAB;--line:rgba(255,255,255,.10)}
+*{box-sizing:border-box}
+body{margin:0;padding:32px;background:#E4E4E4;color:#1A1A1A;font-family:'Segoe UI Variable Text','Segoe UI',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+body.solo{padding:0;background:#E4E4E4}
+.doc{margin:0 0 4px;font:600 22px/28px 'Segoe UI Variable Display','Segoe UI',sans-serif}
+.cap{margin:0 0 16px;font-size:13px;line-height:20px;color:#404040;max-width:900px}
+body.solo .doc,body.solo .cap{display:none}
+.board{display:inline-flex;gap:32px;align-items:flex-start;padding:0 24px 24px;margin:0 0 40px}
+body.solo .board{margin:0}
+body.solo .board.off{display:none}
+.lab{font-size:12px;line-height:16px;color:#5D5D5D;margin:8px 0 6px}
+
+/* Island page */
+.isl{background:var(--isl);color:#FFF;border:1px solid var(--line);border-top:0;border-radius:0 0 20px 20px;box-shadow:0 16px 40px rgba(0,0,0,.35);padding:12px;font-size:13px;line-height:20px}
+.hd{height:28px;display:flex;align-items:center;font-weight:600;margin-bottom:8px}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}
+.clab{height:24px;padding:4px 0 0 2px;font-size:12px;line-height:16px;font-weight:600;color:var(--t3)}
+.card{background:var(--card);border-radius:8px;padding:12px}
+.ico{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.ico12{width:12px;height:12px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.num{font-variant-numeric:tabular-nums}
+
+/* Sound: one control card shape, one row shape */
+.ctl{height:56px;display:flex;align-items:center;gap:10px}
+.ctl .g{color:var(--acc)}
+.ctl .g.c{color:var(--cau)}
+.ctl .mid{flex:1;min-width:0;display:flex;align-items:center;gap:10px}
+.ctl .st.c{color:var(--cau)}
+.btn{height:32px;padding:0 12px;border:1px solid rgba(255,255,255,.07);border-bottom-color:rgba(255,255,255,.04);border-radius:4px;background:rgba(255,255,255,.06);color:#FFF;font:inherit;font-size:14px;flex:none;min-width:76px}
+.sl{flex:1;position:relative;height:20px}
+.sl i{position:absolute;left:0;right:0;top:8px;height:4px;border-radius:2px;background:var(--track)}
+.sl b{position:absolute;left:0;top:8px;height:4px;border-radius:2px;background:var(--acc)}
+.sl s{position:absolute;top:0;width:20px;height:20px;margin-left:-10px;border-radius:50%;background:#454545;border:1px solid rgba(255,255,255,.08)}
+.sl s::after{content:'';position:absolute;left:4px;top:4px;width:10px;height:10px;border-radius:50%;background:var(--acc)}
+.pct{width:44px;text-align:right}
+.meter{flex:1;height:4px;border-radius:2px;background:var(--track);position:relative;overflow:hidden}
+.meter b{position:absolute;left:0;top:0;bottom:0;background:var(--acc);border-radius:2px}
+.sw{width:40px;height:20px;border-radius:10px;border:1px solid #9E9E9E;position:relative;flex:none}
+.sw::after{content:'';position:absolute;left:4px;top:4px;width:10px;height:10px;border-radius:50%;background:#CFCFCF}
+.sw.on{background:var(--acc);border-color:var(--acc)}
+.sw.on::after{left:22px;top:3px;width:12px;height:12px;background:#000}
+.rows{margin-top:6px}
+.row{height:44px;display:flex;align-items:center;gap:10px;padding:0 12px;border-radius:6px}
+.row.sel{background:var(--card)}
+.rad{width:16px;height:16px;border-radius:50%;border:1px solid var(--t3);flex:none}
+.rad.on{border:5px solid var(--acc);background:#000}
+.rn{min-width:0}
+.rn div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rn .s{font-size:12px;line-height:16px;color:var(--t3)}
+.gap8{height:8px}
+
+/* Monitor: two tables on one 32px row rhythm */
+.tbl{background:var(--card);border-radius:8px;padding:4px 12px}
+.tr{display:grid;grid-template-columns:72px 1fr auto;align-items:center;height:32px;gap:12px;font-size:13px}
+.tr+.tr{border-top:1px solid rgba(255,255,255,.06)}
+.tr .n{display:flex;align-items:center;gap:4px;color:var(--t3)}
+.tr .d{font-size:12px;color:var(--t3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tr .v{font-weight:600;text-align:right;min-width:36px}
+.tr .v.c{color:var(--cau)}
+.tr .r{display:flex;gap:14px;justify-content:flex-end;grid-column:2/-1}
+.tr .r span{display:inline-flex;align-items:center;gap:4px}
+.tr .r .ico12{color:var(--t3)}
+.dk .tr{grid-template-columns:72px repeat(3,1fr);gap:0}
+.dk .tr>span:not(:first-child){text-align:right}
+.dk .tr.h{height:28px;font-size:12px;color:var(--t3)}
+.dk .tr.h>span:first-child{font-weight:600}
+.dk .tr .l{color:var(--t3)}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="vol" viewBox="0 0 24 24"><path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"/><path d="M16 9a5 5 0 0 1 0 6"/><path d="M19.364 18.364a9 9 0 0 0 0-12.728"/></symbol>
+  <symbol id="volx" viewBox="0 0 24 24"><path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"/><line x1="22" x2="16" y1="9" y2="15"/><line x1="16" x2="22" y1="9" y2="15"/></symbol>
+  <symbol id="mic" viewBox="0 0 24 24"><path d="M12 19v3"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><rect x="9" y="2" width="6" height="13" rx="3"/></symbol>
+  <symbol id="micx" viewBox="0 0 24 24"><path d="M12 19v3"/><path d="M15 9.34V5a3 3 0 0 0-5.68-1.33"/><path d="M16.95 16.95A7 7 0 0 1 5 12v-2"/><path d="M18.89 13.23A7 7 0 0 0 19 12v-2"/><path d="m2 2 20 20"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12"/></symbol>
+  <symbol id="sliders" viewBox="0 0 24 24"><line x1="21" x2="14" y1="4" y2="4"/><line x1="10" x2="3" y1="4" y2="4"/><line x1="21" x2="12" y1="12" y2="12"/><line x1="8" x2="3" y1="12" y2="12"/><line x1="21" x2="16" y1="20" y2="20"/><line x1="12" x2="3" y1="20" y2="20"/><line x1="14" x2="14" y1="2" y2="6"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="16" x2="16" y1="18" y2="22"/></symbol>
+  <symbol id="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="down" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></symbol>
+  <symbol id="up" viewBox="0 0 24 24"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></symbol>
+</svg>
+
+<h1 class="doc">Sound page, made uniform</h1>
+<p class="cap">One control card shape (56 tall: glyph, live state, one button or switch at the right) and one row shape (44 tall). Both columns start their device rows at the same height. The output's name leaves its card, since the selected row already says "Playing now". Mic processing (was Clean-up) becomes a control card like the other two. Right: the same page muted, with Mic processing on; nothing changes size.</p>
+<div class="board" id="sound"></div>
+
+<h1 class="doc">System monitor, basic</h1>
+<p class="cap">360 wide, two tables on one 32px row: the readings (detail, then the value at the right edge) and Disks (Used, Free, Total). A value turns Caution when its alert fires. Gone: the graphs, "Last 4 min", the processor strip, Committed, Shared, GPU fan, and the disk activity and speed columns. Battery and Thermal zone add rows when the PC has them. A chevron after GPU or Network appears only with more than one to pick from.</p>
+<div class="board" id="monitor"></div>
+
+<script>
+const ico = (id, cls = 'ico') => `<svg class="${cls}"><use href="#${id}"/></svg>`;
+
+function soundPage(o) {
+  const outCard = `<div class="card ctl">
+      <span class="g ${o.outMuted ? 'c' : ''}">${ico(o.outMuted ? 'volx' : 'vol')}</span>
+      <div class="mid"><div class="sl"><i></i><b style="width:${o.vol}%"></b><s style="left:${o.vol}%"></s></div>
+        <span class="pct num st ${o.outMuted ? 'c' : ''}">${o.outMuted ? 'Muted' : o.vol + '%'}</span></div>
+      <button class="btn">${o.outMuted ? 'Unmute' : 'Mute'}</button></div>`;
+  const micCard = `<div class="card ctl">
+      <span class="g ${o.micMuted ? 'c' : ''}">${ico(o.micMuted ? 'micx' : 'mic')}</span>
+      <div class="mid"><span class="st ${o.micMuted ? 'c' : ''}">${o.micMuted ? 'Muted' : 'Live'}</span></div>
+      <button class="btn">${o.micMuted ? 'Unmute' : 'Mute'}</button></div>`;
+  const clean = `<div class="card ctl">
+      <span class="g">${ico('sliders')}</span>
+      <div class="mid"><span>Mic processing</span>${o.clean ? '<div class="meter"><b style="width:38%"></b></div>' : ''}</div>
+      <span class="sw ${o.clean ? 'on' : ''}"></span></div>`;
+  const row = (name, state, on) => `<div class="row ${on ? 'sel' : ''}"><span class="rad ${on ? 'on' : ''}"></span>
+      <div class="rn"><div>${name}</div><div class="s">${state}</div></div></div>`;
+  return `<div class="isl" style="width:640px">
+    <div class="hd">Sound</div>
+    <div class="cols">
+      <div><div class="clab">Output</div>${outCard}
+        <div class="rows">${row('Speakers (INZONE Buds - Game)', 'Connected')}${row('Speakers (Realtek USB2.0 Audio)', 'Playing now', true)}${row('Headphones (RØDE VideoMic GO II)', 'Connected')}</div></div>
+      <div><div class="clab">Microphone</div>${micCard}
+        <div class="rows">${row('Microphone (RØDE VideoMic GO II)', o.micMuted ? 'Muted' : 'In use', true)}${row('Headset Microphone (INZONE Buds - Chat)', 'Connected')}</div>
+        <div class="gap8"></div>${clean}</div>
+    </div></div>`;
+}
+
+function monitorPage() {
+  const row = (name, detail, value, o = {}) => `<div class="tr num"><span class="n">${name}${o.pick ? ico('chev', 'ico12') : ''}</span>
+    <span class="d">${detail}</span><span class="v ${o.c ? 'c' : ''}">${value}</span></div>`;
+  const net = `<div class="tr num"><span class="n">Network</span><span class="r"><span>${ico('down', 'ico12')}1 KiB/s</span><span>${ico('up', 'ico12')}0 KiB/s</span></span></div>`;
+  const vols = [['C:', '214 GiB', '717 GiB', '931 GiB'], ['D:', '0.2 GiB', '477 GiB', '477 GiB'], ['E:', '0.4 GiB', '954 GiB', '954 GiB'],
+    ['F:', '1.19 TiB', '2.45 TiB', '3.64 TiB'], ['X:', '23.6 GiB', '954 GiB', '978 GiB']];
+  const vol = ([l, used, free, total]) => `<div class="tr num"><span class="l">${l}</span><span>${used}</span><span>${free}</span><span>${total}</span></div>`;
+  return `<div class="isl" style="width:360px">
+    <div class="hd">System monitor</div>
+    <div class="tbl">
+      ${row('CPU', '5.29 GHz', '18%')}
+      ${row('GPU', '125 °F · 2.0 of 15.7 GiB', '4%', { pick: true })}
+      ${row('Memory', '29.0 of 61.7 GiB', '47%')}
+      ${net}
+    </div>
+    <div class="gap8"></div>
+    <div class="tbl dk">
+      <div class="tr h"><span>Disks</span><span>Used</span><span>Free</span><span>Total</span></div>
+      ${vols.map(vol).join('')}
+    </div></div>`;
+}
+
+const pane = (label, html) => `<div><div class="lab">${label}</div>${html}</div>`;
+document.getElementById('sound').innerHTML =
+  pane('Default', soundPage({ vol: 36 })) +
+  pane('Muted, Mic processing on', soundPage({ vol: 36, outMuted: true, micMuted: true, clean: true }));
+document.getElementById('monitor').innerHTML = pane('Travis’s PC', monitorPage());
+
+const board = new URLSearchParams(location.search).get('board');
+if (board) {
+  document.body.classList.add('solo');
+  document.querySelectorAll('.board').forEach(b => b.classList.toggle('off', b.id !== board));
+  const r = document.getElementById(board).getBoundingClientRect();
+  document.body.dataset.size = `${Math.ceil(r.width)},${Math.ceil(r.height)}`;
+}
+</script>
+</body>
+</html>

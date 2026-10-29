@@ -10,14 +10,11 @@ using Windows.Win32.Foundation;
 
 namespace Chippi.App.Tray;
 
-/// <summary>The tray icon's display, and the icon itself in physical pixels when the shell knows it.</summary>
-internal sealed record TrayAnchor(TrayDisplay Display, Rect? Icon);
-
 /// <summary>
-/// WS1's composition: the tray icon and its menu, wired to <see cref="ShellCommands"/>. The icon is a
-/// door to the island's pages, not a panel of its own: left click toggles them (in the island while
-/// it shows, otherwise docked by the tray), right click opens the menu. With Hide tray icon on, the
-/// icon leaves the notification area while the island shows.
+/// WS1's composition: the tray icon and its menu, wired to <see cref="ShellCommands"/>. Left click
+/// (or Enter) opens Settings on the last page used, whether or not the island shows; right click opens
+/// the menu (DESIGN.md §5, revised 2026-10-28). With Hide tray icon on, the icon leaves the
+/// notification area while the island shows.
 /// </summary>
 public sealed class TrayController : IDisposable
 {
@@ -38,11 +35,10 @@ public sealed class TrayController : IDisposable
         _icon.Selected += (_, e) =>
         {
             _menu.Hide();
-            shell.Commands.TogglePages(e.Keyboard);
+            shell.Commands.OpenSettings();
         };
         _icon.ContextMenuRequested += (_, e) => _menu.ShowAt(e.X, e.Y, DescribeDisplay(_icon.GetRect()));
 
-        shell.Commands.RegisterTray(Anchor);
         shell.Commands.IslandShowingChanged += (_, _) => ApplyVisibility();
         shell.Config.SectionChanged += (_, e) =>
         {
@@ -77,15 +73,6 @@ public sealed class TrayController : IDisposable
         Log.Info(hide ? "Tray: icon hidden while the island shows" : "Tray: icon shown");
     }
 
-    private TrayAnchor? Anchor()
-    {
-        if (!_icon.Visible)
-            return null;
-        var rect = _icon.GetRect();
-        Rect? icon = rect is RECT r ? new Rect(r.left, r.top, r.right - r.left, r.bottom - r.top) : null;
-        return new TrayAnchor(DescribeDisplay(rect), icon);
-    }
-
     private TrayDisplay DescribeDisplay(RECT? rect)
     {
         var display = FlyoutPlacement.Describe(rect, out bool fallback);
@@ -110,7 +97,7 @@ public sealed class TrayController : IDisposable
     /// <summary>
     /// Debug builds: <c>--flyout-snapshot &lt;dir&gt;</c> opens the tray menu, renders it in dark and
     /// light to ws1-menu-*.png in that folder, then quits. For reviews and reports. The island's
-    /// pages, docked by the tray too, are <c>--island-pages</c>.
+    /// pages are <c>--island-pages</c>.
     /// </summary>
     private void SnapshotIfRequested()
     {

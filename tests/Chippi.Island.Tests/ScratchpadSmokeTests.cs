@@ -20,10 +20,10 @@ namespace Chippi.Island.Tests;
 public sealed class ScratchpadSmokeTests(ITestOutputHelper output)
 {
     [Theory]
-    [InlineData(false, false)]
-    [InlineData(false, true)]
-    [InlineData(true, false)]
-    public void Full_notes_page_and_shell_fit_a_1280_by_720_screen(bool docked, bool side) => WpfTestThread.Run(() =>
+    [InlineData(IslandEdge.Top)]
+    [InlineData(IslandEdge.Left)]
+    [InlineData(IslandEdge.Right)]
+    public void Full_notes_page_and_shell_fit_the_island_on_a_960_by_540_screen(IslandEdge edge) => WpfTestThread.Run(() =>
     {
         var store = new Store(); var ui = new Ui();
         var module = new ScratchpadModule(_ => store);
@@ -42,23 +42,9 @@ public sealed class ScratchpadSmokeTests(ITestOutputHelper output)
             Assert.Equal(store.Document.Selected.Text, editor.Text);
             Assert.Equal(editor.Text.Length, editor.CaretIndex);
             Assert.False(editor.AcceptsTab);
-            Set(panel, "_edge", side ? IslandEdge.Left : IslandEdge.Top);
-            Set(panel, "_area", new MonitorArea(default, new Rect(0, 0, 1280, 720), new Rect(0, 0, 1280, 672), 1));
-            Set(panel, "_window", new Rect(0, 0, 1280, 672));
-            Set(panel, "_tab", side ? new Rect(0, 280, 32, 112) : new Rect(584, 0, 112, 32));
-            if (docked)
-            {
-                Set(panel, "_dock", new TrayDisplay(new PixelRect(0, 0, 1280, 720), new PixelRect(0, 0, 1280, 672), TaskbarEdge.Bottom, 672, 1240, 96));
-                ((FrameworkElement)panel.FindName("Footer")).Visibility = Visibility.Visible;
-            }
-            Invoke(panel, "Reshape", true);
-            var footprint = Get<Rect>(panel, "_target");
-            Assert.Equal(440, footprint.Width);
-            if (!docked)
-                foreach (var (_, rect) in IslandGeometry.OrbitLayout(side ? IslandEdge.Left : IslandEdge.Top, footprint, Get<List<OrbitSlot>>(panel, "_placedSlots"))) footprint.Union(rect);
-            output.WriteLine($"docked={docked}, side={side}: footprint={footprint}, work=1280x672");
-            Assert.InRange(footprint.Left, 0, 1280); Assert.InRange(footprint.Right, 0, 1280);
-            Assert.InRange(footprint.Top, 0, 672); Assert.InRange(footprint.Bottom, 0, 672);
+            IslandBounds.Place(panel, edge, 960, 540);
+            var footprint = IslandBounds.Check(panel, edge, 960, 540);
+            output.WriteLine($"edge={edge}: footprint={footprint}, work=960x492");
             Assert.False(panel.IsVisible); Assert.Equal(IntPtr.Zero, new System.Windows.Interop.WindowInteropHelper(panel).Handle);
         }
         finally { panel.Close(); module.StopAsync(default).GetAwaiter().GetResult(); }

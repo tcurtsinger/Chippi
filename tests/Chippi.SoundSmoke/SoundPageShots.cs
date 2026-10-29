@@ -17,7 +17,7 @@ namespace Chippi.SoundSmoke;
 
 /// <summary>
 /// Renders the island's real Sound, App volume and Now Playing pages over fake devices: on the top
-/// edge, on the left edge, and docked by the tray. Runs only when CHIPPI_ISLAND_SHOTS names an
+/// edge and on the left edge. Runs only when CHIPPI_ISLAND_SHOTS names an
 /// output folder.
 /// </summary>
 public sealed class SoundPageShots
@@ -33,12 +33,10 @@ public sealed class SoundPageShots
         var monitor = new Rect(-20000, 0, 1920, 1080);
         var work = new Rect(-20000, 0, 1920, 1032);
         var area = new MonitorArea(default, monitor, work, 1);
-        var tray = new TrayDisplay(new PixelRect(-20000, 0, -18080, 1080), new PixelRect(-20000, 0, -18080, 1032), TaskbarEdge.Bottom, 1032, -18180, 96);
         foreach (var (name, open) in new (string, Action<IslandPanelWindow>)[]
         {
             ("top", p => p.Open(IslandEdge.Top, new Rect(-20000 + 960 - 68, 0, 136, 36), area)),
             ("left", p => p.Open(IslandEdge.Left, new Rect(-20000, 516 - 68, 36, 136), area)),
-            ("docked", p => p.OpenDocked(tray)),
         })
         {
             var panel = new IslandPanelWindow();

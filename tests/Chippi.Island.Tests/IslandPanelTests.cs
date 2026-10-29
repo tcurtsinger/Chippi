@@ -26,13 +26,12 @@ public sealed class IslandPanelTests
     private static readonly MonitorArea Offscreen = new(default, new Rect(-20000, 0, 1920, 1080), new Rect(-20000, 0, 1920, 1032), 1);
     private static readonly Rect Tab = new(-20000 + 960 - 56, 0, 112, 32);
 
-    internal static IslandTileContribution Part(string key, string name, int order, IslandOrbit orbit = IslandOrbit.None, double width = 328, string status = "")
+    internal static IslandTileContribution Part(string key, string name, int order, IslandOrbit orbit = IslandOrbit.None, string status = "")
     {
         var part = new IslandTileContribution(key, new IslandTileSpec(key, name, "Sliders", order, 0,
             () => new Border { Height = 120, Child = new TextBlock { Text = name } })
         {
             Orbit = orbit,
-            PageWidth = width,
         });
         part.SetStatus(status);
         return part;
@@ -47,7 +46,7 @@ public sealed class IslandPanelTests
         {
             panel.Initialize();
             panel.SetMedia(new FakeMedia());
-            panel.SetTiles(tiles ?? Tiles(Part("keep-awake", "Keep awake", 40, IslandOrbit.Left), Part("sound.mixer", "Volume mixer", 10, IslandOrbit.Right, 344)));
+            panel.SetTiles(tiles ?? Tiles(Part("keep-awake", "Keep awake", 40, IslandOrbit.Left), Part("sound.mixer", "Volume mixer", 10, IslandOrbit.Right)));
             test(panel);
         }
         finally
@@ -73,6 +72,113 @@ public sealed class IslandPanelTests
 
     private static List<string> OrbitNames(IslandPanelWindow panel) =>
         ((Canvas)panel.FindName("Orbit")).Children.OfType<Button>().Where(b => b.Visibility == Visibility.Visible).Select(b => AutomationProperties.GetName(b)).ToList();
+
+    /// <summary>The shape as drawn.</summary>
+    private static (double Width, double Height) Size(IslandPanelWindow panel)
+    {
+        var shape = (FrameworkElement)panel.FindName("Shape");
+        return (Math.Round(shape.Width, 3), Math.Round(shape.Height, 3));
+    }
+
+    private static Rect Drawn(IslandPanelWindow panel)
+    {
+        var shape = (FrameworkElement)panel.FindName("Shape");
+        return new Rect(Canvas.GetLeft(shape), Canvas.GetTop(shape), shape.Width, shape.Height);
+    }
+
+    [Fact]
+    public void The_grid_and_every_page_share_one_size_and_a_page_change_never_moves_the_shape()
+    {
+        WpfTestThread.Run(() => WithPanel(panel =>
+        {
+            Open(panel);
+            var grid = Drawn(panel);
+            Assert.Equal(new Rect(grid.X, grid.Y, 520, 360), grid);
+            foreach (var key in new[] { "keep-awake", IslandPanelWindow.NowPlayingKey, "sound.mixer" })
+            {
+                panel.ShowPage(key);
+                if (!Chippi.UI.Themes.Motion.IsReduced)
+                    Assert.Equal(grid, Drawn(panel)); // the first frame of the change: the same shape, no morph
+                Pump(TimeSpan.FromMilliseconds(400));
+                Assert.Equal(grid, Drawn(panel));
+                Assert.Equal(1, ((FrameworkElement)panel.FindName("Card")).Opacity);
+                if (key != IslandPanelWindow.NowPlayingKey)
+                {
+                    var body = Assert.IsAssignableFrom<FrameworkElement>(panel.PageBody);
+                    Assert.Equal((496, 304), (Math.Round(body.ActualWidth, 3), Math.Round(body.ActualHeight, 3)));
+                }
+            }
+            panel.ShowPage(null, remember: false);
+            Pump(TimeSpan.FromMilliseconds(400));
+            Assert.Equal(grid, Drawn(panel));
+        }));
+    }
+
+    [Fact]
+    public void A_page_change_fades_the_old_content_out_while_the_new_one_fades_in()
+    {
+        if (Chippi.UI.Themes.Motion.IsReduced)
+            return; // reduced motion snaps
+        WpfTestThread.Run(() => WithPanel(panel =>
+        {
+            Open(panel);
+            panel.ShowPage("keep-awake");
+            var leaving = (Image)panel.FindName("Leaving");
+            var card = (FrameworkElement)panel.FindName("Card");
+            Assert.NotNull(leaving.Source); // the grid, held over the new page
+            Assert.Equal(1, leaving.Opacity, 3);
+            Assert.Equal(0, card.Opacity, 3); // no blank gap: the new page starts fading in at once
+            Pump(TimeSpan.FromMilliseconds(400));
+            Assert.Null(leaving.Source);
+            Assert.Equal(0, leaving.Opacity);
+            Assert.Equal(1, card.Opacity);
+        }));
+    }
+
+    [Theory]
+    [InlineData(1, 1, 1, 20, true)]
+    [InlineData(3, 3, 1, 20, true)]
+    [InlineData(4, 2, 2, 20, true)]
+    [InlineData(6, 3, 2, 20, true)]
+    [InlineData(9, 3, 3, 20, true)]
+    [InlineData(12, 4, 3, 20, true)]
+    [InlineData(15, 5, 3, 16, true)]
+    [InlineData(20, 5, 4, 16, true)]
+    [InlineData(24, 6, 4, 14, false)]
+    [InlineData(30, 6, 5, 14, false)]
+    public void The_grid_lays_out_by_tile_count(int tiles, int columns, int rows, double glyph, bool status)
+    {
+        var layout = IslandGridLayout.For(tiles);
+        Assert.Equal((columns, rows, glyph, status), (layout.Columns, layout.Rows, layout.Glyph, layout.ShowsStatus));
+    }
+
+    [Theory]
+    [InlineData(4)]
+    [InlineData(6)]
+    [InlineData(9)]
+    [InlineData(12)]
+    [InlineData(15)]
+    [InlineData(20)]
+    public void The_tiles_fill_the_body_8_apart(int count)
+    {
+        WpfTestThread.Run(() =>
+        {
+            var grid = new IslandGrid();
+            grid.SetTiles([.. Enumerable.Range(0, count).Select(i => new IslandTileView($"t{i}", $"Tile {i}", Chippi.UI.Controls.LucideIcons.Music, "Status"))]);
+            grid.Measure(new Size(IslandPage.BodyWidth, IslandPage.HeaderHeight + IslandPage.Gap + IslandPage.BodyHeight));
+            grid.Arrange(new Rect(0, 0, IslandPage.BodyWidth, IslandPage.HeaderHeight + IslandPage.Gap + IslandPage.BodyHeight));
+            var buttons = grid.Buttons().ToList();
+            var layout = IslandGridLayout.For(count);
+            double width = (IslandPage.BodyWidth - (layout.Columns - 1) * 8) / layout.Columns;
+            double height = (IslandPage.BodyHeight - (layout.Rows - 1) * 8) / layout.Rows;
+            Assert.All(buttons, b => Assert.Equal((Math.Round(width, 2), Math.Round(height, 2)), (Math.Round(b.ActualWidth, 2), Math.Round(b.ActualHeight, 2))));
+            var first = buttons[0].TranslatePoint(new Point(), grid);
+            var last = buttons[^1].TranslatePoint(new Point(buttons[^1].ActualWidth, buttons[^1].ActualHeight), grid);
+            Assert.Equal(IslandPage.HeaderHeight + IslandPage.Gap, first.Y, 2);
+            if (count == layout.Columns * layout.Rows)
+                Assert.Equal((IslandPage.BodyWidth, IslandPage.HeaderHeight + IslandPage.Gap + IslandPage.BodyHeight), (Math.Round(last.X, 2), Math.Round(last.Y, 2)));
+        });
+    }
 
     [Fact]
     public void Opens_on_the_grid_with_now_playing_first_then_tiles_in_grid_order()
@@ -152,7 +258,7 @@ public sealed class IslandPanelTests
     }
 
     [Fact]
-    public void A_tile_opens_its_page_at_its_width_and_is_remembered_for_the_next_open()
+    public void A_tile_opens_its_page_at_the_one_size_and_is_remembered_for_the_next_open()
     {
         WpfTestThread.Run(() => WithPanel(panel =>
         {
@@ -163,7 +269,7 @@ public sealed class IslandPanelTests
             Pump(TimeSpan.FromMilliseconds(400));
             Assert.Equal("sound.mixer", panel.CurrentPage);
             Assert.Equal("sound.mixer", saved);
-            Assert.Equal(344, ((FrameworkElement)panel.FindName("Shape")).Width, 3);
+            Assert.Equal((520, 360), Size(panel));
 
             panel.CloseIsland(immediate: true);
             Open(panel);
@@ -210,7 +316,7 @@ public sealed class IslandPanelTests
     [Fact]
     public void A_notice_opens_its_page_once_and_the_header_shows_the_page_note()
     {
-        var monitor = Part("system-monitor", "System monitor", 60, width: 640, status: "CPU 12%");
+        var monitor = Part("system-monitor", "System monitor", 60, status: "CPU 12%");
         monitor.SetPageNote("Last 4 min");
         WpfTestThread.Run(() => WithPanel(panel =>
         {
@@ -287,7 +393,7 @@ public sealed class IslandPanelTests
             Orbit(panel, "Now Playing").RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
             Pump(TimeSpan.FromMilliseconds(400));
             Assert.Equal(IslandPanelWindow.NowPlayingKey, panel.CurrentPage);
-            Assert.Equal(440, ((FrameworkElement)panel.FindName("Shape")).Width, 3);
+            Assert.Equal((520, 360), Size(panel));
         }, Tiles(Part("sound.microphone", "Microphone", 30, status: "Muted"))));
     }
 
@@ -336,9 +442,10 @@ public sealed class IslandPanelTests
             var window = IslandNative.WindowRect(panel.Handle);
             double left = window.X + Canvas.GetLeft(shape), top = window.Y + Canvas.GetTop(shape);
             Assert.True(panel.Covers(new Point(left + 10, top + 10)));
-            Assert.True(panel.Covers(new Point(left - 12 - 20, top + 60 + 20))); // Keep awake's center, under Back's place
-            Assert.False(panel.Covers(new Point(left - 12 - 20, top + 12 + 20))); // Back's place, empty on the grid with nothing remembered
-            Assert.False(panel.Covers(new Point(left - 12 - 20, top + 12 + 48 * 3 + 20))); // below that column
+            // The left pair is centered on the 360 shape: Back at 145, Keep awake 38 below it, both 32 wide and 10 off.
+            Assert.True(panel.Covers(new Point(left - 10 - 16, top + 183 + 16))); // Keep awake's center, under Back's place
+            Assert.False(panel.Covers(new Point(left - 10 - 16, top + 145 + 16))); // Back's place, empty on the grid with nothing remembered
+            Assert.False(panel.Covers(new Point(left - 10 - 16, top + 183 + 38 + 16))); // below that column
         }));
     }
 
@@ -352,7 +459,7 @@ public sealed class IslandPanelTests
             if (!Chippi.UI.Themes.Motion.IsReduced)
                 Assert.Equal(Tab.Width, shape.Width, 3); // the first frame is the tab
             Pump(TimeSpan.FromMilliseconds(400));
-            Assert.Equal(328, shape.Width, 3);
+            Assert.Equal((520, 360), Size(panel));
             Assert.Equal(1, ((FrameworkElement)panel.FindName("Card")).Opacity);
         }));
     }
