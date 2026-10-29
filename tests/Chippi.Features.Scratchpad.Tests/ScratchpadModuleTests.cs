@@ -66,7 +66,7 @@ public sealed class ScratchpadModuleTests
             island.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));
             settings.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));
             Flush();
-            Assert.Equal("Saved", Assert.IsType<System.Windows.Controls.TextBlock>(Chippi.UI.Controls.SettingsLayout.GetTitleAside(settings)).Text);
+            Assert.Equal("Saved", Assert.IsType<System.Windows.Controls.StackPanel>(Chippi.UI.Controls.SettingsLayout.GetTitleAside(settings)).Children.OfType<System.Windows.Controls.TextBlock>().Single().Text);
             Editor(settings).Text = "Book a room for Thursday";
             Flush();
             Assert.Equal("Book a room for Thursday", Editor(island).Text);

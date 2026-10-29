@@ -27,6 +27,7 @@ public sealed class ScratchpadSettingsPage : UserControl
     private readonly ScrollViewer _preview = new() { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Height = EditorHeight, Padding = new Thickness(12, 10, 12, 10), Visibility = Visibility.Collapsed };
     private readonly SegmentedControl _mode = new() { HorizontalAlignment = HorizontalAlignment.Left };
     private readonly Button _delete;
+    private readonly Button _retry;
     private readonly StackPanel _body = new();
     private bool _painting, _listening, _previewing, _exportFailed;
     private long _shownId;
@@ -38,7 +39,10 @@ public sealed class ScratchpadSettingsPage : UserControl
         _session = session;
         _export = export ?? ExportFile;
         _status.SetResourceReference(StyleProperty, "BodyTextStyle");
-        SettingsLayout.SetTitleAside(this, _status);
+        _retry = Button("Retry");
+        _retry.Margin = new Thickness(12, 0, 0, 0);
+        _retry.Click += async (_, _) => { await Run(_session.LoadAsync()); Paint(); };
+        SettingsLayout.SetTitleAside(this, new StackPanel { Orientation = Orientation.Horizontal, Children = { _status, _retry } });
         AutomationProperties.SetLiveSetting(_status, AutomationLiveSetting.Polite);
 
         _tabs.SetResourceReference(StyleProperty, "SelectorBarStyle");
@@ -97,6 +101,7 @@ public sealed class ScratchpadSettingsPage : UserControl
             bool failed = _exportFailed || state.LoadFailed || state.SaveFailed;
             _status.Text = _exportFailed ? "Export failed" : state.LoadFailed ? "Load failed" : state.SaveFailed ? "Save failed" : state.Document is null ? "" : "Saved";
             _status.SetResourceReference(TextBlock.ForegroundProperty, failed ? "WarningTextBrush" : "TextSecondaryBrush");
+            _retry.Visibility = state.LoadFailed ? Visibility.Visible : Visibility.Collapsed;
             _body.Visibility = state.Document is null ? Visibility.Collapsed : Visibility.Visible;
             if (state.Document is not { } doc)
                 return;
