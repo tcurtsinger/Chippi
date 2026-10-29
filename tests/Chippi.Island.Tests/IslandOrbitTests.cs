@@ -17,15 +17,15 @@ public sealed class IslandOrbitTests
         IslandGeometry.OrbitLayout(edge, shape, slots).ToDictionary(o => o.Slot, o => o.Rect);
 
     [Fact]
-    public void On_top_each_pair_is_centered_on_the_shapes_height_12px_out()
+    public void On_top_each_pair_is_centered_on_the_shapes_height_10px_out()
     {
         var at = Layout(IslandEdge.Top, Shape, All);
-        // The pair is 88 tall (40 + 8 + 40), so it starts 100 - 44 = 56 down a 200-high shape.
-        Assert.Equal(new Rect(48, 56, 40, 40), at[OrbitSlot.Back]);
-        Assert.Equal(new Rect(48, 104, 40, 40), at[OrbitSlot.Left]);
-        Assert.Equal(new Rect(440, 56, 40, 40), at[OrbitSlot.Settings]);
-        Assert.Equal(new Rect(440, 104, 40, 40), at[OrbitSlot.Right]);
-        Assert.Equal(new Rect(244, 212, 40, 40), at[OrbitSlot.Live]);
+        // The pair is 70 tall (32 + 6 + 32), so it starts 100 - 35 = 65 down a 200-high shape.
+        Assert.Equal(new Rect(58, 65, 32, 32), at[OrbitSlot.Back]);
+        Assert.Equal(new Rect(58, 103, 32, 32), at[OrbitSlot.Left]);
+        Assert.Equal(new Rect(438, 65, 32, 32), at[OrbitSlot.Settings]);
+        Assert.Equal(new Rect(438, 103, 32, 32), at[OrbitSlot.Right]);
+        Assert.Equal(new Rect(248, 210, 32, 32), at[OrbitSlot.Live]);
     }
 
     [Fact]
@@ -33,21 +33,21 @@ public sealed class IslandOrbitTests
     {
         var at = Layout(IslandEdge.Top, new Rect(100, 0, 328, 60), All);
         Assert.Equal(8, at[OrbitSlot.Back].Y);
-        Assert.Equal(56, at[OrbitSlot.Left].Y);
+        Assert.Equal(46, at[OrbitSlot.Left].Y);
     }
 
     [Theory]
-    [InlineData(IslandEdge.Left, 440)] // the open side is the right
-    [InlineData(IslandEdge.Right, 48)]
+    [InlineData(IslandEdge.Left, 438)] // the open side is the right
+    [InlineData(IslandEdge.Right, 58)]
     public void On_a_side_one_pair_sits_above_and_one_below_centered_on_the_width(IslandEdge edge, double liveX)
     {
         var at = Layout(edge, Shape, All);
-        // The pair is 88 wide, centered on 264: from 220.
-        Assert.Equal(new Rect(220, -52, 40, 40), at[OrbitSlot.Back]);
-        Assert.Equal(new Rect(268, -52, 40, 40), at[OrbitSlot.Left]);
-        Assert.Equal(new Rect(220, 212, 40, 40), at[OrbitSlot.Settings]);
-        Assert.Equal(new Rect(268, 212, 40, 40), at[OrbitSlot.Right]);
-        Assert.Equal(new Rect(liveX, 80, 40, 40), at[OrbitSlot.Live]); // centered on the height, on the open side
+        // The pair is 70 wide, centered on 264: from 229.
+        Assert.Equal(new Rect(229, -42, 32, 32), at[OrbitSlot.Back]);
+        Assert.Equal(new Rect(267, -42, 32, 32), at[OrbitSlot.Left]);
+        Assert.Equal(new Rect(229, 210, 32, 32), at[OrbitSlot.Settings]);
+        Assert.Equal(new Rect(267, 210, 32, 32), at[OrbitSlot.Right]);
+        Assert.Equal(new Rect(liveX, 84, 32, 32), at[OrbitSlot.Live]); // centered on the height, on the open side
     }
 
     [Theory]
@@ -66,9 +66,9 @@ public sealed class IslandOrbitTests
     [Fact]
     public void Reach_is_how_far_the_buttons_stick_out()
     {
-        Assert.Equal(new Thickness(52, 0, 52, 52), IslandGeometry.OrbitReach(IslandEdge.Top, new Size(328, 200), All));
-        Assert.Equal(new Thickness(0, 52, 52, 52), IslandGeometry.OrbitReach(IslandEdge.Left, new Size(328, 200), All));
-        Assert.Equal(new Thickness(52, 52, 0, 52), IslandGeometry.OrbitReach(IslandEdge.Right, new Size(328, 200), All));
+        Assert.Equal(new Thickness(42, 0, 42, 42), IslandGeometry.OrbitReach(IslandEdge.Top, new Size(328, 200), All));
+        Assert.Equal(new Thickness(0, 42, 42, 42), IslandGeometry.OrbitReach(IslandEdge.Left, new Size(328, 200), All));
+        Assert.Equal(new Thickness(42, 42, 0, 42), IslandGeometry.OrbitReach(IslandEdge.Right, new Size(328, 200), All));
     }
 
     [Fact]
@@ -76,14 +76,14 @@ public sealed class IslandOrbitTests
     {
         var work = new Rect(0, 0, 1920, 1032);
         var tab = new Rect(160 - 68, 0, 136, 36); // tab centered at the 160px end margin
-        var reach = new Thickness(52, 0, 52, 52);
+        var reach = new Thickness(42, 0, 42, 42);
         var origin = IslandGeometry.PanelOrigin(IslandEdge.Top, tab, new Size(440, 200), work, 1, reach);
-        Assert.Equal(new Point(52 + 8, 0), origin); // without the buttons it could sit at 8
+        Assert.Equal(new Point(42 + 8, 0), origin); // without the buttons it could sit at 8
     }
 
     [Theory]
-    [InlineData(1032 - 76 - 68, 1032 - 8 - 52 - 200)] // tab at the bottom end margin: the pair below fits
-    [InlineData(76 - 68, 8 + 52)] // tab at the top end margin: the pair above fits
+    [InlineData(1032 - 76 - 68, 1032 - 8 - 42 - 200)] // tab at the bottom end margin: the pair below fits
+    [InlineData(76 - 68, 8 + 42)] // tab at the top end margin: the pair above fits
     public void On_a_side_the_pairs_keep_the_shape_clear_of_the_screen_ends(double tabTop, double expectedTop)
     {
         var work = new Rect(0, 0, 1920, 1032);

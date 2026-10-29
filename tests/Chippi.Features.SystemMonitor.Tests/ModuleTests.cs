@@ -115,7 +115,7 @@ public sealed class ModuleTests : IDisposable
             await registry.SetInstalledAsync("system-monitor", true);
             var tile = Assert.Single(registry.Find("system-monitor")!.IslandTiles);
 
-            Assert.Equal(("system-monitor", "System monitor", "Activity", 60, 640.0), (tile.Spec.Key, tile.Spec.Name, tile.Spec.Icon, tile.Spec.Order, tile.Spec.PageWidth));
+            Assert.Equal(("system-monitor", "System monitor", "Activity", 60), (tile.Spec.Key, tile.Spec.Name, tile.Spec.Icon, tile.Spec.Order));
             Assert.Equal("Last 4 min", tile.PageNote);
             Assert.Equal(SensorNeed.None, module.Sampler!.Need);
             Assert.Equal(0, fake.CpuReads);

@@ -12,6 +12,27 @@ public enum IslandOrbit
 }
 
 /// <summary>
+/// The open island's one size, for the grid and every page (DESIGN.md §5 Island, revised 2026-10-28),
+/// in DIPs. Inside the 12 inset and the 24 + 8 header each page has a 496 × 304 body of six 76
+/// columns with 8 gaps. Pages fit their content to the body; nothing scrolls.
+/// </summary>
+public static class IslandPage
+{
+    public const double Width = 520;
+    public const double Height = 360;
+    public const double Inset = 12;
+    public const double HeaderHeight = 24;
+    public const double Gap = 8;
+    public const double BodyWidth = Width - 2 * Inset; // 496
+    public const double BodyHeight = Height - 2 * Inset - HeaderHeight - Gap; // 304
+    public const int Columns = 6;
+    public const double ColumnWidth = 76;
+
+    /// <summary>The width of <paramref name="columns"/> body columns and the gaps between them.</summary>
+    public static double Span(int columns) => columns * ColumnWidth + (columns - 1) * Gap;
+}
+
+/// <summary>
 /// One module's part of an island tile (docs/phase-3/architecture.md §5).
 /// </summary>
 /// <param name="Key">Identifies the tile, such as "sound". Modules that use the same key share the tile and its page.</param>
@@ -22,12 +43,6 @@ public enum IslandOrbit
 /// <param name="CreateSection">This module's section of the page. Must return a WPF FrameworkElement.</param>
 public sealed record IslandTileSpec(string Key, string Name, string Icon, int Order, int SectionOrder, Func<object> CreateSection)
 {
-    /// <summary>Default page width in DIPs, the grid's.</summary>
-    public const double DefaultPageWidth = 328;
-
-    /// <summary>The page's width in DIPs. On a shared page the widest section's width wins.</summary>
-    public double PageWidth { get; init; } = DefaultPageWidth;
-
     /// <summary>A round button beside the open island that opens this tile.</summary>
     public IslandOrbit Orbit { get; init; } = IslandOrbit.None;
 
@@ -129,7 +144,7 @@ public sealed class IslandTileContribution(string moduleId, IslandTileSpec spec)
 
     /// <summary>
     /// Groups tile parts by key into tiles in grid order. A tile's parts are in section order, it takes
-    /// its name and icon from its first part, and the widest part's page width.
+    /// its name and icon from its first part.
     /// </summary>
     public static IReadOnlyList<IslandTileGroup> Group(IEnumerable<IslandTileContribution> parts) =>
         [.. parts
@@ -146,8 +161,6 @@ public sealed record IslandTileGroup(string Key, IReadOnlyList<IslandTileContrib
     public string Icon => Parts[0].Spec.Icon;
 
     public int Order => Parts.Min(p => p.Spec.Order);
-
-    public double PageWidth => Parts.Max(p => p.Spec.PageWidth);
 
     public IslandOrbit Orbit => Parts.Select(p => p.Spec.Orbit).FirstOrDefault(o => o != IslandOrbit.None);
 

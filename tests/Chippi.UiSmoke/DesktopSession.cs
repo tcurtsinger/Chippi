@@ -87,7 +87,7 @@ internal sealed class DesktopSession : IDisposable
         return process;
     }
 
-    /// <summary>A second launch shows the island's pages (the window named "Chippi"), in the island or docked by the tray.</summary>
+    /// <summary>A second launch opens the island (the window named "Chippi"); with the island off it opens Settings instead.</summary>
     public AutomationElement OpenPages()
     {
         // A click elsewhere closes the pages. If that happens before their content is reachable,

@@ -26,7 +26,7 @@ public sealed class ScratchpadModule : IFeatureModule
         ScratchpadPage Page() => _page ??= new ScratchpadPage(_session, context.HoldIslandOpen);
         _tile = context.Ui.AddIslandTile(new IslandTileSpec("scratchpad", "Scratchpad", "NotebookPen", 80, 0, () => Page())
         {
-            PageWidth = 440, CreateHeader = () => Page().Header, InitialFocus = () => Page().InitialFocus,
+            CreateHeader = () => Page().Header, InitialFocus = () => Page().InitialFocus,
         });
         _session.Changed += UpdateTile;
         return _session.LoadAsync();

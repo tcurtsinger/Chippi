@@ -54,7 +54,6 @@ public sealed class CleanUrlModule : IFeatureModule
             () => _section ??= new CleanUrlSection(_features))
         {
             InitialFocus = () => _section?.InitialFocus,
-            PageWidth = ClipboardFeatures.PageWidth,
         });
         _features.Changed += UpdateStatus;
         _features.CleanUrl = this;

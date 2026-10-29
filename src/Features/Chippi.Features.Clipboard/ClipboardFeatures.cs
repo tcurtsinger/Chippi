@@ -13,9 +13,6 @@ public sealed class ClipboardFeatures
     /// <summary>The Clipboard tile's key, shared by both modules.</summary>
     public const string TileKey = "clipboard";
 
-    /// <summary>Clipboard and Scratchpad are 440 wide, like Now Playing (notes #6).</summary>
-    public const double PageWidth = 440;
-
     private ClipboardHistoryModule? _history;
     private CleanUrlModule? _cleanUrl;
 

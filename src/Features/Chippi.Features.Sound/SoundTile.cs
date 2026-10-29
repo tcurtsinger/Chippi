@@ -19,5 +19,5 @@ public static class SoundTile
 
     /// <summary>A section of the Sound page, in <paramref name="column"/>, at <paramref name="order"/> (lowest first).</summary>
     public static IslandTileSpec Section(int order, string column, Func<object> create) =>
-        new(Key, "Sound", "AudioLines", Order: 10, SectionOrder: order, create) { PageWidth = 640, Column = column };
+        new(Key, "Sound", "AudioLines", Order: 10, SectionOrder: order, create) { Column = column };
 }
