@@ -24,7 +24,7 @@ namespace Chippi.App.Island;
 /// <summary>
 /// The open island (DESIGN.md §5 Island, revised 2026-10-28): the tile grid or one tile's page, in
 /// one 520 × 360 shape that grows out of the tab, with the orbit buttons around it. Between pages the
-/// shape stays and the content crossfades. <see cref="IslandWindow"/> opens, places and closes it.
+/// shape stays and the new content fades in. <see cref="IslandWindow"/> opens, places and closes it.
 /// </summary>
 public partial class IslandPanelWindow : Window
 {
@@ -36,7 +36,6 @@ public partial class IslandPanelWindow : Window
     private static readonly TimeSpan GrowTime = TimeSpan.FromMilliseconds(220);
     private static readonly TimeSpan ShrinkTime = TimeSpan.FromMilliseconds(160);
     private static readonly TimeSpan PageFadeTime = TimeSpan.FromMilliseconds(150);
-    private const int PageDrawFrames = 2; // frames the new page gets to draw under the old one's picture before it fades
 
     private enum Morph { Open, Page, Close }
 
@@ -291,7 +290,7 @@ public partial class IslandPanelWindow : Window
     /// <summary>Takes the keyboard without a click (the tray icon chosen with the keyboard, or a second launch).</summary>
     internal void TakeKeyboard() => TakeKeyboard(null);
 
-    /// <summary>Shows <paramref name="key"/>'s page, or the grid for null; the old content fades out as the new one fades in.</summary>
+    /// <summary>Shows <paramref name="key"/>'s page, or the grid for null; the new content fades in.</summary>
     internal void ShowPage(string? key, bool remember = true)
     {
         if (key is not null && !Exists(key))
@@ -306,7 +305,6 @@ public partial class IslandPanelWindow : Window
         _page = key;
         if (!IsOpen)
             return;
-        HoldLeaving();
         Attach(key);
         RefreshOrbit(place: false);
         Reshape(snap: false); // the same shape; a changed set of orbit buttons may still move it along the edge
@@ -714,9 +712,8 @@ public partial class IslandPanelWindow : Window
 
     /// <summary>
     /// Starts a morph from what is drawn now: open (tab to page, 220ms, content fading in over the
-    /// second half), page (the shape stays; the new page draws at full opacity under a picture of the
-    /// old one, which fades out over 150ms once the new page has drawn) or close (back to the swollen
-    /// tab, 160ms, content fading out). Reduced motion snaps.
+    /// second half), page (the shape stays; the new page fades in over 150ms) or close (back to the
+    /// swollen tab, 160ms, content fading out). Reduced motion snaps.
     /// </summary>
     private void Begin(Morph morph)
     {
@@ -726,8 +723,6 @@ public partial class IslandPanelWindow : Window
         _radiusFrom = fromTab ? TabRadius() : _radius;
         _fadeFrom = Card.Opacity;
         _elapsed = TimeSpan.Zero;
-        // A new page's first frame is slow to draw; under the still picture nothing moves meanwhile.
-        _drawing = morph == Morph.Page && Leaving.Source is not null ? PageDrawFrames : 0;
         if (Motion.IsReduced)
         {
             StopFrames();
@@ -741,7 +736,7 @@ public partial class IslandPanelWindow : Window
             return;
         }
         if (morph == Morph.Page)
-            Card.Opacity = _drawing > 0 ? 1 : 0; // without a picture of the old page, the new one fades in
+            Card.Opacity = 0;
         if (_frame is not null)
             return;
         _lastFrame = 0;
@@ -749,10 +744,8 @@ public partial class IslandPanelWindow : Window
         {
             // The clock starts on the first frame, so a slow first show doesn't skip the start.
             long now = Stopwatch.GetTimestamp();
-            _elapsed += _lastFrame == 0 || _drawing > 0 ? TimeSpan.Zero : Stopwatch.GetElapsedTime(_lastFrame, now);
+            _elapsed += _lastFrame == 0 ? TimeSpan.Zero : Stopwatch.GetElapsedTime(_lastFrame, now);
             _lastFrame = now;
-            if (_drawing > 0)
-                _drawing--;
             Step();
         };
         CompositionTarget.Rendering += _frame;
@@ -771,16 +764,14 @@ public partial class IslandPanelWindow : Window
         Card.Opacity = _morph switch
         {
             Morph.Open => Math.Max(_fadeFrom, Math.Clamp(t * 2 - 1, 0, 1)),
-            Morph.Page => Leaving.Source is null ? fade : 1,
+            Morph.Page => fade,
             _ => _fadeFrom * Math.Clamp(1 - t * 2, 0, 1),
         };
-        Leaving.Opacity = _morph == Morph.Page ? _leavingFrom * Math.Pow(1 - fade, 3) : 0;
         Draw();
-        bool done = _morph == Morph.Page ? _drawing == 0 && fade >= 1 && t >= 1 : t >= 1;
+        bool done = _morph == Morph.Page ? fade >= 1 && t >= 1 : t >= 1;
         if (!done)
             return;
         StopFrames();
-        Leaving.Source = null;
         if (_morph == Morph.Close)
             Collapse();
     }
@@ -806,7 +797,6 @@ public partial class IslandPanelWindow : Window
         _radius = OpenRadius;
         Hide();
         Card.Opacity = 0;
-        Leaving.Source = null;
         // Unparented views get Unloaded and stop listening until the island opens again.
         Detach();
         MarkOnScreen();
@@ -828,11 +818,8 @@ public partial class IslandPanelWindow : Window
         // Mid-morph the content already sits at its final place; only what's inside the shape shows.
         var inside = new Rect(_drawn.X - Canvas.GetLeft(Card), _drawn.Y - Canvas.GetTop(Card), Math.Max(0, _drawn.Width), Math.Max(0, _drawn.Height));
         Card.Clip = new RectangleGeometry(inside, _radius, _radius);
-        // Nothing half-faded takes a click, nor a page still under the old one's picture (a double-click
-        // on a tile would reach a control on the new page that can't be seen yet).
-        bool settled = Card.Opacity >= 1 && Leaving.Opacity <= 0;
-        Card.IsHitTestVisible = settled;
-        Leaving.Clip = Card.Clip;
+        // Nothing half-faded takes a click (a double-click on a tile would reach the new page's controls).
+        Card.IsHitTestVisible = Card.Opacity >= 1;
         // Opening and closing fade the buttons with the content; between pages they stay.
         Orbit.Opacity = _morph == Morph.Page ? 1 : Card.Opacity;
         Orbit.IsHitTestVisible = IsOpen && Orbit.Opacity >= 1;
@@ -844,42 +831,6 @@ public partial class IslandPanelWindow : Window
     }
 
     private static double Lerp(double from, double to, double t) => from + (to - from) * t;
-
-    private double _leavingFrom;
-    private int _drawing; // frames left before the old page's picture starts to fade
-
-    /// <summary>
-    /// Before a page change: a picture of the content showing now on the island's own fill, laid over
-    /// the new page, which <see cref="Step"/> fades out once the new page has drawn. Inset 1px so the
-    /// island's stroke stays. Nothing while hidden.
-    /// </summary>
-    private void HoldLeaving()
-    {
-        Leaving.Source = null;
-        Leaving.Opacity = _leavingFrom = 0;
-        if (!IsVisible || Card.Opacity <= 0 || Card.ActualWidth <= 0 || Motion.IsReduced)
-            return;
-        double s = Math.Max(1, _area.Scale);
-        var picture = new System.Windows.Media.Imaging.RenderTargetBitmap((int)Math.Ceiling(Card.ActualWidth * s), (int)Math.Ceiling(Card.ActualHeight * s),
-            96 * s, 96 * s, PixelFormats.Pbgra32);
-        var copy = new DrawingVisual();
-        using (var dc = copy.RenderOpen())
-        {
-            var box = new Rect(0, 0, Card.ActualWidth, Card.ActualHeight);
-            var fill = box;
-            fill.Inflate(-1, -1);
-            dc.DrawRectangle((Brush)FindResource("IslandBrush"), null, fill);
-            dc.DrawRectangle(new VisualBrush(Card), null, box);
-        }
-        picture.Render(copy);
-        picture.Freeze();
-        Leaving.Source = picture;
-        Leaving.Width = Card.ActualWidth;
-        Leaving.Height = Card.ActualHeight;
-        Canvas.SetLeft(Leaving, Canvas.GetLeft(Card));
-        Canvas.SetTop(Leaving, Canvas.GetTop(Card));
-        Leaving.Opacity = _leavingFrom = Card.Opacity;
-    }
 
     private void UpdateClock()
     {
