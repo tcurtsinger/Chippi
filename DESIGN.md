@@ -115,8 +115,12 @@ spacing:
   sub-row-indent: "50px"
   section-gap: "24px above a section header, 8px below"
   group-gap: "8px"
-  settings-content: "4px 40px 40px 28px"
+  settings-content: "40px 4px 40px 28px (left, top, right, bottom)"
+  settings-content-max: "1000px, aligned left"
   nav-width: "272px"
+  nav-row: "32px, 36px apart"
+  nav-search: "32px, 12px below"
+  nav-rail: "48px, below a 1008px window"
 ---
 
 # Design System: Chippi
@@ -275,16 +279,18 @@ Reference: the offline Sound mockup at `X:\code\chippi-scratch\phase-3-prep\mock
 - **Colors:** the island always uses its dark accent and dark text tokens in either app theme. Only real media artwork may supply its own colors; do not copy the mockup's decorative gradient art placeholder.
 
 ### Settings window
-- **Frame:** 1120×720 by default and resizable, on the Windows 11 frame: system corners and shadow, so snap layouts, maximize and resize stay native.
-- **Titlebar:** 40px in window color. Gumdrop's small form at 16px, "Chippi Settings" (12 / 400), and caption buttons 46×40. Close hovers to Critical with a white glyph.
-- **Sidebar:** 272 wide on the window color, no divider.
-  - A 34px search field, "Find a setting". Typing replaces the content with matching rows from every page, grouped by page; clicking one opens its page.
-  - **Feature groups** (2026-10-26): the installed features' pages under the catalog's group labels, in Add features' order (Files, Sound, System, Clipboard & text, Windows, Capture, Apps). Only groups with an installed feature show.
+- **Frame (revised 2026-10-28):** 1120×720 by default, centered on the main display, and resizable down to 860 wide, on the Windows 11 frame: system corners and shadow, so snap layouts, maximize and resize stay native. Pointing at maximize shows Windows' snap layouts. It reopens at the size, place and maximized state it closed in; if that place is on no monitor now, it centers on the main display. Esc does nothing (it still clears the search box).
+- **Titlebar:** 40px in window color with no line under it. Gumdrop's small form at 16px, "Chippi Settings" (12 / 400), and caption buttons 46×40. Close hovers to Critical with a white glyph.
+- **Sidebar (revised 2026-10-28):** 272 wide on the window color, no divider. One list for every group: one scroller (the mouse wheel works anywhere on it), one Tab stop, and arrow keys that cross groups. Opening a page scrolls its row into view.
+  - A 32px search field, "Find a setting", 12px above the list. Typing replaces the content with matching rows from every page, grouped by page; clicking one opens its page.
+  - **Feature groups** (2026-10-26): the installed features' pages under the catalog's group labels, in Add features' order (Files, Sound, System, Clipboard & text, Windows, Capture, Apps). Only groups with an installed feature show. Within them: File organizer, Shelf; Now Playing, Output, Microphone, App volume; Keep awake, System monitor; Clipboard history, Clean URL, Paste as plain text, Scratchpad (2026-10-28).
   - **Sound is organized by task (revised 2026-10-28):** **Now Playing** (the shell's, always shown), **Output**, **Microphone** and **App volume**, each with the island's controls first. Output: Volume (slider, percentage, Mute), **Output in use** (a radio row per connected output), then **Priority** (+ Add device: Priority switching, Communications device, the ordered list). Microphone holds three features, shown while each is installed: the **Microphone** row (Mic mute: Live or Muted, Mute / Unmute), **Mic in use** and **Priority** (Audio routing), **Mic processing**, and **Mute shortcut** (Shortcut, removable; Sound feedback). The mic is picked once there. App volume: a row per app, every app, then **Options**. A feature's deep link opens the page that holds it. Features still install one by one in Add features.
   - **Chippi:** General, Island & pet, Notifications, Add features, About. Shortcuts and Permissions join this group only once a feature uses them. Appearance is gone.
-  - Group labels are Nav group type with 12px of space above. Items are 36px with a 16px glyph and a 14 / 400 label. Hover is subtle-hover. The selected item gets subtle-selected, Semibold and a 3×16 accent pill at its left edge.
-- **Opening:** Settings opens on the page its caller asks for (the island's Settings button opens the last page; a notice opens its run in History). With no target it opens the first sidebar item. Sub-tabs open on their first tab.
-- **Content:** padding 4 / 40 / 40 / 28. The page title (20 / 600 Display) sits 14px above the first section, with no description.
+  - Group labels are Nav group type with 12px of space above (none above the first) and 4 below. Items are 32px, 36 apart, with a 16px glyph and a 14 / 400 label that trims with "…". Hover is subtle-hover. The selected item gets subtle-selected, Semibold and a 3×16 accent pill at its left edge.
+  - **Rail (2026-10-28):** below a 1008px window the sidebar becomes a 48px icon rail: a menu button, search as an icon, then the page icons with a hairline between groups and the pill on the open page. The menu button (or search) opens the full sidebar over the page with a shadow; it closes on a pick, on Esc, or on a click outside it.
+- **Scrollbars (2026-10-28):** they float over the content as in Windows 11: a 2px line at rest, 6px over a faint 10px track while the pointer is over the scroller. Content keeps its full width, so cards are 768 wide on every page at 1120.
+- **Opening:** Settings opens on the page its caller asks for (the island's Settings button opens the last page; a notice opens its run in History). With no target (the tray icon) it opens the page showing when Settings last closed, also after a restart, or the first sidebar item if that page has gone (2026-10-28). Sub-tabs open on their first tab.
+- **Content (revised 2026-10-28):** padding 40 / 4 / 40 / 28 (left, top, right, bottom), at most 1000 wide and aligned left, so a maximized window doesn't stretch it. The page title (20 / 600 Display) sits 14px above the first section, with no description.
 - **Page template:** title, then an optional SelectorBar, then sections. A section is a Section header (with an optional right-aligned button) over one card of rows. Two cards in a row of the same section sit 8px apart.
 - **Rows:** at least 60px with a caption, 48px without; 10 / 16 padding; 14px gap. Label over caption on the left, the control on the right. A switch shows "On" or "Off" in body text just left of it. An expander row ends in a chevron and its sub-rows are indented 50px.
 - **File organizer:** a SelectorBar of Settings · Rules · History (§5 File organizer).

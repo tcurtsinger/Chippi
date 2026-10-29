@@ -397,10 +397,10 @@
         </Setter>
     </Style>
 
-    <!-- ===== Nav item: 36px, 4px radius, body label; subtle-hover. Selected: subtle-selected, Semibold
+    <!-- ===== Nav item: 32px, 36 apart, 4px radius, body label; subtle-hover. Selected: subtle-selected, Semibold
          and a 3x16 accent pill at the left edge. NavItemTemplate draws a SegmentItem as glyph + label. ===== -->
     <Style x:Key="NavItemStyle" TargetType="{x:Type ListBoxItem}">
-        <Setter Property="Height" Value="36" />
+        <Setter Property="Height" Value="32" />
         <Setter Property="Margin" Value="0,2" />
         <Setter Property="Padding" Value="12,0" />
         <Setter Property="HorizontalContentAlignment" Value="Stretch" />
@@ -435,11 +435,11 @@
     </Style>
 
     <DataTemplate x:Key="NavItemTemplate" DataType="{x:Type c:SegmentItem}">
-        <StackPanel Orientation="Horizontal">
+        <DockPanel>
             <c:LucideIcon Data="{Binding Icon}" Size="16" VerticalAlignment="Center"
                           Brush="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" />
-            <TextBlock Text="{Binding Label}" Margin="12,0,0,0" VerticalAlignment="Center" />
-        </StackPanel>
+            <TextBlock Text="{Binding Label}" Margin="12,0,0,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+        </DockPanel>
     </DataTemplate>
 
     <!-- ===== Checkbox: 20px, 4px radius. Off: a switch-off stroke. On and mixed: accent with an

@@ -16,7 +16,6 @@ internal sealed class SettingsController
     private readonly ShellContext _shell;
     private readonly Action<SettingsWindow>? _beforeShow;
     private SettingsWindow? _window;
-    private string _lastPage = "";
 
     /// <param name="beforeShow">Tests: places the window before it shows (off screen, not activated).</param>
     internal SettingsController(ShellContext shell, Action<SettingsWindow>? beforeShow = null)
@@ -27,6 +26,9 @@ internal sealed class SettingsController
 
     /// <summary>The open window, or null.</summary>
     internal SettingsWindow? Window => _window;
+
+    /// <summary>The page showing when Settings last closed, kept across restarts (the window saves it on close); empty for none.</summary>
+    private string LastPage => SettingsUi.ReadApp(_shell.Config).SettingsWindow?.Page ?? "";
 
     /// <summary>The [WS2] settings slot.</summary>
     public static void Compose(ShellContext shell)
@@ -46,12 +48,8 @@ internal sealed class SettingsController
     {
         if (_window is null)
         {
-            var window = _window = new SettingsWindow(_shell, page ?? _lastPage);
-            window.Closed += (_, _) =>
-            {
-                _lastPage = window.CurrentPage;
-                _window = null;
-            };
+            var window = _window = page is null ? new SettingsWindow(_shell, LastPage, remembered: true) : new SettingsWindow(_shell, page);
+            window.Closed += (_, _) => _window = null;
             _beforeShow?.Invoke(window);
             window.Show();
         }
@@ -97,7 +95,7 @@ internal sealed class SettingsController
                         SettingsUi.SaveApp(_shell.Config, s => s.Theme = theme);
                         UI.Themes.ThemeManager.Apply(theme);
                         // The tray's open (null): the page showing when Settings closed, or the first one.
-                        string last = _lastPage;
+                        string last = LastPage;
                         Open(null);
                         string expected = last.Length > 0 ? last : _window!.NavigationPages.First().Id;
                         if (_window!.CurrentPage != expected)

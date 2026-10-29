@@ -57,6 +57,7 @@ public static class LucideIcons
 
     // Added for Chippi.
     public static Geometry Search { get; } = G("M11,3 a8,8 0 1 0 0,16 a8,8 0 1 0 0,-16 Z M21,21 L16.65,16.65");
+    public static Geometry Menu { get; } = G("M4,6 H20 M4,12 H20 M4,18 H20");
     public static Geometry Check { get; } = G("M20,6 L9,17 L4,12");
     public static Geometry Volume { get; } = G("M11,5 L6,9 H2 V15 H6 L11,19 Z M15.54,8.46 a5,5 0 0 1 0,7.07 M19.07,4.93 a10,10 0 0 1 0,14.14");
     public static Geometry VolumeMuted { get; } = G("M11,5 L6,9 H2 V15 H6 L11,19 Z M22,9 L16,15 M16,9 L22,15");

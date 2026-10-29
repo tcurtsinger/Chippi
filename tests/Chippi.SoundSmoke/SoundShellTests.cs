@@ -74,7 +74,7 @@ public sealed class SoundShellTests
         try
         {
             // Sound is Output, Microphone and App volume, whichever features hold them.
-            Assert.Equal(["Output", "Microphone", "App volume"], settings.NavigationPages.TakeWhile(p => p.Id != "general").Select(p => p.Label));
+            Assert.Equal(["Now Playing", "Output", "Microphone", "App volume"], settings.NavigationPages.TakeWhile(p => p.Id != "general").Select(p => p.Label));
             Assert.Equal("page:sound-output", settings.CurrentPage);
             Assert.Single(All<RoutingPage>(settings.PageContent));
             var calls = scene.Routing.Settings.Output.Calls;
