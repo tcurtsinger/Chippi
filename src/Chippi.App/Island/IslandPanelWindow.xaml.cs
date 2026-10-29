@@ -157,7 +157,11 @@ public partial class IslandPanelWindow : Window
 
     public void Initialize() => _hwnd = IslandNative.MakeNoActivate(this);
 
-    public void SetPetColor(PetColor color) => _grid.Pet.PetColor = color;
+    public void SetPetColor(PetColor color)
+    {
+        _grid.Pet.PetColor = color;
+        _nowPlaying?.SetPetColor(color);
+    }
 
     /// <summary>Now Playing's media sessions.</summary>
     internal void SetMedia(IMediaSessions media)
@@ -339,7 +343,14 @@ public partial class IslandPanelWindow : Window
         var page = new DockPanel { LastChildFill = true };
         _attached.Add(page);
         if (key == NowPlayingKey && _media is not null)
-            page.Children.Add(_nowPlaying ??= new NowPlayingView(_media)); // its own header and body
+        {
+            if (_nowPlaying is null)
+            {
+                _nowPlaying = new NowPlayingView(_media);
+                _nowPlaying.SetPetColor(_grid.Pet.PetColor);
+            }
+            page.Children.Add(_nowPlaying); // its own header and body
+        }
         else
         {
             // Construct sections first: a module may expose its header and focus through its view.

@@ -316,7 +316,8 @@
         </Setter>
     </Style>
 
-    <!-- Now Playing's previous and next: 32px, glyph only, hover wash; dimmed when the app doesn't offer them. -->
+    <!-- Round glyph buttons (Now Playing's transport, 32px unless sized): glyph only, a round hover and press
+         wash; dimmed when the app doesn't offer them. -->
     <Style x:Key="IslandTransportButtonStyle" TargetType="{x:Type Button}">
         <Setter Property="Width" Value="32" />
         <Setter Property="Height" Value="32" />
@@ -325,15 +326,19 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type Button}">
-                    <Border x:Name="Chrome" CornerRadius="16" Background="Transparent">
+                    <Grid x:Name="Root" Background="Transparent">
+                        <Ellipse x:Name="Chrome" Fill="Transparent" />
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
-                    </Border>
+                    </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Chrome" Property="Background" Value="{StaticResource IslandHoverBrush}" />
+                            <Setter TargetName="Chrome" Property="Fill" Value="{StaticResource IslandHoverBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Chrome" Property="Fill" Value="{StaticResource IslandPressedBrush}" />
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
-                            <Setter TargetName="Chrome" Property="Opacity" Value="0.36" />
+                            <Setter TargetName="Root" Property="Opacity" Value="0.36" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -358,34 +363,6 @@
                         </Trigger>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="Chrome" Property="Background" Value="{StaticResource IslandHoverBrush}" />
-                        </Trigger>
-                    </ControlTemplate.Triggers>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
-    </Style>
-
-    <!-- The 40px accent play/pause on Now Playing. -->
-    <Style x:Key="IslandPlayLargeButtonStyle" TargetType="{x:Type Button}">
-        <Setter Property="Width" Value="40" />
-        <Setter Property="Height" Value="40" />
-        <Setter Property="FocusVisualStyle" Value="{StaticResource IslandFocusVisual}" />
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="{x:Type Button}">
-                    <Grid x:Name="Root">
-                        <Ellipse x:Name="Fill" Fill="{DynamicResource IslandAccentBrush}" />
-                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
-                    </Grid>
-                    <ControlTemplate.Triggers>
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Fill" Property="Opacity" Value="0.88" />
-                        </Trigger>
-                        <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="Fill" Property="Opacity" Value="0.76" />
-                        </Trigger>
-                        <Trigger Property="IsEnabled" Value="False">
-                            <Setter TargetName="Root" Property="Opacity" Value="0.36" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
