@@ -303,6 +303,38 @@ public sealed class ModuleTests : IDisposable
         });
     }
 
+    [Fact]
+    public async Task A_long_history_builds_only_the_rows_that_can_show_and_keeps_the_open_entry()
+    {
+        await StartHistoryAsync();
+        _history.SetRecording(true);
+        for (int i = 0; i < 40; i++)
+        {
+            _hub.CopyText($"copy {i}");
+            await _history.History!.IdleAsync();
+        }
+        WpfTestThread.Run(() =>
+        {
+            var view = (ClipboardView)_historyUi.Spec!.CreateSection();
+            Load(view);
+            Flush(view);
+            void Fit() { view.Measure(new Size(496, 304)); view.Arrange(new Rect(0, 0, 496, 304)); view.UpdateLayout(); }
+            Fit();
+            var rows = Find<WholeRows>(view).Single();
+            Assert.Equal(ClipboardView.BuiltRows, rows.Children.Count);
+
+            // Down 25 times opens the 25th newest, copy 15, far past the rows built at first.
+            var search = Find<SearchBox>(view).Single();
+            for (int i = 0; i < 25; i++)
+                search.RaiseEvent(new System.Windows.Input.KeyEventArgs(System.Windows.Input.Keyboard.PrimaryDevice, new FakeSource(view), 0, System.Windows.Input.Key.Down) { RoutedEvent = System.Windows.Input.Keyboard.PreviewKeyDownEvent });
+            Fit();
+            Assert.True(rows.Children.Count <= ClipboardView.BuiltRows);
+            var open = rows.Children.OfType<Border>().Single();
+            Assert.True(rows.Shows(open));
+            Assert.Contains(Find<TextBlock>(open), t => t.Text == "copy 15");
+        });
+    }
+
     [Theory]
     [InlineData("one", "one")]
     [InlineData("one\ntwo\nthree", "one\ntwo\nthree")]
