@@ -23,19 +23,20 @@ internal sealed class SettingsSection : UserControl
     private static readonly (string Label, int Days)[] Keeps = [("30 days", 30), ("90 days", 90), ("1 year", 365)];
 
     private readonly DownloadsModule _module;
+    private readonly Action<string> _preview;
     private readonly Action<Task<PreviewPlan>> _import;
     private readonly ContentControl _folders = new() { Focusable = false };
     private readonly HashSet<string> _expanded = new(StringComparer.OrdinalIgnoreCase);
     private readonly TextBlock _error = Ui.Warning("");
     private readonly TextBlock _importError = Ui.Warning("");
 
-    public SettingsSection(DownloadsModule module, Action<Task<PreviewPlan>> import)
+    public SettingsSection(DownloadsModule module, Action<Task<PreviewPlan>> import, Action<string>? preview = null)
     {
         _module = module;
+        _preview = preview ?? (_ => { });
         _import = import;
 
-        var add = Ui.Button("Add folder", icon: LucideIcons.Plus);
-        add.Click += (_, _) => AddFolder();
+        var add = SettingsLayout.AddButton("folder", AddFolder);
 
         _error.Visibility = Visibility.Collapsed;
         _importError.Visibility = Visibility.Collapsed;
@@ -52,7 +53,7 @@ internal sealed class SettingsSection : UserControl
     {
         var folders = _module.Settings.Folders;
         _folders.Content = folders.Count == 0
-            ? Ui.Card(Ui.Pad(Ui.Text("No folders yet", "BodyTextStyle", "TextTertiaryBrush")))
+            ? SettingsLayout.Card(SettingsLayout.Empty("No folders yet"))
             : Ui.Card([.. folders.Select(FolderRow)]);
     }
 
@@ -73,7 +74,7 @@ internal sealed class SettingsSection : UserControl
             graceLabels.Add($"{folder.GraceSeconds} seconds"); // a hand-edited value stays visible
             grace = graceLabels.Count - 1;
         }
-        var graceBox = Ui.Choice(graceLabels, grace, "Wait before moving", 160);
+        var graceBox = Ui.Choice(graceLabels, grace, "Wait before moving", 180);
         graceBox.IsEnabled = folder.Mode == FolderMode.Silent;
         graceBox.SelectionChanged += (_, _) =>
         {
@@ -92,7 +93,7 @@ internal sealed class SettingsSection : UserControl
         options.Children.Add(Ui.Setting("Mode", "", mode));
         options.Children.Add(Ui.Setting("Wait before moving", "", graceBox));
         options.Children.Add(Ui.Setting("Ignore list", "", ignore));
-        options.Children.Add(Ui.Setting("Stop watching this folder", "", remove));
+        options.Children.Add(Ui.Setting("Stop watching", "", remove));
 
         string where = folder.Path + (folder.Path.StartsWith(@"\\", StringComparison.Ordinal) ? " · network" : "") + (exists ? "" : " · not found");
         var row = new ExpanderRow
@@ -100,7 +101,7 @@ internal sealed class SettingsSection : UserControl
             Header = name,
             Description = where,
             Icon = LucideIcons.Folder,
-            Value = folder.Mode.DisplayName(),
+            Value = FolderActions(folder, exists),
             Content = options,
             IsExpanded = _expanded.Contains(folder.Path),
             ToolTip = folder.Path,
@@ -109,6 +110,16 @@ internal sealed class SettingsSection : UserControl
         row.Expanded += (_, _) => _expanded.Add(folder.Path);
         row.Collapsed += (_, _) => _expanded.Remove(folder.Path);
         return row;
+    }
+
+    private StackPanel FolderActions(WatchedFolder folder, bool exists)
+    {
+        var mode = Ui.Text(folder.Mode.DisplayName(), brush: "TextSecondaryBrush");
+        mode.Margin = new Thickness(0, 0, 12, 0);
+        var organize = Ui.Button("Organize now", name: $"Organize {Ui.FolderName(folder.Path)} now");
+        organize.IsEnabled = exists;
+        organize.Click += (_, _) => _preview(folder.Path);
+        return Ui.Row(mode, organize);
     }
 
     private SettingRow KeepHistoryRow()
@@ -120,7 +131,7 @@ internal sealed class SettingsSection : UserControl
             labels.Add($"{_module.Settings.HistoryDays} days");
             index = labels.Count - 1;
         }
-        var keep = Ui.Choice(labels, index, "Keep history", 160);
+        var keep = Ui.Choice(labels, index, "Keep history", 180);
         keep.SelectionChanged += (_, _) =>
         {
             if (keep.SelectedIndex is >= 0 and var i && i < Keeps.Length)
@@ -241,7 +252,7 @@ internal sealed class SettingsSection : UserControl
         }
         catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException or System.Security.SecurityException)
         {
-            ShowError(ex.Message);
+            ShowError(ex is UnauthorizedAccessException ? "Access denied" : "Couldn't save settings");
         }
         Dispatcher.BeginInvoke(Render); // not inside the control's own event
     }

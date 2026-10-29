@@ -119,4 +119,28 @@ public sealed class CompactPageTests
         Assert.Equal(9, table.RowDefinitions.Count);
         Assert.Contains(Find<TextBlock>(table), t => t.Text == "J:");
     });
+    [Fact]
+    public void Settings_readings_keep_all_thermal_zones_beyond_the_island_limit() => WpfTestThread.Run(() =>
+    {
+        var view = new SystemMonitorView(new SystemMonitorModule(), settingsPage: true);
+        var s = Snapshot(laptop: true);
+        view.Show(s with { ThermalZones = new(ReadingStatus.Ok,
+            Enumerable.Range(0, 12).Select(i => new ThermalZoneReading("zone" + i, 45)).ToArray(), s.At) });
+        view.Measure(new Size(768, double.PositiveInfinity));
+        view.Arrange(new Rect(view.DesiredSize));
+        Assert.Contains(Find<TextBlock>(view), t => t.Text == "Thermal zone 12");
+        Assert.Equal(17, Find<Grid>(view).Count(g => g.ColumnDefinitions.Count == 3 && g.Height == 48));
+    });
+
+    [Fact]
+    public void No_enabled_readings_leaves_no_empty_Settings_card() => WpfTestThread.Run(() =>
+    {
+        var module = new SystemMonitorModule();
+        module.Save(module.Settings with { Off = Enum.GetValues<Reading>().ToList() });
+        var view = new SystemMonitorView(module, settingsPage: true);
+        view.Show(Snapshot());
+        view.Measure(new Size(768, double.PositiveInfinity));
+        Assert.Equal(0, view.DesiredSize.Height);
+    });
+
 }

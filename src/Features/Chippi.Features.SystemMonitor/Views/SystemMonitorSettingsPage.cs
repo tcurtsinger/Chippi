@@ -12,11 +12,12 @@ using Chippi.UI.Controls;
 
 namespace Chippi.Features.SystemMonitor.Views;
 
-/// <summary>Configuration only, following design notes #23 to #32.</summary>
+/// <summary>Live readings and configuration, using the shared Settings layout.</summary>
 public sealed class SystemMonitorSettingsPage : UserControl
 {
     private readonly SystemMonitorModule _module;
     private readonly StackPanel _body = new();
+    private readonly SystemMonitorView _readings;
     private readonly Border _disks = new() { Padding = new Thickness(16, 2, 16, 2) };
     private readonly List<Action<SystemMonitorSettings>> _sync = [];
     private readonly Dictionary<string, string> _gpus = new(StringComparer.OrdinalIgnoreCase);
@@ -28,6 +29,7 @@ public sealed class SystemMonitorSettingsPage : UserControl
     public SystemMonitorSettingsPage(SystemMonitorModule module)
     {
         _module = module;
+        _readings = new SystemMonitorView(module, settingsPage: true);
         Content = _body;
         Build();
         Loaded += (_, _) => Attach();
@@ -118,6 +120,8 @@ public sealed class SystemMonitorSettingsPage : UserControl
         if (_disks.Parent is Panel prior) prior.Children.Remove(_disks);
         _body.Children.Clear();
         _sync.Clear();
+        if (_readings.Parent is Panel oldReadings) oldReadings.Children.Remove(_readings);
+        _body.Children.Add(_readings);
         Section("Disks").Children.Add(_disks);
         var first = NewCard();
         first.Children.Add(Row("Update speed", Choice("Update speed", SystemMonitorSettings.UpdateChoices,
@@ -128,6 +132,7 @@ public sealed class SystemMonitorSettingsPage : UserControl
             if (_tileStatus.SelectedItem is ComboBoxItem { Tag: TileStatus status }) Save(s => s with { TileStatus = status });
         };
         first.Children.Add(Row("Tile status", _tileStatus));
+        _body.Children.Add(SettingsLayout.Section("General"));
         _body.Children.Add(first);
 
         var readings = Section("Readings");
@@ -155,11 +160,12 @@ public sealed class SystemMonitorSettingsPage : UserControl
             var toggle = Switch("GPU temperature", s => s.GpuTemperature.On, (s, on) =>
                 s with { GpuTemperature = s.GpuTemperature with { On = on } });
             _sync.Add(s => toggle.IsEnabled = _gpus.Keys.Any(s.GpuTemperature.Limits.ContainsKey));
-            alerts.Children.Add(Row("GPU temperature", toggle));
-            foreach (var (id, name) in _gpus) alerts.Children.Add(GpuLimit(id, name));
+            var summary = Text("");
+            _sync.Add(s => summary.Text = string.Join(", ", _gpus.Keys.Where(s.GpuTemperature.Limits.ContainsKey).Select(id => Format.Temperature(s.GpuTemperature.Limits[id], s.Temperature))));
+            alerts.Children.Add(SettingsLayout.Expander("GPU temperature", summary, toggle, [.. _gpus.Select(g => GpuLimit(g.Key, g.Value))]));
         }
         alerts.Children.Add(Row("Repeat interval", Choice("Repeat interval", SystemMonitorSettings.RepeatChoices,
-            n => $"{n} minutes", s => s.RepeatMinutes, (s, n) => s with { RepeatMinutes = n })));
+            n => n % 60 == 0 ? $"{n / 60} hour" + (n == 60 ? "" : "s") : $"{n} minutes", s => s.RepeatMinutes, (s, n) => s with { RepeatMinutes = n })));
         _updating = false;
         Refresh();
     }
@@ -167,7 +173,7 @@ public sealed class SystemMonitorSettingsPage : UserControl
     private void Percent(Card card, string name, Func<SystemMonitorSettings, PercentAlert> get,
         Func<SystemMonitorSettings, PercentAlert, SystemMonitorSettings> set, int min, int max, string suffix = "")
     {
-        card.Children.Add(Row(name, Switch(name, s => get(s).On, (s, on) => set(s, get(s) with { On = on }))));
+        var toggle = Switch(name, s => get(s).On, (s, on) => set(s, get(s) with { On = on }));
         var slider = new Slider { Minimum = min, Maximum = max, SmallChange = 5, LargeChange = 5, TickFrequency = 5,
             IsSnapToTickEnabled = true, Width = 200 };
         slider.SetResourceReference(StyleProperty, "HopperSliderStyle");
@@ -179,12 +185,14 @@ public sealed class SystemMonitorSettingsPage : UserControl
         controls.Children.Add(slider);
         controls.Children.Add(value);
         var row = Row("Threshold", controls, sub: true);
-        card.Children.Add(row);
+        var summary = Text("");
+        card.Children.Add(SettingsLayout.Expander(name, summary, toggle, row));
         _sync.Add(s =>
         {
             slider.Value = get(s).Percent;
             value.Text = $"{get(s).Percent}%{suffix}";
-            row.IsEnabled = get(s).On;
+            summary.Text = value.Text;
+            row.IsEnabled = slider.IsEnabled = get(s).On;
             row.Opacity = row.IsEnabled ? 1 : 0.45;
         });
         slider.ValueChanged += (_, _) => Save(s => set(s, get(s) with { Percent = (int)slider.Value }));
@@ -257,23 +265,20 @@ public sealed class SystemMonitorSettingsPage : UserControl
 
     private static ComboBox Combo(string name)
     {
-        var combo = new ComboBox { MinWidth = 160 };
+        var combo = new ComboBox { Width = SettingsLayout.ComboWidth };
         combo.SetResourceReference(StyleProperty, "HopperComboBoxStyle");
         AutomationProperties.SetName(combo, name);
         return combo;
     }
 
     private static SettingRow Row(string name, object content, bool sub = false) =>
-        new() { Header = name, Content = content, Margin = new Thickness(sub ? 34 : 0, 0, 0, 0) };
+        SettingsLayout.Row(name, (UIElement)content);
 
-    private static Card NewCard() => new();
+    private static Card NewCard() => SettingsLayout.Card();
 
     private Card Section(string name)
     {
-        var heading = Text(name);
-        heading.SetResourceReference(StyleProperty, "HeadlineTextStyle");
-        heading.Margin = new Thickness(0, 24, 0, 8);
-        _body.Children.Add(heading);
+        _body.Children.Add(SettingsLayout.Section(name));
         var card = NewCard();
         _body.Children.Add(card);
         return card;

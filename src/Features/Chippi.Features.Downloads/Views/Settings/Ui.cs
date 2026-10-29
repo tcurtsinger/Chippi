@@ -32,32 +32,29 @@ internal static class Ui
     /// </summary>
     public static FrameworkElement Section(string text, FrameworkElement? right = null, bool first = false)
     {
-        var grid = Columns("*", "Auto").Margin(0, first ? 16 : 24, 0, 8);
-        grid.Children.Add(Text(text, "HeadlineTextStyle").At(0));
-        if (right is not null)
-        {
-            right.VerticalAlignment = VerticalAlignment.Bottom;
-            grid.Children.Add(right.At(1));
-        }
-        return grid;
+        return SettingsLayout.Section(text, right, first);
     }
 
     /// <summary>A card of rows with dividers between them (DESIGN.md §6 "Card").</summary>
     public static Card Card(params UIElement[] rows)
     {
-        var card = new Card();
+        var card = SettingsLayout.Card();
         foreach (var row in rows)
             card.Children.Add(row);
         return card;
     }
 
     /// <summary>A Settings row: label over caption on the left, the control on the right.</summary>
-    public static SettingRow Setting(string header, string description, object control, Geometry? icon = null) =>
-        new() { Header = header, Description = description, Content = control, Icon = icon };
+    public static SettingRow Setting(string header, string description, object control, Geometry? icon = null)
+    {
+        var row = SettingsLayout.Row(header, (UIElement)control, description);
+        row.Icon = icon;
+        return row;
+    }
 
-    /// <summary>A free-form row inside a card, with the row padding (10 / 16) and at least 48px.</summary>
+    /// <summary>A free-form row inside a card, with the shared row padding (16, 8) and at least 48px.</summary>
     public static Border Pad(UIElement child, double minHeight = 48) =>
-        new() { Child = child, Padding = new Thickness(16, 10, 16, 10), MinHeight = minHeight };
+        new() { Child = child, Padding = SettingsLayout.RowPadding, MinHeight = minHeight };
 
     /// <summary>An amber line under a field or a name.</summary>
     public static TextBlock Warning(string text)
@@ -149,7 +146,7 @@ internal static class Ui
         return box;
     }
 
-    public static ComboBox Choice(IEnumerable<string> items, int selected, string name, double width = double.NaN, bool code = false)
+    public static ComboBox Choice(IEnumerable<string> items, int selected, string name, double width = SettingsLayout.ComboWidth, bool code = false)
     {
         var combo = new ComboBox { ItemsSource = items.ToList(), SelectedIndex = selected, Width = width, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center };
         combo.SetResourceReference(FrameworkElement.StyleProperty, "HopperComboBoxStyle");

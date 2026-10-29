@@ -1,28 +1,4 @@
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
-<!-- Settings › Keep awake (DESIGN.md §5 Settings window): the status card, then the options. The
-     shell draws the title and scrolls; every change saves at once. -->
 <UserControl x:Class="Chippi.Features.KeepAwake.KeepAwakePage"
  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
- xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
- xmlns:c="urn:chippi-ui">
- <StackPanel>
-  <c:Card>
-   <c:SettingRow x:Name="Status" Header="Keep awake" Icon="{x:Static c:LucideIcons.Coffee}" Foreground="{DynamicResource AccentBrush}">
-    <ToggleButton x:Name="Switch" Style="{DynamicResource SwitchWithLabelStyle}" />
-   </c:SettingRow>
-  </c:Card>
-
-  <TextBlock Text="Options" Style="{DynamicResource HeadlineTextStyle}" Margin="0,24,0,8" />
-  <c:Card>
-   <c:SettingRow Header="Default length">
-    <ComboBox x:Name="Length" Style="{DynamicResource HopperComboBoxStyle}" MinWidth="160" SelectionChanged="OnLength" />
-   </c:SettingRow>
-   <c:SettingRow Header="Keep screen on">
-    <ToggleButton x:Name="Screen" Style="{DynamicResource SwitchWithLabelStyle}" />
-   </c:SettingRow>
-   <c:SettingRow Header="After a restart">
-    <TextBlock Text="Starts off" Style="{DynamicResource BodyTextStyle}" Foreground="{DynamicResource TextSecondaryBrush}" />
-   </c:SettingRow>
-  </c:Card>
- </StackPanel>
-</UserControl>
+ xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"><StackPanel x:Name="Body"/></UserControl>

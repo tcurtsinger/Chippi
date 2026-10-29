@@ -17,8 +17,10 @@ namespace Chippi.Features.SystemMonitor.Views;
 internal sealed class SystemMonitorView : UserControl
 {
     private readonly SystemMonitorModule _module;
+    private readonly bool _settingsPage;
     private readonly StackPanel _readings = new();
     private readonly Border _readingsCard, _disks;
+    private readonly FrameworkElement _readingsSurface;
     private readonly Dictionary<string, ReadingRow> _rows = [];
     private readonly Popup _picker = new() { StaysOpen = false, AllowsTransparency = true, Placement = PlacementMode.Bottom };
     private SensorWatch? _watch;
@@ -28,12 +30,15 @@ internal sealed class SystemMonitorView : UserControl
     private FrameworkElement? _gpuPicker, _networkPicker;
     private int _zoneCount;
 
-    public SystemMonitorView(SystemMonitorModule module)
+    public SystemMonitorView(SystemMonitorModule module, bool settingsPage = false)
     {
         _module = module;
+        _settingsPage = settingsPage;
         _readingsCard = Card(); _readingsCard.Child = _readings;
+        if (settingsPage) { _readingsCard.ClearValue(StyleProperty); _readingsCard.Padding = new Thickness(16, 2, 16, 2); }
         _disks = Card(); _disks.Margin = new Thickness(0, 8, 0, 0);
-        Content = new StackPanel { VerticalAlignment = VerticalAlignment.Top, Children = { _readingsCard, _disks, _picker } };
+        _readingsSurface = settingsPage ? SettingsLayout.Card(_readingsCard) : _readingsCard;
+        Content = new StackPanel { VerticalAlignment = VerticalAlignment.Top, Children = { _readingsSurface, _disks, _picker } };
         Loaded += (_, _) => Start();
         Unloaded += (_, _) => Stop();
     }
@@ -84,7 +89,7 @@ internal sealed class SystemMonitorView : UserControl
         var visible = new List<ReadingRow>();
         ReadingRow Row(string key, string detail, string value, bool caution = false, FrameworkElement? picker = null)
         {
-            if (!_rows.TryGetValue(key, out var row)) _rows[key] = row = new ReadingRow(key);
+            if (!_rows.TryGetValue(key, out var row)) _rows[key] = row = new ReadingRow(key, _settingsPage);
             row.Set(detail, value, caution, picker);
             visible.Add(row);
             return row;
@@ -152,16 +157,16 @@ internal sealed class SystemMonitorView : UserControl
                     i < zones.Count ? Format.Temperature(zones[i].TemperatureC, settings.Temperature) : "");
         }
         // Unusually many thermal zones still show whole rows only. Settings owns overflow.
-        int capacity = (int)((IslandPage.BodyHeight - 4) / 28);
+        int capacity = _settingsPage ? int.MaxValue : (int)((IslandPage.BodyHeight - 4) / 28);
         if (visible.Count > capacity) visible.RemoveRange(capacity, visible.Count - capacity);
         // Keep existing controls parented when only their readings change.
         foreach (var old in _readings.Children.OfType<ReadingRow>().Where(r => !visible.Contains(r)).ToList()) _readings.Children.Remove(old);
         for (int i = 0; i < visible.Count; i++)
             if (i >= _readings.Children.Count || _readings.Children[i] != visible[i])
             { _readings.Children.Remove(visible[i]); _readings.Children.Insert(i, visible[i]); }
-        _readingsCard.Visibility = visible.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
+        _readingsSurface.Visibility = _readingsCard.Visibility = visible.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
         double remaining = IslandPage.BodyHeight - (visible.Count == 0 ? 0 : visible.Count * 28 + 4 + 8);
-        _disks.Visibility = settings.IsOn(Reading.Disks) && remaining >= 26 ? Visibility.Visible : Visibility.Collapsed;
+        _disks.Visibility = !_settingsPage && settings.IsOn(Reading.Disks) && remaining >= 26 ? Visibility.Visible : Visibility.Collapsed;
         _disks.Margin = new Thickness(0, visible.Count == 0 ? 0 : 8, 0, 0);
         _disks.Child = s.Disks.Status == ReadingStatus.Unavailable ? DiskTable.Unavailable()
             : DiskTable.Build(s.Disks.Value ?? [], id => _module.Alerting("low-disk", id), Math.Max(0, remaining - 4));
@@ -185,33 +190,37 @@ internal sealed class SystemMonitorView : UserControl
     private sealed class ReadingRow : Grid
     {
         private readonly ContentControl _name = new();
+        private readonly bool _settingsPage;
         public TextBlock Detail { get; } = Text("", 11, true);
         private readonly TextBlock _value = Text("");
-        public ReadingRow(string name)
+        public ReadingRow(string name, bool settingsPage)
         {
-            Height = 28;
-            ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(80) });
+            _settingsPage = settingsPage;
+            Height = settingsPage ? 48 : 28;
+            ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(settingsPage ? 100 : 80) });
             ColumnDefinitions.Add(new ColumnDefinition());
             ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            _name.Content = Text(name, 12, true); _name.Tag = name;
+            _name.Content = Text(name, settingsPage ? 14 : 12, true); _name.Tag = name;
+            if (settingsPage) { Detail.FontSize = 12; _value.FontSize = 14; }
             _value.FontWeight = FontWeights.SemiBold; _value.TextAlignment = TextAlignment.Right;
             Grid.SetColumn(Detail, 1); Grid.SetColumn(_value, 2);
             var divider = new Border { Height = 1, VerticalAlignment = VerticalAlignment.Bottom };
-            divider.SetResourceReference(BackgroundProperty, "IslandPanelBrush"); Grid.SetColumnSpan(divider, 3);
+            divider.SetResourceReference(BackgroundProperty, settingsPage ? "BorderBrush" : "IslandPanelBrush"); Grid.SetColumnSpan(divider, 3);
             Children.Add(divider); Children.Add(_name); Children.Add(Detail); Children.Add(_value);
         }
         public void Set(string detail, string value, bool caution, FrameworkElement? picker)
         {
-            _name.Content = picker ?? (object)Text((string)_name.Tag, 12, true);
+            _name.Content = picker ?? (object)Text((string)_name.Tag, _settingsPage ? 14 : 12, true);
             Detail.Text = detail; _value.Inlines.Clear(); _value.Text = value;
-            _value.SetResourceReference(TextBlock.ForegroundProperty, caution ? "WarningTextBrush" : "IslandTextBrush");
+            if (_settingsPage) { Detail.SetResourceReference(TextBlock.ForegroundProperty, "TextSecondaryBrush"); if (_name.Content is TextBlock name) name.SetResourceReference(TextBlock.ForegroundProperty, "TextSecondaryBrush"); }
+            _value.SetResourceReference(TextBlock.ForegroundProperty, caution ? "WarningTextBrush" : _settingsPage ? "TextPrimaryBrush" : "IslandTextBrush");
         }
         public void Network(string down, string up)
         {
             void Arrow(Geometry geometry)
             {
                 var glyph = new LucideIcon { Data = geometry, Size = 12, Margin = new Thickness(0, 0, 4, 0) };
-                glyph.SetResourceReference(LucideIcon.BrushProperty, "IslandTextTertiaryBrush");
+                glyph.SetResourceReference(LucideIcon.BrushProperty, _settingsPage ? "TextSecondaryBrush" : "IslandTextTertiaryBrush");
                 _value.Inlines.Add(new InlineUIContainer(glyph) { BaselineAlignment = BaselineAlignment.Center });
             }
             _value.FontWeight = FontWeights.Normal;
@@ -223,9 +232,9 @@ internal sealed class SystemMonitorView : UserControl
     {
         var text = new TextBlock { Text = what == "GPU" ? "GPU" : "Network", FontSize = 12, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
         var chevron = new LucideIcon { Data = LucideIcons.ChevronDown, Size = 12, Margin = new Thickness(4, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
-        chevron.SetResourceReference(LucideIcon.BrushProperty, "IslandTextTertiaryBrush");
+        chevron.SetResourceReference(LucideIcon.BrushProperty, _settingsPage ? "TextSecondaryBrush" : "IslandTextTertiaryBrush");
         var button = new Button { Content = new StackPanel { Orientation = Orientation.Horizontal, Children = { text, chevron } }, Margin = new Thickness(4, 0, 0, 0), Padding = new Thickness(4, 0, 4, 0), Width = double.NaN, Height = 24 };
-        button.SetResourceReference(StyleProperty, "IslandTransportButtonStyle");
+        button.SetResourceReference(StyleProperty, _settingsPage ? "SubtleButtonStyle" : "IslandTransportButtonStyle");
         AutomationProperties.SetName(button, $"{what}, {current}");
         button.Click += (_, _) =>
         {
@@ -233,7 +242,7 @@ internal sealed class SystemMonitorView : UserControl
             foreach (var (id, name) in items)
             {
                 var item = new Button { Content = name };
-                item.SetResourceReference(StyleProperty, "IslandMenuItemStyle");
+                item.SetResourceReference(StyleProperty, _settingsPage ? "SubtleButtonStyle" : "IslandMenuItemStyle");
                 if (id == currentId)
                     item.FontWeight = FontWeights.SemiBold;
                 item.Click += (_, _) =>
@@ -244,8 +253,8 @@ internal sealed class SystemMonitorView : UserControl
                 list.Children.Add(item);
             }
             var menu = new Border { MinWidth = 160, CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(1), Child = list };
-            menu.SetResourceReference(Border.BackgroundProperty, "IslandBrush");
-            menu.SetResourceReference(Border.BorderBrushProperty, "IslandBorderBrush");
+            menu.SetResourceReference(Border.BackgroundProperty, _settingsPage ? "FlyoutBrush" : "IslandBrush");
+            menu.SetResourceReference(Border.BorderBrushProperty, _settingsPage ? "BorderBrush" : "IslandBorderBrush");
             _picker.PlacementTarget = button;
             _picker.Child = menu;
             _picker.IsOpen = true;

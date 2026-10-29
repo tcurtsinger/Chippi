@@ -4,6 +4,7 @@
   <PropertyGroup>
     <TargetFramework>net10.0-windows</TargetFramework>
     <IsPackable>false</IsPackable>
+    <UseWPF>true</UseWPF>
     <IsTestProject>true</IsTestProject>
   </PropertyGroup>
 
@@ -15,6 +16,8 @@
 
   <ItemGroup>
     <Using Include="Xunit" />
+    <Using Include="System.IO" />
+    <Compile Include="../Chippi.Island.Tests/WpfTestThread.cs" Link="WpfTestThread.cs" />
   </ItemGroup>
 
   <ItemGroup>
