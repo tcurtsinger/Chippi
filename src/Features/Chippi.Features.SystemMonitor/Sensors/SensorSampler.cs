@@ -45,6 +45,9 @@ public static class Series
 /// </summary>
 public sealed class SensorSampler : IDisposable
 {
+    /// <summary>Between the unpublished first sample of a new need and the one that's published.</summary>
+    internal static readonly TimeSpan PrimeDelay = TimeSpan.FromMilliseconds(100);
+
     private readonly SamplerCore _core;
     private readonly TimeProvider _time;
     private readonly ILogger _log;
@@ -152,10 +155,22 @@ public sealed class SensorSampler : IDisposable
                 var interval = Interval;
                 var now = _time.GetUtcNow();
                 // A newly added need is read at once rather than at the next tick.
-                if (need != SensorNeed.None && (now >= next || (need & ~last) != 0))
+                bool added = (need & ~last) != 0;
+                if (need != SensorNeed.None && (now >= next || added))
                 {
                     try
                     {
+                        if (added)
+                        {
+                            // Rates (CPU, GPU load, network, and the disk list itself) need two samples, and a
+                            // pause of over 10s starts them over: a short unpublished first sample means a page
+                            // that just opened shows every reading at once, not 2s later.
+                            _core.Tick(now, need, interval);
+                            if (_wake.WaitOne(PrimeDelay) && _stopping)
+                                break;
+                            need = Need;
+                            now = _time.GetUtcNow();
+                        }
                         var snapshot = _core.Tick(now, need, interval);
                         Updated?.Invoke(snapshot);
                     }

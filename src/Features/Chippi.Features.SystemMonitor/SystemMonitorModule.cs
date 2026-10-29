@@ -67,6 +67,9 @@ public sealed class SystemMonitorModule : IFeatureModule
     /// <summary>GPUs that have reported load this session; the GPU card lists only these (design notes #13).</summary>
     internal HashSet<string> GpusWithLoad { get; } = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>The last readings a page showed beyond CPU and memory, which the next page opens with until its own arrive.</summary>
+    internal SystemSnapshot? PageSnapshot { get; set; }
+
     /// <summary>Raised after <see cref="Save"/>, on the caller's thread.</summary>
     public event Action? Changed;
 
