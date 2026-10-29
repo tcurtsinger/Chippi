@@ -38,6 +38,9 @@ public sealed class CleanUrlModule : IFeatureModule
     /// <summary>The shared clipboard, for the page's prefill and Copy.</summary>
     internal Core.Clipboard.IClipboardHub? Hub => _context?.Clipboard;
 
+    /// <summary>Clipboard history while it runs, so a cleaned link Copy writes is listed (notes #26).</summary>
+    internal ClipboardHistoryModule? History => _features.History;
+
     public event Action? Changed;
 
     public Task StartAsync(ModuleContext context, CancellationToken ct)

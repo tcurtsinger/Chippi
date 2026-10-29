@@ -88,6 +88,9 @@ public partial class SettingsWindow : Window
     private FrameworkElement? _pageView; // the current page's view, kept while search results show
     private const string ModulePrefix = "module:";
 
+    /// <summary>The app Settings was last switched from, for Clipboard history's Paste; null when there was none.</summary>
+    internal Core.Clipboard.PasteTarget? PasteTarget { get; private set; }
+
     /// <param name="remembered">The page is the one Settings last closed on: if it has gone since, open the first page.</param>
     public SettingsWindow(ShellContext shell, string page, bool remembered = false)
     {
@@ -624,6 +627,16 @@ public partial class SettingsWindow : Window
     }
 
     /// <summary>
+    /// WM_ACTIVATE: each time Settings becomes active, lParam is the window it took over from, so a
+    /// Paste from Settings goes back to the app you just left. Settings can stay open across app switches.
+    /// </summary>
+    internal void OnActivate(nint wParam, nint lParam)
+    {
+        if ((wParam & 0xFFFF) != 0) // not WA_INACTIVE
+            PasteTarget = Chippi.Clipboard.Windows.WindowsForeground.Of(lParam);
+    }
+
+    /// <summary>
     /// Snap layouts: Windows shows its flyout only over a window's own maximize button, so the hit test
     /// reports ours as one (HTMAXBUTTON). Windows then sends its mouse input as non-client messages,
     /// so this also draws its hover and pressed states and clicks it.
@@ -632,6 +645,9 @@ public partial class SettingsWindow : Window
     {
         switch ((uint)msg)
         {
+            case PInvoke.WM_ACTIVATE:
+                OnActivate(wParam, lParam);
+                break;
             case PInvoke.WM_NCHITTEST:
                 if (OverMaximize(lParam))
                 {

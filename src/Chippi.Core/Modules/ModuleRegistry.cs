@@ -340,6 +340,7 @@ public sealed class ModuleRegistry(ConfigStore config, IslandActivityHub island,
             Clipboard = _services.Clipboard,
             HoldIslandOpen = _services.HoldIslandOpen,
             IslandPasteTarget = () => _services.IslandPasteTarget?.Invoke(),
+            SettingsPasteTarget = () => _services.SettingsPasteTarget?.Invoke(),
             CloseIsland = () => _services.CloseIsland?.Invoke(),
         };
 

@@ -9,6 +9,7 @@ using Chippi.UI.Controls;
 
 namespace Chippi.Features.PlainPaste;
 
+/// <summary>Settings › Paste as plain text (revised 2026-10-28): the keys, or "Not set" in secondary text, with Set or Change and Remove.</summary>
 public sealed class PlainPasteView : UserControl
 {
     private readonly PlainPasteModule _module;
@@ -34,10 +35,13 @@ public sealed class PlainPasteView : UserControl
         if (_capturing) return;
         _body.Children.Clear();
         var row = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-        row.Children.Add(new TextBlock { Text = _module.Settings.Shortcut?.ToString() ?? "Not set", VerticalAlignment = VerticalAlignment.Center, FontSize = 14 });
+        var keys = new TextBlock { Text = _module.Settings.Shortcut?.ToString() ?? "Not set", VerticalAlignment = VerticalAlignment.Center };
+        keys.SetResourceReference(StyleProperty, "BodyTextStyle");
+        keys.SetResourceReference(TextBlock.ForegroundProperty, _module.Settings.Shortcut is null ? "TextSecondaryBrush" : "TextPrimaryBrush");
+        row.Children.Add(keys);
         row.Children.Add(Button(_module.Settings.Shortcut is null ? "Set" : "Change", BeginCapture));
         if (_module.Settings.Shortcut is not null) row.Children.Add(Button("Remove", () => { _module.RemoveShortcut(); Refresh(); }));
-        var card = new Card(); card.Children.Add(new SettingRow { Header = "Shortcut", Content = row }); _body.Children.Add(card);
+        _body.Children.Add(SettingsLayout.Card(SettingsLayout.Row("Shortcut", row)));
         if (_module.ShortcutError is { } error)
         {
             var line = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 8, 0, 0) };
@@ -49,9 +53,9 @@ public sealed class PlainPasteView : UserControl
     private void BeginCapture()
     {
         _capturing = true; _module.CaptureShortcut(true); Focusable = true;
-        _body.Children.Clear(); var card = new Card();
-        card.Children.Add(new SettingRow { Header = "New shortcut", Content = Button("Cancel", CancelCapture) });
-        _body.Children.Add(card); Focus();
+        _body.Children.Clear();
+        _body.Children.Add(SettingsLayout.Card(SettingsLayout.Row("New shortcut", Button("Cancel", CancelCapture))));
+        Focus();
     }
     private void CancelCapture() { _capturing = false; _module.CaptureShortcut(false); Refresh(); }
     private void Capture(object sender, KeyEventArgs e)

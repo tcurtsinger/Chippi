@@ -506,7 +506,10 @@ internal sealed class ShelfPage : UserControl
     }
 
     /// <summary>What an item drags out as: its files, its text, or its picture.</summary>
-    internal async Task<DataObject?> DataFor(ShelfItem item)
+    internal Task<DataObject?> DataFor(ShelfItem item) => DataFor(_shelf, item);
+
+    /// <summary>What an item drags out as, from the island or Settings.</summary>
+    internal static async Task<DataObject?> DataFor(ShelfService shelf, ShelfItem item)
     {
         var data = new DataObject();
         switch (item.Kind)
@@ -517,7 +520,7 @@ internal sealed class ShelfPage : UserControl
                 data.SetFileDropList(files);
                 break;
             case ShelfKind.Picture:
-                if (await _shelf.PictureAsync(item.Id) is not { } png)
+                if (await shelf.PictureAsync(item.Id) is not { } png)
                     return null;
                 data.SetData("PNG", new MemoryStream(png));
                 data.SetImage(ShelfPictures.Load(png));

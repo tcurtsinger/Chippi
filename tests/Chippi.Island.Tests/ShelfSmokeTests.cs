@@ -199,7 +199,7 @@ public sealed class ShelfSmokeTests
     private static object? Call(object value, string name, params object?[] args) => value.GetType().GetMethod(name, BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(value, args);
     private sealed class Keys : IKeyProtector { public byte[] Protect(byte[] key) => key.ToArray(); public byte[] Unprotect(byte[] key) => key.ToArray(); }
     private sealed class Settings : IModuleSettings { public T Get<T>() where T : class, new() => new(); public void Save<T>(T value) where T : class { } }
-    private sealed class Ui : IModuleUi { public IslandTileContribution? Tile; public IIslandTile AddIslandTile(IslandTileSpec spec) => Tile = new("shelf", spec); public void SetSettingsPage(Func<string?, object> factory) => throw new InvalidOperationException(); }
+    private sealed class Ui : IModuleUi { public IslandTileContribution? Tile; public IIslandTile AddIslandTile(IslandTileSpec spec) => Tile = new("shelf", spec); public Func<string?, object>? Page; public void SetSettingsPage(Func<string?, object> factory) => Page = factory; }
     private sealed class Island : IIslandPublisher { public void Publish(IslandActivity activity) => throw new InvalidOperationException(); public void Clear(string key) { } public void ReportSuccess(string? message = null) => throw new InvalidOperationException(); }
     private sealed class Hub : IClipboardHub
     {

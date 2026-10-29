@@ -132,7 +132,7 @@ public sealed class ScratchpadPage : Grid, IDisposable
             _body.Visibility = state.Document is null ? Visibility.Collapsed : Visibility.Visible;
             if (state.Document is not { } doc) { if (state.LoadFailed && IsLoaded && Window.GetWindow(this)?.IsActive == true) _retry.Focus(); return; }
             bool firstDocument = _shownId == 0;
-            if (_shownId != doc.SelectedId)
+            if (_shownId != doc.SelectedId || (!_editor.IsKeyboardFocusWithin && _editor.Text != doc.Selected.Text)) // Settings' edits show here too
             {
                 _shownId = doc.SelectedId; _editor.Text = doc.Selected.Text; _editor.CaretIndex = _editor.Text.Length;
             }

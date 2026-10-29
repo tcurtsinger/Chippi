@@ -234,6 +234,62 @@ public sealed class PageTests : IDisposable
         return task.GetAwaiter().GetResult();
     }
 
+    [Fact]
+    public async Task Settings_lists_every_item_on_60_rows_with_copy_pin_and_remove_and_dims_unavailable_ones()
+    {
+        await StartAsync();
+        string pdf = _folder.Touch("invoice-0412.pdf", 2_100_000);
+        string gone = _folder.Touch("old-logo.svg", 10);
+        await _module.Shelf!.AddFilesAsync([pdf]);
+        await _module.Shelf.AddFilesAsync([gone]);
+        File.Delete(gone);
+        await _module.Shelf.AddTextAsync("Call Dana about the venue");
+        WpfTestThread.Run(() =>
+        {
+            var page = Assert.IsType<ShelfSettingsPage>(_ui.Page!(null));
+            var rows = Find<Border>(page).Where(b => b.MinHeight == Chippi.UI.Controls.SettingsLayout.CaptionRowHeight).ToList();
+            Assert.Equal(3, rows.Count);
+            Assert.True(Shows(page, "invoice-0412.pdf"));
+            Assert.True(Shows(page, "PDF · 2.1 MB"));
+            Assert.True(Shows(page, "Unavailable"));
+            var unavailable = rows.Single(r => Find<TextBlock>(r).Any(t => t.Text == "Unavailable"));
+            Assert.False(Find<Button>(unavailable).Single(b => b.Content as string == "Copy").IsEnabled);
+            Assert.Equal(0.45, Find<StackPanel>(unavailable).First().Opacity);
+
+            var text = _module.Shelf.Items.Single(i => i.Kind == ShelfKind.Text);
+            var anchor = Find<Chippi.UI.Controls.IconButton>(page).First();
+            var menu = page.Menu(anchor, text);
+            Assert.False(menu.IsOpen);
+            Assert.Equal(new[] { "Pin", "Remove" }, Find<Button>(menu.Child).Select(b => b.Content));
+            Find<Button>(menu.Child).First().RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        });
+        await _module.Shelf.IdleAsync();
+        Assert.True(_module.Shelf.Items.Single(i => i.Kind == ShelfKind.Text).Pinned);
+        WpfTestThread.Run(() =>
+        {
+            var page = new ShelfSettingsPage(_module.Shelf);
+            var text = _module.Shelf.Items.Single(i => i.Kind == ShelfKind.Text);
+            Find<Button>(page).Single(b => AutomationProperties.GetName(b) == "Copy Call Dana about the venue").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            var menu = page.Menu(Find<Chippi.UI.Controls.IconButton>(page).First(), text);
+            Assert.Equal(new[] { "Unpin", "Remove" }, Find<Button>(menu.Child).Select(b => b.Content));
+            Find<Button>(menu.Child).Last().RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        });
+        await _module.Shelf.IdleAsync();
+        Assert.Equal("Call Dana about the venue", Assert.Single(_hub.Written).Text);
+        Assert.Equal(2, _module.Shelf.Items.Count);
+    }
+
+    [Fact]
+    public async Task Settings_says_no_items_inside_the_card()
+    {
+        await StartAsync();
+        WpfTestThread.Run(() =>
+        {
+            var page = Assert.IsType<ShelfSettingsPage>(_ui.Page!(null));
+            Assert.True(Shows(page, "No items"));
+        });
+    }
+
     private static void Wait(Task task) => Wait(task.ContinueWith(_ => true));
 
     private static void Load(FrameworkElement view) => view.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));
@@ -273,7 +329,9 @@ public sealed class PageTests : IDisposable
             return Tile = new IslandTileContribution("test", spec);
         }
 
-        public void SetSettingsPage(Func<string?, object> createView) { }
+        public Func<string?, object>? Page;
+
+        public void SetSettingsPage(Func<string?, object> createView) => Page = createView;
     }
 
     private sealed class Settings : IModuleSettings

@@ -103,16 +103,18 @@ public sealed class ModuleTests : IDisposable
     public async Task The_page_sees_esc_first_and_paste_goes_to_the_shells_target()
     {
         var target = new Core.Clipboard.PasteTarget(42, 7);
+        var settingsTarget = new Core.Clipboard.PasteTarget(43, 8);
         bool closed = false;
         var context = new ModuleContext(ClipboardHistoryModule.Id, _settings, NullLogger.Instance, new Island(), _historyUi)
         {
-            Clipboard = _hub, DataDirectory = _folder.Path, IslandPasteTarget = () => target, CloseIsland = () => closed = true,
+            Clipboard = _hub, DataDirectory = _folder.Path, IslandPasteTarget = () => target, SettingsPasteTarget = () => settingsTarget, CloseIsland = () => closed = true,
         };
         await _history.StartAsync(context, default);
         _history.SetRecording(true);
         _hub.CopyText("to paste");
         await _history.History!.IdleAsync();
         Assert.Same(target, _features.PasteTarget!());
+        Assert.Same(settingsTarget, _features.SettingsPasteTarget!());
         WpfTestThread.Run(() =>
         {
             var view = (ClipboardView)_historyUi.Spec!.CreateSection();
@@ -372,7 +374,7 @@ public sealed class ModuleTests : IDisposable
         {
             var page = new CleanUrlSettingsPage(_clean);
             Assert.True(Shows(page, "No sites"));
-            Button Named(string text) => Find<Button>(page).First(b => b.Content as string == text && IsShown(b));
+            Button Named(string text) => Find<Button>(page).First(b => (b.Content as string ?? System.Windows.Automation.AutomationProperties.GetName(b)) == text && IsShown(b));
             Named("Add site").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             Named("Cancel").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             Assert.True(Shows(page, "No sites"));
@@ -496,6 +498,120 @@ public sealed class ModuleTests : IDisposable
         Assert.Equal("1 hr", Format.When(now.AddMinutes(-90), now));
         Assert.Equal("Oct 21", Format.When(now.AddDays(-7), now));
         Assert.Equal("Yesterday", Format.When(now.AddDays(-1).AddMinutes(-1), now));
+    }
+
+    // ---- Settings pages (brief F3 #5, #6) ----
+
+    [Fact]
+    public async Task Settings_history_lists_every_copy_pinned_first_with_the_count_and_search()
+    {
+        await StartHistoryAsync();
+        _history.SetRecording(true);
+        for (int i = 0; i < 25; i++)
+            _hub.CopyText($"note {i}");
+        await _history.History!.IdleAsync();
+        var pinned = _history.History.Entries.Single(e => e.Text == "note 3");
+        await _history.History.PinAsync(pinned.Id, true);
+        WpfTestThread.Run(() =>
+        {
+            var page = new ClipboardHistorySettingsPage(_history);
+            Assert.True(Shows(page, "25 items"));
+            var rows = Find<Border>(page).Where(b => b.MinHeight == SettingsLayout.RowHeight && b.Child is Grid).ToList();
+            Assert.Equal(25, rows.Count); // no island limit: the page scrolls
+            Assert.Equal("note 3", Find<TextBlock>(rows[0]).First(t => t.Text.StartsWith("note", StringComparison.Ordinal)).Text);
+            Assert.Contains(Find<Button>(page), b => b.Content as string == "Pause");
+            var search = Find<SearchBox>(page).Single();
+            search.Text = "note 1";
+            Assert.Equal(11, Find<Border>(page).Count(b => b.MinHeight == SettingsLayout.RowHeight && b.Child is Grid)); // 1, 10 to 19
+            search.Text = "nothing like it";
+            Assert.True(Shows(page, "No matches"));
+        });
+    }
+
+    [Fact]
+    public async Task Settings_history_menu_copies_pins_and_deletes_and_paste_without_a_target_copies()
+    {
+        await StartHistoryAsync();
+        _history.SetRecording(true);
+        _hub.CopyText("alpha");
+        await _history.History!.IdleAsync();
+        var entry = _history.History.Entries.Single();
+        WpfTestThread.Run(() =>
+        {
+            var page = new ClipboardHistorySettingsPage(_history);
+            var anchor = Find<IconButton>(page).Single();
+            Button Item(string text) => Find<Button>(page.Menu(anchor, _history.History.Entries.Single())).Single(b => b.Content as string == text);
+            Assert.Equal(new[] { "Paste", "Copy", "Pin", "Delete" }, Find<Button>(page.Menu(anchor, entry)).Select(b => b.Content));
+            Item("Paste").RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); // Settings has no app to paste into here
+            Flush(page);
+            Assert.Equal("alpha", Assert.Single(_hub.Written).Text);
+            Assert.Empty(_hub.Pasted);
+        });
+        await _history.History.IdleAsync();
+        WpfTestThread.Run(() =>
+        {
+            var page = new ClipboardHistorySettingsPage(_history);
+            _features.SettingsPasteTarget = () => new Core.Clipboard.PasteTarget(7, 7);
+            var anchor = Find<IconButton>(page).Single();
+            Find<Button>(page.Menu(anchor, entry)).Single(b => b.Content as string == "Paste").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Flush(page);
+            Assert.Equal((nint)7, Assert.Single(_hub.Pasted).Target.Window);
+            Find<Button>(page.Menu(anchor, entry)).Single(b => b.Content as string == "Pin").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        });
+        await _history.History.IdleAsync();
+        Assert.True(_history.History.Entries.Single().Pinned);
+        WpfTestThread.Run(() =>
+        {
+            var page = new ClipboardHistorySettingsPage(_history);
+            var anchor = Find<IconButton>(page).Single();
+            Assert.Contains(Find<Button>(page.Menu(anchor, _history.History.Entries.Single())), b => b.Content as string == "Unpin");
+            Find<Button>(page.Menu(anchor, _history.History.Entries.Single())).Single(b => b.Content as string == "Delete").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        });
+        await _history.History.IdleAsync();
+        Assert.Empty(_history.History.Entries);
+    }
+
+    [Fact]
+    public async Task Settings_history_pause_and_empty_rows_live_in_their_cards()
+    {
+        await StartHistoryAsync();
+        _history.SetRecording(true);
+        WpfTestThread.Run(() =>
+        {
+            var page = new ClipboardHistorySettingsPage(_history);
+            Assert.True(Shows(page, "No apps"));
+            Assert.True(Shows(page, "No items"));
+            Assert.Contains(Find<Button>(page), b => System.Windows.Automation.AutomationProperties.GetName(b) == "Add app");
+            Find<Button>(page).Single(b => b.Content as string == "Pause").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Assert.True(_history.Settings.Paused);
+            Assert.Contains(Find<Button>(new ClipboardHistorySettingsPage(_history)), b => b.Content as string == "Resume");
+        });
+    }
+
+    [Fact]
+    public async Task Settings_clean_url_cleans_as_you_type_copies_and_never_says_removed()
+    {
+        await StartCleanAsync();
+        WpfTestThread.Run(() =>
+        {
+            var page = new CleanUrlSettingsPage(_clean);
+            var link = Find<TextBox>(page).Single(t => System.Windows.Automation.AutomationProperties.GetName(t) == "Link");
+            var copy = Find<Button>(page).Single(b => b.Content as string == "Copy");
+            Assert.False(copy.IsEnabled);
+            link.Text = "https://example.org/p?utm_source=news&item=7#part";
+            Assert.True(Shows(page, "https://example.org/p?item=7#part"));
+            Assert.DoesNotContain(Find<TextBlock>(page), t => t.Text.StartsWith("Removed", StringComparison.Ordinal)); // Travis, task 65
+            Assert.True(copy.IsEnabled);
+            copy.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Flush(page);
+            Assert.Equal("https://example.org/p?item=7#part", Assert.Single(_hub.Written).Text);
+            Assert.Equal("Copied", copy.Content);
+            link.Text = "https://example.org/clean";
+            Assert.True(Shows(page, "Nothing to remove"));
+            link.Text = "not a link";
+            Assert.True(Shows(page, "Not a web link"));
+            Assert.False(copy.IsEnabled);
+        });
     }
 
     private sealed class Ui : IModuleUi

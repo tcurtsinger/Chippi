@@ -8,5 +8,6 @@
     <ProjectReference Include="../../Chippi.Clipboard/Chippi.Clipboard.csproj" />
     <ProjectReference Include="../../Chippi.Core/Chippi.Core.csproj" />
     <ProjectReference Include="../../Chippi.UI/Chippi.UI.csproj" />
+    <InternalsVisibleTo Include="Chippi.Features.Scratchpad.Tests" />
   </ItemGroup>
 </Project>

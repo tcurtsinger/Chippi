@@ -75,6 +75,32 @@ public sealed class ScratchpadPageTests
     }, failRead: true);
 
     [Fact]
+    public void Settings_load_failure_shows_retry_beside_the_title_and_retry_loads_the_notes() => WpfTestThread.Run(() =>
+    {
+        var store = new Store { FailRead = true };
+        var session = new ScratchpadSession(() => store);
+        session.LoadAsync().GetAwaiter().GetResult();
+        var page = new ScratchpadSettingsPage(session);
+        try
+        {
+            var aside = (FrameworkElement)SettingsLayout.GetTitleAside(page)!;
+            var retry = Named<Button>(aside, "Retry");
+            Assert.Contains(Find<TextBlock>(aside), b => b.Text == "Load failed");
+            Assert.Equal(Visibility.Visible, retry.Visibility);
+            Assert.Equal(Visibility.Collapsed, ((FrameworkElement)page.Content).Visibility);
+            store.FailRead = false;
+            store.Document = ScratchpadDocument.Empty().Edit("Preserved note");
+            retry.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            session.FlushAsync().GetAwaiter().GetResult(); Pump();
+            Assert.Equal("Preserved note", Named<TextBox>(page, "Note").Text);
+            Assert.Equal(Visibility.Visible, ((FrameworkElement)page.Content).Visibility);
+            Assert.Equal(Visibility.Collapsed, retry.Visibility);
+            Assert.Contains(Find<TextBlock>(aside), b => b.Text == "Saved");
+        }
+        finally { session.DisposeAsync().AsTask().GetAwaiter().GetResult(); }
+    });
+
+    [Fact]
     public void New_note_opens_an_empty_editor_and_the_twelfth_disables_new() => WithPage((store, session, page) =>
     {
         Named<Button>(page, "New note").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));

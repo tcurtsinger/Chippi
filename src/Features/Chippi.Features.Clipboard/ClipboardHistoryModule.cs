@@ -40,6 +40,9 @@ public sealed class ClipboardHistoryModule : IFeatureModule
 
     public ClipboardHistorySettings Settings { get; private set; } = new();
 
+    /// <summary>What it shares with Clean URL, for the Settings page's Paste.</summary>
+    internal ClipboardFeatures Features => _features;
+
     /// <summary>The saved copies; null while stopped.</summary>
     public ClipboardHistory? History { get; private set; }
 
@@ -59,6 +62,7 @@ public sealed class ClipboardHistoryModule : IFeatureModule
         History.Apply(Settings.Recording, Settings.Paused, Settings.AppsToSkip);
         context.Ui.SetSettingsPage(() => new ClipboardHistorySettingsPage(this));
         _features.PasteTarget = context.IslandPasteTarget;
+        _features.SettingsPasteTarget = context.SettingsPasteTarget;
         _features.CloseIsland = context.CloseIsland;
         _tile = context.Ui.AddIslandTile(new IslandTileSpec(ClipboardFeatures.TileKey, "Clipboard", nameof(LucideIcons.ClipboardList), Order: 70, SectionOrder: 0,
             () => View())
