@@ -35,8 +35,8 @@ public partial class IslandPanelWindow : Window
     private const double ShadowRoom = 40; // beside the shape, for its shadow
     private static readonly TimeSpan GrowTime = TimeSpan.FromMilliseconds(220);
     private static readonly TimeSpan ShrinkTime = TimeSpan.FromMilliseconds(160);
-    private static readonly TimeSpan PageFadeOutTime = TimeSpan.FromMilliseconds(90);
-    private static readonly TimeSpan PageFadeTime = TimeSpan.FromMilliseconds(180);
+    private static readonly TimeSpan PageFadeTime = TimeSpan.FromMilliseconds(150);
+    private const int PageDrawFrames = 2; // frames the new page gets to draw under the old one's picture before it fades
 
     private enum Morph { Open, Page, Close }
 
@@ -714,9 +714,9 @@ public partial class IslandPanelWindow : Window
 
     /// <summary>
     /// Starts a morph from what is drawn now: open (tab to page, 220ms, content fading in over the
-    /// second half), page (the shape stays; the old content fades out over 90ms while the new one
-    /// fades in over 180ms, with no blank gap) or close (back to the swollen tab, 160ms, content
-    /// fading out). Reduced motion snaps.
+    /// second half), page (the shape stays; the new page draws at full opacity under a picture of the
+    /// old one, which fades out over 150ms once the new page has drawn) or close (back to the swollen
+    /// tab, 160ms, content fading out). Reduced motion snaps.
     /// </summary>
     private void Begin(Morph morph)
     {
@@ -726,6 +726,8 @@ public partial class IslandPanelWindow : Window
         _radiusFrom = fromTab ? TabRadius() : _radius;
         _fadeFrom = Card.Opacity;
         _elapsed = TimeSpan.Zero;
+        // A new page's first frame is slow to draw; under the still picture nothing moves meanwhile.
+        _drawing = morph == Morph.Page && Leaving.Source is not null ? PageDrawFrames : 0;
         if (Motion.IsReduced)
         {
             StopFrames();
@@ -739,7 +741,7 @@ public partial class IslandPanelWindow : Window
             return;
         }
         if (morph == Morph.Page)
-            Card.Opacity = 0; // Leaving shows the old content meanwhile
+            Card.Opacity = _drawing > 0 ? 1 : 0; // without a picture of the old page, the new one fades in
         if (_frame is not null)
             return;
         _lastFrame = 0;
@@ -747,8 +749,10 @@ public partial class IslandPanelWindow : Window
         {
             // The clock starts on the first frame, so a slow first show doesn't skip the start.
             long now = Stopwatch.GetTimestamp();
-            _elapsed += _lastFrame == 0 ? TimeSpan.Zero : Stopwatch.GetElapsedTime(_lastFrame, now);
+            _elapsed += _lastFrame == 0 || _drawing > 0 ? TimeSpan.Zero : Stopwatch.GetElapsedTime(_lastFrame, now);
             _lastFrame = now;
+            if (_drawing > 0)
+                _drawing--;
             Step();
         };
         CompositionTarget.Rendering += _frame;
@@ -763,15 +767,16 @@ public partial class IslandPanelWindow : Window
         var to = _morph == Morph.Close ? _tabLocal : _target;
         _drawn = new Rect(Lerp(_from.X, to.X, eased), Lerp(_from.Y, to.Y, eased), Lerp(_from.Width, to.Width, eased), Lerp(_from.Height, to.Height, eased));
         _radius = Lerp(_radiusFrom, _morph == Morph.Close ? TabRadius() : OpenRadius, eased);
+        double fade = Math.Clamp(_elapsed / PageFadeTime, 0, 1);
         Card.Opacity = _morph switch
         {
             Morph.Open => Math.Max(_fadeFrom, Math.Clamp(t * 2 - 1, 0, 1)),
-            Morph.Page => Math.Clamp(_elapsed / PageFadeTime, 0, 1),
+            Morph.Page => Leaving.Source is null ? fade : 1,
             _ => _fadeFrom * Math.Clamp(1 - t * 2, 0, 1),
         };
-        Leaving.Opacity = _morph == Morph.Page ? _leavingFrom * (1 - Math.Clamp(_elapsed / PageFadeOutTime, 0, 1)) : 0;
+        Leaving.Opacity = _morph == Morph.Page ? _leavingFrom * Math.Pow(1 - fade, 3) : 0;
         Draw();
-        bool done = _morph == Morph.Page ? _elapsed >= PageFadeTime && t >= 1 : t >= 1;
+        bool done = _morph == Morph.Page ? _drawing == 0 && fade >= 1 && t >= 1 : t >= 1;
         if (!done)
             return;
         StopFrames();
@@ -839,10 +844,12 @@ public partial class IslandPanelWindow : Window
     private static double Lerp(double from, double to, double t) => from + (to - from) * t;
 
     private double _leavingFrom;
+    private int _drawing; // frames left before the old page's picture starts to fade
 
     /// <summary>
-    /// Before a page change: a picture of the content showing now, laid over the new page, which
-    /// <see cref="Step"/> fades out over 90ms while the new content fades in. Nothing while hidden.
+    /// Before a page change: a picture of the content showing now on the island's own fill, laid over
+    /// the new page, which <see cref="Step"/> fades out once the new page has drawn. Inset 1px so the
+    /// island's stroke stays. Nothing while hidden.
     /// </summary>
     private void HoldLeaving()
     {
@@ -855,7 +862,13 @@ public partial class IslandPanelWindow : Window
             96 * s, 96 * s, PixelFormats.Pbgra32);
         var copy = new DrawingVisual();
         using (var dc = copy.RenderOpen())
-            dc.DrawRectangle(new VisualBrush(Card), null, new Rect(0, 0, Card.ActualWidth, Card.ActualHeight));
+        {
+            var box = new Rect(0, 0, Card.ActualWidth, Card.ActualHeight);
+            var fill = box;
+            fill.Inflate(-1, -1);
+            dc.DrawRectangle((Brush)FindResource("IslandBrush"), null, fill);
+            dc.DrawRectangle(new VisualBrush(Card), null, box);
+        }
         picture.Render(copy);
         picture.Freeze();
         Leaving.Source = picture;
