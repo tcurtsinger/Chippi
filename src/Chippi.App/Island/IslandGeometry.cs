@@ -51,17 +51,20 @@ public static class IslandGeometry
     public const double Gap = 8;
 
     /// <summary>
-    /// The tab's size in DIPs on the top edge, turned on the sides: 96×28 at rest and 120×32 when
-    /// live. Swollen (hovered, or the island open) it is 16px longer and 4px deeper: 112×32 and 136×36.
+    /// The tab's size in DIPs on the top edge, turned on the sides: 96×28 at rest, 120×32 when live,
+    /// and 220×32 while it names the song playing. Swollen (hovered, or the island open) it is 16px
+    /// longer and 4px deeper: 112×32, 136×36 and 236×36.
     /// </summary>
-    public static Size TabSize(IslandEdge edge, bool live, bool swollen = false)
+    public static Size TabSize(IslandEdge edge, bool live, bool swollen = false, bool song = false)
     {
-        var (along, across) = (live, swollen) switch
+        var (along, across) = (song ? 2 : live ? 1 : 0, swollen) switch
         {
-            (false, false) => (96.0, 28.0),
-            (false, true) => (112.0, 32.0),
-            (true, false) => (120.0, 32.0),
-            (true, true) => (136.0, 36.0),
+            (0, false) => (96.0, 28.0),
+            (0, true) => (112.0, 32.0),
+            (1, false) => (120.0, 32.0),
+            (1, true) => (136.0, 36.0),
+            (_, false) => (220.0, 32.0),
+            (_, true) => (236.0, 36.0),
         };
         return edge == IslandEdge.Top ? new Size(along, across) : new Size(across, along);
     }
@@ -110,28 +113,17 @@ public static class IslandGeometry
     };
 
     /// <summary>
-    /// Where a drop at <paramref name="pointer"/> docks: the nearest edge of the work area and the
-    /// place along it, or null when the drop is refused: nearest to the bottom or to the taskbar's
-    /// edge, or inside an edge's end margin (a corner).
+    /// Where a drop at <paramref name="pointer"/> docks: only the top edge for now (side edges retired
+    /// 2026-10-29), at the pointer's place along it. Null when the drop is refused: in the work area's
+    /// lower half, or inside the top edge's end margins (a corner). A taskbar on top leaves the tab
+    /// just under it.
     /// </summary>
-    public static (IslandEdge Edge, double Place)? Snap(Point pointer, Rect monitor, Rect work, double scale)
+    public static (IslandEdge Edge, double Place)? Snap(Point pointer, Rect work, double scale)
     {
-        var distances = new (ScreenEdge Edge, double Distance)[]
-        {
-            (ScreenEdge.Top, Math.Abs(pointer.Y - work.Top)),
-            (ScreenEdge.Left, Math.Abs(pointer.X - work.Left)),
-            (ScreenEdge.Right, Math.Abs(work.Right - pointer.X)),
-            (ScreenEdge.Bottom, Math.Abs(work.Bottom - pointer.Y)),
-        };
-        var nearest = distances.MinBy(d => d.Distance).Edge;
-        if (nearest == ScreenEdge.Bottom || nearest == TaskbarEdge(monitor, work))
+        if (pointer.Y > work.Top + work.Height / 2)
             return null;
-        double place = nearest == ScreenEdge.Top
-            ? Fraction(pointer.X, work.Left, work.Width, TopEndMargin * scale)
-            : Fraction(pointer.Y, work.Top, work.Height, SideEndMargin * scale);
-        if (place is < 0 or > 1)
-            return null;
-        return (nearest switch { ScreenEdge.Left => IslandEdge.Left, ScreenEdge.Right => IslandEdge.Right, _ => IslandEdge.Top }, place);
+        double place = Fraction(pointer.X, work.Left, work.Width, TopEndMargin * scale);
+        return place is < 0 or > 1 ? null : (IslandEdge.Top, place);
     }
 
     /// <summary>

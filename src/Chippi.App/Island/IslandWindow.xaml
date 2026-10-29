@@ -13,7 +13,7 @@
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         ResizeMode="NoResize" ShowInTaskbar="False" ShowActivated="False" Topmost="True"
         SizeToContent="Manual" WindowStartupLocation="Manual"
-        Left="-32000" Top="-32000" Width="136" Height="36">
+        Left="-32000" Top="-32000" Width="236" Height="36">
     <Window.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
@@ -34,6 +34,17 @@
                      button's name and help text carry the state (DESIGN.md §7 Accessibility). -->
                 <StackPanel x:Name="TabContent" HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False">
                     <pet:Gumdrop x:Name="Pet" Size="20" Mood="Sleepy" IsDecorative="True" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    <!-- The song while music plays: title · artist, scrolling when it doesn't fit (IslandWindow.ShowSong). -->
+                    <Canvas x:Name="Song" Height="16" Margin="8,0" ClipToBounds="True" VerticalAlignment="Center" Visibility="Collapsed">
+                        <StackPanel x:Name="SongStrip" Orientation="Horizontal" TextElement.FontFamily="{StaticResource UiFont}" TextElement.FontSize="12"
+                                    TextElement.Foreground="{StaticResource IslandTextBrush}">
+                            <StackPanel.RenderTransform>
+                                <TranslateTransform x:Name="SongMove" />
+                            </StackPanel.RenderTransform>
+                            <TextBlock x:Name="SongText" />
+                            <TextBlock x:Name="SongCopy" Margin="40,0,0,0" />
+                        </StackPanel>
+                    </Canvas>
                     <Grid x:Name="Glyph" Width="14" Height="14" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed">
                         <StackPanel x:Name="Equalizer" Orientation="Horizontal" HorizontalAlignment="Center" Height="14">
                             <Rectangle Style="{StaticResource IslandEqualizerBarStyle}" Height="8" />

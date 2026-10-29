@@ -249,12 +249,13 @@ Mockup: [Chippi Surfaces](https://claude.ai/artifact/RJAX7v2QT6MLpPRgZQVXeS). Ch
 ### Island (movable tab and tile grid, approved 2026-10-25)
 Reference: the offline Sound mockup at `X:\code\chippi-scratch\phase-3-prep\mockup\` (`Island.dc.html`, `IslandTabs.dc.html`), with the side-edge column approved in the Phase 3 kickoff. This replaces the old stack of installed-feature panels. The tab remains one shape that grows into the island; hovering only swells it, and clicking opens it. It never hides at rest, except while a fullscreen app is in front on its display.
 
-- **Position:** drag to Top (default, centered), Left or Right, never the taskbar edge or a corner.
-  - The tab's center stays at least 76px from a side edge's ends and 160px from the top edge's ends. These center margins keep the largest swollen live tab (136 long) fully on screen; the top margin also keeps it clear of window buttons.
+- **Position (revised 2026-10-29: top edge only for now):** drag along the top edge; a drop anywhere in the work area's upper half docks there, at that point along it. A drop in the lower half or a top corner is refused. A saved side edge shows at top center, and a taskbar on top leaves the tab just under it. Settings › Island & pet keeps only Position's Reset.
+  - The tab's center stays at least 160px from the top edge's ends, which keeps the largest swollen tab (236 long, naming a song) fully on screen and clear of window buttons.
   - Save edge and place along it (0 to 1). Display stays a setting: Main display (default), Follow active window, or One monitor by name. Dropping on another monitor selects it; disconnection falls back to the main display on the same edge.
 - **Tab:** half-oval, flat against its edge, Island fill, 1px `rgba(255,255,255,.14)` stroke except on the flat side.
-  - Top: 96x28 at rest, 120x32 live. Sides: 28x96 and 32x120. Gumdrop's small form is 20px at rest, 22px live; sleepy at rest and idle on hover or while open.
-  - Swell adds 16px along the edge and 4px depth: Top 112x32 or 136x36; sides 32x112 or 36x136. No delay; 120ms ease-out, shrinking when the pointer leaves. Grow about the center, never away from the pointer. Reduced motion snaps. Hover never opens the island.
+  - Top: 96x28 at rest, 120x32 live, 220x32 while music plays. Gumdrop's small form is 20px at rest, 22px live; sleepy at rest and idle on hover or while open.
+  - **While music plays (2026-10-29):** Gumdrop, then the song, then the equalizer. The song is the title in 12 Text, then " · artist" in tertiary, 8 from Gumdrop and the glyph. It holds still when it fits; otherwise it scrolls 30 DIPs a second after a 2-second hold at the start of each pass, a copy following 40 behind so it loops, fading over 8 at its ends. It stops while the tab is hidden or the island is open, and holds under reduced motion. The equalizer's three bars follow the default output's real level (the shared audio service's meter, 20 readings a second, the loudest recent peak setting the scale), and rest at 8, 14 and 10 otherwise. Paused, the music activity goes and the tab returns to its live or rest size.
+  - Swell adds 16px along the edge and 4px depth: Top 112x32, 136x36 or 236x36. No delay; 120ms ease-out, shrinking when the pointer leaves. Grow about the center, never away from the pointer. Reduced motion snaps. Hover never opens the island.
   - The highest activity supplies a 14px accent glyph beside Gumdrop (under it on side edges): media, timer, download/stash, agent, then status. Held/failed uses Caution; a successful stash celebrates.
   - **Muted mic:** always add a 14px mic-off glyph in Caution after the highest activity glyph, even when music is playing. A muted mic alone counts as live and uses the live size; no preference can hide this indicator. The glyph/status clears when microphones are unmuted. Accessible state includes "Microphone muted".
 - **Dragging:** a press moving 4px starts a drag and closes the island immediately. A 44px Gumdrop bubble follows the pointer and a 3px accent line marks an allowed drop. Release snaps over 180ms, or returns to the saved position for a refused drop. Dragging never opens it; a press without movement toggles it.
@@ -479,7 +480,7 @@ In the island and flyout header, the pet is decorative (`AutomationProperties.Ac
 - **Don't** nest cards, or give each row its own card.
 - **Don't** ship stock WPF chrome: no default checkboxes, group boxes or gray dialogs.
 - **Don't** use a colored side stripe (a left or right border wider than 1px) to mark a row or card. The nav pill is the one exception.
-- **Don't** animate anything for its own sake. Only switches, segment and tab changes, the island and the pet move. The pet's blink and the island's live equalizer are the only loops.
+- **Don't** animate anything for its own sake. Only switches, segment and tab changes, the island and the pet move. The pet's blink, the island's live equalizer and the tab's scrolling song are the only loops.
 - **Don't** use emoji anywhere in the UI.
 - **Don't** redraw other companies' logos. Use the real app icon or a monogram.
 - **Don't** copy vorssaint's screens, icon or assets.

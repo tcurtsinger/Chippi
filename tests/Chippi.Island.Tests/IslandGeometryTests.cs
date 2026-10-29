@@ -7,7 +7,7 @@ using Chippi.Core.Config;
 
 namespace Chippi.Island.Tests;
 
-/// <summary>DESIGN.md §5 Island: where the tab docks, what a drop is refused, and where the island opens.</summary>
+/// <summary>DESIGN.md §5 Island: where the tab docks (the top edge only, for now), what a drop is refused, and where the island opens.</summary>
 public sealed class IslandGeometryTests
 {
     // 1920×1080 with a 48px taskbar at the bottom.
@@ -17,18 +17,15 @@ public sealed class IslandGeometryTests
     [Fact]
     public void A_drop_near_the_top_docks_on_top_where_it_was_dropped()
     {
-        var snap = IslandGeometry.Snap(new Point(960, 10), Monitor, Work, 1);
+        var snap = IslandGeometry.Snap(new Point(960, 10), Work, 1);
         Assert.Equal((IslandEdge.Top, 0.5), snap);
     }
 
-    [Theory]
-    [InlineData(5, 500, IslandEdge.Left)]
-    [InlineData(1910, 500, IslandEdge.Right)]
-    public void A_drop_near_a_side_docks_on_that_side(double x, double y, IslandEdge edge)
+    [Fact]
+    public void A_drop_anywhere_in_the_upper_half_docks_on_top_at_its_place_along_it()
     {
-        var snap = IslandGeometry.Snap(new Point(x, y), Monitor, Work, 1);
-        Assert.Equal(edge, snap?.Edge);
-        Assert.Equal((500 - 76) / (1032 - 152.0), snap!.Value.Place, 6);
+        Assert.Equal((IslandEdge.Top, (600 - 160) / 1600.0), IslandGeometry.Snap(new Point(600, 500), Work, 1));
+        Assert.Equal(IslandEdge.Top, IslandGeometry.Snap(new Point(1700, 2), Work, 1)?.Edge); // by the right edge's top
     }
 
     [Theory]
@@ -38,44 +35,44 @@ public sealed class IslandGeometryTests
     [InlineData(1916, 4)] // top-right corner
     [InlineData(159, 2)] // top edge, inside the 160px end margin
     [InlineData(1761, 2)]
-    [InlineData(2, 75)] // left edge, inside the 76px end margin
-    [InlineData(2, 970)]
-    [InlineData(1918, 40)] // right edge, inside the margin
-    public void Drops_on_the_taskbar_edge_the_bottom_or_a_corner_are_refused(double x, double y) =>
-        Assert.Null(IslandGeometry.Snap(new Point(x, y), Monitor, Work, 1));
+    [InlineData(2, 75)] // the left edge: past the top edge's end margin
+    [InlineData(5, 500)]
+    [InlineData(1910, 500)] // the right edge
+    [InlineData(960, 520)] // the lower half
+    public void Drops_in_the_lower_half_by_a_side_or_in_a_corner_are_refused(double x, double y) =>
+        Assert.Null(IslandGeometry.Snap(new Point(x, y), Work, 1));
 
     [Fact]
     public void The_end_margins_are_inclusive()
     {
-        Assert.Equal((IslandEdge.Top, 0.0), IslandGeometry.Snap(new Point(160, 2), Monitor, Work, 1));
-        Assert.Equal((IslandEdge.Top, 1.0), IslandGeometry.Snap(new Point(1760, 2), Monitor, Work, 1));
-        Assert.Equal((IslandEdge.Left, 0.0), IslandGeometry.Snap(new Point(2, 76), Monitor, Work, 1));
+        Assert.Equal((IslandEdge.Top, 0.0), IslandGeometry.Snap(new Point(160, 2), Work, 1));
+        Assert.Equal((IslandEdge.Top, 1.0), IslandGeometry.Snap(new Point(1760, 2), Work, 1));
     }
 
     [Fact]
     public void Margins_scale_with_the_monitor()
     {
         // At 150%, the top margin is 240 physical pixels.
-        Assert.Null(IslandGeometry.Snap(new Point(239, 2), Monitor, Work, 1.5));
-        Assert.Equal(0.0, IslandGeometry.Snap(new Point(240, 2), Monitor, Work, 1.5)!.Value.Place);
+        Assert.Null(IslandGeometry.Snap(new Point(239, 2), Work, 1.5));
+        Assert.Equal(0.0, IslandGeometry.Snap(new Point(240, 2), Work, 1.5)!.Value.Place);
     }
 
     [Fact]
-    public void A_taskbar_on_the_left_refuses_the_left_edge()
+    public void A_taskbar_on_the_left_still_leaves_the_top_edge()
     {
         var work = new Rect(48, 0, 1872, 1080);
         Assert.Equal(ScreenEdge.Left, IslandGeometry.TaskbarEdge(Monitor, work));
-        Assert.Null(IslandGeometry.Snap(new Point(50, 540), Monitor, work, 1));
-        Assert.Null(IslandGeometry.Snap(new Point(960, 1078), Monitor, work, 1)); // the bottom is never a dock
-        Assert.Equal(IslandEdge.Right, IslandGeometry.Snap(new Point(1918, 540), Monitor, work, 1)?.Edge);
+        Assert.Null(IslandGeometry.Snap(new Point(50, 540), work, 1));
+        Assert.Equal((IslandEdge.Top, 0.5), IslandGeometry.Snap(new Point(48 + 936, 2), work, 1));
     }
 
     [Fact]
-    public void A_taskbar_on_top_refuses_the_top_edge()
+    public void A_taskbar_on_top_leaves_the_tab_just_under_it()
     {
         var work = new Rect(0, 48, 1920, 1032);
         Assert.Equal(ScreenEdge.Top, IslandGeometry.TaskbarEdge(Monitor, work));
-        Assert.Null(IslandGeometry.Snap(new Point(960, 50), Monitor, work, 1));
+        Assert.Equal((IslandEdge.Top, 0.5), IslandGeometry.Snap(new Point(960, 50), work, 1));
+        Assert.Equal(new Point(960, 48), IslandGeometry.Anchor(IslandEdge.Top, 0.5, Monitor, work, 1));
     }
 
     [Fact]
@@ -91,20 +88,19 @@ public sealed class IslandGeometryTests
     public void An_auto_hidden_taskbar_takes_no_edge()
     {
         Assert.Null(IslandGeometry.TaskbarEdge(Monitor, Monitor));
-        Assert.Equal(IslandEdge.Left, IslandGeometry.Snap(new Point(2, 540), Monitor, Monitor, 1)?.Edge);
+        Assert.Equal((IslandEdge.Top, 0.5), IslandGeometry.Snap(new Point(960, 2), Monitor, 1));
     }
 
     [Theory]
     [InlineData(IslandEdge.Top, 0.0)]
     [InlineData(IslandEdge.Top, 0.37)]
-    [InlineData(IslandEdge.Left, 1.0)]
-    [InlineData(IslandEdge.Right, 0.81)]
+    [InlineData(IslandEdge.Top, 1.0)]
     public void A_saved_place_survives_a_round_trip_on_a_scaled_monitor_left_of_the_main_one(IslandEdge edge, double place)
     {
         var monitor = new Rect(-2560, 0, 2560, 1440);
         var work = new Rect(-2560, 0, 2560, 1380);
         var anchor = IslandGeometry.Anchor(edge, place, monitor, work, 1.5);
-        var snap = IslandGeometry.Snap(anchor, monitor, work, 1.5);
+        var snap = IslandGeometry.Snap(anchor, work, 1.5);
         Assert.Equal(edge, snap?.Edge);
         Assert.Equal(place, snap!.Value.Place, 6);
     }

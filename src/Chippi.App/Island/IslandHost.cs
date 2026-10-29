@@ -134,8 +134,9 @@ public sealed class IslandHost : IDisposable
     }
 
     /// <summary>
-    /// Debug builds (<c>--island-shots &lt;dir&gt;</c>): the closed tab on Top and Right at rest and with
-    /// a fake media activity live, each also swollen as if hovered, then the tab docked on Top, Left and Right with the island open, each scene in
+    /// Debug builds (<c>--island-shots &lt;dir&gt;</c>): the closed tab on Top (the only edge it docks on
+    /// since 2026-10-29) at rest and with a fake media activity live, each also swollen as if hovered,
+    /// then with the island open, each scene in
     /// both app themes (the island must look the same) with Follow Windows, Blue (the mockup's
     /// default) and Violet. Then drops the tab on the taskbar's edge
     /// and in the corners, which must be refused, and once on the top edge, which must be taken
@@ -167,7 +168,7 @@ public sealed class IslandHost : IDisposable
                 {
                     Chippi.UI.Themes.ThemeManager.Apply(theme);
                     var color = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(backdrop);
-                    foreach (var edge in new[] { IslandEdge.Top, IslandEdge.Right })
+                    foreach (var edge in new[] { IslandEdge.Top })
                     {
                         UpdateSettings(s => (s.IslandEdge, s.IslandPlace) = (edge, 0.5));
                         _shell.Island.ClearModule(DebugModuleId);
@@ -179,7 +180,7 @@ public sealed class IslandHost : IDisposable
                         _window.SaveScene(Path.Combine(directory, $"r5-island-live-{edge}-{theme}-{accent}".ToLowerInvariant() + ".png"), color);
                         await SaveSwellAsync($"r5-island-live-swell-{edge}-{theme}-{accent}", color);
                     }
-                    foreach (var edge in new[] { IslandEdge.Top, IslandEdge.Left, IslandEdge.Right })
+                    foreach (var edge in new[] { IslandEdge.Top })
                     {
                         UpdateSettings(s => (s.IslandEdge, s.IslandPlace) = (edge, 0.5));
                         await Task.Delay(settle);
@@ -214,7 +215,7 @@ public sealed class IslandHost : IDisposable
 
     /// <summary>
     /// Debug builds (<c>--island-pages &lt;dir&gt;</c>): with a fake media activity live, the island open on
-    /// Top, Left and Right, on the grid and on every page, plus a page-to-page morph caught midway,
+    /// Top (the only edge it docks on since 2026-10-29), on the grid and on every page, plus a page-to-page morph caught midway,
     /// (s6-*.png). Use a
     /// CHIPPI_DEV_PROFILE: the island settings it moves through are put back.
     /// </summary>
@@ -229,7 +230,7 @@ public sealed class IslandHost : IDisposable
             await _shell.ModulesReady; // their tiles and pages exist once they run
             var color = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#202020");
             debug.Publish(new IslandActivity("media", IslandActivityKind.Media, "Weekend Mix", "Spotify"));
-            foreach (var edge in new[] { IslandEdge.Top, IslandEdge.Left, IslandEdge.Right })
+            foreach (var edge in new[] { IslandEdge.Top })
             {
                 UpdateSettings(s => (s.IslandEdge, s.IslandPlace, s.IslandLastPage) = (edge, 0.5, null));
                 await Task.Delay(settle);
@@ -297,8 +298,8 @@ public sealed class IslandHost : IDisposable
             ("Top-left corner", new(w.Left + 4, w.Top + 4), false),
             ("Top-right corner", new(w.Right - 4, w.Top + 4), false),
             ("Top edge, 100 DIPs from the left end (inside the 160 margin)", new(w.Left + 100 * s, w.Top + 2), false),
-            ("Left edge, 30 DIPs from the bottom end (inside the 64 margin)", new(w.Left + 2, w.Bottom - 30 * s), false),
-            ("Right edge, 30 DIPs from the top end (inside the 64 margin)", new(w.Right - 2, w.Top + 30 * s), false),
+            ("Left edge, lower half", new(w.Left + 2, w.Bottom - 30 * s), false),
+            ("Right edge, by the top end (inside the 160 margin)", new(w.Right - 2, w.Top + 30 * s), false),
         };
         if (taskbar is { } bar && bar != ScreenEdge.Bottom)
             cases.Add(("Taskbar edge, center", bar switch
@@ -306,8 +307,8 @@ public sealed class IslandHost : IDisposable
                 ScreenEdge.Top => new(w.Left + w.Width / 2, w.Top + 2),
                 ScreenEdge.Left => new(w.Left + 2, w.Top + w.Height / 2),
                 _ => new(w.Right - 2, w.Top + w.Height / 2),
-            }, false));
-        cases.Add(("Top edge, center (control)", new(w.Left + w.Width / 2, w.Top + 2), taskbar != ScreenEdge.Top));
+            }, bar == ScreenEdge.Top)); // a taskbar on top leaves the tab just under it
+        cases.Add(("Top edge, center (control)", new(w.Left + w.Width / 2, w.Top + 2), true));
         foreach (var (name, pointer, expected) in cases)
         {
             bool taken = _window.DropAt(pointer);
@@ -339,6 +340,7 @@ public sealed class IslandHost : IDisposable
                 publisher.Clear("track");
         };
         _window.SetMedia(media);
+        _window.SetLevel(new TabLevel(Chippi.Features.Sound.SoundAudio.Get(_logger)));
         _ = media.StartAsync();
     }
 
