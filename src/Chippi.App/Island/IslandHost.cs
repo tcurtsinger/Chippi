@@ -326,6 +326,7 @@ public sealed class IslandHost : IDisposable
     {
         var media = new SystemMediaSessions();
         _media = media;
+        _shell.Media = media;
         var publisher = _shell.Island.CreatePublisher(IslandPanelWindow.NowPlayingKey);
         media.Changed += (_, _) =>
         {

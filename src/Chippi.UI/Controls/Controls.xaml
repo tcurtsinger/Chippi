@@ -742,7 +742,7 @@
                                               Margin="0,0,12,0" VerticalAlignment="Center" />
                                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                     <ContentPresenter Content="{TemplateBinding Header}" ContentTemplate="{TemplateBinding HeaderTemplate}"
-                                                      TextElement.Foreground="{DynamicResource TextPrimaryBrush}" />
+                                                      TextElement.Foreground="{DynamicResource TextPrimaryBrush}" TextElement.FontSize="14" />
                                     <TextBlock x:Name="Caption" Text="{TemplateBinding Description}" Style="{StaticResource CaptionTextStyle}" TextWrapping="Wrap" />
                                 </StackPanel>
                                 <ContentPresenter Grid.Column="2" Content="{TemplateBinding Value}" Margin="12,0,0,0" VerticalAlignment="Center"

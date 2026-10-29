@@ -49,7 +49,7 @@ public sealed class SettingsShellTests
         Assert.Single(Descendants(window.Sidebar).OfType<ListBox>());
         string[] expected =
         [
-            "module:downloads-organizer", "module:app-volume", "module:keep-awake", "module:system-monitor",
+            "module:downloads-organizer", "now-playing", "module:app-volume", "module:keep-awake", "module:system-monitor",
             "module:clipboard-history", "module:clean-url", "module:paste-plain-text", "module:scratchpad",
             "general", "island", "notifications", "features", "about",
         ];
@@ -60,13 +60,21 @@ public sealed class SettingsShellTests
         var rows = window.Nav.Items.OfType<NavItem>().Select(i => (ListBoxItem)window.Nav.ItemContainerGenerator.ContainerFromItem(i)).ToList();
         Assert.All(rows, row => Assert.Equal(32, row.ActualHeight));
         double Top(ListBoxItem row) => row.TranslatePoint(default, window.Nav).Y;
-        Assert.Equal(36, Top(rows[3]) - Top(rows[2])); // within a group
-        Assert.Equal(36 + 16 + 12, Top(rows[2]) - Top(rows[1]), 0.5); // across one: the label and 12 above it
+        Assert.Equal(36, Top(rows[2]) - Top(rows[1])); // within a group (Now Playing, App volume)
+        Assert.Equal(36 + 16 + 12, Top(rows[3]) - Top(rows[2]), 0.5); // across one: the label and 12 above it
         Assert.Equal(16 + 2 + 2, Top(rows[0]), 0.5); // the first label has nothing above it
 
-        // s1: at 1120 x 720 every row fits, About included.
-        Assert.Equal(0, Scroller(window.Nav).ScrollableHeight);
         Assert.Equal(32, window.SettingsSearch.ActualHeight);
+    });
+
+    [Fact]
+    public void At_1120_x_720_s1_s_seven_features_and_Now_Playing_fit_without_scrolling() => WpfTestThread.Run(() =>
+    {
+        // s1's seven have no Scratchpad page; with it (Seven) the list scrolls 12, as the mockup's fuller sidebars do.
+        using var scene = new SettingsScene(Seven.Where(f => f.Id != "scratchpad").ToArray());
+        var window = scene.Show("general");
+        Assert.Equal(13, window.Nav.Items.Count);
+        Assert.Equal(0, Scroller(window.Nav).ScrollableHeight);
     });
 
     [Fact]

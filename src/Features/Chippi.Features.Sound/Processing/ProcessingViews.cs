@@ -109,11 +109,11 @@ internal static class ProcessingUi
     }
 }
 
-/// <summary>Settings › Mic processing (mockup settings-mic-processing). Switches apply at once; levels are heard at once and saved after a pause.</summary>
 /// <summary>
-/// The Mic processing section of Settings › Microphone: the switch and levels, then each stage with its
-/// tuning dimmed while the stage is off. The mic is the one in use, picked above; a mic chosen here
-/// before shows until it is set back to that.
+/// The Mic processing section of Settings › Microphone (revised 2026-10-28): the switch, Default device,
+/// the levels while it runs, then each stage, Noise gate and Auto gain folding their tuning. Switches
+/// apply at once; levels are heard at once and saved after a pause. The mic is the one in use, picked
+/// above; a mic chosen here before shows until it is set back to that.
 /// </summary>
 public sealed class ProcessingPage : UserControl
 {
@@ -124,6 +124,7 @@ public sealed class ProcessingPage : UserControl
     private readonly TextBlock _inDb = RoutingUi.Text("", "NumberTextStyle", "TextSecondaryBrush");
     private readonly TextBlock _outDb = RoutingUi.Text("", "NumberTextStyle", "TextSecondaryBrush");
     private string _shape = "";
+    private bool _gateOpen, _agcOpen; // a rebuild keeps a stage folded or open
 
     public ProcessingPage(MicProcessingModule module)
     {
@@ -153,7 +154,7 @@ public sealed class ProcessingPage : UserControl
     private string Shape()
     {
         var s = _module.Settings;
-        return string.Join("|", s.Enabled, s.Suppression, s.Gate, s.Agc, s.Source, s.SetDefault, _module.StatusText, _module.SourceName, _module.Error,
+        return string.Join("|", s.Enabled, s.Suppression, s.Gate, s.Agc, s.Source, s.SetDefault, _module.Status.State, _module.StatusText, _module.SourceName, _module.Error,
             string.Join(",", _module.Sources.Select(e => e.Id + e.Name)));
     }
 
@@ -163,18 +164,20 @@ public sealed class ProcessingPage : UserControl
         _body.Children.Clear();
         var s = _module.Settings;
 
-        var cleanup = RoutingUi.Card(
-            new SettingRow { Header = "Mic processing", Content = RoutingUi.Switch("Mic processing", s.Enabled, on => Run(_module.SetEnabledAsync(on))) },
-            new SettingRow { Header = "Level", Content = Meters() },
-            new SettingRow { Header = "Noise suppression", Content = RoutingUi.Switch("Noise suppression", s.Suppression, on => Stages(x => x with { Suppression = on })) },
-            new SettingRow { Header = "Noise gate", Content = RoutingUi.Switch("Noise gate", s.Gate, on => Stages(x => x with { Gate = on })) },
-            Level("Threshold", ProcessingSettings.GateRange, s.GateDb, db => Stages(x => x with { GateDb = db }), s.Gate),
-            new SettingRow { Header = "Auto gain", Content = RoutingUi.Switch("Auto gain", s.Agc, on => Stages(x => x with { Agc = on })) },
+        var cleanup = SettingsLayout.Card(
+            SettingsLayout.Row("Use mic processing", RoutingUi.Switch("Use mic processing", s.Enabled, on => Run(_module.SetEnabledAsync(on)))),
+            SettingsLayout.Row("Default device", RoutingUi.Switch("Default device", s.SetDefault, on => Run(_module.SetDefaultMicAsync(on))), "Makes CABLE Output the default mic"));
+        // The meter only means something while processing runs.
+        if (_module.Status.State == ProcessingState.Live)
+            cleanup.Children.Add(SettingsLayout.Row("Level", Meters()));
+        cleanup.Children.Add(SettingsLayout.Row("Noise suppression", RoutingUi.Switch("Noise suppression", s.Suppression, on => Stages(x => x with { Suppression = on }))));
+        cleanup.Children.Add(Fold("Noise gate", RoutingUi.Switch("Noise gate", s.Gate, on => Stages(x => x with { Gate = on })), _gateOpen, open => _gateOpen = open,
+            Level("Threshold", ProcessingSettings.GateRange, s.GateDb, db => Stages(x => x with { GateDb = db }), s.Gate)));
+        cleanup.Children.Add(Fold("Auto gain", RoutingUi.Switch("Auto gain", s.Agc, on => Stages(x => x with { Agc = on })), _agcOpen, open => _agcOpen = open,
             Level("Target level", ProcessingSettings.TargetRange, s.TargetDb, db => Stages(x => x with { TargetDb = db }), s.Agc),
-            Level("Max gain", ProcessingSettings.MaxGainRange, s.MaxGainDb, db => Stages(x => x with { MaxGainDb = db }), s.Agc),
-            new SettingRow { Header = "Default device", Content = RoutingUi.Switch("Default device", s.SetDefault, on => Run(_module.SetDefaultMicAsync(on))) });
+            Level("Max gain", ProcessingSettings.MaxGainRange, s.MaxGainDb, db => Stages(x => x with { MaxGainDb = db }), s.Agc)));
         if (s.Source != ProcessingSettings.PinnedSource)
-            cleanup.Children.Add(new SettingRow { Header = "Input device", Content = SourcePicker() });
+            cleanup.Children.Add(SettingsLayout.Row("Input device", SourcePicker()));
         _body.Children.Add(cleanup);
         // Only what needs attention: a failure, or processing that stopped.
         if ((_module.Error ?? (_module.Status.State == ProcessingState.Stopped ? _module.StatusText : null)) is { } problem)
@@ -216,11 +219,21 @@ public sealed class ProcessingPage : UserControl
 
     private static void Detach(FrameworkElement element) => (element.Parent as Panel)?.Children.Remove(element);
 
-    /// <summary>A stage's tuning, indented under it and dimmed while the stage is off.</summary>
+    /// <summary>A stage with its switch in the header and its tuning folded inside, open or closed as it was.</summary>
+    private static ExpanderRow Fold(string name, ToggleButton toggle, bool open, Action<bool> remember, params UIElement[] tuning)
+    {
+        var row = SettingsLayout.Expander(name, null, toggle, tuning);
+        row.IsExpanded = open;
+        row.Expanded += (_, _) => remember(true);
+        row.Collapsed += (_, _) => remember(false);
+        return row;
+    }
+
+    /// <summary>A stage's tuning, dimmed while the stage is off.</summary>
     private static SettingRow Level(string name, (double Min, double Max) range, double value, Action<double> changed, bool enabled)
     {
         var slider = ProcessingUi.Slider(name, range, value, changed, out var label);
-        return new SettingRow { Header = name, Content = ProcessingUi.WithLabel(slider, label), Margin = new Thickness(34, 0, 0, 0), IsEnabled = enabled, Opacity = enabled ? 1 : 0.45 };
+        return new SettingRow { Header = name, Content = ProcessingUi.WithLabel(slider, label), IsEnabled = enabled, Opacity = enabled ? 1 : 0.45 };
     }
 
     private ComboBox SourcePicker()

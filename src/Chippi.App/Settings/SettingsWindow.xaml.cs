@@ -52,19 +52,22 @@ public partial class SettingsWindow : Window
 
     private const string AddFeatures = "features";
 
+    /// <summary>Now Playing is the shell's, so the Sound group always shows it, first.</summary>
+    private static readonly SettingsPageInfo NowPlaying = new("now-playing", "Now Playing", LucideIcons.Music);
+
     /// <summary>Sound by task: what you set for your output and for your mic, whichever features do it.</summary>
     internal static IReadOnlyList<SharedPage> SharedPages { get; } =
     [
         new("page:sound-output", "Output", LucideIcons.Speaker, FeatureGroup.Sound, [new("audio-routing", "output", null)]),
         new("page:sound-microphone", "Microphone", LucideIcons.Mic, FeatureGroup.Sound,
-            [new("audio-routing", "microphone", "Mic in use"), new("mic-processing", null, "Mic processing"), new("mic-mute", null, "Mute shortcut")]),
+            [new("mic-mute", "mute", null), new("audio-routing", "microphone", null), new("mic-processing", null, "Mic processing"), new("mic-mute", null, "Mute shortcut")]),
     ];
 
     /// <summary>The features' pages in sidebar order within their groups; any not listed follow in catalog order.</summary>
     private static readonly string[] SidebarOrder =
     [
         "module:downloads-organizer", "module:shelf",
-        "page:sound-output", "page:sound-microphone", "module:app-volume",
+        "now-playing", "page:sound-output", "page:sound-microphone", "module:app-volume",
         "module:keep-awake", "module:system-monitor",
         "module:clipboard-history", "module:clean-url", "module:paste-plain-text", "module:scratchpad",
     ];
@@ -143,7 +146,8 @@ public partial class SettingsWindow : Window
         var rows = new List<NavItem>();
         foreach (var group in Enum.GetValues<FeatureGroup>())
         {
-            var pages = shared.Where(p => p.Group == group).Select(p => new SettingsPageInfo(p.Id, p.Label, p.Icon))
+            var pages = (group == FeatureGroup.Sound ? new[] { NowPlaying } : [])
+                .Concat(shared.Where(p => p.Group == group).Select(p => new SettingsPageInfo(p.Id, p.Label, p.Icon)))
                 .Concat(entries.Where(f => f.Descriptor.Group == group && !covered.Contains(f.Id))
                     .Select(f => new SettingsPageInfo(ModulePrefix + f.Id, f.Descriptor.Name, LucideIcons.Get(f.Descriptor.Icon))))
                 .OrderBy(p => Array.IndexOf(SidebarOrder, p.Id) is var i and >= 0 ? i : int.MaxValue)
@@ -318,6 +322,7 @@ public partial class SettingsWindow : Window
                     "island" => new IslandPetPage(_shell),
                     "notifications" => new NotificationsPage(_shell),
                     "about" => new AboutPage(),
+                    "now-playing" => new NowPlayingPage(_shell.Media),
                     _ => new GeneralPage(_shell),
                 };
         }

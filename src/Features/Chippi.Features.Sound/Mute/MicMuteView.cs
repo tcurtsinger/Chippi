@@ -11,20 +11,35 @@ using Chippi.UI.Controls;
 
 namespace Chippi.Features.Sound.Mute;
 
+/// <summary>Where a <see cref="MicMuteView"/> sits.</summary>
+public enum MicMuteSurface
+{
+    /// <summary>The Sound page's mic card.</summary>
+    Island,
+    /// <summary>The Microphone row at the top of Settings › Microphone: the island's card.</summary>
+    Microphone,
+    /// <summary>The Mute shortcut section of Settings › Microphone.</summary>
+    Shortcut,
+}
+
 public sealed class MicMuteView : UserControl
 {
     private readonly MicMuteModule _module;
-    private readonly bool _compact;
+    private readonly MicMuteSurface _surface;
     private readonly StackPanel _body = new();
     private bool _recording;
 
-    public MicMuteView(MicMuteModule module, bool compact = false)
+    public MicMuteView(MicMuteModule module, MicMuteSurface surface = MicMuteSurface.Shortcut)
     {
         _module = module;
-        _compact = compact;
+        _surface = surface;
         Content = _body;
         Loaded += (_, _) => { _module.Changed += Refresh; Refresh(); };
-        Unloaded += (_, _) => { _module.Changed -= Refresh; _recording = false; _module.CaptureShortcut(false); };
+        Unloaded += (_, _) =>
+        {
+            _module.Changed -= Refresh;
+            if (_recording) { _recording = false; _module.CaptureShortcut(false); }
+        };
         PreviewKeyDown += Capture;
         Refresh();
     }
@@ -35,28 +50,62 @@ public sealed class MicMuteView : UserControl
         if (_recording) return;
         _body.Children.Clear();
         bool muted = _module.Status.State == MicrophoneMuteState.Muted;
-        if (_compact)
+        if (_surface == MicMuteSurface.Island)
         {
             _body.Children.Add(MicCard(muted));
             if (_module.Error is { } failed) Error(failed);
             SoundColumn.SetWarning(this, _module.Error is not null);
             return;
         }
-        // The Mute shortcut section of Settings › Microphone: the keys, and the sound it plays. Muting
-        // itself is on the Sound page.
-        var change = RoutingUi.Button("Change", () => BeginCapture());
-        AutomationProperties.SetName(change, "Change shortcut");
-        var shortcut = new StackPanel { Orientation = Orientation.Horizontal };
-        var keys = RoutingUi.Text(_module.Settings.Shortcut.ToString());
-        keys.Margin = new Thickness(0, 0, 12, 0);
-        keys.VerticalAlignment = VerticalAlignment.Center;
-        shortcut.Children.Add(keys);
-        shortcut.Children.Add(change);
-        _body.Children.Add(RoutingUi.Card(
-            new SettingRow { Header = "Shortcut", Content = shortcut },
-            new SettingRow { Header = "Sound feedback", Content = RoutingUi.Switch("Sound feedback", _module.Settings.PlaySound, _module.SetPlaySound) }));
+        if (_surface == MicMuteSurface.Microphone)
+        {
+            _body.Children.Add(SettingsLayout.Card(MicrophoneRow(muted)));
+            if (_module.Error is { } failed) Error(failed);
+            return;
+        }
+        _body.Children.Add(SettingsLayout.Card(
+            SettingsLayout.Row("Shortcut", ShortcutControls()),
+            SettingsLayout.Row("Sound feedback", RoutingUi.Switch("Sound feedback", _module.Settings.PlaySound, _module.SetPlaySound))));
         if (_module.ShortcutError is { } shortcutError) Error(shortcutError);
-        if (_module.Error is { } error) Error(error);
+    }
+
+    /// <summary>The island's mic card as a Settings row: the state as the caption, and Mute or Unmute.</summary>
+    private SettingRow MicrophoneRow(bool muted)
+    {
+        bool none = _module.Status.State == MicrophoneMuteState.NoMicrophone;
+        var action = RoutingUi.Button(muted ? "Unmute" : "Mute", Toggle);
+        AutomationProperties.SetName(action, muted ? "Unmute all microphones" : "Mute all microphones");
+        action.IsEnabled = !none;
+        var row = SettingsLayout.Row("Microphone", action, muted ? "Muted" : _module.StatusText);
+        // A muted or partly muted mic is the one state that needs attention: the caption says it in the warning color.
+        if (_module.Status.State is MicrophoneMuteState.Muted or MicrophoneMuteState.Mixed)
+            row.Loaded += (_, _) =>
+            {
+                row.ApplyTemplate();
+                (row.Template?.FindName("Caption", row) as TextBlock)?.SetResourceReference(TextBlock.ForegroundProperty, "WarningTextBrush");
+            };
+        return row;
+    }
+
+    /// <summary>The keys (or "Not set"), Change or Set, and Remove, as Paste as plain text's shortcut.</summary>
+    private StackPanel ShortcutControls()
+    {
+        var shortcut = _module.Settings.Shortcut;
+        var panel = new StackPanel { Orientation = Orientation.Horizontal };
+        var keys = shortcut is null ? RoutingUi.Text("Not set", brush: "TextSecondaryBrush") : RoutingUi.Text(shortcut.ToString());
+        keys.Margin = new Thickness(0, 0, 12, 0);
+        panel.Children.Add(keys);
+        var change = RoutingUi.Button(shortcut is null ? "Set" : "Change", BeginCapture);
+        AutomationProperties.SetName(change, shortcut is null ? "Set shortcut" : "Change shortcut");
+        panel.Children.Add(change);
+        if (shortcut is not null)
+        {
+            var remove = RoutingUi.Button("Remove", _module.RemoveShortcut);
+            remove.Margin = new Thickness(8, 0, 0, 0);
+            AutomationProperties.SetName(remove, "Remove shortcut");
+            panel.Children.Add(remove);
+        }
+        return panel;
     }
 
     /// <summary>The Sound page's mic card, one 44 row like the Output card: whether the mics are live, and Mute or Unmute.</summary>
@@ -81,7 +130,7 @@ public sealed class MicMuteView : UserControl
         _module.CaptureShortcut(true);
         Focusable = true;
         _body.Children.Clear();
-        _body.Children.Add(RoutingUi.Card(new SettingRow { Header = "New shortcut", Content = RoutingUi.Button("Cancel", CancelCapture) }));
+        _body.Children.Add(SettingsLayout.Card(SettingsLayout.Row("New shortcut", RoutingUi.Button("Cancel", CancelCapture))));
         Focus();
     }
 

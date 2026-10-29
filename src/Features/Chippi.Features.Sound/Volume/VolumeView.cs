@@ -16,8 +16,8 @@ public enum VolumeSurface { Settings, Island }
 
 /// <summary>
 /// App volume's views. On the island's App volume page (DESIGN.md §5 Island) a vertical strip per
-/// app, its output in the strip's menu; the system volume is the Sound page's. In Settings only the
-/// options, since volume is changed on the page.
+/// app, its output in the strip's menu; the system volume is the Sound page's. In Settings (revised
+/// 2026-10-28) a row per app, every app, then the options.
 /// </summary>
 public sealed class VolumeView : UserControl
 {
@@ -62,9 +62,21 @@ public sealed class VolumeView : UserControl
     {
         if (_surface == VolumeSurface.Settings)
         {
-            _root.Children.Add(RoutingUi.Card(
-                new SettingRow { Header = "Inactive apps", Content = RoutingUi.Switch("Inactive apps", _module.Settings.ShowQuietApps, on => Run(_module.SetShowQuietAsync(on))) },
-                new SettingRow { Header = "Saved app outputs", Content = RoutingUi.Switch("Saved app outputs", _module.Settings.RememberOutputs, on => Run(_module.SetRememberAsync(on))) }));
+            // Every app, with no limit: the island's apps beyond 14 are changed here.
+            var list = SettingsLayout.Card();
+            foreach (var app in apps) list.Children.Add(AppRow(app.Key));
+            if (apps.Count == 0) list.Children.Add(SettingsLayout.Empty("No apps"));
+            _root.Children.Add(new StackPanel
+            {
+                Children =
+                {
+                    list,
+                    SettingsLayout.Section("Options"),
+                    SettingsLayout.Card(
+                        SettingsLayout.Row("Show apps that aren't playing", RoutingUi.Switch("Show apps that aren't playing", _module.Settings.ShowQuietApps, on => Run(_module.SetShowQuietAsync(on)))),
+                        SettingsLayout.Row("Remember each app's output", RoutingUi.Switch("Remember each app's output", _module.Settings.RememberOutputs, on => Run(_module.SetRememberAsync(on))))),
+                },
+            });
         }
         else
         {
@@ -131,6 +143,83 @@ public sealed class VolumeView : UserControl
             AutomationProperties.SetName(button, $"{button.ToolTip} {AppName(key)}");
         });
         return button;
+    }
+
+    /// <summary>
+    /// A Settings row for one app, the island's strip laid flat: icon, name, volume and percentage,
+    /// Mute, and the output. Each control calls the module as the strip does.
+    /// </summary>
+    private Border AppRow(AppKey key)
+    {
+        var grid = RoutingUi.Columns(GridLength.Auto, new(1, GridUnitType.Star), GridLength.Auto, GridLength.Auto, GridLength.Auto, GridLength.Auto);
+        var icon = Glyph(key);
+        icon.Margin = new Thickness(0, 0, 12, 0);
+        RoutingUi.Add(grid, icon, 0);
+        var name = RoutingUi.Text(AppName(key));
+        name.Margin = new Thickness(0, 0, 12, 0);
+        name.ToolTip = AppName(key);
+        RoutingUi.Add(grid, name, 1);
+        var slider = new Slider { Minimum = 0, Maximum = 100, SmallChange = 5, LargeChange = 10, Width = 200, IsMoveToPointEnabled = true, VerticalAlignment = VerticalAlignment.Center };
+        slider.SetResourceReference(StyleProperty, "HopperSliderStyle");
+        AutomationProperties.SetName(slider, AppName(key) + " volume");
+        RoutingUi.Add(grid, slider, 2);
+        var percentage = RoutingUi.Text("", "BodyTextStyle", "TextSecondaryBrush");
+        percentage.MinWidth = 52;
+        percentage.TextAlignment = TextAlignment.Right;
+        percentage.Margin = new Thickness(12, 0, 8, 0);
+        RoutingUi.Add(grid, percentage, 3);
+        var mute = new IconButton { Icon = LucideIcons.Volume };
+        mute.Click += (_, _) => Run(_module.SetMutedAsync(key, !Level(key).Muted));
+        RoutingUi.Add(grid, mute, 4);
+        var output = OutputCombo(key);
+        output.Margin = new Thickness(8, 0, 0, 0);
+        RoutingUi.Add(grid, output, 5);
+        void Paint()
+        {
+            bool muted = Level(key).Muted;
+            percentage.Text = muted ? "Muted" : $"{Math.Round(slider.Value)}%";
+            percentage.SetResourceReference(TextBlock.ForegroundProperty, muted ? "WarningTextBrush" : "TextSecondaryBrush");
+            mute.Icon = muted ? LucideIcons.VolumeMuted : LucideIcons.Volume;
+            mute.ToolTip = muted ? "Unmute" : "Mute";
+            AutomationProperties.SetName(mute, $"{mute.ToolTip} {AppName(key)}");
+        }
+        slider.ValueChanged += (_, _) => { Paint(); if (!_refreshing) Run(_module.SetVolumeAsync(key, (float)slider.Value / 100)); };
+        _updates.Add(() => { if (!slider.IsMouseCaptureWithin && !slider.IsKeyboardFocusWithin) slider.Value = Level(key).Volume * 100; Paint(); });
+        return new Border { Child = grid, MinHeight = SettingsLayout.RowHeight, Padding = SettingsLayout.RowPadding };
+    }
+
+    /// <summary>The app's icon at 16, System sounds' speaker, or its first two letters.</summary>
+    private FrameworkElement Glyph(AppKey key)
+    {
+        var app = App(key);
+        if (app?.Name == "System sounds")
+        {
+            var system = new LucideIcon { Data = LucideIcons.Volume, Size = 16, VerticalAlignment = VerticalAlignment.Center };
+            system.SetResourceReference(LucideIcon.BrushProperty, "TextSecondaryBrush");
+            return system;
+        }
+        if (AppIcon.Load(app?.ExePath) is { } icon) return new Image { Source = icon, Width = 16, Height = 16, VerticalAlignment = VerticalAlignment.Center };
+        var label = new TextBlock { Text = Initials(AppName(key)), FontSize = 9, FontWeight = FontWeights.SemiBold, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+        label.SetResourceReference(TextBlock.ForegroundProperty, "TextPrimaryBrush");
+        var tile = new Border { Width = 16, Height = 16, CornerRadius = new CornerRadius(3), Child = label, VerticalAlignment = VerticalAlignment.Center };
+        tile.SetResourceReference(Border.BackgroundProperty, "ChipBrush");
+        return tile;
+    }
+
+    /// <summary>Where the app plays: "Default output" or one of the connected outputs, as the strip's menu.</summary>
+    private ComboBox OutputCombo(AppKey app)
+    {
+        var choices = new[] { (Id: (string?)null, Name: "Default output") }.Concat(_module.Outputs.Select(o => (Id: (string?)o.Id, o.Name))).ToList();
+        var combo = SettingsLayout.Combo(choices.Select(c => (object)c.Name).ToList());
+        AutomationProperties.SetName(combo, $"{AppName(app)} output");
+        combo.IsEnabled = _module.CanPickOutput(app);
+        combo.SelectionChanged += (_, _) =>
+        {
+            if (!_refreshing && combo.SelectedIndex >= 0 && choices[combo.SelectedIndex].Id != _module.ChosenOutput(app))
+                Run(_module.SetOutputAsync(app, choices[combo.SelectedIndex].Id));
+        };
+        _updates.Add(() => combo.SelectedIndex = Math.Max(0, choices.FindIndex(c => c.Id == _module.ChosenOutput(app))));
+        return combo;
     }
 
     /// <summary>A fixed-height strip; narrower variants leave names and then percentages out.</summary>

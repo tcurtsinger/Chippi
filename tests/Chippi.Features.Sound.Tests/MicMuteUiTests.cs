@@ -25,7 +25,7 @@ public sealed class MicMuteUiTests
         await f.Start();
         await Sta(async () =>
         {
-            var page = new MicMuteView(f.Module, compact: true); // the Sound page's mic card
+            var page = new MicMuteView(f.Module, MicMuteSurface.Island); // the Sound page's mic card
             var mute = Children(page).OfType<Button>().Single(b => AutomationProperties.GetName(b) == "Mute all microphones");
             ((IInvokeProvider)new ButtonAutomationPeer(mute)).Invoke();
             await Until(() => page.IsEnabled && f.Module.Status.State == MicrophoneMuteState.Muted);

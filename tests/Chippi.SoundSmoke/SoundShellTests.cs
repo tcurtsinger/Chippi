@@ -74,7 +74,7 @@ public sealed class SoundShellTests
         try
         {
             // Sound is Output, Microphone and App volume, whichever features hold them.
-            Assert.Equal(["Output", "Microphone", "App volume"], settings.NavigationPages.TakeWhile(p => p.Id != "general").Select(p => p.Label));
+            Assert.Equal(["Now Playing", "Output", "Microphone", "App volume"], settings.NavigationPages.TakeWhile(p => p.Id != "general").Select(p => p.Label));
             Assert.Equal("page:sound-output", settings.CurrentPage);
             Assert.Single(All<RoutingPage>(settings.PageContent));
             var calls = scene.Routing.Settings.Output.Calls;
@@ -87,13 +87,13 @@ public sealed class SoundShellTests
             Assert.Equal("page:sound-microphone", settings.CurrentPage);
             Assert.Single(All<RoutingPage>(settings.PageContent));
             Assert.Single(All<ProcessingPage>(settings.PageContent));
-            Assert.Single(All<MicMuteView>(settings.PageContent));
+            Assert.Equal(2, All<MicMuteView>(settings.PageContent).Count()); // the Microphone row at the top, and the Mute shortcut section
             Assert.Equal(["Mic in use", "Mic processing", "Mute shortcut"], Texts(settings.PageContent).Where(t => t is "Mic in use" or "Mic processing" or "Mute shortcut").Distinct());
             Assert.NotNull(Named<ToggleButton>(settings.PageContent, "Priority switching"));
-            Toggle(Named<ToggleButton>(settings.PageContent, "Mic processing"));
+            Toggle(Named<ToggleButton>(settings.PageContent, "Use mic processing"));
             await SmokeDispatcher.Until(() => scene.Pipelines.Live is not null);
             Assert.Equal("desk", scene.Pipelines.Live!.Source);
-            Assert.DoesNotContain(All<Button>(settings.PageContent), b => AutomationProperties.GetName(b) == "Mute all microphones"); // muting is the Sound page's
+            Assert.Single(All<Button>(settings.PageContent), b => AutomationProperties.GetName(b) == "Mute all microphones"); // the island's Mute, once, at the top
             var tone = scene.Mute.Settings.PlaySound;
             Toggle(Named<ToggleButton>(settings.PageContent, "Sound feedback"));
             Assert.NotEqual(tone, scene.Mute.Settings.PlaySound);
@@ -101,12 +101,12 @@ public sealed class SoundShellTests
             settings.Navigate("module:mic-processing");
             Assert.Equal("page:sound-microphone", settings.CurrentPage);
 
-            // App volume's Settings are its options; volume is on the island's page.
+            // App volume's Settings list every app with the island's controls, then the options.
             settings.Navigate("module:app-volume");
             Assert.Single(All<VolumeView>(settings.PageContent));
-            Assert.Empty(All<Slider>(settings.PageContent));
+            Assert.Equal(scene.Volume.Apps.Count(), All<Slider>(settings.PageContent).Count());
             var quiet = scene.Volume.Settings.ShowQuietApps;
-            Toggle(Named<ToggleButton>(settings.PageContent, "Inactive apps"));
+            Toggle(Named<ToggleButton>(settings.PageContent, "Show apps that aren't playing"));
             await SmokeDispatcher.Until(() => scene.Volume.Settings.ShowQuietApps != quiet);
         }
         finally { settings.Close(); }
