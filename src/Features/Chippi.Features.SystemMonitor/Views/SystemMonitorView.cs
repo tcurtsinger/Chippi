@@ -20,6 +20,7 @@ internal sealed class SystemMonitorView : UserControl
     private readonly bool _settingsPage;
     private readonly StackPanel _readings = new();
     private readonly Border _readingsCard, _disks;
+    private readonly FrameworkElement _readingsSurface;
     private readonly Dictionary<string, ReadingRow> _rows = [];
     private readonly Popup _picker = new() { StaysOpen = false, AllowsTransparency = true, Placement = PlacementMode.Bottom };
     private SensorWatch? _watch;
@@ -36,7 +37,8 @@ internal sealed class SystemMonitorView : UserControl
         _readingsCard = Card(); _readingsCard.Child = _readings;
         if (settingsPage) { _readingsCard.ClearValue(StyleProperty); _readingsCard.Padding = new Thickness(16, 2, 16, 2); }
         _disks = Card(); _disks.Margin = new Thickness(0, 8, 0, 0);
-        Content = new StackPanel { VerticalAlignment = VerticalAlignment.Top, Children = { settingsPage ? SettingsLayout.Card(_readingsCard) : _readingsCard, _disks, _picker } };
+        _readingsSurface = settingsPage ? SettingsLayout.Card(_readingsCard) : _readingsCard;
+        Content = new StackPanel { VerticalAlignment = VerticalAlignment.Top, Children = { _readingsSurface, _disks, _picker } };
         Loaded += (_, _) => Start();
         Unloaded += (_, _) => Stop();
     }
@@ -162,7 +164,7 @@ internal sealed class SystemMonitorView : UserControl
         for (int i = 0; i < visible.Count; i++)
             if (i >= _readings.Children.Count || _readings.Children[i] != visible[i])
             { _readings.Children.Remove(visible[i]); _readings.Children.Insert(i, visible[i]); }
-        _readingsCard.Visibility = visible.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
+        _readingsSurface.Visibility = _readingsCard.Visibility = visible.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
         double remaining = IslandPage.BodyHeight - (visible.Count == 0 ? 0 : visible.Count * 28 + 4 + 8);
         _disks.Visibility = !_settingsPage && settings.IsOn(Reading.Disks) && remaining >= 26 ? Visibility.Visible : Visibility.Collapsed;
         _disks.Margin = new Thickness(0, visible.Count == 0 ? 0 : 8, 0, 0);

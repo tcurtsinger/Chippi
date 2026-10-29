@@ -35,3 +35,5 @@ No saved settings format changes. The controls call the existing module methods.
 **Blast Radius:** UI
 
 The organizer wrappers delegate section/card spacing to the toolkit across its Settings tabs. The monitor reuses its reading formatter and picker logic in a Settings mode while retaining island sizing in the default mode. Full live Settings snapshots follow all page integrations; these renders do not certify native popup interaction.
+
+Review follow-up: singular unmatched-file copy; the readings surface collapses completely with all readings off. Nine compact monitor and three compact organizer cases pass. Both Release targets remain warning-free. Straight error apostrophes, original no-BOM encoding, and the Ui.Pad comment are restored.

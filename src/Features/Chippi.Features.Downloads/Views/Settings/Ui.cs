@@ -1,4 +1,4 @@
-﻿// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
 using System.Globalization;
@@ -52,7 +52,7 @@ internal static class Ui
         return row;
     }
 
-    /// <summary>A free-form row inside a card, with the row padding (10 / 16) and at least 48px.</summary>
+    /// <summary>A free-form row inside a card, with the shared row padding (16, 8) and at least 48px.</summary>
     public static Border Pad(UIElement child, double minHeight = 48) =>
         new() { Child = child, Padding = SettingsLayout.RowPadding, MinHeight = minHeight };
 

@@ -129,7 +129,7 @@ internal sealed class PreviewView : UserControl
         {
             var names = SettingsLayout.Card([.. unmatched.Select(i => SettingsLayout.Empty(i.Name))]);
             names.SetResourceReference(StyleProperty, "CardRowsStyle");
-            card.Children.Add(new ExpanderRow { Header = $"{unmatched.Count} files \u00b7 no rule matches", Description = $"They stay in {Ui.FolderName(preview.Folder)}", Content = names });
+            card.Children.Add(new ExpanderRow { Header = $"{unmatched.Count} {(unmatched.Count == 1 ? "file" : "files")} \u00b7 no rule matches", Description = $"They stay in {Ui.FolderName(preview.Folder)}", Content = names });
         }
         RenderPlanFooter();
         Sync();

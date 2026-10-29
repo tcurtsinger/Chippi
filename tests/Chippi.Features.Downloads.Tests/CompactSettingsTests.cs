@@ -16,20 +16,22 @@ namespace Chippi.Features.Downloads.Tests;
 
 public sealed class CompactSettingsTests
 {
-    [Fact]
-    public void Unmatched_files_fold_and_Add_rule_opens_a_draft_without_approval() => WpfTestThread.Run(() =>
+    [Theory]
+    [InlineData(1)]
+    [InlineData(19)]
+    public void Unmatched_files_fold_and_Add_rule_opens_a_draft_without_approval(int count) => WpfTestThread.Run(() =>
     {
         var at = DateTimeOffset.UtcNow;
         var plan = new PreviewPlan(Guid.NewGuid(), @"C:\Fake\Downloads", RunTrigger.Preview, at, at.AddMinutes(5),
-            [.. Enumerable.Range(1, 19).Select(i => new PreviewItem(i, "file" + i, "file" + i, 1, at, OperationKind.NoMatch, null, null, null, [], null))]);
+            [.. Enumerable.Range(1, count).Select(i => new PreviewItem(i, "file" + i, "file" + i, 1, at, OperationKind.NoMatch, null, null, null, [], null))]);
         bool add = false;
         var view = new PreviewView(new DownloadsModule(), () => Task.FromResult(plan), false, () => { }, () => add = true);
         typeof(PreviewView).GetField("_preview", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(view, plan);
         typeof(PreviewView).GetMethod("RenderPlan", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(view, null);
         var fold = Find<ExpanderRow>(view).Single();
-        Assert.Equal("19 files \u00b7 no rule matches", fold.Header);
+        Assert.Equal($"{count} {(count == 1 ? "file" : "files")} \u00b7 no rule matches", fold.Header);
         Assert.False(fold.IsExpanded);
-        Assert.Equal(19, Find<TextBlock>((DependencyObject)fold.Content).Count(t => t.Text.StartsWith("file")));
+        Assert.Equal(count, Find<TextBlock>((DependencyObject)fold.Content).Count(t => t.Text.StartsWith("file")));
         Assert.Contains(Find<TextBlock>(view), t => t.Text == "Nothing to organize");
         Assert.DoesNotContain(Find<Button>(view), b => Equals(b.Content, "Approve"));
         var action = Find<Button>(view).Single(b => AutomationProperties.GetName(b) == "Add rule");

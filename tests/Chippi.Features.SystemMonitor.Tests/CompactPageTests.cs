@@ -132,4 +132,15 @@ public sealed class CompactPageTests
         Assert.Equal(17, Find<Grid>(view).Count(g => g.ColumnDefinitions.Count == 3 && g.Height == 48));
     });
 
+    [Fact]
+    public void No_enabled_readings_leaves_no_empty_Settings_card() => WpfTestThread.Run(() =>
+    {
+        var module = new SystemMonitorModule();
+        module.Save(module.Settings with { Off = Enum.GetValues<Reading>().ToList() });
+        var view = new SystemMonitorView(module, settingsPage: true);
+        view.Show(Snapshot());
+        view.Measure(new Size(768, double.PositiveInfinity));
+        Assert.Equal(0, view.DesiredSize.Height);
+    });
+
 }
