@@ -226,11 +226,11 @@ internal sealed class ShelfPage : UserControl
             }
         }
 
-        // Selected: a 1px accent stroke over a .10 fill (the tile's .06 plus .04).
+        // Selected: a 1px accent stroke over the accent tint.
         var mark = new Border { CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(1) };
         if (selected)
         {
-            mark.Background = new SolidColorBrush(Color.FromArgb(0x0A, 0xFF, 0xFF, 0xFF));
+            mark.SetResourceReference(Border.BackgroundProperty, "IslandAccentTintBrush");
             mark.SetResourceReference(Border.BorderBrushProperty, "IslandAccentBrush");
         }
         var content = new Grid { Children = { mark, body } };

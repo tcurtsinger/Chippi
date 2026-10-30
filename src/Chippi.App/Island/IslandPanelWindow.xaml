@@ -15,7 +15,6 @@
     <Window.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <ResourceDictionary Source="pack://application:,,,/Chippi.UI;component/Themes/Dark.xaml" />
                 <ResourceDictionary Source="pack://application:,,,/Chippi;component/Island/IslandStyles.xaml" />
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
@@ -24,11 +23,11 @@
     <Canvas x:Name="Root" KeyboardNavigation.TabNavigation="Cycle" KeyboardNavigation.ControlTabNavigation="Cycle">
         <!-- The shape; the shadow sits on its own layer, so the content above it renders without an effect. -->
         <Grid x:Name="Shape">
-            <Border x:Name="ShapeShadow" Background="{StaticResource IslandBrush}" Effect="{StaticResource IslandExpandedShadow}" />
-            <Border x:Name="ShapeFill" Background="{StaticResource IslandBrush}" BorderBrush="{StaticResource IslandBorderBrush}" />
+            <Border x:Name="ShapeShadow" Background="{DynamicResource IslandBrush}" Effect="{DynamicResource IslandExpandedShadow}" />
+            <Border x:Name="ShapeFill" Background="{DynamicResource IslandBrush}" BorderBrush="{DynamicResource IslandBorderBrush}" />
         </Grid>
         <!-- The grid or a page, 520 × 360, placed where the shape is heading. -->
-        <Border x:Name="Card" Padding="12" Opacity="0" TextElement.Foreground="{StaticResource IslandTextBrush}">
+        <Border x:Name="Card" Padding="12" Opacity="0" TextElement.Foreground="{DynamicResource IslandTextBrush}">
             <ContentControl x:Name="Page" Focusable="False" />
         </Border>
     </Canvas>

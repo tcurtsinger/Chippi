@@ -35,7 +35,7 @@ public sealed class KeepAwakeIslandView : UserControl
               <Border Name="Card" CornerRadius="8" Background="{DynamicResource IslandPanelBrush}"><Grid><Border Name="Hover" CornerRadius="8" Background="White" Opacity="0" IsHitTestVisible="False"/><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/></Grid></Border>
               <ControlTemplate.Triggers>
                <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Card" Property="Background" Value="{DynamicResource IslandHoverBrush}"/></Trigger>
-               <Trigger Property="IsChecked" Value="True"><Setter TargetName="Card" Property="Background" Value="{DynamicResource IslandAccentBrush}"/><Setter Property="Foreground" Value="Black"/></Trigger>
+               <Trigger Property="IsChecked" Value="True"><Setter TargetName="Card" Property="Background" Value="{DynamicResource IslandAccentFillBrush}"/><Setter Property="Foreground" Value="{DynamicResource IslandOnAccentBrush}"/></Trigger>
                <MultiTrigger><MultiTrigger.Conditions><Condition Property="IsChecked" Value="True"/><Condition Property="IsMouseOver" Value="True"/></MultiTrigger.Conditions><Setter TargetName="Hover" Property="Opacity" Value="0.12"/></MultiTrigger>
               </ControlTemplate.Triggers>
              </ControlTemplate></Setter.Value></Setter>
