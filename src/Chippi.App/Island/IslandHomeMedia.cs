@@ -188,6 +188,9 @@ internal sealed class IslandHomeMedia : UserControl
         AutomationProperties.SetName(_playPause, track?.Playing == true ? "Pause" : "Play");
         _artPet.Mood = track is null ? PetMood.Sleepy : PetMood.Listening;
         ShowArt(track?.Artwork);
+        // The lines keep their width when the text changes (a new title cut off like the last), so the tooltip is
+        // worked out again here, not only when they change size.
+        Tip();
         if (arriving)
         {
             Arrival.Enter(_art, rise: false);

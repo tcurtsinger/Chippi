@@ -194,6 +194,22 @@ public sealed class IslandHomeTests
         var next = Find<Button>(grid, b => AutomationProperties.GetName(b) == "Next track");
         Click(next);
         Assert.Single(opened);
+        // A cut-off title shows in full in the card's tooltip, and the next one cut off the same replaces it.
+        var card = Find<Button>(grid, b => AutomationProperties.GetName(b) == "Now Playing");
+        string longTitle = "A title far too long to fit beside the art and the transport";
+        media.Sessions = [media.Sessions[0] with { Title = longTitle }];
+        grid.Media.SetMedia(media);
+        grid.UpdateLayout();
+        Assert.Contains(longTitle, (string)card.ToolTip);
+        media.Sessions = [media.Sessions[0] with { Title = "Another title far too long to fit beside the art and the transport" }];
+        grid.Media.SetMedia(media);
+        grid.UpdateLayout();
+        Assert.Contains("Another title", (string)card.ToolTip);
+        media.Sessions = [media.Sessions[0] with { Title = "Weekend Mix" }];
+        grid.Media.SetMedia(media);
+        grid.UpdateLayout();
+        Assert.Null(card.ToolTip);
+
         // A press the player declines says so on the app's line, in Caution.
         media.Refuse = true;
         Click(next);
