@@ -164,9 +164,12 @@ public sealed class SoundShellTests
         {
             var host = (ContentControl)panel.FindName("Page");
             var grid = Assert.IsType<IslandGrid>(host.Content);
-            Assert.Equal(["Now Playing", "Sound", "App volume"], grid.Buttons().Select(b => AutomationProperties.GetName(b).Split(',')[0]));
+            // The mic mute shortcut is the Sound tile's button (a toggle); the volume slider's arrow opens the page too.
+            Assert.Equal(["Microphone", "App volume"], grid.Buttons().Select(b => AutomationProperties.GetName(b).Split(',')[0]));
+            Assert.IsType<System.Windows.Controls.Primitives.ToggleButton>(grid.Buttons().First());
+            Assert.NotNull(Named<Slider>(grid, "System volume"));
 
-            Invoke(grid.Buttons().Single(b => AutomationProperties.GetName(b).StartsWith("Sound,", StringComparison.Ordinal)));
+            Invoke(Named<Button>(grid, "Sound"));
             await SmokeDispatcher.Until(() => panel.CurrentPage == SoundTile.Key);
             Assert.Contains("Sound", Texts(host)); // every page starts with its name
             Assert.Contains(SoundTile.Microphone, Texts(host));
@@ -248,6 +251,6 @@ public sealed class SoundShellTests
     }
     private static IEnumerable<string> Texts(DependencyObject root) => All<TextBlock>(root).Select(t => t.Text);
     private static T Named<T>(DependencyObject root, string name) where T : DependencyObject => Assert.Single(All<T>(root), c => AutomationProperties.GetName(c) == name);
-    private static void Invoke(Button button) => ((IInvokeProvider)new ButtonAutomationPeer(button).GetPattern(PatternInterface.Invoke)).Invoke();
+    private static void Invoke(ButtonBase button) => ((IInvokeProvider)new ButtonAutomationPeer((Button)button).GetPattern(PatternInterface.Invoke)).Invoke();
     private static void Toggle(ToggleButton button) => ((IToggleProvider)new ToggleButtonAutomationPeer(button).GetPattern(PatternInterface.Toggle)).Toggle();
 }

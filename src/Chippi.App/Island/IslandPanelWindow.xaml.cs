@@ -39,7 +39,6 @@ public partial class IslandPanelWindow : Window
 
     private enum Morph { Open, Page, Close }
 
-    private readonly DispatcherTimer _clock = new();
     private readonly IslandGrid _grid = new();
     private readonly Dictionary<IslandTileContribution, FrameworkElement> _views = [];
     private readonly List<Panel> _attached = []; // the page's panels, which hold reused section views
@@ -73,8 +72,9 @@ public partial class IslandPanelWindow : Window
     public IslandPanelWindow()
     {
         InitializeComponent();
-        _clock.Tick += (_, _) => UpdateClock();
         _grid.TileOpened += (_, key) => ShowPage(key);
+        _grid.TileToggled += (_, key) => Toggle(key);
+        _grid.SettingsRequested += (_, _) => SettingsRequested?.Invoke(this, EventArgs.Empty);
         Card.Width = IslandPage.Width;
         Card.Height = IslandPage.Height;
         PointSharedKeys();
@@ -112,6 +112,9 @@ public partial class IslandPanelWindow : Window
 
     /// <summary>Esc while the island has the keyboard (the user clicked into it).</summary>
     internal event EventHandler? EscapePressed;
+
+    /// <summary>The home's Settings button.</summary>
+    internal event EventHandler? SettingsRequested;
 
     /// <summary>The user opened a page (a tile key) to restore next time.</summary>
     internal event EventHandler<string>? LastPageChanged;
@@ -186,6 +189,7 @@ public partial class IslandPanelWindow : Window
             _media.Changed -= OnMediaChanged;
         _media = media;
         _media.Changed += OnMediaChanged;
+        _grid.SetMedia(media);
         _nowPlaying = null;
         RefreshGrid();
     }
@@ -267,7 +271,7 @@ public partial class IslandPanelWindow : Window
             _page = _layout.OpensOn == IslandOpensOn.LastPage && _lastPage is not null && Exists(_lastPage) ? _lastPage : null;
         _openOn = null;
         Attach(_page);
-        UpdateClock();
+        RefreshGrid(); // the volume and the toggles are read as the home opens
         Place();
         Show();
         Begin(Morph.Open);
@@ -281,7 +285,6 @@ public partial class IslandPanelWindow : Window
         IsOpen = false;
         _keyboard = false;
         PasteTarget = null;
-        _clock.Stop();
         MarkOnScreen();
         if (immediate)
             Collapse();
@@ -382,8 +385,8 @@ public partial class IslandPanelWindow : Window
     /// <summary>The arrow every page starts with: back to the grid.</summary>
     internal static Button BackButton(Action back)
     {
-        var glyph = new LucideIcon { Data = LucideIcons.ArrowLeft, Size = 14 };
-        glyph.SetResourceReference(LucideIcon.BrushProperty, "IslandTextBrush");
+        var glyph = new LucideIcon { Data = LucideIcons.ChevronLeft, Size = 16 };
+        glyph.SetResourceReference(LucideIcon.BrushProperty, "IslandTextSecondaryBrush");
         var button = new Button { Content = glyph, Margin = new Thickness(-4, 0, 4, 0) };
         button.SetResourceReference(StyleProperty, "IslandIconButtonStyle");
         AutomationProperties.SetName(button, "Back");
@@ -513,25 +516,39 @@ public partial class IslandPanelWindow : Window
         return null;
     }
 
-    /// <summary>Now Playing, then the features' tiles, each with its status and dot, in the chosen order without the hidden ones.</summary>
+    /// <summary>The features' buttons, each with its status, in the chosen order without the hidden ones, and the volume slider. Now Playing is the card, not a button.</summary>
     private void RefreshGrid()
     {
-        var track = _media?.Current;
-        var tiles = new List<IslandTileView>
-        {
-            new(NowPlayingKey, "Now Playing", LucideIcons.Music, track?.Title ?? "", track?.Playing == true || LiveOn(NowPlayingKey) is not null),
-        };
+        var tiles = new List<IslandTileView>();
         foreach (var group in _groups.Where(g => g.Key != NowPlayingKey))
         {
-            var live = LiveOn(group.Key);
+            var toggle = group.Toggle;
             bool muted = Muted(group.Key);
-            tiles.Add(new(group.Key, group.Name, muted ? LucideIcons.MicOff : LucideIcons.Get(group.Icon), group.Status, live is not null, live?.NeedsAttention == true || muted));
+            string name = toggle?.Name ?? group.Name;
+            string status = toggle?.Status?.Invoke() ?? group.Status;
+            var icon = muted ? LucideIcons.MicOff : LucideIcons.Get(toggle?.Icon ?? group.Icon);
+            tiles.Add(new(group.Key, name, icon, status, toggle?.IsOn() == true, LiveOn(group.Key)?.NeedsAttention == true || muted, toggle is not null));
         }
         var shown = _layout.Shown(tiles.Select(t => t.Key));
         _grid.SetTiles([.. shown.Select(key => tiles.First(t => t.Key == key))]);
+        var volumeGroup = _groups.FirstOrDefault(g => g.Volume is not null);
+        _grid.SetVolume(volumeGroup?.Volume, volumeGroup?.Key);
         _shownTiles = shown;
         RefreshPageStatus();
         MarkOnScreen();
+    }
+
+    /// <summary>A split button's toggle on the home.</summary>
+    private void Toggle(string key)
+    {
+        try
+        {
+            Group(key)?.Toggle?.Toggle();
+        }
+        catch (Exception ex)
+        {
+            Log.Error($"Island: toggling {key} failed", ex);
+        }
     }
 
     /// <summary>Tells each tile whether it's seen: the grid open, and the tile not hidden.</summary>
@@ -755,15 +772,6 @@ public partial class IslandPanelWindow : Window
 
     private static double Lerp(double from, double to, double t) => from + (to - from) * t;
 
-    private void UpdateClock()
-    {
-        var now = DateTime.Now;
-        _grid.SetClock(now);
-        _clock.Interval = TimeSpan.FromSeconds(60 - now.Second) - TimeSpan.FromMilliseconds(now.Millisecond) + TimeSpan.FromMilliseconds(50);
-        if (IsOpen)
-            _clock.Start();
-    }
-
 #if DEBUG
     /// <summary>Debug builds: the window's own pixels, for <see cref="IslandWindow.SaveScene"/>.</summary>
     internal FrameworkElement Visual => Root;
@@ -783,7 +791,6 @@ public partial class IslandPanelWindow : Window
 
     protected override void OnClosed(EventArgs e)
     {
-        _clock.Stop();
         StopFrames();
         if (_media is not null)
             _media.Changed -= OnMediaChanged;

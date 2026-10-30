@@ -68,7 +68,8 @@ public sealed class AudioRoutingModule : IFeatureModule
                 new("output-switched", "Output switched", NoticePlaces.Island),
                 new("mic-pinned", "Microphone switched", NoticePlaces.None),
             ]);
-            _tile = context.Ui.AddIslandTile(SoundTile.Section(0, SoundTile.Output, () => new RoutingQuickView(this, AudioFlow.Render)));
+            _tile = context.Ui.AddIslandTile(SoundTile.Section(0, SoundTile.Output, () => new RoutingQuickView(this, AudioFlow.Render))
+                with { Volume = new IslandTileVolume(OutputVolume, SetHomeVolume) });
             context.Ui.AddIslandTile(SoundTile.Section(20, SoundTile.Microphone, () => new RoutingQuickView(this, AudioFlow.Capture)));
             context.Ui.SetSettingsPage(section => new RoutingPage(this, section == "microphone" ? AudioFlow.Capture : AudioFlow.Render));
             _audio.SnapshotChanged += OnSnapshot;
@@ -276,7 +277,23 @@ public sealed class AudioRoutingModule : IFeatureModule
     public void OpenSettings(AudioFlow flow) => _context?.OpenSettings(flow == AudioFlow.Render ? "output" : "microphone");
 
     /// <summary>The Sound tile shows the output in use.</summary>
-    private void UpdateTiles() => _tile?.SetStatus(CurrentName(AudioFlow.Render));
+    private void UpdateTiles()
+    {
+        _tile?.SetStatus(CurrentName(AudioFlow.Render));
+        _tile?.Refresh();
+    }
+
+    private readonly LatestWrite _homeVolume = new();
+
+    /// <summary>The output in use's system volume, 0 to 1 (the home's slider).</summary>
+    private double? OutputVolume() =>
+        InUse(AudioFlow.Render) is { } id && Snapshot.Levels.TryGetValue(id, out var level) ? level.Volume : null;
+
+    private void SetHomeVolume(double volume)
+    {
+        if (InUse(AudioFlow.Render) is { } id)
+            _homeVolume.Send(() => SetOutputVolumeAsync(id, (float)Math.Clamp(volume, 0, 1)));
+    }
 
     public async Task StopAsync(CancellationToken ct)
     {

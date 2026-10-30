@@ -140,58 +140,42 @@ public sealed class IslandPanelTests
     }
 
     [Theory]
-    [InlineData(1, 1, 1, 20, true)]
-    [InlineData(3, 3, 1, 20, true)]
-    [InlineData(4, 2, 2, 20, true)]
-    [InlineData(6, 3, 2, 20, true)]
-    [InlineData(9, 3, 3, 20, true)]
-    [InlineData(12, 4, 3, 20, true)]
-    [InlineData(15, 5, 3, 16, true)]
-    [InlineData(20, 5, 4, 16, true)]
-    [InlineData(24, 6, 4, 14, false)]
-    [InlineData(30, 6, 5, 14, false)]
-    public void The_grid_lays_out_by_tile_count(int tiles, int columns, int rows, double glyph, bool status)
-    {
-        var layout = IslandGridLayout.For(tiles);
-        Assert.Equal((columns, rows, glyph, status), (layout.Columns, layout.Rows, layout.Glyph, layout.ShowsStatus));
-    }
-
-    [Theory]
-    [InlineData(4)]
-    [InlineData(6)]
-    [InlineData(9)]
-    [InlineData(12)]
-    [InlineData(15)]
-    [InlineData(20)]
-    public void The_tiles_fill_the_body_8_apart(int count)
+    [InlineData(1, 1)]
+    [InlineData(4, 1)]
+    [InlineData(5, 2)]
+    [InlineData(8, 2)]
+    [InlineData(12, 2)] // a third row wouldn't fit: only eight show
+    public void The_home_lays_its_buttons_four_across_and_shows_at_most_eight(int count, int rows)
     {
         WpfTestThread.Run(() =>
         {
             var grid = new IslandGrid();
             grid.SetTiles([.. Enumerable.Range(0, count).Select(i => new IslandTileView($"t{i}", $"Tile {i}", Chippi.UI.Controls.LucideIcons.Music, "Status"))]);
-            grid.Measure(new Size(IslandPage.BodyWidth, IslandPage.HeaderHeight + IslandPage.Gap + IslandPage.BodyHeight));
-            grid.Arrange(new Rect(0, 0, IslandPage.BodyWidth, IslandPage.HeaderHeight + IslandPage.Gap + IslandPage.BodyHeight));
+            grid.SetVolume(new IslandTileVolume(() => 0.5, _ => { }), "sound");
+            double width = IslandPage.Width - 2 * IslandPage.Inset, height = IslandPage.Height - 2 * IslandPage.Inset;
+            grid.Measure(new Size(width, height));
+            grid.Arrange(new Rect(0, 0, width, height));
             var buttons = grid.Buttons().ToList();
-            var layout = IslandGridLayout.For(count);
-            double width = (IslandPage.BodyWidth - (layout.Columns - 1) * 8) / layout.Columns;
-            double height = (IslandPage.BodyHeight - (layout.Rows - 1) * 8) / layout.Rows;
-            Assert.All(buttons, b => Assert.Equal((Math.Round(width, 2), Math.Round(height, 2)), (Math.Round(b.ActualWidth, 2), Math.Round(b.ActualHeight, 2))));
-            var first = buttons[0].TranslatePoint(new Point(), grid);
-            var last = buttons[^1].TranslatePoint(new Point(buttons[^1].ActualWidth, buttons[^1].ActualHeight), grid);
-            Assert.Equal(IslandPage.HeaderHeight + IslandPage.Gap, first.Y, 2);
-            if (count == layout.Columns * layout.Rows)
-                Assert.Equal((IslandPage.BodyWidth, IslandPage.HeaderHeight + IslandPage.Gap + IslandPage.BodyHeight), (Math.Round(last.X, 2), Math.Round(last.Y, 2)));
+            Assert.Equal(Math.Min(count, 8), buttons.Count);
+            Assert.All(buttons, b => Assert.Equal(44, b.ActualHeight, 2));
+            var at = buttons.Select(b => b.TranslatePoint(new Point(), grid)).ToList();
+            Assert.Equal(rows, at.Select(p => Math.Round(p.Y, 1)).Distinct().Count());
+            Assert.Equal(Math.Min(count, 4), at.Select(p => Math.Round(p.X, 1)).Distinct().Count());
+            // The rows, the card, the slider and the footer all fit the panel.
+            Assert.True(grid.DesiredSize.Height <= height + 0.01, $"home is {grid.DesiredSize.Height} tall");
+            var last = buttons[^1].TranslatePoint(new Point(0, 44), grid);
+            Assert.True(last.Y <= height - 46 - 32, $"buttons end at {last.Y}");
         });
     }
 
     [Fact]
-    public void Opens_on_the_grid_with_now_playing_first_then_tiles_in_grid_order()
+    public void Opens_on_the_home_with_the_tiles_in_grid_order_and_now_playing_as_the_card()
     {
         WpfTestThread.Run(() => WithPanel(panel =>
         {
             Open(panel);
             Assert.Null(panel.CurrentPage);
-            Assert.Equal(["Now Playing", "Volume mixer", "Keep awake"], TileNames(panel));
+            Assert.Equal(["Volume mixer", "Keep awake"], TileNames(panel));
         }));
     }
 
@@ -238,7 +222,7 @@ public sealed class IslandPanelTests
         WpfTestThread.Run(() => WithPanel(panel =>
         {
             Open(panel);
-            Assert.Equal(["Now Playing", "Microphone, Muted"], TileNames(panel));
+            Assert.Equal(["Microphone, Muted"], TileNames(panel));
         }, Tiles(routing, mute)));
     }
 
