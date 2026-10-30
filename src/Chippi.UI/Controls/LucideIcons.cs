@@ -39,6 +39,7 @@ public static class LucideIcons
     // Shell and controls (from Hopper).
     public static Geometry Sliders { get; } = G("M21,4 H14 M10,4 H3 M21,12 H12 M8,12 H3 M21,20 H16 M12,20 H3 M14,2 V6 M8,10 V14 M16,18 V22");
     public static Geometry Settings { get; } = G("M12.22,2 h-.44 a2,2 0 0 0 -2,2 v.18 a2,2 0 0 1 -1,1.73 l-.43.25 a2,2 0 0 1 -2,0 l-.15-.08 a2,2 0 0 0 -2.73.73 l-.22.38 a2,2 0 0 0 .73,2.73 l.15.1 a2,2 0 0 1 1,1.72 v.51 a2,2 0 0 1 -1,1.74 l-.15.09 a2,2 0 0 0 -.73,2.73 l.22.38 a2,2 0 0 0 2.73.73 l.15-.08 a2,2 0 0 1 2,0 l.43.25 a2,2 0 0 1 1,1.73 V20 a2,2 0 0 0 2,2 h.44 a2,2 0 0 0 2,-2 v-.18 a2,2 0 0 1 1,-1.73 l.43-.25 a2,2 0 0 1 2,0 l.15.08 a2,2 0 0 0 2.73-.73 l.22-.39 a2,2 0 0 0 -.73,-2.73 l-.15-.08 a2,2 0 0 1 -1,-1.74 v-.5 a2,2 0 0 1 1,-1.74 l.15-.09 a2,2 0 0 0 .73,-2.73 l-.22-.38 a2,2 0 0 0 -2.73,-.73 l-.15.08 a2,2 0 0 1 -2,0 l-.43-.25 a2,2 0 0 1 -1,-1.73 V4 a2,2 0 0 0 -2,-2 Z M12,9 a3,3 0 1 0 0,6 a3,3 0 1 0 0,-6 Z");
+    public static Geometry ArrowLeft { get; } = G("M19,12 H5 M12,19 L5,12 L12,5");
     public static Geometry ChevronLeft { get; } = G("M15,18 L9,12 L15,6");
     public static Geometry ChevronRight { get; } = G("M9,18 L15,12 L9,6");
     public static Geometry ChevronDown { get; } = G("M6,9 L12,15 L18,9");

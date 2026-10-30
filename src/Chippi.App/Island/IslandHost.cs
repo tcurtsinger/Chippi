@@ -56,7 +56,6 @@ public sealed class IslandHost : IDisposable
     {
         _window.Initialize();
         _tracker.Ignore = [_window.Handle, _window.PanelHandle];
-        _window.SettingsRequested += (_, _) => _shell.Commands.OpenSettings();
         _window.LastPageChanged += (_, key) => UpdateSettings(s => s.IslandLastPage = key);
         // A page's Paste goes to the app that was in front before the island took the keyboard (Phase 5 notes #62).
         _window.CaptureTarget = () => _shell.Clipboard.CaptureTarget();
@@ -321,7 +320,7 @@ public sealed class IslandHost : IDisposable
 
     /// <summary>
     /// Now Playing reads Windows' media sessions; while one plays it is the island's media activity
-    /// (the tab's equalizer, the live orbit button), opening Now Playing.
+    /// (the tab's equalizer), opening Now Playing.
     /// </summary>
     private void StartMedia()
     {

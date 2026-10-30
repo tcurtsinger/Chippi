@@ -2,6 +2,7 @@
 // Copyright (C) Chippi contributors
 using System.Reflection;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using Chippi.App.Island;
 using Chippi.Core.Modules;
@@ -24,12 +25,14 @@ public sealed class PageHookTests
             panel.SetTiles(IslandTileContribution.Group(parts));
             var attach = typeof(IslandPanelWindow).GetMethod("Attach", BindingFlags.Instance | BindingFlags.NonPublic)!;
             attach.Invoke(panel, ["shared"]);
-            // The header in the 24 row, then the body holding both sections, stacked.
+            // The back arrow and the header in the 24 row, then the body holding both sections, stacked.
             void Check()
             {
                 var page = (DockPanel)((ContentControl)panel.FindName("Page")).Content;
                 Assert.Equal(2, page.Children.Count);
-                Assert.Same(header, Assert.Single(((Grid)page.Children[0]).Children.Cast<UIElement>()));
+                var row = (DockPanel)page.Children[0];
+                Assert.Equal("Back", AutomationProperties.GetName(Assert.IsType<Button>(row.Children[0])));
+                Assert.Same(header, Assert.Single(row.Children.Cast<UIElement>().Skip(1)));
                 var stack = (StackPanel)Assert.Single(((Grid)page.Children[1]).Children.Cast<UIElement>());
                 Assert.Equal([first, second], stack.Children.Cast<UIElement>());
                 Assert.Same(page.Children[1], panel.PageBody);
