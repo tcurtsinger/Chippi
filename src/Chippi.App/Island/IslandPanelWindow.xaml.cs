@@ -726,6 +726,9 @@ public partial class IslandPanelWindow : Window
     /// </summary>
     internal event Action<bool, double>? Morphing;
 
+    /// <summary>The morph's clock, in Stopwatch ticks. Tests hold it still and move it themselves, so a late frame can't skip a step.</summary>
+    internal Func<long> Clock { get; set; } = Stopwatch.GetTimestamp;
+
     private bool _petAtPuck;
 
     /// <summary>
@@ -760,7 +763,7 @@ public partial class IslandPanelWindow : Window
         _frame = (_, _) =>
         {
             // The clock starts on the first frame, so a slow first show doesn't skip the start.
-            long now = Stopwatch.GetTimestamp();
+            long now = Clock();
             _elapsed += _lastFrame == 0 ? TimeSpan.Zero : Stopwatch.GetElapsedTime(_lastFrame, now);
             _lastFrame = now;
             Step();
