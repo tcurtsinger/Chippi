@@ -48,6 +48,8 @@ public partial class IslandPanelWindow : Window
 
     private readonly IslandGrid _grid = new();
     private readonly Dictionary<string, long> _failed = []; // tile key → when its "Failed" goes (Stopwatch ticks)
+    private readonly HashSet<string> _toggling = []; // toggles still being applied
+    private readonly HashSet<string> _unreadable = []; // features whose state threw, logged once until they read again
     private readonly DispatcherTimer _failedTimer = new() { Interval = FailedHold };
     private readonly Dictionary<IslandTileContribution, FrameworkElement> _views = [];
     private readonly List<Panel> _attached = []; // the page's panels, which hold reused section views
@@ -579,23 +581,51 @@ public partial class IslandPanelWindow : Window
             bool attention = LiveOn(group.Key)?.NeedsAttention == true || muted;
             bool failed = _failed.TryGetValue(group.Key, out long until) && until > now;
             string name = toggle?.Name ?? group.Name;
-            string status = failed ? "Failed" : toggle?.Status?.Invoke() ?? group.Status;
             var icon = muted ? LucideIcons.MicOff : LucideIcons.Get(toggle?.Icon ?? group.Icon);
+            // A feature whose state can't be read shows its button plain; the others still refresh.
+            bool on = Read($"{group.Key} state", () => toggle?.IsOn() == true, false);
+            string status = failed ? "Failed" : Read($"{group.Key} status", () => toggle?.Status?.Invoke(), null) ?? group.Status;
             // The accent says something is on and fine: a muted mic, or anything that needs attention, shows in Caution instead.
-            tiles.Add(new(group.Key, name, icon, status, toggle?.IsOn() == true && !attention, attention || failed, toggle is not null, group.Name));
+            tiles.Add(new(group.Key, name, icon, status, on && !attention, attention || failed, toggle is not null, group.Name));
         }
         var shown = _layout.Shown(tiles.Select(t => t.Key));
         _grid.SetTiles([.. shown.Select(key => tiles.First(t => t.Key == key))]);
         var volumeGroup = _groups.FirstOrDefault(g => g.Volume is not null);
-        _grid.SetVolume(volumeGroup?.Volume, volumeGroup?.Key);
+        Read($"{volumeGroup?.Key} volume", () => { _grid.SetVolume(volumeGroup?.Volume, volumeGroup?.Key); return true; }, false);
         _shownTiles = shown;
         RefreshPageStatus();
         MarkOnScreen();
     }
 
-    /// <summary>A split button's toggle on the home. When it fails, "Failed" shows under the button for a few seconds.</summary>
+    /// <summary>
+    /// A feature's state for the home (<paramref name="what"/>, such as "keep-awake status"), read so that one that throws
+    /// (a module stopping as it's read) doesn't stop the others refreshing: it gets <paramref name="fallback"/>, logged once
+    /// until it reads again.
+    /// </summary>
+    private T Read<T>(string what, Func<T> read, T fallback)
+    {
+        try
+        {
+            var value = read();
+            _unreadable.Remove(what);
+            return value;
+        }
+        catch (Exception ex)
+        {
+            if (_unreadable.Add(what))
+                Log.Error($"Island: reading the {what} for the home failed", ex);
+            return fallback;
+        }
+    }
+
+    /// <summary>
+    /// A split button's toggle on the home. A press while the last one is still being applied does nothing, so a double
+    /// click can't turn it on and straight off. When it fails, "Failed" shows under the button for a few seconds.
+    /// </summary>
     private async void Toggle(string key)
     {
+        if (!_toggling.Add(key))
+            return;
         try
         {
             if (Group(key)?.Toggle is { } toggle)
@@ -608,6 +638,10 @@ public partial class IslandPanelWindow : Window
             _failedTimer.Stop();
             _failedTimer.Start();
             RefreshGrid();
+        }
+        finally
+        {
+            _toggling.Remove(key);
         }
     }
 

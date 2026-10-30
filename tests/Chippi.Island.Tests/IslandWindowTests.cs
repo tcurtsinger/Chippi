@@ -495,8 +495,13 @@ public sealed class IslandWindowTests
     /// <summary>A press and release without movement: the pointer stays where it was.</summary>
     private static void Click(IslandWindow window)
     {
+        // The pointer holds still from the press to the release, whatever the real one does: moved 4 between them, it's a drag.
+        var was = window.PointerAt;
+        var at = was();
+        window.PointerAt = () => at;
         Raise(window, new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Left) { RoutedEvent = UIElement.PreviewMouseLeftButtonDownEvent });
         Raise(window, new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Left) { RoutedEvent = UIElement.PreviewMouseLeftButtonUpEvent });
+        window.PointerAt = was;
     }
 
     private static void Raise(IslandWindow window, RoutedEventArgs args) => window.PuckButton.RaiseEvent(args);

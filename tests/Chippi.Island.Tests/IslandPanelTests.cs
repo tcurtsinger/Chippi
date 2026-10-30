@@ -408,6 +408,63 @@ public sealed class IslandPanelTests
         }, Tiles(mute)));
     }
 
+    [Fact]
+    public void A_feature_whose_state_throws_shows_its_button_plain_and_the_others_still_refresh()
+    {
+        bool broken = true;
+        var awake = new IslandTileContribution("keep-awake", new IslandTileSpec("keep-awake", "Keep awake", "Coffee", 40, 0, () => new Border())
+        {
+            Toggle = new IslandTileToggle(() => broken ? throw new ObjectDisposedException("keep awake") : true, () => Task.CompletedTask,
+                Status: () => broken ? throw new ObjectDisposedException("keep awake") : "1 hr left"),
+        });
+        var clipboard = Part("clipboard", "Clipboard", 70, "23 items");
+        WpfTestThread.Run(() => WithPanel(panel =>
+        {
+            Open(panel);
+            Assert.Equal(["Keep awake", "Clipboard, 23 items"], TileNames(panel));
+            var toggle = Assert.IsType<System.Windows.Controls.Primitives.ToggleButton>(Grid(panel).Buttons().First());
+            Assert.False(toggle.IsChecked);
+
+            clipboard.SetStatus("24 items");
+            Pump(TimeSpan.FromMilliseconds(50));
+            Assert.Equal(["Keep awake", "Clipboard, 24 items"], TileNames(panel)); // the others still refresh
+
+            broken = false; // it reads again
+            clipboard.SetStatus("25 items");
+            Pump(TimeSpan.FromMilliseconds(50));
+            Assert.Equal(["Keep awake, 1 hr left", "Clipboard, 25 items"], TileNames(panel));
+            Assert.True(toggle.IsChecked);
+        }, Tiles(awake, clipboard)));
+    }
+
+    [Fact]
+    public void A_second_press_on_a_toggle_waits_for_the_first_to_be_applied()
+    {
+        var applying = new TaskCompletionSource();
+        int toggles = 0;
+        var awake = new IslandTileContribution("keep-awake", new IslandTileSpec("keep-awake", "Keep awake", "Coffee", 40, 0, () => new Border())
+        {
+            Toggle = new IslandTileToggle(() => false, () =>
+            {
+                toggles++;
+                return applying.Task;
+            }),
+        });
+        WpfTestThread.Run(() => WithPanel(panel =>
+        {
+            Open(panel);
+            var toggle = Grid(panel).Buttons().Single(b => (string)b.Tag == "keep-awake");
+            toggle.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+            toggle.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent)); // a double click
+            Assert.Equal(1, toggles);
+
+            applying.SetResult();
+            Pump(TimeSpan.FromMilliseconds(50));
+            toggle.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+            Assert.Equal(2, toggles); // applied: the next press toggles again
+        }, Tiles(awake)));
+    }
+
     private static Geometry TileIcon(IslandPanelWindow panel, string key) => TileGlyph(panel, key).Data!;
 
     private static LucideIcon TileGlyph(IslandPanelWindow panel, string key)

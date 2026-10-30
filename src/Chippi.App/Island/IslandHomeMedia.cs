@@ -38,7 +38,7 @@ internal sealed class IslandHomeMedia : UserControl
     private readonly Button _next;
     private readonly StackPanel _transport;
     private readonly StackPanel _text;
-    private readonly StackPanel _app;
+    private readonly DockPanel _app;
     private readonly Image _artWas = new(), _textWas = new(); // what was there, fading out as a new track arrives
     private readonly DispatcherTimer _failed = new() { Interval = FailedHold };
     private IMediaSessions? _media;
@@ -49,7 +49,8 @@ internal sealed class IslandHomeMedia : UserControl
     {
         _note.SetResourceReference(LucideIcon.BrushProperty, "IslandTextTertiaryBrush");
         _artist.SetResourceReference(TextBlock.ForegroundProperty, "IslandTextSecondaryBrush");
-        _app = new StackPanel { Orientation = Orientation.Horizontal, Children = { _note, _appIcon, _source } };
+        // A dock, not a row: the app's name gets the line's width, so a long one ends in an ellipsis rather than cut mid-letter.
+        _app = new DockPanel { Children = { _note, _appIcon, _source } };
         _text = new StackPanel
         {
             VerticalAlignment = VerticalAlignment.Center,
@@ -124,6 +125,7 @@ internal sealed class IslandHomeMedia : UserControl
         icon.SetResourceReference(LucideIcon.BrushProperty, brush);
         button.Content = icon;
         AutomationProperties.SetName(button, name);
+        button.ToolTip = name;
         button.Click += async (_, e) =>
         {
             e.Handled = true; // the card around it opens Now Playing; a transport press doesn't
@@ -186,6 +188,7 @@ internal sealed class IslandHomeMedia : UserControl
         _playPause.IsEnabled = track is not null && track.PlayPause != PlayPauseCommand.None;
         _playGlyph.Data = track?.Playing == true ? LucideIcons.Pause : LucideIcons.Play;
         AutomationProperties.SetName(_playPause, track?.Playing == true ? "Pause" : "Play");
+        _playPause.ToolTip = AutomationProperties.GetName(_playPause);
         _artPet.Mood = track is null ? PetMood.Sleepy : PetMood.Listening;
         ShowArt(track?.Artwork);
         // The lines keep their width when the text changes (a new title cut off like the last), so the tooltip is

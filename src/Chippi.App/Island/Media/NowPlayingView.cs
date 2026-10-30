@@ -162,6 +162,7 @@ internal sealed class NowPlayingView : UserControl
         icon.SetResourceReference(LucideIcon.BrushProperty, "IslandTextBrush");
         button.Content = icon;
         AutomationProperties.SetName(button, name);
+        button.ToolTip = name;
         button.Click += async (_, _) =>
         {
             try { await run(); }
@@ -214,6 +215,7 @@ internal sealed class NowPlayingView : UserControl
         _playPause.IsEnabled = track.PlayPause != PlayPauseCommand.None;
         _playGlyph.Data = track.Playing ? LucideIcons.Pause : LucideIcons.Play;
         AutomationProperties.SetName(_playPause, track.Playing ? "Pause" : "Play");
+        _playPause.ToolTip = AutomationProperties.GetName(_playPause);
         _fill.SetResourceReference(Border.BackgroundProperty, track.Playing ? "IslandAccentFillBrush" : "IslandTextTertiaryBrush");
         ShowTime();
         if (track.Playing && timed && IsLoaded)
