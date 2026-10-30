@@ -13,10 +13,14 @@ namespace Chippi.App.Pet;
 
 /// <summary>
 /// Debug builds only: renders ChippiPet mood sheets to PNG for review (<c>Chippi.exe --debug
-/// --pet-sheet &lt;dir&gt;</c>). Each sheet is drawn on the dark and the light window color, at 1x.
+/// --pet-sheet &lt;dir&gt;</c>). Each sheet is drawn on the dark and the light window color, at 1x,
+/// with that theme's resources (the z's take its secondary island text).
 /// </summary>
 internal static class PetSheet
 {
+    /// <summary>The moods in the order the approved mock shows them.</summary>
+    private static readonly PetMood[] Moods = [PetMood.Sleepy, PetMood.Idle, PetMood.Listening, PetMood.WideAwake, PetMood.Celebrating];
+
     public static void Save(string directory)
     {
         Directory.CreateDirectory(directory);
@@ -27,24 +31,77 @@ internal static class PetSheet
             var caption = (Brush)tokens["TextTertiaryBrush"];
             string suffix = theme.ToLowerInvariant();
 
+            // Every mood at the small form (20), the puck form (40), and above it (48, 72), per color.
             foreach (var color in Enum.GetValues<PetColor>())
-                foreach (var size in new[] { 24.0, 32, 48, 72 })
-                    Render(Row(background, caption, Enum.GetValues<PetMood>().Select(m => (Pet(size, m, color), ChippiPet.Describe(m)))),
-                        Path.Combine(directory, $"chippi-{color}-{size}-{suffix}.png"), 1);
-            Render(Row(background, caption, Enum.GetValues<PetMood>().Select(m => (Pet(112, m, PetColor.Synth), SentenceCase(ChippiPet.Describe(m))))),
+                Render(Themed(theme, Sheet(background, caption, new[] { 20.0, 40, 48, 72 }.Select(size =>
+                        ($"{size}", Moods.Select(m => ((FrameworkElement)Pet(size, m, color), SentenceCase(ChippiPet.Describe(m)))))))),
+                    Path.Combine(directory, $"chippi-{color}-{suffix}.png"), 1);
+
+            // The pet at 40 on the 50 puck, at 1x and 2x, on the mock's gray wallpaper.
+            foreach (var scale in new[] { 1.0, 2.0 })
+                Render(Themed(theme, Sheet(Wallpaper(), Brushes.White, [("", Moods.Select(m => (Puck(PetColor.Synth, m), SentenceCase(ChippiPet.Describe(m)))))])),
+                    Path.Combine(directory, $"chippi-puck-{scale}x-{suffix}.png"), scale);
+
+            Render(Themed(theme, Row(background, caption, Moods.Select(m => ((FrameworkElement)Pet(112, m, PetColor.Synth), SentenceCase(ChippiPet.Describe(m)))))),
                 Path.Combine(directory, $"ws3-pet-moods-112-{suffix}.png"), 1);
-            Render(Row(background, caption, Enum.GetValues<PetColor>().Select(c => (Pet(112, PetMood.Idle, c), c.ToString()))),
+            Render(Themed(theme, Row(background, caption, Enum.GetValues<PetColor>().Select(c => ((FrameworkElement)Pet(112, PetMood.Idle, c), c.ToString())))),
                 Path.Combine(directory, $"ws3-pet-colors-112-{suffix}.png"), 1);
-            Render(Row(background, caption, new[] { 16.0, 20, 22, 28, 30 }.Select(s => (Pet(s, PetMood.Idle, PetColor.Synth), $"{s}px"))),
+            Render(Themed(theme, Row(background, caption, new[] { 16.0, 20, 22, 28, 30 }.Select(s => ((FrameworkElement)Pet(s, PetMood.Idle, PetColor.Synth), $"{s}px")))),
                 Path.Combine(directory, $"ws3-pet-small-{suffix}.png"), 1);
-            Render(Row(background, caption, new[] { 22.0 }.Select(s => (Pet(s, PetMood.Idle, PetColor.Synth), "22px at 4x"))),
+            Render(Themed(theme, Row(background, caption, new[] { 22.0 }.Select(s => ((FrameworkElement)Pet(s, PetMood.Idle, PetColor.Synth), "22px at 4x")))),
                 Path.Combine(directory, $"ws3-pet-small-22-4x-{suffix}.png"), 4);
         }
     }
 
+    /// <summary>The 50 puck as the widget draws it (island fill, hairline rim) with the pet at 40.</summary>
+    private static FrameworkElement Puck(PetColor color, PetMood mood)
+    {
+        var puck = new Grid { Width = 50, Height = 50, HorizontalAlignment = HorizontalAlignment.Center };
+        var disc = new System.Windows.Shapes.Ellipse { StrokeThickness = 1 };
+        disc.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, "IslandBrush");
+        disc.SetResourceReference(System.Windows.Shapes.Shape.StrokeProperty, "IslandBorderBrush");
+        puck.Children.Add(disc);
+        var pet = Pet(40, mood, color);
+        pet.VerticalAlignment = VerticalAlignment.Center;
+        puck.Children.Add(pet);
+        return puck;
+    }
+
+    private static Brush Wallpaper()
+    {
+        var brush = new LinearGradientBrush(
+            [new GradientStop(Color.FromRgb(0x7A, 0x76, 0x72), 0), new GradientStop(Color.FromRgb(0x5D, 0x5B, 0x59), 0.48), new GradientStop(Color.FromRgb(0x4B, 0x4A, 0x49), 1)],
+            new Point(0, 0), new Point(0.35, 1));
+        brush.Freeze();
+        return brush;
+    }
+
+    /// <summary>Gives a sheet its theme's resources, so resource references in it resolve to that theme, not the app's.</summary>
+    private static FrameworkElement Themed(string theme, FrameworkElement sheet)
+    {
+        sheet.Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri($"pack://application:,,,/Chippi.UI;component/Themes/{theme}.xaml") });
+        return sheet;
+    }
+
+    /// <summary>Rows of cells, each row led by its label (a size).</summary>
+    private static FrameworkElement Sheet(Brush background, Brush caption, IEnumerable<(string Label, IEnumerable<(FrameworkElement Item, string Label)> Cells)> rows)
+    {
+        var stack = new StackPanel { Margin = new Thickness(8) };
+        foreach (var (label, cells) in rows)
+        {
+            var line = new StackPanel { Orientation = Orientation.Horizontal };
+            if (label.Length > 0)
+                line.Children.Add(new TextBlock { Text = label, Foreground = caption, Width = 28, Margin = new Thickness(8, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center });
+            foreach (var (item, text) in cells)
+                line.Children.Add(Cell(caption, item, text));
+            stack.Children.Add(line);
+        }
+        return new Border { Background = background, Child = stack };
+    }
+
     /// <summary>
     /// Renders timed frames of a live 112px pet in an off-screen, non-activating window: the
-    /// celebrate squish and spark fade, falling asleep, and a blink. File names carry "reduced" when
+    /// celebrate squish and spark fade, falling asleep, a breath while asleep, and a blink. File names carry "reduced" when
     /// <see cref="Chippi.UI.Themes.Motion.IsReduced"/> is on (then all frames should match).
     /// </summary>
     public static async Task SaveMotionAsync(string directory)
@@ -77,6 +134,8 @@ internal static class PetSheet
         await Task.Delay(500);
         pet.Mood = PetMood.Sleepy;
         await SaveStripAsync(host, caption, [0, 200, 400, 600, 680, 800, 1000, 1300], Path.Combine(directory, $"ws3-pet-motion-asleep-{mode}.png"));
+        // Still asleep: one 4.2s breath, the z's drifting with it.
+        await SaveStripAsync(host, caption, [0, 525, 1050, 1575, 2100, 2625, 3150, 3675, 4200], Path.Combine(directory, $"pet-motion-breathe-{mode}.png"));
 
         pet.Mood = PetMood.Idle;
         await Task.Delay(500);
@@ -126,21 +185,24 @@ internal static class PetSheet
 
     private static ChippiPet Pet(double size, PetMood mood, PetColor color) => new() { Size = size, Mood = mood, PetColor = color };
 
-    private static FrameworkElement Row(Brush background, Brush caption, IEnumerable<(ChippiPet Pet, string Label)> cells)
+    private static FrameworkElement Row(Brush background, Brush caption, IEnumerable<(FrameworkElement Item, string Label)> cells)
     {
         var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(16) };
-        foreach (var (pet, label) in cells)
-        {
-            var cell = new StackPanel { Margin = new Thickness(8), MinWidth = 64 };
-            pet.HorizontalAlignment = HorizontalAlignment.Center;
-            cell.Children.Add(pet);
-            var text = new TextBlock { Text = label, Foreground = caption, Margin = new Thickness(0, 8, 0, 0), HorizontalAlignment = HorizontalAlignment.Center };
-            text.SetResourceReference(FrameworkElement.StyleProperty, "CaptionTextStyle");
-            text.Foreground = caption;
-            cell.Children.Add(text);
-            row.Children.Add(cell);
-        }
+        foreach (var (item, label) in cells)
+            row.Children.Add(Cell(caption, item, label));
         return new Border { Background = background, Child = row };
+    }
+
+    private static FrameworkElement Cell(Brush caption, FrameworkElement item, string label)
+    {
+        var cell = new StackPanel { Margin = new Thickness(8), MinWidth = 72, VerticalAlignment = VerticalAlignment.Bottom };
+        item.HorizontalAlignment = HorizontalAlignment.Center;
+        cell.Children.Add(item);
+        var text = new TextBlock { Text = label, Margin = new Thickness(0, 8, 0, 0), HorizontalAlignment = HorizontalAlignment.Center };
+        text.SetResourceReference(FrameworkElement.StyleProperty, "CaptionTextStyle");
+        text.Foreground = caption;
+        cell.Children.Add(text);
+        return cell;
     }
 
     private static void Render(FrameworkElement element, string path, double scale)
