@@ -52,10 +52,10 @@ A Windows 11 tray app for the owner's own PC (C#, .NET 10, WPF): a widget on the
 
 ## How work goes
 
-- **One branch and worktree per change** (`X:\code\chippi-<name>`). The main checkout, `X:\code\chippi`, is the owner's.
+- **One branch and worktree per change**, in `%LOCALAPPDATA%\chippi-work\<name>`. Never add a folder to `X:\code` (the owner, 2026-10-30). Once the PR merges, remove the worktree and its local branch; copy a pack worktree's installers to `X:\code\chippi-archive` first. The main checkout, `X:\code\chippi`, is the owner's.
 - **Review:** another agent reviews each PR. Call out new projects in `Chippi.slnx`, and changes to shared code (Core, App, the island, Chippi.UI), in the PR.
 - **Merging:** a PR merges only when every CI job is green, with a merge commit. A PR that runs no CI merges once it's reviewed. Don't wait on `main`'s run after a merge: check it's green before you open the next PR.
-- **Scratch:** shots, probes and review notes go in `X:\code\chippi-scratch\<work>\`, never the repo. At the end of a phase, follow `docs/end-of-phase-checklist.md`.
+- **Scratch:** shots, probes and review notes go in `%LOCALAPPDATA%\chippi-work\scratch\<work>\`, never the repo or `X:\code`. At the end of a phase, follow `docs/end-of-phase-checklist.md`.
 - **Installers:** made with `build/pack.ps1` (`build/README.md`). Every file is hashed against `phase-1-release-artifacts.csv`. Refresh them when the owner is about to install or at the end of a phase, not after every merge.
 - **Live checks for the owner:** each step says how to make every test file, what to type and where to click.
 - **Copy:** bare-verb buttons. A confirm is a short question with Cancel and a verb. Errors read "… failed".
