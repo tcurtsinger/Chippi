@@ -3,14 +3,15 @@
 Run this once a phase's report is written and the last change is merged and pushed (Travis, 2026-10-22). The lead runs it; nothing here touches `main`'s history.
 
 ## During the phase (so cleanup stays small)
-- Review notes, handoffs, probes and UI Automation scripts go in `X:\code\chippi-scratch\phase-N\`, not in the repo root.
+- Review notes, handoffs, probes and UI Automation scripts go in `%LOCALAPPDATA%\chippi-work\scratch\phase-N\`, not in the repo root or a new folder in `X:\code` (revised 2026-10-30).
+- Each change's worktree is in `%LOCALAPPDATA%\chippi-work\<name>` and is removed with its local branch once its PR merges.
 - Dev runs use `CHIPPI_DEV_PROFILE=<name>`, so test settings and logs stay under `Chippi-dev`.
 
 ## Cleanup
 1. **Check before deleting.** Every worktree has no uncommitted changes, and every branch is merged into `main` (`git branch --no-merged main` prints nothing). Anything that fails either check is reported, not deleted.
-2. **Archive.** Zip the untracked and ignored leftovers in the main checkout (review notes, handoffs, probes, scripts, screenshots, scratch files) to `X:\code\chippi-archive\phase-N-leftovers-<date>.zip`. Keep `build\artifacts` (the current installers) and `bin`/`obj`.
+2. **Archive.** Zip the untracked and ignored leftovers in the main checkout (review notes, handoffs, probes, scripts, screenshots, scratch files) and the phase's folders in `%LOCALAPPDATA%\chippi-work\scratch` to `X:\code\chippi-archive\phase-N-leftovers-<date>.zip`. Keep `build\artifacts` (the current installers) and `bin`/`obj`. `X:\code\chippi-scratch\audit-2026-10-27` stays where it is.
 3. **Delete** the archived originals, then confirm `git status` shows nothing untracked.
-4. **Worktrees and branches.** `git worktree remove` each workstream worktree, `git branch -d` its branch, then `git worktree prune`. Only `main` remains, locally and on GitHub.
+4. **Worktrees and branches.** `git worktree remove` any workstream worktree still in `%LOCALAPPDATA%\chippi-work` (or left in `X:\code` from before 2026-10-30), `git branch -d` its branch, then `git worktree prune`. Only `main` remains, locally and on GitHub.
 5. **Dev profiles and temp files.** Delete `%APPDATA%\Chippi-dev`, `%LOCALAPPDATA%\Chippi-dev` and `%TEMP%\chippi*` (probes, UI Automation runs, generated assets, the Core tests' `chippi-tests` folder). Then confirm none of these dev registrations are left:
    - `Chippi-dev-*` values under `HKCU\...\CurrentVersion\Run`
    - `ChippiOrganize-dev-*` keys under `HKCU\Software\Classes\Directory\shell` and `...\Directory\Background\shell`
