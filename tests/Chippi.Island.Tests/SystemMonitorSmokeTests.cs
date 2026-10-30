@@ -84,7 +84,8 @@ public sealed class SystemMonitorSmokeTests(ITestOutputHelper output)
             Assert.InRange(footprint.Top, 0, 672);
             Assert.InRange(footprint.Bottom, 0, 672);
 
-            Assert.Contains(Find<TextBlock>(page), b => b.Text.Contains("C:"));
+            // The disk list takes two samples a prime delay apart on the sampler's thread: wait for its rows, not a fixed time.
+            Until(() => Find<TextBlock>(page).Any(b => b.Text.Contains("C:")));
             if (disks == 5 && !laptop) Assert.Contains(Find<TextBlock>(page), b => b.Text.Contains("G:"));
 
             // Use the actual Settings factory and controls, then return to the grid.
