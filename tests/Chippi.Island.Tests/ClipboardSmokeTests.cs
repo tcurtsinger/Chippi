@@ -22,10 +22,10 @@ namespace Chippi.Island.Tests;
 public sealed class ClipboardSmokeTests
 {
     [Theory]
-    [InlineData(IslandEdge.Top)]
-    [InlineData(IslandEdge.Left)]
-    [InlineData(IslandEdge.Right)]
-    public void Clipboard_page_header_search_and_clean_url_fit_the_island_on_a_960_by_540_screen(IslandEdge edge) => WpfTestThread.Run(() =>
+    [InlineData(Corner.BottomRight)]
+    [InlineData(Corner.TopLeft)]
+    [InlineData(Corner.TopRight)]
+    public void Clipboard_page_header_search_and_clean_url_fit_the_island_on_a_960_by_540_screen(Corner corner) => WpfTestThread.Run(() =>
     {
         var directory = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "chippi-c6-" + Guid.NewGuid().ToString("N"));
         var hub = new Hub(); var features = new ClipboardFeatures();
@@ -54,8 +54,8 @@ public sealed class ClipboardSmokeTests
             var search = Assert.IsType<SearchBox>(historyUi.Tile.Spec.InitialFocus!());
             Assert.Contains(Find<TextBlock>(page), text => text.Text == "Invented first copy");
             Assert.Empty(Find<ScrollViewer>(page)); // nothing scrolls; the list shows whole rows
-            IslandBounds.Place(panel, edge, 960, 540);
-            IslandBounds.Check(panel, edge, 960, 540);
+            IslandBounds.Place(panel, corner, 960, 540);
+            IslandBounds.Check(panel, corner, 960, 540);
 
             search.Text = "no matching invented text";
             Assert.Contains(Find<TextBlock>(page), text => text.Text == "No matches");
@@ -67,7 +67,7 @@ public sealed class ClipboardSmokeTests
             var link = Assert.IsType<TextBox>(historyUi.Tile.Spec.InitialFocus!());
             Assert.Equal("Link", AutomationProperties.GetName(link));
             Assert.Equal("https://example.org/?utm_source=invented", link.Text);
-            IslandBounds.Check(panel, edge, 960, 540);
+            IslandBounds.Check(panel, corner, 960, 540);
             Assert.True(historyUi.Tile.Spec.HandleEscape!());
             Assert.Same(search, historyUi.Tile.Spec.InitialFocus!());
             Assert.False(panel.IsVisible);

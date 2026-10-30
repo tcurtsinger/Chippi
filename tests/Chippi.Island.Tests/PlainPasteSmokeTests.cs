@@ -41,21 +41,21 @@ public sealed class PlainPasteSmokeTests
             activities.CreatePublisher("fake-player").Publish(new IslandActivity("track", IslandActivityKind.Media, "Invented track", "Fake player"));
             key.Pressed!();
             Assert.Equal(1, hub.Calls); Assert.Equal(name is null ? 0 : 1, hub.Beeps);
-            var glyph = (LucideIcon)window.FindName("PlainPasteGlyph"); var tab = (Button)window.FindName("Tab");
+            // The chip: the feedback for 6 s, then the track again (its title and the music glyph: no session here, so no bars).
+            var glyph = window.GlyphIcon; var chip = window.Chip;
             if (name is null)
             {
-                Assert.Equal(Visibility.Collapsed, glyph.Visibility); Assert.Equal("Chippi", AutomationProperties.GetName(tab));
+                Assert.Same(LucideIcons.Music, glyph.Data); Assert.Equal("Invented track", AutomationProperties.GetName(chip));
             }
             else
             {
-                Assert.Equal(Visibility.Visible, glyph.Visibility); Assert.Equal(name, AutomationProperties.GetName(tab));
-                Assert.Equal(((SolidColorBrush)window.FindResource(caution ? "WarningBrush" : "IslandAccentBrush")).Color, ((SolidColorBrush)glyph.Brush).Color);
-                Assert.Equal(Visibility.Collapsed, ((FrameworkElement)window.FindName("Equalizer")).Visibility);
-                clock.Advance(TimeSpan.FromMilliseconds(5999)); Assert.Equal(Visibility.Visible, glyph.Visibility);
-                clock.Advance(TimeSpan.FromMilliseconds(1)); Assert.Equal(Visibility.Collapsed, glyph.Visibility);
-                Assert.Equal("Chippi", AutomationProperties.GetName(tab));
+                Assert.Same(LucideIcons.ClipboardType, glyph.Data); Assert.Equal(name, AutomationProperties.GetName(chip));
+                Assert.Equal(((SolidColorBrush)window.FindResource(caution ? "IslandCautionBrush" : "IslandAccentBrush")).Color, ((SolidColorBrush)glyph.Brush).Color);
+                clock.Advance(TimeSpan.FromMilliseconds(5999)); Assert.Same(LucideIcons.ClipboardType, glyph.Data);
+                clock.Advance(TimeSpan.FromMilliseconds(1)); Assert.Same(LucideIcons.Music, glyph.Data);
+                Assert.Equal("Invented track", AutomationProperties.GetName(chip));
             }
-            Assert.Equal(Visibility.Visible, ((FrameworkElement)window.FindName("Equalizer")).Visibility);
+            Assert.Equal(Visibility.Visible, chip.Visibility); Assert.Equal("Chippi", AutomationProperties.GetName(window.PuckButton));
             Assert.Single(activities.Activities); Assert.Equal("fake-player", activities.Activities[0].ModuleId);
             Assert.False(window.IsVisible); Assert.Equal(IntPtr.Zero, new System.Windows.Interop.WindowInteropHelper(window).Handle);
         }

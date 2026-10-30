@@ -22,10 +22,10 @@ namespace Chippi.Island.Tests;
 public sealed class ShelfSmokeTests
 {
     [Theory]
-    [InlineData(IslandEdge.Top)]
-    [InlineData(IslandEdge.Left)]
-    [InlineData(IslandEdge.Right)]
-    public void Shelf_drop_routes_through_the_panel_releases_the_hold_and_fits_the_island_on_a_960_by_540_screen(IslandEdge edge) => WpfTestThread.Run(() =>
+    [InlineData(Corner.BottomRight)]
+    [InlineData(Corner.TopLeft)]
+    [InlineData(Corner.TopRight)]
+    public void Shelf_drop_routes_through_the_panel_releases_the_hold_and_fits_the_island_on_a_960_by_540_screen(Corner corner) => WpfTestThread.Run(() =>
     {
         using var fixture = new Fixture();
         var panel = fixture.Window.Panel;
@@ -54,8 +54,8 @@ public sealed class ShelfSmokeTests
             for (int i = 0; i < 20; i++) fixture.Shelf.AddTextAsync($"Invented item {i}").GetAwaiter().GetResult();
             Call(page, "Refresh");
             Assert.IsType<Button>(fixture.Tile.Spec.InitialFocus!());
-            IslandBounds.Place(panel, edge, 960, 540);
-            IslandBounds.Check(panel, edge, 960, 540);
+            IslandBounds.Place(panel, corner, 960, 540);
+            IslandBounds.Check(panel, corner, 960, 540);
             Assert.False(panel.IsVisible);
             Assert.Equal(IntPtr.Zero, new System.Windows.Interop.WindowInteropHelper(panel).Handle);
         }
@@ -105,7 +105,7 @@ public sealed class ShelfSmokeTests
         window.SetMonitor(IslandNative.MonitorAt(new Point(0, 0)));
         window.SetTiles(fixture.Tiles);
         window.CursorAt = () => new Point(-30000, -30000);
-        var tab = (Button)window.FindName("Tab");
+        var tab = window.PuckButton;
         Assert.Equal(DragDropEffects.None, Raise(tab, DragDrop.DragEnterEvent).Effects);
         Assert.True(timers[IslandWindow.DragOpenDelay].Running);
         Assert.False(window.IsIslandOpen);
@@ -132,7 +132,7 @@ public sealed class ShelfSmokeTests
         var timers = Manual(window);
         window.Initialize(); window.SetMonitor(IslandNative.MonitorAt(new Point(0, 0)));
         window.SetTiles(fixture.Tiles); window.CursorAt = () => new Point(-30000, -30000);
-        Raise((Button)window.FindName("Tab"), DragDrop.DragEnterEvent);
+        Raise(window.PuckButton, DragDrop.DragEnterEvent);
         timers[IslandWindow.DragOpenDelay].Fire();
         Assert.True(window.IsIslandOpen);
         Raise(fixture.Page, DragDrop.DragEnterEvent);

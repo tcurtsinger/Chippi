@@ -106,7 +106,6 @@
     </LinearGradientBrush>
     <SolidColorBrush x:Key="IslandOnAccentBrush" Color="#170F2E" />
     <SolidColorBrush x:Key="IslandAccentTintBrush" Color="#24B79CFF" />
-    <DropShadowEffect x:Key="IslandShadow" Color="#000000" BlurRadius="24" ShadowDepth="8" Direction="270" Opacity="0.45" />
     <DropShadowEffect x:Key="IslandExpandedShadow" Color="#000000" BlurRadius="40" ShadowDepth="16" Direction="270" Opacity="0.5" />
     <DropShadowEffect x:Key="IslandThumbShadow" Color="#000000" BlurRadius="3" ShadowDepth="1" Direction="270" Opacity="0.3" />
 </ResourceDictionary>
