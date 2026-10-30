@@ -248,7 +248,7 @@ public sealed class VolumeView : UserControl
             bool muted = Level(key).Muted;
             percentage.Text = muted ? "Muted" : $"{Math.Round(slider.Value)}%";
             percentage.SetResourceReference(TextBlock.ForegroundProperty, muted ? "WarningTextBrush" : "IslandTextBrush");
-            if (muted) fill.Background = new SolidColorBrush(Color.FromArgb(71, 255, 255, 255));
+            if (muted) fill.SetResourceReference(Border.BackgroundProperty, "IslandMutedFillBrush");
             else fill.SetResourceReference(Border.BackgroundProperty, "IslandAccentBrush");
             fill.Height = Math.Max(0, bar.ActualHeight) * slider.Value / 100;
         }

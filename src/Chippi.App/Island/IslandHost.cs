@@ -215,9 +215,9 @@ public sealed class IslandHost : IDisposable
 
     /// <summary>
     /// Debug builds (<c>--island-pages &lt;dir&gt;</c>): with a fake media activity live, the island open on
-    /// Top (the only edge it docks on since 2026-10-29), on the grid and on every page, plus a page-to-page morph caught midway,
-    /// (s6-*.png). Use a
-    /// CHIPPI_DEV_PROFILE: the island settings it moves through are put back.
+    /// Top (the only edge it docks on since 2026-10-29), in the dark and the light theme, on the grid and on every
+    /// page, plus a page-to-page morph caught midway (s6-top-&lt;theme&gt;-*.png). Use a
+    /// CHIPPI_DEV_PROFILE: the island settings and the theme it moves through are put back.
     /// </summary>
     private async Task SaveIslandPagesAsync(string directory)
     {
@@ -228,32 +228,31 @@ public sealed class IslandHost : IDisposable
             Directory.CreateDirectory(directory);
             var settle = TimeSpan.FromMilliseconds(900);
             await _shell.ModulesReady; // their tiles and pages exist once they run
-            var color = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#202020");
             debug.Publish(new IslandActivity("media", IslandActivityKind.Media, "Weekend Mix", "Spotify"));
-            foreach (var edge in new[] { IslandEdge.Top })
+            foreach (var (theme, backdrop) in new[] { (ThemePreference.Dark, "#202020"), (ThemePreference.Light, "#F3F3F3") })
             {
-                UpdateSettings(s => (s.IslandEdge, s.IslandPlace, s.IslandLastPage) = (edge, 0.5, null));
+                Chippi.UI.Themes.ThemeManager.Apply(theme);
+                var color = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(backdrop);
+                string prefix = $"s6-top-{theme}".ToLowerInvariant();
+                UpdateSettings(s => (s.IslandEdge, s.IslandPlace, s.IslandLastPage) = (IslandEdge.Top, 0.5, null));
                 await Task.Delay(settle);
                 _window.ForceOpen(true);
                 await Task.Delay(settle);
-                _window.SaveScene(Path.Combine(directory, $"s6-{edge}-grid".ToLowerInvariant() + ".png"), color);
+                _window.SaveScene(Path.Combine(directory, $"{prefix}-grid.png"), color);
                 foreach (var key in _window.Panel.PageKeys())
                 {
                     await KeepOpenAsync(settle);
                     _window.Panel.ShowPage(key);
                     await Task.Delay(settle);
-                    _window.SaveScene(Path.Combine(directory, $"s6-{edge}-{key}".ToLowerInvariant() + ".png"), color);
+                    _window.SaveScene(Path.Combine(directory, $"{prefix}-{key}".ToLowerInvariant() + ".png"), color);
                 }
                 _window.Panel.ShowPage(null, remember: false);
                 await Task.Delay(settle);
-                _window.SaveScene(Path.Combine(directory, $"s6-{edge}-grid-back".ToLowerInvariant() + ".png"), color);
-                if (edge == IslandEdge.Top)
-                {
-                    _window.Panel.ShowPage(IslandPanelWindow.NowPlayingKey);
-                    await Task.Delay(110); // half of the 220ms morph
-                    _window.SaveScene(Path.Combine(directory, "s6-top-morph-midway.png"), color);
-                    await Task.Delay(settle);
-                }
+                _window.SaveScene(Path.Combine(directory, $"{prefix}-grid-back.png"), color);
+                _window.Panel.ShowPage(IslandPanelWindow.NowPlayingKey);
+                await Task.Delay(110); // half of the 220ms morph
+                _window.SaveScene(Path.Combine(directory, $"{prefix}-morph-midway.png"), color);
+                await Task.Delay(settle);
                 _window.ForceOpen(false);
                 await Task.Delay(settle);
             }
@@ -267,6 +266,7 @@ public sealed class IslandHost : IDisposable
         {
             _shell.Island.ClearModule(DebugModuleId);
             UpdateSettings(s => (s.IslandEdge, s.IslandPlace, s.IslandLastPage) = (original.IslandEdge, original.IslandPlace, original.IslandLastPage));
+            Chippi.UI.Themes.ThemeManager.Apply(original.Theme);
         }
     }
 

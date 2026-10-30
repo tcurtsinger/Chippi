@@ -17,9 +17,6 @@
     <Window.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <!-- The island stays dark in both themes (DESIGN.md §2): every themed key used inside it,
-                     including those in Chippi.UI control templates, resolves to its dark value here. -->
-                <ResourceDictionary Source="pack://application:,,,/Chippi.UI;component/Themes/Dark.xaml" />
                 <ResourceDictionary Source="pack://application:,,,/Chippi;component/Island/IslandStyles.xaml" />
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
@@ -28,8 +25,8 @@
     <Grid x:Name="Root">
         <Button x:Name="Tab" Style="{StaticResource IslandTabStyle}" AutomationProperties.Name="Chippi">
             <Grid x:Name="TabBody">
-                <Path x:Name="TabFill" Fill="{StaticResource IslandBrush}" />
-                <Path x:Name="TabStroke" Stroke="{StaticResource IslandTabBorderBrush}" StrokeThickness="1" IsHitTestVisible="False" />
+                <Path x:Name="TabFill" Fill="{DynamicResource IslandBrush}" />
+                <Path x:Name="TabStroke" Stroke="{DynamicResource IslandTabBorderBrush}" StrokeThickness="1" IsHitTestVisible="False" />
                 <!-- Gumdrop, then the live glyph beside it (top) or under it (sides). Decorative: the
                      button's name and help text carry the state (DESIGN.md §7 Accessibility). -->
                 <StackPanel x:Name="TabContent" HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False">
@@ -37,7 +34,7 @@
                     <!-- The song while music plays: title · artist, scrolling when it doesn't fit (IslandWindow.ShowSong). -->
                     <Canvas x:Name="Song" Height="16" Margin="8,0" ClipToBounds="True" VerticalAlignment="Center" Visibility="Collapsed">
                         <StackPanel x:Name="SongStrip" Orientation="Horizontal" TextElement.FontFamily="{StaticResource UiFont}" TextElement.FontSize="12"
-                                    TextElement.Foreground="{StaticResource IslandTextBrush}">
+                                    TextElement.Foreground="{DynamicResource IslandTextBrush}">
                             <StackPanel.RenderTransform>
                                 <TranslateTransform x:Name="SongMove" />
                             </StackPanel.RenderTransform>
@@ -52,23 +49,23 @@
                             <Rectangle Style="{StaticResource IslandEqualizerBarStyle}" Height="10" />
                         </StackPanel>
                         <Grid x:Name="Ring">
-                            <Ellipse Stroke="{StaticResource IslandTrackBrush}" StrokeThickness="2" />
+                            <Ellipse Stroke="{DynamicResource IslandTrackBrush}" StrokeThickness="2" />
                             <Path x:Name="RingArc" Stroke="{DynamicResource IslandAccentBrush}" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
                         </Grid>
                         <c:LucideIcon x:Name="FolderGlyph" Data="{x:Static c:LucideIcons.Folder}" Size="14" Thickness="2" Brush="{DynamicResource IslandAccentBrush}" />
                         <c:LucideIcon x:Name="PlainPasteGlyph" Data="{x:Static c:LucideIcons.ClipboardType}" Size="14" Thickness="2" Visibility="Collapsed" />
                         <c:LucideIcon x:Name="DropGlyph" Size="14" Thickness="2" Brush="{DynamicResource IslandAccentBrush}" Visibility="Collapsed" />
                         <Ellipse x:Name="Dot" Width="7" Height="7" Fill="{DynamicResource IslandAccentBrush}" />
-                        <Ellipse x:Name="CautionDot" Width="7" Height="7" Fill="{StaticResource WarningBrush}" />
+                        <Ellipse x:Name="CautionDot" Width="7" Height="7" Fill="{DynamicResource WarningBrush}" />
                     </Grid>
-                    <c:LucideIcon x:Name="MutedMicGlyph" Data="{x:Static c:LucideIcons.MicOff}" Size="14" Thickness="2" Brush="{StaticResource WarningBrush}" Visibility="Collapsed" HorizontalAlignment="Center" />
+                    <c:LucideIcon x:Name="MutedMicGlyph" Data="{x:Static c:LucideIcons.MicOff}" Size="14" Thickness="2" Brush="{DynamicResource WarningBrush}" Visibility="Collapsed" HorizontalAlignment="Center" />
                 </StackPanel>
             </Grid>
         </Button>
 
         <Popup x:Name="TabMenu" AllowsTransparency="True" StaysOpen="False" Placement="Bottom" VerticalOffset="8"
                PlacementTarget="{Binding ElementName=Tab}" PopupAnimation="None">
-            <Border Background="{StaticResource IslandBrush}" BorderBrush="{StaticResource IslandBorderBrush}" BorderThickness="1"
+            <Border Background="{DynamicResource IslandBrush}" BorderBrush="{DynamicResource IslandBorderBrush}" BorderThickness="1"
                     CornerRadius="8" Padding="4" MinWidth="200">
                 <StackPanel x:Name="TabMenuItems" TextElement.FontFamily="{StaticResource UiFont}" />
             </Border>

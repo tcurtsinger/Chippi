@@ -31,7 +31,7 @@ public partial class IslandPanelWindow : Window
     /// <summary>The shell's Now Playing tile, always on the grid.</summary>
     public const string NowPlayingKey = "now-playing";
 
-    private const double OpenRadius = 20;
+    private const double OpenRadius = 8; // the Windows 11 widget look
     private const double ShadowRoom = 40; // beside the shape, for its shadow
     private static readonly TimeSpan GrowTime = TimeSpan.FromMilliseconds(220);
     private static readonly TimeSpan ShrinkTime = TimeSpan.FromMilliseconds(160);
@@ -81,6 +81,10 @@ public partial class IslandPanelWindow : Window
             Orbit.Children.Add(_orbit[slot] = OrbitButton(slot));
         Card.Width = IslandPage.Width;
         Card.Height = IslandPage.Height;
+        PointSharedKeys();
+        EventHandler themeChanged = (_, _) => PointSharedKeys();
+        ThemeManager.ThemeChanged += themeChanged;
+        Closed += (_, _) => ThemeManager.ThemeChanged -= themeChanged;
 
         // The island grows over the tab: a press where the tab sits is the tab's (click or drag).
         // Any other press is the user clicking into the island: from then on it takes the keyboard.
@@ -156,6 +160,25 @@ public partial class IslandPanelWindow : Window
     }
 
     public void Initialize() => _hwnd = IslandNative.MakeNoActivate(this);
+
+    // Shared Chippi.UI templates inside the island (switches, segments) and module views ask for the app's
+    // accent and segment keys; here they get the island's, for the theme showing. (IslandStyles.xaml drops the
+    // segment shadow: a null set from code isn't stored.)
+    private static readonly (string Key, string Island)[] SharedKeys =
+    [
+        ("AccentBrush", "IslandAccentBrush"),
+        ("OnAccentBrush", "IslandOnAccentBrush"),
+        ("SegmentTroughBrush", "IslandButtonBrush"),
+        ("SegmentStrokeBrush", "IslandControlBorderBrush"),
+        ("SegmentActiveBgBrush", "IslandAccentFillBrush"),
+        ("SegmentActiveBrush", "IslandOnAccentBrush"),
+    ];
+
+    private void PointSharedKeys()
+    {
+        foreach (var (key, island) in SharedKeys)
+            Resources[key] = Application.Current?.TryFindResource(island);
+    }
 
     public void SetPetColor(PetColor color)
     {
@@ -248,10 +271,6 @@ public partial class IslandPanelWindow : Window
             return;
         }
         IsOpen = true;
-        // The island's local Dark.xaml carries the default accent; module views ask for AccentBrush,
-        // so it is pointed at the island accent (the dark shade of the user's choice) on every open.
-        if (Application.Current?.TryFindResource("IslandAccentBrush") is { } accent)
-            Resources["AccentBrush"] = accent;
         bool shrinking = IsVisible;
         if (_openOn is not null && Exists(_openOn))
             _page = _openOn;

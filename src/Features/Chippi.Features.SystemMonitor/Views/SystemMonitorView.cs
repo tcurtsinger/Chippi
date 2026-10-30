@@ -221,7 +221,7 @@ internal sealed class SystemMonitorView : UserControl
             _value.FontWeight = FontWeights.SemiBold; _value.TextAlignment = TextAlignment.Right;
             Grid.SetColumn(Detail, 1); Grid.SetColumn(_value, 2);
             var divider = new Border { Height = 1, VerticalAlignment = VerticalAlignment.Bottom };
-            divider.SetResourceReference(BackgroundProperty, settingsPage ? "BorderBrush" : "IslandPanelBrush"); Grid.SetColumnSpan(divider, 3);
+            divider.SetResourceReference(BackgroundProperty, settingsPage ? "BorderBrush" : "IslandHairBrush"); Grid.SetColumnSpan(divider, 3);
             Children.Add(divider); Children.Add(_name); Children.Add(Detail); Children.Add(_value);
         }
         public void Set(string detail, string value, bool caution, FrameworkElement? picker)
