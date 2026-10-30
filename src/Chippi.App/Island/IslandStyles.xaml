@@ -261,39 +261,6 @@
         </Setter>
     </Style>
 
-    <!-- Orbit buttons (DESIGN.md §5 Island, until panel chrome replaces them): 32px circles in the panel fill
-         with its edge and a 14px glyph; a hover or press wash on top; the active page's button gets an accent edge. -->
-    <DropShadowEffect x:Key="IslandOrbitShadow" Color="#000000" BlurRadius="20" ShadowDepth="8" Direction="270" Opacity="0.3" />
-    <Style x:Key="IslandOrbitButtonStyle" TargetType="{x:Type Button}">
-        <Setter Property="Width" Value="32" />
-        <Setter Property="Height" Value="32" />
-        <Setter Property="Foreground" Value="{DynamicResource IslandTextBrush}" />
-        <Setter Property="FocusVisualStyle" Value="{StaticResource IslandFocusVisual}" />
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="{x:Type Button}">
-                    <Grid>
-                        <Ellipse Fill="{DynamicResource IslandBrush}" Effect="{StaticResource IslandOrbitShadow}" />
-                        <Ellipse x:Name="Fill" Fill="{DynamicResource IslandBrush}" Stroke="{DynamicResource IslandTabBorderBrush}" StrokeThickness="1" />
-                        <Ellipse x:Name="Wash" Fill="Transparent" />
-                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
-                    </Grid>
-                    <ControlTemplate.Triggers>
-                        <Trigger Property="Tag" Value="Active">
-                            <Setter TargetName="Fill" Property="Stroke" Value="{DynamicResource IslandAccentBrush}" />
-                        </Trigger>
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Wash" Property="Fill" Value="{DynamicResource IslandHoverBrush}" />
-                        </Trigger>
-                        <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="Wash" Property="Fill" Value="{DynamicResource IslandPressedBrush}" />
-                        </Trigger>
-                    </ControlTemplate.Triggers>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
-    </Style>
-
     <!-- Grid tiles: they fill the body (IslandGrid), 6px corners, the control fill with a 1px edge. -->
     <Style x:Key="IslandTileStyle" TargetType="{x:Type Button}">
         <Setter Property="Foreground" Value="{DynamicResource IslandTextBrush}" />
