@@ -42,6 +42,9 @@ public sealed class NotificationsPageTests
                 page.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));
                 Assert.Contains("Pinger", Texts(page));
                 Assert.Contains("Ping", Texts(page));
+                // Away again before the features stop: the open's availability check, still running, then
+                // drops its result instead of rebuilding over stopping features on another test's turn.
+                page.RaiseEvent(new RoutedEventArgs(FrameworkElement.UnloadedEvent));
             });
         }
         finally

@@ -50,12 +50,28 @@ public sealed class LucideIcon : Viewbox
 
     public static readonly DependencyProperty BrushProperty = DependencyProperty.Register(
         nameof(Brush), typeof(Brush), typeof(LucideIcon),
-        new PropertyMetadata(Brushes.White, (d, e) => ((LucideIcon)d)._path.Stroke = (Brush?)e.NewValue));
+        new PropertyMetadata(Brushes.White, (d, _) => ((LucideIcon)d).Paint()));
 
     public Brush Brush
     {
         get => (Brush)GetValue(BrushProperty);
         set => SetValue(BrushProperty, value);
+    }
+
+    public static readonly DependencyProperty FilledProperty = DependencyProperty.Register(
+        nameof(Filled), typeof(bool), typeof(LucideIcon), new PropertyMetadata(false, (d, _) => ((LucideIcon)d).Paint()));
+
+    /// <summary>Fills the shapes with <see cref="Brush"/> as well: Now Playing's solid transport glyphs.</summary>
+    public bool Filled
+    {
+        get => (bool)GetValue(FilledProperty);
+        set => SetValue(FilledProperty, value);
+    }
+
+    private void Paint()
+    {
+        _path.Stroke = Brush;
+        _path.Fill = Filled ? Brush : null;
     }
 
     public static readonly DependencyProperty SizeProperty = DependencyProperty.Register(

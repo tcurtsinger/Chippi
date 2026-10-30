@@ -121,7 +121,7 @@ public sealed class FeaturePageShots
             panel.SetMedia(new FakeMedia());
             panel.SetTiles(tiles);
             panel.SetLastPage(null);
-            panel.Open(IslandEdge.Top, new Rect(-20000 + 960 - 68, 0, 136, 36), Area);
+            panel.Open(IslandGeometry.Start(Area.Work, 1), Area);
             Pump(TimeSpan.FromMilliseconds(400));
             panel.ShowPage(key);
             Pump(TimeSpan.FromMilliseconds(400));

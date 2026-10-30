@@ -23,15 +23,7 @@ public enum AccentChoice
     Pink,
 }
 
-/// <summary>The screen edge the island tab docks on (DESIGN.md §5 Island).</summary>
-public enum IslandEdge
-{
-    Top,
-    Left,
-    Right,
-}
-
-/// <summary>Gumdrop's body color (DESIGN.md §7). Synth is the gradient and the default.</summary>
+/// <summary>Chippi's body color (DESIGN.md §7). Synth is the default.</summary>
 public enum PetColor
 {
     Synth,
@@ -45,7 +37,7 @@ public enum PetColor
 /// <summary>Which display the island sits on.</summary>
 public enum IslandDisplay
 {
-    /// <summary>The display with the active window; the island moves as focus moves (DESIGN.md §5).</summary>
+    /// <summary>Retired 2026-10-29 (a widget you place yourself stays put); a saved one reads as <see cref="MainDisplay"/>.</summary>
     FollowActiveWindow,
 
     /// <summary>Always the Windows main display.</summary>
@@ -83,10 +75,15 @@ public sealed class AppSettings
     /// <summary>Settings › Island &amp; pet: no tray icon while the island shows. It comes back while the island is off or hidden for a fullscreen app.</summary>
     public bool HideTrayIcon { get; set; }
 
-    public IslandEdge IslandEdge { get; set; } = IslandEdge.Top;
+    /// <summary>
+    /// Where the widget sits on its display, 0 to 1 across the room it has in the work area (0 is flush
+    /// left), so a resolution change never moves it off screen. Null until it is dragged: then it
+    /// sits 24 in from the bottom-right corner.
+    /// </summary>
+    public double? IslandX { get; set; }
 
-    /// <summary>Where the tab sits along <see cref="IslandEdge"/>, 0 to 1 (0.5 is centered), so resolution changes don't move it.</summary>
-    public double IslandPlace { get; set; } = 0.5;
+    /// <summary>Like <see cref="IslandX"/>, top to bottom.</summary>
+    public double? IslandY { get; set; }
 
     /// <summary>Settings › Notifications master switch: off silences every Windows notification; each event's choice is kept.</summary>
     public bool WindowsNotices { get; set; } = true;
@@ -118,17 +115,8 @@ public sealed class AppSettings
     /// <summary>Settings › Island &amp; pet › Tiles: tile keys in the grid's order. Tiles not listed follow in their own order.</summary>
     public List<string>? IslandTileOrder { get; set; }
 
-    /// <summary>Tile keys left off the grid. Their pages stay, for a round button.</summary>
+    /// <summary>Tile keys left off the grid. Their pages stay.</summary>
     public List<string>? IslandHiddenTiles { get; set; }
-
-    /// <summary>The round button beside the island's left (top edge) or upper (side edge) pair: a tile key, "" for none, or null for its feature's own (Keep awake).</summary>
-    public string? IslandLeftButton { get; set; }
-
-    /// <summary>Likewise for the right or lower pair; null is its feature's own (App volume).</summary>
-    public string? IslandRightButton { get; set; }
-
-    /// <summary>Settings › Island &amp; pet › Live button: the round button for music or a muted mic.</summary>
-    public bool IslandLiveButton { get; set; } = true;
 
     /// <summary>Where the Settings window was and the page it showed when it last closed, which the next one reopens at; null until then.</summary>
     public WindowPlacement? SettingsWindow { get; set; }

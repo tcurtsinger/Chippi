@@ -9,7 +9,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Chippi.Features.KeepAwake.Tests;
 
-/// <summary>The flyout panel's paths: chips start a length without changing the default.</summary>
+/// <summary>The flyout panel's paths: chips start a length, and the home's button starts the last one.</summary>
 public sealed class KeepAwakeSessionTests : IAsyncLifetime
 {
     private readonly string _path = Path.Combine(Path.GetTempPath(), $"Chippi-session-{Guid.NewGuid():N}.json");
@@ -34,16 +34,22 @@ public sealed class KeepAwakeSessionTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task A_chip_starts_its_length_and_keeps_the_default()
+    public async Task A_chip_starts_its_length_and_the_home_button_starts_it_again()
     {
-        var oneHour = KeepAwakeText.Lengths.Single(l => l.Label == "1 hr").Length;
+        var twoHours = KeepAwakeText.Lengths.Single(l => l.Label == "2 hr").Length;
+        Assert.Equal(new KeepAwakeSettings(), _module.Settings); // 1 hr until a length is picked
 
-        await _module.StartSessionAsync(oneHour);
+        await _module.StartSessionAsync(twoHours);
 
         Assert.True(_module.IsOn);
-        Assert.True(KeepAwakeText.SameLength(oneHour, _module.Active!));
+        Assert.True(KeepAwakeText.SameLength(twoHours, _module.Active!));
         Assert.NotNull(_module.Deadline);
-        Assert.Equal(new KeepAwakeSettings(), _module.Settings);
+        Assert.True(KeepAwakeText.SameLength(twoHours, _module.Settings));
+
+        await _module.StopSessionAsync();
+        await _module.ToggleAsync();
+
+        Assert.True(KeepAwakeText.SameLength(twoHours, _module.Active!));
     }
 
     [Fact]

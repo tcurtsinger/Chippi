@@ -77,15 +77,6 @@ public sealed class IslandTileTests : IDisposable
     }
 
     [Fact]
-    public void Orbit_comes_from_whichever_part_sets_one()
-    {
-        var plain = new IslandTileContribution("a", Spec("t", "Tile", 0, 0));
-        var left = new IslandTileContribution("b", Spec("t", "Tile", 0, 1) with { Orbit = IslandOrbit.Left });
-
-        Assert.Equal(IslandOrbit.Left, IslandTileContribution.Group([plain, left]).Single().Orbit);
-    }
-
-    [Fact]
     public void A_feature_needs_nothing_outside_Chippi_by_default()
     {
         Assert.Null(FakeModule.Create("m").Descriptor.Requirement);

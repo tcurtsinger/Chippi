@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) Chippi contributors
-"""Generates Chippi's tray and app icon from Gumdrop's geometry (DESIGN.md section 7).
+"""Generates Chippi's tray and app icon from Chippi's geometry (DESIGN.md section 7).
 
 Writes Assets/chippi.ico next to this script: 16, 20, 24, 32, 40, 48, 64 and 256 px (BMP
 frames, PNG at 256). Chippi.App uses it as ApplicationIcon and as a WPF resource the tray
@@ -29,10 +29,10 @@ SHADOW_MIN = 64
 SUBROWS = 16
 
 # DESIGN.md section 7, on the 120x120 viewBox.
-BODY = "M60 16 C80 30 100 52 100 77 C100 98 82 108 60 108 C38 108 20 98 20 77 C20 52 40 30 60 16 Z"
+BODY = "M17 76 C17 45 36 31 60 31 C84 31 103 45 103 76 C103 98 87 106 60 106 C33 106 17 98 17 76 Z"
 BODY_BOUNDS = (20.0, 16.0, 100.0, 108.0)  # the gradient maps over the geometry's bounding box
-VIOLET = (0xB1, 0x5C, 0xF0)
-AZURE = (0x4D, 0x9B, 0xFF)
+VIOLET = (183, 143, 255)
+AZURE = (161, 125, 224)
 INK = (0x0B, 0x0F, 0x1F)
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
@@ -208,22 +208,12 @@ def render(size):
         scx, scy, srx, sry, salpha = SHADOW
         paint(ellipse(scx, scy, srx, sry), solid(BLACK), salpha)
     paint(parse_path(BODY), synth)
-    if small:
-        # Hinting: at 16-24 px an eye is only 2-4 px, so snap its center (by under half a pixel)
-        # to where its rounded width lands on whole pixels; otherwise the eyes smear into grey.
-        rx, ry = SMALL_EYE_RADII
-        for ex, ey in EYES:
-            px, py = to_px((ex, ey))
-            px = snap(px, 2 * rx * scale)
-            py = snap(py, 2 * ry * scale)
-            paint(ellipse(*to_view(px, py), rx, ry), solid(INK))
-    else:
-        shx, shy, shrx, shry, shrot, shalpha = SHINE
-        paint(ellipse(shx, shy, shrx, shry, shrot), solid(WHITE), shalpha)
-        for ex, ey in EYES:
-            paint(ellipse(ex, ey, *EYE_RADII), solid(INK))
-            paint(ellipse(ex + HIGHLIGHT_OFFSET[0], ey + HIGHLIGHT_OFFSET[1], HIGHLIGHT_R, HIGHLIGHT_R), solid(WHITE))
-        paint(stroke_quadratic(*MOUTH, MOUTH_WIDTH), solid(INK))
+    for ex in (47, 73):
+        paint(ellipse(ex, 66, 10.5, 12.5), solid(WHITE))
+        paint(ellipse(ex + 2, 68, 6, 6), solid(INK))
+        paint(ellipse(ex + 3.6, 65.6, 2, 2), solid(WHITE))
+    mouth = [(50 + 20*t/64, (1-t/64)**2*82 + 2*(1-t/64)*(t/64)*94 + (t/64)**2*82) for t in range(65)]
+    paint(mouth, solid(INK))
 
     return [tuple(int(round(min(max(v, 0.0), 255.0))) for v in px[:3]) + (int(round(px[3] * 255)),) for px in rgba]
 

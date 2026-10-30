@@ -21,7 +21,7 @@ namespace Chippi.App.Island;
 /// </summary>
 public sealed class IslandHost : IDisposable
 {
-    /// <summary>The Keep awake module's id; its Status activity makes Gumdrop wide awake.</summary>
+    /// <summary>The Keep awake module's id; its Status activity makes ChippiPet wide awake.</summary>
     public const string KeepAwakeModuleId = "keep-awake";
 
     private const string DebugModuleId = "debug";
@@ -69,12 +69,11 @@ public sealed class IslandHost : IDisposable
         StartMedia();
         _tracker.Changed += (_, _) =>
         {
-            _window.SetMonitor(_tracker.Monitor);
+            _window.SetMonitor(_tracker.Monitor, _tracker.ChosenMissing);
             _window.SetSuppressed(_tracker.FullscreenInFront);
         };
         _window.DisplayChanged += (_, _) => _tracker.OnDisplaysChanged();
         _window.PlacementChosen += OnPlacementChosen;
-        _window.DropRefused += (_, _) => _logger.LogInformation("Island drop refused: the taskbar's edge, the bottom or a corner");
 
         _shell.Island.Changed += (_, _) => ScheduleRefresh();
         _shell.Registry.Changed += (_, _) => _dispatcher.BeginInvoke(DispatcherPriority.Background, () =>
@@ -85,13 +84,13 @@ public sealed class IslandHost : IDisposable
         _shell.Island.Succeeded += (_, _) => _dispatcher.BeginInvoke(() => _window.Celebrate());
         _shell.Config.SectionChanged += OnSectionChanged;
 
-        // The tab's right click is the tray icon's menu, so Quit stays reachable with the icon hidden.
+        // The puck's right click is the tray icon's menu, so Quit stays reachable with the icon hidden.
         var menu = new List<(string Label, Action Action)?>();
         if (_shell.DebugMode)
             menu.AddRange([.. DebugMenu(), null]);
         menu.Add(("Open settings", () => _shell.Commands.OpenSettings()));
         menu.Add(("Quit", () => _shell.Commands.Quit()));
-        _window.SetTabMenu(menu);
+        _window.SetMenu(menu);
 
         LoadSettings();
         Refresh();
@@ -134,67 +133,50 @@ public sealed class IslandHost : IDisposable
     }
 
     /// <summary>
-    /// Debug builds (<c>--island-shots &lt;dir&gt;</c>): the closed tab on Top and Right at rest and with
-    /// a fake media activity live, each also swollen as if hovered, then the tab docked on Top, Left and Right with the island open, each scene in
-    /// both app themes (the island must look the same) with Follow Windows, Blue (the mockup's
-    /// default) and Violet. Then drops the tab on the taskbar's edge
-    /// and in the corners, which must be refused, and once on the top edge, which must be taken
-    /// (r5-drop-check.txt). Use a CHIPPI_DEV_PROFILE: it saves the island settings it moves through,
-    /// then puts them back.
+    /// Debug builds (<c>--island-shots &lt;dir&gt;</c>): the widget where it starts (bottom right of
+    /// its display), in the dark and the light theme: at rest, hovered, lifted as if dragged, with a
+    /// fake timer live, and with the panel open (r6-widget-&lt;theme&gt;-*.png). Then drops the puck
+    /// through the real drop path in each corner of the work area, past every edge and in the middle,
+    /// and checks it lands inside the work area with the panel inside too (r6-drop-check.txt). Use a
+    /// CHIPPI_DEV_PROFILE: the place, display and theme it moves through are put back.
     /// </summary>
     private async Task SaveIslandShotsAsync(string directory)
     {
         var original = _shell.Config.GetSection<AppSettings>(AppSettings.SectionName);
+        var debug = _shell.Island.CreatePublisher(DebugModuleId);
         try
         {
             Directory.CreateDirectory(directory);
-            var debug = _shell.Island.CreatePublisher(DebugModuleId);
             var settle = TimeSpan.FromMilliseconds(900);
             await _shell.ModulesReady; // their tiles and pages exist once they run
-            var media = new IslandActivity("media", IslandActivityKind.Media, "Weekend Mix", "Spotify") { Progress = 0.38 };
-            async Task SaveSwellAsync(string name, System.Windows.Media.Color color)
+            UpdateSettings(s => (s.IslandX, s.IslandY) = (null, null));
+            foreach (var (theme, backdrop) in new[] { (ThemePreference.Dark, "#202020"), (ThemePreference.Light, "#F3F3F3") })
             {
-                _window.ForceHover(true);
-                await Task.Delay(settle);
-                _window.SaveScene(Path.Combine(directory, name.ToLowerInvariant() + ".png"), color);
-                _window.ForceHover(false);
-                await Task.Delay(settle);
-            }
-            foreach (var accent in new[] { AccentChoice.FollowWindows, AccentChoice.Blue, AccentChoice.Violet })
-            {
-                UpdateSettings(s => s.Accent = accent);
-                foreach (var (theme, backdrop) in new[] { (ThemePreference.Dark, "#202020"), (ThemePreference.Light, "#F3F3F3") })
+                Chippi.UI.Themes.ThemeManager.Apply(theme);
+                var color = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(backdrop);
+                string prefix = $"r6-widget-{theme}".ToLowerInvariant();
+                async Task SaveAsync(string name)
                 {
-                    Chippi.UI.Themes.ThemeManager.Apply(theme);
-                    var color = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(backdrop);
-                    foreach (var edge in new[] { IslandEdge.Top, IslandEdge.Right })
-                    {
-                        UpdateSettings(s => (s.IslandEdge, s.IslandPlace) = (edge, 0.5));
-                        _shell.Island.ClearModule(DebugModuleId);
-                        await Task.Delay(settle);
-                        _window.SaveScene(Path.Combine(directory, $"r5-island-rest-{edge}-{theme}-{accent}".ToLowerInvariant() + ".png"), color);
-                        await SaveSwellAsync($"r5-island-rest-swell-{edge}-{theme}-{accent}", color);
-                        debug.Publish(media);
-                        await Task.Delay(settle);
-                        _window.SaveScene(Path.Combine(directory, $"r5-island-live-{edge}-{theme}-{accent}".ToLowerInvariant() + ".png"), color);
-                        await SaveSwellAsync($"r5-island-live-swell-{edge}-{theme}-{accent}", color);
-                    }
-                    foreach (var edge in new[] { IslandEdge.Top, IslandEdge.Left, IslandEdge.Right })
-                    {
-                        UpdateSettings(s => (s.IslandEdge, s.IslandPlace) = (edge, 0.5));
-                        await Task.Delay(settle);
-                        _window.ForceOpen(true);
-                        await Task.Delay(settle);
-                        string name = $"r5-island-{edge}-{theme}-{accent}".ToLowerInvariant();
-                        _window.SaveScene(Path.Combine(directory, name + ".png"), color);
-                        _window.ForceOpen(false);
-                    }
+                    await Task.Delay(settle);
+                    _window.SaveScene(Path.Combine(directory, $"{prefix}-{name}.png"), color);
                 }
+                _shell.Island.ClearModule(DebugModuleId);
+                await SaveAsync("rest");
+                _window.ForceHover(true);
+                await SaveAsync("hover");
+                _window.ForceHover(false);
+                _window.ForceLift(true);
+                await SaveAsync("lifted");
+                _window.ForceLift(false);
+                debug.Publish(new IslandActivity("timer", IslandActivityKind.Timer, "18:42", "Focus timer") { Progress = 0.4 });
+                await SaveAsync("timer");
+                _shell.Island.ClearModule(DebugModuleId);
+                _window.ForceOpen(true);
+                await SaveAsync("open");
+                _window.ForceOpen(false);
+                await Task.Delay(settle);
             }
-            _shell.Island.ClearModule(DebugModuleId);
-            UpdateSettings(s => (s.IslandEdge, s.IslandPlace) = (IslandEdge.Top, 0.5));
-            await Task.Delay(settle);
-            await File.WriteAllLinesAsync(Path.Combine(directory, "r5-drop-check.txt"), await DropCheckAsync());
+            await File.WriteAllLinesAsync(Path.Combine(directory, "r6-drop-check.txt"), await DropCheckAsync());
             _logger.LogInformation("Island snapshots saved to {Directory}", directory);
         }
         catch (Exception ex)
@@ -203,20 +185,20 @@ public sealed class IslandHost : IDisposable
         }
         finally
         {
+            _shell.Island.ClearModule(DebugModuleId);
             UpdateSettings(s =>
             {
-                (s.Accent, s.Theme, s.IslandEdge, s.IslandPlace) = (original.Accent, original.Theme, original.IslandEdge, original.IslandPlace);
+                (s.Theme, s.IslandX, s.IslandY) = (original.Theme, original.IslandX, original.IslandY);
                 (s.IslandDisplay, s.IslandMonitorId) = (original.IslandDisplay, original.IslandMonitorId);
             });
             Chippi.UI.Themes.ThemeManager.Apply(original.Theme);
         }
     }
-
     /// <summary>
-    /// Debug builds (<c>--island-pages &lt;dir&gt;</c>): with a fake media activity live, the island open on
-    /// Top, Left and Right, on the grid and on every page, plus a page-to-page morph caught midway,
-    /// (s6-*.png). Use a
-    /// CHIPPI_DEV_PROFILE: the island settings it moves through are put back.
+    /// Debug builds (<c>--island-pages &lt;dir&gt;</c>): with a fake media activity live, the panel open
+    /// from the widget where it starts (bottom right), in the dark and the light theme, on the home and
+    /// on every page, plus a page-to-page morph caught midway (s6-top-&lt;theme&gt;-*.png). Use a
+    /// CHIPPI_DEV_PROFILE: the place and the theme it moves through are put back.
     /// </summary>
     private async Task SaveIslandPagesAsync(string directory)
     {
@@ -227,32 +209,31 @@ public sealed class IslandHost : IDisposable
             Directory.CreateDirectory(directory);
             var settle = TimeSpan.FromMilliseconds(900);
             await _shell.ModulesReady; // their tiles and pages exist once they run
-            var color = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#202020");
             debug.Publish(new IslandActivity("media", IslandActivityKind.Media, "Weekend Mix", "Spotify"));
-            foreach (var edge in new[] { IslandEdge.Top, IslandEdge.Left, IslandEdge.Right })
+            foreach (var (theme, backdrop) in new[] { (ThemePreference.Dark, "#202020"), (ThemePreference.Light, "#F3F3F3") })
             {
-                UpdateSettings(s => (s.IslandEdge, s.IslandPlace, s.IslandLastPage) = (edge, 0.5, null));
+                Chippi.UI.Themes.ThemeManager.Apply(theme);
+                var color = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(backdrop);
+                string prefix = $"s6-top-{theme}".ToLowerInvariant();
+                UpdateSettings(s => (s.IslandX, s.IslandY, s.IslandLastPage) = (null, null, null));
                 await Task.Delay(settle);
                 _window.ForceOpen(true);
                 await Task.Delay(settle);
-                _window.SaveScene(Path.Combine(directory, $"s6-{edge}-grid".ToLowerInvariant() + ".png"), color);
+                _window.SaveScene(Path.Combine(directory, $"{prefix}-grid.png"), color);
                 foreach (var key in _window.Panel.PageKeys())
                 {
                     await KeepOpenAsync(settle);
                     _window.Panel.ShowPage(key);
                     await Task.Delay(settle);
-                    _window.SaveScene(Path.Combine(directory, $"s6-{edge}-{key}".ToLowerInvariant() + ".png"), color);
+                    _window.SaveScene(Path.Combine(directory, $"{prefix}-{key}".ToLowerInvariant() + ".png"), color);
                 }
                 _window.Panel.ShowPage(null, remember: false);
                 await Task.Delay(settle);
-                _window.SaveScene(Path.Combine(directory, $"s6-{edge}-grid-back".ToLowerInvariant() + ".png"), color);
-                if (edge == IslandEdge.Top)
-                {
-                    _window.Panel.ShowPage(IslandPanelWindow.NowPlayingKey);
-                    await Task.Delay(110); // half of the 220ms morph
-                    _window.SaveScene(Path.Combine(directory, "s6-top-morph-midway.png"), color);
-                    await Task.Delay(settle);
-                }
+                _window.SaveScene(Path.Combine(directory, $"{prefix}-grid-back.png"), color);
+                _window.Panel.ShowPage(IslandPanelWindow.NowPlayingKey);
+                await Task.Delay(110); // half of the 220ms morph
+                _window.SaveScene(Path.Combine(directory, $"{prefix}-morph-midway.png"), color);
+                await Task.Delay(settle);
                 _window.ForceOpen(false);
                 await Task.Delay(settle);
             }
@@ -265,7 +246,8 @@ public sealed class IslandHost : IDisposable
         finally
         {
             _shell.Island.ClearModule(DebugModuleId);
-            UpdateSettings(s => (s.IslandEdge, s.IslandPlace, s.IslandLastPage) = (original.IslandEdge, original.IslandPlace, original.IslandLastPage));
+            UpdateSettings(s => (s.IslandX, s.IslandY, s.IslandLastPage) = (original.IslandX, original.IslandY, original.IslandLastPage));
+            Chippi.UI.Themes.ThemeManager.Apply(original.Theme);
         }
     }
 
@@ -282,37 +264,43 @@ public sealed class IslandHost : IDisposable
         await Task.Delay(settle);
     }
 
-    /// <summary>Drops the tab at points on its monitor through the real drop path and reports what was taken.</summary>
+    /// <summary>
+    /// Drops the puck through the real drop path at points on its monitor (each corner of the work area,
+    /// past every edge, the middle) and checks that it, and the panel beside it, land inside the work area.
+    /// </summary>
     private async Task<List<string>> DropCheckAsync()
     {
         var lines = new List<string>();
         if (_window.CurrentArea is not { } area)
             return ["No monitor"];
         var (m, w, s) = (area.Monitor, area.Work, area.Scale);
-        var taskbar = IslandGeometry.TaskbarEdge(m, w);
-        lines.Add($"Monitor {m}, work area {w}, scale {s}, taskbar edge {taskbar?.ToString() ?? "none (auto-hide)"}");
-        var cases = new List<(string Name, Point Pointer, bool Expected)>
+        lines.Add($"Monitor {m}, work area {w}, scale {s}");
+        double half = IslandGeometry.Puck * s / 2;
+        var cases = new List<(string Name, Point Pointer)>
         {
-            ("Bottom edge, center", new(w.Left + w.Width / 2, w.Bottom - 2), false),
-            ("Top-left corner", new(w.Left + 4, w.Top + 4), false),
-            ("Top-right corner", new(w.Right - 4, w.Top + 4), false),
-            ("Top edge, 100 DIPs from the left end (inside the 160 margin)", new(w.Left + 100 * s, w.Top + 2), false),
-            ("Left edge, 30 DIPs from the bottom end (inside the 64 margin)", new(w.Left + 2, w.Bottom - 30 * s), false),
-            ("Right edge, 30 DIPs from the top end (inside the 64 margin)", new(w.Right - 2, w.Top + 30 * s), false),
+            ("Top-left corner", new(w.Left + half, w.Top + half)),
+            ("Top-right corner", new(w.Right - half, w.Top + half)),
+            ("Bottom-left corner", new(w.Left + half, w.Bottom - half)),
+            ("Bottom-right corner", new(w.Right - half, w.Bottom - half)),
+            ("Past the top edge", new(w.Left + w.Width / 3, w.Top - 40 * s)),
+            ("Past the left edge", new(w.Left - 40 * s, w.Top + w.Height / 3)),
+            ("Past the right edge", new(w.Right + 40 * s, w.Top + w.Height / 3)),
+            ("On the taskbar", new(w.Left + w.Width / 2, m.Bottom - 4)),
+            ("Middle", new(w.Left + w.Width / 2, w.Top + w.Height / 2)),
         };
-        if (taskbar is { } bar && bar != ScreenEdge.Bottom)
-            cases.Add(("Taskbar edge, center", bar switch
-            {
-                ScreenEdge.Top => new(w.Left + w.Width / 2, w.Top + 2),
-                ScreenEdge.Left => new(w.Left + 2, w.Top + w.Height / 2),
-                _ => new(w.Right - 2, w.Top + w.Height / 2),
-            }, false));
-        cases.Add(("Top edge, center (control)", new(w.Left + w.Width / 2, w.Top + 2), taskbar != ScreenEdge.Top));
-        foreach (var (name, pointer, expected) in cases)
+        foreach (var (name, pointer) in cases)
         {
-            bool taken = _window.DropAt(pointer);
+            var puck = _window.DropAt(pointer);
             await Task.Delay(400);
-            lines.Add($"{(taken == expected ? "PASS" : "FAIL")}  {name} at ({pointer.X:0},{pointer.Y:0}): {(taken ? "taken" : "refused")}");
+            _window.ForceOpen(true);
+            await Task.Delay(400);
+            var panel = _window.Panel.Footprint;
+            _window.ForceOpen(false);
+            await Task.Delay(300);
+            // A point past an edge can be on the display beside it: the puck goes there, inside that work area.
+            var landed = (_window.CurrentArea ?? area).Work;
+            bool inside = landed.Contains(puck) && landed.Contains(panel);
+            lines.Add($"{(inside ? "PASS" : "FAIL")}  {name} at ({pointer.X:0},{pointer.Y:0}): work area {landed}, puck {puck}, panel {panel}");
         }
         return lines;
     }
@@ -320,7 +308,7 @@ public sealed class IslandHost : IDisposable
 
     /// <summary>
     /// Now Playing reads Windows' media sessions; while one plays it is the island's media activity
-    /// (the tab's equalizer, the live orbit button), opening Now Playing.
+    /// (the tab's equalizer), opening Now Playing.
     /// </summary>
     private void StartMedia()
     {
@@ -339,6 +327,7 @@ public sealed class IslandHost : IDisposable
                 publisher.Clear("track");
         };
         _window.SetMedia(media);
+        _window.SetLevel(new TabLevel(Chippi.Features.Sound.SoundAudio.Get(_logger)));
         _ = media.StartAsync();
     }
 
@@ -369,7 +358,7 @@ public sealed class IslandHost : IDisposable
     {
         var settings = _shell.Config.GetSection<AppSettings>(AppSettings.SectionName);
         _window.SetPetColor(settings.PetColor);
-        _window.SetPlacement(settings.IslandEdge, settings.IslandPlace);
+        _window.SetPlacement(settings.IslandX, settings.IslandY);
         _window.SetLastPage(settings.IslandLastPage);
         _window.SetLayout(IslandLayout.From(settings));
         _window.SetEnabled(settings.IslandEnabled);
@@ -377,23 +366,23 @@ public sealed class IslandHost : IDisposable
     }
 
     /// <summary>
-    /// Saves where the tab was dropped. A drop on another display than the island's switches the
+    /// Saves where the widget was dropped. A drop on another display than the widget's switches the
     /// display setting to that one monitor (DESIGN.md §5); otherwise the setting stays as it was.
     /// </summary>
     private void OnPlacementChosen(object? sender, IslandPlacementEventArgs e)
     {
-        string? monitorId = e.Monitor == _tracker.Monitor ? null : Displays.Connected().FirstOrDefault(d => d.Handle == e.Monitor)?.Id;
+        string? monitorId = e.Monitor == _tracker.Monitor && !_tracker.ChosenMissing ? null : Displays.Connected().FirstOrDefault(d => d.Handle == e.Monitor)?.Id;
         UpdateSettings(s =>
         {
-            s.IslandEdge = e.Edge;
-            s.IslandPlace = e.Place;
+            s.IslandX = e.X;
+            s.IslandY = e.Y;
             if (monitorId is not null)
             {
                 s.IslandDisplay = IslandDisplay.SpecificMonitor;
                 s.IslandMonitorId = monitorId;
             }
         });
-        _logger.LogInformation("Island docked on {Edge} at {Place:0.###}{Display}", e.Edge, e.Place, monitorId is null ? "" : " on another display (now One monitor)");
+        _logger.LogInformation("Widget dropped at {X:0.###}, {Y:0.###}{Display}", e.X, e.Y, monitorId is null ? "" : " on another display (now One monitor)");
     }
 
     private void OnSectionChanged(object? sender, ConfigSectionChangedEventArgs e)

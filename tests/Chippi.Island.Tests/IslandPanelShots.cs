@@ -38,18 +38,23 @@ public sealed class IslandPanelShots
                 Sessions = [new MediaTrack("Spotify.exe", "Spotify", "Weekend Mix", "Various Artists", true, true, true, true, true, true,
                     TimeSpan.FromSeconds(72), TimeSpan.FromSeconds(232), DateTimeOffset.Now, null)],
             };
+            // The home as the mock shows it: eight buttons, Keep awake on, the volume slider.
+            var mic = Section("sound", "Sound", 10, 220, status: "Live");
+            var micSpec = mic.Spec with { Toggle = new IslandTileToggle(() => false, () => { }, "Microphone", "Mic", () => "Live"), Volume = new IslandTileVolume(() => 0.62, _ => { }) };
+            var awake = Section("keep-awake", "Keep awake", 40, 96, status: "1 hr left");
+            var awakeSpec = awake.Spec with { Toggle = new IslandTileToggle(() => true, () => { }) };
+            var awakeTile = new IslandTileContribution("keep-awake", awakeSpec);
+            awakeTile.SetStatus("1 hr left");
             var tiles = Tiles(
-                Section("sound", "Sound", 10, 220, status: "Mic muted"),
-                Section("sound.mixer", "App volume", 20, 200, IslandOrbit.Right, status: "4 apps"),
-                Section("keep-awake", "Keep awake", 40, 96, IslandOrbit.Left, status: "1 hr left"),
-                Section("downloads", "File organizer", 50, 120, status: "Auto"));
-            var muted = new IslandActivity("muted", IslandActivityKind.Status, "Microphone", "Muted") { NeedsAttention = true, TileKey = "sound" };
-            foreach (var (edge, tab) in new[]
-            {
-                (IslandEdge.Top, new Rect(-20000 + 960 - 68, 0, 136, 36)),
-                (IslandEdge.Left, new Rect(-20000, 516 - 68, 36, 136)),
-                (IslandEdge.Right, new Rect(-20000 + 1920 - 36, 516 - 68, 36, 136)),
-            })
+                new IslandTileContribution("sound", micSpec),
+                Section("sound.mixer", "App volume", 20, 200, status: "4 apps"),
+                awakeTile,
+                Section("downloads", "File organizer", 50, 120, status: "Auto"),
+                Section("system-monitor", "System monitor", 60, 120, status: "CPU 12%"),
+                Section("clipboard", "Clipboard", 70, 120, status: "23 items"),
+                Section("scratchpad", "Scratchpad", 80, 120, status: "4 notes"),
+                Section("shelf", "Shelf", 90, 120, status: "5 items"));
+            foreach (var edge in new[] { Corner.BottomRight, Corner.TopLeft })
             {
                 var panel = new IslandPanelWindow();
                 try
@@ -57,9 +62,9 @@ public sealed class IslandPanelShots
                     panel.Initialize();
                     panel.SetMedia(media);
                     panel.SetTiles(tiles);
-                    panel.SetActivities([muted], PetMood.Idle);
+                    panel.SetActivities([], PetMood.Idle);
                     panel.SetLastPage(null);
-                    panel.Open(edge, tab, Area);
+                    panel.Open(IslandBounds.Puck(edge, Area.Work), Area);
                     Pump(TimeSpan.FromMilliseconds(500));
                     Save(panel, Path.Combine(folder, $"{edge}-grid.png".ToLowerInvariant()));
                     foreach (var key in panel.PageKeys())
@@ -71,11 +76,11 @@ public sealed class IslandPanelShots
                     panel.ShowPage(null, remember: false);
                     Pump(TimeSpan.FromMilliseconds(500));
                     Save(panel, Path.Combine(folder, $"{edge}-grid-with-back.png".ToLowerInvariant()));
-                    if (edge == IslandEdge.Top)
+                    if (edge == Corner.BottomRight)
                     {
                         panel.ShowPage(IslandPanelWindow.NowPlayingKey);
                         Pump(TimeSpan.FromMilliseconds(110));
-                        Save(panel, Path.Combine(folder, "top-morph-midway.png"));
+                        Save(panel, Path.Combine(folder, "bottomright-morph-midway.png"));
                     }
                 }
                 finally
@@ -87,16 +92,13 @@ public sealed class IslandPanelShots
     }
 
     // A stand-in section: a card of the given height (the island draws the page's name above it).
-    private static IslandTileContribution Section(string key, string name, int order, double height, IslandOrbit orbit = IslandOrbit.None, string status = "")
+    private static IslandTileContribution Section(string key, string name, int order, double height, string status = "")
     {
         var part = new IslandTileContribution(key, new IslandTileSpec(key, name, Icon(key), order, 0, () =>
         {
             return new Border { Height = height, CornerRadius = new CornerRadius(8), Background = new SolidColorBrush(Color.FromArgb(0x0F, 0xFF, 0xFF, 0xFF)),
                 Child = new TextBlock { Text = $"{name} section", Foreground = Brushes.Gray, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center } };
-        })
-        {
-            Orbit = orbit,
-        });
+        }));
         part.SetStatus(status);
         return part;
     }
@@ -106,6 +108,10 @@ public sealed class IslandPanelShots
         "sound" => "AudioLines",
         "sound.mixer" => "Sliders",
         "keep-awake" => "Coffee",
+        "system-monitor" => "Activity",
+        "clipboard" => "ClipboardList",
+        "scratchpad" => "NotebookPen",
+        "shelf" => "Inbox",
         _ => "Folder",
     };
 

@@ -3,186 +3,174 @@
 
 using System.Windows;
 using Chippi.App.Island;
-using Chippi.Core.Config;
 
 namespace Chippi.Island.Tests;
 
-/// <summary>DESIGN.md §5 Island: where the tab docks, what a drop is refused, and where the island opens.</summary>
+/// <summary>DESIGN.md §5: where the widget starts, how its place is saved, where a drop lands, and where the panel opens.</summary>
 public sealed class IslandGeometryTests
 {
-    // 1920×1080 with a 48px taskbar at the bottom.
+    // 1920×1080, with a 48px taskbar on the edge each test names.
     private static readonly Rect Monitor = new(0, 0, 1920, 1080);
-    private static readonly Rect Work = new(0, 0, 1920, 1032);
 
-    [Fact]
-    public void A_drop_near_the_top_docks_on_top_where_it_was_dropped()
+    public enum Taskbar
     {
-        var snap = IslandGeometry.Snap(new Point(960, 10), Monitor, Work, 1);
-        Assert.Equal((IslandEdge.Top, 0.5), snap);
+        Bottom,
+        Top,
+        Left,
+        Right,
+        Hidden,
     }
 
-    [Theory]
-    [InlineData(5, 500, IslandEdge.Left)]
-    [InlineData(1910, 500, IslandEdge.Right)]
-    public void A_drop_near_a_side_docks_on_that_side(double x, double y, IslandEdge edge)
+    private static Rect Work(Taskbar taskbar, Rect? monitor = null, double scale = 1)
     {
-        var snap = IslandGeometry.Snap(new Point(x, y), Monitor, Work, 1);
-        Assert.Equal(edge, snap?.Edge);
-        Assert.Equal((500 - 76) / (1032 - 152.0), snap!.Value.Place, 6);
-    }
-
-    [Theory]
-    [InlineData(960, 1030)] // the bottom, where the taskbar is
-    [InlineData(960, 1079)] // on the taskbar itself
-    [InlineData(4, 4)] // top-left corner
-    [InlineData(1916, 4)] // top-right corner
-    [InlineData(159, 2)] // top edge, inside the 160px end margin
-    [InlineData(1761, 2)]
-    [InlineData(2, 75)] // left edge, inside the 76px end margin
-    [InlineData(2, 970)]
-    [InlineData(1918, 40)] // right edge, inside the margin
-    public void Drops_on_the_taskbar_edge_the_bottom_or_a_corner_are_refused(double x, double y) =>
-        Assert.Null(IslandGeometry.Snap(new Point(x, y), Monitor, Work, 1));
-
-    [Fact]
-    public void The_end_margins_are_inclusive()
-    {
-        Assert.Equal((IslandEdge.Top, 0.0), IslandGeometry.Snap(new Point(160, 2), Monitor, Work, 1));
-        Assert.Equal((IslandEdge.Top, 1.0), IslandGeometry.Snap(new Point(1760, 2), Monitor, Work, 1));
-        Assert.Equal((IslandEdge.Left, 0.0), IslandGeometry.Snap(new Point(2, 76), Monitor, Work, 1));
-    }
-
-    [Fact]
-    public void Margins_scale_with_the_monitor()
-    {
-        // At 150%, the top margin is 240 physical pixels.
-        Assert.Null(IslandGeometry.Snap(new Point(239, 2), Monitor, Work, 1.5));
-        Assert.Equal(0.0, IslandGeometry.Snap(new Point(240, 2), Monitor, Work, 1.5)!.Value.Place);
-    }
-
-    [Fact]
-    public void A_taskbar_on_the_left_refuses_the_left_edge()
-    {
-        var work = new Rect(48, 0, 1872, 1080);
-        Assert.Equal(ScreenEdge.Left, IslandGeometry.TaskbarEdge(Monitor, work));
-        Assert.Null(IslandGeometry.Snap(new Point(50, 540), Monitor, work, 1));
-        Assert.Null(IslandGeometry.Snap(new Point(960, 1078), Monitor, work, 1)); // the bottom is never a dock
-        Assert.Equal(IslandEdge.Right, IslandGeometry.Snap(new Point(1918, 540), Monitor, work, 1)?.Edge);
-    }
-
-    [Fact]
-    public void A_taskbar_on_top_refuses_the_top_edge()
-    {
-        var work = new Rect(0, 48, 1920, 1032);
-        Assert.Equal(ScreenEdge.Top, IslandGeometry.TaskbarEdge(Monitor, work));
-        Assert.Null(IslandGeometry.Snap(new Point(960, 50), Monitor, work, 1));
-    }
-
-    [Fact]
-    public void A_saved_edge_the_taskbar_has_since_taken_docks_on_top()
-    {
-        var work = new Rect(0, 0, 1872, 1080); // taskbar moved to the right
-        Assert.Equal(IslandEdge.Top, IslandGeometry.Docked(IslandEdge.Right, Monitor, work));
-        Assert.Equal(new Point(960 - 24, 0), IslandGeometry.Anchor(IslandEdge.Right, 0.5, Monitor, work, 1));
-        Assert.Equal(IslandEdge.Left, IslandGeometry.Docked(IslandEdge.Left, Monitor, work));
-    }
-
-    [Fact]
-    public void An_auto_hidden_taskbar_takes_no_edge()
-    {
-        Assert.Null(IslandGeometry.TaskbarEdge(Monitor, Monitor));
-        Assert.Equal(IslandEdge.Left, IslandGeometry.Snap(new Point(2, 540), Monitor, Monitor, 1)?.Edge);
-    }
-
-    [Theory]
-    [InlineData(IslandEdge.Top, 0.0)]
-    [InlineData(IslandEdge.Top, 0.37)]
-    [InlineData(IslandEdge.Left, 1.0)]
-    [InlineData(IslandEdge.Right, 0.81)]
-    public void A_saved_place_survives_a_round_trip_on_a_scaled_monitor_left_of_the_main_one(IslandEdge edge, double place)
-    {
-        var monitor = new Rect(-2560, 0, 2560, 1440);
-        var work = new Rect(-2560, 0, 2560, 1380);
-        var anchor = IslandGeometry.Anchor(edge, place, monitor, work, 1.5);
-        var snap = IslandGeometry.Snap(anchor, monitor, work, 1.5);
-        Assert.Equal(edge, snap?.Edge);
-        Assert.Equal(place, snap!.Value.Place, 6);
-    }
-
-    [Fact]
-    public void A_bad_saved_place_docks_in_the_middle()
-    {
-        Assert.Equal(new Point(960, 0), IslandGeometry.Anchor(IslandEdge.Top, double.NaN, Monitor, Work, 1));
-        Assert.Equal(new Point(1760, 0), IslandGeometry.Anchor(IslandEdge.Top, 7, Monitor, Work, 1));
-    }
-
-    [Fact]
-    public void The_tab_is_96_by_28_at_rest_and_120_by_32_live_turned_on_the_sides()
-    {
-        Assert.Equal(new Size(96, 28), IslandGeometry.TabSize(IslandEdge.Top, live: false));
-        Assert.Equal(new Size(120, 32), IslandGeometry.TabSize(IslandEdge.Top, live: true));
-        Assert.Equal(new Size(28, 96), IslandGeometry.TabSize(IslandEdge.Left, live: false));
-        Assert.Equal(new Size(32, 120), IslandGeometry.TabSize(IslandEdge.Right, live: true));
-    }
-
-    [Fact]
-    public void A_swollen_tab_is_16px_longer_and_4px_deeper()
-    {
-        Assert.Equal(new Size(112, 32), IslandGeometry.TabSize(IslandEdge.Top, live: false, swollen: true));
-        Assert.Equal(new Size(136, 36), IslandGeometry.TabSize(IslandEdge.Top, live: true, swollen: true));
-        Assert.Equal(new Size(32, 112), IslandGeometry.TabSize(IslandEdge.Left, live: false, swollen: true));
-        Assert.Equal(new Size(36, 136), IslandGeometry.TabSize(IslandEdge.Right, live: true, swollen: true));
-    }
-
-    [Theory]
-    [InlineData(IslandEdge.Top)]
-    [InlineData(IslandEdge.Left)]
-    [InlineData(IslandEdge.Right)]
-    public void At_either_end_of_an_edge_every_tab_size_stays_inside_the_work_area(IslandEdge edge)
-    {
-        foreach (double scale in new[] { 1.0, 1.5 })
-        foreach (double place in new[] { 0.0, 1.0 })
-        foreach (bool live in new[] { false, true })
-        foreach (bool swollen in new[] { false, true })
+        var m = monitor ?? Monitor;
+        double bar = 48 * scale;
+        return taskbar switch
         {
-            var size = IslandGeometry.TabSize(edge, live, swollen);
-            var tab = IslandGeometry.TabRect(edge, IslandGeometry.Anchor(edge, place, Monitor, Work, scale), new Size(size.Width * scale, size.Height * scale));
-            Assert.True(Work.Contains(tab), $"{edge} {place} live={live} swollen={swollen} x{scale}: {tab}");
+            Taskbar.Top => new Rect(m.Left, m.Top + bar, m.Width, m.Height - bar),
+            Taskbar.Left => new Rect(m.Left + bar, m.Top, m.Width - bar, m.Height),
+            Taskbar.Right => new Rect(m.Left, m.Top, m.Width - bar, m.Height),
+            Taskbar.Hidden => m,
+            _ => new Rect(m.Left, m.Top, m.Width, m.Height - bar),
+        };
+    }
+
+    private static readonly Size Panel = new(520, 360);
+
+    [Theory]
+    [InlineData(Taskbar.Bottom)]
+    [InlineData(Taskbar.Top)]
+    [InlineData(Taskbar.Left)]
+    [InlineData(Taskbar.Right)]
+    [InlineData(Taskbar.Hidden)]
+    public void It_starts_24_in_from_the_work_areas_bottom_right_corner_whatever_edge_the_taskbar_is_on(Taskbar taskbar)
+    {
+        var work = Work(taskbar);
+        foreach (var start in new[] { IslandGeometry.Start(work, 1), IslandGeometry.PuckRect(null, null, work, 1) })
+        {
+            Assert.Equal(new Rect(work.Right - 24 - 50, work.Bottom - 24 - 50, 50, 50), start);
+            Assert.True(work.Contains(start));
         }
     }
 
     [Fact]
-    public void The_tab_sits_flat_against_its_edge_centered_on_its_place()
+    public void Where_it_starts_the_panel_opens_up_and_left_with_the_puck_on_its_lower_right_corner()
     {
-        Assert.Equal(new Rect(918, 0, 84, 26), IslandGeometry.TabRect(IslandEdge.Top, new Point(960, 0), new Size(84, 26)));
-        Assert.Equal(new Rect(0, 458, 26, 84), IslandGeometry.TabRect(IslandEdge.Left, new Point(0, 500), new Size(26, 84)));
-        Assert.Equal(new Rect(1894, 458, 26, 84), IslandGeometry.TabRect(IslandEdge.Right, new Point(1920, 500), new Size(26, 84)));
+        var work = Work(Taskbar.Bottom);
+        var puck = IslandGeometry.Start(work, 1);
+        var origin = IslandGeometry.PanelOrigin(puck, Panel, work, 1);
+        var panel = new Rect(origin, Panel);
+        Assert.Equal(puck.Left, panel.Right); // beside it, as in the mock
+        Assert.Equal(puck.Bottom - 20, panel.Bottom);
+        Assert.Equal(new Rect(1920 - 74 - 520, 1032 - 44 - 360, 520, 360), panel);
+    }
+
+    /// <summary>The puck flush in each corner, with a taskbar on each edge: the panel opens toward the middle and stays 8 inside.</summary>
+    public static TheoryData<Corner, Taskbar> EveryCornerAndTaskbar()
+    {
+        var data = new TheoryData<Corner, Taskbar>();
+        foreach (var corner in Enum.GetValues<Corner>())
+            foreach (var taskbar in Enum.GetValues<Taskbar>())
+                data.Add(corner, taskbar);
+        return data;
+    }
+
+    [Theory]
+    [MemberData(nameof(EveryCornerAndTaskbar))]
+    public void In_every_corner_the_panel_opens_toward_the_middle_and_stays_inside_the_work_area(Corner corner, Taskbar taskbar)
+    {
+        var work = Work(taskbar);
+        var puck = IslandBounds.Puck(corner, work);
+        Assert.True(work.Contains(puck));
+        bool right = corner is Corner.TopRight or Corner.BottomRight, bottom = corner is Corner.BottomLeft or Corner.BottomRight;
+        Assert.Equal(right ? work.Right : work.Left, right ? puck.Right : puck.Left);
+        Assert.Equal(bottom ? work.Bottom : work.Top, bottom ? puck.Bottom : puck.Top);
+
+        var panel = new Rect(IslandGeometry.PanelOrigin(puck, Panel, work, 1), Panel);
+        Assert.Equal(right, IslandGeometry.OpensLeft(puck, work));
+        Assert.Equal(bottom, IslandGeometry.OpensUp(puck, work));
+        Assert.Equal(right ? puck.Left : puck.Right, right ? panel.Right : panel.Left); // beside the puck, never over it
+        var inside = work;
+        inside.Inflate(-8, -8);
+        Assert.True(inside.Contains(panel), $"{panel} not inside {inside}");
     }
 
     [Fact]
-    public void The_island_grows_out_of_the_tab_flat_on_the_same_edge()
+    public void On_a_screen_too_small_for_the_panel_beside_it_the_panel_stays_inside_and_the_puck_stays_on_top()
     {
-        var panel = new Size(328, 300);
-        var top = new Rect(918, 0, 84, 26);
-        Assert.Equal(new Point(796, 0), IslandGeometry.PanelOrigin(IslandEdge.Top, top, panel, Work, 1));
-        var left = new Rect(0, 458, 26, 84);
-        Assert.Equal(new Point(0, 350), IslandGeometry.PanelOrigin(IslandEdge.Left, left, panel, Work, 1));
-        var right = new Rect(1894, 458, 26, 84);
-        Assert.Equal(new Point(1920 - 328, 350), IslandGeometry.PanelOrigin(IslandEdge.Right, right, panel, Work, 1));
+        var work = new Rect(0, 0, 960, 492);
+        var puck = IslandGeometry.PuckRect(0.5, 0.5, work, 1);
+        var panel = new Rect(IslandGeometry.PanelOrigin(puck, Panel, work, 1), Panel);
+        var inside = work;
+        inside.Inflate(-8, -8);
+        Assert.True(inside.Contains(panel));
+    }
+
+    [Theory]
+    [InlineData(0.0, 0.0)]
+    [InlineData(1.0, 1.0)]
+    [InlineData(0.25, 0.8)]
+    public void A_saved_place_survives_a_round_trip_on_a_scaled_monitor_left_of_the_main_one(double x, double y)
+    {
+        var monitor = new Rect(-2880, -200, 2880, 1620);
+        var work = Work(Taskbar.Bottom, monitor, 1.5);
+        var puck = IslandGeometry.PuckRect(x, y, work, 1.5);
+        Assert.Equal(75, puck.Width);
+        Assert.True(work.Contains(puck));
+        var (fx, fy) = IslandGeometry.Fractions(puck, work);
+        Assert.Equal(x, fx, 9);
+        Assert.Equal(y, fy, 9);
     }
 
     [Fact]
-    public void The_island_stays_8px_inside_the_ends_of_its_edge()
+    public void A_resolution_change_keeps_the_puck_on_screen_at_the_same_fractions()
     {
-        var panel = new Size(328, 300);
-        // A left tab near the top end: centering would put the island above the screen.
-        var left = new Rect(0, 22, 26, 84);
-        Assert.Equal(8, IslandGeometry.PanelOrigin(IslandEdge.Left, left, panel, Work, 1).Y);
-        // A top tab at the end of the 160 margin at 200%: centering would cross the left edge.
-        var top = new Rect(320 - 84, 0, 168, 52);
-        Assert.Equal(16, IslandGeometry.PanelOrigin(IslandEdge.Top, top, new Size(656, 600), Work, 2).X);
-        // A right tab near the bottom end.
-        var right = new Rect(1894, 900, 26, 84);
-        Assert.Equal(1032 - 8 - 300, IslandGeometry.PanelOrigin(IslandEdge.Right, right, panel, Work, 1).Y);
+        var big = Work(Taskbar.Bottom);
+        var (x, y) = IslandGeometry.Fractions(new Rect(1700, 900, 50, 50), big);
+        var small = new Rect(0, 0, 1280, 672);
+        var puck = IslandGeometry.PuckRect(x, y, small, 1);
+        Assert.True(small.Contains(puck));
+        var (fx, fy) = IslandGeometry.Fractions(puck, small);
+        Assert.Equal(x, fx, 9);
+        Assert.Equal(y, fy, 9);
+    }
+
+    [Theory]
+    [InlineData(double.NaN, 0.5)]
+    [InlineData(0.5, double.PositiveInfinity)]
+    public void A_bad_saved_place_starts_at_the_bottom_right(double x, double y)
+    {
+        var work = Work(Taskbar.Bottom);
+        Assert.Equal(IslandGeometry.Start(work, 1), IslandGeometry.PuckRect(x, y, work, 1));
+    }
+
+    [Fact]
+    public void A_saved_place_out_of_range_is_kept_on_screen()
+    {
+        var work = Work(Taskbar.Bottom);
+        Assert.Equal(new Rect(1870, 0, 50, 50), IslandGeometry.PuckRect(7, -3, work, 1));
+    }
+
+    [Theory]
+    [InlineData(-30, 500, 0, 500)] // past the left edge
+    [InlineData(1900, 500, 1870, 500)] // past the right edge
+    [InlineData(800, -20, 800, 0)] // past the top
+    [InlineData(800, 1060, 800, 982)] // on the taskbar
+    [InlineData(-30, 1060, 0, 982)] // past a corner
+    [InlineData(800, 500, 800, 500)] // inside: stays put
+    public void A_drop_slides_the_least_distance_that_keeps_all_of_the_puck_inside(double x, double y, double expectedX, double expectedY)
+    {
+        var placed = IslandGeometry.Inside(new Rect(x, y, 50, 50), Work(Taskbar.Bottom));
+        Assert.Equal(new Rect(expectedX, expectedY, 50, 50), placed);
+    }
+
+    [Fact]
+    public void Sizes_scale_with_the_monitor()
+    {
+        var work = Work(Taskbar.Bottom);
+        var start = IslandGeometry.Start(work, 2);
+        Assert.Equal(new Rect(1920 - 48 - 100, 1032 - 48 - 100, 100, 100), start);
+        var panel = new Rect(IslandGeometry.PanelOrigin(start, new Size(1040, 720), work, 2), new Size(1040, 720));
+        Assert.Equal(start.Bottom - 40, panel.Bottom);
     }
 }

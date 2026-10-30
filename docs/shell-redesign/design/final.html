@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>Chippi Shell Final</title>
+<style>
+*{box-sizing:border-box}
+:root{--pad:16px}
+body{margin:0;padding:32px;width:1912px;font-family:'Segoe UI Variable Text','Segoe UI',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+/* Light: Windows acrylic, violet accent. */
+body.light{--board:#E9E6E1;--doc:#1A1A1A;--cap:#4A4A4A;--lbl:#6B6B6B;
+  --wall:radial-gradient(ellipse 60% 45% at 76% 104%,rgba(238,146,66,.5),transparent 70%),radial-gradient(ellipse at 10% 0%,#FFFFFF,transparent 60%),linear-gradient(180deg,#F5F3F0,#E5DFD8);
+  --panel:rgba(245,245,246,.86);--pborder:rgba(0,0,0,.08);--pshadow:0 32px 64px rgba(0,0,0,.2),0 2px 21px rgba(0,0,0,.14);
+  --card:rgba(255,255,255,.74);--cborder:rgba(0,0,0,.06);--ctl:rgba(255,255,255,.86);--ctlb:rgba(0,0,0,.09);--hover:rgba(0,0,0,.045);
+  --tx:#1A1A1A;--t2:#5C5C5C;--t3:#8A8A8A;--hair:rgba(0,0,0,.08);--track:#8A8A8A;--foot:rgba(0,0,0,.035);
+  --ac:#7444F0;--acfill:linear-gradient(135deg,#8F5CFF,#5B86FF);--onac:#FFFFFF;--actint:rgba(116,68,240,.10);--caution:#C42B1C;--thumbring:#FFFFFF}
+/* Dark: Windows dark acrylic, the lighter violet as accent with dark text on it. */
+body.dark{--board:#1C1C1F;--doc:#F2F2F2;--cap:#B9B9B9;--lbl:#9A9A9A;
+  --wall:radial-gradient(ellipse 60% 45% at 76% 104%,rgba(122,72,210,.42),transparent 70%),radial-gradient(ellipse at 10% 0%,#2B3550,transparent 60%),linear-gradient(180deg,#151A26,#0E1018);
+  --panel:rgba(40,40,44,.84);--pborder:rgba(255,255,255,.09);--pshadow:0 32px 64px rgba(0,0,0,.5),0 2px 21px rgba(0,0,0,.4);
+  --card:rgba(255,255,255,.05);--cborder:rgba(255,255,255,.06);--ctl:rgba(255,255,255,.07);--ctlb:rgba(255,255,255,.09);--hover:rgba(255,255,255,.06);
+  --tx:#FFFFFF;--t2:#C9C9C9;--t3:#9A9A9A;--hair:rgba(255,255,255,.08);--track:#9A9A9A;--foot:rgba(255,255,255,.035);
+  --ac:#B79CFF;--acfill:linear-gradient(135deg,#B78FFF,#82AEFF);--onac:#170F2E;--actint:rgba(183,156,255,.14);--caution:#FF99A4;--thumbring:#454545}
+body{background:var(--board);color:var(--doc)}
+h1.doc{font:700 26px 'Segoe UI Variable Display','Segoe UI';margin:0 0 6px}
+p.cap{margin:0 0 24px;max-width:1240px;font-size:14px;line-height:1.5;color:var(--cap)}
+.grid3{display:grid;grid-template-columns:repeat(3,600px);gap:22px 24px}
+.lbl{font:600 11px 'Segoe UI';text-transform:uppercase;letter-spacing:.06em;color:var(--lbl);margin:0 0 6px}
+.desk{position:relative;width:600px;height:404px;border-radius:10px;overflow:hidden;background:var(--wall)}
+.abs{position:absolute}
+.ic{fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;display:block;flex:none}
+.fl{fill:currentColor;stroke:currentColor;stroke-width:1.2;stroke-linejoin:round;display:block;flex:none}
+.row{display:flex;align-items:center}
+.grow{flex:1;min-width:0}
+.cut{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.num{font-variant-numeric:tabular-nums}
+.foot{margin-top:18px;font-size:12px;color:var(--lbl)}
+
+.panel{position:absolute;left:20px;top:20px;width:520px;height:360px;border-radius:8px;background:var(--panel);backdrop-filter:blur(30px) saturate(1.8);
+  border:1px solid var(--pborder);box-shadow:var(--pshadow);color:var(--tx);display:flex;flex-direction:column;overflow:hidden;font-size:13px}
+.pb{flex:1;padding:12px var(--pad) 14px;display:flex;flex-direction:column;min-height:0}
+.hd{height:32px;gap:6px;flex:none}
+.hd .back{width:28px;height:28px;border-radius:4px;display:grid;place-items:center;color:var(--t2);margin-left:-6px}
+.hd .name{font-size:14px;font-weight:600}
+.hd .st{margin-left:auto;font-size:12px;color:var(--t3)}
+.hd .ibtn{width:30px;height:30px;border-radius:4px;display:grid;place-items:center;color:var(--t2)}
+.hd .ibtn.on{background:var(--actint);color:var(--ac)}
+.bd{flex:1;min-height:0;margin-top:8px;position:relative}
+.card{border-radius:6px;background:var(--card);border:1px solid var(--cborder)}
+.btn{height:28px;min-width:64px;padding:0 12px;border-radius:4px;background:var(--ctl);border:1px solid var(--ctlb);font-size:12px;display:inline-flex;align-items:center;justify-content:center;gap:6px;flex:none;color:var(--tx)}
+.btn.ac{background:var(--acfill);border-color:transparent;color:var(--onac);font-weight:600}
+.slider{position:relative;height:4px;border-radius:2px;background:var(--track)}
+.slider .f{position:absolute;left:0;top:0;bottom:0;border-radius:2px;background:var(--acfill)}
+.slider .k{position:absolute;top:50%;width:18px;height:18px;margin:-9px 0 0 -9px;border-radius:50%;background:var(--thumbring);box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.slider .k:after{content:"";position:absolute;inset:4px;border-radius:50%;background:var(--ac)}
+.ft{height:46px;flex:none;background:var(--foot);border-top:1px solid var(--hair);padding:0 10px 0 var(--pad);gap:8px;font-size:12px}
+.ft .gear{width:32px;height:32px;border-radius:4px;display:grid;place-items:center;color:var(--t2)}
+
+/* Home */
+.media{height:68px;padding:8px 10px 8px 8px;gap:12px;flex:none}
+.media .src{font-size:11px;color:var(--t3);gap:5px}
+.media .t{font-size:14px;font-weight:600}.media .a{font-size:12px;color:var(--t2)}
+.tb{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;color:var(--tx)}
+.tb.main{width:36px;height:36px;background:var(--acfill);color:var(--onac)}
+.qgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px 10px;margin-top:12px}
+.qb{height:44px;border-radius:6px;background:var(--ctl);border:1px solid var(--ctlb);display:flex;align-items:stretch;overflow:hidden;color:var(--tx)}
+.qb .main{flex:1;display:grid;place-items:center}
+.qb .side{width:28px;display:grid;place-items:center;border-left:1px solid var(--ctlb);color:var(--t2)}
+.qb.on{background:var(--acfill);border-color:transparent;color:var(--onac)}
+.qb.on .side{border-left-color:rgba(255,255,255,.28);color:var(--onac)}
+.ql{font-size:12px;margin-top:5px;text-align:center}
+.qs{font-size:11px;color:var(--t3);text-align:center;margin-top:1px}
+.vol{gap:12px;height:32px;margin-top:auto;padding:0 2px}
+.vol .pct{font-size:12px;width:30px;color:var(--t2)}
+
+/* Now Playing */
+.np{gap:16px;align-items:stretch}
+.np .meta{display:flex;flex-direction:column;min-width:0;flex:1}
+.np .t{font-size:20px;font-weight:600;line-height:26px;margin-top:-6px}
+.np .a{font-size:13px;color:var(--t2);margin-top:2px}
+.np .tr{margin-top:auto;gap:18px;justify-content:center;margin-bottom:-2px}
+.np .play{width:52px;height:52px;border-radius:50%;background:var(--acfill);color:var(--onac);display:grid;place-items:center;box-shadow:0 6px 16px rgba(116,68,240,.35)}
+.times{gap:10px;margin-top:22px;font-size:11px;color:var(--t3)}
+.cover{border-radius:6px;box-shadow:0 0 0 1px var(--hair),0 6px 18px rgba(0,0,0,.18)}
+
+/* Sound */
+.cols2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.clbl{font-size:12px;font-weight:600;color:var(--t3);margin:2px 0 6px}
+.c44{height:44px;padding:0 6px 0 10px;gap:8px}
+.radio{width:14px;height:14px;border-radius:50%;border:1px solid var(--t3);flex:none}
+.radio.on{border:4px solid var(--ac);background:var(--onac)}
+.rr{height:30px;gap:10px;padding:0 10px;border-radius:4px;font-size:12px}
+.rr.on{background:var(--actint)}
+.switch{width:34px;height:18px;border-radius:9px;background:var(--acfill);position:relative;flex:none}
+.switch:after{content:"";position:absolute;right:3px;top:3px;width:12px;height:12px;border-radius:50%;background:var(--onac)}
+.meter{height:4px;border-radius:2px;background:var(--hair);position:relative;margin-top:6px}
+.meter i{position:absolute;inset:0 auto 0 0;border-radius:2px;background:var(--acfill)}
+
+/* App volume */
+.strips{display:flex;justify-content:center;gap:8px;height:100%}
+.strip{width:62px;display:flex;flex-direction:column;align-items:center;gap:6px;padding:6px 0}
+.vbar{width:32px;flex:1;border-radius:6px;background:var(--ctl);border:1px solid var(--ctlb);position:relative;overflow:hidden}
+.vbar i{position:absolute;left:0;right:0;bottom:0;background:var(--acfill)}
+.vbar.muted i{background:rgba(255,255,255,.55)}
+body.light .vbar.muted i{background:rgba(0,0,0,.18)}
+.appic{width:24px;height:24px;border-radius:6px;display:grid;place-items:center;font:700 10px 'Segoe UI';color:#fff}
+.sname{font-size:11px;text-align:center;line-height:13px;height:26px;color:var(--t2)}
+.spct{font-size:12px}
+
+/* Keep awake */
+.ka{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;height:100%;align-content:center}
+.kc{height:104px;border-radius:6px;background:var(--ctl);border:1px solid var(--ctlb);display:grid;place-items:center;font-size:14px}
+.kc.on{background:var(--acfill);border-color:transparent;color:var(--onac);font-weight:600}
+
+/* File organizer */
+.seg{display:flex;border-radius:4px;border:1px solid var(--ctlb);overflow:hidden;background:var(--ctl);flex:none}
+.seg span{height:26px;padding:0 10px;display:grid;place-items:center;font-size:12px}
+.seg span.on{background:var(--acfill);color:var(--onac);font-weight:600}
+.fr{height:30px;gap:10px;padding:0 6px 0 10px;border-bottom:1px solid var(--hair);font-size:12px}
+.fr .to{color:var(--t3);font-size:11px}
+.lnk{color:var(--ac);font-size:12px;font-weight:600}
+
+/* System monitor */
+.mr{height:28px;gap:10px;padding:0 10px;border-bottom:1px solid var(--hair);font-size:12px}
+.mr:last-child{border-bottom:0}
+.mr .n{width:80px;color:var(--t3);flex:none}
+.mr .d{color:var(--t3);font-size:11px}
+.mr .v{font-weight:600;text-align:right}
+.dg{display:grid;grid-template-columns:80px 1fr 1fr 1fr;align-items:center;padding:0 10px;font-size:12px}
+.dg.h{height:24px;font-size:11px;color:var(--t3);border-bottom:1px solid var(--hair)}
+.dg.r{height:28px;border-bottom:1px solid var(--hair)}
+.dg.r:last-child{border-bottom:0}
+.dg .v{text-align:right;font-weight:600}.dg.h .v{font-weight:400}
+
+/* Clipboard */
+.search{height:28px;border-radius:4px;background:var(--ctl);border:1px solid var(--ctlb);border-bottom:1px solid var(--t3);gap:8px;padding:0 8px;color:var(--t3);font-size:12px}
+.glbl{height:22px;font-size:11px;font-weight:600;color:var(--t3);display:flex;align-items:flex-end;padding:0 4px 3px}
+.cr{height:30px;gap:10px;padding:0 8px;border-radius:4px;font-size:12px;color:var(--tx)}
+.cr .tm{color:var(--t3);font-size:11px;flex:none}
+.cr .gl{color:var(--t2)}
+.open{border-radius:6px;background:var(--actint);padding:0 8px 8px}
+.open .prev{font-size:12px;line-height:17px;color:var(--t2);padding:0 0 0 26px}
+.thumb{width:32px;height:20px;border-radius:3px;background:linear-gradient(135deg,#3F86AC,#1E2226);flex:none}
+
+/* Scratchpad */
+.tabs{height:30px;gap:2px;border-bottom:1px solid var(--hair);flex:none}
+.tab{height:30px;padding:0 10px;display:grid;place-items:center;font-size:12px;color:var(--t2);position:relative}
+.tab.on{color:var(--tx);font-weight:600}
+.tab.on:after{content:"";position:absolute;left:10px;right:10px;bottom:-1px;height:3px;border-radius:2px;background:var(--ac)}
+.editor{flex:1;margin-top:8px;padding:10px 12px;font-size:13px;line-height:20px;color:var(--tx)}
+.editor .h{font-weight:700}.editor .m{color:var(--t3)}
+.caret{display:inline-block;width:1.5px;height:15px;background:var(--ac);vertical-align:-2px}
+
+/* Shelf */
+.tiles{display:grid;grid-template-columns:repeat(6,76px);gap:6px;justify-content:space-between}
+.sti{height:66px;border-radius:6px;display:flex;flex-direction:column;align-items:center;padding-top:7px;gap:5px;font-size:11px;line-height:13px;text-align:center;color:var(--tx);position:relative}
+.sti.sel{background:var(--actint);box-shadow:inset 0 0 0 1px var(--ac)}
+.sti .slot{height:20px;display:grid;place-items:center;color:var(--t2)}
+.sti .pin{position:absolute;top:4px;right:6px;color:var(--ac)}
+
+/* Widget */
+.puck{width:50px;height:50px;border-radius:50%;background:var(--panel);backdrop-filter:blur(24px) saturate(1.6);border:1px solid var(--pborder);box-shadow:0 4px 14px rgba(0,0,0,.18);display:grid;place-items:center;position:relative;flex:none}
+.wchip{height:36px;padding:0 12px 0 6px;border-radius:8px;background:var(--panel);backdrop-filter:blur(24px) saturate(1.6);border:1px solid var(--pborder);box-shadow:0 4px 14px rgba(0,0,0,.16);gap:8px;font-size:12px;color:var(--tx)}
+.wchip b{font-weight:600}.wchip span{color:var(--t2)}
+.bars{display:flex;align-items:flex-end;gap:2px;height:14px}
+.bars i{display:block;width:3px;border-radius:2px;background:var(--acfill)}
+.badge{position:absolute;right:-3px;bottom:-1px;width:18px;height:18px;border-radius:50%;display:grid;place-items:center;color:#fff;background:#C42B1C;box-shadow:0 0 0 2px var(--board)}
+.wl{font-size:11px;color:var(--t3);margin-top:8px}
+body.dark .wl{color:#AEB3C2}
+body.light .wl{color:#6B6B6B}
+</style></head>
+<body class="light">
+
+<svg width="0" height="0" style="position:absolute"><defs>
+  <radialGradient id="pet" cx=".36" cy=".28" r=".85"><stop offset="0" stop-color="#D2BEFF"/><stop offset=".55" stop-color="#9C6CFF"/><stop offset="1" stop-color="#6A3FD9"/></radialGradient>
+  <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0B2236"/><stop offset=".58" stop-color="#3F86AC"/><stop offset=".6" stop-color="#9FC6D6"/></linearGradient>
+</defs>
+  <symbol id="play" viewBox="0 0 24 24"><polygon points="6 3 20 12 6 21 6 3"/></symbol>
+  <symbol id="pause" viewBox="0 0 24 24"><rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/></symbol>
+  <symbol id="back" viewBox="0 0 24 24"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" x2="5" y1="19" y2="5"/></symbol>
+  <symbol id="fwd" viewBox="0 0 24 24"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" x2="19" y1="5" y2="19"/></symbol>
+  <symbol id="chevl" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+  <symbol id="chevr" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+  <symbol id="chevd" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="music" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></symbol>
+  <symbol id="volume" viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></symbol>
+  <symbol id="volmute" viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="22" x2="16" y1="9" y2="15"/><line x1="16" x2="22" y1="9" y2="15"/></symbol>
+  <symbol id="sliders" viewBox="0 0 24 24"><line x1="21" x2="14" y1="4" y2="4"/><line x1="10" x2="3" y1="4" y2="4"/><line x1="21" x2="12" y1="12" y2="12"/><line x1="8" x2="3" y1="12" y2="12"/><line x1="21" x2="16" y1="20" y2="20"/><line x1="12" x2="3" y1="20" y2="20"/><line x1="14" x2="14" y1="2" y2="6"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="16" x2="16" y1="18" y2="22"/></symbol>
+  <symbol id="coffee" viewBox="0 0 24 24"><path d="M10 2v2"/><path d="M14 2v2"/><path d="M6 2v2"/><path d="M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1"/></symbol>
+  <symbol id="folder" viewBox="0 0 24 24"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></symbol>
+  <symbol id="activity" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></symbol>
+  <symbol id="cliplist" viewBox="0 0 24 24"><rect width="8" height="4" x="8" y="2" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></symbol>
+  <symbol id="notepen" viewBox="0 0 24 24"><path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4"/><path d="M2 6h4"/><path d="M2 10h4"/><path d="M2 14h4"/><path d="M2 18h4"/><path d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/></symbol>
+  <symbol id="inbox" viewBox="0 0 24 24"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></symbol>
+  <symbol id="mic" viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></symbol>
+  <symbol id="micoff" viewBox="0 0 24 24"><line x1="2" x2="22" y1="2" y2="22"/><path d="M18.89 13.23A7.12 7.12 0 0 0 19 12v-2"/><path d="M5 10v2a7 7 0 0 0 12 5"/><path d="M15 9.34V5a3 3 0 0 0-5.68-1.33"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12"/><line x1="12" x2="12" y1="19" y2="22"/></symbol>
+  <symbol id="wave" viewBox="0 0 24 24"><path d="M2 13a2 2 0 0 0 2-2V7a2 2 0 0 1 4 0v13a2 2 0 0 0 4 0V4a2 2 0 0 1 4 0v13a2 2 0 0 0 4 0v-4a2 2 0 0 1 2-2"/></symbol>
+  <symbol id="gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></symbol>
+  <symbol id="link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></symbol>
+  <symbol id="pausest" viewBox="0 0 24 24"><rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/></symbol>
+  <symbol id="more" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></symbol>
+  <symbol id="search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+  <symbol id="pin" viewBox="0 0 24 24"><line x1="12" x2="12" y1="17" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/></symbol>
+  <symbol id="trash" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></symbol>
+  <symbol id="copy" viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></symbol>
+  <symbol id="file" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></symbol>
+  <symbol id="text" viewBox="0 0 24 24"><path d="M17 6.1H3"/><path d="M21 12.1H3"/><path d="M15.1 18H3"/></symbol>
+  <symbol id="image" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></symbol>
+  <symbol id="plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+  <symbol id="down" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></symbol>
+  <symbol id="up" viewBox="0 0 24 24"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></symbol>
+</svg>
+
+<h1 class="doc" id="title"></h1>
+<p class="cap">The blob lives on the desktop wherever you drag it; clicking it opens this 520 × 360 panel toward the middle of the screen. Windows materials that follow light and dark mode, Segoe UI Variable, 8px corners, and the pet's violet as the accent (the blob's color follows the pet color picked in Settings). Home works like Windows Quick Settings; every page has a back arrow to it. Page content and rules are today's (DESIGN.md §5), restyled. Clean URL stays inside Clipboard, as it is now.</p>
+<div class="grid3" id="grid"></div>
+<p class="foot">Stand-in cover; track from your screenshot. Clipboard text, files, apps, devices and readings are invented sample values.</p>
+
+<script>
+const dark = new URLSearchParams(location.search).get('theme') === 'dark';
+document.body.className = dark ? 'dark' : 'light';
+document.getElementById('title').textContent = `Chippi's new shell: final mock, ${dark ? 'dark' : 'light'}`;
+
+const ic = (id, s, cls = 'ic') => `<svg width="${s}" height="${s}" class="${cls}"><use href="#${id}"/></svg>`;
+const gl = (id, s) => ic(id, s, 'fl');
+const INK = '#1B1530';
+// The pet: Mochi's body, Jelly's face, no blush.
+function pet(size, mood = 'idle') {
+  const stroke = (d) => `<path d="${d}" fill="none" stroke="${INK}" stroke-width="3.2" stroke-linecap="round"/>`;
+  const big = (x) => `<ellipse cx="${x}" cy="66" rx="9" ry="10.5" fill="#fff"/><circle cx="${x + 2}" cy="68" r="5" fill="${INK}"/><circle cx="${x + 3.6}" cy="65.6" r="1.7" fill="#fff"/>`;
+  const shut = (x) => stroke(`M${x - 7} 67 Q${x} 72 ${x + 7} 67`);
+  const happy = (x) => stroke(`M${x - 7} 70 Q${x} 63 ${x + 7} 70`);
+  const eyes = mood === 'idle' ? big(46) + big(74) : mood === 'sleepy' ? shut(46) + shut(74) : happy(46) + happy(74);
+  const mouth = mood === 'sleepy' ? `<ellipse cx="60" cy="85" rx="3.5" ry="3" fill="${INK}"/>` : `<path d="M50 82 Q60 94 70 82 Z" fill="${INK}"/><path d="M55 87 Q60 91 65 87" fill="#FF7FA8"/>`;
+  const z = mood === 'sleepy' ? `<text x="90" y="30" font-family="Segoe UI Variable Display,Segoe UI" font-weight="700" font-size="17" fill="#8A82A8">z</text><text x="101" y="18" font-family="Segoe UI Variable Display,Segoe UI" font-weight="700" font-size="11" fill="#8A82A8">z</text>` : '';
+  const phones = mood === 'music' ? `<path d="M19 70 C19 19 101 19 101 70" fill="none" stroke="#2A2440" stroke-width="5" stroke-linecap="round"/><rect x="12" y="59" width="13" height="23" rx="5.5" fill="#2A2440"/><rect x="15" y="63" width="5" height="15" rx="2.5" fill="#D2BEFF"/><rect x="95" y="59" width="13" height="23" rx="5.5" fill="#2A2440"/><rect x="102" y="63" width="5" height="15" rx="2.5" fill="#D2BEFF"/>` : '';
+  return `<svg width="${size}" height="${size}" viewBox="0 0 120 120" style="display:block;overflow:visible;flex:none"><ellipse cx="60" cy="111" rx="36" ry="4.5" fill="rgba(0,0,0,.16)"/>
+    <path d="M17 76 C17 45 36 31 60 31 C84 31 103 45 103 76 C103 98 87 106 60 106 C33 106 17 98 17 76 Z" fill="url(#pet)"/>${eyes}${mouth}${z}${phones}</svg>`;
+}
+const cover = (s, r) => `<svg width="${s}" height="${s}" viewBox="0 0 100 100" class="cover" style="display:block;border-radius:${r}px;flex:none">
+  <rect width="100" height="100" fill="url(#sky)"/><path d="M0 64 L18 58 L34 66 L52 60 L70 68 L100 62 V100 H0Z" fill="#1E2226"/>
+  <rect x="22" y="58.6" width="60" height="1.2" fill="#FF9A5A"/><path d="M50 30 l9 5.2 v10.4 l-9 5.2 l-9 -5.2 v-10.4z" fill="none" stroke="rgba(255,255,255,.75)" stroke-width="1"/>
+  <rect x="52" y="54" width="2.2" height="7" fill="#E5562E"/></svg>`;
+const bars = `<div class="bars"><i style="height:8px"></i><i style="height:14px"></i><i style="height:10px"></i></div>`;
+const slider = (p) => `<div class="slider grow"><div class="f" style="width:${p}%"></div><div class="k" style="left:${p}%"></div></div>`;
+const panel = (inner) => `<div class="panel">${inner}</div>`;
+const page = (name, right, body) => panel(`<div class="pb"><div class="hd row"><div class="back">${ic('chevl', 16)}</div><span class="name">${name}</span>${right}</div><div class="bd">${body}</div></div>`);
+const st = (t) => `<span class="st">${t}</span>`;
+const slot = (label, desk) => `<div><div class="lbl">${label}</div><div class="desk">${desk}</div></div>`;
+
+/* ---------- Widget states ---------- */
+const widgets = `
+  <div class="abs" style="left:28px;top:34px"><div class="puck">${pet(36, 'sleepy')}</div><div class="wl">Asleep: nothing going on</div></div>
+  <div class="abs" style="left:300px;top:34px"><div class="row" style="gap:6px"><div class="puck">${pet(36, 'music')}</div><div class="wchip row">${cover(24, 4)}<div class="cut" style="max-width:150px"><b>A Moment Apart</b> <span>· ODESZA</span></div>${bars}</div></div><div class="wl">Music: the song beside it, bars following the sound</div></div>
+  <div class="abs" style="left:28px;top:180px"><div class="row" style="gap:6px"><div class="puck">${pet(36)}<div class="badge">${ic('micoff', 11)}</div></div><div class="wchip row"><span style="color:var(--ac);display:grid">${ic('coffee', 15)}</span><b>1 hr left</b></div></div><div class="wl">Keep awake running, mic muted (the red badge)</div></div>
+  <div class="abs" style="left:300px;top:168px"><div class="puck" style="transform:scale(1.12) rotate(-6deg);box-shadow:0 14px 30px rgba(0,0,0,.28)">${pet(36)}</div><div class="wl" style="margin-top:14px">Dragging: lifted; drop it anywhere</div></div>
+  <div class="abs" style="left:28px;top:300px;right:28px"><div class="wl" style="line-height:1.5">Hover: the puck grows 4px and the blob wakes. Click: the panel opens out of it, toward the screen's middle. It still hides over fullscreen games.</div></div>`;
+
+/* ---------- Home ---------- */
+const q = (icon, label, status, { on = false, split = false } = {}) =>
+  `<div><div class="qb${on ? ' on' : ''}"><div class="main">${ic(icon, 16)}</div>${split ? `<div class="side">${ic('chevr', 13)}</div>` : ''}</div><div class="ql cut">${label}</div><div class="qs cut">${status}</div></div>`;
+const home = panel(`<div class="pb">
+  <div class="card media row">${cover(52, 4)}<div class="grow"><div class="src row">${ic('music', 11)}Spotify</div><div class="t cut">A Moment Apart</div><div class="a cut">ODESZA</div></div>
+    <div class="row" style="gap:2px"><div class="tb">${gl('back', 14)}</div><div class="tb main">${gl('pause', 15)}</div><div class="tb">${gl('fwd', 14)}</div></div></div>
+  <div class="qgrid">${q('coffee', 'Keep awake', '1 hr left', { on: true, split: true })}${q('mic', 'Microphone', 'Live', { split: true })}${q('sliders', 'App volume', '4 apps')}${q('folder', 'File organizer', 'Auto')}
+    ${q('activity', 'System monitor', 'CPU 12%')}${q('cliplist', 'Clipboard', '23 items')}${q('notepen', 'Scratchpad', '4 notes')}${q('inbox', 'Shelf', '5 items')}</div>
+  <div class="vol row">${ic('volume', 16)}${slider(62)}<span class="pct num">62%</span>${ic('chevr', 14)}</div>
+</div><div class="ft row">${pet(20)}<span>Chippi</span><span class="grow"></span><div class="gear">${ic('gear', 16)}</div></div>`);
+
+/* ---------- Now Playing ---------- */
+const nowPlaying = page('Now Playing', st('Spotify'), `
+  <div class="np row">${cover(156, 6)}<div class="meta"><div class="t">A Moment Apart</div><div class="a cut">ODESZA</div>
+    <div class="tr row">${gl('back', 24)}<div class="play">${gl('pause', 22)}</div>${gl('fwd', 24)}</div></div></div>
+  <div class="times row num"><span>2:23</span>${slider(61)}<span>−1:30</span></div>`);
+const nothing = page('Now Playing', '', `<div style="position:absolute;inset:0;display:grid;place-content:center;justify-items:center;gap:8px">${pet(72, 'sleepy')}<span style="font-size:13px;color:var(--t3)">Nothing playing</span></div>`);
+
+/* ---------- Sound ---------- */
+const rr = (name, on) => `<div class="rr row${on ? ' on' : ''}"><div class="radio${on ? ' on' : ''}"></div><span class="cut">${name}</span></div>`;
+const sound = page('Sound', st('Speakers'), `<div class="cols2">
+  <div><div class="clbl">Output</div><div class="card c44 row">${ic('volume', 16)}${slider(62)}<span class="num" style="font-size:12px;width:30px">62%</span><span class="btn">Mute</span></div>
+    <div style="margin-top:8px">${rr('Speakers', true)}${rr('Headphones')}${rr('LG monitor')}</div></div>
+  <div><div class="clbl">Microphone</div><div class="card c44 row">${ic('mic', 16)}<span class="grow">Live</span><span class="btn">Mute</span></div>
+    <div style="margin-top:8px">${rr('Podcast mic', true)}${rr('Webcam')}</div>
+    <div class="card" style="margin-top:8px;padding:10px"><div class="row" style="gap:8px"><span style="color:var(--ac);display:grid">${ic('wave', 16)}</span><span class="grow">Mic processing</span><div class="switch"></div></div><div class="meter"><i style="width:38%"></i></div></div></div>
+</div>`);
+
+/* ---------- App volume ---------- */
+const strip = (tile, color, name, p, muted) => `<div class="strip"><div class="vbar${muted ? ' muted' : ''}"><i style="height:${muted ? 28 : p}%"></i></div>
+  <div class="appic" style="background:${color}">${tile}</div><div class="spct num" style="color:${muted ? 'var(--caution)' : 'var(--tx)'}">${muted ? 'Muted' : p + '%'}</div><div class="sname">${name}</div>${ic('chevd', 12)}</div>`;
+const appVolume = page('App volume', '', `<div class="strips">${strip('Sp', '#1DB954', 'Spotify', 72)}${strip('Fx', '#E8642C', 'Firefox', 45)}${strip('Di', '#5865F2', 'Discord', 60)}${strip('St', '#1B2838', 'Steam', 30, true)}
+  <div class="strip"><div class="vbar"><i style="height:50%"></i></div><div class="appic" style="color:var(--t2)">${ic('volume', 18)}</div><div class="spct num">50%</div><div class="sname">System sounds</div>${ic('chevd', 12)}</div></div>`);
+
+/* ---------- Keep awake ---------- */
+const keepAwake = page('Keep awake', st('1 hr left'), `<div class="ka">${['30 min', '1 hr', '2 hr', '4 hr', 'No limit', 'Until…'].map(c => `<div class="kc${c === '1 hr' ? ' on' : ''}">${c}</div>`).join('')}</div>`);
+
+/* ---------- File organizer ---------- */
+const fr = (icon, name, to, tm, act) => `<div class="fr row">${ic(icon, 15)}<span class="cut">${name}</span><span class="to cut grow">→ ${to}</span><span class="to">${tm}</span><span class="lnk">${act}</span></div>`;
+const organizer = page('File organizer', '', `<div style="display:flex;flex-direction:column;height:100%">
+  <div class="card c44 row"><span style="color:var(--ac);display:grid">${ic('folder', 16)}</span><span class="btn" style="justify-content:space-between;min-width:150px">Downloads ${ic('chevd', 12)}</span><span class="grow"></span><div class="seg"><span class="on">Auto</span><span>Manual</span><span>Paused</span></div></div>
+  <div style="margin-top:8px">${fr('file', 'invoice-0412.pdf', 'Documents', '2 min', 'Undo')}${fr('image', 'IMG_2231.jpg', 'Pictures', '5 min', 'Undo')}${fr('file', 'setup-1.4.exe', 'Installers', '12 min', 'Review')}${fr('file', 'notes.txt', 'Documents', '1 hr', 'Undo')}${fr('image', 'banner-wide.png', 'Pictures', '2 hr', 'Undo')}</div>
+  <div class="row" style="margin-top:auto"><span class="lnk" style="margin-left:10px">History ›</span><span class="grow"></span><span class="btn ac">Organize now</span></div></div>`);
+
+/* ---------- System monitor ---------- */
+const mr = (n, d, v, caution) => `<div class="mr row"><span class="n">${n}</span><span class="d cut grow">${d}</span><span class="v num"${caution ? ' style="color:var(--caution)"' : ''}>${v}</span></div>`;
+const dg = (l, u, f, t, caution) => `<div class="dg r num"><span>${l}</span><span class="v">${u}</span><span class="v"${caution ? ' style="color:var(--caution)"' : ''}>${f}</span><span class="v">${t}</span></div>`;
+const monitor = page('System monitor', '', `<div class="card">${mr('CPU', '4.2 GHz', '12%')}${mr('GPU', '52 °C · 2.1 of 12 GiB', '18%')}${mr('Memory', '14.2 of 31.9 GiB', '45%')}
+  <div class="mr row"><span class="n">Network</span><span class="d grow row" style="gap:4px">${ic('down', 11)}2.4 MiB/s<span style="width:8px"></span>${ic('up', 11)}180 KiB/s</span></div></div>
+  <div class="card" style="margin-top:8px"><div class="dg h"><span>Disks</span><span class="v">Used</span><span class="v">Free</span><span class="v">Total</span></div>
+    ${dg('C:', '412 GiB', '518 GiB', '930 GiB')}${dg('D:', '1.6 TiB', '220 GiB', '1.8 TiB', true)}${dg('E:', '210 GiB', '1.6 TiB', '1.8 TiB')}</div>`);
+
+/* ---------- Clipboard ---------- */
+const cr = (icon, text, tm, extra = '') => `<div class="cr row"><span class="gl">${icon}</span><span class="cut grow">${text}</span><span class="tm">${tm}</span>${extra}</div>`;
+const clipboard = page('Clipboard', `<span style="margin-left:auto" class="row"><span class="ibtn">${ic('link', 15)}</span><span class="ibtn">${ic('pausest', 15)}</span><span class="ibtn">${ic('more', 15)}</span></span>`, `
+  <div class="search row">${ic('search', 14)}Search</div>
+  <div class="glbl">Pinned</div>${cr(ic('text', 15), 'Guest Wi-Fi: maple-otter-42', '3 d', `<span style="color:var(--ac);display:grid">${ic('pin', 12)}</span>`)}
+  <div class="glbl">Recent</div>
+  <div class="open">${cr(ic('text', 15), 'Meeting moved to Thursday 3 PM, room 4B.', '1 min')}
+    <div class="prev">Meeting moved to Thursday 3 PM, room 4B. Bring the Q3 numbers and the draft deck; Sam is joining remotely.</div>
+    <div class="row" style="gap:8px;padding:8px 0 0 26px"><span class="btn ac">Paste</span><span class="btn">Copy</span><span class="grow"></span><span class="ibtn row" style="width:28px;height:28px;display:grid;place-items:center;color:var(--t2)">${ic('pin', 14)}</span><span style="width:28px;height:28px;display:grid;place-items:center;color:var(--t2)">${ic('trash', 14)}</span></div></div>
+  ${cr('<span class="thumb"></span>', 'Screenshot 14:02', '6 min')}`);
+
+/* ---------- Scratchpad ---------- */
+const scratchpad = page('Scratchpad', st('Saved'), `<div style="display:flex;flex-direction:column;height:100%">
+  <div class="tabs row"><span class="tab on">Standup</span><span class="tab">Groceries</span><span class="tab">Ideas</span><span class="tab">Trip</span><span class="tab" style="color:var(--t2)">${ic('plus', 14)}</span></div>
+  <div class="editor card"><div class="h"># Standup</div><div>- Shipped the centered song on the tab</div><div>- Today: mock the new shell</div><div>- Blocked: <span class="m">nothing</span></div><div><br></div><div class="h">## Later</div><div>- Pick the blob's colors<span class="caret"></span></div></div>
+  <div class="row" style="margin-top:8px;gap:8px"><div class="seg"><span class="on">Edit</span><span>Preview</span></div><span class="grow"></span><span style="width:28px;height:28px;display:grid;place-items:center;color:var(--t2)">${ic('more', 16)}</span></div></div>`);
+
+/* ---------- Shelf ---------- */
+const sti = (icon, name, sel, pinned) => `<div class="sti${sel ? ' sel' : ''}">${pinned ? `<span class="pin">${ic('pin', 10)}</span>` : ''}<div class="slot">${icon}</div><span>${name}</span></div>`;
+const shelf = page('Shelf', '', `<div style="display:flex;flex-direction:column;height:100%">
+  <div class="tiles">${sti(ic('file', 18), 'Q3-report.pdf', true, true)}${sti('<span class="thumb" style="width:36px"></span>', 'logo-final.png')}${sti(ic('text', 18), 'Copied text')}${sti(ic('file', 18), 'contract-v2.docx')}${sti(ic('image', 18), 'whiteboard.jpg')}</div>
+  <div class="row" style="margin-top:auto;gap:8px"><span class="grow"></span><span class="btn">${ic('copy', 13)}Copy</span><span class="btn">${ic('pin', 13)}Unpin</span><span class="btn">${ic('trash', 13)}Remove</span></div></div>`);
+
+const withWidget = (p) => p + `<div class="abs" style="left:540px;top:350px"><div class="puck">${pet(36, 'music')}</div></div>`;
+document.getElementById('grid').innerHTML = [
+  slot('The widget on the desktop', widgets),
+  slot('Home (opened from the widget, bottom right)', withWidget(home)),
+  slot('Now Playing', nowPlaying),
+  slot('Now Playing: nothing playing', nothing),
+  slot('Sound', sound),
+  slot('App volume (Steam muted)', appVolume),
+  slot('Keep awake (1 hr running)', keepAwake),
+  slot('File organizer', organizer),
+  slot('System monitor (D: low on space)', monitor),
+  slot('Clipboard (an entry open)', clipboard),
+  slot('Scratchpad', scratchpad),
+  slot('Shelf (an item selected)', shelf),
+].join('');
+addEventListener('load', () => { document.body.dataset.size = `${Math.ceil(document.body.scrollWidth)},${Math.ceil(document.body.scrollHeight) + 8}`; });
+</script>
+</body></html>

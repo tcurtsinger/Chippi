@@ -107,6 +107,7 @@ internal sealed class SystemMonitorView : UserControl
         {
             if (!_rows.TryGetValue(key, out var row)) _rows[key] = row = new ReadingRow(key, _settingsPage);
             row.Set(detail, value, caution, picker);
+            row.SetDivider(_settingsPage || visible.Count > 0);
             visible.Add(row);
             return row;
         }
@@ -173,7 +174,7 @@ internal sealed class SystemMonitorView : UserControl
                     i < zones.Count ? Format.Temperature(zones[i].TemperatureC, settings.Temperature) : "");
         }
         // Unusually many thermal zones still show whole rows only. Settings owns overflow.
-        int capacity = _settingsPage ? int.MaxValue : (int)((IslandPage.BodyHeight - 4) / 28);
+        int capacity = _settingsPage ? int.MaxValue : (int)((IslandPage.BodyHeight - 2) / 28);
         if (visible.Count > capacity) visible.RemoveRange(capacity, visible.Count - capacity);
         // Keep existing controls parented when only their readings change.
         foreach (var old in _readings.Children.OfType<ReadingRow>().Where(r => !visible.Contains(r)).ToList()) _readings.Children.Remove(old);
@@ -181,16 +182,16 @@ internal sealed class SystemMonitorView : UserControl
             if (i >= _readings.Children.Count || _readings.Children[i] != visible[i])
             { _readings.Children.Remove(visible[i]); _readings.Children.Insert(i, visible[i]); }
         _readingsSurface.Visibility = _readingsCard.Visibility = visible.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
-        double remaining = IslandPage.BodyHeight - (visible.Count == 0 ? 0 : visible.Count * 28 + 4 + 8);
+        double remaining = IslandPage.BodyHeight - (visible.Count == 0 ? 0 : visible.Count * 28 + 2 + 8);
         _disks.Visibility = !_settingsPage && settings.IsOn(Reading.Disks) && remaining >= 26 ? Visibility.Visible : Visibility.Collapsed;
         _disks.Margin = new Thickness(0, visible.Count == 0 ? 0 : 8, 0, 0);
         _disks.Child = s.Disks.Status == ReadingStatus.Unavailable ? DiskTable.Unavailable()
-            : DiskTable.Build(s.Disks.Value ?? [], id => _module.Alerting("low-disk", id), Math.Max(0, remaining - 4));
+            : DiskTable.Build(s.Disks.Value ?? [], id => _module.Alerting("low-disk", id), Math.Max(0, remaining - 2));
     }
 
     internal static Border Card()
     {
-        var card = new Border { Padding = new Thickness(10, 2, 10, 2) };
+        var card = new Border { Padding = new Thickness(9, 0, 9, 0) };
         card.SetResourceReference(StyleProperty, "IslandCardStyle");
         return card;
     }
@@ -206,12 +207,14 @@ internal sealed class SystemMonitorView : UserControl
     private sealed class ReadingRow : Grid
     {
         private readonly ContentControl _name = new();
+        private readonly Border _divider = new() { Height = 1, VerticalAlignment = VerticalAlignment.Top };
         private readonly bool _settingsPage;
         public TextBlock Detail { get; } = Text("", 11, true);
         private readonly TextBlock _value = Text("");
         public ReadingRow(string name, bool settingsPage)
         {
             _settingsPage = settingsPage;
+            _divider.VerticalAlignment = settingsPage ? VerticalAlignment.Bottom : VerticalAlignment.Top;
             Height = settingsPage ? 48 : 28;
             ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(settingsPage ? 100 : 80) });
             ColumnDefinitions.Add(new ColumnDefinition());
@@ -220,10 +223,11 @@ internal sealed class SystemMonitorView : UserControl
             if (settingsPage) { Detail.FontSize = 12; _value.FontSize = 14; }
             _value.FontWeight = FontWeights.SemiBold; _value.TextAlignment = TextAlignment.Right;
             Grid.SetColumn(Detail, 1); Grid.SetColumn(_value, 2);
-            var divider = new Border { Height = 1, VerticalAlignment = VerticalAlignment.Bottom };
-            divider.SetResourceReference(BackgroundProperty, settingsPage ? "BorderBrush" : "IslandPanelBrush"); Grid.SetColumnSpan(divider, 3);
-            Children.Add(divider); Children.Add(_name); Children.Add(Detail); Children.Add(_value);
+            _divider.SetResourceReference(BackgroundProperty, settingsPage ? "BorderBrush" : "IslandHairBrush"); Grid.SetColumnSpan(_divider, 3);
+            Children.Add(_divider); Children.Add(_name); Children.Add(Detail); Children.Add(_value);
         }
+        public void SetDivider(bool visible) => _divider.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+
         public void Set(string detail, string value, bool caution, FrameworkElement? picker)
         {
             _name.Content = picker ?? (object)Text((string)_name.Tag, _settingsPage ? 14 : 12, true);

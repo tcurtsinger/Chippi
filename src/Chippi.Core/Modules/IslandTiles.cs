@@ -3,14 +3,6 @@
 
 namespace Chippi.Core.Modules;
 
-/// <summary>Which round button beside the open island opens a tile directly (docs/phase-3/architecture.md §5).</summary>
-public enum IslandOrbit
-{
-    None,
-    Left,
-    Right,
-}
-
 /// <summary>
 /// The open island's one size, for the grid and every page (DESIGN.md §5 Island, revised 2026-10-28),
 /// in DIPs. Inside the 12 inset and the 24 + 8 header each page has a 496 × 304 body of six 76
@@ -33,6 +25,25 @@ public static class IslandPage
 }
 
 /// <summary>
+/// A tile's button on the home that acts without opening the page (Keep awake's start and stop, the
+/// microphone's mute). The home draws the button split: the toggle, and an arrow that opens the page.
+/// </summary>
+/// <param name="IsOn">Whether the button shows on (accent fill). Read each time the home refreshes.</param>
+/// <param name="Toggle">Starts or stops it. Called on the UI thread.</param>
+/// <param name="Name">The button's name when it isn't the tile's (the Sound tile's mute is "Microphone").</param>
+/// <param name="Icon">Lucide icon key when it isn't the tile's.</param>
+/// <param name="Status">The line under the button when it isn't the tile's status (the microphone's "Live").</param>
+public sealed record IslandTileToggle(Func<bool> IsOn, Action Toggle, string? Name = null, string? Icon = null, Func<string>? Status = null);
+
+/// <summary>
+/// The home's volume slider, offered by the tile that owns the system volume (Sound). Its arrow opens
+/// that tile's page.
+/// </summary>
+/// <param name="Level">The volume, 0 to 1, or null when there is no output.</param>
+/// <param name="Set">Sets the volume, 0 to 1. Called on the UI thread for every step of a drag, so it coalesces.</param>
+public sealed record IslandTileVolume(Func<double?> Level, Action<double> Set);
+
+/// <summary>
 /// One module's part of an island tile (docs/phase-3/architecture.md §5).
 /// </summary>
 /// <param name="Key">Identifies the tile, such as "sound". Modules that use the same key share the tile and its page.</param>
@@ -43,8 +54,11 @@ public static class IslandPage
 /// <param name="CreateSection">This module's section of the page. Must return a WPF FrameworkElement.</param>
 public sealed record IslandTileSpec(string Key, string Name, string Icon, int Order, int SectionOrder, Func<object> CreateSection)
 {
-    /// <summary>A round button beside the open island that opens this tile.</summary>
-    public IslandOrbit Orbit { get; init; } = IslandOrbit.None;
+    /// <summary>The home's toggle for this tile; null for a button that only opens the page.</summary>
+    public IslandTileToggle? Toggle { get; init; }
+
+    /// <summary>The home's volume slider; null for every tile but the one that owns the system volume.</summary>
+    public IslandTileVolume? Volume { get; init; }
 
     /// <summary>On a shared tile, the status of the module with the highest priority that set one shows ("Mic muted" over the output).</summary>
     public int StatusPriority { get; init; }
@@ -93,6 +107,9 @@ public interface IIslandTile
     /// <summary>Whether the tile is on screen: the grid is open and the tile isn't hidden. Its page doesn't count.</summary>
     bool OnScreen { get; }
 
+    /// <summary>Asks the home to read the tile's toggle and volume again (they changed without the status changing).</summary>
+    void Refresh();
+
     /// <summary>Raised on the UI thread when <see cref="OnScreen"/> changes, so a status that costs something to keep current runs only while seen.</summary>
     event EventHandler? OnScreenChanged;
 }
@@ -125,6 +142,8 @@ public sealed class IslandTileContribution(string moduleId, IslandTileSpec spec)
         if (Interlocked.Exchange(ref _status, status) != status)
             StatusChanged?.Invoke(this, EventArgs.Empty);
     }
+
+    public void Refresh() => StatusChanged?.Invoke(this, EventArgs.Empty);
 
     public void SetPageNote(string note)
     {
@@ -162,7 +181,11 @@ public sealed record IslandTileGroup(string Key, IReadOnlyList<IslandTileContrib
 
     public int Order => Parts.Min(p => p.Spec.Order);
 
-    public IslandOrbit Orbit => Parts.Select(p => p.Spec.Orbit).FirstOrDefault(o => o != IslandOrbit.None);
+    /// <summary>The first part's toggle, or null.</summary>
+    public IslandTileToggle? Toggle => Parts.Select(p => p.Spec.Toggle).FirstOrDefault(t => t is not null);
+
+    /// <summary>The first part's volume slider, or null.</summary>
+    public IslandTileVolume? Volume => Parts.Select(p => p.Spec.Volume).FirstOrDefault(v => v is not null);
 
     public bool StatusOnPage => Parts.Any(p => p.Spec.StatusOnPage);
 

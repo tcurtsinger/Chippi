@@ -11,6 +11,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Chippi.Island.Tests;
 
+[Collection("ReducedMotion")] // an import applies its reduced-motion setting
 public sealed class GeneralImportTests
 {
     [Fact]

@@ -21,25 +21,11 @@ public enum PetMood
     Celebrating,
     Sleepy,
     WideAwake,
+    Listening,
 }
 
-/// <summary>
-/// Gumdrop, the pet (DESIGN.md §7): a drop of the Synth Gradient with a shine, two eyes and a
-/// mouth that changes with mood, drawn from the exact §7 path data on a 120×120 canvas and scaled
-/// to <see cref="Size"/>. At 22 and below only the small form (body plus enlarged eyes) is drawn;
-/// the ground shadow appears from 64 up.
-/// <para>
-/// Motion: a blink every 4–7s (the only ambient loop), a 150ms cross-fade between moods, the
-/// celebrate squish and spark fade, and eyes easing shut before the z's when falling asleep. With
-/// <see cref="Motion.IsReduced"/> there is no blink or squish and moods swap instantly.
-/// Celebrating returns to the previous mood after about 2.5s.
-/// </para>
-/// <para>
-/// Accessibility: by default the pet reads as "Gumdrop pet, &lt;mood&gt;". Where text beside it
-/// carries the state, set <see cref="IsDecorative"/> (WPF has no <c>AccessibilityView="Raw"</c>).
-/// </para>
-/// </summary>
-public class Gumdrop : UserControl
+/// <summary>Chippi, the rice-cake blob from the approved shell mock. Motion and colors are shared by every host.</summary>
+public class ChippiPet : UserControl
 {
     /// <summary>At this size and below the small form is drawn.</summary>
     public const double SmallFormMaxSize = 22;
@@ -56,16 +42,16 @@ public class Gumdrop : UserControl
     private static readonly TimeSpan ZFade = TimeSpan.FromMilliseconds(400);
 
     public static readonly DependencyProperty MoodProperty = DependencyProperty.Register(
-        nameof(Mood), typeof(PetMood), typeof(Gumdrop), new PropertyMetadata(PetMood.Idle, OnMoodChanged));
+        nameof(Mood), typeof(PetMood), typeof(ChippiPet), new PropertyMetadata(PetMood.Idle, OnMoodChanged));
 
     public static readonly DependencyProperty SizeProperty = DependencyProperty.Register(
-        nameof(Size), typeof(double), typeof(Gumdrop), new PropertyMetadata(28.0, OnSizeChanged));
+        nameof(Size), typeof(double), typeof(ChippiPet), new PropertyMetadata(28.0, OnSizeChanged));
 
     public static readonly DependencyProperty PetColorProperty = DependencyProperty.Register(
-        nameof(PetColor), typeof(PetColor), typeof(Gumdrop), new PropertyMetadata(PetColor.Synth, OnPetColorChanged));
+        nameof(PetColor), typeof(PetColor), typeof(ChippiPet), new PropertyMetadata(PetColor.Synth, OnPetColorChanged));
 
     public static readonly DependencyProperty IsDecorativeProperty = DependencyProperty.Register(
-        nameof(IsDecorative), typeof(bool), typeof(Gumdrop), new PropertyMetadata(false));
+        nameof(IsDecorative), typeof(bool), typeof(ChippiPet), new PropertyMetadata(false));
 
     private readonly Path _shadow;
     private readonly Path _body;
@@ -76,6 +62,7 @@ public class Gumdrop : UserControl
     private readonly Face _celebrating;
     private readonly Face _sleepy;
     private readonly Face _small;
+    private readonly Canvas _headphones;
     private readonly Path _sparks;
     private readonly Path _zs;
     private readonly DispatcherTimer _blinkTimer;
@@ -85,7 +72,7 @@ public class Gumdrop : UserControl
     private bool _hasShown;
     private PetMood _returnMood = PetMood.Idle;
 
-    public Gumdrop()
+    public ChippiPet()
     {
         Focusable = false;
         IsTabStop = false;
@@ -96,27 +83,47 @@ public class Gumdrop : UserControl
         _shine = Filled(Shapes.Shine, "PetShineBrush");
 
         _idle = new Face(canBlink: true,
-            eyes: [Filled(Shapes.IdleEyes, "PetInkBrush"), Filled(Shapes.IdleHighlights, "PetEyeHighlightBrush")],
-            rest: [Stroked(Shapes.IdleMouth, "PetInkBrush", 2.8)]);
+            eyes: [Filled(Shapes.EyeWhites, "PetEyeHighlightBrush"), Filled(Shapes.IdleEyes, "PetInkBrush"), Filled(Shapes.IdleHighlights, "PetEyeHighlightBrush")],
+            rest: [Filled(Shapes.OpenSmile, "PetInkBrush"), new Path { Data = Shapes.Tongue, Fill = new SolidColorBrush(Color.FromRgb(255, 127, 168)) }]);
         _wideAwake = new Face(canBlink: true,
-            eyes: [Filled(Shapes.WideEyes, "PetInkBrush"), Filled(Shapes.WideHighlights, "PetEyeHighlightBrush")],
-            rest: [Filled(Shapes.WideMouth, "PetInkBrush")]);
+            eyes: [Stroked(Shapes.HappyEyes, "PetInkBrush", 3.2)],
+            rest: [Filled(Shapes.OpenSmile, "PetInkBrush"), new Path { Data = Shapes.Tongue, Fill = new SolidColorBrush(Color.FromRgb(255, 127, 168)) }]);
         _celebrating = new Face(canBlink: false,
             eyes: [Stroked(Shapes.HappyEyes, "PetInkBrush", 4.2)],
-            rest: [Filled(Shapes.OpenSmile, "PetInkBrush"), Filled(Shapes.Blush, "PetBlushBrush")]);
+            rest: [Filled(Shapes.OpenSmile, "PetInkBrush"), new Path { Data = Shapes.Tongue, Fill = new SolidColorBrush(Color.FromRgb(255, 127, 168)) }]);
         _sleepy = new Face(canBlink: false,
             eyes: [Stroked(Shapes.SleepyEyes, "PetInkBrush", SleepyEyeStroke)],
-            rest: [Stroked(Shapes.FlatMouth, "PetInkBrush", 2.8)]);
+            rest: [Filled(Shapes.SleepMouth, "PetInkBrush")]);
         _small = new Face(canBlink: true,
             eyes: [Filled(Shapes.SmallEyes, "PetInkBrush")],
             rest: []);
 
+        _headphones = new Canvas { Width = 120, Height = 120 };
+        var headphoneInk = new SolidColorBrush(Color.FromRgb(42, 36, 64));
+        var headphonePad = new SolidColorBrush(Color.FromRgb(210, 190, 255));
+        _headphones.Children.Add(new Path
+        {
+            Data = Shapes.Headphones, Stroke = headphoneInk, StrokeThickness = 5,
+            StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round,
+        });
+        foreach (var x in new[] { 12.0, 95.0 })
+        {
+            var cup = new System.Windows.Shapes.Rectangle { Width = 13, Height = 23, RadiusX = 5.5, RadiusY = 5.5, Fill = headphoneInk };
+            Canvas.SetLeft(cup, x);
+            Canvas.SetTop(cup, 59);
+            _headphones.Children.Add(cup);
+            var pad = new System.Windows.Shapes.Rectangle { Width = 5, Height = 15, RadiusX = 2.5, RadiusY = 2.5, Fill = headphonePad };
+            Canvas.SetLeft(pad, x == 12 ? 15 : 102);
+            Canvas.SetTop(pad, 63);
+            _headphones.Children.Add(pad);
+        }
         _sparks = Stroked(Shapes.Sparks, "PetSparkBrush", 3.5);
         _zs = Filled(Shapes.Zs(), "PetZBrush");
 
         var figure = new Canvas { Width = 120, Height = 120, RenderTransform = _squish };
         figure.Children.Add(_body);
         figure.Children.Add(_shine);
+        figure.Children.Add(_headphones);
         foreach (var face in Faces)
             figure.Children.Add(face.Root);
 
@@ -186,7 +193,7 @@ public class Gumdrop : UserControl
     /// True where the text beside the pet carries the state (island, Settings titlebar): screen readers
     /// skip it. This is WPF's stand-in for <c>AccessibilityView="Raw"</c>, which WPF does not have;
     /// the pet's peer leaves the control and content views. False (the default) reads it as
-    /// "Gumdrop pet, &lt;mood&gt;", for where it stands alone (the Settings preview).
+    /// "Chippi, &lt;mood&gt;", for where it stands alone (the Settings preview).
     /// </summary>
     public bool IsDecorative
     {
@@ -202,8 +209,9 @@ public class Gumdrop : UserControl
     public static string Describe(PetMood mood) => mood switch
     {
         PetMood.Celebrating => "celebrating",
-        PetMood.Sleepy => "sleepy",
+        PetMood.Sleepy => "asleep",
         PetMood.WideAwake => "wide awake",
+        PetMood.Listening => "listening",
         _ => "idle",
     };
 
@@ -235,7 +243,7 @@ public class Gumdrop : UserControl
 
     private static void OnMoodChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
-        var pet = (Gumdrop)d;
+        var pet = (ChippiPet)d;
         var mood = (PetMood)e.NewValue;
         var old = (PetMood)e.OldValue;
         if (mood == PetMood.Celebrating)
@@ -251,12 +259,12 @@ public class Gumdrop : UserControl
         pet.ApplyMood(mood, animate: true);
 
         if (UIElementAutomationPeer.FromElement(pet) is { } peer)
-            peer.RaisePropertyChangedEvent(AutomationElementIdentifiers.NameProperty, $"Gumdrop pet, {Describe(old)}", $"Gumdrop pet, {Describe(mood)}");
+            peer.RaisePropertyChangedEvent(AutomationElementIdentifiers.NameProperty, $"Chippi, {Describe(old)}", $"Chippi, {Describe(mood)}");
     }
 
     private static void OnSizeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
-        var pet = (Gumdrop)d;
+        var pet = (ChippiPet)d;
         pet.Width = pet.Height = (double)e.NewValue;
         bool wasSmall = (double)e.OldValue <= SmallFormMaxSize;
         bool hadShadow = (double)e.OldValue >= GroundShadowMinSize;
@@ -267,15 +275,29 @@ public class Gumdrop : UserControl
         }
     }
 
-    private static void OnPetColorChanged(DependencyObject d, DependencyPropertyChangedEventArgs e) => ((Gumdrop)d).UpdateBodyBrush();
+    private static void OnPetColorChanged(DependencyObject d, DependencyPropertyChangedEventArgs e) => ((ChippiPet)d).UpdateBodyBrush();
 
-    private void UpdateBodyBrush() => _body.SetResourceReference(Shape.FillProperty, $"Pet{PetColor}Brush");
+    private void UpdateBodyBrush()
+    {
+        var color = PetColor switch
+        {
+            PetColor.Iris => "#CBB2FF", PetColor.Azure => "#8EC0FF",
+            PetColor.Signal => "#8EE6C0", PetColor.Ember => "#FFC58F",
+            PetColor.Frost => "#E8ECF6", _ => "#B78FFF",
+        };
+        var baseColor = (Color)ColorConverter.ConvertFromString(color);
+        var shade = Color.FromRgb((byte)(baseColor.R * .88), (byte)(baseColor.G * .88), (byte)(baseColor.B * .88));
+        var brush = new LinearGradientBrush(baseColor, shade, 90);
+        brush.Freeze();
+        _body.Fill = brush;
+        _shine.Visibility = Visibility.Collapsed;
+    }
 
     /// <summary>Small form drops the shine, mouth, highlights and extras; the ground shadow shows from 64px.</summary>
     private void ApplyForm()
     {
         bool small = IsSmall;
-        _shine.Visibility = small ? Visibility.Collapsed : Visibility.Visible;
+        _shine.Visibility = Visibility.Collapsed;
         _shadow.Visibility = !small && Size >= GroundShadowMinSize ? Visibility.Visible : Visibility.Collapsed;
         _sparks.Visibility = small ? Visibility.Collapsed : Visibility.Visible;
         _zs.Visibility = small ? Visibility.Collapsed : Visibility.Visible;
@@ -286,12 +308,14 @@ public class Gumdrop : UserControl
         PetMood.Celebrating => _celebrating,
         PetMood.Sleepy => _sleepy,
         PetMood.WideAwake => _wideAwake,
+        PetMood.Listening => _celebrating,
         _ => _idle,
     };
 
     private void ApplyMood(PetMood mood, bool animate, bool replay = false)
     {
         PetMood? from = _hasShown ? _shown : null;
+        _headphones.Visibility = mood == PetMood.Listening ? Visibility.Visible : Visibility.Collapsed;
         _shown = mood;
         _hasShown = true;
 
@@ -426,7 +450,7 @@ public class Gumdrop : UserControl
         face.EyeScale.BeginAnimation(ScaleTransform.ScaleYProperty, blink);
     }
 
-    protected override AutomationPeer OnCreateAutomationPeer() => new GumdropAutomationPeer(this);
+    protected override AutomationPeer OnCreateAutomationPeer() => new ChippiPetAutomationPeer(this);
 
     private static Geometry Ellipse(double cx, double cy, double rx, double ry) => Freeze(new EllipseGeometry(new Point(cx, cy), rx, ry));
 
@@ -473,7 +497,7 @@ public class Gumdrop : UserControl
 
         public Canvas Root { get; } = new() { Width = 120, Height = 120, Opacity = 0 };
 
-        public ScaleTransform EyeScale { get; } = new(1, 1, 60, 74);
+        public ScaleTransform EyeScale { get; } = new(1, 1, 60, 66);
 
         public bool CanBlink { get; }
 
@@ -487,35 +511,33 @@ public class Gumdrop : UserControl
     /// <summary>DESIGN.md §7 geometry on the 120×120 viewBox, verbatim.</summary>
     internal static class Shapes
     {
-        public static Geometry Body { get; } = Parse("M60 16 C80 30 100 52 100 77 C100 98 82 108 60 108 C38 108 20 98 20 77 C20 52 40 30 60 16 Z");
+        public static Geometry Body { get; } = Parse("M17 76 C17 45 36 31 60 31 C84 31 103 45 103 76 C103 98 87 106 60 106 C33 106 17 98 17 76 Z");
 
         /// <summary>Ellipse centered (46, 46), radii 9 × 5.5, rotated −28°.</summary>
         public static Geometry Shine { get; } = Freeze(new EllipseGeometry(new Point(46, 46), 9, 5.5) { Transform = new RotateTransform(-28, 46, 46) });
 
-        public static Geometry IdleEyes { get; } = Pair(4.8, 6.2);
+        public static Geometry EyeWhites { get; } = Freeze(new GeometryGroup { Children = { Ellipse(47, 66, 10.5, 12.5), Ellipse(73, 66, 10.5, 12.5) } });
+        public static Geometry IdleEyes { get; } = Freeze(new GeometryGroup { Children = { Ellipse(49, 68, 6, 6), Ellipse(75, 68, 6, 6) } });
+        public static Geometry Tongue { get; } = Parse("M55 87 Q60 91 65 87 Z");
+        public static Geometry SleepMouth { get; } = Ellipse(60, 85, 3.5, 3);
+        public static Geometry Headphones { get; } = Parse("M19 70 C19 19 101 19 101 70");
 
         /// <summary>White highlights r 1.7 at (+1.7, −2.3) from each eye center.</summary>
-        public static Geometry IdleHighlights { get; } = Highlights(1.7);
+        public static Geometry IdleHighlights { get; } = Freeze(new GeometryGroup { Children = { Ellipse(50.6, 65.6, 2, 2), Ellipse(76.6, 65.6, 2, 2) } });
 
-        public static Geometry IdleMouth { get; } = Parse("M56 88 Q60 91.5 64 88");
 
-        public static Geometry HappyEyes { get; } = Parse("M42 75 Q47 68 52 75 M68 75 Q73 68 78 75");
+        public static Geometry HappyEyes { get; } = Parse("M39 70 Q46 63 53 70 M67 70 Q74 63 81 70");
 
-        public static Geometry OpenSmile { get; } = Parse("M54 87 Q60 96 66 87 Z");
+        public static Geometry OpenSmile { get; } = Parse("M50 82 Q60 94 70 82 Z");
 
-        public static Geometry Blush { get; } = Freeze(new GeometryGroup { Children = { Ellipse(38, 85, 5.5, 3.2), Ellipse(82, 85, 5.5, 3.2) } });
 
         public static Geometry Sparks { get; } = Parse("M14 30 L6 24 M12 44 H3 M24 18 L20 9 M106 30 L114 24 M108 44 H117 M96 18 L100 9");
 
-        public static Geometry SleepyEyes { get; } = Parse("M42 74 Q47 78.5 52 74 M68 74 Q73 78.5 78 74");
+        public static Geometry SleepyEyes { get; } = Parse("M39 67 Q46 72 53 67 M67 67 Q74 72 81 67");
 
-        public static Geometry FlatMouth { get; } = Parse("M57 89 H63");
 
-        public static Geometry WideEyes { get; } = Pair(6.4, 7.4);
 
-        public static Geometry WideHighlights { get; } = Highlights(2.4);
 
-        public static Geometry WideMouth { get; } = Ellipse(60, 89, 3, 3.6);
 
         /// <summary>Small form: the eyes enlarged to 6 × 7.4.</summary>
         public static Geometry SmallEyes { get; } = Pair(6, 7.4);
@@ -551,22 +573,22 @@ public class Gumdrop : UserControl
         private static Geometry Parse(string data) => Freeze(Geometry.Parse(data));
     }
 
-    private sealed class GumdropAutomationPeer(Gumdrop owner) : FrameworkElementAutomationPeer(owner)
+    private sealed class ChippiPetAutomationPeer(ChippiPet owner) : FrameworkElementAutomationPeer(owner)
     {
-        protected override string GetClassNameCore() => nameof(Gumdrop);
+        protected override string GetClassNameCore() => nameof(ChippiPet);
 
         protected override AutomationControlType GetAutomationControlTypeCore() => AutomationControlType.Image;
 
         protected override string GetNameCore()
         {
             var name = base.GetNameCore();
-            return string.IsNullOrWhiteSpace(name) ? $"Gumdrop pet, {Describe(((Gumdrop)Owner).Mood)}" : name;
+            return string.IsNullOrWhiteSpace(name) ? $"Chippi, {Describe(((ChippiPet)Owner).Mood)}" : name;
         }
 
         protected override List<AutomationPeer>? GetChildrenCore() => null;
 
-        protected override bool IsControlElementCore() => !((Gumdrop)Owner).IsDecorative;
+        protected override bool IsControlElementCore() => !((ChippiPet)Owner).IsDecorative;
 
-        protected override bool IsContentElementCore() => !((Gumdrop)Owner).IsDecorative;
+        protected override bool IsContentElementCore() => !((ChippiPet)Owner).IsDecorative;
     }
 }

@@ -67,7 +67,7 @@ public interface IMediaSessions : IDisposable
 public sealed class SystemMediaSessions : IMediaSessions
 {
     private readonly Dispatcher _dispatcher = Dispatcher.CurrentDispatcher;
-    private readonly Dictionary<string, (string Key, ImageSource? Image)> _art = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, (string Key, ImageSource? Image, bool Sent)> _art = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<GlobalSystemMediaTransportControlsSession> _watched = [];
     private GlobalSystemMediaTransportControlsSessionManager? _manager;
     private IReadOnlyList<MediaTrack> _sessions = [];
@@ -135,6 +135,15 @@ public sealed class SystemMediaSessions : IMediaSessions
         }
     }
 
+    /// <summary>
+    /// A pick lasts until another app starts playing or the picked app goes; then Now Playing follows
+    /// Windows' current session again, so play/pause never stays on an app the user moved away from.
+    /// </summary>
+    internal static string? KeepPick(string? picked, IReadOnlyList<MediaTrack> before, IReadOnlyList<MediaTrack> now) =>
+        picked is not null && now.Any(t => t.Id == picked)
+            && !now.Any(t => t.Playing && t.Id != picked && before.FirstOrDefault(b => b.Id == t.Id) is not { Playing: true })
+            ? picked : null;
+
     private GlobalSystemMediaTransportControlsSession? Session(string? id) =>
         id is null ? null : _manager?.GetSessions().FirstOrDefault(s => s.SourceAppUserModelId == id);
 
@@ -181,6 +190,7 @@ public sealed class SystemMediaSessions : IMediaSessions
                 return;
             foreach (var gone in _art.Keys.Where(id => tracks.All(t => t.Id != id)).ToList())
                 _art.Remove(gone);
+            _selected = KeepPick(_selected, _sessions, tracks);
             _sessions = tracks;
             Changed?.Invoke(this, EventArgs.Empty);
         }
@@ -194,19 +204,21 @@ public sealed class SystemMediaSessions : IMediaSessions
     {
         try
         {
-            var id = session.SourceAppUserModelId;
+            // An app mid-start or mid-close can leave any of these unset: read what's there.
+            var id = session.SourceAppUserModelId ?? "";
             var properties = await session.TryGetMediaPropertiesAsync();
             var playback = session.GetPlaybackInfo();
             var timeline = session.GetTimelineProperties();
-            var controls = playback.Controls;
+            var controls = playback?.Controls;
             string title = properties?.Title ?? "";
             string artist = properties?.Artist ?? "";
-            var duration = timeline.EndTime - timeline.StartTime;
+            var duration = timeline is null ? TimeSpan.Zero : timeline.EndTime - timeline.StartTime;
             return new MediaTrack(id, AppName(id), title, artist,
-                playback.PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing,
-                controls.IsPreviousEnabled, controls.IsPlayEnabled, controls.IsPauseEnabled, controls.IsPlayPauseToggleEnabled, controls.IsNextEnabled,
-                timeline.Position - timeline.StartTime, duration > TimeSpan.Zero ? duration : TimeSpan.Zero, timeline.LastUpdatedTime,
-                await Artwork(id, title + "\n" + artist, properties));
+                playback?.PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing,
+                controls?.IsPreviousEnabled == true, controls?.IsPlayEnabled == true, controls?.IsPauseEnabled == true,
+                controls?.IsPlayPauseToggleEnabled == true, controls?.IsNextEnabled == true,
+                timeline is null ? TimeSpan.Zero : timeline.Position - timeline.StartTime, duration > TimeSpan.Zero ? duration : TimeSpan.Zero,
+                timeline?.LastUpdatedTime ?? DateTimeOffset.Now, await Artwork(id, title + "\n" + artist, properties));
         }
         catch (Exception ex)
         {
@@ -215,10 +227,12 @@ public sealed class SystemMediaSessions : IMediaSessions
         }
     }
 
-    // Decoded once per track; a session without a thumbnail shows the neutral placeholder.
+    // Decoded once per track. Apps send the track first and its cover a moment later (another
+    // properties change), so a track whose cover hasn't come yet is read again; one that came but
+    // won't decode isn't, so it's logged once.
     private async Task<ImageSource?> Artwork(string id, string key, GlobalSystemMediaTransportControlsSessionMediaProperties? properties)
     {
-        if (_art.TryGetValue(id, out var cached) && cached.Key == key)
+        if (_art.TryGetValue(id, out var cached) && cached.Key == key && cached.Sent)
             return cached.Image;
         ImageSource? image = null;
         if (properties?.Thumbnail is { } thumbnail)
@@ -230,7 +244,7 @@ public sealed class SystemMediaSessions : IMediaSessions
                 var bitmap = new BitmapImage();
                 bitmap.BeginInit();
                 bitmap.CacheOption = BitmapCacheOption.OnLoad;
-                bitmap.DecodePixelWidth = 224;
+                bitmap.DecodePixelWidth = 336; // the 168 cover, sharp up to 200% scaling
                 bitmap.StreamSource = source;
                 bitmap.EndInit();
                 bitmap.Freeze();
@@ -241,7 +255,7 @@ public sealed class SystemMediaSessions : IMediaSessions
                 Log.Warn("Now Playing: artwork unreadable", ex);
             }
         }
-        _art[id] = (key, image);
+        _art[id] = (key, image, properties?.Thumbnail is not null);
         return image;
     }
 

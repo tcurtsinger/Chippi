@@ -36,8 +36,8 @@ public sealed class SoundPageShots
         var area = new MonitorArea(default, monitor, work, 1);
         foreach (var (name, open) in new (string, Action<IslandPanelWindow>)[]
         {
-            ("top", p => p.Open(IslandEdge.Top, new Rect(-20000 + 960 - 68, 0, 136, 36), area)),
-            ("left", p => p.Open(IslandEdge.Left, new Rect(-20000, 516 - 68, 36, 136), area)),
+            ("bottomright", p => p.Open(IslandGeometry.Start(work, 1), area)),
+            ("topleft", p => p.Open(IslandGeometry.PuckRect(0, 0, work, 1), area)),
         })
         {
             var panel = new IslandPanelWindow();
@@ -104,7 +104,7 @@ public sealed class SoundPageShots
                 panel.SetTiles(Chippi.Core.Modules.IslandTileContribution.Group(scene.Shell.Registry.Features.SelectMany(e => e.IslandTiles)));
                 panel.SetActivities(scene.Shell.Island.Activities, PetMood.Idle);
                 panel.SetLastPage(null);
-                panel.Open(IslandEdge.Top, new Rect(-20000 + 960 - 68, 0, 136, 36), new MonitorArea(default, new Rect(-20000, 0, 1920, 1080), work, 1));
+                panel.Open(IslandGeometry.Start(work, 1), new MonitorArea(default, new Rect(-20000, 0, 1920, 1080), work, 1));
                 await Task.Delay(500);
                 Save(panel, work, Path.Combine(folder, $"sound-top-grid-{name}.png"));
                 panel.ShowPage(SoundTile.Key);

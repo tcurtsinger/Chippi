@@ -4,6 +4,7 @@
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using Chippi.App.Island;
@@ -17,22 +18,19 @@ using Chippi.UI.Controls;
 namespace Chippi.Island.Tests;
 
 /// <summary>
-/// The open island (DESIGN.md §5 Island) with fake tiles: the grid, pages, the last page and the orbit
+/// The open island (DESIGN.md §5 Island) with fake tiles: the grid, pages, the last page and the back arrow
 /// buttons. The window sits far off every screen, so nothing shows on the desktop.
 /// </summary>
 public sealed class IslandPanelTests
 {
     // A work area off any real monitor: the window is shown there, so it never appears on screen.
     private static readonly MonitorArea Offscreen = new(default, new Rect(-20000, 0, 1920, 1080), new Rect(-20000, 0, 1920, 1032), 1);
-    private static readonly Rect Tab = new(-20000 + 960 - 56, 0, 112, 32);
+    private static readonly Rect Puck = IslandGeometry.Start(Offscreen.Work, 1);
 
-    internal static IslandTileContribution Part(string key, string name, int order, IslandOrbit orbit = IslandOrbit.None, string status = "")
+    internal static IslandTileContribution Part(string key, string name, int order, string status = "")
     {
         var part = new IslandTileContribution(key, new IslandTileSpec(key, name, "Sliders", order, 0,
-            () => new Border { Height = 120, Child = new TextBlock { Text = name } })
-        {
-            Orbit = orbit,
-        });
+            () => new Border { Height = 120, Child = new TextBlock { Text = name } }));
         part.SetStatus(status);
         return part;
     }
@@ -46,7 +44,7 @@ public sealed class IslandPanelTests
         {
             panel.Initialize();
             panel.SetMedia(new FakeMedia());
-            panel.SetTiles(tiles ?? Tiles(Part("keep-awake", "Keep awake", 40, IslandOrbit.Left), Part("sound.mixer", "Volume mixer", 10, IslandOrbit.Right)));
+            panel.SetTiles(tiles ?? Tiles(Part("keep-awake", "Keep awake", 40), Part("sound.mixer", "Volume mixer", 10)));
             test(panel);
         }
         finally
@@ -57,7 +55,7 @@ public sealed class IslandPanelTests
 
     private static void Open(IslandPanelWindow panel)
     {
-        panel.Open(IslandEdge.Top, Tab, Offscreen);
+        panel.Open(Puck, Offscreen);
         Pump(TimeSpan.FromMilliseconds(400));
     }
 
@@ -67,11 +65,17 @@ public sealed class IslandPanelTests
     private static List<string> TileNames(IslandPanelWindow panel) =>
         Grid(panel).Buttons().Select(b => AutomationProperties.GetName(b)).ToList();
 
-    private static Button Orbit(IslandPanelWindow panel, string name) =>
-        ((Canvas)panel.FindName("Orbit")).Children.OfType<Button>().Single(b => b.Visibility == Visibility.Visible && AutomationProperties.GetName(b) == name);
+    private static Button Back(IslandPanelWindow panel) =>
+        Descendants((FrameworkElement)panel.FindName("Card")).OfType<Button>().Single(b => AutomationProperties.GetName(b) == "Back");
 
-    private static List<string> OrbitNames(IslandPanelWindow panel) =>
-        ((Canvas)panel.FindName("Orbit")).Children.OfType<Button>().Where(b => b.Visibility == Visibility.Visible).Select(b => AutomationProperties.GetName(b)).ToList();
+    private static void Click(Button button) => button.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+
+    private sealed class UnshownSource : PresentationSource
+    {
+        public override System.Windows.Media.Visual RootVisual { get; set; } = null!;
+        public override bool IsDisposed => false;
+        protected override System.Windows.Media.CompositionTarget GetCompositionTargetCore() => null!;
+    }
 
     /// <summary>The shape as drawn.</summary>
     private static (double Width, double Height) Size(IslandPanelWindow panel)
@@ -115,7 +119,7 @@ public sealed class IslandPanelTests
     }
 
     [Fact]
-    public void A_page_change_draws_the_new_page_under_the_old_one_then_fades_the_old_one_out()
+    public void A_page_change_fades_the_new_page_in()
     {
         if (Chippi.UI.Themes.Motion.IsReduced)
             return; // reduced motion snaps
@@ -123,73 +127,52 @@ public sealed class IslandPanelTests
         {
             Open(panel);
             panel.ShowPage("keep-awake");
-            var leaving = (Image)panel.FindName("Leaving");
             var card = (FrameworkElement)panel.FindName("Card");
-            Assert.NotNull(leaving.Source); // a picture of the grid, held over the new page
-            Assert.Equal(1, leaving.Opacity, 3);
-            Assert.Equal(1, card.Opacity, 3); // the new page draws at once, under the picture: no blank gap
-            Assert.False(card.IsHitTestVisible); // and takes no click while it can't be seen
+            Assert.Equal(0, card.Opacity, 3);
+            Assert.False(card.IsHitTestVisible); // no click while it can't be seen
             Pump(TimeSpan.FromMilliseconds(400));
-            Assert.Null(leaving.Source);
-            Assert.Equal(0, leaving.Opacity);
             Assert.Equal(1, card.Opacity);
             Assert.True(card.IsHitTestVisible);
         }));
     }
 
     [Theory]
-    [InlineData(1, 1, 1, 20, true)]
-    [InlineData(3, 3, 1, 20, true)]
-    [InlineData(4, 2, 2, 20, true)]
-    [InlineData(6, 3, 2, 20, true)]
-    [InlineData(9, 3, 3, 20, true)]
-    [InlineData(12, 4, 3, 20, true)]
-    [InlineData(15, 5, 3, 16, true)]
-    [InlineData(20, 5, 4, 16, true)]
-    [InlineData(24, 6, 4, 14, false)]
-    [InlineData(30, 6, 5, 14, false)]
-    public void The_grid_lays_out_by_tile_count(int tiles, int columns, int rows, double glyph, bool status)
-    {
-        var layout = IslandGridLayout.For(tiles);
-        Assert.Equal((columns, rows, glyph, status), (layout.Columns, layout.Rows, layout.Glyph, layout.ShowsStatus));
-    }
-
-    [Theory]
-    [InlineData(4)]
-    [InlineData(6)]
-    [InlineData(9)]
-    [InlineData(12)]
-    [InlineData(15)]
-    [InlineData(20)]
-    public void The_tiles_fill_the_body_8_apart(int count)
+    [InlineData(1, 1)]
+    [InlineData(4, 1)]
+    [InlineData(5, 2)]
+    [InlineData(8, 2)]
+    [InlineData(12, 2)] // a third row wouldn't fit: only eight show
+    public void The_home_lays_its_buttons_four_across_and_shows_at_most_eight(int count, int rows)
     {
         WpfTestThread.Run(() =>
         {
             var grid = new IslandGrid();
             grid.SetTiles([.. Enumerable.Range(0, count).Select(i => new IslandTileView($"t{i}", $"Tile {i}", Chippi.UI.Controls.LucideIcons.Music, "Status"))]);
-            grid.Measure(new Size(IslandPage.BodyWidth, IslandPage.HeaderHeight + IslandPage.Gap + IslandPage.BodyHeight));
-            grid.Arrange(new Rect(0, 0, IslandPage.BodyWidth, IslandPage.HeaderHeight + IslandPage.Gap + IslandPage.BodyHeight));
+            grid.SetVolume(new IslandTileVolume(() => 0.5, _ => { }), "sound");
+            double width = IslandPage.Width - 2 * IslandPage.Inset, height = IslandPage.Height - 2 * IslandPage.Inset;
+            grid.Measure(new Size(width, height));
+            grid.Arrange(new Rect(0, 0, width, height));
             var buttons = grid.Buttons().ToList();
-            var layout = IslandGridLayout.For(count);
-            double width = (IslandPage.BodyWidth - (layout.Columns - 1) * 8) / layout.Columns;
-            double height = (IslandPage.BodyHeight - (layout.Rows - 1) * 8) / layout.Rows;
-            Assert.All(buttons, b => Assert.Equal((Math.Round(width, 2), Math.Round(height, 2)), (Math.Round(b.ActualWidth, 2), Math.Round(b.ActualHeight, 2))));
-            var first = buttons[0].TranslatePoint(new Point(), grid);
-            var last = buttons[^1].TranslatePoint(new Point(buttons[^1].ActualWidth, buttons[^1].ActualHeight), grid);
-            Assert.Equal(IslandPage.HeaderHeight + IslandPage.Gap, first.Y, 2);
-            if (count == layout.Columns * layout.Rows)
-                Assert.Equal((IslandPage.BodyWidth, IslandPage.HeaderHeight + IslandPage.Gap + IslandPage.BodyHeight), (Math.Round(last.X, 2), Math.Round(last.Y, 2)));
+            Assert.Equal(Math.Min(count, 8), buttons.Count);
+            Assert.All(buttons, b => Assert.Equal(44, b.ActualHeight, 2));
+            var at = buttons.Select(b => b.TranslatePoint(new Point(), grid)).ToList();
+            Assert.Equal(rows, at.Select(p => Math.Round(p.Y, 1)).Distinct().Count());
+            Assert.Equal(Math.Min(count, 4), at.Select(p => Math.Round(p.X, 1)).Distinct().Count());
+            // The rows, the card, the slider and the footer all fit the panel.
+            Assert.True(grid.DesiredSize.Height <= height + 0.01, $"home is {grid.DesiredSize.Height} tall");
+            var last = buttons[^1].TranslatePoint(new Point(0, 44), grid);
+            Assert.True(last.Y <= height - 46 - 32, $"buttons end at {last.Y}");
         });
     }
 
     [Fact]
-    public void Opens_on_the_grid_with_now_playing_first_then_tiles_in_grid_order()
+    public void Opens_on_the_home_with_the_tiles_in_grid_order_and_now_playing_as_the_card()
     {
         WpfTestThread.Run(() => WithPanel(panel =>
         {
             Open(panel);
             Assert.Null(panel.CurrentPage);
-            Assert.Equal(["Now Playing", "Volume mixer", "Keep awake"], TileNames(panel));
+            Assert.Equal(["Volume mixer", "Keep awake"], TileNames(panel));
         }));
     }
 
@@ -208,20 +191,6 @@ public sealed class IslandPanelTests
     }
 
     [Fact]
-    public void Settings_choose_the_round_buttons_and_can_turn_off_the_live_one()
-    {
-        WpfTestThread.Run(() => WithPanel(panel =>
-        {
-            panel.SetLayout(IslandLayout.Default with { Left = "", Right = IslandPanelWindow.NowPlayingKey, Live = false });
-            panel.SetActivities([new IslandActivity("track", IslandActivityKind.Media, "Song", "Player")], PetMood.Idle);
-            Open(panel);
-            Assert.Equal(["Settings", "Now Playing"], OrbitNames(panel)); // no left button, Now Playing on the right, no live button
-            panel.SetLayout(IslandLayout.Default);
-            Assert.Equal(["Keep awake", "Settings", "Volume mixer", "Now Playing"], OrbitNames(panel));
-        }));
-    }
-
-    [Fact]
     public void With_all_features_chosen_it_opens_on_the_grid_even_with_a_page_remembered()
     {
         WpfTestThread.Run(() => WithPanel(panel =>
@@ -230,7 +199,6 @@ public sealed class IslandPanelTests
             panel.SetLayout(IslandLayout.Default with { OpensOn = IslandOpensOn.AllFeatures });
             Open(panel);
             Assert.Null(panel.CurrentPage);
-            Assert.Contains("Back to Keep awake", OrbitNames(panel));
         }));
     }
 
@@ -240,10 +208,6 @@ public sealed class IslandPanelTests
         var layout = IslandLayout.Default with { Order = ["c", "a"], Hidden = new HashSet<string> { "b" } };
         Assert.Equal(["c", "a", "b", "d"], layout.Sorted(["a", "b", "c", "d"]));
         Assert.Equal(["c", "a", "d"], layout.Shown(["a", "b", "c", "d"]));
-        Assert.Equal("x", IslandLayout.Button(null, _ => true, "x"));
-        Assert.Null(IslandLayout.Button("", _ => true, "x"));
-        Assert.Null(IslandLayout.Button("gone", _ => false, "x"));
-        Assert.Equal("y", IslandLayout.Button("y", _ => true, "x"));
     }
 
     [Fact]
@@ -255,7 +219,7 @@ public sealed class IslandPanelTests
         WpfTestThread.Run(() => WithPanel(panel =>
         {
             Open(panel);
-            Assert.Equal(["Now Playing", "Microphone, Muted"], TileNames(panel));
+            Assert.Equal(["Microphone, Muted"], TileNames(panel));
         }, Tiles(routing, mute)));
     }
 
@@ -287,7 +251,7 @@ public sealed class IslandPanelTests
             panel.SetLastPage("keep-awake");
             Open(panel);
             Assert.Equal("keep-awake", panel.CurrentPage);
-            panel.SetTiles(Tiles(Part("sound.mixer", "Volume mixer", 10, IslandOrbit.Right)));
+            panel.SetTiles(Tiles(Part("sound.mixer", "Volume mixer", 10)));
             Assert.Null(panel.CurrentPage);
             panel.CloseIsland(immediate: true);
             Open(panel);
@@ -347,56 +311,45 @@ public sealed class IslandPanelTests
     }
 
     [Fact]
-    public void Orbit_buttons_follow_installed_features_and_back_returns_to_the_remembered_page()
+    public void Every_page_has_a_back_arrow_to_the_grid_and_the_grid_has_none()
     {
         WpfTestThread.Run(() => WithPanel(panel =>
         {
             Open(panel);
-            Assert.Equal(["Keep awake", "Settings", "Volume mixer"], OrbitNames(panel)); // nothing remembered: no Back
-
-            Orbit(panel, "Keep awake").RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
-            Pump(TimeSpan.FromMilliseconds(400));
-            Assert.Equal("keep-awake", panel.CurrentPage);
-            Assert.Equal("Active", Orbit(panel, "Keep awake").Tag);
-            Orbit(panel, "All features").RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
-            Pump(TimeSpan.FromMilliseconds(400));
-            Assert.Null(panel.CurrentPage);
-            Orbit(panel, "Back to Keep awake").RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
-            Pump(TimeSpan.FromMilliseconds(400));
-            Assert.Equal("keep-awake", panel.CurrentPage);
-        }, Tiles(Part("keep-awake", "Keep awake", 40, IslandOrbit.Left), Part("sound.mixer", "Volume mixer", 10, IslandOrbit.Right))));
+            Assert.DoesNotContain(Descendants((FrameworkElement)panel.FindName("Card")).OfType<Button>(), b => AutomationProperties.GetName(b) == "Back");
+            foreach (var key in new[] { "keep-awake", IslandPanelWindow.NowPlayingKey, "sound.mixer" })
+            {
+                panel.ShowPage(key);
+                Pump(TimeSpan.FromMilliseconds(400));
+                Assert.Equal(key, panel.CurrentPage);
+                var card = (FrameworkElement)panel.FindName("Card");
+                card.Measure(new Size(IslandPage.Width, IslandPage.Height));
+                card.Arrange(new Rect(0, 0, IslandPage.Width, IslandPage.Height));
+                var back = Back(panel);
+                Assert.Equal(IslandPage.HeaderHeight, back.ActualHeight);
+                Click(back);
+                Pump(TimeSpan.FromMilliseconds(400));
+                Assert.Null(panel.CurrentPage);
+            }
+        }));
     }
 
     [Fact]
-    public void Without_those_features_only_settings_orbits()
+    public void Esc_closes_the_island_from_the_grid_and_from_a_page()
     {
         WpfTestThread.Run(() => WithPanel(panel =>
         {
             Open(panel);
-            Assert.Equal(["Settings"], OrbitNames(panel));
-        }, Tiles(Part("downloads", "File organizer", 50))));
-    }
-
-    [Fact]
-    public void The_live_button_opens_now_playing_for_music_and_the_microphone_when_muted()
-    {
-        WpfTestThread.Run(() => WithPanel(panel =>
-        {
-            Open(panel);
-            var muted = new IslandActivity("muted", IslandActivityKind.Status, "Microphone", "Muted") { NeedsAttention = true, TileKey = "sound.microphone" };
-            panel.SetActivities([muted], PetMood.Idle);
-            Assert.Contains("Microphone", OrbitNames(panel));
-            Assert.Contains("Microphone, Muted", TileNames(panel));
-
-            var music = new IslandActivity("media", IslandActivityKind.Media, "Weekend Mix", "Spotify");
-            panel.SetActivities([music, muted], PetMood.Idle);
-            Assert.Contains("Now Playing", OrbitNames(panel));
-            Assert.DoesNotContain("Microphone", OrbitNames(panel));
-            Orbit(panel, "Now Playing").RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+            int closes = 0;
+            panel.EscapePressed += (_, _) => closes++;
+            void Esc() => panel.RaiseEvent(new KeyEventArgs(Keyboard.PrimaryDevice, new UnshownSource(), 0, Key.Escape) { RoutedEvent = UIElement.PreviewKeyDownEvent });
+            Esc();
+            Assert.Equal(1, closes);
+            panel.ShowPage("keep-awake");
             Pump(TimeSpan.FromMilliseconds(400));
-            Assert.Equal(IslandPanelWindow.NowPlayingKey, panel.CurrentPage);
-            Assert.Equal((520, 360), Size(panel));
-        }, Tiles(Part("sound.microphone", "Microphone", 30, status: "Muted"))));
+            Esc();
+            Assert.Equal(2, closes);
+        }));
     }
 
     [Fact]
@@ -435,7 +388,7 @@ public sealed class IslandPanelTests
         parent is DependencyObject d ? LogicalTreeHelper.GetChildren(d).Cast<object>().SelectMany(c => Descendants(c).Prepend(c)) : [];
 
     [Fact]
-    public void The_orbit_buttons_count_as_the_island_for_outside_clicks()
+    public void The_shape_counts_as_the_island_for_outside_clicks()
     {
         WpfTestThread.Run(() => WithPanel(panel =>
         {
@@ -444,49 +397,24 @@ public sealed class IslandPanelTests
             var window = IslandNative.WindowRect(panel.Handle);
             double left = window.X + Canvas.GetLeft(shape), top = window.Y + Canvas.GetTop(shape);
             Assert.True(panel.Covers(new Point(left + 10, top + 10)));
-            // The left pair is centered on the 360 shape: Back at 145, Keep awake 38 below it, both 32 wide and 10 off.
-            Assert.True(panel.Covers(new Point(left - 10 - 16, top + 183 + 16))); // Keep awake's center, under Back's place
-            Assert.False(panel.Covers(new Point(left - 10 - 16, top + 145 + 16))); // Back's place, empty on the grid with nothing remembered
-            Assert.False(panel.Covers(new Point(left - 10 - 16, top + 183 + 38 + 16))); // below that column
+            Assert.False(panel.Covers(new Point(left - 10, top + 183)));
+            Assert.False(panel.Covers(new Point(left + 530, top + 183)));
         }));
     }
 
     [Fact]
-    public void The_shape_grows_from_the_tab_and_ends_at_the_page()
+    public void The_shape_grows_from_the_puck_and_ends_at_the_page()
     {
         WpfTestThread.Run(() => WithPanel(panel =>
         {
-            panel.Open(IslandEdge.Top, Tab, Offscreen);
+            panel.Open(Puck, Offscreen);
             var shape = (FrameworkElement)panel.FindName("Shape");
             if (!Chippi.UI.Themes.Motion.IsReduced)
-                Assert.Equal(Tab.Width, shape.Width, 3); // the first frame is the tab
+                Assert.Equal(Puck.Width, shape.Width, 3); // the first frame is the puck
             Pump(TimeSpan.FromMilliseconds(400));
             Assert.Equal((520, 360), Size(panel));
             Assert.Equal(1, ((FrameworkElement)panel.FindName("Card")).Opacity);
         }));
-    }
-
-    // Karl's S6 review: music starting after the island opened near the bottom of a side edge put the
-    // new live button below the work area (1076 against 1032).
-    [Fact]
-    public void A_live_button_that_appears_after_opening_stays_in_the_work_area()
-    {
-        WpfTestThread.Run(() => WithPanel(panel =>
-        {
-            var lowTab = new Rect(-20000, 1032 - 76 - 68, 36, 136); // a Left tab at the bottom end margin
-            panel.SetLastPage("keep-awake");
-            panel.Open(IslandEdge.Left, lowTab, Offscreen);
-            Pump(TimeSpan.FromMilliseconds(400));
-            Assert.DoesNotContain("Now Playing", OrbitNames(panel));
-
-            panel.SetActivities([new IslandActivity("media", IslandActivityKind.Media, "Weekend Mix", "Spotify")], PetMood.Idle);
-            Pump(TimeSpan.FromMilliseconds(100));
-
-            var live = Orbit(panel, "Now Playing");
-            var window = IslandNative.WindowRect(panel.Handle);
-            double bottom = window.Y + Canvas.GetTop(live) + live.Height;
-            Assert.True(bottom <= 1032 - 8, $"live button bottom {bottom}");
-        }, Tiles(Part("keep-awake", "Keep awake", 40)))); // no feature buttons, so only the live one reaches below
     }
 
     // Karl's S6 review: play/pause enabled for Play or Pause alone but always sent Toggle.
