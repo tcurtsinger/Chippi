@@ -1,8 +1,8 @@
 ﻿# Chippi refresh report: Island and Settings
 
-Draft, 2026-10-29. The refresh is merged through `main` `d443ed1` (PR #109). The current installers were rebuilt from `1f13495` to include #108; the later commits only record their artifact manifest. Travis's installed-build live check (task 123) is pending. This report does not mark the refresh accepted or cleanup complete.
+Updated 2026-10-30 against `main` `4132538`. The refresh shipped in PRs #92 to #109, through `d443ed1`. Phase 5.1 subsequently replaced its island with the movable widget and panel. Marge closed the refresh live check (task 123) as superseded by the redesign live check (task 181), which Travis marked Pass on the build from `4f52e49`. The final build from `16bfd6f`, including #136, is installed. The refresh has no separate live-check Pass.
 
-Brief: [brief.md](brief.md). Approved references: [fixed-size/](fixed-size/), [sound-monitor/](sound-monitor/) and [settings-shell/](settings-shell/). DESIGN.md and PLAN.md record the revised surfaces rule: the island shows live state and controls in a fixed body; Settings starts with the same controls, then configuration and complete lists.
+Brief: [brief.md](brief.md). Approved references: [fixed-size/](fixed-size/), [sound-monitor/](sound-monitor/) and [settings-shell/](settings-shell/). The refresh revised the surfaces rule, retained in DESIGN.md and PLAN.md: the island shows live state and controls in a fixed body; Settings starts with the same controls, then configuration and complete lists.
 
 ## What was built
 
@@ -35,7 +35,7 @@ Development and automated checks use isolated dev profiles and fake clipboard/au
 
 ## Test results
 
-Current installer source `1f13495`: [push CI run 40919456997](https://github.com/tcurtsinger/Chippi/actions/runs/40919456997). Earlier source `7b4a8f1` passed [run 40887785625](https://github.com/tcurtsinger/Chippi/actions/runs/40887785625) before #108.
+Historical refresh installer source `1f13495`: [push CI run 40919456997](https://github.com/tcurtsinger/Chippi/actions/runs/40919456997). Earlier source `7b4a8f1` passed [run 40887785625](https://github.com/tcurtsinger/Chippi/actions/runs/40887785625) before #108.
 
 - Release application builds for win-x64 and win-arm64: 0 warnings, 0 errors each; both publish jobs passed.
 - Regular tests on x64: 1,364 passed, 0 failed. Audio 114, Clipboard 50, Core 111, Clipboard features 68, Downloads 122, Keep awake 32, Plain paste 14, Scratchpad 27, Shelf 27, Sound 95, System monitor 90, Island 192, Notifications 26, Rules 117, Sound smoke 7, URL cleaning 272.
@@ -43,18 +43,19 @@ Current installer source `1f13495`: [push CI run 40919456997](https://github.com
 - PR #106's reviewed head `f678b53` also passed all four push/PR CI jobs before merge. Karl independently ran its Settings window (10) and Scratchpad (27) tests.
 - Review regressions included valid-import page rebuilding, Scratchpad load-failure Retry, shared note updates, empty monitor surface hiding, unmatched-file singular/plural wording, shortcut card styling, hardware filtering and cached availability on reopening.
 
-Offscreen before/after renders are under this folder's part directories. Chippi page comparison: `X:\code\chippi-scratch\refresh\chippi-settings-comparison.html` (28 renders, seven pages in dark and light). These use actual WPF controls with fake data; they do not certify native input or motion.
+Offscreen before/after renders are under this folder's part directories. External scratch paths below are historical; the refresh and redesign evidence was archived during Phase 5.1 cleanup. Chippi page comparison: `X:\code\chippi-scratch\refresh\chippi-settings-comparison.html` (28 renders, seven pages in dark and light). These use actual WPF controls with fake data; they do not certify native input or motion.
 
 ## Acceptance checklist
 
 | Check | Status | Evidence |
 |---|---|---|
-| Fixed island size and compact page fit | Automated/review checks complete; live pending | Part A-D reviews, renders and Island tests; task 123 section 2 |
-| Shared Settings layout and controls | Automated/review checks complete; live pending | PRs #97, #99-#105; task 123 sections 1, 3, 4 and 6 |
+| Fixed island size and compact page fit | Automated/review checks complete; island superseded | Part A-D reviews, renders and Island tests; Phase 5.1 replaced this island |
+| Shared Settings layout and controls | Automated/review checks complete; later installed check passed | PRs #97, #99-#105; task 181 on the redesign build |
 | Wording and surfaces docs | Done | PRs #103 and #106; Marge's wording decisions |
-| Both platform packages match the manifest | Done | PR #109, independent checks by Karl, Kayla and Marge |
-| Update in place and installed user flows | Pending | Travis's task 123 |
-| End-of-refresh cleanup | Pending | After live results and report integration |
+| Both refresh packages match the manifest | Done | PR #109, independent checks by Karl, Kayla and Marge |
+| Refresh installed user flows (task 123) | Superseded | Marge closed task 123; Travis marked task 181 Pass on `4f52e49` |
+| Final redesign installation | Done, reported by Marge | Task 190 Yes; silent Setup exit 0; installed build `16bfd6f` |
+| Refresh and redesign cleanup | Files cleaned; record PR pending | Kayla's task 191, Herb's disk check, PR #139; report worktree retained for this PR |
 
 ## Decisions
 
@@ -74,7 +75,7 @@ Travis requested Kayla as the sole reviewer. Karl did not review #108. Kayla fir
 - Controls on the new page could receive a tile's second click beneath the old-page snapshot. Input now waits until that snapshot has faded.
 - App outputs are refreshed on app/output changes, or on a later sound event when the last read is over two seconds old. This is not a two-second polling timer. Slider changes still avoid an output read on every step.
 
-Kayla ran the relevant suites and confirmed failure under reverted code for the sampler wait, hidden-page input and excessive output reads. She explicitly noted that the two-second refresh itself has no dedicated test. Her verified Island count is 192, not the agent's reported 195. The fixes are merged in `1f13495` and included in the current installer; their live behavior remains pending task 123.
+Kayla ran the relevant suites and confirmed failure under reverted code for the sampler wait, hidden-page input and excessive output reads. She explicitly noted that the two-second refresh itself has no dedicated test. Her verified Island count is 192, not the agent's reported 195. The fixes merged in `1f13495` and shipped in the refresh installer. Task 123 was later superseded by task 181; no separate live verdict was recorded for #108 on the refresh build.
 
 ## Deviations from DESIGN.md
 
@@ -83,7 +84,7 @@ No unapproved design deviations recorded. Tray-based Paste behavior is an observ
 ## Known issues
 
 - ARM64 was built and packaged, not run on ARM64 hardware.
-- Native tray, island, Settings frame and input behavior await the installed-build live check. The portable check covers startup only.
+- The refresh portable check covered startup only. Task 123 has no separate completed live result. The later redesign build passed task 181.
 - On the first Notifications opening, feature groups remain hidden until availability checks finish. Later openings immediately show cached availability while refreshing it. A feature installed while this page is open appears after reopening. Kayla reported both as nonblocking review notes.
 - Hardware checks run once per page opening, without a watch subscription or timer. The small read-only Core availability property was explicitly approved by Marge.
 
@@ -97,30 +98,36 @@ The first-open Notifications wait and refresh-on-reopen behavior above were acce
 
 ## Live checks
 
-Steps: `X:\code\chippi-scratch\refresh\live-checks.md`, reviewed by Karl and Marge, assigned to Travis as task 123. Result: pending. Marge will add the observed outcomes and any follow-up fixes.
+The refresh steps were at `X:\code\chippi-scratch\refresh\live-checks.md`, reviewed by Karl and Marge and assigned as task 123. Marge closed that task when Phase 5.1 replaced the island. Its sections have no separately recorded Pass, Fail or Skipped results; the Paste observation in step 5.3 is also unrecorded.
 
-| Section | Result |
-|---|---|
-| 0. Setup | Pending |
-| 1. Tray and Settings window | Pending |
-| 2. Island | Pending |
-| 3. Sound and System pages | Pending |
-| 4. Clipboard and text pages | Pending |
-| 5. Paste from Settings | Pending; 5.3 records observations only |
-| 6. Chippi pages | Pending |
-| 7. Afterwards | Pending |
+Travis marked the replacement live check, task 181, Pass on the build from `4f52e49` (PLAN.md records 2026-10-29). The historical refresh steps have no individual live results. That build predates #136's cleanup fixes: the Settings preview, remembered Keep awake length, Synth swatch and pet-color preview redraw.
+
+Travis then answered Yes to installing the final build (task 190). Marge reported silent Setup exit 0, successful installation in the installer log, the running file version `0.1.0+16bfd6f84683e184599f35cc07ab7d9bc0a57983`, and no warnings or errors in the app log since restart. Marge did not inspect its screen. Karl did not run that installation or observe its UI.
 
 ## Installers
 
-Current source `1f13495`, manifest commit `16dc592`, merged in #109 as main `d443ed1`. The earlier refresh build used source `7b4a8f1` and manifest `bc9527c` (#107); it is superseded. Release folder: `X:\code\chippi\build\artifacts\releases\0.1.0`. All 12 sizes and SHA-256 hashes match `phase-1-release-artifacts.csv`; the two platform CSV files are additional indexes. Kayla also checked both native RNNoise DLLs and the pinned VB-CABLE ZIP inside both packages.
+### Historical refresh builds
+
+The last refresh source was `1f13495`, manifest commit `16dc592`, merged in #109 as `d443ed1`. The earlier build used source `7b4a8f1` and manifest `bc9527c` (#107). Both have been superseded. At delivery, all 12 files matched their manifests; Kayla also checked both native RNNoise libraries and the pinned VB-CABLE ZIP inside both packages.
 
 | Platform | Setup bytes | Portable bytes | Full package bytes |
 |---|---:|---:|---:|
 | win-x64 | 82,198,782 | 74,683,688 | 74,684,670 |
 | win-arm64 | 75,482,767 | 69,573,817 | 69,574,799 |
 
-Current packaging evidence: `X:\code\chippi-scratch\refresh\pack-2\pack.log`, `artifacts.csv`, `portable-startup.log` and `startup-check.ps1`. Kayla independently checked all 12 files and the native/vendor pins (task 128); Marge copied and rechecked them in the release folder. The packaging worktree was subsequently removed. Marge archived the superseded refresh build in `X:\code\chippi-archive\refresh-installers-0.1.0-7b4a8f1`. The earlier build evidence remains under `refresh\pack` and `refresh\pack-check`; its preceding Phase 5 installers were archived in `phase-5-installers-0.1.0-fa63a54`.
+Historical packaging evidence was under `refresh\pack-2`, including `pack.log`, `artifacts.csv`, `portable-startup.log` and `startup-check.ps1`. The earlier build evidence was under `refresh\pack` and `refresh\pack-check`. The original release folder was `X:\code\chippi\build\artifacts\releases\0.1.0`. These paths describe the refresh delivery, not the currently installed build. Earlier installer archives include `refresh-installers-0.1.0-7b4a8f1` and `phase-5-installers-0.1.0-fa63a54` under `X:\code\chippi-archive`.
+
+### Replacement redesign builds
+
+Task 181 used source `4f52e49`, with x64 Setup 82,202,288 bytes. The final installer used main `16bfd6f`, with x64 Setup 82,202,609 bytes and ARM64 Setup 75,487,558 bytes. PR #138, manifest commit `7edce0c`, merged as `4132538`, records that final set. Karl built both platforms; Herb independently matched all 12 sizes and SHA-256 hashes. Both PR CI runs and main's CI on `16bfd6f` passed. Packaging was build-only; ARM64 execution remains untested.
+
+Full 12-file sets are preserved in `X:\code\chippi-archive\phase-5.1-installers-0.1.0-4f52e49` and `phase-5.1-installers-0.1.0-16bfd6f`. Herb rehashed both sets, 12/12 each. The retained x64 Setups are under `X:\code\chippi-scratch\shell-redesign\installer-4f52e49` and `installer-16bfd6f`; the final folder also contains Marge's install log.
 
 ## Cleanup
 
-Pending, following [end-of-phase-checklist.md](../end-of-phase-checklist.md). Marge owns integration and cleanup after the live check. Four known test profiles remain for cleanup: `chippi-pages-test`, `failed-shortcut-test`, `notice-filter-test` and `render-chippi`. Archive refresh scratch evidence and remove merged worktrees/branches only after verifying ownership and clean state. Preserve the retained boost spike and the installed app's data. No cleanup is claimed complete here.
+Kayla completed the refresh and redesign file cleanup on 2026-10-30 under [end-of-phase-checklist.md](../end-of-phase-checklist.md), and Herb checked her list on disk. PR #139 records it and is pending integration at this report's update.
+
+- The refresh and redesign scratch evidence is archived at `X:\code\chippi-archive\phase-5.1-cleanup-2026-10-30\phase-5.1-leftovers-2026-10-30.zip` (4,839 files). Kayla checked each archived file's size and SHA-256 before removing originals. Herb confirmed the file count, without repeating that per-file hash check.
+- Cleanup removed 20 worktrees, 23 local branches and 24 GitHub branches after ancestry checks. This unmerged report worktree was retained for publication; it is removed after its PR merges.
+- Both Chippi-dev roots (25 profiles), nine temporary folders, ten dev Explorer keys, eleven notification CLSIDs and eleven dev Start Menu shortcuts were removed. This covers the four profiles previously listed here: `chippi-pages-test`, `failed-shortcut-test`, `notice-filter-test` and `render-chippi`. Kayla reported a clean rescan; Herb independently checked the folders and shortcuts, without repeating the registry scan.
+- Both installer sets and retained Setup copies remain. The installed app, its settings, `audit-2026-10-27`, the retained `spike/boost-loopback` branch and the owner's `.impeccable/` folder were preserved.
