@@ -596,4 +596,3 @@ internal sealed class ShelfPage : UserControl
         AutomationProperties.SetName(button, text);
     }
 }
-
