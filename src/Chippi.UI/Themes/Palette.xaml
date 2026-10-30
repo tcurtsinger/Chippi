@@ -22,6 +22,4 @@
     <SolidColorBrush x:Key="PetBlushBrush" Color="#B3FF8FB0" />
     <SolidColorBrush x:Key="PetSparkBrush" Color="#F5C451" />
     <SolidColorBrush x:Key="PetShadowBrush" Color="#59000000" />
-    <!-- The sleepy z's are Muted; the pet lives on the dark island, so it uses the dark value. -->
-    <SolidColorBrush x:Key="PetZBrush" Color="#9D9D9D" />
 </ResourceDictionary>

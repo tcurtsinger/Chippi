@@ -84,7 +84,8 @@ pet:
   spark: "#F5C451"
   synth: "#B78FFF"
   tongue: "#FF7FA8"
-  headphones: "#2A2440"
+  headphones: "#1B1530"
+  headphone-rim: "#E6DCFF"
   headphone-pads: "#D2BEFF"
   iris: "#CBB2FF"
   azure: "#8EC0FF"
@@ -447,6 +448,12 @@ Drawn on a 120×120 viewBox; WPF `Path.Data` takes the same syntax.
 | Body | `M17 76 C17 45 36 31 60 31 C84 31 103 45 103 76 C103 98 87 106 60 106 C33 106 17 98 17 76 Z`, one pet color with soft shading: a vertical gradient from the color to 88% of it |
 | Eyes (idle) | White eye whites 10.5 × 12.5 at (47, 66) and (73, 66); ink pupils r 6 at (49, 68) and (75, 68); white highlights r 2 at (50.6, 65.6) and (76.6, 65.6) |
 | Mouth (idle) | An open grin in ink with a `#FF7FA8` tongue |
+| Eyes (wide awake) | White eye whites 12 × 14 at (46, 65) and (74, 65); ink pupils r 4.4 at (46, 66) and (74, 66); white highlights r 1.6 at (47.7, 63.8) and (75.7, 63.8) |
+| Mouth (wide awake) | An ink "o", 4.4 × 5 at (60, 89) |
+| Eyes (asleep) | Shut arcs `M39 67 Q46 72 53 67 M67 67 Q74 72 81 67`, round caps |
+| Mouth (asleep) | An ink ellipse 4 × 3.4 at (60, 86) |
+| z's (asleep) | "z" in Segoe UI Variable Display SemiBold, in secondary island text (`IslandTextSecondaryBrush`). Puck form: one, 30px at (92, 34). Above it: 22px at (93, 32) and 14px at (106, 16). Points are SVG text origins |
+| Headphones (listening) | Band `M19 70 C19 19 101 19 101 70`, drawn twice with round caps: a `#E6DCFF` rim at 10, then `#1B1530` ink at 5.5. Cups 15 × 26, radius 6, at x 10 and 95, y 57, `#1B1530` with a 2.2 `#E6DCFF` stroke. Pads 6 × 16, radius 3, at the cup's x + 4.5, y 62, `#D2BEFF` |
 | Ground shadow | At sizes of 64 and up only |
 
 ### Moods
@@ -454,14 +461,16 @@ Drawn on a 120×120 viewBox; WPF `Path.Data` takes the same syntax.
 | Mood | Face | Extras | When |
 |---|---|---|---|
 | **Idle** | The eyes and grin above | Blinks | Any activity; the puck while hovered or open |
-| **Wide awake** | Happy-arc eyes (3.2 stroke) | Blinks | While Keep awake holds the PC up |
-| **Celebrating** | Happy arcs (4.2 stroke) | Sparks (`#F5C451`, 3.5) fading over 1.2s; a squish to (1.06, 0.94), then (0.985, 1.02), then back, at 110, 260 and 400ms from the bottom center | Chippi finished something for you (stashed files, a timer, a download). Holds 2.5s, then goes back |
-| **Asleep** (`Sleepy`) | Shut arcs (3.4 stroke) and a small "o" mouth | Two z's, 20 and 13px bold, `#9D9D9D` | Nothing live: the puck at rest, Nothing playing |
-| **Listening** | The celebrating face, no sparks | Headphones: a `#2A2440` band (5 stroke) and cups at the sides with pads in `#D2BEFF` | A song playing: the puck (not while lifted), Now Playing and the home card without art |
+| **Wide awake** | Round open eyes and an "o" mouth | Blinks | While Keep awake holds the PC up |
+| **Celebrating** | Happy arcs `M39 70 Q46 63 53 70 M67 70 Q74 63 81 70` and the grin | Sparks (`#F5C451`) fading over 1.2s; a squish to (1.06, 0.94), then (0.985, 1.02), then back, at 110, 260 and 400ms from the bottom center | Chippi finished something for you (stashed files, a timer, a download). Holds 2.5s, then goes back |
+| **Asleep** (`Sleepy`) | Shut arcs and a small ellipse mouth | z's; breathes | Nothing live: the puck at rest, Nothing playing |
+| **Listening** | The celebrating face, no sparks | Headphones | A song playing: the puck (not while lifted), Now Playing and the home card without art |
 
 ### Sizes
 - **Small form (22 and under):** body and eyes only (6 × 7.4 at y 74); no mouth, sparks or z's.
-- **Puck:** 36 in the 50 puck. **Home footer:** 20. **Home media card without art:** 28. **Now Playing without art:** 76, listening; **Nothing playing:** 72, asleep. **Settings titlebar:** 16. **Settings › Island & pet:** 48 beside the color swatches. **About:** 32.
+- **Puck form (23 to 44):** heavier strokes so the face reads at 40: asleep arcs 4.6, happy arcs 4.8 (celebrating and listening), sparks 4.5; one big z.
+- **Above 44:** asleep arcs 3.8, happy arcs 4.2, sparks 3.5; two z's.
+- **Puck:** 40 in the 50 puck. **Home footer:** 20. **Home media card without art:** 28. **Now Playing without art:** 76, listening; **Nothing playing:** 72, asleep. **Settings titlebar:** 16. **Settings › Island & pet:** 48 beside the color swatches. **About:** 32.
 
 ### Color option
 Settings › Island & pet › Chippi › Color: **Synth** `#B78FFF` (the default, the accent's violet), **Iris** `#CBB2FF`, **Azure** `#8EC0FF`, **Signal** `#8EE6C0`, **Ember** `#FFC58F` or **Frost** `#E8ECF6`. Every color draws the same way (one color, soft shading), and the face stays pet ink and white on all of them.
@@ -469,7 +478,8 @@ Settings › Island & pet › Chippi › Color: **Synth** `#B78FFF` (the default
 ### Motion
 - **Blink:** every 4 to 7s at random, the eyes scale to 10% height for 120ms (idle and wide awake).
 - **Mood change:** the face cross-fades in 150ms. **Falling asleep** from idle or wide awake: the eyes ease shut over 600ms, then the z's fade in over 400ms.
-- **Reduced motion:** no blink, squish or tween; moods swap at once, and a running tween snaps when the setting changes.
+- **Breathing (asleep only):** the body and face scale to (1.022, 1.04) from the bottom center (60, 106) and back, eased in and out, every 4.2s. The z's drift with it, from 2 below to 3 above and from 45% to full opacity. It runs only while the pet is shown, at 30 fps, and settles over 150ms when the mood changes.
+- **Reduced motion:** no blink, breathing, squish or tween; moods swap at once, and a running tween or breath snaps to rest when the setting changes.
 
 ### Accessibility
 Where text beside it carries the state (the puck, the home, Now Playing), the pet is decorative and left out of the accessibility tree. Where it stands alone, as in the Settings preview, its name is "Chippi, {mood}": idle, wide awake, celebrating, asleep or listening. It is never the only signal of anything.
