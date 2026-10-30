@@ -154,7 +154,8 @@ public partial class IslandWindow : Window
             double Shown(double until, double from) => opening ? 1 - Math.Clamp(t / until, 0, 1) : t >= 1 ? 1 : Math.Clamp((t - from) / (1 - from), 0, 1);
             double pet = Shown(0.45, 0.45);
             PuckEnd.Opacity = pet;
-            PetScale.ScaleX = PetScale.ScaleY = 0.7 + 0.3 * pet;
+            // Under reduced motion Chippi only fades; nothing shrinks or grows.
+            PetScale.ScaleX = PetScale.ScaleY = Motion.IsReduced ? 1 : 0.7 + 0.3 * pet;
             BarLayer.Opacity = Shown(0.25, 0.55);
         };
         // Clicked into, the panel comes to the front; the widget, faded out over it, stays above it for the close.

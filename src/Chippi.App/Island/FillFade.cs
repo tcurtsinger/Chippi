@@ -74,18 +74,21 @@ internal static class FillFade
             settle();
             return;
         }
-        // Both fills on one unit square the brush stretches over the element; the new one fades in over the old.
+        // Both fills on one unit square the brush stretches over the element: the old one fades out as the new one fades
+        // in, so a hover wash going back to a clear fill fades away too, and two washes never stack.
         var square = new RectangleGeometry(new Rect(0, 0, 1, 1));
+        var outgoing = new DrawingGroup { Children = { new GeometryDrawing(from, null, square) } };
         var incoming = new DrawingGroup { Opacity = 0, Children = { new GeometryDrawing(to, null, square) } };
-        var blend = new DrawingBrush(new DrawingGroup { Children = { new GeometryDrawing(from, null, square), incoming } }) { Stretch = Stretch.Fill };
+        var blend = new DrawingBrush(new DrawingGroup { Children = { outgoing, incoming } }) { Stretch = Stretch.Fill };
         element.SetValue(property, blend);
-        var fade = new DoubleAnimation(1, Time);
-        fade.Completed += (_, _) =>
+        var fadeIn = new DoubleAnimation(1, Time);
+        fadeIn.Completed += (_, _) =>
         {
             if (ReferenceEquals(element.GetValue(property), blend))
                 settle();
         };
-        incoming.BeginAnimation(DrawingGroup.OpacityProperty, fade);
+        outgoing.BeginAnimation(DrawingGroup.OpacityProperty, new DoubleAnimation(0, Time));
+        incoming.BeginAnimation(DrawingGroup.OpacityProperty, fadeIn);
     }
 
     private static bool OnScreen(FrameworkElement element) => element.IsLoaded && element.IsVisible;

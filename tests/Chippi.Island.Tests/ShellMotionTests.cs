@@ -93,6 +93,44 @@ public sealed class ShellMotionTests
     })));
 
     [Fact]
+    public void Under_reduced_motion_Chippi_only_fades_into_the_panel_and_back() => WpfTestThread.Run(() => WithMotion(true, () => IslandWindowTests.WithShownIsland(window =>
+    {
+        var puck = window.PuckRect;
+        var pointer = new Point(puck.Left + puck.Width / 2, puck.Top + puck.Height / 2);
+        window.PointerAt = () => pointer;
+        window.PuckButton.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Left) { RoutedEvent = UIElement.PreviewMouseLeftButtonDownEvent });
+        window.PuckButton.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Left) { RoutedEvent = UIElement.PreviewMouseLeftButtonUpEvent });
+        Assert.True(window.IsIslandOpen);
+        for (int i = 0; i < 8; i++)
+        {
+            IslandWindowTests.Pump(TimeSpan.FromMilliseconds(20));
+            Assert.Equal(1, window.PetScale.ScaleX); // no shrinking: it fades
+        }
+        window.Escape();
+        for (int i = 0; i < 8; i++)
+        {
+            IslandWindowTests.Pump(TimeSpan.FromMilliseconds(20));
+            Assert.Equal(1, window.PetScale.ScaleX);
+        }
+    })));
+
+    [Fact]
+    public void A_fill_going_back_to_clear_fades_out_rather_than_snapping() => WpfTestThread.Run(() => WithMotion(false, () => IslandWindowTests.WithShownIsland(window =>
+    {
+        // The rim blends the same way the controls' fills do (FillFade.Blend).
+        window.PuckButton.RaiseEvent(new MouseEventArgs(Mouse.PrimaryDevice, 0) { RoutedEvent = Mouse.MouseEnterEvent });
+        IslandWindowTests.Pump(TimeSpan.FromMilliseconds(200));
+        window.PuckButton.RaiseEvent(new MouseEventArgs(Mouse.PrimaryDevice, 0) { RoutedEvent = Mouse.MouseLeaveEvent });
+        var blend = Assert.IsType<DrawingBrush>(window.Body.BorderBrush);
+        var layers = ((DrawingGroup)blend.Drawing).Children.Cast<DrawingGroup>().ToList();
+        IslandWindowTests.Pump(TimeSpan.FromMilliseconds(40));
+        Assert.InRange(layers[0].Opacity, 0, 0.99); // the old one fading out
+        Assert.InRange(layers[1].Opacity, 0.01, 1); // as the new one fades in
+        IslandWindowTests.Pump(TimeSpan.FromMilliseconds(200));
+        Assert.Same(window.FindResource("IslandWidgetBorderBrush"), window.Body.BorderBrush);
+    })));
+
+    [Fact]
     public void Laying_the_home_out_ahead_leaves_the_panel_closed() => WpfTestThread.Run(() => WithPanel(panel =>
     {
         panel.Prewarm();
