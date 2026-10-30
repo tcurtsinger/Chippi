@@ -58,7 +58,7 @@ public sealed class ScratchpadPageTests
         using var reopened = new ScratchpadPage(session, new IslandOpenHold().Hold);
         Assert.Equal(editor.Text, Named<TextBox>(reopened, "Note").Text);
         Assert.False(editor.AcceptsTab);
-        Assert.Equal(12, editor.FontSize);
+        Assert.Equal(13, editor.FontSize);
     });
 
     [Fact]

@@ -6,7 +6,6 @@ using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
-using System.Windows.Markup;
 using System.Windows.Threading;
 using Chippi.Core.Modules;
 using Chippi.UI.Controls;
@@ -59,31 +58,8 @@ public sealed class ScratchpadPage : Grid, IDisposable
         tabText.SetValue(TextBlock.TextTrimmingProperty, TextTrimming.CharacterEllipsis);
         tabText.SetValue(TextBlock.MaxWidthProperty, 96.0);
         _tabs.ItemTemplate = new DataTemplate { VisualTree = tabText };
-        var tabStyle = (Style)XamlReader.Parse("""
-            <Style xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" TargetType="ListBoxItem">
-              <Setter Property="Foreground" Value="{DynamicResource IslandTextSecondaryBrush}"/>
-              <Setter Property="FocusVisualStyle" Value="{DynamicResource IslandFocusVisual}"/>
-              <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ListBoxItem">
-                <Grid Background="Transparent">
-                  <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="{TemplateBinding Padding}"/>
-                  <Border Name="Bar" Height="3" CornerRadius="1.5" Margin="10,0,10,0" VerticalAlignment="Bottom"
-                          Background="{DynamicResource IslandAccentBrush}" Visibility="Collapsed"/>
-                </Grid>
-                <ControlTemplate.Triggers>
-                  <Trigger Property="IsMouseOver" Value="True"><Setter Property="Foreground" Value="{DynamicResource IslandTextBrush}"/></Trigger>
-                  <Trigger Property="IsSelected" Value="True">
-                    <Setter Property="Foreground" Value="{DynamicResource IslandTextBrush}"/>
-                    <Setter Property="FontWeight" Value="SemiBold"/>
-                    <Setter TargetName="Bar" Property="Visibility" Value="Visible"/>
-                  </Trigger>
-                  <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.45"/></Trigger>
-                </ControlTemplate.Triggers>
-              </ControlTemplate></Setter.Value></Setter>
-            </Style>
-            """);
-        tabStyle.Setters.Add(new Setter(HeightProperty, 30.0));
-        tabStyle.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(10, 0, 10, 0)));
-        tabStyle.Setters.Add(new Setter(AutomationProperties.NameProperty, new System.Windows.Data.Binding("Label")));
+        Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri("pack://application:,,,/Chippi.Features.Scratchpad;component/ScratchpadStyles.xaml") });
+        var tabStyle = (Style)FindResource("ScratchpadTabStyle");
         _tabs.ItemContainerStyle = tabStyle;
         AutomationProperties.SetName(_tabs, "Notes");
         _tabs.SelectionChanged += async (_, _) => { if (!_painting && _tabs.SelectedItem is SegmentItem { Value: long id }) await SelectAsync(id); };

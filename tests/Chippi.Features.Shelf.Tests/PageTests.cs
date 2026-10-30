@@ -253,7 +253,7 @@ public sealed class PageTests : IDisposable
             Assert.True(Shows(page, "PDF · 2.1 MB"));
             Assert.True(Shows(page, "Unavailable"));
             var unavailable = rows.Single(r => Find<TextBlock>(r).Any(t => t.Text == "Unavailable"));
-            Assert.False(Find<Button>(unavailable).Single(b => AutomationProperties.GetName(b) == "Copy").IsEnabled);
+            Assert.False(Find<Button>(unavailable).Single(b => b.Content as string == "Copy").IsEnabled);
             Assert.Equal(0.45, Find<StackPanel>(unavailable).First().Opacity);
 
             var text = _module.Shelf.Items.Single(i => i.Kind == ShelfKind.Text);
