@@ -37,7 +37,8 @@
                 <Border x:Name="BodyShadow" CornerRadius="25" Background="{DynamicResource IslandBrush}" Effect="{StaticResource IslandPuckShadow}" />
                 <Border x:Name="Body" CornerRadius="25" Background="{DynamicResource IslandBrush}" BorderBrush="{DynamicResource IslandWidgetBorderBrush}" BorderThickness="1" />
                 <!-- The bar's content, laid out on the full 256 from the puck's end and clipped while the bar unfolds:
-                     the lead (cover or glyph), the two lines, then the bars or the pause mark (IslandWindow.LayOutBar). -->
+                     the lead (cover or glyph) in the far round end, the two lines, then the bars or the pause mark by
+                     Chippi. IslandWindow.LayOutBar mirrors the columns when Chippi is on the left. -->
                 <Grid x:Name="BarLayer" ClipToBounds="True" IsHitTestVisible="False">
                     <Grid x:Name="Bar" Width="256" Height="50" Opacity="0" HorizontalAlignment="Right">
                         <Grid.ColumnDefinitions>

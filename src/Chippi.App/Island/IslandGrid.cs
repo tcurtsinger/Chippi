@@ -107,7 +107,8 @@ internal sealed class IslandGrid : UserControl
             _volumeRow.Children.Add(part);
 
         _media.OpenRequested += (_, _) => TileOpened?.Invoke(this, IslandPanelWindow.NowPlayingKey);
-        var body = new Grid { Margin = new Thickness(0, 0, 0, 14) };
+        // 10 above the footer: the volume row sits midway between the buttons' last status line and the footer's hairline.
+        var body = new Grid { Margin = new Thickness(0, 0, 0, 10) };
         body.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         body.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         body.RowDefinitions.Add(new RowDefinition());
