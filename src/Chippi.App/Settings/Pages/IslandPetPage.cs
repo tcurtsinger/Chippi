@@ -302,7 +302,7 @@ internal sealed class IslandPetPage : UserControl
             {
                 preview.PetColor = color;
                 row.Description = color.ToString();
-                SettingsUi.SaveApp(_shell.Config, s => s.PetColor = color);
+                Save(s => s.PetColor = color);
             };
             controls.Children.Add(swatch);
         }
