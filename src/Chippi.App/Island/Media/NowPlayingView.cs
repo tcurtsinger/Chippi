@@ -34,7 +34,7 @@ internal sealed class NowPlayingView : UserControl
     private readonly LucideIcon _chevron = new() { Data = LucideIcons.ChevronDown, Size = 12, Margin = new Thickness(4, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
     private readonly Popup _sources = new() { StaysOpen = false, AllowsTransparency = true, Placement = PlacementMode.Bottom };
     private readonly Border _art = new() { Width = Art, Height = Art, CornerRadius = new CornerRadius(6), ClipToBounds = true };
-    private readonly ChippiPet _artPet = new() { Size = 76, IsDecorative = true, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+    private readonly ChippiPet _artPet = new() { Size = 76, Mood = PetMood.Listening, IsDecorative = true, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
     private readonly TextBlock _title = new()
     {
         FontSize = 20, FontWeight = FontWeights.SemiBold, LineHeight = 26, LineStackingStrategy = LineStackingStrategy.BlockLineHeight,
