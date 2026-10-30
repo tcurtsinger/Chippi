@@ -64,7 +64,8 @@ public sealed class CompactPageTests
         var table = Find<Grid>(view).Single(g => g.ColumnDefinitions.Count == 4);
         Assert.Equal(8, table.RowDefinitions.Count); // header and seven drives
         Assert.All(table.RowDefinitions, r => Assert.Equal(22, r.Height.Value));
-        Assert.InRange(view.DesiredSize.Height, 1, 304);
+        Assert.Equal(8 * 22, table.ActualHeight); // header and every whole drive row
+        Assert.Equal(296, view.DesiredSize.Height); // four 28px readings, 8px gap and the 176px table
         Assert.DoesNotContain(Find<TextBlock>(view), t => t.Text == "J:");
         Assert.Empty(Find<ScrollViewer>(view));
     });
