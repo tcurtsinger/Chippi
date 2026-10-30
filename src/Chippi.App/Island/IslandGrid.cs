@@ -114,7 +114,8 @@ internal sealed class IslandGrid : UserControl
         Typography.SetNumeralAlignment(_percent, FontNumeralAlignment.Tabular);
         var arrowGlyph = new LucideIcon { Data = LucideIcons.ChevronRight, Size = 14 };
         arrowGlyph.SetResourceReference(LucideIcon.BrushProperty, "IslandTextSecondaryBrush");
-        var arrow = new Button { Content = arrowGlyph, Margin = new Thickness(6, 0, 0, 0), ToolTip = "Sound" };
+        // Mirrors the speaker: its glyph sits where a bare glyph would at the row's end (the button is 7 wider each side).
+        var arrow = new Button { Content = arrowGlyph, Margin = new Thickness(6, 0, -7, 0), ToolTip = "Sound" };
         arrow.SetResourceReference(StyleProperty, "IslandIconButtonStyle");
         AutomationProperties.SetName(arrow, "Sound");
         arrow.Click += (_, _) =>
@@ -251,6 +252,17 @@ internal sealed class IslandGrid : UserControl
     {
         if (tiles.SequenceEqual(_shown))
             return;
+        // The same buttons in the same order take a new status, glyph or state in place, so a hover or a press on one
+        // carries on through it (System monitor's status changes every 2 seconds while the home shows).
+        var built = _tiles.Children.OfType<HomeTile>().ToList();
+        var shown = tiles.Take(MaxTiles).ToList();
+        if (built.Count == shown.Count && built.Zip(shown).All(p => p.First.View.Key == p.Second.Key && p.First.View.Split == p.Second.Split))
+        {
+            _shown = tiles;
+            for (int i = 0; i < shown.Count; i++)
+                built[i].Show(shown[i]);
+            return;
+        }
         // The focus comes back to the same part (a button or its arrow) of the same tile.
         var parts = Parts();
         int focusedAt = parts.FindIndex(p => p.Part.IsKeyboardFocused);
@@ -259,8 +271,8 @@ internal sealed class IslandGrid : UserControl
         _shown = tiles;
         _tiles.Rows = Math.Max(1, (Math.Min(tiles.Count, MaxTiles) + Columns - 1) / Columns);
         _tiles.Children.Clear();
-        foreach (var tile in tiles.Take(MaxTiles))
-            _tiles.Children.Add(Tile(tile));
+        foreach (var tile in shown)
+            _tiles.Children.Add(new HomeTile(tile, key => TileOpened?.Invoke(this, key), key => TileToggled?.Invoke(this, key)));
         if (focusedKey is not null && Parts().Where(p => _shown[p.Tile].Key == focusedKey).ToList() is { Count: > 0 } again)
             again[focusedArrow ? again.Count - 1 : 0].Part.Focus();
     }
@@ -272,61 +284,96 @@ internal sealed class IslandGrid : UserControl
     private List<(int Tile, ButtonBase Part)> Parts() =>
         [.. _tiles.Children.OfType<Panel>().SelectMany((c, i) => ((Panel)c.Children[0]).Children.OfType<ButtonBase>().Select(b => (i, b)))];
 
-    private StackPanel Tile(IslandTileView tile)
+    /// <summary>
+    /// One button with its name and status under it. It keeps its controls while its key and split stay, and shows a new
+    /// status, glyph or state on them (Show).
+    /// </summary>
+    private sealed class HomeTile : StackPanel
     {
-        var glyph = new LucideIcon { Data = tile.Icon, Size = 16, HorizontalAlignment = HorizontalAlignment.Center };
-        glyph.SetResourceReference(LucideIcon.BrushProperty, tile.On ? "IslandOnAccentBrush" : tile.Caution ? "WarningBrush" : "IslandTextBrush");
-        ButtonBase main;
-        var box = new Grid { Height = 44 };
-        if (tile.Split)
-        {
-            var toggle = new ToggleButton { IsChecked = tile.On, Content = glyph, Tag = tile.Key };
-            toggle.SetResourceReference(StyleProperty, "IslandSplitMainStyle");
-            // The module decides: the button follows its state, not the click.
-            toggle.Click += (_, _) =>
-            {
-                toggle.IsChecked = tile.On;
-                TileToggled?.Invoke(this, tile.Key);
-            };
-            var arrowGlyph = new LucideIcon { Data = LucideIcons.ChevronRight, Size = 13 };
-            string page = tile.Page ?? tile.Name;
-            var side = new Button { Content = arrowGlyph, Tag = tile.On ? "On" : null, ToolTip = page };
-            side.SetResourceReference(StyleProperty, "IslandSplitSideStyle");
-            arrowGlyph.SetBinding(LucideIcon.BrushProperty, new System.Windows.Data.Binding(nameof(Foreground)) { Source = side });
-            AutomationProperties.SetName(side, $"Open {page}");
-            side.Click += (_, _) => TileOpened?.Invoke(this, tile.Key);
-            box.ColumnDefinitions.Add(new ColumnDefinition());
-            box.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            Grid.SetColumn(side, 1);
-            box.Children.Add(toggle);
-            box.Children.Add(side);
-            box.SizeChanged += (_, _) => Span(toggle, side);
-            main = toggle;
-        }
-        else
-        {
-            var button = new Button { Content = glyph, Tag = tile.Key };
-            button.SetResourceReference(StyleProperty, "IslandTileStyle");
-            button.Click += (_, _) => TileOpened?.Invoke(this, tile.Key);
-            box.Children.Add(button);
-            main = button;
-        }
-        AutomationProperties.SetName(main, tile.Status.Length > 0 ? $"{tile.Name}, {tile.Status}" : tile.Name);
+        private readonly LucideIcon _glyph = new() { Size = 16, HorizontalAlignment = HorizontalAlignment.Center };
+        private readonly TextBlock _name = new() { FontSize = 12, Margin = new Thickness(0, 5, 0, 0), HorizontalAlignment = HorizontalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
+        private readonly TextBlock _status = new() { FontSize = 11, Margin = new Thickness(0, 1, 0, 0), HorizontalAlignment = HorizontalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
+        private readonly ButtonBase _main;
+        private readonly Button? _side;
 
-        var name = new TextBlock { Text = tile.Name, FontSize = 12, Margin = new Thickness(0, 5, 0, 0), HorizontalAlignment = HorizontalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
-        name.SetResourceReference(TextBlock.ForegroundProperty, "IslandTextBrush");
-        var status = new TextBlock { Text = tile.Status, FontSize = 11, Margin = new Thickness(0, 1, 0, 0), HorizontalAlignment = HorizontalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
-        status.SetResourceReference(TextBlock.ForegroundProperty, tile.Caution ? "WarningTextBrush" : "IslandTextTertiaryBrush");
+        public HomeTile(IslandTileView tile, Action<string> open, Action<string> toggled)
+        {
+            View = tile;
+            var box = new Grid { Height = 44 };
+            if (tile.Split)
+            {
+                var toggle = new ToggleButton { Content = _glyph, Tag = tile.Key };
+                toggle.SetResourceReference(StyleProperty, "IslandSplitMainStyle");
+                // The module decides: the button follows its state, not the click.
+                toggle.Click += (_, _) =>
+                {
+                    toggle.IsChecked = View.On;
+                    toggled(View.Key);
+                };
+                var arrowGlyph = new LucideIcon { Data = LucideIcons.ChevronRight, Size = 13 };
+                var side = new Button { Content = arrowGlyph };
+                side.SetResourceReference(StyleProperty, "IslandSplitSideStyle");
+                arrowGlyph.SetBinding(LucideIcon.BrushProperty, new System.Windows.Data.Binding(nameof(Foreground)) { Source = side });
+                side.Click += (_, _) => open(View.Key);
+                box.ColumnDefinitions.Add(new ColumnDefinition());
+                box.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                Grid.SetColumn(side, 1);
+                box.Children.Add(toggle);
+                box.Children.Add(side);
+                box.SizeChanged += (_, _) => Span(toggle, side);
+                _main = toggle;
+                _side = side;
+            }
+            else
+            {
+                var button = new Button { Content = _glyph, Tag = tile.Key };
+                button.SetResourceReference(StyleProperty, "IslandTileStyle");
+                button.Click += (_, _) => open(View.Key);
+                box.Children.Add(button);
+                _main = button;
+            }
+            _name.SetResourceReference(TextBlock.ForegroundProperty, "IslandTextBrush");
+            _name.SizeChanged += (_, _) => Tip();
+            _status.SizeChanged += (_, _) => Tip();
+            Margin = new Thickness(0, 0, 10, 12);
+            Children.Add(box);
+            Children.Add(_name);
+            Children.Add(_status);
+            Show(tile);
+        }
+
+        /// <summary>The tile as it shows now.</summary>
+        public IslandTileView View { get; private set; }
+
+        public void Show(IslandTileView tile)
+        {
+            View = tile;
+            _glyph.Data = tile.Icon;
+            _glyph.SetResourceReference(LucideIcon.BrushProperty, tile.On ? "IslandOnAccentBrush" : tile.Caution ? "WarningBrush" : "IslandTextBrush");
+            if (_main is ToggleButton toggle)
+                toggle.IsChecked = tile.On;
+            if (_side is not null)
+            {
+                string page = tile.Page ?? tile.Name;
+                _side.Tag = tile.On ? "On" : null;
+                _side.ToolTip = page;
+                AutomationProperties.SetName(_side, $"Open {page}");
+            }
+            AutomationProperties.SetName(_main, tile.Status.Length > 0 ? $"{tile.Name}, {tile.Status}" : tile.Name);
+            _name.Text = tile.Name;
+            _status.Text = tile.Status;
+            _status.SetResourceReference(TextBlock.ForegroundProperty, tile.Caution ? "WarningTextBrush" : "IslandTextTertiaryBrush");
+            // The lines keep their width when only the text changes (a new status cut off like the last), so the tooltip is
+            // worked out again here, not only when they change size.
+            Tip();
+        }
 
         // A long name or status is cut off under the button; the tooltip carries all of it.
-        void Tip()
+        private void Tip()
         {
-            bool cut = Cut(name, tile.Name) || Cut(status, tile.Status);
-            main.ToolTip = !cut ? null : tile.Status.Length == 0 ? tile.Name : $"{tile.Name} · {tile.Status}";
+            bool cut = Cut(_name, View.Name) || Cut(_status, View.Status);
+            _main.ToolTip = !cut ? null : View.Status.Length == 0 ? View.Name : $"{View.Name} · {View.Status}";
         }
-        name.SizeChanged += (_, _) => Tip();
-        status.SizeChanged += (_, _) => Tip();
-        return new StackPanel { Margin = new Thickness(0, 0, 10, 12), Children = { box, name, status } };
     }
 
     /// <summary>

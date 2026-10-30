@@ -46,6 +46,32 @@ public sealed class IslandHomeTests
     private static void Click(ButtonBase button) => button.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
 
     [Fact]
+    public void A_new_status_or_state_shows_on_the_same_buttons_and_only_a_new_set_builds_them_again() => WpfTestThread.Run(() =>
+    {
+        var grid = Laid(g => g.SetTiles([Tile("keep-awake", split: true), Tile("clipboard")]));
+        var before = grid.Buttons().ToList();
+        var toggled = new List<string>();
+        grid.TileToggled += (_, key) => toggled.Add(key);
+
+        // System monitor's status every 2 seconds, Keep awake turning on: a hover or a press on a button carries on through it.
+        grid.SetTiles([Tile("keep-awake", on: true, split: true) with { Status = "1 hr left" }, Tile("clipboard") with { Status = "24 items" }]);
+        Assert.Equal(before, grid.Buttons());
+        var main = Assert.IsType<ToggleButton>(before[0]);
+        Assert.True(main.IsChecked);
+        Assert.Equal("On", Find<Button>(grid, b => AutomationProperties.GetName(b) == "Open keep-awake").Tag);
+        Assert.Equal("keep-awake, 1 hr left", AutomationProperties.GetName(main));
+        Assert.NotNull(Find<TextBlock>(grid, t => t.Text == "24 items"));
+        Click(main);
+        Assert.Equal(["keep-awake"], toggled); // the kept button toggles the tile it shows now
+        Assert.True(main.IsChecked);
+
+        // Another set or order builds them again.
+        grid.SetTiles([Tile("clipboard"), Tile("keep-awake", split: true)]);
+        Assert.DoesNotContain(grid.Buttons(), before.Contains);
+        Assert.Equal(["clipboard", "keep-awake"], grid.Buttons().Select(b => (string)b.Tag));
+    });
+
+    [Fact]
     public void A_split_button_toggles_without_opening_and_its_arrow_opens_without_toggling() => WpfTestThread.Run(() =>
     {
         var grid = Laid(g => g.SetTiles([Tile("keep-awake", on: true, split: true), Tile("clipboard")]));
@@ -101,6 +127,13 @@ public sealed class IslandHomeTests
 
         slider.Value = 30;
         Assert.Equal([0.3], set);
+
+        // The row's two ends mirror each other: the arrow's glyph as far in from the right as the speaker's from the left.
+        var row = (FrameworkElement)slider.Parent;
+        var speaker = Find<LucideIcon>(row, i => i.Data == LucideIcons.Volume);
+        var arrow = Find<LucideIcon>(row, i => i.Data == LucideIcons.ChevronRight);
+        double left = speaker.TranslatePoint(default, row).X, right = row.ActualWidth - arrow.TranslatePoint(new Point(arrow.ActualWidth, 0), row).X;
+        Assert.Equal(left, right, 1);
 
         level = null; // no output: it says so in the slider's place
         grid.SetVolume(new IslandTileVolume(() => level, set.Add), "sound");
@@ -240,6 +273,19 @@ public sealed class IslandHomeTests
         grid.UpdateLayout();
         Assert.Equal("Chrome", Find<TextBlock>(grid.Media, t => t.FontSize == 14).Text);
         Assert.Equal(Visibility.Collapsed, ((FrameworkElement)note.Parent).Visibility);
+
+        // A long app name ends in an ellipsis inside the text's column, not cut mid-letter where the transport starts.
+        string longName = string.Concat(Enumerable.Repeat("Windows Media Player Legacy ", 4)).Trim();
+        media.Sessions = [new MediaTrack("wmplayer.exe", longName, "Song", "", true, true, true, true, true, true, TimeSpan.Zero, TimeSpan.Zero, DateTimeOffset.Now, null)];
+        grid.Media.SetMedia(media);
+        grid.UpdateLayout();
+        var source = Find<TextBlock>(grid.Media, t => t.Text == longName);
+        Assert.True(IslandGrid.Cut(source, longName));
+        var pause = Find<Button>(grid, b => AutomationProperties.GetName(b) == "Pause");
+        Assert.Equal("Pause", pause.ToolTip); // the transport names itself, as the other icon buttons do
+        Assert.Equal("Next track", Find<Button>(grid, b => AutomationProperties.GetName(b) == "Next track").ToolTip);
+        var transport = (FrameworkElement)pause.Parent;
+        Assert.True(source.TranslatePoint(new Point(source.ActualWidth, 0), grid.Media).X <= transport.TranslatePoint(default, grid.Media).X);
     });
 
     [Fact]

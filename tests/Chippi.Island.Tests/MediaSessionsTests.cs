@@ -21,4 +21,13 @@ public sealed class MediaSessionsTests
         Assert.Null(SystemMediaSessions.KeepPick("spotify", picked, [Track("firefox", true)]));
         Assert.Null(SystemMediaSessions.KeepPick(null, picked, picked));
     }
+
+    [Fact]
+    public void A_players_title_is_one_line_and_white_space_alone_is_no_title()
+    {
+        Assert.Equal("Karma Police (Live)", SystemMediaSessions.OneLine("  Karma Police\r\n(Live)\t"));
+        Assert.Equal("", SystemMediaSessions.OneLine(" \n\t "));
+        Assert.Equal("", SystemMediaSessions.OneLine(null));
+        Assert.Equal("Radiohead", SystemMediaSessions.OneLine("Radiohead"));
+    }
 }

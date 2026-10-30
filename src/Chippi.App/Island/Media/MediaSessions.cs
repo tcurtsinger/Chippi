@@ -223,8 +223,8 @@ public sealed class SystemMediaSessions : IMediaSessions
             var playback = session.GetPlaybackInfo();
             var timeline = session.GetTimelineProperties();
             var controls = playback?.Controls;
-            string title = properties?.Title ?? "";
-            string artist = properties?.Artist ?? "";
+            string title = OneLine(properties?.Title);
+            string artist = OneLine(properties?.Artist);
             var duration = timeline is null ? TimeSpan.Zero : timeline.EndTime - timeline.StartTime;
             return new MediaTrack(id, AppName(id), title, artist,
                 playback?.PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing,
@@ -239,6 +239,12 @@ public sealed class SystemMediaSessions : IMediaSessions
             return null;
         }
     }
+
+    /// <summary>
+    /// A player's text as one line: some send a title with a line break or tabs in it, which would break the card's and the
+    /// bar's one line. Runs of white space become one space, trimmed; white space alone is no text.
+    /// </summary>
+    internal static string OneLine(string? text) => string.Join(' ', (text ?? "").Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
 
     // Decoded once per track. Apps send the track first and its cover a moment later (another
     // properties change), so a track whose cover hasn't come yet is read again; one that came but
