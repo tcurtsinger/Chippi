@@ -32,7 +32,7 @@ internal static class DiskTable
             if (row > 0)
             {
                 var line = new Border { Height = 1, VerticalAlignment = VerticalAlignment.Top };
-                line.SetResourceReference(Border.BackgroundProperty, island ? "IslandPanelBrush" : "BorderBrush");
+                line.SetResourceReference(Border.BackgroundProperty, island ? "IslandHairBrush" : "BorderBrush");
                 Grid.SetRow(line, row); Grid.SetColumnSpan(line, 4); grid.Children.Add(line);
             }
             for (int column = 0; column < values.Length; column++)

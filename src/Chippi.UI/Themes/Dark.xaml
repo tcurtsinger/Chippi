@@ -71,4 +71,42 @@
 
     <!-- Flyout shadow: 0 8px 32px rgba(0,0,0,.28). -->
     <DropShadowEffect x:Key="WindowShadow" Color="#000000" BlurRadius="32" ShadowDepth="8" Direction="270" Opacity="0.28" />
+
+    <!-- ===== Island (shell redesign, docs/shell-redesign/design/final.html): the Windows 11 widget look
+         in both themes, with the pet's violet as its own accent (the Accent setting doesn't reach it).
+         The surface is solid: with Transparency effects off, Windows draws acrylic solid too. ===== -->
+    <SolidColorBrush x:Key="IslandBrush" Color="#F528282C" />
+    <SolidColorBrush x:Key="IslandBorderBrush" Color="#17FFFFFF" />
+    <SolidColorBrush x:Key="IslandTabBorderBrush" Color="#24FFFFFF" />
+    <SolidColorBrush x:Key="IslandFooterBrush" Color="#09FFFFFF" />
+    <SolidColorBrush x:Key="IslandHairBrush" Color="#14FFFFFF" />
+    <!-- Cards inside the panel, and controls (buttons, tiles, segments) on it. -->
+    <SolidColorBrush x:Key="IslandPanelBrush" Color="#0DFFFFFF" />
+    <SolidColorBrush x:Key="IslandCardBorderBrush" Color="#0FFFFFFF" />
+    <SolidColorBrush x:Key="IslandButtonBrush" Color="#12FFFFFF" />
+    <SolidColorBrush x:Key="IslandButtonHoverBrush" Color="#17FFFFFF" />
+    <SolidColorBrush x:Key="IslandPressedBrush" Color="#0AFFFFFF" />
+    <SolidColorBrush x:Key="IslandControlBorderBrush" Color="#17FFFFFF" />
+    <SolidColorBrush x:Key="IslandHoverBrush" Color="#0FFFFFFF" />
+    <!-- An empty bar or meter, the slider's remainder, its thumb ring, and a muted bar's fill. -->
+    <SolidColorBrush x:Key="IslandTrackBrush" Color="#24FFFFFF" />
+    <SolidColorBrush x:Key="IslandSliderTrackBrush" Color="#9A9A9A" />
+    <SolidColorBrush x:Key="IslandThumbBrush" Color="#454545" />
+    <SolidColorBrush x:Key="IslandMutedFillBrush" Color="#8CFFFFFF" />
+    <SolidColorBrush x:Key="IslandTextBrush" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="IslandTextSecondaryBrush" Color="#C9C9C9" />
+    <SolidColorBrush x:Key="IslandTextTertiaryBrush" Color="#9A9A9A" />
+    <SolidColorBrush x:Key="IslandCautionBrush" Color="#FF99A4" />
+    <!-- Accent: a glyph, link or mark; the fill behind whatever is on, with on-accent text on it;
+         and the tint behind a selected row. -->
+    <SolidColorBrush x:Key="IslandAccentBrush" Color="#B79CFF" />
+    <LinearGradientBrush x:Key="IslandAccentFillBrush" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="#B78FFF" Offset="0" />
+        <GradientStop Color="#82AEFF" Offset="1" />
+    </LinearGradientBrush>
+    <SolidColorBrush x:Key="IslandOnAccentBrush" Color="#170F2E" />
+    <SolidColorBrush x:Key="IslandAccentTintBrush" Color="#24B79CFF" />
+    <DropShadowEffect x:Key="IslandShadow" Color="#000000" BlurRadius="24" ShadowDepth="8" Direction="270" Opacity="0.45" />
+    <DropShadowEffect x:Key="IslandExpandedShadow" Color="#000000" BlurRadius="40" ShadowDepth="16" Direction="270" Opacity="0.5" />
+    <DropShadowEffect x:Key="IslandThumbShadow" Color="#000000" BlurRadius="3" ShadowDepth="1" Direction="270" Opacity="0.3" />
 </ResourceDictionary>

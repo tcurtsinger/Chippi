@@ -11,7 +11,7 @@ namespace Chippi.UI.Themes;
 /// <summary>
 /// Swaps the Dark/Light dictionary in Application resources (ported from Hopper) and adds
 /// "Follow Windows": with <see cref="ThemePreference.System"/> it reads the Windows app theme and
-/// re-applies when the user changes it. Palette.xaml (island, pet) is never swapped. The accent
+/// re-applies when the user changes it. Palette.xaml (pet) is never swapped. The accent
 /// is a dark and a light shade (DESIGN.md §2); the theme picks which one shows.
 /// </summary>
 public static class ThemeManager
@@ -34,8 +34,8 @@ public static class ThemeManager
     };
 
     /// <summary>
-    /// Sets AccentBrush and OnAccentBrush for the showing theme, and IslandAccentBrush (always the
-    /// dark shade). Written at the application level, so they win over the theme dictionaries' defaults.
+    /// Sets AccentBrush and OnAccentBrush for the showing theme. Written at the application level, so they
+    /// win over the theme dictionaries' defaults. The island keeps the pet's violet (IslandAccentBrush).
     /// </summary>
     public static void SetAccent(Color dark, Color light)
     {
@@ -123,7 +123,6 @@ public static class ThemeManager
         var resources = Application.Current.Resources;
         resources["AccentBrush"] = Frozen(IsLight ? accent.Light : accent.Dark);
         resources["OnAccentBrush"] = Frozen(IsLight ? Colors.White : Colors.Black);
-        resources["IslandAccentBrush"] = Frozen(accent.Dark);
     }
 
     private static SolidColorBrush Frozen(Color color)

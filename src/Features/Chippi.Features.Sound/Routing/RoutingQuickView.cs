@@ -152,9 +152,11 @@ public sealed class RoutingQuickView : UserControl
         var radio = new Ellipse
         {
             Width = 14, Height = 14, StrokeThickness = selected ? 4 : 1, Margin = new Thickness(1, 0, 11, 0),
-            VerticalAlignment = VerticalAlignment.Center, Fill = selected ? Brushes.Black : Brushes.Transparent,
+            VerticalAlignment = VerticalAlignment.Center, Fill = Brushes.Transparent,
         };
         radio.SetResourceReference(Shape.StrokeProperty, selected ? "IslandAccentBrush" : "IslandTextTertiaryBrush");
+        if (selected)
+            radio.SetResourceReference(Shape.FillProperty, "IslandOnAccentBrush");
         var name = new TextBlock { Text = entry.Name, FontSize = 12, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center };
         DockPanel.SetDock(radio, Dock.Left);
         var button = new Button { Content = new DockPanel { Children = { radio, name } }, ToolTip = entry.Name, Tag = selected ? "Selected" : null };

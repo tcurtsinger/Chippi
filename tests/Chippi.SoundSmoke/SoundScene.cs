@@ -24,6 +24,8 @@ namespace Chippi.SoundSmoke;
 // This Application never runs App.OnStartup. Every external dependency is supplied below.
 internal static class SmokeDispatcher
 {
+    private static string ShotsTheme => Environment.GetEnvironmentVariable("CHIPPI_SHOTS_THEME") == "light" ? "Light" : "Dark";
+
     private static readonly Lazy<Dispatcher> Ui = new(() =>
     {
         var ready = new TaskCompletionSource<Dispatcher>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -32,7 +34,8 @@ internal static class SmokeDispatcher
             try
             {
                 var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
-                foreach (var path in new[] { "Themes/Dark.xaml", "Themes/Palette.xaml", "Themes/SharedStyles.xaml", "Controls/Controls.xaml" })
+                // Shots render in the light theme with CHIPPI_SHOTS_THEME=light.
+                foreach (var path in new[] { $"Themes/{ShotsTheme}.xaml", "Themes/Palette.xaml", "Themes/SharedStyles.xaml", "Controls/Controls.xaml" })
                     app.Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri($"pack://application:,,,/Chippi.UI;component/{path}") });
                 SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext());
                 ready.SetResult(Dispatcher.CurrentDispatcher);
