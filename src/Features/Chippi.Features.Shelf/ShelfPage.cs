@@ -53,6 +53,7 @@ internal sealed class ShelfPage : UserControl
     {
         _shelf = shelf;
         _hold = hold;
+        Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri("pack://application:,,,/Chippi.Features.Shelf;component/ShelfStyles.xaml") });
 
         // Empty (notes #41): a dashed zone with Inbox and "No items"; during a drag its stroke and glyph turn accent.
         var empty = Text("No items", 12, "IslandTextTertiaryBrush");
@@ -244,7 +245,7 @@ internal sealed class ShelfPage : UserControl
         }
 
         var button = new Button { Content = content, Tag = item.Id, Opacity = item.Id == _dragging ? 0.4 : 1, ToolTip = $"{ShelfFormat.Name(item)}\n{ShelfFormat.Caption(item)}" };
-        button.SetResourceReference(StyleProperty, "IslandBareButtonStyle");
+        button.SetResourceReference(StyleProperty, "ShelfTileStyle");
         button.HorizontalContentAlignment = HorizontalAlignment.Stretch;
         AutomationProperties.SetName(button, $"{ShelfFormat.Name(item)}, {ShelfFormat.Caption(item)}{(item.Pinned ? ", pinned" : "")}");
         AutomationProperties.SetItemStatus(button, selected ? "Selected" : "");
