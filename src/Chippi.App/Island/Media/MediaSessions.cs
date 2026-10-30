@@ -56,6 +56,8 @@ public interface IMediaSessions : IDisposable
     /// <summary>Shows this app's session; null follows Windows' current one.</summary>
     void Select(string? id);
 
+    // The transport: each faults when the app declines the command or it fails (it's logged), so a caller can say so.
+
     Task PreviousAsync();
 
     Task PlayPauseAsync();
@@ -124,18 +126,25 @@ public sealed class SystemMediaSessions : IMediaSessions
 
     public Task NextAsync() => Command(s => s.TrySkipNextAsync().AsTask());
 
+    // Logged here, then passed on: the caller says "Failed" (the home's card) or lets it go (the page).
     private async Task Command(Func<GlobalSystemMediaTransportControlsSession, Task<bool>> command)
     {
         if (Session(Current?.Id) is not { } session)
             return;
+        bool done;
         try
         {
-            if (!await command(session))
-                Log.Info($"Now Playing: {Current?.Source} declined the command");
+            done = await command(session);
         }
         catch (Exception ex)
         {
             Log.Warn("Now Playing: media command failed", ex);
+            throw;
+        }
+        if (!done)
+        {
+            Log.Info($"Now Playing: {Current?.Source} declined the command");
+            throw new InvalidOperationException($"{Current?.Source} declined the command");
         }
     }
 

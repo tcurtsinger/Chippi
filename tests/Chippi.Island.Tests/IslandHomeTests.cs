@@ -190,6 +190,16 @@ public sealed class IslandHomeTests
         grid.TileOpened += (_, key) => opened.Add(key);
         Click(Find<Button>(grid, b => AutomationProperties.GetName(b) == "Now Playing"));
         Assert.Equal([IslandPanelWindow.NowPlayingKey], opened);
+        // The transport sits on the card: its presses don't open Now Playing too.
+        var next = Find<Button>(grid, b => AutomationProperties.GetName(b) == "Next track");
+        Click(next);
+        Assert.Single(opened);
+        // A press the player declines says so on the app's line, in Caution.
+        media.Refuse = true;
+        Click(next);
+        Assert.Same(grid.FindResource("WarningTextBrush"), Find<TextBlock>(grid.Media, t => t.Text == "Failed").Foreground);
+        Assert.Single(opened);
+        media.Refuse = false;
 
         // Nothing playing: the card says so, on its own line level with the art, and the transport is dimmed.
         media.Sessions = [];

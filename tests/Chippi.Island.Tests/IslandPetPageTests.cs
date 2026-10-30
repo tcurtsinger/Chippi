@@ -45,6 +45,19 @@ public sealed class IslandPetPageTests
         }));
     }
 
+    [Fact]
+    public void Turning_a_tile_off_frees_its_slot_for_the_switch_turned_on_next_not_the_next_tile_in_order()
+    {
+        // Ten tiles: "i" is past the home's eight, so its switch shows off; "j" was turned off.
+        string[] order = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"];
+        var hidden = Chippi.App.Island.IslandLayout.Switched(["j"], order, "a", show: false, room: 8);
+        Assert.Equal(["j", "i", "a"], hidden); // "i" stays off rather than taking "a"'s slot
+        hidden = Chippi.App.Island.IslandLayout.Switched(hidden, order, "j", show: true, room: 8);
+        Assert.Equal(["i", "a"], hidden); // so "j" can have it
+        hidden = Chippi.App.Island.IslandLayout.Switched(hidden, order, "b", show: false, room: 8);
+        Assert.Equal(["i", "a", "b"], hidden); // with room, turning one off hides nothing else
+    }
+
     private static void WithPage(Action<IslandPetPage, ConfigStore> test)
     {
         string root = Path.Combine(Path.GetTempPath(), "chippi-islandpet-" + Guid.NewGuid().ToString("N"));

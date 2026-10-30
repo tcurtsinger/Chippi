@@ -79,7 +79,12 @@ internal sealed class IslandHomeMedia : UserControl
         _card.SetResourceReference(StyleProperty, "IslandCardButtonStyle");
         _card.Padding = new Thickness(7, 7, 10, 7);
         AutomationProperties.SetName(_card, "Now Playing");
-        _card.Click += (_, _) => OpenRequested?.Invoke(this, EventArgs.Empty);
+        // Only the card's own click: a transport button's bubbles up through it.
+        _card.Click += (_, e) =>
+        {
+            if (ReferenceEquals(e.OriginalSource, _card))
+                OpenRequested?.Invoke(this, EventArgs.Empty);
+        };
         Content = _card;
 
         Loaded += (_, _) =>
@@ -119,13 +124,13 @@ internal sealed class IslandHomeMedia : UserControl
         icon.SetResourceReference(LucideIcon.BrushProperty, brush);
         button.Content = icon;
         AutomationProperties.SetName(button, name);
-        button.Click += async (_, _) =>
+        button.Click += async (_, e) =>
         {
+            e.Handled = true; // the card around it opens Now Playing; a transport press doesn't
             try { await run(); }
-            catch (Exception ex)
+            catch (Exception)
             {
-                // The player refused: the app's line says so for a moment.
-                Log.Warn($"Now Playing: {name} failed", ex);
+                // The player refused (the session logged why): the app's line says so for a moment.
                 _failed.Stop();
                 _failed.Start();
                 Show();
@@ -150,6 +155,8 @@ internal sealed class IslandHomeMedia : UserControl
         string shown = track is null ? "" : $"{track.Id}\n{track.Title}\n{track.Artist}";
         bool arriving = _shownTrack is not null && shown != _shownTrack && Arrival.Showing(_text);
         bool flipped = _shownTrack is not null && shown == _shownTrack && track?.Playing != _shownPlaying && Arrival.Showing(_playGlyph);
+        if (shown != _shownTrack)
+            _failed.Stop(); // "Failed" was about the track that went
         _shownTrack = shown;
         _shownPlaying = track?.Playing == true;
         if (arriving)

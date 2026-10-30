@@ -491,11 +491,16 @@ public sealed class IslandPanelTests
 
         public void Select(string? id) { }
 
-        public Task PreviousAsync() => Task.CompletedTask;
+        /// <summary>The player declines every command, as SystemMediaSessions reports it: the task faults.</summary>
+        public bool Refuse { get; set; }
 
-        public Task PlayPauseAsync() => Task.CompletedTask;
+        private Task Command() => Refuse ? Task.FromException(new InvalidOperationException("declined")) : Task.CompletedTask;
 
-        public Task NextAsync() => Task.CompletedTask;
+        public Task PreviousAsync() => Command();
+
+        public Task PlayPauseAsync() => Command();
+
+        public Task NextAsync() => Command();
 
         public void Dispose() { }
     }

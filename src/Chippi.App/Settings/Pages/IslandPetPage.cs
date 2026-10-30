@@ -209,13 +209,8 @@ internal sealed class IslandPetPage : UserControl
         var show = SettingsUi.Switch(shown);
         show.IsEnabled = shown || room;
         AutomationProperties.SetName(show, $"Show {tile.Name}");
-        SettingsUi.OnSwitched(show, on => Save(s =>
-        {
-            var hidden = (s.IslandHiddenTiles ?? []).Where(k => k != tile.Key).ToList();
-            if (!on)
-                hidden.Add(tile.Key);
-            s.IslandHiddenTiles = hidden;
-        }));
+        // What shows off stays off: the tiles past the home's eight are saved hidden with it (IslandLayout.Switched).
+        SettingsUi.OnSwitched(show, on => Save(s => s.IslandHiddenTiles = IslandLayout.Switched(s.IslandHiddenTiles ?? [], order, tile.Key, on, IslandGrid.MaxTiles)));
         var name = new TextBlock { Text = tile.Name, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
         DockPanel.SetDock(handle, Dock.Left);
         DockPanel.SetDock(glyph, Dock.Left);
