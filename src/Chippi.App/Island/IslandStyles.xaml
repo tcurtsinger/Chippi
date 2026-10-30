@@ -39,14 +39,43 @@
     <!-- The shared segmented control's selected item sits flat on the accent fill (no light-theme lift). -->
     <x:Null x:Key="SegmentSelectedShadow" />
 
-    <!-- The tab: only its content draws (the half-oval paths), so transparent pixels click through.
-         A Button for Enter, Space and UI Automation's Invoke; the window handles the mouse itself. -->
-    <Style x:Key="IslandTabStyle" TargetType="{x:Type Button}">
+    <!-- The widget (the shell redesign's mock): the puck and its chip on the panel's surface with a 1px edge
+         and a soft shadow, so they stay visible on a light desktop too. The same in both themes. -->
+    <DropShadowEffect x:Key="IslandPuckShadow" Color="#000000" BlurRadius="14" ShadowDepth="4" Direction="270" Opacity="0.18" />
+    <DropShadowEffect x:Key="IslandChipShadow" Color="#000000" BlurRadius="14" ShadowDepth="4" Direction="270" Opacity="0.16" />
+    <!-- Lifted while dragged: deeper. -->
+    <DropShadowEffect x:Key="IslandLiftShadow" Color="#000000" BlurRadius="30" ShadowDepth="14" Direction="270" Opacity="0.28" />
+    <!-- The muted mic's badge: Windows' red in both themes. -->
+    <SolidColorBrush x:Key="IslandBadgeBrush" Color="#C42B1C" />
+
+    <!-- The puck: only its content draws, so transparent pixels click through. A Button for Enter, Space and
+         UI Automation's Invoke; the window handles the mouse itself. -->
+    <Style x:Key="IslandPuckButtonStyle" TargetType="{x:Type Button}">
         <Setter Property="FocusVisualStyle" Value="{x:Null}" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type Button}">
                     <ContentPresenter />
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- The chip beside the puck: 36 tall, 8px corners, 6 in before a cover or glyph and 12 after the line. -->
+    <Style x:Key="IslandChipStyle" TargetType="{x:Type Button}">
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="Height" Value="36" />
+        <Setter Property="Foreground" Value="{DynamicResource IslandTextBrush}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type Button}">
+                    <Grid>
+                        <Border Background="{DynamicResource IslandBrush}" CornerRadius="8" Effect="{StaticResource IslandChipShadow}" />
+                        <Border Background="{DynamicResource IslandBrush}" BorderBrush="{DynamicResource IslandBorderBrush}" BorderThickness="1"
+                                CornerRadius="8" Padding="5,0,11,0">
+                            <ContentPresenter VerticalAlignment="Center" />
+                        </Border>
+                    </Grid>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
@@ -503,14 +532,14 @@
         </Setter>
     </Style>
 
-    <!-- The tab's 3-bar equalizer glyph: 12px tall, accent. -->
+    <!-- The song chip's 3-bar equalizer: 3px bars 2 apart, up to 14 tall, on the accent fill. -->
     <Style x:Key="IslandEqualizerBarStyle" TargetType="{x:Type Rectangle}">
-        <Setter Property="Width" Value="2" />
-        <Setter Property="RadiusX" Value="1" />
-        <Setter Property="RadiusY" Value="1" />
+        <Setter Property="Width" Value="3" />
+        <Setter Property="RadiusX" Value="1.5" />
+        <Setter Property="RadiusY" Value="1.5" />
         <Setter Property="Margin" Value="1,0" />
         <Setter Property="VerticalAlignment" Value="Bottom" />
-        <Setter Property="Fill" Value="{DynamicResource IslandAccentBrush}" />
+        <Setter Property="Fill" Value="{DynamicResource IslandAccentFillBrush}" />
     </Style>
 
     <!-- A button with no chrome of its own, for a region that opens something (the home's Now Playing card):

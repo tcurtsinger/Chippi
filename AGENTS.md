@@ -27,7 +27,7 @@ A Windows 11 tray app for the owner's own PC (C#, .NET 10, WPF): an island at th
 - **Never against the real profile.** `CHIPPI_DEV_PROFILE=<name>` (or `--dev-profile <name>`) gives a run its own instance, settings (`%APPDATA%\Chippi-dev\<name>`) and logs (`%LOCALAPPDATA%\Chippi-dev\<name>\logs`). A dev profile is single-instance.
 - **Never install Sound modules in a dev profile:** routing claims the owner's default devices.
 - **Snapshots without showing anything:** a Debug build run with `--debug` saves PNGs to a folder with `--island-pages <dir>`, `--island-shots <dir>`, `--settings-snapshot <dir>` or `--flyout-snapshot <dir>` (the tray menu).
-  `--island-pages` does open the island on screen, so check what's in front first; it shoots every page in dark, then light.
+  `--island-pages` and `--island-shots` show the widget and the panel on screen, so check what's in front first; both shoot dark, then light. `--island-shots` also drops the widget in each corner and past every edge and checks where it lands (`r6-drop-check.txt`).
 - **Shots in tests:** the offscreen page shots run when `CHIPPI_ISLAND_SHOTS` names an output folder. They render dark; `CHIPPI_SHOTS_THEME=light` renders them light. The island follows the app theme.
 
 ## Done means used, with proof

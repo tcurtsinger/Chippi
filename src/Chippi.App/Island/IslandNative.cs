@@ -79,6 +79,26 @@ internal static class IslandNative
     }
 
     /// <summary>
+    /// Moves the window's top-left corner (physical pixels, rounded down), keeping its size and place in the
+    /// z-order: a drag's move every frame. <see cref="Move"/> rounds the size out, so a fractional position can
+    /// resize it by a pixel, and WPF redraws the whole layered window.
+    /// </summary>
+    public static void MoveTo(HWND hwnd, Point topLeft)
+    {
+        if (hwnd != default)
+            PInvoke.SetWindowPos(hwnd, HWND.Null, (int)Math.Floor(topLeft.X), (int)Math.Floor(topLeft.Y), 0, 0,
+                SET_WINDOW_POS_FLAGS.SWP_NOSIZE | SET_WINDOW_POS_FLAGS.SWP_NOZORDER | SET_WINDOW_POS_FLAGS.SWP_NOACTIVATE | SET_WINDOW_POS_FLAGS.SWP_NOOWNERZORDER);
+    }
+
+    /// <summary>Brings the window to the top of the topmost windows, where it is, without activating it.</summary>
+    public static void Raise(HWND hwnd)
+    {
+        if (hwnd != default)
+            PInvoke.SetWindowPos(hwnd, Topmost, 0, 0, 0, 0,
+                SET_WINDOW_POS_FLAGS.SWP_NOMOVE | SET_WINDOW_POS_FLAGS.SWP_NOSIZE | SET_WINDOW_POS_FLAGS.SWP_NOACTIVATE | SET_WINDOW_POS_FLAGS.SWP_NOOWNERZORDER);
+    }
+
+    /// <summary>
     /// Makes the window the foreground window. Only after the user clicked into it: the click is the
     /// last input, so Windows allows it.
     /// </summary>

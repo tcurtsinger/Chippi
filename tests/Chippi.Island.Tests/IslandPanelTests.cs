@@ -25,7 +25,7 @@ public sealed class IslandPanelTests
 {
     // A work area off any real monitor: the window is shown there, so it never appears on screen.
     private static readonly MonitorArea Offscreen = new(default, new Rect(-20000, 0, 1920, 1080), new Rect(-20000, 0, 1920, 1032), 1);
-    private static readonly Rect Tab = new(-20000 + 960 - 56, 0, 112, 32);
+    private static readonly Rect Puck = IslandGeometry.Start(Offscreen.Work, 1);
 
     internal static IslandTileContribution Part(string key, string name, int order, IslandOrbit orbit = IslandOrbit.None, string status = "")
     {
@@ -58,7 +58,7 @@ public sealed class IslandPanelTests
 
     private static void Open(IslandPanelWindow panel)
     {
-        panel.Open(IslandEdge.Top, Tab, Offscreen);
+        panel.Open(Puck, Offscreen);
         Pump(TimeSpan.FromMilliseconds(400));
     }
 
@@ -406,14 +406,14 @@ public sealed class IslandPanelTests
     }
 
     [Fact]
-    public void The_shape_grows_from_the_tab_and_ends_at_the_page()
+    public void The_shape_grows_from_the_puck_and_ends_at_the_page()
     {
         WpfTestThread.Run(() => WithPanel(panel =>
         {
-            panel.Open(IslandEdge.Top, Tab, Offscreen);
+            panel.Open(Puck, Offscreen);
             var shape = (FrameworkElement)panel.FindName("Shape");
             if (!Chippi.UI.Themes.Motion.IsReduced)
-                Assert.Equal(Tab.Width, shape.Width, 3); // the first frame is the tab
+                Assert.Equal(Puck.Width, shape.Width, 3); // the first frame is the puck
             Pump(TimeSpan.FromMilliseconds(400));
             Assert.Equal((520, 360), Size(panel));
             Assert.Equal(1, ((FrameworkElement)panel.FindName("Card")).Opacity);
