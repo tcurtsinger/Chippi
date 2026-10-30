@@ -19,7 +19,7 @@ namespace Chippi.App.Settings.Pages;
 
 /// <summary>
 /// Settings › Island &amp; pet (DESIGN.md §5): the island and the tray icon, where the island opens and
-/// sits, its tiles (order, show or hide, with a preview) and its round buttons, then ChippiPet.
+/// sits, its tiles (order, show or hide, with a preview), then Chippi.
 /// </summary>
 internal sealed class IslandPetPage : UserControl
 {
@@ -153,14 +153,14 @@ internal sealed class IslandPetPage : UserControl
 
     // ----- Tiles -----
 
-    private sealed record Tile(string Key, string Name, Geometry Icon, IslandOrbit Orbit);
+    private sealed record Tile(string Key, string Name, Geometry Icon);
 
     /// <summary>The running features' home buttons, in their own order. Now Playing is a fixed card.</summary>
     private List<Tile> AllTiles() =>
     [
         .. IslandTileContribution.Group(_shell.Registry.Features.Where(f => f.IsRunning).SelectMany(f => f.IslandTiles))
             .Where(g => g.Key != IslandPanelWindow.NowPlayingKey)
-            .Select(g => new Tile(g.Key, g.Name, LucideIcons.Get(g.Icon), g.Orbit)),
+            .Select(g => new Tile(g.Key, g.Name, LucideIcons.Get(g.Icon))),
     ];
 
     private IslandLayout Layout() => IslandLayout.From(SettingsUi.ReadApp(_shell.Config));
@@ -233,42 +233,52 @@ internal sealed class IslandPetPage : UserControl
             row.Children.OfType<DragHandle>().FirstOrDefault()?.Focus();
     }
 
-    // ----- Round buttons -----
-
     // ----- Preview -----
 
     /// <summary>
-    /// A small picture of the open island on the top edge: the shown tiles three across.
+    /// A small desktop with the widget at its bottom right: the open panel over the puck, the shown tiles four across.
     /// </summary>
     private void RefreshPreview()
     {
-        const double width = 260, inset = 6, gap = 4, header = 12, room = 0;
+        const double width = 260, height = 160, edge = 10, puck = 30, panelWidth = 176, inset = 6, gap = 4;
         var all = AllTiles();
         var layout = Layout();
-        var shown = layout.Shown(all.Select(t => t.Key)).Select(k => all.First(t => t.Key == k)).ToList();
-        int columns = shown.Count <= 3 ? Math.Max(1, shown.Count) : shown.Count == 4 ? 2 : 3;
-        int rows = Math.Max(1, (shown.Count + columns - 1) / columns);
-        const double height = 180;
-        double tile = (152 - (rows - 1) * gap) / rows;
-        var canvas = new Canvas { Width = width + 2 * room, Height = height };
+        var shown = layout.Shown(all.Select(t => t.Key)).Select(k => all.First(t => t.Key == k)).Take(IslandGrid.MaxTiles).ToList();
+        int rows = Math.Max(1, (shown.Count + IslandGrid.Columns - 1) / IslandGrid.Columns);
+        double tile = 18;
+        double panelHeight = 2 * inset + 22 + rows * tile + (rows - 1) * gap + 14;
+        var canvas = new Canvas { Width = width, Height = height };
 
-        var shape = new Border { Width = width, Height = height, CornerRadius = new CornerRadius(0, 0, 12, 12), BorderThickness = new Thickness(1, 0, 1, 1) };
-        shape.SetResourceReference(Border.BackgroundProperty, "IslandBrush");
-        shape.SetResourceReference(Border.BorderBrushProperty, "IslandBorderBrush");
-        var title = new TextBlock { Text = "Chippi", FontSize = 9, FontWeight = FontWeights.SemiBold, Height = header, Margin = new Thickness(0, 0, 0, 5) };
-        title.SetResourceReference(TextBlock.ForegroundProperty, "IslandTextBrush");
-        var grid = new UniformGrid { Columns = columns, Margin = new Thickness(0, 0, -gap, 0) };
+        var screen = new Border { Width = width, Height = height, CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(1) };
+        screen.SetResourceReference(Border.BackgroundProperty, "WindowBackgroundBrush");
+        screen.SetResourceReference(Border.BorderBrushProperty, "BorderBrush");
+        canvas.Children.Add(screen);
+
+        var panel = new Border { Width = panelWidth, Height = panelHeight, CornerRadius = new CornerRadius(6), BorderThickness = new Thickness(1) };
+        panel.SetResourceReference(Border.BackgroundProperty, "IslandBrush");
+        panel.SetResourceReference(Border.BorderBrushProperty, "IslandBorderBrush");
+        var card = new Border { Height = 22, CornerRadius = new CornerRadius(4), Margin = new Thickness(0, 0, 0, gap) };
+        card.SetResourceReference(Border.BackgroundProperty, "IslandPanelBrush");
+        var grid = new UniformGrid { Columns = IslandGrid.Columns, Margin = new Thickness(0, 0, -gap, 0) };
         foreach (var t in shown)
         {
-            var glyph = new LucideIcon { Data = t.Icon, Size = 14, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+            var glyph = new LucideIcon { Data = t.Icon, Size = 10, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
             glyph.SetResourceReference(LucideIcon.BrushProperty, "IslandTextBrush");
-            var cell = new Border { Height = tile, CornerRadius = new CornerRadius(6), Margin = new Thickness(0, 0, gap, gap), Child = glyph };
+            var cell = new Border { Height = tile, CornerRadius = new CornerRadius(4), Margin = new Thickness(0, 0, gap, gap), Child = glyph };
             cell.SetResourceReference(Border.BackgroundProperty, "IslandPanelBrush");
             grid.Children.Add(cell);
         }
-        shape.Child = new StackPanel { Margin = new Thickness(inset, inset, inset, 0), Children = { title, grid } };
-        Canvas.SetLeft(shape, room);
-        canvas.Children.Add(shape);
+        panel.Child = new StackPanel { Margin = new Thickness(inset, inset, inset, 0), Children = { card, grid } };
+        Canvas.SetLeft(panel, width - edge - panelWidth);
+        Canvas.SetTop(panel, height - edge - puck / 2 - panelHeight);
+        canvas.Children.Add(panel);
+
+        var button = new Border { Width = puck, Height = puck, CornerRadius = new CornerRadius(puck / 2), BorderThickness = new Thickness(1), Child = new ChippiPet { Size = 22, Mood = PetMood.Idle, IsDecorative = true, PetColor = SettingsUi.ReadApp(_shell.Config).PetColor, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center } };
+        button.SetResourceReference(Border.BackgroundProperty, "IslandBrush");
+        button.SetResourceReference(Border.BorderBrushProperty, "IslandBorderBrush");
+        Canvas.SetLeft(button, width - edge - puck);
+        Canvas.SetTop(button, height - edge - puck);
+        canvas.Children.Add(button);
 
         _preview.Child = canvas;
     }

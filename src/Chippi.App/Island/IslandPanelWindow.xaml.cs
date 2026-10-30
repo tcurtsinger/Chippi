@@ -192,7 +192,7 @@ public partial class IslandPanelWindow : Window
     /// <summary>The page the next open shows instead of the usual one (a notice click); null for the usual.</summary>
     internal void OpenOn(string? key) => _openOn = key;
 
-    /// <summary>Settings › Island &amp; pet: where it opens, the tiles' order and which show, and the round buttons.</summary>
+    /// <summary>Settings › Island &amp; pet: where it opens, the tiles' order and which show.</summary>
     internal void SetLayout(IslandLayout layout)
     {
         if (layout == _layout)

@@ -55,7 +55,7 @@ public sealed record IslandActivity(string Key, IslandActivityKind Kind, string 
     public string ModuleId { get; init; } = "";
 }
 
-/// <summary>A module reported that it finished something for the user; the shell makes Gumdrop celebrate.</summary>
+/// <summary>A module reported that it finished something for the user; the shell makes Chippi celebrate.</summary>
 public sealed class ModuleSucceededEventArgs(string moduleId, string? message) : EventArgs
 {
     public string ModuleId { get; } = moduleId;
@@ -71,6 +71,6 @@ public interface IIslandPublisher
 
     void Clear(string key);
 
-    /// <summary>Signals "done" (a timer finished, files stashed). Gumdrop celebrates for about 2.5s.</summary>
+    /// <summary>Signals "done" (a timer finished, files stashed). Chippi celebrates for about 2.5s.</summary>
     void ReportSuccess(string? message = null);
 }

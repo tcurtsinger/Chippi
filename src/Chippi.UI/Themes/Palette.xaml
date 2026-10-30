@@ -8,11 +8,8 @@
     <!-- Critical fills behind white text. -->
     <SolidColorBrush x:Key="DangerDeepBrush" Color="#C42B1C" />
 
-    <!-- Gumdrop, DESIGN.md §7. The Synth body is the app's one gradient. -->
-    <LinearGradientBrush x:Key="PetSynthBrush" StartPoint="0,0" EndPoint="1,1">
-        <GradientStop Color="#B15CF0" Offset="0" />
-        <GradientStop Color="#4D9BFF" Offset="1" />
-    </LinearGradientBrush>
+    <!-- Chippi's body colors, DESIGN.md §7. -->
+    <SolidColorBrush x:Key="PetSynthBrush" Color="#B78FFF" />
     <SolidColorBrush x:Key="PetIrisBrush" Color="#CBB2FF" />
     <SolidColorBrush x:Key="PetAzureBrush" Color="#8EC0FF" />
     <SolidColorBrush x:Key="PetSignalBrush" Color="#8EE6C0" />

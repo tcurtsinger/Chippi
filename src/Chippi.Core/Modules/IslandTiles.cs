@@ -3,14 +3,6 @@
 
 namespace Chippi.Core.Modules;
 
-/// <summary>Which round button beside the open island opens a tile directly (docs/phase-3/architecture.md §5).</summary>
-public enum IslandOrbit
-{
-    None,
-    Left,
-    Right,
-}
-
 /// <summary>
 /// The open island's one size, for the grid and every page (DESIGN.md §5 Island, revised 2026-10-28),
 /// in DIPs. Inside the 12 inset and the 24 + 8 header each page has a 496 × 304 body of six 76
@@ -62,9 +54,6 @@ public sealed record IslandTileVolume(Func<double?> Level, Action<double> Set);
 /// <param name="CreateSection">This module's section of the page. Must return a WPF FrameworkElement.</param>
 public sealed record IslandTileSpec(string Key, string Name, string Icon, int Order, int SectionOrder, Func<object> CreateSection)
 {
-    /// <summary>A round button beside the open island that opens this tile.</summary>
-    public IslandOrbit Orbit { get; init; } = IslandOrbit.None;
-
     /// <summary>The home's toggle for this tile; null for a button that only opens the page.</summary>
     public IslandTileToggle? Toggle { get; init; }
 
@@ -191,8 +180,6 @@ public sealed record IslandTileGroup(string Key, IReadOnlyList<IslandTileContrib
     public string Icon => Parts[0].Spec.Icon;
 
     public int Order => Parts.Min(p => p.Spec.Order);
-
-    public IslandOrbit Orbit => Parts.Select(p => p.Spec.Orbit).FirstOrDefault(o => o != IslandOrbit.None);
 
     /// <summary>The first part's toggle, or null.</summary>
     public IslandTileToggle? Toggle => Parts.Select(p => p.Spec.Toggle).FirstOrDefault(t => t is not null);

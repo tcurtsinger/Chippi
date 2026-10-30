@@ -17,7 +17,7 @@ public sealed class AwakeSessionTests
         Assert.Throws<ArgumentException>(() => new KeepAwakeSettings { Mode = (AwakeMode)mode, DurationMinutes = duration, UntilMinute = until }.Validate());
 
     [Fact]
-    public void IndefiniteHasNoDeadline() => Assert.Null(new KeepAwakeSettings().Deadline(DateTimeOffset.Now));
+    public void IndefiniteHasNoDeadline() => Assert.Null(new KeepAwakeSettings { Mode = AwakeMode.Indefinitely }.Deadline(DateTimeOffset.Now));
 
     [Fact]
     public void PastTimeMeansTomorrow()

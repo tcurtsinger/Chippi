@@ -42,7 +42,7 @@ public sealed record Notice(string Kind, string Title)
     /// <summary>How the island shows it (Stash for files, Status for background state).</summary>
     public IslandActivityKind IslandKind { get; init; } = IslandActivityKind.Stash;
 
-    /// <summary>Gumdrop celebrates when the notice reaches the island.</summary>
+    /// <summary>Chippi celebrates when the notice reaches the island.</summary>
     public bool Celebrate { get; init; }
 
     /// <summary>Something was held or failed; the island shows it in amber. Set by the module, never inferred from text.</summary>
