@@ -64,6 +64,8 @@ public sealed class KeepAwakeModule : IFeatureModule
         {
             Orbit = IslandOrbit.Left,
             StatusOnPage = true, // the chips show the length, not the time left
+            // The home's button starts the default length, or stops.
+            Toggle = new IslandTileToggle(() => IsOn, () => _ = ToggleFromHomeAsync()),
         });
         UpdateTile();
         // Runs only while a timed session counts down ("45 min left"); see OnSessionChanged.
@@ -150,7 +152,17 @@ public sealed class KeepAwakeModule : IFeatureModule
         : Deadline is { } end ? $"{KeepAwakeText.Left(end - now)} left"
         : "No limit";
 
-    private void UpdateTile() => _tile?.SetStatus(TileStatus(DateTimeOffset.Now));
+    private void UpdateTile()
+    {
+        _tile?.SetStatus(TileStatus(DateTimeOffset.Now));
+        _tile?.Refresh();
+    }
+
+    private async Task ToggleFromHomeAsync()
+    {
+        try { await ToggleAsync(); }
+        catch (Exception ex) { _context?.Logger.LogWarning(ex, "Toggling Keep awake from the home failed"); }
+    }
 
     /// <summary>Opens this feature's Settings page.</summary>
     public void OpenSettings() => _context?.OpenSettings(null);

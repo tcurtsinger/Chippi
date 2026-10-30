@@ -121,6 +121,11 @@ public partial class IslandWindow : Window
         };
         _panel.TabPressed += OnPress;
         _panel.EscapePressed += (_, _) => CloseIsland();
+        _panel.SettingsRequested += (_, _) =>
+        {
+            CloseIsland(immediate: true);
+            SettingsRequested?.Invoke(this, EventArgs.Empty);
+        };
         _panel.LastPageChanged += (_, key) => LastPageChanged?.Invoke(this, key);
 
         // The mouse is handled here, before the button sees it: a press is a click or the start of a drag.
@@ -180,6 +185,9 @@ public partial class IslandWindow : Window
 
     /// <summary>The user dropped the tab on the taskbar's edge, the bottom or a corner; it went back.</summary>
     public event EventHandler? DropRefused;
+
+    /// <summary>The home's Settings button: the island has closed; open Settings.</summary>
+    public event EventHandler? SettingsRequested;
 
     /// <summary>The user opened an island page (a tile key): save it as AppSettings.IslandLastPage.</summary>
     public event EventHandler<string>? LastPageChanged;
