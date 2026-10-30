@@ -790,8 +790,9 @@ public partial class IslandWindow : Window
             string detail = tile?.Name ?? top.Source;
             ShowLine(top.Key, title, detail == title ? "" : detail);
         }
-        // The equalizer follows the output's real level while a song plays on the bar and can be seen.
-        if (_singing && !paused && IsVisible && !Motion.IsReduced)
+        // The equalizer follows the output's real level while a song plays on the bar and can be seen: not while
+        // the panel is out, where the bar keeps its state only for the fold back.
+        if (_singing && !paused && IsVisible && !_panel.IsVisible && !Motion.IsReduced)
             _level?.Start();
         else
             StopLevel();
@@ -942,7 +943,7 @@ public partial class IslandWindow : Window
     /// The bar's lines: <paramref name="title"/> (13, semibold) over <paramref name="detail"/> (12, secondary, cut
     /// with an ellipsis). The title holds still when it fits its room (125 beside the equalizer); otherwise it
     /// scrolls 30 a second after a 2s hold, a copy following 40 behind so it loops seamlessly. It stops while the
-    /// widget is hidden or motion is reduced. <paramref name="id"/> tells one song or activity from the next, so an
+    /// widget is hidden, the panel is out, or motion is reduced. <paramref name="id"/> tells one song or activity from the next, so an
     /// update doesn't start it over.
     /// </summary>
     private void ShowLine(string? id, string title, string detail)
@@ -966,7 +967,7 @@ public partial class IslandWindow : Window
         double full = Math.Ceiling(SongText.DesiredSize.Width);
         double room = _lineRoom;
         bool fits = full <= room;
-        bool scroll = !fits && !Motion.IsReduced && IsVisible;
+        bool scroll = !fits && !Motion.IsReduced && IsVisible && !_panel.IsVisible;
         string state = $"{_lineText}\n{full}\n{room}\n{scroll}";
         if (state == _lineState)
             return; // still on its way: a timeline or play-state update doesn't start it over

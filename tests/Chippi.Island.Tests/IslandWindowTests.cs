@@ -90,6 +90,16 @@ public sealed class IslandWindowTests
             Hover(window, Mouse.MouseLeaveEvent);
             Assert.Same(fade, window.Song.OpacityMask);
 
+            // With the panel out the bar keeps its song for the fold back, but stops scrolling; closed, it scrolls again.
+            Click(window);
+            Assert.True(window.IsIslandOpen);
+            Assert.Equal(Visibility.Collapsed, window.SongCopy.Visibility);
+            window.Escape();
+            Pump(TimeSpan.FromMilliseconds(400));
+            Assert.False(window.IsIslandOpen);
+            if (!Chippi.UI.Themes.Motion.IsReduced)
+                Assert.Equal(Visibility.Visible, window.SongCopy.Visibility);
+
             media.Sessions = [Track("Creep")];
             media.Raise();
             Assert.Equal(Visibility.Collapsed, window.SongCopy.Visibility); // fits: holds still
