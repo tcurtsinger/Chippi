@@ -96,6 +96,7 @@ public sealed class IslandHost : IDisposable
         Refresh();
         RefreshPanels();
         _tracker.Start();
+        _ = PrewarmAsync();
 
         if (Application.Current is { } app)
             app.Exit += (_, _) => Dispose();
@@ -116,6 +117,24 @@ public sealed class IslandHost : IDisposable
             _ = SaveIslandPagesAsync(args[pages + 1]);
 #endif
         _logger.LogInformation("Island started");
+    }
+
+    /// <summary>Once the features run and the app is idle, lays the panel's home out so the first open is as quick as the rest.</summary>
+    private async Task PrewarmAsync()
+    {
+        try
+        {
+            await _shell.ModulesReady;
+            await _dispatcher.InvokeAsync(() =>
+            {
+                if (!_disposed)
+                    _window.Prewarm();
+            }, DispatcherPriority.ApplicationIdle);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Island prewarm failed");
+        }
     }
 
 #if DEBUG

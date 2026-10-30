@@ -36,7 +36,10 @@ public partial class IslandPanelWindow : Window
     private const double ShadowRoom = 40; // beside the shape, for its shadow
     private static readonly TimeSpan GrowTime = TimeSpan.FromMilliseconds(220);
     private static readonly TimeSpan ShrinkTime = TimeSpan.FromMilliseconds(160);
-    private static readonly TimeSpan PageFadeTime = TimeSpan.FromMilliseconds(150);
+    private static readonly TimeSpan PageTime = TimeSpan.FromMilliseconds(180);
+    private const double PageSlide = 12; // a page comes in from the right, the home from the left
+    // Reduced motion: nothing grows or slides; the panel and its pages fade in place this quickly.
+    private static readonly TimeSpan ReducedFadeTime = TimeSpan.FromMilliseconds(120);
 
     private enum Morph { Open, Page, Close }
 
@@ -64,6 +67,8 @@ public partial class IslandPanelWindow : Window
     private Rect _from;
     private double _radiusFrom;
     private Morph _morph;
+    private bool _reduced; // this morph fades in place (reduced motion)
+    private double _pageFrom; // where the new page slides from: +1 the right (into a page), -1 the left (back home)
     private TimeSpan _elapsed;
     private double _fadeFrom;
     private long _lastFrame;
@@ -95,11 +100,16 @@ public partial class IslandPanelWindow : Window
             if (!PageHandlesEscape())
                 EscapePressed?.Invoke(this, EventArgs.Empty);
         };
-        DpiChanged += (_, _) => Dispatcher.BeginInvoke(DispatcherPriority.Render, () =>
+        // Only the window's own scale: an Image on a page raises the same routed event, which bubbles up here.
+        DpiChanged += (_, e) =>
         {
-            if (IsOpen)
-                Place();
-        });
+            if (ReferenceEquals(e.OriginalSource, this))
+                Dispatcher.BeginInvoke(DispatcherPriority.Render, () =>
+                {
+                    if (IsOpen)
+                        Place();
+                });
+        };
     }
 
 
@@ -149,6 +159,22 @@ public partial class IslandPanelWindow : Window
     }
 
     public void Initialize() => _hwnd = IslandNative.MakeNoActivate(this);
+
+    /// <summary>
+    /// Lays the home out once while the panel is closed, so the first open costs what later ones do: its
+    /// templates, text and code paths are ready (the first open after start used to skip about 5 frames).
+    /// The app calls it once it's idle after start; it does nothing while the panel is open.
+    /// </summary>
+    internal void Prewarm()
+    {
+        if (IsOpen || IsVisible)
+            return;
+        Attach(null);
+        RefreshGrid();
+        Card.Measure(new Size(IslandPage.Width, IslandPage.Height));
+        Card.Arrange(new Rect(0, 0, IslandPage.Width, IslandPage.Height));
+        Detach();
+    }
 
     // Shared Chippi.UI templates inside the island (switches, segments) and module views ask for the app's
     // accent and segment keys; here they get the island's, for the theme showing. (IslandStyles.xaml drops the
@@ -329,6 +355,7 @@ public partial class IslandPanelWindow : Window
             return;
         Attach(key);
         Reshape(snap: false);
+        _pageFrom = key is null ? -1 : 1;
         Begin(Morph.Page);
         if (_keyboard)
             Dispatcher.BeginInvoke(DispatcherPriority.Input, FocusFirst);
@@ -668,29 +695,22 @@ public partial class IslandPanelWindow : Window
 
     /// <summary>
     /// Starts a morph from what is drawn now: open (the widget to page, 220ms, content fading in over the
-    /// second half), page (the shape stays; the new page fades in over 150ms) or close (back into the
-    /// widget, 160ms, content fading out). Reduced motion snaps.
+    /// second half), page (the shape stays; the new page slides 12 in from its side as it fades in, over 180ms)
+    /// or close (back into the widget, 160ms, content fading out). Under reduced motion nothing grows or slides:
+    /// the panel fades in where it opens and out where it is, and a page fades in, each over 120ms.
     /// </summary>
     private void Begin(Morph morph)
     {
         _morph = morph;
-        bool fromWidget = morph == Morph.Open && _frame is null;
-        _from = fromWidget ? _widgetLocal : _drawn;
-        _radiusFrom = fromWidget ? WidgetRadius : _radius;
+        _reduced = Motion.IsReduced;
+        bool fromWidget = morph == Morph.Open && _frame is null && !_reduced;
+        bool inPlace = morph == Morph.Open && _reduced;
+        _from = fromWidget ? _widgetLocal : inPlace ? _target : _drawn;
+        _radiusFrom = fromWidget ? WidgetRadius : inPlace ? OpenRadius : _radius;
         _fadeFrom = Card.Opacity;
+        // Opening from closed starts clear; opening again mid-close carries on from where the fade is.
+        _rootFrom = morph == Morph.Open && _frame is null ? 0 : Root.Opacity;
         _elapsed = TimeSpan.Zero;
-        if (Motion.IsReduced)
-        {
-            StopFrames();
-            if (morph == Morph.Close)
-            {
-                Collapse();
-                return;
-            }
-            _elapsed = TimeSpan.FromSeconds(1);
-            Step();
-            return;
-        }
         if (morph == Morph.Page)
             Card.Opacity = 0;
         if (_frame is not null)
@@ -710,31 +730,48 @@ public partial class IslandPanelWindow : Window
 
     private void Step()
     {
-        var time = _morph == Morph.Close ? ShrinkTime : GrowTime;
+        var time = _reduced ? ReducedFadeTime : _morph switch { Morph.Close => ShrinkTime, Morph.Page => PageTime, _ => GrowTime };
         double t = Math.Min(1, _elapsed / time);
         double eased = 1 - Math.Pow(1 - t, 3);
-        var to = _morph == Morph.Close ? _widgetLocal : _target;
+        bool shrink = _morph == Morph.Close && !_reduced;
+        var to = shrink ? _widgetLocal : _target;
         _drawn = new Rect(Lerp(_from.X, to.X, eased), Lerp(_from.Y, to.Y, eased), Lerp(_from.Width, to.Width, eased), Lerp(_from.Height, to.Height, eased));
-        _radius = Lerp(_radiusFrom, _morph == Morph.Close ? WidgetRadius : OpenRadius, eased);
-        double fade = Math.Clamp(_elapsed / PageFadeTime, 0, 1);
-        Card.Opacity = _morph switch
+        _radius = Lerp(_radiusFrom, shrink ? WidgetRadius : OpenRadius, eased);
+        if (_reduced)
         {
-            Morph.Open => Math.Max(_fadeFrom, Math.Clamp(t * 2 - 1, 0, 1)),
-            Morph.Page => fade,
-            _ => _fadeFrom * Math.Clamp(1 - t * 2, 0, 1),
-        };
-        // The shadow deepens from about the widget's to the panel's, and back.
-        ShapeShadow.Opacity = _morph switch
+            // In place: the panel fades in or out as one piece, and a page fades in.
+            Root.Opacity = _morph switch { Morph.Open => Math.Max(_rootFrom, t), Morph.Close => _rootFrom * (1 - t), _ => 1 };
+            if (_morph != Morph.Close)
+                Card.Opacity = _morph == Morph.Page ? t : 1;
+            PageShift.X = 0;
+            Page.RenderTransform = Transform.Identity;
+            ShapeShadow.Opacity = 1;
+        }
+        else
         {
-            Morph.Open => Lerp(WidgetShadowShare, 1, eased),
-            Morph.Close => Lerp(1, WidgetShadowShare, eased),
-            _ => 1,
-        };
+            Root.Opacity = 1;
+            Card.Opacity = _morph switch
+            {
+                Morph.Open => Math.Max(_fadeFrom, Math.Clamp(t * 2 - 1, 0, 1)),
+                Morph.Page => t,
+                _ => _fadeFrom * Math.Clamp(1 - t * 2, 0, 1),
+            };
+            // A new page comes in from its side as it fades in: into a page from the right, back home from the left.
+            // The shift is on the page only while it slides, so the open, the close and a page at rest draw without it.
+            PageShift.X = _morph == Morph.Page ? _pageFrom * PageSlide * (1 - eased) : 0;
+            Page.RenderTransform = _morph == Morph.Page && t < 1 ? PageShift : Transform.Identity;
+            // The shadow deepens from about the widget's to the panel's, and back.
+            ShapeShadow.Opacity = _morph switch
+            {
+                Morph.Open => Lerp(WidgetShadowShare, 1, eased),
+                Morph.Close => Lerp(1, WidgetShadowShare, eased),
+                _ => 1,
+            };
+        }
         Draw();
         if (_morph != Morph.Page)
             Morphing?.Invoke(_morph == Morph.Open, t);
-        bool done = _morph == Morph.Page ? fade >= 1 && t >= 1 : t >= 1;
-        if (!done)
+        if (t < 1)
             return;
         StopFrames();
         if (_morph == Morph.Close)
@@ -742,6 +779,10 @@ public partial class IslandPanelWindow : Window
     }
 
     private double _radius = OpenRadius;
+    private double _rootFrom = 1;
+
+    /// <summary>The new page's slide, on the page only while it slides.</summary>
+    internal TranslateTransform PageShift { get; } = new();
 
     /// <summary>The puck's and the bar's round ends: half their height.</summary>
     private double WidgetRadius => Math.Min(_widgetLocal.Width, _widgetLocal.Height) / 2;
@@ -766,6 +807,8 @@ public partial class IslandPanelWindow : Window
         Hide();
         Morphing?.Invoke(false, 1);
         Card.Opacity = 0;
+        Root.Opacity = 1;
+        PageShift.X = 0;
         // Unparented views get Unloaded and stop listening until the island opens again.
         Detach();
         MarkOnScreen();

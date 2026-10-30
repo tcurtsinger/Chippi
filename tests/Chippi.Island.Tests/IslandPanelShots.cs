@@ -38,22 +38,7 @@ public sealed class IslandPanelShots
                 Sessions = [new MediaTrack("Spotify.exe", "Spotify", "Weekend Mix", "Various Artists", true, true, true, true, true, true,
                     TimeSpan.FromSeconds(72), TimeSpan.FromSeconds(232), DateTimeOffset.Now, null)],
             };
-            // The home as the mock shows it: eight buttons, Keep awake on, the volume slider.
-            var mic = Section("sound", "Sound", 10, 220, status: "Live");
-            var micSpec = mic.Spec with { Toggle = new IslandTileToggle(() => false, () => { }, "Microphone", "Mic", () => "Live"), Volume = new IslandTileVolume(() => 0.62, _ => { }) };
-            var awake = Section("keep-awake", "Keep awake", 40, 96, status: "1 hr left");
-            var awakeSpec = awake.Spec with { Toggle = new IslandTileToggle(() => true, () => { }) };
-            var awakeTile = new IslandTileContribution("keep-awake", awakeSpec);
-            awakeTile.SetStatus("1 hr left");
-            var tiles = Tiles(
-                new IslandTileContribution("sound", micSpec),
-                Section("sound.mixer", "App volume", 20, 200, status: "4 apps"),
-                awakeTile,
-                Section("downloads", "File organizer", 50, 120, status: "Auto"),
-                Section("system-monitor", "System monitor", 60, 120, status: "CPU 12%"),
-                Section("clipboard", "Clipboard", 70, 120, status: "23 items"),
-                Section("scratchpad", "Scratchpad", 80, 120, status: "4 notes"),
-                Section("shelf", "Shelf", 90, 120, status: "5 items"));
+            var tiles = HomeTiles();
             foreach (var edge in new[] { Corner.BottomRight, Corner.TopLeft })
             {
                 var panel = new IslandPanelWindow();
@@ -89,6 +74,26 @@ public sealed class IslandPanelShots
                 }
             }
         });
+    }
+
+    /// <summary>The home as the mock shows it: eight buttons, Keep awake on, the volume slider.</summary>
+    internal static IReadOnlyList<IslandTileGroup> HomeTiles()
+    {
+        var mic = Section("sound", "Sound", 10, 220, status: "Live");
+        var micSpec = mic.Spec with { Toggle = new IslandTileToggle(() => false, () => { }, "Microphone", "Mic", () => "Live"), Volume = new IslandTileVolume(() => 0.62, _ => { }) };
+        var awake = Section("keep-awake", "Keep awake", 40, 96, status: "1 hr left");
+        var awakeSpec = awake.Spec with { Toggle = new IslandTileToggle(() => true, () => { }) };
+        var awakeTile = new IslandTileContribution("keep-awake", awakeSpec);
+        awakeTile.SetStatus("1 hr left");
+        return Tiles(
+            new IslandTileContribution("sound", micSpec),
+            Section("sound.mixer", "App volume", 20, 200, status: "4 apps"),
+            awakeTile,
+            Section("downloads", "File organizer", 50, 120, status: "Auto"),
+            Section("system-monitor", "System monitor", 60, 120, status: "CPU 12%"),
+            Section("clipboard", "Clipboard", 70, 120, status: "23 items"),
+            Section("scratchpad", "Scratchpad", 80, 120, status: "4 notes"),
+            Section("shelf", "Shelf", 90, 120, status: "5 items"));
     }
 
     // A stand-in section: a card of the given height (the island draws the page's name above it).

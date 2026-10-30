@@ -26,7 +26,8 @@
             <Border x:Name="ShapeShadow" Background="{DynamicResource IslandBrush}" Effect="{DynamicResource IslandExpandedShadow}" />
             <Border x:Name="ShapeFill" Background="{DynamicResource IslandBrush}" BorderBrush="{DynamicResource IslandBorderBrush}" BorderThickness="1" />
         </Grid>
-        <!-- The home or a page, 520 × 360, placed where the shape is heading. -->
+        <!-- The home or a page, 520 × 360, placed where the shape is heading. A new page slides in from its side
+             inside the card, whose clip keeps it to the shape (IslandPanelWindow.PageShift). -->
         <Border x:Name="Card" Padding="12" Opacity="0" TextElement.Foreground="{DynamicResource IslandTextBrush}">
             <ContentControl x:Name="Page" Focusable="False" />
         </Border>
