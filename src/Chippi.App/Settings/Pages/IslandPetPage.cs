@@ -19,7 +19,7 @@ namespace Chippi.App.Settings.Pages;
 
 /// <summary>
 /// Settings › Island &amp; pet (DESIGN.md §5): the island and the tray icon, where the island opens and
-/// sits, its tiles (order, show or hide, with a preview) and its round buttons, then Gumdrop.
+/// sits, its tiles (order, show or hide, with a preview) and its round buttons, then ChippiPet.
 /// </summary>
 internal sealed class IslandPetPage : UserControl
 {
@@ -46,7 +46,7 @@ internal sealed class IslandPetPage : UserControl
         tiles.Children.Add(preview);
         page.Children.Add(tiles);
 
-        page.Children.Add(SettingsUi.Section("Gumdrop"));
+        page.Children.Add(SettingsUi.Section("Chippi"));
         page.Children.Add(SettingsUi.Group(ColorRow(app), MotionRow(app)));
         Content = page;
 
@@ -153,10 +153,9 @@ internal sealed class IslandPetPage : UserControl
 
     private sealed record Tile(string Key, string Name, Geometry Icon, IslandOrbit Orbit);
 
-    /// <summary>Now Playing and the running features' tiles, in their own order.</summary>
+    /// <summary>The running features' home buttons, in their own order. Now Playing is a fixed card.</summary>
     private List<Tile> AllTiles() =>
     [
-        new(IslandPanelWindow.NowPlayingKey, "Now Playing", LucideIcons.Music, IslandOrbit.None),
         .. IslandTileContribution.Group(_shell.Registry.Features.Where(f => f.IsRunning).SelectMany(f => f.IslandTiles))
             .Where(g => g.Key != IslandPanelWindow.NowPlayingKey)
             .Select(g => new Tile(g.Key, g.Name, LucideIcons.Get(g.Icon), g.Orbit)),
@@ -272,11 +271,11 @@ internal sealed class IslandPetPage : UserControl
         _preview.Child = canvas;
     }
 
-    // ----- Gumdrop -----
+    // ----- ChippiPet -----
 
     private SettingRow ColorRow(AppSettings app)
     {
-        var preview = new Gumdrop { Size = 48, PetColor = app.PetColor, Margin = new Thickness(0, 0, 20, 0) };
+        var preview = new ChippiPet { Size = 48, PetColor = app.PetColor, Margin = new Thickness(0, 0, 20, 0) };
         var controls = new StackPanel { Orientation = Orientation.Horizontal };
         controls.Children.Add(preview);
         var row = new SettingRow { Header = "Color", Description = app.PetColor.ToString(), Content = controls };

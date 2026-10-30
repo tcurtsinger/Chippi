@@ -46,7 +46,7 @@ internal sealed class IslandGrid : UserControl
 
     public IslandGrid()
     {
-        Pet = new Gumdrop { Size = 20, Mood = PetMood.Idle, IsDecorative = true, VerticalAlignment = VerticalAlignment.Center };
+        Pet = new ChippiPet { Size = 20, Mood = PetMood.Idle, IsDecorative = true, VerticalAlignment = VerticalAlignment.Center };
         Content = Build();
         KeyboardNavigation.SetDirectionalNavigation(_tiles, KeyboardNavigationMode.None);
         PreviewKeyDown += OnKey;
@@ -121,7 +121,7 @@ internal sealed class IslandGrid : UserControl
     }
 
     /// <summary>The footer's pet.</summary>
-    public Gumdrop Pet { get; }
+    public ChippiPet Pet { get; }
 
     /// <summary>The Now Playing card.</summary>
     internal IslandHomeMedia Media => _media;

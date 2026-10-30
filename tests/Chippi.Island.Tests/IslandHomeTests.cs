@@ -7,6 +7,7 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using Chippi.App.Island;
 using Chippi.App.Island.Media;
+using Chippi.App.Pet;
 using Chippi.Core.Modules;
 using Chippi.UI.Controls;
 using Xunit;
@@ -118,6 +119,7 @@ public sealed class IslandHomeTests
         Assert.Contains("Weekend Mix", texts);
         Assert.Contains("Various Artists", texts);
         Assert.Contains("Spotify", texts);
+        Assert.Equal(PetMood.Listening, Find<ChippiPet>(grid.Media, _ => true).Mood);
         Assert.True(Find<Button>(grid, b => AutomationProperties.GetName(b) == "Pause").IsEnabled);
 
         var opened = new List<string>();
@@ -129,6 +131,8 @@ public sealed class IslandHomeTests
         media.Sessions = [];
         media.Raise();
         grid.Media.SetMedia(media);
+        grid.UpdateLayout();
+        Assert.Equal(PetMood.Sleepy, Find<ChippiPet>(grid.Media, _ => true).Mood);
         Assert.False(Find<Button>(grid, b => AutomationProperties.GetName(b) == "Play").IsEnabled);
     });
 

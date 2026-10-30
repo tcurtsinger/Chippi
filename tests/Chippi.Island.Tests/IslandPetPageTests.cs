@@ -36,14 +36,12 @@ public sealed class IslandPetPageTests
     }
 
     [Fact]
-    public void A_tiles_switch_leaves_it_off_the_grid()
+    public void The_fixed_now_playing_card_has_no_show_switch()
     {
-        WpfTestThread.Run(() => WithPage((page, config) =>
+        WpfTestThread.Run(() => WithPage((page, _) =>
         {
-            Toggle(Named<ToggleButton>(page, "Show Now Playing"));
-            Assert.Equal(["now-playing"], Read(config).IslandHiddenTiles);
-            Toggle(Named<ToggleButton>(page, "Show Now Playing"));
-            Assert.Empty(Read(config).IslandHiddenTiles!);
+            Assert.DoesNotContain(All<ToggleButton>(page),
+                button => AutomationProperties.GetName(button) == "Show Now Playing");
         }));
     }
 

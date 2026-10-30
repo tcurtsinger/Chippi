@@ -20,7 +20,7 @@ namespace Chippi.App.Island;
 internal sealed class IslandHomeMedia : UserControl
 {
     private readonly Border _art = new() { Width = 52, Height = 52, CornerRadius = new CornerRadius(4), ClipToBounds = true };
-    private readonly Gumdrop _artPet = new() { Size = 28, Mood = PetMood.Sleepy, IsDecorative = true, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+    private readonly ChippiPet _artPet = new() { Size = 28, Mood = PetMood.Sleepy, IsDecorative = true, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
     private readonly TextBlock _source = new() { FontSize = 11, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(5, 0, 0, 0), TextTrimming = TextTrimming.CharacterEllipsis };
     private readonly TextBlock _title = new() { FontSize = 14, FontWeight = FontWeights.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis };
     private readonly TextBlock _artist = new() { FontSize = 12, TextTrimming = TextTrimming.CharacterEllipsis };
@@ -117,6 +117,7 @@ internal sealed class IslandHomeMedia : UserControl
         _playPause.IsEnabled = track is not null && track.PlayPause != PlayPauseCommand.None;
         _playGlyph.Data = track?.Playing == true ? LucideIcons.Pause : LucideIcons.Play;
         AutomationProperties.SetName(_playPause, track?.Playing == true ? "Pause" : "Play");
+        _artPet.Mood = track is null ? PetMood.Sleepy : PetMood.Listening;
         ShowArt(track?.Artwork);
     }
 

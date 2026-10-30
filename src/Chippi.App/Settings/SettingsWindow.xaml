@@ -47,7 +47,7 @@
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="15,0,0,0">
                         <!-- Decorative: the title beside it names the window. -->
-                        <pet:Gumdrop Size="16" IsDecorative="True" IsHitTestVisible="False" />
+                        <pet:ChippiPet Size="16" IsDecorative="True" IsHitTestVisible="False" />
                         <TextBlock Text="Chippi Settings" FontSize="12" Margin="10,0,0,0" VerticalAlignment="Center" />
                     </StackPanel>
                 </DockPanel>

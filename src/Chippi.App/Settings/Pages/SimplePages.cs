@@ -46,7 +46,7 @@ internal sealed class AboutPage : UserControl
         var version = SettingsUi.Styled(new TextBlock { Text = "Version " + AppInfo.Version, VerticalAlignment = VerticalAlignment.Center }, "BodyTextStyle");
         DockPanel.SetDock(version, Dock.Right);
         product.Children.Add(version);
-        product.Children.Add(new Gumdrop { Size = 32, Margin = new Thickness(0, 0, 14, 0) });
+        product.Children.Add(new ChippiPet { Size = 32, Margin = new Thickness(0, 0, 14, 0) });
         var name = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
         name.Children.Add(SettingsUi.Styled(new TextBlock { Text = "Chippi" }, "BodyTextStyle"));
         product.Children.Add(name);

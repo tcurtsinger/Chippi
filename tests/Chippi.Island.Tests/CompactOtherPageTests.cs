@@ -22,7 +22,7 @@ public sealed class CompactOtherPageTests
         Fit(playing, 496, 336);
         var art = Find<Border>(playing).Single(b => b.Width == 156);
         Assert.Equal(156, art.ActualHeight);
-        Assert.IsType<Chippi.App.Pet.Gumdrop>(art.Child); // no artwork: Gumdrop in its place
+        Assert.IsType<Chippi.App.Pet.ChippiPet>(art.Child); // no artwork: ChippiPet in its place
         Assert.Equal(new Thickness(0), art.BorderThickness);
         var cover = System.Windows.Media.Imaging.BitmapSource.Create(1, 1, 96, 96, System.Windows.Media.PixelFormats.Bgra32, null, new byte[4], 4);
         var covered = new NowPlayingView(new IslandPanelTests.FakeMedia { Sessions = [new("spotify", "Spotify", "Weekend Mix", "Various Artists", true, true, true, true, true, true,
@@ -48,7 +48,7 @@ public sealed class CompactOtherPageTests
                     return false;
             return true;
         }
-        var asleep = Find<Chippi.App.Pet.Gumdrop>(nothing).Single(Shown);
+        var asleep = Find<Chippi.App.Pet.ChippiPet>(nothing).Single(Shown);
         Assert.Equal(Chippi.App.Pet.PetMood.Sleepy, asleep.Mood);
         Assert.Contains(Find<TextBlock>(nothing), t => t.Text == "Nothing playing" && Shown(t));
         Assert.DoesNotContain(Find<Button>(nothing), Shown); // no dead controls
