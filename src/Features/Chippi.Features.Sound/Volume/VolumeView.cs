@@ -112,7 +112,7 @@ public sealed class VolumeView : UserControl
 
     private Button Mute(AppKey key)
     {
-        var button = new Button { Width = 28, Height = 24, ToolTip = "Mute", HorizontalAlignment = HorizontalAlignment.Center };
+        var button = new Button { Width = 28, Height = 28, ToolTip = "Mute", HorizontalAlignment = HorizontalAlignment.Center };
         button.SetResourceReference(StyleProperty, "IslandIconButtonStyle");
         var app = App(key);
         var icon = AppIcon.Load(app?.ExePath);
@@ -228,14 +228,18 @@ public sealed class VolumeView : UserControl
     {
         double width = StripWidth(count), barWidth = count <= 7 ? 32 : 24;
         var strip = new Grid { Width = width, Margin = new Thickness(0, 0, last ? 0 : 8, 0) };
-        foreach (var height in new[] { new GridLength(24), new GridLength(1, GridUnitType.Star), new GridLength(count <= 12 ? 24 : 0), new GridLength(count <= 7 ? 36 : 0), new GridLength(24) })
+        // The mock's order: the bar, then the app's icon (its mute), the percentage, the name and the output menu.
+        foreach (var height in new[] { new GridLength(1, GridUnitType.Star), new GridLength(28), new GridLength(count <= 12 ? 20 : 0), new GridLength(count <= 7 ? 36 : 0), new GridLength(24) })
             strip.RowDefinitions.Add(new RowDefinition { Height = height });
-        strip.Children.Add(Mute(key));
-        var bar = new Grid { Width = barWidth, Margin = new Thickness(0, 8, 0, 8) };
-        Grid.SetRow(bar, 1); strip.Children.Add(bar);
-        var track = new Border { CornerRadius = new CornerRadius(8) };
-        track.SetResourceReference(Border.BackgroundProperty, "IslandTrackBrush"); bar.Children.Add(track);
-        var fill = new Border { CornerRadius = new CornerRadius(8), VerticalAlignment = VerticalAlignment.Bottom };
+        var mute = Mute(key);
+        Grid.SetRow(mute, 1); strip.Children.Add(mute);
+        var bar = new Grid { Width = barWidth, Margin = new Thickness(0, 6, 0, 6) };
+        Grid.SetRow(bar, 0); strip.Children.Add(bar);
+        // The trough: the control fill with its 1px edge, 6px corners; the level fills it from the bottom.
+        var track = new Border { CornerRadius = new CornerRadius(6), BorderThickness = new Thickness(1) };
+        track.SetResourceReference(Border.BackgroundProperty, "IslandButtonBrush");
+        track.SetResourceReference(Border.BorderBrushProperty, "IslandControlBorderBrush"); bar.Children.Add(track);
+        var fill = new Border { CornerRadius = new CornerRadius(5), VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(1) };
         bar.Children.Add(fill);
         var slider = new Slider { Minimum = 0, Maximum = 100, SmallChange = 5, LargeChange = 10, Orientation = Orientation.Vertical, Height = double.NaN, IsMoveToPointEnabled = true, Opacity = 0 };
         slider.SetResourceReference(StyleProperty, "IslandSliderStyle");
@@ -249,8 +253,8 @@ public sealed class VolumeView : UserControl
             percentage.Text = muted ? "Muted" : $"{Math.Round(slider.Value)}%";
             percentage.SetResourceReference(TextBlock.ForegroundProperty, muted ? "WarningTextBrush" : "IslandTextBrush");
             if (muted) fill.SetResourceReference(Border.BackgroundProperty, "IslandMutedFillBrush");
-            else fill.SetResourceReference(Border.BackgroundProperty, "IslandAccentBrush");
-            fill.Height = Math.Max(0, bar.ActualHeight) * slider.Value / 100;
+            else fill.SetResourceReference(Border.BackgroundProperty, "IslandAccentFillBrush");
+            fill.Height = Math.Max(0, bar.ActualHeight - 2) * slider.Value / 100;
         }
         var write = new LatestWrite();
         slider.ValueChanged += (_, _) => { Paint(); if (!_refreshing) write.Send(() => _module.SetVolumeAsync(key, (float)slider.Value / 100)); };
@@ -258,7 +262,7 @@ public sealed class VolumeView : UserControl
         _updates.Add(() => { if (!slider.IsMouseCaptureWithin && !slider.IsKeyboardFocusWithin) slider.Value = Level(key).Volume * 100; Paint(); });
         var name = new TextBlock { Text = AppName(key), FontSize = 11, Width = width, Height = 28, LineHeight = 14, LineStackingStrategy = LineStackingStrategy.BlockLineHeight, MaxHeight = 28, TextWrapping = TextWrapping.WrapWithOverflow, TextTrimming = TextTrimming.CharacterEllipsis, TextAlignment = TextAlignment.Center, ToolTip = AppName(key), Visibility = count <= 7 ? Visibility.Visible : Visibility.Collapsed };
         name.Text = FitName(AppName(key), name);
-        name.SetResourceReference(TextBlock.ForegroundProperty, "IslandTextTertiaryBrush");
+        name.SetResourceReference(TextBlock.ForegroundProperty, "IslandTextSecondaryBrush");
         Grid.SetRow(name, 3); strip.Children.Add(name);
         var menu = OutputMenu(key); menu.IsEnabled = _module.CanPickOutput(key);
         Grid.SetRow(menu, 4); strip.Children.Add(menu);
@@ -290,10 +294,10 @@ public sealed class VolumeView : UserControl
         return "\u2026";
     }
 
-    /// <summary>The strip's ⋯: where the app plays, Default or one of the connected outputs.</summary>
+    /// <summary>The strip's chevron: where the app plays, Default or one of the connected outputs.</summary>
     private Button OutputMenu(AppKey app)
     {
-        var glyph = new LucideIcon { Data = LucideIcons.Ellipsis, Size = 14 };
+        var glyph = new LucideIcon { Data = LucideIcons.ChevronDown, Size = 12 };
         glyph.SetResourceReference(LucideIcon.BrushProperty, "IslandTextTertiaryBrush");
         var more = new Button { Content = glyph, Width = 28, Height = 24, HorizontalAlignment = HorizontalAlignment.Center, ToolTip = "Output" };
         more.SetResourceReference(StyleProperty, "IslandIconButtonStyle");
