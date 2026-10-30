@@ -153,10 +153,9 @@ internal sealed class IslandPetPage : UserControl
 
     private sealed record Tile(string Key, string Name, Geometry Icon, IslandOrbit Orbit);
 
-    /// <summary>Now Playing and the running features' tiles, in their own order.</summary>
+    /// <summary>The running features' home buttons, in their own order. Now Playing is a fixed card.</summary>
     private List<Tile> AllTiles() =>
     [
-        new(IslandPanelWindow.NowPlayingKey, "Now Playing", LucideIcons.Music, IslandOrbit.None),
         .. IslandTileContribution.Group(_shell.Registry.Features.Where(f => f.IsRunning).SelectMany(f => f.IslandTiles))
             .Where(g => g.Key != IslandPanelWindow.NowPlayingKey)
             .Select(g => new Tile(g.Key, g.Name, LucideIcons.Get(g.Icon), g.Orbit)),

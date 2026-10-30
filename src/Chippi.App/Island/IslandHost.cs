@@ -56,6 +56,7 @@ public sealed class IslandHost : IDisposable
     {
         _window.Initialize();
         _tracker.Ignore = [_window.Handle, _window.PanelHandle];
+        _window.SettingsRequested += (_, _) => _shell.Commands.OpenSettings();
         _window.LastPageChanged += (_, key) => UpdateSettings(s => s.IslandLastPage = key);
         // A page's Paste goes to the app that was in front before the island took the keyboard (Phase 5 notes #62).
         _window.CaptureTarget = () => _shell.Clipboard.CaptureTarget();
