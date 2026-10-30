@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Prints the foreground window's process and whether it covers its whole monitor. Read-only.
 # Run it before anything that shows a window or sends input: wait while a game or Zoom is in front.
+# Exits 1 when the foreground is fullscreen or Zoom, so scripts can gate on the exit code.
 Add-Type @"
 using System;
 using System.Runtime.InteropServices;
@@ -25,3 +26,4 @@ $m = $mi.rcMonitor
 $full = $r.L -le $m.L -and $r.T -le $m.T -and $r.R -ge $m.R -and $r.B -ge $m.B
 $name = (Get-Process -Id $procId -ErrorAction SilentlyContinue).ProcessName
 "foreground=$name pid=$procId fullscreen=$full primary=$(($mi.dwFlags -band 1) -eq 1)"
+if ($full -or $name -like 'Zoom*') { exit 1 }
