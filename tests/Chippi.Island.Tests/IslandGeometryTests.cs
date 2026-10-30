@@ -54,15 +54,31 @@ public sealed class IslandGeometryTests
     }
 
     [Fact]
-    public void Where_it_starts_the_panel_opens_up_and_left_with_the_puck_on_its_lower_right_corner()
+    public void Where_it_starts_the_puck_becomes_the_panel_sharing_its_lower_right_corner()
     {
         var work = Work(Taskbar.Bottom);
         var puck = IslandGeometry.Start(work, 1);
         var origin = IslandGeometry.PanelOrigin(puck, Panel, work, 1);
         var panel = new Rect(origin, Panel);
-        Assert.Equal(puck.Left, panel.Right); // beside it, as in the mock
-        Assert.Equal(puck.Bottom - 20, panel.Bottom);
-        Assert.Equal(new Rect(1920 - 74 - 520, 1032 - 44 - 360, 520, 360), panel);
+        Assert.Equal(puck.Right, panel.Right); // the puck's outer corner is the panel's (Travis, 2026-10-30)
+        Assert.Equal(puck.Bottom, panel.Bottom);
+        Assert.Equal(new Rect(1920 - 24 - 520, 1032 - 24 - 360, 520, 360), panel);
+    }
+
+    [Theory]
+    [InlineData(1.0)]
+    [InlineData(1.5)]
+    public void The_bar_grows_from_the_puck_toward_the_middle_at_one_width(double scale)
+    {
+        var work = Work(Taskbar.Bottom);
+        var right = IslandGeometry.Start(work, scale);
+        var bar = IslandGeometry.BarRect(right, IslandGeometry.OpensLeft(right, work), scale);
+        Assert.Equal(new Rect(right.Right - 256 * scale, right.Top, 256 * scale, right.Height), bar); // its outer end where the puck's is
+        var left = IslandGeometry.PuckRect(0, 0.5, work, scale);
+        Assert.Equal(new Rect(left.Left, left.Top, 256 * scale, left.Height), IslandGeometry.BarRect(left, IslandGeometry.OpensLeft(left, work), scale));
+        // The bar shares the puck's outer corner, so the panel grown out of either sits in the same place.
+        var panel = new Rect(IslandGeometry.PanelOrigin(right, new Size(520 * scale, 360 * scale), work, scale), new Size(520 * scale, 360 * scale));
+        Assert.True(panel.Contains(bar));
     }
 
     /// <summary>The puck flush in each corner, with a taskbar on each edge: the panel opens toward the middle and stays 8 inside.</summary>
@@ -77,7 +93,7 @@ public sealed class IslandGeometryTests
 
     [Theory]
     [MemberData(nameof(EveryCornerAndTaskbar))]
-    public void In_every_corner_the_panel_opens_toward_the_middle_and_stays_inside_the_work_area(Corner corner, Taskbar taskbar)
+    public void In_every_corner_the_puck_becomes_the_panel_toward_the_middle_inside_the_work_area(Corner corner, Taskbar taskbar)
     {
         var work = Work(taskbar);
         var puck = IslandBounds.Puck(corner, work);
@@ -89,14 +105,17 @@ public sealed class IslandGeometryTests
         var panel = new Rect(IslandGeometry.PanelOrigin(puck, Panel, work, 1), Panel);
         Assert.Equal(right, IslandGeometry.OpensLeft(puck, work));
         Assert.Equal(bottom, IslandGeometry.OpensUp(puck, work));
-        Assert.Equal(right ? puck.Left : puck.Right, right ? panel.Right : panel.Left); // beside the puck, never over it
+        // On the puck's outer corner, moved in only the 8 the work area keeps: the panel covers where the puck was.
+        Assert.Equal(right ? puck.Right - 8 : puck.Left + 8, right ? panel.Right : panel.Left);
+        Assert.Equal(bottom ? puck.Bottom - 8 : puck.Top + 8, bottom ? panel.Bottom : panel.Top);
+        Assert.True(panel.Contains(new Point(puck.Left + puck.Width / 2, puck.Top + puck.Height / 2)));
         var inside = work;
         inside.Inflate(-8, -8);
         Assert.True(inside.Contains(panel), $"{panel} not inside {inside}");
     }
 
     [Fact]
-    public void On_a_screen_too_small_for_the_panel_beside_it_the_panel_stays_inside_and_the_puck_stays_on_top()
+    public void On_a_screen_too_small_for_the_panel_the_panel_stays_inside()
     {
         var work = new Rect(0, 0, 960, 492);
         var puck = IslandGeometry.PuckRect(0.5, 0.5, work, 1);
@@ -171,6 +190,8 @@ public sealed class IslandGeometryTests
         var start = IslandGeometry.Start(work, 2);
         Assert.Equal(new Rect(1920 - 48 - 100, 1032 - 48 - 100, 100, 100), start);
         var panel = new Rect(IslandGeometry.PanelOrigin(start, new Size(1040, 720), work, 2), new Size(1040, 720));
-        Assert.Equal(start.Bottom - 40, panel.Bottom);
+        Assert.Equal(start.Bottom, panel.Bottom);
+        Assert.Equal(start.Right, panel.Right);
+        Assert.Equal(new Rect(start.Right - 512, start.Top, 512, 100), IslandGeometry.BarRect(start, opensLeft: true, 2));
     }
 }

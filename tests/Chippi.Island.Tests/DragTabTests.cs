@@ -21,7 +21,7 @@ public sealed class DragTabTests
     ]);
 
     [Fact]
-    public void A_drag_over_the_puck_grows_it_names_the_page_on_the_chip_and_never_drops_on_it() => WpfTestThread.Run(() =>
+    public void A_drag_over_the_puck_names_the_page_on_the_bar_and_never_drops_on_it() => WpfTestThread.Run(() =>
     {
         var window = new IslandWindow();
         try
@@ -30,19 +30,17 @@ public sealed class DragTabTests
             var puck = window.PuckButton;
             var over = Raise(puck, DragDrop.DragEnterEvent);
             Assert.Equal(DragDropEffects.None, over.Effects);
-            Assert.Equal(Visibility.Visible, window.Chip.Visibility);
-            Assert.False(window.Chip.IsHitTestVisible); // the drag stays the puck's
+            Assert.True(window.BarShown); // the puck becomes the bar, which is still the puck's button
             Assert.Same(LucideIcons.Inbox, window.GlyphIcon.Data);
             Assert.Equal("Shelf", window.ChipText);
-            Assert.Equal(54, 50 * window.PuckScaleTarget, 9);
+            Assert.Equal(1, window.PuckScaleTarget); // one size: hover and drags never grow it
 
             Raise(puck, DragDrop.DragLeaveEvent);
-            Assert.Equal(Visibility.Collapsed, window.Chip.Visibility);
-            Assert.Equal(1, window.PuckScaleTarget);
+            Assert.False(window.BarShown);
 
             Raise(puck, DragDrop.DragEnterEvent);
             Assert.Equal(DragDropEffects.None, Raise(puck, DragDrop.DropEvent).Effects);
-            Assert.Equal(Visibility.Collapsed, window.Chip.Visibility);
+            Assert.False(window.BarShown);
         }
         finally { window.Close(); }
     });
@@ -55,7 +53,7 @@ public sealed class DragTabTests
         {
             window.SetTiles(Tiles(opensOnDrag: false));
             Raise(window.PuckButton, DragDrop.DragEnterEvent);
-            Assert.Equal(Visibility.Collapsed, window.Chip.Visibility);
+            Assert.False(window.BarShown);
             Assert.Equal(1, window.PuckScaleTarget);
         }
         finally { window.Close(); }

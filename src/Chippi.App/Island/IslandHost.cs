@@ -134,8 +134,9 @@ public sealed class IslandHost : IDisposable
 
     /// <summary>
     /// Debug builds (<c>--island-shots &lt;dir&gt;</c>): the widget where it starts (bottom right of
-    /// its display), in the dark and the light theme: at rest, hovered, lifted as if dragged, with a
-    /// fake timer live, and with the panel open (r6-widget-&lt;theme&gt;-*.png). Then drops the puck
+    /// its display), in the dark and the light theme: at rest, hovered, lifted as if dragged, the bar
+    /// with a fake timer live and that bar becoming the panel (early in the morph, open, folding back),
+    /// and the puck's panel open (r6-widget-&lt;theme&gt;-*.png). Then drops the puck
     /// through the real drop path in each corner of the work area, past every edge and in the middle,
     /// and checks it lands inside the work area with the panel inside too (r6-drop-check.txt). Use a
     /// CHIPPI_DEV_PROFILE: the place, display and theme it moves through are put back.
@@ -170,6 +171,15 @@ public sealed class IslandHost : IDisposable
                 _window.ForceLift(false);
                 debug.Publish(new IslandActivity("timer", IslandActivityKind.Timer, "18:42", "Focus timer") { Progress = 0.4 });
                 await SaveAsync("timer");
+                // The bar becomes the panel: caught early in the 220ms morph, then open, then early in the fold.
+                _window.ForceOpen(true);
+                await Task.Delay(70);
+                _window.SaveScene(Path.Combine(directory, $"{prefix}-timer-opening.png"), color);
+                await SaveAsync("timer-open");
+                _window.ForceOpen(false);
+                await Task.Delay(60);
+                _window.SaveScene(Path.Combine(directory, $"{prefix}-timer-closing.png"), color);
+                await Task.Delay(settle);
                 _shell.Island.ClearModule(DebugModuleId);
                 _window.ForceOpen(true);
                 await SaveAsync("open");

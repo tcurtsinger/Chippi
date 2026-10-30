@@ -17,29 +17,29 @@ public sealed class PlainPasteGlyphTests
     [InlineData(false, "Plain text copied")]
     [InlineData(true, "No text copied")]
     [InlineData(true, "Clipboard busy")]
-    public void Feedback_shows_on_the_chip_with_the_right_glyph_color_and_name_without_a_dot_or_page_activity(bool caution, string name) => WpfTestThread.Run(() =>
+    public void Feedback_shows_on_the_bar_with_the_right_glyph_color_and_name_without_a_dot_or_page_activity(bool caution, string name) => WpfTestThread.Run(() =>
     {
         var window = new IslandWindow();
         try
         {
             window.SetActivities([new IslandActivity(PlainPasteModule.FeedbackKey, IslandActivityKind.Status, name, "") { ModuleId = PlainPasteModule.Id, NeedsAttention = caution }], PetMood.Idle);
             var glyph = window.GlyphIcon;
-            Assert.Equal(Visibility.Visible, window.Chip.Visibility);
+            Assert.True(window.BarShown);
             Assert.Same(LucideIcons.ClipboardType, glyph.Data);
             Assert.Equal(((SolidColorBrush)window.FindResource(caution ? "IslandCautionBrush" : "IslandAccentBrush")).Color, ((SolidColorBrush)glyph.Brush).Color);
-            Assert.Equal(name, AutomationProperties.GetName(window.Chip));
-            Assert.Equal(AutomationLiveSetting.Polite, AutomationProperties.GetLiveSetting(window.Chip));
+            Assert.Equal($"Chippi, {name}", AutomationProperties.GetName(window.PuckButton));
+            Assert.Equal(AutomationLiveSetting.Polite, AutomationProperties.GetLiveSetting(window.PuckButton));
             Assert.Equal(Visibility.Collapsed, window.Dot.Visibility);
             var pageActivities = (IReadOnlyList<IslandActivity>)typeof(IslandPanelWindow).GetField("_activities", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(window.Panel)!;
             Assert.Empty(pageActivities);
             window.SetActivities([], PetMood.Sleepy);
-            Assert.Equal(Visibility.Collapsed, window.Chip.Visibility);
+            Assert.False(window.BarShown);
             Assert.Equal("Chippi", AutomationProperties.GetName(window.PuckButton));
         }
         finally { window.Close(); }
     });
     [Fact]
-    public void Feedback_takes_the_chip_for_a_moment_and_gives_it_back_to_the_song() => WpfTestThread.Run(() =>
+    public void Feedback_takes_the_bar_for_a_moment_and_gives_it_back_to_the_song() => WpfTestThread.Run(() =>
     {
         var window = new IslandWindow();
         try

@@ -1,8 +1,8 @@
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
-<!-- The open panel (DESIGN.md §5): one shape grown out of the widget's puck, 1px stroke, 8px corners, the
-     panel shadow, 12px padding. It shows the home or one tile's page and morphs between them. A transparent,
-     topmost tool window that doesn't activate until the user clicks into it; while open it covers the puck and
-     the panel beside it, and its transparent pixels click through. -->
+<!-- The open panel (DESIGN.md §5): the widget (the puck, or the bar) become one shape on its outer corner, 1px
+     stroke, 8px corners, the panel shadow, 12px padding. It shows the home or one tile's page and morphs between
+     them. A transparent, topmost tool window that doesn't activate until the user clicks into it; while open it
+     covers the widget and the panel it became, and its transparent pixels click through. -->
 <Window x:Class="Chippi.App.Island.IslandPanelWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
