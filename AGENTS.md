@@ -15,7 +15,8 @@ A Windows 11 tray app for the owner's own PC (C#, .NET 10, WPF): a widget on the
 
 ## Test
 
-- CI runs every project under `tests/` in Release on x64. Locally, run the projects your change touches, and let CI run the rest.
+- CI runs every project under `tests/` in Release on x64, in its own job beside the two builds. It builds `Chippi.slnx` once and runs the tests without building again, so a new test project must be in `Chippi.slnx`. Locally, run the projects your change touches, and let CI run the rest.
+- CI runs once per pull request and once on `main` after a merge, not on branch pushes. A change that only touches Markdown, `docs/` or `phase-1-release-artifacts.csv` runs no CI.
 - Run in Release too when a test touches Debug-only members.
 - `Chippi.UiSmoke` drives real windows and keys on the desktop. It's skipped unless `CHIPPI_UI_SMOKE=1`; only enable it when the owner has set a time (`tests/Chippi.UiSmoke/README.md`).
 - Tests that show windows (`Chippi.Island.Tests` and the like), dev runs and renders may run while a game or Zoom is in front (the owner, 2026-10-29). While the owner is doing live checks, leave those tests to CI.
@@ -53,9 +54,9 @@ A Windows 11 tray app for the owner's own PC (C#, .NET 10, WPF): a widget on the
 
 - **One branch and worktree per change** (`X:\code\chippi-<name>`). The main checkout, `X:\code\chippi`, is the owner's.
 - **Review:** another agent reviews each PR. Call out new projects in `Chippi.slnx`, and changes to shared code (Core, App, the island, Chippi.UI), in the PR.
-- **Merging:** a PR merges only when every CI job is green, with a merge commit. Then watch `main`.
+- **Merging:** a PR merges only when every CI job is green, with a merge commit. A PR that runs no CI merges once it's reviewed. Don't wait on `main`'s run after a merge: check it's green before you open the next PR.
 - **Scratch:** shots, probes and review notes go in `X:\code\chippi-scratch\<work>\`, never the repo. At the end of a phase, follow `docs/end-of-phase-checklist.md`.
-- **Installers:** made with `build/pack.ps1` (`build/README.md`). Every file is hashed against `phase-1-release-artifacts.csv`.
+- **Installers:** made with `build/pack.ps1` (`build/README.md`). Every file is hashed against `phase-1-release-artifacts.csv`. Refresh them when the owner is about to install or at the end of a phase, not after every merge.
 - **Live checks for the owner:** each step says how to make every test file, what to type and where to click.
 - **Copy:** bare-verb buttons. A confirm is a short question with Cancel and a verb. Errors read "… failed".
 
