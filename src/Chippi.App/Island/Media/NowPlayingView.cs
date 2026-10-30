@@ -8,6 +8,7 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Documents;
 using System.Windows.Media;
+using System.Windows.Shapes;
 using System.Windows.Threading;
 using Chippi.App.Pet;
 using Chippi.Core.Config;
@@ -18,13 +19,13 @@ namespace Chippi.App.Island.Media;
 
 /// <summary>
 /// The Now Playing page (DESIGN.md §5 Island, revised 2026-10-29), after Apple Music's widget: the
-/// header names the app (a menu of apps when two or more have sessions), then 168px artwork beside
+/// header names the app (a menu of apps when two or more have sessions), then 156px artwork beside
 /// the title, artist and previous / play-pause / next, each disabled when the app doesn't offer it,
-/// with the progress under them. No artwork shows Gumdrop in its place; nothing playing, Gumdrop asleep.
+/// with the progress under them. No artwork shows ChippiPet in its place; nothing playing, ChippiPet asleep.
 /// </summary>
 internal sealed class NowPlayingView : UserControl
 {
-    private const double Art = 168;
+    private const double Art = 156;
 
     private readonly IMediaSessions _media;
     private readonly DispatcherTimer _tick = new() { Interval = TimeSpan.FromMilliseconds(500) };
@@ -32,28 +33,28 @@ internal sealed class NowPlayingView : UserControl
     private readonly TextBlock _sourceText = new() { FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
     private readonly LucideIcon _chevron = new() { Data = LucideIcons.ChevronDown, Size = 12, Margin = new Thickness(4, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
     private readonly Popup _sources = new() { StaysOpen = false, AllowsTransparency = true, Placement = PlacementMode.Bottom };
-    private readonly Border _art = new() { Width = Art, Height = Art, CornerRadius = new CornerRadius(8), ClipToBounds = true };
-    private readonly Gumdrop _artPet = new() { Size = 76, IsDecorative = true, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+    private readonly Border _art = new() { Width = Art, Height = Art, CornerRadius = new CornerRadius(6), ClipToBounds = true };
+    private readonly ChippiPet _artPet = new() { Size = 76, Mood = PetMood.Listening, IsDecorative = true, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
     private readonly TextBlock _title = new()
     {
         FontSize = 20, FontWeight = FontWeights.SemiBold, LineHeight = 26, LineStackingStrategy = LineStackingStrategy.BlockLineHeight,
         MaxHeight = 52, TextWrapping = TextWrapping.Wrap, TextTrimming = TextTrimming.CharacterEllipsis,
     };
     private readonly TextBlock _artist = new() { FontSize = 13, TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(0, 2, 0, 0) };
-    private readonly Grid _progress = new() { Height = 4, Margin = new Thickness(10, 0, 10, 0) };
-    private readonly Border _fill = new() { CornerRadius = new CornerRadius(2) };
+    private readonly Grid _progress = new() { Height = 18, Margin = new Thickness(10, 0, 10, 0) };
+    private readonly Border _fill = new() { Height = 4, VerticalAlignment = VerticalAlignment.Center, CornerRadius = new CornerRadius(2) };
     private readonly TextBlock _elapsed = new() { FontSize = 11, MinWidth = 30, VerticalAlignment = VerticalAlignment.Center };
     private readonly TextBlock _remaining = new() { FontSize = 11, MinWidth = 30, TextAlignment = TextAlignment.Right, VerticalAlignment = VerticalAlignment.Center };
     private readonly Grid _timeline = new() { Margin = new Thickness(0, 22, 0, 0) };
     private readonly Button _previous;
     private readonly Button _playPause;
-    private readonly LucideIcon _playGlyph = new() { Data = LucideIcons.Play, Size = 36, Filled = true };
+    private readonly LucideIcon _playGlyph = new() { Data = LucideIcons.Play, Size = 22, Filled = true };
     private readonly Button _next;
     private readonly StackPanel _player;
-    private readonly Gumdrop _asleep = new() { Size = 72, Mood = PetMood.Sleepy, IsDecorative = true, HorizontalAlignment = HorizontalAlignment.Center };
+    private readonly ChippiPet _asleep = new() { Size = 72, Mood = PetMood.Sleepy, IsDecorative = true, HorizontalAlignment = HorizontalAlignment.Center };
     private readonly StackPanel _empty;
 
-    public NowPlayingView(IMediaSessions media)
+    public NowPlayingView(IMediaSessions media, Action? back = null)
     {
         _media = media;
         SetResourceReference(ForegroundProperty, "IslandTextBrush");
@@ -72,17 +73,24 @@ internal sealed class NowPlayingView : UserControl
         _sources.PlacementTarget = _source;
         DockPanel.SetDock(_source, Dock.Right);
         var header = new DockPanel { Height = IslandPage.HeaderHeight, Margin = new Thickness(0, 0, 0, IslandPage.Gap), LastChildFill = true, Children = { _source, heading } };
+        if (back is not null)
+            header.Children.Insert(0, IslandPanelWindow.BackButton(back));
 
         // The card: artwork, then the title and artist over the transport; the progress under both.
         // Optically level with the art: the title's capitals with its top, the solid glyphs with its bottom.
         RenderOptions.SetBitmapScalingMode(_art, BitmapScalingMode.HighQuality);
         _art.SetResourceReference(Border.BorderBrushProperty, "IslandBorderBrush");
-        _artist.SetResourceReference(TextBlock.ForegroundProperty, "IslandTextTertiaryBrush");
+        _artist.SetResourceReference(TextBlock.ForegroundProperty, "IslandTextSecondaryBrush");
         _title.SizeChanged += (_, _) => Tip(_title);
         _artist.SizeChanged += (_, _) => Tip(_artist);
-        _previous = Transport(Glyph(LucideIcons.SkipBack, 28), 48, "Previous track", () => _media.PreviousAsync());
+        _previous = Transport(Glyph(LucideIcons.SkipBack, 24), 48, "Previous track", () => _media.PreviousAsync());
         _playPause = Transport(_playGlyph, 52, "Play", () => _media.PlayPauseAsync());
-        _next = Transport(Glyph(LucideIcons.SkipForward, 28), 48, "Next track", () => _media.NextAsync());
+        _next = Transport(Glyph(LucideIcons.SkipForward, 24), 48, "Next track", () => _media.NextAsync());
+        // The play disc: the accent fill, an on-accent glyph and a violet glow.
+        _playPause.SetResourceReference(StyleProperty, "IslandPlayDiscStyle");
+        _playPause.Width = _playPause.Height = 52;
+        _playGlyph.SetResourceReference(LucideIcon.BrushProperty, "IslandOnAccentBrush");
+        _playPause.SetResourceReference(UIElement.EffectProperty, "IslandPlayGlow");
         var transport = new UniformGrid { Rows = 1, Columns = 3, Height = 52, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(4, 0, 4, -14),
             Children = { _previous, _playPause, _next } };
         var meta = new Grid { Children = { new StackPanel { Margin = new Thickness(0, -6, 0, 0), Children = { _title, _artist } }, transport } };
@@ -96,11 +104,19 @@ internal sealed class NowPlayingView : UserControl
         }
         _progress.ColumnDefinitions.Add(new ColumnDefinition());
         _progress.ColumnDefinitions.Add(new ColumnDefinition());
-        var bar = new Border { CornerRadius = new CornerRadius(2) };
-        bar.SetResourceReference(Border.BackgroundProperty, "IslandTrackBrush");
+        var bar = new Border { Height = 4, VerticalAlignment = VerticalAlignment.Center, CornerRadius = new CornerRadius(2) };
+        bar.SetResourceReference(Border.BackgroundProperty, "IslandSliderTrackBrush");
         Grid.SetColumnSpan(bar, 2);
         _progress.Children.Add(bar);
         _progress.Children.Add(_fill);
+        // The slider's ringed thumb, at the end of the fill (the page shows the position; it doesn't seek).
+        var thumbDot = new Ellipse { Width = 10, Height = 10, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+        thumbDot.SetResourceReference(Shape.FillProperty, "IslandAccentBrush");
+        var thumbRing = new Ellipse { Width = 18, Height = 18 };
+        thumbRing.SetResourceReference(UIElement.EffectProperty, "IslandThumbShadow");
+        thumbRing.SetResourceReference(Shape.FillProperty, "IslandThumbBrush");
+        var thumb = new Grid { Width = 18, Height = 18, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, -9, 0), IsHitTestVisible = false, Children = { thumbRing, thumbDot } };
+        _progress.Children.Add(thumb);
         _timeline.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         _timeline.ColumnDefinitions.Add(new ColumnDefinition());
         _timeline.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -131,7 +147,7 @@ internal sealed class NowPlayingView : UserControl
         Show();
     }
 
-    /// <summary>Gumdrop's color here, the user's choice in Settings › Island &amp; pet.</summary>
+    /// <summary>ChippiPet's color here, the user's choice in Settings › Island &amp; pet.</summary>
     internal void SetPetColor(PetColor color) => _artPet.PetColor = _asleep.PetColor = color;
 
     private static LucideIcon Glyph(Geometry data, double size) => new() { Data = data, Size = size, Filled = true };
@@ -179,7 +195,7 @@ internal sealed class NowPlayingView : UserControl
         _playPause.IsEnabled = track.PlayPause != PlayPauseCommand.None;
         _playGlyph.Data = track.Playing ? LucideIcons.Pause : LucideIcons.Play;
         AutomationProperties.SetName(_playPause, track.Playing ? "Pause" : "Play");
-        _fill.SetResourceReference(Border.BackgroundProperty, track.Playing ? "IslandAccentBrush" : "IslandTextTertiaryBrush");
+        _fill.SetResourceReference(Border.BackgroundProperty, track.Playing ? "IslandAccentFillBrush" : "IslandTextTertiaryBrush");
         ShowTime();
         if (track.Playing && timed && IsLoaded)
             _tick.Start();

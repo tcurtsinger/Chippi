@@ -64,8 +64,8 @@ public sealed class ConfigStoreTests : IDisposable
         var app = store.GetSection<AppSettings>(AppSettings.SectionName);
         Assert.Equal(ThemePreference.System, app.Theme);
         Assert.Equal(AccentChoice.FollowWindows, app.Accent);
-        Assert.Equal(IslandEdge.Top, app.IslandEdge);
-        Assert.Equal(0.5, app.IslandPlace);
+        Assert.Null(app.IslandX);
+        Assert.Null(app.IslandY);
         Assert.False(store.HasModuleSettings("keep-awake"));
         Assert.Equal(0, store.GetModuleSettings<SampleSettings>("keep-awake").Minutes);
     }

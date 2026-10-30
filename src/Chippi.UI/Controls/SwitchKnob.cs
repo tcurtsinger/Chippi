@@ -15,8 +15,16 @@ namespace Chippi.UI.Controls;
 /// </summary>
 public static class SwitchKnob
 {
-    /// <summary>How far the knob travels from Off to On.</summary>
+    /// <summary>How far the knob travels from Off to On on the 40 × 20 switch.</summary>
     public const double Travel = 19;
+
+    /// <summary>The travel on a switch of another size (the island's is 34 × 18). Set it before IsOn.</summary>
+    public static readonly DependencyProperty DistanceProperty = DependencyProperty.RegisterAttached(
+        "Distance", typeof(double), typeof(SwitchKnob), new PropertyMetadata(Travel));
+
+    public static double GetDistance(DependencyObject element) => (double)element.GetValue(DistanceProperty);
+
+    public static void SetDistance(DependencyObject element, double value) => element.SetValue(DistanceProperty, value);
 
     public static readonly DependencyProperty IsOnProperty = DependencyProperty.RegisterAttached(
         "IsOn", typeof(bool?), typeof(SwitchKnob), new PropertyMetadata(null, OnIsOnChanged));
@@ -32,7 +40,7 @@ public static class SwitchKnob
         // The knob's offset is made here, not in XAML: the template binds this before it would set a RenderTransform.
         if (knob.RenderTransform is not TranslateTransform offset)
             knob.RenderTransform = offset = new TranslateTransform();
-        double to = e.NewValue as bool? == true ? Travel : 0;
+        double to = e.NewValue as bool? == true ? GetDistance(knob) : 0;
         if (e.OldValue is null)
         {
             offset.BeginAnimation(TranslateTransform.XProperty, null);

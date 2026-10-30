@@ -296,7 +296,7 @@ public sealed class ModuleTests : IDisposable
             var open = rows.Children.OfType<Border>().Single();
             Assert.True(rows.Shows(open));
             Assert.True(rows.ActualHeight <= 304 - 28 - 8);
-            var preview = Find<TextBlock>(open).Single(t => t.Text.StartsWith("copy 6", StringComparison.Ordinal));
+            var preview = Find<TextBlock>(open).Single(t => t.Text.StartsWith("copy 6", StringComparison.Ordinal) && t.TextWrapping == TextWrapping.Wrap);
             Assert.Equal(3 * 18, preview.MaxHeight); // at most 3 lines, the last trimmed
             Assert.Equal(TextTrimming.CharacterEllipsis, preview.TextTrimming);
             Assert.Equal("copy 6\nsecond line\nthird line…", preview.Text); // the hidden fourth line shows as "…"
@@ -308,7 +308,8 @@ public sealed class ModuleTests : IDisposable
     {
         await StartHistoryAsync();
         _history.SetRecording(true);
-        for (int i = 0; i < 40; i++)
+        const int Copies = 300;
+        for (int i = 0; i < Copies; i++)
         {
             _hub.CopyText($"copy {i}");
             await _history.History!.IdleAsync();
@@ -323,7 +324,7 @@ public sealed class ModuleTests : IDisposable
             var rows = Find<WholeRows>(view).Single();
             Assert.Equal(ClipboardView.BuiltRows, rows.Children.Count);
 
-            // Down 25 times opens the 25th newest, copy 15, far past the rows built at first.
+            // Down 25 times opens the 25th newest, far past the rows built at first.
             var search = Find<SearchBox>(view).Single();
             for (int i = 0; i < 25; i++)
                 search.RaiseEvent(new System.Windows.Input.KeyEventArgs(System.Windows.Input.Keyboard.PrimaryDevice, new FakeSource(view), 0, System.Windows.Input.Key.Down) { RoutedEvent = System.Windows.Input.Keyboard.PreviewKeyDownEvent });
@@ -331,7 +332,7 @@ public sealed class ModuleTests : IDisposable
             Assert.True(rows.Children.Count <= ClipboardView.BuiltRows);
             var open = rows.Children.OfType<Border>().Single();
             Assert.True(rows.Shows(open));
-            Assert.Contains(Find<TextBlock>(open), t => t.Text == "copy 15");
+            Assert.Contains(Find<TextBlock>(open), t => t.Text == $"copy {Copies - 25}");
         });
     }
 

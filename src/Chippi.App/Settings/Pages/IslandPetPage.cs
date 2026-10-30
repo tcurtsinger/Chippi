@@ -19,7 +19,7 @@ namespace Chippi.App.Settings.Pages;
 
 /// <summary>
 /// Settings › Island &amp; pet (DESIGN.md §5): the island and the tray icon, where the island opens and
-/// sits, its tiles (order, show or hide, with a preview) and its round buttons, then Gumdrop.
+/// sits, its tiles (order, show or hide, with a preview), then Chippi.
 /// </summary>
 internal sealed class IslandPetPage : UserControl
 {
@@ -28,8 +28,6 @@ internal sealed class IslandPetPage : UserControl
     private readonly ShellContext _shell;
     private readonly Card _tiles = new();
     private readonly DecorativeHost _preview = new() { HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(16) };
-    private readonly ComboBox _left;
-    private readonly ComboBox _right;
     private string _tileKeys = "";
 
     public IslandPetPage(ShellContext shell)
@@ -48,20 +46,7 @@ internal sealed class IslandPetPage : UserControl
         tiles.Children.Add(preview);
         page.Children.Add(tiles);
 
-        page.Children.Add(SettingsUi.Section("Round buttons"));
-        _left = ButtonPicker("Left button");
-        _right = ButtonPicker("Right button");
-        _left.SelectionChanged += (_, _) => SaveButton(_left, (s, key) => s.IslandLeftButton = key);
-        _right.SelectionChanged += (_, _) => SaveButton(_right, (s, key) => s.IslandRightButton = key);
-        var live = SettingsUi.Switch(app.IslandLiveButton);
-        AutomationProperties.SetName(live, "Live button");
-        SettingsUi.OnSwitched(live, on => Save(s => s.IslandLiveButton = on));
-        page.Children.Add(SettingsUi.Group(
-            SettingsUi.Row("Left button", "", _left),
-            SettingsUi.Row("Right button", "", _right),
-            SettingsUi.Row("Live button", "", live)));
-
-        page.Children.Add(SettingsUi.Section("Gumdrop"));
+        page.Children.Add(SettingsUi.Section("Chippi"));
         page.Children.Add(SettingsUi.Group(ColorRow(app), MotionRow(app)));
         Content = page;
 
@@ -115,17 +100,19 @@ internal sealed class IslandPetPage : UserControl
         return SettingsUi.Row("Opens on", "", picker);
     }
 
-    // Only the top edge docks for now (side edges retired 2026-10-29); dragging the tab moves it along it.
+    // Dragging the widget moves it; Reset puts it back where it starts, 24 in from the bottom-right corner.
     private Border PositionRow()
     {
         var reset = SettingsUi.Button("Reset");
-        reset.Click += (_, _) => SettingsUi.SaveApp(_shell.Config, s => { s.IslandEdge = IslandEdge.Top; s.IslandPlace = 0.5; });
+        reset.Click += (_, _) => SettingsUi.SaveApp(_shell.Config, s => { s.IslandX = null; s.IslandY = null; });
         return SettingsUi.Row("Position", "", reset);
     }
 
+    // Follow active window is retired (2026-10-29): a widget you place yourself stays put. A saved one shows as Main display.
     private Border DisplayRow(AppSettings app)
     {
-        var mode = Combo("Island display", new[] { ("Follow active window", IslandDisplay.FollowActiveWindow), ("Main display", IslandDisplay.MainDisplay), ("One monitor", IslandDisplay.SpecificMonitor) }, app.IslandDisplay);
+        var shown = app.IslandDisplay == IslandDisplay.FollowActiveWindow ? IslandDisplay.MainDisplay : app.IslandDisplay;
+        var mode = Combo("Island display", new[] { ("Main display", IslandDisplay.MainDisplay), ("One monitor", IslandDisplay.SpecificMonitor) }, shown);
         var picker = SettingsUi.Styled(new ComboBox { MinWidth = 180, MaxWidth = 300, Tag = "Choose a monitor", Margin = new Thickness(0, 8, 0, 0) }, "HopperComboBoxStyle");
         AutomationProperties.SetName(picker, "Island monitor");
         foreach (var monitor in Displays.Connected())
@@ -166,20 +153,19 @@ internal sealed class IslandPetPage : UserControl
 
     // ----- Tiles -----
 
-    private sealed record Tile(string Key, string Name, Geometry Icon, IslandOrbit Orbit);
+    private sealed record Tile(string Key, string Name, Geometry Icon);
 
-    /// <summary>Now Playing and the running features' tiles, in their own order.</summary>
+    /// <summary>The running features' home buttons, in their own order. Now Playing is a fixed card.</summary>
     private List<Tile> AllTiles() =>
     [
-        new(IslandPanelWindow.NowPlayingKey, "Now Playing", LucideIcons.Music, IslandOrbit.None),
         .. IslandTileContribution.Group(_shell.Registry.Features.Where(f => f.IsRunning).SelectMany(f => f.IslandTiles))
             .Where(g => g.Key != IslandPanelWindow.NowPlayingKey)
-            .Select(g => new Tile(g.Key, g.Name, LucideIcons.Get(g.Icon), g.Orbit)),
+            .Select(g => new Tile(g.Key, g.Name, LucideIcons.Get(g.Icon))),
     ];
 
     private IslandLayout Layout() => IslandLayout.From(SettingsUi.ReadApp(_shell.Config));
 
-    /// <summary>A row per tile in the island's order, with its grip and its switch; then the button pickers and preview.</summary>
+    /// <summary>A row per tile in the island's order, with its grip and its switch; then the preview.</summary>
     private void RefreshTiles()
     {
         var all = AllTiles();
@@ -193,8 +179,6 @@ internal sealed class IslandPetPage : UserControl
             for (int i = 0; i < order.Count; i++)
                 _tiles.Children.Add(TileRow(all.First(t => t.Key == order[i]), i, order, !layout.Hidden.Contains(order[i])));
         }
-        FillButtonPicker(_left, all, layout.Left, IslandOrbit.Left);
-        FillButtonPicker(_right, all, layout.Right, IslandOrbit.Right);
         RefreshPreview();
     }
 
@@ -249,110 +233,61 @@ internal sealed class IslandPetPage : UserControl
             row.Children.OfType<DragHandle>().FirstOrDefault()?.Focus();
     }
 
-    // ----- Round buttons -----
-
-    private static ComboBox ButtonPicker(string name)
-    {
-        var combo = SettingsUi.Styled(new ComboBox { MinWidth = 180, HorizontalAlignment = HorizontalAlignment.Left }, "HopperComboBoxStyle");
-        AutomationProperties.SetName(combo, name);
-        return combo;
-    }
-
-    /// <summary>None and every tile, with the saved choice selected (or the tile whose feature asks for that side).</summary>
-    private static void FillButtonPicker(ComboBox combo, IReadOnlyList<Tile> tiles, string? choice, IslandOrbit side)
-    {
-        string selected = choice ?? tiles.FirstOrDefault(t => t.Orbit == side)?.Key ?? "";
-        var items = new[] { new ComboBoxItem { Content = "None", Tag = "" } }
-            .Concat(tiles.Select(t => new ComboBoxItem { Content = t.Name, Tag = t.Key })).ToList();
-        if (combo.Items.Count == items.Count && combo.Items.OfType<ComboBoxItem>().Select(i => (string)i.Tag).SequenceEqual(items.Select(i => (string)i.Tag)))
-        {
-            if ((combo.SelectedItem as ComboBoxItem)?.Tag as string != selected)
-                combo.SelectedItem = combo.Items.OfType<ComboBoxItem>().FirstOrDefault(i => (string)i.Tag == selected);
-            return;
-        }
-        combo.Tag = "filling";
-        combo.Items.Clear();
-        foreach (var item in items)
-            combo.Items.Add(item);
-        combo.SelectedItem = combo.Items.OfType<ComboBoxItem>().FirstOrDefault(i => (string)i.Tag == selected);
-        combo.Tag = null;
-    }
-
-    private void SaveButton(ComboBox combo, Action<AppSettings, string> set)
-    {
-        if (combo.Tag is "filling" || combo.SelectedItem is not ComboBoxItem { Tag: string key })
-            return;
-        Save(s => set(s, key));
-    }
-
     // ----- Preview -----
 
     /// <summary>
-    /// A small picture of the open island on the top edge: the shown tiles three across, the round
-    /// buttons in their pairs beside it, and the live button below.
+    /// A small desktop with the widget at its bottom right: the open panel over the puck, the shown tiles four across.
     /// </summary>
     private void RefreshPreview()
     {
-        const double width = 260, inset = 6, gap = 4, header = 12, button = 20, buttonGap = 6, room = 30;
+        const double width = 260, height = 160, edge = 10, puck = 30, panelWidth = 176, inset = 6, gap = 4;
         var all = AllTiles();
         var layout = Layout();
-        var shown = layout.Shown(all.Select(t => t.Key)).Select(k => all.First(t => t.Key == k)).ToList();
-        int columns = shown.Count <= 3 ? Math.Max(1, shown.Count) : shown.Count == 4 ? 2 : 3;
-        int rows = Math.Max(1, (shown.Count + columns - 1) / columns);
-        const double height = 180;
-        double tile = (152 - (rows - 1) * gap) / rows;
-        var canvas = new Canvas { Width = width + 2 * room, Height = height + (layout.Live ? buttonGap + button : 0) };
+        var shown = layout.Shown(all.Select(t => t.Key)).Select(k => all.First(t => t.Key == k)).Take(IslandGrid.MaxTiles).ToList();
+        int rows = Math.Max(1, (shown.Count + IslandGrid.Columns - 1) / IslandGrid.Columns);
+        double tile = 18;
+        double panelHeight = 2 * inset + 22 + rows * tile + (rows - 1) * gap + 14;
+        var canvas = new Canvas { Width = width, Height = height };
 
-        var shape = new Border { Width = width, Height = height, CornerRadius = new CornerRadius(0, 0, 12, 12), BorderThickness = new Thickness(1, 0, 1, 1) };
-        shape.SetResourceReference(Border.BackgroundProperty, "IslandBrush");
-        shape.SetResourceReference(Border.BorderBrushProperty, "IslandBorderBrush");
-        var title = new TextBlock { Text = "Chippi", FontSize = 9, FontWeight = FontWeights.SemiBold, Height = header, Margin = new Thickness(0, 0, 0, 5) };
-        title.SetResourceReference(TextBlock.ForegroundProperty, "IslandTextBrush");
-        var grid = new UniformGrid { Columns = columns, Margin = new Thickness(0, 0, -gap, 0) };
+        var screen = new Border { Width = width, Height = height, CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(1) };
+        screen.SetResourceReference(Border.BackgroundProperty, "WindowBackgroundBrush");
+        screen.SetResourceReference(Border.BorderBrushProperty, "BorderBrush");
+        canvas.Children.Add(screen);
+
+        var panel = new Border { Width = panelWidth, Height = panelHeight, CornerRadius = new CornerRadius(6), BorderThickness = new Thickness(1) };
+        panel.SetResourceReference(Border.BackgroundProperty, "IslandBrush");
+        panel.SetResourceReference(Border.BorderBrushProperty, "IslandBorderBrush");
+        var card = new Border { Height = 22, CornerRadius = new CornerRadius(4), Margin = new Thickness(0, 0, 0, gap) };
+        card.SetResourceReference(Border.BackgroundProperty, "IslandPanelBrush");
+        var grid = new UniformGrid { Columns = IslandGrid.Columns, Margin = new Thickness(0, 0, -gap, 0) };
         foreach (var t in shown)
         {
-            var glyph = new LucideIcon { Data = t.Icon, Size = 14, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+            var glyph = new LucideIcon { Data = t.Icon, Size = 10, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
             glyph.SetResourceReference(LucideIcon.BrushProperty, "IslandTextBrush");
-            var cell = new Border { Height = tile, CornerRadius = new CornerRadius(6), Margin = new Thickness(0, 0, gap, gap), Child = glyph };
+            var cell = new Border { Height = tile, CornerRadius = new CornerRadius(4), Margin = new Thickness(0, 0, gap, gap), Child = glyph };
             cell.SetResourceReference(Border.BackgroundProperty, "IslandPanelBrush");
             grid.Children.Add(cell);
         }
-        shape.Child = new StackPanel { Margin = new Thickness(inset, inset, inset, 0), Children = { title, grid } };
-        Canvas.SetLeft(shape, room);
-        canvas.Children.Add(shape);
+        panel.Child = new StackPanel { Margin = new Thickness(inset, inset, inset, 0), Children = { card, grid } };
+        Canvas.SetLeft(panel, width - edge - panelWidth);
+        Canvas.SetTop(panel, height - edge - puck / 2 - panelHeight);
+        canvas.Children.Add(panel);
 
-        bool Exists(string key) => all.Any(t => t.Key == key);
-        Geometry? Glyph(string? key) => key is null ? null : all.FirstOrDefault(t => t.Key == key)?.Icon;
-        void Round(Geometry? glyph, double x, double y)
-        {
-            if (glyph is null)
-                return;
-            var icon = new LucideIcon { Data = glyph, Size = 12, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
-            icon.SetResourceReference(LucideIcon.BrushProperty, "IslandTextBrush");
-            var circle = new Border { Width = button, Height = button, CornerRadius = new CornerRadius(button / 2), BorderThickness = new Thickness(1), Child = icon };
-            circle.SetResourceReference(Border.BackgroundProperty, "IslandBrush");
-            circle.SetResourceReference(Border.BorderBrushProperty, "IslandTabBorderBrush");
-            Canvas.SetLeft(circle, x);
-            Canvas.SetTop(circle, y);
-            canvas.Children.Add(circle);
-        }
-        // Each pair centered on the island's height, as on screen.
-        double top = Math.Max(4, height / 2 - (2 * button + 4) / 2);
-        double left = room - buttonGap - button, right = room + width + buttonGap;
-        Round(LucideIcons.LayoutGrid, left, top);
-        Round(Glyph(IslandLayout.Button(layout.Left, Exists, all.FirstOrDefault(t => t.Orbit == IslandOrbit.Left)?.Key)), left, top + button + 4);
-        Round(LucideIcons.Settings, right, top);
-        Round(Glyph(IslandLayout.Button(layout.Right, Exists, all.FirstOrDefault(t => t.Orbit == IslandOrbit.Right)?.Key)), right, top + button + 4);
-        if (layout.Live)
-            Round(LucideIcons.Music, room + width / 2 - button / 2, height + buttonGap);
+        var button = new Border { Width = puck, Height = puck, CornerRadius = new CornerRadius(puck / 2), BorderThickness = new Thickness(1), Child = new ChippiPet { Size = 22, Mood = PetMood.Idle, IsDecorative = true, PetColor = SettingsUi.ReadApp(_shell.Config).PetColor, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center } };
+        button.SetResourceReference(Border.BackgroundProperty, "IslandBrush");
+        button.SetResourceReference(Border.BorderBrushProperty, "IslandBorderBrush");
+        Canvas.SetLeft(button, width - edge - puck);
+        Canvas.SetTop(button, height - edge - puck);
+        canvas.Children.Add(button);
+
         _preview.Child = canvas;
     }
 
-    // ----- Gumdrop -----
+    // ----- ChippiPet -----
 
     private SettingRow ColorRow(AppSettings app)
     {
-        var preview = new Gumdrop { Size = 48, PetColor = app.PetColor, Margin = new Thickness(0, 0, 20, 0) };
+        var preview = new ChippiPet { Size = 48, PetColor = app.PetColor, Margin = new Thickness(0, 0, 20, 0) };
         var controls = new StackPanel { Orientation = Orientation.Horizontal };
         controls.Children.Add(preview);
         var row = new SettingRow { Header = "Color", Description = app.PetColor.ToString(), Content = controls };
@@ -367,7 +302,7 @@ internal sealed class IslandPetPage : UserControl
             {
                 preview.PetColor = color;
                 row.Description = color.ToString();
-                SettingsUi.SaveApp(_shell.Config, s => s.PetColor = color);
+                Save(s => s.PetColor = color);
             };
             controls.Children.Add(swatch);
         }

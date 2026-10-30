@@ -14,7 +14,7 @@ namespace Chippi.Island.Tests;
 public sealed class MicMuteTabTests
 {
     [Fact]
-    public void Muted_glyph_stays_after_the_top_activity_and_disappears_when_unmuted()
+    public void The_red_badge_shows_beside_the_song_and_goes_when_unmuted()
     {
         WpfTestThread.Run(() =>
         {
@@ -24,16 +24,22 @@ public sealed class MicMuteTabTests
                 var music = new IslandActivity("music", IslandActivityKind.Media, "Track", "Player");
                 var muted = new IslandActivity("muted", IslandActivityKind.Status, "Muted", "Microphone")
                     { ModuleId = "mic-mute", NeedsAttention = true, TileKey = "sound.microphone" };
+                window.SetMedia(new IslandPanelTests.FakeMedia
+                {
+                    Sessions = [new("player", "Player", "Track", "", true, true, true, true, true, true, TimeSpan.Zero, TimeSpan.FromMinutes(3), DateTimeOffset.Now, null)],
+                });
                 window.SetActivities([music, muted], PetMood.Idle);
-                var glyph = Assert.IsType<LucideIcon>(window.FindName("MutedMicGlyph"));
-                Assert.Equal(Visibility.Visible, glyph.Visibility);
-                Assert.Same(LucideIcons.MicOff, glyph.Data);
-                Assert.Equal(Visibility.Visible, Assert.IsAssignableFrom<FrameworkElement>(window.FindName("Equalizer")).Visibility);
-                Assert.Equal(IslandGeometry.TabSize(Chippi.Core.Config.IslandEdge.Top, live: true), window.TabTarget);
+                Assert.Equal(Visibility.Visible, window.MicBadge.Visibility);
+                Assert.Equal(Visibility.Visible, window.Equalizer.Visibility); // the song keeps the chip; the mic is the badge
+                Assert.Equal("Track", window.ChipText);
+                Assert.Equal("Microphone muted", AutomationProperties.GetHelpText(window.PuckButton));
                 window.SetActivities([music, muted with { Title = "Some microphones muted" }], PetMood.Idle);
-                Assert.Equal("Some microphones muted", AutomationProperties.GetHelpText((DependencyObject)window.FindName("Tab")));
+                Assert.Equal("Some microphones muted", AutomationProperties.GetHelpText(window.PuckButton));
+                window.SetActivities([muted], PetMood.Idle);
+                Assert.Equal(Visibility.Collapsed, window.Chip.Visibility); // muted alone: only the badge
+                Assert.Equal(Visibility.Visible, window.MicBadge.Visibility);
                 window.SetActivities([music], PetMood.Idle);
-                Assert.Equal(Visibility.Collapsed, glyph.Visibility);
+                Assert.Equal(Visibility.Collapsed, window.MicBadge.Visibility);
             }
             finally { window.Close(); }
         });

@@ -12,7 +12,7 @@ using Chippi.UI.Controls;
 
 namespace Chippi.Island.Tests;
 
-/// <summary>A drag from another app over the closed tab (Phase 5 notes #48). Run fullscreen-check first: one test shows the island.</summary>
+/// <summary>A drag from another app over the closed widget (Phase 5 notes #48). Run fullscreen-check first: two tests show it.</summary>
 public sealed class DragTabTests
 {
     private static IReadOnlyList<IslandTileGroup> Tiles(bool opensOnDrag) => IslandTileContribution.Group(
@@ -21,46 +21,48 @@ public sealed class DragTabTests
     ]);
 
     [Fact]
-    public void A_drag_over_the_tab_swells_it_with_the_pages_glyph_and_never_drops_on_it() => WpfTestThread.Run(() =>
+    public void A_drag_over_the_puck_grows_it_names_the_page_on_the_chip_and_never_drops_on_it() => WpfTestThread.Run(() =>
     {
         var window = new IslandWindow();
         try
         {
             window.SetTiles(Tiles(opensOnDrag: true));
-            var tab = (Button)window.FindName("Tab");
-            var glyph = (LucideIcon)window.FindName("DropGlyph");
-            var over = Raise(tab, DragDrop.DragEnterEvent);
+            var puck = window.PuckButton;
+            var over = Raise(puck, DragDrop.DragEnterEvent);
             Assert.Equal(DragDropEffects.None, over.Effects);
-            Assert.Equal(Visibility.Visible, glyph.Visibility);
-            Assert.Same(LucideIcons.Inbox, glyph.Data);
-            Assert.Equal(IslandGeometry.TabSize(IslandEdge.Top, live: true, swollen: true), window.TabTarget);
+            Assert.Equal(Visibility.Visible, window.Chip.Visibility);
+            Assert.False(window.Chip.IsHitTestVisible); // the drag stays the puck's
+            Assert.Same(LucideIcons.Inbox, window.GlyphIcon.Data);
+            Assert.Equal("Shelf", window.ChipText);
+            Assert.Equal(54, 50 * window.PuckScaleTarget, 9);
 
-            Raise(tab, DragDrop.DragLeaveEvent);
-            Assert.Equal(Visibility.Collapsed, glyph.Visibility);
-            Assert.Equal(IslandGeometry.TabSize(IslandEdge.Top, live: false), window.TabTarget);
+            Raise(puck, DragDrop.DragLeaveEvent);
+            Assert.Equal(Visibility.Collapsed, window.Chip.Visibility);
+            Assert.Equal(1, window.PuckScaleTarget);
 
-            Raise(tab, DragDrop.DragEnterEvent);
-            Assert.Equal(DragDropEffects.None, Raise(tab, DragDrop.DropEvent).Effects);
-            Assert.Equal(Visibility.Collapsed, glyph.Visibility);
+            Raise(puck, DragDrop.DragEnterEvent);
+            Assert.Equal(DragDropEffects.None, Raise(puck, DragDrop.DropEvent).Effects);
+            Assert.Equal(Visibility.Collapsed, window.Chip.Visibility);
         }
         finally { window.Close(); }
     });
 
     [Fact]
-    public void Without_a_page_that_opens_on_drag_the_tab_ignores_drags() => WpfTestThread.Run(() =>
+    public void Without_a_page_that_opens_on_drag_the_puck_ignores_drags() => WpfTestThread.Run(() =>
     {
         var window = new IslandWindow();
         try
         {
             window.SetTiles(Tiles(opensOnDrag: false));
-            Raise((Button)window.FindName("Tab"), DragDrop.DragEnterEvent);
-            Assert.Equal(Visibility.Collapsed, ((LucideIcon)window.FindName("DropGlyph")).Visibility);
+            Raise(window.PuckButton, DragDrop.DragEnterEvent);
+            Assert.Equal(Visibility.Collapsed, window.Chip.Visibility);
+            Assert.Equal(1, window.PuckScaleTarget);
         }
         finally { window.Close(); }
     });
 
     [Fact]
-    public void After_250_ms_the_island_opens_without_the_keyboard_and_closes_500_ms_after_the_drag_leaves() => WpfTestThread.Run(() =>
+    public void After_250_ms_the_panel_opens_without_the_keyboard_and_closes_500_ms_after_the_drag_leaves() => WpfTestThread.Run(() =>
     {
         var window = new IslandWindow();
         try
@@ -70,14 +72,14 @@ public sealed class DragTabTests
             window.SetTiles(Tiles(opensOnDrag: true));
             var away = new Point(-30000, -30000);
             window.CursorAt = () => away;
-            var tab = (Button)window.FindName("Tab");
+            var tab = window.PuckButton;
 
             var timers = Manual(window);
 
             Raise(tab, DragDrop.DragEnterEvent);
             var open = timers[IslandWindow.DragOpenDelay];
             Assert.True(open.Running);
-            Assert.False(window.IsIslandOpen); // passing over the tab doesn't open it
+            Assert.False(window.IsIslandOpen); // passing over the puck doesn't open it
             open.Fire();
             Assert.True(window.IsIslandOpen);
             Assert.True(window.OpenedByDrag);
@@ -98,14 +100,14 @@ public sealed class DragTabTests
     });
 
     [Fact]
-    public void A_drag_that_leaves_the_tab_before_250_ms_opens_nothing() => WpfTestThread.Run(() =>
+    public void A_drag_that_leaves_the_puck_before_250_ms_opens_nothing() => WpfTestThread.Run(() =>
     {
         var window = new IslandWindow();
         try
         {
             window.SetTiles(Tiles(opensOnDrag: true));
             var timers = Manual(window);
-            var tab = (Button)window.FindName("Tab");
+            var tab = window.PuckButton;
             Raise(tab, DragDrop.DragEnterEvent);
             Raise(tab, DragDrop.DragLeaveEvent);
             Assert.False(timers[IslandWindow.DragOpenDelay].Running);
@@ -123,7 +125,7 @@ public sealed class DragTabTests
         {
             window.SetTiles(Tiles(opensOnDrag: true));
             var timers = Manual(window);
-            Raise((Button)window.FindName("Tab"), DragDrop.DragEnterEvent); // makes the open timer
+            Raise(window.PuckButton, DragDrop.DragEnterEvent); // makes the open timer
             window.ClosePages(); // makes the close timer, to stop it
             Assert.Equal([TimeSpan.FromMilliseconds(250), TimeSpan.FromMilliseconds(500)], timers.Keys.Order());
         }
@@ -141,7 +143,7 @@ public sealed class DragTabTests
             window.SetTiles(Tiles(opensOnDrag: true));
             window.CursorAt = () => new Point(-30000, -30000);
             var timers = Manual(window);
-            Raise((Button)window.FindName("Tab"), DragDrop.DragEnterEvent);
+            Raise(window.PuckButton, DragDrop.DragEnterEvent);
             timers[IslandWindow.DragOpenDelay].Fire();
             Assert.True(window.IsIslandOpen);
             Raise(window.Panel, DragDrop.DropEvent);

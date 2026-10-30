@@ -68,4 +68,36 @@
 
     <!-- Flyout shadow: 0 8px 32px rgba(0,0,0,.14). -->
     <DropShadowEffect x:Key="WindowShadow" Color="#000000" BlurRadius="32" ShadowDepth="8" Direction="270" Opacity="0.14" />
+
+    <!-- ===== Island: Dark.xaml says what each key is for. ===== -->
+    <SolidColorBrush x:Key="IslandBrush" Color="#F5F5F5F6" />
+    <SolidColorBrush x:Key="IslandBorderBrush" Color="#14000000" />
+    <SolidColorBrush x:Key="IslandTabBorderBrush" Color="#1F000000" />
+    <SolidColorBrush x:Key="IslandFooterBrush" Color="#09000000" />
+    <SolidColorBrush x:Key="IslandHairBrush" Color="#14000000" />
+    <SolidColorBrush x:Key="IslandPanelBrush" Color="#BDFFFFFF" />
+    <SolidColorBrush x:Key="IslandCardBorderBrush" Color="#0F000000" />
+    <SolidColorBrush x:Key="IslandButtonBrush" Color="#DBFFFFFF" />
+    <SolidColorBrush x:Key="IslandButtonHoverBrush" Color="#F6F6F6" />
+    <SolidColorBrush x:Key="IslandPressedBrush" Color="#F0F0F0" />
+    <SolidColorBrush x:Key="IslandControlBorderBrush" Color="#17000000" />
+    <SolidColorBrush x:Key="IslandHoverBrush" Color="#0B000000" />
+    <SolidColorBrush x:Key="IslandTrackBrush" Color="#1F000000" />
+    <SolidColorBrush x:Key="IslandSliderTrackBrush" Color="#8A8A8A" />
+    <SolidColorBrush x:Key="IslandThumbBrush" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="IslandMutedFillBrush" Color="#2E000000" />
+    <SolidColorBrush x:Key="IslandTextBrush" Color="#1A1A1A" />
+    <SolidColorBrush x:Key="IslandTextSecondaryBrush" Color="#5C5C5C" />
+    <SolidColorBrush x:Key="IslandTextTertiaryBrush" Color="#8A8A8A" />
+    <SolidColorBrush x:Key="IslandCautionBrush" Color="#C42B1C" />
+    <SolidColorBrush x:Key="IslandAccentBrush" Color="#7444F0" />
+    <LinearGradientBrush x:Key="IslandAccentFillBrush" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="#8F5CFF" Offset="0" />
+        <GradientStop Color="#5B86FF" Offset="1" />
+    </LinearGradientBrush>
+    <SolidColorBrush x:Key="IslandOnAccentBrush" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="IslandAccentTintBrush" Color="#1A7444F0" />
+    <DropShadowEffect x:Key="IslandExpandedShadow" Color="#000000" BlurRadius="40" ShadowDepth="16" Direction="270" Opacity="0.2" />
+    <DropShadowEffect x:Key="IslandPlayGlow" Color="#7444F0" BlurRadius="16" ShadowDepth="6" Direction="270" Opacity="0.35" />
+    <DropShadowEffect x:Key="IslandThumbShadow" Color="#000000" BlurRadius="3" ShadowDepth="1" Direction="270" Opacity="0.3" />
 </ResourceDictionary>

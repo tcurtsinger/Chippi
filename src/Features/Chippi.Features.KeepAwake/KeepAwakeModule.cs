@@ -62,8 +62,9 @@ public sealed class KeepAwakeModule : IFeatureModule
         CreateSession();
         _tile = context.Ui.AddIslandTile(new IslandTileSpec(TileKey, Descriptor.Name, nameof(LucideIcons.Coffee), Order: 40, SectionOrder: 0, () => new KeepAwakeIslandView(this))
         {
-            Orbit = IslandOrbit.Left,
             StatusOnPage = true, // the chips show the length, not the time left
+            // The home's button starts the default length, or stops.
+            Toggle = new IslandTileToggle(() => IsOn, () => _ = ToggleFromHomeAsync()),
         });
         UpdateTile();
         // Runs only while a timed session counts down ("45 min left"); see OnSessionChanged.
@@ -81,22 +82,40 @@ public sealed class KeepAwakeModule : IFeatureModule
             if (_context is null || _session is null) throw new InvalidOperationException("Keep awake uninstalled");
             _context.Settings.Save(settings);
             Settings = settings;
-            // The default length waits for the next start; only the screen setting reaches a running session.
+            // The remembered length waits for the next start; only the screen setting reaches a running session.
             if (IsOn) await _session.SetDisplayAsync(settings.KeepDisplayOn);
             Changed?.Invoke();
         }
         finally { _gate.Release(); }
     }
 
-    /// <summary>Starts the default length, or stops.</summary>
+    /// <summary>Starts the last length used (1 hr the first time), or stops.</summary>
     public Task ToggleAsync(CancellationToken ct = default) => IsOn ? StopSessionAsync(ct) : StartSessionAsync(Settings, ct);
 
     /// <summary>
-    /// Starts (or restarts) a session of <paramref name="length"/>'s mode and length, without changing
-    /// the default. The screen follows the Keep screen on setting.
+    /// Starts (or restarts) a session of <paramref name="length"/>'s mode and length, and remembers it as
+    /// the length the home's button starts next. The screen follows the Keep screen on setting.
     /// </summary>
-    public Task StartSessionAsync(KeepAwakeSettings length, CancellationToken ct = default) =>
-        RunAsync(session => session.StartAsync(length with { KeepDisplayOn = Settings.KeepDisplayOn }), length, ct);
+    public async Task StartSessionAsync(KeepAwakeSettings length, CancellationToken ct = default)
+    {
+        await RunAsync(session => session.StartAsync(length with { KeepDisplayOn = Settings.KeepDisplayOn }), length, ct);
+        if (IsOn)
+            await RememberAsync(length, ct);
+    }
+
+    private async Task RememberAsync(KeepAwakeSettings length, CancellationToken ct)
+    {
+        await _gate.WaitAsync(ct);
+        try
+        {
+            var remembered = Settings with { Mode = length.Mode, DurationMinutes = length.DurationMinutes, UntilMinute = length.UntilMinute };
+            if (_context is null || remembered == Settings)
+                return;
+            _context.Settings.Save(remembered);
+            Settings = remembered;
+        }
+        finally { _gate.Release(); }
+    }
 
     public Task StopSessionAsync(CancellationToken ct = default) => RunAsync(session => session.StopAsync(), null, ct);
 
@@ -150,7 +169,17 @@ public sealed class KeepAwakeModule : IFeatureModule
         : Deadline is { } end ? $"{KeepAwakeText.Left(end - now)} left"
         : "No limit";
 
-    private void UpdateTile() => _tile?.SetStatus(TileStatus(DateTimeOffset.Now));
+    private void UpdateTile()
+    {
+        _tile?.SetStatus(TileStatus(DateTimeOffset.Now));
+        _tile?.Refresh();
+    }
+
+    private async Task ToggleFromHomeAsync()
+    {
+        try { await ToggleAsync(); }
+        catch (Exception ex) { _context?.Logger.LogWarning(ex, "Toggling Keep awake from the home failed"); }
+    }
 
     /// <summary>Opens this feature's Settings page.</summary>
     public void OpenSettings() => _context?.OpenSettings(null);

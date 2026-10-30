@@ -25,27 +25,33 @@ public sealed class KeepAwakeIslandView : UserControl
     private readonly Popup _untilPopup = new() { StaysOpen = false, Placement = PlacementMode.Bottom, AllowsTransparency = true, PopupAnimation = PopupAnimation.None };
     private readonly DispatcherTimer _tick = new() { Interval = TimeSpan.FromSeconds(15) };
 
-    public KeepAwakeIslandView(KeepAwakeModule module)
-    {
-        _module = module;
-        Resources["ChoiceStyle"] = System.Windows.Markup.XamlReader.Parse("""
+    // Parsed once per UI thread (a Style belongs to its thread): building the page is on the way to every open of Keep awake.
+    [ThreadStatic]
+    private static Style? _choiceStyle;
+
+    private static Style ChoiceStyle => _choiceStyle ??= (Style)System.Windows.Markup.XamlReader.Parse("""
             <Style xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" TargetType="ToggleButton">
              <Setter Property="Foreground" Value="{DynamicResource IslandTextBrush}"/>
              <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ToggleButton">
-              <Border Name="Card" CornerRadius="8" Background="{DynamicResource IslandPanelBrush}"><Grid><Border Name="Hover" CornerRadius="8" Background="White" Opacity="0" IsHitTestVisible="False"/><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/></Grid></Border>
+              <Border Name="Card" CornerRadius="6" BorderThickness="1" Background="{DynamicResource IslandButtonBrush}" BorderBrush="{DynamicResource IslandControlBorderBrush}"><Grid><Border Name="Hover" CornerRadius="6" Background="White" Opacity="0" IsHitTestVisible="False"/><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/></Grid></Border>
               <ControlTemplate.Triggers>
-               <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Card" Property="Background" Value="{DynamicResource IslandHoverBrush}"/></Trigger>
-               <Trigger Property="IsChecked" Value="True"><Setter TargetName="Card" Property="Background" Value="{DynamicResource IslandAccentBrush}"/><Setter Property="Foreground" Value="Black"/></Trigger>
+               <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Card" Property="Background" Value="{DynamicResource IslandButtonHoverBrush}"/></Trigger>
+               <Trigger Property="IsChecked" Value="True"><Setter TargetName="Card" Property="Background" Value="{DynamicResource IslandAccentFillBrush}"/><Setter TargetName="Card" Property="BorderBrush" Value="Transparent"/><Setter Property="FontWeight" Value="SemiBold"/><Setter Property="Foreground" Value="{DynamicResource IslandOnAccentBrush}"/></Trigger>
                <MultiTrigger><MultiTrigger.Conditions><Condition Property="IsChecked" Value="True"/><Condition Property="IsMouseOver" Value="True"/></MultiTrigger.Conditions><Setter TargetName="Hover" Property="Opacity" Value="0.12"/></MultiTrigger>
               </ControlTemplate.Triggers>
              </ControlTemplate></Setter.Value></Setter>
             </Style>
             """);
+
+    public KeepAwakeIslandView(KeepAwakeModule module)
+    {
+        _module = module;
+        Resources["ChoiceStyle"] = ChoiceStyle;
         _error.SetResourceReference(StyleProperty, "CaptionTextStyle");
         _error.SetResourceReference(TextBlock.ForegroundProperty, "WarningTextBrush");
         System.Windows.Automation.AutomationProperties.SetLiveSetting(_error, System.Windows.Automation.AutomationLiveSetting.Polite);
 
-        // Six compact cards, with an 8 DIP gap in each direction.
+        // Six cards (104 tall), with an 8 DIP gap in each direction.
         var chips = new UniformGrid { Columns = 3, Margin = new Thickness(0, 0, -8, -8) };
         foreach (var (label, length) in KeepAwakeText.Lengths)
             chips.Children.Add(Chip(label, length));
@@ -53,8 +59,7 @@ public sealed class KeepAwakeIslandView : UserControl
         System.Windows.Automation.AutomationProperties.SetName(chips, "Keep awake length");
 
         // "Until…": pick a time, then Start. Minute precision, as in Settings.
-        for (int minute = 0; minute < 1440; minute++)
-            _until.Items.Add(new ComboBoxItem { Content = KeepAwakeText.Until(minute), Tag = minute });
+        // The 1,440 times are added when the picker is first opened, not on every build of the page.
         _until.SetResourceReference(StyleProperty, "HopperComboBoxStyle");
         System.Windows.Automation.AutomationProperties.SetName(_until, "End time");
         var start = new Button { Content = "Start", Margin = new Thickness(8, 0, 0, 0) };
@@ -84,7 +89,7 @@ public sealed class KeepAwakeIslandView : UserControl
 
     private ToggleButton Chip(string label, KeepAwakeSettings? length)
     {
-        var chip = new ToggleButton { Content = label, Height = 96, FontSize = 14, Margin = new Thickness(0, 0, 8, 8) };
+        var chip = new ToggleButton { Content = label, Height = 104, FontSize = 14, Margin = new Thickness(0, 0, 8, 8) };
         chip.SetResourceReference(StyleProperty, "ChoiceStyle");
         chip.MouseEnter += (_, _) => Refresh();
         chip.MouseLeave += (_, _) => Refresh();
@@ -135,11 +140,20 @@ public sealed class KeepAwakeIslandView : UserControl
             Run(_module.StartSessionAsync(length));
         else
         {
+            FillTimes();
             _until.SelectedIndex = _module.Settings.UntilMinute;
             _untilPopup.PlacementTarget = chip;
             _untilPopup.IsOpen = true;
             _until.Focus();
         }
+    }
+
+    private void FillTimes()
+    {
+        if (_until.Items.Count > 0)
+            return;
+        for (int minute = 0; minute < 1440; minute++)
+            _until.Items.Add(new ComboBoxItem { Content = KeepAwakeText.Until(minute), Tag = minute });
     }
 
     private async void Run(Task change)

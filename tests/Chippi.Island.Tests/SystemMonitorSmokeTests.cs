@@ -23,13 +23,13 @@ namespace Chippi.Island.Tests;
 public sealed class SystemMonitorSmokeTests(ITestOutputHelper output)
 {
     [Theory]
-    [InlineData(IslandEdge.Top, false, 5)]
-    [InlineData(IslandEdge.Left, false, 5)]
-    [InlineData(IslandEdge.Right, false, 5)]
-    [InlineData(IslandEdge.Top, true, 2)]
-    [InlineData(IslandEdge.Left, true, 2)]
-    [InlineData(IslandEdge.Right, true, 2)]
-    public void Tile_page_settings_and_close_share_one_module_on_a_short_screen(IslandEdge edge, bool laptop, int disks) => WpfTestThread.Run(() =>
+    [InlineData(Corner.BottomRight, false, 5)]
+    [InlineData(Corner.TopLeft, false, 5)]
+    [InlineData(Corner.TopRight, false, 5)]
+    [InlineData(Corner.BottomRight, true, 2)]
+    [InlineData(Corner.TopLeft, true, 2)]
+    [InlineData(Corner.TopRight, true, 2)]
+    public void Tile_page_settings_and_close_share_one_module_on_a_short_screen(Corner corner, bool laptop, int disks) => WpfTestThread.Run(() =>
     {
         var fake = new FakeSources
         {
@@ -52,12 +52,7 @@ public sealed class SystemMonitorSmokeTests(ITestOutputHelper output)
             panel.SetMedia(new IslandPanelTests.FakeMedia());
             panel.SetTiles(IslandTileContribution.Group([tile]));
             var area = new MonitorArea(default, new Rect(-20000, 0, 1280, 720), new Rect(-20000, 0, 1280, 672), 1);
-            void Open() => panel.Open(edge, edge switch
-            {
-                IslandEdge.Left => new Rect(-20000, 280, 32, 112),
-                IslandEdge.Right => new Rect(-18752, 280, 32, 112),
-                _ => new Rect(-19416, 0, 112, 32),
-            }, area);
+            void Open() => panel.Open(IslandBounds.Puck(corner, area.Work), area);
             Open();
             Until(() => tile.Status == "CPU 25%");
             Assert.True(tile.OnScreen);
@@ -75,11 +70,7 @@ public sealed class SystemMonitorSmokeTests(ITestOutputHelper output)
             Assert.Empty(Find<ScrollViewer>(page));
             var card = (FrameworkElement)panel.FindName("Card");
             var footprint = new Rect(Canvas.GetLeft(card), Canvas.GetTop(card), card.ActualWidth, card.ActualHeight);
-            foreach (var orbit in ((Canvas)panel.FindName("Orbit")).Children.OfType<Button>().Where(b => b.Visibility == Visibility.Visible))
-                {
-                    footprint.Union(new Rect(Canvas.GetLeft(orbit), Canvas.GetTop(orbit), orbit.Width, orbit.Height));
-                }
-            output.WriteLine($"laptop={laptop}, disks={disks}, edge={edge}: page={page.DesiredSize.Height:F2} DIP; card={card.ActualHeight:F2} DIP; card + buttons={footprint.Height:F2} DIP; top={footprint.Top:F2}, bottom={footprint.Bottom:F2} (672 DIP work area).");
+            output.WriteLine($"laptop={laptop}, disks={disks}, corner={corner}: page={page.DesiredSize.Height:F2} DIP; card={card.ActualHeight:F2} DIP; card={footprint.Height:F2} DIP; top={footprint.Top:F2}, bottom={footprint.Bottom:F2} (672 DIP work area).");
             Assert.InRange(footprint.Height, 1, 672);
             Assert.InRange(footprint.Top, 0, 672);
             Assert.InRange(footprint.Bottom, 0, 672);

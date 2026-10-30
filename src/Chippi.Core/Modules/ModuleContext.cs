@@ -21,7 +21,7 @@ public sealed class ModuleContext(
 
     public ILogger Logger { get; } = logger;
 
-    /// <summary>Publish island activities and report successes (which make Gumdrop celebrate).</summary>
+    /// <summary>Publish island activities and report successes (which make Chippi celebrate).</summary>
     public IIslandPublisher Island { get; } = island;
 
     /// <summary>Optional island tiles and settings page.</summary>

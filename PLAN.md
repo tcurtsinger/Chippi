@@ -1,7 +1,7 @@
 # Chippi
 
 A Windows tray app that bundles the utilities people usually install one by one,
-behind a single tray icon, with a floating island pill at the top of the screen
+behind a single tray icon, with a widget you place anywhere on the desktop
 and a pet companion. Install only the features you use.
 
 Inspired by [vorssaint-utils](https://github.com/vorssaint/vorssaint-utils) (macOS)
@@ -18,9 +18,9 @@ and [Mouzi](https://github.com/hsr88/mouzi) (Downloads organizer). Absorbs
 | License | GPL-3.0-or-later |
 | Audience | Public open-source release (GitHub releases, installer, auto-update) |
 | Look | Native Windows 11 (2026-10-23): neutral grays, one flat accent (Follow Windows by default, or Blue, Violet, Green, Pink), Segoe UI Variable. It replaced Direction A "Studio Rack" after the [UI/UX audit](docs/phase-1-2-ui-ux-audit.md). See [DESIGN.md](DESIGN.md) |
-| Island | A movable tab docked on the top (default), left or right screen edge; opens on click to a grid of tiles, each opening its own page (2026-10-25); one fixed size, 520 × 360 (2026-10-28) |
+| Island | A widget on the desktop (2026-10-29): a 50px puck with the pet, dragged anywhere on any display, with a chip beside it for the song or the top activity. A click opens a 520 × 360 panel out of the puck, toward the screen's middle: a Quick Settings home, and a page per feature with a back arrow. Before that, a tab docked on a screen edge (2026-10-25) |
 | Surfaces | Two surfaces, the island and Settings (2026-10-28). The island's pages are the only quick panel; each feature's page is built once. Nothing on the island scrolls except a Scratchpad note's text: pages adapt to fit, and what still doesn't fit is in the feature's Settings page, which may hold information for this, not just configuration. The tray icon opens Settings on the last page used; right click is Settings and Quit. Hide tray icon leaves the island as the only door. Settings groups pages by the catalog's groups, Sound by task (Output, Microphone, App volume), and can do everything the island can, its island controls first (2026-10-26, [mockup](https://claude.ai/artifact/RJAX7v2QT6MLpPRgZQVXeS); revised 2026-10-28, [refresh](docs/refresh-2026-10-28/brief.md)) |
-| Pet | Gumdrop, a blob with a face in the Synth gradient that lives in the island. See DESIGN.md §7 |
+| Pet | Chippi, a soft blob with big shiny eyes that lives in the widget (2026-10-29; it replaced Gumdrop). See DESIGN.md §7 |
 | Mouzi | Rebuilt from scratch with the same functionality. Its code is reference only |
 | vorssaint | Feature list and behavior are the spec. We do not port its code |
 | Hopper | Merged in as the Audio routing feature. Its repo is archived once Chippi covers it |
@@ -101,7 +101,8 @@ Clipboard history, paste as plain text, clean URL, scratchpad and shelf, on thre
 
 ### Phase 5.1: Shell redesign
 Brief: [docs/shell-redesign-handoff.md](docs/shell-redesign-handoff.md). Design: [docs/shell-redesign/design/](docs/shell-redesign/design/). Approved 2026-10-29.
-The island at the top of the screen becomes a blob widget you drag anywhere, opening a Windows 11–style panel with a Quick Settings home and the pet's violet as the accent. A new blob replaces Gumdrop.
+The island at the top of the screen becomes a blob widget you drag anywhere, opening a Windows 11–style panel with a Quick Settings home and the pet's violet as the accent. A new blob replaces Gumdrop. Built in PRs #122 to #136 on `redesign/shell`. Live check passed (Travis, 2026-10-29, task 181, on the build from `4f52e49`).
+- Known cost (2026-10-29): at 165 Hz the panel's open skips about 2 frames (up to 11 on the first open after start), its close about 6 and a page switch about 3. The panel's shadow is 1 or 2 of them. Travis kept the grow-out-of-the-puck open over a cheaper fade and scale (task 167).
 
 ### Phase 5.5: Everyday tools, continued
 Quick toggles, cleaning mode, command bar, radial menu, AI agent usage in the island (Travis, 2026-10-27, tasks 27 and 28). Quick panel leaves the catalog; keep awake already shipped.

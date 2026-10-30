@@ -38,10 +38,9 @@
  </UserControl.Resources>
  <Grid>
  <DockPanel>
-  <Border x:Name="FolderCard" DockPanel.Dock="Top" Style="{DynamicResource IslandCardStyle}" Height="44" Padding="10">
+  <Border x:Name="FolderCard" DockPanel.Dock="Top" Style="{DynamicResource IslandCardStyle}" Height="44" Padding="10,0">
    <DockPanel>
-    <c:SegmentedControl x:Name="Modes" DockPanel.Dock="Right" Width="220" FontSize="12" SelectionChanged="OnModeChanged" AutomationProperties.Name="Folder mode">
-     <c:SegmentedControl.ItemContainerStyle><Style TargetType="ListBoxItem" BasedOn="{StaticResource SegmentItemStyle}"><Setter Property="Height" Value="18"/><Setter Property="Padding" Value="8,0"/><Setter Property="FontSize" Value="12"/></Style></c:SegmentedControl.ItemContainerStyle>
+    <c:SegmentedControl x:Name="Modes" DockPanel.Dock="Right" HorizontalContentAlignment="Right" VerticalAlignment="Center" Style="{DynamicResource IslandSegmentedStyle}" SelectionChanged="OnModeChanged" AutomationProperties.Name="Folder mode">
      <c:SegmentItem Label="Auto"/><c:SegmentItem Label="Manual"/><c:SegmentItem Label="Paused"/>
     </c:SegmentedControl>
     <c:LucideIcon x:Name="FolderChip" Data="{x:Static c:LucideIcons.Folder}" Size="16" Brush="{DynamicResource IslandAccentBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
@@ -54,7 +53,7 @@
 
   <!-- History on the left, Organize now on the right. -->
   <DockPanel DockPanel.Dock="Bottom" Height="28" x:Name="Actions" Margin="0,8,0,0" LastChildFill="False">
-   <Button DockPanel.Dock="Right" Content="Organize now" Style="{DynamicResource IslandButtonStyle}" Click="OnOrganize" AutomationProperties.Name="Organize now"/>
+   <Button DockPanel.Dock="Right" Content="Organize now" Style="{DynamicResource IslandAccentButtonStyle}" Click="OnOrganize" AutomationProperties.Name="Organize now"/>
    <Button Style="{StaticResource SubtleButtonStyle}" Padding="10,0" Click="OnHistory" AutomationProperties.Name="History">
     <StackPanel Orientation="Horizontal">
      <TextBlock Text="History" VerticalAlignment="Center"/>

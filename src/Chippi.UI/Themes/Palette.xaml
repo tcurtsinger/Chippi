@@ -1,30 +1,15 @@
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
 <!-- Theme-invariant tokens: identical in dark and light, so they are defined once here and never
-     swapped by ThemeManager. DESIGN.md §2 (critical, island), §4 (island shadows), §7 (pet). -->
+     swapped by ThemeManager. DESIGN.md §2 (critical), §7 (pet). The island's keys follow the theme,
+     so they live in Dark.xaml and Light.xaml. -->
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
     <!-- Critical fills behind white text. -->
     <SolidColorBrush x:Key="DangerDeepBrush" Color="#C42B1C" />
 
-    <!-- Island: darker than any window and never themed. It always uses the dark accent shade, which
-         ThemeManager.SetAccent writes at the application level (the island merges Dark.xaml locally,
-         which would hide an AccentBrush). -->
-    <SolidColorBrush x:Key="IslandBrush" Color="#0A0A0A" />
-    <SolidColorBrush x:Key="IslandBorderBrush" Color="#1AFFFFFF" />
-    <SolidColorBrush x:Key="IslandTabBorderBrush" Color="#24FFFFFF" />
-    <SolidColorBrush x:Key="IslandTextBrush" Color="#FFFFFF" />
-    <SolidColorBrush x:Key="IslandTextTertiaryBrush" Color="#ABABAB" />
-    <SolidColorBrush x:Key="IslandPanelBrush" Color="#0FFFFFFF" />
-    <SolidColorBrush x:Key="IslandAccentBrush" Color="#4CC2FF" />
-    <DropShadowEffect x:Key="IslandShadow" Color="#000000" BlurRadius="24" ShadowDepth="8" Direction="270" Opacity="0.45" />
-    <DropShadowEffect x:Key="IslandExpandedShadow" Color="#000000" BlurRadius="40" ShadowDepth="16" Direction="270" Opacity="0.45" />
-
-    <!-- Gumdrop, DESIGN.md §7. The Synth body is the app's one gradient. -->
-    <LinearGradientBrush x:Key="PetSynthBrush" StartPoint="0,0" EndPoint="1,1">
-        <GradientStop Color="#B15CF0" Offset="0" />
-        <GradientStop Color="#4D9BFF" Offset="1" />
-    </LinearGradientBrush>
+    <!-- Chippi's body colors, DESIGN.md §7. -->
+    <SolidColorBrush x:Key="PetSynthBrush" Color="#B78FFF" />
     <SolidColorBrush x:Key="PetIrisBrush" Color="#CBB2FF" />
     <SolidColorBrush x:Key="PetAzureBrush" Color="#8EC0FF" />
     <SolidColorBrush x:Key="PetSignalBrush" Color="#8EE6C0" />

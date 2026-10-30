@@ -7,7 +7,7 @@ public enum AwakeMode { Indefinitely, Duration, UntilTime }
 
 public sealed record KeepAwakeSettings
 {
-    public AwakeMode Mode { get; init; }
+    public AwakeMode Mode { get; init; } = AwakeMode.Duration;
     public int DurationMinutes { get; init; } = 60;
     public int UntilMinute { get; init; } = 18 * 60;
     public bool KeepDisplayOn { get; init; }

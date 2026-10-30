@@ -20,10 +20,10 @@ namespace Chippi.Island.Tests;
 public sealed class ScratchpadSmokeTests(ITestOutputHelper output)
 {
     [Theory]
-    [InlineData(IslandEdge.Top)]
-    [InlineData(IslandEdge.Left)]
-    [InlineData(IslandEdge.Right)]
-    public void Full_notes_page_and_shell_fit_the_island_on_a_960_by_540_screen(IslandEdge edge) => WpfTestThread.Run(() =>
+    [InlineData(Corner.BottomRight)]
+    [InlineData(Corner.TopLeft)]
+    [InlineData(Corner.TopRight)]
+    public void Full_notes_page_and_shell_fit_the_island_on_a_960_by_540_screen(Corner corner) => WpfTestThread.Run(() =>
     {
         var store = new Store(); var ui = new Ui();
         var module = new ScratchpadModule(_ => store);
@@ -42,9 +42,9 @@ public sealed class ScratchpadSmokeTests(ITestOutputHelper output)
             Assert.Equal(store.Document.Selected.Text, editor.Text);
             Assert.Equal(editor.Text.Length, editor.CaretIndex);
             Assert.False(editor.AcceptsTab);
-            IslandBounds.Place(panel, edge, 960, 540);
-            var footprint = IslandBounds.Check(panel, edge, 960, 540);
-            output.WriteLine($"edge={edge}: footprint={footprint}, work=960x492");
+            IslandBounds.Place(panel, corner, 960, 540);
+            var footprint = IslandBounds.Check(panel, corner, 960, 540);
+            output.WriteLine($"corner={corner}: footprint={footprint}, work=960x492");
             Assert.False(panel.IsVisible); Assert.Equal(IntPtr.Zero, new System.Windows.Interop.WindowInteropHelper(panel).Handle);
         }
         finally { panel.Close(); module.StopAsync(default).GetAwaiter().GetResult(); }
