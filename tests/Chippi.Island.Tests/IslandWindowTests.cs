@@ -57,9 +57,12 @@ public sealed class IslandWindowTests
             Hover(window, Mouse.MouseEnterEvent);
             Assert.Equal(1, window.PuckScaleTarget);
             Assert.Equal(50, window.PuckButton.Width);
+            Assert.IsType<System.Windows.Media.DrawingBrush>(window.Body.BorderBrush); // the rim blends over 83ms, like Windows' own controls
+            Pump(TimeSpan.FromMilliseconds(200));
             Assert.Same(window.FindResource("IslandWidgetHoverBorderBrush"), window.Body.BorderBrush);
             Assert.Equal(Chippi.App.Pet.PetMood.Idle, window.Pet.Mood);
             Hover(window, Mouse.MouseLeaveEvent);
+            Pump(TimeSpan.FromMilliseconds(200));
             Assert.Same(window.FindResource("IslandWidgetBorderBrush"), window.Body.BorderBrush);
             Assert.Equal(Chippi.App.Pet.PetMood.Sleepy, window.Pet.Mood);
         }));

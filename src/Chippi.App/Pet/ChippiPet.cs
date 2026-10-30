@@ -47,6 +47,9 @@ public class ChippiPet : UserControl
     private static readonly TimeSpan SparkFade = TimeSpan.FromMilliseconds(1200);
     private static readonly TimeSpan EyesShut = TimeSpan.FromMilliseconds(600);
     private static readonly TimeSpan ZFade = TimeSpan.FromMilliseconds(400);
+    private static readonly TimeSpan HeadphonesOn = TimeSpan.FromMilliseconds(180);
+    private static readonly TimeSpan HeadphonesOff = TimeSpan.FromMilliseconds(120);
+    private const double HeadphonesDrop = 18; // in the 120 drawing: 6px on the 40 puck
 
     /// <summary>
     /// The breathing loop runs whenever the puck is asleep, so it asks WPF for 30 frames a second, not 60.
@@ -350,6 +353,52 @@ public class ChippiPet : UserControl
         _zGlyphs.Data = puck ? Shapes.PuckZ() : Shapes.Zs();
     }
 
+    private bool _headphonesOn;
+
+    /// <summary>
+    /// The headphones go on when a song starts: they drop 18 onto Chippi (6px on the 40 puck) as they fade in over
+    /// 180ms, and come off lifting the same as they fade over 120ms. Under reduced motion only the fades.
+    /// </summary>
+    private void ShowHeadphones(bool on, bool animate)
+    {
+        if (on == _headphonesOn && animate)
+            return; // already on their way
+        _headphonesOn = on;
+        if (_headphones.RenderTransform is not TranslateTransform drop || drop.IsFrozen)
+            _headphones.RenderTransform = drop = new TranslateTransform();
+        if (!animate)
+        {
+            _headphones.BeginAnimation(OpacityProperty, null);
+            drop.BeginAnimation(TranslateTransform.YProperty, null);
+            _headphones.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
+            return;
+        }
+        var ease = new CubicEase { EasingMode = on ? EasingMode.EaseOut : EasingMode.EaseIn };
+        var time = on ? HeadphonesOn : HeadphonesOff;
+        // From off they start above and clear; turning back midway, they go on from where they are.
+        bool fromOff = _headphones.Visibility != Visibility.Visible;
+        _headphones.Visibility = Visibility.Visible;
+        var fade = new DoubleAnimation(on ? 1 : 0, time);
+        if (fromOff)
+            fade.From = 0;
+        fade.Completed += (_, _) =>
+        {
+            if (_headphonesOn != on)
+                return; // turned again meanwhile
+            if (!on)
+                _headphones.Visibility = Visibility.Collapsed;
+            _headphones.BeginAnimation(OpacityProperty, null);
+            drop.BeginAnimation(TranslateTransform.YProperty, null);
+        };
+        _headphones.BeginAnimation(OpacityProperty, fade, HandoffBehavior.SnapshotAndReplace);
+        if (Motion.IsReduced)
+            return;
+        var move = new DoubleAnimation(on ? 0 : -HeadphonesDrop, time) { EasingFunction = ease };
+        if (fromOff)
+            move.From = -HeadphonesDrop;
+        drop.BeginAnimation(TranslateTransform.YProperty, move, HandoffBehavior.SnapshotAndReplace);
+    }
+
     private Face FaceFor(PetMood mood) => mood switch
     {
         PetMood.Celebrating => _celebrating,
@@ -362,7 +411,7 @@ public class ChippiPet : UserControl
     private void ApplyMood(PetMood mood, bool animate, bool replay = false)
     {
         PetMood? from = _hasShown ? _shown : null;
-        _headphones.Visibility = mood == PetMood.Listening ? Visibility.Visible : Visibility.Collapsed;
+        ShowHeadphones(mood == PetMood.Listening, animate && IsLoaded && from is not null && from != mood);
         _shown = mood;
         _hasShown = true;
 

@@ -28,7 +28,11 @@ internal sealed class IslandHomeMedia : UserControl
     private readonly Button _previous;
     private readonly Button _playPause;
     private readonly Button _next;
+    private readonly StackPanel _text;
+    private readonly Image _artWas = new(), _textWas = new(); // what was there, fading out as a new track arrives
     private IMediaSessions? _media;
+    private string? _shownTrack;
+    private bool _shownPlaying;
 
     public IslandHomeMedia()
     {
@@ -37,12 +41,14 @@ internal sealed class IslandHomeMedia : UserControl
         _source.SetResourceReference(TextBlock.ForegroundProperty, "IslandTextTertiaryBrush");
         _title.SetResourceReference(TextBlock.ForegroundProperty, "IslandTextBrush");
         _artist.SetResourceReference(TextBlock.ForegroundProperty, "IslandTextSecondaryBrush");
-        var text = new StackPanel
+        _text = new StackPanel
         {
-            VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 0, 0),
+            VerticalAlignment = VerticalAlignment.Center,
             Children = { new StackPanel { Orientation = Orientation.Horizontal, Children = { note, _source } }, _title, _artist },
         };
-        var open = new Button { Content = new DockPanel { LastChildFill = true, Children = { _art, text } }, HorizontalContentAlignment = HorizontalAlignment.Stretch };
+        var art = new Grid { Children = { _art, _artWas } };
+        var text = new Grid { Margin = new Thickness(12, 0, 0, 0), Children = { _text, _textWas } };
+        var open = new Button { Content = new DockPanel { LastChildFill = true, Children = { art, text } }, HorizontalContentAlignment = HorizontalAlignment.Stretch };
         open.SetResourceReference(StyleProperty, "IslandBareButtonStyle");
         AutomationProperties.SetName(open, "Now Playing");
         open.Click += (_, _) => OpenRequested?.Invoke(this, EventArgs.Empty);
@@ -63,6 +69,7 @@ internal sealed class IslandHomeMedia : UserControl
         {
             if (_media is not null)
                 _media.Changed += OnChanged;
+            _shownTrack = null; // opening shows what's playing now; only a change while it's out arrives
             Show();
         };
         Unloaded += (_, _) =>
@@ -108,6 +115,17 @@ internal sealed class IslandHomeMedia : UserControl
     private void Show()
     {
         var track = _media?.Current;
+        // A new track (or none) on a card that's on screen arrives: the old one fades where it was (Arrival).
+        string shown = track is null ? "" : $"{track.Id}\n{track.Title}\n{track.Artist}";
+        bool arriving = _shownTrack is not null && shown != _shownTrack && Arrival.Showing(_text);
+        bool flipped = _shownTrack is not null && shown == _shownTrack && track?.Playing != _shownPlaying && Arrival.Showing(_playGlyph);
+        _shownTrack = shown;
+        _shownPlaying = track?.Playing == true;
+        if (arriving)
+        {
+            Arrival.Leave(_art, _artWas);
+            Arrival.Leave(_text, _textWas);
+        }
         _source.Text = track?.Source ?? "";
         _title.Text = track is null ? "Nothing playing" : track.Title.Length > 0 ? track.Title : track.Source;
         _artist.Text = track?.Artist ?? "";
@@ -119,6 +137,13 @@ internal sealed class IslandHomeMedia : UserControl
         AutomationProperties.SetName(_playPause, track?.Playing == true ? "Pause" : "Play");
         _artPet.Mood = track is null ? PetMood.Sleepy : PetMood.Listening;
         ShowArt(track?.Artwork);
+        if (arriving)
+        {
+            Arrival.Enter(_art, rise: false);
+            Arrival.Enter(_text, rise: true);
+        }
+        else if (flipped)
+            Arrival.Pop(_playGlyph); // play to pause and back
     }
 
     private void ShowArt(ImageSource? image)

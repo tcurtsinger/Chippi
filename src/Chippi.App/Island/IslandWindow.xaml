@@ -93,6 +93,9 @@
                         <!-- Paused: a pause mark in tertiary in the bars' place (three flat bars read as a "more" button). -->
                         <c:LucideIcon x:Name="PausedMark" Grid.Column="5" Data="{x:Static c:LucideIcons.Pause}" Size="14" Filled="True"
                                       Brush="{DynamicResource IslandTextTertiaryBrush}" VerticalAlignment="Center" Visibility="Collapsed" />
+                        <!-- What the lead and the lines showed, fading out while something new arrives (Arrival). -->
+                        <Image x:Name="LeadWas" />
+                        <Image x:Name="LinesWas" />
                     </Grid>
                 </Grid>
                 <!-- Chippi at the puck's end, 40 in its 50 square, with the muted mic's badge inside that square. -->

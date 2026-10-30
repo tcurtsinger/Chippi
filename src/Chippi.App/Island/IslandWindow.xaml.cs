@@ -55,9 +55,13 @@ public partial class IslandWindow : Window
     private const double SongSpeed = 30; // DIPs a second
     private const double LiftScale = 1.12;
     private const double LiftTilt = -6;
+    private const double PressScale = 0.96; // pressed, before it opens or lifts
     private const uint VK_ESCAPE = 0x1B;
 
     private static readonly TimeSpan GrowTime = TimeSpan.FromMilliseconds(120);
+    private static readonly TimeSpan BadgeIn = TimeSpan.FromMilliseconds(160);
+    private static readonly TimeSpan BadgeOut = TimeSpan.FromMilliseconds(100);
+    private static readonly TimeSpan ReducedFade = TimeSpan.FromMilliseconds(120); // the bar's content, under reduced motion
     private static readonly TimeSpan SlideTime = TimeSpan.FromMilliseconds(180);
     private static readonly TimeSpan UnfoldTime = TimeSpan.FromMilliseconds(240);
     private static readonly TimeSpan FoldTime = TimeSpan.FromMilliseconds(180);
@@ -101,6 +105,9 @@ public partial class IslandWindow : Window
     private string? _chipKey; // the page the bar opens
     private string? _lastPage; // the page last opened, saved once the panel has gone
     private string _lineText = "";
+    private string? _shownContent; // what the bar shows, by identity: a new one arrives (Arrival)
+    private string? _rim; // the rim's brush key, rest or hovered
+    private bool _badge; // the muted mic's badge is up
     private string _chipText = ""; // the line as plain text, for the chip's name
     private string _lineState = "";
     private TabLevel? _level;
@@ -712,6 +719,9 @@ public partial class IslandWindow : Window
     /// <summary>The open panel itself, for tests and snapshots.</summary>
     internal IslandPanelWindow Panel => _panel;
 
+    /// <summary>Lays the panel's home out ahead of the first open (<see cref="IslandPanelWindow.Prewarm"/>).</summary>
+    internal void Prewarm() => _panel.Prewarm();
+
     /// <summary>Whether the keyboard and mouse hooks are installed (only while the panel is open).</summary>
     internal bool IsHooked => _escapeHook is { IsInvalid: false } || _clickHook is { IsInvalid: false };
 
@@ -731,11 +741,12 @@ public partial class IslandWindow : Window
         var top = _activities.FirstOrDefault(a => a.ModuleId is not Chippi.Features.PlainPaste.PlainPasteModule.Id and not "mic-mute");
         bool dropping = _dragKey is not null;
         bool awake = dropping || _hovered || _lifted || _panel.IsVisible;
-        Grow(_lifted ? LiftScale : 1, _lifted ? LiftTilt : 0);
+        bool pressed = _pressAt is not null && !_dragging && !Motion.IsReduced;
+        Grow(_lifted ? LiftScale : pressed ? PressScale : 1, _lifted ? LiftTilt : 0, pressed ? FillFade.Time : GrowTime);
         BodyShadow.Effect = (System.Windows.Media.Effects.Effect)FindResource(_lifted ? "IslandLiftShadow" : "IslandPuckShadow");
-        Body.SetResourceReference(Border.BorderBrushProperty, _hovered && !_lifted ? "IslandWidgetHoverBorderBrush" : "IslandWidgetBorderBrush");
+        ShowRim(_hovered && !_lifted ? "IslandWidgetHoverBorderBrush" : "IslandWidgetBorderBrush");
         Body.Visibility = BodyShadow.Visibility = _panel.IsVisible ? Visibility.Hidden : Visibility.Visible;
-        MicBadge.Visibility = Shown(mic is not null);
+        ShowBadge(mic is not null);
 
         var current = _media?.Current;
         var playing = top?.Kind == IslandActivityKind.Media && current is { Playing: true } ? current : null;
@@ -757,13 +768,34 @@ public partial class IslandWindow : Window
         // Listening (headphones) while a song plays, the panel out or not; otherwise the mood for the activities, awake on hover or on the bar.
         Pet.ShowMood(playing is not null && !_lifted ? PetMood.Listening : _mood != PetMood.Sleepy ? _mood : awake || bar ? PetMood.Idle : PetMood.Sleepy);
         _chipKey = dropTile is not null || feedback is not null ? null : _singing ? IslandPanelWindow.NowPlayingKey : top?.TileKey;
+        // What the bar shows, by identity rather than its values ("59 min left" after "1 hr left" is the same activity):
+        // a new song or a new activity on a bar that's out and seen arrives (Arrival), the old fading where it was.
+        string? content = !bar ? null
+            : dropTile is not null ? "drop " + dropTile.Key
+            : feedback is not null ? "feedback " + feedback.Key
+            : song is not null ? $"song {song.Id}\n{song.Title}\n{song.Artist}"
+            : "activity " + top!.Key;
+        bool settled = _barShown && Bar.Opacity >= 1 && IsVisible && !_panel.IsVisible;
+        bool arriving = bar && settled && _shownContent is not null && content != _shownContent;
+        _shownContent = content;
+        if (arriving)
+        {
+            Arrival.Leave(Cover.Visibility == Visibility.Visible ? Cover : Glyph, LeadWas);
+            Arrival.Leave(Lines, LinesWas);
+        }
         ShowBar(bar);
         if (bar)
         {
             // Folding, the bar keeps what it showed while it fades.
             Cover.Visibility = Shown(_singing);
             Glyph.Visibility = Shown(!_singing);
-            Equalizer.Visibility = Shown(_singing && !paused);
+            bool bars = _singing && !paused;
+            // Playing to paused and back on a bar that's out: the mark that takes over scales in.
+            if (settled && !arriving && bars && Equalizer.Visibility != Visibility.Visible)
+                Arrival.Pop(Equalizer);
+            if (settled && !arriving && paused && PausedMark.Visibility != Visibility.Visible)
+                Arrival.Pop(PausedMark);
+            Equalizer.Visibility = Shown(bars);
             PausedMark.Visibility = Shown(paused);
             // The lines' column: what the rest takes, with the bars three 3s 1 apart and 1 in (15) or the pause mark (14).
             _lineRoom = IslandGeometry.BarWidth - 8 - 34 - 10 - 10 - 10 - 46 - (_singing ? paused ? 14 : 15 : 0);
@@ -797,6 +829,12 @@ public partial class IslandWindow : Window
             string detail = tile?.Name ?? top.Source;
             ShowLine(top.Key, title, detail == title ? "" : detail);
         }
+        if (arriving)
+        {
+            Arrival.Enter(Cover, rise: false);
+            Arrival.Enter(Glyph, rise: false);
+            Arrival.Enter(Lines, rise: true);
+        }
         // The equalizer follows the output's real level while a song plays on the bar and can be seen: not while
         // the panel is out, where the bar keeps its state only for the fold back.
         if (_singing && !paused && IsVisible && !_panel.IsVisible && !Motion.IsReduced)
@@ -809,6 +847,53 @@ public partial class IslandWindow : Window
     }
 
     private static Visibility Shown(bool shown) => shown ? Visibility.Visible : Visibility.Collapsed;
+
+    /// <summary>The rim brightens on hover and dims after, over 83ms, like Windows' own controls.</summary>
+    private void ShowRim(string key)
+    {
+        if (key == _rim)
+            return;
+        bool first = _rim is null;
+        _rim = key;
+        if (first)
+            Body.SetResourceReference(Border.BorderBrushProperty, key);
+        else
+            FillFade.Blend(Body, Border.BorderBrushProperty, Body.BorderBrush, (Brush)FindResource(key), () => Body.SetResourceReference(Border.BorderBrushProperty, key));
+    }
+
+    /// <summary>
+    /// The muted mic's badge scales in from 0.6 as it fades in over 160ms, and fades out over 100ms when the mic is
+    /// live again; under reduced motion it only fades. It never changes the widget's size.
+    /// </summary>
+    private void ShowBadge(bool shown)
+    {
+        if (shown == _badge)
+            return;
+        _badge = shown;
+        bool seen = IsVisible && !_panel.IsVisible;
+        if (shown)
+        {
+            MicBadge.Visibility = Visibility.Visible;
+            if (seen)
+                Arrival.Pop(MicBadge, 0.6, BadgeIn);
+            return;
+        }
+        if (!seen)
+        {
+            MicBadge.BeginAnimation(OpacityProperty, null);
+            MicBadge.Visibility = Visibility.Collapsed;
+            return;
+        }
+        var fade = new DoubleAnimation(0, BadgeOut);
+        fade.Completed += (_, _) =>
+        {
+            if (_badge)
+                return; // muted again meanwhile: its pop has taken over
+            MicBadge.Visibility = Visibility.Collapsed;
+            MicBadge.BeginAnimation(OpacityProperty, null);
+        };
+        MicBadge.BeginAnimation(OpacityProperty, fade, HandoffBehavior.SnapshotAndReplace);
+    }
 
     private IIslandTimer? _pauseTimer;
 
@@ -858,6 +943,9 @@ public partial class IslandWindow : Window
             PuckButton.Width = width;
             Bar.BeginAnimation(OpacityProperty, null);
             Bar.Opacity = shown ? 1 : 0;
+            // Under reduced motion the bar is there at once and what it shows fades in, so it still reads as new.
+            if (shown && Motion.IsReduced && IsVisible && !_lifted && !_panel.IsVisible)
+                Bar.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, ReducedFade) { FillBehavior = FillBehavior.Stop });
             return;
         }
         PuckButton.BeginAnimation(WidthProperty, new DoubleAnimation(width, shown ? UnfoldTime : FoldTime) { EasingFunction = EaseOut }, HandoffBehavior.SnapshotAndReplace);
@@ -867,8 +955,8 @@ public partial class IslandWindow : Window
         Bar.BeginAnimation(OpacityProperty, fade, HandoffBehavior.SnapshotAndReplace);
     }
 
-    /// <summary>The puck's size and tilt, eased over 120ms (at once under reduced motion or while hidden).</summary>
-    private void Grow(double scale, double tilt)
+    /// <summary>The puck's size and tilt, eased over <paramref name="time"/> (120ms; 83ms for a press), at once under reduced motion or while hidden.</summary>
+    private void Grow(double scale, double tilt, TimeSpan? time = null)
     {
         if (scale == _scaleTarget && tilt == _tiltTarget)
             return;
@@ -887,7 +975,7 @@ public partial class IslandWindow : Window
                 target.SetValue(property, to);
             }
             else
-                target.BeginAnimation(property, new DoubleAnimation(to, GrowTime) { EasingFunction = EaseOut }, HandoffBehavior.SnapshotAndReplace);
+                target.BeginAnimation(property, new DoubleAnimation(to, time ?? GrowTime) { EasingFunction = EaseOut }, HandoffBehavior.SnapshotAndReplace);
         }
     }
 
@@ -1069,6 +1157,7 @@ public partial class IslandWindow : Window
         _pressedBar = _barShown;
         _grab = _pressAt.Value - Center(_puck);
         ((UIElement)sender).CaptureMouse();
+        RefreshPuck(); // pressed in: it dips to 0.96 until it opens or lifts
     }
 
     private void OnPointerMove(object sender, MouseEventArgs e)
@@ -1094,6 +1183,8 @@ public partial class IslandWindow : Window
         bool dragged = _dragging;
         _pressAt = null;
         ((UIElement)sender).ReleaseMouseCapture();
+        if (!dragged)
+            RefreshPuck(); // back from its press
         if (dragged)
             DropAt(PointerAt());
         else if (_pressedBar)
@@ -1110,6 +1201,8 @@ public partial class IslandWindow : Window
         _pressAt = null;
         if (_dragging)
             DropAt(PointerAt());
+        else
+            RefreshPuck();
     }
 
     /// <summary>The puck lifts (bigger, tilted, a deeper shadow): the panel goes and the bar folds at once.</summary>

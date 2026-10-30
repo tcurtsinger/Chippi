@@ -51,6 +51,10 @@ internal sealed class NowPlayingView : UserControl
     private readonly LucideIcon _playGlyph = new() { Data = LucideIcons.Play, Size = 24, Filled = true };
     private readonly Button _next;
     private readonly StackPanel _player;
+    private readonly StackPanel _words;
+    private readonly Image _artWas = new(), _wordsWas = new(); // what was there, fading out as a new track arrives
+    private string? _shownTrack;
+    private bool _shownPlaying;
     private readonly ChippiPet _asleep = new() { Size = 72, Mood = PetMood.Sleepy, IsDecorative = true, HorizontalAlignment = HorizontalAlignment.Center };
     private readonly StackPanel _empty;
 
@@ -94,9 +98,10 @@ internal sealed class NowPlayingView : UserControl
         // Grouped 8 apart, the previous glyph on the title's left edge (12 in from its 48 button).
         var transport = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Bottom,
             Margin = new Thickness(-12, 0, 0, 0), Children = { _previous, _playPause, _next } };
-        var meta = new Grid { Children = { new StackPanel { Margin = new Thickness(0, -6, 0, 0), Children = { _title, _artist } }, transport } };
+        _words = new StackPanel { Margin = new Thickness(0, -6, 0, 0), VerticalAlignment = VerticalAlignment.Top, Children = { _title, _artist } };
+        var meta = new Grid { Children = { _words, _wordsWas, transport } };
         Grid.SetColumn(meta, 2);
-        var row = new Grid { Height = Art, ColumnDefinitions = { new() { Width = new GridLength(Art) }, new() { Width = new GridLength(16) }, new() }, Children = { _art, meta } };
+        var row = new Grid { Height = Art, ColumnDefinitions = { new() { Width = new GridLength(Art) }, new() { Width = new GridLength(16) }, new() }, Children = { _art, _artWas, meta } };
 
         foreach (var time in new[] { _elapsed, _remaining })
         {
@@ -133,6 +138,7 @@ internal sealed class NowPlayingView : UserControl
         Loaded += (_, _) =>
         {
             _media.Changed += OnChanged;
+            _shownTrack = null; // opening shows what's playing now; only a change while it's out arrives
             Show();
         };
         Unloaded += (_, _) =>
@@ -174,8 +180,20 @@ internal sealed class NowPlayingView : UserControl
         _source.IsHitTestVisible = _source.Focusable = choice;
         if (track is null)
         {
+            _shownTrack = null;
             _tick.Stop();
             return;
+        }
+        // A new track on a page that's on screen arrives: the old art and words fade where they were (Arrival).
+        string shown = $"{track.Id}\n{track.Title}\n{track.Artist}";
+        bool arriving = _shownTrack is not null && shown != _shownTrack && Arrival.Showing(_words);
+        bool flipped = _shownTrack is not null && shown == _shownTrack && track.Playing != _shownPlaying && Arrival.Showing(_playGlyph);
+        _shownTrack = shown;
+        _shownPlaying = track.Playing;
+        if (arriving)
+        {
+            Arrival.Leave(_art, _artWas);
+            Arrival.Leave(_words, _wordsWas);
         }
         _title.Text = track.Title.Length > 0 ? track.Title : track.Source;
         _artist.Text = track.Artist;
@@ -198,6 +216,13 @@ internal sealed class NowPlayingView : UserControl
             _tick.Start();
         else
             _tick.Stop();
+        if (arriving)
+        {
+            Arrival.Enter(_art, rise: false);
+            Arrival.Enter(_words, rise: true);
+        }
+        else if (flipped)
+            Arrival.Pop(_playGlyph); // play to pause and back
     }
 
     // A title or artist cut off by its lines shows in full in a tooltip.
