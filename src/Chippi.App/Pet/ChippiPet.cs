@@ -62,7 +62,7 @@ public class ChippiPet : UserControl
     private readonly Face _celebrating;
     private readonly Face _sleepy;
     private readonly Face _small;
-    private readonly Path _headphones;
+    private readonly Canvas _headphones;
     private readonly Path _sparks;
     private readonly Path _zs;
     private readonly DispatcherTimer _blinkTimer;
@@ -98,7 +98,25 @@ public class ChippiPet : UserControl
             eyes: [Filled(Shapes.SmallEyes, "PetInkBrush")],
             rest: []);
 
-        _headphones = Stroked(Shapes.Headphones, "PetInkBrush", 5);
+        _headphones = new Canvas { Width = 120, Height = 120 };
+        var headphoneInk = new SolidColorBrush(Color.FromRgb(42, 36, 64));
+        var headphonePad = new SolidColorBrush(Color.FromRgb(210, 190, 255));
+        _headphones.Children.Add(new Path
+        {
+            Data = Shapes.Headphones, Stroke = headphoneInk, StrokeThickness = 5,
+            StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round,
+        });
+        foreach (var x in new[] { 12.0, 95.0 })
+        {
+            var cup = new System.Windows.Shapes.Rectangle { Width = 13, Height = 23, RadiusX = 5.5, RadiusY = 5.5, Fill = headphoneInk };
+            Canvas.SetLeft(cup, x);
+            Canvas.SetTop(cup, 59);
+            _headphones.Children.Add(cup);
+            var pad = new System.Windows.Shapes.Rectangle { Width = 5, Height = 15, RadiusX = 2.5, RadiusY = 2.5, Fill = headphonePad };
+            Canvas.SetLeft(pad, x == 12 ? 15 : 102);
+            Canvas.SetTop(pad, 63);
+            _headphones.Children.Add(pad);
+        }
         _sparks = Stroked(Shapes.Sparks, "PetSparkBrush", 3.5);
         _zs = Filled(Shapes.Zs(), "PetZBrush");
 
@@ -498,14 +516,14 @@ public class ChippiPet : UserControl
         /// <summary>Ellipse centered (46, 46), radii 9 × 5.5, rotated −28°.</summary>
         public static Geometry Shine { get; } = Freeze(new EllipseGeometry(new Point(46, 46), 9, 5.5) { Transform = new RotateTransform(-28, 46, 46) });
 
-        public static Geometry EyeWhites { get; } = Freeze(new GeometryGroup { Children = { Ellipse(46, 66, 9, 10.5), Ellipse(74, 66, 9, 10.5) } });
-        public static Geometry IdleEyes { get; } = Freeze(new GeometryGroup { Children = { Ellipse(48, 68, 5, 5), Ellipse(76, 68, 5, 5) } });
+        public static Geometry EyeWhites { get; } = Freeze(new GeometryGroup { Children = { Ellipse(47, 66, 10.5, 12.5), Ellipse(73, 66, 10.5, 12.5) } });
+        public static Geometry IdleEyes { get; } = Freeze(new GeometryGroup { Children = { Ellipse(49, 68, 6, 6), Ellipse(75, 68, 6, 6) } });
         public static Geometry Tongue { get; } = Parse("M55 87 Q60 91 65 87 Z");
         public static Geometry SleepMouth { get; } = Ellipse(60, 85, 3.5, 3);
-        public static Geometry Headphones { get; } = Parse("M19 70 C19 19 101 19 101 70 M18 62 V79 M102 62 V79");
+        public static Geometry Headphones { get; } = Parse("M19 70 C19 19 101 19 101 70");
 
         /// <summary>White highlights r 1.7 at (+1.7, −2.3) from each eye center.</summary>
-        public static Geometry IdleHighlights { get; } = Freeze(new GeometryGroup { Children = { Ellipse(49.6, 65.6, 1.7, 1.7), Ellipse(77.6, 65.6, 1.7, 1.7) } });
+        public static Geometry IdleHighlights { get; } = Freeze(new GeometryGroup { Children = { Ellipse(50.6, 65.6, 2, 2), Ellipse(76.6, 65.6, 2, 2) } });
 
 
         public static Geometry HappyEyes { get; } = Parse("M39 70 Q46 63 53 70 M67 70 Q74 63 81 70");

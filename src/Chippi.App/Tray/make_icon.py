@@ -208,10 +208,10 @@ def render(size):
         scx, scy, srx, sry, salpha = SHADOW
         paint(ellipse(scx, scy, srx, sry), solid(BLACK), salpha)
     paint(parse_path(BODY), synth)
-    for ex in (46, 74):
-        paint(ellipse(ex, 66, 9, 10.5), solid(WHITE))
-        paint(ellipse(ex + 2, 68, 5, 5), solid(INK))
-        paint(ellipse(ex + 3.6, 65.6, 1.7, 1.7), solid(WHITE))
+    for ex in (47, 73):
+        paint(ellipse(ex, 66, 10.5, 12.5), solid(WHITE))
+        paint(ellipse(ex + 2, 68, 6, 6), solid(INK))
+        paint(ellipse(ex + 3.6, 65.6, 2, 2), solid(WHITE))
     mouth = [(50 + 20*t/64, (1-t/64)**2*82 + 2*(1-t/64)*(t/64)*94 + (t/64)**2*82) for t in range(65)]
     paint(mouth, solid(INK))
 
