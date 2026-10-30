@@ -204,6 +204,7 @@ internal sealed class IslandGrid : UserControl
             Grid.SetColumn(side, 1);
             box.Children.Add(toggle);
             box.Children.Add(side);
+            box.SizeChanged += (_, _) => Span(toggle, side);
             main = toggle;
         }
         else
@@ -230,6 +231,23 @@ internal sealed class IslandGrid : UserControl
         name.SizeChanged += (_, _) => Tip();
         status.SizeChanged += (_, _) => Tip();
         return new StackPanel { Margin = new Thickness(0, 0, 10, 12), Children = { box, name, status } };
+    }
+
+    /// <summary>
+    /// Runs one fill across a split's toggle and its arrow (FillFade.Span), so on, the accent gradient doesn't start
+    /// again at the arrow and the split reads as one button with a divider.
+    /// </summary>
+    private static void Span(FrameworkElement main, FrameworkElement side)
+    {
+        double m = main.ActualWidth, s = side.ActualWidth;
+        if (m <= 0 || s <= 0)
+            return;
+        var toMain = new ScaleTransform((m + s) / m, 1);
+        var toSide = new MatrixTransform((m + s) / s, 0, 0, 1, -m / s, 0);
+        toMain.Freeze();
+        toSide.Freeze();
+        FillFade.SetSpan(main, toMain);
+        FillFade.SetSpan(side, toSide);
     }
 
     /// <summary>Whether <paramref name="text"/> is cut off in <paramref name="block"/>: wider than one line, or taller than a wrapping block's MaxHeight.</summary>

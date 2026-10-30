@@ -66,6 +66,18 @@ public sealed class IslandPanelShots
                         panel.ShowPage(IslandPanelWindow.NowPlayingKey);
                         Pump(TimeSpan.FromMilliseconds(110));
                         Save(panel, Path.Combine(folder, "bottomright-morph-midway.png"));
+                        Pump(TimeSpan.FromMilliseconds(400));
+
+                        // Nothing playing: the page and the home's card at rest.
+                        var sessions = media.Sessions;
+                        media.Sessions = [];
+                        media.Raise();
+                        Pump(TimeSpan.FromMilliseconds(500));
+                        Save(panel, Path.Combine(folder, "bottomright-now-playing-nothing.png"));
+                        panel.ShowPage(null, remember: false);
+                        Pump(TimeSpan.FromMilliseconds(500));
+                        Save(panel, Path.Combine(folder, "bottomright-grid-nothing-playing.png"));
+                        media.Sessions = sessions;
                     }
                 }
                 finally

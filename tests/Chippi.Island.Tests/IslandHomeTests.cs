@@ -33,6 +33,8 @@ public sealed class IslandHomeTests
     private static IslandGrid Laid(Action<IslandGrid> set)
     {
         var grid = new IslandGrid();
+        // The island's own templates, as the panel gives them.
+        grid.Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri("pack://application:,,,/Chippi;component/Island/IslandStyles.xaml") });
         set(grid);
         double width = IslandPage.Width - 2 * IslandPage.Inset, height = IslandPage.Height - 2 * IslandPage.Inset;
         grid.Measure(new Size(width, height));
@@ -63,6 +65,18 @@ public sealed class IslandHomeTests
         Click(arrow);
         Assert.Equal(["keep-awake"], opened);
         Assert.Single(toggled);
+
+        // On, one accent gradient runs across both halves: the arrow's continues the toggle's, not starting again.
+        static System.Windows.Media.Matrix Fill(Control part) =>
+            Assert.IsAssignableFrom<System.Windows.Media.GradientBrush>(((Border)part.Template.FindName("Chrome", part)).Background).RelativeTransform.Value;
+        double whole = main.ActualWidth + arrow.ActualWidth;
+        Assert.Equal(whole, Fill(main).Transform(new Point(1, 1)).X * main.ActualWidth, 1); // the toggle's ends past its edge
+        Assert.Equal(-main.ActualWidth, Fill(arrow).Transform(new Point(0, 0)).X * arrow.ActualWidth, 1); // the arrow's starts at the toggle's
+        Assert.Equal(new Thickness(0), ((Border)main.Template.FindName("Chrome", main)).BorderThickness); // edge to edge, level with the arrow's
+
+        // Its glyph sits in the middle of the whole button, arrow included, where a plain button's glyph sits.
+        double Middle(FrameworkElement e) => e.TranslatePoint(new Point(e.ActualWidth / 2, 0), grid).X;
+        Assert.Equal(Middle((FrameworkElement)main.Parent), Middle((FrameworkElement)main.Content), 1);
 
         // A plain button only opens.
         Click(grid.Buttons().Last());
@@ -121,19 +135,31 @@ public sealed class IslandHomeTests
         Assert.Contains("Spotify", texts);
         Assert.Equal(PetMood.Listening, Find<ChippiPet>(grid.Media, _ => true).Mood);
         Assert.True(Find<Button>(grid, b => AutomationProperties.GetName(b) == "Pause").IsEnabled);
+        // The 52 art fits the 68 card whole, 8 from its outside at the top and the bottom.
+        var art = Find<Border>(grid.Media, b => b.Width == 52);
+        double top = art.TranslatePoint(default, grid.Media).Y;
+        Assert.Equal(8, top, 1);
+        Assert.Equal(8, 68 - top - art.ActualHeight, 1);
 
         var opened = new List<string>();
         grid.TileOpened += (_, key) => opened.Add(key);
         Click(Find<Button>(grid, b => AutomationProperties.GetName(b) == "Now Playing"));
         Assert.Equal([IslandPanelWindow.NowPlayingKey], opened);
 
-        // Nothing playing: the card says so and the transport is dimmed.
+        // Nothing playing: the card says so, on its own line level with the art, and the transport is dimmed.
         media.Sessions = [];
         media.Raise();
         grid.Media.SetMedia(media);
         grid.UpdateLayout();
-        Assert.Equal(PetMood.Sleepy, Find<ChippiPet>(grid.Media, _ => true).Mood);
+        var pet = Find<ChippiPet>(grid.Media, _ => true);
+        Assert.Equal(PetMood.Sleepy, pet.Mood);
         Assert.False(Find<Button>(grid, b => AutomationProperties.GetName(b) == "Play").IsEnabled);
+        var nothing = Find<TextBlock>(grid.Media, t => t.Text == "Nothing playing");
+        Assert.Equal(FontWeights.Normal, nothing.FontWeight); // a state, not a song's title
+        var note = Find<LucideIcon>(grid.Media, i => i.Data == LucideIcons.Music);
+        Assert.Equal(Visibility.Collapsed, ((FrameworkElement)note.Parent).Visibility); // no app line without an app
+        double Middle(FrameworkElement e) => e.TranslatePoint(new Point(0, e.ActualHeight / 2), grid.Media).Y;
+        Assert.Equal(Middle(Find<Border>(grid.Media, b => b.Width == 52)), Middle(nothing), 1); // the art's square
     });
 
     [Fact]
