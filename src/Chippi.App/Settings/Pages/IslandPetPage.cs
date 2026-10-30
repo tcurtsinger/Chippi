@@ -176,13 +176,16 @@ internal sealed class IslandPetPage : UserControl
         {
             _tileKeys = keys;
             _tiles.Children.Clear();
+            // A switch is on when its button is on the home, which holds eight: past that a shown one isn't there, so its
+            // switch is off, and the off ones can't be turned on until another is turned off.
+            var onHome = layout.Shown(order).Take(IslandGrid.MaxTiles).ToHashSet();
             for (int i = 0; i < order.Count; i++)
-                _tiles.Children.Add(TileRow(all.First(t => t.Key == order[i]), i, order, !layout.Hidden.Contains(order[i])));
+                _tiles.Children.Add(TileRow(all.First(t => t.Key == order[i]), i, order, onHome.Contains(order[i]), onHome.Count < IslandGrid.MaxTiles));
         }
         RefreshPreview();
     }
 
-    private FrameworkElement TileRow(Tile tile, int index, IReadOnlyList<string> order, bool shown)
+    private FrameworkElement TileRow(Tile tile, int index, IReadOnlyList<string> order, bool shown, bool room)
     {
         var handle = new DragHandle { Width = 16, Height = 24, Margin = new Thickness(0, 0, 16, 0), ToolTip = "Reorder" };
         AutomationProperties.SetName(handle, $"Reorder {tile.Name}");
@@ -204,14 +207,10 @@ internal sealed class IslandPetPage : UserControl
         var glyph = new LucideIcon { Data = tile.Icon, Size = 16, Margin = new Thickness(0, 0, 16, 0), VerticalAlignment = VerticalAlignment.Center };
         glyph.SetResourceReference(LucideIcon.BrushProperty, "TextSecondaryBrush");
         var show = SettingsUi.Switch(shown);
+        show.IsEnabled = shown || room;
         AutomationProperties.SetName(show, $"Show {tile.Name}");
-        SettingsUi.OnSwitched(show, on => Save(s =>
-        {
-            var hidden = (s.IslandHiddenTiles ?? []).Where(k => k != tile.Key).ToList();
-            if (!on)
-                hidden.Add(tile.Key);
-            s.IslandHiddenTiles = hidden;
-        }));
+        // What shows off stays off: the tiles past the home's eight are saved hidden with it (IslandLayout.Switched).
+        SettingsUi.OnSwitched(show, on => Save(s => s.IslandHiddenTiles = IslandLayout.Switched(s.IslandHiddenTiles ?? [], order, tile.Key, on, IslandGrid.MaxTiles)));
         var name = new TextBlock { Text = tile.Name, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
         DockPanel.SetDock(handle, Dock.Left);
         DockPanel.SetDock(glyph, Dock.Left);

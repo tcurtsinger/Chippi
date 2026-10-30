@@ -71,7 +71,7 @@ public sealed class MicMuteModule : IFeatureModule
             _hotkey = _createHotkey();
             ShortcutError = Settings.Shortcut is null || _hotkey.Register(Settings.Shortcut, OnHotkey) ? null : "Shortcut in use";
             _tile = context.Ui.AddIslandTile(SoundTile.Section(10, SoundTile.Microphone, () => new MicMuteView(this, MicMuteSurface.Island))
-                with { StatusPriority = 100, Toggle = new IslandTileToggle(() => Status.State == MicrophoneMuteState.Muted, () => _ = ToggleFromHomeAsync(), "Microphone", "Mic", () => StatusText) });
+                with { StatusPriority = 100, Toggle = new IslandTileToggle(() => Status.State == MicrophoneMuteState.Muted, ToggleAsync, "Microphone", "Mic", () => StatusText) });
             // Settings › Microphone: "mute" is the Microphone row at the top, the rest the Mute shortcut section.
             context.Ui.SetSettingsPage(section => new MicMuteView(this, section == "mute" ? MicMuteSurface.Microphone : section == "shortcut-list" ? MicMuteSurface.ShortcutList : MicMuteSurface.Shortcut));
             _audio.SnapshotChanged += OnSnapshot;
@@ -107,12 +107,6 @@ public sealed class MicMuteModule : IFeatureModule
             throw;
         }
         finally { _gate.Release(); }
-    }
-
-    private async Task ToggleFromHomeAsync()
-    {
-        try { await ToggleAsync(); }
-        catch { /* Error is shown in the module. */ }
     }
 
     public void CaptureShortcut(bool capture) => _capturingShortcut = capture;

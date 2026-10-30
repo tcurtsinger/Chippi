@@ -131,6 +131,60 @@ public sealed class ShellMotionTests
     })));
 
     [Fact]
+    public void The_footers_Chippi_sits_on_the_pucks_side_and_meets_the_pucks_own_on_a_bottom_corner() => WpfTestThread.Run(() => WithPanel(panel =>
+    {
+        // 24 in from each corner, as the puck starts; flush in a corner the panel is kept 8 inside the work area, off the puck's corner.
+        var work = Offscreen.Work;
+        Rect At(bool right, bool bottom, double inset = 24) =>
+            new(right ? work.Right - inset - 50 : work.Left + inset, bottom ? work.Bottom - inset - 50 : work.Top + inset, 50, 50);
+        foreach (var (puck, meets, right) in new[]
+        {
+            (At(right: true, bottom: true), true, true), (At(right: false, bottom: true), true, false),
+            (At(right: true, bottom: false), false, true), (At(right: false, bottom: false), false, false),
+            (At(right: true, bottom: true, inset: 0), false, true),
+        })
+        {
+            panel.Open(puck, Offscreen);
+            Pump(TimeSpan.FromMilliseconds(400));
+            Assert.Equal(meets, panel.PetMeetsPuck);
+            var grid = Assert.IsType<IslandGrid>(panel.Page.Content);
+            var pet = grid.Pet.PointToScreen(new Point(grid.Pet.ActualWidth / 2, grid.Pet.ActualHeight / 2));
+            var footprint = panel.Footprint;
+            Assert.Equal(right, pet.X > footprint.Left + footprint.Width / 2); // on the puck's side
+            if (meets) // exactly where the puck's center is
+            {
+                Assert.Equal(puck.Left + puck.Width / 2, pet.X, 1);
+                Assert.Equal(puck.Top + puck.Height / 2, pet.Y, 1);
+            }
+            panel.CloseIsland(immediate: true);
+            Pump(TimeSpan.FromMilliseconds(100));
+        }
+    }));
+
+    [Fact]
+    public void Opening_on_a_bottom_corner_Chippi_shrinks_onto_the_footers_and_closing_it_takes_over_again() => WpfTestThread.Run(() => WithMotion(false, () => IslandWindowTests.WithShownIsland(window =>
+    {
+        var puck = window.PuckRect;
+        var pointer = new Point(puck.Left + puck.Width / 2, puck.Top + puck.Height / 2);
+        window.PointerAt = () => pointer;
+        window.PuckButton.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Left) { RoutedEvent = UIElement.PreviewMouseLeftButtonDownEvent });
+        window.PuckButton.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Left) { RoutedEvent = UIElement.PreviewMouseLeftButtonUpEvent });
+        Assert.True(window.Panel.PetMeetsPuck);
+        IslandWindowTests.Pump(TimeSpan.FromMilliseconds(130)); // past the first 45% of the 220ms open
+        Assert.Equal(1, window.PuckEnd.Opacity); // Chippi doesn't fade…
+        Assert.Equal(0.7, window.PetScale.ScaleX, 2); // …it's the footer's size
+        IslandWindowTests.Pump(TimeSpan.FromMilliseconds(300));
+        Assert.Equal(0, window.PuckEnd.Opacity); // and the footer's Chippi has it now
+
+        window.Escape();
+        IslandWindowTests.Pump(TimeSpan.FromMilliseconds(20));
+        Assert.Equal(1, window.PuckEnd.Opacity); // closing, the widget's Chippi takes over at once, at the footer's size
+        Assert.Equal(0.7, window.PetScale.ScaleX, 2);
+        IslandWindowTests.Pump(TimeSpan.FromMilliseconds(300));
+        Assert.Equal(1, window.PetScale.ScaleX, 3);
+    })));
+
+    [Fact]
     public void Laying_the_home_out_ahead_leaves_the_panel_closed() => WpfTestThread.Run(() => WithPanel(panel =>
     {
         panel.Prewarm();

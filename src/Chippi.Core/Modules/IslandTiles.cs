@@ -28,12 +28,13 @@ public static class IslandPage
 /// A tile's button on the home that acts without opening the page (Keep awake's start and stop, the
 /// microphone's mute). The home draws the button split: the toggle, and an arrow that opens the page.
 /// </summary>
-/// <param name="IsOn">Whether the button shows on (accent fill). Read each time the home refreshes.</param>
-/// <param name="Toggle">Starts or stops it. Called on the UI thread.</param>
+/// <param name="IsOn">Whether it's on (Keep awake running, the microphone muted). Read each time the home refreshes; the
+/// home draws it in the accent fill unless the tile needs attention (a muted mic shows in Caution instead).</param>
+/// <param name="Toggle">Starts or stops it. Called on the UI thread; when it fails (throws or faults), the home says "Failed" under the button.</param>
 /// <param name="Name">The button's name when it isn't the tile's (the Sound tile's mute is "Microphone").</param>
 /// <param name="Icon">Lucide icon key when it isn't the tile's.</param>
 /// <param name="Status">The line under the button when it isn't the tile's status (the microphone's "Live").</param>
-public sealed record IslandTileToggle(Func<bool> IsOn, Action Toggle, string? Name = null, string? Icon = null, Func<string>? Status = null);
+public sealed record IslandTileToggle(Func<bool> IsOn, Func<Task> Toggle, string? Name = null, string? Icon = null, Func<string>? Status = null);
 
 /// <summary>
 /// The home's volume slider, offered by the tile that owns the system volume (Sound). Its arrow opens
@@ -41,7 +42,9 @@ public sealed record IslandTileToggle(Func<bool> IsOn, Action Toggle, string? Na
 /// </summary>
 /// <param name="Level">The volume, 0 to 1, or null when there is no output.</param>
 /// <param name="Set">Sets the volume, 0 to 1. Called on the UI thread for every step of a drag, so it coalesces.</param>
-public sealed record IslandTileVolume(Func<double?> Level, Action<double> Set);
+/// <param name="Muted">Whether the output is muted; null where the tile can't tell (the home then never shows it muted).</param>
+/// <param name="SetMuted">Mutes or unmutes the output; null where the tile can't (the speaker is then just a glyph).</param>
+public sealed record IslandTileVolume(Func<double?> Level, Action<double> Set, Func<bool>? Muted = null, Func<bool, Task>? SetMuted = null);
 
 /// <summary>
 /// One module's part of an island tile (docs/phase-3/architecture.md §5).

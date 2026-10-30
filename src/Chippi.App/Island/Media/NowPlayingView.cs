@@ -162,7 +162,11 @@ internal sealed class NowPlayingView : UserControl
         icon.SetResourceReference(LucideIcon.BrushProperty, "IslandTextBrush");
         button.Content = icon;
         AutomationProperties.SetName(button, name);
-        button.Click += async (_, _) => await run();
+        button.Click += async (_, _) =>
+        {
+            try { await run(); }
+            catch (Exception) { /* the player refused (the session logged why); the page shows what it reports next */ }
+        };
         return button;
     }
 

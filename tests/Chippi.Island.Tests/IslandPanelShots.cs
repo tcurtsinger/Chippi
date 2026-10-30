@@ -47,7 +47,7 @@ public sealed class IslandPanelShots
                     panel.Initialize();
                     panel.SetMedia(media);
                     panel.SetTiles(tiles);
-                    panel.SetActivities([], PetMood.Idle);
+                    panel.SetActivities([]);
                     panel.SetLastPage(null);
                     panel.Open(IslandBounds.Puck(edge, Area.Work), Area);
                     Pump(TimeSpan.FromMilliseconds(500));
@@ -78,6 +78,15 @@ public sealed class IslandPanelShots
                         Pump(TimeSpan.FromMilliseconds(500));
                         Save(panel, Path.Combine(folder, "bottomright-grid-nothing-playing.png"));
                         media.Sessions = sessions;
+                        media.Raise();
+
+                        // Needing attention: the mic muted (Caution, not the accent) and the output muted.
+                        panel.SetTiles(HomeTiles(muted: true));
+                        panel.SetActivities([new IslandActivity("mic", IslandActivityKind.Status, "Muted", "Microphone") { ModuleId = "mic-mute", NeedsAttention = true, TileKey = "sound" }]);
+                        Pump(TimeSpan.FromMilliseconds(500));
+                        Save(panel, Path.Combine(folder, "bottomright-grid-muted.png"));
+                        panel.SetActivities([]);
+                        panel.SetTiles(tiles);
                     }
                 }
                 finally
@@ -88,20 +97,24 @@ public sealed class IslandPanelShots
         });
     }
 
-    /// <summary>The home as the mock shows it: eight buttons, Keep awake on, the volume slider.</summary>
-    internal static IReadOnlyList<IslandTileGroup> HomeTiles()
+    /// <summary>The home as the mock shows it: eight buttons, Keep awake on, the volume slider; <paramref name="muted"/>, the mic and the output muted.</summary>
+    internal static IReadOnlyList<IslandTileGroup> HomeTiles(bool muted = false)
     {
         var mic = Section("sound", "Sound", 10, 220, status: "Live");
-        var micSpec = mic.Spec with { Toggle = new IslandTileToggle(() => false, () => { }, "Microphone", "Mic", () => "Live"), Volume = new IslandTileVolume(() => 0.62, _ => { }) };
+        var micSpec = mic.Spec with
+        {
+            Toggle = new IslandTileToggle(() => muted, () => Task.CompletedTask, "Microphone", "Mic", () => muted ? "Muted" : "Live"),
+            Volume = new IslandTileVolume(() => 0.62, _ => { }, () => muted, _ => Task.CompletedTask),
+        };
         var awake = Section("keep-awake", "Keep awake", 40, 96, status: "1 hr left");
-        var awakeSpec = awake.Spec with { Toggle = new IslandTileToggle(() => true, () => { }) };
+        var awakeSpec = awake.Spec with { Toggle = new IslandTileToggle(() => true, () => Task.CompletedTask) };
         var awakeTile = new IslandTileContribution("keep-awake", awakeSpec);
         awakeTile.SetStatus("1 hr left");
         return Tiles(
             new IslandTileContribution("sound", micSpec),
             Section("sound.mixer", "App volume", 20, 200, status: "4 apps"),
             awakeTile,
-            Section("downloads", "File organizer", 50, 120, status: "Auto"),
+            Section("downloads", "File organizer", 50, 120, status: "2 to review"),
             Section("system-monitor", "System monitor", 60, 120, status: "CPU 12%"),
             Section("clipboard", "Clipboard", 70, 120, status: "23 items"),
             Section("scratchpad", "Scratchpad", 80, 120, status: "4 notes"),

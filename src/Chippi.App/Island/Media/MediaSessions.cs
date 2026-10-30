@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using System.Diagnostics;
 using System.IO;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Chippi.Core.Diagnostics;
+using Chippi.UI.Controls;
 using Windows.Media.Control;
 
 namespace Chippi.App.Island.Media;
@@ -15,10 +17,11 @@ namespace Chippi.App.Island.Media;
 /// <param name="Source">The app's display name, such as "Spotify".</param>
 /// <param name="UpdatedAt">When Windows last reported <paramref name="Position"/>.</param>
 /// <param name="CanPlay">The app's separate Play, Pause and Toggle capabilities, as Windows reports them.</param>
+/// <param name="Icon">The app's own icon, when it can be found (the home card's app line).</param>
 public sealed record MediaTrack(
     string Id, string Source, string Title, string Artist, bool Playing,
     bool CanPrevious, bool CanPlay, bool CanPause, bool CanToggle, bool CanNext,
-    TimeSpan Position, TimeSpan Duration, DateTimeOffset UpdatedAt, ImageSource? Artwork)
+    TimeSpan Position, TimeSpan Duration, DateTimeOffset UpdatedAt, ImageSource? Artwork, ImageSource? Icon = null)
 {
     /// <summary>
     /// What the play/pause button sends: Pause while playing and Play while not, when the app offers
@@ -53,6 +56,8 @@ public interface IMediaSessions : IDisposable
     /// <summary>Shows this app's session; null follows Windows' current one.</summary>
     void Select(string? id);
 
+    // The transport: each faults when the app declines the command or it fails (it's logged), so a caller can say so.
+
     Task PreviousAsync();
 
     Task PlayPauseAsync();
@@ -68,6 +73,7 @@ public sealed class SystemMediaSessions : IMediaSessions
 {
     private readonly Dispatcher _dispatcher = Dispatcher.CurrentDispatcher;
     private readonly Dictionary<string, (string Key, ImageSource? Image, bool Sent)> _art = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, ImageSource?> _icons = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<GlobalSystemMediaTransportControlsSession> _watched = [];
     private GlobalSystemMediaTransportControlsSessionManager? _manager;
     private IReadOnlyList<MediaTrack> _sessions = [];
@@ -120,18 +126,25 @@ public sealed class SystemMediaSessions : IMediaSessions
 
     public Task NextAsync() => Command(s => s.TrySkipNextAsync().AsTask());
 
+    // Logged here, then passed on: the caller says "Failed" (the home's card) or lets it go (the page).
     private async Task Command(Func<GlobalSystemMediaTransportControlsSession, Task<bool>> command)
     {
         if (Session(Current?.Id) is not { } session)
             return;
+        bool done;
         try
         {
-            if (!await command(session))
-                Log.Info($"Now Playing: {Current?.Source} declined the command");
+            done = await command(session);
         }
         catch (Exception ex)
         {
             Log.Warn("Now Playing: media command failed", ex);
+            throw;
+        }
+        if (!done)
+        {
+            Log.Info($"Now Playing: {Current?.Source} declined the command");
+            throw new InvalidOperationException($"{Current?.Source} declined the command");
         }
     }
 
@@ -218,7 +231,7 @@ public sealed class SystemMediaSessions : IMediaSessions
                 controls?.IsPreviousEnabled == true, controls?.IsPlayEnabled == true, controls?.IsPauseEnabled == true,
                 controls?.IsPlayPauseToggleEnabled == true, controls?.IsNextEnabled == true,
                 timeline is null ? TimeSpan.Zero : timeline.Position - timeline.StartTime, duration > TimeSpan.Zero ? duration : TimeSpan.Zero,
-                timeline?.LastUpdatedTime ?? DateTimeOffset.Now, await Artwork(id, title + "\n" + artist, properties));
+                timeline?.LastUpdatedTime ?? DateTimeOffset.Now, await Artwork(id, title + "\n" + artist, properties), await Icon(id));
         }
         catch (Exception ex)
         {
@@ -257,6 +270,63 @@ public sealed class SystemMediaSessions : IMediaSessions
         }
         _art[id] = (key, image, properties?.Thumbnail is not null);
         return image;
+    }
+
+    // Looked up once per app.
+    private async Task<ImageSource?> Icon(string id)
+    {
+        if (!_icons.TryGetValue(id, out var icon))
+            _icons[id] = icon = await AppIconAsync(id);
+        return icon;
+    }
+
+    /// <summary>
+    /// A media app's own icon: a packaged app's logo, or the program file's icon of a running desktop app whose id names
+    /// its exe ("Spotify.exe"). Null when neither is found; the card shows the music glyph then. Call on the UI thread.
+    /// </summary>
+    internal static async Task<ImageSource?> AppIconAsync(string id)
+    {
+        ImageSource? icon = null;
+        try
+        {
+            if (id.Contains('!'))
+            {
+                var logo = Windows.ApplicationModel.AppInfo.GetFromAppUserModelId(id).DisplayInfo.GetLogo(new Windows.Foundation.Size(24, 24));
+                using var stream = await logo.OpenReadAsync();
+                using var source = stream.AsStreamForRead();
+                var bitmap = new BitmapImage();
+                bitmap.BeginInit();
+                bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                bitmap.DecodePixelWidth = 24; // a 12 glyph, sharp up to 200% scaling
+                bitmap.StreamSource = source;
+                bitmap.EndInit();
+                bitmap.Freeze();
+                icon = bitmap;
+            }
+            else if (id.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+            {
+                foreach (var process in Process.GetProcessesByName(Path.GetFileNameWithoutExtension(id)))
+                {
+                    using (process)
+                    {
+                        try
+                        {
+                            if (icon is null && process.MainModule?.FileName is { } path)
+                                icon = AppIcon.Load(path);
+                        }
+                        catch (Exception)
+                        {
+                            // Another user's or an elevated process: try the next.
+                        }
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("Now Playing: the app's icon is unreadable", ex);
+        }
+        return icon;
     }
 
     /// <summary>A readable app name from an AppUserModelID: the package's display name, else the exe or app part.</summary>

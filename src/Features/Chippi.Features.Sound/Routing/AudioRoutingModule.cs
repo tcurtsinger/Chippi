@@ -69,7 +69,7 @@ public sealed class AudioRoutingModule : IFeatureModule
                 new("mic-pinned", "Microphone switched", NoticePlaces.None),
             ]);
             _tile = context.Ui.AddIslandTile(SoundTile.Section(0, SoundTile.Output, () => new RoutingQuickView(this, AudioFlow.Render))
-                with { Volume = new IslandTileVolume(OutputVolume, SetHomeVolume) });
+                with { Volume = new IslandTileVolume(OutputVolume, SetHomeVolume, OutputMuted, SetHomeMutedAsync) });
             context.Ui.AddIslandTile(SoundTile.Section(20, SoundTile.Microphone, () => new RoutingQuickView(this, AudioFlow.Capture)));
             context.Ui.SetSettingsPage(section => new RoutingPage(this, section == "microphone" ? AudioFlow.Capture : AudioFlow.Render));
             _audio.SnapshotChanged += OnSnapshot;
@@ -294,6 +294,13 @@ public sealed class AudioRoutingModule : IFeatureModule
         if (InUse(AudioFlow.Render) is { } id)
             _homeVolume.Send(() => SetOutputVolumeAsync(id, (float)Math.Clamp(volume, 0, 1)));
     }
+
+    /// <summary>Whether the output in use is muted (the home's speaker).</summary>
+    private bool OutputMuted() =>
+        InUse(AudioFlow.Render) is { } id && Snapshot.Levels.TryGetValue(id, out var level) && level.Muted;
+
+    private Task SetHomeMutedAsync(bool muted) =>
+        InUse(AudioFlow.Render) is { } id ? SetOutputMutedAsync(id, muted) : Task.CompletedTask;
 
     public async Task StopAsync(CancellationToken ct)
     {

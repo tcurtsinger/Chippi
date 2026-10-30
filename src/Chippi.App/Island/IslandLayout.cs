@@ -28,4 +28,18 @@ internal sealed record IslandLayout(IslandOpensOn OpensOn, IReadOnlyList<string>
 
     /// <summary>The grid's tiles: <see cref="Sorted"/>, without the hidden ones.</summary>
     public IReadOnlyList<string> Shown(IEnumerable<string> keys) => [.. Sorted(keys).Where(k => !Hidden.Contains(k))];
+
+    /// <summary>
+    /// The hidden tiles once <paramref name="key"/>'s Show switch is turned on or off (<paramref name="show"/>). The tiles that
+    /// were past the first <paramref name="room"/> shown in <paramref name="order"/>, whose switches showed off, are saved hidden
+    /// too, so a slot freed stays free for the next switch turned on instead of going to the next tile in order.
+    /// </summary>
+    public static List<string> Switched(IEnumerable<string> hidden, IReadOnlyList<string> order, string key, bool show, int room)
+    {
+        var was = hidden.ToList();
+        var next = was.Concat(order.Where(k => !was.Contains(k)).Skip(room)).Where(k => k != key).ToList();
+        if (!show)
+            next.Add(key);
+        return next;
+    }
 }

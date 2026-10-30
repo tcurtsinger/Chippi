@@ -6,14 +6,17 @@ using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Media.Imaging;
 
-namespace Chippi.Features.Sound.Volume;
+namespace Chippi.UI.Controls;
 
-/// <summary>Reads the program file's large icon. Handles never outlive the conversion.</summary>
-internal static class AppIcon
+/// <summary>
+/// Reads the program file's large icon (App volume's strips, the island's Now Playing card). Handles never outlive the
+/// conversion. Call on the UI thread, which owns the cache.
+/// </summary>
+public static class AppIcon
 {
     private static readonly Dictionary<string, BitmapSource?> Cache = new(StringComparer.OrdinalIgnoreCase);
 
-    internal static BitmapSource? Load(string? path)
+    public static BitmapSource? Load(string? path)
     {
         if (string.IsNullOrWhiteSpace(path)) return null;
         if (Cache.TryGetValue(path, out var cached)) return cached;

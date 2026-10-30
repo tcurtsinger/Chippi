@@ -46,7 +46,7 @@ public sealed class SoundPageShots
                 panel.Initialize();
                 panel.SetMedia(new FakeMedia());
                 panel.SetTiles(Chippi.Core.Modules.IslandTileContribution.Group(scene.Shell.Registry.Features.SelectMany(e => e.IslandTiles)));
-                panel.SetActivities(scene.Shell.Island.Activities, PetMood.Idle);
+                panel.SetActivities(scene.Shell.Island.Activities);
                 panel.SetLastPage(null);
                 open(panel);
                 await Task.Delay(500);
@@ -102,7 +102,7 @@ public sealed class SoundPageShots
                 panel.Initialize();
                 panel.SetMedia(new FakeMedia());
                 panel.SetTiles(Chippi.Core.Modules.IslandTileContribution.Group(scene.Shell.Registry.Features.SelectMany(e => e.IslandTiles)));
-                panel.SetActivities(scene.Shell.Island.Activities, PetMood.Idle);
+                panel.SetActivities(scene.Shell.Island.Activities);
                 panel.SetLastPage(null);
                 panel.Open(IslandGeometry.Start(work, 1), new MonitorArea(default, new Rect(-20000, 0, 1920, 1080), work, 1));
                 await Task.Delay(500);
