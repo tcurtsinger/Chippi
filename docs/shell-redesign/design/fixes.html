@@ -1,0 +1,513 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Chippi Shell Fixes</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;padding:32px;width:1912px;font-family:'Segoe UI Variable Text','Segoe UI',system-ui,sans-serif;-webkit-font-smoothing:antialiased;
+  background:var(--board);color:var(--doc);
+  --wall:linear-gradient(160deg,#7A7672 0%,#5D5B59 48%,#4B4A49 100%)}
+/* Island tokens as built (Dark.xaml / Light.xaml), with tertiary moved up to the Muted Floor where noted. */
+body.light{--board:#E9E6E1;--doc:#1A1A1A;--cap:#454545;--lbl:#5A5A5A;
+  --panel:rgba(245,245,246,.96);--panelsolid:#F5F5F6;--pborder:rgba(0,0,0,.08);--pborder2:rgba(0,0,0,.12);--pborderh:rgba(0,0,0,.28);
+  --pshadow:0 16px 40px rgba(0,0,0,.2);--puckshadow:0 4px 14px rgba(0,0,0,.18);
+  --card:rgba(0,0,0,.035);--hair:rgba(0,0,0,.08);
+  --tx:#1A1A1A;--t2:#5C5C5C;--t3:#8A8A8A;--t3fix:#616161;--track:#8A8A8A;--track2:rgba(0,0,0,.12);
+  --ac:#7444F0;--acfill:linear-gradient(135deg,#8F5CFF,#5B86FF);--onac:#FFFFFF;--actint:rgba(116,68,240,.12);
+  --glow:rgba(116,68,240,.35);--z:#5C5C5C;--thumbring:#FFFFFF;--seg:rgba(0,0,0,.04);--segon:#FFFFFF}
+body.dark{--board:#1C1C1F;--doc:#F2F2F2;--cap:#BDBDBD;--lbl:#A8A8A8;
+  --panel:rgba(40,40,44,.96);--panelsolid:#28282C;--pborder:rgba(255,255,255,.09);--pborder2:rgba(255,255,255,.17);--pborderh:rgba(255,255,255,.34);
+  --pshadow:0 16px 40px rgba(0,0,0,.5);--puckshadow:0 4px 14px rgba(0,0,0,.18);
+  --card:rgba(255,255,255,.05);--hair:rgba(255,255,255,.08);
+  --tx:#FFFFFF;--t2:#C9C9C9;--t3:#9A9A9A;--t3fix:#9D9D9D;--track:#9A9A9A;--track2:rgba(255,255,255,.14);
+  --ac:#B79CFF;--acfill:linear-gradient(135deg,#B78FFF,#82AEFF);--onac:#170F2E;--actint:rgba(183,156,255,.16);
+  --glow:rgba(183,143,255,.35);--z:#C9C9C9;--thumbring:#454545;--seg:rgba(0,0,0,.22);--segon:rgba(255,255,255,.10)}
+::selection{background:var(--actint);color:var(--doc)}
+h1.doc{font:600 26px/1.2 'Segoe UI Variable Display','Segoe UI';margin:0 0 8px}
+h2.doc{font:600 19px/1.3 'Segoe UI Variable Display','Segoe UI';margin:40px 0 14px}
+p.cap{margin:0;max-width:1180px;font-size:14px;line-height:1.5;color:var(--cap)}
+.grid3{display:grid;grid-template-columns:repeat(3,600px);gap:22px 24px}
+.lbl{font-size:12px;font-weight:600;color:var(--lbl);margin:0 0 6px}
+.desk{position:relative;width:600px;height:404px;border-radius:10px;overflow:hidden;background:var(--wall)}
+.notes{margin:14px 0 0;padding:0 0 0 18px;font-size:13px;line-height:1.6;color:var(--cap);max-width:1240px}
+.notes li{margin:2px 0}.notes b{color:var(--doc);font-weight:600}
+.abs{position:absolute}
+.row{display:flex;align-items:center}
+.grow{flex:1;min-width:0}
+.cut{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.num{font-variant-numeric:tabular-nums}
+.ic{fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;display:block;flex:none}
+.fl{fill:currentColor;stroke:none;display:block;flex:none}
+
+/* Pet motion: the proposed asleep breathes and its z drifts. */
+@keyframes breathe{0%,100%{transform:scale(1,1)}50%{transform:scale(1.022,1.04)}}
+@keyframes zdrift{0%,100%{transform:translate(0,2px);opacity:.45}50%{transform:translate(0,-3px);opacity:1}}
+.breathe{transform-box:view-box;transform-origin:60px 106px;animation:breathe 4.2s ease-in-out infinite}
+.zdrift{transform-box:view-box;animation:zdrift 4.2s ease-in-out infinite}
+body.still .breathe,body.still .zdrift{animation:none}
+
+/* Widget */
+.puck{width:50px;height:50px;border-radius:50%;background:var(--panel);border:1px solid var(--pborder);box-shadow:var(--puckshadow);display:grid;place-items:center;position:relative;flex:none;transition:transform .12s cubic-bezier(.2,.8,.2,1)}
+.puck.v2{border-color:var(--pborder2)}
+.puck.hover{transform:scale(1.08)}
+.wchip{height:36px;padding:0 12px 0 6px;border-radius:8px;background:var(--panel);border:1px solid var(--pborder);box-shadow:0 4px 14px rgba(0,0,0,.16);gap:8px;font-size:12px;color:var(--tx);white-space:nowrap}
+.wchip b{font-weight:600}.wchip span{color:var(--t2)}
+.bars{display:flex;align-items:flex-end;gap:2px;height:14px;flex:none}
+.bars i{display:block;width:3px;border-radius:2px;background:var(--acfill)}
+.bars.rest i{background:var(--t3fix)}
+.cover{display:block;flex:none;box-shadow:0 0 0 1px var(--hair)}
+.badge{position:absolute;width:18px;height:18px;border-radius:50%;display:grid;place-items:center;color:#fff;background:#C42B1C;box-shadow:0 0 0 2px var(--panelsolid)}
+
+/* The bar: the puck stretched toward the middle, Chippi at the puck's end. */
+.bar-in{display:flex;align-items:center;width:256px;height:50px;gap:10px;color:var(--tx);white-space:nowrap}
+.bar-in .txt{display:flex;flex-direction:column;flex:1;min-width:0}
+.bar-in .bt{font-size:13px;font-weight:600;line-height:17px;overflow:hidden}
+.bar-in .ba{font-size:12px;line-height:16px;color:var(--t2);overflow:hidden;text-overflow:ellipsis}
+.bar-in .fade{-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 12px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 12px),transparent)}
+.bar-in .pslot{width:46px;flex:none}
+.bcover{width:34px;height:34px;border-radius:50%;overflow:hidden;flex:none;box-shadow:0 0 0 1px var(--hair)}
+.bcover svg{box-shadow:none}
+.bglyph{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:var(--actint);color:var(--ac);flex:none}
+.wlbl{font-size:12px;color:#F6F4F2;text-shadow:0 1px 2px rgba(0,0,0,.4)}
+.wlbl b{font-weight:600}
+
+/* Pet sheets */
+.rowlbl{font-size:12px;font-weight:600;color:#F6F4F2;text-shadow:0 1px 2px rgba(0,0,0,.4)}
+.pcell{width:100px;display:flex;flex-direction:column;align-items:center}
+.plbl{font-size:11px;color:#F6F4F2;text-shadow:0 1px 2px rgba(0,0,0,.4);margin-top:8px}
+.band{position:absolute;left:0;right:0;height:135px}
+.band .bl{position:absolute;left:24px;top:12px;font-size:11px;font-weight:600}
+
+/* Panel */
+.panel{position:absolute;width:520px;height:360px;border-radius:8px;background:var(--panel);border:1px solid var(--pborder);box-shadow:var(--pshadow);overflow:hidden;color:var(--tx)}
+.inner{position:absolute;left:-1px;top:-1px;width:520px;height:360px;color:var(--tx)}
+.hdr{position:absolute;left:12px;top:12px;width:496px;height:24px;gap:2px}
+.hdr .back{width:28px;height:24px;margin-left:-7px;display:grid;place-items:center;color:var(--t2);border-radius:4px}
+.hdr .name{font-size:13px;font-weight:600}
+.hdr .src{margin-left:auto;font-size:12px;gap:3px}
+.col{position:absolute;display:flex;flex-direction:column}
+.col .t{font-size:20px;font-weight:600;line-height:26px;margin-top:-5px}
+.clamp2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.col .a{font-size:13px;line-height:18px;color:var(--t3fix);margin-top:2px}
+.tr{gap:8px;margin-left:-12px}
+.tb{width:48px;height:48px;border-radius:50%;display:grid;place-items:center;color:var(--tx)}
+.disc{width:52px;height:52px;border-radius:50%;display:grid;place-items:center;background:var(--acfill);color:var(--onac)}
+.disc.glow{box-shadow:0 6px 16px var(--glow)}
+.pbar{position:relative;height:4px;border-radius:2px;background:var(--track2);overflow:hidden}
+.pbar i{position:absolute;left:0;top:0;bottom:0;border-radius:2px}
+.times{margin-top:6px;font-size:11px;line-height:14px;color:var(--t3fix)}
+.noart{position:absolute;border-radius:6px;background:var(--card);box-shadow:inset 0 0 0 1px var(--hair);display:grid;place-items:center}
+.today-tr{display:grid;grid-template-columns:repeat(3,1fr);place-items:center;color:var(--tx)}
+.obar{position:relative;height:4px;border-radius:2px;background:var(--track);margin:0 8px}
+.obar i{position:absolute;left:0;top:0;bottom:0;border-radius:2px;background:var(--t3)}
+.obar b{position:absolute;top:50%;width:18px;height:18px;margin:-9px 0 0 -9px;border-radius:50%;background:var(--thumbring);box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.obar b:after{content:"";position:absolute;inset:4px;border-radius:50%;background:var(--ac)}
+
+/* Morph */
+.morph{display:grid;grid-template-columns:600px 1224px;gap:24px;align-items:start}
+.mdesk{position:relative;overflow:hidden;border-radius:10px;background:var(--wall);user-select:none}
+.mshape{position:absolute;background:var(--panel);border:1px solid var(--pborder2)}
+.mdesk .mshape{cursor:pointer}
+.mpet{position:absolute;width:40px;height:40px;margin:-20px 0 0 -20px;pointer-events:none}
+.mbarc{position:absolute;pointer-events:none}
+.mcontent{position:absolute;width:520px;height:360px}
+.mpuck{position:absolute;cursor:pointer}
+.mchip{position:absolute;cursor:pointer}
+.pspot{position:absolute;width:50px;height:50px;border-radius:50%;border:7px dashed var(--ac)}
+.strip{display:grid;grid-template-columns:repeat(5,228px);gap:12px;margin-bottom:16px}
+.fr{width:228px;height:160px;overflow:hidden;border-radius:6px;position:relative}
+.fr.c{height:133px}
+.frs{transform-origin:0 0;position:absolute;left:0;top:0}
+.fcap{font-size:11px;color:var(--lbl);margin-top:5px}
+.ctrls{gap:14px;margin-top:12px;font-size:13px;color:var(--doc)}
+.seg{display:flex;padding:2px;border-radius:6px;background:var(--seg);border:1px solid var(--hair)}
+.seg button{height:28px;padding:0 14px;border:0;border-radius:4px;background:transparent;color:var(--t2);font:13px 'Segoe UI Variable Text','Segoe UI';cursor:pointer}
+.seg button.on{background:var(--segon);color:var(--doc);box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.seg button:focus-visible,.sw:focus-visible{outline:2px solid var(--doc);outline-offset:1px}
+.sw{display:flex;align-items:center;gap:8px;border:0;background:none;color:var(--doc);font:13px 'Segoe UI Variable Text','Segoe UI';cursor:pointer;padding:0}
+.sw i{width:40px;height:20px;border-radius:10px;border:1px solid var(--t2);position:relative;display:block}
+.sw i:after{content:"";position:absolute;left:4px;top:3px;width:12px;height:12px;border-radius:50%;background:var(--t2);transition:left .15s}
+.sw[aria-pressed="true"] i{background:var(--acfill);border-color:transparent}
+.sw[aria-pressed="true"] i:after{left:22px;top:2px;width:14px;height:14px;background:var(--onac)}
+</style></head>
+<body class="light">
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <linearGradient id="petbody" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#B78FFF"/><stop offset="1" stop-color="#A17EE0"/></linearGradient>
+  <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0B2236"/><stop offset=".58" stop-color="#3F86AC"/><stop offset=".6" stop-color="#9FC6D6"/></linearGradient>
+</defs>
+  <symbol id="play" viewBox="0 0 24 24"><path d="M8.2 5.3v13.4a1 1 0 0 0 1.53.85l10.6-6.7a1 1 0 0 0 0-1.7L9.73 4.45A1 1 0 0 0 8.2 5.3z"/></symbol>
+  <symbol id="pause" viewBox="0 0 24 24"><rect x="6" y="5" width="4.2" height="14" rx="1.4"/><rect x="13.8" y="5" width="4.2" height="14" rx="1.4"/></symbol>
+  <symbol id="skipb" viewBox="0 0 24 24"><path d="M19 5.6v12.8a1 1 0 0 1-1.56.83l-9.3-6.4a1 1 0 0 1 0-1.66l9.3-6.4A1 1 0 0 1 19 5.6z"/><rect x="4.6" y="5" width="2.8" height="14" rx="1.4"/></symbol>
+  <symbol id="skipf" viewBox="0 0 24 24"><path d="M5 5.6v12.8a1 1 0 0 0 1.56.83l9.3-6.4a1 1 0 0 0 0-1.66l-9.3-6.4A1 1 0 0 0 5 5.6z"/><rect x="16.6" y="5" width="2.8" height="14" rx="1.4"/></symbol>
+  <symbol id="chevl" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+  <symbol id="chevd" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="coffee" viewBox="0 0 24 24"><path d="M10 2v2"/><path d="M14 2v2"/><path d="M6 2v2"/><path d="M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1"/></symbol>
+  <symbol id="micoff" viewBox="0 0 24 24"><line x1="2" x2="22" y1="2" y2="22"/><path d="M18.89 13.23A7.12 7.12 0 0 0 19 12v-2"/><path d="M5 10v2a7 7 0 0 0 12 5"/><path d="M15 9.34V5a3 3 0 0 0-5.68-1.33"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12"/><line x1="12" x2="12" y1="19" y2="22"/></symbol>
+</svg>
+
+<h1 class="doc" id="title"></h1>
+<p class="cap">Proposals from the shell critique of 30 October. The pet is redrawn for the puck. The puck stretches into the now-playing bar instead of opening a chip beside it, and the puck or the bar becomes the panel. Now Playing uses option B, which you picked; it's built on fix/now-playing-layout. Click the widget in the live demo to try it: Music playing folds the bar in and out, Slow motion stretches everything five times, and Today plays what ships now. The cover is a stand-in; the track is from your screenshot.</p>
+
+<h2 class="doc">The pet on the puck</h2>
+<div class="grid3" id="petGrid"></div>
+<ul class="notes">
+  <li><b>Bigger:</b> Chippi is 40 in the 50 puck, up from 36. The body goes from 26 to 29 wide.</li>
+  <li><b>Asleep:</b> heavier shut eyes. One z, 10px, in secondary text, replaces two bold z's in #9D9D9D (about 3px tall today). It breathes: 4% taller from its base every 4.2s, with the z drifting up and back. Reduced motion holds it still.</li>
+  <li><b>Listening:</b> the headphones get a light rim (#E6DCFF) around a darker band and cups. They read on the dark puck and on Now Playing's no-art card, where today's #2A2440 vanishes into #28282C.</li>
+  <li><b>Wide awake:</b> wide-open eyes and an "o" mouth. Today it's happy arcs 1px thinner than Listening's, so the two read as one mood.</li>
+  <li><b>The puck's edge:</b> in dark, the rim goes from white 9% to 17%, so the puck holds its edge on a mid-gray wallpaper. Light is unchanged.</li>
+</ul>
+
+<h2 class="doc">The puck becomes the bar</h2>
+<div class="grid3" id="barGrid"></div>
+<ul class="notes">
+  <li><b>Two sizes, never any other:</b> the 50 puck and the 256 × 50 bar. A short title, a long one, a pause, Keep awake and a timer all fill the same bar. A badge sits inside the puck's 50 × 50 square, and hover brightens the rim instead of growing it.</li>
+  <li><b>One object:</b> while a song plays, the puck stretches into the bar toward the screen's middle. Chippi keeps the puck's place at its end, listening. Nothing opens beside it.</li>
+  <li><b>What's in it:</b> the cover as a 34 circle, set 8 in so it sits concentric with the bar's round end. Then the title (13 / 600) over the artist (12, secondary) in the 125 between the cover and the equalizer. A title that doesn't fit scrolls, as it does today.</li>
+  <li><b>Activities use the same bar:</b> the feature's glyph in a tinted circle, and the status over the feature's name ("1 hr left" over "Keep awake"). It turns Caution when the activity needs you.</li>
+  <li><b>Unfold, 240ms ease-out:</b> the round end slides out from Chippi's end, and the cover and text fade in over the second half. Folding back takes 180ms.</li>
+  <li><b>Paused:</b> a pause mark in tertiary replaces the equalizer, and Chippi takes off the headphones. 10s later the bar folds back into the puck, so a quick pause doesn't make it flicker.</li>
+  <li><b>Click anywhere on it</b> to open the page it shows: Now Playing for a song, the feature's page for an activity. A drag folds it into the puck while lifted and unfolds it where it lands, on whichever side faces the middle.</li>
+  <li><b>Mic muted:</b> the red badge stays on Chippi's end.</li>
+</ul>
+
+<h2 class="doc">The puck, or the bar, becomes the panel</h2>
+<div class="morph">
+  <div>
+    <div class="lbl">Live: click the widget (Esc or a click outside closes)</div>
+    <div class="mdesk" id="live" style="width:600px;height:420px"></div>
+    <div class="ctrls row">
+      <div class="seg" role="group" aria-label="Behavior"><button id="mToday">Today</button><button id="mNew" class="on">Proposed</button></div>
+      <button class="sw" id="music" aria-pressed="true"><i></i>Music playing</button>
+      <button class="sw" id="slow" aria-pressed="false"><i></i>Slow motion</button>
+    </div>
+    <ul class="notes" style="padding-left:18px">
+      <li><b>Where it opens:</b> the panel's corner is the widget's outer corner. A bottom-right puck or bar shares its right and bottom edges with the panel. Kept 8 inside the work area.</li>
+      <li><b>Frame 0 is the widget</b>, the puck or the bar, at its one size. The widget window hides on that frame, so there's only ever one object.</li>
+      <li><b>Open, 220ms ease-out:</b> the shape grows out of its own corner. The bar's cover and text fade in the first 25%. Chippi shrinks to 70% and fades in place over the first 45%, and the page fades in over the second half. The shadow deepens from the widget's to the panel's.</li>
+      <li><b>Close, 160ms:</b> the page fades over the first half, and the shape folds back into the bar (or the puck). Chippi and the bar's content fade back in at the end, and the widget takes over on the last frame.</li>
+      <li><b>While open there's no widget:</b> Esc or a click outside closes the panel. Right-click and drag come back with the widget.</li>
+    </ul>
+  </div>
+  <div id="strips"></div>
+</div>
+
+<h2 class="doc">Now Playing</h2>
+<div class="grid3" id="npGrid"></div>
+<ul class="notes">
+  <li><b>Option B, the one you picked,</b> is built on fix/now-playing-layout. It keeps the approved mock's 156 art, top-aligned.</li>
+  <li><b>No glow:</b> the disc keeps the accent fill, the Gradient Rule's one allowed use, and casts no colored shadow.</li>
+  <li><b>Transport grouped:</b> 48 / 52 / 48, 8 apart, with the first glyph on the title's left edge and the disc level with the art's bottom. Today it's spread over 211.</li>
+  <li><b>Progress:</b> no thumb, because it doesn't seek. The track is white 14% (black 12% in light), so a paused fill in tertiary still shows where you are. Playing fills with the accent.</li>
+  <li><b>Option A,</b> not picked, grew the art to 264 and centered it.</li>
+</ul>
+
+<script>
+const params = new URLSearchParams(location.search);
+const dark = params.get('theme') === 'dark';
+document.body.className = (dark ? 'dark' : 'light') + (params.has('still') ? ' still' : '');
+document.getElementById('title').textContent = `Chippi shell fixes: the pet, the bar, the morph and Now Playing (${dark ? 'dark' : 'light'})`;
+
+const ic = (id, s, cls = 'ic') => `<svg width="${s}" height="${s}" class="${cls}" aria-hidden="true"><use href="#${id}"/></svg>`;
+const gl = (id, s) => ic(id, s, 'fl');
+const clamp = (x) => Math.max(0, Math.min(1, x));
+const lerp = (a, b, t) => a + (b - a) * t;
+const ease = (t) => 1 - Math.pow(1 - t, 3);
+
+/* ---------- The pet ---------- */
+const INK = '#0B0F1F', TONGUE = '#FF7FA8';
+// v2 = proposed. Built geometry is DESIGN.md §7 / ChippiPet.cs verbatim.
+function pet(size, mood = 'idle', v2 = true) {
+  const small = size <= 44;
+  const st = (d, w, c = INK) => `<path d="${d}" fill="none" stroke="${c}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round"/>`;
+  const smile = `<path d="M50 82 Q60 94 70 82 Z" fill="${INK}"/><path d="M55 87 Q60 91 65 87 Z" fill="${TONGUE}"/>`;
+  const idleEyes = `<ellipse cx="47" cy="66" rx="10.5" ry="12.5" fill="#fff"/><ellipse cx="73" cy="66" rx="10.5" ry="12.5" fill="#fff"/><circle cx="49" cy="68" r="6" fill="${INK}"/><circle cx="75" cy="68" r="6" fill="${INK}"/><circle cx="50.6" cy="65.6" r="2" fill="#fff"/><circle cx="76.6" cy="65.6" r="2" fill="#fff"/>`;
+  const happy = (w) => st('M39 70 Q46 63 53 70 M67 70 Q74 63 81 70', w);
+  const shut = (w) => st('M39 67 Q46 72 53 67 M67 67 Q74 72 81 67', w);
+  const body = `<path d="M17 76 C17 45 36 31 60 31 C84 31 103 45 103 76 C103 98 87 106 60 106 C33 106 17 98 17 76 Z" fill="url(#petbody)"/>`;
+  const ground = size >= 64 ? `<ellipse cx="60" cy="113" rx="30" ry="4" fill="rgba(0,0,0,.18)"/>` : '';
+  let face = '', over = '', breathe = false;
+  if (mood === 'idle') face = idleEyes + smile;
+  else if (mood === 'sleepy') {
+    if (v2) {
+      breathe = true;
+      face = shut(small ? 4.6 : 3.8) + `<ellipse cx="60" cy="86" rx="4" ry="3.4" fill="${INK}"/>`;
+      over = small
+        ? `<g class="zdrift"><text x="92" y="34" font-family="Segoe UI Variable Display,Segoe UI" font-weight="600" font-size="30" style="fill:var(--z)">z</text></g>`
+        : `<g class="zdrift"><text x="93" y="32" font-family="Segoe UI Variable Display,Segoe UI" font-weight="600" font-size="22" style="fill:var(--z)">z</text><text x="106" y="16" font-family="Segoe UI Variable Display,Segoe UI" font-weight="600" font-size="14" style="fill:var(--z)">z</text></g>`;
+    } else {
+      face = shut(3.4) + `<ellipse cx="60" cy="85" rx="3.5" ry="3" fill="${INK}"/>`;
+      over = `<text x="94" y="30" font-family="Segoe UI Variable Display,Segoe UI" font-weight="700" font-size="20" fill="#9D9D9D">z</text><text x="106" y="15" font-family="Segoe UI Variable Display,Segoe UI" font-weight="700" font-size="13" fill="#9D9D9D">z</text>`;
+    }
+  } else if (mood === 'wide') {
+    face = v2
+      ? `<ellipse cx="46" cy="65" rx="12" ry="14" fill="#fff"/><ellipse cx="74" cy="65" rx="12" ry="14" fill="#fff"/><circle cx="46" cy="66" r="4.4" fill="${INK}"/><circle cx="74" cy="66" r="4.4" fill="${INK}"/><circle cx="47.7" cy="63.8" r="1.6" fill="#fff"/><circle cx="75.7" cy="63.8" r="1.6" fill="#fff"/><ellipse cx="60" cy="89" rx="4.4" ry="5" fill="${INK}"/>`
+      : happy(3.2) + smile;
+  } else if (mood === 'music') {
+    face = happy(v2 && small ? 4.8 : 4.2) + smile;
+    over = v2
+      ? `<path d="M19 70 C19 19 101 19 101 70" fill="none" stroke="#E6DCFF" stroke-width="10" stroke-linecap="round"/><path d="M19 70 C19 19 101 19 101 70" fill="none" stroke="#1B1530" stroke-width="5.5" stroke-linecap="round"/>`
+        + [10, 95].map(x => `<rect x="${x}" y="57" width="15" height="26" rx="6" fill="#1B1530" stroke="#E6DCFF" stroke-width="2.2"/><rect x="${x + 4.5}" y="62" width="6" height="16" rx="3" fill="#D2BEFF"/>`).join('')
+      : `<path d="M19 70 C19 19 101 19 101 70" fill="none" stroke="#2A2440" stroke-width="5" stroke-linecap="round"/>`
+        + [12, 95].map(x => `<rect x="${x}" y="59" width="13" height="23" rx="5.5" fill="#2A2440"/><rect x="${x === 12 ? 15 : 102}" y="63" width="5" height="15" rx="2.5" fill="#D2BEFF"/>`).join('');
+  } else if (mood === 'celebrate') {
+    face = happy(v2 && small ? 4.8 : 4.2) + smile;
+    over = st('M14 30 L6 24 M12 44 H3 M24 18 L20 9 M106 30 L114 24 M108 44 H117 M96 18 L100 9', v2 && small ? 4.5 : 3.5, '#F5C451');
+  }
+  const core = breathe ? `<g class="breathe">${body}${face}</g>` : body + face;
+  return `<svg width="${size}" height="${size}" viewBox="0 0 120 120" style="display:block;overflow:visible;flex:none" aria-hidden="true">${ground}${core}${over}</svg>`;
+}
+const puck = (mood, v2 = true, hover = false) => `<div class="puck${v2 ? ' v2' : ''}${hover ? ' hover' : ''}">${pet(v2 ? 40 : 36, mood, v2)}</div>`;
+const cover = (s, r) => `<svg width="${s}" height="${s}" viewBox="0 0 100 100" class="cover" style="border-radius:${r}px" aria-hidden="true">
+  <rect width="100" height="100" fill="url(#sky)"/><path d="M0 64 L18 58 L34 66 L52 60 L70 68 L100 62 V100 H0Z" fill="#1E2226"/>
+  <rect x="22" y="58.6" width="60" height="1.2" fill="#FF9A5A"/><path d="M50 30 l9 5.2 v10.4 l-9 5.2 l-9 -5.2 v-10.4z" fill="none" stroke="rgba(255,255,255,.75)" stroke-width="1"/>
+  <rect x="52" y="54" width="2.2" height="7" fill="#E5562E"/></svg>`;
+const bars = (rest = false) => `<div class="bars${rest ? ' rest' : ''}">${(rest ? [3, 3, 3] : [8, 14, 10]).map(h => `<i style="height:${h}px"></i>`).join('')}</div>`;
+const TRACK = { t: 'Runaway', a: 'Big Wild', el: '1:05', rem: '−1:59', p: 35.3 };
+const LONG = { t: 'Midnight City (Eric Prydz Private Remix) [Remastered]', a: 'M83', el: '2:23', rem: '−4:40', p: 34 };
+const chip = (tr = TRACK) => `<div class="wchip row">${cover(24, 4)}<div class="cut" style="max-width:150px"><b>${tr.t}</b> <span>· ${tr.a}</span></div>${bars()}</div>`;
+const slot = (label, inner, style = '') => `<div><div class="lbl">${label}</div><div class="desk" style="${style}">${inner}</div></div>`;
+const shadow = (k) => `0 ${lerp(4, 16, k).toFixed(1)}px ${lerp(14, 40, k).toFixed(1)}px rgba(0,0,0,${lerp(.18, dark ? .5 : .2, k).toFixed(3)})`;
+
+/* ---------- Pet sheets ---------- */
+const MOODS = [['sleepy', 'Asleep'], ['idle', 'Idle'], ['music', 'Listening'], ['wide', 'Wide awake'], ['celebrate', 'Celebrating']];
+const petRow = (v2, y, label, zoom = 1) => `<div class="abs rowlbl" style="left:24px;top:${y}px">${label}</div>` +
+  MOODS.map(([m, n], i) => `<div class="abs pcell" style="left:${12 + i * 116}px;top:${y + 26}px"><div style="zoom:${zoom}">${puck(m, v2)}</div><div class="plbl">${n}</div></div>`).join('');
+const actual = petRow(false, 62, 'Today · 36 in the puck') + petRow(true, 232, 'Proposed · 40 in the puck');
+const zoomed = petRow(false, 24, 'Today, at 2×', 2) + petRow(true, 208, 'Proposed, at 2×', 2);
+
+/* ---------- The bar ---------- */
+// kind: song | long | paused | awake. side: where Chippi sits, the puck's end ('right' for a puck on the right half).
+function barInner(kind, side) {
+  const song = kind !== 'awake';
+  const lead = song ? `<div class="bcover">${cover(34, 0)}</div>` : `<div class="bglyph">${ic('coffee', 16)}</div>`;
+  const tr = kind === 'long' ? LONG : TRACK;
+  const [t, a] = song ? [tr.t, tr.a] : ['1 hr left', 'Keep awake'];
+  const txt = `<div class="txt"><div class="bt${kind === 'long' ? ' fade' : ''}">${t}</div><div class="ba">${a}</div></div>`;
+  // Paused: a pause mark in tertiary; three flat bars read as a "more" button.
+  const eq = !song ? '' : kind === 'paused' ? `<span style="color:var(--t3fix);display:grid;flex:none">${gl('pause', 14)}</span>` : bars();
+  return side === 'right'
+    ? `<div class="bar-in" style="padding-left:8px">${lead}${txt}${eq}<span class="pslot"></span></div>`
+    : `<div class="bar-in" style="padding-right:${song ? 18 : 22}px"><span class="pslot"></span>${lead}${txt}${eq}</div>`;
+}
+// One width for every bar, whatever it holds: a short title, a long one (it scrolls), Keep awake, a timer.
+const BAR_W = 256;
+const barWidth = () => BAR_W;
+// A bar (or a bar mid-unfold: w from 50 to its full width), anchored at Chippi's end.
+function barAt(kind, side, mood, { t = 1, badge = false } = {}) {
+  const W = barWidth(kind, side), e = ease(t), w = lerp(50, W, e), x = side === 'right' ? W - w : 0;
+  const clip = side === 'right' ? `inset(0 0 0 ${x}px round 25px)` : `inset(0 ${W - w}px 0 0 round 25px)`;
+  const petX = side === 'right' ? W - 25 : 25;
+  return `<div style="position:relative;width:${W}px;height:50px">
+    <div class="mshape" style="left:${x}px;top:0;width:${w}px;height:50px;border-radius:25px;box-shadow:${shadow(0)}"></div>
+    <div class="abs" style="left:0;top:0;opacity:${clamp(2 * t - 1)};clip-path:${clip}">${barInner(kind, side)}</div>
+    <div class="mpet" style="left:${petX}px;top:25px">${pet(40, mood)}</div>
+    ${badge ? `<div class="badge" style="left:${petX + 7}px;top:32px">${ic('micoff', 11)}</div>` : ''}</div>`;
+}
+const onRight = (html, y, W) => `<div class="abs" style="right:24px;top:${y}px">${html}</div>`;
+// The 50 puck, its badge inside its 50 × 50 square.
+const puckBadge = `<div style="position:relative;width:50px;height:50px">${puck('idle')}<div class="badge" style="left:32px;top:32px">${ic('micoff', 11)}</div></div>`;
+const states = [
+  ['Nothing live', puck('sleepy')],
+  ['Mic muted, nothing else live', puckBadge],
+  ['A song', barAt('song', 'right', 'music')],
+  ['A long title, scrolling', barAt('long', 'right', 'music')],
+  ['Paused (folds after 10s)', barAt('paused', 'right', 'idle')],
+  ['Keep awake', barAt('awake', 'right', 'wide')],
+  ['A song, mic muted', barAt('song', 'right', 'music', { badge: true })],
+].map(([name, html], i) => `<div class="abs wlbl" style="left:24px;top:${22 + i * 62 + 17}px">${name}</div>` + onRight(html, 22 + i * 62)).join('');
+const compare = `<div class="abs wlbl" style="left:24px;top:22px"><b>Today:</b> a chip opens beside the puck</div>
+  <div class="abs row" style="right:24px;top:48px;gap:6px">${chip()}${puck('music', false)}</div>
+  <div class="abs wlbl" style="left:24px;top:136px"><b>Proposed:</b> the puck is the bar</div>
+  <div class="abs" style="right:24px;top:162px">${barAt('song', 'right', 'music')}</div>
+  <div class="abs wlbl" style="left:24px;top:250px"><b>Proposed, on the left of the screen:</b> Chippi stays at the edge end</div>
+  <div class="abs" style="left:24px;top:276px">${barAt('song', 'left', 'music')}</div>`;
+const unfold = [0, .25, .5, .75, 1].map((t, i) => `<div class="abs wlbl" style="left:24px;top:${22 + i * 72 + 17}px">${[0, 60, 120, 180, 240][i]} ms</div>` + onRight(barAt('song', 'right', 'music', { t }), 22 + i * 72)).join('');
+document.getElementById('barGrid').innerHTML = [
+  slot('Two sizes only: the 50 puck and the 256 × 50 bar', states, 'height:470px'),
+  slot('Today\'s chip, and the bar on either side', compare),
+  slot('Unfolding when a song starts (240ms)', unfold),
+].join('');
+
+const bandsDef = [['#15171C', '#C9C9C9', 'Dark wallpaper'], ['', '#F6F4F2', 'Mid-gray wallpaper'], ['#DAD6D0', '#4A4A4A', 'Light wallpaper']];
+const walls = bandsDef.map(([bg, fg, name], i) => `<div class="band" style="top:${i * 135}px;${bg ? `background:${bg}` : ''}">
+  <div class="bl" style="color:${fg}">${name}</div>
+  <div class="abs" style="left:24px;top:52px">${puck('sleepy')}</div>
+  <div class="abs" style="left:96px;top:52px">${barAt('song', 'left', 'music')}</div>
+  <div class="abs" style="left:520px;top:30px;font-size:11px;color:${fg};width:56px;text-align:center">Today</div>
+  <div class="abs" style="left:523px;top:52px">${puck('music', false)}</div></div>`).join('');
+document.getElementById('petGrid').innerHTML = [
+  slot('Actual size, on the gray wallpaper from your screenshot', actual),
+  slot('Twice the size, to see the drawing', zoomed),
+  slot('Proposed on three wallpapers, with today\'s Listening for reference', walls, 'background:var(--wall)'),
+].join('');
+
+/* ---------- Now Playing ---------- */
+const hdr = (src, chev = false, color = 'var(--t3fix)') => `<div class="hdr row"><span class="back">${ic('chevl', 16)}</span><span class="name">Now Playing</span>${src ? `<span class="src row" style="color:${color}">${src}${chev ? ic('chevd', 12) : ''}</span>` : ''}</div>`;
+const transport = (playing, glow = false) => `<div class="tr row"><span class="tb">${gl('skipb', 24)}</span><span class="disc${glow ? ' glow' : ''}">${gl(playing ? 'pause' : 'play', 24)}</span><span class="tb">${gl('skipf', 24)}</span></div>`;
+function npToday() {
+  const tr = TRACK;
+  return hdr('Spotify', true, 'var(--t3)') + `<div class="abs" style="left:12px;top:98px">${cover(156, 6)}</div>
+  <div class="abs" style="left:184px;top:93px;width:324px"><div style="font-size:20px;font-weight:600;line-height:26px">${tr.t}</div><div style="font-size:13px;color:var(--t2);margin-top:2px">${tr.a}</div></div>
+  <div class="abs today-tr" style="left:188px;top:216px;width:316px;height:52px"><span>${gl('skipb', 24)}</span><span class="disc glow">${gl('play', 22)}</span><span>${gl('skipf', 24)}</span></div>
+  <div class="abs row num" style="left:12px;top:276px;width:496px;height:18px;font-size:11px;color:var(--t3)"><span style="width:36px">${tr.el}</span><div class="obar grow"><i style="width:${tr.p}%"></i><b style="left:${tr.p}%"></b></div><span style="width:36px;text-align:right">${tr.rem}</span></div>`;
+}
+function npB(state = 'playing') {
+  const tr = state === 'long' ? LONG : TRACK, playing = state !== 'paused';
+  const art = state === 'noart'
+    ? `<div class="noart" style="left:12px;top:44px;width:156px;height:156px">${pet(76, 'music')}</div>`
+    : `<div class="abs" style="left:12px;top:44px">${cover(156, 6)}</div>`;
+  return hdr('Spotify', state === 'long') + art + `<div class="col" style="left:184px;top:44px;width:324px;height:156px"><div class="t clamp2">${tr.t}</div><div class="a cut">${tr.a}</div><div class="grow"></div>${transport(playing)}</div>
+  <div class="abs row num" style="left:12px;top:214px;width:496px;height:16px;font-size:11px;color:var(--t3fix)"><span style="width:36px">${tr.el}</span><div class="grow" style="margin:0 10px"><div class="pbar"><i style="width:${tr.p}%;background:${playing ? 'var(--acfill)' : 'var(--t3fix)'}"></i></div></div><span style="width:36px;text-align:right">${tr.rem}</span></div>`;
+}
+const npNothing = () => hdr('') + `<div class="abs" style="left:12px;top:44px;width:496px;height:304px;display:grid;place-content:center;justify-items:center;gap:8px">${pet(72, 'sleepy')}<span style="font-size:13px;color:var(--t3fix)">Nothing playing</span></div>`;
+const npDesk = (inner) => `<div class="panel" style="left:40px;top:22px"><div class="inner">${inner}</div></div>`;
+document.getElementById('npGrid').innerHTML = [
+  slot('Today: paused, as in your screenshot', npDesk(npToday())),
+  slot('Option B: playing', npDesk(npB('playing'))),
+  slot('Option B: paused', npDesk(npB('paused'))),
+  slot('Option B: no artwork', npDesk(npB('noart'))),
+  slot('Option B: a long title, two apps playing', npDesk(npB('long'))),
+  slot('Nothing playing', npDesk(npNothing())),
+].join('');
+
+/* ---------- The morph ---------- */
+const PW = 520, PH = 360, GAP = 8, M = 24;
+const SONG_W = barWidth('song', 'right');
+function geom(w, h, px, py) {
+  const P = { x: px, y: py, w: 50, h: 50 };
+  const left = P.x + 25 > w / 2, up = P.y + 25 > h / 2;
+  // The bar grows from the puck toward the middle; Chippi keeps the puck's place at its end.
+  const B = { x: left ? P.x + 50 - SONG_W : P.x, y: P.y, w: SONG_W, h: 50 };
+  let nx = left ? P.x + 50 - PW : P.x, ny = up ? P.y + 50 - PH : P.y;
+  nx = Math.min(Math.max(nx, GAP), w - GAP - PW); ny = Math.min(Math.max(ny, GAP), h - GAP - PH);
+  // Today (IslandGeometry.PanelOrigin): beside the puck, 20 in from its far side.
+  let tx = left ? P.x - PW : P.x + 50, ty = up ? P.y + 50 - 20 - PH : P.y + 20;
+  tx = Math.min(Math.max(tx, GAP), w - GAP - PW); ty = Math.min(Math.max(ty, GAP), h - GAP - PH);
+  return { w, h, P, B, left, N: { x: nx, y: ny, w: PW, h: PH }, T: { x: tx, y: ty, w: PW, h: PH } };
+}
+const lerpR = (a, b, t) => ({ x: lerp(a.x, b.x, t), y: lerp(a.y, b.y, t), w: lerp(a.w, b.w, t), h: lerp(a.h, b.h, t) });
+const grow = (R, d) => ({ x: R.x - d, y: R.y - d, w: R.w + 2 * d, h: R.h + 2 * d });
+const inset = (S, R) => [S.y - R.y, R.x + R.w - (S.x + S.w), R.y + R.h - (S.y + S.h), S.x - R.x].map(v => Math.max(0, v).toFixed(1) + 'px').join(' ');
+
+// Proposed: one shape that is the puck, the bar or the panel. kind: rest | unfold | fold | open | close.
+function frameNew(kind, t, G, music, hover = false) {
+  // Hover brightens the rim; the size never changes.
+  const e = ease(t), R = music ? G.B : G.P, Rh = R, r0 = 25;
+  const f = { shape: Rh, r: r0, bar: music ? 1 : 0, page: 0, pet: 1, ps: 1, k: 0, hover: hover && kind === 'rest' };
+  if (kind === 'unfold') Object.assign(f, { shape: lerpR(G.P, G.B, e), r: 25, bar: clamp(2 * t - 1) });
+  if (kind === 'fold') Object.assign(f, { shape: lerpR(G.B, G.P, e), r: 25, bar: 1 - clamp(2 * t) });
+  if (kind === 'open') { const q = clamp(t / .45); Object.assign(f, { shape: lerpR(Rh, G.N, e), r: lerp(r0, 8, e), bar: music ? 1 - clamp(t / .25) : 0, page: clamp(2 * t - 1), pet: 1 - q, ps: 1 - .3 * q, k: e }); }
+  if (kind === 'close') { const q = clamp((t - .45) / .55); Object.assign(f, { shape: lerpR(G.N, R, e), r: lerp(8, 25, e), bar: music ? clamp((t - .55) / .45) : 0, page: 1 - clamp(2 * t), pet: q, ps: .7 + .3 * q, k: 1 - e }); }
+  return f;
+}
+function deskNew(G, f, music, mood, page) {
+  const S = f.shape;
+  let html = `<div class="mshape" style="left:${S.x}px;top:${S.y}px;width:${S.w}px;height:${S.h}px;border-radius:${f.r}px;box-shadow:${shadow(f.k)}${f.hover ? ';border-color:var(--pborderh)' : ''}"></div>`;
+  if (music && f.bar > 0) html += `<div class="mbarc" style="left:${G.B.x}px;top:${G.B.y}px;opacity:${f.bar};clip-path:inset(${inset(S, G.B)} round ${f.r}px)">${barInner('song', G.left ? 'right' : 'left')}</div>`;
+  if (f.pet > 0) html += `<div class="mpet" style="left:${G.P.x + 25}px;top:${G.P.y + 25}px;opacity:${f.pet};transform:scale(${f.ps})">${pet(40, mood)}</div>`;
+  if (f.page > 0) html += `<div class="mcontent" style="left:${G.N.x}px;top:${G.N.y}px;opacity:${f.page};clip-path:inset(${inset(S, G.N)} round ${f.r}px);${f.page >= 1 ? '' : 'pointer-events:none'}">${page}</div>`;
+  return html;
+}
+// Today: the puck stays on top, a chip beside it, and the panel grows beside the puck.
+function frameToday(kind, t, G, music, hover = false) {
+  const e = ease(t), f = { rect: null, r: 8, c: 0, k: 0, chip: 0, hover };
+  if (kind === 'rest') return { ...f, chip: music ? 1 : 0 };
+  if (kind === 'open') Object.assign(f, { rect: lerpR(G.P, G.T, e), r: lerp(25, 8, e), c: clamp(2 * t - 1), k: e, hover: true });
+  else Object.assign(f, { rect: t >= 1 ? null : lerpR(G.T, G.P, e), r: lerp(8, 25, e), c: 1 - clamp(2 * t), k: 1 - e });
+  return f;
+}
+function deskToday(G, f, mood, page) {
+  const { P, w } = G, N = G.T;
+  const chipPos = G.left ? `right:${w - P.x + 6}px` : `left:${P.x + 56}px`;
+  let html = `<div class="mchip" style="${chipPos};top:${P.y + 7}px;opacity:${f.chip};${f.chip ? '' : 'pointer-events:none'}">${chip()}</div>`;
+  if (f.rect) {
+    const R = f.rect;
+    html += `<div class="mshape" style="left:${R.x}px;top:${R.y}px;width:${R.w}px;height:${R.h}px;border-radius:${f.r}px;box-shadow:${shadow(f.k)}"></div>`;
+    html += `<div class="mcontent" style="left:${N.x}px;top:${N.y}px;opacity:${f.c};clip-path:inset(${inset(R, N)} round ${f.r}px);${f.c >= 1 ? '' : 'pointer-events:none'}">${page}</div>`;
+  }
+  return html + `<div class="mpuck" style="left:${P.x}px;top:${P.y}px">${puck(mood, false, f.hover)}</div>`;
+}
+const PAGE = npB('playing');
+const scaled = (G, inner, s, cls = '') => `<div class="fr ${cls}"><div class="frs" style="transform:scale(${s})"><div class="mdesk" style="width:${G.w}px;height:${G.h}px;border-radius:0">${inner}</div></div></div>`;
+
+const G0 = geom(600, 420, 600 - M - 50, 420 - M - 50);
+const ts = [0, .25, .5, .75, 1];
+const strip = (title, ms, render) => `<div class="lbl">${title}</div><div class="strip">${ts.map((t, i) => `<div>${scaled(G0, render(t), .38)}<div class="fcap">${ms[i]} ms</div></div>`).join('')}</div>`;
+const corners = [['Bottom right (the default)', 1200 - M - 50, 700 - M - 50], ['Bottom left', M, 700 - M - 50], ['Top right', 1200 - M - 50, M], ['Top left', M, M], ['Left edge, away from a corner', M, 290]];
+document.getElementById('strips').innerHTML =
+  strip('Today: the panel grows beside the puck, and the puck and chip stay', [0, 55, 110, 165, 220], t => deskToday(G0, frameToday('open', t, G0, true), 'music', PAGE)) +
+  strip('Proposed: the bar becomes the panel (open, 220ms)', [0, 55, 110, 165, 220], t => deskNew(G0, frameNew('open', t, G0, true, true), true, 'music', PAGE)) +
+  strip('Proposed: the panel folds back into the bar (close, 160ms)', [0, 40, 80, 120, 160], t => deskNew(G0, frameNew('close', t, G0, true), true, 'music', PAGE)) +
+  `<div class="lbl">Any corner: the widget's outer edges are the panel's (dashed: where the puck was), on a 1200 × 700 screen</div><div class="strip">` +
+  corners.map(([name, x, y]) => { const G = geom(1200, 700, x, y);
+    return `<div>${scaled(G, deskNew(G, frameNew('open', 1, G, false), false, 'idle', PAGE) + `<div class="pspot" style="left:${x}px;top:${y}px"></div>`, .19, 'c')}<div class="fcap">${name}</div></div>`; }).join('') + `</div>`;
+
+/* ---------- Live demo ---------- */
+const live = document.getElementById('live');
+let mode = 'new', music = true, state = 'closed', slow = 1, hovered = false, raf = 0;
+const restMood = () => music ? 'music' : hovered ? 'idle' : 'sleepy';
+function draw(kind, t) {
+  live.innerHTML = mode === 'today'
+    ? deskToday(G0, frameToday(kind, t, G0, music, hovered), restMood(), PAGE)
+    : deskNew(G0, frameNew(kind, t, G0, music, hovered && kind === 'rest' || kind === 'open'), music, kind === 'rest' ? restMood() : music ? 'music' : 'idle', PAGE);
+}
+function animate(kind, ms, done) {
+  state = 'moving';
+  const dur = ms * slow, t0 = performance.now(), reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const step = (now) => {
+    const t = reduce ? 1 : Math.min(1, (now - t0) / dur);
+    draw(kind, t);
+    if (t < 1) { raf = requestAnimationFrame(step); return; }
+    done();
+  };
+  cancelAnimationFrame(raf);
+  raf = requestAnimationFrame(step);
+}
+const open = () => animate('open', 220, () => { state = 'open'; });
+const close = () => animate('close', 160, () => { state = 'closed'; hovered = false; draw('rest', 0); });
+live.addEventListener('click', (e) => {
+  const onWidget = e.target.closest(mode === 'today' ? '.mpuck, .mchip' : '.mshape');
+  if (state === 'closed' && onWidget) { open(); return; }
+  if (state !== 'open') return;
+  if (mode === 'today' && e.target.closest('.mpuck')) { close(); return; }
+  if (!e.target.closest('.mcontent')) close();
+});
+live.addEventListener('mouseover', (e) => { if (state === 'closed' && e.target.closest('.mpuck, .mshape') && !hovered) { hovered = true; draw('rest', 0); } });
+live.addEventListener('mouseout', (e) => { if (state === 'closed' && hovered && !e.relatedTarget?.closest?.('.mpuck, .mshape')) { hovered = false; draw('rest', 0); } });
+addEventListener('keydown', (e) => { if (e.key === 'Escape' && state === 'open') close(); });
+const setMode = (m) => { mode = m; document.getElementById('mToday').classList.toggle('on', m === 'today'); document.getElementById('mNew').classList.toggle('on', m === 'new'); cancelAnimationFrame(raf); state = 'closed'; hovered = false; draw('rest', 0); };
+document.getElementById('mToday').onclick = () => setMode('today');
+document.getElementById('mNew').onclick = () => setMode('new');
+const musicBtn = document.getElementById('music');
+musicBtn.onclick = () => {
+  if (state !== 'closed') return;
+  music = !music; musicBtn.setAttribute('aria-pressed', String(music));
+  if (mode === 'today') { draw('rest', 0); return; }
+  // Unfold on a song starting; fold after it stops (the 10s pause grace is skipped here).
+  if (music) animate('unfold', 240, () => { state = 'closed'; draw('rest', 0); });
+  else { music = true; animate('fold', 180, () => { music = false; state = 'closed'; draw('rest', 0); }); }
+};
+const slowBtn = document.getElementById('slow');
+slowBtn.onclick = () => { slow = slow === 1 ? 5 : 1; slowBtn.setAttribute('aria-pressed', String(slow === 5)); };
+draw('rest', 0);
+
+if (params.has('selftest')) addEventListener('load', async () => {
+  const wait = (ms) => new Promise(r => setTimeout(r, ms)), out = {};
+  // Headless Edge doesn't run animation frames under virtual time; drive them from a timer.
+  window.requestAnimationFrame = (cb) => setTimeout(() => cb(performance.now()), 16);
+  window.cancelAnimationFrame = (id) => clearTimeout(id);
+  const snap = () => ({ state, music, shape: live.querySelector('.mshape')?.style.width, bar: !!live.querySelector('.mbarc'), page: live.querySelector('.mcontent')?.style.opacity ?? null, puck: !!live.querySelector('.mpuck') });
+  out.rest = snap();
+  live.querySelector('.mshape').click(); await wait(500); out.open = snap();
+  dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })); await wait(500); out.closed = snap();
+  musicBtn.click(); await wait(500); out.folded = snap();
+  musicBtn.click(); await wait(500); out.unfolded = snap();
+  setMode('today'); out.today = snap();
+  live.querySelector('.mpuck').click(); await wait(500); out.todayOpen = snap();
+  document.body.dataset.selftest = JSON.stringify(out);
+});
+addEventListener('load', () => { document.body.dataset.size = `${Math.ceil(document.body.scrollWidth)},${Math.ceil(document.body.scrollHeight) + 8}`; });
+</script>
+</body></html>

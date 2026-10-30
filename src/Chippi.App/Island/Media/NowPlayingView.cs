@@ -8,7 +8,6 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Documents;
 using System.Windows.Media;
-using System.Windows.Shapes;
 using System.Windows.Threading;
 using Chippi.App.Pet;
 using Chippi.Core.Config;
@@ -18,10 +17,11 @@ using Chippi.UI.Controls;
 namespace Chippi.App.Island.Media;
 
 /// <summary>
-/// The Now Playing page (DESIGN.md §5 Island, revised 2026-10-29), after Apple Music's widget: the
-/// header names the app (a menu of apps when two or more have sessions), then 156px artwork beside
-/// the title, artist and previous / play-pause / next, each disabled when the app doesn't offer it,
-/// with the progress under them. No artwork shows ChippiPet in its place; nothing playing, ChippiPet asleep.
+/// The Now Playing page (DESIGN.md §5 Island, revised 2026-10-30), after Apple Music's widget: the
+/// header names the app (a menu of apps when two or more have sessions), then 156px artwork at the
+/// top of the body beside the title, artist and previous / play-pause / next, each disabled when the
+/// app doesn't offer it, with the progress under them. No artwork shows ChippiPet in its place;
+/// nothing playing, ChippiPet asleep.
 /// </summary>
 internal sealed class NowPlayingView : UserControl
 {
@@ -48,7 +48,7 @@ internal sealed class NowPlayingView : UserControl
     private readonly Grid _timeline = new() { Margin = new Thickness(0, 22, 0, 0) };
     private readonly Button _previous;
     private readonly Button _playPause;
-    private readonly LucideIcon _playGlyph = new() { Data = LucideIcons.Play, Size = 22, Filled = true };
+    private readonly LucideIcon _playGlyph = new() { Data = LucideIcons.Play, Size = 24, Filled = true };
     private readonly Button _next;
     private readonly StackPanel _player;
     private readonly ChippiPet _asleep = new() { Size = 72, Mood = PetMood.Sleepy, IsDecorative = true, HorizontalAlignment = HorizontalAlignment.Center };
@@ -77,22 +77,23 @@ internal sealed class NowPlayingView : UserControl
             header.Children.Insert(0, IslandPanelWindow.BackButton(back));
 
         // The card: artwork, then the title and artist over the transport; the progress under both.
-        // Optically level with the art: the title's capitals with its top, the solid glyphs with its bottom.
+        // Level with the art: the title's capitals with its top, the play disc with its bottom.
         RenderOptions.SetBitmapScalingMode(_art, BitmapScalingMode.HighQuality);
         _art.SetResourceReference(Border.BorderBrushProperty, "IslandBorderBrush");
-        _artist.SetResourceReference(TextBlock.ForegroundProperty, "IslandTextSecondaryBrush");
+        _artist.SetResourceReference(TextBlock.ForegroundProperty, "IslandTextTertiaryBrush");
         _title.SizeChanged += (_, _) => Tip(_title);
         _artist.SizeChanged += (_, _) => Tip(_artist);
         _previous = Transport(Glyph(LucideIcons.SkipBack, 24), 48, "Previous track", () => _media.PreviousAsync());
         _playPause = Transport(_playGlyph, 52, "Play", () => _media.PlayPauseAsync());
         _next = Transport(Glyph(LucideIcons.SkipForward, 24), 48, "Next track", () => _media.NextAsync());
-        // The play disc: the accent fill, an on-accent glyph and a violet glow.
+        // The play disc: the accent fill and an on-accent glyph, with no shadow (the No-Glow Rule).
         _playPause.SetResourceReference(StyleProperty, "IslandPlayDiscStyle");
         _playPause.Width = _playPause.Height = 52;
+        _playPause.Margin = new Thickness(8, 0, 8, 0);
         _playGlyph.SetResourceReference(LucideIcon.BrushProperty, "IslandOnAccentBrush");
-        _playPause.SetResourceReference(UIElement.EffectProperty, "IslandPlayGlow");
-        var transport = new UniformGrid { Rows = 1, Columns = 3, Height = 52, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(4, 0, 4, -14),
-            Children = { _previous, _playPause, _next } };
+        // Grouped 8 apart, the previous glyph on the title's left edge (12 in from its 48 button).
+        var transport = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Bottom,
+            Margin = new Thickness(-12, 0, 0, 0), Children = { _previous, _playPause, _next } };
         var meta = new Grid { Children = { new StackPanel { Margin = new Thickness(0, -6, 0, 0), Children = { _title, _artist } }, transport } };
         Grid.SetColumn(meta, 2);
         var row = new Grid { Height = Art, ColumnDefinitions = { new() { Width = new GridLength(Art) }, new() { Width = new GridLength(16) }, new() }, Children = { _art, meta } };
@@ -104,19 +105,13 @@ internal sealed class NowPlayingView : UserControl
         }
         _progress.ColumnDefinitions.Add(new ColumnDefinition());
         _progress.ColumnDefinitions.Add(new ColumnDefinition());
+        // A bar, not a slider: the page shows the position but doesn't seek, so it has no thumb. The track
+        // is the faint empty-bar fill, so the tertiary fill of a paused track still shows where it is.
         var bar = new Border { Height = 4, VerticalAlignment = VerticalAlignment.Center, CornerRadius = new CornerRadius(2) };
-        bar.SetResourceReference(Border.BackgroundProperty, "IslandSliderTrackBrush");
+        bar.SetResourceReference(Border.BackgroundProperty, "IslandTrackBrush");
         Grid.SetColumnSpan(bar, 2);
         _progress.Children.Add(bar);
         _progress.Children.Add(_fill);
-        // The slider's ringed thumb, at the end of the fill (the page shows the position; it doesn't seek).
-        var thumbDot = new Ellipse { Width = 10, Height = 10, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
-        thumbDot.SetResourceReference(Shape.FillProperty, "IslandAccentBrush");
-        var thumbRing = new Ellipse { Width = 18, Height = 18 };
-        thumbRing.SetResourceReference(UIElement.EffectProperty, "IslandThumbShadow");
-        thumbRing.SetResourceReference(Shape.FillProperty, "IslandThumbBrush");
-        var thumb = new Grid { Width = 18, Height = 18, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, -9, 0), IsHitTestVisible = false, Children = { thumbRing, thumbDot } };
-        _progress.Children.Add(thumb);
         _timeline.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         _timeline.ColumnDefinitions.Add(new ColumnDefinition());
         _timeline.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -125,7 +120,8 @@ internal sealed class NowPlayingView : UserControl
         _timeline.Children.Add(_elapsed);
         _timeline.Children.Add(_progress);
         _timeline.Children.Add(_remaining);
-        _player = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Children = { row, _timeline } };
+        // From the top of the body, like the approved mock (Travis, 2026-10-30).
+        _player = new StackPanel { VerticalAlignment = VerticalAlignment.Top, Children = { row, _timeline } };
 
         var nothing = new TextBlock { Text = "Nothing playing", FontSize = 12, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 8, 0, 0) };
         nothing.SetResourceReference(TextBlock.ForegroundProperty, "IslandTextTertiaryBrush");

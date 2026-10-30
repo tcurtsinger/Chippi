@@ -55,6 +55,25 @@ public sealed class CompactOtherPageTests
     });
 
     [Fact]
+    public void Now_playing_starts_at_the_top_with_the_transport_grouped_and_no_glow() => WpfTestThread.Run(() =>
+    {
+        var view = new NowPlayingView(new IslandPanelTests.FakeMedia { Sessions = [new("spotify", "Spotify", "Weekend Mix", "Various Artists", false, true, true, true, true, true,
+            TimeSpan.FromSeconds(72), TimeSpan.FromSeconds(232), DateTimeOffset.Now, null)] });
+        Fit(view, 496, 336);
+        double Left(FrameworkElement e) => e.TranslatePoint(new Point(), view).X;
+        double Bottom(FrameworkElement e) => e.TranslatePoint(new Point(0, e.ActualHeight), view).Y;
+        var art = Find<Border>(view).Single(b => b.Width == 156);
+        Assert.Equal(Chippi.Core.Modules.IslandPage.HeaderHeight + Chippi.Core.Modules.IslandPage.Gap, art.TranslatePoint(new Point(), view).Y, 1); // the body's top
+        var transport = Find<Button>(view).Where(b => b.Content is Chippi.UI.Controls.LucideIcon).ToArray();
+        Assert.Equal(48 + 8, Left(transport[1]) - Left(transport[0]), 1); // grouped 8 apart, not spread
+        Assert.Equal(52 + 8, Left(transport[2]) - Left(transport[1]), 1);
+        Assert.Equal(156 + 16 - 12, Left(transport[0]), 1); // the previous glyph on the title's left edge
+        Assert.Equal(Bottom(art), Bottom(transport[1]), 1); // the play disc's bottom on the art's
+        Assert.All(transport, b => Assert.Null(b.Effect)); // no glow
+        Assert.Empty(Find<System.Windows.Shapes.Ellipse>(view)); // a bar, not a slider: no thumb
+    });
+
+    [Fact]
     public void The_source_opens_a_choice_only_when_two_apps_have_sessions() => WpfTestThread.Run(() =>
     {
         static MediaTrack Track(string id) => new(id, id, "Title", "Artist", true, true, true, true, true, true, TimeSpan.Zero, TimeSpan.FromMinutes(3), DateTimeOffset.Now, null);
