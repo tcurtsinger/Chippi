@@ -28,8 +28,6 @@ internal sealed class IslandPetPage : UserControl
     private readonly ShellContext _shell;
     private readonly Card _tiles = new();
     private readonly DecorativeHost _preview = new() { HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(16) };
-    private readonly ComboBox _left;
-    private readonly ComboBox _right;
     private string _tileKeys = "";
 
     public IslandPetPage(ShellContext shell)
@@ -47,19 +45,6 @@ internal sealed class IslandPetPage : UserControl
         tiles.Children.Add(_tiles);
         tiles.Children.Add(preview);
         page.Children.Add(tiles);
-
-        page.Children.Add(SettingsUi.Section("Round buttons"));
-        _left = ButtonPicker("Left button");
-        _right = ButtonPicker("Right button");
-        _left.SelectionChanged += (_, _) => SaveButton(_left, (s, key) => s.IslandLeftButton = key);
-        _right.SelectionChanged += (_, _) => SaveButton(_right, (s, key) => s.IslandRightButton = key);
-        var live = SettingsUi.Switch(app.IslandLiveButton);
-        AutomationProperties.SetName(live, "Live button");
-        SettingsUi.OnSwitched(live, on => Save(s => s.IslandLiveButton = on));
-        page.Children.Add(SettingsUi.Group(
-            SettingsUi.Row("Left button", "", _left),
-            SettingsUi.Row("Right button", "", _right),
-            SettingsUi.Row("Live button", "", live)));
 
         page.Children.Add(SettingsUi.Section("Chippi"));
         page.Children.Add(SettingsUi.Group(ColorRow(app), MotionRow(app)));
@@ -179,7 +164,7 @@ internal sealed class IslandPetPage : UserControl
 
     private IslandLayout Layout() => IslandLayout.From(SettingsUi.ReadApp(_shell.Config));
 
-    /// <summary>A row per tile in the island's order, with its grip and its switch; then the button pickers and preview.</summary>
+    /// <summary>A row per tile in the island's order, with its grip and its switch; then the preview.</summary>
     private void RefreshTiles()
     {
         var all = AllTiles();
@@ -193,8 +178,6 @@ internal sealed class IslandPetPage : UserControl
             for (int i = 0; i < order.Count; i++)
                 _tiles.Children.Add(TileRow(all.First(t => t.Key == order[i]), i, order, !layout.Hidden.Contains(order[i])));
         }
-        FillButtonPicker(_left, all, layout.Left, IslandOrbit.Left);
-        FillButtonPicker(_right, all, layout.Right, IslandOrbit.Right);
         RefreshPreview();
     }
 
@@ -251,49 +234,14 @@ internal sealed class IslandPetPage : UserControl
 
     // ----- Round buttons -----
 
-    private static ComboBox ButtonPicker(string name)
-    {
-        var combo = SettingsUi.Styled(new ComboBox { MinWidth = 180, HorizontalAlignment = HorizontalAlignment.Left }, "HopperComboBoxStyle");
-        AutomationProperties.SetName(combo, name);
-        return combo;
-    }
-
-    /// <summary>None and every tile, with the saved choice selected (or the tile whose feature asks for that side).</summary>
-    private static void FillButtonPicker(ComboBox combo, IReadOnlyList<Tile> tiles, string? choice, IslandOrbit side)
-    {
-        string selected = choice ?? tiles.FirstOrDefault(t => t.Orbit == side)?.Key ?? "";
-        var items = new[] { new ComboBoxItem { Content = "None", Tag = "" } }
-            .Concat(tiles.Select(t => new ComboBoxItem { Content = t.Name, Tag = t.Key })).ToList();
-        if (combo.Items.Count == items.Count && combo.Items.OfType<ComboBoxItem>().Select(i => (string)i.Tag).SequenceEqual(items.Select(i => (string)i.Tag)))
-        {
-            if ((combo.SelectedItem as ComboBoxItem)?.Tag as string != selected)
-                combo.SelectedItem = combo.Items.OfType<ComboBoxItem>().FirstOrDefault(i => (string)i.Tag == selected);
-            return;
-        }
-        combo.Tag = "filling";
-        combo.Items.Clear();
-        foreach (var item in items)
-            combo.Items.Add(item);
-        combo.SelectedItem = combo.Items.OfType<ComboBoxItem>().FirstOrDefault(i => (string)i.Tag == selected);
-        combo.Tag = null;
-    }
-
-    private void SaveButton(ComboBox combo, Action<AppSettings, string> set)
-    {
-        if (combo.Tag is "filling" || combo.SelectedItem is not ComboBoxItem { Tag: string key })
-            return;
-        Save(s => set(s, key));
-    }
-
     // ----- Preview -----
 
     /// <summary>
-    /// A small picture of the open island on the top edge: the shown tiles three across, the round
-    /// buttons in their pairs beside it, and the live button below.
+    /// A small picture of the open island on the top edge: the shown tiles three across.
     /// </summary>
     private void RefreshPreview()
     {
-        const double width = 260, inset = 6, gap = 4, header = 12, button = 20, buttonGap = 6, room = 30;
+        const double width = 260, inset = 6, gap = 4, header = 12, room = 0;
         var all = AllTiles();
         var layout = Layout();
         var shown = layout.Shown(all.Select(t => t.Key)).Select(k => all.First(t => t.Key == k)).ToList();
@@ -301,7 +249,7 @@ internal sealed class IslandPetPage : UserControl
         int rows = Math.Max(1, (shown.Count + columns - 1) / columns);
         const double height = 180;
         double tile = (152 - (rows - 1) * gap) / rows;
-        var canvas = new Canvas { Width = width + 2 * room, Height = height + (layout.Live ? buttonGap + button : 0) };
+        var canvas = new Canvas { Width = width + 2 * room, Height = height };
 
         var shape = new Border { Width = width, Height = height, CornerRadius = new CornerRadius(0, 0, 12, 12), BorderThickness = new Thickness(1, 0, 1, 1) };
         shape.SetResourceReference(Border.BackgroundProperty, "IslandBrush");
@@ -321,30 +269,6 @@ internal sealed class IslandPetPage : UserControl
         Canvas.SetLeft(shape, room);
         canvas.Children.Add(shape);
 
-        bool Exists(string key) => all.Any(t => t.Key == key);
-        Geometry? Glyph(string? key) => key is null ? null : all.FirstOrDefault(t => t.Key == key)?.Icon;
-        void Round(Geometry? glyph, double x, double y)
-        {
-            if (glyph is null)
-                return;
-            var icon = new LucideIcon { Data = glyph, Size = 12, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
-            icon.SetResourceReference(LucideIcon.BrushProperty, "IslandTextBrush");
-            var circle = new Border { Width = button, Height = button, CornerRadius = new CornerRadius(button / 2), BorderThickness = new Thickness(1), Child = icon };
-            circle.SetResourceReference(Border.BackgroundProperty, "IslandBrush");
-            circle.SetResourceReference(Border.BorderBrushProperty, "IslandTabBorderBrush");
-            Canvas.SetLeft(circle, x);
-            Canvas.SetTop(circle, y);
-            canvas.Children.Add(circle);
-        }
-        // Each pair centered on the island's height, as on screen.
-        double top = Math.Max(4, height / 2 - (2 * button + 4) / 2);
-        double left = room - buttonGap - button, right = room + width + buttonGap;
-        Round(LucideIcons.LayoutGrid, left, top);
-        Round(Glyph(IslandLayout.Button(layout.Left, Exists, all.FirstOrDefault(t => t.Orbit == IslandOrbit.Left)?.Key)), left, top + button + 4);
-        Round(LucideIcons.Settings, right, top);
-        Round(Glyph(IslandLayout.Button(layout.Right, Exists, all.FirstOrDefault(t => t.Orbit == IslandOrbit.Right)?.Key)), right, top + button + 4);
-        if (layout.Live)
-            Round(LucideIcons.Music, room + width / 2 - button / 2, height + buttonGap);
         _preview.Child = canvas;
     }
 

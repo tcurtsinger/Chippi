@@ -15,24 +15,6 @@ public enum ScreenEdge
     Bottom,
 }
 
-/// <summary>The round buttons around the open island (DESIGN.md §5 Island).</summary>
-public enum OrbitSlot
-{
-    /// <summary>All features on a page; Back to the remembered page on the grid.</summary>
-    Back,
-
-    /// <summary>The tile with <c>IslandOrbit.Left</c> (Keep awake).</summary>
-    Left,
-
-    Settings,
-
-    /// <summary>The tile with <c>IslandOrbit.Right</c> (App volume).</summary>
-    Right,
-
-    /// <summary>The live activity's tile, below the island.</summary>
-    Live,
-}
-
 /// <summary>
 /// Where the island's tab and panel go (DESIGN.md §5 Island), in a monitor's physical pixels. Pure
 /// arithmetic, so the snapping rules are unit-tested: the tab docks on the work area's Top, Left or
@@ -154,84 +136,6 @@ public static class IslandGeometry
         else
             y = Math.Clamp(y, work.Top + gap, Math.Max(work.Top + gap, work.Bottom - gap - panel.Height));
         return new Point(x, y);
-    }
-
-    /// <summary>An orbit button's diameter (DIPs).</summary>
-    public const double OrbitSize = 32;
-
-    /// <summary>The gap between the shape and its orbit buttons (DIPs).</summary>
-    public const double OrbitGap = 10;
-
-    /// <summary>From one orbit button's top to the next one's: 32 plus the 6px between a pair (DIPs).</summary>
-    public const double OrbitStep = 38;
-
-    /// <summary>
-    /// The orbit buttons around an open shape (DIPs, any origin), DESIGN.md §5 Island: two pairs 10px
-    /// off the shape, beside it along its edge, each pair centered on it. On the top edge
-    /// <see cref="OrbitSlot.Back"/> over <see cref="OrbitSlot.Left"/> sit left of the shape and Settings
-    /// over <see cref="OrbitSlot.Right"/> right of it, never closer than 8px to its top. On a side edge
-    /// Back and Left sit side by side above it and Settings and Right below it. Each pair keeps both
-    /// places, so nothing moves when a button appears. <see cref="OrbitSlot.Live"/> is centered on the
-    /// far side: below the shape on top, beside it on a side.
-    /// </summary>
-    public static IReadOnlyList<(OrbitSlot Slot, Rect Rect)> OrbitLayout(IslandEdge edge, Rect shape, IReadOnlyCollection<OrbitSlot> slots)
-    {
-        var placed = new List<(OrbitSlot, Rect)>();
-        const double pair = OrbitStep + OrbitSize; // two buttons and the 6px between them
-        void Place(OrbitSlot slot, double x, double y)
-        {
-            if (slots.Contains(slot))
-                placed.Add((slot, new Rect(x, y, OrbitSize, OrbitSize)));
-        }
-        if (edge == IslandEdge.Top)
-        {
-            double top = shape.Top + Math.Max(Gap, shape.Height / 2 - pair / 2);
-            double left = shape.Left - OrbitGap - OrbitSize, right = shape.Right + OrbitGap;
-            Place(OrbitSlot.Back, left, top);
-            Place(OrbitSlot.Left, left, top + OrbitStep);
-            Place(OrbitSlot.Settings, right, top);
-            Place(OrbitSlot.Right, right, top + OrbitStep);
-            Place(OrbitSlot.Live, shape.Left + shape.Width / 2 - OrbitSize / 2, shape.Bottom + OrbitGap);
-        }
-        else
-        {
-            double left = shape.Left + shape.Width / 2 - pair / 2;
-            double above = shape.Top - OrbitGap - OrbitSize, below = shape.Bottom + OrbitGap;
-            Place(OrbitSlot.Back, left, above);
-            Place(OrbitSlot.Left, left + OrbitStep, above);
-            Place(OrbitSlot.Settings, left, below);
-            Place(OrbitSlot.Right, left + OrbitStep, below);
-            Place(OrbitSlot.Live, edge == IslandEdge.Left ? shape.Right + OrbitGap : shape.Left - OrbitGap - OrbitSize,
-                shape.Top + shape.Height / 2 - OrbitSize / 2);
-        }
-        return placed;
-    }
-
-    /// <summary>How far the orbit buttons reach beyond a shape of <paramref name="shape"/> size on each side (DIPs).</summary>
-    public static Thickness OrbitReach(IslandEdge edge, Size shape, IReadOnlyCollection<OrbitSlot> slots)
-    {
-        var box = new Rect(shape);
-        foreach (var (_, rect) in OrbitLayout(edge, new Rect(shape), slots))
-            box.Union(rect);
-        return new Thickness(-box.Left, -box.Top, box.Right - shape.Width, box.Bottom - shape.Height);
-    }
-
-    /// <summary>
-    /// <see cref="PanelOrigin"/> for a shape whose orbit buttons reach <paramref name="reach"/> (DIPs)
-    /// beyond it: the whole interactive footprint stays 8px inside the work area along the edge.
-    /// </summary>
-    public static Point PanelOrigin(IslandEdge edge, Rect tab, Size panel, Rect work, double scale, Thickness reach)
-    {
-        var inner = new Rect(work.Left + reach.Left * scale, work.Top + reach.Top * scale,
-            Math.Max(0, work.Width - (reach.Left + reach.Right) * scale), Math.Max(0, work.Height - (reach.Top + reach.Bottom) * scale));
-        var origin = PanelOrigin(edge, tab, panel, inner, scale);
-        // The flat side stays on the edge whatever the buttons need.
-        return edge switch
-        {
-            IslandEdge.Left => new Point(tab.Left, origin.Y),
-            IslandEdge.Right => new Point(tab.Right - panel.Width, origin.Y),
-            _ => new Point(origin.X, tab.Top),
-        };
     }
 
     private static ScreenEdge Edge(IslandEdge edge) => edge switch

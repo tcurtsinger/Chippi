@@ -53,7 +53,7 @@ internal sealed class NowPlayingView : UserControl
     private readonly ChippiPet _asleep = new() { Size = 72, Mood = PetMood.Sleepy, IsDecorative = true, HorizontalAlignment = HorizontalAlignment.Center };
     private readonly StackPanel _empty;
 
-    public NowPlayingView(IMediaSessions media)
+    public NowPlayingView(IMediaSessions media, Action? back = null)
     {
         _media = media;
         SetResourceReference(ForegroundProperty, "IslandTextBrush");
@@ -72,6 +72,8 @@ internal sealed class NowPlayingView : UserControl
         _sources.PlacementTarget = _source;
         DockPanel.SetDock(_source, Dock.Right);
         var header = new DockPanel { Height = IslandPage.HeaderHeight, Margin = new Thickness(0, 0, 0, IslandPage.Gap), LastChildFill = true, Children = { _source, heading } };
+        if (back is not null)
+            header.Children.Insert(0, IslandPanelWindow.BackButton(back));
 
         // The card: artwork, then the title and artist over the transport; the progress under both.
         // Optically level with the art: the title's capitals with its top, the solid glyphs with its bottom.

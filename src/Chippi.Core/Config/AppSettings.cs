@@ -118,17 +118,8 @@ public sealed class AppSettings
     /// <summary>Settings › Island &amp; pet › Tiles: tile keys in the grid's order. Tiles not listed follow in their own order.</summary>
     public List<string>? IslandTileOrder { get; set; }
 
-    /// <summary>Tile keys left off the grid. Their pages stay, for a round button.</summary>
+    /// <summary>Tile keys left off the grid. Their pages stay.</summary>
     public List<string>? IslandHiddenTiles { get; set; }
-
-    /// <summary>The round button beside the island's left (top edge) or upper (side edge) pair: a tile key, "" for none, or null for its feature's own (Keep awake).</summary>
-    public string? IslandLeftButton { get; set; }
-
-    /// <summary>Likewise for the right or lower pair; null is its feature's own (App volume).</summary>
-    public string? IslandRightButton { get; set; }
-
-    /// <summary>Settings › Island &amp; pet › Live button: the round button for music or a muted mic.</summary>
-    public bool IslandLiveButton { get; set; } = true;
 
     /// <summary>Where the Settings window was and the page it showed when it last closed, which the next one reopens at; null until then.</summary>
     public WindowPlacement? SettingsWindow { get; set; }

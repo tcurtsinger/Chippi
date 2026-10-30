@@ -12,7 +12,7 @@ namespace Chippi.Island.Tests;
 /// <summary>
 /// The island on a screen without a window: places the panel's tab on an edge of a <paramref name="width"/> ×
 /// <paramref name="height"/> DIP screen with a 48 DIP taskbar, then checks the one 520 × 360 size, its 496 × 304
-/// body, and that the island and its orbit buttons stay in the work area (DESIGN.md §5 Island, revised 2026-10-28).
+/// body, and that the island stays in the work area (DESIGN.md §5 Island, revised 2026-10-28).
 /// </summary>
 internal static class IslandBounds
 {
@@ -33,7 +33,7 @@ internal static class IslandBounds
         });
     }
 
-    /// <summary>The island is 520 × 360 with a 496 × 304 body, and it and its orbit buttons sit inside the work area.</summary>
+    /// <summary>The island is 520 × 360 with a 496 × 304 body, and it sits inside the work area.</summary>
     public static Rect Check(IslandPanelWindow panel, IslandEdge edge, double width = 1280, double height = 720, bool body = true)
     {
         panel.GetType().GetMethod("Reshape", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(panel, [true]);
@@ -41,8 +41,6 @@ internal static class IslandBounds
         Assert.Equal(IslandPage.Width, shape.Width);
         Assert.Equal(IslandPage.Height, shape.Height);
         var footprint = shape;
-        foreach (var (_, rect) in IslandGeometry.OrbitLayout(edge, shape, Get<List<OrbitSlot>>(panel, "_placedSlots")))
-            footprint.Union(rect);
         Assert.InRange(footprint.Left, 0, width);
         Assert.InRange(footprint.Right, 0, width);
         Assert.InRange(footprint.Top, 0, height - Taskbar);
