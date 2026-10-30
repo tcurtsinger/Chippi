@@ -54,12 +54,7 @@ public sealed class IslandPanelShots
                 Section("clipboard", "Clipboard", 70, 120, status: "23 items"),
                 Section("scratchpad", "Scratchpad", 80, 120, status: "4 notes"),
                 Section("shelf", "Shelf", 90, 120, status: "5 items"));
-            foreach (var (edge, tab) in new[]
-            {
-                (IslandEdge.Top, new Rect(-20000 + 960 - 68, 0, 136, 36)),
-                (IslandEdge.Left, new Rect(-20000, 516 - 68, 36, 136)),
-                (IslandEdge.Right, new Rect(-20000 + 1920 - 36, 516 - 68, 36, 136)),
-            })
+            foreach (var edge in new[] { Corner.BottomRight, Corner.TopLeft })
             {
                 var panel = new IslandPanelWindow();
                 try
@@ -69,7 +64,7 @@ public sealed class IslandPanelShots
                     panel.SetTiles(tiles);
                     panel.SetActivities([], PetMood.Idle);
                     panel.SetLastPage(null);
-                    panel.Open(edge, tab, Area);
+                    panel.Open(IslandBounds.Puck(edge, Area.Work), Area);
                     Pump(TimeSpan.FromMilliseconds(500));
                     Save(panel, Path.Combine(folder, $"{edge}-grid.png".ToLowerInvariant()));
                     foreach (var key in panel.PageKeys())
@@ -81,11 +76,11 @@ public sealed class IslandPanelShots
                     panel.ShowPage(null, remember: false);
                     Pump(TimeSpan.FromMilliseconds(500));
                     Save(panel, Path.Combine(folder, $"{edge}-grid-with-back.png".ToLowerInvariant()));
-                    if (edge == IslandEdge.Top)
+                    if (edge == Corner.BottomRight)
                     {
                         panel.ShowPage(IslandPanelWindow.NowPlayingKey);
                         Pump(TimeSpan.FromMilliseconds(110));
-                        Save(panel, Path.Combine(folder, "top-morph-midway.png"));
+                        Save(panel, Path.Combine(folder, "bottomright-morph-midway.png"));
                     }
                 }
                 finally

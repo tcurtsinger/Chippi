@@ -51,11 +51,13 @@ internal sealed class ForegroundTracker : IDisposable
     public event EventHandler? Changed;
 
     /// <summary>
-    /// The monitor the island belongs on: with <see cref="IslandDisplay.FollowActiveWindow"/> the one
-    /// holding the foreground window (or, for the desktop, the pointer); otherwise the main display or
-    /// the chosen monitor, falling back to the main display while that one is disconnected.
+    /// The monitor the widget belongs on: the main display or the chosen monitor, falling back to the
+    /// main display while that one is disconnected.
     /// </summary>
     public HMONITOR Monitor { get; private set; }
+
+    /// <summary>The chosen monitor isn't connected, so <see cref="Monitor"/> is the main display in its place.</summary>
+    public bool ChosenMissing { get; private set; }
 
     /// <summary>Applies the island display setting and re-evaluates. Call on the UI thread.</summary>
     public void SetPlacement(IslandDisplay display, string? monitorId)
@@ -112,7 +114,7 @@ internal sealed class ForegroundTracker : IDisposable
             : PInvoke.MonitorFromWindow(foreground, MONITOR_FROM_FLAGS.MONITOR_DEFAULTTONEAREST);
         if (active == default)
             active = MonitorUnderPointer();
-        var monitor = IslandMonitor(active);
+        var monitor = IslandMonitor();
 
         // Fullscreen hides the island only on its own monitor. A D3D game counts where it runs (the
         // foreground's monitor); presentation mode is system-wide, so it hides the island anywhere.
@@ -163,13 +165,12 @@ internal sealed class ForegroundTracker : IDisposable
         return rect.left <= m.left && rect.top <= m.top && rect.right >= m.right && rect.bottom >= m.bottom;
     }
 
-    /// <summary>The island's monitor for the current setting, given the active window's monitor.</summary>
-    private HMONITOR IslandMonitor(HMONITOR active)
+    /// <summary>The widget's monitor for the current setting. Follow active window (retired 2026-10-29) reads as Main display.</summary>
+    private HMONITOR IslandMonitor()
     {
+        ChosenMissing = false;
         switch (_display)
         {
-            case IslandDisplay.MainDisplay:
-                return Displays.Main;
             case IslandDisplay.SpecificMonitor:
                 if (!_chosenResolved)
                 {
@@ -186,9 +187,10 @@ internal sealed class ForegroundTracker : IDisposable
                     _logger.LogInformation("Island monitor {Id} is not connected; using the main display", _monitorId ?? "(none chosen)");
                     _loggedMissingMonitor = true;
                 }
+                ChosenMissing = true;
                 return Displays.Main;
             default:
-                return active;
+                return Displays.Main;
         }
     }
 

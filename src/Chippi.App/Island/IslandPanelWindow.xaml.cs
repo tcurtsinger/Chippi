@@ -22,9 +22,10 @@ using Windows.Win32.Foundation;
 namespace Chippi.App.Island;
 
 /// <summary>
-/// The open island (DESIGN.md §5 Island, revised 2026-10-28): the tile grid or one tile's page, in
-/// one 520 × 360 shape that grows out of the tab; every page starts with a back arrow. Between pages the
-/// shape stays and the new content fades in. <see cref="IslandWindow"/> opens, places and closes it.
+/// The open panel (DESIGN.md §5): the home or one tile's page, in one 520 × 360 shape that grows out
+/// of the widget's puck, beside it toward the screen's middle; every page starts with a back arrow.
+/// Between pages the shape stays and the new content fades in. <see cref="IslandWindow"/> opens,
+/// places and closes it.
 /// </summary>
 public partial class IslandPanelWindow : Window
 {
@@ -53,11 +54,10 @@ public partial class IslandPanelWindow : Window
     private string? _openOn;
     private IReadOnlyList<string> _shownTiles = [];
     private HWND _hwnd;
-    private IslandEdge _edge;
-    private Rect _tab; // physical pixels
+    private Rect _puck; // physical pixels
     private MonitorArea _area;
     private Rect _window; // the window while open, physical pixels
-    private Rect _tabLocal; // the tab, in the window's DIPs
+    private Rect _puckLocal; // the puck, in the window's DIPs
     private Rect _target; // where the shape is heading, likewise
     private Rect _drawn; // where it is drawn now
     private Rect _from;
@@ -82,15 +82,9 @@ public partial class IslandPanelWindow : Window
         ThemeManager.ThemeChanged += themeChanged;
         Closed += (_, _) => ThemeManager.ThemeChanged -= themeChanged;
 
-        // The island grows over the tab: a press where the tab sits is the tab's (click or drag).
-        // Any other press is the user clicking into the island: from then on it takes the keyboard.
-        PreviewMouseLeftButtonDown += (_, e) =>
-        {
-            if (_tabLocal.Contains(e.GetPosition(Root)))
-                TabPressed?.Invoke(this, e);
-            else
-                TakeKeyboard(e.OriginalSource as DependencyObject);
-        };
+        // A press in the panel is the user clicking into it: from then on it takes the keyboard.
+        // (The puck's window sits above this one, so a press on the puck is the puck's.)
+        PreviewMouseLeftButtonDown += (_, e) => TakeKeyboard(e.OriginalSource as DependencyObject);
         PreviewMouseRightButtonDown += (_, e) => TakeKeyboard(e.OriginalSource as DependencyObject);
         PreviewKeyDown += (_, e) =>
         {
@@ -107,8 +101,6 @@ public partial class IslandPanelWindow : Window
         });
     }
 
-    /// <summary>A left press inside the tab's footprint, which the island covers while it is visible.</summary>
-    internal event MouseButtonEventHandler? TabPressed;
 
     /// <summary>Esc while the island has the keyboard (the user clicked into it).</summary>
     internal event EventHandler? EscapePressed;
@@ -252,11 +244,10 @@ public partial class IslandPanelWindow : Window
         RefreshGrid();
     }
 
-    /// <summary>Grows out of <paramref name="tab"/> (physical pixels) on <paramref name="edge"/>, or moves there when already open.</summary>
-    internal void Open(IslandEdge edge, Rect tab, MonitorArea area)
+    /// <summary>Grows out of the <paramref name="puck"/> (physical pixels), or moves beside it when already open.</summary>
+    internal void Open(Rect puck, MonitorArea area)
     {
-        _edge = edge;
-        _tab = tab;
+        _puck = puck;
         _area = area;
         if (IsOpen)
         {
@@ -277,7 +268,7 @@ public partial class IslandPanelWindow : Window
         Begin(Morph.Open);
     }
 
-    /// <summary>Shrinks back into the tab, then hides; <paramref name="immediate"/> hides at once.</summary>
+    /// <summary>Shrinks back into the puck, then hides; <paramref name="immediate"/> hides at once.</summary>
     public void CloseIsland(bool immediate = false)
     {
         if (!IsOpen)
@@ -606,33 +597,30 @@ public partial class IslandPanelWindow : Window
 
     // ----- Placement and the morph -----
 
+    /// <summary>The panel's rectangle beside the puck, in physical pixels.</summary>
+    private Rect PanelRect()
+    {
+        double s = _area.Scale;
+        var size = new Size(IslandPage.Width * s, IslandPage.Height * s);
+        return new Rect(IslandGeometry.PanelOrigin(_puck, size, _area.Work, s), size);
+    }
+
     /// <summary>
-    /// Covers a fixed area around the tab while open, so the morph never moves the window: the island
-    /// plus its shadow room, centered on the tab; the work area's full height.
+    /// Covers the puck and the panel beside it, with room for the shadow, while open, so the morph never
+    /// moves the window. Kept on the monitor, and no bigger: every frame copies all of it.
     /// </summary>
     private void Place()
     {
         double s = _area.Scale;
-        var work = _area.Work;
-        double widest = IslandPage.Width;
-        double width = (widest + 2 * ShadowRoom) * s;
-        double left = _edge switch
-        {
-            IslandEdge.Left => work.Left,
-            IslandEdge.Right => work.Right - width,
-            _ => Math.Clamp(_tab.Left + _tab.Width / 2 - width / 2, work.Left, Math.Max(work.Left, work.Right - width)),
-        };
-        _window = new Rect(left, work.Top, width, work.Height);
+        var cover = PanelRect();
+        cover.Union(_puck);
+        cover.Inflate(ShadowRoom * s, ShadowRoom * s);
+        cover.Intersect(_area.Monitor);
+        _window = new Rect(Math.Floor(cover.X), Math.Floor(cover.Y), Math.Ceiling(cover.Width), Math.Ceiling(cover.Height));
         IslandNative.Move(_hwnd, _window);
         Root.Width = _window.Width / s;
         Root.Height = _window.Height / s;
-        _tabLocal = Local(_tab);
-        ShapeFill.BorderThickness = _edge switch
-        {
-            IslandEdge.Left => new Thickness(0, 1, 1, 1),
-            IslandEdge.Right => new Thickness(1, 1, 0, 1),
-            _ => new Thickness(1, 0, 1, 1),
-        };
+        _puckLocal = Local(_puck);
         Reshape(snap: _frame is null);
     }
 
@@ -640,15 +628,12 @@ public partial class IslandPanelWindow : Window
         new((physical.X - _window.X) / _area.Scale, (physical.Y - _window.Y) / _area.Scale, physical.Width / _area.Scale, physical.Height / _area.Scale);
 
     /// <summary>
-    /// Centers the 520 × 360 island on the tab, keeping it in the work area.
+    /// Puts the 520 × 360 panel beside the puck, inside the work area.
     /// <paramref name="snap"/> also draws it there at once (no morph running).
     /// </summary>
     private void Reshape(bool snap)
     {
-        double s = _area.Scale;
-        const double width = IslandPage.Width, height = IslandPage.Height;
-        var origin = IslandGeometry.PanelOrigin(_edge, _tab, new Size(width * s, height * s), _area.Work, s);
-        _target = Local(new Rect(origin.X, origin.Y, width * s, height * s));
+        _target = Local(PanelRect());
         Canvas.SetLeft(Card, _target.X);
         Canvas.SetTop(Card, _target.Y);
         if (snap && _morph != Morph.Close)
@@ -659,16 +644,16 @@ public partial class IslandPanelWindow : Window
     }
 
     /// <summary>
-    /// Starts a morph from what is drawn now: open (tab to page, 220ms, content fading in over the
-    /// second half), page (the shape stays; the new page fades in over 150ms) or close (back to the
-    /// swollen tab, 160ms, content fading out). Reduced motion snaps.
+    /// Starts a morph from what is drawn now: open (puck to page, 220ms, content fading in over the
+    /// second half), page (the shape stays; the new page fades in over 150ms) or close (back into the
+    /// puck, 160ms, content fading out). Reduced motion snaps.
     /// </summary>
     private void Begin(Morph morph)
     {
         _morph = morph;
-        bool fromTab = morph == Morph.Open && _frame is null;
-        _from = fromTab ? _tabLocal : _drawn;
-        _radiusFrom = fromTab ? TabRadius() : _radius;
+        bool fromPuck = morph == Morph.Open && _frame is null;
+        _from = fromPuck ? _puckLocal : _drawn;
+        _radiusFrom = fromPuck ? PuckRadius : _radius;
         _fadeFrom = Card.Opacity;
         _elapsed = TimeSpan.Zero;
         if (Motion.IsReduced)
@@ -705,9 +690,9 @@ public partial class IslandPanelWindow : Window
         var time = _morph == Morph.Close ? ShrinkTime : GrowTime;
         double t = Math.Min(1, _elapsed / time);
         double eased = 1 - Math.Pow(1 - t, 3);
-        var to = _morph == Morph.Close ? _tabLocal : _target;
+        var to = _morph == Morph.Close ? _puckLocal : _target;
         _drawn = new Rect(Lerp(_from.X, to.X, eased), Lerp(_from.Y, to.Y, eased), Lerp(_from.Width, to.Width, eased), Lerp(_from.Height, to.Height, eased));
-        _radius = Lerp(_radiusFrom, _morph == Morph.Close ? TabRadius() : OpenRadius, eased);
+        _radius = Lerp(_radiusFrom, _morph == Morph.Close ? PuckRadius : OpenRadius, eased);
         double fade = Math.Clamp(_elapsed / PageFadeTime, 0, 1);
         Card.Opacity = _morph switch
         {
@@ -726,9 +711,7 @@ public partial class IslandPanelWindow : Window
 
     private double _radius = OpenRadius;
 
-    // The tab's corners are as round as it is deep.
-    private double TabRadius() =>
-        _edge == IslandEdge.Top ? Math.Min(_tabLocal.Height, _tabLocal.Width / 2) : Math.Min(_tabLocal.Width, _tabLocal.Height / 2);
+    private double PuckRadius => Math.Min(_puckLocal.Width, _puckLocal.Height) / 2;
 
     private void StopFrames()
     {
@@ -738,7 +721,7 @@ public partial class IslandPanelWindow : Window
         _frame = null;
     }
 
-    /// <summary>Back in the tab: hidden, with the views let go.</summary>
+    /// <summary>Back in the puck: hidden, with the views let go.</summary>
     private void Collapse()
     {
         StopFrames();
@@ -750,19 +733,14 @@ public partial class IslandPanelWindow : Window
         MarkOnScreen();
     }
 
-    /// <summary>The shape at <see cref="_drawn"/>, flat on its edge.</summary>
+    /// <summary>The shape at <see cref="_drawn"/>.</summary>
     private void Draw()
     {
         Canvas.SetLeft(Shape, _drawn.X);
         Canvas.SetTop(Shape, _drawn.Y);
         Shape.Width = Math.Max(0, _drawn.Width);
         Shape.Height = Math.Max(0, _drawn.Height);
-        ShapeShadow.CornerRadius = ShapeFill.CornerRadius = _edge switch
-        {
-            IslandEdge.Left => new CornerRadius(0, _radius, _radius, 0),
-            IslandEdge.Right => new CornerRadius(_radius, 0, 0, _radius),
-            _ => new CornerRadius(0, 0, _radius, _radius),
-        };
+        ShapeShadow.CornerRadius = ShapeFill.CornerRadius = new CornerRadius(_radius);
         // Mid-morph the content already sits at its final place; only what's inside the shape shows.
         var inside = new Rect(_drawn.X - Canvas.GetLeft(Card), _drawn.Y - Canvas.GetTop(Card), Math.Max(0, _drawn.Width), Math.Max(0, _drawn.Height));
         Card.Clip = new RectangleGeometry(inside, _radius, _radius);
@@ -772,11 +750,7 @@ public partial class IslandPanelWindow : Window
 
     private static double Lerp(double from, double to, double t) => from + (to - from) * t;
 
-#if DEBUG
-    /// <summary>Debug builds: the window's own pixels, for <see cref="IslandWindow.SaveScene"/>.</summary>
-    internal FrameworkElement Visual => Root;
-
-    /// <summary>Debug builds: the shape as drawn and where it is heading, in physical pixels.</summary>
+    /// <summary>The shape as drawn and where it is heading, in physical pixels (snapshots and tests).</summary>
     internal Rect Footprint
     {
         get
@@ -787,6 +761,10 @@ public partial class IslandPanelWindow : Window
             return new Rect(_window.X + box.X * s, _window.Y + box.Y * s, box.Width * s, box.Height * s);
         }
     }
+
+#if DEBUG
+    /// <summary>Debug builds: the window's own pixels, for <see cref="IslandWindow.SaveScene"/>.</summary>
+    internal FrameworkElement Visual => Root;
 #endif
 
     protected override void OnClosed(EventArgs e)

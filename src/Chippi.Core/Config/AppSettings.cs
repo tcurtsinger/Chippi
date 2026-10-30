@@ -23,14 +23,6 @@ public enum AccentChoice
     Pink,
 }
 
-/// <summary>The screen edge the island tab docks on (DESIGN.md §5 Island).</summary>
-public enum IslandEdge
-{
-    Top,
-    Left,
-    Right,
-}
-
 /// <summary>Gumdrop's body color (DESIGN.md §7). Synth is the gradient and the default.</summary>
 public enum PetColor
 {
@@ -45,7 +37,7 @@ public enum PetColor
 /// <summary>Which display the island sits on.</summary>
 public enum IslandDisplay
 {
-    /// <summary>The display with the active window; the island moves as focus moves (DESIGN.md §5).</summary>
+    /// <summary>Retired 2026-10-29 (a widget you place yourself stays put); a saved one reads as <see cref="MainDisplay"/>.</summary>
     FollowActiveWindow,
 
     /// <summary>Always the Windows main display.</summary>
@@ -83,10 +75,15 @@ public sealed class AppSettings
     /// <summary>Settings › Island &amp; pet: no tray icon while the island shows. It comes back while the island is off or hidden for a fullscreen app.</summary>
     public bool HideTrayIcon { get; set; }
 
-    public IslandEdge IslandEdge { get; set; } = IslandEdge.Top;
+    /// <summary>
+    /// Where the widget sits on its display, 0 to 1 across the room it has in the work area (0 is flush
+    /// left), so a resolution change never moves it off screen. Null until it is dragged: then it
+    /// sits 24 in from the bottom-right corner.
+    /// </summary>
+    public double? IslandX { get; set; }
 
-    /// <summary>Where the tab sits along <see cref="IslandEdge"/>, 0 to 1 (0.5 is centered), so resolution changes don't move it.</summary>
-    public double IslandPlace { get; set; } = 0.5;
+    /// <summary>Like <see cref="IslandX"/>, top to bottom.</summary>
+    public double? IslandY { get; set; }
 
     /// <summary>Settings › Notifications master switch: off silences every Windows notification; each event's choice is kept.</summary>
     public bool WindowsNotices { get; set; } = true;

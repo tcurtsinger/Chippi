@@ -239,7 +239,7 @@ public sealed class SoundShellTests
         panel.SetTiles(Tiles(scene));
         panel.Initialize();
         var offscreen = new MonitorArea(default, new Rect(-20000, 0, 1920, 1080), new Rect(-20000, 0, 1920, 1032), 1);
-        panel.Open(IslandEdge.Top, new Rect(-19100, 0, 112, 32), offscreen);
+        panel.Open(IslandGeometry.Start(offscreen.Work, 1), offscreen);
         return panel;
     }
 

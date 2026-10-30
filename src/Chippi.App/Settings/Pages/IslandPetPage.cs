@@ -100,17 +100,19 @@ internal sealed class IslandPetPage : UserControl
         return SettingsUi.Row("Opens on", "", picker);
     }
 
-    // Only the top edge docks for now (side edges retired 2026-10-29); dragging the tab moves it along it.
+    // Dragging the widget moves it; Reset puts it back where it starts, 24 in from the bottom-right corner.
     private Border PositionRow()
     {
         var reset = SettingsUi.Button("Reset");
-        reset.Click += (_, _) => SettingsUi.SaveApp(_shell.Config, s => { s.IslandEdge = IslandEdge.Top; s.IslandPlace = 0.5; });
+        reset.Click += (_, _) => SettingsUi.SaveApp(_shell.Config, s => { s.IslandX = null; s.IslandY = null; });
         return SettingsUi.Row("Position", "", reset);
     }
 
+    // Follow active window is retired (2026-10-29): a widget you place yourself stays put. A saved one shows as Main display.
     private Border DisplayRow(AppSettings app)
     {
-        var mode = Combo("Island display", new[] { ("Follow active window", IslandDisplay.FollowActiveWindow), ("Main display", IslandDisplay.MainDisplay), ("One monitor", IslandDisplay.SpecificMonitor) }, app.IslandDisplay);
+        var shown = app.IslandDisplay == IslandDisplay.FollowActiveWindow ? IslandDisplay.MainDisplay : app.IslandDisplay;
+        var mode = Combo("Island display", new[] { ("Main display", IslandDisplay.MainDisplay), ("One monitor", IslandDisplay.SpecificMonitor) }, shown);
         var picker = SettingsUi.Styled(new ComboBox { MinWidth = 180, MaxWidth = 300, Tag = "Choose a monitor", Margin = new Thickness(0, 8, 0, 0) }, "HopperComboBoxStyle");
         AutomationProperties.SetName(picker, "Island monitor");
         foreach (var monitor in Displays.Connected())
