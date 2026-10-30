@@ -324,7 +324,7 @@ public sealed class IslandWindowTests
 
             Click(window);
             Raise(window, new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Left) { RoutedEvent = UIElement.PreviewMouseLeftButtonDownEvent });
-            pointer = new Point(area.Work.Left + area.Work.Width / 2, area.Work.Top + area.Work.Height / 2);
+            pointer = UnevenDrop(area, puck.Size);
             Raise(window, new MouseEventArgs(Mouse.PrimaryDevice, 0) { RoutedEvent = UIElement.PreviewMouseMoveEvent });
             Assert.False(window.IsIslandOpen);
             Assert.False(window.IsHooked);
@@ -451,6 +451,25 @@ public sealed class IslandWindowTests
         Assert.Equal(puck.Top + puck.Height / 2 - 62 * scale, rect.Top, 1);
         double center = window.OpensLeft ? rect.Right - 62 * scale : rect.Left + 62 * scale;
         Assert.Equal(puck.Left + puck.Width / 2, center, 1);
+    }
+
+    /// <summary>
+    /// A drop point near the work area's middle (held 10 right and 20 down of the puck's corner) whose saved fractions
+    /// don't give back exactly the same place, so anything that re-places the puck from them after the drop shows,
+    /// whatever the screen's size.
+    /// </summary>
+    private static Point UnevenDrop(MonitorArea area, Size puck)
+    {
+        var w = area.Work;
+        for (int dx = 0; dx < 500; dx++)
+        {
+            var at = new Point(Math.Floor(w.Left + w.Width / 2) + dx, Math.Floor(w.Top + w.Height / 2));
+            var rect = new Rect(at.X - 10, at.Y - 20, puck.Width, puck.Height);
+            var (x, y) = IslandGeometry.Fractions(rect, w);
+            if (IslandGeometry.PuckRect(x, y, w, area.Scale) != rect)
+                return at;
+        }
+        throw new InvalidOperationException("No drop point near the middle loses anything to the fractions");
     }
 
     /// <summary>A real widget on the primary display (no-activate, so it takes no focus), closed afterwards.</summary>

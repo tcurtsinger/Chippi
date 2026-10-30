@@ -100,11 +100,16 @@ public partial class IslandPanelWindow : Window
             if (!PageHandlesEscape())
                 EscapePressed?.Invoke(this, EventArgs.Empty);
         };
-        DpiChanged += (_, _) => Dispatcher.BeginInvoke(DispatcherPriority.Render, () =>
+        // Only the window's own scale: an Image on a page raises the same routed event, which bubbles up here.
+        DpiChanged += (_, e) =>
         {
-            if (IsOpen)
-                Place();
-        });
+            if (ReferenceEquals(e.OriginalSource, this))
+                Dispatcher.BeginInvoke(DispatcherPriority.Render, () =>
+                {
+                    if (IsOpen)
+                        Place();
+                });
+        };
     }
 
 

@@ -219,7 +219,13 @@ public partial class IslandWindow : Window
         // A press or a key on the panel ends the drag-opened mode: normal closing resumes.
         _panel.PreviewMouseDown += (_, _) => _openedByDrag = false;
         _panel.PreviewKeyDown += (_, _) => _openedByDrag = false;
-        DpiChanged += (_, _) => Dispatcher.BeginInvoke(DispatcherPriority.Render, Place);
+        // Only the window's own scale: an Image inside raises the same routed event, which bubbles up here, and a
+        // re-place from the saved fractions would move a just-dropped puck by their rounding.
+        DpiChanged += (_, e) =>
+        {
+            if (ReferenceEquals(e.OriginalSource, this))
+                Dispatcher.BeginInvoke(DispatcherPriority.Render, Place);
+        };
 
         ApplySide(left: true);
     }
