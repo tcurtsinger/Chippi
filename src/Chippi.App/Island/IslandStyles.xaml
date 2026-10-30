@@ -563,7 +563,7 @@
     </Style>
 
     <!-- The island's segment (File organizer's mode, Scratchpad's Edit / Preview): a 4px-corner trough in the
-         control fill with a 1px edge, 26 tall items 10 in, the selected one in the accent fill with an
+         control fill with a 1px edge, 24 tall items 10 in, the selected one in the accent fill with an
          on-accent semibold label. The trough hugs its items and sits where its layout puts it. -->
     <Style x:Key="IslandSegmentItemStyle" TargetType="{x:Type ListBoxItem}">
         <Setter Property="Height" Value="24" />

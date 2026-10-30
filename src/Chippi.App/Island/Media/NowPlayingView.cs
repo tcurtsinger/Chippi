@@ -8,7 +8,6 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Documents;
 using System.Windows.Media;
-using System.Windows.Media.Effects;
 using System.Windows.Shapes;
 using System.Windows.Threading;
 using Chippi.App.Pet;
@@ -20,7 +19,7 @@ namespace Chippi.App.Island.Media;
 
 /// <summary>
 /// The Now Playing page (DESIGN.md §5 Island, revised 2026-10-29), after Apple Music's widget: the
-/// header names the app (a menu of apps when two or more have sessions), then 168px artwork beside
+/// header names the app (a menu of apps when two or more have sessions), then 156px artwork beside
 /// the title, artist and previous / play-pause / next, each disabled when the app doesn't offer it,
 /// with the progress under them. No artwork shows ChippiPet in its place; nothing playing, ChippiPet asleep.
 /// </summary>
@@ -44,7 +43,6 @@ internal sealed class NowPlayingView : UserControl
     private readonly TextBlock _artist = new() { FontSize = 13, TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(0, 2, 0, 0) };
     private readonly Grid _progress = new() { Height = 18, Margin = new Thickness(10, 0, 10, 0) };
     private readonly Border _fill = new() { Height = 4, VerticalAlignment = VerticalAlignment.Center, CornerRadius = new CornerRadius(2) };
-    private Grid _thumb = null!;
     private readonly TextBlock _elapsed = new() { FontSize = 11, MinWidth = 30, VerticalAlignment = VerticalAlignment.Center };
     private readonly TextBlock _remaining = new() { FontSize = 11, MinWidth = 30, TextAlignment = TextAlignment.Right, VerticalAlignment = VerticalAlignment.Center };
     private readonly Grid _timeline = new() { Margin = new Thickness(0, 22, 0, 0) };
@@ -92,7 +90,7 @@ internal sealed class NowPlayingView : UserControl
         _playPause.SetResourceReference(StyleProperty, "IslandPlayDiscStyle");
         _playPause.Width = _playPause.Height = 52;
         _playGlyph.SetResourceReference(LucideIcon.BrushProperty, "IslandOnAccentBrush");
-        _playPause.Effect = new System.Windows.Media.Effects.DropShadowEffect { Color = Color.FromRgb(0x74, 0x44, 0xF0), BlurRadius = 16, ShadowDepth = 6, Direction = 270, Opacity = 0.35 };
+        _playPause.SetResourceReference(UIElement.EffectProperty, "IslandPlayGlow");
         var transport = new UniformGrid { Rows = 1, Columns = 3, Height = 52, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(4, 0, 4, -14),
             Children = { _previous, _playPause, _next } };
         var meta = new Grid { Children = { new StackPanel { Margin = new Thickness(0, -6, 0, 0), Children = { _title, _artist } }, transport } };
@@ -107,7 +105,7 @@ internal sealed class NowPlayingView : UserControl
         _progress.ColumnDefinitions.Add(new ColumnDefinition());
         _progress.ColumnDefinitions.Add(new ColumnDefinition());
         var bar = new Border { Height = 4, VerticalAlignment = VerticalAlignment.Center, CornerRadius = new CornerRadius(2) };
-        bar.SetResourceReference(Border.BackgroundProperty, "IslandTrackBrush");
+        bar.SetResourceReference(Border.BackgroundProperty, "IslandSliderTrackBrush");
         Grid.SetColumnSpan(bar, 2);
         _progress.Children.Add(bar);
         _progress.Children.Add(_fill);
@@ -117,8 +115,8 @@ internal sealed class NowPlayingView : UserControl
         var thumbRing = new Ellipse { Width = 18, Height = 18 };
         thumbRing.SetResourceReference(UIElement.EffectProperty, "IslandThumbShadow");
         thumbRing.SetResourceReference(Shape.FillProperty, "IslandThumbBrush");
-        _thumb = new Grid { Width = 18, Height = 18, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, -9, 0), IsHitTestVisible = false, Children = { thumbRing, thumbDot } };
-        _progress.Children.Add(_thumb);
+        var thumb = new Grid { Width = 18, Height = 18, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, -9, 0), IsHitTestVisible = false, Children = { thumbRing, thumbDot } };
+        _progress.Children.Add(thumb);
         _timeline.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         _timeline.ColumnDefinitions.Add(new ColumnDefinition());
         _timeline.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
