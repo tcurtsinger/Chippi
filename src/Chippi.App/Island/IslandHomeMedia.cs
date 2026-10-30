@@ -15,7 +15,7 @@ namespace Chippi.App.Island;
 /// <summary>
 /// The home's Now Playing card: 68 tall, the cover, the app, the title and the artist, then previous,
 /// play or pause and next. Pressing the card opens the Now Playing page. Nothing playing shows the pet
-/// asleep and the transport dimmed.
+/// asleep beside "Nothing playing" alone, and the transport dimmed.
 /// </summary>
 internal sealed class IslandHomeMedia : UserControl
 {
@@ -29,6 +29,7 @@ internal sealed class IslandHomeMedia : UserControl
     private readonly Button _playPause;
     private readonly Button _next;
     private readonly StackPanel _text;
+    private readonly StackPanel _app;
     private readonly Image _artWas = new(), _textWas = new(); // what was there, fading out as a new track arrives
     private IMediaSessions? _media;
     private string? _shownTrack;
@@ -39,12 +40,12 @@ internal sealed class IslandHomeMedia : UserControl
         var note = new LucideIcon { Data = LucideIcons.Music, Size = 11, VerticalAlignment = VerticalAlignment.Center };
         note.SetResourceReference(LucideIcon.BrushProperty, "IslandTextTertiaryBrush");
         _source.SetResourceReference(TextBlock.ForegroundProperty, "IslandTextTertiaryBrush");
-        _title.SetResourceReference(TextBlock.ForegroundProperty, "IslandTextBrush");
         _artist.SetResourceReference(TextBlock.ForegroundProperty, "IslandTextSecondaryBrush");
+        _app = new StackPanel { Orientation = Orientation.Horizontal, Children = { note, _source } };
         _text = new StackPanel
         {
             VerticalAlignment = VerticalAlignment.Center,
-            Children = { new StackPanel { Orientation = Orientation.Horizontal, Children = { note, _source } }, _title, _artist },
+            Children = { _app, _title, _artist },
         };
         var art = new Grid { Children = { _art, _artWas } };
         var text = new Grid { Margin = new Thickness(12, 0, 0, 0), Children = { _text, _textWas } };
@@ -60,9 +61,10 @@ internal sealed class IslandHomeMedia : UserControl
         var transport = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 0, 0), Children = { _previous, _playPause, _next } };
         DockPanel.SetDock(transport, Dock.Right);
 
-        var card = new Border { Height = 68, Padding = new Thickness(8, 8, 10, 8), Child = new DockPanel { LastChildFill = true, Children = { transport, open } } };
+        // 68 tall: inside the card's 1px edge, 7 around the 52 art, so it sits 8 from the card's outside and nothing clips it.
+        var card = new Border { Height = 68, Child = new DockPanel { LastChildFill = true, Children = { transport, open } } };
         card.SetResourceReference(StyleProperty, "IslandCardStyle");
-        card.Padding = new Thickness(8, 8, 10, 8);
+        card.Padding = new Thickness(7, 7, 10, 7);
         Content = card;
 
         Loaded += (_, _) =>
@@ -127,7 +129,11 @@ internal sealed class IslandHomeMedia : UserControl
             Arrival.Leave(_text, _textWas);
         }
         _source.Text = track?.Source ?? "";
+        _app.Visibility = _source.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
         _title.Text = track is null ? "Nothing playing" : track.Title.Length > 0 ? track.Title : track.Source;
+        // Nothing playing is a state, not a song: one regular secondary line, centered beside the sleeping pet.
+        _title.FontWeight = track is null ? FontWeights.Normal : FontWeights.SemiBold;
+        _title.SetResourceReference(TextBlock.ForegroundProperty, track is null ? "IslandTextSecondaryBrush" : "IslandTextBrush");
         _artist.Text = track?.Artist ?? "";
         _artist.Visibility = _artist.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
         _previous.IsEnabled = track?.CanPrevious == true;

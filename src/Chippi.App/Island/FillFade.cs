@@ -34,17 +34,49 @@ internal static class FillFade
 
     public static void SetOpacity(DependencyObject element, double value) => element.SetValue(OpacityProperty, value);
 
+    /// <summary>
+    /// Where a gradient fill falls when one fill runs across several controls (the home's split button: the toggle
+    /// and its arrow share one accent fill). The transform maps the whole's unit square into this element's. It's
+    /// inherited, so set it on the control and its template's fill follows. Solid fills ignore it.
+    /// </summary>
+    public static readonly DependencyProperty SpanProperty =
+        DependencyProperty.RegisterAttached("Span", typeof(Transform), typeof(FillFade),
+            new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.Inherits, OnSpanChanged));
+
+    public static Transform? GetSpan(DependencyObject element) => (Transform?)element.GetValue(SpanProperty);
+
+    public static void SetSpan(DependencyObject element, Transform? value) => element.SetValue(SpanProperty, value);
+
+    private static DependencyProperty? FillOf(DependencyObject d) => d switch
+    {
+        Border => Border.BackgroundProperty,
+        Panel => Panel.BackgroundProperty,
+        Shape => Shape.FillProperty,
+        _ => null,
+    };
+
     private static void OnToChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
-        var property = d switch
-        {
-            Border => Border.BackgroundProperty,
-            Panel => Panel.BackgroundProperty,
-            Shape => Shape.FillProperty,
-            _ => null,
-        };
-        if (property is not null && d is FrameworkElement element)
-            Blend(element, property, (Brush?)e.OldValue, (Brush?)e.NewValue);
+        if (FillOf(d) is { } property && d is FrameworkElement element)
+            Blend(element, property, Spanned(d, (Brush?)e.OldValue), Spanned(d, (Brush?)e.NewValue));
+    }
+
+    // The span is known once the controls are laid out: the fill they show already moves to it, without a fade.
+    private static void OnSpanChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        if (FillOf(d) is { } property && GetTo(d) is { } to)
+            d.SetValue(property, Spanned(d, to));
+    }
+
+    private static Brush? Spanned(DependencyObject element, Brush? brush)
+    {
+        if (brush is not GradientBrush gradient || GetSpan(element) is not { } span)
+            return brush;
+        var spanned = gradient.Clone();
+        spanned.RelativeTransform = span;
+        if (spanned.CanFreeze)
+            spanned.Freeze();
+        return spanned;
     }
 
     private static void OnOpacityChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)

@@ -72,6 +72,58 @@
         </Setter>
     </Style>
 
+    <!-- The same ring, 3 out, following the shape of controls that aren't 4px-corner: round ones (the transport, the
+         play disc), the 6px-corner tiles and the two halves of a split, and the switch's pill. -->
+    <Style x:Key="IslandRoundFocusVisual">
+        <Setter Property="Control.Template">
+            <Setter.Value>
+                <ControlTemplate>
+                    <Ellipse Margin="-3" Stroke="{DynamicResource IslandTextBrush}" StrokeThickness="2" />
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="IslandTileFocusVisual">
+        <Setter Property="Control.Template">
+            <Setter.Value>
+                <ControlTemplate>
+                    <Border Margin="-3" CornerRadius="9" BorderBrush="{DynamicResource IslandTextBrush}" BorderThickness="2" />
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="IslandSplitMainFocusVisual">
+        <Setter Property="Control.Template">
+            <Setter.Value>
+                <ControlTemplate>
+                    <Border Margin="-3" CornerRadius="9,3,3,9" BorderBrush="{DynamicResource IslandTextBrush}" BorderThickness="2" />
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="IslandSplitSideFocusVisual">
+        <Setter Property="Control.Template">
+            <Setter.Value>
+                <ControlTemplate>
+                    <Border Margin="-3" CornerRadius="3,9,9,3" BorderBrush="{DynamicResource IslandTextBrush}" BorderThickness="2" />
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="IslandPillFocusVisual">
+        <Setter Property="Control.Template">
+            <Setter.Value>
+                <ControlTemplate>
+                    <Border Margin="-3" CornerRadius="12" BorderBrush="{DynamicResource IslandTextBrush}" BorderThickness="2" />
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- Inner cards: the card fill with a 1px edge, 6px corners, content 10 in. -->
     <Style x:Key="IslandCardStyle" TargetType="{x:Type Border}">
         <Setter Property="Background" Value="{DynamicResource IslandPanelBrush}" />
@@ -273,7 +325,7 @@
     <!-- Grid tiles: they fill the body (IslandGrid), 6px corners, the control fill with a 1px edge. -->
     <Style x:Key="IslandTileStyle" TargetType="{x:Type Button}">
         <Setter Property="Foreground" Value="{DynamicResource IslandTextBrush}" />
-        <Setter Property="FocusVisualStyle" Value="{StaticResource IslandFocusVisual}" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource IslandTileFocusVisual}" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type Button}">
@@ -295,17 +347,20 @@
 
     <!-- The home's split button, Quick Settings style: a 44 tall toggle on the left (IslandSplitMainStyle) and a
          28 wide arrow on the right (IslandSplitSideStyle), 6px outer corners, the control fill with a 1px edge.
-         On, both take the accent fill and on-accent glyphs; set the arrow's Tag to "On" with the toggle. -->
+         On, both take one accent fill edge to edge (IslandGrid spans it across the two with FillFade.Span) and
+         on-accent glyphs, with a divider drawn on the fill; set the arrow's Tag to "On" with the toggle. -->
     <Style x:Key="IslandSplitMainStyle" TargetType="{x:Type ToggleButton}">
         <Setter Property="Height" Value="44" />
         <Setter Property="Foreground" Value="{DynamicResource IslandTextBrush}" />
-        <Setter Property="FocusVisualStyle" Value="{StaticResource IslandFocusVisual}" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource IslandSplitMainFocusVisual}" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type ToggleButton}">
                     <Grid x:Name="Root">
                         <Border x:Name="Chrome" CornerRadius="6,0,0,6" BorderThickness="1,1,0,1" i:FillFade.To="{DynamicResource IslandButtonBrush}" BorderBrush="{DynamicResource IslandControlBorderBrush}" />
-                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        <!-- The glyph sits in the middle of the whole button, arrow included (28 in from the left), so it's
+                             level with the other buttons' glyphs and the name under it. -->
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="28,0,0,0" />
                     </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
@@ -316,7 +371,7 @@
                         </Trigger>
                         <Trigger Property="IsChecked" Value="True">
                             <Setter TargetName="Chrome" Property="i:FillFade.To" Value="{DynamicResource IslandAccentFillBrush}" />
-                            <Setter TargetName="Chrome" Property="BorderBrush" Value="Transparent" />
+                            <Setter TargetName="Chrome" Property="BorderThickness" Value="0" />
                             <Setter Property="Foreground" Value="{DynamicResource IslandOnAccentBrush}" />
                         </Trigger>
                         <MultiTrigger>
@@ -339,12 +394,14 @@
         <Setter Property="Width" Value="28" />
         <Setter Property="Height" Value="44" />
         <Setter Property="Foreground" Value="{DynamicResource IslandTextSecondaryBrush}" />
-        <Setter Property="FocusVisualStyle" Value="{StaticResource IslandFocusVisual}" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource IslandSplitSideFocusVisual}" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type Button}">
                     <Grid x:Name="Root">
                         <Border x:Name="Chrome" CornerRadius="0,6,6,0" BorderThickness="1" i:FillFade.To="{DynamicResource IslandButtonBrush}" BorderBrush="{DynamicResource IslandControlBorderBrush}" />
+                        <!-- On, the divider: white at 28% on the fill. -->
+                        <Rectangle x:Name="Divider" Width="1" HorizontalAlignment="Left" Fill="#47FFFFFF" Visibility="Collapsed" />
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Grid>
                     <ControlTemplate.Triggers>
@@ -356,9 +413,8 @@
                         </Trigger>
                         <Trigger Property="Tag" Value="On">
                             <Setter TargetName="Chrome" Property="i:FillFade.To" Value="{DynamicResource IslandAccentFillBrush}" />
-                            <!-- Only the divider shows on the fill: white at 28%. -->
-                            <Setter TargetName="Chrome" Property="BorderThickness" Value="1,0,0,0" />
-                            <Setter TargetName="Chrome" Property="BorderBrush" Value="#47FFFFFF" />
+                            <Setter TargetName="Chrome" Property="BorderThickness" Value="0" />
+                            <Setter TargetName="Divider" Property="Visibility" Value="Visible" />
                             <Setter Property="Foreground" Value="{DynamicResource IslandOnAccentBrush}" />
                         </Trigger>
                         <MultiTrigger>
@@ -382,7 +438,7 @@
     <Style x:Key="SwitchStyle" TargetType="{x:Type ToggleButton}">
         <Setter Property="Width" Value="34" />
         <Setter Property="Height" Value="18" />
-        <Setter Property="FocusVisualStyle" Value="{StaticResource IslandFocusVisual}" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource IslandPillFocusVisual}" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type ToggleButton}">
@@ -440,7 +496,7 @@
         <Setter Property="Width" Value="32" />
         <Setter Property="Height" Value="32" />
         <Setter Property="Foreground" Value="{DynamicResource IslandTextBrush}" />
-        <Setter Property="FocusVisualStyle" Value="{StaticResource IslandFocusVisual}" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource IslandRoundFocusVisual}" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type Button}">
@@ -547,7 +603,7 @@
     <Style x:Key="IslandPlayDiscStyle" TargetType="{x:Type Button}">
         <Setter Property="Width" Value="36" />
         <Setter Property="Height" Value="36" />
-        <Setter Property="FocusVisualStyle" Value="{StaticResource IslandFocusVisual}" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource IslandRoundFocusVisual}" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type Button}">

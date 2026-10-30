@@ -90,8 +90,9 @@
                             <Rectangle Style="{StaticResource IslandEqualizerBarStyle}" Height="14" />
                             <Rectangle Style="{StaticResource IslandEqualizerBarStyle}" Height="10" />
                         </StackPanel>
-                        <!-- Paused: a pause mark in tertiary in the bars' place (three flat bars read as a "more" button). -->
-                        <c:LucideIcon x:Name="PausedMark" Grid.Column="5" Data="{x:Static c:LucideIcons.Pause}" Size="14" Filled="True"
+                        <!-- Paused: a pause mark in tertiary in the bars' place (three flat bars read as a "more" button),
+                             as wide as the bars (15), so the lines don't move when it takes over. -->
+                        <c:LucideIcon x:Name="PausedMark" Grid.Column="5" Data="{x:Static c:LucideIcons.Pause}" Size="14" Filled="True" Margin="0,0,1,0"
                                       Brush="{DynamicResource IslandTextTertiaryBrush}" VerticalAlignment="Center" Visibility="Collapsed" />
                         <!-- What the lead and the lines showed, fading out while something new arrives (Arrival). -->
                         <Image x:Name="LeadWas" />

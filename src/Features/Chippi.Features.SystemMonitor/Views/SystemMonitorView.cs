@@ -253,8 +253,23 @@ internal sealed class SystemMonitorView : UserControl
         var text = new TextBlock { Text = what == "GPU" ? "GPU" : "Network", FontSize = 12, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
         var chevron = new LucideIcon { Data = LucideIcons.ChevronDown, Size = 12, Margin = new Thickness(4, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
         chevron.SetResourceReference(LucideIcon.BrushProperty, _settingsPage ? "TextSecondaryBrush" : "IslandTextTertiaryBrush");
-        var button = new Button { Content = new StackPanel { Orientation = Orientation.Horizontal, Children = { text, chevron } }, Margin = new Thickness(4, 0, 0, 0), Padding = new Thickness(4, 0, 4, 0), Width = double.NaN, Height = 24 };
-        button.SetResourceReference(StyleProperty, _settingsPage ? "SubtleButtonStyle" : "IslandTransportButtonStyle");
+        var content = new StackPanel { Orientation = Orientation.Horizontal, Children = { text, chevron } };
+        var button = new Button { Content = content, Width = double.NaN, Height = 24 };
+        if (_settingsPage)
+        {
+            button.Margin = new Thickness(4, 0, 0, 0);
+            button.Padding = new Thickness(4, 0, 4, 0);
+            button.SetResourceReference(StyleProperty, "SubtleButtonStyle");
+        }
+        else
+        {
+            // Level with the other rows' names and in their color; the hover wash reaches 4 past the text each side.
+            content.Margin = new Thickness(4, 0, 4, 0);
+            button.Margin = new Thickness(-4, 0, 0, 0);
+            button.HorizontalAlignment = HorizontalAlignment.Left;
+            text.SetResourceReference(TextBlock.ForegroundProperty, "IslandTextTertiaryBrush");
+            button.SetResourceReference(StyleProperty, "IslandBareButtonStyle");
+        }
         AutomationProperties.SetName(button, $"{what}, {current}");
         button.Click += (_, _) =>
         {
