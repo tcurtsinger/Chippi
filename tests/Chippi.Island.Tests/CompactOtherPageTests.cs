@@ -15,20 +15,20 @@ namespace Chippi.Island.Tests;
 public sealed class CompactOtherPageTests
 {
     [Fact]
-    public void Now_playing_is_a_168_art_card_and_nothing_playing_is_gumdrop_asleep() => WpfTestThread.Run(() =>
+    public void Now_playing_is_a_156_art_card_and_nothing_playing_is_gumdrop_asleep() => WpfTestThread.Run(() =>
     {
         var playing = new NowPlayingView(new IslandPanelTests.FakeMedia { Sessions = [new("spotify", "Spotify", "Weekend Mix", "Various Artists", true, false, true, true, true, true,
             TimeSpan.FromSeconds(72), TimeSpan.FromSeconds(232), DateTimeOffset.Now, null)] });
         Fit(playing, 496, 336);
-        var art = Find<Border>(playing).Single(b => b.Width == 168);
-        Assert.Equal(168, art.ActualHeight);
+        var art = Find<Border>(playing).Single(b => b.Width == 156);
+        Assert.Equal(156, art.ActualHeight);
         Assert.IsType<Chippi.App.Pet.Gumdrop>(art.Child); // no artwork: Gumdrop in its place
         Assert.Equal(new Thickness(0), art.BorderThickness);
         var cover = System.Windows.Media.Imaging.BitmapSource.Create(1, 1, 96, 96, System.Windows.Media.PixelFormats.Bgra32, null, new byte[4], 4);
         var covered = new NowPlayingView(new IslandPanelTests.FakeMedia { Sessions = [new("spotify", "Spotify", "Weekend Mix", "Various Artists", true, true, true, true, true, true,
             TimeSpan.FromSeconds(72), TimeSpan.FromSeconds(232), DateTimeOffset.Now, cover)] });
         Fit(covered, 496, 336);
-        var coverArt = Find<Border>(covered).Single(b => b.Width == 168);
+        var coverArt = Find<Border>(covered).Single(b => b.Width == 156);
         Assert.Null(coverArt.Child);
         Assert.Equal(new Thickness(1), coverArt.BorderThickness); // a hairline, so a dark cover keeps its edge
         var transport = Find<Button>(playing).Where(b => b.Content is Chippi.UI.Controls.LucideIcon).ToArray();
@@ -76,7 +76,7 @@ public sealed class CompactOtherPageTests
         Fit(view, 496, 304);
         var cards = Find<ToggleButton>(view).ToArray();
         Assert.Equal(6, cards.Length);
-        Assert.All(cards, c => Assert.Equal(96, c.ActualHeight));
+        Assert.All(cards, c => Assert.Equal(104, c.ActualHeight));
         var grid = Find<UniformGrid>(view).Single();
         Assert.Equal(3, grid.Columns);
         Assert.True(grid.TranslatePoint(new Point(), view).Y > 40);

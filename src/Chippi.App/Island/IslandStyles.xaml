@@ -562,4 +562,59 @@
         </Setter>
     </Style>
 
+    <!-- The island's segment (File organizer's mode, Scratchpad's Edit / Preview): a 4px-corner trough in the
+         control fill with a 1px edge, 26 tall items 10 in, the selected one in the accent fill with an
+         on-accent semibold label. The trough hugs its items and sits where its layout puts it. -->
+    <Style x:Key="IslandSegmentItemStyle" TargetType="{x:Type ListBoxItem}">
+        <Setter Property="Height" Value="24" />
+        <Setter Property="Padding" Value="10,0" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Foreground" Value="{DynamicResource IslandTextBrush}" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource IslandFocusVisual}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type ListBoxItem}">
+                    <Border x:Name="Chrome" CornerRadius="3" Background="Transparent">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="{TemplateBinding Padding}" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource IslandHoverBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource IslandAccentFillBrush}" />
+                            <Setter Property="Foreground" Value="{DynamicResource IslandOnAccentBrush}" />
+                            <Setter Property="FontWeight" Value="SemiBold" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.45" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="IslandSegmentedStyle" TargetType="{x:Type c:SegmentedControl}" BasedOn="{StaticResource {x:Type c:SegmentedControl}}">
+        <Setter Property="Background" Value="{DynamicResource IslandButtonBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource IslandControlBorderBrush}" />
+        <Setter Property="ItemContainerStyle" Value="{StaticResource IslandSegmentItemStyle}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type c:SegmentedControl}">
+                    <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="1" CornerRadius="4" Padding="1"
+                            HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}">
+                        <ItemsPresenter />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.45" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
 </ResourceDictionary>
