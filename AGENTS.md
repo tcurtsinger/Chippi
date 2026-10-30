@@ -18,7 +18,7 @@ A Windows 11 tray app for the owner's own PC (C#, .NET 10, WPF): an island at th
 - CI runs every project under `tests/` in Release on x64. Locally, run the projects your change touches, and let CI run the rest.
 - Run in Release too when a test touches Debug-only members.
 - `Chippi.UiSmoke` drives real windows and keys on the desktop. It's skipped unless `CHIPPI_UI_SMOKE=1`; only enable it when the owner has set a time (`tests/Chippi.UiSmoke/README.md`).
-- Before tests that show windows (`Chippi.Island.Tests` and the like), run `build/fullscreen-check.ps1`. Wait while a fullscreen app (a game) or Zoom is in front. While the owner is doing live checks, leave those tests to CI.
+- Before tests that show windows (`Chippi.Island.Tests` and the like), run `build/fullscreen-check.ps1`. It exits 1 while a fullscreen app (a game) or Zoom is in front: stop on that exit code and wait. Explorer reporting fullscreen is usually just the desktop; ask the owner before going on. While the owner is doing live checks, leave those tests to CI.
 - The CI runner's GPU has no engine counters, so tests that read hardware must accept null readings.
 - Make a flaky test deterministic with injected timers and clocks, not longer waits.
 
