@@ -77,6 +77,10 @@
          The surface is solid: with Transparency effects off, Windows draws acrylic solid too. ===== -->
     <SolidColorBrush x:Key="IslandBrush" Color="#F528282C" />
     <SolidColorBrush x:Key="IslandBorderBrush" Color="#17FFFFFF" />
+    <!-- The widget's rim (puck or bar): stronger than a panel's edge, so it holds on a mid-gray wallpaper;
+         brighter still on hover, which never changes the widget's size. -->
+    <SolidColorBrush x:Key="IslandWidgetBorderBrush" Color="#2BFFFFFF" />
+    <SolidColorBrush x:Key="IslandWidgetHoverBorderBrush" Color="#57FFFFFF" />
     <SolidColorBrush x:Key="IslandTabBorderBrush" Color="#24FFFFFF" />
     <SolidColorBrush x:Key="IslandFooterBrush" Color="#09FFFFFF" />
     <SolidColorBrush x:Key="IslandHairBrush" Color="#14FFFFFF" />

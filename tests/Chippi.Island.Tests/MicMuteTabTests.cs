@@ -30,13 +30,13 @@ public sealed class MicMuteTabTests
                 });
                 window.SetActivities([music, muted], PetMood.Idle);
                 Assert.Equal(Visibility.Visible, window.MicBadge.Visibility);
-                Assert.Equal(Visibility.Visible, window.Equalizer.Visibility); // the song keeps the chip; the mic is the badge
+                Assert.Equal(Visibility.Visible, window.Equalizer.Visibility); // the song keeps the bar; the mic is the badge
                 Assert.Equal("Track", window.ChipText);
                 Assert.Equal("Microphone muted", AutomationProperties.GetHelpText(window.PuckButton));
                 window.SetActivities([music, muted with { Title = "Some microphones muted" }], PetMood.Idle);
                 Assert.Equal("Some microphones muted", AutomationProperties.GetHelpText(window.PuckButton));
                 window.SetActivities([muted], PetMood.Idle);
-                Assert.Equal(Visibility.Collapsed, window.Chip.Visibility); // muted alone: only the badge
+                Assert.False(window.BarShown); // muted alone: the puck, with only the badge
                 Assert.Equal(Visibility.Visible, window.MicBadge.Visibility);
                 window.SetActivities([music], PetMood.Idle);
                 Assert.Equal(Visibility.Collapsed, window.MicBadge.Visibility);

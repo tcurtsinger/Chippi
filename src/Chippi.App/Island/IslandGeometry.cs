@@ -8,22 +8,23 @@ namespace Chippi.App.Island;
 /// <summary>
 /// Where the widget and its panel go (DESIGN.md §5), in a monitor's physical pixels. Pure arithmetic,
 /// so the rules are unit-tested: the puck sits anywhere inside the work area, its place saved as
-/// fractions of the room it has there (so a resolution change doesn't move it off screen), and the
-/// panel opens beside it toward the work area's middle, kept 8px inside.
+/// fractions of the room it has there (so a resolution change doesn't move it off screen); the bar
+/// grows from it toward the work area's middle; and the panel grows out of the widget's outer corner,
+/// kept 8px inside.
 /// </summary>
 public static class IslandGeometry
 {
-    /// <summary>The puck's diameter in DIPs.</summary>
+    /// <summary>The puck's diameter in DIPs, and the bar's height.</summary>
     public const double Puck = 50;
+
+    /// <summary>The bar's width in DIPs, the same whatever it shows (Travis, 2026-10-30).</summary>
+    public const double BarWidth = 256;
 
     /// <summary>Where the puck starts: this far (DIPs) in from the work area's bottom-right corner.</summary>
     public const double CornerInset = 24;
 
     /// <summary>The open panel stays this far (DIPs) inside the work area.</summary>
     public const double Gap = 8;
-
-    /// <summary>The panel's edge nearest the puck sits this far (DIPs) in from the puck's far side, so the puck sits on its corner.</summary>
-    public const double PanelOverlap = 20;
 
     /// <summary>
     /// The puck's rectangle for a saved place: <paramref name="x"/> and <paramref name="y"/> are 0–1
@@ -59,22 +60,29 @@ public static class IslandGeometry
         new(Math.Clamp(puck.Left, work.Left, Math.Max(work.Left, work.Right - puck.Width)),
             Math.Clamp(puck.Top, work.Top, Math.Max(work.Top, work.Bottom - puck.Height)), puck.Width, puck.Height);
 
-    /// <summary>Whether the panel and the chips go left of the puck: it sits right of the work area's middle.</summary>
+    /// <summary>Whether the bar and the panel grow left from the puck: it sits right of the work area's middle.</summary>
     public static bool OpensLeft(Rect puck, Rect work) => puck.Left + puck.Width / 2 > work.Left + work.Width / 2;
 
-    /// <summary>Whether the panel goes above the puck: it sits below the work area's middle.</summary>
+    /// <summary>Whether the panel grows up from the puck: it sits below the work area's middle.</summary>
     public static bool OpensUp(Rect puck, Rect work) => puck.Top + puck.Height / 2 > work.Top + work.Height / 2;
 
+    /// <summary>The bar: the puck stretched to <see cref="BarWidth"/> toward the middle, its outer end where the puck's is.</summary>
+    public static Rect BarRect(Rect puck, bool opensLeft, double scale)
+    {
+        double width = BarWidth * scale;
+        return new Rect(opensLeft ? puck.Right - width : puck.Left, puck.Top, width, puck.Height);
+    }
+
     /// <summary>
-    /// The open panel's top-left: beside the puck toward the work area's middle, its near edge
-    /// level with the puck's side and 20 in from the puck's far side, so the puck sits on its corner,
-    /// then kept 8px inside the work area.
+    /// The open panel's top-left: the widget becomes the panel, so the panel's corner is the puck's
+    /// outer corner (a bottom-right puck shares its right and bottom edges with the panel, and the bar,
+    /// which grows from the puck, shares them too), then kept 8px inside the work area.
     /// </summary>
     public static Point PanelOrigin(Rect puck, Size panel, Rect work, double scale)
     {
-        double gap = Gap * scale, overlap = PanelOverlap * scale;
-        double x = OpensLeft(puck, work) ? puck.Left - panel.Width : puck.Right;
-        double y = OpensUp(puck, work) ? puck.Bottom - overlap - panel.Height : puck.Top + overlap;
+        double gap = Gap * scale;
+        double x = OpensLeft(puck, work) ? puck.Right - panel.Width : puck.Left;
+        double y = OpensUp(puck, work) ? puck.Bottom - panel.Height : puck.Top;
         x = Math.Clamp(x, work.Left + gap, Math.Max(work.Left + gap, work.Right - gap - panel.Width));
         y = Math.Clamp(y, work.Top + gap, Math.Max(work.Top + gap, work.Bottom - gap - panel.Height));
         return new Point(x, y);

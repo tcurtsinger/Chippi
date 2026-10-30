@@ -5,7 +5,6 @@ using System.Diagnostics;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
-using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
@@ -38,30 +37,34 @@ internal sealed class IslandPlacementEventArgs(double x, double y, HMONITOR moni
 
 /// <summary>
 /// The widget on the desktop (DESIGN.md §5, §9), and the controller for the open panel and the drag:
-/// the puck with Chippi, a chip beside it (the song, or the highest activity), and the red badge for
-/// a muted mic. Every window here never activates (WS_EX_NOACTIVATE plus WM_MOUSEACTIVATE) and never
-/// shows in Alt+Tab or the taskbar, and is placed in physical pixels on the monitor it is given.
-/// Hovering grows the puck and wakes the blob; a click opens the panel, which stays open until a
-/// click outside it, Esc or another click on the puck. A press that moves 4px lifts the puck and drags
-/// it; it drops where it is let go, kept inside the work area. The tray icon opens Settings.
-/// <see cref="IslandHost"/> feeds it activities, the mood, the monitor, the saved place and whether to hide.
+/// one shape that is the puck with Chippi, or the bar it stretches into toward the screen's middle while
+/// there is something to show (the song, or the highest activity), with the red badge for a muted mic.
+/// Two sizes only: the 50 puck and the 256 × 50 bar. Every window here never activates (WS_EX_NOACTIVATE
+/// plus WM_MOUSEACTIVATE) and never shows in Alt+Tab or the taskbar, and is placed in physical pixels on
+/// the monitor it is given. Hovering brightens the rim and wakes the blob; a click becomes the panel,
+/// which stays open until a click outside it or Esc. A press that moves 4px lifts the puck (the bar
+/// folds) and drags it; it drops where it is let go, kept inside the work area. The tray icon opens
+/// Settings. <see cref="IslandHost"/> feeds it activities, the mood, the monitor, the saved place and
+/// whether to hide.
 /// </summary>
 public partial class IslandWindow : Window
 {
     private const double DragThreshold = 4;
     private const double Room = 62; // the puck's center, in from the window's top and its near side: room for the lift and its shadow
-    private const double ChipGap = 6;
-    private const double LineMax = 150; // the chip's line, at most; longer scrolls
     private const double SongGap = 40; // between one pass and the next
     private const double SongSpeed = 30; // DIPs a second
-    private const double HoverScale = (IslandGeometry.Puck + 4) / IslandGeometry.Puck; // 4px bigger
     private const double LiftScale = 1.12;
     private const double LiftTilt = -6;
     private const uint VK_ESCAPE = 0x1B;
 
     private static readonly TimeSpan GrowTime = TimeSpan.FromMilliseconds(120);
     private static readonly TimeSpan SlideTime = TimeSpan.FromMilliseconds(180);
+    private static readonly TimeSpan UnfoldTime = TimeSpan.FromMilliseconds(240);
+    private static readonly TimeSpan FoldTime = TimeSpan.FromMilliseconds(180);
     private static readonly TimeSpan SongHold = TimeSpan.FromSeconds(2);
+
+    /// <summary>A paused song keeps the bar this long before it folds, so a quick pause doesn't make it flicker.</summary>
+    internal static readonly TimeSpan PauseHold = TimeSpan.FromSeconds(10);
     private static readonly IEasingFunction EaseOut = new CubicEase { EasingMode = EasingMode.EaseOut };
 
     private readonly IslandPanelWindow _panel = new();
@@ -74,7 +77,7 @@ public partial class IslandWindow : Window
     private bool _suppressed;
     private bool _hovered;
     private bool _lifted;
-    private bool _left; // the chip and the panel go left of the puck
+    private bool _left; // the bar and the panel grow left from the puck
     private readonly HOOKPROC _onKeyboard; // both kept alive for as long as their hook exists
     private readonly HOOKPROC _onMouse;
     private UnhookWindowsHookExSafeHandle? _escapeHook;
@@ -84,14 +87,18 @@ public partial class IslandWindow : Window
     private Rect _puck; // the puck at rest, physical pixels
     private Point? _pressAt;
     private Vector _grab; // from the puck's center to the pointer, physical pixels
-    private bool _pressedChip;
+    private bool _pressedBar;
     private bool _dragging;
     private EventHandler? _slideFrame;
     private double _followScale = double.NaN; // the scale of the last full move during a drag or slide
     private double _scaleTarget = 1, _tiltTarget;
     private Media.IMediaSessions? _media;
-    private bool _singing; // the chip names the song playing
-    private string? _chipKey; // the page the chip opens
+    private bool _singing; // the bar names a song, playing or just paused
+    private bool _barShown; // the widget is the bar (or unfolding into it), not the puck
+    private string? _heldSong; // the song last shown playing, which keeps the bar for PauseHold after it pauses
+    private bool _holdingPause;
+    private double _lineRoom; // the title's room on the bar; longer scrolls
+    private string? _chipKey; // the page the bar opens
     private string? _lastPage; // the page last opened, saved once the panel has gone
     private string _lineText = "";
     private string _chipText = ""; // the line as plain text, for the chip's name
@@ -121,9 +128,9 @@ public partial class IslandWindow : Window
         Motion.Changed += OnMotionChanged;
         _panel.IsVisibleChanged += (_, _) =>
         {
-            // The panel may have covered the puck's surroundings, so the puck never saw the pointer come or go.
+            // The panel covered the widget, so the widget never saw the pointer come or go.
             if (!_panel.IsVisible)
-                _hovered = IsVisible && _puck.Contains(IslandNative.Cursor());
+                _hovered = IsVisible && WidgetRect.Contains(IslandNative.Cursor());
             RefreshPuck();
             if (!_panel.IsVisible && _lastPage is { } page)
             {
@@ -131,7 +138,19 @@ public partial class IslandWindow : Window
                 Dispatcher.BeginInvoke(DispatcherPriority.ContextIdle, () => LastPageChanged?.Invoke(this, page));
             }
         };
-        // Clicked into, the panel comes to the front; the puck stays above it.
+        // While it is out, the panel is the widget's shape: the widget draws only Chippi and the bar's content, above it,
+        // fading as the shape grows and coming back as it folds. Opening, the bar's content goes over the first 25%, and
+        // Chippi shrinks to 70% and fades over the first 45%; closing, they come back over the end.
+        _panel.Morphing += (opening, t) =>
+        {
+            // How much of something is showing: gone by `until` opening, back from `from` closing (exactly 1 at the end).
+            double Shown(double until, double from) => opening ? 1 - Math.Clamp(t / until, 0, 1) : t >= 1 ? 1 : Math.Clamp((t - from) / (1 - from), 0, 1);
+            double pet = Shown(0.45, 0.45);
+            PuckEnd.Opacity = pet;
+            PetScale.ScaleX = PetScale.ScaleY = 0.7 + 0.3 * pet;
+            BarLayer.Opacity = Shown(0.25, 0.55);
+        };
+        // Clicked into, the panel comes to the front; the widget, faded out over it, stays above it for the close.
         _panel.Activated += (_, _) => IslandNative.Raise(_hwnd);
         _panel.EscapePressed += (_, _) => CloseIsland();
         _panel.SettingsRequested += (_, _) =>
@@ -142,24 +161,26 @@ public partial class IslandWindow : Window
         // Saved once the panel has gone: a save writes settings.json, which mid-switch costs frames.
         _panel.LastPageChanged += (_, key) => _lastPage = key;
 
-        // The mouse is handled here, before the buttons see it: a press is a click or the start of a drag.
+        // The mouse is handled here, before the button sees it: a press is a click or the start of a drag.
         // Click itself comes only from Enter, Space or UI Automation's Invoke.
-        foreach (var button in new[] { PuckButton, Chip })
+        PuckButton.PreviewMouseLeftButtonDown += OnPress;
+        PuckButton.PreviewMouseMove += OnPointerMove;
+        PuckButton.PreviewMouseLeftButtonUp += OnRelease;
+        PuckButton.LostMouseCapture += OnLostCapture;
+        PuckButton.MouseRightButtonUp += (_, e) =>
         {
-            button.PreviewMouseLeftButtonDown += OnPress;
-            button.PreviewMouseMove += OnPointerMove;
-            button.PreviewMouseLeftButtonUp += OnRelease;
-            button.LostMouseCapture += OnLostCapture;
-            button.MouseRightButtonUp += (_, e) =>
-            {
-                if (MenuItems.Children.Count == 0)
-                    return;
-                Menu.IsOpen = true;
-                e.Handled = true;
-            };
-        }
-        PuckButton.Click += (_, _) => Toggle();
-        Chip.Click += (_, _) => OpenChip();
+            if (MenuItems.Children.Count == 0)
+                return;
+            Menu.IsOpen = true;
+            e.Handled = true;
+        };
+        PuckButton.Click += (_, _) =>
+        {
+            if (_barShown)
+                OpenChip();
+            else
+                Toggle();
+        };
         // A drag from another app over the closed puck (Phase 5 notes #48). The puck never takes the drop itself.
         PuckButton.AllowDrop = true;
         PuckButton.DragEnter += OnPuckDrag;
@@ -218,7 +239,7 @@ public partial class IslandWindow : Window
     /// <summary>Settings › Island &amp; pet: where the panel opens, and its buttons.</summary>
     internal void SetLayout(IslandLayout layout) => _panel.SetLayout(layout);
 
-    /// <summary>The output's live level for the bars while the chip names a song.</summary>
+    /// <summary>The output's live level for the equalizer while the bar names a song playing.</summary>
     internal void SetLevel(TabLevel level)
     {
         _level = level;
@@ -294,7 +315,7 @@ public partial class IslandWindow : Window
         _panel.SetActivities(activities.Where(a => a.ModuleId != Chippi.Features.PlainPaste.PlainPasteModule.Id).ToArray(), mood);
     }
 
-    /// <summary>The running features' tiles, in the home's order. The chip shows a tile's status, so it follows them.</summary>
+    /// <summary>The running features' tiles, in the home's order. The bar shows a tile's status, so it follows them.</summary>
     public void SetTiles(IReadOnlyList<IslandTileGroup> tiles)
     {
         foreach (var part in _tiles.SelectMany(t => t.Parts))
@@ -361,13 +382,19 @@ public partial class IslandWindow : Window
 
     private MonitorArea? Area => IslandNative.Area(_monitor);
 
-    /// <summary>The puck at rest, in physical pixels: where the panel grows out of and shrinks back into.</summary>
+    /// <summary>The puck at rest, in physical pixels: the bar grows from it, and the panel sits on its outer corner.</summary>
     internal Rect PuckRect => _puck;
 
-    /// <summary>Whether the chip and the panel go left of the puck (it sits right of the middle).</summary>
+    /// <summary>The widget at rest, in physical pixels: the bar while it shows, otherwise the puck. The panel grows out of it and folds back into it.</summary>
+    internal Rect WidgetRect => _barShown && Area is { } area ? IslandGeometry.BarRect(_puck, _left, area.Scale) : _puck;
+
+    /// <summary>Whether the widget is the bar (or unfolding into it).</summary>
+    internal bool BarShown => _barShown;
+
+    /// <summary>Whether the bar and the panel grow left from the puck (it sits right of the middle).</summary>
     internal bool OpensLeft => _left;
 
-    /// <summary>The window around a puck centered on <paramref name="center"/>, with the chip's room on its side.</summary>
+    /// <summary>The window around a puck centered on <paramref name="center"/>, with the bar's room on its side.</summary>
     private Rect WindowAt(Point center, double scale) =>
         new(center.X - (_left ? Root.Width - Room : Room) * scale, center.Y - Room * scale, Root.Width * scale, Root.Height * scale);
 
@@ -386,7 +413,7 @@ public partial class IslandWindow : Window
         IslandNative.Move(_hwnd, rect);
     }
 
-    /// <summary>Puts the widget at its saved place on its monitor (and the open panel beside it), and re-asserts topmost.</summary>
+    /// <summary>Puts the widget at its saved place on its monitor (and the open panel on its corner), and re-asserts topmost.</summary>
     private void Place()
     {
         if (_hwnd == default || _dragging || Area is not { } area)
@@ -396,17 +423,33 @@ public partial class IslandWindow : Window
         ApplySide(IslandGeometry.OpensLeft(_puck, area.Work));
         IslandNative.Move(_hwnd, WindowAt(Center(_puck), area.Scale));
         if (_panel.IsOpen)
-            _panel.Open(_puck, area);
+            _panel.Open(_puck, WidgetRect, area);
     }
 
-    /// <summary>The puck on the window's right with the chip left of it, or the other way round.</summary>
+    /// <summary>
+    /// The puck on the window's right with the bar growing left from it, or the other way round: the widget is
+    /// held at the puck's outer side, and Chippi sits at that end.
+    /// </summary>
     private void ApplySide(bool left)
     {
         _left = left;
-        Canvas.SetLeft(PuckButton, (left ? Root.Width - Room : Room) - IslandGeometry.Puck / 2);
-        double chip = Room + IslandGeometry.Puck / 2 + ChipGap;
-        Canvas.SetLeft(Chip, left ? double.NaN : chip);
-        Canvas.SetRight(Chip, left ? chip : double.NaN);
+        double outer = Room - IslandGeometry.Puck / 2;
+        Canvas.SetLeft(PuckButton, left ? double.NaN : outer);
+        Canvas.SetRight(PuckButton, left ? outer : double.NaN);
+        Bar.HorizontalAlignment = PuckEnd.HorizontalAlignment = left ? HorizontalAlignment.Right : HorizontalAlignment.Left;
+        LayOutBar(left);
+    }
+
+    /// <summary>
+    /// The bar's columns from its round far end to Chippi's: 8, the lead (34), 10, the lines, 10, the equalizer, 10 and
+    /// Chippi's 46; with Chippi at the left, 56 (Chippi's 46 and 10), the same middle, then 8. The lines get 125 either way.
+    /// </summary>
+    private void LayOutBar(bool chippiRight)
+    {
+        var columns = Bar.ColumnDefinitions;
+        columns[0].Width = new GridLength(chippiRight ? 8 : 56);
+        columns[6].Width = new GridLength(chippiRight ? 10 : 0);
+        columns[7].Width = new GridLength(chippiRight ? 46 : 8);
     }
 
     private nint WndProc(nint hwnd, int msg, nint wParam, nint lParam, ref bool handled)
@@ -464,12 +507,12 @@ public partial class IslandWindow : Window
     }
 
     /// <summary>
-    /// A press at <paramref name="physical"/> while the panel is open: off the panel and the puck it
+    /// A press at <paramref name="physical"/> while the panel is open: off the panel and the widget it
     /// closes the panel, unless a list or menu the panel opened has the mouse.
     /// </summary>
     internal void PressedAt(Point physical)
     {
-        if (!_panel.IsOpen || _panel.Covers(physical) || (IsVisible && _puck.Contains(physical))
+        if (!_panel.IsOpen || _panel.Covers(physical) || (IsVisible && WidgetRect.Contains(physical))
             || Menu.IsOpen || Mouse.Captured is not null)
             return;
         Dispatcher.BeginInvoke(() => CloseIsland());
@@ -485,7 +528,7 @@ public partial class IslandWindow : Window
             OpenIsland();
     }
 
-    /// <summary>The chip's page: the song's opens Now Playing, an activity's its feature's page; without one it acts as the puck.</summary>
+    /// <summary>The bar's page: a song's opens Now Playing, an activity's its feature's page; without one it acts as the puck.</summary>
     private void OpenChip()
     {
         if (_chipKey is { } key && !_panel.IsOpen)
@@ -528,8 +571,8 @@ public partial class IslandWindow : Window
     {
         if (!IsVisible || _dragging || Area is not { } area)
             return;
-        _panel.Open(_puck, area);
-        IslandNative.Raise(_hwnd); // the puck stays above the panel that grows out of it
+        _panel.Open(_puck, WidgetRect, area);
+        IslandNative.Raise(_hwnd); // Chippi and the bar's content stay above the shape the widget became, fading
         Hook();
     }
 
@@ -544,7 +587,7 @@ public partial class IslandWindow : Window
         RefreshPuck();
     }
 
-    /// <summary>Shrinks the panel back into the puck; <paramref name="immediate"/> hides it at once.</summary>
+    /// <summary>Folds the panel back into the widget, the puck or the bar; <paramref name="immediate"/> hides it at once.</summary>
     private void CloseIsland(bool immediate = false)
     {
         if (!immediate && _openHolds.IsHeld) return;
@@ -556,7 +599,7 @@ public partial class IslandWindow : Window
         DragCloseTimer.Stop();
         if (!_panel.IsOpen)
             return;
-        _panel.CloseIsland(immediate);
+        _panel.CloseIsland(immediate, WidgetRect);
         RefreshPuck();
     }
 
@@ -641,7 +684,7 @@ public partial class IslandWindow : Window
         if (!_openedByDrag)
             return;
         var at = CursorAt();
-        if (_panel.Covers(at) || (IsVisible && _puck.Contains(at)))
+        if (_panel.Covers(at) || (IsVisible && WidgetRect.Contains(at)))
             return; // still over the widget: a later leave starts this again
         CloseIsland();
     }
@@ -666,13 +709,14 @@ public partial class IslandWindow : Window
     /// <summary>Whether the keyboard and mouse hooks are installed (only while the panel is open).</summary>
     internal bool IsHooked => _escapeHook is { IsInvalid: false } || _clickHook is { IsInvalid: false };
 
-    // ----- The puck and its chip -----
+    // ----- The puck and the bar -----
 
     /// <summary>
-    /// The puck and its chip: the blob sleeps at rest and wakes on hover or while anything is live; the
-    /// puck grows 4px on hover (and while the panel is out), and lifts while dragged. The chip shows,
-    /// in order: a drag from another app (the page it opens), Plain paste's feedback, the song playing,
-    /// or the highest activity. It hides while the panel is out and while dragging.
+    /// The widget: the blob sleeps at rest and wakes on hover or while anything is live; hover brightens the
+    /// rim, never the size, and the puck lifts while dragged. The widget is the bar while there is something
+    /// to show, in order: a drag from another app (the page it opens), Plain paste's feedback, the song
+    /// playing (or paused, for <see cref="PauseHold"/>), or the highest activity. Otherwise, and while
+    /// dragged, it is the puck. While the panel is out, the panel is its shape.
     /// </summary>
     private void RefreshPuck()
     {
@@ -680,25 +724,44 @@ public partial class IslandWindow : Window
         var mic = _activities.FirstOrDefault(a => a.ModuleId == "mic-mute" && a.NeedsAttention);
         var top = _activities.FirstOrDefault(a => a.ModuleId is not Chippi.Features.PlainPaste.PlainPasteModule.Id and not "mic-mute");
         bool dropping = _dragKey is not null;
-        bool grown = dropping || _hovered || _lifted || _panel.IsVisible;
-        Grow(_lifted ? LiftScale : grown ? HoverScale : 1, _lifted ? LiftTilt : 0);
-        PuckShadow.Effect = (System.Windows.Media.Effects.Effect)FindResource(_lifted ? "IslandLiftShadow" : "IslandPuckShadow");
+        bool awake = dropping || _hovered || _lifted || _panel.IsVisible;
+        Grow(_lifted ? LiftScale : 1, _lifted ? LiftTilt : 0);
+        BodyShadow.Effect = (System.Windows.Media.Effects.Effect)FindResource(_lifted ? "IslandLiftShadow" : "IslandPuckShadow");
+        Body.SetResourceReference(Border.BorderBrushProperty, _hovered && !_lifted ? "IslandWidgetHoverBorderBrush" : "IslandWidgetBorderBrush");
+        Body.Visibility = BodyShadow.Visibility = _panel.IsVisible ? Visibility.Hidden : Visibility.Visible;
         MicBadge.Visibility = Shown(mic is not null);
 
-        var song = top?.Kind == IslandActivityKind.Media && _media?.Current is { Playing: true } track ? track : null;
+        var current = _media?.Current;
+        var playing = top?.Kind == IslandActivityKind.Media && current is { Playing: true } ? current : null;
+        if (playing is not null)
+        {
+            _heldSong = playing.Id;
+            if (_holdingPause)
+            {
+                _holdingPause = false;
+                PauseTimer.Stop();
+            }
+        }
+        var song = playing ?? HeldSong(current);
         var tile = top?.TileKey is { } key ? _tiles.FirstOrDefault(t => t.Key == key) : null;
         var dropTile = dropping ? _tiles.FirstOrDefault(t => t.Key == _dragKey) : null;
-        bool chip = !_lifted && !_panel.IsVisible && (dropTile is not null || feedback is not null || top is not null);
-        _singing = chip && dropTile is null && feedback is null && song is not null;
-        // Listening (headphones) while a song plays, the panel out or not; otherwise the mood for the activities, awake on hover.
-        Pet.ShowMood(song is not null && !_lifted ? PetMood.Listening : _mood != PetMood.Sleepy ? _mood : grown ? PetMood.Idle : PetMood.Sleepy);
-        _chipKey = dropTile is null && feedback is null ? top?.TileKey : null;
-        Chip.Visibility = Shown(chip);
-        Chip.IsHitTestVisible = !dropping; // a drag over it stays the puck's
-        Cover.Visibility = Shown(_singing);
-        Glyph.Visibility = Shown(chip && !_singing);
-        Equalizer.Visibility = Shown(_singing);
-        if (!chip)
+        bool bar = !_lifted && (dropTile is not null || feedback is not null || song is not null || top is not null);
+        _singing = bar && dropTile is null && feedback is null && song is not null;
+        bool paused = _singing && playing is null;
+        // Listening (headphones) while a song plays, the panel out or not; otherwise the mood for the activities, awake on hover or on the bar.
+        Pet.ShowMood(playing is not null && !_lifted ? PetMood.Listening : _mood != PetMood.Sleepy ? _mood : awake || bar ? PetMood.Idle : PetMood.Sleepy);
+        _chipKey = dropTile is not null || feedback is not null ? null : _singing ? IslandPanelWindow.NowPlayingKey : top?.TileKey;
+        ShowBar(bar);
+        if (bar)
+        {
+            // Folding, the bar keeps what it showed while it fades.
+            Cover.Visibility = Shown(_singing);
+            Glyph.Visibility = Shown(!_singing);
+            Equalizer.Visibility = Shown(_singing && !paused);
+            PausedMark.Visibility = Shown(paused);
+            _lineRoom = IslandGeometry.BarWidth - 8 - 34 - 10 - 10 - 10 - 46 - (_singing ? paused ? 14 : 13 : 0);
+        }
+        if (!bar)
             ShowLine(null, "", "");
         else if (dropTile is not null)
         {
@@ -721,21 +784,80 @@ public partial class IslandWindow : Window
                 ShowGlyph(LucideIcons.Get(tile.Toggle?.Icon ?? tile.Icon), top.NeedsAttention);
             else
                 ShowKindGlyph(top);
+            // The status over the feature: "1 hr left" over "Keep awake".
             string status = tile is null ? "" : tile.Toggle?.Status?.Invoke() ?? tile.Status;
-            ShowLine(top.Key, status.Length > 0 ? status : top.Title, "");
+            string title = status.Length > 0 ? status : top.Title;
+            string detail = tile?.Name ?? top.Source;
+            ShowLine(top.Key, title, detail == title ? "" : detail);
         }
-        // The bars follow the output's real level while the song shows and can be seen.
-        if (_singing && IsVisible && !Motion.IsReduced)
+        // The equalizer follows the output's real level while a song plays on the bar and can be seen.
+        if (_singing && !paused && IsVisible && !Motion.IsReduced)
             _level?.Start();
         else
             StopLevel();
-        AutomationProperties.SetName(PuckButton, "Chippi");
+        AutomationProperties.SetName(PuckButton, bar ? $"Chippi, {_chipText}" : "Chippi");
         AutomationProperties.SetHelpText(PuckButton, mic is not null ? (mic.Title == "Muted" ? "Microphone muted" : mic.Title) : "");
-        AutomationProperties.SetName(Chip, chip ? _chipText : "");
-        AutomationProperties.SetLiveSetting(Chip, AutomationLiveSetting.Polite);
+        AutomationProperties.SetLiveSetting(PuckButton, AutomationLiveSetting.Polite);
     }
 
     private static Visibility Shown(bool shown) => shown ? Visibility.Visible : Visibility.Collapsed;
+
+    private IIslandTimer? _pauseTimer;
+
+    private IIslandTimer PauseTimer => _pauseTimer ??= CreateTimer(PauseHold, () =>
+    {
+        _heldSong = null;
+        _holdingPause = false;
+        RefreshPuck();
+    });
+
+    /// <summary>
+    /// The song the bar keeps after it pauses: the one last shown playing, still the session in use and paused,
+    /// for <see cref="PauseHold"/> from the pause. Anything else lets it go.
+    /// </summary>
+    private Media.MediaTrack? HeldSong(Media.MediaTrack? current)
+    {
+        if (_heldSong is not null && current is { Playing: false } && current.Id == _heldSong)
+        {
+            if (!_holdingPause)
+            {
+                _holdingPause = true;
+                PauseTimer.Start();
+            }
+            return current;
+        }
+        if (_holdingPause)
+            PauseTimer.Stop();
+        _heldSong = null;
+        _holdingPause = false;
+        return null;
+    }
+
+    /// <summary>
+    /// The puck unfolds into the bar (240ms ease-out from Chippi's end, its content fading in over the second
+    /// half) or folds back (180ms, the content fading over the first half). At once under reduced motion, while
+    /// hidden, lifted, or while the panel is its shape.
+    /// </summary>
+    private void ShowBar(bool shown)
+    {
+        if (shown == _barShown)
+            return;
+        _barShown = shown;
+        double width = shown ? IslandGeometry.BarWidth : IslandGeometry.Puck;
+        if (Motion.IsReduced || !IsVisible || _lifted || _panel.IsVisible)
+        {
+            PuckButton.BeginAnimation(WidthProperty, null);
+            PuckButton.Width = width;
+            Bar.BeginAnimation(OpacityProperty, null);
+            Bar.Opacity = shown ? 1 : 0;
+            return;
+        }
+        PuckButton.BeginAnimation(WidthProperty, new DoubleAnimation(width, shown ? UnfoldTime : FoldTime) { EasingFunction = EaseOut }, HandoffBehavior.SnapshotAndReplace);
+        var fade = shown
+            ? new DoubleAnimation(1, UnfoldTime / 2) { BeginTime = UnfoldTime / 2 }
+            : new DoubleAnimation(0, FoldTime / 2);
+        Bar.BeginAnimation(OpacityProperty, fade, HandoffBehavior.SnapshotAndReplace);
+    }
 
     /// <summary>The puck's size and tilt, eased over 120ms (at once under reduced motion or while hidden).</summary>
     private void Grow(double scale, double tilt)
@@ -761,10 +883,10 @@ public partial class IslandWindow : Window
         }
     }
 
-    /// <summary>The chip's line as plain text (its name).</summary>
+    /// <summary>The bar's lines as plain text ("title · detail"), in its name.</summary>
     internal string ChipText => _chipText;
 
-    /// <summary>The size the puck is drawn at, or heading to (1 at rest).</summary>
+    /// <summary>The size the puck is drawn at, or heading to: 1, except lifted (hover never changes it).</summary>
     internal double PuckScaleTarget => _scaleTarget;
 
     /// <summary>The puck's tilt, or where it is heading (0 unless lifted).</summary>
@@ -802,24 +924,26 @@ public partial class IslandWindow : Window
         }
     }
 
+    // The cover fills the 34 circle; without one, a Music glyph on the button fill.
     private void ShowCover(ImageSource? art)
     {
         if (art is null)
         {
-            Cover.SetResourceReference(Border.BackgroundProperty, "IslandButtonBrush");
+            CoverArt.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, "IslandButtonBrush");
             CoverGlyph.Visibility = Visibility.Visible;
             return;
         }
-        if (Cover.Background is not ImageBrush { ImageSource: var shown } || shown != art)
-            Cover.Background = new ImageBrush(art) { Stretch = Stretch.UniformToFill };
+        if (CoverArt.Fill is not ImageBrush { ImageSource: var shown } || shown != art)
+            CoverArt.Fill = new ImageBrush(art) { Stretch = Stretch.UniformToFill };
         CoverGlyph.Visibility = Visibility.Collapsed;
     }
 
     /// <summary>
-    /// The chip's line: <paramref name="title"/> in semibold, then " · detail" in secondary. It holds
-    /// still when it fits in 150; otherwise it scrolls 30 a second after a 2s hold, a copy following 40
-    /// behind so it loops seamlessly. It stops while the widget is hidden or motion is reduced.
-    /// <paramref name="id"/> tells one song or activity from the next, so an update doesn't start it over.
+    /// The bar's lines: <paramref name="title"/> (13, semibold) over <paramref name="detail"/> (12, secondary, cut
+    /// with an ellipsis). The title holds still when it fits its room (125 beside the equalizer); otherwise it
+    /// scrolls 30 a second after a 2s hold, a copy following 40 behind so it loops seamlessly. It stops while the
+    /// widget is hidden or motion is reduced. <paramref name="id"/> tells one song or activity from the next, so an
+    /// update doesn't start it over.
     /// </summary>
     private void ShowLine(string? id, string title, string detail)
     {
@@ -834,19 +958,21 @@ public partial class IslandWindow : Window
         {
             _lineText = text;
             _chipText = detail.Length > 0 ? $"{title} · {detail}" : title;
-            Fill(SongText, title, detail);
-            Fill(SongCopy, title, detail);
+            SongText.Text = SongCopy.Text = title;
+            Detail.Text = detail;
+            Detail.Visibility = Shown(detail.Length > 0);
         }
         SongText.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
         double full = Math.Ceiling(SongText.DesiredSize.Width);
-        bool fits = full <= LineMax;
+        double room = _lineRoom;
+        bool fits = full <= room;
         bool scroll = !fits && !Motion.IsReduced && IsVisible;
-        string state = $"{_lineText}\n{full}\n{scroll}";
+        string state = $"{_lineText}\n{full}\n{room}\n{scroll}";
         if (state == _lineState)
             return; // still on its way: a timeline or play-state update doesn't start it over
         _lineState = state;
-        Song.Width = fits ? full : LineMax;
-        Song.OpacityMask = fits ? null : Fade(LineMax, start: scroll);
+        Song.Width = fits ? full : room;
+        Song.OpacityMask = fits ? null : Fade(room, start: scroll);
         SongCopy.Visibility = Shown(scroll);
         if (!scroll)
         {
@@ -877,17 +1003,6 @@ public partial class IslandWindow : Window
         double[] rest = [8, 14, 10];
         for (int i = 0; i < rest.Length; i++)
             ((FrameworkElement)Equalizer.Children[i]).Height = rest[i];
-    }
-
-    private static void Fill(TextBlock block, string title, string detail)
-    {
-        block.Inlines.Clear();
-        block.Inlines.Add(new Run(title) { FontWeight = FontWeights.SemiBold });
-        if (detail.Length == 0)
-            return;
-        var by = new Run(" · " + detail);
-        by.SetResourceReference(TextElement.ForegroundProperty, "IslandTextSecondaryBrush");
-        block.Inlines.Add(by);
     }
 
     // The line fades over its last 8, and its first 8 while scrolling (a held line starts at the edge).
@@ -929,7 +1044,7 @@ public partial class IslandWindow : Window
     {
         e.Handled = true;
         _pressAt = PointerAt();
-        _pressedChip = sender == Chip;
+        _pressedBar = _barShown;
         _grab = _pressAt.Value - Center(_puck);
         ((UIElement)sender).CaptureMouse();
     }
@@ -959,7 +1074,7 @@ public partial class IslandWindow : Window
         ((UIElement)sender).ReleaseMouseCapture();
         if (dragged)
             DropAt(PointerAt());
-        else if (_pressedChip)
+        else if (_pressedBar)
             OpenChip();
         else
             Toggle();
@@ -975,7 +1090,7 @@ public partial class IslandWindow : Window
             DropAt(PointerAt());
     }
 
-    /// <summary>The puck lifts (bigger, tilted, a deeper shadow) and the panel and chip go.</summary>
+    /// <summary>The puck lifts (bigger, tilted, a deeper shadow): the panel goes and the bar folds at once.</summary>
     private void BeginDrag()
     {
         _dragging = true;
@@ -1029,7 +1144,7 @@ public partial class IslandWindow : Window
 
     /// <summary>
     /// Slides the puck from <paramref name="from"/> to <paramref name="to"/> (its center) over 180ms, at
-    /// once under reduced motion; then the chip takes the side toward the middle, and <paramref name="arrived"/> runs.
+    /// once under reduced motion; then the bar takes the side toward the middle, and <paramref name="arrived"/> runs.
     /// </summary>
     private void SlideTo(Point from, Point to, double scale, bool left, Action arrived)
     {

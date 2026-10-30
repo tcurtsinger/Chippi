@@ -72,6 +72,8 @@
     <!-- ===== Island: Dark.xaml says what each key is for. ===== -->
     <SolidColorBrush x:Key="IslandBrush" Color="#F5F5F5F6" />
     <SolidColorBrush x:Key="IslandBorderBrush" Color="#14000000" />
+    <SolidColorBrush x:Key="IslandWidgetBorderBrush" Color="#1F000000" />
+    <SolidColorBrush x:Key="IslandWidgetHoverBorderBrush" Color="#47000000" />
     <SolidColorBrush x:Key="IslandTabBorderBrush" Color="#1F000000" />
     <SolidColorBrush x:Key="IslandFooterBrush" Color="#09000000" />
     <SolidColorBrush x:Key="IslandHairBrush" Color="#14000000" />

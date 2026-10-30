@@ -22,8 +22,8 @@ using Windows.Win32.Foundation;
 namespace Chippi.App.Island;
 
 /// <summary>
-/// The open panel (DESIGN.md §5): the home or one tile's page, in one 520 × 360 shape that grows out
-/// of the widget's puck, beside it toward the screen's middle; every page starts with a back arrow.
+/// The open panel (DESIGN.md §5): the home or one tile's page, in one 520 × 360 shape that the widget
+/// (the puck, or the bar) becomes, on its outer corner; every page starts with a back arrow.
 /// Between pages the shape stays and the new content fades in. <see cref="IslandWindow"/> opens,
 /// places and closes it.
 /// </summary>
@@ -55,9 +55,10 @@ public partial class IslandPanelWindow : Window
     private IReadOnlyList<string> _shownTiles = [];
     private HWND _hwnd;
     private Rect _puck; // physical pixels
+    private Rect _widget; // the widget at rest, the puck or the bar: what the shape grows out of and folds back into
     private MonitorArea _area;
     private Rect _window; // the window while open, physical pixels
-    private Rect _puckLocal; // the puck, in the window's DIPs
+    private Rect _widgetLocal; // the widget, in the window's DIPs
     private Rect _target; // where the shape is heading, likewise
     private Rect _drawn; // where it is drawn now
     private Rect _from;
@@ -244,10 +245,18 @@ public partial class IslandPanelWindow : Window
         RefreshGrid();
     }
 
-    /// <summary>Grows out of the <paramref name="puck"/> (physical pixels), or moves beside it when already open.</summary>
-    internal void Open(Rect puck, MonitorArea area)
+    /// <summary>Grows out of the puck alone (physical pixels), or moves to it when already open.</summary>
+    internal void Open(Rect puck, MonitorArea area) => Open(puck, puck, area);
+
+    /// <summary>
+    /// The widget becomes the panel: grows out of <paramref name="widget"/> (the puck, or the bar grown
+    /// from <paramref name="puck"/>; physical pixels) into the panel on the puck's outer corner, or moves
+    /// there when already open.
+    /// </summary>
+    internal void Open(Rect puck, Rect widget, MonitorArea area)
     {
         _puck = puck;
+        _widget = widget;
         _area = area;
         if (IsOpen)
         {
@@ -268,12 +277,20 @@ public partial class IslandPanelWindow : Window
         Begin(Morph.Open);
     }
 
-    /// <summary>Shrinks back into the puck, then hides; <paramref name="immediate"/> hides at once.</summary>
-    public void CloseIsland(bool immediate = false)
+    /// <summary>
+    /// Folds back into the widget, then hides; <paramref name="immediate"/> hides at once. <paramref name="widget"/>
+    /// is the widget as it is now (a song may have started or stopped while the panel was open).
+    /// </summary>
+    public void CloseIsland(bool immediate = false, Rect? widget = null)
     {
         if (!IsOpen)
             return;
         IsOpen = false;
+        if (widget is { } now && _hwnd != default)
+        {
+            _widget = now;
+            _widgetLocal = Local(now);
+        }
         _keyboard = false;
         PasteTarget = null;
         MarkOnScreen();
@@ -597,7 +614,7 @@ public partial class IslandPanelWindow : Window
 
     // ----- Placement and the morph -----
 
-    /// <summary>The panel's rectangle beside the puck, in physical pixels.</summary>
+    /// <summary>The panel's rectangle on the puck's outer corner, in physical pixels.</summary>
     private Rect PanelRect()
     {
         double s = _area.Scale;
@@ -606,21 +623,21 @@ public partial class IslandPanelWindow : Window
     }
 
     /// <summary>
-    /// Covers the puck and the panel beside it, with room for the shadow, while open, so the morph never
+    /// Covers the widget and the panel it becomes, with room for the shadow, while open, so the morph never
     /// moves the window. Kept on the monitor, and no bigger: every frame copies all of it.
     /// </summary>
     private void Place()
     {
         double s = _area.Scale;
         var cover = PanelRect();
-        cover.Union(_puck);
+        cover.Union(_widget);
         cover.Inflate(ShadowRoom * s, ShadowRoom * s);
         cover.Intersect(_area.Monitor);
         _window = new Rect(Math.Floor(cover.X), Math.Floor(cover.Y), Math.Ceiling(cover.Width), Math.Ceiling(cover.Height));
         IslandNative.Move(_hwnd, _window);
         Root.Width = _window.Width / s;
         Root.Height = _window.Height / s;
-        _puckLocal = Local(_puck);
+        _widgetLocal = Local(_widget);
         Reshape(snap: _frame is null);
     }
 
@@ -644,16 +661,22 @@ public partial class IslandPanelWindow : Window
     }
 
     /// <summary>
-    /// Starts a morph from what is drawn now: open (puck to page, 220ms, content fading in over the
+    /// Each frame of an open or a close: whether it is opening, and how far along (0–1), so the widget
+    /// fades Chippi and the bar's content in step with the shape it has become. A close ends at 1.
+    /// </summary>
+    internal event Action<bool, double>? Morphing;
+
+    /// <summary>
+    /// Starts a morph from what is drawn now: open (the widget to page, 220ms, content fading in over the
     /// second half), page (the shape stays; the new page fades in over 150ms) or close (back into the
-    /// puck, 160ms, content fading out). Reduced motion snaps.
+    /// widget, 160ms, content fading out). Reduced motion snaps.
     /// </summary>
     private void Begin(Morph morph)
     {
         _morph = morph;
-        bool fromPuck = morph == Morph.Open && _frame is null;
-        _from = fromPuck ? _puckLocal : _drawn;
-        _radiusFrom = fromPuck ? PuckRadius : _radius;
+        bool fromWidget = morph == Morph.Open && _frame is null;
+        _from = fromWidget ? _widgetLocal : _drawn;
+        _radiusFrom = fromWidget ? WidgetRadius : _radius;
         _fadeFrom = Card.Opacity;
         _elapsed = TimeSpan.Zero;
         if (Motion.IsReduced)
@@ -690,9 +713,9 @@ public partial class IslandPanelWindow : Window
         var time = _morph == Morph.Close ? ShrinkTime : GrowTime;
         double t = Math.Min(1, _elapsed / time);
         double eased = 1 - Math.Pow(1 - t, 3);
-        var to = _morph == Morph.Close ? _puckLocal : _target;
+        var to = _morph == Morph.Close ? _widgetLocal : _target;
         _drawn = new Rect(Lerp(_from.X, to.X, eased), Lerp(_from.Y, to.Y, eased), Lerp(_from.Width, to.Width, eased), Lerp(_from.Height, to.Height, eased));
-        _radius = Lerp(_radiusFrom, _morph == Morph.Close ? PuckRadius : OpenRadius, eased);
+        _radius = Lerp(_radiusFrom, _morph == Morph.Close ? WidgetRadius : OpenRadius, eased);
         double fade = Math.Clamp(_elapsed / PageFadeTime, 0, 1);
         Card.Opacity = _morph switch
         {
@@ -700,7 +723,16 @@ public partial class IslandPanelWindow : Window
             Morph.Page => fade,
             _ => _fadeFrom * Math.Clamp(1 - t * 2, 0, 1),
         };
+        // The shadow deepens from about the widget's to the panel's, and back.
+        ShapeShadow.Opacity = _morph switch
+        {
+            Morph.Open => Lerp(WidgetShadowShare, 1, eased),
+            Morph.Close => Lerp(1, WidgetShadowShare, eased),
+            _ => 1,
+        };
         Draw();
+        if (_morph != Morph.Page)
+            Morphing?.Invoke(_morph == Morph.Open, t);
         bool done = _morph == Morph.Page ? fade >= 1 && t >= 1 : t >= 1;
         if (!done)
             return;
@@ -711,7 +743,11 @@ public partial class IslandPanelWindow : Window
 
     private double _radius = OpenRadius;
 
-    private double PuckRadius => Math.Min(_puckLocal.Width, _puckLocal.Height) / 2;
+    /// <summary>The puck's and the bar's round ends: half their height.</summary>
+    private double WidgetRadius => Math.Min(_widgetLocal.Width, _widgetLocal.Height) / 2;
+
+    /// <summary>The panel's shadow, scaled down to about the widget's while the shape is the widget.</summary>
+    private const double WidgetShadowShare = 0.4;
 
     private void StopFrames()
     {
@@ -721,12 +757,14 @@ public partial class IslandPanelWindow : Window
         _frame = null;
     }
 
-    /// <summary>Back in the puck: hidden, with the views let go.</summary>
+    /// <summary>Back in the widget: hidden, with the views let go; the widget shows itself again.</summary>
     private void Collapse()
     {
         StopFrames();
         _radius = OpenRadius;
+        ShapeShadow.Opacity = 1;
         Hide();
+        Morphing?.Invoke(false, 1);
         Card.Opacity = 0;
         // Unparented views get Unloaded and stop listening until the island opens again.
         Detach();
