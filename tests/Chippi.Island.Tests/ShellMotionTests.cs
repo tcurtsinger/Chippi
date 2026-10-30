@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -164,25 +165,52 @@ public sealed class ShellMotionTests
     [Fact]
     public void Opening_on_a_bottom_corner_Chippi_shrinks_onto_the_footers_and_closing_it_takes_over_again() => WpfTestThread.Run(() => WithMotion(false, () => IslandWindowTests.WithShownIsland(window =>
     {
+        // The morph's clock moves only when the test moves it, so a slow runner's late frames can't leave it short.
+        long now = Stopwatch.GetTimestamp();
+        window.Panel.Clock = () => now;
+        int frames = 0;
+        window.Panel.Morphing += (_, _) => frames++;
+        void Frame()
+        {
+            int at = frames;
+            PumpUntil(() => frames > at);
+        }
+        void Advance(double ms)
+        {
+            now += (long)(ms * Stopwatch.Frequency / 1000);
+            Frame();
+        }
+
         var puck = window.PuckRect;
         var pointer = new Point(puck.Left + puck.Width / 2, puck.Top + puck.Height / 2);
         window.PointerAt = () => pointer;
         window.PuckButton.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Left) { RoutedEvent = UIElement.PreviewMouseLeftButtonDownEvent });
         window.PuckButton.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Left) { RoutedEvent = UIElement.PreviewMouseLeftButtonUpEvent });
         Assert.True(window.Panel.PetMeetsPuck);
-        IslandWindowTests.Pump(TimeSpan.FromMilliseconds(130)); // past the first 45% of the 220ms open
+        Frame(); // the clock starts on the first frame
+        Advance(130); // past the first 45% of the 220ms open
         Assert.Equal(1, window.PuckEnd.Opacity); // Chippi doesn't fade…
         Assert.Equal(0.7, window.PetScale.ScaleX, 2); // …it's the footer's size
-        IslandWindowTests.Pump(TimeSpan.FromMilliseconds(300));
+        Advance(300);
         Assert.Equal(0, window.PuckEnd.Opacity); // and the footer's Chippi has it now
 
         window.Escape();
-        IslandWindowTests.Pump(TimeSpan.FromMilliseconds(20));
+        Frame();
+        Advance(20);
         Assert.Equal(1, window.PuckEnd.Opacity); // closing, the widget's Chippi takes over at once, at the footer's size
         Assert.Equal(0.7, window.PetScale.ScaleX, 2);
-        IslandWindowTests.Pump(TimeSpan.FromMilliseconds(300));
+        Advance(300);
         Assert.Equal(1, window.PetScale.ScaleX, 3);
     })));
+
+    // Runs the dispatcher until ready (frames included), for at most 5 seconds.
+    private static void PumpUntil(Func<bool> ready)
+    {
+        var until = DateTime.UtcNow.AddSeconds(5);
+        while (!ready() && DateTime.UtcNow < until)
+            IslandWindowTests.Pump(TimeSpan.FromMilliseconds(5));
+        Assert.True(ready());
+    }
 
     [Fact]
     public void Laying_the_home_out_ahead_leaves_the_panel_closed() => WpfTestThread.Run(() => WithPanel(panel =>
