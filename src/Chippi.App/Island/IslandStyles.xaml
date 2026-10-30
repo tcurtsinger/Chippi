@@ -346,9 +346,10 @@
     </Style>
 
     <!-- The home's split button, Quick Settings style: a 44 tall toggle on the left (IslandSplitMainStyle) and a
-         28 wide arrow on the right (IslandSplitSideStyle), 6px outer corners, the control fill with a 1px edge.
-         On, both take one accent fill edge to edge (IslandGrid spans it across the two with FillFade.Span) and
-         on-accent glyphs, with a divider drawn on the fill; set the arrow's Tag to "On" with the toggle. -->
+         28 wide arrow on the right (IslandSplitSideStyle), 6px outer corners, the control fill with a 1px edge and a
+         divider between them. On, both take one accent fill edge to edge (IslandGrid spans it across the two with
+         FillFade.Span) and on-accent glyphs, with the divider drawn on the fill; set the arrow's Tag to "On" with the
+         toggle. A muted mic isn't on: it stays plain with a Caution glyph (IslandPanelWindow.RefreshGrid). -->
     <Style x:Key="IslandSplitMainStyle" TargetType="{x:Type ToggleButton}">
         <Setter Property="Height" Value="44" />
         <Setter Property="Foreground" Value="{DynamicResource IslandTextBrush}" />
@@ -393,15 +394,16 @@
     <Style x:Key="IslandSplitSideStyle" TargetType="{x:Type Button}">
         <Setter Property="Width" Value="28" />
         <Setter Property="Height" Value="44" />
-        <Setter Property="Foreground" Value="{DynamicResource IslandTextSecondaryBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource IslandTextBrush}" />
         <Setter Property="FocusVisualStyle" Value="{StaticResource IslandSplitSideFocusVisual}" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type Button}">
                     <Grid x:Name="Root">
-                        <Border x:Name="Chrome" CornerRadius="0,6,6,0" BorderThickness="1" i:FillFade.To="{DynamicResource IslandButtonBrush}" BorderBrush="{DynamicResource IslandControlBorderBrush}" />
-                        <!-- On, the divider: white at 28% on the fill. -->
-                        <Rectangle x:Name="Divider" Width="1" HorizontalAlignment="Left" Fill="#47FFFFFF" Visibility="Collapsed" />
+                        <Border x:Name="Chrome" CornerRadius="0,6,6,0" BorderThickness="0,1,1,1" i:FillFade.To="{DynamicResource IslandButtonBrush}" BorderBrush="{DynamicResource IslandControlBorderBrush}" />
+                        <!-- The divider, so a split reads as two parts at rest: tertiary at half strength, 10 in from top and
+                             bottom. On, it runs the full height in white at 28% on the fill. -->
+                        <Rectangle x:Name="Divider" Width="1" Margin="0,10" HorizontalAlignment="Left" Fill="{DynamicResource IslandTextTertiaryBrush}" Opacity="0.5" />
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Grid>
                     <ControlTemplate.Triggers>
@@ -414,7 +416,9 @@
                         <Trigger Property="Tag" Value="On">
                             <Setter TargetName="Chrome" Property="i:FillFade.To" Value="{DynamicResource IslandAccentFillBrush}" />
                             <Setter TargetName="Chrome" Property="BorderThickness" Value="0" />
-                            <Setter TargetName="Divider" Property="Visibility" Value="Visible" />
+                            <Setter TargetName="Divider" Property="Margin" Value="0" />
+                            <Setter TargetName="Divider" Property="Fill" Value="#47FFFFFF" />
+                            <Setter TargetName="Divider" Property="Opacity" Value="1" />
                             <Setter Property="Foreground" Value="{DynamicResource IslandOnAccentBrush}" />
                         </Trigger>
                         <MultiTrigger>
@@ -592,6 +596,33 @@
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="Chrome" Property="i:FillFade.To" Value="{DynamicResource IslandHoverBrush}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- A card that opens something as a whole (the home's Now Playing card): the card's fill and edge with 6 corners, a
+         hover wash and a press over all of it. Buttons inside keep their own. -->
+    <Style x:Key="IslandCardButtonStyle" TargetType="{x:Type Button}">
+        <Setter Property="Foreground" Value="{DynamicResource IslandTextBrush}" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource IslandTileFocusVisual}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type Button}">
+                    <Border Background="{DynamicResource IslandPanelBrush}" BorderBrush="{DynamicResource IslandCardBorderBrush}" BorderThickness="1" CornerRadius="6">
+                        <Border x:Name="Chrome" CornerRadius="5" i:FillFade.To="Transparent" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="Center" />
+                        </Border>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Chrome" Property="i:FillFade.To" Value="{DynamicResource IslandHoverBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Chrome" Property="i:FillFade.To" Value="{DynamicResource IslandPressedBrush}" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>

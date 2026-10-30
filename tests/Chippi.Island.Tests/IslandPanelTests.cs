@@ -362,16 +362,49 @@ public sealed class IslandPanelTests
             Assert.Same(LucideIcons.Mic, TileIcon(panel, "sound.microphone"));
 
             var stopped = new IslandActivity("stopped", IslandActivityKind.Status, "Stopped", "Microphone") { NeedsAttention = true, TileKey = "sound.microphone", ModuleId = "mic-processing" };
-            panel.SetActivities([stopped], PetMood.Idle);
+            panel.SetActivities([stopped]);
             Assert.Same(LucideIcons.Mic, TileIcon(panel, "sound.microphone"));
 
             var muted = new IslandActivity("muted", IslandActivityKind.Status, "Muted", "Microphone") { NeedsAttention = true, TileKey = "sound.microphone", ModuleId = "mic-mute" };
-            panel.SetActivities([stopped, muted], PetMood.Idle);
+            panel.SetActivities([stopped, muted]);
             Assert.Same(LucideIcons.MicOff, TileIcon(panel, "sound.microphone"));
             Assert.Same(panel.FindResource("WarningBrush"), TileGlyph(panel, "sound.microphone").Brush);
 
-            panel.SetActivities([], PetMood.Idle);
+            panel.SetActivities([]);
             Assert.Same(LucideIcons.Mic, TileIcon(panel, "sound.microphone"));
+        }, Tiles(mute)));
+    }
+
+    [Fact]
+    public void A_muted_mic_shows_as_needing_attention_not_as_on_and_a_toggle_that_fails_says_so()
+    {
+        bool muted = true, fail = false;
+        var mute = new IslandTileContribution("mic-mute", new IslandTileSpec("sound", "Sound", "AudioLines", 10, 0, () => new Border())
+        {
+            StatusPriority = 100,
+            Toggle = new IslandTileToggle(() => muted, () => fail ? Task.FromException(new InvalidOperationException("No microphone")) : Task.CompletedTask,
+                "Microphone", "Mic", () => muted ? "Muted" : "Live"),
+        });
+        WpfTestThread.Run(() => WithPanel(panel =>
+        {
+            Open(panel);
+            var activity = new IslandActivity("muted", IslandActivityKind.Status, "Muted", "Microphone") { NeedsAttention = true, TileKey = "sound", ModuleId = "mic-mute" };
+            panel.SetActivities([activity]);
+            // The accent says on and fine: muted, the button keeps its plain fill and the glyph is MicOff in Caution.
+            var toggle = Assert.IsType<System.Windows.Controls.Primitives.ToggleButton>(Grid(panel).Buttons().Single(b => (string)b.Tag == "sound"));
+            Assert.False(toggle.IsChecked);
+            Assert.Same(LucideIcons.MicOff, TileIcon(panel, "sound"));
+            Assert.Same(panel.FindResource("WarningBrush"), TileGlyph(panel, "sound").Brush);
+            Assert.Contains(Descendants(Grid(panel)).OfType<Button>(), b => AutomationProperties.GetName(b) == "Open Sound"); // its arrow opens Sound
+
+            // A toggle that fails says "Failed" under its button.
+            muted = false;
+            fail = true;
+            panel.SetActivities([]);
+            toggle = Assert.IsType<System.Windows.Controls.Primitives.ToggleButton>(Grid(panel).Buttons().Single(b => (string)b.Tag == "sound"));
+            toggle.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+            Pump(TimeSpan.FromMilliseconds(50));
+            Assert.Contains(Descendants(Grid(panel)).OfType<TextBlock>(), t => t.Text == "Failed");
         }, Tiles(mute)));
     }
 

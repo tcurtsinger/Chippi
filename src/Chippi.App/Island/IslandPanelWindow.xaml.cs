@@ -43,7 +43,12 @@ public partial class IslandPanelWindow : Window
 
     private enum Morph { Open, Page, Close }
 
+    // A toggle that failed says "Failed" under its button this long.
+    private static readonly TimeSpan FailedHold = TimeSpan.FromSeconds(4);
+
     private readonly IslandGrid _grid = new();
+    private readonly Dictionary<string, long> _failed = []; // tile key → when its "Failed" goes (Stopwatch ticks)
+    private readonly DispatcherTimer _failedTimer = new() { Interval = FailedHold };
     private readonly Dictionary<IslandTileContribution, FrameworkElement> _views = [];
     private readonly List<Panel> _attached = []; // the page's panels, which hold reused section views
     private readonly TextBlock _pageStatus = new() { FontSize = 12, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
@@ -81,6 +86,15 @@ public partial class IslandPanelWindow : Window
         _grid.TileOpened += (_, key) => ShowPage(key);
         _grid.TileToggled += (_, key) => Toggle(key);
         _grid.SettingsRequested += (_, _) => SettingsRequested?.Invoke(this, EventArgs.Empty);
+        _failedTimer.Tick += (_, _) =>
+        {
+            long now = Stopwatch.GetTimestamp();
+            foreach (var key in _failed.Where(f => f.Value <= now).Select(f => f.Key).ToList())
+                _failed.Remove(key);
+            if (_failed.Count == 0)
+                _failedTimer.Stop();
+            RefreshGrid();
+        };
         Card.Width = IslandPage.Width;
         Card.Height = IslandPage.Height;
         PointSharedKeys();
@@ -234,13 +248,15 @@ public partial class IslandPanelWindow : Window
             _grid.Pet.Celebrate();
     }
 
-    /// <summary>The activities give tiles their dots.</summary>
-    public void SetActivities(IReadOnlyList<IslandActivity> activities, PetMood mood)
+    /// <summary>The activities: a feature that needs attention shows in Caution.</summary>
+    public void SetActivities(IReadOnlyList<IslandActivity> activities)
     {
         _activities = activities;
-        _grid.Pet.ShowMood(mood == PetMood.WideAwake ? PetMood.WideAwake : PetMood.Idle);
         RefreshGrid();
     }
+
+    /// <summary>The footer's Chippi wears the widget's mood (listening, wide awake…), so the two match where one becomes the other.</summary>
+    internal void ShowPetMood(PetMood mood) => _grid.Pet.ShowMood(mood);
 
     /// <summary>The running features' island tiles, in grid order. A page whose tile went away falls back to the grid.</summary>
     public void SetTiles(IReadOnlyList<IslandTileGroup> tiles)
@@ -555,14 +571,18 @@ public partial class IslandPanelWindow : Window
     private void RefreshGrid()
     {
         var tiles = new List<IslandTileView>();
+        long now = Stopwatch.GetTimestamp();
         foreach (var group in _groups.Where(g => g.Key != NowPlayingKey))
         {
             var toggle = group.Toggle;
             bool muted = Muted(group.Key);
+            bool attention = LiveOn(group.Key)?.NeedsAttention == true || muted;
+            bool failed = _failed.TryGetValue(group.Key, out long until) && until > now;
             string name = toggle?.Name ?? group.Name;
-            string status = toggle?.Status?.Invoke() ?? group.Status;
+            string status = failed ? "Failed" : toggle?.Status?.Invoke() ?? group.Status;
             var icon = muted ? LucideIcons.MicOff : LucideIcons.Get(toggle?.Icon ?? group.Icon);
-            tiles.Add(new(group.Key, name, icon, status, toggle?.IsOn() == true, LiveOn(group.Key)?.NeedsAttention == true || muted, toggle is not null));
+            // The accent says something is on and fine: a muted mic, or anything that needs attention, shows in Caution instead.
+            tiles.Add(new(group.Key, name, icon, status, toggle?.IsOn() == true && !attention, attention || failed, toggle is not null, group.Name));
         }
         var shown = _layout.Shown(tiles.Select(t => t.Key));
         _grid.SetTiles([.. shown.Select(key => tiles.First(t => t.Key == key))]);
@@ -573,16 +593,21 @@ public partial class IslandPanelWindow : Window
         MarkOnScreen();
     }
 
-    /// <summary>A split button's toggle on the home.</summary>
-    private void Toggle(string key)
+    /// <summary>A split button's toggle on the home. When it fails, "Failed" shows under the button for a few seconds.</summary>
+    private async void Toggle(string key)
     {
         try
         {
-            Group(key)?.Toggle?.Toggle();
+            if (Group(key)?.Toggle is { } toggle)
+                await toggle.Toggle();
         }
         catch (Exception ex)
         {
             Log.Error($"Island: toggling {key} failed", ex);
+            _failed[key] = Stopwatch.GetTimestamp() + (long)(FailedHold.TotalSeconds * Stopwatch.Frequency);
+            _failedTimer.Stop();
+            _failedTimer.Start();
+            RefreshGrid();
         }
     }
 
@@ -680,6 +705,14 @@ public partial class IslandPanelWindow : Window
         _target = Local(PanelRect());
         Canvas.SetLeft(Card, _target.X);
         Canvas.SetTop(Card, _target.Y);
+        // The home's Chippi sits on the puck's side of the footer. On a bottom corner that's where the puck's own Chippi is,
+        // unless the work area's edge pushed the panel off the puck's corner.
+        var puck = Local(_puck);
+        var puckCenter = new Point(puck.X + puck.Width / 2, puck.Y + puck.Height / 2);
+        bool right = puckCenter.X > _target.X + _target.Width / 2;
+        _grid.SetPetSide(right);
+        var pet = new Point(right ? _target.Right - IslandGrid.FooterPet : _target.X + IslandGrid.FooterPet, _target.Bottom - IslandGrid.FooterPet);
+        _petAtPuck = (pet - puckCenter).Length < 1;
         if (snap && _morph != Morph.Close)
         {
             _drawn = _target;
@@ -692,6 +725,14 @@ public partial class IslandPanelWindow : Window
     /// fades Chippi and the bar's content in step with the shape it has become. A close ends at 1.
     /// </summary>
     internal event Action<bool, double>? Morphing;
+
+    private bool _petAtPuck;
+
+    /// <summary>
+    /// The home is showing and its footer's Chippi is exactly where the puck's is (a puck on a bottom corner): the widget's
+    /// Chippi shrinks onto it and hands over instead of fading.
+    /// </summary>
+    internal bool PetMeetsPuck => _petAtPuck && _page is null;
 
     /// <summary>
     /// Starts a morph from what is drawn now: open (the widget to page, 220ms, content fading in over the

@@ -15,8 +15,8 @@ namespace Chippi.Island.Tests;
 
 /// <summary>
 /// Filmstrips of the shell's motion on the primary display (motion-&lt;theme&gt;-&lt;name&gt;-&lt;ms&gt;.png): the bar
-/// unfolding as Chippi's headphones go on, a new song arriving, playing to paused, the mic badge, and a page
-/// coming in and the home coming back. The times are about right: each frame is saved as the dispatcher reaches it.
+/// unfolding as Chippi's headphones go on, a new song arriving, playing to paused, the mic badge, the panel opening,
+/// a page coming in and the home coming back, and the panel closing. The times are about right: each frame is saved as the dispatcher reaches it.
 /// Runs only when CHIPPI_ISLAND_SHOTS names an output folder.
 /// </summary>
 public sealed class IslandMotionFrames
@@ -63,12 +63,12 @@ public sealed class IslandMotionFrames
             media.Raise();
             Pump(TimeSpan.FromMilliseconds(600));
             window.SetLastPage(null);
-            window.ForceOpen(true);
-            Pump(TimeSpan.FromMilliseconds(500));
+            // On the bottom-right puck, so Chippi shrinks onto the footer's as the panel opens, and takes over again as it closes.
+            Strip("open", () => window.ForceOpen(true));
+            Pump(TimeSpan.FromMilliseconds(100));
             Strip("page", () => window.Panel.ShowPage("keep-awake", remember: false));
             Strip("back", () => window.Panel.ShowPage(null, remember: false));
-            window.ForceOpen(false);
-            Pump(TimeSpan.FromMilliseconds(400));
+            Strip("close", () => window.ForceOpen(false));
         }));
     }
 }

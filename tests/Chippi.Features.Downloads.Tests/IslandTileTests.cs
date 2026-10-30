@@ -25,16 +25,19 @@ public sealed class IslandTileTests : IDisposable
     }
 
     [Fact]
-    public void The_status_is_the_folders_mode_or_what_waits_for_review()
+    public void The_status_is_what_changes_held_files_files_to_review_or_a_mode_other_than_auto()
     {
         var folder = new WatchedFolder { Path = @"C:\Users\me\Downloads", Mode = FolderMode.Manual };
-        PendingFile Ready(string name) => new(@"C:\Users\me\Downloads\", @"C:\Users\me\Downloads\" + name, name, PendingStatus.Ready, null);
+        PendingFile Pending(string name, PendingStatus status) => new(@"C:\Users\me\Downloads\", @"C:\Users\me\Downloads\" + name, name, status, null);
+        PendingFile Ready(string name) => Pending(name, PendingStatus.Ready);
 
         Assert.Equal("", DownloadsModule.TileStatus(null, []));
         Assert.Equal("Manual", DownloadsModule.TileStatus(folder, []));
         Assert.Equal("2 to review", DownloadsModule.TileStatus(folder, [Ready("a.pdf"), Ready("b.zip")]));
+        Assert.Equal("1 held", DownloadsModule.TileStatus(folder, [Ready("a.pdf"), Pending("setup.pdf.exe", PendingStatus.Held)]));
         folder.Mode = FolderMode.Silent;
-        Assert.Equal("Auto", DownloadsModule.TileStatus(folder, []));
+        Assert.Equal("", DownloadsModule.TileStatus(folder, [])); // Auto is the setting, not news
+        Assert.Equal("1 to review", DownloadsModule.TileStatus(folder, [Ready("a.pdf")])); // already there when the folder was added
         folder.Mode = FolderMode.Paused;
         Assert.Equal("Paused", DownloadsModule.TileStatus(folder, [Ready("a.pdf")]));
     }
@@ -60,7 +63,7 @@ public sealed class IslandTileTests : IDisposable
         {
             await registry.StartAsync();
             var tile = Assert.Single(registry.Find("downloads-organizer")!.IslandTiles);
-            Assert.Equal("Auto", tile.Status);
+            Assert.Equal("", tile.Status); // Auto with nothing waiting
 
             var paused = module.Settings.Clone();
             paused.Folders[0].Mode = FolderMode.Paused;

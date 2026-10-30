@@ -147,13 +147,17 @@ public partial class IslandWindow : Window
         };
         // While it is out, the panel is the widget's shape: the widget draws only Chippi and the bar's content, above it,
         // fading as the shape grows and coming back as it folds. Opening, the bar's content goes over the first 25%, and
-        // Chippi shrinks to 70% and fades over the first 45%; closing, they come back over the end.
+        // Chippi shrinks to 70% and fades over the first 45%; closing, they come back over the end. When the home's footer
+        // holds Chippi where the puck's is (a puck on a bottom corner), Chippi doesn't fade: it shrinks onto the footer's,
+        // the same size there, and hands over once the panel is in, so the puck becomes the panel; closing, it takes over again.
         _panel.Morphing += (opening, t) =>
         {
             // How much of something is showing: gone by `until` opening, back from `from` closing (exactly 1 at the end).
             double Shown(double until, double from) => opening ? 1 - Math.Clamp(t / until, 0, 1) : t >= 1 ? 1 : Math.Clamp((t - from) / (1 - from), 0, 1);
             double pet = Shown(0.45, 0.45);
-            PuckEnd.Opacity = pet;
+            bool handOver = _panel.PetMeetsPuck && !Motion.IsReduced;
+            PuckEnd.Opacity = !handOver ? pet : opening && t >= 1 ? 0 : 1;
+            BadgeLayer.Opacity = handOver ? pet : 1; // the badge fades either way
             // Under reduced motion Chippi only fades; nothing shrinks or grows.
             PetScale.ScaleX = PetScale.ScaleY = Motion.IsReduced ? 1 : 0.7 + 0.3 * pet;
             BarLayer.Opacity = Shown(0.25, 0.55);
@@ -326,7 +330,7 @@ public partial class IslandWindow : Window
         _activities = activities;
         _mood = mood;
         RefreshPuck();
-        _panel.SetActivities(activities.Where(a => a.ModuleId != Chippi.Features.PlainPaste.PlainPasteModule.Id).ToArray(), mood);
+        _panel.SetActivities(activities.Where(a => a.ModuleId != Chippi.Features.PlainPaste.PlainPasteModule.Id).ToArray());
     }
 
     /// <summary>The running features' tiles, in the home's order. The bar shows a tile's status, so it follows them.</summary>
@@ -773,7 +777,9 @@ public partial class IslandWindow : Window
         _singing = bar && dropTile is null && feedback is null && song is not null;
         bool paused = _singing && playing is null;
         // Listening (headphones) while a song plays, the panel out or not; otherwise the mood for the activities, awake on hover or on the bar.
-        Pet.ShowMood(playing is not null && !_lifted ? PetMood.Listening : _mood != PetMood.Sleepy ? _mood : awake || bar ? PetMood.Idle : PetMood.Sleepy);
+        var mood = playing is not null && !_lifted ? PetMood.Listening : _mood != PetMood.Sleepy ? _mood : awake || bar ? PetMood.Idle : PetMood.Sleepy;
+        Pet.ShowMood(mood);
+        _panel.ShowPetMood(mood);
         _chipKey = dropTile is not null || feedback is not null ? null : _singing ? IslandPanelWindow.NowPlayingKey : top?.TileKey;
         // What the bar shows, by identity rather than its values ("59 min left" after "1 hr left" is the same activity):
         // a new song or a new activity on a bar that's out and seen arrives (Arrival), the old fading where it was.

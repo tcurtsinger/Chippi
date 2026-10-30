@@ -108,11 +108,14 @@
                         <!-- Decorative: the button's name and help text carry the state. -->
                         <pet:ChippiPet x:Name="Pet" Size="40" Mood="Sleepy" IsDecorative="True" IsHitTestVisible="False" />
                     </Grid>
-                    <Grid x:Name="MicBadge" Width="22" Height="22" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,-2,-2"
-                          IsHitTestVisible="False" Visibility="Collapsed">
-                        <Ellipse Fill="{DynamicResource IslandBrush}" />
-                        <Ellipse Width="18" Height="18" Fill="{StaticResource IslandBadgeBrush}" />
-                        <c:LucideIcon Data="{x:Static c:LucideIcons.MicOff}" Size="11" Thickness="2" Brush="White" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    <!-- The badge's own layer, so the open can fade it while Chippi stays (IslandWindow's Morphing). -->
+                    <Grid x:Name="BadgeLayer" IsHitTestVisible="False">
+                        <Grid x:Name="MicBadge" Width="22" Height="22" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,-2,-2"
+                              Visibility="Collapsed">
+                            <Ellipse Fill="{DynamicResource IslandBrush}" />
+                            <Ellipse Width="18" Height="18" Fill="{StaticResource IslandBadgeBrush}" />
+                            <c:LucideIcon Data="{x:Static c:LucideIcons.MicOff}" Size="11" Thickness="2" Brush="White" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Grid>
                     </Grid>
                 </Grid>
             </Grid>

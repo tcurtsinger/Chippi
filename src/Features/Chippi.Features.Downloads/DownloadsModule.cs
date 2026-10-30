@@ -175,16 +175,20 @@ public sealed class DownloadsModule : IFeatureModule
     }
 
     /// <summary>
-    /// The island tile's status, for the first watched folder (the one the island page shows): files to
-    /// review in Manual, else its mode ("Auto", "Manual", "Paused"); empty with no folder.
+    /// The island tile's status, for the first watched folder (the one the island page shows), as it changes: "Paused",
+    /// else files held for a look ("1 held"), else files waiting for Organize now ("2 to review"), else "Manual". Auto
+    /// with nothing waiting shows nothing: the mode is a setting, and the home shows only what changes. Empty with no folder.
     /// </summary>
     public static string TileStatus(WatchedFolder? folder, IReadOnlyList<PendingFile> pending)
     {
         if (folder is null)
             return "";
-        int ready = pending.Count(p => p.Status == PendingStatus.Ready
-            && string.Equals(Path.TrimEndingDirectorySeparator(p.Folder), Path.TrimEndingDirectorySeparator(folder.Path), StringComparison.OrdinalIgnoreCase));
-        return folder.Mode == FolderMode.Manual && ready > 0 ? $"{ready} to review" : folder.Mode.DisplayName();
+        if (folder.Mode == FolderMode.Paused)
+            return folder.Mode.DisplayName();
+        var here = pending.Where(p => string.Equals(Path.TrimEndingDirectorySeparator(p.Folder), Path.TrimEndingDirectorySeparator(folder.Path), StringComparison.OrdinalIgnoreCase)).ToList();
+        int held = here.Count(p => p.Status == PendingStatus.Held);
+        int ready = here.Count(p => p.Status == PendingStatus.Ready);
+        return held > 0 ? $"{held} held" : ready > 0 ? $"{ready} to review" : folder.Mode == FolderMode.Manual ? folder.Mode.DisplayName() : "";
     }
 
     private void OnPendingChanged(object? sender, EventArgs e) => UpdateTile();
