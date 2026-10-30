@@ -35,7 +35,7 @@ internal sealed class ShelfPage : UserControl
     private readonly WrapPanel _items = new() { Width = IslandPage.BodyWidth };
     private readonly Grid _grid = new() { VerticalAlignment = VerticalAlignment.Top };
     private readonly Rectangle _gridStroke = Dashed(8);
-    private readonly Button _copy = Button("Copy"), _pin = Button("Pin"), _remove = Button("Remove");
+    private readonly Button _copy = Button("Copy", LucideIcons.Files), _pin = Button("Pin", LucideIcons.Pin), _remove = Button("Remove", LucideIcons.Trash);
     private readonly StackPanel _caution = Caution();
     private readonly DockPanel _actions = new() { Height = ActionsHeight, Margin = new Thickness(0, Gap, 0, 0) };
     private int _columns = 6;
@@ -157,7 +157,7 @@ internal sealed class ShelfPage : UserControl
         ((Panel)_copy.Parent).Visibility = empty ? Visibility.Collapsed : Visibility.Visible;
         _copy.IsEnabled = selected is not null && ShelfFormat.State(selected) != ShelfFormat.FileState.Missing;
         _pin.IsEnabled = _remove.IsEnabled = selected is not null;
-        _pin.Content = selected?.Pinned == true ? "Unpin" : "Pin";
+        SetAction(_pin, selected?.Pinned == true ? "Unpin" : "Pin", LucideIcons.Pin);
         ShowCaution(limit);
     }
 
@@ -201,7 +201,7 @@ internal sealed class ShelfPage : UserControl
         bool missing = ShelfFormat.State(item) == ShelfFormat.FileState.Missing;
         FrameworkElement visual = item.Kind == ShelfKind.Picture && Thumbnail(item) is { } thumbnail
             ? new Image { Source = thumbnail, Width = 36, Height = 20, Stretch = Stretch.UniformToFill }
-            : Glyph(ShelfFormat.Glyph(item), 16, "IslandTextTertiaryBrush");
+            : Glyph(ShelfFormat.Glyph(item), 18, "IslandTextSecondaryBrush");
         visual.HorizontalAlignment = HorizontalAlignment.Center;
         visual.VerticalAlignment = VerticalAlignment.Center;
         var glyphSlot = new Grid { Height = 20, Children = { visual } };
@@ -227,7 +227,7 @@ internal sealed class ShelfPage : UserControl
         }
 
         // Selected: a 1px accent stroke over the accent tint.
-        var mark = new Border { CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(1) };
+        var mark = new Border { CornerRadius = new CornerRadius(6), BorderThickness = new Thickness(1) };
         if (selected)
         {
             mark.SetResourceReference(Border.BackgroundProperty, "IslandAccentTintBrush");
@@ -236,15 +236,15 @@ internal sealed class ShelfPage : UserControl
         var content = new Grid { Children = { mark, body } };
         if (item.Pinned)
         {
-            var pin = Glyph(LucideIcons.Pin, 12, "IslandTextTertiaryBrush");
+            var pin = Glyph(LucideIcons.Pin, 10, "IslandAccentBrush");
             pin.HorizontalAlignment = HorizontalAlignment.Right;
             pin.VerticalAlignment = VerticalAlignment.Top;
-            pin.Margin = new Thickness(0, 5, 5, 0);
+            pin.Margin = new Thickness(0, 4, 6, 0);
             content.Children.Add(pin);
         }
 
         var button = new Button { Content = content, Tag = item.Id, Opacity = item.Id == _dragging ? 0.4 : 1, ToolTip = $"{ShelfFormat.Name(item)}\n{ShelfFormat.Caption(item)}" };
-        button.SetResourceReference(StyleProperty, "IslandTileStyle");
+        button.SetResourceReference(StyleProperty, "IslandBareButtonStyle");
         button.HorizontalContentAlignment = HorizontalAlignment.Stretch;
         AutomationProperties.SetName(button, $"{ShelfFormat.Name(item)}, {ShelfFormat.Caption(item)}{(item.Pinned ? ", pinned" : "")}");
         AutomationProperties.SetItemStatus(button, selected ? "Selected" : "");
@@ -579,10 +579,21 @@ internal sealed class ShelfPage : UserControl
         return glyph;
     }
 
-    private static Button Button(string text)
+    private static Button Button(string text, Geometry icon)
     {
-        var button = new Button { Content = text };
+        var button = new Button();
+        SetAction(button, text, icon);
         button.SetResourceReference(StyleProperty, "IslandButtonStyle");
         return button;
     }
+
+    private static void SetAction(Button button, string text, Geometry icon)
+    {
+        if (AutomationProperties.GetName(button) == text) return;
+        var glyph = Glyph(icon, 13, "IslandTextBrush");
+        glyph.Margin = new Thickness(0, 0, 6, 0);
+        button.Content = new StackPanel { Orientation = Orientation.Horizontal, Children = { glyph, Text(text, 12, "IslandTextBrush") } };
+        AutomationProperties.SetName(button, text);
+    }
 }
+

@@ -63,7 +63,7 @@ public sealed class PageTests : IDisposable
             Load(page);
             Assert.True(Shows(page, "No items"));
             Assert.Equal("Shelf, empty", AutomationProperties.GetName((DependencyObject)_ui.Spec.InitialFocus!()!));
-            Assert.DoesNotContain(Find<Button>(page), b => b.Content as string == "Copy" && IsShown(b));
+            Assert.DoesNotContain(Find<Button>(page), b => AutomationProperties.GetName(b) == "Copy" && IsShown(b));
 
             Wait(page.Take(Data(DataFormats.FileDrop, new[] { pdf })));
             Wait(page.Take(Data(DataFormats.UnicodeText, "Call Dana about the venue\nBring the plan")));
@@ -87,7 +87,7 @@ public sealed class PageTests : IDisposable
         {
             var page = (ShelfPage)_ui.Spec!.CreateSection();
             Load(page);
-            Button Action(string text) => Find<Button>(page).Single(b => b.Content as string == text);
+            Button Action(string text) => Find<Button>(page).Single(b => AutomationProperties.GetName(b) == text);
             Assert.False(Action("Copy").IsEnabled);
             Assert.False(Action("Remove").IsEnabled);
             page.Move(1); // nothing selected: the first item
@@ -118,8 +118,8 @@ public sealed class PageTests : IDisposable
             Load(page);
             Assert.True(Shows(page, "old-logo.svg") && Shows(page, "Unavailable"));
             page.Move(1);
-            Assert.False(Find<Button>(page).Single(b => b.Content as string == "Copy").IsEnabled);
-            Assert.True(Find<Button>(page).Single(b => b.Content as string == "Remove").IsEnabled);
+            Assert.False(Find<Button>(page).Single(b => AutomationProperties.GetName(b) == "Copy").IsEnabled);
+            Assert.True(Find<Button>(page).Single(b => AutomationProperties.GetName(b) == "Remove").IsEnabled);
         });
     }
 
@@ -253,7 +253,7 @@ public sealed class PageTests : IDisposable
             Assert.True(Shows(page, "PDF · 2.1 MB"));
             Assert.True(Shows(page, "Unavailable"));
             var unavailable = rows.Single(r => Find<TextBlock>(r).Any(t => t.Text == "Unavailable"));
-            Assert.False(Find<Button>(unavailable).Single(b => b.Content as string == "Copy").IsEnabled);
+            Assert.False(Find<Button>(unavailable).Single(b => AutomationProperties.GetName(b) == "Copy").IsEnabled);
             Assert.Equal(0.45, Find<StackPanel>(unavailable).First().Opacity);
 
             var text = _module.Shelf.Items.Single(i => i.Kind == ShelfKind.Text);

@@ -38,7 +38,7 @@ internal static class DiskTable
             for (int column = 0; column < values.Length; column++)
             {
                 var cell = SystemMonitorView.Text(values[column], island ? heading ? 11 : 12 : heading ? 12 : 14, heading || column == 0);
-                if (heading && column == 0) cell.FontWeight = FontWeights.SemiBold;
+                if ((!island && heading && column == 0) || (island && !heading && column > 0)) cell.FontWeight = FontWeights.SemiBold;
                 cell.TextAlignment = column == 0 ? TextAlignment.Left : TextAlignment.Right;
                 cell.Margin = new Thickness(0, 0, column == 3 ? 0 : 8, 0);
                 if (!island) cell.SetResourceReference(TextBlock.ForegroundProperty, heading || column == 0 ? "TextSecondaryBrush" : "TextPrimaryBrush");

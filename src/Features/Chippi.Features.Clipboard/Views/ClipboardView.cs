@@ -290,7 +290,7 @@ internal sealed class ClipboardView : UserControl
         var kind = Kind(entry);
         kind.Margin = new Thickness(0, 0, 8, 0);
         head.Children.Add(kind);
-        head.Children.Add(selected ? Ui.Muted(Format.Details(entry), 11) : Ui.Text(Format.Line(entry), 12));
+        head.Children.Add(Ui.Text(Format.Line(entry), 12));
 
         var button = new Button { Content = head }; // an open row's fill is its card's
         button.SetResourceReference(StyleProperty, "IslandListRowStyle");
@@ -306,8 +306,8 @@ internal sealed class ClipboardView : UserControl
 
         // Open: the row, at most 3 lines of preview, then the actions. It counts at its full height.
         var open = new StackPanel { Children = { button, Preview(entry), Actions(entry) } };
-        var card = new Border { Child = open, CornerRadius = new CornerRadius(8), Padding = new Thickness(0, 0, 0, 8), Margin = new Thickness(0, 2, 0, 2) };
-        card.SetResourceReference(Border.BackgroundProperty, "IslandPanelBrush");
+        var card = new Border { Child = open, CornerRadius = new CornerRadius(6), Padding = new Thickness(8, 0, 8, 8), Margin = new Thickness(0, 2, 0, 2) };
+        card.SetResourceReference(Border.BackgroundProperty, "IslandAccentTintBrush");
         _rows.Keep = card;
         return card;
     }
@@ -377,7 +377,7 @@ internal sealed class ClipboardView : UserControl
     private FrameworkElement Preview(HistoryEntry entry)
     {
         const double Line = 18, Lines = 3;
-        var margin = new Thickness(10, 0, 10, 8);
+        var margin = new Thickness(26, 0, 0, 8);
         switch (entry.Kind)
         {
             case EntryKind.Picture:
@@ -410,7 +410,7 @@ internal sealed class ClipboardView : UserControl
             default:
                 // Trimming only marks a line cut at its width, so lines past the third end the third with "…";
                 // a wrapped line past the 3 lines is trimmed by the TextBlock itself.
-                var text = Ui.Text(PreviewText(entry.Text ?? "", (int)Lines), 12);
+                var text = Ui.Text(PreviewText(entry.Text ?? "", (int)Lines), 12, "IslandTextSecondaryBrush");
                 text.TextWrapping = TextWrapping.Wrap;
                 text.TextTrimming = TextTrimming.CharacterEllipsis;
                 text.LineHeight = Line;
@@ -465,7 +465,7 @@ internal sealed class ClipboardView : UserControl
         DockPanel.SetDock(icons, Dock.Right);
 
         string? status = missing > 0 ? Format.Unavailable(missing) : _status;
-        var line = new DockPanel { Margin = new Thickness(10, 0, 10, 0), Children = { icons } };
+        var line = new DockPanel { Margin = new Thickness(26, 0, 0, 0), Children = { icons } };
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, Children = { paste, copy } };
         if (status is not null)
         {

@@ -6,6 +6,7 @@ using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
+using System.Windows.Markup;
 using System.Windows.Threading;
 using Chippi.Core.Modules;
 using Chippi.UI.Controls;
@@ -24,8 +25,8 @@ public sealed class ScratchpadPage : Grid, IDisposable
     private const double TabsWidth = IslandPage.BodyWidth - 28 - 52; // beside New note and the "+N" menu
     private readonly SegmentedControl _tabs = new() { FontSize = 12, HorizontalAlignment = HorizontalAlignment.Left };
     private readonly SegmentedControl _mode = new();
-    private readonly TextBox _editor = new() { AcceptsReturn = true, AcceptsTab = false, TextWrapping = TextWrapping.Wrap, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, FontSize = 12, Padding = new Thickness(8, 6, 8, 6), BorderThickness = new Thickness(0) };
-    private readonly ScrollViewer _preview = new() { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Padding = new Thickness(10, 8, 10, 8), Visibility = Visibility.Collapsed };
+    private readonly TextBox _editor = new() { AcceptsReturn = true, AcceptsTab = false, TextWrapping = TextWrapping.Wrap, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, FontSize = 13, Padding = new Thickness(11, 9, 11, 9), BorderThickness = new Thickness(0) };
+    private readonly ScrollViewer _preview = new() { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Padding = new Thickness(11, 9, 11, 9), Visibility = Visibility.Collapsed };
     private readonly Button _add = Icon(LucideIcons.Plus, "New note");
     private readonly TextBlock _overflowCount = new() { FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
     private readonly Button _overflow;
@@ -58,7 +59,28 @@ public sealed class ScratchpadPage : Grid, IDisposable
         tabText.SetValue(TextBlock.TextTrimmingProperty, TextTrimming.CharacterEllipsis);
         tabText.SetValue(TextBlock.MaxWidthProperty, 96.0);
         _tabs.ItemTemplate = new DataTemplate { VisualTree = tabText };
-        var tabStyle = new Style(typeof(ListBoxItem), (Style)FindResource("SelectorBarItemStyle"));
+        var tabStyle = (Style)XamlReader.Parse("""
+            <Style xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" TargetType="ListBoxItem">
+              <Setter Property="Foreground" Value="{DynamicResource IslandTextSecondaryBrush}"/>
+              <Setter Property="FocusVisualStyle" Value="{DynamicResource IslandFocusVisual}"/>
+              <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ListBoxItem">
+                <Grid Background="Transparent">
+                  <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="{TemplateBinding Padding}"/>
+                  <Border Name="Bar" Height="3" CornerRadius="1.5" Margin="10,0,10,0" VerticalAlignment="Bottom"
+                          Background="{DynamicResource IslandAccentBrush}" Visibility="Collapsed"/>
+                </Grid>
+                <ControlTemplate.Triggers>
+                  <Trigger Property="IsMouseOver" Value="True"><Setter Property="Foreground" Value="{DynamicResource IslandTextBrush}"/></Trigger>
+                  <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Foreground" Value="{DynamicResource IslandTextBrush}"/>
+                    <Setter Property="FontWeight" Value="SemiBold"/>
+                    <Setter TargetName="Bar" Property="Visibility" Value="Visible"/>
+                  </Trigger>
+                  <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.45"/></Trigger>
+                </ControlTemplate.Triggers>
+              </ControlTemplate></Setter.Value></Setter>
+            </Style>
+            """);
         tabStyle.Setters.Add(new Setter(HeightProperty, 30.0));
         tabStyle.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(10, 0, 10, 0)));
         tabStyle.Setters.Add(new Setter(AutomationProperties.NameProperty, new System.Windows.Data.Binding("Label")));
@@ -85,17 +107,13 @@ public sealed class ScratchpadPage : Grid, IDisposable
         _editor.SetResourceReference(TextBoxBase.SelectionBrushProperty, "IslandAccentBrush");
         _editor.SetResourceReference(Control.ForegroundProperty, "IslandTextBrush");
         _editor.Background = System.Windows.Media.Brushes.Transparent;
-        TextBlock.SetLineHeight(_editor, 18);
+        TextBlock.SetLineHeight(_editor, 20);
         AutomationProperties.SetName(_editor, "Note");
         _surface.Children.Add(_editor); _surface.Children.Add(_preview);
-        var frame = new Border { CornerRadius = new CornerRadius(8), Child = _surface };
+        var frame = new Border { CornerRadius = new CornerRadius(6), BorderThickness = new Thickness(1), Child = _surface };
+        frame.SetResourceReference(Border.BorderBrushProperty, "IslandCardBorderBrush");
         frame.SetResourceReference(Border.BackgroundProperty, "IslandPanelBrush");
-        // Edit / Preview at the island's size: 22 items in the 2 padding and 1 border, 28 in all.
-        var modeStyle = new Style(typeof(ListBoxItem), (Style)FindResource("SegmentItemStyle"));
-        modeStyle.Setters.Add(new Setter(HeightProperty, 22.0));
-        modeStyle.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(10, 0, 10, 0)));
-        modeStyle.Setters.Add(new Setter(Control.FontSizeProperty, 12.0));
-        _mode.ItemContainerStyle = modeStyle;
+        _mode.SetResourceReference(StyleProperty, "IslandSegmentedStyle");
         _mode.Items.Add("Edit"); _mode.Items.Add("Preview"); _mode.SelectedIndex = 0;
         AutomationProperties.SetName(_mode, "View");
         _mode.SelectionChanged += (_, _) => SetPreview(_mode.SelectedIndex == 1);
@@ -104,8 +122,11 @@ public sealed class ScratchpadPage : Grid, IDisposable
         _mode.HorizontalAlignment = HorizontalAlignment.Left;
         DockPanel.SetDock(_more, Dock.Right); footer.Children.Add(_more); footer.Children.Add(_mode);
         _more.Click += (_, _) => ShowMenu(_more);
-        DockPanel.SetDock(row, Dock.Top); DockPanel.SetDock(footer, Dock.Bottom);
-        _body.Children.Add(row); _body.Children.Add(footer); _body.Children.Add(frame); Children.Add(_body);
+        var tabLine = new Border { Height = 1, Margin = new Thickness(0, 0, 0, 8), VerticalAlignment = VerticalAlignment.Bottom, IsHitTestVisible = false };
+        tabLine.SetResourceReference(Border.BackgroundProperty, "IslandHairBrush");
+        var tabsRow = new Grid { Children = { row, tabLine } };
+        DockPanel.SetDock(tabsRow, Dock.Top); DockPanel.SetDock(footer, Dock.Bottom);
+        _body.Children.Add(tabsRow); _body.Children.Add(footer); _body.Children.Add(frame); Children.Add(_body);
         AddHandler(PreviewKeyDownEvent, new KeyEventHandler(OnKey), handledEventsToo: true);
         Loaded += async (_, _) => { Subscribe(); await Run(_session.LoadAsync()); Paint(); };
         Unloaded += async (_, _) => { CloseTransient(); Unsubscribe(); await Run(_session.FlushAsync()); };
