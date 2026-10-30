@@ -23,7 +23,7 @@ namespace Chippi.App.Island;
 
 /// <summary>
 /// The open island (DESIGN.md §5 Island, revised 2026-10-28): the tile grid or one tile's page, in
-/// one 520 × 360 shape that grows out of the tab, with the orbit buttons around it. Between pages the
+/// one 520 × 360 shape that grows out of the tab; every page starts with a back arrow. Between pages the
 /// shape stays and the new content fades in. <see cref="IslandWindow"/> opens, places and closes it.
 /// </summary>
 public partial class IslandPanelWindow : Window
@@ -42,7 +42,6 @@ public partial class IslandPanelWindow : Window
     private readonly DispatcherTimer _clock = new();
     private readonly IslandGrid _grid = new();
     private readonly Dictionary<IslandTileContribution, FrameworkElement> _views = [];
-    private readonly Dictionary<OrbitSlot, Button> _orbit = [];
     private readonly List<Panel> _attached = []; // the page's panels, which hold reused section views
     private readonly TextBlock _pageStatus = new() { FontSize = 12, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
     private IslandLayout _layout = IslandLayout.Default;
@@ -70,15 +69,12 @@ public partial class IslandPanelWindow : Window
     private long _lastFrame;
     private EventHandler? _frame;
     private bool _keyboard;
-    private List<OrbitSlot> _placedSlots = []; // the buttons the current placement made room for
 
     public IslandPanelWindow()
     {
         InitializeComponent();
         _clock.Tick += (_, _) => UpdateClock();
         _grid.TileOpened += (_, key) => ShowPage(key);
-        foreach (var slot in Enum.GetValues<OrbitSlot>())
-            Orbit.Children.Add(_orbit[slot] = OrbitButton(slot));
         Card.Width = IslandPage.Width;
         Card.Height = IslandPage.Height;
 
@@ -112,9 +108,6 @@ public partial class IslandPanelWindow : Window
 
     /// <summary>Esc while the island has the keyboard (the user clicked into it).</summary>
     internal event EventHandler? EscapePressed;
-
-    /// <summary>The Settings orbit button.</summary>
-    internal event EventHandler? SettingsRequested;
 
     /// <summary>The user opened a page (a tile key) to restore next time.</summary>
     internal event EventHandler<string>? LastPageChanged;
@@ -187,7 +180,6 @@ public partial class IslandPanelWindow : Window
             return;
         _layout = layout;
         RefreshGrid();
-        RefreshOrbit();
     }
 
     public void Celebrate()
@@ -196,13 +188,12 @@ public partial class IslandPanelWindow : Window
             _grid.Pet.Celebrate();
     }
 
-    /// <summary>The activities give tiles their dots and pick the live orbit button.</summary>
+    /// <summary>The activities give tiles their dots.</summary>
     public void SetActivities(IReadOnlyList<IslandActivity> activities, PetMood mood)
     {
         _activities = activities;
         _grid.Pet.ShowMood(mood == PetMood.WideAwake ? PetMood.WideAwake : PetMood.Idle);
         RefreshGrid();
-        RefreshOrbit();
     }
 
     /// <summary>The running features' island tiles, in grid order. A page whose tile went away falls back to the grid.</summary>
@@ -224,7 +215,6 @@ public partial class IslandPanelWindow : Window
             ShowPage(null, remember: false);
         else
             Attach(_page);
-        RefreshOrbit(place: false);
         Reshape(snap: _frame is null);
     }
 
@@ -233,7 +223,6 @@ public partial class IslandPanelWindow : Window
     private void OnMediaChanged(object? sender, EventArgs e)
     {
         RefreshGrid();
-        RefreshOrbit(); // playing or not decides the live button
     }
 
     /// <summary>Grows out of <paramref name="tab"/> (physical pixels) on <paramref name="edge"/>, or moves there when already open.</summary>
@@ -259,7 +248,6 @@ public partial class IslandPanelWindow : Window
             _page = _layout.OpensOn == IslandOpensOn.LastPage && _lastPage is not null && Exists(_lastPage) ? _lastPage : null;
         _openOn = null;
         Attach(_page);
-        RefreshOrbit(place: false);
         UpdateClock();
         Place();
         Show();
@@ -282,13 +270,13 @@ public partial class IslandPanelWindow : Window
             Begin(Morph.Close);
     }
 
-    /// <summary>Whether <paramref name="physical"/> is on the open island: its shape or an orbit button.</summary>
+    /// <summary>Whether <paramref name="physical"/> is on the open island's shape.</summary>
     internal bool Covers(Point physical)
     {
         if (!IsOpen)
             return false;
         var local = new Point((physical.X - _window.X) / _area.Scale, (physical.Y - _window.Y) / _area.Scale);
-        return _target.Contains(local) || IslandGeometry.OrbitLayout(_edge, _target, Slots()).Any(o => o.Rect.Contains(local));
+        return _target.Contains(local);
     }
 
     /// <summary>Takes the keyboard without a click (the tray icon chosen with the keyboard, or a second launch).</summary>
@@ -310,8 +298,7 @@ public partial class IslandPanelWindow : Window
         if (!IsOpen)
             return;
         Attach(key);
-        RefreshOrbit(place: false);
-        Reshape(snap: false); // the same shape; a changed set of orbit buttons may still move it along the edge
+        Reshape(snap: false);
         Begin(Morph.Page);
         if (_keyboard)
             Dispatcher.BeginInvoke(DispatcherPriority.Input, FocusFirst);
@@ -346,7 +333,7 @@ public partial class IslandPanelWindow : Window
         {
             if (_nowPlaying is null)
             {
-                _nowPlaying = new NowPlayingView(_media);
+                _nowPlaying = new NowPlayingView(_media, () => ShowPage(null, remember: false));
                 _nowPlaying.SetPetColor(_grid.Pet.PetColor);
             }
             page.Children.Add(_nowPlaying); // its own header and body
@@ -360,7 +347,9 @@ public partial class IslandPanelWindow : Window
             header.Margin = new Thickness(0);
             header.VerticalAlignment = VerticalAlignment.Center;
             // Every header gets the same 24 row and the 8 gap below it, so every body is 496 × 304.
-            var row = new Grid { Height = IslandPage.HeaderHeight, Margin = new Thickness(0, 0, 0, IslandPage.Gap), Children = { header } };
+            var back = BackButton(() => ShowPage(null, remember: false));
+            DockPanel.SetDock(back, Dock.Left);
+            var row = new DockPanel { Height = IslandPage.HeaderHeight, Margin = new Thickness(0, 0, 0, IslandPage.Gap), LastChildFill = true, Children = { back, header } };
             DockPanel.SetDock(row, Dock.Top);
             _attached.Add(row);
             page.Children.Add(row);
@@ -369,6 +358,19 @@ public partial class IslandPanelWindow : Window
         Page.Content = page;
         RefreshPageStatus();
         MarkOnScreen();
+    }
+
+    /// <summary>The arrow every page starts with: back to the grid.</summary>
+    internal static Button BackButton(Action back)
+    {
+        var glyph = new LucideIcon { Data = LucideIcons.ArrowLeft, Size = 14 };
+        glyph.SetResourceReference(LucideIcon.BrushProperty, "IslandTextBrush");
+        var button = new Button { Content = glyph, Margin = new Thickness(-4, 0, 4, 0) };
+        button.SetResourceReference(StyleProperty, "IslandIconButtonStyle");
+        AutomationProperties.SetName(button, "Back");
+        DockPanel.SetDock(button, Dock.Left);
+        button.Click += (_, _) => back();
+        return button;
     }
 
     /// <summary>Every page but Now Playing (which has its own) starts with its name, and the tile's status where the page doesn't show it.</summary>
@@ -527,103 +529,6 @@ public partial class IslandPanelWindow : Window
     private IslandActivity? LiveOn(string key) =>
         _activities.FirstOrDefault(a => a.TileKey == key || (key == NowPlayingKey && a.Kind == IslandActivityKind.Media));
 
-    /// <summary>
-    /// The live button's tile: Now Playing while media plays, otherwise the tile of an activity that
-    /// needs attention (a muted mic), or none.
-    /// </summary>
-    private string? LiveKey()
-    {
-        if (_activities.Any(a => a.Kind == IslandActivityKind.Media) || _media?.Current?.Playing == true)
-            return NowPlayingKey;
-        return _activities.FirstOrDefault(a => a.NeedsAttention && a.TileKey is { } key && Exists(key))?.TileKey;
-    }
-
-    // ----- Orbit buttons -----
-
-    private Button OrbitButton(OrbitSlot slot)
-    {
-        var glyph = new LucideIcon { Size = 14 };
-        glyph.SetResourceReference(LucideIcon.BrushProperty, "IslandTextBrush");
-        var button = new Button { Content = glyph, Visibility = Visibility.Collapsed };
-        button.SetResourceReference(StyleProperty, "IslandOrbitButtonStyle");
-        button.Click += (_, _) => OnOrbit(slot);
-        return button;
-    }
-
-    private void OnOrbit(OrbitSlot slot)
-    {
-        switch (slot)
-        {
-            case OrbitSlot.Back:
-                ShowPage(_page is null ? _lastPage : null, remember: false);
-                break;
-            case OrbitSlot.Settings:
-                SettingsRequested?.Invoke(this, EventArgs.Empty);
-                break;
-            default:
-                if (OrbitTarget(slot) is { } key)
-                    ShowPage(key);
-                break;
-        }
-    }
-
-    private string? OrbitTarget(OrbitSlot slot) => slot switch
-    {
-        OrbitSlot.Left => IslandLayout.Button(_layout.Left, Exists, _groups.FirstOrDefault(g => g.Orbit == IslandOrbit.Left)?.Key),
-        OrbitSlot.Right => IslandLayout.Button(_layout.Right, Exists, _groups.FirstOrDefault(g => g.Orbit == IslandOrbit.Right)?.Key),
-        OrbitSlot.Live => _layout.Live ? LiveKey() : null,
-        _ => null,
-    };
-
-    private List<OrbitSlot> Slots()
-    {
-        var slots = new List<OrbitSlot>();
-        if (_page is not null || (_lastPage is not null && Exists(_lastPage)))
-            slots.Add(OrbitSlot.Back);
-        if (OrbitTarget(OrbitSlot.Left) is not null)
-            slots.Add(OrbitSlot.Left);
-        slots.Add(OrbitSlot.Settings);
-        if (OrbitTarget(OrbitSlot.Right) is not null)
-            slots.Add(OrbitSlot.Right);
-        if (OrbitTarget(OrbitSlot.Live) is not null)
-            slots.Add(OrbitSlot.Live);
-        return slots;
-    }
-
-    /// <summary>
-    /// Which buttons show, with their glyphs, names and the active page's ring. Unless
-    /// <paramref name="place"/> is false (the caller places the island next), a changed set of buttons
-    /// re-places the open island.
-    /// </summary>
-    private void RefreshOrbit(bool place = true)
-    {
-        var slots = Slots();
-        foreach (var (slot, button) in _orbit)
-        {
-            button.Visibility = slots.Contains(slot) ? Visibility.Visible : Visibility.Collapsed;
-            string? target = slot == OrbitSlot.Back ? (_page is null ? _lastPage : null) : OrbitTarget(slot);
-            var (glyph, name) = slot switch
-            {
-                OrbitSlot.Back when _page is null => (LucideIcons.Undo, $"Back to {TileName(target)}"),
-                OrbitSlot.Back => (LucideIcons.LayoutGrid, "All features"),
-                OrbitSlot.Settings => (LucideIcons.Settings, "Settings"),
-                _ when target == NowPlayingKey => (LucideIcons.Music, "Now Playing"),
-                _ => (LucideIcons.Get(Group(target)?.Icon), TileName(target)),
-            };
-            ((LucideIcon)button.Content).Data = glyph;
-            AutomationProperties.SetName(button, name);
-            button.Tag = slot is not (OrbitSlot.Back or OrbitSlot.Settings) && target is not null && target == _page ? "Active" : null;
-        }
-        if (!IsOpen || !place)
-            return;
-        // A button that appeared or went (the live one, once music starts) changes how far the island
-        // reaches, so it is placed again to keep every button in the work area.
-        if (!slots.SequenceEqual(_placedSlots))
-            Reshape(snap: _frame is null);
-        else
-            Draw();
-    }
-
     private string TileName(string? key) => key == NowPlayingKey ? "Now Playing" : Group(key)?.Name ?? "";
 
     // ----- Keyboard -----
@@ -666,17 +571,15 @@ public partial class IslandPanelWindow : Window
     // ----- Placement and the morph -----
 
     /// <summary>
-    /// Covers a fixed area around the tab while open, so the morph never moves the window: on the top
-    /// edge the island plus both orbit pairs, centered on the tab; on a side edge the island plus the
-    /// live button beside it; the work area's full height either way.
+    /// Covers a fixed area around the tab while open, so the morph never moves the window: the island
+    /// plus its shadow room, centered on the tab; the work area's full height.
     /// </summary>
     private void Place()
     {
         double s = _area.Scale;
         var work = _area.Work;
         double widest = IslandPage.Width;
-        double reach = IslandGeometry.OrbitGap + IslandGeometry.OrbitSize;
-        double width = (_edge == IslandEdge.Top ? widest + 2 * (reach + ShadowRoom) : widest + reach + ShadowRoom) * s;
+        double width = (widest + 2 * ShadowRoom) * s;
         double left = _edge switch
         {
             IslandEdge.Left => work.Left,
@@ -701,16 +604,14 @@ public partial class IslandPanelWindow : Window
         new((physical.X - _window.X) / _area.Scale, (physical.Y - _window.Y) / _area.Scale, physical.Width / _area.Scale, physical.Height / _area.Scale);
 
     /// <summary>
-    /// Centers the 520 × 360 island on the tab, keeping it and its orbit buttons in the work area.
+    /// Centers the 520 × 360 island on the tab, keeping it in the work area.
     /// <paramref name="snap"/> also draws it there at once (no morph running).
     /// </summary>
     private void Reshape(bool snap)
     {
         double s = _area.Scale;
         const double width = IslandPage.Width, height = IslandPage.Height;
-        _placedSlots = Slots();
-        var reach = IslandGeometry.OrbitReach(_edge, new Size(width, height), _placedSlots);
-        var origin = IslandGeometry.PanelOrigin(_edge, _tab, new Size(width * s, height * s), _area.Work, s, reach);
+        var origin = IslandGeometry.PanelOrigin(_edge, _tab, new Size(width * s, height * s), _area.Work, s);
         _target = Local(new Rect(origin.X, origin.Y, width * s, height * s));
         Canvas.SetLeft(Card, _target.X);
         Canvas.SetTop(Card, _target.Y);
@@ -813,7 +714,7 @@ public partial class IslandPanelWindow : Window
         MarkOnScreen();
     }
 
-    /// <summary>The shape at <see cref="_drawn"/>, flat on its edge, and the orbit buttons following it.</summary>
+    /// <summary>The shape at <see cref="_drawn"/>, flat on its edge.</summary>
     private void Draw()
     {
         Canvas.SetLeft(Shape, _drawn.X);
@@ -831,14 +732,6 @@ public partial class IslandPanelWindow : Window
         Card.Clip = new RectangleGeometry(inside, _radius, _radius);
         // Nothing half-faded takes a click (a double-click on a tile would reach the new page's controls).
         Card.IsHitTestVisible = Card.Opacity >= 1;
-        // Opening and closing fade the buttons with the content; between pages they stay.
-        Orbit.Opacity = _morph == Morph.Page ? 1 : Card.Opacity;
-        Orbit.IsHitTestVisible = IsOpen && Orbit.Opacity >= 1;
-        foreach (var (slot, rect) in IslandGeometry.OrbitLayout(_edge, _drawn, Slots()))
-        {
-            Canvas.SetLeft(_orbit[slot], rect.X);
-            Canvas.SetTop(_orbit[slot], rect.Y);
-        }
     }
 
     private static double Lerp(double from, double to, double t) => from + (to - from) * t;
@@ -856,15 +749,13 @@ public partial class IslandPanelWindow : Window
     /// <summary>Debug builds: the window's own pixels, for <see cref="IslandWindow.SaveScene"/>.</summary>
     internal FrameworkElement Visual => Root;
 
-    /// <summary>Debug builds: the shape as drawn and where it is heading, with its orbit buttons, in physical pixels.</summary>
+    /// <summary>Debug builds: the shape as drawn and where it is heading, in physical pixels.</summary>
     internal Rect Footprint
     {
         get
         {
             var box = _drawn;
             box.Union(_target);
-            foreach (var (_, rect) in IslandGeometry.OrbitLayout(_edge, _drawn, Slots()))
-                box.Union(rect);
             double s = _area.Scale;
             return new Rect(_window.X + box.X * s, _window.Y + box.Y * s, box.Width * s, box.Height * s);
         }

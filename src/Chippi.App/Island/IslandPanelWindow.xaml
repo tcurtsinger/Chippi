@@ -1,8 +1,7 @@
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
 <!-- The open island (DESIGN.md §5 Island): one Island-colored shape grown out of the tab, flat side on the
      same edge, 1px stroke on every side but the flat one, 20px corners away from the edge, the island
-     shadow, 12px padding. It shows the tile grid or one tile's page and morphs between them; the orbit
-     buttons sit around it. A transparent, topmost tool window that doesn't activate until the user clicks
+     shadow, 12px padding. It shows the tile grid or one tile's page and morphs between them. A transparent, topmost tool window that doesn't activate until the user clicks
      into it; while open it covers a fixed area around the tab, and its transparent pixels click through. -->
 <Window x:Class="Chippi.App.Island.IslandPanelWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -32,7 +31,5 @@
         <Border x:Name="Card" Padding="12" Opacity="0" TextElement.Foreground="{StaticResource IslandTextBrush}">
             <ContentControl x:Name="Page" Focusable="False" />
         </Border>
-        <!-- The round buttons around the shape (IslandGeometry.OrbitLayout). -->
-        <Canvas x:Name="Orbit" />
     </Canvas>
 </Window>

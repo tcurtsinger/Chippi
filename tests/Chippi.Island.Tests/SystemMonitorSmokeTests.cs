@@ -75,11 +75,7 @@ public sealed class SystemMonitorSmokeTests(ITestOutputHelper output)
             Assert.Empty(Find<ScrollViewer>(page));
             var card = (FrameworkElement)panel.FindName("Card");
             var footprint = new Rect(Canvas.GetLeft(card), Canvas.GetTop(card), card.ActualWidth, card.ActualHeight);
-            foreach (var orbit in ((Canvas)panel.FindName("Orbit")).Children.OfType<Button>().Where(b => b.Visibility == Visibility.Visible))
-                {
-                    footprint.Union(new Rect(Canvas.GetLeft(orbit), Canvas.GetTop(orbit), orbit.Width, orbit.Height));
-                }
-            output.WriteLine($"laptop={laptop}, disks={disks}, edge={edge}: page={page.DesiredSize.Height:F2} DIP; card={card.ActualHeight:F2} DIP; card + buttons={footprint.Height:F2} DIP; top={footprint.Top:F2}, bottom={footprint.Bottom:F2} (672 DIP work area).");
+            output.WriteLine($"laptop={laptop}, disks={disks}, edge={edge}: page={page.DesiredSize.Height:F2} DIP; card={card.ActualHeight:F2} DIP; card={footprint.Height:F2} DIP; top={footprint.Top:F2}, bottom={footprint.Bottom:F2} (672 DIP work area).");
             Assert.InRange(footprint.Height, 1, 672);
             Assert.InRange(footprint.Top, 0, 672);
             Assert.InRange(footprint.Bottom, 0, 672);
