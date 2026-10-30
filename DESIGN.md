@@ -1,6 +1,6 @@
 ---
 name: Chippi
-description: A Windows tray suite that looks like it shipped with Windows 11 — neutral layers, Segoe, the user's accent — with one small gradient blob that lives in the island.
+description: A Windows tray suite that looks like it shipped with Windows 11 — neutral layers, Segoe, the user's accent — with one small blob that lives in a widget on the desktop.
 colors:
   window: "#202020"
   card: "#2B2B2B"
@@ -32,7 +32,10 @@ colors:
   caution-tint: "rgba(252,225,0,0.10)"
   success: "#6CCB5F"
   critical: "#C42B1C"
-  island: "#0A0A0A"
+  island: "#F528282C"
+  island-accent: "#B79CFF"
+  island-accent-fill: "linear-gradient(135deg, #B78FFF, #82AEFF)"
+  island-on-accent: "#170F2E"
 colors-light:
   window: "#F3F3F3"
   card: "#FBFBFB"
@@ -64,7 +67,10 @@ colors-light:
   caution-tint: "rgba(157,93,0,0.10)"
   success: "#0F7B0F"
   critical: "#C42B1C"
-  island: "#0A0A0A"
+  island: "#F5F5F5F6"
+  island-accent: "#7444F0"
+  island-accent-fill: "linear-gradient(135deg, #8F5CFF, #5B86FF)"
+  island-on-accent: "#FFFFFF"
 accent:
   follow-windows: "default. Dark theme uses the Windows AccentLight2 shade, light theme uses AccentDark1"
   blue: { dark: "#4CC2FF", light: "#005FB8" }
@@ -76,7 +82,10 @@ pet:
   ink: "#0B0F1F"
   blush: "#FF8FB0"
   spark: "#F5C451"
-  synth: "linear-gradient(135deg, #B15CF0, #4D9BFF)"
+  synth: "#B78FFF"
+  tongue: "#FF7FA8"
+  headphones: "#2A2440"
+  headphone-pads: "#D2BEFF"
   iris: "#CBB2FF"
   azure: "#8EC0FF"
   signal: "#8EE6C0"
@@ -105,8 +114,10 @@ rounded:
   window: "system (8px)"
   switch: "10px"
   badge: "4px"
-  island-tab: "half-oval: fully round on the side away from the edge"
-  island: "20px away from the edge, square against it"
+  puck: "50px circle"
+  chip: "8px"
+  island: "8px"
+  island-card: "6px"
 spacing:
   flyout-padding: "12px"
   card-row: "12px 16px"
@@ -135,7 +146,7 @@ This replaces Direction A "Studio Rack" (navy chassis, Manrope, the violet→azu
 
 Chippi should look like it shipped with Windows 11. It uses Windows' own font, its neutral layered surfaces, its control shapes and the user's accent color, so it sits next to Settings, Quick Settings and File Explorer without looking like a guest. vorssaint looks polished because it looks native to macOS; Chippi gets there by looking native to Windows.
 
-The personality comes from one place: **Gumdrop**, a gradient blob with a face who lives in the island, a small tab the user docks on a screen edge. It naps when nothing is happening and reacts when Chippi does something for you. Everything else stays quiet.
+The personality comes from one place: **Chippi**, a soft blob with a face who lives in the widget, a puck the user places anywhere on the desktop. It naps when nothing is happening, listens along with your music and reacts when Chippi does something for you. Everything else stays quiet.
 
 **Key characteristics**
 - Neutral gray layers: window, card, control. No tinted chassis.
@@ -152,7 +163,7 @@ The personality comes from one place: **Gumdrop**, a gradient blob with a face w
 ### Surfaces
 Dark: Window `#202020` · Card `#2B2B2B` · Flyout `#2C2C2C` · Flyout footer `#202020`. Light: Window `#F3F3F3` · Card `#FBFBFB` · Flyout `#F3F3F3` · Flyout cards `#FFFFFF` · Flyout footer `#EBEBEB`. Controls, hovers, strokes and dividers are white (dark) or black (light) at low alpha; the exact values are in the front matter.
 
-**Island** `#0A0A0A` is darker than any window, so the pill reads as a hole in the screen. It stays dark in both themes.
+**Island** (revised 2026-10-29): the widget and its panel follow the app theme on a solid surface, `#28282C` in dark and `#F5F5F6` in light, both at 96% (Windows shows its own acrylic this way on this PC, with transparency effects off). Its accent is the pet's violet, not the Accent setting: `#B79CFF` dark, `#7444F0` light, and what's on or primary takes the accent fill, a violet-to-blue gradient (`#B78FFF` → `#82AEFF` dark with `#170F2E` text, `#8F5CFF` → `#5B86FF` light with white text). The exact keys are the `Island*` brushes in `Dark.xaml` and `Light.xaml`.
 
 ### Text
 Dark: Text `#FFFFFF` · Secondary `#C5C5C5` (values, inactive tab and segment labels, icon buttons) · Caption `#ABABAB` · Muted `#9D9D9D` (nav group labels, placeholders, glyphs of features that are off). Light: `#1A1A1A` · `#404040` · `#5D5D5D` · `#616161`.
@@ -178,7 +189,7 @@ Text and glyphs on an accent fill are black in dark and white in light (**On-acc
 ### Named rules
 **The Accent Rule.** The accent marks what is on, selected or primary: a switch that is on, a checked box, the selected nav item's pill, the selected tab's bar, the selected duration chip, the one primary button per view, and the glyph of an installed or watched feature. It is never decoration, a background wash, a divider or body text.
 
-**The One Gradient Rule.** Gumdrop's body is the only gradient in the app.
+**The Gradient Rule** (revised 2026-10-29). Two gradients exist: the island's accent fill, on what's on or primary in the island, and the pet's soft shading. Nothing else is a gradient.
 
 **The Muted Floor Rule.** `#9D9D9D` (dark) or `#616161` (light) is the quietest text allowed. Both clear 4.5:1 on their surfaces.
 
@@ -219,7 +230,7 @@ Flat, like Windows 11. Depth comes from the surface steps (window → card → c
 
 - **Settings window:** the system frame draws the corners and shadow.
 - **Flyout:** `0 8px 32px rgba(0,0,0,.28)` (light `rgba(0,0,0,.14)`), the shadow Windows uses on its own flyouts.
-- **Island:** `0 16px 40px rgba(0,0,0,.45)` on the open island and `0 8px 24px rgba(0,0,0,.45)` on the drag bubble. The docked tab has none.
+- **Island (revised 2026-10-29):** the panel: blur 40, 16 down, black at 50% (dark) or 20% (light). The puck: blur 14, 4 down, 18%; the chip the same at 16%; the lifted puck blur 30, 14 down, 28%. Now Playing's play disc: blur 16, 6 down, 35%.
 - **Selected segment, light theme only:** `0 1px 2px rgba(0,0,0,.12)`.
 
 **The No-Glow Rule.** Nothing glows: no colored shadows under chips, thumbs, cards or buttons.
@@ -230,58 +241,62 @@ Flat, like Windows 11. Depth comes from the surface steps (window → card → c
 Mockup: [Chippi Surfaces](https://claude.ai/artifact/RJAX7v2QT6MLpPRgZQVXeS). Chippi has two surfaces, the island and the Settings window (Travis, 2026-10-28). There is no tray flyout and no docked panel.
 - **Left click** (or Enter on the focused icon) opens Settings on the last page used, whether or not the island shows (revised 2026-10-28). With the island off, or hidden for a fullscreen app, that's the way in.
 - **Right click:** the tray menu, in flyout colors: 8px radius, 36px items with a 16px glyph and a 13 / 400 label: Open settings, Quit. Its bottom edge sits at the click point, kept 12px off the taskbar.
-- **Hide tray icon** (Settings › Island & pet, off by default): the icon leaves the notification area while the island shows, so the island is the only door. It comes back while the island is off or hidden for a fullscreen app. Right-clicking the island's tab opens the same menu (Open settings, Quit), so Quit is always reachable.
+- **Hide tray icon** (Settings › Island & pet, off by default): the icon leaves the notification area while the island shows, so the island is the only door. It comes back while the island is off or hidden for a fullscreen app. Right-clicking the widget opens the same menu (Open settings, Quit), so Quit is always reachable.
 - **A second launch** (Chippi started again from Start) opens the island and gives it the keyboard; with the island off or hidden, it opens Settings. A notice click opens its island page the same way, or Settings (revised 2026-10-28).
 
 ### Island pages (approved 2026-10-26)
 - **Every page** but Now Playing starts with a 24px header row, 8 above the body (revised 2026-10-28): the tile's name (13 / 600) and, only where the page's controls don't already show it, the tile's status on the right in Caption (Keep awake's "1 hr left"). Now Playing keeps its own header, with the app playing on the right.
-- **Now Playing (revised 2026-10-29, after Apple Music's widget):** the header names the app playing on the right in Caption. Only when two or more apps have sessions does it get a chevron and open a menu: each app over its track, the one in use semibold, the one playing marked with the accent Audio lines glyph. A pick holds until another app starts playing or the picked one goes. The body centers a 168 × 168 artwork row: 16 to its right the title (20 / 600, up to 2 lines) and the artist (13, tertiary, 1 line, never the app's name), with previous / play-pause / next as solid 28 / 36 / 28 glyphs spread under them in 48 / 52 / 48 round buttons. The column is optically level with the art: the title's capitals on its top edge, the solid glyphs' bottoms on its bottom edge. A cover has a 1px hairline (IslandBorderBrush), so a dark one keeps its edge. The progress runs the full width 22 below, elapsed and remaining at its ends, its fill tertiary while paused, its space kept when there's no timeline. A cut-off title or artist shows in full in a tooltip. No artwork shows Gumdrop (idle, 76) on the panel fill in the art's place; nothing playing shows Gumdrop asleep (72) over "Nothing playing", centered, with no controls. No volume or output picker.
+- **Now Playing (revised 2026-10-29, after Apple Music's widget):** the header names the app playing on the right in Caption. Only when two or more apps have sessions does it get a chevron and open a menu: each app over its track, the one in use semibold, the one playing marked with the accent Audio lines glyph. A pick holds until another app starts playing or the picked one goes. The body centers a 168 × 168 artwork row: 16 to its right the title (20 / 600, up to 2 lines) and the artist (13, tertiary, 1 line, never the app's name), with previous / play-pause / next as solid 28 / 36 / 28 glyphs spread under them in 48 / 52 / 48 round buttons. The column is optically level with the art: the title's capitals on its top edge, the solid glyphs' bottoms on its bottom edge. A cover has a 1px hairline (IslandBorderBrush), so a dark one keeps its edge. The progress runs the full width 22 below, elapsed and remaining at its ends, its fill tertiary while paused, its space kept when there's no timeline. A cut-off title or artist shows in full in a tooltip. No artwork shows Chippi (listening, 76) on the panel fill in the art's place; nothing playing shows Chippi asleep (72) over "Nothing playing", centered, with no controls. No volume or output picker.
 - **Sound** (Audio routing, Mic mute shortcut and Mic processing share it; revised 2026-10-28): two columns 244 wide and 8 apart, both from the top, each under a 12 / 600 tertiary label. Every card is one 44 row: a 16 glyph, the middle, then the control; the cards' text buttons share MinWidth 64.
   - **Output:** a card with the speaker glyph (Caution VolumeMuted while muted), the system volume slider (IslandSliderStyle: 4 track, 16 thumb) and its percentage (12, tabular, 34 wide; "Muted" in Caution while muted), and Mute / Unmute. 8 below, a one-line radio row (30, radio 14 under the card's glyph) per *connected* output; the one in use is filled and highlighted. Picking one uses it at once and moves it to the top of its priority list, whether or not priority switching is on. With no output: the glyph and "No output" in tertiary, no slider, Mute disabled, no rows.
   - **Microphone:** a card with the mic glyph (Caution mic-off while muted), "Live" or "Muted" in Caution, and Mute / Unmute. Then a one-line radio row per connected mic, then the Mic processing card (AudioWaveform in the accent, "Mic processing", while it runs a 4 tall meter of the processed mic, then the switch, 34 × 18). A warning shows below it only when Mic processing failed or stopped. With no microphone: mic-off and "No microphone" in tertiary, Mute disabled, no rows; the Mic processing card stays.
   - **Fit:** the Output column shows 7 rows and the Microphone column 5, one fewer for each warning line showing in that column, so no row is cut off. The rest are in Settings › Output and Settings › Microphone.
   - The tile's status is the output in use, "Mic muted" (Caution, with the mic-off glyph and dot) while muted, or "Mic stopped" (Caution, with the dot) when Mic processing stopped.
 - **App volume (revised 2026-10-28):** centered vertical app strips, 8 apart, filling the 304 body height. Up to 7 apps use 56-wide strips with a 32 bar, 20 app icon (also Mute), percentage, two-line name and output menu. At 8 to 12 use 34 strips and 24 bars without names; at 13 or 14 use 28 strips without percentages. Past 14, active apps come first; the rest are in Settings. Use the program file icon, System sounds Volume glyph or two-letter name tile. Muted replaces the icon with Caution VolumeMuted, the bar with white 28%, and the percentage with Caution "Muted". Empty centers Sliders (20) and "No apps playing". The system volume stays on Sound.
-- **Keep awake (revised 2026-10-28):** six cards in 3 ? 2, about 160 ? 96, with 8 gaps and 14 labels, centered vertically. Choices remain 30 min ? 1 hr ? 2 hr ? 4 hr ? No limit ? Until?. The running choice is accent with black text; hovering it says "Stop". Until? opens the existing time picker. The header keeps the remaining time.
-- **File organizer (revised 2026-10-28):** one 44-high control card with a bare accent folder glyph, folder picker, then Auto / Manual / Paused at the right. Recent files use whole 30-high rows from the top, with existing Review/Undo actions. Empty centers File (20) and "No recent files". History ? and Organize now sit at the bottom; History starts 10 in. Overflow stays in History. Auto is a display label; the stored mode remains `silent`.
+- **Keep awake (revised 2026-10-28):** six cards in 3 × 2, 104 tall, with 8 gaps and 14 labels, centered vertically. Choices remain 30 min · 1 hr · 2 hr · 4 hr · No limit · Until…. The running choice takes the accent fill with on-accent text, semibold; hovering it says "Stop". Until… opens the existing time picker. The header keeps the remaining time.
+- **File organizer (revised 2026-10-28):** one 44-high control card with a bare accent folder glyph, folder picker, then Auto / Manual / Paused at the right. Recent files use whole 30-high rows from the top, with existing Review/Undo actions. Empty centers File (20) and "No recent files". History › and Organize now sit at the bottom; History starts 10 in. Overflow stays in History. Auto is a display label; the stored mode remains `silent`.
 - Quick pages show live state and controls only: no captions that restate a setting, and no unplugged devices (Settings lists those).
 
-### Island (movable tab and tile grid, approved 2026-10-25)
-Reference: the offline Sound mockup at `X:\code\chippi-scratch\phase-3-prep\mockup\` (`Island.dc.html`, `IslandTabs.dc.html`), with the side-edge column approved in the Phase 3 kickoff. This replaces the old stack of installed-feature panels. The tab remains one shape that grows into the island; hovering only swells it, and clicking opens it. It never hides at rest, except while a fullscreen app is in front on its display.
+### Island (the widget and its panel, approved 2026-10-29)
+Brief: [docs/shell-redesign-handoff.md](docs/shell-redesign-handoff.md). Mock: [final.html](docs/shell-redesign/design/final.html), shots [final-light.png](docs/shell-redesign/design/shots/final-light.png) and [final-dark.png](docs/shell-redesign/design/shots/final-dark.png). This replaces the movable tab, the tile grid and the round (orbit) buttons of 2026-10-25. The island is the widget and the panel it opens. It follows the app theme, and its accent is the pet's violet (§2 Island).
 
-- **Position (revised 2026-10-29: top edge only for now):** drag along the top edge; a drop anywhere in the work area's upper half docks there, at that point along it. A drop in the lower half or a top corner is refused. A saved side edge shows at top center, and a taskbar on top leaves the tab just under it. Settings › Island & pet keeps only Position's Reset.
-  - The tab's center stays at least 160px from the top edge's ends, which keeps the largest swollen tab (236 long, naming a song) fully on screen and clear of window buttons.
-  - Save edge and place along it (0 to 1). Display stays a setting: Main display (default), Follow active window, or One monitor by name. Dropping on another monitor selects it; disconnection falls back to the main display on the same edge.
-- **Tab:** half-oval, flat against its edge, Island fill, 1px `rgba(255,255,255,.14)` stroke except on the flat side.
-  - Top: 96x28 at rest, 120x32 live, 220x32 while music plays. Gumdrop's small form is 20px at rest, 22px live; sleepy at rest and idle on hover or while open.
-  - **While music plays (2026-10-29):** Gumdrop, then the song, then the equalizer. The song is the title in 12 Text, then " · artist" in tertiary, 8 from Gumdrop and the glyph. It holds still, centered between Gumdrop and the equalizer, when it fits; otherwise it scrolls 30 DIPs a second after a 2-second hold at the start of each pass, a copy following 40 behind so it loops, fading over 8 at its ends. It stops while the tab is hidden or the island is open, and holds under reduced motion. The equalizer's three bars follow the default output's real level (the shared audio service's meter, 20 readings a second, the loudest recent peak setting the scale), and rest at 8, 14 and 10 otherwise. Paused, the music activity goes and the tab returns to its live or rest size.
-  - Swell adds 16px along the edge and 4px depth: Top 112x32, 136x36 or 236x36. No delay; 120ms ease-out, shrinking when the pointer leaves. Grow about the center, never away from the pointer. Reduced motion snaps. Hover never opens the island.
-  - The highest activity supplies a 14px accent glyph beside Gumdrop (under it on side edges): media, timer, download/stash, agent, then status. Held/failed uses Caution; a successful stash celebrates.
-  - **Muted mic:** always add a 14px mic-off glyph in Caution after the highest activity glyph, even when music is playing. A muted mic alone counts as live and uses the live size; no preference can hide this indicator. The glyph/status clears when microphones are unmuted. Accessible state includes "Microphone muted".
-- **Dragging:** a press moving 4px starts a drag and closes the island immediately. A 44px Gumdrop bubble follows the pointer and a 3px accent line marks an allowed drop. Release snaps over 180ms, or returns to the saved position for a refused drop. Dragging never opens it; a press without movement toggles it.
-- **Opening and closing:** clicking the tab opens the last available page, or the grid if none is remembered or its feature was removed. A focused tab also accepts Enter or Space. Another tab click, Esc or an outside click closes it; leaving the pointer does not. Outside clicks still reach the underlying app. Orbit buttons and child menus are inside the island's interaction region.
-  - Only Esc is watched before the user clicks into the island. After that click, Tab, arrows and Enter navigate its controls; do not take those keys from the app in front with a global hook. Grid arrows move through whatever columns are showing, Enter opens the focused tile. Esc closes the island.
-- **Shape and pages:** one Island-colored shape, flat on its docked edge, 20px corners away from it and square against it, 1px `rgba(255,255,255,.10)` stroke away from the edge, island shadow. Center on the tab and keep the shape and its orbit buttons inside the work area.
-  - **One size (revised 2026-10-28):** the grid and every page are 520 × 360, so the island never changes size between pages. Inside the 12 inset and the 24 header with 8 below it, every page has a 496 × 304 body: six 76 columns with 8 gaps, which every page lines up to. Pages sharing a tile combine their sections, never duplicate the tile. Mockups: [fixed-size](docs/refresh-2026-10-28/fixed-size/index.html), [sound-monitor](docs/refresh-2026-10-28/sound-monitor/index.html), [settings-shell](docs/refresh-2026-10-28/settings-shell/index.html); brief: [refresh-2026-10-28/brief.md](docs/refresh-2026-10-28/brief.md).
+- **The widget:** a 50px round puck with Chippi (§7) at 36, Island fill, a 1px Island border and a soft shadow (blur 14, 4 down, black at 18%). It sits anywhere on any display and never hides at rest, except while a fullscreen app is in front on its display.
+  - **Where it starts:** 24 in from the bottom-right corner of the main display's work area, for new and existing installs.
+  - **Place:** saved as two fractions (0 to 1) of the room the puck has in its display's work area, so a resolution or taskbar change moves it with the work area and never off screen. Position â€º Reset puts it back at the start.
+  - **Display** (Settings › Island & pet): Main display (default) or One monitor by name. Dropping the widget on another display picks that one monitor. While the chosen monitor is disconnected, the widget sits at the start on the main display. Follow active window is gone: a widget you place yourself doesn't jump between screens (a saved one reads as Main display).
+- **Chippi's mood on the puck:** asleep at rest, idle while hovered or open, wide awake while Keep awake runs, idle for any other activity, listening (headphones) while a song plays, and celebrating when Chippi finishes something for you.
+- **The chip:** 36 tall, 8 corners, Island fill and border, a lighter shadow (blur 14, 4 down, 16%), 6 from the puck on the side toward the screen's middle, centered on it. It shows the first that applies:
+  - a drag from another app over the puck: the target tile's glyph and name;
+  - Plain paste feedback for 6 seconds: ClipboardType, accent or Caution (§5 Clipboard and text);
+  - a song playing: a 24 cover (4 corners; a Music glyph without art), the title in 12 Text and " · artist" in tertiary, then the equalizer: three 3-wide bars in the accent fill that follow the default output's real level, resting at 8, 14 and 10;
+  - the highest activity: its tile's glyph (or the progress ring, a folder or a dot) and its status, such as "1 hr left". The glyph turns Caution while the activity needs attention.
+  - The line is at most 150 wide. Longer, it scrolls 30 DIPs a second after a 2-second hold, a copy 40 behind so it loops, fading over 8 at its ends; it holds under reduced motion and stops while the panel is open. With nothing to show there's no chip.
+  - Clicking the chip opens its page: the song's opens Now Playing, an activity's its feature's page. It replaces the live round button.
+- **Muted mic:** a red badge on the puck's lower right: an 18 `#C42B1C` circle with a white 11 MicOff, ringed 2 in the Island fill. It shows whatever else is live, and the puck's help text says "Microphone muted".
+- **Hover:** the puck grows 4px (50 to 54) over 120ms ease-out and Chippi wakes. Hover never opens the panel.
+- **Clicks:** a click opens the panel on the last page used, or home if none is remembered or its feature is gone; another click, Esc or a click outside closes it. Outside clicks still reach the app underneath. Right click opens the tray menu (Open settings, Quit) above the puck, so Quit stays reachable with the tray icon hidden.
+- **Dragging:** a press that moves 4px starts a drag and closes the panel at once. The puck lifts (scale 1.12, tilted −6°, a deeper shadow: blur 30, 14 down, 28%), the chip goes, and it follows the pointer onto any display. On release it slides the least distance that keeps it whole inside that display's work area (180ms, ease-out), then the place is saved. The chip comes back on the side toward the middle.
+- **Shelf drop target:** a drag from another app held 250ms over the puck opens the Shelf without taking focus; leaving for 500ms closes it again.
+- **Reduced motion:** hover, lift and the drop's slide snap; the song holds and the bars rest.
+- **The panel:** 520 × 360 with 8 corners, Island fill, a 1px Island border and the panel shadow (§4). It opens beside the puck toward the screen's middle (left or right and up or down by the puck's center), overlapping the puck's far side by 20, and stays 8 inside the work area. The puck stays above it.
+  - **Morph:** the shape grows out of the puck (from its circle to the panel, corners 25 to 8) over 220ms ease-out, the content fading in over the second half. Closing shrinks it back into the puck over 160ms, the content fading out over the first half. Page to page the shape doesn't change: the old page goes at once and the new one fades in over 150ms. A drag or a fullscreen app closes it at once. Reduced motion snaps every transition.
+  - **Known cost (2026-10-29):** at 165 Hz the open skips about 2 frames (up to 11 on the first open after start), the close about 6 and a page switch about 3; the panel's shadow is 1 or 2 of them. Travis kept this open over a cheaper fade and scale (task 167).
+  - **Keyboard:** only Esc is watched before the user clicks into the panel. After that click, Tab, arrows and Enter move through its controls; no global hook takes those keys from the app in front. A page may use Esc first (clear a search, leave Clean URL); otherwise Esc closes the panel.
+- **Home** (like Windows Quick Settings), top to bottom in the 496 wide body:
+  - **Now Playing card:** 68 tall: the art at 52 (4 corners; without art Chippi at 28, listening while a track plays, asleep otherwise), the app in 11 tertiary, the title in 14 / 600 and the artist in 12 secondary ("Nothing playing" with no track), then previous and next (32, glyph 14) around a 36 play disc in the accent fill. Clicking the card opens Now Playing.
+  - **Feature buttons:** up to 8, in 4 columns and 2 rows, in Settings › Island & pet's order and Show choices; fewer features means fewer buttons, and nothing moves. Each is a 44 tall button with a 16 glyph (6 corners, button fill, a 1px control border), with the name in 12 and the status in 11 tertiary under the button. A cut-off name or status shows in full in a tooltip.
+  - **Toggle buttons** split in two: the main part toggles, and a 28 wide arrow (ChevronRight 13, named "Open {feature}") opens the page. On, the button takes the accent fill with an on-accent glyph; the name and status under it keep their colors. Keep awake starts its default length (Settings â€º Keep awake, 1 hr out of the box; a card on its page doesn't change it) and stops when on; Microphone mutes and unmutes.
+  - **Attention:** a muted mic or a feature that needs attention turns its glyph (MicOff for the mic) and status Caution. There are no live dots.
+  - **Volume:** shown only with Sound installed: a 16 speaker, the system volume slider, its percentage (12, tabular) and an arrow that opens Sound.
+  - **Footer:** 46 tall across the panel's full width, a hairline above it and a faint fill: Chippi at 20 and "Chippi" in 12 on the left, a 32 Settings button on the right. Settings closes the panel, then opens Settings on its last page.
+- **Pages:** the body is 496 × 304, as before; see Island pages above. Every page starts with the shell header: a Back arrow (ChevronLeft 16, an icon button named "Back") to home, then the page's own header row. The page header and the fit rules below are unchanged.
   - **Fit rules (revised 2026-10-28):** nothing on the island scrolls except the text inside a Scratchpad note. Pages adapt to fit the body: when content grows, a page adds columns, shortens rows, narrows strips and shrinks tiles. Lists show whole rows only and leave out a row that doesn't fully fit. Lists start at the top; content that never grows (Keep awake's choices, empty states) sits in the vertical middle. Content never grows the island, and no page has a ScrollViewer. Whatever still can't fit is in that feature's Settings page, which may hold information for this, not just configuration.
-  - **Compact sizes (revised 2026-10-28):** text 12, captions and secondary lines 11, page titles 13 / 600. One 8 gap between every card, tile and column, and below the header. Header row 24: its text and buttons end at the 12 inset, and the last icon button gets a −7 right margin so its glyph lines up with the cards' right edge (also the last icon button in Scratchpad's tabs and action rows and in Clipboard's expanded entry). Text buttons 28 tall, 10 padding, 12 text, at least 64 wide. Icon buttons 28 × 24 with a 14 glyph. Glyphs are 12, 14, 16 or 20, all drawn with the same 1.25px line. Filled surfaces (cards, selected rows, expanded entries, tiles) have 8 corners (20 − 12); controls (buttons, fields, search) 4. Content inside every row and card starts 10 in; a field or the search box counts its 1px border (padding 9). Control cards 44 tall with 10 padding; list rows 30, one line; table rows 28; switches 34 × 18; slider thumbs 16. These are shared island resources in `IslandStyles.xaml`.
-  - **Morph (revised 2026-10-28):** opening and closing animate shape size, place and corners together: tab to island over 220ms ease-out with the content fading in over the second half; closing reverses to the swollen tab over 160ms, then lets the tab shrink. Page to page the shape doesn't change: the old page goes at once and the new one fades in over 150ms (revised 2026-10-29: a still picture of the old page fading out over the new one made the GPU stall for 20–30ms early in every switch). Drag/fullscreen hide closes immediately. Reduced motion snaps every transition and removes continuous animation. Orbit positions follow every morph frame.
-  - **Fit on screen (revised 2026-10-28):** the island and its orbit buttons fit on the top, left and right edges down to a 960 × 540 DIP screen (1080p at 200%).
-- **Grid (revised 2026-10-28):** the tiles always fill the body, 8px apart, 8px radius, `rgba(255,255,255,.06)` fill; hover `.10`, pressed `.04`. The layout follows the tile count: 1 to 3 in one row; up to 4, 2 × 2; up to 6, 3 × 2; up to 9, 3 × 3 (about 160 × 96 each); up to 12, 4 × 3, each with a 20 glyph over the 12 / 600 name and 11 tertiary status, centered. Up to 15, 5 × 3, and up to 20, 5 × 4, with a 16 glyph, an 11 / 600 name and a 10 status. Up to 24, 6 × 4, and up to 30, 6 × 5, with a 14 glyph and a 10 / 600 name, no status. Status is actual state ("Muted", "1 hr left", current media title), not a shortcut. A cut-off name or status shows in full in a tooltip.
-  - Order: Now Playing, Sound, App volume, Keep awake, File organizer, unless Settings › Island & pet reorders them or leaves some off the grid (a hidden tile's page stays, for a round button). Now Playing is shell-owned and always available; other tiles appear only when at least one contributing feature is installed. Routing, processing and mute share Sound; its highest-priority nonempty status wins, with Mic muted above the output.
-  - A live tile (Now Playing playing, Keep awake on) shows a 6px accent dot, 8px from its top/right. A tile that needs attention gets the dot, its status and its glyph in Caution: Sound shows the mic-off glyph and "Mic muted". The grid's 24px header holds Gumdrop, Chippi and the clock. Tile names are structural labels, the semibold exception to the Weight Rule.
-- **Pages:** see Island pages above. Inner cards use `rgba(255,255,255,.06)`, 8px radius and 10px padding. Omit sections without a contributing installed feature.
-- **Orbit buttons (revised 2026-10-28):** 32px circles, Island fill, 1px `rgba(255,255,255,.14)` stroke, 14px glyph, `0 8px 20px rgba(0,0,0,.3)` shadow. Hover `#1F1F1F`, pressed `#000000`; the active page's button gets a `.5` white stroke. Accessible names describe the target/action. They are part of the island window and hit region, not click-away.
-  - **One rule on every edge (2026-10-26):** the buttons sit 10px off the shape in two pairs, beside it along its edge, each pair centered on it, 6px between the two buttons of a pair. The first pair is All features (Back on the grid) and the left button; the second is Settings and the right button.
-  - **Top edge:** one pair stacked left of the shape, one right, centered on its height and never closer than 8px to its top.
-  - **Left/Right edges:** one pair side by side above the shape, one below, centered on its width.
-  - On the grid, All features becomes Back to the remembered page, if available; with nothing remembered its place stays empty. A pair keeps both places, so no button moves when one appears. The left and right buttons hold Keep awake and App volume unless Settings › Island & pet picks another tile or None; they appear only while their tile exists. Nothing sits beyond the screen edge: clamp the complete interactive footprint inside the work area.
-  - One live button, also 32, is centered on the shape's far side, 10px off: below it on top, beside it on a side. It opens Now Playing for music, otherwise Sound when the mic is muted. Settings › Island & pet can turn it off. Closed-tab indicators still show both music and mute. Hide orbit buttons while closed or dragging. A removed target falls back to the grid.
-- **Colors:** the island always uses its dark accent and dark text tokens in either app theme. Only real media artwork may supply its own colors; do not copy the mockup's decorative gradient art placeholder.
+  - **Compact sizes (revised 2026-10-29):** text 12, captions and secondary lines 11, page titles 13 / 600. One 8 gap between every card, tile and column, and below the header. Header row 24. Text buttons 28 tall, 10 padding, 12 text, at least 64 wide. Icon buttons 28 × 24 with a 14 glyph. Glyphs are 12, 14, 16 or 20, all drawn with the same 1.25px line. Cards, tiles and expanded entries have 6 corners; controls (buttons, fields, search) 4. Content inside every row and card starts 10 in. Control cards 44 tall with 10 padding; list rows 30, one line; table rows 28; switches 34 × 18; slider thumbs 18 with a ring. These are shared island resources in `IslandStyles.xaml`.
+- **Pages restyled to the mock (2026-10-29):** the accent fill marks what's on or primary (Now Playing's play disc, a running Keep awake card, the selected segment, App volume's bars); Clipboard's open entry sits on the accent tint; Scratchpad's selected tab gets a 3px accent bar over a hairline under the tabs; Shelf's tiles have no fill until selected, with an accent pin; System monitor's rows are divided by hairlines with none above the first.
 
 ### Settings window
 - **Frame (revised 2026-10-28):** 1120×720 by default, centered on the main display, and resizable down to 860 wide, on the Windows 11 frame: system corners and shadow, so snap layouts, maximize and resize stay native. Pointing at maximize shows Windows' snap layouts. It reopens at the size, place and maximized state it closed in; if that place is on no monitor now, it centers on the main display. Esc does nothing (it still clears the search box).
-- **Titlebar:** 40px in window color with no line under it. Gumdrop's small form at 16px, "Chippi Settings" (12 / 400), and caption buttons 46×40. Close hovers to Critical with a white glyph.
+- **Titlebar:** 40px in window color with no line under it. Chippi's small form at 16px, "Chippi Settings" (12 / 400), and caption buttons 46×40. Close hovers to Critical with a white glyph.
 - **Sidebar (revised 2026-10-28):** 272 wide on the window color, no divider. One list for every group: one scroller (the mouse wheel works anywhere on it), one Tab stop, and arrow keys that cross groups. Opening a page scrolls its row into view.
   - A 32px search field, "Find a setting", 12px above the list. Typing replaces the content with matching rows from every page, grouped by page; clicking one opens its page.
   - **Feature groups** (2026-10-26): the installed features' pages under the catalog's group labels, in Add features' order (Files, Sound, System, Clipboard & text, Windows, Capture, Apps). Only groups with an installed feature show. Within them: File organizer, Shelf; Now Playing, Output, Microphone, App volume; Keep awake, System monitor; Clipboard history, Clean URL, Paste as plain text, Scratchpad (2026-10-28).
@@ -295,16 +310,16 @@ Reference: the offline Sound mockup at `X:\code\chippi-scratch\phase-3-prep\mock
 - **Page template:** title, then an optional SelectorBar, then sections. A section is a Section header (with an optional right-aligned button) over one card of rows. Two cards in a row of the same section sit 8px apart.
 - **Rows (revised 2026-10-28):** at least 60px with a caption, 48px without; 16,8 padding; 12px gap. Label over caption on the left, the control on the right. A switch shows "On" or "Off" in body text just left of it. An expander row ends in a chevron and its sub-rows are indented 50px.
 - **File organizer (revised 2026-10-28):** each watched folder shows its glyph, name/path, mode, Organize now and a chevron for Mode, Wait before moving, Ignore list and Stop watching. Unmatched preview files fold into one count row; with nothing actionable the footer says Nothing to organize with Cancel and Add rule, which opens a new unsaved draft. A SelectorBar of Settings · Rules · History (§5 File organizer).
-- **Island & pet** (2026-10-26): one card of Island, Hide tray icon (dimmed while the island is off), Opens on (Last page used / All features), Position with Reset, and Display. Then **Tiles**: a row per tile with a grip (drag, or Up and Down on the focused grip), its glyph, its name and a Show switch, beside a card with a small preview of the open island and its round buttons. Then **Round buttons**: Left button and Right button (None or any tile) and Live button. Then Gumdrop.
+- **Island & pet** (2026-10-26): one card of Island, Hide tray icon (dimmed while the island is off), Opens on (Last page used / All features), Position with Reset (back to the start), and Display (Main display or One monitor, with "Monitor not connected · using main display" while the chosen one is gone). Then **Tiles**: a row per tile with a grip (drag, or Up and Down on the focused grip), its glyph, its name and a Show switch, beside a card with a small preview. The home shows the first 8 shown tiles. Then **Chippi**: Color and Reduce motion (revised 2026-10-29: the round buttons are gone).
 - **Two surfaces (revised 2026-10-28, replaces "Settings never repeats a daily control").** Settings can do everything the island can: a feature's page starts with its island controls, which call the same module method as their island twin, then its configuration, and lists every item the fixed island leaves out. The island is unchanged: its pages show live state and controls only. No page intros and no info buttons; subtext appears only when a label cannot stand alone.
 - **Keep awake (revised 2026-10-28):** a Keep awake row with the state caption and Stop while on, then Length with the six island choices (30 min, 1 hr, 2 hr, 4 hr, No limit, Until...), with the active choice lit. Until opens the time picker. Keep screen on follows. There is no session switch, Default length or After a restart row.
 - **System monitor Settings (revised 2026-10-28):** the live readings first, including every thermal zone, then Disks with every drive, General (Update speed, Tile status), Readings, Units and Alerts. Alert switches and current thresholds sit in expandable headers; their tuning folds inside at the shared 50px inset. Repeat interval uses hour-style values.
 
 - **Add features** (replaces the Features hub): a search field with the "2 on" count beside it. **Available** lists the features that work, each a row with a 32px icon chip (accent glyph when on, muted when off), name, one-line description and a switch. One collapsed **Coming later** row ("39 features") expands into one row per group listing the names. Presets are hidden until enough features exist for them to matter. Toggling a feature installs or uninstalls it, and an installed feature appears in the sidebar at once.
 - **General:** Theme (Dark · Light · Follow Windows segment, default Follow Windows), Accent color (a "Windows" pill and four 24px swatches; the caption reads "Follow Windows" or the color's name), Run at startup (switch). A Settings file section with one row, "Location", captioned with the path, and Export… and Import… on the right.
-- **Island & pet:** Island (switch), Position (Top · Left edge · Right edge combo plus a Reset button; dragging the island also sets it), Display (combo). A Gumdrop section: a Color row with a 48px Gumdrop preview, the color's name as caption and six swatches; Reduce motion (combo: Follow Windows · On · Off).
+- **Island & pet:** see above. The Chippi section: a Color row with a 48px Chippi preview, the color's name as caption and six swatches; Reduce motion (combo: Follow Windows · On · Off).
 - **Notifications:** see below.
-- **About:** Chippi with a 32px Gumdrop and "Version 0.1.0" on the right; License (GPL-3.0-or-later, View); Privacy ("No telemetry"); Third-party notices (View). The sidebar has no version footer. Notices open as rendered text, never raw markdown.
+- **About:** Chippi with a 32px Chippi and "Version 0.1.0" on the right; License (GPL-3.0-or-later, View); Privacy ("No telemetry"); Third-party notices (View). The sidebar has no version footer. Notices open as rendered text, never raw markdown.
 - **Swatch selection:** a selected swatch or pill gets a 2px gap in the card color and a 2px accent ring.
 
 ### File organizer
@@ -345,7 +360,7 @@ Screen and copy specification: [approved notes](docs/phase-4/design/notes.md), [
 - No tray readouts, extra tray icons, page settings link, pause or time-range control.
 - **Settings:** System group after Keep awake, all drives in a Disks section at the top, followed by configuration (revised 2026-10-28). First configuration card: Update speed (1/2/5 seconds, default 2), Tile status (CPU/Memory/GPU/Network, enabled readings only). Readings switches default on; Battery/Thermal zone options appear only where present. Tile status falls back to the first enabled reading. Units and Alerts follow, with no feature switch or page intro. Settings can scroll.
 - **Alerts:** five off-by-default kinds: CPU load, Memory in use, Low disk space, Low battery and GPU temperature. Threshold sub-rows contain sliders and values and dim while off. GPU limit fields remain editable while off, one per reporting GPU, 40 to 110 Celsius with "Not set" and no default. The GPU switch requires at least one limit. Repeat interval choices: 2/5/15/30/60 minutes, default 15. Exact threshold and sustain behavior is in the brief.
-- **Notices:** Windows and Island destinations default on for each opt-in alert. One short reading (for example "Memory in use 93%"), no buttons; clicking opens the System monitor page in the island, or Settings while the island can't show. The closed tab uses an Activity glyph in Caution, after media/timer/stash/agent priority, until the alert clears. Gumdrop stays Idle.
+- **Notices:** Windows and Island destinations default on for each opt-in alert. One short reading (for example "Memory in use 93%"), no buttons; clicking opens the System monitor page in the island, or Settings while the island can't show. The widget's chip shows the alert's reading with its glyph in Caution, after media/timer/stash/agent priority, until the alert clears. Chippi stays idle.
 
 ### Clipboard and text (approved 2026-10-28)
 
@@ -356,10 +371,10 @@ Screen and copy specification: [approved notes](docs/phase-5/design/notes.md), [
   - Recording is off until Turn on (on the page) or Recording (Settings). With recording off and nothing saved, the ClipboardList glyph (20), "Recording off" and Turn on sit in the middle of the body. A private or skipped copy leaves no row, gap, count change or status.
   - A missing file shows FileX and "Unavailable", and disables Paste and Copy ("1 file unavailable"). A copy over a limit shows one Caution line above the list until the next copy.
 - **Clean URL:** the link button (shown pressed) swaps the list for a full-width link field that grows to three padded lines. Longer links keep their start and end with a middle ellipsis while unfocused; focus selects the whole link. The clean link follows as you type, trimmed the same way, with Copy for the whole link. Nothing scrolls (revised 2026-10-28). No list of what was removed (Travis, 2026-10-28). The button again, or Esc, goes back. Without Clipboard history the page is Clean URL alone, with the tile status in the header. The current copy fills the field when it's one web link without a private marker. States: "Nothing to remove", "Not a web link" (Caution), "Copied".
-- **Paste as plain text:** a shortcut only, with no default; it does nothing until one is set in Settings. It pastes into the app in front. When it can't (an admin app, or one whose level can't be read), the plain text becomes the copy. That case, pictures or files only, and a busy clipboard each play the Windows default beep and show the ClipboardType glyph on the closed tab for 6 seconds: accent for "Plain text copied", Caution for "No text copied" and "Clipboard busy" (screen-reader names). No Windows notification, Notifications group or "Pasted" state.
+- **Paste as plain text:** a shortcut only, with no default; it does nothing until one is set in Settings. It pastes into the app in front. When it can't (an admin app, or one whose level can't be read), the plain text becomes the copy. That case, pictures or files only, and a busy clipboard each play the Windows default beep and show the ClipboardType glyph on the widget's chip for 6 seconds: accent for "Plain text copied", Caution for "No text copied" and "Clipboard busy" (screen-reader names). No Windows notification, Notifications group or "Pasted" state.
 - **Scratchpad** (revised 2026-10-28): header status "Saved", "Save failed" or "Export failed" (Caution). A 30 tabs row of up to 12 named notes (the ones that don't fit under "+N ⌄") with New note, the editor or preview filling the body, then at the bottom edge a 28 Edit · Preview segment and ⋯ (Rename, Export…, Delete). Only the note's text scrolls, inside the editor, and notes have no length cap. Preview renders local Markdown and fetches nothing. A failed load shows "Load failed" (Caution) with Retry and no editor.
 - **Shelf** (revised 2026-10-28): tiles fill the body above Copy, Pin and Remove (bottom edge, right), newest first, and shrink as items pile up: up to 18 at 6 × 3 (76 × 66, the glyph or 36 × 20 picture in a 20 slot 7 from the top, then the name on up to 2 lines, or 1 above "Unavailable" or "Online only"), up to 28 at 7 × 4 (the name on up to 2 lines), up to 40 at 8 × 5 (the glyph alone, centered). Names wrap at spaces and hyphens; one long word trims. Size and type are in the tooltip with the full name. At 40 items the Shelf is full: "Shelf full" (Caution) at the left of the action row, and drops are refused until something is removed; nothing is thrown away. Empty, the dashed drop zone fills the body with Inbox (20) and "No items". The whole page takes drops, one drop per item. Out is copy-only; an accepted drop removes an unpinned item. Remove has no confirmation and never touches the source file. Kept text and pictures are capped at 128 MiB.
-  - A drag that stays 250 ms over the closed tab swells it with the Inbox glyph and opens the Shelf without taking focus. The tray icon never takes a drop.
+  - A drag that stays 250 ms over the puck shows the Shelf on its chip and opens the Shelf without taking focus. The tray icon never takes a drop.
 - **Keyboard:** opening puts the keyboard in Search (the link field in Clean URL or without History), at the end of the note, or on the first Shelf item. On Clipboard the first Esc clears a search or leaves Clean URL, and the next closes. Tab leaves the Scratchpad note and never types a tab.
 - **Settings (revised 2026-10-28):** Clipboard & text holds Clipboard history, Clean URL, Paste as plain text and Scratchpad; Shelf is under Files, after File organizer.
   - **Clipboard history:** Recording, Apps to skip, then History: Pause or Resume in its header, a search box with the item count, and every copy on a 48 row, pinned first, each with a ⋯ of Paste, Copy, Pin or Unpin, and Delete. Paste goes to the window Settings was switched from; with none, it copies and shows "Copied". The list is as long as the history; the page scrolls.
@@ -383,7 +398,7 @@ Behavior approved 2026-10-22 (`docs/phase-2/design/notifications/`); visuals res
   - Organized and Archive imported: clicking opens that run in History. The buttons are Undo (opens the run's inline Undo confirmation, never undoes on its own; only when something is undoable) and History.
   - Failed: clicking opens the run in History; the button is History.
   - Held and Ready to review: clicking, or the Review button, opens the review.
-- **Island tab on a stash:** Gumdrop celebrates, then goes idle, and the folder glyph shows. Held and failed stashes add a caution dot.
+- **The widget on a stash:** Chippi celebrates, then goes idle, and the chip shows the folder glyph. Held and failed stashes turn it Caution.
 
 ## 6. Components
 
@@ -419,48 +434,45 @@ Every interactive control is custom-templated with the full state set: rest, hov
 - **Sound glyphs:** the Sound tile uses `AudioLines` (six vertical audio lines); Mic processing uses `Mic`; Mic mute shortcut uses `MicOff` (slashed microphone). Use the matching mic-off glyph for muted state in the flyout, island tab and Microphone tile/page, in Caution. These are distinct feature glyphs, not two features sharing Mic.
 - **Icons:** Lucide on a 24px grid, round caps and joins, drawn at 16px (20px for a Settings row lead glyph). The stroke is 30 / size in the grid, so every size draws the same 1.25px line (revised 2026-10-28). Each feature has its own glyph; no glyph is reused for two features. Brand logos are never redrawn: an app shows its real icon, or a monogram tile when no icon is available.
 
-## 7. The pet: Gumdrop
+## 7. The pet: Chippi
 
 ### Character
-Gumdrop is a rounded drop of the Synth gradient with two dark eyes, a white shine and a tiny mouth. It has no limbs, no accessories and no text. It is calm by default, quietly pleased when Chippi finishes something for you, and asleep when nothing is happening. It never interrupts, nags or needs feeding. It is a status light with a face.
-
-It is deliberately different from vorssaint's companion: a drop silhouette rather than a ball, a gradient rather than flat pastels, a shine highlight, and a mouth that changes with mood. Keep those four traits, and never reduce it to a plain colored ball with two dots.
+Chippi (the pet shares the app's name, Travis 2026-10-29) is a soft rice-cake blob with big shiny eyes and an open grin, no blush, no limbs and no text. It replaced Gumdrop. It is calm by default, pleased when Chippi finishes something for you, asleep when nothing is happening, and wears headphones while music plays. It never interrupts, nags or needs feeding. It is a status light with a face. The control is `ChippiPet` (`src/Chippi.App/Pet/ChippiPet.cs`).
 
 ### Geometry
-Drawn on a 120×120 viewBox. These are SVG path strings, and WPF `Path.Data` accepts the same syntax.
+Drawn on a 120×120 viewBox; WPF `Path.Data` takes the same syntax.
 
 | Part | Spec |
 |---|---|
-| Body | `M60 16 C80 30 100 52 100 77 C100 98 82 108 60 108 C38 108 20 98 20 77 C20 52 40 30 60 16 Z`, filled with the Synth gradient at 135° (WPF `StartPoint="0,0" EndPoint="1,1"`) |
-| Shine | Ellipse centered (46, 46), radii 9 × 5.5, rotated −28°, white at 38% |
-| Eyes (idle) | Ellipses at (47, 74) and (73, 74), radii 4.8 × 6.2, pet ink `#0B0F1F`, each with a white highlight (r 1.7) at (+1.7, −2.3) |
-| Mouth (idle) | `M56 88 Q60 91.5 64 88`, a 2.8 ink stroke with round caps |
-| Ground shadow | Ellipse (60, 113), 30 × 4, black at 35%, at sizes of 64px and up only |
+| Body | `M17 76 C17 45 36 31 60 31 C84 31 103 45 103 76 C103 98 87 106 60 106 C33 106 17 98 17 76 Z`, one pet color with soft shading: a vertical gradient from the color to 88% of it |
+| Eyes (idle) | White eye whites 10.5 × 12.5 at (47, 66) and (73, 66); ink pupils r 6 at (49, 68) and (75, 68); white highlights r 2 at (50.6, 65.6) and (76.6, 65.6) |
+| Mouth (idle) | An open grin in ink with a `#FF7FA8` tongue |
+| Ground shadow | At sizes of 64 and up only |
 
 ### Moods
 
-| Mood | Eyes | Mouth | Extras | When |
-|---|---|---|---|---|
-| **Idle** | Dots, as in the geometry table | Small smile | None | The default when the island shows activity, in the flyout header and in Settings |
-| **Celebrating** | Happy arcs `M42 75 Q47 68 52 75 M68 75 Q73 68 78 75` (4.2 stroke) | Open smile `M54 87 Q60 96 66 87 Z` (filled ink) | Blush ellipses at (38, 85) and (82, 85), 5.5 × 3.2, `#FF8FB0` at 70%. Spark strokes `M14 30 L6 24 M12 44 H3 M24 18 L20 9 M106 30 L114 24 M108 44 H117 M96 18 L100 9` (3.5, `#F5C451`). The body squishes to scale (1.06, 0.94) from the bottom center (60, 108) | The organizer stashed files, a timer finished, an agent task finished, a download completed. Holds about 2.5s, then returns to idle |
-| **Sleepy** | Closed arcs `M42 74 Q47 78.5 52 74 M68 74 Q73 78.5 78 74` | Flat line `M57 89 H63` | A "z" in 20px Segoe UI Variable Display Bold at (94, 30) and another in 13px at (106, 15), in Muted | The island tab at rest, with nothing live |
-| **Wide awake** | Larger dots, radii 6.4 × 7.4, highlights r 2.4 | Small "o", an ellipse at (60, 89), 3 × 3.6, filled ink | None | While Keep awake is holding the PC up |
+| Mood | Face | Extras | When |
+|---|---|---|---|
+| **Idle** | The eyes and grin above | Blinks | Any activity; the puck while hovered or open |
+| **Wide awake** | Happy-arc eyes (3.2 stroke) | Blinks | While Keep awake holds the PC up |
+| **Celebrating** | Happy arcs (4.2 stroke) | Sparks (`#F5C451`, 3.5) fading over 1.2s; a squish to (1.06, 0.94), then (0.985, 1.02), then back, at 110, 260 and 400ms from the bottom center | Chippi finished something for you (stashed files, a timer, a download). Holds 2.5s, then goes back |
+| **Asleep** (`Sleepy`) | Shut arcs (3.4 stroke) and a small "o" mouth | Two z's, 20 and 13px bold, `#9D9D9D` | Nothing live: the puck at rest, Nothing playing |
+| **Listening** | The celebrating face, no sparks | Headphones: a `#2A2440` band (5 stroke) and cups at the sides with pads in `#D2BEFF` | A song playing: the puck (not while lifted), Now Playing and the home card without art |
 
 ### Sizes
-- **Small form, for the tray icon (16–20px) and the Settings titlebar (16px):** body plus eyes only, with eyes enlarged to 6 × 7.4. Drop the shine, mouth, highlights and extras, which are illegible at that size.
-- **Island tab:** 20–22px in the small form (sleepy uses closed arcs instead of dots). **Island header and flyout header:** 22–24px, full detail. **Settings › Island & pet:** 48px beside the color swatches. **About:** 32px.
+- **Small form (22 and under):** body and eyes only (6 × 7.4 at y 74); no mouth, sparks or z's.
+- **Puck:** 36 in the 50 puck. **Home footer:** 20. **Home media card without art:** 28. **Now Playing without art:** 76, listening; **Nothing playing:** 72, asleep. **Settings titlebar:** 16. **Settings › Island & pet:** 48 beside the color swatches. **About:** 32.
 
 ### Color option
-Synth is the default and the brand. Settings › Island & pet can switch the body to a solid **Iris** `#CBB2FF`, **Azure** `#8EC0FF`, **Signal** `#8EE6C0`, **Ember** `#FFC58F` or **Frost** `#E8ECF6`. The eyes and mouth stay pet ink on every color, which keeps contrast at 5:1 or better. In the light theme the Frost swatch gets a 1px `rgba(0,0,0,.15)` stroke so it doesn't vanish.
+Settings › Island & pet › Chippi › Color: **Synth** `#B78FFF` (the default, the accent's violet), **Iris** `#CBB2FF`, **Azure** `#8EC0FF`, **Signal** `#8EE6C0`, **Ember** `#FFC58F` or **Frost** `#E8ECF6`. Every color draws the same way (one color, soft shading), and the face stays pet ink and white on all of them.
 
 ### Motion
-- **Blink:** every 4–7s at random, the eyes scale to 10% height for 120ms. This is the only ambient loop in the whole app.
-- **Mood change:** eyes and mouth cross-fade in 150ms. Celebrating springs into the squish and back (about 400ms) while the sparks fade out over 1.2s.
-- **Falling asleep:** the eyes ease shut over 600ms before the z's fade in.
-- **Reduced motion** (Windows "Animation effects" off, or the setting): no blink and no squish. Moods swap instantly with no tween.
+- **Blink:** every 4 to 7s at random, the eyes scale to 10% height for 120ms (idle and wide awake).
+- **Mood change:** the face cross-fades in 150ms. **Falling asleep** from idle or wide awake: the eyes ease shut over 600ms, then the z's fade in over 400ms.
+- **Reduced motion:** no blink, squish or tween; moods swap at once, and a running tween snaps when the setting changes.
 
 ### Accessibility
-In the island and flyout header, the pet is decorative (`AutomationProperties.AccessibilityView="Raw"`), because the text beside it carries the state. Where it stands alone, as in the Settings preview, it gets a name such as "Gumdrop pet, idle". It must never be the only signal of anything.
+Where text beside it carries the state (the puck, the home, Now Playing), the pet is decorative and left out of the accessibility tree. Where it stands alone, as in the Settings preview, its name is "Chippi, {mood}": idle, wide awake, celebrating, asleep or listening. It is never the only signal of anything.
 
 ## 8. Do's and Don'ts
 
@@ -474,13 +486,13 @@ In the island and flyout header, the pet is decorative (`AutomationProperties.Ac
 - **Do** list only features that work. Coming soon stays folded away.
 
 ### Don't
-- **Don't** use gradients anywhere but Gumdrop, and never gradient text.
+- **Don't** use gradients beyond the Gradient Rule's two, and never gradient text.
 - **Don't** use Bold, colored glows, glassmorphism or hero metrics.
 - **Don't** put a description under a page title, or a sentence where a label will do.
 - **Don't** nest cards, or give each row its own card.
 - **Don't** ship stock WPF chrome: no default checkboxes, group boxes or gray dialogs.
 - **Don't** use a colored side stripe (a left or right border wider than 1px) to mark a row or card. The nav pill is the one exception.
-- **Don't** animate anything for its own sake. Only switches, segment and tab changes, the island and the pet move. The pet's blink, the island's live equalizer and the tab's scrolling song are the only loops.
+- **Don't** animate anything for its own sake. Only switches, segment and tab changes, the island and the pet move. The pet's blink, the chip's live equalizer and its scrolling song are the only loops.
 - **Don't** use emoji anywhere in the UI.
 - **Don't** redraw other companies' logos. Use the real app icon or a monogram.
 - **Don't** copy vorssaint's screens, icon or assets.
@@ -491,7 +503,7 @@ In the island and flyout header, the pet is decorative (`AutomationProperties.Ac
 - **Variable fonts:** WPF draws only a variable font's default instance and can't select weights from it. That is why Manrope once rendered ExtraLight, and Segoe UI Variable is a variable font. Check that 400 and 600 render as true weights before building on it. If they don't, use static **Segoe UI** (Regular `segoeui.ttf`, Semibold `seguisb.ttf`, present on every Windows 11 install) for both roles. The design holds either way.
 - **Tabular figures:** `Typography.NumeralAlignment="Tabular"` on any element showing numbers, or on the base text style.
 - **Accent:** read the Windows accent shades with `Windows.UI.ViewManagement.UISettings.GetColorValue` (`AccentLight2` for dark, `AccentDark1` for light) and listen to `ColorValuesChanged`, which fires off the UI thread. Swap one `AccentBrush` and one `OnAccentBrush` when the accent setting, the theme or the Windows accent changes.
-- **Theme:** Follow Windows is the default and reads `AppsUseLightTheme`. Both themes define every key; the island keeps its own dark keys.
-- **Pet control:** a `UserControl` with a `Mood` dependency property, the size forms above and one `Path` per part. Moods switch through visual states.
-- **Island window:** borderless, `AllowsTransparency`, topmost, `WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE`, so it never steals focus or shows in Alt+Tab. It sits on the display the island display setting picks and hides while a fullscreen app or game is in front on that display. Because it never activates, dragging uses mouse capture and `SetWindowPos`, not `DragMove`. Keep the window sized to the swollen tab while closed, so the rest of the edge stays clickable. While the island is open, low-level keyboard and mouse hooks watch for Esc and for a click elsewhere; they are installed only while it is open and always pass the input on.
+- **Theme:** Follow Windows is the default and reads `AppsUseLightTheme`. Both themes define every key, the island's `Island*` keys included; the island's accent keys stay violet whatever the Accent setting.
+- **Pet control:** `ChippiPet`, with a `Mood` property (`PetMood`: Idle, Celebrating, Sleepy, WideAwake, Listening), `Size`, `PetColor` and `IsDecorative`, drawn from paths on the 120 viewBox.
+- **Island window:** borderless, `AllowsTransparency`, topmost, `WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE`, so it never steals focus or shows in Alt+Tab. The widget's window is 340 × 124 around the puck with room for its lift and shadow; fully transparent pixels click through. It sits on the display the Display setting picks and hides while a fullscreen app or game is in front on that display. Because it never activates, dragging uses mouse capture and `SetWindowPos`, not `DragMove`; a drag's moves change only the position (no resize, no z-order), which keeps each under 1 ms. The panel is its own window, sized to the panel and the puck with room for the shadow. While the island is open, low-level keyboard and mouse hooks watch for Esc and for a click elsewhere; they are installed only while it is open and always pass the input on.
 - **Reduced motion:** read `SystemParameters.ClientAreaAnimation` and listen for changes.
