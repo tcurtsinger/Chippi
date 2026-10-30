@@ -101,7 +101,7 @@ Clipboard history, paste as plain text, clean URL, scratchpad and shelf, on thre
 
 ### Phase 5.1: Shell redesign
 Brief: [docs/shell-redesign-handoff.md](docs/shell-redesign-handoff.md). Design: [docs/shell-redesign/design/](docs/shell-redesign/design/). Approved 2026-10-29.
-The island at the top of the screen becomes a blob widget you drag anywhere, opening a Windows 11–style panel with a Quick Settings home and the pet's violet as the accent. A new blob replaces Gumdrop. Built in PRs #122 to #133 on `redesign/shell`.
+The island at the top of the screen becomes a blob widget you drag anywhere, opening a Windows 11–style panel with a Quick Settings home and the pet's violet as the accent. A new blob replaces Gumdrop. Built in PRs #122 to #136 on `redesign/shell`. Live check passed (Travis, 2026-10-29, task 181, on the build from `4f52e49`).
 - Known cost (2026-10-29): at 165 Hz the panel's open skips about 2 frames (up to 11 on the first open after start), its close about 6 and a page switch about 3. The panel's shadow is 1 or 2 of them. Travis kept the grow-out-of-the-puck open over a cheaper fade and scale (task 167).
 
 ### Phase 5.5: Everyday tools, continued
