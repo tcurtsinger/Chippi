@@ -12,7 +12,7 @@ using Chippi.Core.Config;
 namespace Chippi.App.Pet;
 
 /// <summary>
-/// Debug builds only: renders Gumdrop mood sheets to PNG for review (<c>Chippi.exe --debug
+/// Debug builds only: renders ChippiPet mood sheets to PNG for review (<c>Chippi.exe --debug
 /// --pet-sheet &lt;dir&gt;</c>). Each sheet is drawn on the dark and the light window color, at 1x.
 /// </summary>
 internal static class PetSheet
@@ -27,7 +27,11 @@ internal static class PetSheet
             var caption = (Brush)tokens["TextTertiaryBrush"];
             string suffix = theme.ToLowerInvariant();
 
-            Render(Row(background, caption, Enum.GetValues<PetMood>().Select(m => (Pet(112, m, PetColor.Synth), SentenceCase(Gumdrop.Describe(m))))),
+            foreach (var color in Enum.GetValues<PetColor>())
+                foreach (var size in new[] { 24.0, 32, 48, 72 })
+                    Render(Row(background, caption, Enum.GetValues<PetMood>().Select(m => (Pet(size, m, color), ChippiPet.Describe(m)))),
+                        Path.Combine(directory, $"chippi-{color}-{size}-{suffix}.png"), 1);
+            Render(Row(background, caption, Enum.GetValues<PetMood>().Select(m => (Pet(112, m, PetColor.Synth), SentenceCase(ChippiPet.Describe(m))))),
                 Path.Combine(directory, $"ws3-pet-moods-112-{suffix}.png"), 1);
             Render(Row(background, caption, Enum.GetValues<PetColor>().Select(c => (Pet(112, PetMood.Idle, c), c.ToString()))),
                 Path.Combine(directory, $"ws3-pet-colors-112-{suffix}.png"), 1);
@@ -120,9 +124,9 @@ internal static class PetSheet
 
     private static string SentenceCase(string text) => text.Length == 0 ? text : char.ToUpperInvariant(text[0]) + text[1..];
 
-    private static Gumdrop Pet(double size, PetMood mood, PetColor color) => new() { Size = size, Mood = mood, PetColor = color };
+    private static ChippiPet Pet(double size, PetMood mood, PetColor color) => new() { Size = size, Mood = mood, PetColor = color };
 
-    private static FrameworkElement Row(Brush background, Brush caption, IEnumerable<(Gumdrop Pet, string Label)> cells)
+    private static FrameworkElement Row(Brush background, Brush caption, IEnumerable<(ChippiPet Pet, string Label)> cells)
     {
         var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(16) };
         foreach (var (pet, label) in cells)

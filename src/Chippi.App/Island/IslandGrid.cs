@@ -41,7 +41,7 @@ internal sealed record IslandGridLayout(int Columns, int Rows, double Glyph, dou
 }
 
 /// <summary>
-/// The island's grid (DESIGN.md §5 Island): a 24px header with Gumdrop, Chippi and the clock, 8 below
+/// The island's grid (DESIGN.md §5 Island): a 24px header with ChippiPet, Chippi and the clock, 8 below
 /// it, then the tiles filling the 496 × 304 body 8px apart, laid out by <see cref="IslandGridLayout"/>.
 /// Arrows move among the tiles once the island has keyboard focus, and Enter opens the focused one.
 /// </summary>
@@ -53,7 +53,7 @@ internal sealed class IslandGrid : UserControl
 
     public IslandGrid()
     {
-        Pet = new Gumdrop { Size = 20, Mood = PetMood.Idle, IsDecorative = true, VerticalAlignment = VerticalAlignment.Center };
+        Pet = new ChippiPet { Size = 20, Mood = PetMood.Idle, IsDecorative = true, VerticalAlignment = VerticalAlignment.Center };
         var name = new TextBlock { Text = "Chippi", FontSize = 13, FontWeight = FontWeights.SemiBold, Margin = new Thickness(8, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
         _clock.SetResourceReference(StyleProperty, "NumberTextStyle");
         _clock.FontSize = 12;
@@ -66,8 +66,8 @@ internal sealed class IslandGrid : UserControl
         PreviewKeyDown += OnKey;
     }
 
-    /// <summary>The header's Gumdrop.</summary>
-    public Gumdrop Pet { get; }
+    /// <summary>The header's ChippiPet.</summary>
+    public ChippiPet Pet { get; }
 
     /// <summary>The layout for the tiles showing now.</summary>
     internal IslandGridLayout Layout { get; private set; } = IslandGridLayout.For(0);

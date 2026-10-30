@@ -19,7 +19,7 @@ namespace Chippi.App.Settings.Pages;
 
 /// <summary>
 /// Settings › Island &amp; pet (DESIGN.md §5): the island and the tray icon, where the island opens and
-/// sits, its tiles (order, show or hide, with a preview) and its round buttons, then Gumdrop.
+/// sits, its tiles (order, show or hide, with a preview) and its round buttons, then ChippiPet.
 /// </summary>
 internal sealed class IslandPetPage : UserControl
 {
@@ -61,7 +61,7 @@ internal sealed class IslandPetPage : UserControl
             SettingsUi.Row("Right button", "", _right),
             SettingsUi.Row("Live button", "", live)));
 
-        page.Children.Add(SettingsUi.Section("Gumdrop"));
+        page.Children.Add(SettingsUi.Section("Chippi"));
         page.Children.Add(SettingsUi.Group(ColorRow(app), MotionRow(app)));
         Content = page;
 
@@ -348,11 +348,11 @@ internal sealed class IslandPetPage : UserControl
         _preview.Child = canvas;
     }
 
-    // ----- Gumdrop -----
+    // ----- ChippiPet -----
 
     private SettingRow ColorRow(AppSettings app)
     {
-        var preview = new Gumdrop { Size = 48, PetColor = app.PetColor, Margin = new Thickness(0, 0, 20, 0) };
+        var preview = new ChippiPet { Size = 48, PetColor = app.PetColor, Margin = new Thickness(0, 0, 20, 0) };
         var controls = new StackPanel { Orientation = Orientation.Horizontal };
         controls.Children.Add(preview);
         var row = new SettingRow { Header = "Color", Description = app.PetColor.ToString(), Content = controls };

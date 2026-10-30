@@ -51,7 +51,7 @@ public partial class IslandWindow : Window
     private const double LineThickness = 3;
     private const double GlyphGap = 4;
     private const double MicRoom = 18; // the muted-mic glyph and its gap
-    private const double SongChrome = 80; // around the song: the tab's 14 at each end, Gumdrop's 22, the song's 8 each side, the glyph's 14
+    private const double SongChrome = 80; // around the song: the tab's 14 at each end, ChippiPet's 22, the song's 8 each side, the glyph's 14
     private const double SongGap = 40; // between one pass and the next
     private const double SongSpeed = 30; // DIPs a second
     private const uint VK_ESCAPE = 0x1B;
@@ -287,7 +287,7 @@ public partial class IslandWindow : Window
         _panel.SetTiles(tiles);
     }
 
-    /// <summary>A module reported success: Gumdrop celebrates for about 2.5s.</summary>
+    /// <summary>A module reported success: ChippiPet celebrates for about 2.5s.</summary>
     public void Celebrate()
     {
         Pet.Celebrate();
@@ -630,9 +630,9 @@ public partial class IslandWindow : Window
     }
 
     /// <summary>
-    /// Sizes and fills the tab: 20px sleepy Gumdrop at rest; 22px with the highest activity's 14px glyph
+    /// Sizes and fills the tab: 20px sleepy ChippiPet at rest; 22px with the highest activity's 14px glyph
     /// when something is live, and the song between them while music plays. Hovered or open it swells,
-    /// and Gumdrop wakes.
+    /// and ChippiPet wakes.
     /// </summary>
     private void RefreshTab()
     {
@@ -709,7 +709,7 @@ public partial class IslandWindow : Window
         _songState = state;
         Song.Width = width;
         Song.OpacityMask = full > width ? Fade(width, start: scroll) : null;
-        // Centered between Gumdrop and the bars when it fits; clear of the start's fade while it scrolls.
+        // Centered between ChippiPet and the bars when it fits; clear of the start's fade while it scrolls.
         SongStrip.Margin = new Thickness(scroll ? 8 : full < width ? Math.Round((width - full) / 2) : 0, 0, 0, 0);
         SongCopy.Visibility = Shown(scroll);
         if (!scroll)

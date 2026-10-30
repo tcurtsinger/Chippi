@@ -20,7 +20,7 @@ namespace Chippi.App.Island.Media;
 /// The Now Playing page (DESIGN.md §5 Island, revised 2026-10-29), after Apple Music's widget: the
 /// header names the app (a menu of apps when two or more have sessions), then 168px artwork beside
 /// the title, artist and previous / play-pause / next, each disabled when the app doesn't offer it,
-/// with the progress under them. No artwork shows Gumdrop in its place; nothing playing, Gumdrop asleep.
+/// with the progress under them. No artwork shows ChippiPet in its place; nothing playing, ChippiPet asleep.
 /// </summary>
 internal sealed class NowPlayingView : UserControl
 {
@@ -33,7 +33,7 @@ internal sealed class NowPlayingView : UserControl
     private readonly LucideIcon _chevron = new() { Data = LucideIcons.ChevronDown, Size = 12, Margin = new Thickness(4, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
     private readonly Popup _sources = new() { StaysOpen = false, AllowsTransparency = true, Placement = PlacementMode.Bottom };
     private readonly Border _art = new() { Width = Art, Height = Art, CornerRadius = new CornerRadius(8), ClipToBounds = true };
-    private readonly Gumdrop _artPet = new() { Size = 76, IsDecorative = true, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+    private readonly ChippiPet _artPet = new() { Size = 76, IsDecorative = true, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
     private readonly TextBlock _title = new()
     {
         FontSize = 20, FontWeight = FontWeights.SemiBold, LineHeight = 26, LineStackingStrategy = LineStackingStrategy.BlockLineHeight,
@@ -50,7 +50,7 @@ internal sealed class NowPlayingView : UserControl
     private readonly LucideIcon _playGlyph = new() { Data = LucideIcons.Play, Size = 36, Filled = true };
     private readonly Button _next;
     private readonly StackPanel _player;
-    private readonly Gumdrop _asleep = new() { Size = 72, Mood = PetMood.Sleepy, IsDecorative = true, HorizontalAlignment = HorizontalAlignment.Center };
+    private readonly ChippiPet _asleep = new() { Size = 72, Mood = PetMood.Sleepy, IsDecorative = true, HorizontalAlignment = HorizontalAlignment.Center };
     private readonly StackPanel _empty;
 
     public NowPlayingView(IMediaSessions media)
@@ -131,7 +131,7 @@ internal sealed class NowPlayingView : UserControl
         Show();
     }
 
-    /// <summary>Gumdrop's color here, the user's choice in Settings › Island &amp; pet.</summary>
+    /// <summary>ChippiPet's color here, the user's choice in Settings › Island &amp; pet.</summary>
     internal void SetPetColor(PetColor color) => _artPet.PetColor = _asleep.PetColor = color;
 
     private static LucideIcon Glyph(Geometry data, double size) => new() { Data = data, Size = size, Filled = true };

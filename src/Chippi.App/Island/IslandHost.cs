@@ -21,7 +21,7 @@ namespace Chippi.App.Island;
 /// </summary>
 public sealed class IslandHost : IDisposable
 {
-    /// <summary>The Keep awake module's id; its Status activity makes Gumdrop wide awake.</summary>
+    /// <summary>The Keep awake module's id; its Status activity makes ChippiPet wide awake.</summary>
     public const string KeepAwakeModuleId = "keep-awake";
 
     private const string DebugModuleId = "debug";

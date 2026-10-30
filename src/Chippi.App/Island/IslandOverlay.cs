@@ -11,7 +11,7 @@ using Windows.Win32.Foundation;
 namespace Chippi.App.Island;
 
 /// <summary>
-/// What a drag shows (DESIGN.md §5 Island): the 44px bubble with Gumdrop that follows the pointer,
+/// What a drag shows (DESIGN.md §5 Island): the 44px bubble with ChippiPet that follows the pointer,
 /// and the 3px accent line on the target edge. Topmost no-activate windows placed in physical
 /// pixels; the tab window keeps the mouse captured, so they never take input.
 /// </summary>
@@ -39,7 +39,7 @@ internal sealed class IslandOverlay : Window
 
     public HWND Handle { get; private set; }
 
-    public Gumdrop? Pet { get; private init; }
+    public ChippiPet? Pet { get; private init; }
 
     public void Initialize() => Handle = IslandNative.MakeNoActivate(this);
 
@@ -58,7 +58,7 @@ internal sealed class IslandOverlay : Window
         var face = new Ellipse { Width = 44, Height = 44, StrokeThickness = 1 };
         face.SetResourceReference(Shape.FillProperty, "IslandBrush");
         face.SetResourceReference(Shape.StrokeProperty, "IslandTabBorderBrush");
-        var pet = new Gumdrop { Size = 30, Mood = PetMood.Idle, IsDecorative = true, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+        var pet = new ChippiPet { Size = 30, Mood = PetMood.Idle, IsDecorative = true, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
         var stage = new Grid { Width = BubbleWindow, Height = BubbleWindow, Children = { shadow, face, pet } };
         // The window can land on a monitor with another DPI before it is resized; the Viewbox keeps the drawing whole.
         return new IslandOverlay(new Viewbox { Child = stage }) { Pet = pet };

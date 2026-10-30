@@ -30,10 +30,10 @@
             <Grid x:Name="TabBody">
                 <Path x:Name="TabFill" Fill="{StaticResource IslandBrush}" />
                 <Path x:Name="TabStroke" Stroke="{StaticResource IslandTabBorderBrush}" StrokeThickness="1" IsHitTestVisible="False" />
-                <!-- Gumdrop, then the live glyph beside it (top) or under it (sides). Decorative: the
+                <!-- ChippiPet, then the live glyph beside it (top) or under it (sides). Decorative: the
                      button's name and help text carry the state (DESIGN.md §7 Accessibility). -->
                 <StackPanel x:Name="TabContent" HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False">
-                    <pet:Gumdrop x:Name="Pet" Size="20" Mood="Sleepy" IsDecorative="True" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    <pet:ChippiPet x:Name="Pet" Size="20" Mood="Sleepy" IsDecorative="True" HorizontalAlignment="Center" VerticalAlignment="Center" />
                     <!-- The song while music plays: title · artist, scrolling when it doesn't fit (IslandWindow.ShowSong). -->
                     <Canvas x:Name="Song" Height="16" Margin="8,0" ClipToBounds="True" VerticalAlignment="Center" Visibility="Collapsed">
                         <StackPanel x:Name="SongStrip" Orientation="Horizontal" TextElement.FontFamily="{StaticResource UiFont}" TextElement.FontSize="12"
