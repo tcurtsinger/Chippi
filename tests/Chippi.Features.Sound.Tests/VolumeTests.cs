@@ -103,7 +103,7 @@ public sealed class VolumeTests
         Assert.Empty(f.System.AppOutputWrites);
         Assert.Equal(0.5f,f.System.SessionById("one").Volume);
         var mixer = Assert.Single(f.Ui.Tiles);
-        Assert.Equal((AppVolumeModule.TileKey,"App volume",IslandOrbit.Right),(mixer.Spec.Key,mixer.Spec.Name,mixer.Spec.Orbit));
+        Assert.Equal((AppVolumeModule.TileKey,"App volume"),(mixer.Spec.Key,mixer.Spec.Name));
     }
 
     [Fact]

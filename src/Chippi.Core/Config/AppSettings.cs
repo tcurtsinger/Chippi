@@ -23,7 +23,7 @@ public enum AccentChoice
     Pink,
 }
 
-/// <summary>Gumdrop's body color (DESIGN.md §7). Synth is the gradient and the default.</summary>
+/// <summary>Chippi's body color (DESIGN.md §7). Synth is the default.</summary>
 public enum PetColor
 {
     Synth,

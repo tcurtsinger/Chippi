@@ -27,13 +27,10 @@ public sealed class IslandPanelTests
     private static readonly MonitorArea Offscreen = new(default, new Rect(-20000, 0, 1920, 1080), new Rect(-20000, 0, 1920, 1032), 1);
     private static readonly Rect Puck = IslandGeometry.Start(Offscreen.Work, 1);
 
-    internal static IslandTileContribution Part(string key, string name, int order, IslandOrbit orbit = IslandOrbit.None, string status = "")
+    internal static IslandTileContribution Part(string key, string name, int order, string status = "")
     {
         var part = new IslandTileContribution(key, new IslandTileSpec(key, name, "Sliders", order, 0,
-            () => new Border { Height = 120, Child = new TextBlock { Text = name } })
-        {
-            Orbit = orbit,
-        });
+            () => new Border { Height = 120, Child = new TextBlock { Text = name } }));
         part.SetStatus(status);
         return part;
     }
@@ -47,7 +44,7 @@ public sealed class IslandPanelTests
         {
             panel.Initialize();
             panel.SetMedia(new FakeMedia());
-            panel.SetTiles(tiles ?? Tiles(Part("keep-awake", "Keep awake", 40, IslandOrbit.Left), Part("sound.mixer", "Volume mixer", 10, IslandOrbit.Right)));
+            panel.SetTiles(tiles ?? Tiles(Part("keep-awake", "Keep awake", 40), Part("sound.mixer", "Volume mixer", 10)));
             test(panel);
         }
         finally
@@ -254,7 +251,7 @@ public sealed class IslandPanelTests
             panel.SetLastPage("keep-awake");
             Open(panel);
             Assert.Equal("keep-awake", panel.CurrentPage);
-            panel.SetTiles(Tiles(Part("sound.mixer", "Volume mixer", 10, IslandOrbit.Right)));
+            panel.SetTiles(Tiles(Part("sound.mixer", "Volume mixer", 10)));
             Assert.Null(panel.CurrentPage);
             panel.CloseIsland(immediate: true);
             Open(panel);
