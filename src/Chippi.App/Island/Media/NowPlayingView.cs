@@ -120,8 +120,9 @@ internal sealed class NowPlayingView : UserControl
         _timeline.Children.Add(_elapsed);
         _timeline.Children.Add(_progress);
         _timeline.Children.Add(_remaining);
-        // From the top of the body, like the approved mock (Travis, 2026-10-30).
-        _player = new StackPanel { VerticalAlignment = VerticalAlignment.Top, Children = { row, _timeline } };
+        // In the body's vertical middle, like every page's content that never grows (layout pass, 2026-10-30); the
+        // timeline keeps its space without a timeline, so the art never moves.
+        _player = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Children = { row, _timeline } };
 
         var nothing = new TextBlock { Text = "Nothing playing", FontSize = 12, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 8, 0, 0) };
         nothing.SetResourceReference(TextBlock.ForegroundProperty, "IslandTextTertiaryBrush");

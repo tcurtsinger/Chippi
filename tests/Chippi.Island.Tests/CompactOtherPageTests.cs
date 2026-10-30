@@ -55,7 +55,7 @@ public sealed class CompactOtherPageTests
     });
 
     [Fact]
-    public void Now_playing_starts_at_the_top_with_the_transport_grouped_and_no_glow() => WpfTestThread.Run(() =>
+    public void Now_playing_sits_in_the_middle_with_the_transport_grouped_and_no_glow() => WpfTestThread.Run(() =>
     {
         var view = new NowPlayingView(new IslandPanelTests.FakeMedia { Sessions = [new("spotify", "Spotify", "Weekend Mix", "Various Artists", false, true, true, true, true, true,
             TimeSpan.FromSeconds(72), TimeSpan.FromSeconds(232), DateTimeOffset.Now, null)] });
@@ -63,7 +63,11 @@ public sealed class CompactOtherPageTests
         double Left(FrameworkElement e) => e.TranslatePoint(new Point(), view).X;
         double Bottom(FrameworkElement e) => e.TranslatePoint(new Point(0, e.ActualHeight), view).Y;
         var art = Find<Border>(view).Single(b => b.Width == 156);
-        Assert.Equal(Chippi.Core.Modules.IslandPage.HeaderHeight + Chippi.Core.Modules.IslandPage.Gap, art.TranslatePoint(new Point(), view).Y, 1); // the body's top
+        var timeline = Find<Grid>(view).Single(g => g.Margin.Top == 22);
+        double top = Chippi.Core.Modules.IslandPage.HeaderHeight + Chippi.Core.Modules.IslandPage.Gap;
+        double above = art.TranslatePoint(new Point(), view).Y - top, below = top + Chippi.Core.Modules.IslandPage.BodyHeight - Bottom(timeline);
+        Assert.Equal(above, below, 1); // the art and the progress in the body's middle
+        Assert.True(above > 40, $"{above}");
         var transport = Find<Button>(view).Where(b => b.Content is Chippi.UI.Controls.LucideIcon).ToArray();
         Assert.Equal(48 + 8, Left(transport[1]) - Left(transport[0]), 1); // grouped 8 apart, not spread
         Assert.Equal(52 + 8, Left(transport[2]) - Left(transport[1]), 1);

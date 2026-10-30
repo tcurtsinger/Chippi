@@ -79,9 +79,14 @@ public sealed class IslandWindowTests
             Assert.Equal(Visibility.Visible, window.Cover.Visibility);
             Assert.Equal(Visibility.Visible, window.Equalizer.Visibility);
             Assert.Equal("Radiohead", window.Detail.Text); // the artist under the title
-            Assert.Equal(125, window.Song.Width); // too long: held to its 125
+            Assert.Equal(123, window.Song.Width); // too long: held to its 123
+            Assert.Equal(window.Lines.ActualWidth, window.Song.Width, 1); // its column, so the fade's last 8 aren't cut off
             if (!Chippi.UI.Themes.Motion.IsReduced)
+            {
                 Assert.Equal(Visibility.Visible, window.SongCopy.Visibility); // and a second copy follows it round
+                var first = ((System.Windows.Media.LinearGradientBrush)window.Song.OpacityMask).GradientStops[0];
+                Assert.Equal(255, first.Color.A); // held at the start, its first letter is whole: the fade opens as it moves
+            }
 
             // Hovering doesn't start the song over (a restart sets a new fade).
             var fade = window.Song.OpacityMask;
@@ -110,6 +115,31 @@ public sealed class IslandWindowTests
 
             window.SetActivities([], Chippi.App.Pet.PetMood.Idle); // another app took over: the song goes
             Assert.False(window.BarShown);
+        }));
+    }
+
+    [Fact]
+    public void On_the_left_the_bar_mirrors_so_its_two_circles_sit_in_its_round_ends()
+    {
+        WpfTestThread.Run(() => WithShownIsland(window =>
+        {
+            window.SetMedia(new IslandPanelTests.FakeMedia { Sessions = [Track("Creep")] });
+            window.SetActivities([Playing], Chippi.App.Pet.PetMood.Idle);
+            foreach (var (x, chippiRight) in new[] { ((double?)null, true), (0.0, false) })
+            {
+                window.SetPlacement(x, x is null ? null : 1);
+                Assert.Equal(chippiRight, window.OpensLeft); // a puck at the right grows its bar to the left
+                Pump(TimeSpan.FromMilliseconds(400)); // the unfold
+                double Left(FrameworkElement part) => part.TranslatePoint(default, window.PuckButton).X;
+                double bar = window.PuckButton.ActualWidth;
+                // The cover 8 in from the far round end, Chippi at the other, the bars beside Chippi, the lines between.
+                double cover = chippiRight ? Left(window.Cover) : bar - Left(window.Cover) - window.Cover.ActualWidth;
+                Assert.Equal(8, cover, 1);
+                Assert.True(chippiRight
+                    ? Left(window.Cover) < Left(window.Lines) && Left(window.Lines) < Left(window.Equalizer) && Left(window.Equalizer) < Left(window.PuckEnd)
+                    : Left(window.PuckEnd) < Left(window.Equalizer) && Left(window.Equalizer) < Left(window.Lines) && Left(window.Lines) < Left(window.Cover));
+                Assert.Equal(123, window.Lines.ActualWidth, 1); // the same room either way
+            }
         }));
     }
 

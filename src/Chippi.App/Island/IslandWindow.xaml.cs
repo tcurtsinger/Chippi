@@ -442,14 +442,20 @@ public partial class IslandWindow : Window
 
     /// <summary>
     /// The bar's columns from its round far end to Chippi's: 8, the lead (34), 10, the lines, 10, the equalizer, 10 and
-    /// Chippi's 46; with Chippi at the left, 56 (Chippi's 46 and 10), the same middle, then 8. The lines get 125 either way.
+    /// Chippi's 46. With Chippi at the left it's the same mirrored, so the two circles always sit in the two round
+    /// ends and the bars always sit by Chippi; the lines still read left to right. They get 123 either way.
     /// </summary>
     private void LayOutBar(bool chippiRight)
     {
-        var columns = Bar.ColumnDefinitions;
-        columns[0].Width = new GridLength(chippiRight ? 8 : 56);
-        columns[6].Width = new GridLength(chippiRight ? 10 : 0);
-        columns[7].Width = new GridLength(chippiRight ? 46 : 8);
+        GridLength[] widths = [new(8), new(34), new(10), new(1, GridUnitType.Star), new(10), GridLength.Auto, new(10), new(46)];
+        int Column(int fromFarEnd) => chippiRight ? fromFarEnd : widths.Length - 1 - fromFarEnd;
+        for (int i = 0; i < widths.Length; i++)
+            Bar.ColumnDefinitions[Column(i)].Width = widths[i];
+        Grid.SetColumn(Cover, Column(1));
+        Grid.SetColumn(Glyph, Column(1));
+        Grid.SetColumn(Lines, Column(3));
+        Grid.SetColumn(Equalizer, Column(5));
+        Grid.SetColumn(PausedMark, Column(5));
     }
 
     private nint WndProc(nint hwnd, int msg, nint wParam, nint lParam, ref bool handled)
@@ -759,7 +765,8 @@ public partial class IslandWindow : Window
             Glyph.Visibility = Shown(!_singing);
             Equalizer.Visibility = Shown(_singing && !paused);
             PausedMark.Visibility = Shown(paused);
-            _lineRoom = IslandGeometry.BarWidth - 8 - 34 - 10 - 10 - 10 - 46 - (_singing ? paused ? 14 : 13 : 0);
+            // The lines' column: what the rest takes, with the bars three 3s 1 apart and 1 in (15) or the pause mark (14).
+            _lineRoom = IslandGeometry.BarWidth - 8 - 34 - 10 - 10 - 10 - 46 - (_singing ? paused ? 14 : 15 : 0);
         }
         if (!bar)
             ShowLine(null, "", "");
@@ -941,7 +948,7 @@ public partial class IslandWindow : Window
 
     /// <summary>
     /// The bar's lines: <paramref name="title"/> (13, semibold) over <paramref name="detail"/> (12, secondary, cut
-    /// with an ellipsis). The title holds still when it fits its room (125 beside the equalizer); otherwise it
+    /// with an ellipsis). The title holds still when it fits its room (123 beside the equalizer); otherwise it
     /// scrolls 30 a second after a 2s hold, a copy following 40 behind so it loops seamlessly. It stops while the
     /// widget is hidden, the panel is out, or motion is reduced. <paramref name="id"/> tells one song or activity from the next, so an
     /// update doesn't start it over.
@@ -972,16 +979,16 @@ public partial class IslandWindow : Window
         if (state == _lineState)
             return; // still on its way: a timeline or play-state update doesn't start it over
         _lineState = state;
+        double cycle = full + SongGap;
+        var run = TimeSpan.FromSeconds(cycle / SongSpeed);
         Song.Width = fits ? full : room;
-        Song.OpacityMask = fits ? null : Fade(room, start: scroll);
+        Song.OpacityMask = fits ? null : Fade(room, scroll ? run : null);
         SongCopy.Visibility = Shown(scroll);
         if (!scroll)
         {
             SongMove.BeginAnimation(TranslateTransform.XProperty, null);
             return;
         }
-        double cycle = full + SongGap;
-        var run = TimeSpan.FromSeconds(cycle / SongSpeed);
         var move = new DoubleAnimationUsingKeyFrames { Duration = SongHold + run, RepeatBehavior = RepeatBehavior.Forever };
         move.KeyFrames.Add(new LinearDoubleKeyFrame(0, KeyTime.FromTimeSpan(SongHold)));
         move.KeyFrames.Add(new LinearDoubleKeyFrame(-cycle, KeyTime.FromTimeSpan(SongHold + run)));
@@ -1006,17 +1013,31 @@ public partial class IslandWindow : Window
             ((FrameworkElement)Equalizer.Children[i]).Height = rest[i];
     }
 
-    // The line fades over its last 8, and its first 8 while scrolling (a held line starts at the edge).
+    // The line fades over its last 8. Scrolling, it fades over its first 8 too, but only while it moves: held at the
+    // start of each loop, its first letter is whole. The fade opens as the text crosses it, in step with the scroll.
     // In the line's own DIPs: relative units would follow the whole strip, which runs far past it.
-    private static LinearGradientBrush Fade(double width, bool start)
+    private static LinearGradientBrush Fade(double width, TimeSpan? run)
     {
         double f = 8 / width;
         var fade = new LinearGradientBrush { MappingMode = BrushMappingMode.Absolute, StartPoint = new Point(0, 0), EndPoint = new Point(width, 0) };
-        fade.GradientStops.Add(new GradientStop(start ? Colors.Transparent : Colors.Black, 0));
+        var first = new GradientStop(Colors.Black, 0);
+        fade.GradientStops.Add(first);
         fade.GradientStops.Add(new GradientStop(Colors.Black, f));
         fade.GradientStops.Add(new GradientStop(Colors.Black, 1 - f));
         fade.GradientStops.Add(new GradientStop(Colors.Transparent, 1));
-        fade.Freeze();
+        if (run is not { } moving)
+        {
+            fade.Freeze();
+            return fade;
+        }
+        var cross = TimeSpan.FromSeconds(8 / SongSpeed);
+        var open = new ColorAnimationUsingKeyFrames { Duration = SongHold + moving, RepeatBehavior = RepeatBehavior.Forever };
+        open.KeyFrames.Add(new LinearColorKeyFrame(Colors.Black, KeyTime.FromTimeSpan(SongHold)));
+        open.KeyFrames.Add(new LinearColorKeyFrame(Colors.Transparent, KeyTime.FromTimeSpan(SongHold + cross)));
+        open.KeyFrames.Add(new LinearColorKeyFrame(Colors.Transparent, KeyTime.FromTimeSpan(SongHold + moving - cross)));
+        open.KeyFrames.Add(new LinearColorKeyFrame(Colors.Black, KeyTime.FromTimeSpan(SongHold + moving)));
+        Timeline.SetDesiredFrameRate(open, 60);
+        first.BeginAnimation(GradientStop.ColorProperty, open);
         return fade;
     }
 
