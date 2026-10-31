@@ -88,9 +88,9 @@ public sealed class SoundShellTests
             Assert.Single(All<RoutingPage>(settings.PageContent));
             Assert.Single(All<ProcessingPage>(settings.PageContent));
             Assert.Equal(2, All<MicMuteView>(settings.PageContent).Count()); // the Microphone row at the top, and the Mute shortcut section
-            Assert.Equal(["Mic in use", "Mic processing", "Mute shortcut"], Texts(settings.PageContent).Where(t => t is "Mic in use" or "Mic processing" or "Mute shortcut").Distinct());
+            Assert.Equal(["Priority", "Mic processing", "Mute shortcut"], Texts(settings.PageContent).Where(t => t is "Priority" or "Mic processing" or "Mute shortcut").Distinct());
             Assert.NotNull(Named<ToggleButton>(settings.PageContent, "Priority switching"));
-            Toggle(Named<ToggleButton>(settings.PageContent, "Use mic processing"));
+            Toggle(Named<ToggleButton>(settings.PageContent, "Mic processing"));
             await SmokeDispatcher.Until(() => scene.Pipelines.Live is not null);
             Assert.Equal("desk", scene.Pipelines.Live!.Source);
             Assert.Single(All<Button>(settings.PageContent), b => AutomationProperties.GetName(b) == "Mute all microphones"); // the island's Mute, once, at the top
@@ -215,11 +215,12 @@ public sealed class SoundShellTests
             await SmokeDispatcher.Until(() => Texts(host).Contains("Muted") && All<Button>(host).Any(b => b.Content is "Unmute" && AutomationProperties.GetName(b) == "Unmute system volume"));
             Assert.Equal(headphones, scene.Devices.GetLevel("headphones"));
 
-            // Picking another output uses it now and puts it first in routing's list.
+            // Picking another output uses it now and leaves routing's list as it was.
+            var order = scene.Routing.Settings.Output.Devices.Select(d => d.Id).ToList();
             Invoke(Assert.Single(All<Button>(host), b => AutomationProperties.GetName(b)?.EndsWith("Headphones", StringComparison.OrdinalIgnoreCase) == true
                 && AutomationProperties.GetName(b)!.StartsWith("Use ", StringComparison.Ordinal)));
-            await SmokeDispatcher.Until(() => scene.Routing.Settings.Output.Devices[0].Id == "headphones");
             await SmokeDispatcher.Until(() => scene.Routing.InUse(Chippi.Audio.AudioFlow.Render) == "headphones");
+            Assert.Equal(order, scene.Routing.Settings.Output.Devices.Select(d => d.Id));
 
             await scene.Shell.Registry.SetInstalledAsync("audio-routing", false);
             panel.SetTiles(Tiles(scene));

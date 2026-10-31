@@ -13,8 +13,8 @@ using Chippi.UI.Controls;
 namespace Chippi.Features.Sound.Routing;
 
 /// <summary>
-/// The routing Settings page (revised 2026-10-28): what the island does first (Output's Volume, then the
-/// device in use), then Priority. All edits save immediately, as in Hopper.
+/// The routing Settings page (revised 2026-10-31): Output's Volume, then one Priority list whose radios
+/// pick the device in use, as the island's rows do. All edits save immediately, as in Hopper.
 /// </summary>
 public sealed class RoutingPage : UserControl
 {
@@ -71,7 +71,7 @@ public sealed class RoutingPage : UserControl
     {
         var list = _module.Settings.For(_flow);
         return string.Join("|", list.Enabled, list.Calls, _module.InUse(_flow), _module.Error,
-            string.Join(",", list.Devices.Select(e => e.Id + e.Name + _module.Status(_flow, e) + _module.Snapshot.Find(e.Id)?.AdapterName + Connected(e))));
+            string.Join(",", list.Devices.Select(e => e.Id + e.Name + _module.Snapshot.Find(e.Id)?.AdapterName + Connected(e))));
     }
 
     private bool Connected(PriorityEntry entry) => _module.Snapshot.Find(entry.Id)?.IsActive == true;
@@ -83,15 +83,6 @@ public sealed class RoutingPage : UserControl
         var list = _module.Settings.For(_flow);
         if (_flow == AudioFlow.Render)
             _body.Children.Add(_volumeCard ??= SettingsLayout.Card(SettingsLayout.Row("Volume", VolumeControls())));
-
-        // The island's rows: the connected devices, and picking one makes it the one in use.
-        var inUse = _module.InUse(_flow);
-        _body.Children.Add(SettingsLayout.Section(_flow == AudioFlow.Render ? "Output in use" : "Mic in use"));
-        var choices = SettingsLayout.Card();
-        foreach (var entry in list.Devices.Where(Connected))
-            choices.Children.Add(Choice(entry, string.Equals(entry.Id, inUse, StringComparison.OrdinalIgnoreCase)));
-        if (choices.Children.Count == 0) choices.Children.Add(SettingsLayout.Empty("No devices"));
-        _body.Children.Add(choices);
 
         Button? add = null;
         add = SettingsLayout.AddButton(_flow == AudioFlow.Render ? "device" : "mic", () =>
@@ -106,8 +97,9 @@ public sealed class RoutingPage : UserControl
             SettingsLayout.Row("Priority switching", RoutingUi.Switch("Priority switching", list.Enabled, enabled => Run(_module.SetEnabledAsync(_flow, enabled)))),
             SettingsLayout.Row("Communications device", RoutingUi.Switch("Communications device", list.Calls, on => Run(_module.SetCallsAsync(_flow, on))), "Calls follow this list"));
         if (list.Devices.Count == 0) card.Children.Add(SettingsLayout.Empty("No devices"));
+        var inUse = _module.InUse(_flow);
         for (var i = 0; i < list.Devices.Count; i++)
-            card.Children.Add(DeviceRow(list.Devices[i], i, list.Devices.Count));
+            card.Children.Add(DeviceRow(list.Devices[i], i, list.Devices.Count, inUse));
         _body.Children.Add(card);
         if (_module.Error is { } error)
         {
@@ -165,29 +157,15 @@ public sealed class RoutingPage : UserControl
         AutomationProperties.SetName(_mute, muted ? "Unmute system volume" : "Mute system volume");
     }
 
-    /// <summary>A connected device as a radio row. Picking it makes it the one in use, as the island's row does.</summary>
-    private Button Choice(PriorityEntry entry, bool selected)
+    /// <summary>
+    /// A priority row: the grip, its place, a radio and the name, "Not connected" when it isn't, and its
+    /// menu. A connected row's radio and name use it now, as the island's row does; the order stays.
+    /// </summary>
+    private FrameworkElement DeviceRow(PriorityEntry entry, int index, int count, string? inUse)
     {
-        var radio = new Ellipse { Width = 20, Height = 20, StrokeThickness = selected ? 5 : 1, Margin = new Thickness(0, 0, 12, 0), VerticalAlignment = VerticalAlignment.Center };
-        radio.SetResourceReference(Shape.StrokeProperty, selected ? "AccentBrush" : "TextSecondaryBrush");
-        if (selected) radio.SetResourceReference(Shape.FillProperty, "OnAccentBrush");
-        else radio.Fill = Brushes.Transparent;
-        var name = RoutingUi.Text(entry.Name);
-        DockPanel.SetDock(radio, Dock.Left);
-        var button = new Button { Content = new DockPanel { Children = { radio, name } }, ToolTip = entry.Name };
-        button.SetResourceReference(StyleProperty, "FlyoutRowButtonStyle");
-        AutomationProperties.SetName(button, selected ? $"{entry.Name}, in use" : $"Use {entry.Name}");
-        button.Click += (_, _) =>
-        {
-            if (!selected)
-                Run(_module.PreferAsync(_flow, entry.Id));
-        };
-        return button;
-    }
-
-    private FrameworkElement DeviceRow(PriorityEntry entry, int index, int count)
-    {
-        var grid = RoutingUi.Columns(GridLength.Auto, GridLength.Auto, GridLength.Auto, new(1, GridUnitType.Star), GridLength.Auto, GridLength.Auto);
+        bool connected = Connected(entry);
+        bool selected = connected && string.Equals(entry.Id, inUse, StringComparison.OrdinalIgnoreCase);
+        var grid = RoutingUi.Columns(GridLength.Auto, GridLength.Auto, new(1, GridUnitType.Star), GridLength.Auto, GridLength.Auto);
         var handle = new DragHandle { Width = 16, Height = 24, Margin = new Thickness(0, 0, 16, 0), ToolTip = "Reorder" };
         AutomationProperties.SetName(handle, $"Reorder {entry.Name}");
         _handles[entry.Id] = handle;
@@ -206,31 +184,44 @@ public sealed class RoutingPage : UserControl
         var number = RoutingUi.Text((index + 1).ToString(CultureInfo.CurrentCulture), "NumberTextStyle", "TextSecondaryBrush");
         number.Width = 24;
         RoutingUi.Add(grid, number, 1);
-        var icon = new LucideIcon { Data = _flow == AudioFlow.Render ? LucideIcons.Headphones : LucideIcons.Mic, Size = 16, Margin = new Thickness(0, 0, 16, 0), VerticalAlignment = VerticalAlignment.Center };
-        icon.SetResourceReference(LucideIcon.BrushProperty, "TextSecondaryBrush");
-        RoutingUi.Add(grid, icon, 2);
+        var radio = new Ellipse { Width = 20, Height = 20, StrokeThickness = selected ? 5 : 1, Margin = new Thickness(0, 0, 12, 0), VerticalAlignment = VerticalAlignment.Center };
+        radio.SetResourceReference(Shape.StrokeProperty, selected ? "AccentBrush" : connected ? "TextSecondaryBrush" : "TextTertiaryBrush");
+        if (selected) radio.SetResourceReference(Shape.FillProperty, "OnAccentBrush");
+        else radio.Fill = Brushes.Transparent;
+        DockPanel.SetDock(radio, Dock.Left);
         // Windows often puts the adapter in the name already ("Speakers (INZONE Buds)"); say it once.
         var label = entry.Name;
         if (_module.Snapshot.Find(entry.Id)?.AdapterName is { Length: > 0 } adapter && !entry.Name.Contains(adapter, StringComparison.OrdinalIgnoreCase))
             label = $"{entry.Name} · {adapter}";
-        var name = RoutingUi.Text(label);
+        var name = RoutingUi.Text(label, brush: connected ? null : "TextTertiaryBrush");
         name.Margin = new Thickness(0, 0, 12, 0);
-        RoutingUi.Add(grid, name, 3);
-        var status = RoutingUi.Text(_module.Status(_flow, entry), "CaptionTextStyle", "TextSecondaryBrush");
-        status.Margin = new Thickness(0, 0, 12, 0);
-        RoutingUi.Add(grid, status, 4);
+        var pick = new Button { Content = new DockPanel { Children = { radio, name } }, IsEnabled = connected, ToolTip = label };
+        pick.SetResourceReference(StyleProperty, "RadioRowButtonStyle");
+        AutomationProperties.SetName(pick, selected ? $"{entry.Name}, in use" : $"Use {entry.Name}");
+        pick.Click += (_, _) =>
+        {
+            if (!selected)
+                Run(_module.UseAsync(_flow, entry.Id));
+        };
+        RoutingUi.Add(grid, pick, 2);
+        if (!connected)
+        {
+            var status = RoutingUi.Text("Not connected", "CaptionTextStyle", "TextSecondaryBrush");
+            status.Margin = new Thickness(0, 0, 12, 0);
+            RoutingUi.Add(grid, status, 3);
+        }
         var more = new IconButton { Icon = LucideIcons.Ellipsis, ToolTip = $"Options for {entry.Name}" };
         AutomationProperties.SetName(more, $"Options for {entry.Name}");
         more.Click += (_, _) =>
         {
             RoutingUi.Menu(more, [
-                ("Move to top", () => Run(_module.PreferAsync(_flow, entry.Id), entry.Id), index > 0),
+                ("Move to top", () => Run(_module.MoveAsync(_flow, entry.Id, 0), entry.Id), index > 0),
                 ("Move up", () => Run(_module.MoveAsync(_flow, entry.Id, index - 1), entry.Id), index > 0),
                 ("Move down", () => Run(_module.MoveAsync(_flow, entry.Id, index + 1), entry.Id), index + 1 < count),
                 ("Remove", () => Run(_module.RemoveAsync(_flow, entry.Id)), true),
             ]);
         };
-        RoutingUi.Add(grid, more, 5);
+        RoutingUi.Add(grid, more, 4);
         return new Border { Child = grid, MinHeight = SettingsLayout.RowHeight, Padding = SettingsLayout.RowPadding };
     }
 

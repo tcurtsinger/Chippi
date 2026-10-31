@@ -2,6 +2,7 @@
 // Copyright (C) Chippi contributors
 
 using Chippi.Audio;
+using Chippi.Features.Sound.Mute;
 
 namespace Chippi.Features.Sound.Routing;
 
@@ -41,6 +42,9 @@ public sealed record RoutingSettings
 {
     public RoutingList Output { get; init; } = new();
     public RoutingList Microphone { get; init; } = new();
+
+    /// <summary>Switches to the next connected output; not set until the user records one.</summary>
+    public MicShortcut? SwitchShortcut { get; init; }
 
     public RoutingList For(AudioFlow flow) => flow == AudioFlow.Render ? Output : Microphone;
     public RoutingSettings With(AudioFlow flow, RoutingList list) =>

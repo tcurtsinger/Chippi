@@ -137,15 +137,42 @@ public sealed class MicProcessingModule : IFeatureModule
     {
         ProcessingState.Live => "Live",
         ProcessingState.Off => "Off",
-        _ => "Stopped · " + Status.Reason switch
-        {
-            StopReason.NoDriver => "No driver",
-            StopReason.DriverDisabled => "Driver disabled",
-            StopReason.MoreThanOneCable => "More than one cable",
-            StopReason.NoMicrophone => "No microphone",
-            _ => Status.Error ?? "Start failed",
-        },
+        _ => "Stopped · " + StopText,
     };
+
+    private string StopText => Status.Reason switch
+    {
+        StopReason.NoDriver => "No VB-CABLE",
+        StopReason.DriverDisabled => "VB-CABLE turned off",
+        StopReason.MoreThanOneCable => "More than one VB-CABLE",
+        StopReason.NoMicrophone => "No microphone",
+        _ => Status.Error ?? "Start failed",
+    };
+
+    /// <summary>
+    /// The warning line under Mic processing, or null while it's fine: a failure reads "Failed · Device
+    /// in use", a stop for a missing piece "Stopped · No VB-CABLE".
+    /// </summary>
+    public string? Problem => Error ?? (Status.State != ProcessingState.Stopped ? null
+        : Status.Reason == StopReason.Failed ? Status.Error is { } error ? $"Failed · {error}" : "Start failed"
+        : StatusText);
+
+    /// <summary>What the warning line offers: Retry after a failure, Install or Turn on for VB-CABLE, or nothing.</summary>
+    public ProcessingFix Fix => Error is not null ? ProcessingFix.Retry
+        : Status.State != ProcessingState.Stopped ? ProcessingFix.None
+        : Status.Reason switch
+        {
+            StopReason.Failed => ProcessingFix.Retry,
+            StopReason.NoDriver => ProcessingFix.Install,
+            StopReason.DriverDisabled => ProcessingFix.TurnOn,
+            _ => ProcessingFix.None,
+        };
+
+    /// <summary>Starts again after a failure: a new request clears it.</summary>
+    public Task RetryAsync() => EditAsync(s => s, apply: true, saveNow: false);
+
+    /// <summary>Opens Add features on Mic processing's row, where VB-CABLE installs.</summary>
+    public void OpenDriver() => _context?.OpenSettings(ModuleContext.RequirementSection);
 
     public IDisposable WatchMeters() => Audio(NullLogger.Instance).WatchMeters([], []);
 
@@ -178,7 +205,7 @@ public sealed class MicProcessingModule : IFeatureModule
         }
         catch (Exception ex)
         {
-            Error = AudioErrors.Reason(ex);
+            Error = AudioErrors.Reason(ex) is var reason && reason.EndsWith(" failed", StringComparison.Ordinal) ? reason : $"Failed · {reason}";
             _context?.Logger.LogWarning(ex, "Changing mic processing failed");
             throw;
         }
@@ -332,3 +359,6 @@ public sealed class MicProcessingModule : IFeatureModule
         finally { await lease.DisposeAsync(); }
     }
 }
+
+/// <summary>The fix Mic processing's warning line offers.</summary>
+public enum ProcessingFix { None, Retry, Install, TurnOn }

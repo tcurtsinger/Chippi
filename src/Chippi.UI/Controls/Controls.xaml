@@ -643,6 +643,23 @@
             </Setter.Value>
         </Setter>
     </Style>
+    <!-- A radio and its label as one target inside a row that has other controls (Settings › Output's
+         priority rows): no chrome; the radio shows the choice. -->
+    <Style x:Key="RadioRowButtonStyle" TargetType="{x:Type Button}">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource FocusRing4}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type Button}">
+                    <Border Background="{TemplateBinding Background}">
+                        <ContentPresenter VerticalAlignment="Center" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" />
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
     <!-- Dividers only: an expander's sub-rows, inside the card that already holds the expander. -->
     <Style x:Key="CardRowsStyle" TargetType="{x:Type c:Card}">
         <Setter Property="Background" Value="{x:Null}" />

@@ -18,12 +18,11 @@ internal sealed class LevelBar : Grid
 {
     private readonly Border _fill = new() { Height = 4, CornerRadius = new CornerRadius(2), HorizontalAlignment = HorizontalAlignment.Left, Width = 0 };
 
-    /// <param name="island">In the island's colors, like its slider.</param>
-    public LevelBar(bool island = false)
+    public LevelBar()
     {
         var track = new Border { Height = 4, CornerRadius = new CornerRadius(2) };
-        track.SetResourceReference(Border.BackgroundProperty, island ? "IslandTrackBrush" : "TrackRemainderBrush");
-        _fill.SetResourceReference(Border.BackgroundProperty, island ? "IslandAccentBrush" : "AccentBrush");
+        track.SetResourceReference(Border.BackgroundProperty, "TrackRemainderBrush");
+        _fill.SetResourceReference(Border.BackgroundProperty, "AccentBrush");
         VerticalAlignment = VerticalAlignment.Center;
         Children.Add(track);
         Children.Add(_fill);
@@ -43,9 +42,74 @@ internal sealed class LevelBar : Grid
     }
 }
 
+/// <summary>
+/// The Sound page's level meter: 12 short bars that light in the accent from the left, so it can't
+/// pass for the volume slider beside it (DESIGN.md §5 Island).
+/// </summary>
+internal sealed class SegmentMeter : StackPanel
+{
+    private const int Bars = 12;
+    private int _lit = -1;
+
+    public SegmentMeter()
+    {
+        Orientation = Orientation.Horizontal;
+        VerticalAlignment = VerticalAlignment.Center;
+        for (var i = 0; i < Bars; i++)
+            Children.Add(new Border { Width = 3, Height = 10, CornerRadius = new CornerRadius(1), Margin = new Thickness(i == 0 ? 0 : 2, 0, 0, 0) });
+        Level = 0;
+    }
+
+    /// <summary>0 to 1.</summary>
+    public double Level
+    {
+        set
+        {
+            int lit = (int)Math.Round(Math.Clamp(value, 0, 1) * Bars);
+            if (lit == _lit) return;
+            _lit = lit;
+            for (var i = 0; i < Bars; i++)
+                ((Border)Children[i]).SetResourceReference(Border.BackgroundProperty, i < lit ? "IslandAccentBrush" : "IslandTrackBrush");
+        }
+    }
+}
+
 /// <summary>Shared pieces of the processing views.</summary>
 internal static class ProcessingUi
 {
+    /// <summary>The warning line's button, or null: Retry a failure, Install or Turn on VB-CABLE.</summary>
+    public static Button? FixButton(MicProcessingModule module, ProcessingFix fix, bool island, Action refresh)
+    {
+        (string Label, Action Act)? action = fix switch
+        {
+            ProcessingFix.Retry => ("Retry", () => Run(module.RetryAsync(), refresh)),
+            ProcessingFix.Install => ("Install", module.OpenDriver),
+            ProcessingFix.TurnOn => ("Turn on", VbCableRequirement.OpenWindowsSoundSettings),
+            _ => null,
+        };
+        if (action is not { } chosen) return null;
+        var button = island ? RoutingUi.IslandButton(chosen.Label, chosen.Act) : RoutingUi.Button(chosen.Label, chosen.Act);
+        button.VerticalAlignment = VerticalAlignment.Center;
+        return button;
+    }
+
+    /// <summary>The warning line: the problem in Caution, and its fix at the end.</summary>
+    public static DockPanel ProblemLine(TextBlock text)
+    {
+        AutomationProperties.SetLiveSetting(text, AutomationLiveSetting.Polite);
+        return new DockPanel { Children = { text } };
+    }
+
+    /// <summary>Puts <paramref name="fix"/>'s button on <paramref name="line"/>, replacing the one there.</summary>
+    public static void ShowFix(DockPanel line, Button? fix)
+    {
+        foreach (var old in line.Children.OfType<Button>().ToList())
+            line.Children.Remove(old);
+        if (fix is null) return;
+        DockPanel.SetDock(fix, Dock.Right);
+        line.Children.Insert(0, fix);
+    }
+
     public static string Db(double db) => (db > 0 ? "+" : db < 0 ? "−" : "") + Math.Abs(Math.Round(db)).ToString(CultureInfo.CurrentCulture) + " dB";
 
     /// <summary>A peak (0 to 1) in dBFS for the meter's label; silence reads as "−∞ dB".</summary>
@@ -165,7 +229,7 @@ public sealed class ProcessingPage : UserControl
         var s = _module.Settings;
 
         var cleanup = SettingsLayout.Card(
-            SettingsLayout.Row("Use mic processing", RoutingUi.Switch("Use mic processing", s.Enabled, on => Run(_module.SetEnabledAsync(on)))),
+            SettingsLayout.Row("Mic processing", RoutingUi.Switch("Mic processing", s.Enabled, on => Run(_module.SetEnabledAsync(on)))),
             SettingsLayout.Row("Default device", RoutingUi.Switch("Default device", s.SetDefault, on => Run(_module.SetDefaultMicAsync(on))), "Makes CABLE Output the default mic"));
         // The meter only means something while processing runs.
         if (_module.Status.State == ProcessingState.Live)
@@ -179,13 +243,13 @@ public sealed class ProcessingPage : UserControl
         if (s.Source != ProcessingSettings.PinnedSource)
             cleanup.Children.Add(SettingsLayout.Row("Input device", SourcePicker()));
         _body.Children.Add(cleanup);
-        // Only what needs attention: a failure, or processing that stopped.
-        if ((_module.Error ?? (_module.Status.State == ProcessingState.Stopped ? _module.StatusText : null)) is { } problem)
+        // Only what needs attention: a failure, or processing that stopped, with its fix as on the island.
+        if (_module.Problem is { } problem)
         {
-            var text = RoutingUi.Text(problem, "CaptionTextStyle", "WarningTextBrush");
-            text.Margin = new Thickness(0, 8, 0, 0);
-            AutomationProperties.SetLiveSetting(text, AutomationLiveSetting.Polite);
-            _body.Children.Add(text);
+            var line = ProcessingUi.ProblemLine(RoutingUi.Text(problem, "CaptionTextStyle", "WarningTextBrush"));
+            line.Margin = new Thickness(0, 8, 0, 0);
+            ProcessingUi.ShowFix(line, ProcessingUi.FixButton(_module, _module.Fix, island: false, Refresh));
+            _body.Children.Add(line);
         }
     }
 
@@ -259,16 +323,20 @@ public sealed class ProcessingPage : UserControl
 }
 
 /// <summary>
-/// Mic processing's card on the Sound page (DESIGN.md §5 Island, revised 2026-10-28): one 44 row with
-/// the switch, and while it runs a meter of the processed mic after the label. A warning shows below
-/// the card only when it failed or stopped.
+/// Mic processing's card on the Sound page (DESIGN.md §5 Island, revised 2026-10-31): one 44 row with
+/// the switch, and while it runs a bar meter of the processed mic before it. The glyph is the accent
+/// while it runs, tertiary while off and Caution while stopped. A warning line shows below the card
+/// only when it failed or stopped, with Retry, Install or Turn on at its end when one fixes it.
 /// </summary>
 public sealed class ProcessingQuickView : UserControl
 {
     private readonly MicProcessingModule _module;
     private readonly ToggleButton _switch = new();
+    private readonly LucideIcon _glyph = new() { Data = LucideIcons.AudioWaveform };
     private readonly TextBlock _warning = RoutingUi.Text("", "CaptionTextStyle", "WarningTextBrush");
-    private readonly LevelBar _meter = new(island: true) { Margin = new Thickness(10, 0, 10, 0) };
+    private readonly DockPanel _problem;
+    private readonly SegmentMeter _meter = new() { HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(10, 0, 10, 0) };
+    private ProcessingFix? _fix;
     private bool _refreshing;
 
     public ProcessingQuickView(MicProcessingModule module)
@@ -282,12 +350,10 @@ public sealed class ProcessingQuickView : UserControl
         var label = RoutingUi.Text("Mic processing");
         label.FontSize = 12;
         DockPanel.SetDock(label, Dock.Left);
-        var glyph = new LucideIcon { Data = LucideIcons.AudioWaveform };
-        glyph.SetResourceReference(LucideIcon.BrushProperty, "IslandAccentBrush");
-        var card = RoutingUi.IslandCard(glyph, new DockPanel { Children = { label, _meter } }, _switch);
-        _warning.Margin = new Thickness(10, 4, 0, 0);
-        AutomationProperties.SetLiveSetting(_warning, AutomationLiveSetting.Polite);
-        Content = new StackPanel { Children = { card, _warning } };
+        var card = RoutingUi.IslandCard(_glyph, new DockPanel { Children = { label, _meter } }, _switch);
+        _problem = ProcessingUi.ProblemLine(_warning);
+        _problem.Margin = new Thickness(10, 4, 0, 0);
+        Content = new StackPanel { Children = { card, _problem } };
         ProcessingUi.Meter(this, module, readings => _meter.Level = ProcessingUi.MeterFill(readings.ProcessingOutput));
         Loaded += (_, _) => { _module.Changed += Refresh; Refresh(); };
         Unloaded += (_, _) => _module.Changed -= Refresh;
@@ -307,10 +373,18 @@ public sealed class ProcessingQuickView : UserControl
         try
         {
             _switch.IsChecked = _module.Settings.Enabled;
-            _warning.Text = _module.Error ?? (_module.Status.State == ProcessingState.Stopped ? _module.StatusText : "");
-            _warning.Visibility = _warning.Text.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
-            SoundColumn.SetWarning(this, _warning.Text.Length > 0);
-            _meter.Visibility = _module.Status.State == ProcessingState.Live ? Visibility.Visible : Visibility.Collapsed;
+            var problem = _module.Problem;
+            _warning.Text = problem ?? "";
+            _problem.Visibility = problem is null ? Visibility.Collapsed : Visibility.Visible;
+            SoundColumn.SetWarning(this, problem is not null);
+            if (_module.Fix != _fix)
+            {
+                _fix = _module.Fix;
+                ProcessingUi.ShowFix(_problem, ProcessingUi.FixButton(_module, _module.Fix, island: true, Refresh));
+            }
+            bool live = _module.Status.State == ProcessingState.Live;
+            _glyph.SetResourceReference(LucideIcon.BrushProperty, problem is not null ? "WarningBrush" : live ? "IslandAccentBrush" : "IslandTextTertiaryBrush");
+            _meter.Visibility = live ? Visibility.Visible : Visibility.Collapsed;
         }
         finally { _refreshing = false; }
     }

@@ -197,6 +197,12 @@ internal sealed class IslandGrid : UserControl
         string action = muted ? "Unmute" : "Mute";
         AutomationProperties.SetName(_speaker, action);
         _speaker.ToolTip = volume.SetMuted is null ? null : action;
+        // Muted, the slider keeps its level in tertiary instead of the accent, as on Sound's page.
+        foreach (var brush in new[] { "IslandAccentFillBrush", "IslandAccentBrush" })
+        {
+            if (muted) _volume.Resources[brush] = TryFindResource("IslandTextTertiaryBrush");
+            else _volume.Resources.Remove(brush);
+        }
         if (!_volume.IsMouseCaptureWithin)
         {
             _refreshing = true;

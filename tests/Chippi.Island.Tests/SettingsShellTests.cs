@@ -103,6 +103,15 @@ public sealed class SettingsShellTests
     });
 
     [Fact]
+    public void A_features_requirement_link_opens_add_features() => WpfTestThread.Run(() =>
+    {
+        using var scene = new SettingsScene(Seven);
+        var window = scene.Show("general");
+        window.Navigate("module:downloads-organizer/" + Chippi.Core.Modules.ModuleContext.RequirementSection); // Mic processing's Install
+        Assert.Equal("features", window.CurrentPage);
+    });
+
+    [Fact]
     public void Esc_does_not_close_Settings_and_still_clears_the_search() => WpfTestThread.Run(() =>
     {
         using var scene = new SettingsScene(Seven);

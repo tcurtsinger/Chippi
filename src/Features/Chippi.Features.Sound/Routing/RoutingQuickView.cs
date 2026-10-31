@@ -15,9 +15,9 @@ namespace Chippi.Features.Sound.Routing;
 
 /// <summary>
 /// Routing's sections of the Sound page (DESIGN.md §5 Island, revised 2026-10-28). Output: the system
-/// volume and mute, then the connected outputs. Microphone: the connected mics. Rows are one line; a
-/// pick always works and moves the device to the top of its priority list. Rows that don't fit the
-/// column, and unplugged devices, are only in Settings.
+/// volume and mute, then the connected outputs. Microphone: the connected mics. Rows are one line and
+/// lead with the device; a pick always works, now, and leaves the priority list alone. Rows that don't
+/// fit the column, and unplugged devices, are only in Settings, but the one in use always shows.
 /// </summary>
 public sealed class RoutingQuickView : UserControl
 {
@@ -94,6 +94,19 @@ public sealed class RoutingQuickView : UserControl
         bool muted = OutputMuted();
         _percent.Text = muted ? "Muted" : $"{Math.Round(_volume.Value).ToString(CultureInfo.CurrentCulture)}%";
         _percent.SetResourceReference(TextBlock.ForegroundProperty, muted ? "WarningTextBrush" : "IslandTextTertiaryBrush");
+        Quiet(_volume, muted);
+    }
+
+    /// <summary>A muted output's slider keeps its level in tertiary, not the accent, as a paused song's bar does (DESIGN.md §5).</summary>
+    internal static void Quiet(Slider slider, bool muted)
+    {
+        foreach (var key in new[] { "IslandAccentFillBrush", "IslandAccentBrush" })
+        {
+            if (muted)
+                slider.Resources[key] = slider.TryFindResource("IslandTextTertiaryBrush");
+            else
+                slider.Resources.Remove(key);
+        }
     }
 
     /// <summary>A warning line in the column came or went.</summary>
@@ -112,13 +125,17 @@ public sealed class RoutingQuickView : UserControl
             // Whole rows only: each warning line in the column, this one's or a card's below, takes one row's place.
             int fit = (_flow == AudioFlow.Render ? OutputRows : MicrophoneRows) - (_error.Text.Length == 0 ? 0 : 1) - SoundColumn.WarningsBeside(this);
             var shown = connected.Take(fit).ToList();
-            var shape = string.Join("|", shown.Select(e => e.Id + e.Name)) + ":" + inUse;
+            // The one in use always shows: past the rows that fit, it takes the last one's place.
+            if (shown.Count > 0 && connected.FindIndex(e => string.Equals(e.Id, inUse, StringComparison.OrdinalIgnoreCase)) >= shown.Count)
+                shown[^1] = connected.First(e => string.Equals(e.Id, inUse, StringComparison.OrdinalIgnoreCase));
+            var names = DeviceName.Shown(connected);
+            var shape = string.Join("|", shown.Select(e => e.Id + names[e.Id])) + ":" + inUse;
             if (shape != _shape)
             {
                 _shape = shape;
                 _rows.Children.Clear();
                 foreach (var entry in shown)
-                    _rows.Children.Add(Row(entry, string.Equals(entry.Id, inUse, StringComparison.OrdinalIgnoreCase)));
+                    _rows.Children.Add(Row(entry, names[entry.Id], string.Equals(entry.Id, inUse, StringComparison.OrdinalIgnoreCase)));
             }
             _rows.Visibility = shown.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
             if (_flow == AudioFlow.Render)
@@ -146,8 +163,8 @@ public sealed class RoutingQuickView : UserControl
         AutomationProperties.SetName(_mute, muted ? "Unmute system volume" : "Mute system volume");
     }
 
-    /// <summary>A connected device on one line: a radio and its name. Picking it makes it the one in use.</summary>
-    private Button Row(PriorityEntry entry, bool selected)
+    /// <summary>A connected device on one line: a radio and its shown name (the full one in its tooltip). Picking it uses it now.</summary>
+    private Button Row(PriorityEntry entry, string shownName, bool selected)
     {
         var radio = new Ellipse
         {
@@ -157,7 +174,7 @@ public sealed class RoutingQuickView : UserControl
         radio.SetResourceReference(Shape.StrokeProperty, selected ? "IslandAccentBrush" : "IslandTextTertiaryBrush");
         if (selected)
             radio.SetResourceReference(Shape.FillProperty, "IslandOnAccentBrush");
-        var name = new TextBlock { Text = entry.Name, FontSize = 12, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center };
+        var name = new TextBlock { Text = shownName, FontSize = 12, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center };
         DockPanel.SetDock(radio, Dock.Left);
         var button = new Button { Content = new DockPanel { Children = { radio, name } }, ToolTip = entry.Name, Tag = selected ? "Selected" : null };
         button.SetResourceReference(StyleProperty, "IslandListRowStyle");
@@ -165,7 +182,7 @@ public sealed class RoutingQuickView : UserControl
         button.Click += (_, _) =>
         {
             if (!selected)
-                Run(_module.PreferAsync(_flow, entry.Id));
+                Run(_module.UseAsync(_flow, entry.Id));
         };
         return button;
     }

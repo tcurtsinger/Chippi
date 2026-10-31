@@ -25,7 +25,7 @@ namespace Chippi.Features.Sound.Tests;
 public sealed class SoundSettingsTests
 {
     [Fact]
-    public async Task Output_in_use_rows_pick_the_device_as_the_island_rows_do()
+    public async Task Priority_rows_are_the_one_list_and_their_radios_pick_as_the_island_rows_do()
     {
         await using var f = new RoutingFixture();
         f.System.With(Speaker("A"), Speaker("B"), Speaker("Gone")).WithDefault("A");
@@ -35,15 +35,16 @@ public sealed class SoundSettingsTests
         await Sta(async () =>
         {
             var page = new RoutingPage(f.Module);
-            Assert.Equal(["Output in use", "Priority"], Sections(page));
-            var rows = Descendants(page).OfType<Button>().Select(AutomationProperties.GetName).Where(n => n.StartsWith("Use ", StringComparison.Ordinal) || n.EndsWith(", in use", StringComparison.Ordinal)).ToList();
-            Assert.Equal(["A, in use", "Use B"], rows); // connected outputs only
-            var pick = Descendants(page).OfType<Button>().Single(b => AutomationProperties.GetName(b) == "Use B");
-            ((IInvokeProvider)new ButtonAutomationPeer(pick)).Invoke();
-            await Until(() => !Descendants(page).Contains(pick));
+            Assert.Equal(["Priority"], Sections(page)); // no separate "Output in use" list
+            var picks = Descendants(page).OfType<Button>().Where(b => AutomationProperties.GetName(b) is { } n && (n.StartsWith("Use ", StringComparison.Ordinal) || n.EndsWith(", in use", StringComparison.Ordinal))).ToList();
+            Assert.Equal(["A, in use", "Use B", "Use Gone"], picks.Select(AutomationProperties.GetName));
+            Assert.Equal([true, true, false], picks.Select(b => b.IsEnabled)); // an unplugged device can't be used
+            Assert.Equal(["Not connected"], Descendants(page).OfType<TextBlock>().Select(t => t.Text).Where(t => t is "Not connected" or "Connected" or "Playing now"));
+            ((IInvokeProvider)new ButtonAutomationPeer(picks[1])).Invoke();
+            await Until(() => !Descendants(page).Contains(picks[1]));
         });
         Assert.Equal("B", f.System.DefaultOf(AudioFlow.Render, AudioRole.Multimedia));
-        Assert.Equal("B", f.Module.Settings.Output.Devices[0].Id); // PreferAsync, the island row's call
+        Assert.Equal(["A", "B", "Gone"], f.Module.Settings.Output.Devices.Select(d => d.Id)); // UseAsync, the island row's call: the order stays
     }
 
     [Fact]
@@ -76,7 +77,7 @@ public sealed class SoundSettingsTests
         {
             var page = new RoutingPage(f.Module, AudioFlow.Capture);
             Assert.Empty(Descendants(page).OfType<Slider>()); // the Microphone row is mic mute's
-            Assert.Equal(["Mic in use", "Priority"], Sections(page));
+            Assert.Equal(["Priority"], Sections(page));
             Assert.Contains(Descendants(page).OfType<Button>(), b => AutomationProperties.GetName(b) == "Add mic");
             var calls = Descendants(page).OfType<SettingRow>().Single(r => (string)r.Header == "Communications device");
             Assert.Equal("Calls follow this list", calls.Description);
@@ -94,7 +95,7 @@ public sealed class SoundSettingsTests
         await Sta(() =>
         {
             var page = new RoutingPage(f.Module, AudioFlow.Capture);
-            Assert.Equal(2, Descendants(page).OfType<TextBlock>().Count(t => t.Text == "No devices"));
+            Assert.Equal(1, Descendants(page).OfType<TextBlock>().Count(t => t.Text == "No devices"));
             Assert.All(Descendants(page).OfType<TextBlock>().Where(t => t.Text == "No devices"), t => Assert.IsType<Card>(((FrameworkElement)t.Parent).Parent));
         });
     }
@@ -166,7 +167,7 @@ public sealed class SoundSettingsTests
         {
             var off = new ProcessingPage(f.Module);
             var rows = Descendants(off).OfType<SettingRow>().Select(r => (string)r.Header).ToList();
-            Assert.Equal(["Use mic processing", "Default device", "Noise suppression", "Threshold", "Target level", "Max gain"], rows);
+            Assert.Equal(["Mic processing", "Default device", "Noise suppression", "Threshold", "Target level", "Max gain"], rows);
             Assert.Equal("Makes CABLE Output the default mic", Descendants(off).OfType<SettingRow>().Single(r => (string)r.Header == "Default device").Description);
             var folds = Descendants(off).OfType<ExpanderRow>().ToList();
             Assert.Equal(["Noise gate", "Auto gain"], folds.Select(r => (string)r.Header));

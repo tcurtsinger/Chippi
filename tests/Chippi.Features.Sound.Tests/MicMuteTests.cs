@@ -49,6 +49,17 @@ public sealed class FakeHotkey : IMicHotkey
 public sealed class MicMuteTests
 {
     [Fact]
+    public async Task VB_CABLE_alone_is_no_microphone()
+    {
+        await using var f = new MuteFixture();
+        f.System.With(CableInput(), CableOutput());
+        await f.Start();
+        Assert.Equal((MicrophoneMuteState.NoMicrophone, "No microphone"), (f.Module.Status.State, f.Module.StatusText));
+        f.System.Connect(Mic("Real"));
+        await RoutingFixture.Until(() => f.Module.Status.State == MicrophoneMuteState.Live);
+    }
+
+    [Fact]
     public async Task Startup_registers_shortcut_without_changing_mute_and_conflicts_do_not_disable_the_button()
     {
         await using var f = new MuteFixture();
@@ -82,7 +93,7 @@ public sealed class MicMuteTests
         Assert.Equal("Mic muted", group.Status);
         f.System.ChangeLevel("B", new(.5f, false));
         await f.Audio.RefreshAsync();
-        Assert.Equal("Some microphones muted", group.Status);
+        Assert.Equal("Partly muted", group.Status);
         f.System.ChangeLevel("A", new(.5f, false));
         await f.Audio.RefreshAsync();
         Assert.Equal("Mic stopped", group.Status);

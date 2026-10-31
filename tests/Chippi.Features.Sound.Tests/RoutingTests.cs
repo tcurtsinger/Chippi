@@ -96,8 +96,8 @@ public sealed class RoutingTests
         Assert.Equal(["A", "B", "C"], f.Module.Settings.Output.Devices.Select(d => d.Id));
         await f.Module.MoveAsync(AudioFlow.Render, "C", 1);
         Assert.Equal(["A", "C", "B"], f.Settings.Value.Output.Devices.Select(d => d.Id));
-        await f.Module.PreferAsync(AudioFlow.Render, "B");
-        Assert.Equal("B", f.Settings.Value.Output.Devices[0].Id);
+        await f.Module.UseAsync(AudioFlow.Render, "B");
+        Assert.Equal(["A", "C", "B"], f.Settings.Value.Output.Devices.Select(d => d.Id)); // a pick leaves the order alone
         Assert.Equal("B", f.System.DefaultOf(AudioFlow.Render, AudioRole.Multimedia));
     }
 
@@ -108,10 +108,8 @@ public sealed class RoutingTests
         f.System.With(Speaker("A"), Speaker("B")).WithDefault("A");
         await f.Start();
         await f.Module.SetEnabledAsync(AudioFlow.Render, false);
-        var before = f.System.Enumerations;
-        await f.Audio.RefreshAsync();
-        f.System.ReadsBeforeFailure = f.System.Enumerations - before; // the pick's release passes, then its claim fails
-        await Assert.ThrowsAnyAsync<Exception>(() => f.Module.PreferAsync(AudioFlow.Render, "B"));
+        f.System.ReadsBeforeFailure = 0; // the pick's claim fails at once; its release then passes
+        await Assert.ThrowsAnyAsync<Exception>(() => f.Module.UseAsync(AudioFlow.Render, "B"));
         Assert.Null(f.System.ReadsBeforeFailure);
         await f.Audio.RefreshAsync();
         Assert.Equal("A", f.System.DefaultOf(AudioFlow.Render, AudioRole.Multimedia)); // Routing let go of the roles
@@ -164,7 +162,7 @@ public sealed class RoutingTests
         await f.Start();
         Assert.DoesNotContain(f.Module.Settings.Microphone.Devices, d => d.Id == "Transport");
         await f.Audio.ClaimRolesAsync(RoleOwner.Processing, AudioFlow.Capture, Enum.GetValues<AudioRole>(), _ => "Transport");
-        await f.Module.PreferAsync(AudioFlow.Capture, "Backup");
+        await f.Module.UseAsync(AudioFlow.Capture, "Backup");
         Assert.Equal("Transport", f.System.DefaultOf(AudioFlow.Capture, AudioRole.Multimedia));
         Assert.Equal("Backup", f.Module.WinningMicrophone);
         await f.Audio.ReleaseRolesAsync(RoleOwner.Processing, AudioFlow.Capture);
@@ -259,5 +257,107 @@ public sealed class RoutingTests
         Assert.Equal("A", f.System.DefaultOf(AudioFlow.Render, AudioRole.Multimedia));
         Assert.Equal("output-switched", Assert.Single(f.Notices.Sent).Kind);
     }
+    [Fact]
+    public async Task A_pick_holds_until_a_device_comes_or_goes_and_then_the_list_decides_for_good()
+    {
+        await using var f = new RoutingFixture();
+        f.System.With(Speaker("Headset"), Speaker("Speakers")).WithDefault("Headset");
+        await f.Start();
+        await f.Module.UseAsync(AudioFlow.Render, "Speakers");
+        Assert.Equal("Speakers", f.System.DefaultOf(AudioFlow.Render, AudioRole.Multimedia));
+        Assert.Equal(["Headset", "Speakers"], f.Module.Settings.Output.Devices.Select(d => d.Id)); // the order stays
+        f.System.ChangeDefault("Headset"); // Windows drifts: switching puts the pick back
+        await f.Audio.RefreshAsync();
+        Assert.Equal("Speakers", f.System.DefaultOf(AudioFlow.Render, AudioRole.Multimedia));
+
+        f.System.Disconnect("Headset", windowsPicks: "Speakers");
+        await Until(() => f.Module.Snapshot.Find("Headset")?.IsActive == false);
+        f.System.Connect(Speaker("Headset")); // plugged back in: the list decides, so the headset takes over
+        await Until(() => f.System.DefaultOf(AudioFlow.Render, AudioRole.Multimedia) == "Headset");
+        Assert.Equal("Headset", f.Module.InUse(AudioFlow.Render));
+    }
+
+    [Fact]
+    public async Task Editing_the_list_drops_a_pick_and_the_list_decides_at_once()
+    {
+        await using var f = new RoutingFixture();
+        f.System.With(Speaker("A"), Speaker("B"), Speaker("C")).WithDefault("A");
+        await f.Start();
+        await f.Module.UseAsync(AudioFlow.Render, "C");
+        Assert.Equal("C", f.Module.Order(AudioFlow.Render)[0].Id);
+        await f.Module.MoveAsync(AudioFlow.Render, "B", 0);
+        Assert.Equal("B", f.System.DefaultOf(AudioFlow.Render, AudioRole.Multimedia));
+        Assert.Equal(["B", "A", "C"], f.Module.Order(AudioFlow.Render).Select(e => e.Id));
+    }
+
+    [Fact]
+    public async Task A_mic_pick_leads_the_order_mic_processing_reads_until_a_mic_comes_or_goes()
+    {
+        await using var f = new RoutingFixture(e => e.Id == "Transport");
+        f.System.With(Mic("Real"), Mic("Headset"), Mic("Transport")).WithDefault("Real");
+        await f.Start();
+        await f.Audio.ClaimRolesAsync(RoleOwner.Processing, AudioFlow.Capture, Enum.GetValues<AudioRole>(), _ => "Transport");
+        await f.Module.UseAsync(AudioFlow.Capture, "Headset");
+        Assert.Equal(["Headset", "Real"], f.Module.Order(AudioFlow.Capture).Select(e => e.Id));
+        Assert.Equal("Headset", f.Module.InUse(AudioFlow.Capture)); // the real mic, while the cable holds the default
+        f.System.Connect(Mic("Desk"));
+        await Until(() => f.Module.Order(AudioFlow.Capture)[0].Id == "Real");
+        Assert.Equal("Real", f.Module.InUse(AudioFlow.Capture));
+    }
+
+    [Fact]
+    public async Task The_output_shortcut_is_unset_until_recorded_then_steps_through_the_connected_outputs()
+    {
+        await using var f = new RoutingFixture();
+        f.System.With(Speaker("A"), Speaker("B"), Speaker("C"), Speaker("Gone")).WithDefault("A");
+        await f.Start();
+        f.System.Disconnect("Gone");
+        await Until(() => f.Module.Snapshot.Find("Gone")?.IsActive == false);
+        Assert.Null(f.Hotkey.Current); // nothing registered by default
+        var keys = new Mute.MicShortcut(Mute.ShortcutModifiers.Control | Mute.ShortcutModifiers.Alt, 0x4F);
+        Assert.True(f.Module.ChangeShortcut(keys));
+        Assert.Equal(keys, f.Settings.Value.SwitchShortcut);
+
+        foreach (var next in new[] { "B", "C", "A" }) // past the last connected one, back to the first
+        {
+            int notices = f.Notices.Sent.Count(n => n.Kind == "output-switched");
+            f.Hotkey.Pressed!();
+            await Until(() => f.System.DefaultOf(AudioFlow.Render, AudioRole.Multimedia) == next && f.Notices.Sent.Count(n => n.Kind == "output-switched") > notices);
+            await Task.Delay(50);
+            var said = f.Notices.Sent.Where(n => n.Kind == "output-switched").Skip(notices).ToList();
+            Assert.Equal(next, Assert.Single(said).Body); // the bar says which, once
+        }
+        Assert.Equal(["A", "B", "C", "Gone"], f.Module.Settings.Output.Devices.Select(d => d.Id));
+
+        f.Module.RemoveShortcut();
+        Assert.True(f.Hotkey.Disposed);
+        Assert.Null(f.Settings.Value.SwitchShortcut);
+    }
+
+    [Fact]
+    public async Task A_saved_output_shortcut_registers_at_start_and_says_when_its_keys_are_taken()
+    {
+        await using var f = new RoutingFixture();
+        f.System.With(Speaker("A"), Speaker("B")).WithDefault("A");
+        f.Settings.Value = new() { SwitchShortcut = new(Mute.ShortcutModifiers.Control | Mute.ShortcutModifiers.Alt, 0x4F) };
+        f.Hotkey.Available = false;
+        await f.Start();
+        Assert.Equal("Shortcut in use", f.Module.ShortcutError);
+        f.Hotkey.Available = true;
+        Assert.True(f.Module.ChangeShortcut(new(Mute.ShortcutModifiers.Control | Mute.ShortcutModifiers.Alt, 0x50)));
+        Assert.Null(f.Module.ShortcutError);
+    }
+
+    [Fact]
+    public async Task Errors_say_what_failed_then_why()
+    {
+        await using var f = new RoutingFixture();
+        f.System.With(Speaker("A"), Speaker("B")).WithDefault("A");
+        await f.Start();
+        await Assert.ThrowsAnyAsync<Exception>(() => f.Module.UseAsync(AudioFlow.Render, "Nowhere"));
+        Assert.Equal("Switch failed · Device unavailable", f.Module.Error);
+        Assert.Equal("Mute failed", AudioRoutingModule.Failed("Mute", new AudioFailure("Mute failed"))); // never "Mute failed · Mute failed"
+    }
+
     private static RoutingList Saved(params string[] ids) => new() { Seeded = true, Devices = ids.Select(id => new PriorityEntry(id, id)).ToList() };
 }

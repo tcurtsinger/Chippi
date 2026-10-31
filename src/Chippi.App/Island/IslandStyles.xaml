@@ -294,8 +294,8 @@
         </Setter>
     </Style>
 
-    <!-- A one-line list row to pick or act on (Clipboard, File organizer): 30 tall, content 10 in,
-         4px corners, hover wash; Tag "Selected" gets the accent tint. -->
+    <!-- A one-line list row to pick or act on (Sound, Clipboard, File organizer): 30 tall, content 10 in,
+         4px corners, hover wash; Tag "Selected" gets the accent tint, which hover doesn't wash out. -->
     <Style x:Key="IslandListRowStyle" TargetType="{x:Type Button}">
         <Setter Property="Height" Value="30" />
         <Setter Property="Padding" Value="10,0" />
@@ -310,11 +310,12 @@
                         <ContentPresenter VerticalAlignment="Center" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" />
                     </Border>
                     <ControlTemplate.Triggers>
-                        <Trigger Property="Tag" Value="Selected">
-                            <Setter TargetName="Chrome" Property="i:FillFade.To" Value="{DynamicResource IslandAccentTintBrush}" />
-                        </Trigger>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="Chrome" Property="i:FillFade.To" Value="{DynamicResource IslandHoverBrush}" />
+                        </Trigger>
+                        <!-- After hover, so the selected row keeps its tint under the pointer. -->
+                        <Trigger Property="Tag" Value="Selected">
+                            <Setter TargetName="Chrome" Property="i:FillFade.To" Value="{DynamicResource IslandAccentTintBrush}" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
