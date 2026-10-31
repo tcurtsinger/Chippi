@@ -56,7 +56,7 @@ public sealed class IslandPanelTests
     private static void Open(IslandPanelWindow panel)
     {
         panel.Open(Puck, Offscreen);
-        Pump(TimeSpan.FromMilliseconds(400));
+        IslandWindowTests.Settle(panel);
     }
 
     private static IslandGrid Grid(IslandPanelWindow panel) =>
@@ -103,7 +103,7 @@ public sealed class IslandPanelTests
                 panel.ShowPage(key);
                 if (!Chippi.UI.Themes.Motion.IsReduced)
                     Assert.Equal(grid, Drawn(panel)); // the first frame of the change: the same shape, no morph
-                Pump(TimeSpan.FromMilliseconds(400));
+                IslandWindowTests.Settle(panel);
                 Assert.Equal(grid, Drawn(panel));
                 Assert.Equal(1, ((FrameworkElement)panel.FindName("Card")).Opacity);
                 if (key != IslandPanelWindow.NowPlayingKey)
@@ -113,7 +113,7 @@ public sealed class IslandPanelTests
                 }
             }
             panel.ShowPage(null, remember: false);
-            Pump(TimeSpan.FromMilliseconds(400));
+            IslandWindowTests.Settle(panel);
             Assert.Equal(grid, Drawn(panel));
         }));
     }
@@ -130,7 +130,7 @@ public sealed class IslandPanelTests
             var card = (FrameworkElement)panel.FindName("Card");
             Assert.Equal(0, card.Opacity, 3);
             Assert.False(card.IsHitTestVisible); // no click while it can't be seen
-            Pump(TimeSpan.FromMilliseconds(400));
+            IslandWindowTests.Settle(panel);
             Assert.Equal(1, card.Opacity);
             Assert.True(card.IsHitTestVisible);
         }));
@@ -232,7 +232,7 @@ public sealed class IslandPanelTests
             panel.LastPageChanged += (_, key) => saved = key;
             Open(panel);
             Grid(panel).Buttons().Single(b => (string)b.Tag == "sound.mixer").RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
-            Pump(TimeSpan.FromMilliseconds(400));
+            IslandWindowTests.Settle(panel);
             Assert.Equal("sound.mixer", panel.CurrentPage);
             Assert.Equal("sound.mixer", saved);
             Assert.Equal((520, 360), Size(panel));
@@ -269,10 +269,10 @@ public sealed class IslandPanelTests
             Open(panel);
             Assert.True(monitor.OnScreen);
             panel.ShowPage("system-monitor");
-            Pump(TimeSpan.FromMilliseconds(400));
+            IslandWindowTests.Settle(panel);
             Assert.False(monitor.OnScreen);
             panel.ShowPage(null);
-            Pump(TimeSpan.FromMilliseconds(400));
+            IslandWindowTests.Settle(panel);
             Assert.True(monitor.OnScreen);
             panel.CloseIsland(immediate: true);
             Assert.False(monitor.OnScreen);
@@ -320,7 +320,7 @@ public sealed class IslandPanelTests
             foreach (var key in new[] { "keep-awake", IslandPanelWindow.NowPlayingKey, "sound.mixer" })
             {
                 panel.ShowPage(key);
-                Pump(TimeSpan.FromMilliseconds(400));
+                IslandWindowTests.Settle(panel);
                 Assert.Equal(key, panel.CurrentPage);
                 var card = (FrameworkElement)panel.FindName("Card");
                 card.Measure(new Size(IslandPage.Width, IslandPage.Height));
@@ -328,7 +328,7 @@ public sealed class IslandPanelTests
                 var back = Back(panel);
                 Assert.Equal(IslandPage.HeaderHeight, back.ActualHeight);
                 Click(back);
-                Pump(TimeSpan.FromMilliseconds(400));
+                IslandWindowTests.Settle(panel);
                 Assert.Null(panel.CurrentPage);
             }
         }));
@@ -346,7 +346,7 @@ public sealed class IslandPanelTests
             Esc();
             Assert.Equal(1, closes);
             panel.ShowPage("keep-awake");
-            Pump(TimeSpan.FromMilliseconds(400));
+            IslandWindowTests.Settle(panel);
             Esc();
             Assert.Equal(2, closes);
         }));
@@ -501,7 +501,7 @@ public sealed class IslandPanelTests
             var shape = (FrameworkElement)panel.FindName("Shape");
             if (!Chippi.UI.Themes.Motion.IsReduced)
                 Assert.Equal(Puck.Width, shape.Width, 3); // the first frame is the puck
-            Pump(TimeSpan.FromMilliseconds(400));
+            IslandWindowTests.Settle(panel);
             Assert.Equal((520, 360), Size(panel));
             Assert.Equal(1, ((FrameworkElement)panel.FindName("Card")).Opacity);
         }));

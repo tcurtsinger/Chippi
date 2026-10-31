@@ -494,7 +494,7 @@ public partial class IslandWindow : Window
     /// </summary>
     private unsafe LRESULT OnKeyboard(int code, WPARAM wParam, LPARAM lParam)
     {
-        if (code >= 0 && wParam.Value == PInvoke.WM_KEYDOWN && ((KBDLLHOOKSTRUCT*)lParam.Value)->vkCode == VK_ESCAPE)
+        if (WatchesInput && code >= 0 && wParam.Value == PInvoke.WM_KEYDOWN && ((KBDLLHOOKSTRUCT*)lParam.Value)->vkCode == VK_ESCAPE)
             Escape();
         return PInvoke.CallNextHookEx(_escapeHook, code, wParam, lParam);
     }
@@ -514,6 +514,13 @@ public partial class IslandWindow : Window
     }
 
     /// <summary>
+    /// Whether the hooks act on the real keyboard and mouse. The island tests turn it off for the whole run,
+    /// so a click or an Esc on the PC while they run can't close a test's panel; they press through
+    /// <see cref="PressedAt"/> and <see cref="Escape"/> instead.
+    /// </summary>
+    internal static bool WatchesInput { get; set; } = true;
+
+    /// <summary>
     /// A click anywhere off the panel closes it. It never activates, so it can't lose focus to see
     /// that; a low-level mouse hook watches for presses while it is open, and always passes them
     /// on: the click still reaches the app under the pointer.
@@ -521,7 +528,7 @@ public partial class IslandWindow : Window
     private unsafe LRESULT OnMouse(int code, WPARAM wParam, LPARAM lParam)
     {
         uint message = (uint)wParam.Value;
-        if (code >= 0 && message is PInvoke.WM_LBUTTONDOWN or PInvoke.WM_RBUTTONDOWN or PInvoke.WM_MBUTTONDOWN or PInvoke.WM_XBUTTONDOWN)
+        if (WatchesInput && code >= 0 && message is PInvoke.WM_LBUTTONDOWN or PInvoke.WM_RBUTTONDOWN or PInvoke.WM_MBUTTONDOWN or PInvoke.WM_XBUTTONDOWN)
         {
             var at = ((MSLLHOOKSTRUCT*)lParam.Value)->pt;
             PressedAt(new Point(at.X, at.Y));

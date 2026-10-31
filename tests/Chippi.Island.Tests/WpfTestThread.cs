@@ -18,6 +18,8 @@ internal static class WpfTestThread
             try
             {
                 var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
+                // A real click or Esc on the PC while the tests run must not close a test's panel; tests press for themselves.
+                Chippi.App.Island.IslandWindow.WatchesInput = false;
                 // Shots render in the light theme with CHIPPI_SHOTS_THEME=light.
                 foreach (var source in new[] { $"Themes/{ShotsTheme}.xaml", "Themes/Palette.xaml", "Themes/SharedStyles.xaml", "Controls/Controls.xaml" })
                     app.Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri($"pack://application:,,,/Chippi.UI;component/{source}") });
