@@ -180,10 +180,10 @@ public partial class App : Application
         Exit += (_, _) => keepAwake.ReleaseOnExit();
         shell.Registry.Register(new Chippi.Features.Downloads.DownloadsModule());
         // [Phase 3] Sound. Routing never lists VB-CABLE (recognized by device identity); Mic
-        // processing's "Highest priority" source is routing's microphone list.
+        // processing's "Highest priority" source is routing's microphone order, a pick first.
         var routing = new Chippi.Features.Sound.Routing.AudioRoutingModule(null, Chippi.Audio.VbCable.IsCable);
         shell.Registry.Register(routing);
-        shell.Registry.Register(new Chippi.Features.Sound.Processing.MicProcessingModule(null, () => routing.Settings.Microphone.Devices,
+        shell.Registry.Register(new Chippi.Features.Sound.Processing.MicProcessingModule(null, () => routing.Order(Chippi.Audio.AudioFlow.Capture),
             Path.Combine(shell.Services.DataRoot, Chippi.Features.Sound.Processing.MicProcessingModule.Id)));
 
         shell.Registry.Register(new Chippi.Features.Sound.Volume.AppVolumeModule());

@@ -66,7 +66,8 @@ internal sealed class MicrophoneMute
             }
             catch { failed.Add(mic.Id); }
         }
-        Status = new(active.Count == 0 ? MicrophoneMuteState.NoMicrophone
+        // VB-CABLE's capture side mutes with the rest, but alone it isn't a microphone.
+        Status = new(active.All(VbCable.IsCable) ? MicrophoneMuteState.NoMicrophone
             : readable != active.Count ? MicrophoneMuteState.Unavailable
             : muted == active.Count ? MicrophoneMuteState.Muted
             : muted == 0 ? MicrophoneMuteState.Live : MicrophoneMuteState.Mixed,

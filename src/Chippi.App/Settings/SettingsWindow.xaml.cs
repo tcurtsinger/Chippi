@@ -60,7 +60,8 @@ public partial class SettingsWindow : Window
     /// <summary>Sound by task: what you set for your output and for your mic, whichever features do it.</summary>
     internal static IReadOnlyList<SharedPage> SharedPages { get; } =
     [
-        new("page:sound-output", "Output", LucideIcons.Speaker, FeatureGroup.Sound, [new("audio-routing", "output", null)]),
+        new("page:sound-output", "Output", LucideIcons.Speaker, FeatureGroup.Sound,
+            [new("audio-routing", "output", null), new("audio-routing", Chippi.Features.Sound.Routing.AudioRoutingModule.OutputShortcutSection, "Output shortcut")]),
         new("page:sound-microphone", "Microphone", LucideIcons.Mic, FeatureGroup.Sound,
             [new("mic-mute", "mute", null), new("audio-routing", "microphone", null), new("mic-processing", null, "Mic processing"), new("mic-mute", null, "Mute shortcut")]),
     ];
@@ -125,7 +126,7 @@ public partial class SettingsWindow : Window
     internal FrameworkElement PageContent => PageHost;
     private IEnumerable<SettingsPageInfo> ChippiPages => Pages.Where(p =>
         p.Id != "shortcuts" && p.Id != "permissions"
-        || p.Id == "shortcuts" && _shell.Registry.Features.Any(f => f.IsRunning && f.SettingsPage is not null && f.Id is "mic-mute" or "paste-plain-text")
+        || p.Id == "shortcuts" && _shell.Registry.Features.Any(f => f.IsRunning && f.SettingsPage is not null && f.Id is "audio-routing" or "mic-mute" or "paste-plain-text")
         || p.Id == "permissions" && _shell.Registry.GetPermissions().Any(u => u.UsedBy.Count > 0 || u.IsUnused));
 
     internal IEnumerable<SettingsPageInfo> NavigationPages => _featurePages.Concat(ChippiPages);
@@ -219,6 +220,9 @@ public partial class SettingsWindow : Window
     /// <summary>The sidebar page a request opens, or null when it isn't there; a feature on a shared page (Sound's) is opened there.</summary>
     private SettingsPageInfo? Find(ref string page)
     {
+        // A feature's requirement (Mic processing's VB-CABLE) installs from its row in Add features.
+        if (page.EndsWith("/" + Chippi.Core.Modules.ModuleContext.RequirementSection, StringComparison.OrdinalIgnoreCase))
+            page = AddFeatures;
         string baseId = page.Split('/')[0];
         var target = NavigationPages.FirstOrDefault(p => p.Id.Equals(baseId, StringComparison.OrdinalIgnoreCase));
         if (target is null && baseId.StartsWith(ModulePrefix, StringComparison.OrdinalIgnoreCase)

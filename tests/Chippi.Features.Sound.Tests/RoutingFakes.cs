@@ -20,12 +20,13 @@ public sealed class RoutingFixture : IAsyncDisposable
     public RoutingMemorySettings Settings { get; } = new();
     public RoutingNotifier Notices { get; } = new();
     public RoutingUiFake Ui { get; } = new();
+    public FakeHotkey Hotkey { get; } = new();
     public ModuleContext Context { get; }
 
     public RoutingFixture(Func<AudioEndpoint, bool>? exclude = null)
     {
         Audio = new AudioService(() => System, null, options: new AudioServiceOptions { Debounce = TimeSpan.FromMilliseconds(20) });
-        Module = new AudioRoutingModule(Audio, exclude);
+        Module = new AudioRoutingModule(Audio, exclude, () => Hotkey);
         Context = new ModuleContext("audio-routing", Settings, NullLogger.Instance, new IslandActivityHub().CreatePublisher("audio-routing"), Ui) { Notifier = Notices };
     }
 

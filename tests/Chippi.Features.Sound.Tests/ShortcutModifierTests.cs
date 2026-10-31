@@ -17,4 +17,11 @@ public sealed class ShortcutModifierTests
             Assert.True(new MicShortcut(ShortcutModifiers.Alt | ShortcutModifiers.Shift, key).IsValid);
         }
     }
+
+    [Theory]
+    [InlineData(0x31u, "Ctrl+Shift+1")] // not "D1"
+    [InlineData(0x4Du, "Ctrl+Shift+M")]
+    [InlineData(0x75u, "Ctrl+Shift+F6")]
+    public void Shortcuts_read_as_their_keys(uint key, string shown) =>
+        Assert.Equal(shown, new MicShortcut(ShortcutModifiers.Control | ShortcutModifiers.Shift, key).ToString());
 }

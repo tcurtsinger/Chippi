@@ -49,7 +49,7 @@ public sealed class MicMuteModule : IFeatureModule
     public string StatusText => Status.State switch
     {
         MicrophoneMuteState.Muted => "Muted",
-        MicrophoneMuteState.Mixed => "Some microphones muted",
+        MicrophoneMuteState.Mixed => "Partly muted",
         MicrophoneMuteState.Unavailable => "Microphone unavailable",
         MicrophoneMuteState.NoMicrophone => "No microphone",
         _ => "Live",
@@ -94,14 +94,14 @@ public sealed class MicMuteModule : IFeatureModule
         {
             if (_stopping || _lease is null) return;
             await _audio!.ToggleMicrophoneMuteAsync();
-            Error = Status.Failed.Count > 0 ? "Some microphones failed" : null;
+            Error = Status.Failed.Count > 0 ? "Mute failed · some mics" : null;
             if (Error is null && Settings.PlaySound && Status.State is MicrophoneMuteState.Muted or MicrophoneMuteState.Live)
                 _tone(Status.State == MicrophoneMuteState.Muted);
             UpdateState();
         }
         catch (Exception ex)
         {
-            Error = AudioErrors.Reason(ex);
+            Error = Routing.AudioRoutingModule.Failed("Mute", ex);
             _context?.Logger.LogWarning(ex, "Toggling the microphone mute failed");
             Changed?.Invoke();
             throw;

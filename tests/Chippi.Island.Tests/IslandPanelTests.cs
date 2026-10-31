@@ -409,6 +409,32 @@ public sealed class IslandPanelTests
     }
 
     [Fact]
+    public void Stopped_mic_processing_says_mic_stopped_on_the_home_and_a_muted_mic_still_says_muted()
+    {
+        bool muted = false;
+        var mute = new IslandTileContribution("mic-mute", new IslandTileSpec("sound", "Sound", "AudioLines", 10, 10, () => new Border())
+        {
+            StatusPriority = 100,
+            Toggle = new IslandTileToggle(() => muted, () => Task.CompletedTask, "Microphone", "Mic", () => muted ? "Muted" : "Live"),
+        });
+        var processing = new IslandTileContribution("mic-processing", new IslandTileSpec("sound", "Sound", "AudioLines", 10, 30, () => new Border()) { StatusPriority = 10 });
+        processing.SetStatus("Mic stopped");
+        WpfTestThread.Run(() => WithPanel(panel =>
+        {
+            Open(panel);
+            string[] Texts() => [.. Descendants(Grid(panel)).OfType<TextBlock>().Select(t => t.Text)];
+            var stopped = new IslandActivity("stopped", IslandActivityKind.Status, "Mic processing stopped", "Microphone") { NeedsAttention = true, TileKey = "sound", ModuleId = "mic-processing" };
+            panel.SetActivities([stopped]);
+            Assert.Contains("Mic stopped", Texts()); // why it needs attention, not a Caution "Live"
+            Assert.DoesNotContain("Live", Texts());
+
+            muted = true;
+            panel.SetActivities([stopped, new IslandActivity("muted", IslandActivityKind.Status, "Muted", "Microphone") { NeedsAttention = true, TileKey = "sound", ModuleId = "mic-mute" }]);
+            Assert.Contains("Muted", Texts());
+        }, Tiles(mute, processing)));
+    }
+
+    [Fact]
     public void A_feature_whose_state_throws_shows_its_button_plain_and_the_others_still_refresh()
     {
         bool broken = true;

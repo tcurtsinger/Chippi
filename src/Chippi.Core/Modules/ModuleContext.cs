@@ -42,6 +42,9 @@ public sealed class ModuleContext(
     /// <summary>Opens Settings on this module's page, at <c>section</c> when given (a notice click opening History).</summary>
     public Action<string?> OpenSettings { get; init; } = _ => { };
 
+    /// <summary>The <see cref="OpenSettings"/> section that opens Add features, where the module's requirement installs.</summary>
+    public const string RequirementSection = "requirement";
+
     /// <summary>Opens the island on a tile's page (a notice click opening the System monitor page): in the island, or docked by the tray.</summary>
     public Action<string> OpenIslandPage { get; init; } = _ => { };
 

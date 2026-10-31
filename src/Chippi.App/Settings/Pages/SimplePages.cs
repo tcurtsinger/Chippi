@@ -21,7 +21,7 @@ internal sealed class ShortcutsPage : UserControl
         {
             while (page.Children.Count > 1) page.Children.RemoveAt(1);
             var card = new Card();
-            foreach (var entry in shell.Registry.Features.Where(f => f.IsRunning && f.Id is "mic-mute" or "paste-plain-text"))
+            foreach (var entry in shell.Registry.Features.Where(f => f.IsRunning && f.Id is "audio-routing" or "mic-mute" or "paste-plain-text"))
                 if (entry.SettingsPage?.CreateView("shortcut-list") is FrameworkElement view)
                     card.Children.Add(view);
             if (card.Children.Count == 0) card.Children.Add(SettingsLayout.Empty("No shortcuts"));

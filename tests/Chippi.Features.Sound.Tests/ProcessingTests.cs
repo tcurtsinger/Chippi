@@ -153,8 +153,9 @@ public sealed class ProcessingModuleTests
         await Until(() => f.Module.Status.Reason == StopReason.NoDriver);
         await f.Audio.RefreshAsync();
         var notice = Assert.Single(f.Notices.Sent);
-        Assert.Equal(("stopped", "No driver"), (notice.Kind, notice.Body));
-        Assert.Equal("Stopped · No driver", f.Module.StatusText);
+        Assert.Equal(("stopped", "No VB-CABLE"), (notice.Kind, notice.Body));
+        Assert.Equal("Stopped · No VB-CABLE", f.Module.StatusText);
+        Assert.Equal(("Stopped · No VB-CABLE", ProcessingFix.Install), (f.Module.Problem, f.Module.Fix)); // the warning line installs it
         Assert.Equal("Real", f.System.DefaultOf(AudioFlow.Capture, AudioRole.Multimedia));
         Assert.True(f.Settings.Value.Enabled); // the switch stays; status says what's real
         Assert.Equal("Mic stopped", f.Ui.Tiles[0].Status);
@@ -174,7 +175,7 @@ public sealed class ProcessingModuleTests
         f.System.With(Mic("Real"), CableInput(), CableOutput(), CableInput("In2", second), CableOutput("Out2", second));
         f.Settings.Value = new() { Enabled = true };
         await f.Start();
-        Assert.Equal("Stopped · More than one cable", f.Module.StatusText);
+        Assert.Equal("Stopped · More than one VB-CABLE", f.Module.StatusText);
     }
 
     [Fact]
@@ -185,6 +186,36 @@ public sealed class ProcessingModuleTests
         f.Settings.Value = new() { Enabled = true };
         await f.Start();
         Assert.Equal("Stopped · No microphone", f.Module.StatusText);
+        Assert.Equal(("Stopped · No microphone", ProcessingFix.None), (f.Module.Problem, f.Module.Fix)); // plugging one in is the fix
+    }
+
+    [Fact]
+    public async Task A_failed_start_says_failed_and_why_and_retry_starts_again()
+    {
+        await using var f = new ProcessingFixture();
+        f.System.With(Mic("Real"), CableInput(), CableOutput()).WithDefault("Real");
+        f.Pipelines.FailOnStart.Add("Real");
+        f.Settings.Value = new() { Enabled = true };
+        await f.Start();
+        Assert.Equal(("Failed · Device in use", ProcessingFix.Retry), (f.Module.Problem, f.Module.Fix));
+        await f.Audio.RefreshAsync();
+        Assert.Equal(ProcessingState.Stopped, f.Module.Status.State); // a failure isn't retried on its own
+
+        f.Pipelines.FailOnStart.Clear();
+        await f.Module.RetryAsync();
+        Assert.Equal(ProcessingState.Live, f.Module.Status.State);
+        Assert.Equal((null, ProcessingFix.None), (f.Module.Problem, f.Module.Fix));
+    }
+
+    [Fact]
+    public async Task Off_and_live_have_no_warning_line()
+    {
+        await using var f = new ProcessingFixture();
+        f.System.With(Mic("Real"), CableInput(), CableOutput()).WithDefault("Real");
+        await f.Start();
+        Assert.Equal((null, ProcessingFix.None), (f.Module.Problem, f.Module.Fix));
+        await f.Module.SetEnabledAsync(true);
+        Assert.Equal((null, ProcessingFix.None), (f.Module.Problem, f.Module.Fix));
     }
 
     [Fact]

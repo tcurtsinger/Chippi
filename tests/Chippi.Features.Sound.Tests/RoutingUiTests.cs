@@ -10,6 +10,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using Chippi.Audio;
+using Chippi.Audio.Processing;
 using Chippi.Features.Sound.Routing;
 using static Chippi.Audio.Tests.FakeDeviceSystem;
 
@@ -89,7 +90,7 @@ public sealed class RoutingUiTests
             await Until(() => !Descendants(page).Contains(pick)); // rebuilt once the pick has finished
         });
         Assert.Equal("B", f.System.DefaultOf(AudioFlow.Render, AudioRole.Multimedia));
-        Assert.Equal("B", f.Module.Settings.Output.Devices[0].Id);
+        Assert.Equal(["A", "B", "Gone"], f.Module.Settings.Output.Devices.Select(d => d.Id)); // a pick leaves the order alone
         Assert.False(f.Module.Settings.Output.Enabled); // the pick is set once; switching stays off
         f.System.ChangeDefault("A");
         await f.Audio.RefreshAsync();
@@ -147,6 +148,65 @@ public sealed class RoutingUiTests
             Assert.Equal(Visibility.Collapsed, ((FrameworkElement)Descendants(view).OfType<System.Windows.Controls.Slider>().Single().Parent).Visibility);
             Assert.False(Descendants(view).OfType<System.Windows.Controls.Button>().Single(b => AutomationProperties.GetName(b) == "Mute system volume").IsEnabled);
             Assert.DoesNotContain(Descendants(view).OfType<System.Windows.Controls.Button>(), b => AutomationProperties.GetName(b).StartsWith("Use ", StringComparison.Ordinal));
+        });
+    }
+
+    [Fact]
+    public async Task The_one_in_use_shows_even_past_the_rows_that_fit()
+    {
+        await using var f = new RoutingFixture();
+        f.System.With([.. Enumerable.Range(1, 9).Select(i => Speaker($"S{i}"))]).WithDefault("S1");
+        await f.Start();
+        await f.Module.SetEnabledAsync(AudioFlow.Render, false);
+        f.System.ChangeDefault("S9"); // Windows picked one far down the list
+        await f.Audio.RefreshAsync();
+        await Sta(() =>
+        {
+            var view = new RoutingQuickView(f.Module, AudioFlow.Render);
+            var rows = Descendants(view).OfType<System.Windows.Controls.Button>().Select(AutomationProperties.GetName).Skip(1).ToList(); // after the card's Mute
+            Assert.Equal(["Use S1", "Use S2", "Use S3", "Use S4", "Use S5", "Use S6", "S9, in use"], rows); // it takes the last row's place
+        });
+    }
+
+    [Fact]
+    public async Task Rows_lead_with_the_device_and_keep_the_full_name_in_their_tooltip()
+    {
+        await using var f = new RoutingFixture();
+        string[] names = ["Speakers (INZONE Buds - Game)", "Headset Earphone (INZONE Buds - Chat)", "Speakers (Realtek(R) Audio)", "Digital Audio (S/PDIF) (Realtek(R) Audio)"];
+        f.System.With([.. names.Select(n => Speaker(n))]).WithDefault(names[0]);
+        await f.Start();
+        await Sta(() =>
+        {
+            var rows = Descendants(new RoutingQuickView(f.Module, AudioFlow.Render)).OfType<System.Windows.Controls.Button>().Skip(1).ToList();
+            Assert.Equal(["INZONE Buds - Game", "INZONE Buds - Chat", "Speakers (Realtek(R) Audio)", "Digital Audio (S/PDIF) (Realtek(R) Audio)"],
+                rows.Select(r => Descendants(r).OfType<System.Windows.Controls.TextBlock>().Single().Text));
+            Assert.Equal(names, rows.Select(r => (string)r.ToolTip));
+        });
+    }
+
+    [Fact]
+    public async Task Stopped_mic_processing_says_why_on_its_card_and_offers_the_fix()
+    {
+        await using var f = new ProcessingFixture();
+        f.System.With(Mic("Real")).WithDefault("Real"); // no VB-CABLE yet
+        f.Settings.Value = new() { Enabled = true };
+        await f.Start();
+        await Sta(async () =>
+        {
+            var card = new Processing.ProcessingQuickView(f.Module);
+            var texts = Descendants(card).OfType<System.Windows.Controls.TextBlock>().ToList();
+            Assert.Contains(texts, t => t.Text == "Stopped · No VB-CABLE");
+            Assert.Equal(["Install"], Descendants(card).OfType<System.Windows.Controls.Button>().Select(b => (string)b.Content));
+            Assert.Equal(Visibility.Collapsed, Descendants(card).OfType<Processing.SegmentMeter>().Single().Visibility);
+            Assert.True(SoundColumn.GetWarning(card)); // its line takes a mic row's place
+
+            f.System.Connect(CableInput());
+            f.System.Connect(CableOutput());
+            await Until(() => f.Module.Status.State == ProcessingState.Live);
+            card = new Processing.ProcessingQuickView(f.Module); // unshown controls don't refresh on their own
+            Assert.False(SoundColumn.GetWarning(card));
+            Assert.Empty(Descendants(card).OfType<System.Windows.Controls.Button>());
+            Assert.Equal(Visibility.Visible, Descendants(card).OfType<Processing.SegmentMeter>().Single().Visibility);
         });
     }
 

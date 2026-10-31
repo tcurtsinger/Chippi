@@ -23,8 +23,23 @@ public sealed record MicShortcut(ShortcutModifiers Modifiers = ShortcutModifiers
         Modifiers.HasFlag(ShortcutModifiers.Control) ? "Ctrl" : null,
         Modifiers.HasFlag(ShortcutModifiers.Alt) ? "Alt" : null,
         Modifiers.HasFlag(ShortcutModifiers.Shift) ? "Shift" : null,
-        KeyInterop.KeyFromVirtualKey((int)Key).ToString(),
+        Key is >= 0x30 and <= 0x5A ? ((char)Key).ToString() : KeyInterop.KeyFromVirtualKey((int)Key).ToString(), // "1", not "D1"
     }.Where(x => x is not null));
+
+    /// <summary>The shortcut a key press makes while one is being recorded, or null while only modifiers are down.</summary>
+    public static MicShortcut? From(KeyEventArgs e)
+    {
+        var key = e.Key == System.Windows.Input.Key.System ? e.SystemKey : e.Key;
+        if (key is System.Windows.Input.Key.LeftCtrl or System.Windows.Input.Key.RightCtrl or System.Windows.Input.Key.LeftAlt or System.Windows.Input.Key.RightAlt
+            or System.Windows.Input.Key.LeftShift or System.Windows.Input.Key.RightShift or System.Windows.Input.Key.LWin or System.Windows.Input.Key.RWin)
+            return null;
+        var modifiers = Keyboard.Modifiers;
+        var mapped = (modifiers.HasFlag(ModifierKeys.Control) ? ShortcutModifiers.Control : 0)
+            | (modifiers.HasFlag(ModifierKeys.Shift) ? ShortcutModifiers.Shift : 0)
+            | (modifiers.HasFlag(ModifierKeys.Alt) ? ShortcutModifiers.Alt : 0)
+            | (modifiers.HasFlag(ModifierKeys.Windows) ? ShortcutModifiers.Windows : 0);
+        return new(mapped, (uint)KeyInterop.VirtualKeyFromKey(key));
+    }
 }
 
 public interface IMicHotkey : IDisposable

@@ -29,6 +29,7 @@ public sealed class MicMuteView : UserControl
     private readonly MicMuteModule _module;
     private readonly MicMuteSurface _surface;
     private readonly StackPanel _body = new();
+    private Button? _action; // Mute or Unmute, focused again after a press from the keyboard rebuilds it
     private bool _recording;
 
     public MicMuteView(MicMuteModule module, MicMuteSurface surface = MicMuteSurface.Shortcut)
@@ -83,7 +84,7 @@ public sealed class MicMuteView : UserControl
     private SettingRow MicrophoneRow(bool muted)
     {
         bool none = _module.Status.State == MicrophoneMuteState.NoMicrophone;
-        var action = RoutingUi.Button(muted ? "Unmute" : "Mute", Toggle);
+        var action = _action = RoutingUi.Button(muted ? "Unmute" : "Mute", Toggle);
         AutomationProperties.SetName(action, muted ? "Unmute all microphones" : "Mute all microphones");
         action.IsEnabled = !none;
         var row = SettingsLayout.Row("Microphone", action, muted ? "Muted" : _module.StatusText);
@@ -128,7 +129,7 @@ public sealed class MicMuteView : UserControl
         var state = new TextBlock { Text = muted ? "Muted" : _module.StatusText, FontSize = 12, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
         if (warning || none) state.SetResourceReference(TextBlock.ForegroundProperty, warning ? "WarningTextBrush" : "IslandTextTertiaryBrush");
         AutomationProperties.SetLiveSetting(state, AutomationLiveSetting.Polite);
-        var action = RoutingUi.IslandButton(muted ? "Unmute" : "Mute", Toggle);
+        var action = _action = RoutingUi.IslandButton(muted ? "Unmute" : "Mute", Toggle);
         AutomationProperties.SetName(action, muted ? "Unmute all microphones" : "Mute all microphones");
         action.IsEnabled = !none;
         return RoutingUi.IslandCard(glyph, state, action);
@@ -152,14 +153,8 @@ public sealed class MicMuteView : UserControl
     {
         if (!_recording) return;
         if (e.Key == Key.Escape) { CancelCapture(); e.Handled = true; return; }
-        var key = e.Key == Key.System ? e.SystemKey : e.Key;
-        if (key is Key.LeftCtrl or Key.RightCtrl or Key.LeftAlt or Key.RightAlt or Key.LeftShift or Key.RightShift or Key.LWin or Key.RWin) return;
-        var modifiers = Keyboard.Modifiers;
-        var mapped = (modifiers.HasFlag(ModifierKeys.Control) ? ShortcutModifiers.Control : 0)
-            | (modifiers.HasFlag(ModifierKeys.Shift) ? ShortcutModifiers.Shift : 0)
-            | (modifiers.HasFlag(ModifierKeys.Alt) ? ShortcutModifiers.Alt : 0)
-            | (modifiers.HasFlag(ModifierKeys.Windows) ? ShortcutModifiers.Windows : 0);
-        _module.ChangeShortcut(new(mapped, (uint)KeyInterop.VirtualKeyFromKey(key)));
+        if (MicShortcut.From(e) is not { } shortcut) return;
+        _module.ChangeShortcut(shortcut);
         _module.CaptureShortcut(false);
         _recording = false;
         e.Handled = true;
@@ -168,10 +163,19 @@ public sealed class MicMuteView : UserControl
 
     private async void Toggle()
     {
+        bool focused = IsKeyboardFocusWithin;
         IsEnabled = false;
         try { await _module.ToggleAsync(); }
         catch { /* The module displays Error. */ }
-        finally { Dispatcher.Invoke(() => { IsEnabled = true; Refresh(); }); }
+        finally
+        {
+            Dispatcher.Invoke(() =>
+            {
+                IsEnabled = true;
+                Refresh();
+                if (focused) _action?.Focus(); // a second Enter undoes the first
+            });
+        }
     }
 
     private void Error(string message)

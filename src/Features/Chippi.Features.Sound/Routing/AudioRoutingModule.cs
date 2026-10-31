@@ -5,6 +5,7 @@ using Chippi.Audio;
 using Chippi.Core.Island;
 using Chippi.Core.Modules;
 using Chippi.Core.Notifications;
+using Chippi.Features.Sound.Mute;
 using Microsoft.Extensions.Logging;
 
 namespace Chippi.Features.Sound.Routing;
@@ -15,19 +16,24 @@ public sealed class AudioRoutingModule : IFeatureModule
     private static readonly AudioRole[] WithoutCalls = [AudioRole.Console, AudioRole.Multimedia];
     private readonly SemaphoreSlim _gate = new(1);
     private readonly Func<AudioEndpoint, bool> _excluded;
+    private readonly Func<IMicHotkey> _createHotkey;
     private AudioService? _audio;
     private IAsyncDisposable? _lease;
     private ModuleContext? _context;
     private IIslandTile? _tile;
+    private IMicHotkey? _hotkey;
     private volatile bool _stopping;
+    private volatile bool _capturingShortcut;
 
     public AudioRoutingModule() : this(null) { }
 
     /// <param name="excluded">Verified transport endpoints supplied by the processing integration; never a name heuristic.</param>
-    public AudioRoutingModule(AudioService? audio, Func<AudioEndpoint, bool>? excluded = null)
+    /// <param name="hotkey">The output shortcut's registration; a message window, made only once a shortcut is set.</param>
+    public AudioRoutingModule(AudioService? audio, Func<AudioEndpoint, bool>? excluded = null, Func<IMicHotkey>? hotkey = null)
     {
         _audio = audio;
         _excluded = excluded ?? (_ => false);
+        _createHotkey = hotkey ?? GlobalMicHotkey.Create;
     }
 
     public FeatureDescriptor Descriptor { get; } = new("audio-routing", "Audio routing",
@@ -40,8 +46,37 @@ public sealed class AudioRoutingModule : IFeatureModule
     public RoutingSettings Settings { get; private set; } = new();
     public AudioSnapshot Snapshot => _audio?.Snapshot ?? AudioSnapshot.Empty;
     /// <summary>Routing's real-input winner even while Processing owns the Windows capture roles.</summary>
-    public string? WinningMicrophone => PriorityPolicy.Resolve(Settings.Microphone.Devices,
+    public string? WinningMicrophone => PriorityPolicy.Resolve(Order(AudioFlow.Capture),
         Snapshot.Active(AudioFlow.Capture).Where(e => !_excluded(e)).ToList());
+
+    /// <summary>A pick holds while the same devices stay connected; the next plug or unplug hands back to the list.</summary>
+    private sealed record Pick(string Id, IReadOnlySet<string> Connected)
+    {
+        public bool Holds(IEnumerable<string> connected) => Connected.SetEquals(connected);
+    }
+
+    private volatile Pick? _outputPick, _micPick;
+
+    private Pick? PickFor(AudioFlow flow) => flow == AudioFlow.Render ? _outputPick : _micPick;
+
+    private void SetPick(AudioFlow flow, Pick? pick)
+    {
+        if (flow == AudioFlow.Render) _outputPick = pick;
+        else _micPick = pick;
+    }
+
+    private HashSet<string> Connected(AudioFlow flow) =>
+        Snapshot.Active(flow).Where(e => !_excluded(e)).Select(e => e.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// The flow's priority list with a pick that still holds first: what decides the device in use, and
+    /// Mic processing's source. Read on the audio engine thread too, so it only reads immutable state.
+    /// </summary>
+    public IReadOnlyList<PriorityEntry> Order(AudioFlow flow)
+    {
+        var list = Settings.For(flow).Devices;
+        return PickFor(flow) is { } pick ? [new(pick.Id, pick.Id), .. list.Where(e => !Eq(e.Id, pick.Id))] : list;
+    }
 
     public string? Error { get; private set; }
     public event Action? Changed;
@@ -71,7 +106,20 @@ public sealed class AudioRoutingModule : IFeatureModule
             _tile = context.Ui.AddIslandTile(SoundTile.Section(0, SoundTile.Output, () => new RoutingQuickView(this, AudioFlow.Render))
                 with { Volume = new IslandTileVolume(OutputVolume, SetHomeVolume, OutputMuted, SetHomeMutedAsync) });
             context.Ui.AddIslandTile(SoundTile.Section(20, SoundTile.Microphone, () => new RoutingQuickView(this, AudioFlow.Capture)));
-            context.Ui.SetSettingsPage(section => new RoutingPage(this, section == "microphone" ? AudioFlow.Capture : AudioFlow.Render));
+            context.Ui.SetSettingsPage(section => section switch
+            {
+                "microphone" => new RoutingPage(this, AudioFlow.Capture),
+                OutputShortcutSection => new OutputShortcutView(this, list: false),
+                "shortcut-list" => new OutputShortcutView(this, list: true),
+                _ => new RoutingPage(this, AudioFlow.Render),
+            });
+            if (Settings.SwitchShortcut is { IsValid: false })
+                Settings = Settings with { SwitchShortcut = null };
+            if (Settings.SwitchShortcut is { } shortcut)
+            {
+                _hotkey = _createHotkey();
+                ShortcutError = _hotkey.Register(shortcut, OnShortcut) ? null : "Shortcut in use";
+            }
             _audio.SnapshotChanged += OnSnapshot;
             _audio.RolesChanged += OnRoles;
             Error = null;
@@ -79,6 +127,8 @@ public sealed class AudioRoutingModule : IFeatureModule
         }
         catch
         {
+            _hotkey?.Dispose();
+            _hotkey = null;
             if (_lease is not null)
             {
                 try { await ReleaseLeaseAsync(); }
@@ -104,12 +154,15 @@ public sealed class AudioRoutingModule : IFeatureModule
     private Task EnforceAsync(AudioFlow flow)
     {
         var list = Settings.For(flow);
+        var pick = PickFor(flow);
         return list.Enabled
             ? _audio!.ClaimRolesAsync(RoleOwner.Routing, flow, list.Calls ? AllRoles : WithoutCalls,
                 active =>
                 {
                     var available = active.Where(e => !_excluded(e)).ToList();
-                    var id = PriorityPolicy.Resolve(list.Devices, available);
+                    // A pick wins until the connected devices change; the module then drops it.
+                    IReadOnlyList<PriorityEntry> order = pick is not null && pick.Holds(available.Select(e => e.Id)) ? [new(pick.Id, pick.Id), .. list.Devices] : list.Devices;
+                    var id = PriorityPolicy.Resolve(order, available);
                     return available.FirstOrDefault(e => Eq(e.Id, id))?.Id;
                 })
             : _audio!.ReleaseRolesAsync(RoleOwner.Routing, flow);
@@ -154,22 +207,32 @@ public sealed class AudioRoutingModule : IFeatureModule
     });
 
     /// <summary>
-    /// A pick on the Sound page: the device moves to the top of its priority list and is used now.
-    /// With priority switching off, it is set once and then left to Windows, so a pick always works;
-    /// switching only decides what happens when devices come and go.
+    /// A pick on the Sound page, in Settings or by the shortcut: the device is used now and the list's
+    /// order stays. With priority switching on, the pick holds until a device is plugged in or out, and
+    /// then the list decides again; with it off, it is set once and left to Windows.
     /// </summary>
-    public Task PreferAsync(AudioFlow flow, string id) => EditAsync(flow, list =>
+    public async Task UseAsync(AudioFlow flow, string id)
     {
-        var items = list.Devices.ToList();
-        var from = items.FindIndex(e => Eq(e.Id, id));
-        if (from <= 0) return list;
-        var item = items[from];
-        items.RemoveAt(from);
-        items.Insert(0, item);
-        return list with { Devices = items };
-    }, pick: id);
+        await _gate.WaitAsync();
+        try
+        {
+            if (_context is null || _stopping) throw new AudioFailure("Audio routing uninstalled");
+            var connected = Connected(flow);
+            if (!connected.Contains(id)) throw new AudioFailure("Device unavailable");
+            SetPick(flow, new(id, connected));
+            var list = Settings.For(flow);
+            if (list.Enabled)
+                await EnforceAsync(flow);
+            else
+                await PickOnceAsync(flow, id, list.Calls);
+            Error = null;
+            UpdateTiles();
+        }
+        catch (Exception ex) { Error = Failed("Switch", ex); _context?.Logger.LogWarning(ex, "Switching the device in use failed"); throw; }
+        finally { _gate.Release(); Changed?.Invoke(); }
+    }
 
-    private async Task EditAsync(AudioFlow flow, Func<RoutingList, RoutingList> edit, string? pick = null)
+    private async Task EditAsync(AudioFlow flow, Func<RoutingList, RoutingList> edit)
     {
         await _gate.WaitAsync();
         try
@@ -179,15 +242,66 @@ public sealed class AudioRoutingModule : IFeatureModule
             settings.Validate();
             _context.Settings.Save(settings);
             Settings = settings;
+            SetPick(flow, null); // an edited list decides at once
             await EnforceAsync(flow);
-            if (pick is not null && !settings.For(flow).Enabled)
-                await PickOnceAsync(flow, pick, settings.For(flow).Calls);
             Error = null;
             UpdateTiles();
         }
-        catch (Exception ex) { Error = AudioErrors.Reason(ex); _context?.Logger.LogWarning(ex, "Changing audio routing failed"); throw; }
+        catch (Exception ex) { Error = Failed("Change", ex); _context?.Logger.LogWarning(ex, "Changing audio routing failed"); throw; }
         finally { _gate.Release(); Changed?.Invoke(); }
     }
+
+    /// <summary>Settings › Output's shortcut section.</summary>
+    public const string OutputShortcutSection = "output-shortcut";
+
+    public string? ShortcutError { get; private set; }
+
+    /// <summary>
+    /// The output shortcut: the next connected output after the one in use, in priority order, used now
+    /// as a pick is, and the bar says which, since the island may be hidden behind a game.
+    /// </summary>
+    private async void OnShortcut()
+    {
+        if (_capturingShortcut || _context is null || _stopping) return;
+        try
+        {
+            var connected = Settings.Output.Devices.Where(e => Snapshot.Find(e.Id) is { IsActive: true } d && !_excluded(d)).ToList();
+            if (connected.Count < 2) return;
+            var inUse = InUse(AudioFlow.Render);
+            var next = connected[(connected.FindIndex(e => Eq(e.Id, inUse)) + 1) % connected.Count];
+            await UseAsync(AudioFlow.Render, next.Id);
+            _context?.Notifier.Show(new("output-switched", "Output switched") { Body = next.Name, IslandKind = IslandActivityKind.Status });
+        }
+        catch { /* UseAsync shows the error. */ }
+    }
+
+    public void CaptureShortcut(bool capture) => _capturingShortcut = capture;
+
+    public bool ChangeShortcut(MicShortcut shortcut)
+    {
+        if (!shortcut.IsValid) { ShortcutError = "Shortcut unavailable"; Changed?.Invoke(); return false; }
+        if (_context is not null && !_stopping) _hotkey ??= _createHotkey();
+        if (_hotkey?.Register(shortcut, OnShortcut) != true) { ShortcutError = "Shortcut in use"; Changed?.Invoke(); return false; }
+        ShortcutError = null;
+        Settings = Settings with { SwitchShortcut = shortcut };
+        _context?.Settings.Save(Settings);
+        Changed?.Invoke();
+        return true;
+    }
+
+    public void RemoveShortcut()
+    {
+        _hotkey?.Dispose();
+        _hotkey = null;
+        ShortcutError = null;
+        Settings = Settings with { SwitchShortcut = null };
+        _context?.Settings.Save(Settings);
+        Changed?.Invoke();
+    }
+
+    /// <summary>"Switch failed · Device in use": what failed, then why, as every error reads (DESIGN.md §3).</summary>
+    internal static string Failed(string action, Exception error) =>
+        AudioErrors.Reason(error) is var reason && reason.EndsWith(" failed", StringComparison.Ordinal) ? reason : $"{action} failed · {reason}";
 
     /// <summary>Points the flow's roles at <paramref name="id"/> once: claimed, applied, then released to Windows.</summary>
     private async Task PickOnceAsync(AudioFlow flow, string id, bool calls)
@@ -207,16 +321,28 @@ public sealed class AudioRoutingModule : IFeatureModule
         {
             if (_context is null || _stopping) return;
             var refreshed = RefreshLists(Settings, Snapshot);
-            if (!ReferenceEquals(refreshed.Output, Settings.Output) || !ReferenceEquals(refreshed.Microphone, Settings.Microphone))
+            bool listed = !ReferenceEquals(refreshed.Output, Settings.Output) || !ReferenceEquals(refreshed.Microphone, Settings.Microphone);
+            if (listed)
             {
                 _context.Settings.Save(refreshed);
                 Settings = refreshed;
+            }
+            // A device came or went: a pick made before it is spent, so the list decides again.
+            bool spent = false;
+            foreach (var flow in new[] { AudioFlow.Render, AudioFlow.Capture })
+                if (PickFor(flow) is { } pick && !pick.Holds(Connected(flow)))
+                {
+                    SetPick(flow, null);
+                    spent = true;
+                }
+            if (listed || spent)
+            {
                 await EnforceAsync(AudioFlow.Render);
                 await EnforceAsync(AudioFlow.Capture);
             }
             UpdateTiles();
         }
-        catch (Exception ex) { Error = AudioErrors.Reason(ex); _context?.Logger.LogWarning(ex, "Refreshing audio routing failed"); }
+        catch (Exception ex) { Error = Failed("Switch", ex); _context?.Logger.LogWarning(ex, "Refreshing audio routing failed"); }
         finally { _gate.Release(); Changed?.Invoke(); }
     }
 
@@ -233,7 +359,7 @@ public sealed class AudioRoutingModule : IFeatureModule
     public async Task SetOutputVolumeAsync(string id, float volume)
     {
         try { await _audio!.SetEndpointVolumeAsync(id, volume); Error = null; }
-        catch (Exception ex) { Error = AudioErrors.Reason(ex); _context?.Logger.LogWarning(ex, "Setting the output volume failed"); throw; }
+        catch (Exception ex) { Error = Failed("Volume", ex); _context?.Logger.LogWarning(ex, "Setting the output volume failed"); throw; }
         finally { Changed?.Invoke(); }
     }
 
@@ -245,7 +371,7 @@ public sealed class AudioRoutingModule : IFeatureModule
             if ((await _audio!.SetEndpointMuteAsync([id], muted)).Count > 0) throw new AudioFailure("Mute failed");
             Error = null;
         }
-        catch (Exception ex) { Error = AudioErrors.Reason(ex); _context?.Logger.LogWarning(ex, "Muting the output failed"); throw; }
+        catch (Exception ex) { Error = Failed("Mute", ex); _context?.Logger.LogWarning(ex, "Muting the output failed"); throw; }
         finally { Changed?.Invoke(); }
     }
 
@@ -264,15 +390,6 @@ public sealed class AudioRoutingModule : IFeatureModule
 
     public IReadOnlyList<AudioEndpoint> Addable(AudioFlow flow) => Snapshot.Known(flow)
         .Where(e => !_excluded(e) && !Settings.For(flow).Devices.Any(d => Eq(d.Id, e.Id))).ToList();
-
-    public string Status(AudioFlow flow, PriorityEntry entry)
-    {
-        var endpoint = Snapshot.Find(entry.Id);
-        if (endpoint is null || !endpoint.IsActive) return "Not connected";
-        return Eq(InUse(flow), entry.Id)
-            ? flow == AudioFlow.Render ? "Playing now" : "In use"
-            : "Connected";
-    }
 
     public void OpenSettings(AudioFlow flow) => _context?.OpenSettings(flow == AudioFlow.Render ? "output" : "microphone");
 
@@ -305,6 +422,9 @@ public sealed class AudioRoutingModule : IFeatureModule
     public async Task StopAsync(CancellationToken ct)
     {
         _stopping = true;
+        _capturingShortcut = false;
+        _hotkey?.Dispose();
+        _hotkey = null;
         if (_audio is not null) { _audio.SnapshotChanged -= OnSnapshot; _audio.RolesChanged -= OnRoles; }
         await _gate.WaitAsync();
         try

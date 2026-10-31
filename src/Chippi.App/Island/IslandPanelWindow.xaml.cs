@@ -595,7 +595,10 @@ public partial class IslandPanelWindow : Window
             var icon = muted ? LucideIcons.MicOff : LucideIcons.Get(toggle?.Icon ?? group.Icon);
             // A feature whose state can't be read shows its button plain; the others still refresh.
             bool on = Read($"{group.Key} state", () => toggle?.IsOn() == true, false);
-            string status = failed ? "Failed" : Read($"{group.Key} status", () => toggle?.Status?.Invoke(), null) ?? group.Status;
+            // Needing attention for another reason than mute, the tile's status says why ("Mic stopped"), not the toggle's "Live".
+            string status = failed ? "Failed"
+                : attention && !muted && group.Status.Length > 0 ? group.Status
+                : Read($"{group.Key} status", () => toggle?.Status?.Invoke(), null) ?? group.Status;
             // The accent says something is on and fine: a muted mic, or anything that needs attention, shows in Caution instead.
             tiles.Add(new(group.Key, name, icon, status, on && !attention, attention || failed, toggle is not null, group.Name));
         }
