@@ -1,7 +1,7 @@
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
 <!-- File organizer's island page (DESIGN.md §5 Island): the folder card with its picker and mode
-     segment, the latest whole rows of moves or files waiting, then History and Organize now. The page's header
-     shows the status. -->
+     segment, the picked folder's latest whole rows (what Organize now just did, files to review, held,
+     waiting, moves), then History and Organize now. The page's header shows the status. -->
 <UserControl x:Class="Chippi.Features.Downloads.Views.Tidy.TidyView"
  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:c="urn:chippi-ui"
@@ -43,6 +43,8 @@
     <c:SegmentedControl x:Name="Modes" DockPanel.Dock="Right" HorizontalContentAlignment="Right" VerticalAlignment="Center" Style="{DynamicResource IslandSegmentedStyle}" SelectionChanged="OnModeChanged" AutomationProperties.Name="Folder mode">
      <c:SegmentItem Label="Auto"/><c:SegmentItem Label="Manual"/><c:SegmentItem Label="Paused"/>
     </c:SegmentedControl>
+    <!-- A folder that's gone: its state in the mode's place. -->
+    <TextBlock x:Name="NotFound" DockPanel.Dock="Right" Text="Not found" Visibility="Collapsed" VerticalAlignment="Center" FontSize="12" Foreground="{DynamicResource WarningTextBrush}"/>
     <c:LucideIcon x:Name="FolderChip" Data="{x:Static c:LucideIcons.Folder}" Size="16" Brush="{DynamicResource IslandAccentBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
     <ComboBox x:Name="Folders" MaxWidth="200" Style="{StaticResource FolderPickerStyle}" SelectionChanged="OnFolderChanged" AutomationProperties.Name="Watched folder">
      <ComboBox.ItemTemplate><DataTemplate><Grid ToolTip="{Binding Path}" Margin="0,4"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis"/><TextBlock Grid.Column="1" Text="{Binding Mode}" Foreground="{DynamicResource TextTertiaryBrush}" Margin="16,0,0,0"/></Grid></DataTemplate></ComboBox.ItemTemplate>
@@ -53,7 +55,7 @@
 
   <!-- History on the left, Organize now on the right. -->
   <DockPanel DockPanel.Dock="Bottom" Height="28" x:Name="Actions" Margin="0,8,0,0" LastChildFill="False">
-   <Button DockPanel.Dock="Right" Content="Organize now" Style="{DynamicResource IslandAccentButtonStyle}" Click="OnOrganize" AutomationProperties.Name="Organize now"/>
+   <Button x:Name="Organize" DockPanel.Dock="Right" Content="Organize now" Style="{DynamicResource IslandAccentButtonStyle}" Click="OnOrganize" AutomationProperties.Name="Organize now"/>
    <Button Style="{StaticResource SubtleButtonStyle}" Padding="10,0" Click="OnHistory" AutomationProperties.Name="History">
     <StackPanel Orientation="Horizontal">
      <TextBlock Text="History" VerticalAlignment="Center"/>
@@ -64,6 +66,15 @@
   <TextBlock DockPanel.Dock="Bottom" x:Name="Error" Visibility="Collapsed" TextWrapping="Wrap" Foreground="{DynamicResource WarningTextBrush}" Style="{StaticResource CaptionTextStyle}" Margin="0,8,0,0" AutomationProperties.LiveSetting="Polite"/>
   <Border x:Name="Recent" Style="{DynamicResource IslandCardStyle}" Padding="0" Margin="0,8,0,0">
    <Grid>
+    <!-- The picked folder is gone: point it somewhere else, or stop watching it. -->
+    <StackPanel x:Name="Missing" Visibility="Collapsed" VerticalAlignment="Center" HorizontalAlignment="Center">
+     <c:LucideIcon Data="{x:Static c:LucideIcons.Folder}" Size="20" Brush="{DynamicResource WarningBrush}" HorizontalAlignment="Center"/>
+     <TextBlock x:Name="MissingText" FontSize="12" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="400" Margin="0,6,0,0"/>
+     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,12,0,0">
+      <Button Content="Choose folder…" Style="{DynamicResource IslandButtonStyle}" Click="OnRelocate" AutomationProperties.Name="Choose another folder"/>
+      <Button Content="Remove" Style="{DynamicResource IslandButtonStyle}" Margin="8,0,0,0" Click="OnRemove" AutomationProperties.Name="Stop watching this folder"/>
+     </StackPanel>
+    </StackPanel>
     <StackPanel x:Name="NoRecent" VerticalAlignment="Center" HorizontalAlignment="Center">
      <c:LucideIcon Data="{x:Static c:LucideIcons.File}" Size="20" Brush="{DynamicResource IslandTextTertiaryBrush}" HorizontalAlignment="Center"/>
      <TextBlock Text="No recent files" FontSize="12" Foreground="{DynamicResource IslandTextTertiaryBrush}" Margin="0,6,0,0"/>
@@ -86,6 +97,8 @@
       <DataTemplate.Triggers>
        <DataTrigger Binding="{Binding IsHeld}" Value="True"><Setter TargetName="Lead" Property="Brush" Value="{DynamicResource WarningBrush}"/><Setter TargetName="Detail" Property="Foreground" Value="{DynamicResource WarningTextBrush}"/></DataTrigger>
        <DataTrigger Binding="{Binding IsFailed}" Value="True"><Setter TargetName="Lead" Property="Brush" Value="{DynamicResource WarningBrush}"/><Setter TargetName="Detail" Property="Foreground" Value="{DynamicResource WarningTextBrush}"/></DataTrigger>
+       <DataTrigger Binding="{Binding IsDone}" Value="True"><Setter TargetName="Lead" Property="Brush" Value="{DynamicResource SuccessBrush}"/></DataTrigger>
+       <DataTrigger Binding="{Binding NeedsLook}" Value="True"><Setter TargetName="Detail" Property="Foreground" Value="{DynamicResource WarningTextBrush}"/></DataTrigger>
       </DataTemplate.Triggers>
      </DataTemplate></ItemsControl.ItemTemplate>
     </ItemsControl>

@@ -54,9 +54,63 @@ internal sealed class RuleDrafts
 
     public bool HasUnsaved => Drafts.Any(r => IsChanged(r.Id));
 
-    /// <summary>Save is offered: the draft changed, no field shows a problem and it passes validation.</summary>
+    /// <summary>
+    /// Save is offered: the draft changed, no field shows a problem, it has a condition and it passes
+    /// validation. A rule with no condition would win every file, so it never saves.
+    /// </summary>
     public bool CanSave(string id) =>
-        IsChanged(id) && !HasProblem(id) && Valid(Drafts).Any(r => r.Id == id);
+        IsChanged(id) && !HasProblem(id) && Drafts.Find(r => r.Id == id) is { } draft && HasCondition(draft) && Valid(Drafts).Any(r => r.Id == id);
+
+    public static bool HasCondition(RuleSetting rule) =>
+        rule.Extensions is not null || rule.NameRegex is { Length: > 0 } || rule.MinBytes is not null || rule.MaxBytes is not null
+        || rule.ModifiedAfter is not null || rule.ModifiedBefore is not null;
+
+    /// <summary>
+    /// What "Test a file name" runs: the saved rules in list order, with the rule being edited as it
+    /// stands in its place, a new one included, once it has a condition and no field shows a problem.
+    /// </summary>
+    public List<RuleSetting> Testing(string? open)
+    {
+        var rules = new List<RuleSetting>();
+        foreach (var draft in Drafts)
+        {
+            bool editing = draft.Id == open && !HasProblem(draft.Id) && HasCondition(draft);
+            if (editing)
+                rules.Add(draft.Clone());
+            else if (_saved.TryGetValue(draft.Id, out var saved))
+                rules.Add(saved.Clone());
+            else
+                continue;
+            rules[^1].Order = rules.Count - 1;
+        }
+        return rules;
+    }
+
+    /// <summary>
+    /// An earlier rule that's on and tests only extensions (or nothing at all) and wins some of this draft's
+    /// extensions first, with the ones it takes: "Rule 1 (PDFs to Documents) matches .pdf first". Null when
+    /// none does or the draft tests no extension (other conditions can't be compared).
+    /// </summary>
+    public string? Shadow(RuleSetting draft)
+    {
+        int index = Drafts.IndexOf(draft);
+        if (index <= 0 || draft.Extensions is not { Count: > 0 } mine)
+            return null;
+        for (int i = 0; i < index; i++)
+        {
+            if (!_saved.TryGetValue(Drafts[i].Id, out var earlier) || !earlier.Enabled
+                || earlier.NameRegex is { Length: > 0 } || earlier.MinBytes is not null || earlier.MaxBytes is not null
+                || earlier.ModifiedAfter is not null || earlier.ModifiedBefore is not null)
+                continue;
+            bool every = earlier.Extensions is null || earlier.Extensions.Contains("*");
+            var taken = every ? mine : mine.Where(e => earlier.Extensions!.Contains(e, StringComparer.OrdinalIgnoreCase)).ToList();
+            if (taken.Count == 0)
+                continue;
+            string what = every ? "every file" : string.Join(" ", taken.Select(e => e.Length == 0 ? "no extension" : "." + e));
+            return $"Rule {i + 1} ({earlier.Name}) matches {what} first";
+        }
+        return null;
+    }
 
     /// <summary>Makes the draft its rule's saved version. False when it can't be saved.</summary>
     public bool Save(string id)

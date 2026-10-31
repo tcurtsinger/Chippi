@@ -34,7 +34,8 @@ public enum DownloadsRequestKind
 
 /// <summary>Something asked to show part of the organizer (a notice click, the Explorer menu, the Tidy tab).</summary>
 /// <param name="FromExplorer">The Explorer menu asked: the run is recorded as Explorer, not Organize now.</param>
-public sealed record DownloadsRequest(DownloadsRequestKind Kind, string? Folder = null, long? RunId = null, bool FromExplorer = false);
+/// <param name="File">A file's name in <paramref name="Folder"/> for Preview to show first (a held row's Review).</param>
+public sealed record DownloadsRequest(DownloadsRequestKind Kind, string? Folder = null, long? RunId = null, bool FromExplorer = false, string? File = null);
 
 /// <summary>
 /// The File organizer. Owns the engine and the history database while installed; the views
@@ -121,6 +122,7 @@ public sealed class DownloadsModule : IFeatureModule
     /// <summary>
     /// The Settings deep link for a request, for the shell to open (<c>ShellCommands.OpenSettings</c>):
     /// <c>module:downloads-organizer/preview/C:\Users\…\Downloads</c>, <c>…/history/42</c>, <c>…/rules</c>, <c>…/review</c>.
+    /// A file to show first follows the folder after a <c>*</c>, which no Windows path holds: <c>…/preview/C:\…\Downloads*setup.pdf.exe</c>.
     /// </summary>
     public static string SettingsLink(DownloadsRequest request) => $"module:downloads-organizer/{Section(request)}";
 
@@ -130,6 +132,7 @@ public sealed class DownloadsModule : IFeatureModule
         return request switch
         {
             { Kind: DownloadsRequestKind.Organize, Folder: { Length: > 0 } folder, FromExplorer: true } => $"explorer/{folder}",
+            { Kind: DownloadsRequestKind.Organize, Folder: { Length: > 0 } folder, File: { Length: > 0 } file } => $"preview/{folder}*{file}",
             { Kind: DownloadsRequestKind.Organize, Folder: { Length: > 0 } folder } => $"preview/{folder}",
             { Kind: DownloadsRequestKind.Organize or DownloadsRequestKind.Review } => "review",
             { Kind: DownloadsRequestKind.Undo, RunId: { } run } => $"history/{run}/undo",
@@ -175,25 +178,31 @@ public sealed class DownloadsModule : IFeatureModule
     }
 
     /// <summary>
-    /// The island tile's status, for the first watched folder (the one the island page shows), as it changes: "Paused",
-    /// else files held for a look ("1 held"), else files waiting for Organize now ("2 to review"), else "Manual". Auto
-    /// with nothing waiting shows nothing: the mode is a setting, and the home shows only what changes. Empty with no folder.
+    /// The island tile's status across every watched folder, as it changes: files held for a look ("1 held"), else
+    /// files waiting for Organize now ("2 to review"), else "Not found" for a folder that's gone, else "Paused" when
+    /// all are, else "Manual" when none is on Auto. Auto with nothing waiting shows nothing: the mode is a setting,
+    /// and the home shows only what changes. A paused folder's files don't count. Empty with no folder.
     /// </summary>
-    public static string TileStatus(WatchedFolder? folder, IReadOnlyList<PendingFile> pending)
+    public static string TileStatus(IReadOnlyList<WatchedFolder> folders, IReadOnlyList<PendingFile> pending, Func<string, bool>? exists = null)
     {
-        if (folder is null)
+        if (folders.Count == 0)
             return "";
-        if (folder.Mode == FolderMode.Paused)
-            return folder.Mode.DisplayName();
-        var here = pending.Where(p => string.Equals(Path.TrimEndingDirectorySeparator(p.Folder), Path.TrimEndingDirectorySeparator(folder.Path), StringComparison.OrdinalIgnoreCase)).ToList();
+        exists ??= Directory.Exists;
+        var live = folders.Where(f => f.Mode != FolderMode.Paused).ToList();
+        var here = pending.Where(p => live.Any(f => Views.Tidy.TidyProjection.SameFolder(f.Path, p.Folder))).ToList();
         int held = here.Count(p => p.Status == PendingStatus.Held);
         int ready = here.Count(p => p.Status == PendingStatus.Ready);
-        return held > 0 ? $"{held} held" : ready > 0 ? $"{ready} to review" : folder.Mode == FolderMode.Manual ? folder.Mode.DisplayName() : "";
+        return held > 0 ? $"{held} held"
+            : ready > 0 ? $"{ready} to review"
+            : folders.Any(f => !exists(f.Path)) ? "Not found"
+            : live.Count == 0 ? FolderMode.Paused.DisplayName()
+            : live.All(f => f.Mode == FolderMode.Manual) ? FolderMode.Manual.DisplayName()
+            : "";
     }
 
     private void OnPendingChanged(object? sender, EventArgs e) => UpdateTile();
 
-    private void UpdateTile() => _tile?.SetStatus(TileStatus(Settings.Folders.FirstOrDefault(), Engine?.Pending ?? []));
+    private void UpdateTile() => _tile?.SetStatus(TileStatus(Settings.Folders, Engine?.Pending ?? []));
 
     /// <summary>A rule was saved or switched on: it sorts the files already there that it wins. Call after <see cref="SaveSettings"/>.</summary>
     public void SortExisting(string ruleId) => Engine?.SortExisting(ruleId);

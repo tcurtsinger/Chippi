@@ -265,7 +265,7 @@ internal sealed class HistorySection : UserControl
         var results = await engine.UndoRunAsync(runId);
         _confirming = null;
         int failed = results.Count(r => !r.Succeeded);
-        ShowError(failed == 0 ? null : $"{failed} not undone · {Lower(results.First(r => !r.Succeeded).Error)}");
+        ShowError(failed == 0 ? null : $"Undo failed for {(failed == 1 ? "1 file" : $"{failed} files")} · {Lower(results.First(r => !r.Succeeded).Error)}");
         Render();
     }
 
@@ -275,7 +275,7 @@ internal sealed class HistorySection : UserControl
             return;
         var result = await engine.UndoAsync(operationId);
         _confirmingRow = null;
-        ShowError(result.Succeeded ? null : $"Not undone · {Lower(result.Error)}");
+        ShowError(result.Succeeded ? null : $"Undo failed · {Lower(result.Error)}");
         Render();
     }
 

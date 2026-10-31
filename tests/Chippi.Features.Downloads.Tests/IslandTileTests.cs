@@ -30,16 +30,32 @@ public sealed class IslandTileTests : IDisposable
         var folder = new WatchedFolder { Path = @"C:\Users\me\Downloads", Mode = FolderMode.Manual };
         PendingFile Pending(string name, PendingStatus status) => new(@"C:\Users\me\Downloads\", @"C:\Users\me\Downloads\" + name, name, status, null);
         PendingFile Ready(string name) => Pending(name, PendingStatus.Ready);
+        string Status(params PendingFile[] pending) => DownloadsModule.TileStatus([folder], pending, _ => true);
 
-        Assert.Equal("", DownloadsModule.TileStatus(null, []));
-        Assert.Equal("Manual", DownloadsModule.TileStatus(folder, []));
-        Assert.Equal("2 to review", DownloadsModule.TileStatus(folder, [Ready("a.pdf"), Ready("b.zip")]));
-        Assert.Equal("1 held", DownloadsModule.TileStatus(folder, [Ready("a.pdf"), Pending("setup.pdf.exe", PendingStatus.Held)]));
+        Assert.Equal("", DownloadsModule.TileStatus([], []));
+        Assert.Equal("Manual", Status());
+        Assert.Equal("2 to review", Status(Ready("a.pdf"), Ready("b.zip")));
+        Assert.Equal("1 held", Status(Ready("a.pdf"), Pending("setup.pdf.exe", PendingStatus.Held)));
         folder.Mode = FolderMode.Silent;
-        Assert.Equal("", DownloadsModule.TileStatus(folder, [])); // Auto is the setting, not news
-        Assert.Equal("1 to review", DownloadsModule.TileStatus(folder, [Ready("a.pdf")])); // already there when the folder was added
+        Assert.Equal("", Status()); // Auto is the setting, not news
+        Assert.Equal("1 to review", Status(Ready("a.pdf"))); // already there when the folder was added
         folder.Mode = FolderMode.Paused;
-        Assert.Equal("Paused", DownloadsModule.TileStatus(folder, [Ready("a.pdf")]));
+        Assert.Equal("Paused", Status(Ready("a.pdf")));
+    }
+
+    /// <summary>Critique 2026-10-31: the home read only the first folder, so a second folder's held files never showed.</summary>
+    [Fact]
+    public void The_status_counts_every_folder_and_says_when_one_is_gone()
+    {
+        var downloads = new WatchedFolder { Path = @"C:\Users\me\Downloads", Mode = FolderMode.Silent };
+        var desktop = new WatchedFolder { Path = @"C:\Users\me\Desktop", Mode = FolderMode.Manual };
+        var gone = new WatchedFolder { Path = @"D:\Old inbox", Mode = FolderMode.Manual };
+        PendingFile Held(string folder, string name) => new(folder, Path.Combine(folder, name), name, PendingStatus.Held, "Check before opening");
+
+        Assert.Equal("1 held", DownloadsModule.TileStatus([downloads, desktop], [Held(desktop.Path, "a.torrent")], _ => true));
+        Assert.Equal("", DownloadsModule.TileStatus([downloads, desktop], [], _ => true)); // one on Auto
+        Assert.Equal("Not found", DownloadsModule.TileStatus([downloads, gone], [], p => p != gone.Path));
+        Assert.Equal("1 held", DownloadsModule.TileStatus([downloads, gone], [Held(downloads.Path, "a.torrent")], p => p != gone.Path)); // files first
     }
 
     [Fact]
