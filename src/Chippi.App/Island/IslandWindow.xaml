@@ -116,6 +116,13 @@
                             <Ellipse Width="18" Height="18" Fill="{StaticResource IslandBadgeBrush}" />
                             <c:LucideIcon Data="{x:Static c:LucideIcons.MicOff}" Size="11" Thickness="2" Brush="White" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Grid>
+                        <!-- Keep awake running while a song holds the bar: the accent says it's on and fine. -->
+                        <Grid x:Name="AwakeBadge" Width="22" Height="22" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-2,-2,0"
+                              Visibility="Collapsed">
+                            <Ellipse Fill="{DynamicResource IslandBrush}" />
+                            <Ellipse Width="18" Height="18" Fill="{DynamicResource IslandAccentFillBrush}" />
+                            <c:LucideIcon Data="{x:Static c:LucideIcons.Coffee}" Size="11" Thickness="2" Brush="{DynamicResource IslandOnAccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Grid>
                     </Grid>
                 </Grid>
             </Grid>

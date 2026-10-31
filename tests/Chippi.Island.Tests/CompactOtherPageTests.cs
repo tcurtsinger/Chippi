@@ -143,12 +143,14 @@ public sealed class CompactOtherPageTests
         card.RaiseEvent(new System.Windows.Input.MouseEventArgs(System.Windows.Input.Mouse.PrimaryDevice, 0) { RoutedEvent = UIElement.MouseEnterEvent });
         var refresh = typeof(KeepAwakeIslandView).GetMethod("Refresh", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
         refresh.Invoke(view, null); // the timer refresh while still pointing at the active card
-        Assert.Equal("Stop", card.Content);
+        // The card's first line is its length, or Stop; the second, lit, is the time left.
+        string Label() => ((Panel)card.Content).Children.OfType<TextBlock>().First().Text;
+        Assert.Equal("Stop", Label());
         active.SetValue(module, null);
         refresh.Invoke(view, null); // session stops while the pointer remains over it
         Assert.False(card.IsChecked);
-        Assert.NotEqual("Stop", card.Content);
-        Assert.Equal(until ? "Until\u2026" : "1 hr", card.Content);
+        Assert.NotEqual("Stop", Label());
+        Assert.Equal(until ? "Until\u2026" : "1 hr", Label());
         card.SetValue(hoverKey, false);
         writeFlag.Invoke(card, [hoverFlag, false]);
     });

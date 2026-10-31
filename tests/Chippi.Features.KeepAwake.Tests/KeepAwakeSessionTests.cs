@@ -53,6 +53,21 @@ public sealed class KeepAwakeSessionTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task The_home_button_starts_the_last_fixed_length_never_no_limit_or_an_until_time()
+    {
+        await _module.StartSessionAsync(KeepAwakeText.Lengths.Single(l => l.Label == "2 hr").Length);
+        await _module.StartSessionAsync(new KeepAwakeSettings { Mode = AwakeMode.Indefinitely });
+        await _module.StartSessionAsync(new KeepAwakeSettings { Mode = AwakeMode.UntilTime, UntilMinute = 7 * 60 });
+        await _module.StopSessionAsync();
+        Assert.Equal(7 * 60, _module.Settings.UntilMinute); // the picker's next start
+
+        await _module.ToggleAsync();
+
+        Assert.Equal(AwakeMode.Duration, _module.Active!.Mode);
+        Assert.Equal(120, _module.Active.DurationMinutes);
+    }
+
+    [Fact]
     public async Task Stopping_clears_the_active_length()
     {
         await _module.StartSessionAsync(new KeepAwakeSettings { Mode = AwakeMode.Indefinitely });
@@ -105,6 +120,10 @@ public sealed class KeepAwakeSessionTests : IAsyncLifetime
 
         await _module.StartSessionAsync(new KeepAwakeSettings { Mode = AwakeMode.Indefinitely });
         Assert.Equal("No limit", tile.Status);
+
+        // An Until time shows as the time picked, not a countdown, on the home and on the bar.
+        await _module.StartSessionAsync(new KeepAwakeSettings { Mode = AwakeMode.UntilTime, UntilMinute = 18 * 60 });
+        Assert.Equal($"Until {DateTime.Today.AddHours(18):t}", tile.Status);
 
         await _module.StopSessionAsync();
         Assert.Equal("Off", tile.Status);

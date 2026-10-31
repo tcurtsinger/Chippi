@@ -345,6 +345,47 @@
         </Setter>
     </Style>
 
+    <!-- Choice cards (Keep awake's lengths): a toggle with the control fill and a 1px edge, 6px corners, its content
+         centered. On, it takes the accent fill with on-accent text, semibold, as the split toggle does. -->
+    <Style x:Key="IslandChoiceStyle" TargetType="{x:Type ToggleButton}">
+        <Setter Property="Foreground" Value="{DynamicResource IslandTextBrush}" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource IslandTileFocusVisual}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type ToggleButton}">
+                    <Grid x:Name="Root">
+                        <Border x:Name="Chrome" CornerRadius="6" BorderThickness="1" i:FillFade.To="{DynamicResource IslandButtonBrush}" BorderBrush="{DynamicResource IslandControlBorderBrush}" />
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Chrome" Property="i:FillFade.To" Value="{DynamicResource IslandButtonHoverBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Chrome" Property="i:FillFade.To" Value="{DynamicResource IslandPressedBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Chrome" Property="i:FillFade.To" Value="{DynamicResource IslandAccentFillBrush}" />
+                            <Setter TargetName="Chrome" Property="BorderThickness" Value="0" />
+                            <Setter Property="Foreground" Value="{DynamicResource IslandOnAccentBrush}" />
+                            <Setter Property="FontWeight" Value="SemiBold" />
+                        </Trigger>
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="IsChecked" Value="True" />
+                                <Condition Property="IsMouseOver" Value="True" />
+                            </MultiTrigger.Conditions>
+                            <Setter TargetName="Chrome" Property="i:FillFade.Opacity" Value="0.9" />
+                        </MultiTrigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="Root" Property="Opacity" Value="0.45" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- The home's split button, Quick Settings style: a 44 tall toggle on the left (IslandSplitMainStyle) and a
          28 wide arrow on the right (IslandSplitSideStyle), 6px outer corners, the control fill with a 1px edge and a
          divider between them. On, both take one accent fill edge to edge (IslandGrid spans it across the two with

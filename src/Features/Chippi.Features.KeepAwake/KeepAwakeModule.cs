@@ -15,12 +15,13 @@ public sealed class KeepAwakeModule : IFeatureModule
     private AwakeSession? _session;
     private ModuleContext? _context;
     private IIslandTile? _tile;
+    private KeepAwakeIslandView? _view;
     private Timer? _tileClock;
     private static readonly TimeSpan TileTick = TimeSpan.FromSeconds(30);
     public KeepAwakeSettings Settings { get; private set; } = new();
     public bool IsOn { get; private set; }
 
-    /// <summary>"Off", "Indefinitely" or "Until 6:00 PM".</summary>
+    /// <summary>"Off", "No limit" or "Until 6:00 PM".</summary>
     public string StateLine { get; private set; } = "Off";
 
     /// <summary>The running session's mode and length, as started; null while off.</summary>
@@ -60,15 +61,22 @@ public sealed class KeepAwakeModule : IFeatureModule
         Deadline = null;
         StateLine = "Off";
         CreateSession();
-        _tile = context.Ui.AddIslandTile(new IslandTileSpec(TileKey, Descriptor.Name, nameof(LucideIcons.Coffee), Order: 40, SectionOrder: 0, () => new KeepAwakeIslandView(this))
+        // No status in the page's header: the lit card carries the time left.
+        _tile = context.Ui.AddIslandTile(new IslandTileSpec(TileKey, Descriptor.Name, nameof(LucideIcons.Coffee), Order: 40, SectionOrder: 0, () => _view = new KeepAwakeIslandView(this))
         {
-            StatusOnPage = true, // the chips show the length, not the time left
-            // The home's button starts the default length, or stops.
+            // The home's button starts the last fixed length, or stops.
             Toggle = new IslandTileToggle(() => IsOn, ToggleFromHomeAsync),
+            // Esc leaves the Until picker before it closes the island.
+            HandleEscape = () => _view?.CloseUntil() == true,
         });
         UpdateTile();
-        // Runs only while a timed session counts down ("45 min left"); see OnSessionChanged.
-        _tileClock = new Timer(_ => UpdateTile());
+        // Runs only while a timed session counts down ("45 min left"); see OnSessionChanged. The page refreshes with it
+        // (Changed), so the lit card and the tile never disagree.
+        _tileClock = new Timer(_ =>
+        {
+            UpdateTile();
+            Changed?.Invoke();
+        });
         context.Ui.SetSettingsPage(() => new KeepAwakePage(this));
         return Task.CompletedTask;
     }
@@ -89,12 +97,17 @@ public sealed class KeepAwakeModule : IFeatureModule
         finally { _gate.Release(); }
     }
 
-    /// <summary>Starts the last length used (1 hr the first time), or stops.</summary>
-    public Task ToggleAsync(CancellationToken ct = default) => IsOn ? StopSessionAsync(ct) : StartSessionAsync(Settings, ct);
+    /// <summary>
+    /// Starts the last fixed length used (1 hr the first time), or stops. Never No limit or an Until time, which one
+    /// click from the home shouldn't start without saying so.
+    /// </summary>
+    public Task ToggleAsync(CancellationToken ct = default) =>
+        IsOn ? StopSessionAsync(ct) : StartSessionAsync(Settings with { Mode = AwakeMode.Duration }, ct);
 
     /// <summary>
-    /// Starts (or restarts) a session of <paramref name="length"/>'s mode and length, and remembers it as
-    /// the length the home's button starts next. The screen follows the Keep screen on setting.
+    /// Starts (or restarts) a session of <paramref name="length"/>'s mode and length, and remembers it: a fixed length as
+    /// the one the home's button starts next, an Until time as the picker's next start. The screen follows the Keep screen
+    /// on setting.
     /// </summary>
     public async Task StartSessionAsync(KeepAwakeSettings length, CancellationToken ct = default)
     {
@@ -108,7 +121,13 @@ public sealed class KeepAwakeModule : IFeatureModule
         await _gate.WaitAsync(ct);
         try
         {
-            var remembered = Settings with { Mode = length.Mode, DurationMinutes = length.DurationMinutes, UntilMinute = length.UntilMinute };
+            // Only what the length sets: No limit keeps the last fixed length and the last Until time.
+            var remembered = Settings with
+            {
+                Mode = length.Mode,
+                DurationMinutes = length.Mode == AwakeMode.Duration ? length.DurationMinutes : Settings.DurationMinutes,
+                UntilMinute = length.Mode == AwakeMode.UntilTime ? length.UntilMinute : Settings.UntilMinute,
+            };
             if (_context is null || remembered == Settings)
                 return;
             _context.Settings.Save(remembered);
@@ -135,6 +154,7 @@ public sealed class KeepAwakeModule : IFeatureModule
             Error = null;
             await command(_session);
             Active = IsOn ? active : null;
+            UpdateTile(); // an Until time shows as its clock time, which needs the mode
             Changed?.Invoke();
         }
         finally { _gate.Release(); }
@@ -152,7 +172,7 @@ public sealed class KeepAwakeModule : IFeatureModule
         IsOn = active;
         Deadline = active ? deadline : null;
         if (!active) Active = null;
-        StateLine = active ? deadline is { } end ? $"Until {end.LocalDateTime:t}" : "Indefinitely" : "Off";
+        StateLine = active ? deadline is { } end ? $"Until {end.LocalDateTime:t}" : "No limit" : "Off";
         if (active)
             _context?.Island.Publish(new IslandActivity("awake", IslandActivityKind.Status, "Keep awake", StateLine) { TileKey = TileKey });
         else _context?.Island.Clear("awake");
@@ -164,10 +184,14 @@ public sealed class KeepAwakeModule : IFeatureModule
         Changed?.Invoke();
     }
 
-    /// <summary>The island tile's status: "Off", "45 min left" or "No limit".</summary>
+    /// <summary>
+    /// The island tile's status, which the bar and the home show: "Off", "45 min left", "Until 6:00 PM" (the time you picked,
+    /// not a countdown) or "No limit".
+    /// </summary>
     public string TileStatus(DateTimeOffset now) => !IsOn ? "Off"
-        : Deadline is { } end ? $"{KeepAwakeText.Left(end - now)} left"
-        : "No limit";
+        : Deadline is not { } end ? "No limit"
+        : Active?.Mode == AwakeMode.UntilTime ? $"Until {end.LocalDateTime:t}"
+        : $"{KeepAwakeText.Left(end - now)} left";
 
     private void UpdateTile()
     {
@@ -212,6 +236,7 @@ public sealed class KeepAwakeModule : IFeatureModule
             _tileClock?.Dispose();
             _tileClock = null;
             _tile = null;
+            _view = null;
             Changed?.Invoke();
         }
         finally { _gate.Release(); }

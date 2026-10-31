@@ -26,10 +26,10 @@ public static class KeepAwakeText
 
     public static string Until(int minute) => DateTime.Today.AddMinutes(minute).ToString("t");
 
-    /// <summary>"Off", "On · no time limit" or "On · 1 hr left".</summary>
+    /// <summary>"Off", "On · no limit" or "On · 1 hr left".</summary>
     public static string Status(KeepAwakeModule module, DateTimeOffset now) => !module.IsOn ? "Off"
         : module.Deadline is { } end ? $"On · {Left(end - now)} left"
-        : "On · no time limit";
+        : "On · no limit";
 
     /// <summary>The line under the status, only with an end time: "Until 11:42 AM". Otherwise empty.</summary>
     public static string Detail(KeepAwakeModule module) => module.IsOn && module.Deadline is { } end ? $"Until {end.LocalDateTime:t}" : "";
