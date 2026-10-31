@@ -115,6 +115,25 @@ public sealed class CompactOtherPageTests
     });
 
     [Fact]
+    public void Keep_awake_picker_holds_the_page_edges_with_the_hour_under_chippi_and_start_on_the_right() => WpfTestThread.Run(() =>
+    {
+        var view = new KeepAwakeIslandView(new KeepAwakeModule());
+        Fit(view, 496, 304);
+        Find<ToggleButton>(view).Single(c => c.Tag as string == "Until…").IsChecked = true; // opens the picker; starts nothing
+        view.UpdateLayout();
+        // Chippi's body is centered in his box (60 of its 120 units); the hour column's center sits under it.
+        var pet = Find<Chippi.UI.Pet.ChippiPet>(view).Single();
+        var hour = Find<Border>(view).Single(b => AutomationProperties.GetName(b) == "Hour");
+        Assert.Equal(pet.TranslatePoint(new Point(pet.ActualWidth / 2, 0), view).X, hour.TranslatePoint(new Point(hour.ActualWidth / 2, 0), view).X, 1);
+        // Start ends on the right edge, where Stop does; Cancel 8 before it.
+        var start = Find<Button>(view).Single(b => b.Content as string == "Start");
+        var cancel = Find<Button>(view).Single(b => b.Content as string == "Cancel");
+        Assert.Equal(496, start.TranslatePoint(new Point(start.ActualWidth, 0), view).X, 1);
+        Assert.Equal(8, start.TranslatePoint(new Point(), view).X - cancel.TranslatePoint(new Point(cancel.ActualWidth, 0), view).X, 1);
+        cancel.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+    });
+
+    [Fact]
     public void Organizer_folder_control_is_one_row_and_recent_rows_fit_whole() => WpfTestThread.Run(() =>
     {
         var module = new DownloadsModule();

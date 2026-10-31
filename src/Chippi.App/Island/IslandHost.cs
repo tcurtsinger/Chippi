@@ -119,7 +119,7 @@ public sealed class IslandHost : IDisposable
         _logger.LogInformation("Island started");
     }
 
-    /// <summary>Once the features run and the app is idle, lays the panel's home out so the first open is as quick as the rest.</summary>
+    /// <summary>Once the features run and the app is idle, lays the panel's home and last page out so their first open is as quick as the rest.</summary>
     private async Task PrewarmAsync()
     {
         try

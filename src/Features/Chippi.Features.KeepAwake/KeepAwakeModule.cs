@@ -16,6 +16,7 @@ public sealed class KeepAwakeModule : IFeatureModule
     private ModuleContext? _context;
     private IIslandTile? _tile;
     private KeepAwakeIslandView? _view;
+    private KeepAwakeSettings? _starting; // the length a command starts, taken when the session reports it
     private Timer? _tileClock;
     private static readonly TimeSpan TileTick = TimeSpan.FromSeconds(30);
     public KeepAwakeSettings Settings { get; private set; } = new();
@@ -155,9 +156,11 @@ public sealed class KeepAwakeModule : IFeatureModule
                 CreateSession();
             }
             Error = null;
+            // The session reports the new end before the command returns; the mode goes with that report (OnSessionChanged),
+            // so no listener sees the old length against the new end ("21 hr left" on a switch to an Until time).
+            _starting = active;
             await command(_session);
-            Active = IsOn ? active : null;
-            UpdateTile(); // an Until time shows as its clock time, which needs the mode
+            UpdateTile();
             Changed?.Invoke();
         }
         finally { _gate.Release(); }
@@ -172,9 +175,10 @@ public sealed class KeepAwakeModule : IFeatureModule
     private void OnSessionChanged(bool active, DateTimeOffset? deadline, bool timed, Exception? error)
     {
         Error = error?.Message;
+        // A start reports active (its command set _starting); a stop, a run-out or a failure reports off.
+        Active = active ? _starting : null;
         IsOn = active;
         Deadline = active ? deadline : null;
-        if (!active) Active = null;
         StateLine = active ? deadline is { } end ? $"Until {end.LocalDateTime:t}" : "No limit" : "Off";
         if (active)
             _context?.Island.Publish(new IslandActivity("awake", IslandActivityKind.Status, "Keep awake", StateLine) { TileKey = TileKey });

@@ -222,6 +222,49 @@ public sealed class ShellMotionTests
     }));
 
     [Fact]
+    public void Laying_out_ahead_builds_the_last_page_and_its_first_open_uses_it() => WpfTestThread.Run(() => WithMotion(false, () =>
+    {
+        int built = 0;
+        var page = new IslandTileContribution("keep-awake", new IslandTileSpec("keep-awake", "Keep awake", "Coffee", 40, 0, () =>
+        {
+            built++;
+            return new System.Windows.Controls.Border { Height = 120 };
+        }));
+        var panel = new IslandPanelWindow();
+        try
+        {
+            panel.Initialize();
+            panel.SetMedia(new FakeMedia());
+            panel.SetTiles(Tiles(page, Part("sound.mixer", "Volume mixer", 10)));
+            // Now Playing and a page that's gone are let be.
+            foreach (var gone in new[] { IslandPanelWindow.NowPlayingKey, "gone" })
+            {
+                panel.SetLastPage(gone);
+                panel.Prewarm();
+            }
+            Assert.Equal(0, built);
+
+            panel.SetLastPage("keep-awake");
+            panel.Prewarm();
+            Assert.Equal(1, built); // built and laid out while closed
+            Assert.False(panel.IsVisible);
+            Assert.Null(panel.Page.Content); // and let go: nothing is attached until it opens
+
+            panel.SetLastPage(null);
+            panel.Open(IslandGeometry.Start(Offscreen.Work, 1), Offscreen);
+            Pump(TimeSpan.FromMilliseconds(400));
+            panel.ShowPage("keep-awake");
+            Pump(TimeSpan.FromMilliseconds(400));
+            Assert.Equal(1, built); // the first open shows the one built ahead
+            Assert.NotNull(panel.PageBody);
+        }
+        finally
+        {
+            panel.Close();
+        }
+    }));
+
+    [Fact]
     public void A_new_song_on_the_bar_arrives_and_the_old_one_fades_where_it_was() => WpfTestThread.Run(() => WithMotion(false, () => IslandWindowTests.WithShownIsland(window =>
     {
         var media = new FakeMedia { Sessions = [Track("Creep")] };
