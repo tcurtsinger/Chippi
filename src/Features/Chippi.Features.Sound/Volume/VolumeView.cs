@@ -431,9 +431,10 @@ public sealed class VolumeView : UserControl
             button.IsEnabled = _module.CanPickOutput(key);
             var where = plays is null ? "" : "plays on " + OutputName(plays, names);
             var connected = _module.Outputs.Any(o => string.Equals(o.Id, chosen, StringComparison.OrdinalIgnoreCase));
-            string tip = elsewhere ? (connected ? $"Picked {OutputName(chosen, names)} · still {where}" : $"{OutputName(chosen, names)} not connected · {where}")
-                : where.Length == 0 ? "Output"
-                : char.ToUpperInvariant(where[0]) + where[1..] + (own ? "" : " · Default");
+            string tip = !elsewhere ? (where.Length == 0 ? "Output" : char.ToUpperInvariant(where[0]) + where[1..] + (own ? "" : " · Default"))
+                : chosen is null ? $"Default · {OutputName(_module.DefaultOutput, names)} · still {where}"
+                : connected ? $"Picked {OutputName(chosen, names)} · still {where}"
+                : $"{OutputName(chosen, names)} not connected · {where}";
             button.ToolTip = tip;
             AutomationProperties.SetName(button, $"{AppName(key)} output");
             AutomationProperties.SetHelpText(button, tip);

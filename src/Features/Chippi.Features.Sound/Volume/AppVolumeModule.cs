@@ -55,9 +55,12 @@ public sealed class AppVolumeModule(AudioService? audio = null) : IFeatureModule
     /// <summary>Where the app is heard: the output its playing session is on.</summary>
     public string? PlaysOn(AppKey app) => Snapshot.Apps.FirstOrDefault(a => a.Key == app)?.EndpointIds.FirstOrDefault();
 
-    /// <summary>The app plays somewhere other than its pick: it chose a device itself, the pick failed, or the pick isn't connected.</summary>
-    public bool PlaysElsewhere(AppKey app) => CanPickOutput(app) && ChosenOutput(app) is { } chosen && PlaysOn(app) is { } plays
-        && !string.Equals(chosen, plays, StringComparison.OrdinalIgnoreCase);
+    /// <summary>
+    /// The app plays somewhere other than its pick, or than the default when it has none: its open
+    /// stream hasn't moved yet, it chose a device itself, the pick failed, or the pick isn't connected.
+    /// </summary>
+    public bool PlaysElsewhere(AppKey app) => CanPickOutput(app) && (ChosenOutput(app) ?? DefaultOutput) is { } target
+        && PlaysOn(app) is { } plays && !string.Equals(target, plays, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Polls these apps' peaks until disposed, while a page shows them.</summary>
     public IDisposable WatchMeters(IReadOnlyCollection<AppKey> apps) => (_audio ?? throw new AudioFailure("App volume stopped")).WatchMeters([], apps);

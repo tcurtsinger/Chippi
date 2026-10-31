@@ -159,6 +159,26 @@ public sealed class VolumeUiTests
         });
     }
 
+    // An app with no pick of its own that plays somewhere other than the default isn't "Default".
+    [Fact]
+    public async Task An_app_following_the_default_but_playing_elsewhere_says_so()
+    {
+        await using var f = new VolumeFixture();
+        f.System.EndSession("one");
+        f.System.WithSession(VolumeFixture.Session("one", "B", 123));
+        await f.Start();
+        Assert.True(f.Module.PlaysElsewhere(VolumeFixture.Key));
+        await Sta(() =>
+        {
+            var island = new VolumeView(f.Module, VolumeSurface.Island);
+            var output = Descendants(island).OfType<Button>().Single(b => AutomationProperties.GetName(b) == "Music output");
+            Assert.Equal("Default · A · still plays on B", output.ToolTip);
+            var settings = new VolumeView(f.Module, VolumeSurface.Settings);
+            Assert.Contains(Descendants(settings).OfType<TextBlock>(), t => t.Text == "Still plays on B" && t.Visibility == Visibility.Visible);
+            return Task.CompletedTask;
+        });
+    }
+
     [Fact]
     public async Task A_name_past_two_lines_marks_the_second_and_keeps_its_tooltip()
     {

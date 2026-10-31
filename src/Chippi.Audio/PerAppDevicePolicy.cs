@@ -24,18 +24,19 @@ public interface IPerAppDeviceSystem
 /// the Phase 3 spike verified it on build 26300 x64. Activation asks for that ID, so a Windows that
 /// changed it fails before any slot is called. Reads must come back in the endpoint format and every
 /// write is read back. A format Chippi doesn't know turns this instance off at once; other failures
-/// may be one app's (a process that just closed), so it takes <see cref="FailuresAllowed"/> in a row.
-/// Volume and mute continue through documented Core Audio. Never calls the clear-all slot.
+/// may be one app's (a process that just closed), so reads and writes each count their own
+/// (<see cref="FailedProcesses"/>). Volume and mute continue through documented Core Audio. Never
+/// calls the clear-all slot.
 /// </summary>
 internal sealed class PerAppDevicePolicy(ILogger logger) : IDisposable
 {
     private const string Prefix = @"\\?\SWD#MMDEVAPI#";
     private const string Suffix = "#{e6327cad-dcec-4949-ae8a-991e976a79d2}";
-    internal const int FailuresAllowed = 3;
+    private readonly FailedProcesses _reads = new();
+    private readonly FailedProcesses _writes = new();
     private IntPtr _factory;
     private bool _disabled;
     private bool _initialized;
-    private int _failures;
 
     /// <summary>Windows 11 (build 22000 on), x64 or ARM64: Chippi's own target (PLAN.md).</summary>
     public static bool IsSupportedBuild(Version version) => version.Major == 10 && version.Build >= 22000;
@@ -49,10 +50,10 @@ internal sealed class PerAppDevicePolicy(ILogger logger) : IDisposable
         try
         {
             var endpoint = Read(pid, AudioRole.Multimedia);
-            _failures = 0;
+            _reads.Succeeded();
             return new(true, endpoint);
         }
-        catch (Exception ex) { Fail(ex, "read"); return new(false); }
+        catch (Exception ex) { Fail(ex, _reads, pid, "read"); return new(false); }
     }
 
     public bool Set(int pid, string? endpoint)
@@ -71,15 +72,15 @@ internal sealed class PerAppDevicePolicy(ILogger logger) : IDisposable
                 if (!string.Equals(Read(pid, role), endpoint, StringComparison.OrdinalIgnoreCase))
                     throw new InvalidOperationException("App output readback differs");
             }
-            _failures = 0;
+            _writes.Succeeded();
             return true;
         }
-        catch (Exception ex) { Fail(ex, "write"); return false; }
+        catch (Exception ex) { Fail(ex, _writes, pid, "write"); return false; }
     }
 
-    private void Fail(Exception ex, string call)
+    private void Fail(Exception ex, FailedProcesses failures, int pid, string call)
     {
-        _disabled = ex is FormatException || ++_failures >= FailuresAllowed;
+        _disabled = ex is FormatException || failures.Failed(pid);
         logger.LogWarning(ex, "Per-app output {Call} failed on Windows {Build}{Off}", call, Environment.OSVersion.Version, _disabled ? "; turned off" : "");
     }
 
@@ -150,4 +151,24 @@ internal sealed class PerAppDevicePolicy(ILogger logger) : IDisposable
     [DllImport("combase.dll")] private static extern int WindowsDeleteString(IntPtr value);
     [DllImport("combase.dll")] private static extern IntPtr WindowsGetStringRawBuffer(IntPtr value, out uint length);
 #pragma warning restore SYSLIB1054
+}
+
+/// <summary>
+/// One kind of policy call's failures since its last success. A process that just closed fails once;
+/// the same app tried again adds nothing; three different processes failing in a row means the policy
+/// itself doesn't work here. A success of the same kind starts over, and one of the other kind doesn't.
+/// </summary>
+internal sealed class FailedProcesses
+{
+    internal const int Allowed = 3;
+    private readonly HashSet<int> _pids = [];
+
+    /// <summary>Records a failure for this process; true once the policy should turn off.</summary>
+    public bool Failed(int pid)
+    {
+        _pids.Add(pid);
+        return _pids.Count >= Allowed;
+    }
+
+    public void Succeeded() => _pids.Clear();
 }
