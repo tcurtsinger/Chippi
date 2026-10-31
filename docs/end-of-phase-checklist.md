@@ -3,14 +3,14 @@
 Run this once a phase's report is written and the last change is merged and pushed (Travis, 2026-10-22). The lead runs it; nothing here touches `main`'s history.
 
 ## During the phase (so cleanup stays small)
-- Review notes, handoffs, probes and UI Automation scripts go in `%LOCALAPPDATA%\chippi-work\scratch\phase-N\`, not in the repo root or a new folder in `X:\code` (revised 2026-10-30).
-- Each change's worktree is in `%LOCALAPPDATA%\chippi-work\<name>` and is removed with its local branch once its PR merges.
+- Review notes, handoffs, probes and UI Automation scripts go in the session's own temp folder, never the repo root or a folder in `X:\code`, and are deleted once their PR merges. Nothing is archived (revised 2026-10-31).
+- Each change's worktree is in `%LOCALAPPDATA%\chippi-work\<name>` and is removed with its local branch once its PR merges. `X:\code\chippi` is the only Chippi folder that lasts.
 - Dev runs use `CHIPPI_DEV_PROFILE=<name>`, so test settings and logs stay under `Chippi-dev`.
 
 ## Cleanup
 1. **Check before deleting.** Every worktree has no uncommitted changes, and every branch is merged into `main` (`git branch --no-merged main` prints nothing). Anything that fails either check is reported, not deleted.
-2. **Archive.** Zip the untracked and ignored leftovers in the main checkout (review notes, handoffs, probes, scripts, screenshots, scratch files) and the phase's folders in `%LOCALAPPDATA%\chippi-work\scratch` to `X:\code\chippi-archive\phase-N-leftovers-<date>.zip`. Keep `build\artifacts` (the current installers) and `bin`/`obj`. `X:\code\chippi-scratch\audit-2026-10-27` stays where it is.
-3. **Delete** the archived originals, then confirm `git status` shows nothing untracked.
+2. **Leftovers.** Delete the untracked and ignored leftovers in the main checkout (review notes, handoffs, probes, scripts, screenshots, scratch files) and anything left in `%LOCALAPPDATA%\chippi-work`. Keep `build\artifacts\releases` (the newest installers), `build\artifacts\vendor` and `bin`/`obj`. Nothing is zipped or archived (revised 2026-10-31).
+3. **Confirm** `git status` shows nothing untracked, and no Chippi folder but `X:\code\chippi` is left in `X:\code`.
 4. **Worktrees and branches.** `git worktree remove` any workstream worktree still in `%LOCALAPPDATA%\chippi-work` (or left in `X:\code` from before 2026-10-30), `git branch -d` its branch, then `git worktree prune`. Only `main` remains, locally and on GitHub.
 5. **Dev profiles and temp files.** Delete `%APPDATA%\Chippi-dev`, `%LOCALAPPDATA%\Chippi-dev` and `%TEMP%\chippi*` (probes, UI Automation runs, generated assets, the Core tests' `chippi-tests` folder). Then confirm none of these dev registrations are left:
    - `Chippi-dev-*` values under `HKCU\...\CurrentVersion\Run`
@@ -80,3 +80,11 @@ Run this once a phase's report is written and the last change is merged and push
 - Deleted both `Chippi-dev` roots (10 Roaming and 15 Local profiles), nine `%TEMP%/chippi*` items, 10 dev Explorer keys, 11 dev notification CLSIDs and 11 dev Start Menu shortcuts. No dev Run values or notification-settings keys were present. The final dev registration inventory is empty.
 - Installed Chippi stayed running (PID 21184, `ChippiApp/current`), and its settings hash is unchanged. No audio, driver, real clipboard or installed-app changes were made. The main checkout's untracked `.impeccable/` is the owner's and was left alone.
 - Evidence is at `X:/code/chippi-archive/phase-5.1-cleanup-2026-10-30`: per-file archive hashes and summary, archived installer hashes, before/after worktrees, branches and registrations, the settings and process checks, and the scripts. `tools/` keeps copies of the pack hash check and the island-test loop, which were in the archived scratch.
+
+## Folder cleanup (2026-10-31)
+
+- Travis: `X:\code\chippi` is the only Chippi folder that lasts, and nothing is archived. AGENTS.md and the steps above now say so.
+- Copied the newest installer set (main `0aee61c`, recorded by #155) into `X:\code\chippi\build\artifacts\releases\0.1.0`, replacing the 2026-10-29 set there. All 12 files match its `artifacts.csv`.
+- Moved `chippi-scratch\audit-2026-10-27\code-audit.md` into `docs/code-audit-2026-10-27.md`, unchanged.
+- Sent to the Recycle Bin: `X:\code\chippi-archive` (11 GB: every installer set since Phase 2, the leftover ZIPs and the cleanup records above), `X:\code\chippi-scratch`, `%LOCALAPPDATA%\chippi-work\scratch`, both `Chippi-dev` roots and nine `%TEMP%\chippi*` folders.
+- Left: the installed app (`%LOCALAPPDATA%\ChippiApp`, `%LOCALAPPDATA%\Chippi` and `%APPDATA%\Chippi`), untouched, and this PR's worktree, removed when it merges.
