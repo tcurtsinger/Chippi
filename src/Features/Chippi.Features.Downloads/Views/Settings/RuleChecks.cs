@@ -105,14 +105,17 @@ internal static class RuleChecks
         }
     }
 
-    /// <summary>".pdf · name matches · up to 25 MB → Documents\Invoices\{year}\{month}", ".png .jpg → Pictures".</summary>
+    /// <summary>
+    /// ".pdf · name matches "^inv" · up to 25 MB → Documents\Invoices\{year}\{month}", ".png .jpg → Pictures",
+    /// ".torrent · hold: Check before opening". The pattern shows, so two pattern rules don't read alike.
+    /// </summary>
     public static string Summary(RuleSetting rule)
     {
         var parts = new List<string>();
         if (rule.Extensions is { Count: > 0 } extensions)
             parts.Add(string.Join(" ", extensions.Select(e => e.Length == 0 ? "no extension" : e == "*" ? e : "." + e)));
         if (!string.IsNullOrEmpty(rule.NameRegex))
-            parts.Add("name matches");
+            parts.Add($"name matches \"{rule.NameRegex}\"");
         if (rule.MinBytes is { } min && rule.MaxBytes is { } max)
             parts.Add($"{Ui.Size(min)} to {Ui.Size(max)}");
         else if (rule.MaxBytes is { } upTo)
@@ -125,7 +128,7 @@ internal static class RuleChecks
         return rule.Action switch
         {
             RuleActionKind.Rename => $"{when} · rename to {rule.Template}",
-            RuleActionKind.Hold => $"{when} · hold",
+            RuleActionKind.Hold => string.IsNullOrWhiteSpace(rule.HoldReason) ? $"{when} · hold" : $"{when} · hold: {rule.HoldReason}",
             _ => $"{when} → {DestinationName(rule.Template ?? "")}",
         };
     }

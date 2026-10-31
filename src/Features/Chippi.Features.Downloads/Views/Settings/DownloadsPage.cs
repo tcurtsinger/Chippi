@@ -27,7 +27,8 @@ public sealed class DownloadsPage : UserControl
     public DownloadsPage(DownloadsModule module, string? section)
     {
         _module = module;
-        _segment = Ui.SelectorBar("Section", "Settings", "Rules", "History");
+        // "Folders", not "Settings": the whole window is Settings (the section's key stays "settings").
+        _segment = Ui.SelectorBar("Section", "Folders", "Rules", "History");
         _segment.SelectionChanged += (_, _) =>
         {
             if (_switching || _segment.SelectedIndex < 0)
@@ -97,6 +98,12 @@ public sealed class DownloadsPage : UserControl
                 break;
             case "history":
                 // history/<run>/undo opens that run with its Undo confirmation showing; nothing is undone yet.
+                // history/in/<folder> shows that folder's runs (the island's History ›).
+                if (tail?.StartsWith("in/", StringComparison.Ordinal) == true)
+                {
+                    Show("history", folder: tail[3..]);
+                    break;
+                }
                 string[] parts = tail?.Split('/') ?? [];
                 Show("history", parts.Length > 0 && long.TryParse(parts[0], out long run) ? run : null, confirmUndo: parts is [_, "undo"]);
                 break;
@@ -106,7 +113,7 @@ public sealed class DownloadsPage : UserControl
         }
     }
 
-    private void Show(string section, long? runId = null, bool confirmUndo = false)
+    private void Show(string section, long? runId = null, bool confirmUndo = false, string? folder = null)
     {
         SelectTab(section);
         _segment.Visibility = Visibility.Visible;
@@ -118,7 +125,7 @@ public sealed class DownloadsPage : UserControl
         _host.Content = section switch
         {
             "rules" => new RulesSection(_module),
-            "history" => new HistorySection(_module, runId, confirmUndo),
+            "history" => new HistorySection(_module, runId, confirmUndo, folder),
             _ => new SettingsSection(_module, ShowImport, folder => Preview(folder)),
         };
     }

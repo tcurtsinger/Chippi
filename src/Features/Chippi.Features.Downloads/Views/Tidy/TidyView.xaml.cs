@@ -216,7 +216,7 @@ public partial class TidyView : UserControl
     private void OnHistory(object sender, RoutedEventArgs e)
     {
         if (_busy || _module.Engine is null) return;
-        try { _request(new DownloadsRequest(DownloadsRequestKind.Run)); }
+        try { _request(new DownloadsRequest(DownloadsRequestKind.Run, Folder: _selected)); } // that folder's runs
         catch (Exception ex) when (ex is InvalidOperationException or IOException) { ShowError("History failed"); }
     }
 

@@ -32,7 +32,8 @@ internal sealed class HistorySection : UserControl
     private long? _confirming;
     private long? _confirmingRow;
 
-    public HistorySection(DownloadsModule module, long? focusRun, bool confirmUndo = false)
+    /// <param name="folder">A watched folder to show the runs of (the island's History ›), else all folders.</param>
+    public HistorySection(DownloadsModule module, long? focusRun, bool confirmUndo = false, string? folder = null)
     {
         _module = module;
         _focusRun = focusRun;
@@ -54,7 +55,8 @@ internal sealed class HistorySection : UserControl
         };
         var folders = new List<string> { "All folders" };
         folders.AddRange(module.Settings.Folders.Select(f => Ui.FolderName(f.Path)));
-        _folder = Ui.Choice(folders, 0, "Folder", 170);
+        int picked = folder is null ? -1 : module.Settings.Folders.FindIndex(f => Views.Tidy.TidyProjection.SameFolder(f.Path, folder));
+        _folder = Ui.Choice(folders, picked + 1, "Folder", 170);
         _folder.SelectionChanged += (_, _) => Render();
 
         var clear = Ui.Button("Clear history");
@@ -142,7 +144,6 @@ internal sealed class HistorySection : UserControl
         int moved = rows.Count(o => o.State == OperationState.Completed && o.Kind != HistoryOperationKind.Restore);
         int failed = rows.Count(o => o.State == OperationState.Failed);
         int undone = rows.Count(o => o.State == OperationState.Undone);
-        string counts = string.Join(" · ", new[] { (moved, "moved"), (failed, "failed"), (undone, "undone") }.Where(c => c.Item1 > 0).Select(c => $"{c.Item1} {c.Item2}"));
         string time = Ui.Time(run?.StartedAt ?? rows[0].PlannedAt);
 
         void Toggle()
@@ -159,7 +160,16 @@ internal sealed class HistorySection : UserControl
         var expand = Ui.Icon(collapsed ? LucideIcons.ChevronRight : LucideIcons.ChevronDown, collapsed ? $"Show {rows.Count} files" : "Hide files");
         expand.Click += (_, _) => Toggle();
         head.Children.Add(expand.Margin(-8, 0, 8, 0).At(0));
-        head.Children.Add(Ui.Stack(Ui.Text(trigger + where), Ui.Text(counts.Length > 0 ? $"{time} · {counts}" : time, "CaptionTextStyle")).At(1));
+        // "4:00 PM · 3 moved · 1 failed", the failures in Caution.
+        var caption = Ui.Text(time, "CaptionTextStyle");
+        foreach (var (count, what) in new[] { (moved, "moved"), (failed, "failed"), (undone, "undone") }.Where(c => c.Item1 > 0))
+        {
+            var part = new System.Windows.Documents.Run($" · {count} {what}");
+            if (what == "failed")
+                part.SetResourceReference(System.Windows.Documents.TextElement.ForegroundProperty, "WarningTextBrush");
+            caption.Inlines.Add(part);
+        }
+        head.Children.Add(Ui.Stack(Ui.Text(trigger + where), caption).At(1));
         head.MouseLeftButtonUp += (_, e) =>
         {
             if (e.OriginalSource is DependencyObject source && !Ui.IsInside<ButtonBase>(source))
@@ -203,7 +213,8 @@ internal sealed class HistorySection : UserControl
 
         TextBlock status = op switch
         {
-            { State: OperationState.Failed } => Ui.Text($"Failed · {Lower(op.Error)}", "CaptionTextStyle", "WarningTextBrush"),
+            { State: OperationState.Failed, Kind: HistoryOperationKind.Restore } => Ui.Text($"Undo failed · {Lower(op.Error)}", "CaptionTextStyle", "WarningTextBrush"),
+            { State: OperationState.Failed } => Ui.Text($"{(op.Kind == HistoryOperationKind.Rename ? "Rename" : "Move")} failed · {Lower(op.Error)}", "CaptionTextStyle", "WarningTextBrush"),
             { State: OperationState.Undone } => Ui.Text(restore?.CompletedAt is { } at ? $"Undone · {Ui.Time(at)}" : "Undone", "CaptionTextStyle"),
             { Kind: HistoryOperationKind.Import } => Ui.Text("Imported", "CaptionTextStyle"),
             { Kind: HistoryOperationKind.Rename } => Ui.Text("Renamed", "CaptionTextStyle"),
