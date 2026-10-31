@@ -18,9 +18,10 @@ public sealed class ChippiPagesTests
     [Fact]
     public void Shortcuts_reuses_the_features_shortcut_section_and_Add_features_shows_a_failure_reason() => WpfTestThread.Run(() =>
     {
-        string root = Path.Combine(Path.GetTempPath(), "chippi-pages-" + Guid.NewGuid().ToString("N"));
+        string profile = "chippi-pages-" + Guid.NewGuid().ToString("N");
+        string root = Path.Combine(Path.GetTempPath(), profile);
         Directory.CreateDirectory(root);
-        var shell = new ShellContext(new ConfigStore(Path.Combine(root, "settings.json")), NullLoggerFactory.Instance, false, "chippi-pages-test");
+        var shell = new ShellContext(new ConfigStore(Path.Combine(root, "settings.json")), NullLoggerFactory.Instance, false, profile);
         var shortcut = new ShortcutFeature();
         try
         {
@@ -35,15 +36,22 @@ public sealed class ChippiPagesTests
             var features = new AddFeaturesPage(shell);
             Assert.Contains(Find<SettingRow>(features), r => r.Header == "Failed feature" && r.Description == "Start failed \u00b7 Access denied");
         }
-        finally { shell.Registry.StopAllAsync().GetAwaiter().GetResult(); shell.Clipboard.Dispose(); Directory.Delete(root, true); }
+        finally
+        {
+            shell.Registry.StopAllAsync().GetAwaiter().GetResult();
+            shell.Clipboard.Dispose();
+            foreach (string folder in new[] { root, Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Chippi-dev", profile) })
+                if (Directory.Exists(folder)) Directory.Delete(folder, true);
+        }
     });
 
     [Fact]
     public void A_failed_shortcut_feature_has_no_sidebar_entry_and_unknown_errors_have_no_invented_reason() => WpfTestThread.Run(() =>
     {
-        string root = Path.Combine(Path.GetTempPath(), "chippi-failed-shortcut-" + Guid.NewGuid().ToString("N"));
+        string profile = "chippi-failed-shortcut-" + Guid.NewGuid().ToString("N");
+        string root = Path.Combine(Path.GetTempPath(), profile);
         Directory.CreateDirectory(root);
-        var shell = new ShellContext(new ConfigStore(Path.Combine(root, "settings.json")), NullLoggerFactory.Instance, false, "failed-shortcut-test");
+        var shell = new ShellContext(new ConfigStore(Path.Combine(root, "settings.json")), NullLoggerFactory.Instance, false, profile);
         try
         {
             shell.Registry.Register(new FailedFeature("mic-mute", unknown: true));
@@ -54,7 +62,13 @@ public sealed class ChippiPagesTests
             var features = new AddFeaturesPage(shell);
             Assert.Contains(Find<SettingRow>(features), r => r.Header == "Failed feature" && r.Description == "Start failed");
         }
-        finally { shell.Registry.StopAllAsync().GetAwaiter().GetResult(); shell.Clipboard.Dispose(); Directory.Delete(root, true); }
+        finally
+        {
+            shell.Registry.StopAllAsync().GetAwaiter().GetResult();
+            shell.Clipboard.Dispose();
+            foreach (string folder in new[] { root, Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Chippi-dev", profile) })
+                if (Directory.Exists(folder)) Directory.Delete(folder, true);
+        }
     });
 
     private sealed class ShortcutFeature : IFeatureModule
