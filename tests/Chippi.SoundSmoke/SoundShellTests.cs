@@ -110,9 +110,9 @@ public sealed class SoundShellTests
             settings.Navigate("module:app-volume");
             Assert.Single(All<VolumeView>(settings.PageContent));
             Assert.Equal(scene.Volume.Apps.Count(), All<Slider>(settings.PageContent).Count());
-            var quiet = scene.Volume.Settings.ShowQuietApps;
-            Toggle(Named<ToggleButton>(settings.PageContent, "Show apps that aren't playing"));
-            await SmokeDispatcher.Until(() => scene.Volume.Settings.ShowQuietApps != quiet);
+            var remember = scene.Volume.Settings.RememberOutputs;
+            Toggle(Named<ToggleButton>(settings.PageContent, "Remember each app's output"));
+            await SmokeDispatcher.Until(() => scene.Volume.Settings.RememberOutputs != remember);
         }
         finally { settings.Close(); }
     });

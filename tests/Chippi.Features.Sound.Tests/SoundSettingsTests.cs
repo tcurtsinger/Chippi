@@ -259,7 +259,7 @@ public sealed class SoundSettingsTests
     {
         await using var f = new VolumeFixture();
         for (int i = 0; i < 16; i++)
-            f.System.WithSession(VolumeFixture.Session($"app{i}", "A", 200 + i, $@"C:\Apps\App{i}.exe"));
+            f.System.WithSession(VolumeFixture.Session($"app{i}", "A", 200 + i, $@"C:\Apps\App{i}.exe") with { AppName = $"App {i:00}" });
         await f.Start();
         await Sta(async () =>
         {
@@ -268,8 +268,8 @@ public sealed class SoundSettingsTests
             Assert.True(apps > 14);
             Assert.Equal(apps, Descendants(view).OfType<Slider>().Count()); // no island limit here
             Assert.All(Descendants(view).OfType<Slider>(), s => Assert.Equal(200, s.Width));
-            Assert.Equal(["Show apps that aren't playing", "Remember each app's output"],
-                Descendants(view).OfType<SettingRow>().Select(r => (string)r.Header));
+            Assert.Equal(["Remember each app's output"],
+                Descendants(view).OfType<SettingRow>().Where(r => r.Visibility == Visibility.Visible).Select(r => (string)r.Header));
 
             var slider = Descendants(view).OfType<Slider>().First(s => AutomationProperties.GetName(s) == "Music volume");
             ((IRangeValueProvider)new SliderAutomationPeer(slider)).SetValue(35);
@@ -278,8 +278,8 @@ public sealed class SoundSettingsTests
             ((IInvokeProvider)new ButtonAutomationPeer(mute)).Invoke();
             await Until(() => f.System.SessionById("one").Muted);
             var output = Descendants(view).OfType<ComboBox>().First(c => AutomationProperties.GetName(c) == "Music output");
-            Assert.Equal("Default output", output.SelectedItem);
-            output.SelectedIndex = 2; // Default output, A, B
+            Assert.Equal("Default · A", output.SelectedItem);
+            output.SelectedIndex = 2; // Default · A, A, B
             await Until(() => f.Settings.Value.Outputs.GetValueOrDefault(VolumeFixture.Key.Value) == "B");
         });
     }

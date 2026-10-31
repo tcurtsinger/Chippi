@@ -47,6 +47,8 @@ include process IDs for detecting app return; persistence remains keyed by `AppK
 
 `PerAppDevicePolicy` activates the undocumented factory only on native x64 Windows build 26300,
 the exact build verified by the Phase 3 spike. ARM64 and other builds keep volume and mute but hide
-the output picker. Read probes must succeed before Set; each write is read back; any failure disables
-the instance and is logged. It never calls clear-all. An output choice affects the next audio stream,
+the output picker, and `AudioService.AppOutputUnsupported` says why for Settings. Read probes must
+succeed before Set; each write is read back. A value in a format Chippi doesn't know disables the
+instance at once; other failures can be one app's (a process that just closed), so three in a row
+disable it, and a success starts the count again. Each is logged. It never calls clear-all. An output choice affects the next audio stream,
 not necessarily an existing stream. Tests use fake policy methods; no test changes real routing.

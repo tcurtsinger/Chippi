@@ -96,7 +96,7 @@
     <SolidColorBrush x:Key="IslandTrackBrush" Color="#24FFFFFF" />
     <SolidColorBrush x:Key="IslandSliderTrackBrush" Color="#9A9A9A" />
     <SolidColorBrush x:Key="IslandThumbBrush" Color="#454545" />
-    <SolidColorBrush x:Key="IslandMutedFillBrush" Color="#8CFFFFFF" />
+    <SolidColorBrush x:Key="IslandMutedFillBrush" Color="#47FFFFFF" />
     <SolidColorBrush x:Key="IslandTextBrush" Color="#FFFFFF" />
     <SolidColorBrush x:Key="IslandTextSecondaryBrush" Color="#C9C9C9" />
     <SolidColorBrush x:Key="IslandTextTertiaryBrush" Color="#9A9A9A" />

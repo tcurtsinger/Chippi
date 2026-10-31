@@ -179,24 +179,69 @@ public sealed class VolumeTests
     }
 
     [Fact]
-    public async Task Failed_device_write_disables_picker_without_disabling_volume()
+    public async Task A_failed_pick_says_so_keeps_volume_and_the_next_pick_tries_again()
     {
         await using var f = new VolumeFixture(); await f.Start(); f.System.AppPolicyFailsWrite=true;
         await Assert.ThrowsAsync<AppOutputPolicyException>(()=>f.Module.SetOutputAsync(VolumeFixture.Key,"B"));
-        Assert.False(f.Module.DevicePickerAvailable); Assert.Empty(f.Settings.Value.Outputs);
+        Assert.Equal("Switch failed · Music",f.Module.Error);
+        Assert.True(f.Module.CanPickOutput(VolumeFixture.Key)); Assert.Empty(f.Settings.Value.Outputs);
         await f.Module.SetVolumeAsync(VolumeFixture.Key,0.4f);
         Assert.Equal(0.4f,f.System.SessionById("one").Volume);
+        f.System.AppPolicyFailsWrite=false;
+        await f.Module.SetOutputAsync(VolumeFixture.Key,"B");
+        Assert.Null(f.Module.Error); Assert.Equal("B",f.System.AppOutputs[123]);
+    }
+
+    // One app's output that won't take leaves the others' alone, and isn't tried again on every read.
+    [Fact]
+    public async Task One_apps_failing_output_leaves_the_others_alone()
+    {
+        await using var f = new VolumeFixture();
+        var other = AppKey.ForExe(@"C:\Apps\Other.exe");
+        f.Settings.Value = new AppVolumeSettings { Outputs = new() { [VolumeFixture.Key.Value] = "B", [other.Value] = "B" } };
+        f.System.WithSession(VolumeFixture.Session("other","A",125,@"C:\Apps\Other.exe") with { AppName = "Other" });
+        f.System.AppPolicyFailsFor.Add(123);
+        await f.Start();
+        Assert.Equal("B",f.System.AppOutputs.GetValueOrDefault(125));
+        Assert.Equal("Switch failed · Music",f.Module.Error);
+        Assert.True(f.Module.CanPickOutput(other)); Assert.True(f.Module.CanPickOutput(VolumeFixture.Key));
+        Assert.True(f.Module.PlaysElsewhere(VolumeFixture.Key)); // picked B, still on A
+        int failures = f.System.AppOutputFailures, reads = f.System.AppOutputReads;
+        f.System.WithSession(VolumeFixture.Session("third","A",127,@"C:\Apps\Third.exe") with { AppName = "Third" }); await f.Audio.RefreshAsync();
+        await Until(()=>f.System.AppOutputReads > reads);
+        Assert.Equal(failures,f.System.AppOutputFailures);
+        f.System.AppPolicyFailsFor.Clear();
+        await f.Module.SetOutputAsync(VolumeFixture.Key,"B");
+        Assert.Equal("B",f.System.AppOutputs[123]);
     }
 
     [Fact]
-    public async Task Quiet_apps_and_remember_options_persist_without_changing_audio()
+    public async Task Settings_says_why_when_no_app_can_pick_an_output()
     {
-        await using var f = new VolumeFixture(); f.System.EndSession("one");
-        f.System.WithSession(VolumeFixture.Session("quiet","A",123,state:SessionState.Inactive));
-        await f.Start(); Assert.Single(f.Module.Apps);
-        await f.Module.SetShowQuietAsync(false); Assert.Empty(f.Module.Apps);
+        await using var f = new VolumeFixture(); f.System.AppPolicyAvailable=false; await f.Start();
+        Assert.NotNull(f.Module.OutputsOff);
+        f.System.AppPolicyAvailable=true; f.System.WithSession(VolumeFixture.Session("two","A",124)); await f.Audio.RefreshAsync();
+        await Until(()=>f.Module.OutputsOff is null);
+    }
+
+    [Fact]
+    public async Task Apps_go_by_name_with_system_sounds_last_and_the_tile_counts_those_playing()
+    {
+        await using var f = new VolumeFixture();
+        f.System.WithSession(new("sys","A",0,null,"System sounds",true,SessionState.Active,0.5f,false));
+        f.System.WithSession(VolumeFixture.Session("zoom","B",125,@"C:\Apps\Zoom.exe",SessionState.Inactive) with { AppName = "Zoom" });
+        f.System.WithSession(VolumeFixture.Session("audacity","B",126,@"C:\Apps\Audacity.exe") with { AppName = "Audacity" });
+        await f.Start();
+        Assert.Equal(["Audacity","Music","Zoom","System sounds"],f.Module.Apps.Select(a=>a.Name));
+        Assert.Equal("2 playing",Assert.Single(f.Ui.Tiles).Status);
+    }
+
+    [Fact]
+    public async Task Remember_option_persists_without_changing_audio()
+    {
+        await using var f = new VolumeFixture(); await f.Start();
         await f.Module.SetRememberAsync(false);
-        Assert.False(f.Settings.Value.ShowQuietApps); Assert.False(f.Settings.Value.RememberOutputs);
+        Assert.False(f.Settings.Value.RememberOutputs);
         Assert.Empty(f.System.AppOutputWrites);
     }
 

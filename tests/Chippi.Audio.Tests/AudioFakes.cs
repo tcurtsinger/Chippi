@@ -24,8 +24,11 @@ public sealed class FakeDeviceSystem : IDeviceSystem, IPerAppDeviceSystem
 
     public bool AppPolicyAvailable { get; set; }
     public bool AppPolicyFailsWrite { get; set; }
+    /// <summary>Processes whose writes fail, as one app's can while the others' work.</summary>
+    public HashSet<int> AppPolicyFailsFor { get; } = [];
     public Dictionary<int, string?> AppOutputs { get; } = [];
     public List<(int Pid, string? Output)> AppOutputWrites { get; } = [];
+    public int AppOutputFailures { get; private set; }
     private int _appOutputReads;
     public int AppOutputReads => Volatile.Read(ref _appOutputReads);
     public AppDeviceChoice GetAppOutput(int processId)
@@ -35,7 +38,7 @@ public sealed class FakeDeviceSystem : IDeviceSystem, IPerAppDeviceSystem
     }
     public bool SetAppOutput(int processId, string? endpointId)
     {
-        if (!AppPolicyAvailable || AppPolicyFailsWrite) return false;
+        if (!AppPolicyAvailable || AppPolicyFailsWrite || AppPolicyFailsFor.Contains(processId)) { AppOutputFailures++; return false; }
         AppOutputs[processId] = endpointId;
         AppOutputWrites.Add((processId, endpointId));
         return true;

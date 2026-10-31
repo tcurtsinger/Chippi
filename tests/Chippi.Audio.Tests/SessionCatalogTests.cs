@@ -25,7 +25,7 @@ public class SessionCatalogTests
         Assert.Equal(AppKey.ForExe(@"C:\Apps\Chat.exe"), chat.Key);
         Assert.Equal(0.7f, chat.Volume); // the active session leads
         Assert.True(chat.IsActive);
-        Assert.Equal(["Spk", "Hdp"], chat.EndpointIds);
+        Assert.Equal(["Hdp", "Spk"], chat.EndpointIds); // where it's heard first
     }
 
     [Fact]

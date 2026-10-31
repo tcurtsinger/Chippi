@@ -19,36 +19,50 @@ public interface IPerAppDeviceSystem
 }
 
 /// <summary>
-/// Undocumented Windows policy, verified by the Phase 3 spike on build 26300 x64 only.
-/// No activation or vtable call is made outside that gate. A failed call disables this instance;
-/// volume and mute continue through documented Core Audio. Never calls the clear-all slot.
+/// Undocumented Windows policy, verified by the Phase 3 spike on build 26300 x64 only. No activation
+/// or vtable call is made outside that gate: a Windows that reorders the interface under the same
+/// IID can't be told apart at runtime (docs/phase-3/architecture.md). A format Chippi doesn't know
+/// turns this instance off at once; other failures may be one app's (a process that just closed), so
+/// it takes <see cref="FailuresAllowed"/> in a row. Volume and mute continue through documented Core
+/// Audio. Never calls the clear-all slot.
 /// </summary>
 internal sealed class PerAppDevicePolicy(ILogger logger) : IDisposable
 {
     private const string Prefix = @"\\?\SWD#MMDEVAPI#";
     private const string Suffix = "#{e6327cad-dcec-4949-ae8a-991e976a79d2}";
+    internal const int FailuresAllowed = 3;
     private IntPtr _factory;
     private bool _disabled;
     private bool _initialized;
+    private int _failures;
 
     public static bool IsVerifiedBuild(Version version, Architecture architecture) =>
         version.Major == 10 && version.Build == 26300 && architecture == Architecture.X64;
 
+    /// <summary>Why this PC has no per-app output, for Settings; null where it can have it.</summary>
+    public static string? Unsupported(Version version, Architecture os, Architecture process) =>
+        os != Architecture.X64 || process != Architecture.X64 ? "Not available on Arm PCs"
+        : version.Major != 10 || version.Build < 26300 ? "Needs Windows build 26300"
+        : !IsVerifiedBuild(version, os) ? $"Not checked on Windows build {version.Build} yet"
+        : null;
+
     public AppDeviceChoice Get(int pid)
     {
+        if (!Ensure()) return new(false);
         try
         {
-            if (!Ensure()) return new(false);
-            return new(true, Read(pid, AudioRole.Multimedia));
+            var endpoint = Read(pid, AudioRole.Multimedia);
+            _failures = 0;
+            return new(true, endpoint);
         }
-        catch (Exception ex) { logger.LogWarning(ex,"Per-app output read disabled on Windows {Build}",Environment.OSVersion.Version); _disabled = true; return new(false); }
+        catch (Exception ex) { Fail(ex, "read"); return new(false); }
     }
 
     public bool Set(int pid, string? endpoint)
     {
+        if (!Ensure()) return false;
         try
         {
-            if (!Ensure()) return false;
             // Probe every role before any write, and verify each write by reading it back.
             foreach (var role in Enum.GetValues<AudioRole>()) _ = Read(pid, role);
             var set = Marshal.GetDelegateForFunctionPointer<SetEndpoint>(Slot(25));
@@ -60,28 +74,42 @@ internal sealed class PerAppDevicePolicy(ILogger logger) : IDisposable
                 if (!string.Equals(Read(pid, role), endpoint, StringComparison.OrdinalIgnoreCase))
                     throw new InvalidOperationException("App output readback differs");
             }
+            _failures = 0;
             return true;
         }
-        catch (Exception ex) { logger.LogWarning(ex,"Per-app output write disabled on Windows {Build}",Environment.OSVersion.Version); _disabled = true; return false; }
+        catch (Exception ex) { Fail(ex, "write"); return false; }
+    }
+
+    private void Fail(Exception ex, string call)
+    {
+        _disabled = ex is FormatException || ++_failures >= FailuresAllowed;
+        logger.LogWarning(ex, "Per-app output {Call} failed on Windows {Build}{Off}", call, Environment.OSVersion.Version, _disabled ? "; turned off" : "");
     }
 
     private bool Ensure()
     {
         if (_disabled) return false;
         if (_factory != IntPtr.Zero) return true;
-        if (!IsVerifiedBuild(Environment.OSVersion.Version, RuntimeInformation.OSArchitecture)
-            || RuntimeInformation.ProcessArchitecture != Architecture.X64)
+        if (Unsupported(Environment.OSVersion.Version, RuntimeInformation.OSArchitecture, RuntimeInformation.ProcessArchitecture) is not null)
         { _disabled = true; return false; }
-        Marshal.ThrowExceptionForHR(RoInitialize(1));
-        _initialized = true;
-        var name = HString("Windows.Media.Internal.AudioPolicyConfig");
         try
         {
-            var iid = new Guid("ab3d4648-e242-459f-b02f-541c70306324");
-            Marshal.ThrowExceptionForHR(RoGetActivationFactory(name, ref iid, out _factory));
-            return _factory != IntPtr.Zero;
+            if (!_initialized)
+            {
+                Marshal.ThrowExceptionForHR(RoInitialize(1));
+                _initialized = true;
+            }
+            var name = HString("Windows.Media.Internal.AudioPolicyConfig");
+            try
+            {
+                var iid = new Guid("ab3d4648-e242-459f-b02f-541c70306324");
+                Marshal.ThrowExceptionForHR(RoGetActivationFactory(name, ref iid, out _factory));
+            }
+            finally { WindowsDeleteString(name); }
         }
-        finally { WindowsDeleteString(name); }
+        catch (Exception ex) { logger.LogWarning(ex, "Per-app output unavailable on Windows {Build}", Environment.OSVersion.Version); }
+        _disabled = _factory == IntPtr.Zero;
+        return !_disabled;
     }
 
     private string? Read(int pid, AudioRole role)
@@ -94,7 +122,7 @@ internal sealed class PerAppDevicePolicy(ILogger logger) : IDisposable
             var text = Marshal.PtrToStringUni(ptr, (int)length) ?? "";
             if (text.Length == 0) return null;
             if (!text.StartsWith(Prefix, StringComparison.OrdinalIgnoreCase) || !text.EndsWith(Suffix, StringComparison.OrdinalIgnoreCase))
-                throw new InvalidOperationException("Unknown app output format");
+                throw new FormatException("Unknown app output format");
             return text[Prefix.Length..^Suffix.Length];
         }
         finally { if (value != IntPtr.Zero) WindowsDeleteString(value); }

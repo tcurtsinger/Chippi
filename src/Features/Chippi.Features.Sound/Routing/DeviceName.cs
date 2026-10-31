@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using System.Windows.Media;
 using Chippi.Audio;
+using Chippi.UI.Controls;
 
 namespace Chippi.Features.Sound.Routing;
 
@@ -29,6 +31,32 @@ internal static class DeviceName
         foreach (var row in rows.Where(r => twice.Contains(shown[r.Id])))
             shown[row.Id] = row.Name;
         return shown;
+    }
+
+    /// <summary>Shown names for these outputs, as for the Sound page's rows.</summary>
+    public static IReadOnlyDictionary<string, string> Shown(IEnumerable<AudioEndpoint> outputs) =>
+        Shown(outputs.Select(e => new PriorityEntry(e.Id, e.Name)).ToList());
+
+    // Display audio: a monitor or TV over HDMI or DisplayPort. A board's own "High Definition Audio Device" isn't one.
+    private static readonly string[] Displays = ["NVIDIA High Definition Audio", "AMD High Definition Audio", "Display Audio"];
+
+    /// <summary>
+    /// The kind of device as App volume's glyph: earbuds, headphones (a headset, earphones), a monitor
+    /// for display audio, else a speaker. Read from Windows' names, so a renamed endpoint may read as a speaker.
+    /// </summary>
+    public static Geometry Glyph(AudioEndpoint? output)
+    {
+        if (output is null)
+            return LucideIcons.Speaker;
+        var (kind, device) = Split(output.Name) ?? ("", output.Name);
+        bool Has(string text, string part) => text.Contains(part, StringComparison.OrdinalIgnoreCase);
+        if (Has(output.Name, "buds") || Has(output.Name, "AirPods"))
+            return LucideIcons.Earbuds;
+        if (Has(kind, "Head") || Has(kind, "Earphone") || Has(device, "Headset") || Has(device, "Headphone"))
+            return LucideIcons.Headphones;
+        if (Displays.Any(d => Has(device, d) || Has(output.AdapterName, d)))
+            return LucideIcons.Monitor;
+        return LucideIcons.Speaker;
     }
 
     /// <summary>"INZONE Buds - Game" for "Speakers (INZONE Buds - Game)"; the name itself when it doesn't start with a kind.</summary>
