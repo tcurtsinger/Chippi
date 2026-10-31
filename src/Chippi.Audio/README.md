@@ -45,10 +45,12 @@ Tests use `FakePipelines` from AudioFakes.cs: nothing captures, renders or plays
 the engine through optional `IPerAppDeviceSystem`, with no default-role claim. Session snapshots
 include process IDs for detecting app return; persistence remains keyed by `AppKey`, never PID.
 
-`PerAppDevicePolicy` activates the undocumented factory only on native x64 Windows build 26300,
-the exact build verified by the Phase 3 spike. ARM64 and other builds keep volume and mute but hide
-the output picker, and `AudioService.AppOutputUnsupported` says why for Settings. Read probes must
-succeed before Set; each write is read back. A value in a format Chippi doesn't know disables the
-instance at once; other failures can be one app's (a process that just closed), so three in a row
-disable it, and a success starts the count again. Each is logged. It never calls clear-all. An output choice affects the next audio stream,
-not necessarily an existing stream. Tests use fake policy methods; no test changes real routing.
+`PerAppDevicePolicy` activates the undocumented factory on every Windows 11 build (22000 on), x64
+and ARM64: the interface ID and slots Windows' own volume mixer uses, verified by the Phase 3 spike
+on build 26300 x64. Activation asks for that interface ID, so a Windows that changed it fails before
+any slot is called. Windows 10 keeps volume and mute but hides the output picker, and
+`AudioService.AppOutputUnsupported` says why for Settings. Read probes must succeed before Set; each
+write is read back. A value in a format Chippi doesn't know disables the instance at once; other
+failures can be one app's (a process that just closed), so three in a row disable it, and a success
+starts the count again. Each is logged. It never calls clear-all. An output choice affects the next
+audio stream, not necessarily an existing stream. Tests use fake policy methods; no test changes real routing.

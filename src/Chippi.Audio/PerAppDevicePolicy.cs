@@ -19,12 +19,13 @@ public interface IPerAppDeviceSystem
 }
 
 /// <summary>
-/// Undocumented Windows policy, verified by the Phase 3 spike on build 26300 x64 only. No activation
-/// or vtable call is made outside that gate: a Windows that reorders the interface under the same
-/// IID can't be told apart at runtime (docs/phase-3/architecture.md). A format Chippi doesn't know
-/// turns this instance off at once; other failures may be one app's (a process that just closed), so
-/// it takes <see cref="FailuresAllowed"/> in a row. Volume and mute continue through documented Core
-/// Audio. Never calls the clear-all slot.
+/// Undocumented Windows policy, the one Windows' own volume mixer uses to set an app's output. Every
+/// Windows 11 build has it under one interface ID and slot layout (the one EarTrumpet relies on too);
+/// the Phase 3 spike verified it on build 26300 x64. Activation asks for that ID, so a Windows that
+/// changed it fails before any slot is called. Reads must come back in the endpoint format and every
+/// write is read back. A format Chippi doesn't know turns this instance off at once; other failures
+/// may be one app's (a process that just closed), so it takes <see cref="FailuresAllowed"/> in a row.
+/// Volume and mute continue through documented Core Audio. Never calls the clear-all slot.
 /// </summary>
 internal sealed class PerAppDevicePolicy(ILogger logger) : IDisposable
 {
@@ -36,15 +37,11 @@ internal sealed class PerAppDevicePolicy(ILogger logger) : IDisposable
     private bool _initialized;
     private int _failures;
 
-    public static bool IsVerifiedBuild(Version version, Architecture architecture) =>
-        version.Major == 10 && version.Build == 26300 && architecture == Architecture.X64;
+    /// <summary>Windows 11 (build 22000 on), x64 or ARM64: Chippi's own target (PLAN.md).</summary>
+    public static bool IsSupportedBuild(Version version) => version.Major == 10 && version.Build >= 22000;
 
     /// <summary>Why this PC has no per-app output, for Settings; null where it can have it.</summary>
-    public static string? Unsupported(Version version, Architecture os, Architecture process) =>
-        os != Architecture.X64 || process != Architecture.X64 ? "Not available on Arm PCs"
-        : version.Major != 10 || version.Build < 26300 ? "Needs Windows build 26300"
-        : !IsVerifiedBuild(version, os) ? $"Not checked on Windows build {version.Build} yet"
-        : null;
+    public static string? Unsupported(Version version) => IsSupportedBuild(version) ? null : "Needs Windows 11";
 
     public AppDeviceChoice Get(int pid)
     {
@@ -90,7 +87,7 @@ internal sealed class PerAppDevicePolicy(ILogger logger) : IDisposable
     {
         if (_disabled) return false;
         if (_factory != IntPtr.Zero) return true;
-        if (Unsupported(Environment.OSVersion.Version, RuntimeInformation.OSArchitecture, RuntimeInformation.ProcessArchitecture) is not null)
+        if (!IsSupportedBuild(Environment.OSVersion.Version))
         { _disabled = true; return false; }
         try
         {

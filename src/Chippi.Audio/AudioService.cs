@@ -2,7 +2,6 @@
 // Copyright (C) Chippi contributors
 
 using System.Collections.Concurrent;
-using System.Runtime.InteropServices;
 using Chippi.Audio.Processing;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -61,8 +60,7 @@ public sealed class AudioService
     }
 
     /// <summary>Why this PC can't set an app's output (Settings says so); null where it can.</summary>
-    public static string? AppOutputUnsupported { get; } = PerAppDevicePolicy.Unsupported(
-        Environment.OSVersion.Version, RuntimeInformation.OSArchitecture, RuntimeInformation.ProcessArchitecture);
+    public static string? AppOutputUnsupported { get; } = PerAppDevicePolicy.Unsupported(Environment.OSVersion.Version);
 
     /// <summary>The latest snapshot. <see cref="AudioSnapshot.Empty"/> while the engine is stopped.</summary>
     public AudioSnapshot Snapshot => _snapshot;
