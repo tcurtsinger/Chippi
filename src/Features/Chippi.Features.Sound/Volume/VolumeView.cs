@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using System.Globalization;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
@@ -8,6 +9,7 @@ using System.Windows.Media;
 using Chippi.Audio;
 using Chippi.Features.Sound.Routing;
 using Chippi.UI.Controls;
+using Chippi.UI.Themes;
 
 namespace Chippi.Features.Sound.Volume;
 
@@ -36,8 +38,10 @@ public sealed class VolumeView : UserControl
     private readonly List<Action> _updates = []; // Settings' options
     private Button? _more;
     private Grid? _moreStrip;
-    private int _density = -1; // the strips' widths (StripWidth); only narrows while the page is open
+    private int _built = -1; // the density (StripWidth) the strips were made at
+    private int _floor = -1; // while the page is open the strips only get narrower
     private string _watched = "";
+    private string? _errorShown; // the error this page showed: seen once the page closes on it
     private IDisposable? _meters;
     private bool _loaded;
     private bool _refreshing;
@@ -72,21 +76,28 @@ public sealed class VolumeView : UserControl
         bool island = surface == VolumeSurface.Island;
         Loaded += (_, _) =>
         {
-            // The island's page opened again starts from the apps playing now, at their widest.
-            if (_loaded && island) { _shown.Clear(); Clear(); _density = -1; }
+            // The island keeps this page: opened again, it starts from the apps playing now, at their
+            // widest, and keeps the strips it can (a rebuild is 10 to 20 ms for 14).
+            if (_loaded && island) { _shown.Clear(); _floor = -1; }
             _loaded = true;
             _module.Changed += Refresh;
+            ThemeManager.ThemeChanged += OnTheme;
             if (island) _module.Meters += OnMeters;
             Refresh();
         };
         Unloaded += (_, _) =>
         {
             _module.Changed -= Refresh;
+            ThemeManager.ThemeChanged -= OnTheme;
             if (island) _module.Meters -= OnMeters;
             _meters?.Dispose(); (_meters, _watched) = (null, "");
+            // An error this page showed has been seen: the next visit starts clean, unless a newer one came.
+            if (_errorShown is not null) _module.ClearError(_errorShown);
         };
         Refresh();
     }
+
+    private void OnTheme(object? sender, EventArgs e) => Refresh();
 
     private void Refresh()
     {
@@ -97,8 +108,10 @@ public sealed class VolumeView : UserControl
             if (_surface == VolumeSurface.Island) Strips(); else Rows();
             foreach (var item in _items.Values) item.Update();
             foreach (var update in _updates) update();
-            _error.Text = _module.Error ?? "";
-            _error.Visibility = _module.Error is null ? Visibility.Collapsed : Visibility.Visible;
+            _errorShown = _module.Error;
+            _error.Text = _errorShown ?? "";
+            _error.ToolTip = _errorShown;
+            _error.Visibility = _errorShown is null ? Visibility.Collapsed : Visibility.Visible;
         }
         finally { _refreshing = false; }
     }
@@ -122,16 +135,16 @@ public sealed class VolumeView : UserControl
             shown = shown.Where(a => kept.Contains(a.Key)).ToList();
         }
         int more = _shown.Count - shown.Count;
-        int density = Math.Max(_density, Density(shown.Count + (more > 0 ? 1 : 0)));
-        if (density != _density) { Clear(); _density = density; }
+        int density = _floor = Math.Max(_floor, Density(shown.Count + (more > 0 ? 1 : 0)));
+        if (density != _built) { Clear(); _built = density; }
         Sync(shown.Select(a => a.Key).ToList(), key => Strip(key, density));
         if (more > 0)
         {
             _moreStrip ??= More(density);
             if (_list.Children.IndexOf(_moreStrip) != _list.Children.Count - 1) { _list.Children.Remove(_moreStrip); _list.Children.Add(_moreStrip); }
-            _more!.Content = $"+{more}";
+            _more!.Content = more > 99 ? "99+" : $"+{more}";
             _more.ToolTip = $"{more} more in Settings";
-            AutomationProperties.SetName(_more, $"{more} more apps, open Settings");
+            AutomationProperties.SetName(_more, $"{more} more apps, open Settings"); // never fewer than 2: 13 strips are kept
         }
         else if (_moreStrip is not null) { _list.Children.Remove(_moreStrip); (_more, _moreStrip) = (null, null); }
         foreach (FrameworkElement strip in _list.Children)
@@ -182,21 +195,33 @@ public sealed class VolumeView : UserControl
 
     private AppAudio? App(AppKey key) => _module.Snapshot.Apps.FirstOrDefault(a => a.Key == key);
     private (float Volume, bool Muted) Level(AppKey key) => App(key) is { } app ? (app.Volume, app.Muted) : (0, false);
-    private string AppName(AppKey key) => App(key)?.Name ?? "App";
+    private string AppName(AppKey key) => App(key) is { } app ? AppVolumeModule.NameOf(app) : "App";
 
     internal static int Density(int count) => count <= 7 ? 0 : count <= 12 ? 1 : 2;
     internal static double StripWidth(int count) => Widths[Density(count)];
     private static readonly double[] Widths = [56, 34, 28];
 
-    /// <summary>"MT" for Microsoft Teams, its words' first letters; a one-word name keeps its first two ("Py" for Python).</summary>
+    /// <summary>
+    /// "MT" for Microsoft Teams, its words' first letters; a one-word name keeps its first two ("Py" for
+    /// Python). Only letters and digits, as whole characters: "SP" for "🎧 Studio Pro", "7Z" for 7-Zip,
+    /// and an accented letter is never split from its accent. A name with none keeps its first character.
+    /// </summary>
     internal static string Initials(string name)
     {
-        var words = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        return words.Length switch
+        static List<string> Letters(string word)
         {
-            0 => "",
-            1 => new string(words[0].Take(2).ToArray()),
-            _ => string.Concat(words.Take(2).Select(w => char.ToUpperInvariant(w[0]))),
+            var letters = new List<string>();
+            var each = StringInfo.GetTextElementEnumerator(word);
+            while (each.MoveNext())
+                if (char.IsLetterOrDigit(each.GetTextElement(), 0)) letters.Add(each.GetTextElement());
+            return letters;
+        }
+        var words = name.Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(Letters).Where(w => w.Count > 0).ToList();
+        return words.Count switch
+        {
+            0 => name.Trim() is { Length: > 0 } rest ? StringInfo.GetNextTextElement(rest) : "",
+            1 => string.Concat(words[0].Take(2)),
+            _ => string.Concat(words.Take(2).Select(w => w[0].ToUpperInvariant())),
         };
     }
 
@@ -232,7 +257,6 @@ public sealed class VolumeView : UserControl
         var mute = new Button { Content = icon, Width = 28, Height = 28, HorizontalAlignment = HorizontalAlignment.Center };
         mute.SetResourceReference(StyleProperty, "IslandIconButtonStyle");
         mute.Click += (_, _) => Run(_module.SetMutedAsync(key, !Level(key).Muted));
-        Grid.SetRow(mute, 1); strip.Children.Add(mute);
 
         var bar = new Grid { Width = barWidth, Margin = new Thickness(0, 6, 0, 6), Background = Brushes.Transparent };
         Grid.SetRow(bar, 0); strip.Children.Add(bar);
@@ -250,6 +274,8 @@ public sealed class VolumeView : UserControl
         var slider = new Slider { Minimum = 0, Maximum = 100, SmallChange = 5, LargeChange = 10, Orientation = Orientation.Vertical, Height = double.NaN, Opacity = 0, IsHitTestVisible = false };
         slider.SetResourceReference(StyleProperty, "IslandSliderStyle");
         bar.Children.Add(slider);
+        // Tab reads the strip from the top: the level, then Mute, then the output.
+        Grid.SetRow(mute, 1); strip.Children.Add(mute);
 
         var percentage = new TextBlock { FontSize = 12, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
         percentage.SetResourceReference(TextBlock.ForegroundProperty, "IslandTextBrush");
@@ -318,11 +344,12 @@ public sealed class VolumeView : UserControl
         string shownName = "";
         return new Item(strip, () =>
         {
-            if (!bar.IsMouseCaptured && !slider.IsKeyboardFocusWithin) slider.Value = Level(key).Volume * 100;
+            // Not while a drag or a write is under way: the level would jump back to a step already passed.
+            if (!bar.IsMouseCaptured && !write.Busy) slider.Value = Level(key).Volume * 100;
             if (AppName(key) != shownName)
             {
                 shownName = AppName(key);
-                name.Text = FitName(shownName, name);
+                name.Text = density == 0 ? FitName(shownName, name) : shownName; // narrower strips have no name row
                 name.ToolTip = shownName;
                 AutomationProperties.SetName(slider, shownName + " volume");
             }
@@ -375,12 +402,17 @@ public sealed class VolumeView : UserControl
             return measure.DesiredSize.Height <= target.Height + 0.01;
         }
         if (Fits(full)) return full;
-        for (int length = full.Length - 1; length > 0; length--)
+        // The longest start that fits with the ellipsis, found by halving, cut between whole characters.
+        var starts = StringInfo.ParseCombiningCharacters(full);
+        string? best = null;
+        for (int low = 1, high = starts.Length - 1; low <= high;)
         {
+            int middle = (low + high) / 2, length = starts[middle];
             var candidate = full[..length].TrimEnd() + "\u2026";
-            if (Fits(candidate)) return candidate;
+            if (Fits(candidate)) (best, low) = (candidate, middle + 1);
+            else high = middle - 1;
         }
-        return "\u2026";
+        return best ?? "\u2026";
     }
 
     private string OutputName(string? id, IReadOnlyDictionary<string, string> names) =>
@@ -431,7 +463,10 @@ public sealed class VolumeView : UserControl
             button.IsEnabled = _module.CanPickOutput(key);
             var where = plays is null ? "" : "plays on " + OutputName(plays, names);
             var connected = _module.Outputs.Any(o => string.Equals(o.Id, chosen, StringComparison.OrdinalIgnoreCase));
-            string tip = !elsewhere ? (where.Length == 0 ? "Output" : char.ToUpperInvariant(where[0]) + where[1..] + (own ? "" : " · Default"))
+            string tip = !button.IsEnabled ? (where.Length == 0 ? "Output" : char.ToUpperInvariant(where[0]) + where[1..])
+                    // Off, it says why: per-app output is off here, or this app has no program to set it for.
+                    + " · " + (_module.OutputsOff ?? "Its output can't be set")
+                : !elsewhere ? (where.Length == 0 ? "Output" : char.ToUpperInvariant(where[0]) + where[1..] + (own ? "" : " · Default"))
                 : chosen is null ? $"Default · {OutputName(_module.DefaultOutput, names)} · still {where}"
                 : connected ? $"Picked {OutputName(chosen, names)} · still {where}"
                 : $"{OutputName(chosen, names)} not connected · {where}";
@@ -470,7 +505,9 @@ public sealed class VolumeView : UserControl
         var (output, updateOutput) = OutputCombo(key);
         output.Margin = new Thickness(8, 0, 0, 0);
         RoutingUi.Add(grid, output, 5);
-        var row = new Border { Child = grid, MinHeight = SettingsLayout.RowHeight, Padding = SettingsLayout.RowPadding };
+        // Every row is a captioned row's height, so a caption coming and going as apps start and stop
+        // playing never moves the rows under it.
+        var row = new Border { Child = grid, MinHeight = SettingsLayout.CaptionRowHeight, Padding = SettingsLayout.RowPadding };
         void Paint()
         {
             bool muted = Level(key).Muted;
@@ -487,16 +524,16 @@ public sealed class VolumeView : UserControl
         slider.ValueChanged += (_, _) => { Paint(); if (!_refreshing) write.Send(() => _module.SetVolumeAsync(key, (float)slider.Value / 100)); };
         return new Item(row, () =>
         {
-            if (!slider.IsMouseCaptureWithin && !slider.IsKeyboardFocusWithin) slider.Value = Level(key).Volume * 100;
+            if (!slider.IsMouseCaptureWithin && !write.Busy) slider.Value = Level(key).Volume * 100;
             name.Text = AppName(key);
             name.ToolTip = AppName(key);
             AutomationProperties.SetName(slider, AppName(key) + " volume");
             var (text, brush) = _module.PlaysElsewhere(key) ? ("Still plays on " + OutputName(_module.PlaysOn(key), DeviceName.Shown(_module.Outputs)), "WarningTextBrush")
                 : App(key) is { IsActive: false } && key != AppKey.SystemSounds ? ("Not playing", "TextTertiaryBrush") : ("", "TextTertiaryBrush");
             caption.Text = text;
+            caption.ToolTip = text.Length == 0 ? null : text;
             caption.SetResourceReference(TextBlock.ForegroundProperty, brush);
             caption.Visibility = text.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
-            row.MinHeight = text.Length == 0 ? SettingsLayout.RowHeight : SettingsLayout.CaptionRowHeight;
             updateOutput();
             Paint();
         });

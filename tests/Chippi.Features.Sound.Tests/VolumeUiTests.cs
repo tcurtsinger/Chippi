@@ -9,6 +9,7 @@ using System.Windows.Input;
 using System.Windows.Threading;
 using Chippi.Audio;
 using Chippi.Features.Sound.Volume;
+using Chippi.UI.Controls;
 using static Chippi.Features.Sound.Tests.RoutingFixture;
 namespace Chippi.Features.Sound.Tests;
 public sealed class VolumeUiTests
@@ -63,8 +64,82 @@ public sealed class VolumeUiTests
     [InlineData("Microsoft Teams", "MT")]
     [InlineData("Microsoft Teams (work or school)", "MT")]
     [InlineData("VLC media player", "VM")]
+    [InlineData("🎧 Studio Pro", "SP")] // letters only: the emoji stays in the name
+    [InlineData("🎧Mix", "Mi")]
+    [InlineData("7-Zip", "7Z")]
+    [InlineData("éclair", "éc")]
+    [InlineData("🎧🎵", "🎧")] // no letters: its first character, whole
     public void Fallback_distinguishes_apps_sharing_the_first_letter(string name, string expected) =>
         Assert.Equal(expected, VolumeView.Initials(name));
+
+    // The island keeps its page: opened again, the strips that still fit are the same ones, not rebuilt.
+    [Fact]
+    public async Task Reopening_the_page_keeps_its_strips()
+    {
+        await using var f = new VolumeFixture(); await f.Start();
+        await Sta(() =>
+        {
+            var view = new VolumeView(f.Module, VolumeSurface.Island);
+            view.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));
+            var slider = Descendants(view).OfType<Slider>().Single();
+            view.RaiseEvent(new RoutedEventArgs(FrameworkElement.UnloadedEvent));
+            view.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));
+            Assert.Same(slider, Descendants(view).OfType<Slider>().Single());
+            return Task.CompletedTask;
+        });
+    }
+
+    // An error the page showed is gone on the next visit; one that came after it stays.
+    [Fact]
+    public async Task An_error_shown_is_cleared_when_the_page_closes()
+    {
+        await using var f = new VolumeFixture(); await f.Start(); f.System.AppPolicyFailsWrite = true;
+        await Sta(async () =>
+        {
+            var view = new VolumeView(f.Module, VolumeSurface.Island);
+            view.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));
+            await Assert.ThrowsAnyAsync<InvalidOperationException>(() => f.Module.SetOutputAsync(VolumeFixture.Key, "B"));
+            await Until(() => Descendants(view).OfType<TextBlock>().Any(t => t.Text == "Switch failed · Music" && t.Visibility == Visibility.Visible));
+            view.RaiseEvent(new RoutedEventArgs(FrameworkElement.UnloadedEvent));
+            Assert.Null(f.Module.Error);
+
+            view.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));
+            view.RaiseEvent(new RoutedEventArgs(FrameworkElement.UnloadedEvent));
+            await Assert.ThrowsAnyAsync<InvalidOperationException>(() => f.Module.SetOutputAsync(VolumeFixture.Key, "B"));
+            Assert.Equal("Switch failed · Music", f.Module.Error); // came while the page was closed: not seen yet
+        });
+    }
+
+    // Off, the output button still says where the app plays, and why it can't be changed.
+    [Fact]
+    public async Task An_output_that_cant_be_picked_says_why()
+    {
+        await using var f = new VolumeFixture(); f.System.AppPolicyAvailable = false; await f.Start();
+        await Sta(() =>
+        {
+            var view = new VolumeView(f.Module, VolumeSurface.Island);
+            var output = Descendants(view).OfType<Button>().Single(b => AutomationProperties.GetName(b) == "Music output");
+            Assert.False(output.IsEnabled);
+            Assert.Equal($"Plays on A · {f.Module.OutputsOff}", output.ToolTip);
+            return Task.CompletedTask;
+        });
+    }
+
+    // A program whose description is blank goes by its file name, here and in its errors.
+    [Fact]
+    public async Task An_app_without_a_name_goes_by_its_program()
+    {
+        await using var f = new VolumeFixture();
+        f.System.EndSession("one");
+        f.System.WithSession(VolumeFixture.Session("one", "A", 123) with { AppName = "  " });
+        await f.Start();
+        await Sta(() =>
+        {
+            var view = new VolumeView(f.Module, VolumeSurface.Island);
+            Assert.Equal(["Music volume"], Descendants(view).OfType<Slider>().Select(AutomationProperties.GetName));
+            return Task.CompletedTask;
+        });
+    }
 
     // The island shows what's playing; Settings lists every app, saying which aren't.
     [Fact]
@@ -80,6 +155,9 @@ public sealed class VolumeUiTests
             var settings = new VolumeView(f.Module, VolumeSurface.Settings);
             Assert.Equal(["Music volume", "Quiet volume"], Descendants(settings).OfType<Slider>().Select(AutomationProperties.GetName));
             Assert.Contains(Descendants(settings).OfType<TextBlock>(), t => t.Text == "Not playing" && t.Visibility == Visibility.Visible);
+            // Captioned or not, the rows are one height, so a caption coming and going moves nothing.
+            var card = Descendants(settings).OfType<Card>().First();
+            Assert.All(card.Children.OfType<Border>(), row => Assert.Equal(SettingsLayout.CaptionRowHeight, row.MinHeight));
             return Task.CompletedTask;
         });
     }

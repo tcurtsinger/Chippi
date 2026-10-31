@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using System.IO;
 using Chippi.Audio;
 using Chippi.Core.Modules;
 using Microsoft.Extensions.Logging;
@@ -145,7 +146,21 @@ public sealed class AppVolumeModule(AudioService? audio = null) : IFeatureModule
     private void Save(AppVolumeSettings settings) { _context!.Settings.Save(settings); Settings = settings; }
 
     // "Switch failed · Spotify": what failed, for which app (DESIGN.md §3).
-    private string Failed(string verb, AppKey app) => $"{verb} failed · {Snapshot.Apps.FirstOrDefault(a => a.Key == app)?.Name ?? "App"}";
+    private string Failed(string verb, AppKey app) => $"{verb} failed · {(Snapshot.Apps.FirstOrDefault(a => a.Key == app) is { } audio ? NameOf(audio) : "App")}";
+
+    /// <summary>The app's name, or its program's file name when Windows gives it none (a blank description).</summary>
+    public static string NameOf(AppAudio app) =>
+        !string.IsNullOrWhiteSpace(app.Name) ? app.Name.Trim()
+        : Path.GetFileNameWithoutExtension(app.ExePath) is { Length: > 0 } file ? file
+        : "App";
+
+    /// <summary>Clears <paramref name="seen"/> once a page has shown it and closed; a newer error stays.</summary>
+    public void ClearError(string seen)
+    {
+        if (Error != seen) return;
+        Error = null;
+        Changed?.Invoke();
+    }
 
     private async Task Change(Func<Task> command, string failure)
     {
@@ -220,7 +235,7 @@ public sealed class AppVolumeModule(AudioService? audio = null) : IFeatureModule
                         _context?.Logger.LogWarning(ex, "Reapplying an app's output failed");
                         if (ex is not AppOutputPolicyException) continue; // the app or output went mid-write: the next read tries again
                         _failed.Add(app.Key);
-                        Error = $"Switch failed · {app.Name}";
+                        Error = $"Switch failed · {NameOf(app)}";
                     }
                 }
             }
@@ -235,7 +250,7 @@ public sealed class AppVolumeModule(AudioService? audio = null) : IFeatureModule
 
     internal static IReadOnlyList<AppAudio> Ordered(IEnumerable<AppAudio> apps) => apps
         .OrderBy(a => a.Key == AppKey.SystemSounds)
-        .ThenBy(a => a.Name, StringComparer.CurrentCultureIgnoreCase)
+        .ThenBy(NameOf, StringComparer.CurrentCultureIgnoreCase)
         .ThenBy(a => a.Key.Value, StringComparer.Ordinal)
         .ToList();
 

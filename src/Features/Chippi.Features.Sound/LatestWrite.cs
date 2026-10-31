@@ -13,6 +13,9 @@ internal sealed class LatestWrite
     private Func<Task>? _next;
     private bool _writing;
 
+    /// <summary>A write is running or waiting: the slider leads, and the level read back mustn't move it.</summary>
+    public bool Busy => _writing;
+
     public async void Send(Func<Task> write)
     {
         _next = write;

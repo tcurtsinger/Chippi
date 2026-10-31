@@ -98,7 +98,10 @@ internal static class RoutingUi
         Button? focus = null;
         foreach (var (item, index) in items.Select((item, index) => (item, index)))
         {
-            var button = new Button { Content = item.Label, IsEnabled = item.Enabled, HorizontalContentAlignment = HorizontalAlignment.Left, MinWidth = 160 };
+            // A long device name ends in "…" at 360 rather than stretching the menu across the screen.
+            var label = new TextBlock { Text = item.Label, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center };
+            var button = new Button { Content = label, IsEnabled = item.Enabled, HorizontalContentAlignment = HorizontalAlignment.Left, MinWidth = 160, MaxWidth = 360 };
+            AutomationProperties.SetName(button, item.Label);
             if (current >= 0)
             {
                 // A 20 column for the check, so the labels line up whichever item has it.
@@ -109,9 +112,8 @@ internal static class RoutingUi
                     check.SetResourceReference(LucideIcon.BrushProperty, "AccentBrush");
                     Add(row, check, 0);
                 }
-                Add(row, new TextBlock { Text = item.Label, VerticalAlignment = VerticalAlignment.Center }, 1);
+                Add(row, label, 1);
                 button.Content = row;
-                AutomationProperties.SetName(button, item.Label);
                 if (index == current && item.Enabled) focus = button;
             }
             button.SetResourceReference(FrameworkElement.StyleProperty, "FlyoutRowButtonStyle");
