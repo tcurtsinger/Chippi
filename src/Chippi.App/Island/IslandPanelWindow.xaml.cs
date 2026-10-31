@@ -777,6 +777,9 @@ public partial class IslandPanelWindow : Window
     /// <summary>The morph's clock, in Stopwatch ticks. Tests hold it still and move it themselves, so a late frame can't skip a step.</summary>
     internal Func<long> Clock { get; set; } = Stopwatch.GetTimestamp;
 
+    /// <summary>An open, page or close is still drawing its frames.</summary>
+    internal bool IsMorphing => _frame is not null;
+
     private bool _petAtPuck;
 
     /// <summary>

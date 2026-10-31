@@ -15,13 +15,13 @@ A Windows 11 tray app for the owner's own PC (C#, .NET 10, WPF): a widget on the
 
 ## Test
 
-- CI runs every project under `tests/` in Release on x64, in its own job beside the two builds. It builds `Chippi.slnx` once and runs the tests without building again, so a new test project must be in `Chippi.slnx`. Locally, run the projects your change touches, and let CI run the rest.
+- CI runs every project under `tests/` in Release on x64, in its own job beside the two builds. It builds `Chippi.slnx` once and runs the tests without building again, so a new test project must be in `Chippi.slnx`. Locally, run the projects your change touches, and let CI run the rest. A test file other projects link (`tests/Chippi.Island.Tests/WpfTestThread.cs` is in six feature test projects) needs `dotnet build Chippi.slnx -c Release` before you push.
 - CI runs once per pull request and once on `main` after a merge, not on branch pushes. A change that only touches Markdown, `docs/` or `phase-1-release-artifacts.csv` runs no CI.
 - Run in Release too when a test touches Debug-only members.
 - `Chippi.UiSmoke` drives real windows and keys on the desktop. It's skipped unless `CHIPPI_UI_SMOKE=1`; only enable it when the owner has set a time (`tests/Chippi.UiSmoke/README.md`).
 - Tests that show windows (`Chippi.Island.Tests` and the like), dev runs and renders may run while a game or Zoom is in front (the owner, 2026-10-29). While the owner is doing live checks, leave those tests to CI.
 - The CI runner's GPU has no engine counters, so tests that read hardware must accept null readings.
-- Make a flaky test deterministic with injected timers and clocks, not longer waits. Local runs share the owner's real mouse, so tests that press the widget pin its pointer (`IslandWindow.PointerAt`).
+- Make a flaky test deterministic with injected timers and clocks, not longer waits. Local runs share the owner's real mouse, so tests that press the widget pin its pointer (`IslandWindow.PointerAt`), and the island tests' hooks ignore the real keyboard and mouse (`IslandWindow.WatchesInput`). Wait for the panel's open, page or close with `IslandWindowTests.Settle`, not a fixed pump.
 
 ## Run it
 

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -103,7 +104,7 @@ public sealed class IslandWindowTests
             Assert.True(window.IsIslandOpen);
             Assert.Equal(Visibility.Collapsed, window.SongCopy.Visibility);
             window.Escape();
-            Pump(TimeSpan.FromMilliseconds(400));
+            Settle(window.Panel);
             Assert.False(window.IsIslandOpen);
             if (!Chippi.UI.Themes.Motion.IsReduced)
                 Assert.Equal(Visibility.Visible, window.SongCopy.Visibility);
@@ -228,7 +229,7 @@ public sealed class IslandWindowTests
             Assert.True(window.IsIslandOpen);
             Assert.True(window.IsHooked);
             Assert.Equal(Visibility.Hidden, window.Body.Visibility); // the panel is the widget's shape now
-            Pump(TimeSpan.FromMilliseconds(400)); // the morph out of the puck
+            Settle(window.Panel); // the morph out of the puck
             Assert.Equal(0, window.PuckEnd.Opacity); // nothing of the puck left over the panel
             var area = window.CurrentArea!.Value;
             var panel = window.Panel.Footprint;
@@ -237,7 +238,7 @@ public sealed class IslandWindowTests
             Assert.Equal(puck.Right, panel.Right, 1); // the puck's corner is the panel's, up and left from where it starts
             Assert.Equal(puck.Bottom, panel.Bottom, 1);
             window.Escape();
-            Pump(TimeSpan.FromMilliseconds(400)); // folding back
+            Settle(window.Panel); // folding back
             Assert.False(window.IsIslandOpen);
             Assert.Equal(Visibility.Visible, window.Body.Visibility);
             Assert.Equal(1, window.PuckEnd.Opacity);
@@ -255,11 +256,11 @@ public sealed class IslandWindowTests
             var bar = window.WidgetRect;
             Assert.Equal(IslandGeometry.BarRect(window.PuckRect, window.OpensLeft, window.CurrentArea!.Value.Scale), bar);
             Click(window);
-            Pump(TimeSpan.FromMilliseconds(400));
+            Settle(window.Panel);
             Assert.Equal(IslandPanelWindow.NowPlayingKey, window.Panel.CurrentPage); // the song's bar opens Now Playing
             Assert.Equal(0, window.BarLayer.Opacity);
             window.Escape();
-            Pump(TimeSpan.FromMilliseconds(400));
+            Settle(window.Panel);
             Assert.True(window.BarShown);
             Assert.Equal(1, window.BarLayer.Opacity);
             Assert.Equal(bar, window.WidgetRect);
@@ -519,6 +520,33 @@ public sealed class IslandWindowTests
                 Thread.Sleep(10);
         }
         while (DateTime.UtcNow < until);
+    }
+
+    /// <summary>Runs the dispatcher until ready (frames included), for at most 5 seconds.</summary>
+    internal static void PumpUntil(Func<bool> ready)
+    {
+        var until = DateTime.UtcNow.AddSeconds(5);
+        while (!ready() && DateTime.UtcNow < until)
+            Pump(TimeSpan.FromMilliseconds(5));
+        Assert.True(ready());
+    }
+
+    /// <summary>
+    /// Plays the panel's open, page or close to its end by frames, not by the wall clock: what's queued runs
+    /// first (Esc closes from the dispatcher), then the clock jumps a second at each frame, so the morph ends
+    /// on its next frames however late a busy runner draws them.
+    /// </summary>
+    internal static void Settle(IslandPanelWindow panel)
+    {
+        var wall = panel.Clock;
+        long now = wall();
+        panel.Clock = () => now += Stopwatch.Frequency;
+        try
+        {
+            Pump(TimeSpan.Zero);
+            PumpUntil(() => !panel.IsMorphing);
+        }
+        finally { panel.Clock = wall; }
     }
 }
 

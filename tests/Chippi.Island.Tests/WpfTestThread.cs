@@ -6,9 +6,12 @@ using System.Windows.Threading;
 
 namespace Chippi.Island.Tests;
 
-internal static class WpfTestThread
+internal static partial class WpfTestThread
 {
     internal static string ShotsTheme => Environment.GetEnvironmentVariable("CHIPPI_SHOTS_THEME") == "light" ? "Light" : "Dark";
+
+    /// <summary>A project's own setup on the UI thread before its first test; the island tests' is in WpfTestThread.Island.cs.</summary>
+    static partial void Prepare();
 
     private static readonly Lazy<Dispatcher> Ui = new(() =>
     {
@@ -18,6 +21,7 @@ internal static class WpfTestThread
             try
             {
                 var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
+                Prepare();
                 // Shots render in the light theme with CHIPPI_SHOTS_THEME=light.
                 foreach (var source in new[] { $"Themes/{ShotsTheme}.xaml", "Themes/Palette.xaml", "Themes/SharedStyles.xaml", "Controls/Controls.xaml" })
                     app.Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri($"pack://application:,,,/Chippi.UI;component/{source}") });

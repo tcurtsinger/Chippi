@@ -61,16 +61,16 @@ public sealed class ShellMotionTests
     public void A_page_comes_in_from_the_right_and_the_home_from_the_left() => WpfTestThread.Run(() => WithMotion(false, () => WithPanel(panel =>
     {
         panel.Open(IslandGeometry.Start(Offscreen.Work, 1), Offscreen);
-        Pump(TimeSpan.FromMilliseconds(400));
+        IslandWindowTests.Settle(panel);
         panel.ShowPage("keep-awake");
         Assert.Equal(12, panel.PageShift.X, 1); // into a page: from the right
         Assert.Equal(0, panel.Card.Opacity, 2);
-        Pump(TimeSpan.FromMilliseconds(400));
+        IslandWindowTests.Settle(panel);
         Assert.Equal(0, panel.PageShift.X, 3);
         Assert.Equal(1, panel.Card.Opacity, 3);
         panel.ShowPage(null, remember: false);
         Assert.Equal(-12, panel.PageShift.X, 1); // back home: from the left
-        Pump(TimeSpan.FromMilliseconds(400));
+        IslandWindowTests.Settle(panel);
         Assert.Equal(0, panel.PageShift.X, 3);
     })));
 
@@ -80,15 +80,15 @@ public sealed class ShellMotionTests
         panel.Open(IslandGeometry.Start(Offscreen.Work, 1), Offscreen);
         Assert.Equal(IslandPage.Width, panel.Shape.Width, 1); // no growing: it's the panel from the first frame
         Assert.True(panel.Root.Opacity < 1);
-        Pump(TimeSpan.FromMilliseconds(300));
+        IslandWindowTests.Settle(panel);
         Assert.Equal(1, panel.Root.Opacity, 3);
         panel.ShowPage("keep-awake");
         Assert.Equal(0, panel.PageShift.X); // no slide, only the fade
-        Pump(TimeSpan.FromMilliseconds(300));
+        IslandWindowTests.Settle(panel);
         panel.CloseIsland();
         Assert.True(panel.IsVisible); // fading out where it is
         Assert.Equal(IslandPage.Width, panel.Shape.Width, 1);
-        Pump(TimeSpan.FromMilliseconds(300));
+        IslandWindowTests.Settle(panel);
         Assert.False(panel.IsVisible);
         Assert.Equal(1, panel.Root.Opacity); // ready for the next open
     })));
@@ -146,7 +146,7 @@ public sealed class ShellMotionTests
         })
         {
             panel.Open(puck, Offscreen);
-            Pump(TimeSpan.FromMilliseconds(400));
+            IslandWindowTests.Settle(panel);
             Assert.Equal(meets, panel.PetMeetsPuck);
             var grid = Assert.IsType<IslandGrid>(panel.Page.Content);
             var pet = grid.Pet.PointToScreen(new Point(grid.Pet.ActualWidth / 2, grid.Pet.ActualHeight / 2));
@@ -173,7 +173,7 @@ public sealed class ShellMotionTests
         void Frame()
         {
             int at = frames;
-            PumpUntil(() => frames > at);
+            IslandWindowTests.PumpUntil(() => frames > at);
         }
         void Advance(double ms)
         {
@@ -202,15 +202,6 @@ public sealed class ShellMotionTests
         Advance(300);
         Assert.Equal(1, window.PetScale.ScaleX, 3);
     })));
-
-    // Runs the dispatcher until ready (frames included), for at most 5 seconds.
-    private static void PumpUntil(Func<bool> ready)
-    {
-        var until = DateTime.UtcNow.AddSeconds(5);
-        while (!ready() && DateTime.UtcNow < until)
-            IslandWindowTests.Pump(TimeSpan.FromMilliseconds(5));
-        Assert.True(ready());
-    }
 
     [Fact]
     public void Laying_the_home_out_ahead_leaves_the_panel_closed() => WpfTestThread.Run(() => WithPanel(panel =>
@@ -252,9 +243,9 @@ public sealed class ShellMotionTests
 
             panel.SetLastPage(null);
             panel.Open(IslandGeometry.Start(Offscreen.Work, 1), Offscreen);
-            Pump(TimeSpan.FromMilliseconds(400));
+            IslandWindowTests.Settle(panel);
             panel.ShowPage("keep-awake");
-            Pump(TimeSpan.FromMilliseconds(400));
+            IslandWindowTests.Settle(panel);
             Assert.Equal(1, built); // the first open shows the one built ahead
             Assert.NotNull(panel.PageBody);
         }
