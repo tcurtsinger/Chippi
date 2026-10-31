@@ -132,3 +132,25 @@ public sealed class InvalidExplorerProfileTests
         }
     }
 }
+
+[Collection("DownloadsProfileEnvironment")]
+public sealed class TestHostExplorerTests
+{
+    /// <summary>
+    /// SettingsWindowTests start a module like this, which could delete the owner's ChippiOrganize entry. Start, uninstall
+    /// and Save change only what this returns, so it's checked without starting anything.
+    /// </summary>
+    [Theory]
+    [InlineData(null)]
+    [InlineData("test")]
+    public void A_test_hosted_module_never_targets_the_real_Explorer_menu(string? profile)
+    {
+        string? before = Environment.GetEnvironmentVariable("CHIPPI_DEV_PROFILE");
+        try
+        {
+            Environment.SetEnvironmentVariable("CHIPPI_DEV_PROFILE", profile);
+            Assert.Null(new DownloadsModule().GetExplorer());
+        }
+        finally { Environment.SetEnvironmentVariable("CHIPPI_DEV_PROFILE", before); }
+    }
+}

@@ -236,10 +236,17 @@ public sealed class DownloadsModule : IFeatureModule
         return Task.CompletedTask;
     }
 
-    private ExplorerRegistration? GetExplorer()
+    /// <summary>The injected registration, else this run's. None in a test host: the owner's Explorer menu is Chippi.exe's alone.</summary>
+    internal ExplorerRegistration? GetExplorer()
     {
         if (_explorer is not null) return _explorer;
-        try { return _explorer = new ExplorerRegistration(Environment.GetEnvironmentVariable("CHIPPI_DEV_PROFILE")); }
+        try
+        {
+            var explorer = new ExplorerRegistration(Environment.GetEnvironmentVariable("CHIPPI_DEV_PROFILE"));
+            if (explorer.CanChange) return _explorer = explorer;
+            _context?.Logger.LogInformation("Skipping Explorer registration outside Chippi.exe");
+            return null;
+        }
         catch (ArgumentException ex)
         {
             _context?.Logger.LogWarning(ex, "Skipping Explorer registration for an invalid dev profile");
