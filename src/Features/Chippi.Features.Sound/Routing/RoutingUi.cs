@@ -83,7 +83,8 @@ internal static class RoutingUi
         return toggle;
     }
 
-    public static void Menu(FrameworkElement anchor, IEnumerable<(string Label, Action Action, bool Enabled)> items)
+    /// <summary>A popup menu under <paramref name="anchor"/>. With <paramref name="current"/>, that item gets a check and the focus.</summary>
+    public static void Menu(FrameworkElement anchor, IEnumerable<(string Label, Action Action, bool Enabled)> items, int current = -1)
     {
         var stack = new StackPanel();
         var border = new Border { Child = stack, Padding = new Thickness(4), CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(1) };
@@ -94,9 +95,25 @@ internal static class RoutingUi
         border.SetValue(TextElement.FontSizeProperty, 14d);
         var popup = new Popup { Child = border, PlacementTarget = anchor, Placement = PlacementMode.Bottom, StaysOpen = false, AllowsTransparency = true };
         var buttons = new List<Button>();
-        foreach (var item in items)
+        Button? focus = null;
+        foreach (var (item, index) in items.Select((item, index) => (item, index)))
         {
             var button = new Button { Content = item.Label, IsEnabled = item.Enabled, HorizontalContentAlignment = HorizontalAlignment.Left, MinWidth = 160 };
+            if (current >= 0)
+            {
+                // A 20 column for the check, so the labels line up whichever item has it.
+                var row = Columns(new GridLength(20), new(1, GridUnitType.Star));
+                if (index == current)
+                {
+                    var check = new LucideIcon { Data = LucideIcons.Check, Size = 12, VerticalAlignment = VerticalAlignment.Center };
+                    check.SetResourceReference(LucideIcon.BrushProperty, "AccentBrush");
+                    Add(row, check, 0);
+                }
+                Add(row, new TextBlock { Text = item.Label, VerticalAlignment = VerticalAlignment.Center }, 1);
+                button.Content = row;
+                AutomationProperties.SetName(button, item.Label);
+                if (index == current && item.Enabled) focus = button;
+            }
             button.SetResourceReference(FrameworkElement.StyleProperty, "FlyoutRowButtonStyle");
             button.Click += (_, _) => { popup.IsOpen = false; item.Action(); };
             stack.Children.Add(button);
@@ -116,7 +133,7 @@ internal static class RoutingUi
         popup.Closed += (_, _) => anchor.Unloaded -= Close;
         void Close(object sender, RoutedEventArgs args) => popup.IsOpen = false;
         popup.IsOpen = true;
-        buttons.FirstOrDefault()?.Focus();
+        (focus ?? buttons.FirstOrDefault())?.Focus();
     }
 
     public static Grid Columns(params GridLength[] columns)

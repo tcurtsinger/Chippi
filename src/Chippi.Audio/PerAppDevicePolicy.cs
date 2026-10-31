@@ -19,36 +19,48 @@ public interface IPerAppDeviceSystem
 }
 
 /// <summary>
-/// Undocumented Windows policy, verified by the Phase 3 spike on build 26300 x64 only.
-/// No activation or vtable call is made outside that gate. A failed call disables this instance;
-/// volume and mute continue through documented Core Audio. Never calls the clear-all slot.
+/// Undocumented Windows policy, the one Windows' own volume mixer uses to set an app's output. Every
+/// Windows 11 build has it under one interface ID and slot layout (the one EarTrumpet relies on too);
+/// the Phase 3 spike verified it on build 26300 x64. Activation asks for that ID, so a Windows that
+/// changed it fails before any slot is called. Reads must come back in the endpoint format and every
+/// write is read back. A format Chippi doesn't know turns this instance off at once; other failures
+/// may be one app's (a process that just closed), so reads and writes each count their own
+/// (<see cref="FailedProcesses"/>). Volume and mute continue through documented Core Audio. Never
+/// calls the clear-all slot.
 /// </summary>
 internal sealed class PerAppDevicePolicy(ILogger logger) : IDisposable
 {
     private const string Prefix = @"\\?\SWD#MMDEVAPI#";
     private const string Suffix = "#{e6327cad-dcec-4949-ae8a-991e976a79d2}";
+    private readonly FailedProcesses _reads = new();
+    private readonly FailedProcesses _writes = new();
     private IntPtr _factory;
     private bool _disabled;
     private bool _initialized;
 
-    public static bool IsVerifiedBuild(Version version, Architecture architecture) =>
-        version.Major == 10 && version.Build == 26300 && architecture == Architecture.X64;
+    /// <summary>Windows 11 (build 22000 on), x64 or ARM64: Chippi's own target (PLAN.md).</summary>
+    public static bool IsSupportedBuild(Version version) => version.Major == 10 && version.Build >= 22000;
+
+    /// <summary>Why this PC has no per-app output, for Settings; null where it can have it.</summary>
+    public static string? Unsupported(Version version) => IsSupportedBuild(version) ? null : "Needs Windows 11";
 
     public AppDeviceChoice Get(int pid)
     {
+        if (!Ensure()) return new(false);
         try
         {
-            if (!Ensure()) return new(false);
-            return new(true, Read(pid, AudioRole.Multimedia));
+            var endpoint = Read(pid, AudioRole.Multimedia);
+            _reads.Succeeded();
+            return new(true, endpoint);
         }
-        catch (Exception ex) { logger.LogWarning(ex,"Per-app output read disabled on Windows {Build}",Environment.OSVersion.Version); _disabled = true; return new(false); }
+        catch (Exception ex) { Fail(ex, _reads, pid, "read"); return new(false); }
     }
 
     public bool Set(int pid, string? endpoint)
     {
+        if (!Ensure()) return false;
         try
         {
-            if (!Ensure()) return false;
             // Probe every role before any write, and verify each write by reading it back.
             foreach (var role in Enum.GetValues<AudioRole>()) _ = Read(pid, role);
             var set = Marshal.GetDelegateForFunctionPointer<SetEndpoint>(Slot(25));
@@ -60,28 +72,42 @@ internal sealed class PerAppDevicePolicy(ILogger logger) : IDisposable
                 if (!string.Equals(Read(pid, role), endpoint, StringComparison.OrdinalIgnoreCase))
                     throw new InvalidOperationException("App output readback differs");
             }
+            _writes.Succeeded();
             return true;
         }
-        catch (Exception ex) { logger.LogWarning(ex,"Per-app output write disabled on Windows {Build}",Environment.OSVersion.Version); _disabled = true; return false; }
+        catch (Exception ex) { Fail(ex, _writes, pid, "write"); return false; }
+    }
+
+    private void Fail(Exception ex, FailedProcesses failures, int pid, string call)
+    {
+        _disabled = ex is FormatException || failures.Failed(pid);
+        logger.LogWarning(ex, "Per-app output {Call} failed on Windows {Build}{Off}", call, Environment.OSVersion.Version, _disabled ? "; turned off" : "");
     }
 
     private bool Ensure()
     {
         if (_disabled) return false;
         if (_factory != IntPtr.Zero) return true;
-        if (!IsVerifiedBuild(Environment.OSVersion.Version, RuntimeInformation.OSArchitecture)
-            || RuntimeInformation.ProcessArchitecture != Architecture.X64)
+        if (!IsSupportedBuild(Environment.OSVersion.Version))
         { _disabled = true; return false; }
-        Marshal.ThrowExceptionForHR(RoInitialize(1));
-        _initialized = true;
-        var name = HString("Windows.Media.Internal.AudioPolicyConfig");
         try
         {
-            var iid = new Guid("ab3d4648-e242-459f-b02f-541c70306324");
-            Marshal.ThrowExceptionForHR(RoGetActivationFactory(name, ref iid, out _factory));
-            return _factory != IntPtr.Zero;
+            if (!_initialized)
+            {
+                Marshal.ThrowExceptionForHR(RoInitialize(1));
+                _initialized = true;
+            }
+            var name = HString("Windows.Media.Internal.AudioPolicyConfig");
+            try
+            {
+                var iid = new Guid("ab3d4648-e242-459f-b02f-541c70306324");
+                Marshal.ThrowExceptionForHR(RoGetActivationFactory(name, ref iid, out _factory));
+            }
+            finally { WindowsDeleteString(name); }
         }
-        finally { WindowsDeleteString(name); }
+        catch (Exception ex) { logger.LogWarning(ex, "Per-app output unavailable on Windows {Build}", Environment.OSVersion.Version); }
+        _disabled = _factory == IntPtr.Zero;
+        return !_disabled;
     }
 
     private string? Read(int pid, AudioRole role)
@@ -94,7 +120,7 @@ internal sealed class PerAppDevicePolicy(ILogger logger) : IDisposable
             var text = Marshal.PtrToStringUni(ptr, (int)length) ?? "";
             if (text.Length == 0) return null;
             if (!text.StartsWith(Prefix, StringComparison.OrdinalIgnoreCase) || !text.EndsWith(Suffix, StringComparison.OrdinalIgnoreCase))
-                throw new InvalidOperationException("Unknown app output format");
+                throw new FormatException("Unknown app output format");
             return text[Prefix.Length..^Suffix.Length];
         }
         finally { if (value != IntPtr.Zero) WindowsDeleteString(value); }
@@ -125,4 +151,24 @@ internal sealed class PerAppDevicePolicy(ILogger logger) : IDisposable
     [DllImport("combase.dll")] private static extern int WindowsDeleteString(IntPtr value);
     [DllImport("combase.dll")] private static extern IntPtr WindowsGetStringRawBuffer(IntPtr value, out uint length);
 #pragma warning restore SYSLIB1054
+}
+
+/// <summary>
+/// One kind of policy call's failures since its last success. A process that just closed fails once;
+/// the same app tried again adds nothing; three different processes failing in a row means the policy
+/// itself doesn't work here. A success of the same kind starts over, and one of the other kind doesn't.
+/// </summary>
+internal sealed class FailedProcesses
+{
+    internal const int Allowed = 3;
+    private readonly HashSet<int> _pids = [];
+
+    /// <summary>Records a failure for this process; true once the policy should turn off.</summary>
+    public bool Failed(int pid)
+    {
+        _pids.Add(pid);
+        return _pids.Count >= Allowed;
+    }
+
+    public void Succeeded() => _pids.Clear();
 }

@@ -30,7 +30,10 @@ internal sealed class SessionCatalog(int ownProcessId)
         : !string.IsNullOrEmpty(s.ExePath) ? AppKey.ForExe(s.ExePath)
         : AppKey.ForName(s.AppName);
 
-    /// <summary>One entry per app, in first-seen order. An app reads as muted only when every session is.</summary>
+    /// <summary>
+    /// One entry per app, in first-seen order. An app reads as muted only when every session is. Its
+    /// outputs list where an active session plays first: where the app is heard.
+    /// </summary>
     public static IReadOnlyList<AppAudio> Group(IReadOnlyList<AudioSessionInfo> sessions) =>
         sessions
             .GroupBy(KeyOf)
@@ -44,7 +47,7 @@ internal sealed class SessionCatalog(int ownProcessId)
                     lead.Volume,
                     g.All(s => s.Muted),
                     g.Any(s => s.State == SessionState.Active),
-                    g.Select(s => s.EndpointId).Distinct(StringComparer.OrdinalIgnoreCase).ToList()) { ProcessIds = g.Select(s => s.ProcessId).Distinct().ToList() };
+                    g.OrderByDescending(s => s.State == SessionState.Active).Select(s => s.EndpointId).Distinct(StringComparer.OrdinalIgnoreCase).ToList()) { ProcessIds = g.Select(s => s.ProcessId).Distinct().ToList() };
             })
             .ToList();
 }

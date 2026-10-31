@@ -59,6 +59,9 @@ public sealed class AudioService
         _options = options ?? new AudioServiceOptions();
     }
 
+    /// <summary>Why this PC can't set an app's output (Settings says so); null where it can.</summary>
+    public static string? AppOutputUnsupported { get; } = PerAppDevicePolicy.Unsupported(Environment.OSVersion.Version);
+
     /// <summary>The latest snapshot. <see cref="AudioSnapshot.Empty"/> while the engine is stopped.</summary>
     public AudioSnapshot Snapshot => _snapshot;
 
@@ -187,7 +190,7 @@ public sealed class AudioService
         if (endpointId is not null && !e.Catalog.Active(AudioFlow.Render).Any(d => PriorityPolicy.Eq(d.Id, endpointId) && !VbCable.IsCable(d)))
             throw new AudioFailure("Output unavailable");
         var pids = e.Sessions.SessionsOf(app).Where(s => s.ProcessId > 0 && s.ExePath is not null && !s.IsSystemSounds).Select(s => s.ProcessId).Distinct().ToList();
-        if (pids.Count == 0) throw new AudioFailure("App output unavailable");
+        if (pids.Count == 0) throw new AudioFailure("App closed");
         if (e.System is not IPerAppDeviceSystem policy) throw new AppOutputPolicyException();
         foreach (var pid in pids)
             if (!policy.GetAppOutput(pid).Available || !policy.SetAppOutput(pid, endpointId))

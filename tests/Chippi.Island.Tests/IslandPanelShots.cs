@@ -112,7 +112,7 @@ public sealed class IslandPanelShots
         awakeTile.SetStatus("1 hr left");
         return Tiles(
             new IslandTileContribution("sound", micSpec),
-            Section("sound.mixer", "App volume", 20, 200, status: "4 apps"),
+            Section("sound.mixer", "App volume", 20, 200, status: "4 playing"),
             awakeTile,
             Section("downloads", "File organizer", 50, 120, status: "2 to review"),
             Section("system-monitor", "System monitor", 60, 120, status: "CPU 12%"),

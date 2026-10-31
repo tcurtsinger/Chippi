@@ -5,7 +5,9 @@ using System.Windows.Controls;
 using System.Windows.Automation;
 using System.Windows.Automation.Peers;
 using System.Windows.Automation.Provider;
+using System.Windows.Input;
 using System.Windows.Threading;
+using Chippi.Audio;
 using Chippi.Features.Sound.Volume;
 using static Chippi.Features.Sound.Tests.RoutingFixture;
 namespace Chippi.Features.Sound.Tests;
@@ -58,8 +60,124 @@ public sealed class VolumeUiTests
     [InlineData("Python", "Py")]
     [InlineData(" PowerShell", "Po")]
     [InlineData("R", "R")]
+    [InlineData("Microsoft Teams", "MT")]
+    [InlineData("Microsoft Teams (work or school)", "MT")]
+    [InlineData("VLC media player", "VM")]
     public void Fallback_distinguishes_apps_sharing_the_first_letter(string name, string expected) =>
         Assert.Equal(expected, VolumeView.Initials(name));
+
+    // The island shows what's playing; Settings lists every app, saying which aren't.
+    [Fact]
+    public async Task The_island_shows_playing_apps_and_settings_every_app()
+    {
+        await using var f = new VolumeFixture();
+        f.System.WithSession(VolumeFixture.Session("quiet", "A", 300, @"C:\Apps\Quiet.exe", SessionState.Inactive) with { AppName = "Quiet" });
+        await f.Start();
+        await Sta(() =>
+        {
+            var island = new VolumeView(f.Module, VolumeSurface.Island);
+            Assert.Equal(["Music volume"], Descendants(island).OfType<Slider>().Select(AutomationProperties.GetName));
+            var settings = new VolumeView(f.Module, VolumeSurface.Settings);
+            Assert.Equal(["Music volume", "Quiet volume"], Descendants(settings).OfType<Slider>().Select(AutomationProperties.GetName));
+            Assert.Contains(Descendants(settings).OfType<TextBlock>(), t => t.Text == "Not playing" && t.Visibility == Visibility.Visible);
+            return Task.CompletedTask;
+        });
+    }
+
+    [Fact]
+    public async Task Past_fourteen_the_last_strip_counts_the_rest()
+    {
+        await using var f = new VolumeFixture();
+        f.System.EndSession("one");
+        for (int i = 0; i < 18; i++)
+            f.System.WithSession(VolumeFixture.Session($"app{i}", "A", 200 + i, $@"C:\Apps\App{i:00}.exe") with { AppName = $"App {i:00}" });
+        await f.Start();
+        await Sta(() =>
+        {
+            var view = new VolumeView(f.Module, VolumeSurface.Island);
+            var strips = (StackPanel)((Grid)view.Content).Children[0];
+            Assert.Equal(14, strips.Children.Count);
+            var more = Assert.Single(Descendants(strips.Children[^1]).OfType<Button>());
+            Assert.Equal("+5", more.Content);
+            Assert.Equal("5 more apps, open Settings", AutomationProperties.GetName(more));
+            Assert.DoesNotContain(Descendants(strips).OfType<Slider>(), s => AutomationProperties.GetName(s) is "App 17 volume");
+            return Task.CompletedTask;
+        });
+    }
+
+    // A strip stays the same element while levels change and other apps come and go, so a drag on it holds.
+    [Fact]
+    public async Task Strips_update_in_place_as_apps_join_and_levels_change()
+    {
+        await using var f = new VolumeFixture(); await f.Start();
+        await Sta(async () =>
+        {
+            var view = new VolumeView(f.Module, VolumeSurface.Island);
+            view.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent)); // follows the module, as on screen
+            var slider = Descendants(view).OfType<Slider>().Single();
+            f.System.SetSessionVolume("one", 0.8f);
+            f.System.WithSession(VolumeFixture.Session("aaa", "A", 301, @"C:\Apps\Aaa.exe") with { AppName = "Aaa" });
+            await f.Audio.RefreshAsync();
+            await Until(() => Descendants(view).OfType<Slider>().Count() == 2);
+            Assert.Equal(["Aaa volume", "Music volume"], Descendants(view).OfType<Slider>().Select(AutomationProperties.GetName));
+            Assert.Same(slider, Descendants(view).OfType<Slider>().Last());
+            Assert.Equal(80, slider.Value, 3);
+        });
+    }
+
+    [Fact]
+    public async Task The_wheel_moves_a_strip_two_a_notch()
+    {
+        await using var f = new VolumeFixture(); await f.Start();
+        await Sta(async () =>
+        {
+            var view = new VolumeView(f.Module, VolumeSurface.Island);
+            var strips = (StackPanel)((Grid)view.Content).Children[0];
+            var strip = (Grid)strips.Children[0];
+            strip.RaiseEvent(new MouseWheelEventArgs(Mouse.PrimaryDevice, 0, 120) { RoutedEvent = UIElement.MouseWheelEvent });
+            await Until(() => Math.Abs(f.System.SessionById("one").Volume - 0.52f) < 0.001f);
+            strip.RaiseEvent(new MouseWheelEventArgs(Mouse.PrimaryDevice, 0, -240) { RoutedEvent = UIElement.MouseWheelEvent });
+            await Until(() => Math.Abs(f.System.SessionById("one").Volume - 0.48f) < 0.001f);
+        });
+    }
+
+    // Where the app plays: a pick the app doesn't follow shows in Caution, naming both.
+    [Fact]
+    public async Task The_output_button_says_where_the_app_plays()
+    {
+        await using var f = new VolumeFixture(); await f.Start();
+        await Sta(async () =>
+        {
+            var view = new VolumeView(f.Module, VolumeSurface.Island);
+            view.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent)); // follows the module, as on screen
+            var output = Descendants(view).OfType<Button>().Single(b => AutomationProperties.GetName(b) == "Music output");
+            Assert.Equal("Plays on A · Default", output.ToolTip);
+            await f.Module.SetOutputAsync(VolumeFixture.Key, "B");
+            await Until(() => Equals(output.ToolTip, "Picked B · still plays on A"));
+            var glyph = (Chippi.UI.Controls.LucideIcon)output.Content;
+            Assert.Equal(Chippi.UI.Controls.LucideIcons.Speaker, glyph.Data);
+        });
+    }
+
+    // An app with no pick of its own that plays somewhere other than the default isn't "Default".
+    [Fact]
+    public async Task An_app_following_the_default_but_playing_elsewhere_says_so()
+    {
+        await using var f = new VolumeFixture();
+        f.System.EndSession("one");
+        f.System.WithSession(VolumeFixture.Session("one", "B", 123));
+        await f.Start();
+        Assert.True(f.Module.PlaysElsewhere(VolumeFixture.Key));
+        await Sta(() =>
+        {
+            var island = new VolumeView(f.Module, VolumeSurface.Island);
+            var output = Descendants(island).OfType<Button>().Single(b => AutomationProperties.GetName(b) == "Music output");
+            Assert.Equal("Default · A · still plays on B", output.ToolTip);
+            var settings = new VolumeView(f.Module, VolumeSurface.Settings);
+            Assert.Contains(Descendants(settings).OfType<TextBlock>(), t => t.Text == "Still plays on B" && t.Visibility == Visibility.Visible);
+            return Task.CompletedTask;
+        });
+    }
 
     [Fact]
     public async Task A_name_past_two_lines_marks_the_second_and_keeps_its_tooltip()
