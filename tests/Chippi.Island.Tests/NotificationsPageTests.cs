@@ -19,7 +19,8 @@ public sealed class NotificationsPageTests
     [Fact]
     public async Task A_feature_installed_while_the_page_was_away_shows_when_it_returns()
     {
-        string root = Path.Combine(Path.GetTempPath(), "chippi-notifications-" + Guid.NewGuid().ToString("N"));
+        string profile = "chippi-notifications-" + Guid.NewGuid().ToString("N");
+        string root = Path.Combine(Path.GetTempPath(), profile);
         Directory.CreateDirectory(root);
         ShellContext? shell = null;
         try
@@ -27,7 +28,7 @@ public sealed class NotificationsPageTests
             NotificationsPage page = null!;
             WpfTestThread.Run(() =>
             {
-                shell = new ShellContext(new ConfigStore(Path.Combine(root, "settings.json")), NullLoggerFactory.Instance, false, "notifications-test");
+                shell = new ShellContext(new ConfigStore(Path.Combine(root, "settings.json")), NullLoggerFactory.Instance, false, profile);
                 page = new NotificationsPage(shell);
                 Assert.DoesNotContain("Pinger", Texts(page));
             });
@@ -50,16 +51,18 @@ public sealed class NotificationsPageTests
         finally
         {
             if (shell is not null) await shell.Registry.StopAllAsync();
-            Directory.Delete(root, true);
+            foreach (string folder in new[] { root, Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Chippi-dev", profile) })
+                if (Directory.Exists(folder)) Directory.Delete(folder, true);
         }
     }
 
     [Fact]
     public void Hardware_filter_is_checked_on_open_and_keeps_saved_places() => WpfTestThread.Run(() =>
     {
-        string root = Path.Combine(Path.GetTempPath(), "chippi-notice-filter-" + Guid.NewGuid().ToString("N"));
+        string profile = "chippi-notice-filter-" + Guid.NewGuid().ToString("N");
+        string root = Path.Combine(Path.GetTempPath(), profile);
         Directory.CreateDirectory(root);
-        var shell = new ShellContext(new ConfigStore(Path.Combine(root, "settings.json")), NullLoggerFactory.Instance, false, "notice-filter-test");
+        var shell = new ShellContext(new ConfigStore(Path.Combine(root, "settings.json")), NullLoggerFactory.Instance, false, profile);
         var module = new HardwareNotices();
         try
         {
@@ -87,7 +90,14 @@ public sealed class NotificationsPageTests
             Assert.Equal(NoticePlaces.Windows, notifier.PlacesFor("low-battery"));
             page.RaiseEvent(new RoutedEventArgs(FrameworkElement.UnloadedEvent));
         }
-        finally { module.Gate.Set(); shell.Registry.StopAllAsync().GetAwaiter().GetResult(); shell.Clipboard.Dispose(); Directory.Delete(root, true); }
+        finally
+        {
+            module.Gate.Set();
+            shell.Registry.StopAllAsync().GetAwaiter().GetResult();
+            shell.Clipboard.Dispose();
+            foreach (string folder in new[] { root, Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Chippi-dev", profile) })
+                if (Directory.Exists(folder)) Directory.Delete(folder, true);
+        }
     });
 
     private static void PumpUntil(Func<bool> ready)

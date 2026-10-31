@@ -16,7 +16,18 @@ internal static class SmokeLog
     internal static void Initialize()
     {
         Log.Default = new RollingFileLog(Path.Combine(Root, "logs"));
-        AppDomain.CurrentDomain.ProcessExit += (_, _) => { if (Directory.Exists(Root)) Directory.Delete(Root, true); };
+        AppDomain.CurrentDomain.ProcessExit += (_, _) =>
+        {
+            if (Directory.Exists(Root)) Directory.Delete(Root, true);
+            // Tests delete their own profiles as they end; the Chippi-dev folders go after the last one.
+            // Not per test: parallel tests would race the empty parent against another's CreateDirectory.
+            foreach (var folder in new[] { Environment.SpecialFolder.LocalApplicationData, Environment.SpecialFolder.ApplicationData })
+            {
+                string parent = Path.Combine(Environment.GetFolderPath(folder), "Chippi-dev");
+                try { if (Directory.Exists(parent)) Directory.Delete(parent); }
+                catch (IOException) { } // not empty: another test process or a dev run still has a profile there
+            }
+        };
     }
 
     internal static void AssertOnlyHere(string marker)
