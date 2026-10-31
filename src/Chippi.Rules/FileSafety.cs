@@ -65,6 +65,18 @@ public static class FileSafety
             && (parts.Length >= 3 && Disguises.Contains(parts[^2].Trim()) || name.IndexOfAny(['\u202D', '\u202E']) >= 0 || parts[^2].EndsWith("  ", StringComparison.Ordinal));
     }
 
+    /// <summary>
+    /// What a misleading name hides, for people: "Looks like a .pdf \u00B7 is an app" when a second extension
+    /// is the disguise, else "Disguised app" (a reversed name, padding before the real extension).
+    /// </summary>
+    public static string Disguise(string name)
+    {
+        var parts = name.Split('.');
+        return parts.Length >= 3 && Disguises.Contains(parts[^2].Trim()) && name.IndexOfAny(['\u202D', '\u202E']) < 0
+            ? $"Looks like a .{parts[^2].Trim().ToLowerInvariant()} \u00B7 is an app"
+            : "Disguised app";
+    }
+
     public static PlanWarning? Exclusion(FileFacts file)
     {
         const FileAttributes recallOnDataAccess = (FileAttributes)0x00400000;

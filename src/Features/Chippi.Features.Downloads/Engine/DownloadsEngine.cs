@@ -984,7 +984,7 @@ public sealed class DownloadsEngine : IDisposable
             foreach (var run in Failed.GroupBy(o => o.RunId))
             {
                 var files = run.ToList();
-                notifier.Show(new Notice(DownloadsNotices.Failed, files.Count == 1 ? "1 file not moved" : $"{files.Count} files not moved")
+                notifier.Show(new Notice(DownloadsNotices.Failed, files.Count == 1 ? "Move failed" : $"{files.Count} moves failed")
                 {
                     Body = files.Count == 1 ? $"{files[0].Name} · {files[0].Error}" : null,
                     Activation = DownloadsNotices.RunActivation(run.Key),

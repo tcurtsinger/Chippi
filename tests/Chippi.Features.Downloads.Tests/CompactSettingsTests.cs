@@ -46,6 +46,45 @@ public sealed class CompactSettingsTests
         Assert.True(add);
     });
 
+    /// <summary>
+    /// Critique 2026-10-31: 118 flat rows put the held files around row 45 and Approve 6,000px down. Files
+    /// that need a look come first, open; each destination is a group with its own box, closed when long.
+    /// </summary>
+    [Fact]
+    public void Preview_groups_by_destination_with_files_that_need_a_look_first() => WpfTestThread.Run(() =>
+    {
+        var at = DateTimeOffset.UtcNow;
+        const string folder = @"C:\Fake\Downloads";
+        var items = new List<PreviewItem>();
+        PreviewItem Move(string name, string to) => new(items.Count + 1, Path.Combine(folder, name), name, 1024, at, OperationKind.Move, Path.Combine(folder, to, name), "r", "Rule", [], null);
+        for (int i = 0; i < 9; i++) items.Add(Move($"photo{i}.jpg", "Pictures"));
+        for (int i = 0; i < 6; i++) items.Add(Move($"doc{i}.pdf", "Documents"));
+        items.Add(new PreviewItem(items.Count + 1, Path.Combine(folder, "a.torrent"), "a.torrent", 10, at, OperationKind.Hold, null, "t", "Torrents", [], "Check before opening"));
+        items.Add(new PreviewItem(items.Count + 1, Path.Combine(folder, "setup.pdf.exe"), "setup.pdf.exe", 10, at, OperationKind.Move, Path.Combine(folder, "Installers", "setup.pdf.exe"), "r", "Rule",
+            [new PlanWarning(WarningKind.MisleadingName, "Looks like a .pdf · is an app")], null));
+        var plan = new PreviewPlan(Guid.NewGuid(), folder, RunTrigger.Preview, at, at.AddMinutes(5), items);
+        var view = new PreviewView(new DownloadsModule(), () => Task.FromResult(plan), false, () => { }) { ShowFirst = "photo3.jpg" };
+        typeof(PreviewView).GetField("_preview", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(view, plan);
+        typeof(PreviewView).GetMethod("RenderPlan", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(view, null);
+
+        var boxes = Find<CheckBox>(view).Select(AutomationProperties.GetName).Where(n => n?.StartsWith("Include ", StringComparison.Ordinal) == true).ToList();
+        Assert.Equal(["Include Needs a look", "Include a.torrent", "Include setup.pdf.exe", "Include Documents"], boxes.Take(4));
+        Assert.Contains("Include Pictures", boxes);
+        Assert.Single(Find<TextBlock>(view), t => t.Text == "Held · looks like a .pdf · is an app");
+        Assert.Contains(Find<IconButton>(view), b => AutomationProperties.GetName(b) == "Show setup.pdf.exe in folder");
+
+        // 15 files to approve: Documents starts closed; Pictures holds the file Review asked for, so it's open.
+        var expanders = Find<IconButton>(view).Select(AutomationProperties.GetName).ToList();
+        Assert.Contains("Show 6 files", expanders);
+        Assert.Equal(2, expanders.Count(n => n == "Hide files")); // Needs a look and Pictures
+
+        // A group's box selects its files; the misleading name starts out.
+        Assert.Single(Find<TextBlock>(view), t => t.Text == "15 of 16 selected · 15 KB");
+        var documents = Find<CheckBox>(view).Single(b => AutomationProperties.GetName(b) == "Include Documents");
+        documents.IsChecked = false;
+        Assert.Single(Find<TextBlock>(view), t => t.Text == "9 of 16 selected · 9 KB");
+    });
+
     [Fact]
     public void A_folder_header_organizes_that_folder_without_changing_its_mode() => WpfTestThread.Run(() =>
     {

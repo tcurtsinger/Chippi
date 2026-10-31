@@ -30,7 +30,7 @@ public static class Planner
         if (context.IgnorePatterns.Any(p => IgnoreFile.Matches(file.Name, p))) return Held(new(WarningKind.IgnoreMatch, "Ignored file"));
         if (FileSafety.IsMisleadingName(file.Name))
         {
-            var warning = new PlanWarning(WarningKind.MisleadingName, "Misleading name");
+            var warning = new PlanWarning(WarningKind.MisleadingName, FileSafety.Disguise(file.Name));
             if (!context.Preview) return Held(warning);
             warnings.Add(warning);
         }
