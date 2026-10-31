@@ -50,6 +50,7 @@ A Windows 11 tray app for the owner's own PC (C#, .NET 10, WPF): a widget on the
 - **No sound** without warning.
 - **No CPU stress tests:** one froze the PC.
 - **Logs:** tests never write the real `chippi.log`. `tests/Directory.Build.targets` gives them their own (`SmokeLog.cs`).
+- **Explorer menu:** tests never change the owner's Organize entry. Only Chippi.exe changes the real menu (`ExplorerRegistration.CanChange`), so a test-hosted `DownloadsModule` has no registration; a test of the verb injects one under its own key.
 
 ## How work goes
 

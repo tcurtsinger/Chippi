@@ -24,8 +24,18 @@ public sealed class ExplorerRegistration
     public string VerbName => _profile is null ? "ChippiOrganize" : $"ChippiOrganize-dev-{_profile}";
     public IReadOnlyList<string> KeyPaths => [ $@"{_classesRoot}\Directory\shell\{VerbName}", $@"{_classesRoot}\Directory\Background\shell\{VerbName}" ];
 
+    /// <summary>
+    /// False in the real Explorer menu (the default classes root) outside Chippi.exe: a test host never
+    /// writes or deletes the owner's Organize entry, and <see cref="SetEnabled"/> refuses to.
+    /// </summary>
+    public bool CanChange => !string.Equals(_classesRoot.TrimEnd('\\'), DefaultClassesRoot, StringComparison.OrdinalIgnoreCase) || IsApp(Environment.ProcessPath);
+
+    /// <summary>Chippi.exe, installed or a dev build.</summary>
+    internal static bool IsApp(string? processPath) => string.Equals(Path.GetFileName(processPath), "Chippi.exe", StringComparison.OrdinalIgnoreCase);
+
     public void SetEnabled(bool enabled)
     {
+        if (!CanChange) throw new InvalidOperationException("Only Chippi.exe changes the Explorer menu");
         string? executable = enabled ? StableExecutable(_executable ?? Environment.ProcessPath ?? throw new InvalidOperationException("Executable not found")) : null;
         foreach (string path in KeyPaths)
         {

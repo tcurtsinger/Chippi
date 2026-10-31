@@ -67,6 +67,21 @@ public sealed class ExplorerRegistrationTests : IDisposable
     [InlineData("bad\"profile")]
     public void Dev_profile_cannot_escape_its_key_or_command(string profile) =>
         Assert.Throws<ArgumentException>(() => new ExplorerRegistration(profile, _root, Exe));
+
+    /// <summary>Test hosts could delete the owner's Organize entry. Never calls SetEnabled on the real menu, so a broken guard can't.</summary>
+    [Fact]
+    public void Only_Chippi_exe_changes_the_real_Explorer_menu()
+    {
+        string installed = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ChippiApp", "current", "Chippi.exe");
+        Assert.True(ExplorerRegistration.IsApp(installed));
+        Assert.True(ExplorerRegistration.IsApp(@"C:\Dev\Chippi.App\bin\Release\win-x64\CHIPPI.EXE"));
+        Assert.False(ExplorerRegistration.IsApp(Environment.ProcessPath)); // this test host
+        Assert.False(ExplorerRegistration.IsApp(null));
+        Assert.False(new ExplorerRegistration().CanChange);
+        Assert.False(new ExplorerRegistration("test").CanChange);
+        Assert.False(new ExplorerRegistration(classesRoot: @"SOFTWARE\Classes\").CanChange);
+        Assert.True(new ExplorerRegistration(classesRoot: _root, executable: Exe).CanChange);
+    }
 }
 
 [CollectionDefinition("ExplorerProfileEnvironment", DisableParallelization = true)]
