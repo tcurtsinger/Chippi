@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -113,15 +114,28 @@ internal static class FillFade
         var incoming = new DrawingGroup { Opacity = 0, Children = { new GeometryDrawing(to, null, square) } };
         var blend = new DrawingBrush(new DrawingGroup { Children = { outgoing, incoming } }) { Stretch = Stretch.Fill };
         element.SetValue(property, blend);
-        var fadeIn = new DoubleAnimation(1, Time);
-        fadeIn.Completed += (_, _) =>
+        // Stepped each frame from Clock, evenly, as an animation would: the fade starts on the first frame, so a slow
+        // first frame doesn't skip the start.
+        long? start = null;
+        EventHandler? frame = null;
+        frame = (_, _) =>
         {
+            long now = Clock();
+            start ??= now;
+            double t = Math.Min(1, Stopwatch.GetElapsedTime(start.Value, now) / Time);
+            outgoing.Opacity = 1 - t;
+            incoming.Opacity = t;
+            if (t < 1)
+                return;
+            CompositionTarget.Rendering -= frame;
             if (ReferenceEquals(element.GetValue(property), blend))
                 settle();
         };
-        outgoing.BeginAnimation(DrawingGroup.OpacityProperty, new DoubleAnimation(0, Time));
-        incoming.BeginAnimation(DrawingGroup.OpacityProperty, fadeIn);
+        CompositionTarget.Rendering += frame;
     }
+
+    /// <summary>The blends' clock, in Stopwatch ticks. Tests hold it still and move it themselves, so a late frame can't skip a step.</summary>
+    internal static Func<long> Clock { get; set; } = Stopwatch.GetTimestamp;
 
     private static bool OnScreen(FrameworkElement element) => element.IsLoaded && element.IsVisible;
 }
