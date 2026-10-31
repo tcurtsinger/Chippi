@@ -36,14 +36,19 @@ public sealed class SoundShellTests
             panel.ShowPage(SoundTile.Key);
             Assert.Equal(2, All<RoutingQuickView>(host).Count()); // Output and Microphone
             Assert.Single(All<ProcessingQuickView>(host));
-            Assert.Single(All<MicMuteView>(host));
+            Assert.Single(All<MicQuickView>(host));
             Assert.Empty(All<VolumeView>(host)); // App volume has its own page
-            // Two 244 columns inside the 496 x 304 body, nothing to scroll (DESIGN.md §5, revised 2026-10-28).
+            // Two 244 sections, each one card, inside the 496 x 304 body, nothing to scroll; the cards end level,
+            // and Mic processing is a section of its own, full width under them (DESIGN.md §5, revised 2026-10-31).
             panel.UpdateLayout();
             var body = panel.PageBody!;
             Assert.Empty(All<ScrollViewer>(host));
-            Assert.All(All<RoutingQuickView>(host), v => Assert.Equal(244, v.ActualWidth));
+            Assert.All(All<RoutingQuickView>(host), v => Assert.Equal(242, v.ActualWidth)); // inside the card's 1px edges
+            var bottoms = All<RoutingQuickView>(host).Select(v => v.TranslatePoint(new Point(0, v.ActualHeight), body).Y).ToList();
+            Assert.Equal(bottoms[0], bottoms[1], 1);
             var processing = Assert.Single(All<ProcessingQuickView>(host));
+            Assert.Equal(496, processing.ActualWidth);
+            Assert.Equal(bottoms[0] + 1 + 8, processing.TranslatePoint(default, body).Y, 1); // the card's edge, then 8
             Assert.InRange(processing.TranslatePoint(new Point(0, processing.ActualHeight), body).Y, 0, body.ActualHeight);
             Assert.Equal(44, Assert.IsType<Border>(((StackPanel)processing.Content).Children[0]).ActualHeight);
             Assert.Contains("Mic processing", Texts(processing));
@@ -56,11 +61,11 @@ public sealed class SoundShellTests
             // A registry refresh must not double or lose a section.
             await scene.Shell.Registry.SetInstalledAsync("mic-mute", false);
             panel.SetTiles(Tiles(scene));
-            Assert.Empty(All<MicMuteView>(host));
+            Assert.Empty(All<MicQuickView>(host));
             Assert.Equal(2, All<RoutingQuickView>(host).Count());
             await scene.Shell.Registry.SetInstalledAsync("mic-mute", true);
             panel.SetTiles(Tiles(scene));
-            Assert.Single(All<MicMuteView>(host));
+            Assert.Single(All<MicQuickView>(host));
         }
         finally { panel.Close(); }
     });
@@ -225,6 +230,29 @@ public sealed class SoundShellTests
             await scene.Shell.Registry.SetInstalledAsync("audio-routing", false);
             panel.SetTiles(Tiles(scene));
             Assert.DoesNotContain(All<Slider>(host), s => AutomationProperties.GetName(s) == "System volume");
+        }
+        finally { panel.Close(); }
+    });
+
+    [Fact]
+    public Task With_no_microphone_the_microphone_card_holds_only_its_row_with_no_line_under_it() => SmokeDispatcher.Run(async () =>
+    {
+        await using var scene = new SoundScene();
+        await scene.Start();
+        scene.Devices.Remove("desk", "CableOut");
+        await scene.Audio.RefreshAsync();
+        var panel = OpenPanel(scene, new FakeMedia());
+        try
+        {
+            var host = (ContentControl)panel.FindName("Page");
+            panel.ShowPage(SoundTile.Key);
+            panel.UpdateLayout();
+            Assert.Contains("No microphone", Texts(All<MicQuickView>(host).Single()));
+            var mics = All<RoutingQuickView>(host).Last();
+            Assert.Equal(Visibility.Collapsed, mics.Visibility);
+            var card = (DockPanel)LogicalTreeHelper.GetParent(mics);
+            var hairline = Assert.Single(card.Children.OfType<Border>(), b => b.Height == 1);
+            Assert.Equal(Visibility.Collapsed, hairline.Visibility); // it goes with the list under it
         }
         finally { panel.Close(); }
     });

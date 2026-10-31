@@ -99,7 +99,7 @@ internal sealed class SoundScene : IAsyncDisposable
         Routing = new(Audio, VbCable.IsCable);
         Processing = new(Audio, () => Routing.Settings.Microphone.Devices, Path.Combine(_root, "processing"), new ForbiddenSetup());
         Volume = new(Audio);
-        Mute = new(Audio, () => Hotkey, _ => throw new InvalidOperationException("Smoke test attempted to play a real tone"));
+        Mute = new(Audio, () => Hotkey, _ => throw new InvalidOperationException("Smoke test attempted to play a real tone"), () => Routing.InUse(AudioFlow.Capture));
         var config = new ConfigStore(Path.Combine(_root, "settings.json"));
         config.SetSection("features", new { preset = FeaturePreset.Custom, installed = new[] { "audio-routing", "mic-processing", "app-volume", "mic-mute" }, capabilitiesUsed = Array.Empty<string>() });
         Shell = new(config, NullLoggerFactory.Instance, false, _profile);
@@ -124,6 +124,9 @@ internal sealed class SoundScene : IAsyncDisposable
         Assert.False(Devices.GetLevel("desk").Muted);
         Assert.False(Devices.GetLevel("CableOut").Muted);
         Directory.Delete(_root, true);
+        // Leave no Chippi-dev folder behind once the last scene is gone (another may still be running).
+        try { Directory.Delete(Path.GetDirectoryName(_root)!); }
+        catch (IOException) { }
     }
 
     private sealed class ForbiddenSetup : IDriverSetup

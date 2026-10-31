@@ -174,8 +174,9 @@ internal static class ProcessingUi
 }
 
 /// <summary>
-/// The Mic processing section of Settings › Microphone (revised 2026-10-28): the switch, Default device,
-/// the levels while it runs, then each stage, Noise gate and Auto gain folding their tuning. Switches
+/// The Mic processing section of Settings › Microphone (revised 2026-10-31): a card with the switch and
+/// the levels while it runs, its warning line, then a card of Default device and each stage, Noise gate
+/// and Auto gain folding their tuning. Switches
 /// apply at once; levels are heard at once and saved after a pause. The mic is the one in use, picked
 /// above; a mic chosen here before shows until it is set back to that.
 /// </summary>
@@ -228,21 +229,15 @@ public sealed class ProcessingPage : UserControl
         _body.Children.Clear();
         var s = _module.Settings;
 
-        var cleanup = SettingsLayout.Card(
-            SettingsLayout.Row("Mic processing", RoutingUi.Switch("Mic processing", s.Enabled, on => Run(_module.SetEnabledAsync(on)))),
-            SettingsLayout.Row("Default device", RoutingUi.Switch("Default device", s.SetDefault, on => Run(_module.SetDefaultMicAsync(on))), "Makes CABLE Output the default mic"));
+        // Two cards (revised 2026-10-31): whether it runs and what it hears, then how it processes.
+        var processing = SettingsLayout.Card(
+            SettingsLayout.Row("Mic processing", RoutingUi.Switch("Mic processing", s.Enabled, on => Run(_module.SetEnabledAsync(on)))));
         // The meter only means something while processing runs.
         if (_module.Status.State == ProcessingState.Live)
-            cleanup.Children.Add(SettingsLayout.Row("Level", Meters()));
-        cleanup.Children.Add(SettingsLayout.Row("Noise suppression", RoutingUi.Switch("Noise suppression", s.Suppression, on => Stages(x => x with { Suppression = on }))));
-        cleanup.Children.Add(Fold("Noise gate", RoutingUi.Switch("Noise gate", s.Gate, on => Stages(x => x with { Gate = on })), _gateOpen, open => _gateOpen = open,
-            Level("Threshold", ProcessingSettings.GateRange, s.GateDb, db => Stages(x => x with { GateDb = db }), s.Gate)));
-        cleanup.Children.Add(Fold("Auto gain", RoutingUi.Switch("Auto gain", s.Agc, on => Stages(x => x with { Agc = on })), _agcOpen, open => _agcOpen = open,
-            Level("Target level", ProcessingSettings.TargetRange, s.TargetDb, db => Stages(x => x with { TargetDb = db }), s.Agc),
-            Level("Max gain", ProcessingSettings.MaxGainRange, s.MaxGainDb, db => Stages(x => x with { MaxGainDb = db }), s.Agc)));
+            processing.Children.Add(SettingsLayout.Row("Level", Meters()));
         if (s.Source != ProcessingSettings.PinnedSource)
-            cleanup.Children.Add(SettingsLayout.Row("Input device", SourcePicker()));
-        _body.Children.Add(cleanup);
+            processing.Children.Add(SettingsLayout.Row("Input device", SourcePicker()));
+        _body.Children.Add(processing);
         // Only what needs attention: a failure, or processing that stopped, with its fix as on the island.
         if (_module.Problem is { } problem)
         {
@@ -251,6 +246,16 @@ public sealed class ProcessingPage : UserControl
             ProcessingUi.ShowFix(line, ProcessingUi.FixButton(_module, _module.Fix, island: false, Refresh));
             _body.Children.Add(line);
         }
+        var stages = SettingsLayout.Card(
+            SettingsLayout.Row("Default device", RoutingUi.Switch("Default device", s.SetDefault, on => Run(_module.SetDefaultMicAsync(on))), "Makes CABLE Output the default mic"),
+            SettingsLayout.Row("Noise suppression", RoutingUi.Switch("Noise suppression", s.Suppression, on => Stages(x => x with { Suppression = on }))),
+            Fold("Noise gate", RoutingUi.Switch("Noise gate", s.Gate, on => Stages(x => x with { Gate = on })), _gateOpen, open => _gateOpen = open,
+                Level("Threshold", ProcessingSettings.GateRange, s.GateDb, db => Stages(x => x with { GateDb = db }), s.Gate)),
+            Fold("Auto gain", RoutingUi.Switch("Auto gain", s.Agc, on => Stages(x => x with { Agc = on })), _agcOpen, open => _agcOpen = open,
+                Level("Target level", ProcessingSettings.TargetRange, s.TargetDb, db => Stages(x => x with { TargetDb = db }), s.Agc),
+                Level("Max gain", ProcessingSettings.MaxGainRange, s.MaxGainDb, db => Stages(x => x with { MaxGainDb = db }), s.Agc)));
+        stages.Margin = new Thickness(0, 8, 0, 0);
+        _body.Children.Add(stages);
     }
 
     private FrameworkElement Meters()
@@ -323,10 +328,11 @@ public sealed class ProcessingPage : UserControl
 }
 
 /// <summary>
-/// Mic processing's card on the Sound page (DESIGN.md §5 Island, revised 2026-10-31): one 44 row with
-/// the switch, and while it runs a bar meter of the processed mic before it. The glyph is the accent
-/// while it runs, tertiary while off and Caution while stopped. A warning line shows below the card
-/// only when it failed or stopped, with Retry, Install or Turn on at its end when one fixes it.
+/// Mic processing's card on the Sound page (DESIGN.md §5 Island pages, revised 2026-10-31), full
+/// width under the Output and Microphone sections: one 44 row with the switch, and while it runs a
+/// bar meter of the processed mic before it. The glyph is the accent while it runs, tertiary while
+/// off and Caution while stopped. A warning line shows below the card only when it failed or
+/// stopped, with Retry, Install or Turn on at its end when one fixes it.
 /// </summary>
 public sealed class ProcessingQuickView : UserControl
 {
@@ -376,7 +382,6 @@ public sealed class ProcessingQuickView : UserControl
             var problem = _module.Problem;
             _warning.Text = problem ?? "";
             _problem.Visibility = problem is null ? Visibility.Collapsed : Visibility.Visible;
-            SoundColumn.SetWarning(this, problem is not null);
             if (_module.Fix != _fix)
             {
                 _fix = _module.Fix;

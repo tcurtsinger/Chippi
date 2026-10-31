@@ -42,15 +42,35 @@ internal static class RoutingUi
     /// <summary>A 44 tall card on the Sound page: a 16 glyph, then <paramref name="middle"/>, then <paramref name="right"/>.</summary>
     public static Border IslandCard(LucideIcon glyph, UIElement middle, FrameworkElement right)
     {
+        var card = new Border { Child = Line(glyph, middle, right) };
+        card.SetResourceReference(FrameworkElement.StyleProperty, "IslandControlCardStyle");
+        return card;
+    }
+
+    /// <summary>
+    /// The top row of a Sound section, the card's line without a frame of its own: the column's card
+    /// frames it. 42 tall and 9 in, so with the card's edge it sits as a 44 card's line does.
+    /// </summary>
+    public static Border IslandRow(LucideIcon glyph, UIElement middle, FrameworkElement right) =>
+        new() { Child = Line(glyph, middle, right), Height = 42, Padding = new Thickness(9, 0, 9, 0) };
+
+    /// <summary>The hairline between a section's top row and its list.</summary>
+    public static Border Hairline()
+    {
+        var line = new Border { Height = 1 };
+        line.SetResourceReference(Border.BackgroundProperty, "IslandHairBrush");
+        return line;
+    }
+
+    private static DockPanel Line(LucideIcon glyph, UIElement middle, FrameworkElement right)
+    {
         glyph.Size = 16;
         glyph.Margin = new Thickness(0, 0, 10, 0);
         glyph.VerticalAlignment = VerticalAlignment.Center;
         right.VerticalAlignment = VerticalAlignment.Center;
         DockPanel.SetDock(glyph, Dock.Left);
         DockPanel.SetDock(right, Dock.Right);
-        var card = new Border { Child = new DockPanel { Children = { glyph, right, middle } } };
-        card.SetResourceReference(FrameworkElement.StyleProperty, "IslandControlCardStyle");
-        return card;
+        return new DockPanel { Children = { glyph, right, middle } };
     }
 
     public static ToggleButton Switch(string name, bool on, Action<bool> changed)

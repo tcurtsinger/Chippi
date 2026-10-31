@@ -73,6 +73,9 @@ public sealed record IslandTileSpec(string Key, string Name, string Icon, int Or
     /// </summary>
     public string? Column { get; init; }
 
+    /// <summary>On a page of columns, this section sits under all of them, full width, instead of in its column (Sound's Mic processing).</summary>
+    public bool SpansColumns { get; init; }
+
     /// <summary>The page's header repeats the tile's status, for a page whose controls don't show it (Keep awake's time left).</summary>
     public bool StatusOnPage { get; init; }
 

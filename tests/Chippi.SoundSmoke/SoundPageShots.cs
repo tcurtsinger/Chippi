@@ -84,10 +84,24 @@ public sealed class SoundPageShots
                 s.Devices.With([.. outputs.Select((n, i) => Speaker($"out{i}", n)), .. mics.Select((n, i) => Mic($"mic{i}", n))]);
                 return s.Audio.RefreshAsync();
             }),
+            ("crowded-stopped", async s =>
+            {
+                s.Devices.With([.. outputs.Select((n, i) => Speaker($"out{i}", n)), .. mics.Select((n, i) => Mic($"mic{i}", n))]);
+                s.Devices.Remove("CableIn", "CableOut");
+                await s.Audio.RefreshAsync();
+                await s.Processing.SetEnabledAsync(true); // stops: no VB-CABLE, so its line takes room from both cards
+            }),
             ("no-mic", s =>
             {
                 s.Devices.Remove("desk", "CableOut");
                 return s.Audio.RefreshAsync();
+            }),
+            ("routing-only-no-mic", async s =>
+            {
+                await s.Shell.Registry.SetInstalledAsync("mic-mute", false);
+                await s.Shell.Registry.SetInstalledAsync("mic-processing", false);
+                s.Devices.Remove("desk", "CableOut");
+                await s.Audio.RefreshAsync();
             }),
         })
         {

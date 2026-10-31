@@ -84,6 +84,24 @@ public sealed class SoundSettingsTests
             var devices = Descendants(page).OfType<Border>().Where(b => b.Child is Grid g && g.Children.OfType<DragHandle>().Any()).ToList();
             Assert.Equal(2, devices.Count);
             Assert.All(devices, d => Assert.Equal(SettingsLayout.RowHeight, d.MinHeight));
+            // The list is a card of its own, 8 under the switches' card.
+            var list = Assert.IsType<Card>(devices[0].Parent);
+            Assert.Equal(new Thickness(0, 8, 0, 0), list.Margin);
+            Assert.DoesNotContain(list.Children.OfType<SettingRow>(), r => (string)r.Header == "Priority switching");
+            Assert.Same(list, devices[1].Parent);
+        });
+    }
+
+    [Fact]
+    public async Task Output_volume_is_captioned_with_the_output_it_sets()
+    {
+        await using var f = new RoutingFixture();
+        f.System.With(Speaker("Speakers (INZONE Buds - Game)"), Speaker("Headphones")).WithDefault("Speakers (INZONE Buds - Game)");
+        await f.Start();
+        await Sta(() =>
+        {
+            var volume = Descendants(new RoutingPage(f.Module)).OfType<SettingRow>().Single(r => (string)r.Header == "Volume");
+            Assert.Equal("Speakers (INZONE Buds - Game)", volume.Description);
         });
     }
 
@@ -118,6 +136,56 @@ public sealed class SoundSettingsTests
             Assert.True(f.System.GetLevel("A").Muted && f.System.GetLevel("B").Muted);
             Assert.Equal("Muted", Descendants(view).OfType<SettingRow>().Single().Description);
             Assert.DoesNotContain(Descendants(view).OfType<Button>(), b => AutomationProperties.GetName(b) == "Change shortcut");
+        });
+    }
+
+    [Fact]
+    public async Task Microphone_volume_sets_the_mic_in_use_as_the_island_row_does_and_says_muted_in_its_place()
+    {
+        await using var f = new MuteFixture();
+        f.System.With(Mic("Microphone (RØDE VideoMic GO II)"), Mic("B")).WithDefault("Microphone (RØDE VideoMic GO II)");
+        await f.Start();
+        await Sta(async () =>
+        {
+            var view = Assert.IsType<MicMuteView>(f.Ui.Page!("mute"));
+            var row = Descendants(view).OfType<SettingRow>().Single();
+            Assert.Equal("Volume", row.Header);
+            Assert.Equal("Microphone (RØDE VideoMic GO II)", row.Description);
+            var level = Descendants(view).OfType<Slider>().Single();
+            Assert.Equal("Microphone volume", AutomationProperties.GetName(level));
+            level.Value = 70;
+            await Until(() => Math.Abs(f.System.GetLevel("Microphone (RØDE VideoMic GO II)").Volume - 0.7f) < 0.001f);
+            Assert.Equal(0.5f, f.System.GetLevel("B").Volume, 3);
+
+            var mute = Descendants(view).OfType<Button>().Single(b => AutomationProperties.GetName(b) == "Mute all microphones");
+            ((IInvokeProvider)new ButtonAutomationPeer(mute)).Invoke();
+            await Until(() => view.IsEnabled && f.Module.Status.State == MicrophoneMuteState.Muted);
+            Assert.Contains(Descendants(view).OfType<TextBlock>(), t => t.Text == "Muted");
+            Assert.Same(level, Descendants(view).OfType<Slider>().Single()); // the same row: a level change never rebuilds it
+        });
+    }
+
+    [Fact]
+    public async Task Microphone_volume_keeps_its_own_mute_button_after_showing_the_state_row_and_back()
+    {
+        await using var f = new MuteFixture();
+        f.System.With(Mic("A"), CableOutput()).WithDefault("A");
+        await f.Start();
+        await Sta(async () =>
+        {
+            var view = Assert.IsType<MicMuteView>(f.Ui.Page!("mute"));
+            view.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent)); // follow the module, as a shown page does
+            string Header() => (string)Descendants(view).OfType<SettingRow>().Single().Header;
+            Assert.Equal("Volume", Header());
+            f.System.ChangeDefault("CableOut"); // VB-CABLE as the default mic, with routing off: no level to tell
+            await Until(() => Header() == "Microphone");
+            f.System.ChangeDefault("A");
+            await Until(() => Header() == "Volume");
+
+            var mute = Descendants(view).OfType<Button>().Single(b => AutomationProperties.GetName(b) == "Mute all microphones");
+            ((IInvokeProvider)new ButtonAutomationPeer(mute)).Invoke();
+            await Until(() => view.IsEnabled && f.Module.Status.State == MicrophoneMuteState.Muted);
+            Assert.Equal("Unmute", Descendants(view).OfType<Button>().Single(b => AutomationProperties.GetName(b) == "Unmute all microphones").Content);
         });
     }
 
@@ -177,6 +245,12 @@ public sealed class SoundSettingsTests
             await f.Module.SetEnabledAsync(true);
             var live = new ProcessingPage(f.Module);
             Assert.Contains(Descendants(live).OfType<SettingRow>(), r => (string)r.Header == "Level");
+            // Two cards: whether it runs and its level, then how it processes.
+            var cards = Descendants(live).OfType<Card>().Where(c => c.Children.Count > 0 && c.Parent is StackPanel).ToList();
+            Assert.Equal(2, cards.Count);
+            Assert.Equal(["Mic processing", "Level"], cards[0].Children.OfType<SettingRow>().Select(r => (string)r.Header));
+            Assert.Equal("Default device", cards[1].Children.OfType<SettingRow>().Select(r => (string)r.Header).First());
+            Assert.Equal(new Thickness(0, 8, 0, 0), cards[1].Margin);
         });
     }
 
