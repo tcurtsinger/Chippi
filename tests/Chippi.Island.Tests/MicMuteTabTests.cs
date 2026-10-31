@@ -44,4 +44,32 @@ public sealed class MicMuteTabTests
             finally { window.Close(); }
         });
     }
+
+    [Fact]
+    public void Keep_awake_shows_as_a_badge_while_a_song_holds_the_bar_and_as_the_bar_otherwise()
+    {
+        WpfTestThread.Run(() =>
+        {
+            var window = new IslandWindow();
+            try
+            {
+                var music = new IslandActivity("music", IslandActivityKind.Media, "Track", "Player");
+                var awake = new IslandActivity("awake", IslandActivityKind.Status, "Keep awake", "Until 6:00 PM")
+                    { ModuleId = IslandHost.KeepAwakeModuleId, TileKey = "keep-awake" };
+                window.SetMedia(new IslandPanelTests.FakeMedia
+                {
+                    Sessions = [new("player", "Player", "Track", "", true, true, true, true, true, true, TimeSpan.Zero, TimeSpan.FromMinutes(3), DateTimeOffset.Now, null)],
+                });
+                window.SetActivities([awake], PetMood.WideAwake);
+                Assert.True(window.BarShown); // Keep awake has the bar: no badge
+                Assert.Equal(Visibility.Collapsed, window.AwakeBadge.Visibility);
+                window.SetActivities([music, awake], PetMood.WideAwake);
+                Assert.Equal("Track", window.ChipText); // the song takes the bar, and Keep awake stays in sight as the badge
+                Assert.Equal(Visibility.Visible, window.AwakeBadge.Visibility);
+                window.SetActivities([music], PetMood.Idle);
+                Assert.Equal(Visibility.Collapsed, window.AwakeBadge.Visibility);
+            }
+            finally { window.Close(); }
+        });
+    }
 }

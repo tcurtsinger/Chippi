@@ -47,9 +47,97 @@ public sealed class KeepAwakeViewTests
         }
     }
 
+    [Fact]
+    public async Task The_lit_card_reads_the_time_left_and_until_opens_a_time_picker_in_the_page()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"Chippi-view-{Guid.NewGuid():N}.json");
+        var module = new KeepAwakeModule(new NullNative());
+        var registry = new ModuleRegistry(new ConfigStore(path), new IslandActivityHub(), NullLoggerFactory.Instance);
+        registry.Register(module);
+        try
+        {
+            await registry.StartAsync();
+            await OnSta(async () =>
+            {
+                var view = new KeepAwakeIslandView(module);
+                var hour = Chip(view, "1 hr")!;
+                hour.IsChecked = true;
+                await Until(() => module.IsOn && hour.IsChecked == true);
+                // Lit: the length over the time left, the one live fact on the page.
+                Assert.Equal(["1 hr", "1 hr left"], Lines(hour));
+                Assert.Equal("1 hr, 1 hr left", System.Windows.Automation.AutomationProperties.GetName(hour));
+
+                // Until… swaps the cards for the picker, at the last Until time; a step and Start run until then.
+                var until = Chip(view, "Until…")!;
+                until.IsChecked = true;
+                var picker = Find<System.Windows.Controls.StackPanel>(view, p => System.Windows.Automation.AutomationProperties.GetName(p) == "End time")!;
+                Assert.Equal(System.Windows.Visibility.Visible, picker.Visibility);
+                Assert.True(module.IsOn); // opening the picker starts nothing
+                Click(Find<System.Windows.Controls.Button>(view, b => System.Windows.Automation.AutomationProperties.GetName(b) == "Minute up")!);
+                var now = DateTime.Now;
+                string day = 18 * 60 + 5 <= now.Hour * 60 + now.Minute ? "Tomorrow" : "Today"; // a time already past is tomorrow's
+                Assert.NotNull(Find<System.Windows.Controls.TextBlock>(picker, t => t.Text == day));
+                Click(Find<System.Windows.Controls.Button>(view, b => b.Content as string == "Start")!);
+                await Until(() => module.Active?.Mode == AwakeMode.UntilTime);
+                Assert.Equal(18 * 60 + 5, module.Active!.UntilMinute);
+                Assert.NotEqual(System.Windows.Visibility.Visible, picker.Visibility);
+                await Until(() => until.IsChecked == true);
+                Assert.Equal($"Until {KeepAwakeText.Until(18 * 60 + 5)}", Lines(until)[0]);
+
+                // Esc (the module's HandleEscape) leaves the picker before it closes the island.
+                Assert.False(view.CloseUntil());
+                view.OpenUntil();
+                Assert.True(view.CloseUntil());
+                Assert.NotEqual(System.Windows.Visibility.Visible, picker.Visibility);
+            });
+        }
+        finally
+        {
+            await registry.StopAllAsync();
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public async Task A_failed_start_says_keep_awake_failed_never_the_exception()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"Chippi-view-{Guid.NewGuid():N}.json");
+        var module = new KeepAwakeModule(new FailingNative());
+        var registry = new ModuleRegistry(new ConfigStore(path), new IslandActivityHub(), NullLoggerFactory.Instance);
+        registry.Register(module);
+        try
+        {
+            await registry.StartAsync();
+            await OnSta(async () =>
+            {
+                var view = new KeepAwakeIslandView(module);
+                Chip(view, "30 min")!.IsChecked = true;
+                var failed = Find<System.Windows.Controls.TextBlock>(view, t => t.Text == "Keep awake failed")!;
+                await Until(() => failed.Visibility == System.Windows.Visibility.Visible);
+                Assert.Null(Find<System.Windows.Controls.TextBlock>(view, t => t.Text.Contains(FailingNative.Message)));
+            });
+        }
+        finally
+        {
+            await registry.StopAllAsync();
+            File.Delete(path);
+        }
+    }
+
+    // The island's cards carry their fixed label as Tag (their content is two lines); the Settings page's chips are text.
     private static ToggleButton? Chip(System.Windows.DependencyObject root, string label) =>
-        root is ToggleButton { Content: string text } chip && text == label ? chip
-        : System.Windows.LogicalTreeHelper.GetChildren(root).OfType<System.Windows.DependencyObject>().Select(c => Chip(c, label)).FirstOrDefault(c => c is not null);
+        Find<ToggleButton>(root, chip => chip.Tag as string == label || chip.Content as string == label);
+
+    private static T? Find<T>(System.Windows.DependencyObject root, Func<T, bool> where) where T : System.Windows.DependencyObject =>
+        root is T hit && where(hit) ? hit
+        : System.Windows.LogicalTreeHelper.GetChildren(root).OfType<System.Windows.DependencyObject>().Select(c => Find(c, where)).FirstOrDefault(c => c is not null);
+
+    // A card's visible lines: its length (or Stop) and, lit, the time left.
+    private static string[] Lines(ToggleButton card) =>
+        [.. ((System.Windows.Controls.Panel)card.Content).Children.OfType<System.Windows.Controls.TextBlock>()
+            .Where(t => t.Visibility == System.Windows.Visibility.Visible).Select(t => t.Text)];
+
+    private static void Click(ButtonBase button) => button.RaiseEvent(new System.Windows.RoutedEventArgs(ButtonBase.ClickEvent));
 
     private static async Task Until(Func<bool> condition)
     {
@@ -85,5 +173,16 @@ public sealed class KeepAwakeViewTests
     private sealed class NullNative : IExecutionState
     {
         public void Set(bool active, bool display) { }
+    }
+
+    private sealed class FailingNative : IExecutionState
+    {
+        public const string Message = "The handle is invalid";
+
+        public void Set(bool active, bool display)
+        {
+            if (active)
+                throw new System.ComponentModel.Win32Exception(6, Message);
+        }
     }
 }

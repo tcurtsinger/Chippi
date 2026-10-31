@@ -107,7 +107,6 @@ public partial class IslandWindow : Window
     private string _lineText = "";
     private string? _shownContent; // what the bar shows, by identity: a new one arrives (Arrival)
     private string? _rim; // the rim's brush key, rest or hovered
-    private bool _badge; // the muted mic's badge is up
     private string _chipText = ""; // the line as plain text, for the chip's name
     private string _lineState = "";
     private TabLevel? _level;
@@ -757,7 +756,7 @@ public partial class IslandWindow : Window
         BodyShadow.Effect = (System.Windows.Media.Effects.Effect)FindResource(_lifted ? "IslandLiftShadow" : "IslandPuckShadow");
         ShowRim(_hovered && !_lifted ? "IslandWidgetHoverBorderBrush" : "IslandWidgetBorderBrush");
         Body.Visibility = BodyShadow.Visibility = _panel.IsVisible ? Visibility.Hidden : Visibility.Visible;
-        ShowBadge(mic is not null);
+        ShowBadge(MicBadge, mic is not null);
 
         var current = _media?.Current;
         var playing = top?.Kind == IslandActivityKind.Media && current is { Playing: true } ? current : null;
@@ -775,6 +774,10 @@ public partial class IslandWindow : Window
         var dropTile = dropping ? _tiles.FirstOrDefault(t => t.Key == _dragKey) : null;
         bool bar = !_lifted && (dropTile is not null || feedback is not null || song is not null || top is not null);
         _singing = bar && dropTile is null && feedback is null && song is not null;
+        // Keep awake stays in sight while something else holds the bar (a song, a drag, another activity) or the puck is lifted.
+        var keepAwake = _activities.FirstOrDefault(a => a.Kind == IslandActivityKind.Status && a.ModuleId == IslandHost.KeepAwakeModuleId);
+        bool awakeOnBar = bar && dropTile is null && feedback is null && song is null && ReferenceEquals(top, keepAwake);
+        ShowBadge(AwakeBadge, keepAwake is not null && !awakeOnBar);
         bool paused = _singing && playing is null;
         // Listening (headphones) while a song plays, the panel out or not; otherwise the mood for the activities, awake on hover or on the bar.
         var mood = playing is not null && !_lifted ? PetMood.Listening : _mood != PetMood.Sleepy ? _mood : awake || bar ? PetMood.Idle : PetMood.Sleepy;
@@ -875,37 +878,37 @@ public partial class IslandWindow : Window
     }
 
     /// <summary>
-    /// The muted mic's badge scales in from 0.6 as it fades in over 160ms, and fades out over 100ms when the mic is
-    /// live again; under reduced motion it only fades. It never changes the widget's size.
+    /// A badge on the puck (the muted mic's, Keep awake's) scales in from 0.6 as it fades in over 160ms, and fades out over
+    /// 100ms when it goes; under reduced motion it only fades. It never changes the widget's size. Its Tag is whether it's up.
     /// </summary>
-    private void ShowBadge(bool shown)
+    private void ShowBadge(FrameworkElement badge, bool shown)
     {
-        if (shown == _badge)
+        if (shown == (badge.Tag is true))
             return;
-        _badge = shown;
+        badge.Tag = shown;
         bool seen = IsVisible && !_panel.IsVisible;
         if (shown)
         {
-            MicBadge.Visibility = Visibility.Visible;
+            badge.Visibility = Visibility.Visible;
             if (seen)
-                Arrival.Pop(MicBadge, 0.6, BadgeIn);
+                Arrival.Pop(badge, 0.6, BadgeIn);
             return;
         }
         if (!seen)
         {
-            MicBadge.BeginAnimation(OpacityProperty, null);
-            MicBadge.Visibility = Visibility.Collapsed;
+            badge.BeginAnimation(OpacityProperty, null);
+            badge.Visibility = Visibility.Collapsed;
             return;
         }
         var fade = new DoubleAnimation(0, BadgeOut);
         fade.Completed += (_, _) =>
         {
-            if (_badge)
-                return; // muted again meanwhile: its pop has taken over
-            MicBadge.Visibility = Visibility.Collapsed;
-            MicBadge.BeginAnimation(OpacityProperty, null);
+            if (badge.Tag is true)
+                return; // up again meanwhile: its pop has taken over
+            badge.Visibility = Visibility.Collapsed;
+            badge.BeginAnimation(OpacityProperty, null);
         };
-        MicBadge.BeginAnimation(OpacityProperty, fade, HandoffBehavior.SnapshotAndReplace);
+        badge.BeginAnimation(OpacityProperty, fade, HandoffBehavior.SnapshotAndReplace);
     }
 
     private IIslandTimer? _pauseTimer;
