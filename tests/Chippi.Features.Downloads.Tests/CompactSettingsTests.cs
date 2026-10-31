@@ -71,6 +71,8 @@ public sealed class CompactSettingsTests
         Assert.Equal(["Include Needs a look", "Include a.torrent", "Include setup.pdf.exe", "Include Documents"], boxes.Take(4));
         Assert.Contains("Include Pictures", boxes);
         Assert.Single(Find<TextBlock>(view), t => t.Text == "Held · looks like a .pdf · is an app");
+        Assert.Single(Find<TextBlock>(view), t => t.Text == "Rule → Installers"); // checkable in Needs a look, so it says where it goes
+        Assert.Single(Find<TextBlock>(view), t => t.Text == "Torrents"); // held: it goes nowhere
         Assert.Contains(Find<IconButton>(view), b => AutomationProperties.GetName(b) == "Show setup.pdf.exe in folder");
 
         // 15 files to approve: Documents starts closed; Pictures holds the file Review asked for, so it's open.

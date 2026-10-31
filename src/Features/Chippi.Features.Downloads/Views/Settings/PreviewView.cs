@@ -457,10 +457,15 @@ internal sealed class PreviewView : UserControl
             nameStack.Children.Add(Ui.Text($"→ {Path.GetFileName(renamed)}", "CaptionTextStyle", "TextSecondaryBrush"));
         var size = Right(Ui.Number(Ui.Size(item.Bytes), "TextTertiaryBrush"));
         size.VerticalAlignment = VerticalAlignment.Center;
-        var rule = Ui.Text(noMatch ? "No match" : item.RuleName ?? (preview.Archive is not null && item.RuleId is null ? "Import" : "Safety check"), "CaptionTextStyle", "TextSecondaryBrush").Margin(14, 0, 8, 0);
+        string ruleName = noMatch ? "No match" : item.RuleName ?? (preview.Archive is not null && item.RuleId is null ? "Import" : "Safety check");
+        // Needs a look has no destination header, so a file there that would move says where: "Rule → Installers".
+        string? to = look && item.Destination is { } target
+            ? item.Kind == OperationKind.Rename ? Path.GetFileName(target) : Title(preview, Path.GetDirectoryName(target) ?? "", item.Kind)
+            : null;
+        var rule = Ui.Text(to is null ? ruleName : $"{ruleName} → {to}", "CaptionTextStyle", "TextSecondaryBrush").Margin(14, 0, 8, 0);
         rule.VerticalAlignment = VerticalAlignment.Center;
         rule.TextTrimming = TextTrimming.CharacterEllipsis;
-        rule.ToolTip = item.RuleName;
+        rule.ToolTip = to is null ? item.RuleName : item.Destination;
         var grid = Columns();
         grid.Children.Add(lead.At(0));
         grid.Children.Add(nameStack.At(1));
