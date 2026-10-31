@@ -278,14 +278,16 @@ internal sealed class RulesSection : UserControl, ISettingsLeaveGuard
         Dispatcher.BeginInvoke(() => Render(focusHandleOf: rule.Id)); // after the thumb finishes its own drag
     }
 
-    /// <summary>A new rule is a draft until its Save; Cancel removes it.</summary>
+    /// <summary>
+    /// A new rule is a draft until its Save; Cancel removes it. It starts with no condition (Save waits
+    /// for one), so it never copies what an earlier rule already wins.
+    /// </summary>
     internal void AddRule()
     {
         var rule = new RuleSetting
         {
             Id = RuleDrafts.NewId(),
             Name = "New rule",
-            Extensions = ["pdf"],
             Action = RuleActionKind.Move,
             Template = DocumentsFolder(),
         };
@@ -304,6 +306,8 @@ internal sealed class RulesSection : UserControl, ISettingsLeaveGuard
         var editor = new StackPanel { Margin = new Thickness(48, 14, 6, 4) };
         var save = Ui.Button("Save", "PrimaryButtonStyle", name: $"Save {rule.Name}");
         save.IsEnabled = false;
+        // Under Conditions: that the rule needs one, or which earlier rule wins its files first.
+        var conditionsNote = Hidden(Ui.Warning(""));
         void Changed()
         {
             if (_summaries.TryGetValue(rule.Id, out var summary))
@@ -311,7 +315,11 @@ internal sealed class RulesSection : UserControl, ISettingsLeaveGuard
                 summary.Text = RuleChecks.Summary(rule);
                 summary.ToolTip = DestinationTip(rule);
             }
+            string? note = !RuleDrafts.HasCondition(rule) ? "Turn on a condition" : _drafts.Shadow(rule);
+            conditionsNote.Text = note ?? "";
+            conditionsNote.Visibility = note is null ? Visibility.Collapsed : Visibility.Visible;
             save.IsEnabled = _drafts.CanSave(rule.Id);
+            RunTest();
         }
 
         // Name
@@ -327,6 +335,7 @@ internal sealed class RulesSection : UserControl, ISettingsLeaveGuard
 
         // Conditions: each turns on with a checkbox; an unchecked one's fields dim.
         editor.Children.Add(Ui.Text("Conditions", "HeadlineTextStyle").Margin(0, 14, 0, 8));
+        editor.Children.Add(conditionsNote.Margin(0, -4, 0, 8));
 
         var extensions = Ui.Field(rule.Extensions is { } e ? string.Join(", ", e) : "", name: "Extensions", width: 320);
         var extensionsError = Hidden(Ui.Warning(""));
@@ -401,8 +410,7 @@ internal sealed class RulesSection : UserControl, ISettingsLeaveGuard
 
         // Action
         editor.Children.Add(Ui.Text("Action", "HeadlineTextStyle").Margin(0, 14, 0, 8));
-        bool hold = rule.Action == RuleActionKind.Hold;
-        var action = hold ? Ui.Segment("Action", "Move to folder", "Rename", "Hold") : Ui.Segment("Action", "Move to folder", "Rename");
+        var action = Ui.Segment("Action", "Move to folder", "Rename", "Hold");
         action.SelectedIndex = (int)rule.Action;
         editor.Children.Add(Line("", action));
 
@@ -504,13 +512,15 @@ internal sealed class RulesSection : UserControl, ISettingsLeaveGuard
                 rule.Template = template.Text = "{year}-{month}-{day} {filename}";
             else if (kind == RuleActionKind.Move)
                 rule.Template = DocumentsFolder();
+            else if (string.IsNullOrWhiteSpace(rule.HoldReason))
+                reason.Text = "Check before opening"; // its TextChanged sets the reason
             ShowAction();
             Changed();
         };
         ShowAction();
 
         // Save, Cancel on the left; Duplicate, Delete (which save at once) on the right.
-        save.IsEnabled = _drafts.CanSave(rule.Id);
+        Changed();
         save.Click += (_, _) =>
         {
             if (!_drafts.Save(rule.Id))
@@ -647,8 +657,8 @@ internal sealed class RulesSection : UserControl, ISettingsLeaveGuard
         if (name.Length > 0)
         {
             string folder = SampleFolder();
-            // What would actually run: the committed rules, not drafts mid-edit.
-            var rules = RuleDrafts.Valid(_drafts.Effective()).Select((r, i) => r.ToRule() with { Order = i }).ToList();
+            // The saved rules, with the one being edited as it stands: what would run once it's saved.
+            var rules = RuleDrafts.Valid(_drafts.Testing(_open)).Select((r, i) => r.ToRule() with { Order = i }).ToList();
             PlannedOperation plan;
             try
             {

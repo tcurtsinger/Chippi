@@ -9,11 +9,12 @@ using System.Windows.Media;
 
 namespace Chippi.Features.Downloads.Views.Tidy;
 
-public enum TidyRowAction { None, Review, Retry, Undo, RetryUndo }
+/// <summary>What a row's button does. <see cref="UndoRun"/> puts back the whole run Organize now just made.</summary>
+public enum TidyRowAction { None, Review, Retry, Undo, RetryUndo, UndoRun }
 
 /// <summary>A recent row's immutable display state; no file operation is decided by a visual toggle.</summary>
 public sealed class TidyRow(string name, string detail, string folder, string source,
-    bool isHeld, bool isWaiting, bool isFailed, TidyRowAction action, long? operationId = null)
+    bool isHeld, bool isWaiting, bool isFailed, TidyRowAction action, long? operationId = null, bool isSummary = false, bool needsLook = false)
 {
     // UI Automation peers track item identity, so refreshed rows must not compare equal to detached containers.
     public string Name { get; } = name;
@@ -26,13 +27,22 @@ public sealed class TidyRow(string name, string detail, string folder, string so
     public TidyRowAction Action { get; } = action;
     public long? OperationId { get; } = operationId;
 
+    /// <summary>The folder's "116 files to review" row, not a file: its Review opens the whole preview.</summary>
+    public bool IsSummary { get; } = isSummary;
+
+    /// <summary>The run Organize now just made ("116 moved"), with a check and its Undo.</summary>
+    public bool IsDone => Action == TidyRowAction.UndoRun;
+
+    /// <summary>Its detail is in Caution: files Organize now left for a look, or that failed.</summary>
+    public bool NeedsLook { get; } = needsLook;
+
     public override string ToString() => $"{Name}. {Detail}";
 
     public string ActionLabel => Action switch
     {
         TidyRowAction.Review => "Review",
         TidyRowAction.Retry or TidyRowAction.RetryUndo => "Retry",
-        TidyRowAction.Undo => "Undo",
+        TidyRowAction.Undo or TidyRowAction.UndoRun => "Undo",
         _ => "",
     };
     public string AccessibleAction => $"{ActionLabel} {Name}";
@@ -42,8 +52,8 @@ public sealed class TidyRow(string name, string detail, string folder, string so
     public bool IsReview => Action == TidyRowAction.Review;
     public bool HasIconAction => HasAction && !IsReview;
 
-    /// <summary>A caution triangle (held), a clock (waiting), the info glyph (failed) or a file.</summary>
-    public Geometry Lead => IsHeld ? LucideIcons.TriangleAlert : IsWaiting ? LucideIcons.Clock : IsFailed ? LucideIcons.Info : LucideIcons.File;
+    /// <summary>A check (Organize now's run), an inbox (files to review), a caution triangle (held), a clock (waiting), the info glyph (failed) or a file.</summary>
+    public Geometry Lead => IsDone ? LucideIcons.Check : IsSummary ? LucideIcons.Inbox : IsHeld ? LucideIcons.TriangleAlert : IsWaiting ? LucideIcons.Clock : IsFailed ? LucideIcons.Info : LucideIcons.File;
     public Geometry ActionIcon => Action switch
     {
         TidyRowAction.Review => LucideIcons.Eye,
@@ -66,13 +76,21 @@ internal static class TidyProjection
 
     public static string FolderName(string path) => Path.GetFileName(Path.TrimEndingDirectorySeparator(path)) is { Length: > 0 } name ? name : path;
 
-    /// <summary>Held rows first, then waiting, then the latest moves: "Documents · 23m", "Restored to Downloads".</summary>
-    public static IReadOnlyList<TidyRow> Rows(IReadOnlyList<PendingFile> pending, IReadOnlyList<OperationRecord> history, DateTimeOffset now)
+    /// <summary>
+    /// The picked folder's rows: its files to review as one row, then held, then waiting, then its latest moves
+    /// ("Documents · 23m", "Restored to Downloads"); <paramref name="history"/> is already that folder's. A held
+    /// row says why ("Check before opening"): its triangle and Review already say it's held.
+    /// </summary>
+    public static IReadOnlyList<TidyRow> Rows(string folder, IReadOnlyList<PendingFile> pending, IReadOnlyList<OperationRecord> history, DateTimeOffset now)
     {
-        var rows = pending.Where(p => p.Status is PendingStatus.Held or PendingStatus.Waiting)
+        var here = pending.Where(p => SameFolder(p.Folder, folder)).ToList();
+        int ready = here.Count(p => p.Status == PendingStatus.Ready);
+        IEnumerable<TidyRow> review = ready == 0 ? [] :
+            [new TidyRow(ready == 1 ? "1 file to review" : $"{ready} files to review", "", folder, folder, false, false, false, TidyRowAction.Review, isSummary: true)];
+        var rows = here.Where(p => p.Status is PendingStatus.Held or PendingStatus.Waiting)
             .OrderBy(p => p.Status == PendingStatus.Held ? 0 : 1)
             .Select(p => new TidyRow(
-                p.Name, $"{(p.Status == PendingStatus.Held ? "Held" : "Waiting")} · {p.Reason ?? "Not ready"}",
+                p.Name, p.Status == PendingStatus.Held ? p.Reason ?? "Held" : $"Waiting · {p.Reason ?? "Not ready"}",
                 p.Folder, p.Path, p.Status == PendingStatus.Held, p.Status == PendingStatus.Waiting, false,
                 p.Status == PendingStatus.Held ? TidyRowAction.Review : TidyRowAction.None));
         var recent = history.Where(o => o.State is OperationState.Completed or OperationState.Failed or OperationState.Undone)
@@ -87,8 +105,11 @@ internal static class TidyProjection
                 o.State == OperationState.Failed ? o.Kind == HistoryOperationKind.Restore ? TidyRowAction.RetryUndo : TidyRowAction.Retry :
                     o.State == OperationState.Completed && o.Kind is HistoryOperationKind.Move or HistoryOperationKind.Rename ? TidyRowAction.Undo : TidyRowAction.None,
                 o.Kind == HistoryOperationKind.Restore ? o.UndoOf : o.Id));
-        return [.. rows.Concat(recent).Take(RecentRows)];
+        return [.. review.Concat(rows).Concat(recent).Take(RecentRows)];
     }
+
+    public static bool SameFolder(string? a, string? b) =>
+        string.Equals(a is null ? null : Path.TrimEndingDirectorySeparator(a), b is null ? null : Path.TrimEndingDirectorySeparator(b), StringComparison.OrdinalIgnoreCase);
 
     private static string Age(TimeSpan age) => age.TotalMinutes < 1 ? "now" : age.TotalHours < 1 ? $"{(int)age.TotalMinutes}m" :
         age.TotalDays < 1 ? $"{(int)age.TotalHours}h" : $"{(int)age.TotalDays}d";

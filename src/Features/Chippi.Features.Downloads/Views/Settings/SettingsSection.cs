@@ -30,6 +30,9 @@ internal sealed class SettingsSection : UserControl
     private readonly TextBlock _error = Ui.Warning("");
     private readonly TextBlock _importError = Ui.Warning("");
 
+    /// <summary>Import archive's Choose file…, off while no watched folder exists to import into.</summary>
+    private readonly Button _importChoose = Ui.Button("Choose file…", name: "Import archive");
+
     public SettingsSection(DownloadsModule module, Action<Task<PreviewPlan>> import, Action<string>? preview = null)
     {
         _module = module;
@@ -52,6 +55,7 @@ internal sealed class SettingsSection : UserControl
     private void Render()
     {
         var folders = _module.Settings.Folders;
+        _importChoose.IsEnabled = folders.Any(f => Directory.Exists(f.Path));
         _folders.Content = folders.Count == 0
             ? SettingsLayout.Card(SettingsLayout.Empty("No folders yet"))
             : Ui.Card([.. folders.Select(FolderRow)]);
@@ -95,31 +99,56 @@ internal sealed class SettingsSection : UserControl
         options.Children.Add(Ui.Setting("Ignore list", "", ignore));
         options.Children.Add(Ui.Setting("Stop watching", "", remove));
 
-        string where = folder.Path + (folder.Path.StartsWith(@"\\", StringComparison.Ordinal) ? " · network" : "") + (exists ? "" : " · not found");
+        string where = folder.Path + (folder.Path.StartsWith(@"\\", StringComparison.Ordinal) ? " · network" : "");
         var row = new ExpanderRow
         {
             Header = name,
             Description = where,
             Icon = LucideIcons.Folder,
-            Value = FolderActions(folder, exists),
+            Value = FolderActions(folder, exists, out var state),
             Content = options,
             IsExpanded = _expanded.Contains(folder.Path),
             ToolTip = folder.Path,
         };
-        row.SetResourceReference(ForegroundProperty, paused ? "TextMutedBrush" : "AccentBrush");
-        row.Expanded += (_, _) => _expanded.Add(folder.Path);
-        row.Collapsed += (_, _) => _expanded.Remove(folder.Path);
+        row.SetResourceReference(ForegroundProperty, !exists ? "WarningBrush" : paused ? "TextMutedBrush" : "AccentBrush");
+        // Open, the Mode segment says the mode; "Not found" stays.
+        void ShowState() => state.Visibility = row.IsExpanded && exists ? Visibility.Collapsed : Visibility.Visible;
+        row.Expanded += (_, _) => { _expanded.Add(folder.Path); ShowState(); };
+        row.Collapsed += (_, _) => { _expanded.Remove(folder.Path); ShowState(); };
+        ShowState();
         return row;
     }
 
-    private StackPanel FolderActions(WatchedFolder folder, bool exists)
+    /// <summary>The mode and Organize now; for a folder that's gone, "Not found" in Caution and Choose folder… to point it elsewhere.</summary>
+    private StackPanel FolderActions(WatchedFolder folder, bool exists, out TextBlock state)
     {
-        var mode = Ui.Text(folder.Mode.DisplayName(), brush: "TextSecondaryBrush");
-        mode.Margin = new Thickness(0, 0, 12, 0);
+        state = Ui.Text(exists ? folder.Mode.DisplayName() : "Not found", brush: exists ? "TextSecondaryBrush" : "WarningTextBrush");
+        state.Margin = new Thickness(0, 0, 12, 0);
+        if (!exists)
+        {
+            var relocate = Ui.Button("Choose folder…", name: $"Choose a folder in place of {Ui.FolderName(folder.Path)}");
+            relocate.Click += (_, _) => Relocate(folder);
+            return Ui.Row(state, relocate);
+        }
         var organize = Ui.Button("Organize now", name: $"Organize {Ui.FolderName(folder.Path)} now");
-        organize.IsEnabled = exists;
         organize.Click += (_, _) => _preview(folder.Path);
-        return Ui.Row(mode, organize);
+        return Ui.Row(state, organize);
+    }
+
+    /// <summary>A watched folder that's gone: watch another in its place, keeping its mode and wait (a new path starts from now).</summary>
+    private void Relocate(WatchedFolder folder)
+    {
+        var dialog = new OpenFolderDialog { Title = "Choose folder", Multiselect = false };
+        if (dialog.ShowDialog(Window.GetWindow(this)) != true)
+            return;
+        string path = dialog.FolderName;
+        Save(s =>
+        {
+            if (s.Folders.Any(f => Same(f.Path, path)))
+                s.Folders.RemoveAll(f => Same(f.Path, folder.Path));
+            else if (s.Folders.FirstOrDefault(f => Same(f.Path, folder.Path)) is { } gone)
+                gone.Path = path;
+        });
     }
 
     private SettingRow KeepHistoryRow()
@@ -159,7 +188,7 @@ internal sealed class SettingsSection : UserControl
 
     private FrameworkElement ImportRow()
     {
-        var choose = Ui.Button("Choose file…", name: "Import archive");
+        var choose = _importChoose;
         choose.Click += async (_, _) => await ImportAsync(choose);
         var row = Ui.Setting("Import archive", "", choose);
         return Ui.Stack(row, _importError.Margin(16, 0, 16, 10));
@@ -172,7 +201,7 @@ internal sealed class SettingsSection : UserControl
         string? target = _module.Settings.Folders.Select(f => f.Path).FirstOrDefault(Directory.Exists);
         if (target is null || _module.Engine is not { } engine || _module.ImportStaging is not { } staging)
         {
-            ShowImportError("Add a folder first");
+            ShowImportError("Import failed · no folder to import into");
             return;
         }
         var dialog = new OpenFileDialog { Title = "Import archive", Filter = "Archives (*.zip;*.tgz;*.tar.gz)|*.zip;*.tgz;*.tar.gz" };
@@ -186,11 +215,11 @@ internal sealed class SettingsSection : UserControl
         }
         catch (ArchiveRejectedException ex)
         {
-            ShowImportError(ex.Message);
+            ShowImportError($"Import failed · {char.ToLowerInvariant(ex.Message[0])}{ex.Message[1..].TrimEnd('.')}");
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            ShowImportError("Archive unreadable");
+            ShowImportError("Import failed · archive unreadable");
         }
         finally
         {
@@ -252,7 +281,7 @@ internal sealed class SettingsSection : UserControl
         }
         catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException or System.Security.SecurityException)
         {
-            ShowError(ex is UnauthorizedAccessException ? "Access denied" : "Save failed");
+            ShowError(ex is UnauthorizedAccessException ? "Save failed · access denied" : "Save failed");
         }
         Dispatcher.BeginInvoke(Render); // not inside the control's own event
     }

@@ -71,7 +71,7 @@ public sealed class NoticeActionTests : IDisposable
 
         long run = f.History.Query(new HistoryQuery()).Single(o => o.State == OperationState.Failed).RunId;
         var notice = f.Notifier.Shown.Single(n => n.Kind == DownloadsNotices.Failed);
-        Assert.Equal("1 file not moved", notice.Title);
+        Assert.Equal("Move failed", notice.Title);
         Assert.StartsWith("report.pdf · ", notice.Body, StringComparison.Ordinal);
         Assert.Equal($"--downloads-run {run}", notice.Activation);
         Assert.Equal([("History", $"--downloads-run {run}")], Buttons(notice));

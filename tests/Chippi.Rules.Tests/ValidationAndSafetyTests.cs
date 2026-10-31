@@ -109,6 +109,18 @@ public sealed class ValidationAndSafetyTests
     public void Ordinary_names_are_not_misleading(string name) => Assert.False(FileSafety.IsMisleadingName(name));
 
     [Theory]
+    [InlineData("invoice-0412.pdf.exe", "Looks like a .pdf · is an app")]
+    [InlineData("picture.PNG.LNK", "Looks like a .png · is an app")]
+    [InlineData("invoice.pdf .exe", "Looks like a .pdf · is an app")]
+    [InlineData("run  .exe", "Disguised app")]
+    [InlineData("ab\u202Efdp.exe", "Disguised app")]
+    public void A_misleading_name_says_what_it_hides(string name, string detail)
+    {
+        var plan = Planner.Plan(File(name), [Rule(new MoveTo("Sorted"))], new(@"C:\Inbox", DateTimeOffset.UnixEpoch, TimeZoneInfo.Utc, []));
+        Assert.Equal(detail, Assert.Single(plan.Warnings).Detail);
+    }
+
+    [Theory]
     [InlineData("partial.part")]
     [InlineData("partial.partial")]
     [InlineData("partial.crdownload")]
