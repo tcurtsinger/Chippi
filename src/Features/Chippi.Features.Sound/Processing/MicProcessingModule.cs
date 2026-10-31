@@ -84,7 +84,7 @@ public sealed class MicProcessingModule : IFeatureModule
             _lease = audio.Acquire();
             await RecoverAsync(audio, context);
             context.Notifier.Declare([new("stopped", "Stopped", NoticePlaces.Windows | NoticePlaces.Island)]);
-            _tile = context.Ui.AddIslandTile(SoundTile.Section(30, SoundTile.Microphone, () => new ProcessingQuickView(this)) with { StatusPriority = 10 });
+            _tile = context.Ui.AddIslandTile(SoundTile.Section(30, SoundTile.Microphone, () => new ProcessingQuickView(this)) with { StatusPriority = 10, SpansColumns = true });
             context.Ui.SetSettingsPage(_ => new ProcessingPage(this));
             audio.SnapshotChanged += OnSnapshot;
             _lastState = ProcessingState.Off;

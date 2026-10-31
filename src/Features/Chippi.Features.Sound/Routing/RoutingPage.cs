@@ -13,8 +13,9 @@ using Chippi.UI.Controls;
 namespace Chippi.Features.Sound.Routing;
 
 /// <summary>
-/// The routing Settings page (revised 2026-10-31): Output's Volume, then one Priority list whose radios
-/// pick the device in use, as the island's rows do. All edits save immediately, as in Hopper.
+/// The routing Settings page (revised 2026-10-31): Output's Volume, captioned with the output it sets,
+/// then Priority: its switches in one card and, 8 below, the one list whose radios pick the device in
+/// use, as the island's rows do. All edits save immediately, as in Hopper.
 /// </summary>
 public sealed class RoutingPage : UserControl
 {
@@ -29,6 +30,7 @@ public sealed class RoutingPage : UserControl
     private readonly StackPanel _levels = new() { Orientation = Orientation.Horizontal };
     private readonly TextBlock _none = RoutingUi.Text("No output", "BodyTextStyle", "TextTertiaryBrush");
     private Card? _volumeCard;
+    private SettingRow? _volumeRow;
     private string _shape = "";
     private bool _refreshing;
 
@@ -82,7 +84,7 @@ public sealed class RoutingPage : UserControl
         _handles.Clear();
         var list = _module.Settings.For(_flow);
         if (_flow == AudioFlow.Render)
-            _body.Children.Add(_volumeCard ??= SettingsLayout.Card(SettingsLayout.Row("Volume", VolumeControls())));
+            _body.Children.Add(_volumeCard ??= SettingsLayout.Card(_volumeRow = SettingsLayout.Row("Volume", VolumeControls())));
 
         Button? add = null;
         add = SettingsLayout.AddButton(_flow == AudioFlow.Render ? "device" : "mic", () =>
@@ -93,14 +95,17 @@ public sealed class RoutingPage : UserControl
             RoutingUi.Menu(add!, items);
         });
         _body.Children.Add(SettingsLayout.Section("Priority", add));
-        var card = SettingsLayout.Card(
+        _body.Children.Add(SettingsLayout.Card(
             SettingsLayout.Row("Priority switching", RoutingUi.Switch("Priority switching", list.Enabled, enabled => Run(_module.SetEnabledAsync(_flow, enabled)))),
-            SettingsLayout.Row("Communications device", RoutingUi.Switch("Communications device", list.Calls, on => Run(_module.SetCallsAsync(_flow, on))), "Calls follow this list"));
-        if (list.Devices.Count == 0) card.Children.Add(SettingsLayout.Empty("No devices"));
+            SettingsLayout.Row("Communications device", RoutingUi.Switch("Communications device", list.Calls, on => Run(_module.SetCallsAsync(_flow, on))), "Calls follow this list")));
+        // The list is the section's content, so it's a card of its own under the switches that drive it.
+        var devices = SettingsLayout.Card();
+        devices.Margin = new Thickness(0, 8, 0, 0);
+        if (list.Devices.Count == 0) devices.Children.Add(SettingsLayout.Empty("No devices"));
         var inUse = _module.InUse(_flow);
         for (var i = 0; i < list.Devices.Count; i++)
-            card.Children.Add(DeviceRow(list.Devices[i], i, list.Devices.Count, inUse));
-        _body.Children.Add(card);
+            devices.Children.Add(DeviceRow(list.Devices[i], i, list.Devices.Count, inUse));
+        _body.Children.Add(devices);
         if (_module.Error is { } error)
         {
             var text = RoutingUi.Text(error, "CaptionTextStyle", "WarningTextBrush");
@@ -153,6 +158,9 @@ public sealed class RoutingPage : UserControl
         if (!_volume.IsMouseCaptureWithin && !_volume.IsKeyboardFocusWithin)
             _volume.Value = volume * 100;
         ShowPercent();
+        // The caption names the output the slider sets: its full name, as the list shows it.
+        if (_volumeRow is not null)
+            _volumeRow.Description = none ? "" : _module.CurrentName(AudioFlow.Render);
         _mute.Content = muted ? "Unmute" : "Mute";
         AutomationProperties.SetName(_mute, muted ? "Unmute system volume" : "Mute system volume");
     }

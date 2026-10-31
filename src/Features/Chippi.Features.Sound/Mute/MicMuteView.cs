@@ -4,6 +4,7 @@
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using System.Windows.Input;
 using Chippi.Audio;
 using Chippi.Features.Sound.Routing;
@@ -11,12 +12,10 @@ using Chippi.UI.Controls;
 
 namespace Chippi.Features.Sound.Mute;
 
-/// <summary>Where a <see cref="MicMuteView"/> sits.</summary>
+/// <summary>Where a <see cref="MicMuteView"/> sits in Settings; the Sound page's row is <see cref="MicQuickView"/>.</summary>
 public enum MicMuteSurface
 {
-    /// <summary>The Sound page's mic card.</summary>
-    Island,
-    /// <summary>The Microphone row at the top of Settings › Microphone: the island's card.</summary>
+    /// <summary>The Microphone row at the top of Settings › Microphone: the island's row.</summary>
     Microphone,
     /// <summary>The Mute shortcut section of Settings › Microphone.</summary>
     Shortcut,
@@ -29,8 +28,14 @@ public sealed class MicMuteView : UserControl
     private readonly MicMuteModule _module;
     private readonly MicMuteSurface _surface;
     private readonly StackPanel _body = new();
+    private readonly Slider _level = new() { Minimum = 0, Maximum = 100, SmallChange = 5, LargeChange = 10, IsMoveToPointEnabled = true, Width = 200, VerticalAlignment = VerticalAlignment.Center };
+    private readonly TextBlock _percent = RoutingUi.Text("", "BodyTextStyle", "TextSecondaryBrush");
+    private readonly LatestWrite _levelWrite = new();
+    private Card? _levelCard;
+    private SettingRow? _levelRow;
+    private string _microphoneShape = "";
     private Button? _action; // Mute or Unmute, focused again after a press from the keyboard rebuilds it
-    private bool _recording;
+    private bool _recording, _refreshingLevel;
 
     public MicMuteView(MicMuteModule module, MicMuteSurface surface = MicMuteSurface.Shortcut)
     {
@@ -51,21 +56,8 @@ public sealed class MicMuteView : UserControl
     {
         if (!Dispatcher.CheckAccess()) { Dispatcher.BeginInvoke(Refresh); return; }
         if (_recording) return;
+        if (_surface == MicMuteSurface.Microphone) { RefreshMicrophone(); return; }
         _body.Children.Clear();
-        bool muted = _module.Status.State == MicrophoneMuteState.Muted;
-        if (_surface == MicMuteSurface.Island)
-        {
-            _body.Children.Add(MicCard(muted));
-            if (_module.Error is { } failed) Error(failed);
-            SoundColumn.SetWarning(this, _module.Error is not null);
-            return;
-        }
-        if (_surface == MicMuteSurface.Microphone)
-        {
-            _body.Children.Add(SettingsLayout.Card(MicrophoneRow(muted)));
-            if (_module.Error is { } failed) Error(failed);
-            return;
-        }
         if (_surface == MicMuteSurface.ShortcutList)
         {
             var card = SettingsLayout.Card(SettingsLayout.Row(_module.Descriptor.Name, ShortcutControls()));
@@ -80,7 +72,66 @@ public sealed class MicMuteView : UserControl
         if (_module.ShortcutError is { } shortcutError) Error(shortcutError);
     }
 
-    /// <summary>The island's mic card as a Settings row: the state as the caption, and Mute or Unmute.</summary>
+    /// <summary>
+    /// The top of Settings › Microphone, the island's Microphone row as a Settings row, as Output's
+    /// Volume is (revised 2026-10-31): the level of the mic in use, its percentage and Mute, captioned
+    /// with the mic. Without a mic whose level it can tell, the mics' state and Mute. Only a change of
+    /// shape rebuilds it, so a level change never drops a drag.
+    /// </summary>
+    private void RefreshMicrophone()
+    {
+        bool muted = _module.Status.State == MicrophoneMuteState.Muted;
+        var level = _module.Status.State == MicrophoneMuteState.NoMicrophone ? null : _module.MicLevel;
+        var shape = string.Join("|", level is null, _module.Status.State, _module.Error);
+        if (shape != _microphoneShape)
+        {
+            _microphoneShape = shape;
+            _body.Children.Clear();
+            _body.Children.Add(level is null ? SettingsLayout.Card(MicrophoneRow(muted)) : _levelCard ??= SettingsLayout.Card(_levelRow = LevelRow()));
+            if (_module.Error is { } failed) Error(failed);
+        }
+        if (level is not { } volume || _levelRow is null)
+            return;
+        _refreshingLevel = true;
+        try
+        {
+            if (!_level.IsMouseCaptureWithin && !_level.IsKeyboardFocusWithin)
+                _level.Value = volume * 100;
+            ShowPercent();
+            _levelRow.Description = _module.LevelMicrophoneName ?? "";
+            _action!.Content = muted ? "Unmute" : "Mute";
+            AutomationProperties.SetName(_action, muted ? "Unmute all microphones" : "Mute all microphones");
+        }
+        finally { _refreshingLevel = false; }
+    }
+
+    private SettingRow LevelRow()
+    {
+        _level.SetResourceReference(StyleProperty, "HopperSliderStyle");
+        AutomationProperties.SetName(_level, "Microphone volume");
+        _level.ValueChanged += (_, e) =>
+        {
+            ShowPercent();
+            if (!_refreshingLevel)
+                _levelWrite.Send(() => _module.SetMicLevelAsync((float)e.NewValue / 100));
+        };
+        _percent.MinWidth = 52;
+        _percent.TextAlignment = TextAlignment.Right;
+        _percent.Margin = new Thickness(12, 0, 12, 0);
+        Typography.SetNumeralAlignment(_percent, FontNumeralAlignment.Tabular);
+        _action = RoutingUi.Button("Mute", Toggle);
+        return SettingsLayout.Row("Volume", new StackPanel { Orientation = Orientation.Horizontal, Children = { _level, _percent, _action } });
+    }
+
+    /// <summary>The percentage, or "Muted" or "Partly muted" in Caution in its place.</summary>
+    private void ShowPercent()
+    {
+        bool warning = _module.Status.State is MicrophoneMuteState.Muted or MicrophoneMuteState.Mixed;
+        _percent.Text = warning ? _module.StatusText : $"{Math.Round(_level.Value).ToString(System.Globalization.CultureInfo.CurrentCulture)}%";
+        _percent.SetResourceReference(TextBlock.ForegroundProperty, warning ? "WarningTextBrush" : "TextSecondaryBrush");
+    }
+
+    /// <summary>The island's mic row as a Settings row when no level can be told: the state as the caption, and Mute or Unmute.</summary>
     private SettingRow MicrophoneRow(bool muted)
     {
         bool none = _module.Status.State == MicrophoneMuteState.NoMicrophone;
@@ -117,22 +168,6 @@ public sealed class MicMuteView : UserControl
             panel.Children.Add(remove);
         }
         return panel;
-    }
-
-    /// <summary>The Sound page's mic card, one 44 row like the Output card: whether the mics are live, and Mute or Unmute.</summary>
-    private Border MicCard(bool muted)
-    {
-        bool warning = _module.Status.State is MicrophoneMuteState.Muted or MicrophoneMuteState.Mixed;
-        bool none = _module.Status.State == MicrophoneMuteState.NoMicrophone;
-        var glyph = new LucideIcon { Data = warning || none ? LucideIcons.MicOff : LucideIcons.Mic };
-        glyph.SetResourceReference(LucideIcon.BrushProperty, warning ? "WarningBrush" : none ? "IslandTextTertiaryBrush" : "IslandAccentBrush");
-        var state = new TextBlock { Text = muted ? "Muted" : _module.StatusText, FontSize = 12, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
-        if (warning || none) state.SetResourceReference(TextBlock.ForegroundProperty, warning ? "WarningTextBrush" : "IslandTextTertiaryBrush");
-        AutomationProperties.SetLiveSetting(state, AutomationLiveSetting.Polite);
-        var action = _action = RoutingUi.IslandButton(muted ? "Unmute" : "Mute", Toggle);
-        AutomationProperties.SetName(action, muted ? "Unmute all microphones" : "Mute all microphones");
-        action.IsEnabled = !none;
-        return RoutingUi.IslandCard(glyph, state, action);
     }
 
     private void BeginCapture()

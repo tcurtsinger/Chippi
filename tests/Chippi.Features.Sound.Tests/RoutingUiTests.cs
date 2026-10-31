@@ -97,17 +97,20 @@ public sealed class RoutingUiTests
         Assert.Equal("A", f.System.DefaultOf(AudioFlow.Render, AudioRole.Multimedia));
     }
     [Fact]
-    public async Task Sound_rows_are_one_line_and_only_the_rows_that_fit_show()
+    public async Task Sound_rows_are_one_line_and_only_the_rows_that_fit_their_card_show()
     {
         await using var f = new RoutingFixture();
         f.System.With([.. Enumerable.Range(1, 9).Select(i => Speaker($"S{i}")), .. Enumerable.Range(1, 7).Select(i => Mic($"M{i}"))]).WithDefault("S1").WithDefault("M1");
         await f.Start();
         await Sta(() =>
         {
-            foreach (var (flow, fit) in new[] { (AudioFlow.Render, 7), (AudioFlow.Capture, 5) })
+            // The room inside the column's card: Output under its own top row; Microphone under Mic mute's
+            // row and the hairline; with Mic processing below the cards, and without it.
+            foreach (var (flow, height, fit) in new[] { (AudioFlow.Render, 226.0, 5), (AudioFlow.Render, 278.0, 7), (AudioFlow.Capture, 183.0, 5) })
             {
                 var view = new RoutingQuickView(f.Module, flow);
-                var rows = Descendants(view).OfType<System.Windows.Controls.Button>().Where(b => b.Tag is "Selected" || AutomationProperties.GetName(b).StartsWith("Use ", StringComparison.Ordinal)).ToList();
+                Lay(view, height);
+                var rows = Rows(view);
                 Assert.Equal(fit, rows.Count); // the rest are in Settings
                 Assert.All(rows, row => Assert.Single(Descendants(row).OfType<System.Windows.Controls.TextBlock>())); // the name only, no state line
             }
@@ -115,7 +118,7 @@ public sealed class RoutingUiTests
     }
 
     [Fact]
-    public async Task A_warning_line_in_the_microphone_column_leaves_out_the_fifth_row()
+    public async Task Rows_come_and_go_as_the_list_gets_room()
     {
         await using var f = new RoutingFixture();
         f.System.With([.. Enumerable.Range(1, 7).Select(i => Mic($"M{i}"))]).WithDefault("M1");
@@ -123,15 +126,25 @@ public sealed class RoutingUiTests
         await Sta(() =>
         {
             var mics = new RoutingQuickView(f.Module, AudioFlow.Capture);
-            var processing = new System.Windows.Controls.Border(); // stands in for the Mic processing card below the rows
-            _ = new System.Windows.Controls.StackPanel { Children = { mics, processing } };
-            int Rows() => Descendants(mics).OfType<System.Windows.Controls.Button>().Count();
+            Lay(mics, 183);
+            Assert.Equal(5, Rows(mics).Count);
+            Lay(mics, 151); // Mic processing's warning line takes room from both cards
+            Assert.Equal(4, Rows(mics).Count);
+            Lay(mics, 183);
+            Assert.Equal(5, Rows(mics).Count);
+        });
+    }
 
-            Assert.Equal(5, Rows());
-            SoundColumn.SetWarning(processing, true); // its warning line shows under the card
-            Assert.Equal(4, Rows());
-            SoundColumn.SetWarning(processing, false);
-            Assert.Equal(5, Rows());
+    [Fact]
+    public async Task The_row_in_use_reads_semibold()
+    {
+        await using var f = new RoutingFixture();
+        f.System.With(Speaker("A"), Speaker("B")).WithDefault("A");
+        await f.Start();
+        await Sta(() =>
+        {
+            var rows = Rows(new RoutingQuickView(f.Module, AudioFlow.Render));
+            Assert.Equal([FontWeights.SemiBold, FontWeights.Normal], rows.Select(r => Descendants(r).OfType<System.Windows.Controls.TextBlock>().Single().FontWeight));
         });
     }
 
@@ -163,7 +176,8 @@ public sealed class RoutingUiTests
         await Sta(() =>
         {
             var view = new RoutingQuickView(f.Module, AudioFlow.Render);
-            var rows = Descendants(view).OfType<System.Windows.Controls.Button>().Select(AutomationProperties.GetName).Skip(1).ToList(); // after the card's Mute
+            Lay(view, 278); // room for 7
+            var rows = Descendants(view).OfType<System.Windows.Controls.Button>().Select(AutomationProperties.GetName).Skip(1).ToList(); // after the top row's Mute
             Assert.Equal(["Use S1", "Use S2", "Use S3", "Use S4", "Use S5", "Use S6", "S9, in use"], rows); // it takes the last row's place
         });
     }
@@ -198,17 +212,26 @@ public sealed class RoutingUiTests
             Assert.Contains(texts, t => t.Text == "Stopped · No VB-CABLE");
             Assert.Equal(["Install"], Descendants(card).OfType<System.Windows.Controls.Button>().Select(b => (string)b.Content));
             Assert.Equal(Visibility.Collapsed, Descendants(card).OfType<Processing.SegmentMeter>().Single().Visibility);
-            Assert.True(SoundColumn.GetWarning(card)); // its line takes a mic row's place
 
             f.System.Connect(CableInput());
             f.System.Connect(CableOutput());
             await Until(() => f.Module.Status.State == ProcessingState.Live);
             card = new Processing.ProcessingQuickView(f.Module); // unshown controls don't refresh on their own
-            Assert.False(SoundColumn.GetWarning(card));
             Assert.Empty(Descendants(card).OfType<System.Windows.Controls.Button>());
             Assert.Equal(Visibility.Visible, Descendants(card).OfType<Processing.SegmentMeter>().Single().Visibility);
         });
     }
+
+    /// <summary>Lays a section out at the column's 242 inside width and <paramref name="height"/>, as its card would.</summary>
+    private static void Lay(FrameworkElement view, double height)
+    {
+        view.Measure(new Size(242, height));
+        view.Arrange(new Rect(0, 0, 242, height));
+        view.UpdateLayout();
+    }
+
+    private static List<System.Windows.Controls.Button> Rows(DependencyObject view) =>
+        Descendants(view).OfType<System.Windows.Controls.Button>().Where(b => b.Tag is "Selected" || AutomationProperties.GetName(b).StartsWith("Use ", StringComparison.Ordinal)).ToList();
 
     private static IEnumerable<DependencyObject> Descendants(DependencyObject root)
     {

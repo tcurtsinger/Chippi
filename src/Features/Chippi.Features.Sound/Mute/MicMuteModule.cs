@@ -22,6 +22,7 @@ public sealed class MicMuteModule : IFeatureModule
     private readonly SemaphoreSlim _gate = new(1);
     private readonly Func<IMicHotkey> _createHotkey;
     private readonly Action<bool> _tone;
+    private readonly Func<string?>? _microphone;
     private AudioService? _audio;
     private IMicHotkey? _hotkey;
     private IAsyncDisposable? _lease;
@@ -30,11 +31,13 @@ public sealed class MicMuteModule : IFeatureModule
     private bool _stopping;
     private bool _capturingShortcut;
 
-    public MicMuteModule(AudioService? audio = null, Func<IMicHotkey>? hotkey = null, Action<bool>? tone = null)
+    /// <param name="microphone">The mic in use as Audio routing picks it, never VB-CABLE (the app passes routing's); null while routing is off.</param>
+    public MicMuteModule(AudioService? audio = null, Func<IMicHotkey>? hotkey = null, Action<bool>? tone = null, Func<string?>? microphone = null)
     {
         _audio = audio;
         _createHotkey = hotkey ?? GlobalMicHotkey.Create;
         _tone = tone ?? (muted => { if (muted) SystemSounds.Hand.Play(); else SystemSounds.Asterisk.Play(); });
+        _microphone = microphone;
     }
 
     public FeatureDescriptor Descriptor { get; } = new(Id, "Mic mute shortcut", "Hotkey for all microphones", FeatureGroup.Sound)
@@ -46,6 +49,41 @@ public sealed class MicMuteModule : IFeatureModule
     public MicrophoneMuteStatus Status => _audio?.Snapshot.MicrophoneMute ?? MicrophoneMuteStatus.Empty;
     public string? Error { get; private set; }
     public string? ShortcutError { get; private set; }
+
+    /// <summary>
+    /// The mic whose input level the Sound page's Microphone row shows: routing's mic in use, else
+    /// Windows' default mic unless it's VB-CABLE. Null when neither is connected.
+    /// </summary>
+    public string? LevelMicrophone
+    {
+        get
+        {
+            if (_audio?.Snapshot is not { } snapshot) return null;
+            if (_microphone?.Invoke() is { } id && snapshot.Find(id) is { IsActive: true }) return id;
+            return snapshot.Default(AudioFlow.Capture, AudioRole.Multimedia) is { } fallback
+                && snapshot.Find(fallback) is { IsActive: true } endpoint && !VbCable.IsCable(endpoint) ? fallback : null;
+        }
+    }
+
+    /// <summary>Windows' name for <see cref="LevelMicrophone"/>.</summary>
+    public string? LevelMicrophoneName => LevelMicrophone is { } id ? _audio!.Snapshot.Find(id)?.Name : null;
+
+    /// <summary>The input level, 0 to 1, of <see cref="LevelMicrophone"/>; null when there's none to show.</summary>
+    public float? MicLevel => LevelMicrophone is { } id && _audio!.Snapshot.Levels.TryGetValue(id, out var level) ? level.Volume : null;
+
+    /// <summary>Sets the input level of <see cref="LevelMicrophone"/>; a failure reads "Volume failed · why".</summary>
+    public async Task SetMicLevelAsync(float volume)
+    {
+        if (_lease is null || LevelMicrophone is not { } id) return;
+        try { await _audio!.SetEndpointVolumeAsync(id, volume); Error = null; }
+        catch (Exception ex)
+        {
+            Error = Routing.AudioRoutingModule.Failed("Volume", ex);
+            _context?.Logger.LogWarning(ex, "Setting the microphone level failed");
+            throw;
+        }
+        finally { Changed?.Invoke(); }
+    }
     public string StatusText => Status.State switch
     {
         MicrophoneMuteState.Muted => "Muted",
@@ -70,7 +108,7 @@ public sealed class MicMuteModule : IFeatureModule
             ct.ThrowIfCancellationRequested();
             _hotkey = _createHotkey();
             ShortcutError = Settings.Shortcut is null || _hotkey.Register(Settings.Shortcut, OnHotkey) ? null : "Shortcut in use";
-            _tile = context.Ui.AddIslandTile(SoundTile.Section(10, SoundTile.Microphone, () => new MicMuteView(this, MicMuteSurface.Island))
+            _tile = context.Ui.AddIslandTile(SoundTile.Section(10, SoundTile.Microphone, () => new MicQuickView(this))
                 with { StatusPriority = 100, Toggle = new IslandTileToggle(() => Status.State == MicrophoneMuteState.Muted, ToggleAsync, "Microphone", "Mic", () => StatusText) });
             // Settings › Microphone: "mute" is the Microphone row at the top, the rest the Mute shortcut section.
             context.Ui.SetSettingsPage(section => new MicMuteView(this, section == "mute" ? MicMuteSurface.Microphone : section == "shortcut-list" ? MicMuteSurface.ShortcutList : MicMuteSurface.Shortcut));

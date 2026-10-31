@@ -480,9 +480,8 @@ public partial class IslandPanelWindow : Window
         var body = new Grid { ClipToBounds = true };
         _attached.Add(body);
         PageBody = body;
-        var columns = parts.GroupBy(p => p.Spec.Column).ToList(); // parts are in section order, so columns are too
-        if (columns.Any(c => c.Key is not null))
-            body.Children.Add(Columns(columns));
+        if (parts.Any(p => p.Spec.Column is not null))
+            body.Children.Add(Columns(parts));
         else if (parts.Count == 1)
         {
             if (View(parts[0]) is { } view)
@@ -501,26 +500,66 @@ public partial class IslandPanelWindow : Window
         return body;
     }
 
-    /// <summary>Side-by-side columns, 8px apart, each under its name.</summary>
-    private Grid Columns(IReadOnlyList<IGrouping<string?, IslandTileContribution>> columns)
+    /// <summary>
+    /// Side-by-side columns, 8px apart, each under its name and framed as one card, all of one height:
+    /// its sections inside, divided by hairlines, the last filling the rest. Sections that span the
+    /// columns sit 8px below them, full width (DESIGN.md §5 Island pages, revised 2026-10-31).
+    /// </summary>
+    private Grid Columns(IReadOnlyList<IslandTileContribution> parts)
     {
         var grid = new Grid();
-        foreach (var column in columns)
+        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        grid.RowDefinitions.Add(new RowDefinition());
+        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        foreach (var column in parts.Where(p => !p.Spec.SpansColumns).GroupBy(p => p.Spec.Column)) // parts are in section order, so columns are too
         {
+            var views = column.Select(View).OfType<FrameworkElement>().ToList();
+            if (views.Count == 0)
+                continue;
             if (grid.ColumnDefinitions.Count > 0)
                 grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(IslandPage.Gap) });
             grid.ColumnDefinitions.Add(new ColumnDefinition());
-            var stack = new StackPanel();
-            _attached.Add(stack);
+            int index = grid.ColumnDefinitions.Count - 1;
             if (column.Key is { } title)
             {
                 var label = new TextBlock { Text = title, FontSize = 12, FontWeight = FontWeights.SemiBold, Height = 24, Padding = new Thickness(2, 4, 0, 0) };
                 label.SetResourceReference(TextBlock.ForegroundProperty, "IslandTextTertiaryBrush");
-                stack.Children.Add(label);
+                Grid.SetColumn(label, index);
+                grid.Children.Add(label);
             }
-            AddSections(stack, column);
-            Grid.SetColumn(stack, grid.ColumnDefinitions.Count - 1);
-            grid.Children.Add(stack);
+            var sections = new DockPanel();
+            _attached.Add(sections);
+            for (int i = 0; i < views.Count; i++)
+            {
+                if (i > 0)
+                {
+                    var hairline = new Border { Height = 1 };
+                    hairline.SetResourceReference(Border.BackgroundProperty, "IslandHairBrush");
+                    DockPanel.SetDock(hairline, Dock.Top);
+                    sections.Children.Add(hairline);
+                }
+                views[i].Margin = new Thickness(0);
+                DockPanel.SetDock(views[i], Dock.Top);
+                sections.Children.Add(views[i]);
+            }
+            var card = new Border { Child = sections };
+            card.SetResourceReference(StyleProperty, "IslandCardStyle");
+            card.Padding = new Thickness(0);
+            Grid.SetRow(card, 1);
+            Grid.SetColumn(card, index);
+            grid.Children.Add(card);
+        }
+        var spans = new StackPanel();
+        _attached.Add(spans);
+        AddSections(spans, parts.Where(p => p.Spec.SpansColumns));
+        if (spans.Children.Count > 0)
+        {
+            // Under the cards, or at the top when no column has a section.
+            bool under = grid.ColumnDefinitions.Count > 0;
+            spans.Margin = new Thickness(0, under ? IslandPage.Gap : 0, 0, 0);
+            Grid.SetRow(spans, under ? 2 : 0);
+            Grid.SetColumnSpan(spans, Math.Max(1, grid.ColumnDefinitions.Count));
+            grid.Children.Add(spans);
         }
         return grid;
     }

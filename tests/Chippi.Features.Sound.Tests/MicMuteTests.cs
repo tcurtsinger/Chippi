@@ -21,10 +21,10 @@ public sealed class MuteFixture : IAsyncDisposable
     public IslandActivityHub Hub { get; } = new();
     public RoutingUiFake Ui { get; } = new();
     public MicMuteModule Module { get; }
-    public MuteFixture()
+    public MuteFixture(Func<string?>? microphone = null)
     {
         Audio = new(() => System, null, options: new() { Debounce = TimeSpan.FromMilliseconds(10) });
-        Module = new(Audio, () => Hotkey, Tones.Add);
+        Module = new(Audio, () => Hotkey, Tones.Add, microphone);
     }
     public Task Start() => Module.StartAsync(new(MicMuteModule.Id, Settings, NullLogger.Instance, Hub.CreatePublisher(MicMuteModule.Id), Ui), CancellationToken.None);
     public ValueTask DisposeAsync() => new(Module.StopAsync(CancellationToken.None));

@@ -21,6 +21,7 @@ A Windows 11 tray app for the owner's own PC (C#, .NET 10, WPF): a widget on the
 - `Chippi.UiSmoke` drives real windows and keys on the desktop. It's skipped unless `CHIPPI_UI_SMOKE=1`; only enable it when the owner has set a time (`tests/Chippi.UiSmoke/README.md`).
 - Tests that show windows (`Chippi.Island.Tests` and the like), dev runs and renders may run while a game or Zoom is in front (the owner, 2026-10-29). While the owner is doing live checks, leave those tests to CI.
 - The CI runner's GPU has no engine counters, so tests that read hardware must accept null readings.
+- Feature test projects build controls without the app's themes, so a control there has default templates: test sizes, alignment and fit in `Chippi.SoundSmoke` or `Chippi.Island.Tests`, which load them, or in the shots.
 - Make a flaky test deterministic with injected timers and clocks, not longer waits. Local runs share the owner's real mouse, so tests that press the widget pin its pointer (`IslandWindow.PointerAt`), and the island tests' hooks ignore the real keyboard and mouse (`IslandWindow.WatchesInput`). Wait for the panel's open, page or close with `IslandWindowTests.Settle`, not a fixed pump.
 
 ## Run it
