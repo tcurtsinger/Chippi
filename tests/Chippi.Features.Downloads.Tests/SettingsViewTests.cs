@@ -44,7 +44,9 @@ public sealed class SettingsViewTests
     {
         var rule = new RuleSetting { Extensions = ["pdf"], NameRegex = "^inv", MaxBytes = 25L * 1024 * 1024, Action = RuleActionKind.Move, Template = @"Documents\{year}" };
 
-        Assert.Equal(@".pdf · name matches · up to 25 MB → Documents\{year}", RuleChecks.Summary(rule));
+        Assert.Equal(@".pdf · name matches ""^inv"" · up to 25 MB → Documents\{year}", RuleChecks.Summary(rule));
+        Assert.Equal(".torrent · hold: Check before opening",
+            RuleChecks.Summary(new RuleSetting { Extensions = ["torrent"], Action = RuleActionKind.Hold, HoldReason = "Check before opening" }));
     }
 
     [Fact]

@@ -44,7 +44,7 @@ internal sealed class SettingsSection : UserControl
         _error.Visibility = Visibility.Collapsed;
         _importError.Visibility = Visibility.Collapsed;
         Content = Ui.Stack(
-            Ui.Section("Watched folders", add, first: true),
+            Ui.Section("Watched folders", add, first: true).Margin(0, 16, 0, 8), // 16 under the tabs, as Rules and History start
             _folders,
             _error.Margin(0, 6, 0, 0),
             Ui.Section("Options"),
@@ -57,8 +57,18 @@ internal sealed class SettingsSection : UserControl
         var folders = _module.Settings.Folders;
         _importChoose.IsEnabled = folders.Any(f => Directory.Exists(f.Path));
         _folders.Content = folders.Count == 0
-            ? SettingsLayout.Card(SettingsLayout.Empty("No folders yet"))
+            ? SettingsLayout.Card(NoFolders())
             : Ui.Card([.. folders.Select(FolderRow)]);
+    }
+
+    /// <summary>"No folders yet", with the island's one-click Add Downloads when the Downloads folder exists.</summary>
+    private UIElement NoFolders()
+    {
+        if (DownloadsModule.DownloadsFolder() is not { } downloads || !Directory.Exists(downloads))
+            return SettingsLayout.Empty("No folders yet");
+        var add = Ui.Button("Add Downloads", name: "Add Downloads");
+        add.Click += (_, _) => Save(s => s.Folders.Add(new WatchedFolder { Path = downloads, Mode = FolderMode.Manual })); // Manual: its first contact is a preview
+        return Ui.Setting("No folders yet", "", add);
     }
 
     private ExpanderRow FolderRow(WatchedFolder folder)

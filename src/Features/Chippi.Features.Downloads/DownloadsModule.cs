@@ -137,6 +137,7 @@ public sealed class DownloadsModule : IFeatureModule
             { Kind: DownloadsRequestKind.Organize or DownloadsRequestKind.Review } => "review",
             { Kind: DownloadsRequestKind.Undo, RunId: { } run } => $"history/{run}/undo",
             { Kind: DownloadsRequestKind.Run, RunId: { } run } => $"history/{run}",
+            { Kind: DownloadsRequestKind.Run, Folder: { Length: > 0 } folder } => $"history/in/{folder}",
             { Kind: DownloadsRequestKind.Run or DownloadsRequestKind.Undo } => "history",
             _ => "rules",
         };

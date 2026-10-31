@@ -144,6 +144,14 @@ public sealed class OrganizeHereTests : IDisposable
         Assert.Equal(@"module:downloads-organizer/preview/C:\Users\me\Downloads*setup.pdf.exe", DownloadsModule.SettingsLink(request));
     }
 
+    /// <summary>Polish 2026-10-31: the island page shows one folder, so its History › opens that folder's runs.</summary>
+    [Fact]
+    public void The_islands_History_opens_the_picked_folders_runs()
+    {
+        Assert.Equal(@"module:downloads-organizer/history/in/C:\Users\me\Desktop", DownloadsModule.SettingsLink(new DownloadsRequest(DownloadsRequestKind.Run, @"C:\Users\me\Desktop")));
+        Assert.Equal("module:downloads-organizer/history", DownloadsModule.SettingsLink(new DownloadsRequest(DownloadsRequestKind.Run)));
+    }
+
     private static void Until(Func<bool> done)
     {
         var until = DateTime.UtcNow.AddSeconds(15);
