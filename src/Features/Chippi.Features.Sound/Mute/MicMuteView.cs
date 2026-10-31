@@ -31,10 +31,13 @@ public sealed class MicMuteView : UserControl
     private readonly Slider _level = new() { Minimum = 0, Maximum = 100, SmallChange = 5, LargeChange = 10, IsMoveToPointEnabled = true, Width = 200, VerticalAlignment = VerticalAlignment.Center };
     private readonly TextBlock _percent = RoutingUi.Text("", "BodyTextStyle", "TextSecondaryBrush");
     private readonly LatestWrite _levelWrite = new();
+    private readonly LevelTarget _shown = new();
+    private readonly TextBlock _microphoneError = RoutingUi.Text("", "CaptionTextStyle", "WarningTextBrush");
     private Card? _levelCard;
     private SettingRow? _levelRow;
+    private Button? _levelMute;
     private string _microphoneShape = "";
-    private Button? _action; // Mute or Unmute, focused again after a press from the keyboard rebuilds it
+    private Button? _action; // Mute or Unmute as shown now, focused again after a press from the keyboard rebuilds it
     private bool _recording, _refreshingLevel;
 
     public MicMuteView(MicMuteModule module, MicMuteSurface surface = MicMuteSurface.Shortcut)
@@ -75,32 +78,42 @@ public sealed class MicMuteView : UserControl
     /// <summary>
     /// The top of Settings › Microphone, the island's Microphone row as a Settings row, as Output's
     /// Volume is (revised 2026-10-31): the level of the mic in use, its percentage and Mute, captioned
-    /// with the mic. Without a mic whose level it can tell, the mics' state and Mute. Only a change of
-    /// shape rebuilds it, so a level change never drops a drag.
+    /// with the mic. Without a mic whose level it can tell, the mics' state and Mute. Only switching
+    /// between the two (or the state row's state changing) rebuilds it: a level, a mute or an error
+    /// updates it in place, so none of them drops a drag.
     /// </summary>
     private void RefreshMicrophone()
     {
         bool muted = _module.Status.State == MicrophoneMuteState.Muted;
         var level = _module.Status.State == MicrophoneMuteState.NoMicrophone ? null : _module.MicLevel;
-        var shape = string.Join("|", level is null, _module.Status.State, _module.Error);
+        var shape = level is null ? $"state|{_module.Status.State}" : "level";
         if (shape != _microphoneShape)
         {
             _microphoneShape = shape;
             _body.Children.Clear();
-            _body.Children.Add(level is null ? SettingsLayout.Card(MicrophoneRow(muted)) : _levelCard ??= SettingsLayout.Card(_levelRow = LevelRow()));
-            if (_module.Error is { } failed) Error(failed);
+            if (level is null)
+                _body.Children.Add(SettingsLayout.Card(MicrophoneRow(muted)));
+            else
+            {
+                _body.Children.Add(_levelCard ??= SettingsLayout.Card(_levelRow = LevelRow()));
+                _action = _levelMute;
+            }
+            _microphoneError.Margin = new Thickness(0, 8, 0, 0);
+            AutomationProperties.SetLiveSetting(_microphoneError, AutomationLiveSetting.Polite);
+            _body.Children.Add(_microphoneError);
         }
-        if (level is not { } volume || _levelRow is null)
+        _microphoneError.Text = _module.Error ?? "";
+        _microphoneError.Visibility = _module.Error is null ? Visibility.Collapsed : Visibility.Visible;
+        if (level is not { } shown || _levelRow is null || _levelMute is null)
             return;
         _refreshingLevel = true;
         try
         {
-            if (!_level.IsMouseCaptureWithin && !_level.IsKeyboardFocusWithin)
-                _level.Value = volume * 100;
+            _shown.Show(_level, shown.Id, shown.Volume);
             ShowPercent();
             _levelRow.Description = _module.LevelMicrophoneName ?? "";
-            _action!.Content = muted ? "Unmute" : "Mute";
-            AutomationProperties.SetName(_action, muted ? "Unmute all microphones" : "Mute all microphones");
+            _levelMute.Content = muted ? "Unmute" : "Mute";
+            AutomationProperties.SetName(_levelMute, muted ? "Unmute all microphones" : "Mute all microphones");
         }
         finally { _refreshingLevel = false; }
     }
@@ -112,15 +125,15 @@ public sealed class MicMuteView : UserControl
         _level.ValueChanged += (_, e) =>
         {
             ShowPercent();
-            if (!_refreshingLevel)
-                _levelWrite.Send(() => _module.SetMicLevelAsync((float)e.NewValue / 100));
+            if (!_refreshingLevel && _shown.Id is { } id)
+                _levelWrite.Send(() => _module.SetMicLevelAsync(id, (float)e.NewValue / 100));
         };
         _percent.MinWidth = 52;
         _percent.TextAlignment = TextAlignment.Right;
         _percent.Margin = new Thickness(12, 0, 12, 0);
         Typography.SetNumeralAlignment(_percent, FontNumeralAlignment.Tabular);
-        _action = RoutingUi.Button("Mute", Toggle);
-        return SettingsLayout.Row("Volume", new StackPanel { Orientation = Orientation.Horizontal, Children = { _level, _percent, _action } });
+        _levelMute = RoutingUi.Button("Mute", Toggle);
+        return SettingsLayout.Row("Volume", new StackPanel { Orientation = Orientation.Horizontal, Children = { _level, _percent, _levelMute } });
     }
 
     /// <summary>The percentage, or "Muted" or "Partly muted" in Caution in its place.</summary>

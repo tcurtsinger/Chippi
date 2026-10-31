@@ -31,6 +31,7 @@ public sealed class RoutingQuickView : UserControl
     private readonly Grid _list = new() { ClipToBounds = true };
     private readonly StackPanel _rows = new() { Margin = new Thickness(ListInset), VerticalAlignment = VerticalAlignment.Top };
     private readonly TextBlock _error = RoutingUi.Text("", "CaptionTextStyle", "WarningTextBrush");
+    private readonly Border _empty; // "No microphone", for a Microphone card with no Mic mute row above to say it
     private readonly LucideIcon _glyph = new();
     private readonly TextBlock _none = new() { Text = "No output", FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
     private readonly Button _mute;
@@ -38,7 +39,11 @@ public sealed class RoutingQuickView : UserControl
     private readonly TextBlock _percent = new() { FontSize = 12, Width = 34, TextAlignment = TextAlignment.Right, VerticalAlignment = VerticalAlignment.Center };
     private readonly DockPanel _levels = new();
     private readonly LatestWrite _volumeWrite = new();
-    private int _fit = int.MaxValue; // every row until the list is laid out and knows its room
+    private readonly LevelTarget _shown = new();
+    // No rows until the list is laid out and knows its room: building every device's row first, only
+    // to drop most of them a moment later, doubled the page's first open with a dozen devices.
+    private int _fit;
+    private Dictionary<string, Button> _built = new(StringComparer.Ordinal);
     private string _shape = "";
     private bool _refreshing;
 
@@ -65,6 +70,10 @@ public sealed class RoutingQuickView : UserControl
         AutomationProperties.SetLiveSetting(_error, AutomationLiveSetting.Polite);
         DockPanel.SetDock(_error, Dock.Bottom);
         root.Children.Add(_error);
+        var empty = new TextBlock { Text = "No microphone", FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
+        empty.SetResourceReference(TextBlock.ForegroundProperty, "IslandTextTertiaryBrush");
+        _empty = new Border { Child = empty, Height = RowHeight, Margin = new Thickness(ListInset + 6, ListInset, 0, 0), VerticalAlignment = VerticalAlignment.Top, Visibility = Visibility.Collapsed };
+        _list.Children.Add(_empty);
         _list.Children.Add(_rows);
         _list.SizeChanged += (_, e) => Refit(e.NewSize.Height);
         root.Children.Add(_list);
@@ -82,7 +91,7 @@ public sealed class RoutingQuickView : UserControl
         _volume.ValueChanged += (_, e) =>
         {
             ShowPercent();
-            if (!_refreshing && _module.InUse(AudioFlow.Render) is { } id)
+            if (!_refreshing && _shown.Id is { } id)
                 _volumeWrite.Send(() => _module.SetOutputVolumeAsync(id, (float)e.NewValue / 100));
         };
         _percent.SetResourceReference(TextBlock.ForegroundProperty, "IslandTextTertiaryBrush");
@@ -139,24 +148,41 @@ public sealed class RoutingQuickView : UserControl
             var inUse = _module.InUse(_flow);
             var connected = _module.Settings.For(_flow).Devices.Where(e => _module.Snapshot.Find(e.Id)?.IsActive == true).ToList();
             _error.Text = _module.Error ?? "";
+            _error.ToolTip = _module.Error; // in full when a long reason is cut off
             _error.Visibility = _error.Text.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
             var shown = connected.Take(_fit).ToList();
             // The one in use always shows: past the rows that fit, it takes the last one's place.
             if (shown.Count > 0 && connected.FindIndex(e => string.Equals(e.Id, inUse, StringComparison.OrdinalIgnoreCase)) >= shown.Count)
                 shown[^1] = connected.First(e => string.Equals(e.Id, inUse, StringComparison.OrdinalIgnoreCase));
             var names = DeviceName.Shown(connected);
-            var shape = string.Join("|", shown.Select(e => e.Id + names[e.Id])) + ":" + inUse;
+            var shape = string.Join("|", shown.Select(e => e.Id + e.Name + names[e.Id])) + ":" + inUse;
             if (shape != _shape)
             {
                 _shape = shape;
+                // A row whose device, names and selection haven't changed is kept, not built again.
+                var built = new Dictionary<string, Button>(StringComparer.Ordinal);
                 _rows.Children.Clear();
                 foreach (var entry in shown)
-                    _rows.Children.Add(Row(entry, names[entry.Id], string.Equals(entry.Id, inUse, StringComparison.OrdinalIgnoreCase)));
+                {
+                    bool selected = string.Equals(entry.Id, inUse, StringComparison.OrdinalIgnoreCase);
+                    var key = string.Join("\n", entry.Id, entry.Name, names[entry.Id], selected);
+                    if (!_built.TryGetValue(key, out var row))
+                        row = Row(entry, names[entry.Id], selected);
+                    built[key] = row;
+                    _rows.Children.Add(row);
+                }
+                _built = built;
             }
             if (_flow == AudioFlow.Render)
                 RefreshOutput(inUse);
-            else // Mic mute's row above says when there's no microphone; nothing shows here then
-                Visibility = connected.Count == 0 && _error.Text.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
+            else
+            {
+                // With no microphone, Mic mute's row above says so and nothing shows here; with no row
+                // above it (Mic mute is off), the list says it, so the card isn't left empty.
+                bool alone = VisualTreeHelper.GetParent(this) is not Panel column || column.Children.IndexOf(this) <= 0;
+                _empty.Visibility = connected.Count == 0 && alone ? Visibility.Visible : Visibility.Collapsed;
+                Visibility = connected.Count == 0 && !alone && _error.Text.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
+            }
         }
         finally { _refreshing = false; }
     }
@@ -169,8 +195,7 @@ public sealed class RoutingQuickView : UserControl
         _levels.Visibility = none ? Visibility.Collapsed : Visibility.Visible;
         _none.Visibility = none ? Visibility.Visible : Visibility.Collapsed;
         _volume.IsEnabled = _mute.IsEnabled = known && !none;
-        if (!_volume.IsMouseCaptureWithin && !_volume.IsKeyboardFocusWithin)
-            _volume.Value = volume * 100;
+        _shown.Show(_volume, known && !none ? inUse : null, volume);
         ShowPercent();
         _glyph.Data = muted || none ? LucideIcons.VolumeMuted : LucideIcons.Speaker;
         _glyph.SetResourceReference(LucideIcon.BrushProperty, none ? "IslandTextTertiaryBrush" : muted ? "WarningBrush" : "IslandAccentBrush");

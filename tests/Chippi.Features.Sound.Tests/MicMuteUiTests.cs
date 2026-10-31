@@ -116,9 +116,25 @@ public sealed class MicMuteUiTests
         f.System.With(Mic("A"), Mic("B")).WithDefault("A");
         await f.Start();
         Assert.Equal("B", f.Module.LevelMicrophone);
-        await f.Module.SetMicLevelAsync(0.25f);
+        Assert.Equal(("B", 0.5f), f.Module.MicLevel);
+        await f.Module.SetMicLevelAsync("B", 0.25f);
         Assert.Equal(0.25f, f.System.GetLevel("B").Volume, 3);
         Assert.Equal(0.5f, f.System.GetLevel("A").Volume, 3);
+    }
+
+    [Fact]
+    public async Task A_level_change_never_sets_VB_CABLE_or_clears_a_mute_failure()
+    {
+        await using var f = new MuteFixture();
+        f.System.With(Mic("A"), Mic("B"), CableOutput()).WithDefault("A");
+        f.System.Failing.Add("B"); // B won't mute
+        await f.Start();
+        await f.Module.ToggleAsync();
+        Assert.Equal("Mute failed · some mics", f.Module.Error);
+        await f.Module.SetMicLevelAsync("A", 0.3f);
+        Assert.Equal("Mute failed · some mics", f.Module.Error); // B still isn't muted
+        await f.Module.SetMicLevelAsync("CableOut", 0.1f);
+        Assert.Equal(0.5f, f.System.GetLevel("CableOut").Volume, 3);
     }
 
     private static IEnumerable<DependencyObject> Children(DependencyObject root)

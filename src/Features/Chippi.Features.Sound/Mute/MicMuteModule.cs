@@ -30,6 +30,7 @@ public sealed class MicMuteModule : IFeatureModule
     private IIslandTile? _tile;
     private bool _stopping;
     private bool _capturingShortcut;
+    private bool _levelFailed; // Error is a level's failure, which a level that works clears; a mute's failure stays
 
     /// <param name="microphone">The mic in use as Audio routing picks it, never VB-CABLE (the app passes routing's); null while routing is off.</param>
     public MicMuteModule(AudioService? audio = null, Func<IMicHotkey>? hotkey = null, Action<bool>? tone = null, Func<string?>? microphone = null)
@@ -59,31 +60,43 @@ public sealed class MicMuteModule : IFeatureModule
         get
         {
             if (_audio?.Snapshot is not { } snapshot) return null;
-            if (_microphone?.Invoke() is { } id && snapshot.Find(id) is { IsActive: true }) return id;
-            return snapshot.Default(AudioFlow.Capture, AudioRole.Multimedia) is { } fallback
-                && snapshot.Find(fallback) is { IsActive: true } endpoint && !VbCable.IsCable(endpoint) ? fallback : null;
+            if (_microphone?.Invoke() is { } id && Settable(snapshot, id)) return id;
+            return snapshot.Default(AudioFlow.Capture, AudioRole.Multimedia) is { } fallback && Settable(snapshot, fallback) ? fallback : null;
         }
     }
 
     /// <summary>Windows' name for <see cref="LevelMicrophone"/>.</summary>
     public string? LevelMicrophoneName => LevelMicrophone is { } id ? _audio!.Snapshot.Find(id)?.Name : null;
 
-    /// <summary>The input level, 0 to 1, of <see cref="LevelMicrophone"/>; null when there's none to show.</summary>
-    public float? MicLevel => LevelMicrophone is { } id && _audio!.Snapshot.Levels.TryGetValue(id, out var level) ? level.Volume : null;
+    /// <summary><see cref="LevelMicrophone"/> and its input level, 0 to 1; null when there's none to show.</summary>
+    public (string Id, float Volume)? MicLevel =>
+        LevelMicrophone is { } id && _audio!.Snapshot.Levels.TryGetValue(id, out var level) ? (id, level.Volume) : null;
 
-    /// <summary>Sets the input level of <see cref="LevelMicrophone"/>; a failure reads "Volume failed · why".</summary>
-    public async Task SetMicLevelAsync(float volume)
+    /// <summary>
+    /// Sets the input level of the mic <paramref name="id"/>, the one a slider shows; a failure reads
+    /// "Volume failed · why". A mic that's gone, or VB-CABLE, is left alone.
+    /// </summary>
+    public async Task SetMicLevelAsync(string id, float volume)
     {
-        if (_lease is null || LevelMicrophone is not { } id) return;
-        try { await _audio!.SetEndpointVolumeAsync(id, volume); Error = null; }
+        if (_lease is null || !Settable(_audio!.Snapshot, id)) return;
+        try
+        {
+            await _audio.SetEndpointVolumeAsync(id, volume);
+            if (_levelFailed) { Error = null; _levelFailed = false; }
+        }
         catch (Exception ex)
         {
             Error = Routing.AudioRoutingModule.Failed("Volume", ex);
+            _levelFailed = true;
             _context?.Logger.LogWarning(ex, "Setting the microphone level failed");
             throw;
         }
         finally { Changed?.Invoke(); }
     }
+
+    private static bool Settable(AudioSnapshot snapshot, string id) =>
+        snapshot.Find(id) is { IsActive: true, Flow: AudioFlow.Capture } endpoint && !VbCable.IsCable(endpoint);
+
     public string StatusText => Status.State switch
     {
         MicrophoneMuteState.Muted => "Muted",
@@ -133,6 +146,7 @@ public sealed class MicMuteModule : IFeatureModule
             if (_stopping || _lease is null) return;
             await _audio!.ToggleMicrophoneMuteAsync();
             Error = Status.Failed.Count > 0 ? "Mute failed · some mics" : null;
+            _levelFailed = false;
             if (Error is null && Settings.PlaySound && Status.State is MicrophoneMuteState.Muted or MicrophoneMuteState.Live)
                 _tone(Status.State == MicrophoneMuteState.Muted);
             UpdateState();
@@ -140,6 +154,7 @@ public sealed class MicMuteModule : IFeatureModule
         catch (Exception ex)
         {
             Error = Routing.AudioRoutingModule.Failed("Mute", ex);
+            _levelFailed = false;
             _context?.Logger.LogWarning(ex, "Toggling the microphone mute failed");
             Changed?.Invoke();
             throw;

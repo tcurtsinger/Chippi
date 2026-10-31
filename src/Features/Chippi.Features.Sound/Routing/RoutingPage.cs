@@ -25,6 +25,7 @@ public sealed class RoutingPage : UserControl
     private readonly Dictionary<string, DragHandle> _handles = new(StringComparer.OrdinalIgnoreCase);
     private readonly Slider _volume = new() { Minimum = 0, Maximum = 100, SmallChange = 5, LargeChange = 10, IsMoveToPointEnabled = true, Width = 200, VerticalAlignment = VerticalAlignment.Center };
     private readonly LatestWrite _volumeWrite = new();
+    private readonly LevelTarget _shown = new();
     private readonly TextBlock _percent = RoutingUi.Text("", "BodyTextStyle", "TextSecondaryBrush");
     private readonly Button _mute;
     private readonly StackPanel _levels = new() { Orientation = Orientation.Horizontal };
@@ -123,7 +124,7 @@ public sealed class RoutingPage : UserControl
         _volume.ValueChanged += (_, e) =>
         {
             ShowPercent();
-            if (!_refreshing && _module.InUse(AudioFlow.Render) is { } id)
+            if (!_refreshing && _shown.Id is { } id)
                 _volumeWrite.Send(() => _module.SetOutputVolumeAsync(id, (float)e.NewValue / 100));
         };
         _percent.MinWidth = 52;
@@ -155,8 +156,7 @@ public sealed class RoutingPage : UserControl
         _levels.Visibility = none ? Visibility.Collapsed : Visibility.Visible;
         _none.Visibility = none ? Visibility.Visible : Visibility.Collapsed;
         _volume.IsEnabled = _mute.IsEnabled = known && !none;
-        if (!_volume.IsMouseCaptureWithin && !_volume.IsKeyboardFocusWithin)
-            _volume.Value = volume * 100;
+        _shown.Show(_volume, known && !none ? inUse : null, volume);
         ShowPercent();
         // The caption names the output the slider sets: its full name, as the list shows it.
         if (_volumeRow is not null)

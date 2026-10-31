@@ -96,6 +96,13 @@ public sealed class SoundPageShots
                 s.Devices.Remove("desk", "CableOut");
                 return s.Audio.RefreshAsync();
             }),
+            ("routing-only-no-mic", async s =>
+            {
+                await s.Shell.Registry.SetInstalledAsync("mic-mute", false);
+                await s.Shell.Registry.SetInstalledAsync("mic-processing", false);
+                s.Devices.Remove("desk", "CableOut");
+                await s.Audio.RefreshAsync();
+            }),
         })
         {
             await using var scene = new SoundScene();

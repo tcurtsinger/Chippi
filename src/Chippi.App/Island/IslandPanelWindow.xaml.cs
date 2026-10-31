@@ -533,8 +533,10 @@ public partial class IslandPanelWindow : Window
             {
                 if (i > 0)
                 {
+                    // Shown with the section under it, so a section with nothing to show leaves no line.
                     var hairline = new Border { Height = 1 };
                     hairline.SetResourceReference(Border.BackgroundProperty, "IslandHairBrush");
+                    hairline.SetBinding(VisibilityProperty, new System.Windows.Data.Binding(nameof(Visibility)) { Source = views[i] });
                     DockPanel.SetDock(hairline, Dock.Top);
                     sections.Children.Add(hairline);
                 }

@@ -30,6 +30,7 @@ public sealed class MicQuickView : UserControl
     private readonly Button _mute;
     private readonly TextBlock _error = RoutingUi.Text("", "CaptionTextStyle", "WarningTextBrush");
     private readonly LatestWrite _write = new();
+    private readonly LevelTarget _shown = new();
     private bool _refreshing;
 
     public MicQuickView(MicMuteModule module)
@@ -40,8 +41,8 @@ public sealed class MicQuickView : UserControl
         _level.ValueChanged += (_, e) =>
         {
             ShowPercent();
-            if (!_refreshing)
-                _write.Send(() => _module.SetMicLevelAsync((float)e.NewValue / 100));
+            if (!_refreshing && _shown.Id is { } id)
+                _write.Send(() => _module.SetMicLevelAsync(id, (float)e.NewValue / 100));
         };
         Typography.SetNumeralAlignment(_percent, FontNumeralAlignment.Tabular);
         DockPanel.SetDock(_percent, Dock.Right);
@@ -80,8 +81,7 @@ public sealed class MicQuickView : UserControl
             // default with routing off) the row says the mics' state in its place.
             _levels.Visibility = level is null ? Visibility.Collapsed : Visibility.Visible;
             _state.Visibility = level is null ? Visibility.Visible : Visibility.Collapsed;
-            if (level is { } volume && !_level.IsMouseCaptureWithin && !_level.IsKeyboardFocusWithin)
-                _level.Value = volume * 100;
+            _shown.Show(_level, level?.Id, level?.Volume ?? 0);
             ShowPercent();
             _state.Text = _module.StatusText;
             if (Warning || none)
@@ -95,6 +95,7 @@ public sealed class MicQuickView : UserControl
             AutomationProperties.SetName(_mute, muted ? "Unmute all microphones" : "Mute all microphones");
             _mute.IsEnabled = !none;
             _error.Text = _module.Error ?? "";
+            _error.ToolTip = _module.Error; // in full when a long reason is cut off
             _error.Visibility = _module.Error is null ? Visibility.Collapsed : Visibility.Visible;
         }
         finally { _refreshing = false; }

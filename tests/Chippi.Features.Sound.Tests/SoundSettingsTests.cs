@@ -166,6 +166,30 @@ public sealed class SoundSettingsTests
     }
 
     [Fact]
+    public async Task Microphone_volume_keeps_its_own_mute_button_after_showing_the_state_row_and_back()
+    {
+        await using var f = new MuteFixture();
+        f.System.With(Mic("A"), CableOutput()).WithDefault("A");
+        await f.Start();
+        await Sta(async () =>
+        {
+            var view = Assert.IsType<MicMuteView>(f.Ui.Page!("mute"));
+            view.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent)); // follow the module, as a shown page does
+            string Header() => (string)Descendants(view).OfType<SettingRow>().Single().Header;
+            Assert.Equal("Volume", Header());
+            f.System.ChangeDefault("CableOut"); // VB-CABLE as the default mic, with routing off: no level to tell
+            await Until(() => Header() == "Microphone");
+            f.System.ChangeDefault("A");
+            await Until(() => Header() == "Volume");
+
+            var mute = Descendants(view).OfType<Button>().Single(b => AutomationProperties.GetName(b) == "Mute all microphones");
+            ((IInvokeProvider)new ButtonAutomationPeer(mute)).Invoke();
+            await Until(() => view.IsEnabled && f.Module.Status.State == MicrophoneMuteState.Muted);
+            Assert.Equal("Unmute", Descendants(view).OfType<Button>().Single(b => AutomationProperties.GetName(b) == "Unmute all microphones").Content);
+        });
+    }
+
+    [Fact]
     public async Task The_mute_shortcut_can_be_removed_and_set_again()
     {
         await using var f = new MuteFixture();

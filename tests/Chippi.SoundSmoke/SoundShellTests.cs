@@ -234,6 +234,29 @@ public sealed class SoundShellTests
         finally { panel.Close(); }
     });
 
+    [Fact]
+    public Task With_no_microphone_the_microphone_card_holds_only_its_row_with_no_line_under_it() => SmokeDispatcher.Run(async () =>
+    {
+        await using var scene = new SoundScene();
+        await scene.Start();
+        scene.Devices.Remove("desk", "CableOut");
+        await scene.Audio.RefreshAsync();
+        var panel = OpenPanel(scene, new FakeMedia());
+        try
+        {
+            var host = (ContentControl)panel.FindName("Page");
+            panel.ShowPage(SoundTile.Key);
+            panel.UpdateLayout();
+            Assert.Contains("No microphone", Texts(All<MicQuickView>(host).Single()));
+            var mics = All<RoutingQuickView>(host).Last();
+            Assert.Equal(Visibility.Collapsed, mics.Visibility);
+            var card = (DockPanel)LogicalTreeHelper.GetParent(mics);
+            var hairline = Assert.Single(card.Children.OfType<Border>(), b => b.Height == 1);
+            Assert.Equal(Visibility.Collapsed, hairline.Visibility); // it goes with the list under it
+        }
+        finally { panel.Close(); }
+    });
+
     private static IReadOnlyList<IslandTileGroup> Tiles(SoundScene scene) =>
         IslandTileContribution.Group(scene.Shell.Registry.Features.SelectMany(e => e.IslandTiles));
 

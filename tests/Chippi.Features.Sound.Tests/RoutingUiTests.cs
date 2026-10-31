@@ -83,6 +83,7 @@ public sealed class RoutingUiTests
         await Sta(async () =>
         {
             var page = new RoutingQuickView(f.Module, AudioFlow.Render);
+            Lay(page, 278);
             var rows = Descendants(page).OfType<System.Windows.Controls.Button>().Select(AutomationProperties.GetName).ToList();
             Assert.Equal(["Mute system volume", "A, in use", "Use B"], rows); // the card's mute, then connected outputs only
             var pick = Descendants(page).OfType<System.Windows.Controls.Button>().Single(b => AutomationProperties.GetName(b) == "Use B");
@@ -136,6 +137,66 @@ public sealed class RoutingUiTests
     }
 
     [Fact]
+    public async Task The_volume_slider_sets_the_output_it_shows_never_one_that_took_its_place()
+    {
+        await using var f = new RoutingFixture();
+        f.System.With(Speaker("Headset"), Speaker("Speakers")).WithDefault("Headset");
+        await f.Start();
+        await f.Module.SetEnabledAsync(AudioFlow.Render, false);
+        await Sta(async () =>
+        {
+            var view = new RoutingQuickView(f.Module, AudioFlow.Render); // shows the headset's level
+            f.System.ChangeDefault("Speakers"); // the speakers take over before the view hears of it
+            await f.Audio.RefreshAsync();
+            Descendants(view).OfType<System.Windows.Controls.Slider>().Single().Value = 100;
+            await Until(() => Math.Abs(f.System.GetLevel("Headset").Volume - 1f) < 0.001f);
+            Assert.Equal(0.5f, f.System.GetLevel("Speakers").Volume, 3);
+        });
+    }
+
+    [Fact]
+    public async Task A_microphone_card_without_a_mic_mute_row_says_no_microphone()
+    {
+        await using var f = new RoutingFixture();
+        f.System.With(Speaker("A")).WithDefault("A");
+        await f.Start();
+        await Sta(() =>
+        {
+            var alone = new RoutingQuickView(f.Module, AudioFlow.Capture);
+            _ = new System.Windows.Controls.DockPanel { Children = { alone } };
+            Assert.Equal(Visibility.Visible, alone.Visibility);
+            Assert.Contains(Descendants(alone).OfType<System.Windows.Controls.TextBlock>(), t => t.Text == "No microphone" && ((FrameworkElement)t.Parent).Visibility == Visibility.Visible);
+
+            var under = new RoutingQuickView(f.Module, AudioFlow.Capture);
+            _ = new System.Windows.Controls.DockPanel { Children = { new System.Windows.Controls.Border(), under } }; // under Mic mute's row, which says it
+            under.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));
+            Assert.Equal(Visibility.Collapsed, under.Visibility);
+        });
+    }
+
+    [Fact]
+    public async Task A_list_builds_no_rows_until_it_knows_its_room_and_keeps_the_rows_a_pick_leaves_alone()
+    {
+        await using var f = new RoutingFixture();
+        f.System.With(Speaker("S1"), Speaker("S2"), Speaker("S3")).WithDefault("S1");
+        await f.Start();
+        await f.Module.SetEnabledAsync(AudioFlow.Render, false);
+        await Sta(async () =>
+        {
+            var view = new RoutingQuickView(f.Module, AudioFlow.Render);
+            Assert.Empty(Rows(view)); // not laid out yet
+            Lay(view, 278);
+            var before = Rows(view);
+            Assert.Equal(3, before.Count);
+            ((IInvokeProvider)new ButtonAutomationPeer(before[1])).Invoke(); // use S2
+            await Until(() => Rows(view).Any(r => AutomationProperties.GetName(r) == "S2, in use"));
+            var after = Rows(view);
+            Assert.Same(before[2], after[2]); // S3's row didn't change, so it wasn't built again
+            Assert.NotSame(before[0], after[0]);
+        });
+    }
+
+    [Fact]
     public async Task The_row_in_use_reads_semibold()
     {
         await using var f = new RoutingFixture();
@@ -143,7 +204,9 @@ public sealed class RoutingUiTests
         await f.Start();
         await Sta(() =>
         {
-            var rows = Rows(new RoutingQuickView(f.Module, AudioFlow.Render));
+            var view = new RoutingQuickView(f.Module, AudioFlow.Render);
+            Lay(view, 278);
+            var rows = Rows(view);
             Assert.Equal([FontWeights.SemiBold, FontWeights.Normal], rows.Select(r => Descendants(r).OfType<System.Windows.Controls.TextBlock>().Single().FontWeight));
         });
     }
@@ -191,7 +254,9 @@ public sealed class RoutingUiTests
         await f.Start();
         await Sta(() =>
         {
-            var rows = Descendants(new RoutingQuickView(f.Module, AudioFlow.Render)).OfType<System.Windows.Controls.Button>().Skip(1).ToList();
+            var view = new RoutingQuickView(f.Module, AudioFlow.Render);
+            Lay(view, 278);
+            var rows = Descendants(view).OfType<System.Windows.Controls.Button>().Skip(1).ToList();
             Assert.Equal(["INZONE Buds - Game", "INZONE Buds - Chat", "Speakers (Realtek(R) Audio)", "Digital Audio (S/PDIF) (Realtek(R) Audio)"],
                 rows.Select(r => Descendants(r).OfType<System.Windows.Controls.TextBlock>().Single().Text));
             Assert.Equal(names, rows.Select(r => (string)r.ToolTip));
