@@ -4,7 +4,7 @@
 using System.Windows;
 using System.Windows.Automation;
 using Chippi.App.Island;
-using Chippi.App.Pet;
+using Chippi.UI.Pet;
 using Chippi.Core.Island;
 using Chippi.UI.Controls;
 

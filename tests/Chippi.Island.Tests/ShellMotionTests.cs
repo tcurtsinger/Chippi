@@ -227,7 +227,7 @@ public sealed class ShellMotionTests
         var media = new FakeMedia { Sessions = [Track("Creep")] };
         window.SetMedia(media);
         var playing = new IslandActivity("track", IslandActivityKind.Media, "Song", "Spotify") { TileKey = IslandPanelWindow.NowPlayingKey };
-        window.SetActivities([playing], Chippi.App.Pet.PetMood.Idle);
+        window.SetActivities([playing], Chippi.UI.Pet.PetMood.Idle);
         IslandWindowTests.Pump(TimeSpan.FromMilliseconds(400)); // the unfold
         Assert.Null(window.LinesWas.Source);
 
@@ -246,7 +246,7 @@ public sealed class ShellMotionTests
 
         // Paused, the same song doesn't arrive again: only the pause mark takes over.
         media.Sessions = [Track("Karma Police", playing: false)];
-        window.SetActivities([], Chippi.App.Pet.PetMood.Sleepy);
+        window.SetActivities([], Chippi.UI.Pet.PetMood.Sleepy);
         Assert.Null(window.LinesWas.Source);
         Assert.Equal(Visibility.Visible, window.PausedMark.Visibility);
     })));
@@ -255,10 +255,10 @@ public sealed class ShellMotionTests
     public void The_badge_fades_out_before_it_goes_and_the_press_dips_the_puck() => WpfTestThread.Run(() => WithMotion(false, () => IslandWindowTests.WithShownIsland(window =>
     {
         var muted = new IslandActivity("mic", IslandActivityKind.Status, "Muted", "Microphone") { ModuleId = "mic-mute", NeedsAttention = true };
-        window.SetActivities([muted], Chippi.App.Pet.PetMood.Sleepy);
+        window.SetActivities([muted], Chippi.UI.Pet.PetMood.Sleepy);
         Assert.Equal(Visibility.Visible, window.MicBadge.Visibility);
         IslandWindowTests.Pump(TimeSpan.FromMilliseconds(300));
-        window.SetActivities([], Chippi.App.Pet.PetMood.Sleepy);
+        window.SetActivities([], Chippi.UI.Pet.PetMood.Sleepy);
         Assert.Equal(Visibility.Visible, window.MicBadge.Visibility); // fading
         IslandWindowTests.Pump(TimeSpan.FromMilliseconds(300));
         Assert.Equal(Visibility.Collapsed, window.MicBadge.Visibility);

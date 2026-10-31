@@ -13,6 +13,12 @@
     <ProjectReference Include="..\Chippi.Core\Chippi.Core.csproj" />
   </ItemGroup>
 
+  <!-- Chippi's test hooks (ChippiPet's breathing, faces, a blink on demand) for the pet sheet and the tests. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="Chippi" />
+    <InternalsVisibleTo Include="Chippi.Island.Tests" />
+  </ItemGroup>
+
   <!-- The control gallery is a development tool: compiled into Debug builds only. -->
   <ItemGroup Condition="'$(Configuration)' != 'Debug'">
     <Page Remove="Controls\Gallery\**" />

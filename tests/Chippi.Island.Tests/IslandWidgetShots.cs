@@ -6,7 +6,7 @@ using System.IO;
 using System.Windows.Media;
 using Chippi.App.Island;
 using Chippi.App.Island.Media;
-using Chippi.App.Pet;
+using Chippi.UI.Pet;
 using Chippi.Core.Island;
 using static Chippi.Island.Tests.IslandWindowTests;
 

@@ -8,7 +8,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using System.Windows.Shapes;
 using Chippi.App.Island;
-using Chippi.App.Pet;
+using Chippi.UI.Pet;
 using Chippi.App.Shell;
 using Chippi.Core.Config;
 using Chippi.Core.Modules;

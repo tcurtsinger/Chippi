@@ -9,7 +9,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Documents;
 using System.Windows.Media;
 using System.Windows.Threading;
-using Chippi.App.Pet;
+using Chippi.UI.Pet;
 using Chippi.Core.Config;
 using Chippi.Core.Modules;
 using Chippi.UI.Controls;

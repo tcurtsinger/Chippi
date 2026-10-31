@@ -48,7 +48,7 @@ public sealed class KeepAwakeViewTests
     }
 
     [Fact]
-    public async Task The_lit_card_reads_the_time_left_and_until_opens_a_time_picker_in_the_page()
+    public async Task The_top_row_reads_the_state_with_chippi_and_stop_and_until_opens_a_time_picker()
     {
         var path = Path.Combine(Path.GetTempPath(), $"Chippi-view-{Guid.NewGuid():N}.json");
         var module = new KeepAwakeModule(new NullNative());
@@ -60,12 +60,27 @@ public sealed class KeepAwakeViewTests
             await OnSta(async () =>
             {
                 var view = new KeepAwakeIslandView(module);
+                var pet = Find<Chippi.UI.Pet.ChippiPet>(view, _ => true)!;
+                var stop = Find<System.Windows.Controls.Button>(view, b => b.Content as string == "Stop")!;
+                // Off: Chippi asleep beside "Off", and no Stop.
+                Assert.Equal(Chippi.UI.Pet.PetMood.Sleepy, pet.Mood);
+                Assert.NotNull(Find<System.Windows.Controls.TextBlock>(view, t => t.Text == "Off"));
+                Assert.NotEqual(System.Windows.Visibility.Visible, stop.Visibility);
+
                 var hour = Chip(view, "1 hr")!;
                 hour.IsChecked = true;
                 await Until(() => module.IsOn && hour.IsChecked == true);
-                // Lit: the length over the time left, the one live fact on the page.
-                Assert.Equal(["1 hr", "1 hr left"], Lines(hour));
-                Assert.Equal("1 hr, 1 hr left", System.Windows.Automation.AutomationProperties.GetName(hour));
+                // On: Chippi wide awake beside the time left, when it ends, and Stop; the lit card just keeps its length.
+                Assert.Equal(Chippi.UI.Pet.PetMood.WideAwake, pet.Mood);
+                Assert.NotNull(Find<System.Windows.Controls.TextBlock>(view, t => t.Text == "1 hr left"));
+                Assert.NotNull(Find<System.Windows.Controls.TextBlock>(view, t => t.Text == $"Until {module.Deadline!.Value.LocalDateTime:t}"));
+                Assert.Equal("1 hr", hour.Content);
+                Assert.Equal(System.Windows.Visibility.Visible, stop.Visibility);
+                Click(stop);
+                await Until(() => !module.IsOn && hour.IsChecked == false);
+                Assert.NotEqual(System.Windows.Visibility.Visible, stop.Visibility);
+                hour.IsChecked = true;
+                await Until(() => module.IsOn);
 
                 // Until… swaps the cards for the picker, at the last Until time; a step and Start run until then.
                 var until = Chip(view, "Until…")!;
@@ -82,7 +97,10 @@ public sealed class KeepAwakeViewTests
                 Assert.Equal(18 * 60 + 5, module.Active!.UntilMinute);
                 Assert.NotEqual(System.Windows.Visibility.Visible, picker.Visibility);
                 await Until(() => until.IsChecked == true);
-                Assert.Equal($"Until {KeepAwakeText.Until(18 * 60 + 5)}", Lines(until)[0]);
+                Assert.Equal($"Until {KeepAwakeText.Until(18 * 60 + 5)}", until.Content);
+                // An Until session's state is the time picked (the card's text isn't a TextBlock of its own), its detail the time left.
+                Assert.NotNull(Find<System.Windows.Controls.TextBlock>(view, t => t.Text == $"Until {KeepAwakeText.Until(18 * 60 + 5)}"));
+                Assert.NotNull(Find<System.Windows.Controls.TextBlock>(view, t => t.Text.EndsWith(" left", StringComparison.Ordinal)));
 
                 // Esc (the module's HandleEscape) leaves the picker before it closes the island.
                 Assert.False(view.CloseUntil());
@@ -124,7 +142,7 @@ public sealed class KeepAwakeViewTests
         }
     }
 
-    // The island's cards carry their fixed label as Tag (their content is two lines); the Settings page's chips are text.
+    // The island's cards carry their fixed label as Tag (a lit Until card reads its time); the Settings page's chips are text.
     private static ToggleButton? Chip(System.Windows.DependencyObject root, string label) =>
         Find<ToggleButton>(root, chip => chip.Tag as string == label || chip.Content as string == label);
 
@@ -132,10 +150,6 @@ public sealed class KeepAwakeViewTests
         root is T hit && where(hit) ? hit
         : System.Windows.LogicalTreeHelper.GetChildren(root).OfType<System.Windows.DependencyObject>().Select(c => Find(c, where)).FirstOrDefault(c => c is not null);
 
-    // A card's visible lines: its length (or Stop) and, lit, the time left.
-    private static string[] Lines(ToggleButton card) =>
-        [.. ((System.Windows.Controls.Panel)card.Content).Children.OfType<System.Windows.Controls.TextBlock>()
-            .Where(t => t.Visibility == System.Windows.Visibility.Visible).Select(t => t.Text)];
 
     private static void Click(ButtonBase button) => button.RaiseEvent(new System.Windows.RoutedEventArgs(ButtonBase.ClickEvent));
 

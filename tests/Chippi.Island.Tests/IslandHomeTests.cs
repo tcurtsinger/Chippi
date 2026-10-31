@@ -7,7 +7,7 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using Chippi.App.Island;
 using Chippi.App.Island.Media;
-using Chippi.App.Pet;
+using Chippi.UI.Pet;
 using Chippi.Core.Modules;
 using Chippi.UI.Controls;
 using Xunit;

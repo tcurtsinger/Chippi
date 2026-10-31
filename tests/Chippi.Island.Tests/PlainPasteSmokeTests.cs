@@ -5,7 +5,7 @@ using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Media;
 using Chippi.App.Island;
-using Chippi.App.Pet;
+using Chippi.UI.Pet;
 using Chippi.Clipboard.Tests;
 using Chippi.Core.Clipboard;
 using Chippi.Core.Island;

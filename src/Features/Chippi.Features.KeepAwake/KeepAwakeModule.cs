@@ -32,6 +32,9 @@ public sealed class KeepAwakeModule : IFeatureModule
     public string? Error { get; private set; }
     public event Action? Changed;
 
+    /// <summary>A timed session ran out (not a stop): the page's Chippi celebrates, as the widget's does.</summary>
+    public event Action? Finished;
+
     public KeepAwakeModule() : this(new WindowsExecutionState()) { }
 
     public KeepAwakeModule(IExecutionState native)
@@ -179,7 +182,11 @@ public sealed class KeepAwakeModule : IFeatureModule
         UpdateTile();
         // Twice a minute while a timed session counts down, so its tile is never a minute stale.
         _tileClock?.Change(Deadline is null ? Timeout.InfiniteTimeSpan : TileTick, TileTick);
-        if (timed) _context?.Island.ReportSuccess("Keep awake finished");
+        if (timed)
+        {
+            _context?.Island.ReportSuccess("Keep awake finished");
+            Finished?.Invoke();
+        }
         if (error is not null) _context?.Logger.LogError(error, "Keep awake execution state failed");
         Changed?.Invoke();
     }

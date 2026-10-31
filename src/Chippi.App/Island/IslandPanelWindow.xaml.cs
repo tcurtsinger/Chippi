@@ -10,7 +10,7 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using Chippi.App.Flyout;
 using Chippi.App.Island.Media;
-using Chippi.App.Pet;
+using Chippi.UI.Pet;
 using Chippi.Core.Config;
 using Chippi.Core.Diagnostics;
 using Chippi.Core.Island;
@@ -213,6 +213,7 @@ public partial class IslandPanelWindow : Window
 
     public void SetPetColor(PetColor color)
     {
+        ChippiPet.SetPetColor(this, color); // inherited by a feature page's Chippi (Keep awake's)
         _grid.Pet.PetColor = color;
         _nowPlaying?.SetPetColor(color);
     }
