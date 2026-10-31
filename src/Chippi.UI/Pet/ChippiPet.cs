@@ -13,7 +13,7 @@ using System.Windows.Threading;
 using Chippi.Core.Config;
 using Chippi.UI.Themes;
 
-namespace Chippi.App.Pet;
+namespace Chippi.UI.Pet;
 
 public enum PetMood
 {
@@ -68,8 +68,16 @@ public class ChippiPet : UserControl
     public static readonly DependencyProperty SizeProperty = DependencyProperty.Register(
         nameof(Size), typeof(double), typeof(ChippiPet), new PropertyMetadata(28.0, OnSizeChanged));
 
-    public static readonly DependencyProperty PetColorProperty = DependencyProperty.Register(
-        nameof(PetColor), typeof(PetColor), typeof(ChippiPet), new PropertyMetadata(PetColor.Synth, OnPetColorChanged));
+    /// <summary>
+    /// The pet's color. Inherited: set on a host (the island's panel), it reaches every pet inside, including one on a
+    /// feature's page that never hears about the setting.
+    /// </summary>
+    public static readonly DependencyProperty PetColorProperty = DependencyProperty.RegisterAttached(
+        nameof(PetColor), typeof(PetColor), typeof(ChippiPet), new FrameworkPropertyMetadata(PetColor.Synth, FrameworkPropertyMetadataOptions.Inherits, OnPetColorChanged));
+
+    public static PetColor GetPetColor(DependencyObject element) => (PetColor)element.GetValue(PetColorProperty);
+
+    public static void SetPetColor(DependencyObject element, PetColor value) => element.SetValue(PetColorProperty, value);
 
     public static readonly DependencyProperty IsDecorativeProperty = DependencyProperty.Register(
         nameof(IsDecorative), typeof(bool), typeof(ChippiPet), new PropertyMetadata(false));
@@ -262,7 +270,7 @@ public class ChippiPet : UserControl
     /// pet returns to when the celebration ends. For hosts (the island) whose own state changes
     /// while the pet celebrates.
     /// </summary>
-    internal void ShowMood(PetMood mood)
+    public void ShowMood(PetMood mood)
     {
         if (Mood == PetMood.Celebrating && _celebrationTimer.IsEnabled && mood != PetMood.Celebrating)
             _returnMood = mood;
@@ -271,7 +279,7 @@ public class ChippiPet : UserControl
     }
 
     /// <summary>Celebrates for about 2.5s, then returns to the current mood. Celebrating again restarts it.</summary>
-    internal void Celebrate()
+    public void Celebrate()
     {
         if (Mood == PetMood.Celebrating)
         {
@@ -318,7 +326,12 @@ public class ChippiPet : UserControl
         }
     }
 
-    private static void OnPetColorChanged(DependencyObject d, DependencyPropertyChangedEventArgs e) => ((ChippiPet)d).UpdateBodyBrush();
+    // Inherited, so every element under a host hears it; only pets redraw.
+    private static void OnPetColorChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        if (d is ChippiPet pet)
+            pet.UpdateBodyBrush();
+    }
 
     private void UpdateBodyBrush()
     {

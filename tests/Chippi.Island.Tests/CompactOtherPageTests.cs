@@ -22,7 +22,7 @@ public sealed class CompactOtherPageTests
         Fit(playing, 496, 336);
         var art = Find<Border>(playing).Single(b => b.Width == 156);
         Assert.Equal(156, art.ActualHeight);
-        Assert.IsType<Chippi.App.Pet.ChippiPet>(art.Child); // no artwork: ChippiPet in its place
+        Assert.IsType<Chippi.UI.Pet.ChippiPet>(art.Child); // no artwork: ChippiPet in its place
         Assert.Equal(new Thickness(0), art.BorderThickness);
         var cover = System.Windows.Media.Imaging.BitmapSource.Create(1, 1, 96, 96, System.Windows.Media.PixelFormats.Bgra32, null, new byte[4], 4);
         var covered = new NowPlayingView(new IslandPanelTests.FakeMedia { Sessions = [new("spotify", "Spotify", "Weekend Mix", "Various Artists", true, true, true, true, true, true,
@@ -48,8 +48,8 @@ public sealed class CompactOtherPageTests
                     return false;
             return true;
         }
-        var asleep = Find<Chippi.App.Pet.ChippiPet>(nothing).Single(Shown);
-        Assert.Equal(Chippi.App.Pet.PetMood.Sleepy, asleep.Mood);
+        var asleep = Find<Chippi.UI.Pet.ChippiPet>(nothing).Single(Shown);
+        Assert.Equal(Chippi.UI.Pet.PetMood.Sleepy, asleep.Mood);
         Assert.Contains(Find<TextBlock>(nothing), t => t.Text == "Nothing playing" && Shown(t));
         Assert.DoesNotContain(Find<Button>(nothing), Shown); // no dead controls
     });
@@ -93,18 +93,44 @@ public sealed class CompactOtherPageTests
     });
 
     [Fact]
-    public void Keep_awake_has_six_equal_cards_centered_inside_the_body() => WpfTestThread.Run(() =>
+    public void Keep_awake_has_chippi_and_the_state_on_top_then_four_lengths_then_two_centered_in_the_body() => WpfTestThread.Run(() =>
     {
         var view = new KeepAwakeIslandView(new KeepAwakeModule());
         Fit(view, 496, 304);
         var cards = Find<ToggleButton>(view).ToArray();
         Assert.Equal(6, cards.Length);
-        Assert.All(cards, c => Assert.Equal(104, c.ActualHeight));
-        var grid = Find<UniformGrid>(view).Single();
-        Assert.Equal(3, grid.Columns);
-        Assert.True(grid.TranslatePoint(new Point(), view).Y > 40);
-        Assert.True(grid.TranslatePoint(new Point(0, grid.ActualHeight), view).Y <= 304);
+        Assert.All(cards, c => Assert.Equal(52, c.ActualHeight));
+        // Grouped by meaning: the durations in a row, then No limit and Until….
+        var rows = Find<UniformGrid>(view).ToArray();
+        Assert.Equal([4, 2], rows.Select(r => r.Columns));
+        Assert.Equal(["30 min", "1 hr", "2 hr", "4 hr"], rows[0].Children.OfType<ToggleButton>().Select(c => (string)c.Tag));
+        Assert.Equal(["No limit", "Until…"], rows[1].Children.OfType<ToggleButton>().Select(c => (string)c.Tag));
+        // The block (Chippi's row to the last cards) sits in the body's vertical middle, Chippi's body on the cards' edge.
+        var pet = Find<Chippi.UI.Pet.ChippiPet>(view).Single();
+        double top = pet.TranslatePoint(new Point(), view).Y, bottom = rows[1].TranslatePoint(new Point(0, rows[1].ActualHeight), view).Y;
+        Assert.Equal(304 - bottom, top, 1);
+        Assert.Equal(-10, pet.TranslatePoint(new Point(), view).X, 1);
+        Assert.Equal(24, rows[0].TranslatePoint(new Point(), view).Y - (top + pet.ActualHeight), 1);
         Assert.Empty(Find<ScrollViewer>(view));
+    });
+
+    [Fact]
+    public void Keep_awake_picker_holds_the_page_edges_with_the_hour_under_chippi_and_start_on_the_right() => WpfTestThread.Run(() =>
+    {
+        var view = new KeepAwakeIslandView(new KeepAwakeModule());
+        Fit(view, 496, 304);
+        Find<ToggleButton>(view).Single(c => c.Tag as string == "Until…").IsChecked = true; // opens the picker; starts nothing
+        view.UpdateLayout();
+        // Chippi's body is centered in his box (60 of its 120 units); the hour column's center sits under it.
+        var pet = Find<Chippi.UI.Pet.ChippiPet>(view).Single();
+        var hour = Find<Border>(view).Single(b => AutomationProperties.GetName(b) == "Hour");
+        Assert.Equal(pet.TranslatePoint(new Point(pet.ActualWidth / 2, 0), view).X, hour.TranslatePoint(new Point(hour.ActualWidth / 2, 0), view).X, 1);
+        // Start ends on the right edge, where Stop does; Cancel 8 before it.
+        var start = Find<Button>(view).Single(b => b.Content as string == "Start");
+        var cancel = Find<Button>(view).Single(b => b.Content as string == "Cancel");
+        Assert.Equal(496, start.TranslatePoint(new Point(start.ActualWidth, 0), view).X, 1);
+        Assert.Equal(8, start.TranslatePoint(new Point(), view).X - cancel.TranslatePoint(new Point(cancel.ActualWidth, 0), view).X, 1);
+        cancel.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
     });
 
     [Fact]
@@ -125,7 +151,7 @@ public sealed class CompactOtherPageTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void Hover_label_tracks_running_state_on_every_refresh(bool until) => WpfTestThread.Run(() =>
+    public void The_lit_card_keeps_its_length_under_the_pointer_and_unlights_when_stopped(bool until) => WpfTestThread.Run(() =>
     {
         var module = new KeepAwakeModule();
         var active = typeof(KeepAwakeModule).GetProperty("Active")!;
@@ -143,14 +169,13 @@ public sealed class CompactOtherPageTests
         card.RaiseEvent(new System.Windows.Input.MouseEventArgs(System.Windows.Input.Mouse.PrimaryDevice, 0) { RoutedEvent = UIElement.MouseEnterEvent });
         var refresh = typeof(KeepAwakeIslandView).GetMethod("Refresh", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
         refresh.Invoke(view, null); // the timer refresh while still pointing at the active card
-        // The card's first line is its length, or Stop; the second, lit, is the time left.
-        string Label() => ((Panel)card.Content).Children.OfType<TextBlock>().First().Text;
-        Assert.Equal("Stop", Label());
+        // Stop is its own button in the top row now: the lit card keeps its length (an Until card its time) under the pointer.
+        Assert.True(card.IsChecked);
+        Assert.Equal(until ? $"Until {KeepAwakeText.Until(1080)}" : "1 hr", card.Content);
         active.SetValue(module, null);
         refresh.Invoke(view, null); // session stops while the pointer remains over it
         Assert.False(card.IsChecked);
-        Assert.NotEqual("Stop", Label());
-        Assert.Equal(until ? "Until\u2026" : "1 hr", Label());
+        Assert.Equal(until ? "Until\u2026" : "1 hr", card.Content);
         card.SetValue(hoverKey, false);
         writeFlag.Invoke(card, [hoverFlag, false]);
     });

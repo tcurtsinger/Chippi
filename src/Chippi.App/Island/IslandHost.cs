@@ -5,7 +5,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Threading;
 using Chippi.App.Island.Media;
-using Chippi.App.Pet;
+using Chippi.UI.Pet;
 using Chippi.App.Shell;
 using Chippi.Core.Config;
 using Chippi.Core.Island;
@@ -105,7 +105,7 @@ public sealed class IslandHost : IDisposable
         var args = Environment.GetCommandLineArgs();
         int sheet = Array.FindIndex(args, a => string.Equals(a, "--pet-sheet", StringComparison.OrdinalIgnoreCase));
         if (_shell.DebugMode && sheet >= 0 && sheet + 1 < args.Length)
-            PetSheet.Save(args[sheet + 1]);
+            Chippi.App.Pet.PetSheet.Save(args[sheet + 1]);
         int motion = Array.FindIndex(args, a => string.Equals(a, "--pet-motion", StringComparison.OrdinalIgnoreCase));
         if (_shell.DebugMode && motion >= 0 && motion + 1 < args.Length)
             _ = SaveMotionAsync(args[motion + 1]);
@@ -119,7 +119,7 @@ public sealed class IslandHost : IDisposable
         _logger.LogInformation("Island started");
     }
 
-    /// <summary>Once the features run and the app is idle, lays the panel's home out so the first open is as quick as the rest.</summary>
+    /// <summary>Once the features run and the app is idle, lays the panel's home and last page out so their first open is as quick as the rest.</summary>
     private async Task PrewarmAsync()
     {
         try
@@ -142,7 +142,7 @@ public sealed class IslandHost : IDisposable
     {
         try
         {
-            await PetSheet.SaveMotionAsync(directory);
+            await Chippi.App.Pet.PetSheet.SaveMotionAsync(directory);
             _logger.LogInformation("Pet motion sheets saved to {Directory}", directory);
         }
         catch (Exception ex)

@@ -53,18 +53,18 @@ public sealed class IslandWindowTests
         WpfTestThread.Run(() => WithShownIsland(window =>
         {
             Assert.Equal(1, window.PuckScaleTarget);
-            Assert.Equal(Chippi.App.Pet.PetMood.Sleepy, window.Pet.Mood);
+            Assert.Equal(Chippi.UI.Pet.PetMood.Sleepy, window.Pet.Mood);
             Hover(window, Mouse.MouseEnterEvent);
             Assert.Equal(1, window.PuckScaleTarget);
             Assert.Equal(50, window.PuckButton.Width);
             Assert.IsType<System.Windows.Media.DrawingBrush>(window.Body.BorderBrush); // the rim blends over 83ms, like Windows' own controls
             Pump(TimeSpan.FromMilliseconds(200));
             Assert.Same(window.FindResource("IslandWidgetHoverBorderBrush"), window.Body.BorderBrush);
-            Assert.Equal(Chippi.App.Pet.PetMood.Idle, window.Pet.Mood);
+            Assert.Equal(Chippi.UI.Pet.PetMood.Idle, window.Pet.Mood);
             Hover(window, Mouse.MouseLeaveEvent);
             Pump(TimeSpan.FromMilliseconds(200));
             Assert.Same(window.FindResource("IslandWidgetBorderBrush"), window.Body.BorderBrush);
-            Assert.Equal(Chippi.App.Pet.PetMood.Sleepy, window.Pet.Mood);
+            Assert.Equal(Chippi.UI.Pet.PetMood.Sleepy, window.Pet.Mood);
         }));
     }
 
@@ -75,7 +75,7 @@ public sealed class IslandWindowTests
         {
             var media = new IslandPanelTests.FakeMedia { Sessions = [Track("Everything In Its Right Place (Live at the Ancient Theatre)")] };
             window.SetMedia(media);
-            window.SetActivities([Playing], Chippi.App.Pet.PetMood.Idle);
+            window.SetActivities([Playing], Chippi.UI.Pet.PetMood.Idle);
             Assert.True(window.BarShown);
             Pump(TimeSpan.FromMilliseconds(400)); // the unfold
             Assert.Equal(IslandGeometry.BarWidth, window.PuckButton.ActualWidth, 1); // one width, whatever the title
@@ -116,7 +116,7 @@ public sealed class IslandWindowTests
             Pump(TimeSpan.FromMilliseconds(100));
             Assert.Equal(IslandGeometry.BarWidth, window.PuckButton.ActualWidth, 1); // still the same bar
 
-            window.SetActivities([], Chippi.App.Pet.PetMood.Idle); // another app took over: the song goes
+            window.SetActivities([], Chippi.UI.Pet.PetMood.Idle); // another app took over: the song goes
             Assert.False(window.BarShown);
         }));
     }
@@ -127,7 +127,7 @@ public sealed class IslandWindowTests
         WpfTestThread.Run(() => WithShownIsland(window =>
         {
             window.SetMedia(new IslandPanelTests.FakeMedia { Sessions = [Track("Creep")] });
-            window.SetActivities([Playing], Chippi.App.Pet.PetMood.Idle);
+            window.SetActivities([Playing], Chippi.UI.Pet.PetMood.Idle);
             foreach (var (x, chippiRight) in new[] { ((double?)null, true), (0.0, false) })
             {
                 window.SetPlacement(x, x is null ? null : 1);
@@ -155,15 +155,15 @@ public sealed class IslandWindowTests
             window.CreateTimer = (interval, tick) => { timers.Add((interval, tick)); return new StillTimer(); };
             var media = new IslandPanelTests.FakeMedia { Sessions = [Track("Creep")] };
             window.SetMedia(media);
-            window.SetActivities([Playing], Chippi.App.Pet.PetMood.Idle);
-            Assert.Equal(Chippi.App.Pet.PetMood.Listening, window.Pet.Mood);
+            window.SetActivities([Playing], Chippi.UI.Pet.PetMood.Idle);
+            Assert.Equal(Chippi.UI.Pet.PetMood.Listening, window.Pet.Mood);
 
             media.Sessions = [Track("Creep", playing: false)];
-            window.SetActivities([], Chippi.App.Pet.PetMood.Sleepy); // paused: the activity goes
+            window.SetActivities([], Chippi.UI.Pet.PetMood.Sleepy); // paused: the activity goes
             Assert.True(window.BarShown);
             Assert.Equal(Visibility.Visible, window.PausedMark.Visibility);
             Assert.Equal(Visibility.Collapsed, window.Equalizer.Visibility);
-            Assert.Equal(Chippi.App.Pet.PetMood.Idle, window.Pet.Mood); // the headphones come off
+            Assert.Equal(Chippi.UI.Pet.PetMood.Idle, window.Pet.Mood); // the headphones come off
 
             var hold = Assert.Single(timers, t => t.Interval == IslandWindow.PauseHold);
             hold.Tick();
@@ -250,7 +250,7 @@ public sealed class IslandWindowTests
         WpfTestThread.Run(() => WithShownIsland(window =>
         {
             window.SetMedia(new IslandPanelTests.FakeMedia { Sessions = [Track("Creep")] });
-            window.SetActivities([Playing], Chippi.App.Pet.PetMood.Idle);
+            window.SetActivities([Playing], Chippi.UI.Pet.PetMood.Idle);
             Pump(TimeSpan.FromMilliseconds(400)); // the unfold
             var bar = window.WidgetRect;
             Assert.Equal(IslandGeometry.BarRect(window.PuckRect, window.OpensLeft, window.CurrentArea!.Value.Scale), bar);
@@ -289,7 +289,7 @@ public sealed class IslandWindowTests
         WpfTestThread.Run(() => WithShownIsland(window =>
         {
             window.SetMedia(new IslandPanelTests.FakeMedia { Sessions = [Track("Creep")] });
-            window.SetActivities([Playing], Chippi.App.Pet.PetMood.Idle);
+            window.SetActivities([Playing], Chippi.UI.Pet.PetMood.Idle);
             window.SetLastPage(null);
             Click(window);
             Assert.True(window.IsIslandOpen);
@@ -546,7 +546,7 @@ public sealed class IslandMotionTests
                     Sessions = [new("spotify", "Spotify", "Everything In Its Right Place (Live at the Ancient Theatre)", "Radiohead",
                         true, true, true, true, true, true, TimeSpan.Zero, TimeSpan.FromMinutes(4), DateTimeOffset.Now, null)],
                 });
-                window.SetActivities([new IslandActivity("track", IslandActivityKind.Media, "Everything", "Spotify")], Chippi.App.Pet.PetMood.Idle);
+                window.SetActivities([new IslandActivity("track", IslandActivityKind.Media, "Everything", "Spotify")], Chippi.UI.Pet.PetMood.Idle);
                 Assert.Equal(Visibility.Visible, window.SongCopy.Visibility); // too long: it scrolls
                 Chippi.UI.Themes.Motion.Override = true;
                 Assert.Equal(Visibility.Collapsed, window.SongCopy.Visibility); // holds at once
@@ -574,10 +574,10 @@ public sealed class IslandMotionTests
                 window.PointerAt = () => pointer;
                 window.PuckButton.RaiseEvent(new MouseEventArgs(Mouse.PrimaryDevice, 0) { RoutedEvent = Mouse.MouseEnterEvent });
                 Assert.Equal(1, window.PuckScale.ScaleX, 9); // hover never changes the size
-                window.SetActivities([new IslandActivity("timer", IslandActivityKind.Timer, "18:42", "Focus timer") { Progress = 0.4 }], Chippi.App.Pet.PetMood.Idle);
+                window.SetActivities([new IslandActivity("timer", IslandActivityKind.Timer, "18:42", "Focus timer") { Progress = 0.4 }], Chippi.UI.Pet.PetMood.Idle);
                 Assert.Equal(IslandGeometry.BarWidth, window.PuckButton.Width); // the bar is there at once: no unfold
                 Assert.Equal(1, window.Bar.Opacity);
-                window.SetActivities([], Chippi.App.Pet.PetMood.Idle);
+                window.SetActivities([], Chippi.UI.Pet.PetMood.Idle);
                 Assert.Equal(IslandGeometry.Puck, window.PuckButton.Width); // and gone at once
                 window.PuckButton.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Left) { RoutedEvent = UIElement.PreviewMouseLeftButtonDownEvent });
                 pointer = new Point(pointer.X - 200, pointer.Y - 200);

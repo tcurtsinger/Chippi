@@ -6,7 +6,7 @@ using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Documents;
-using Chippi.App.Pet;
+using Chippi.UI.Pet;
 using Chippi.UI.Controls;
 
 namespace Chippi.App.Settings.Pages;

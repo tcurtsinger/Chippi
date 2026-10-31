@@ -8,7 +8,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Chippi.App.Flyout;
 using Chippi.App.Island;
-using Chippi.App.Pet;
+using Chippi.UI.Pet;
 using Chippi.Core.Config;
 using Chippi.Features.Sound;
 using Chippi.Features.Sound.Volume;

@@ -9,7 +9,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
-using Chippi.App.Pet;
+using Chippi.UI.Pet;
 using Chippi.Core.Config;
 using Chippi.Core.Island;
 using Chippi.Core.Modules;

@@ -6,7 +6,7 @@ using System.Windows.Automation.Peers;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Shapes;
-using Chippi.App.Pet;
+using Chippi.UI.Pet;
 using Chippi.Core.Config;
 using Chippi.UI.Themes;
 
@@ -14,6 +14,21 @@ namespace Chippi.Island.Tests;
 
 public sealed class ChippiPetTests
 {
+    [Fact]
+    public void A_pet_inside_a_host_takes_its_color_unless_given_one()
+    {
+        // The panel sets the color once; a feature page's Chippi (Keep awake's) picks it up without hearing of the setting.
+        WpfTestThread.Run(() =>
+        {
+            var page = new ChippiPet();
+            var own = new ChippiPet { PetColor = PetColor.Synth };
+            var host = new StackPanel { Children = { new Border { Child = page }, own } };
+            ChippiPet.SetPetColor(host, PetColor.Iris);
+            Assert.Equal(PetColor.Iris, page.PetColor);
+            Assert.Equal(PetColor.Synth, own.PetColor); // a color set on the pet itself wins
+        });
+    }
+
     [Fact]
     public void Every_mood_color_and_size_has_the_named_pet()
     {
@@ -106,7 +121,7 @@ public sealed class ChippiPetTests
     {
         var output = Environment.GetEnvironmentVariable("CHIPPI_PET_SHOTS");
         if (output is not null)
-            WpfTestThread.Run(() => PetSheet.Save(output));
+            WpfTestThread.Run(() => Chippi.App.Pet.PetSheet.Save(output));
     }
 #endif
 

@@ -81,6 +81,27 @@ public sealed class KeepAwakeSessionTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Every_change_reads_one_state_even_mid_switch()
+    {
+        // The session reports from its own thread before the start returns; each report must already carry the new mode,
+        // never the old length against the new end ("21 hr left" with 1 hr lit, switching to an Until time).
+        var seen = new ConcurrentQueue<(bool On, AwakeMode? Mode, DateTimeOffset? Deadline, string Status)>();
+        _module.Changed += () => seen.Enqueue((_module.IsOn, _module.Active?.Mode, _module.Deadline, _module.TileStatus(DateTimeOffset.Now)));
+
+        await _module.StartSessionAsync(new KeepAwakeSettings { Mode = AwakeMode.Duration, DurationMinutes = 60 });
+        Assert.All(seen, s => Assert.Equal((true, AwakeMode.Duration, "1 hr left"), (s.On, s.Mode, s.Status)));
+        seen.Clear();
+
+        await _module.StartSessionAsync(new KeepAwakeSettings { Mode = AwakeMode.UntilTime, UntilMinute = 18 * 60 });
+        Assert.NotEmpty(seen);
+        Assert.All(seen, s => Assert.Equal((true, AwakeMode.UntilTime, $"Until {KeepAwakeText.Until(18 * 60)}"), (s.On, s.Mode, s.Status)));
+        seen.Clear();
+
+        await _module.StopSessionAsync();
+        Assert.All(seen, s => Assert.Equal((false, (AwakeMode?)null, (DateTimeOffset?)null), (s.On, s.Mode, s.Deadline)));
+    }
+
+    [Fact]
     public async Task Keep_screen_on_reaches_a_running_session_without_moving_its_deadline()
     {
         await _module.StartSessionAsync(new KeepAwakeSettings { Mode = AwakeMode.Duration, DurationMinutes = 30 });

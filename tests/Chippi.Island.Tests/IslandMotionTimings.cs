@@ -74,8 +74,8 @@ public sealed class IslandMotionTimings
                     Cycle("");
                 for (int i = 0; i < Warm; i++)
                 {
-                    Time("unfold", 240, () => { media.Sessions = [song]; media.Raise(); window.SetActivities([new IslandActivity("track", IslandActivityKind.Media, "Weekend Mix", "Spotify")], Chippi.App.Pet.PetMood.Idle); });
-                    Time("fold", 180, () => { media.Sessions = []; media.Raise(); window.SetActivities([], Chippi.App.Pet.PetMood.Sleepy); });
+                    Time("unfold", 240, () => { media.Sessions = [song]; media.Raise(); window.SetActivities([new IslandActivity("track", IslandActivityKind.Media, "Weekend Mix", "Spotify")], Chippi.UI.Pet.PetMood.Idle); });
+                    Time("fold", 180, () => { media.Sessions = []; media.Raise(); window.SetActivities([], Chippi.UI.Pet.PetMood.Sleepy); });
                 }
                 // Where the time goes: the same open and close without the panel's shadow effect.
                 var shadow = window.Panel.ShapeShadow.Effect;

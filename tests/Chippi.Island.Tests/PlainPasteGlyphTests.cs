@@ -6,7 +6,7 @@ using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Media;
 using Chippi.App.Island;
-using Chippi.App.Pet;
+using Chippi.UI.Pet;
 using Chippi.Core.Island;
 using Chippi.Features.PlainPaste;
 using Chippi.UI.Controls;

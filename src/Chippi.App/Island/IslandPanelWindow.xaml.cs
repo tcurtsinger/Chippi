@@ -10,7 +10,7 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using Chippi.App.Flyout;
 using Chippi.App.Island.Media;
-using Chippi.App.Pet;
+using Chippi.UI.Pet;
 using Chippi.Core.Config;
 using Chippi.Core.Diagnostics;
 using Chippi.Core.Island;
@@ -179,17 +179,27 @@ public partial class IslandPanelWindow : Window
     /// <summary>
     /// Lays the home out once while the panel is closed, so the first open costs what later ones do: its
     /// templates, text and code paths are ready (the first open after start used to skip about 5 frames).
-    /// The app calls it once it's idle after start; it does nothing while the panel is open.
+    /// The page last opened, the likeliest next, is built and laid out first, and kept as every page is
+    /// (Keep awake's first open took 16–19ms against 4 after). The app calls it once it's idle after start;
+    /// it does nothing while the panel is open.
     /// </summary>
     internal void Prewarm()
     {
         if (IsOpen || IsVisible)
             return;
-        Attach(null);
-        RefreshGrid();
-        Card.Measure(new Size(IslandPage.Width, IslandPage.Height));
-        Card.Arrange(new Rect(0, 0, IslandPage.Width, IslandPage.Height));
+        if (_lastPage is { } last && last != NowPlayingKey && Exists(last))
+            Lay(last);
+        Lay(null);
         Detach();
+
+        void Lay(string? key)
+        {
+            Attach(key);
+            if (key is null)
+                RefreshGrid();
+            Card.Measure(new Size(IslandPage.Width, IslandPage.Height));
+            Card.Arrange(new Rect(0, 0, IslandPage.Width, IslandPage.Height));
+        }
     }
 
     // Shared Chippi.UI templates inside the island (switches, segments) and module views ask for the app's
@@ -213,6 +223,7 @@ public partial class IslandPanelWindow : Window
 
     public void SetPetColor(PetColor color)
     {
+        ChippiPet.SetPetColor(this, color); // inherited by a feature page's Chippi (Keep awake's)
         _grid.Pet.PetColor = color;
         _nowPlaying?.SetPetColor(color);
     }
