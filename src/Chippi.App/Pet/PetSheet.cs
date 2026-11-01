@@ -101,8 +101,8 @@ internal static class PetSheet
     }
 
     /// <summary>
-    /// Renders timed frames of a live 112px pet in an off-screen, non-activating window: the
-    /// celebrate squish and spark fade, falling asleep, a breath while asleep, and a blink. File names carry "reduced" when
+    /// Renders timed frames of a live 112px pet in an off-screen, non-activating window: the celebrate squish, spark
+    /// burst and fade, falling asleep, a breath while asleep, waking, and a blink. File names carry "reduced" when
     /// <see cref="Chippi.UI.Themes.Motion.IsReduced"/> is on (then all frames should match).
     /// </summary>
     public static async Task SaveMotionAsync(string directory)
@@ -129,7 +129,7 @@ internal static class PetSheet
         string mode = Chippi.UI.Themes.Motion.IsReduced ? "reduced" : "full";
 
         pet.Mood = PetMood.Celebrating;
-        await SaveStripAsync(host, caption, [0, 60, 110, 180, 260, 400, 700, 1300], Path.Combine(directory, $"ws3-pet-motion-celebrate-{mode}.png"));
+        await SaveStripAsync(host, caption, [0, 60, 110, 140, 200, 330, 1300, 2200, 2450], Path.Combine(directory, $"ws3-pet-motion-celebrate-{mode}.png"));
 
         pet.Mood = PetMood.Idle;
         await Task.Delay(500);
@@ -139,6 +139,7 @@ internal static class PetSheet
         await SaveStripAsync(host, caption, [0, 525, 1050, 1575, 2100, 2625, 3150, 3675, 4200], Path.Combine(directory, $"pet-motion-breathe-{mode}.png"));
 
         pet.Mood = PetMood.Idle;
+        await SaveStripAsync(host, caption, [0, 40, 90, 140, 180, 230, 280, 400], Path.Combine(directory, $"pet-motion-wake-{mode}.png"));
         await Task.Delay(500);
         pet.BlinkNow();
         await SaveStripAsync(host, caption, [0, 25, 50, 60, 70, 95, 120, 200], Path.Combine(directory, $"ws3-pet-motion-blink-{mode}.png"));

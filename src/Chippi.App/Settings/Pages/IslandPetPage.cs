@@ -19,7 +19,7 @@ namespace Chippi.App.Settings.Pages;
 
 /// <summary>
 /// Settings › Island &amp; pet (DESIGN.md §5): the island and the tray icon, where the island opens and
-/// sits, its tiles (order, show or hide, with a preview), then Chippi.
+/// sits, its tiles (order, show or hide, with a preview), then Chippi's color. Reduce motion is General's.
 /// </summary>
 internal sealed class IslandPetPage : UserControl
 {
@@ -47,7 +47,7 @@ internal sealed class IslandPetPage : UserControl
         page.Children.Add(tiles);
 
         page.Children.Add(SettingsUi.Section("Chippi"));
-        page.Children.Add(SettingsUi.Group(ColorRow(app), MotionRow(app)));
+        page.Children.Add(SettingsUi.Group(ColorRow(app)));
         Content = page;
 
         RefreshTiles();
@@ -284,9 +284,26 @@ internal sealed class IslandPetPage : UserControl
 
     // ----- ChippiPet -----
 
+    /// <summary>The moods the preview steps through when clicked, so each can be seen in the color.</summary>
+    internal static readonly PetMood[] PreviewMoods = [PetMood.Idle, PetMood.Sleepy, PetMood.Listening, PetMood.WideAwake, PetMood.Celebrating];
+
+    /// <summary>
+    /// Color: a 48 Chippi beside the six swatches. Picking a color, he celebrates in it; clicking him shows his next mood.
+    /// </summary>
     private SettingRow ColorRow(AppSettings app)
     {
-        var preview = new ChippiPet { Size = 48, PetColor = app.PetColor, Margin = new Thickness(0, 0, 20, 0) };
+        var pet = new ChippiPet { Size = 48, PetColor = app.PetColor, IsDecorative = true };
+        var preview = SettingsUi.Styled(new Button { Content = pet, Width = 56, Height = 56, Padding = new Thickness(0), Margin = new Thickness(0, 0, 16, 0), ToolTip = "Next mood" }, "SubtleButtonStyle");
+        AutomationProperties.SetName(preview, "Next mood");
+        int shown = 0;
+        preview.Click += (_, _) =>
+        {
+            shown = (shown + 1) % PreviewMoods.Length;
+            if (PreviewMoods[shown] == PetMood.Celebrating)
+                pet.Celebrate();
+            else
+                pet.Mood = PreviewMoods[shown];
+        };
         var controls = new StackPanel { Orientation = Orientation.Horizontal };
         controls.Children.Add(preview);
         var row = new SettingRow { Header = "Color", Description = app.PetColor.ToString(), Content = controls };
@@ -294,33 +311,19 @@ internal sealed class IslandPetPage : UserControl
         {
             var swatch = SettingsUi.Styled(new RadioButton { GroupName = "PetColor", IsChecked = color == app.PetColor, ToolTip = color.ToString(), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(4, 0, 0, 0) }, "SwatchStyle");
             AutomationProperties.SetName(swatch, color.ToString());
-            swatch.SetResourceReference(Control.BackgroundProperty, color == PetColor.Synth ? "PetSynthBrush" : "Pet" + color + "Brush");
+            swatch.Background = new SolidColorBrush(ChippiPet.ColorOf(color));
             if (color == PetColor.Frost)
                 swatch.SetResourceReference(Control.BorderBrushProperty, "BorderBrush");
             swatch.Checked += (_, _) =>
             {
-                preview.PetColor = color;
+                pet.PetColor = color;
+                pet.Celebrate();
                 row.Description = color.ToString();
                 Save(s => s.PetColor = color);
             };
             controls.Children.Add(swatch);
         }
         return row;
-    }
-
-    private Border MotionRow(AppSettings app)
-    {
-        var motion = Combo("Reduce motion", new[] { ("Follow Windows", (bool?)null), ("On", (bool?)true), ("Off", (bool?)false) }, app.ReduceMotion);
-        motion.SelectionChanged += (_, _) =>
-        {
-            if (motion.SelectedItem is ComboBoxItem item)
-            {
-                var choice = (bool?)item.Tag;
-                Motion.Override = choice;
-                SettingsUi.SaveApp(_shell.Config, s => s.ReduceMotion = choice);
-            }
-        };
-        return SettingsUi.Row("Reduce motion", "", motion);
     }
 
     private static ComboBox Combo<T>(string name, IEnumerable<(string Label, T Value)> choices, T selected)

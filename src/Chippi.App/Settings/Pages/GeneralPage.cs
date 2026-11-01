@@ -13,7 +13,7 @@ using Microsoft.Win32;
 
 namespace Chippi.App.Settings.Pages;
 
-/// <summary>General: theme, run at startup, and settings export and import (brief §4.5).</summary>
+/// <summary>General: theme, accent, reduce motion, run at startup, and settings export and import (brief §4.5).</summary>
 internal sealed class GeneralPage : UserControl
 {
     private readonly ShellContext _shell;
@@ -44,7 +44,7 @@ internal sealed class GeneralPage : UserControl
                 SettingsUi.SaveApp(_shell.Config, s => s.Theme = choice);
             }
         };
-        page.Children.Add(SettingsUi.Group(SettingsUi.Row("Theme", "", theme), AccentRow(), StartupRow()));
+        page.Children.Add(SettingsUi.Group(SettingsUi.Row("Theme", "", theme), AccentRow(), MotionRow(), StartupRow()));
 
         page.Children.Add(SettingsUi.Section("Settings file"));
         page.Children.Add(SettingsUi.Group(TransferRow()));
@@ -78,6 +78,28 @@ internal sealed class GeneralPage : UserControl
         }
         return row;
     }
+
+    // App-wide: the island's motion, the arrivals and Chippi all follow it. Follow Windows reads Windows' animation effects.
+    private Border MotionRow()
+    {
+        var motion = SettingsUi.Styled(new ComboBox { MinWidth = 180, HorizontalAlignment = HorizontalAlignment.Left }, "HopperComboBoxStyle");
+        foreach (var (label, value) in new[] { ("Follow Windows", (bool?)null), ("On", (bool?)true), ("Off", (bool?)false) })
+            motion.Items.Add(new ComboBoxItem { Content = label, Tag = value });
+        var selected = SettingsUi.ReadApp(_shell.Config).ReduceMotion;
+        motion.SelectedItem = motion.Items.OfType<ComboBoxItem>().FirstOrDefault(i => Equals(i.Tag, selected));
+        System.Windows.Automation.AutomationProperties.SetName(motion, "Reduce motion");
+        motion.SelectionChanged += (_, _) =>
+        {
+            if (motion.SelectedItem is ComboBoxItem item)
+            {
+                var choice = (bool?)item.Tag;
+                Motion.Override = choice;
+                SettingsUi.SaveApp(_shell.Config, s => s.ReduceMotion = choice);
+            }
+        };
+        return SettingsUi.Row("Reduce motion", "", motion);
+    }
+
     private Border StartupRow()
     {
         var message = SettingsUi.Message();

@@ -6,10 +6,12 @@ using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Automation.Peers;
 using System.Windows.Automation.Provider;
+using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using Chippi.App.Settings.Pages;
 using Chippi.App.Shell;
 using Chippi.Core.Config;
+using Chippi.UI.Pet;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Chippi.Island.Tests;
@@ -56,6 +58,32 @@ public sealed class IslandPetPageTests
         Assert.Equal(["i", "a"], hidden); // so "j" can have it
         hidden = Chippi.App.Island.IslandLayout.Switched(hidden, order, "b", show: false, room: 8);
         Assert.Equal(["i", "a", "b"], hidden); // with room, turning one off hides nothing else
+    }
+
+    [Fact]
+    public void Picking_a_color_makes_the_preview_celebrate_in_it_and_a_click_shows_the_next_mood()
+    {
+        WpfTestThread.Run(() => WithPage((page, config) =>
+        {
+            var preview = Named<Button>(page, "Next mood");
+            var pet = Assert.IsType<ChippiPet>(preview.Content);
+            Assert.Equal(PetMood.Idle, pet.Mood);
+            Assert.True(pet.IsDecorative); // the button carries the name
+
+            Named<RadioButton>(page, "Ember").IsChecked = true;
+            Assert.Equal(PetColor.Ember, pet.PetColor);
+            Assert.Equal(PetMood.Celebrating, pet.Mood);
+            Assert.Equal(PetColor.Ember, Read(config).PetColor);
+
+            foreach (var mood in IslandPetPage.PreviewMoods.Skip(1))
+            {
+                preview.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+                Assert.Equal(mood, pet.Mood);
+            }
+
+            // Reduce motion is General's: it covers the whole app, not only Chippi.
+            Assert.DoesNotContain(All<ComboBox>(page), combo => AutomationProperties.GetName(combo) == "Reduce motion");
+        }));
     }
 
     private static void WithPage(Action<IslandPetPage, ConfigStore> test)

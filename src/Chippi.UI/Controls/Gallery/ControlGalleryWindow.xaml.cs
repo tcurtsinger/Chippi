@@ -23,8 +23,6 @@ public partial class ControlGalleryWindow : Window
 
     private static readonly AccentChoice[] Accents = [AccentChoice.Blue, AccentChoice.Violet, AccentChoice.Green, AccentChoice.Pink];
 
-    private static readonly string[] PetTokens = ["PetSynthBrush", "PetIrisBrush", "PetAzureBrush", "PetSignalBrush", "PetEmberBrush", "PetFrostBrush"];
-
     public ControlGalleryWindow()
     {
         Resources.Add("InverseBool", new InverseBoolConverter());
@@ -32,11 +30,10 @@ public partial class ControlGalleryWindow : Window
 
         ThemePicker.SelectedIndex = ThemeManager.Mode switch { ThemePreference.Light => 1, ThemePreference.System => 2, _ => 0 };
         AddTokens();
-        foreach (var key in PetTokens)
+        foreach (var color in Enum.GetValues<PetColor>())
         {
-            var swatch = new RadioButton { Style = (Style)FindResource("SwatchStyle"), GroupName = "Pet", IsChecked = key == PetTokens[0] };
-            swatch.SetResourceReference(BackgroundProperty, key);
-            System.Windows.Automation.AutomationProperties.SetName(swatch, key.Replace("Pet", "", StringComparison.Ordinal).Replace("Brush", "", StringComparison.Ordinal));
+            var swatch = new RadioButton { Style = (Style)FindResource("SwatchStyle"), GroupName = "Pet", IsChecked = color == PetColor.Synth, Background = new SolidColorBrush(Pet.ChippiPet.ColorOf(color)) };
+            System.Windows.Automation.AutomationProperties.SetName(swatch, color.ToString());
             PetSwatches.Children.Add(swatch);
         }
 

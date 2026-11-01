@@ -92,6 +92,7 @@
     <SolidColorBrush x:Key="IslandTextSecondaryBrush" Color="#5C5C5C" />
     <SolidColorBrush x:Key="IslandTextTertiaryBrush" Color="#707070" />
     <SolidColorBrush x:Key="IslandCautionBrush" Color="#C42B1C" />
+    <SolidColorBrush x:Key="PetSparkBrush" Color="#B07800" />
     <SolidColorBrush x:Key="IslandAccentBrush" Color="#7444F0" />
     <LinearGradientBrush x:Key="IslandAccentFillBrush" StartPoint="0,0" EndPoint="1,1">
         <GradientStop Color="#8F5CFF" Offset="0" />
