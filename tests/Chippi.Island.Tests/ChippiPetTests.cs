@@ -226,6 +226,54 @@ public sealed class ChippiPetTests
         });
     }
 
+    [Fact]
+    public void He_breathes_at_10_frames_a_second_on_the_puck_and_30_above()
+    {
+        // The puck sleeps all day; at 30 a second its breath cost about 5% of a core for about a pixel of movement.
+        WpfTestThread.Run(() =>
+        {
+            foreach (var size in new[] { 16.0, 28, 40, 44 })
+                Assert.Equal(ChippiPet.BreathFrameRatePuck, new ChippiPet { Size = size }.BreathRate);
+            foreach (var size in new[] { 48.0, 72, 96, 120 })
+                Assert.Equal(ChippiPet.BreathFrameRate, new ChippiPet { Size = size }.BreathRate);
+            Assert.Equal(10, ChippiPet.BreathFrameRatePuck);
+        });
+    }
+
+    [Fact]
+    public void Held_his_eyes_go_round_over_any_mood_and_set_down_his_face_comes_back()
+    {
+        WpfTestThread.Run(() =>
+        {
+            foreach (var mood in new[] { PetMood.Sleepy, PetMood.Idle, PetMood.WideAwake, PetMood.Listening })
+            {
+                var pet = new ChippiPet { Size = 40, Mood = mood };
+                pet.IsHeld = true;
+                Assert.Equal(1, pet.HeldFace.Opacity);
+                Assert.Equal(0, pet.ShownFace.Opacity);
+                var held = Paths(pet.HeldFace).Select(p => p.Data).ToList();
+                Assert.Equal(new[] { ChippiPet.Shapes.WideEyeWhites, ChippiPet.Shapes.WidePupils, ChippiPet.Shapes.WideHighlights, ChippiPet.Shapes.HeldMouth }, held);
+
+                pet.Mood = mood == PetMood.Idle ? PetMood.Sleepy : PetMood.Idle; // a mood change while held keeps the round eyes
+                Assert.Equal(1, pet.HeldFace.Opacity);
+                Assert.Equal(0, pet.ShownFace.Opacity);
+
+                pet.IsHeld = false;
+                Assert.Equal(0, pet.HeldFace.Opacity);
+                Assert.Equal(1, pet.ShownFace.Opacity);
+            }
+        });
+    }
+
+    [Fact]
+    public void The_yawn_squeezes_his_eyes_and_opens_his_mouth_tall()
+    {
+        AssertBounds(new Rect(40, 62, 40, 10), ChippiPet.Shapes.SqueezedEyes);
+        AssertBounds(new Rect(53.5, 79, 13, 18), ChippiPet.Shapes.YawnMouth); // 6.5 × 9 at (60, 88)
+        AssertBounds(new Rect(56, 91.1, 8, 4.8), ChippiPet.Shapes.YawnTongue); // at the mouth's floor
+        AssertBounds(new Rect(56.8, 84.2, 6.4, 7.6), ChippiPet.Shapes.HeldMouth); // 3.2 × 3.8 at (60, 88)
+    }
+
 #if DEBUG
     [Fact]
     public void Render_approved_pet_sizes()
@@ -370,6 +418,168 @@ public sealed class ChippiPetMotionTests
                 Assert.False(pet.Hop.HasAnimatedProperties);
                 Assert.False(pet.Squish.HasAnimatedProperties);
                 Assert.Equal(1, pet.Sparks.Opacity); // the sparks just show
+            }
+            finally
+            {
+                window.Close();
+                Motion.Override = motion;
+            }
+        });
+    }
+
+    [Fact]
+    public void Keep_awake_perks_him_up_and_when_it_ends_he_yawns_before_he_sleeps()
+    {
+        var motion = Motion.Override;
+        WpfTestThread.Run(() =>
+        {
+            var pet = new ChippiPet { Size = 72, Mood = PetMood.Idle };
+            var window = Offscreen(pet);
+            try
+            {
+                Motion.Override = false;
+                window.Show();
+                IslandWindowTests.Pump(TimeSpan.Zero);
+
+                // Perking up: a stretch tall, and the steam rising into place.
+                pet.Mood = PetMood.WideAwake;
+                Assert.True(pet.Squish.HasAnimatedProperties);
+                Assert.True(pet.SteamDrift.HasAnimatedProperties);
+
+                // Keep awake ends: a yawn, not the plain falling asleep.
+                pet.Mood = PetMood.Sleepy;
+                Assert.True(pet.YawnMouth.HasAnimatedProperties);
+
+                // From idle he just falls asleep.
+                var idle = new ChippiPet { Size = 72, Mood = PetMood.Idle };
+                window.Content = idle;
+                IslandWindowTests.Pump(TimeSpan.Zero);
+                idle.Mood = PetMood.Sleepy;
+                Assert.False(idle.YawnMouth.HasAnimatedProperties);
+
+                // A timed Keep awake runs out: he celebrates, then yawns as he falls asleep after it.
+                var timed = new ChippiPet { Size = 72, Mood = PetMood.WideAwake };
+                window.Content = timed;
+                IslandWindowTests.Pump(TimeSpan.Zero);
+                timed.Celebrate();
+                timed.Mood = PetMood.Sleepy; // the celebration over
+                Assert.True(timed.YawnMouth.HasAnimatedProperties);
+
+                // Under reduced motion, none of it.
+                Motion.Override = true;
+                IslandWindowTests.Pump(TimeSpan.Zero);
+                var still = new ChippiPet { Size = 72, Mood = PetMood.Idle };
+                window.Content = still;
+                IslandWindowTests.Pump(TimeSpan.Zero);
+                still.Mood = PetMood.WideAwake;
+                still.Mood = PetMood.Sleepy;
+                Assert.False(still.Squish.HasAnimatedProperties);
+                Assert.False(still.YawnMouth.HasAnimatedProperties);
+            }
+            finally
+            {
+                window.Close();
+                Motion.Override = motion;
+            }
+        });
+    }
+
+    [Fact]
+    public void Reduce_motion_coming_on_mid_glance_mid_beat_or_mid_yawn_snaps_him_to_rest()
+    {
+        var motion = Motion.Override;
+        WpfTestThread.Run(() =>
+        {
+            var idle = new ChippiPet { Size = 40, Mood = PetMood.Idle };
+            var listening = new ChippiPet { Size = 40, Mood = PetMood.Listening };
+            var yawning = new ChippiPet { Size = 72, Mood = PetMood.WideAwake };
+            var window = Offscreen(new StackPanel { Children = { idle, listening, yawning } });
+            try
+            {
+                Motion.Override = false;
+                window.Show();
+                IslandWindowTests.Pump(TimeSpan.Zero);
+                var pupils = idle.Pupils!;
+                idle.Glance(-1);
+                listening.Beat(1);
+                yawning.Mood = PetMood.Sleepy;
+                Assert.True(pupils.HasAnimatedProperties);
+                Assert.True(listening.BandPulse.HasAnimatedProperties);
+                Assert.True(yawning.YawnMouth.HasAnimatedProperties);
+
+                Motion.Override = true;
+                IslandWindowTests.Pump(TimeSpan.Zero);
+                Assert.False(pupils.HasAnimatedProperties);
+                Assert.Equal(0, pupils.X);
+                Assert.False(listening.BandPulse.HasAnimatedProperties);
+                Assert.Equal((1.0, 1.0), (listening.BandPulse.ScaleX, listening.BandPulse.ScaleY));
+                Assert.False(yawning.YawnMouth.HasAnimatedProperties);
+                Assert.Equal(0, yawning.YawnFace.Opacity);
+                Assert.Equal(1, yawning.ShownFace.Opacity); // asleep, at once
+            }
+            finally
+            {
+                window.Close();
+                Motion.Override = motion;
+            }
+        });
+    }
+
+    [Fact]
+    public void He_glances_boops_bobs_to_the_beat_and_lands_and_under_reduced_motion_holds_still()
+    {
+        var motion = Motion.Override;
+        WpfTestThread.Run(() =>
+        {
+            var pet = new ChippiPet { Size = 40, Mood = PetMood.Idle };
+            var window = Offscreen(pet);
+            try
+            {
+                Motion.Override = false;
+                window.Show();
+                IslandWindowTests.Pump(TimeSpan.Zero);
+
+                // Open eyes glance; his pupils move, his whites don't.
+                pet.Glance(-1);
+                Assert.True(pet.Pupils!.HasAnimatedProperties);
+
+                // Not listening, a beat does nothing.
+                pet.Beat(1);
+                Assert.False(pet.BandPulse.HasAnimatedProperties);
+
+                pet.Boop();
+                Assert.True(pet.Squish.HasAnimatedProperties);
+
+                // Listening: a glance is a nod, and a beat dips him and pulses the band.
+                var listening = new ChippiPet { Size = 40, Mood = PetMood.Listening };
+                window.Content = listening;
+                IslandWindowTests.Pump(TimeSpan.Zero);
+                Assert.Null(listening.Pupils);
+                listening.Glance(1);
+                Assert.True(listening.Squish.HasAnimatedProperties);
+                listening.Beat(0.8);
+                Assert.True(listening.BandPulse.HasAnimatedProperties);
+
+                // Set down, he lands.
+                var held = new ChippiPet { Size = 40, Mood = PetMood.Idle };
+                window.Content = held;
+                IslandWindowTests.Pump(TimeSpan.Zero);
+                held.IsHeld = true;
+                Assert.False(held.Squish.HasAnimatedProperties);
+                held.IsHeld = false;
+                Assert.True(held.Squish.HasAnimatedProperties);
+
+                // Under reduced motion: no glance, no beat, no squish.
+                Motion.Override = true;
+                IslandWindowTests.Pump(TimeSpan.Zero);
+                var still = new ChippiPet { Size = 40, Mood = PetMood.Listening };
+                window.Content = still;
+                IslandWindowTests.Pump(TimeSpan.Zero);
+                still.Glance(-1);
+                still.Beat(1);
+                still.Boop();
+                Assert.False(still.Squish.HasAnimatedProperties);
+                Assert.False(still.BandPulse.HasAnimatedProperties);
             }
             finally
             {

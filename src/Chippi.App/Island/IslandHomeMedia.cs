@@ -203,6 +203,9 @@ internal sealed class IslandHomeMedia : UserControl
             Arrival.Pop(_playGlyph); // play to pause and back
     }
 
+    /// <summary>A beat in the music: the cover's Chippi, if he's showing, bobs to it.</summary>
+    internal void Beat(double strength) => _artPet.Beat(strength);
+
     private void ShowArt(ImageSource? image)
     {
         if (image is not null)

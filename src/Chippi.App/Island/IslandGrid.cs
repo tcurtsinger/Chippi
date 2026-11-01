@@ -57,6 +57,8 @@ internal sealed class IslandGrid : UserControl
     private readonly LucideIcon _speakerGlyph = new() { Data = LucideIcons.Volume, Size = 16 };
     private readonly Button _speaker = new();
     private readonly Button _settings = new() { Width = 32, Height = 32, VerticalAlignment = VerticalAlignment.Center };
+    // Chippi himself, a 32 button like Settings across from him: a click boops him.
+    private readonly Button _boop = new() { Width = 32, Height = 32, Padding = new Thickness(0), VerticalAlignment = VerticalAlignment.Bottom };
     private readonly DispatcherTimer _volumeFailed = new() { Interval = TimeSpan.FromSeconds(4) };
     private IReadOnlyList<IslandTileView> _shown = [];
     private IslandTileVolume? _volumeSource;
@@ -65,7 +67,7 @@ internal sealed class IslandGrid : UserControl
 
     public IslandGrid()
     {
-        Pet = new ChippiPet { Size = FooterPetSize, Mood = PetMood.Idle, IsDecorative = true, VerticalAlignment = VerticalAlignment.Bottom };
+        Pet = new ChippiPet { Size = FooterPetSize, Mood = PetMood.Idle, IsDecorative = true, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
         Content = Build();
         SetPetSide(right: false);
         KeyboardNavigation.SetDirectionalNavigation(_tiles, KeyboardNavigationMode.None);
@@ -82,10 +84,14 @@ internal sealed class IslandGrid : UserControl
         AutomationProperties.SetName(_settings, "Settings");
         _settings.ToolTip = "Settings";
         _settings.Click += (_, _) => SettingsRequested?.Invoke(this, EventArgs.Empty);
+        _boop.Content = Pet;
+        _boop.SetResourceReference(StyleProperty, "IslandIconButtonStyle");
+        AutomationProperties.SetName(_boop, "Chippi");
+        _boop.Click += (_, _) => Pet.Boop();
         var footer = new Border
         {
             Height = 46, Margin = new Thickness(-12, 0, -12, -12), BorderThickness = new Thickness(0, 1, 0, 0),
-            Child = new Grid { Children = { Pet, _settings } },
+            Child = new Grid { Children = { _boop, _settings } },
         };
         footer.SetResourceReference(Border.BackgroundProperty, "IslandFooterBrush");
         footer.SetResourceReference(Border.BorderBrushProperty, "IslandHairBrush");
@@ -247,9 +253,10 @@ internal sealed class IslandGrid : UserControl
     /// <summary>Puts Chippi on the puck's side of the footer (the side the panel opened from) and Settings on the other.</summary>
     internal void SetPetSide(bool right)
     {
-        double inset = FooterPet - FooterPetSize / 2;
-        Pet.HorizontalAlignment = right ? HorizontalAlignment.Right : HorizontalAlignment.Left;
-        Pet.Margin = new Thickness(right ? 0 : inset, 0, right ? inset : 0, inset);
+        // His button is centered on his center, so he sits where he would without it.
+        double inset = FooterPet - _boop.Width / 2;
+        _boop.HorizontalAlignment = right ? HorizontalAlignment.Right : HorizontalAlignment.Left;
+        _boop.Margin = new Thickness(right ? 0 : inset, 0, right ? inset : 0, inset);
         _settings.HorizontalAlignment = right ? HorizontalAlignment.Left : HorizontalAlignment.Right;
         _settings.Margin = new Thickness(right ? 10 : 0, 0, right ? 0 : 10, 0);
     }

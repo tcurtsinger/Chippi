@@ -114,6 +114,17 @@ public partial class IslandWindow : Window
     private string _lineState = "";
     private TabLevel? _level;
     private EqualizerBars _bars = new();
+    private readonly BeatDetector _beats = new(); // the same level, for Chippi to bob to while he listens
+    private DateOnly? _morning; // the day Chippi last woke for the first unlock
+    private bool _stretching; // awake for a moment after his morning yawn
+    private readonly DispatcherTimer _stretch = new() { Interval = TimeSpan.FromSeconds(3) };
+
+    /// <summary>After his morning yawn he stays awake this long (3s), then dozes off as usual. Tests shorten it.</summary>
+    internal TimeSpan MorningAwake
+    {
+        get => _stretch.Interval;
+        set => _stretch.Interval = value;
+    }
 
     public IslandWindow()
     {
@@ -133,6 +144,12 @@ public partial class IslandWindow : Window
         };
         // Hidden (a fullscreen app in front), the song stops scrolling; shown again, it starts over.
         IsVisibleChanged += (_, _) => RefreshPuck();
+        _stretch.Tick += (_, _) =>
+        {
+            _stretch.Stop();
+            _stretching = false;
+            RefreshPuck();
+        };
         // Reduced motion turned on or off: the song holds or scrolls, and the bars stop or follow, at once.
         Motion.Changed += OnMotionChanged;
         _panel.IsVisibleChanged += (_, _) =>
@@ -259,11 +276,39 @@ public partial class IslandWindow : Window
     /// <summary>Settings › Island &amp; pet: where the panel opens, and its buttons.</summary>
     internal void SetLayout(IslandLayout layout) => _panel.SetLayout(layout);
 
-    /// <summary>The output's live level for the equalizer while the bar names a song playing.</summary>
+    /// <summary>
+    /// The output's live level for the equalizer while the bar names a song playing, and its beats for Chippi to bob to,
+    /// on the bar and in the panel.
+    /// </summary>
     internal void SetLevel(TabLevel level)
     {
         _level = level;
         level.Level += (_, peak) => ShowLevel(peak);
+    }
+
+    /// <summary>
+    /// The session was unlocked: the first time each day, Chippi wakes with a yawn and a stretch, stays awake a moment,
+    /// then dozes off as usual.
+    /// </summary>
+    internal void Unlocked(DateTime now)
+    {
+        var today = DateOnly.FromDateTime(now);
+        if (_morning == today)
+            return;
+        _morning = today;
+        Morning();
+    }
+
+    /// <summary>Chippi's morning: a yawn and a stretch, awake a moment, then dozing off (the debug menu's Morning too).</summary>
+    internal void Morning()
+    {
+        if (!IsVisible || _lifted)
+            return;
+        _stretching = true;
+        _stretch.Stop();
+        _stretch.Start();
+        RefreshPuck();
+        Pet.Yawn();
     }
 
     /// <summary>Now Playing's media sessions.</summary>
@@ -760,7 +805,9 @@ public partial class IslandWindow : Window
         var mic = _activities.FirstOrDefault(a => a.ModuleId == "mic-mute" && a.NeedsAttention);
         var top = _activities.FirstOrDefault(a => a.ModuleId is not Chippi.Features.PlainPaste.PlainPasteModule.Id and not "mic-mute");
         bool dropping = _dragKey is not null;
-        bool awake = dropping || _hovered || _lifted || _panel.IsVisible;
+        bool awake = dropping || _hovered || _lifted || _panel.IsVisible || _stretching;
+        if (_lifted)
+            Pet.IsHeld = true; // set down once the drop has slid into place (DropAt)
         bool pressed = _pressAt is not null && !_dragging && !Motion.IsReduced;
         Grow(_lifted ? LiftScale : pressed ? PressScale : 1, _lifted ? LiftTilt : 0, pressed ? FillFade.Time : GrowTime);
         BodyShadow.Effect = (System.Windows.Media.Effects.Effect)FindResource(_lifted ? "IslandLiftShadow" : "IslandPuckShadow");
@@ -805,6 +852,9 @@ public partial class IslandWindow : Window
             : "activity " + top!.Key;
         bool settled = _barShown && Bar.Opacity >= 1 && IsVisible && !_panel.IsVisible;
         bool arriving = bar && settled && _shownContent is not null && content != _shownContent;
+        // Something new beside him (the bar unfolding, or a new song or activity on it): Chippi looks toward it.
+        if (content is not null && content != _shownContent && IsVisible && !_panel.IsVisible)
+            Pet.Glance(_left ? -1 : 1);
         _shownContent = content;
         if (arriving)
         {
@@ -863,9 +913,9 @@ public partial class IslandWindow : Window
             Arrival.Enter(Glyph, rise: false);
             Arrival.Enter(Lines, rise: true);
         }
-        // The equalizer follows the output's real level while a song plays on the bar and can be seen: not while
-        // the panel is out, where the bar keeps its state only for the fold back.
-        if (_singing && !paused && IsVisible && !_panel.IsVisible && !Motion.IsReduced)
+        // The equalizer follows the output's real level while a song plays on the bar and can be seen, and Chippi bobs
+        // to its beats there; with the panel out the bars keep still, but the panel's listening Chippis still bob.
+        if (_singing && !paused && (IsVisible || _panel.IsVisible) && !Motion.IsReduced)
             _level?.Start();
         else
             StopLevel();
@@ -1117,12 +1167,18 @@ public partial class IslandWindow : Window
         var heights = _bars.Next(peak);
         for (int i = 0; i < heights.Count; i++)
             ((FrameworkElement)Equalizer.Children[i]).Height = 2 + Math.Round(12 * heights[i]);
+        if (_beats.Next(peak, TimeSpan.FromMilliseconds(Environment.TickCount64)) is { } beat)
+        {
+            Pet.Beat(beat);
+            _panel.Beat(beat);
+        }
     }
 
     // Still, the bars take their resting shape again (8, 14, 10).
     private void StopLevel()
     {
         _level?.Stop();
+        _beats.Reset();
         _bars = new EqualizerBars();
         double[] rest = [8, 14, 10];
         for (int i = 0; i < rest.Length; i++)
@@ -1268,6 +1324,7 @@ public partial class IslandWindow : Window
         if (IslandNative.Area(monitor) is not { } area)
         {
             Place();
+            Pet.IsHeld = false;
             RefreshPuck();
             return _puck;
         }
@@ -1280,7 +1337,12 @@ public partial class IslandWindow : Window
         _hovered = puck.Contains(pointer);
         // Saved once it has landed: a save writes settings.json, which mid-slide costs frames.
         var chosen = new IslandPlacementEventArgs(_x.Value, _y.Value, monitor);
-        SlideTo(center, Center(puck), area.Scale, IslandGeometry.OpensLeft(puck, area.Work), () => PlacementChosen?.Invoke(this, chosen));
+        // Chippi's eyes stay round until the puck has slid into place; then he lands.
+        SlideTo(center, Center(puck), area.Scale, IslandGeometry.OpensLeft(puck, area.Work), () =>
+        {
+            Pet.IsHeld = false;
+            PlacementChosen?.Invoke(this, chosen);
+        });
         RefreshPuck();
         return puck;
     }
@@ -1351,6 +1413,7 @@ public partial class IslandWindow : Window
     internal void ForceLift(bool lifted)
     {
         _lifted = lifted;
+        Pet.IsHeld = lifted;
         RefreshPuck();
     }
 
