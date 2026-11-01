@@ -69,13 +69,15 @@ public sealed class ModuleTests : IDisposable
     }
 
     [Fact]
-    public void The_tile_and_the_page_read_only_what_they_show()
+    public void The_history_reads_what_the_overview_graphs_and_the_page_adds_what_it_shows()
     {
         var settings = new SystemMonitorSettings();
 
-        Assert.Equal(SensorNeed.Cpu, SystemMonitorModule.TileNeed(settings));
-        Assert.Equal(SensorNeed.GpuLoad, SystemMonitorModule.TileNeed(settings with { TileStatus = TileStatus.Gpu }));
-        Assert.Equal(SensorNeed.None, SystemMonitorModule.TileNeed(settings with { Off = [Reading.Cpu, Reading.Memory, Reading.Gpu, Reading.Network] }));
+        Assert.Equal(SensorNeed.Cpu | SensorNeed.Memory | SensorNeed.GpuLoad | SensorNeed.Network | SensorNeed.Battery | SensorNeed.ThermalZones,
+            SystemMonitorModule.HistoryNeed(settings));
+        var fewer = SystemMonitorModule.HistoryNeed(settings with { Off = [Reading.Gpu, Reading.Battery] });
+        Assert.False(fewer.HasFlag(SensorNeed.GpuLoad) || fewer.HasFlag(SensorNeed.Battery));
+        Assert.Equal(SensorNeed.None, SystemMonitorModule.HistoryNeed(settings with { Off = [.. Enum.GetValues<Reading>()] }));
         Assert.Equal((SensorNeed)0b1_1111_1101, SystemView.Need(settings));
         Assert.False(SystemView.Need(settings).HasFlag(SensorNeed.PerProcessor));
         var some = SystemView.Need(settings with { Off = [Reading.Gpu, Reading.Battery] });
@@ -99,7 +101,7 @@ public sealed class ModuleTests : IDisposable
     }
 
     [Fact]
-    public async Task The_tile_reads_only_while_on_screen_and_the_page_has_no_note()
+    public async Task The_history_reads_from_the_start_and_the_page_has_no_note()
     {
         var fake = new FakeSources();
         var module = new SystemMonitorModule(() => fake.Sources);
@@ -117,18 +119,17 @@ public sealed class ModuleTests : IDisposable
 
             Assert.Equal(("system-monitor", "System", "Activity", 60), (tile.Spec.Key, tile.Spec.Name, tile.Spec.Icon, tile.Spec.Order));
             Assert.Equal("", tile.PageNote);
-            Assert.Equal(SensorNeed.None, module.Sampler!.Need);
-            Assert.Equal(0, fake.CpuReads);
-
+            // With nothing on screen: the overview's readings for their history, and the drives once.
             using var status = new SemaphoreSlim(0);
             tile.StatusChanged += (_, _) => status.Release();
-            tile.SetOnScreen(true);
-            Assert.Equal(SensorNeed.Cpu, module.Sampler.Need);
-            Assert.True(status.Wait(Wait));
-            Assert.Equal("CPU 25%", tile.Status);
-
-            tile.SetOnScreen(false);
-            Assert.Equal(SensorNeed.None, module.Sampler.Need);
+            Assert.Equal(SystemMonitorModule.HistoryNeed(module.Settings), module.Sampler!.Need & ~SensorNeed.Disks);
+            while (tile.Status != "CPU 25%")
+                Assert.True(status.Wait(Wait));
+            var waited = System.Diagnostics.Stopwatch.StartNew();
+            while (module.Sampler.Need != SystemMonitorModule.HistoryNeed(module.Settings) && waited.Elapsed < Wait)
+                Thread.Sleep(20);
+            Assert.Equal(SystemMonitorModule.HistoryNeed(module.Settings), module.Sampler.Need);
+            Assert.NotEmpty(module.Sampler.History(Series.Cpu));
 
             module.Save(module.Settings with { UpdateSeconds = 5, TileStatus = TileStatus.Memory });
             Assert.Equal("", tile.PageNote);
@@ -190,8 +191,8 @@ public sealed class ModuleTests : IDisposable
             var tile = Assert.Single(registry.Find("system-monitor")!.IslandTiles);
             tile.StatusChanged += (_, _) => status.Release();
 
-            // The alert alone makes the sampler read memory, with nothing on screen.
-            Assert.Equal(SensorNeed.Memory, module.Sampler!.Need);
+            // The alert reads memory, which the history reads too.
+            Assert.True(module.Sampler!.Need.HasFlag(SensorNeed.Memory));
             while (tile.Status != "Memory 93%")
                 Assert.True(status.Wait(Wait));
             Assert.True(module.Alerting("memory", "memory"));
@@ -201,7 +202,7 @@ public sealed class ModuleTests : IDisposable
             module.Save(module.Settings with { Memory = new() { On = false, Percent = 90 } });
             Assert.False(module.Alerting("memory", "memory"));
             Assert.DoesNotContain(island.Activities, a => a.TileKey == SystemMonitorModule.TileKey);
-            Assert.Equal(SensorNeed.None, module.Sampler.Need);
+            Assert.Equal(SystemMonitorModule.HistoryNeed(module.Settings), module.Sampler.Need & ~SensorNeed.Disks);
         }
         finally { await registry.StopAllAsync(); }
     }

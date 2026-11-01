@@ -6,7 +6,7 @@ using Chippi.Features.SystemMonitor.Views;
 
 namespace Chippi.Features.SystemMonitor.Tests;
 
-/// <summary>The System page's small rules: names, numbers, top apps and the network graph's scale.</summary>
+/// <summary>The System page's small rules: names, numbers, top apps, the graphs' scales and the overview's rows.</summary>
 public sealed class CompactPageTests
 {
     [Theory]
@@ -69,5 +69,34 @@ public sealed class CompactPageTests
     [InlineData(100_000, 128 * 1024)]
     [InlineData(2.4 * 1024 * 1024, 4 * 1024 * 1024)]
     public void The_network_graph_scales_to_the_next_doubling_above_its_busiest_point(double busiest, double scale) =>
-        Assert.Equal(scale, DetailPage.RateScale(busiest));
+        Assert.Equal(scale, GraphScale.Rate(busiest));
+
+    [Theory]
+    [InlineData(new double[0], 10)]
+    [InlineData(new[] { 3.0, 4.2, 9.9 }, 10)]
+    [InlineData(new[] { 4.0, 12 }, 25)]
+    [InlineData(new[] { 30.0 }, 50)]
+    [InlineData(new[] { 20.0, 80 }, 100)]
+    public void Load_graphs_fit_their_history(double[] values, double scale)
+    {
+        var at = DateTimeOffset.UtcNow;
+        Assert.Equal(scale, GraphScale.Load([.. values.Select(v => new HistoryPoint(at, v)), new HistoryPoint(at, null)]));
+    }
+
+    [Theory]
+    [InlineData(52, 75)]
+    [InlineData(20, 25)]
+    [InlineData(100, 100)]
+    public void Temperature_graphs_go_by_25_degrees(double hottest, double scale) => Assert.Equal(scale, GraphScale.Temperature(hottest));
+
+    // Rows of 20 for two drives each, up to 3, giving one up while a graph row would be under 104.
+    [Theory]
+    [InlineData(true, "Network", 6, 3)] // a desktop: loads 116, Network 72, Drives 100
+    [InlineData(true, "Network", 8, 3)]
+    [InlineData(true, "Network", 3, 2)]
+    [InlineData(true, "Network Battery Temperature", 1, 1)] // a laptop
+    [InlineData(true, "Network Temperature", 6, 2)] // two graph rows: Drives give one up
+    [InlineData(false, "", 8, 3)]
+    public void The_overviews_drives_take_the_rows_the_graphs_can_spare(bool loads, string rest, int volumes, int rows) =>
+        Assert.Equal(rows, OverviewPage.DriveRows(loads, [.. rest.Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(Enum.Parse<Detail>)], volumes));
 }

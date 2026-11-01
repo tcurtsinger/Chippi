@@ -4,6 +4,7 @@
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using System.Windows.Media;
 using Chippi.Features.SystemMonitor.Sensors;
 using Chippi.UI.Controls;
@@ -14,8 +15,9 @@ namespace Chippi.Features.SystemMonitor.Views;
 internal enum Detail { Cpu, Gpu, Memory, Network, Drives, Battery, Temperature }
 
 /// <summary>
-/// One reading's widget: glyph and name with one fact at the right, a big value, a line of context
-/// and a meter. On the island it's a button that opens its detail page; in Settings, a card.
+/// One reading's widget: glyph and name with one fact at the right, a big value, a line of context,
+/// then the reading's graph out to the card's edges, or a meter for a level. On the island it's a
+/// button that opens its detail page; in Settings, a card.
 /// </summary>
 internal class Widget
 {
@@ -38,13 +40,26 @@ internal class Widget
 
     public Look Look { get; }
 
-    /// <summary>The widget's content: lines from the top, a meter at the bottom, filling the card.</summary>
+    /// <summary>The widget's content: lines from the top, a meter or graph at the bottom, filling the card.</summary>
     public DockPanel Body { get; }
 
     protected void Add(UIElement element, Dock dock = Dock.Top)
     {
         DockPanel.SetDock(element, dock);
         Body.Children.Add(element);
+    }
+
+    /// <summary>A graph that fills the rest of the card, past its padding to its sides and bottom.</summary>
+    protected HistoryGraph AddGraph()
+    {
+        var graph = new HistoryGraph(Look)
+        {
+            Midline = false, Baseline = false, BottomRadius = Look.InnerRadius,
+            Margin = new Thickness(-Look.Padding.Left, 0, -Look.Padding.Right, -Look.Padding.Bottom),
+        };
+        Body.LastChildFill = true;
+        Body.Children.Add(graph);
+        return graph;
     }
 
     /// <summary>The island's card button, or Settings' card.</summary>
@@ -67,7 +82,7 @@ internal class Widget
     {
         if (look == Look.Island)
         {
-            var button = new Button { Content = body, Padding = new Thickness(11, 9, 11, 9), HorizontalContentAlignment = HorizontalAlignment.Stretch };
+            var button = new Button { Content = body, Padding = look.Padding, HorizontalContentAlignment = HorizontalAlignment.Stretch };
             button.SetResourceReference(FrameworkElement.StyleProperty, "IslandCardButtonStyle");
             // The card button centers its content; the body fills it instead, so a row's widgets line up
             // top and bottom (12 by 10 inside the 1 border).
@@ -76,28 +91,33 @@ internal class Widget
                 button.Click += (_, _) => open();
             return button;
         }
-        var card = new Border { Child = body, CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(1), Padding = new Thickness(15, 11, 15, 11) };
+        var card = new Border { Child = body, CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(1), Padding = look.Padding };
         card.SetResourceReference(Border.BackgroundProperty, "SurfaceBrush");
         card.SetResourceReference(Border.BorderBrushProperty, "CardBorderBrush");
         return card;
     }
 }
 
-/// <summary>A widget with one value: CPU, GPU, Memory, Battery, Temperature.</summary>
+/// <summary>
+/// A widget with one value: CPU, GPU, Memory and Temperature with their graphs, and Battery, a level,
+/// with a meter (4 minutes of a battery would be a flat line).
+/// </summary>
 internal sealed class ReadingWidget : Widget
 {
-    public ReadingWidget(Detail kind, Geometry glyph, string name, Look look, Action<Detail>? open, bool meter) : base(kind, glyph, name, look, open)
+    public ReadingWidget(Detail kind, Geometry glyph, string name, Look look, Action<Detail>? open) : base(kind, glyph, name, look, open)
     {
-        Hero = new Hero(look) { Margin = new Thickness(0, look == Look.Island ? 6 : 4, 0, 0) };
+        Hero = new Hero(look) { Margin = new Thickness(0, 4, 0, 0) };
         Context = Parts.Text("", look.Small, look.Tertiary);
         Context.Height = 16;
         Add(Hero);
         Add(Context);
-        if (meter)
+        if (kind == Detail.Battery)
         {
             Meter = new Meter(look) { Margin = new Thickness(0, 4, 0, 0) };
             Add(Meter, Dock.Bottom);
         }
+        else
+            Graph = AddGraph();
     }
 
     public Hero Hero { get; }
@@ -105,6 +125,8 @@ internal sealed class ReadingWidget : Widget
     public TextBlock Context { get; }
 
     public Meter? Meter { get; }
+
+    public HistoryGraph? Graph { get; }
 
     public void Set(string value, string context, double? share, bool caution = false, bool quiet = false)
     {
@@ -116,7 +138,11 @@ internal sealed class ReadingWidget : Widget
     }
 }
 
-/// <summary>Download and upload: side by side across the whole width, or download over upload in a narrow one.</summary>
+/// <summary>
+/// Download and upload with their graph. Alone in its row: the two side by side on the left and the
+/// graph across the rest, its oldest readings fading in. Beside other widgets: download over upload,
+/// the graph under them.
+/// </summary>
 internal sealed class NetworkWidget : Widget
 {
     private readonly bool _wide;
@@ -135,22 +161,29 @@ internal sealed class NetworkWidget : Widget
         _upLine = Parts.Text("", look.Small, look.Tertiary);
         if (wide)
         {
-            var twin = new Grid { Margin = new Thickness(0, 8, 0, 0) };
-            twin.ColumnDefinitions.Add(new ColumnDefinition());
-            twin.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(16) });
-            twin.ColumnDefinitions.Add(new ColumnDefinition());
-            var up = new StackPanel { Orientation = Orientation.Horizontal, Children = { _upArrow, _up } };
-            Grid.SetColumn(up, 2);
-            twin.Children.Add(down);
-            twin.Children.Add(up);
-            Add(twin);
+            // The values' column ends where the graph starts: 245 into the island's 496, 345 into Settings' 760.
+            var row = new Grid { Margin = new Thickness(0, look == Look.Island ? 4 : 6, 0, 0) };
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(look == Look.Island ? 233 : 329) });
+            row.ColumnDefinitions.Add(new ColumnDefinition());
+            var up = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(16, 0, 0, 0), Children = { _upArrow, _up } };
+            row.Children.Add(new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Top, Children = { down, up } });
+            Graph = new HistoryGraph(look)
+            {
+                Midline = false, Baseline = false, BottomRadius = look.InnerRadius, RoundLeft = false, FadeIn = 40,
+                Margin = new Thickness(0, 0, -look.Padding.Right, -look.Padding.Bottom),
+            };
+            Grid.SetColumn(Graph, 1);
+            row.Children.Add(Graph);
+            Body.LastChildFill = true;
+            Body.Children.Add(row);
         }
         else
         {
-            down.Margin = new Thickness(0, look == Look.Island ? 6 : 4, 0, 0);
+            down.Margin = new Thickness(0, 4, 0, 0);
             Add(down);
             _upArrow.Margin = new Thickness(0, 0, 3, 0);
             Add(new StackPanel { Orientation = Orientation.Horizontal, Height = 16, Children = { _upArrow, _upLine } });
+            Graph = AddGraph();
         }
 
         FrameworkElement Arrow(Geometry data, double size)
@@ -165,6 +198,10 @@ internal sealed class NetworkWidget : Widget
 
     public string Up => _wide ? _up.Value : _upLine.Text;
 
+    public bool Wide => _wide;
+
+    public HistoryGraph Graph { get; }
+
     public void Set(string adapter, string? down, string? up, string status = "")
     {
         SetFact(adapter);
@@ -178,13 +215,14 @@ internal sealed class NetworkWidget : Widget
 }
 
 /// <summary>
-/// Free space: one column per drive for up to 4, or the 3 fullest (an alerting one first) and "+N";
-/// a single drive across the whole width.
+/// Free space in rows of 20, two drives to a row: the letter, a meter of what's used and what's free.
+/// <see cref="Rows"/> rows hold every drive, or the fullest (an alerting one first) and "+N more" in the
+/// last place. A single drive is one row with its size.
 /// </summary>
 internal sealed class DrivesWidget : Widget
 {
-    public const int Columns = 4;
-    private readonly Grid _columns = new();
+    public const double RowHeight = 20;
+    private readonly Grid _cells = new() { Margin = new Thickness(0, 4, 0, 0) };
     private readonly TextBlock _status;
     private readonly Func<string, bool> _alerting;
     private string _key = "";
@@ -194,23 +232,30 @@ internal sealed class DrivesWidget : Widget
         _alerting = alerting;
         _status = Parts.Text("", look.Name, look.Tertiary);
         _status.Margin = new Thickness(0, 8, 0, 0);
-        _columns.Margin = new Thickness(0, 8, 0, 0);
         Add(_status);
-        Body.LastChildFill = true; // the columns fill the rest, their meters at the bottom
-        Body.Children.Add(_columns);
+        Add(_cells);
     }
+
+    /// <summary>How many rows of drives the overview gives the widget, 1 to 3.</summary>
+    public int Rows { get; set; } = 3;
+
+    /// <summary>The widget's height for <paramref name="rows"/> rows: its padding and border, the top line, 4, and the rows.</summary>
+    public static double Height(int rows) => 20 + 16 + 4 + rows * RowHeight;
 
     /// <summary>The drives shown, in order (tests read them).</summary>
     internal IReadOnlyList<string> Shown { get; private set; } = [];
 
     internal string More { get; private set; } = "";
 
-    /// <summary>Which volumes show, in letter order: all up to 4; past that the 3 fullest, alerting ones first.</summary>
-    internal static (IReadOnlyList<VolumeReading> Shown, int More) Choose(IReadOnlyList<VolumeReading> volumes, Func<string, bool> alerting)
+    /// <summary>
+    /// Which volumes show in <paramref name="places"/>, in letter order: all that fit; past that the
+    /// fullest, alerting ones first, leaving the last place for "+N more" when <paramref name="morePlace"/>.
+    /// </summary>
+    internal static (IReadOnlyList<VolumeReading> Shown, int More) Choose(IReadOnlyList<VolumeReading> volumes, Func<string, bool> alerting, int places, bool morePlace = true)
     {
-        if (volumes.Count <= Columns)
+        if (volumes.Count <= places)
             return (volumes, 0);
-        var keep = volumes.OrderByDescending(v => alerting(v.Id)).ThenBy(v => v.FreePercent).Take(Columns - 1).ToHashSet();
+        var keep = volumes.OrderByDescending(v => alerting(v.Id)).ThenBy(v => v.FreePercent).Take(Math.Max(0, morePlace ? places - 1 : places)).ToHashSet();
         return ([.. volumes.Where(keep.Contains)], volumes.Count - keep.Count);
     }
 
@@ -220,56 +265,52 @@ internal sealed class DrivesWidget : Widget
         {
             _status.Text = snapshot.Disks.Status == ReadingStatus.Unavailable ? "Unavailable" : "";
             _status.Visibility = Visibility.Visible;
-            _columns.Visibility = Visibility.Collapsed;
+            _cells.Visibility = Visibility.Collapsed;
             SetFact("");
             Shown = [];
             Describe(_status.Text);
             return;
         }
         _status.Visibility = Visibility.Collapsed;
-        _columns.Visibility = Visibility.Visible;
+        _cells.Visibility = Visibility.Visible;
         var volumes = Volumes(snapshot.Disks.Value);
-        var (shown, more) = Choose(volumes, _alerting);
-        SetFact(volumes.Count == 1 ? Letter(volumes[0]) : volumes.Count > 1 ? $"{volumes.Count} drives" : "");
-        string key = string.Join("|", shown.Select(v => v.Id)) + "+" + more;
+        bool solo = volumes.Count == 1;
+        var (shown, more) = Choose(volumes, _alerting, solo ? 1 : Rows * 2);
+        SetFact(volumes.Count > 1 ? $"{volumes.Count} drives" : "");
+        string key = string.Join("|", shown.Select(v => v.Id)) + "+" + more + "/" + Rows;
         if (key != _key)
         {
             _key = key;
-            Build(shown, more);
+            Build(shown.Count, more, solo);
         }
         for (int i = 0; i < shown.Count; i++)
-            ((DriveColumn)_columns.Children[i]).Set(shown[i], _alerting(shown[i].Id));
+            ((DriveCell)_cells.Children[i]).Set(shown[i], _alerting(shown[i].Id), solo);
         Shown = [.. shown.Select(Letter)];
         More = more > 0 ? $"+{more}" : "";
         Describe(string.Join(", ", shown.Select(v => $"{Letter(v)} {Format.Size(v.FreeBytes)} free")), More.Length > 0 ? $"{more} more" : "");
     }
 
-    private void Build(IReadOnlyList<VolumeReading> shown, int more)
+    // Two to a row, 24 apart, filling across then down; a single drive across the whole width.
+    private void Build(int count, int more, bool solo)
     {
-        _columns.Children.Clear();
-        _columns.ColumnDefinitions.Clear();
-        int count = shown.Count + (more > 0 ? 1 : 0);
-        for (int i = 0; i < count; i++)
+        _cells.Children.Clear();
+        _cells.ColumnDefinitions.Clear();
+        _cells.RowDefinitions.Clear();
+        int across = solo ? 1 : 2;
+        for (int c = 0; c < across; c++)
         {
-            if (i > 0) _columns.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(16) });
-            _columns.ColumnDefinitions.Add(new ColumnDefinition());
+            if (c > 0) _cells.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(24) });
+            _cells.ColumnDefinitions.Add(new ColumnDefinition());
         }
-        for (int i = 0; i < shown.Count; i++)
+        int places = count + (more > 0 ? 1 : 0);
+        for (int r = 0; r < (places + across - 1) / across; r++)
+            _cells.RowDefinitions.Add(new RowDefinition { Height = new GridLength(RowHeight) });
+        for (int i = 0; i < places; i++)
         {
-            var column = new DriveColumn(Look, solo: count == 1);
-            Grid.SetColumn(column, i * 2);
-            _columns.Children.Add(column);
-        }
-        if (more > 0)
-        {
-            var hero = new Hero(Look, Look == Look.Island ? 18 : 20, 12);
-            hero.Set($"+{more}");
-            hero.SetResourceReference(TextBlock.ForegroundProperty, Look.Secondary);
-            var label = Parts.Text("more drives", Look.Small, Look.Tertiary);
-            var cell = new StackPanel { Children = { new Border { Height = 16 }, hero, label } };
-            hero.Margin = new Thickness(0, 2, 0, 0);
-            Grid.SetColumn(cell, (count - 1) * 2);
-            _columns.Children.Add(cell);
+            FrameworkElement cell = i < count ? new DriveCell(Look) : Parts.Text($"+{more} more", Look.Name, Look.Secondary);
+            Grid.SetRow(cell, i / across);
+            Grid.SetColumn(cell, i % across * 2);
+            _cells.Children.Add(cell);
         }
     }
 
@@ -279,53 +320,42 @@ internal sealed class DrivesWidget : Widget
 
     internal static string Letter(VolumeReading volume) => volume.Letter.Length > 0 ? volume.Letter : "Volume";
 
-    /// <summary>One drive: its letter and size, its free space, and a meter of what's used at the bottom.</summary>
-    private sealed class DriveColumn : DockPanel
+    /// <summary>One drive's row: its letter, a meter of what's used, and "704 GiB free" (of its size when alone).</summary>
+    private sealed class DriveCell : Grid
     {
-        private readonly TextBlock _letter, _total, _of;
-        private readonly Hero _free;
+        private readonly TextBlock _letter, _text;
+        private readonly Run _free = new() { FontWeight = FontWeights.SemiBold }, _rest = new();
         private readonly Meter _meter;
-        private readonly bool _solo;
+        private readonly Look _look;
 
-        public DriveColumn(Look look, bool solo)
+        public DriveCell(Look look)
         {
-            _solo = solo;
-            _letter = Parts.Text("", look.Name, look.Tertiary);
-            _total = Parts.Text("", look.Small, look.Tertiary);
-            DockPanel.SetDock(_total, Dock.Right);
-            _free = new Hero(look, solo ? look.Hero : look == Look.Island ? 18 : 20, 12);
-            var free = Parts.Text(" free", look.Small, look.Tertiary);
-            free.VerticalAlignment = VerticalAlignment.Bottom;
-            free.Margin = new Thickness(0, 0, 0, solo ? 5 : 3);
-            _of = Parts.Text("", look.Small, look.Tertiary);
-            DockPanel.SetDock(_of, Dock.Right);
-            _of.VerticalAlignment = VerticalAlignment.Bottom;
-            _of.Margin = free.Margin;
-            _meter = new Meter(look) { Margin = new Thickness(0, 6, 0, 0) };
-            LastChildFill = false;
-            if (!solo)
-            {
-                var top = new DockPanel { Height = 16, Children = { _total, _letter } };
-                SetDock(top, Dock.Top);
-                Children.Add(top);
-            }
-            var heroLine = new DockPanel { LastChildFill = false };
-            if (solo) heroLine.Children.Add(_of);
-            heroLine.Children.Add(_free);
-            heroLine.Children.Add(free);
-            SetDock(heroLine, Dock.Top);
-            SetDock(_meter, Dock.Bottom);
-            Children.Add(heroLine);
+            _look = look;
+            ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(20) });
+            ColumnDefinitions.Add(new ColumnDefinition());
+            ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto, MinWidth = 76 });
+            _letter = Parts.Text("", look.Name, look.Secondary);
+            _meter = new Meter(look) { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 8, 0) };
+            _text = Parts.Text("", look.Small, look.Tertiary);
+            _text.TextAlignment = TextAlignment.Right;
+            _free.FontSize = look.Name;
+            _text.Inlines.Add(_free);
+            _text.Inlines.Add(_rest);
+            SetColumn(_meter, 1);
+            SetColumn(_text, 2);
+            Children.Add(_letter);
             Children.Add(_meter);
+            Children.Add(_text);
         }
 
-        public void Set(VolumeReading volume, bool caution)
+        public void Set(VolumeReading volume, bool caution, bool solo)
         {
             _letter.Text = Letter(volume);
-            _total.Text = Format.Size(volume.TotalBytes);
-            _of.Text = _solo ? "of " + Format.Size(volume.TotalBytes) : "";
-            _free.Set(Format.Size(volume.FreeBytes), caution);
+            _free.Text = Format.Size(volume.FreeBytes);
+            _free.SetResourceReference(TextElement.ForegroundProperty, caution ? Look.Caution : _look.Text);
+            _rest.Text = solo ? " free of " + Format.Size(volume.TotalBytes) : " free";
             _meter.Set(volume.TotalBytes == 0 ? 0 : 1 - (double)volume.FreeBytes / volume.TotalBytes, caution);
+            ToolTip = $"{Letter(volume)} {Format.Size(volume.FreeBytes)} free of {Format.Size(volume.TotalBytes)}";
         }
     }
 }

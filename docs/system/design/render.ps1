@@ -14,6 +14,7 @@ New-Item -ItemType Directory -Force $out | Out-Null
 $boards = [ordered]@{
     'overviews-dark' = 'board=overviews&theme=dark'; 'overviews-light' = 'board=overviews&theme=light'
     'details-dark' = 'board=details&theme=dark'; 'details-light' = 'board=details&theme=light'
+    'more-dark' = 'board=more&theme=dark'; 'more-light' = 'board=more&theme=light'
     'settings-dark' = 'board=settings&theme=dark'; 'settings-light' = 'board=settings&theme=light'
     'settings-laptop-dark' = 'board=settings&theme=dark&machine=laptop'
 }

@@ -8,15 +8,19 @@ using Chippi.Features.SystemMonitor.Sensors;
 namespace Chippi.Features.SystemMonitor.Views;
 
 /// <summary>
-/// The top of Settings › System: the island's widgets (but Drives, which has its own section), 4 to a
-/// row, live while Settings shows them. Settings' cards and the accent meter; nothing to click.
+/// The top of Settings › System: the island's widgets (but Drives, which has its own section) in the
+/// island's rows, CPU, GPU and Memory, then Network, Battery and Temperature (Network alone across the
+/// whole width), live while Settings shows them. Settings' cards, graphs and meters in the Windows
+/// accent; nothing to click.
 /// </summary>
 internal sealed class SettingsReadings : UserControl
 {
-    private const int PerRow = 4;
+    /// <summary>A row of widgets with graphs, and Network alone in its row.</summary>
+    public const double RowHeight = 126, WideNetworkHeight = 92;
+
     private readonly SystemMonitorModule _module;
     private readonly Present _present;
-    private readonly Grid _grid = new();
+    private readonly StackPanel _grid = new();
     private readonly Dictionary<Detail, Widget> _widgets = [];
     private SensorWatch? _watch;
     private SensorSampler? _sampler;
@@ -64,43 +68,41 @@ internal sealed class SettingsReadings : UserControl
     internal void Show(SystemSnapshot s)
     {
         var (loads, rest, _) = _present.Plan(s);
-        var kinds = loads.Concat(rest).ToList();
-        string key = string.Join(",", kinds);
+        string key = string.Join(",", loads) + "|" + string.Join(",", rest);
         if (key != _key)
         {
             _key = key;
-            Layout(kinds);
+            Layout(loads, rest);
         }
         foreach (var widget in Widgets)
             _present.Fill(widget, s);
     }
 
-    private void Layout(List<Detail> kinds)
+    private void Layout(List<Detail> loads, List<Detail> rest)
     {
+        foreach (var row in _grid.Children.OfType<Grid>()) row.Children.Clear();
         _grid.Children.Clear();
-        _grid.RowDefinitions.Clear();
-        _grid.ColumnDefinitions.Clear();
-        for (int c = 0; c < PerRow; c++)
-        {
-            if (c > 0) _grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(8) });
-            _grid.ColumnDefinitions.Add(new ColumnDefinition());
-        }
+        bool wide = rest is [Detail.Network];
+        if (_widgets.TryGetValue(Detail.Network, out var old) && old is NetworkWidget network && network.Wide != wide)
+            _widgets.Remove(Detail.Network);
         var widgets = new List<Widget>();
-        for (int i = 0; i < kinds.Count; i++)
+        foreach (var kinds in new[] { loads, rest })
         {
-            int row = i / PerRow, column = i % PerRow;
-            if (column == 0)
+            if (kinds.Count == 0)
+                continue;
+            var row = new Grid { Height = kinds == rest && wide ? WideNetworkHeight : RowHeight, Margin = new Thickness(0, _grid.Children.Count > 0 ? 8 : 0, 0, 0) };
+            for (int c = 0; c < kinds.Count; c++)
             {
-                if (row > 0) _grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(8) });
-                _grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                if (c > 0) row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(8) });
+                row.ColumnDefinitions.Add(new ColumnDefinition());
+                var kind = kinds[c];
+                if (!_widgets.TryGetValue(kind, out var widget))
+                    _widgets[kind] = widget = kind == Detail.Network ? new NetworkWidget(Look.Settings, null, wide) : _present.NewReading(kind, Look.Settings, null);
+                Grid.SetColumn(widget.Root, c * 2);
+                row.Children.Add(widget.Root);
+                widgets.Add(widget);
             }
-            var kind = kinds[i];
-            if (!_widgets.TryGetValue(kind, out var widget))
-                _widgets[kind] = widget = kind == Detail.Network ? new NetworkWidget(Look.Settings, null, wide: false) : _present.NewReading(kind, Look.Settings, null);
-            Grid.SetRow(widget.Root, row * 2);
-            Grid.SetColumn(widget.Root, column * 2);
-            _grid.Children.Add(widget.Root);
-            widgets.Add(widget);
+            _grid.Children.Add(row);
         }
         Widgets = widgets;
         Visibility = widgets.Count == 0 ? Visibility.Collapsed : Visibility.Visible;

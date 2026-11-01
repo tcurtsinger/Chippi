@@ -12,14 +12,20 @@ using Chippi.UI.Controls;
 namespace Chippi.Features.SystemMonitor.Views;
 
 /// <summary>Which surface a part draws on: the island's brushes and sizes, or Settings'.</summary>
-internal sealed record Look(string Text, string Secondary, string Tertiary, string Track, string Fill, string Hair,
+internal sealed record Look(string Text, string Secondary, string Tertiary, string Track, string Fill, string Hair, string Accent,
     double Hero, double Unit, double Name, double Small)
 {
     public static Look Island { get; } = new("IslandTextBrush", "IslandTextSecondaryBrush", "IslandTextTertiaryBrush",
-        "IslandTrackBrush", "IslandTextSecondaryBrush", "IslandHairBrush", 24, 14, 12, 11);
+        "IslandTrackBrush", "IslandTextSecondaryBrush", "IslandHairBrush", "IslandAccentBrush", 24, 14, 12, 11);
 
     public static Look Settings { get; } = new("TextPrimaryBrush", "TextSecondaryBrush", "TextTertiaryBrush",
-        "BorderStrongBrush", "AccentBrush", "BorderBrush", 28, 16, 12, 12);
+        "BorderStrongBrush", "AccentBrush", "BorderBrush", "AccentBrush", 28, 16, 12, 12);
+
+    /// <summary>The card's padding inside its border, which a graph reaches past to the card's edges.</summary>
+    public Thickness Padding => this == Island ? new Thickness(11, 9, 11, 9) : new Thickness(15, 11, 15, 11);
+
+    /// <summary>The card's corner inside its border.</summary>
+    public double InnerRadius => this == Island ? 5 : 7;
 
     public const string Caution = "WarningTextBrush";
 }
