@@ -80,8 +80,7 @@ accent:
   on-accent: { dark: "#000000", light: "#FFFFFF" }
 pet:
   ink: "#0B0F1F"
-  blush: "#FF8FB0"
-  spark: "#F5C451"
+  spark: { dark: "#F5C451", light: "#B07800" }
   synth: "#B78FFF"
   tongue: "#FF7FA8"
   headphones: "#1B1530"
@@ -190,7 +189,7 @@ Text and glyphs on an accent fill are black in dark and white in light (**On-acc
 ### Named rules
 **The Accent Rule.** The accent marks what is on, selected or primary: a switch that is on, a checked box, the selected nav item's pill, the selected tab's bar, the selected duration chip, the one primary button per view, and the glyph of an installed or watched feature. It is never decoration, a background wash, a divider or body text.
 
-**The Gradient Rule** (revised 2026-10-29). Two gradients exist: the island's accent fill, on what's on or primary in the island, and the pet's soft shading. Nothing else is a gradient.
+**The Gradient Rule** (revised 2026-10-29). Two gradients exist: the island's accent fill, on what's on or primary in the island, and the pet's soft shading (with his ground shadow's falloff, revised 2026-11-01). Nothing else is a gradient.
 
 **The Muted Floor Rule.** `#9D9D9D` (dark) or `#616161` (light) is the quietest text allowed. Both clear 4.5:1 on their surfaces. On the island's own fill the quietest text (`IslandTextTertiaryBrush`) is `#9A9A9A` dark and `#707070` light, both 4.5:1 or more (light revised 2026-10-30 from `#8A8A8A`, which was 3.2:1).
 
@@ -333,14 +332,14 @@ Brief: [docs/shell-redesign-handoff.md](docs/shell-redesign-handoff.md). Mock: [
 - **Page template:** title, then an optional SelectorBar, then sections. A section is a Section header (with an optional right-aligned button) over one card of rows. Two cards in a row of the same section sit 8px apart.
 - **Rows (revised 2026-10-28):** at least 60px with a caption, 48px without; 16,8 padding; 12px gap. Label over caption on the left, the control on the right. A switch shows "On" or "Off" in body text just left of it. An expander row ends in a chevron and its sub-rows are indented 50px.
 - **File organizer (revised 2026-10-28):** each watched folder shows its glyph, name/path, mode, Organize now and a chevron for Mode, Wait before moving, Ignore list and Stop watching. Unmatched preview files fold into one count row; with nothing actionable the footer says Nothing to organize with Cancel and Add rule, which opens a new unsaved draft. A SelectorBar of Folders · Rules · History (§5 File organizer).
-- **Island & pet** (2026-10-26): one card of Island, Hide tray icon (dimmed while the island is off), Opens on (Last page used / All features), Position with Reset (back to the start), and Display (Main display or One monitor, with "Monitor not connected · using main display" while the chosen one is gone). Then **Tiles**: a row per tile with a grip (drag, or Up and Down on the focused grip), its glyph, its name and a Show switch, beside a card with a small preview. The home shows the first 8 shown tiles, and the switches say so: a switch is on only for a tile on the home, and once 8 are, the others can't be turned on until one is turned off; the slot that frees is for the switch turned on next, not the next tile in order (revised 2026-10-30). Then **Chippi**: Color and Reduce motion (revised 2026-10-29: the round buttons are gone).
+- **Island & pet** (2026-10-26): one card of Island, Hide tray icon (dimmed while the island is off), Opens on (Last page used / All features), Position with Reset (back to the start), and Display (Main display or One monitor, with "Monitor not connected · using main display" while the chosen one is gone). Then **Tiles**: a row per tile with a grip (drag, or Up and Down on the focused grip), its glyph, its name and a Show switch, beside a card with a small preview. The home shows the first 8 shown tiles, and the switches say so: a switch is on only for a tile on the home, and once 8 are, the others can't be turned on until one is turned off; the slot that frees is for the switch turned on next, not the next tile in order (revised 2026-10-30). Then **Chippi**: Color (revised 2026-10-29: the round buttons are gone; 2026-11-01: Reduce motion moved to General, since it covers the whole app).
 - **Two surfaces (revised 2026-10-28, replaces "Settings never repeats a daily control").** Settings can do everything the island can: a feature's page starts with its island controls, which call the same module method as their island twin, then its configuration, and lists every item the fixed island leaves out. The island is unchanged: its pages show live state and controls only. No page intros and no info buttons; subtext appears only when a label cannot stand alone.
 - **Keep awake (revised 2026-10-28):** a Keep awake row with the state caption and Stop while on, then Length with the six island choices (30 min, 1 hr, 2 hr, 4 hr, No limit, Until...), with the active choice lit. Until opens the time picker. Keep screen on follows. There is no session switch, Default length or After a restart row.
 - **System Settings (revised 2026-11-01):** the island's widgets first, in the island's rows, then Drives with the drives two to a row, Thermal zones with every zone (when there are 2 or more), General (Update speed, Home status, and GPU and Network adapter dropdowns when there's a choice), Readings, Units and Alerts. Alert switches and current thresholds sit in expandable headers; their tuning folds inside at the shared 50px inset. Repeat interval uses hour-style values.
 
 - **Add features** (replaces the Features hub): a search field with the "2 on" count beside it. **Available** lists the features that work, each a row with a 32px icon chip (accent glyph when on, muted when off), name, one-line description and a switch. One collapsed **Coming later** row ("39 features") expands into one row per group listing the names. Presets are hidden until enough features exist for them to matter. Toggling a feature installs or uninstalls it, and an installed feature appears in the sidebar at once.
-- **General:** Theme (Dark · Light · Follow Windows segment, default Follow Windows), Accent color (a "Windows" pill and four 24px swatches; the caption reads "Follow Windows" or the color's name), Run at startup (switch). A Settings file section with one row, "Location", captioned with the path, and Export… and Import… on the right.
-- **Island & pet:** see above. The Chippi section: a Color row with a 48px Chippi preview, the color's name as caption and six swatches; Reduce motion (combo: Follow Windows · On · Off).
+- **General:** Theme (Dark · Light · Follow Windows segment, default Follow Windows), Accent color (a "Windows" pill and four 24px swatches; the caption reads "Follow Windows" or the color's name), Reduce motion (combo: Follow Windows · On · Off; it covers the island, the arrivals and Chippi), Run at startup (switch). A Settings file section with one row, "Location", captioned with the path, and Export… and Import… on the right.
+- **Island & pet:** see above. The Chippi section: a Color row with a 48px Chippi preview (a button that shows his next mood; he celebrates in a color when it's picked), the color's name as caption and six swatches.
 - **Notifications:** see below.
 - **About:** Chippi with a 32px Chippi and "Version 0.1.0" on the right; License (GPL-3.0-or-later, View); Privacy ("No telemetry"); Third-party notices (View). The sidebar has no version footer. Notices open as rendered text, never raw markdown.
 - **Swatch selection:** a selected swatch or pill gets a 2px gap in the card color and a 2px accent ring.
@@ -481,44 +480,47 @@ Drawn on a 120×120 viewBox; WPF `Path.Data` takes the same syntax.
 | Part | Spec |
 |---|---|
 | Body | `M17 76 C17 45 36 31 60 31 C84 31 103 45 103 76 C103 98 87 106 60 106 C33 106 17 98 17 76 Z`, one pet color with soft shading: a vertical gradient from the color to 88% of it |
-| Eyes (idle) | White eye whites 10.5 × 12.5 at (47, 66) and (73, 66); ink pupils r 6 at (49, 68) and (75, 68); white highlights r 2 at (50.6, 65.6) and (76.6, 65.6) |
+| Eyes (idle) | White eye whites 10.5 × 12.5 at (47, 66) and (73, 66); ink pupils r 6 at (49, 68) and (75, 68); white highlights r 2 at (50.6, 65.6) and (76.6, 65.6). Every eye white has a 1.5 rim of ink at 18%, so it keeps its edge on a pale body (Frost) (2026-11-01) |
 | Mouth (idle) | An open grin in ink with a `#FF7FA8` tongue |
 | Eyes (wide awake) | White eye whites 12 × 14 at (46, 65) and (74, 65); ink pupils r 4.4 at (46, 66) and (74, 66); white highlights r 1.6 at (47.7, 63.8) and (75.7, 63.8) |
 | Mouth (wide awake) | An ink "o", 4.4 × 5 at (60, 89) |
+| Lids (idle, wide awake) | The eyes shut, for a blink and for falling asleep: `M38 66 H56 M64 66 H82` (wide awake `M35 65 H57 M63 65 H85`), ink, 3.6 (4.4 in the puck form), round caps |
+| Steam (wide awake) | `M95 36 C91 31 99 27 95 21 M105 33 C101 28 109 24 105 18` in secondary island text, 3.4, round caps, where the z's sit. Above the puck form only: on the puck that corner is the Keep awake badge's |
 | Eyes (asleep) | Shut arcs `M39 67 Q46 72 53 67 M67 67 Q74 72 81 67`, round caps |
 | Mouth (asleep) | An ink ellipse 4 × 3.4 at (60, 86) |
 | z's (asleep) | "z" in Segoe UI Variable Display SemiBold, in secondary island text (`IslandTextSecondaryBrush`). Puck form: one, 30px at (92, 34). Above it: 22px at (93, 32) and 14px at (106, 16). Points are SVG text origins |
 | Headphones (listening) | Band `M19 70 C19 19 101 19 101 70`, drawn twice with round caps: a `#E6DCFF` rim at 10, then `#1B1530` ink at 5.5. Cups 15 × 26, radius 6, at x 10 and 95, y 57, `#1B1530` with a 2.2 `#E6DCFF` stroke. Pads 6 × 16, radius 3, at the cup's x + 4.5, y 62, `#D2BEFF` |
-| Ground shadow | At sizes of 64 and up only |
+| Ground shadow | At sizes of 64 and up only: a soft ellipse 34 × 5.5 at (60, 108), black at 26% in the middle fading to clear at its edge, spreading across with the squish (revised 2026-11-01; it was a hard 35% ellipse that read as a gray plinth on light) |
+| Sparks (celebrating) | `M14 30 L6 24 M12 44 H3 M24 18 L20 9 M106 30 L114 24 M108 44 H117 M96 18 L100 9`, round caps, in `PetSparkBrush`: `#F5C451` on the dark island, `#B07800` on the light one, where gold is 1.5:1 (revised 2026-11-01) |
 
 ### Moods
 
 | Mood | Face | Extras | When |
 |---|---|---|---|
 | **Idle** | The eyes and grin above | Blinks | Any activity; the puck while hovered or open |
-| **Wide awake** | Round open eyes and an "o" mouth | Blinks | While Keep awake holds the PC up |
-| **Celebrating** | Happy arcs `M39 70 Q46 63 53 70 M67 70 Q74 63 81 70` and the grin | Sparks (`#F5C451`) fading over 1.2s; a squish to (1.06, 0.94), then (0.985, 1.02), then back, at 110, 260 and 400ms from the bottom center | Chippi finished something for you (stashed files, a timer, a download). Holds 2.5s, then goes back |
+| **Wide awake** | Round open eyes and an "o" mouth | Blinks; steam above the puck form | While Keep awake holds the PC up |
+| **Celebrating** | Happy arcs `M39 70 Q46 63 53 70 M67 70 Q74 63 81 70` and the grin | Sparks that burst out from 75% over 220ms as the face swaps, hold to 2.1s and fade by 2.5s; a squish to (1.10, 0.90), then (0.97, 1.03), then back, at 110, 260 and 400ms from the bottom center (60, 106) (revised 2026-11-01) | Chippi finished something for you (stashed files, a timer, a download). Holds 2.5s, then goes back. During a song he keeps his headphones on |
 | **Asleep** (`Sleepy`) | Shut arcs and a small ellipse mouth | z's; breathes | Nothing live: the puck at rest, Nothing playing |
 | **Listening** | The celebrating face, no sparks | Headphones | A song playing: the puck (not while lifted), Now Playing and the home card without art |
 
 ### Sizes
-- **Small form (22 and under):** body and eyes only (6 × 7.4 at y 74); no mouth, sparks or z's.
-- **Puck form (23 to 44):** heavier strokes so the face reads at 40: asleep arcs 4.6, happy arcs 4.8 (celebrating and listening), sparks 4.5; one big z.
-- **Above 44:** asleep arcs 3.8, happy arcs 4.2, sparks 3.5; two z's.
-- **Puck:** 40 in the 50 puck. **Home footer:** 28, the puck form, so its moods read (revised 2026-10-30). **Home media card without art:** 28. **Now Playing without art:** 76, listening; **Nothing playing:** 72, asleep. **Keep awake's page:** 72, asleep or wide awake (revised 2026-10-30). **Settings titlebar:** 16. **Settings › Island & pet:** 48 beside the color swatches. **About:** 32.
+- **Small form (22 and under):** body and the tray icon's eyes only: whites 12 × 13.5 at (46, 70) and (74, 70), pupils r 7.5 at (47, 71) and (75, 71) (revised 2026-11-01; dots alone didn't read at 16). One face for every mood: no mouth, sparks, z's, steam or headphones, and it blinks only while idle or wide awake.
+- **Puck form (23 to 44):** heavier strokes so the face reads at 40: asleep arcs 4.6, happy arcs 4.8 (celebrating and listening), sparks 4.5, lids 4.4; one big z.
+- **Above 44:** asleep arcs 3.8, happy arcs 4.2, sparks 3.5, lids 3.6; two z's; Wide awake's steam.
+- **Puck:** 40 in the 50 puck. **Home footer:** 28, the puck form, so its moods read (revised 2026-10-30). **Home media card without art:** 28. **Now Playing without art:** 76, listening; **Nothing playing:** 72, asleep. **Keep awake's page:** 72, asleep or wide awake (revised 2026-10-30). **Settings titlebar:** 16. **Settings › Island & pet:** 48 beside the color swatches, in a button that shows his next mood (idle, asleep, listening, wide awake, celebrating); picking a color, he celebrates in it (2026-11-01). **About:** 32.
 
 ### Color option
-Settings › Island & pet › Chippi › Color: **Synth** `#B78FFF` (the default, the accent's violet), **Iris** `#CBB2FF`, **Azure** `#8EC0FF`, **Signal** `#8EE6C0`, **Ember** `#FFC58F` or **Frost** `#E8ECF6`. Every color draws the same way (one color, soft shading), and the face stays pet ink and white on all of them.
+Settings › Island & pet › Chippi › Color: **Synth** `#B78FFF` (the default, the accent's violet), **Iris** `#CBB2FF`, **Azure** `#8EC0FF`, **Signal** `#8EE6C0`, **Ember** `#FFC58F` or **Frost** `#E8ECF6`. Every color draws the same way (one color, soft shading), and the face stays pet ink and white on all of them. The six live in one place, `ChippiPet.ColorOf`, which the pet, the Settings swatches and the gallery all read.
 
 ### Motion
-- **Blink:** every 4 to 7s at random, the eyes scale to 10% height for 120ms (idle and wide awake).
-- **Mood change:** the face cross-fades in 150ms. **Falling asleep** from idle or wide awake: the eyes ease shut over 600ms, then the z's fade in over 400ms.
+- **Blink:** every 4 to 7s at random, the eyes scale to 10% height for 120ms (idle and wide awake); while they're shut the lids show over them, so a blink reads as closed eyes, not a white sliver (2026-11-01).
+- **Mood change:** the face cross-fades in 150ms. **Celebrating** swaps the face at once at the squish's deepest point (110ms), so the two faces never show together. **Falling asleep** from idle or wide awake: the eyes ease shut over 600ms while the grin closes to a third over the first 300ms and the lids draw in over the last 180ms, so he never smirks on the way; then the z's fade in over 400ms. **Waking** from asleep: the eyes open from shut a little past round (112% at 180ms) and settle by 280ms (2026-11-01).
 - **Breathing (asleep only):** the body and face scale to (1.022, 1.04) from the bottom center (60, 106) and back, eased in and out, every 4.2s. The z's drift with it, from 2 below to 3 above and from 45% to full opacity. It runs only while the pet is shown, at 30 fps, and settles over 150ms when the mood changes.
 - **Headphones** (2026-10-30, motion pass): when a song starts they drop 18 (6px on the 40 puck) onto Chippi as they fade in over 180ms, ease-out; they come off lifting the same way as they fade over 120ms.
-- **Reduced motion:** no blink, breathing, squish or tween; moods swap at once, and a running tween or breath snaps to rest when the setting changes. The headphones only fade.
+- **Reduced motion:** no blink, breathing, squish, burst or tween; moods swap at once, sparks and steam just show, and a running tween or breath snaps to rest when the setting changes. The headphones only fade.
 
 ### Accessibility
-Where text beside it carries the state (the puck, the home, Now Playing), the pet is decorative and left out of the accessibility tree. Where it stands alone, as in the Settings preview, its name is "Chippi, {mood}": idle, wide awake, celebrating, asleep or listening. It is never the only signal of anything.
+Where text beside it carries the state (the puck, the home, Now Playing, About), the pet is decorative and left out of the accessibility tree. Where it stands alone its name is "Chippi, {mood}": idle, wide awake, celebrating, asleep or listening. The Settings preview is a button named "Next mood", with the pet inside it decorative. It is never the only signal of anything.
 
 ## 8. Do's and Don'ts
 

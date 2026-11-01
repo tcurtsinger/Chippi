@@ -65,6 +65,26 @@ public sealed class GeneralImportTests
         finally { shell.Clipboard.Dispose(); Chippi.UI.Themes.Motion.Override = null; Directory.Delete(root, true); }
     });
 
+    [Fact]
+    public void Reduce_motion_is_on_General() => WpfTestThread.Run(() =>
+    {
+        string root = Path.Combine(Path.GetTempPath(), "chippi-general-motion-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var config = new ConfigStore(Path.Combine(root, "settings.json"));
+        config.SetSection(AppSettings.SectionName, new AppSettings { ReduceMotion = true });
+        var shell = new ShellContext(config, NullLoggerFactory.Instance, false, "general-motion-test");
+        try
+        {
+            var page = new GeneralPage(shell);
+            var combo = Assert.Single(Find<ComboBox>(page), c => System.Windows.Automation.AutomationProperties.GetName(c) == "Reduce motion");
+            Assert.Equal(true, ((ComboBoxItem)combo.SelectedItem).Tag);
+            combo.SelectedItem = combo.Items.OfType<ComboBoxItem>().Single(i => Equals(i.Tag, false));
+            Assert.False(config.GetSection<AppSettings>(AppSettings.SectionName).ReduceMotion);
+            Assert.False(Chippi.UI.Themes.Motion.Override);
+        }
+        finally { shell.Clipboard.Dispose(); Chippi.UI.Themes.Motion.Override = null; Directory.Delete(root, true); }
+    });
+
     private static IEnumerable<T> Find<T>(DependencyObject root) where T : DependencyObject
     {
         if (root is T match) yield return match;

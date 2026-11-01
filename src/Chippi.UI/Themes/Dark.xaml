@@ -101,6 +101,8 @@
     <SolidColorBrush x:Key="IslandTextSecondaryBrush" Color="#C9C9C9" />
     <SolidColorBrush x:Key="IslandTextTertiaryBrush" Color="#9A9A9A" />
     <SolidColorBrush x:Key="IslandCautionBrush" Color="#FF99A4" />
+    <!-- Chippi's celebrating sparks: gold here; a deeper amber on the light island, where gold fades out. -->
+    <SolidColorBrush x:Key="PetSparkBrush" Color="#F5C451" />
     <!-- Accent: a glyph, link or mark; the fill behind whatever is on, with on-accent text on it;
          and the tint behind a selected row. -->
     <SolidColorBrush x:Key="IslandAccentBrush" Color="#B79CFF" />

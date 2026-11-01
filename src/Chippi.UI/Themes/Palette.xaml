@@ -8,18 +8,13 @@
     <!-- Critical fills behind white text. -->
     <SolidColorBrush x:Key="DangerDeepBrush" Color="#C42B1C" />
 
-    <!-- Chippi's body colors, DESIGN.md §7. -->
-    <SolidColorBrush x:Key="PetSynthBrush" Color="#B78FFF" />
-    <SolidColorBrush x:Key="PetIrisBrush" Color="#CBB2FF" />
-    <SolidColorBrush x:Key="PetAzureBrush" Color="#8EC0FF" />
-    <SolidColorBrush x:Key="PetSignalBrush" Color="#8EE6C0" />
-    <SolidColorBrush x:Key="PetEmberBrush" Color="#FFC58F" />
-    <SolidColorBrush x:Key="PetFrostBrush" Color="#E8ECF6" />
+    <!-- Chippi, DESIGN.md §7. His body colors are ChippiPet.ColorOf's; his sparks follow the theme. -->
     <SolidColorBrush x:Key="PetInkBrush" Color="#0B0F1F" />
     <SolidColorBrush x:Key="PetEyeHighlightBrush" Color="#FFFFFF" />
-    <!-- Shine: white at 38%. Blush: #FF8FB0 at 70%. Ground shadow: black at 35%. -->
-    <SolidColorBrush x:Key="PetShineBrush" Color="#61FFFFFF" />
-    <SolidColorBrush x:Key="PetBlushBrush" Color="#B3FF8FB0" />
-    <SolidColorBrush x:Key="PetSparkBrush" Color="#F5C451" />
-    <SolidColorBrush x:Key="PetShadowBrush" Color="#59000000" />
+    <!-- The eye whites' rim: ink at 18%. The ground shadow: black at 26%, fading out from the middle. -->
+    <SolidColorBrush x:Key="PetEyeRimBrush" Color="#2E0B0F1F" />
+    <RadialGradientBrush x:Key="PetShadowBrush">
+        <GradientStop Color="#42000000" Offset="0" />
+        <GradientStop Color="#00000000" Offset="1" />
+    </RadialGradientBrush>
 </ResourceDictionary>

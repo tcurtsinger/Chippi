@@ -98,20 +98,96 @@ public sealed class ChippiPetTests
             {
                 var parts = Paths(new ChippiPet { Size = size, Mood = PetMood.WideAwake }.ShownFace);
                 var data = parts.Select(p => p.Data).ToList();
-                Assert.Equal(new[] { ChippiPet.Shapes.WideEyeWhites, ChippiPet.Shapes.WidePupils, ChippiPet.Shapes.WideHighlights, ChippiPet.Shapes.WideMouth }, data);
+                Assert.Equal(new[] { ChippiPet.Shapes.WideEyeWhites, ChippiPet.Shapes.WidePupils, ChippiPet.Shapes.WideHighlights, ChippiPet.Shapes.WideMouth, ChippiPet.Shapes.WideLids }, data);
                 Assert.DoesNotContain(ChippiPet.Shapes.HappyEyes, data); // no longer Listening's face without the headphones
 
-                // White eyes, ink pupils and mouth, whatever the pet's color.
+                // White eyes with a faint ink rim, ink pupils and mouth, whatever the pet's color; the lids only show in a blink.
                 Assert.Equal(Colors.White, Fill(parts[0]));
+                Assert.Equal(Color.FromArgb(0x2E, 0x0B, 0x0F, 0x1F), ((SolidColorBrush)parts[0].Stroke).Color);
                 Assert.Equal(Color.FromRgb(0x0B, 0x0F, 0x1F), Fill(parts[1]));
                 Assert.Equal(Colors.White, Fill(parts[2]));
                 Assert.Equal(Color.FromRgb(0x0B, 0x0F, 0x1F), Fill(parts[3]));
+                Assert.Equal(0, parts[4].Opacity);
             }
 
             AssertBounds(new Rect(34, 51, 52, 28), ChippiPet.Shapes.WideEyeWhites);      // 12 × 14 at (46, 65) and (74, 65)
             AssertBounds(new Rect(41.6, 61.6, 36.8, 8.8), ChippiPet.Shapes.WidePupils); // r 4.4 at (46, 66) and (74, 66)
             AssertBounds(new Rect(46.1, 62.2, 31.2, 3.2), ChippiPet.Shapes.WideHighlights); // r 1.6 at (47.7, 63.8) and (75.7, 63.8)
             AssertBounds(new Rect(55.6, 84, 8.8, 10), ChippiPet.Shapes.WideMouth);       // 4.4 × 5 at (60, 89)
+        });
+    }
+
+    [Fact]
+    public void Wide_awake_steams_above_the_puck_form_only()
+    {
+        // The puck's corner is the Keep awake badge's, so the steam is for the bigger Chippi on Keep awake's page.
+        WpfTestThread.Run(() =>
+        {
+            var page = new ChippiPet { Size = 72, Mood = PetMood.WideAwake };
+            Assert.Equal(Visibility.Visible, page.Steam.Visibility);
+            Assert.Equal(1, page.Steam.Opacity);
+            var secondary = (SolidColorBrush)Application.Current.FindResource("IslandTextSecondaryBrush");
+            Assert.Equal(secondary.Color, ((SolidColorBrush)page.Steam.Stroke).Color);
+
+            page.Mood = PetMood.Idle;
+            Assert.Equal(0, page.Steam.Opacity);
+            foreach (var size in new[] { 16.0, 28, 40, 44 })
+                Assert.Equal(Visibility.Collapsed, new ChippiPet { Size = size, Mood = PetMood.WideAwake }.Steam.Visibility);
+        });
+    }
+
+    [Fact]
+    public void The_small_form_has_the_tray_icons_eyes_and_never_the_headphones()
+    {
+        WpfTestThread.Run(() =>
+        {
+            var small = new ChippiPet { Size = 16, Mood = PetMood.Listening };
+            var data = Paths(small.ShownFace).Select(p => p.Data).ToList();
+            Assert.Equal(new[] { ChippiPet.Shapes.SmallEyeWhites, ChippiPet.Shapes.SmallEyes }, data);
+            Assert.Equal(Visibility.Collapsed, small.Headphones.Visibility);
+
+            small.Size = 40; // grown into the puck form, the headphones go on
+            Assert.Equal(Visibility.Visible, small.Headphones.Visibility);
+            small.Size = 22;
+            Assert.Equal(Visibility.Collapsed, small.Headphones.Visibility);
+        });
+    }
+
+    [Fact]
+    public void A_celebration_during_a_song_keeps_the_headphones_on()
+    {
+        WpfTestThread.Run(() =>
+        {
+            var pet = new ChippiPet { Size = 40, Mood = PetMood.Listening };
+            pet.Celebrate();
+            Assert.Equal(PetMood.Celebrating, pet.Mood);
+            Assert.Equal(Visibility.Visible, pet.Headphones.Visibility);
+
+            var quiet = new ChippiPet { Size = 40, Mood = PetMood.Idle };
+            quiet.Celebrate();
+            Assert.Equal(Visibility.Collapsed, quiet.Headphones.Visibility);
+        });
+    }
+
+    [Fact]
+    public void The_squish_springs_from_the_bottom_of_the_body_and_the_sparks_follow_the_theme()
+    {
+        WpfTestThread.Run(() =>
+        {
+            var pet = new ChippiPet { Size = 72 };
+            Assert.Equal((60.0, 106.0), (pet.Squish.CenterX, pet.Squish.CenterY)); // the body's bottom center, as the breath
+            Assert.Equal((60.0, 106.0), (pet.Breath.CenterX, pet.Breath.CenterY));
+            Assert.IsType<RadialGradientBrush>(pet.Shadow.Fill); // a soft contact shadow, not a hard plinth
+
+            // Gold on the dark island, a deeper amber on the light one.
+            foreach (var (theme, color) in new[] { ("Dark", Color.FromRgb(0xF5, 0xC4, 0x51)), ("Light", Color.FromRgb(0xB0, 0x78, 0x00)) })
+            {
+                var themed = new ChippiPet { Size = 72, Mood = PetMood.Celebrating };
+                var host = new Border { Child = themed };
+                host.Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri($"pack://application:,,,/Chippi.UI;component/Themes/{theme}.xaml") });
+                Assert.Equal(color, ((SolidColorBrush)themed.Sparks.Stroke).Color);
+                Assert.Equal(1, themed.Sparks.Opacity);
+            }
         });
     }
 
@@ -244,6 +320,33 @@ public sealed class ChippiPetMotionTests
                 Assert.False(pet.IsBreathing);
                 Assert.False(pet.Breath.HasAnimatedProperties);
                 Assert.Equal(1.0, pet.ZGlyphs.Opacity);
+            }
+            finally
+            {
+                window.Close();
+                Motion.Override = motion;
+            }
+        });
+    }
+
+    [Fact]
+    public void The_small_form_blinks_only_while_its_eyes_are_open()
+    {
+        var motion = Motion.Override;
+        WpfTestThread.Run(() =>
+        {
+            var pet = new ChippiPet { Size = 16, Mood = PetMood.Idle };
+            var window = Offscreen(pet);
+            try
+            {
+                Motion.Override = false;
+                window.Show();
+                IslandWindowTests.Pump(TimeSpan.Zero);
+                foreach (var mood in Enum.GetValues<PetMood>())
+                {
+                    pet.Mood = mood;
+                    Assert.Equal(mood is PetMood.Idle or PetMood.WideAwake, pet.IsBlinking);
+                }
             }
             finally
             {
