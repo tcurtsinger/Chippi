@@ -1,6 +1,6 @@
 # Cleaning mode: brief
 
-Confirmed by Travis, 2026-11-01. The mockup is built from this; DESIGN.md wins where it speaks.
+Confirmed by Travis, 2026-11-01, and its mockup approved the same day as drawn: [Chippi Phase 5.5: Quick actions and Cleaning mode](https://claude.ai/artifact/HNpG8aciGLWyJecHFyfeeW). DESIGN.md wins where it speaks.
 
 ## Job
 
@@ -12,29 +12,25 @@ Every key, the Windows key and the media and volume keys included. The mouse sta
 
 ## Screens
 
-Black on every screen, so smudges show. The main screen shows Chippi in the middle, the hint ("Press Esc 3 times to unlock"), three dots that fill with each Esc press, and an Unlock button. The other screens are plain black.
+Black on every screen, so smudges show. The main screen centers, top to bottom: Chippi at 200, idle; 32 below him the hint, "Press Esc 3 times to unlock", in 16 Muted (`#9D9D9D`); 16 below that three 10 dots, 12 apart, each an outline until its press fills it with the island's violet; and 32 below, Unlock, a 32-tall button in white at 8% with a 14 label. Every other screen is plain black, with nothing on it.
 
 ## Unlock
 
-- **Esc three times,** each within about a second of the last. Any other key, or a held key's repeat, starts the count over.
+- **Esc three times,** each within a second of the last. Any other key, or a held key's repeat, starts the count over.
 - **Unlock,** clicked.
 - No time limit. Locking the PC, sleep and Ctrl+Alt+Del (which Windows always keeps) end it too.
 
-## Start
-
-- A Cleaning mode action on the Quick toggles page, offered while both features are installed.
-- A shortcut, in Settings › Shortcuts, off by default.
-- A Start button on Settings › Cleaning mode.
-
-No home tile of its own.
-
 ## Chippi
 
-Chippi reacts to each Esc press. Under reduced motion only the dots change.
+- **Each Esc:** he squishes to (1.08, 0.92) from his bottom center over about 120ms with the celebrating face's grin, and back, the way a boop does (DESIGN.md §7).
+- **The third, or Unlock:** he rises 16 and celebrates, sparks and all; 700ms later the black fades out over 240ms.
+- **Coming in:** the black fades in over 200ms.
+- **Reduced motion:** only the dots change, and the black comes and goes at once.
 
-## For the mockup to settle
+## Start
 
-- How Chippi reacts to each press, and to the unlock.
-- The hint's words.
-- Where Unlock sits.
-- How the black screens come in and go.
+- An action on the Quick actions page, Cleaning (the island's one word), offered while both features are installed.
+- A shortcut, in Settings › Shortcuts, off by default.
+- **Settings › Cleaning mode:** one row, the droplet glyph in the accent, "Cleaning mode", and Start (the accent button).
+
+No home button of its own.
