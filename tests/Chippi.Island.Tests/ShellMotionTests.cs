@@ -118,17 +118,46 @@ public sealed class ShellMotionTests
     [Fact]
     public void A_fill_going_back_to_clear_fades_out_rather_than_snapping() => WpfTestThread.Run(() => WithMotion(false, () => IslandWindowTests.WithShownIsland(window =>
     {
-        // The rim blends the same way the controls' fills do (FillFade.Blend).
-        window.PuckButton.RaiseEvent(new MouseEventArgs(Mouse.PrimaryDevice, 0) { RoutedEvent = Mouse.MouseEnterEvent });
-        IslandWindowTests.Pump(TimeSpan.FromMilliseconds(200));
-        window.PuckButton.RaiseEvent(new MouseEventArgs(Mouse.PrimaryDevice, 0) { RoutedEvent = Mouse.MouseLeaveEvent });
-        var blend = Assert.IsType<DrawingBrush>(window.Body.BorderBrush);
-        var layers = ((DrawingGroup)blend.Drawing).Children.Cast<DrawingGroup>().ToList();
-        IslandWindowTests.Pump(TimeSpan.FromMilliseconds(40));
-        Assert.InRange(layers[0].Opacity, 0, 0.99); // the old one fading out
-        Assert.InRange(layers[1].Opacity, 0.01, 1); // as the new one fades in
-        IslandWindowTests.Pump(TimeSpan.FromMilliseconds(200));
-        Assert.Same(window.FindResource("IslandWidgetBorderBrush"), window.Body.BorderBrush);
+        // The rim blends the same way the controls' fills do (FillFade.Blend). The blend's clock moves only when the
+        // test moves it, so a slow runner's late frames can't leave it unstarted.
+        var wall = FillFade.Clock;
+        long now = Stopwatch.GetTimestamp();
+        int frames = 0;
+        EventHandler counted = (_, _) => frames++;
+        void Frame()
+        {
+            int at = frames;
+            IslandWindowTests.PumpUntil(() => frames > at);
+        }
+        void Advance(double ms)
+        {
+            now += (long)(ms * Stopwatch.Frequency / 1000);
+            Frame();
+        }
+
+        FillFade.Clock = () => now;
+        CompositionTarget.Rendering += counted;
+        try
+        {
+            window.PuckButton.RaiseEvent(new MouseEventArgs(Mouse.PrimaryDevice, 0) { RoutedEvent = Mouse.MouseEnterEvent });
+            Frame(); // the fade starts on the first frame
+            Advance(100);
+            Assert.Same(window.FindResource("IslandWidgetHoverBorderBrush"), window.Body.BorderBrush);
+            window.PuckButton.RaiseEvent(new MouseEventArgs(Mouse.PrimaryDevice, 0) { RoutedEvent = Mouse.MouseLeaveEvent });
+            var blend = Assert.IsType<DrawingBrush>(window.Body.BorderBrush);
+            var layers = ((DrawingGroup)blend.Drawing).Children.Cast<DrawingGroup>().ToList();
+            Frame();
+            Advance(40); // about half of the 83ms
+            Assert.Equal(1 - 40 / 83.0, layers[0].Opacity, 3); // the old one fading out
+            Assert.Equal(40 / 83.0, layers[1].Opacity, 3); // as the new one fades in
+            Advance(60);
+            Assert.Same(window.FindResource("IslandWidgetBorderBrush"), window.Body.BorderBrush);
+        }
+        finally
+        {
+            CompositionTarget.Rendering -= counted;
+            FillFade.Clock = wall;
+        }
     })));
 
     [Fact]
