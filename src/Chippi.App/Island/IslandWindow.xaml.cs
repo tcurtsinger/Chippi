@@ -18,6 +18,7 @@ using Chippi.UI.Themes;
 using Windows.Win32;
 using Windows.Win32.Foundation;
 using Windows.Win32.Graphics.Gdi;
+using Windows.Win32.System.Power;
 using Windows.Win32.UI.WindowsAndMessaging;
 
 namespace Chippi.App.Island;
@@ -97,6 +98,8 @@ public partial class IslandWindow : Window
     private bool _pressedBar;
     private bool _dragging;
     private EventHandler? _slideFrame;
+    private Action? _landing; // a drop's slide ending: Chippi set down and the place saved, even when it's cut short
+    private HPOWERNOTIFY _displayNotice; // the display turning off or on
     private double _followScale = double.NaN; // the scale of the last full move during a drag or slide
     private double _scaleTarget = 1, _tiltTarget;
     private Media.IMediaSessions? _media;
@@ -256,6 +259,9 @@ public partial class IslandWindow : Window
     /// <summary>Raised when the display layout or work area changed (WM_DISPLAYCHANGE, WM_SETTINGCHANGE).</summary>
     public event EventHandler? DisplayChanged;
 
+    /// <summary>Raised when the display turns off (false) or on again (true, dimmed too), and once with its state at the start.</summary>
+    internal event EventHandler<bool>? DisplayPowerChanged;
+
     /// <summary>The user dropped the widget. It is already there; save it.</summary>
     internal event EventHandler<IslandPlacementEventArgs>? PlacementChosen;
 
@@ -323,6 +329,7 @@ public partial class IslandWindow : Window
     public void Initialize()
     {
         _hwnd = IslandNative.MakeNoActivate(this, WndProc);
+        _displayNotice = IslandNative.WatchDisplayPower(_hwnd);
         _panel.Initialize();
     }
 
@@ -489,6 +496,7 @@ public partial class IslandWindow : Window
         IslandNative.Move(_hwnd, WindowAt(Center(_puck), area.Scale));
         if (_panel.IsOpen)
             _panel.Open(_puck, WidgetRect, area);
+        Land(); // a drop's slide this cut short still sets him down
     }
 
     /// <summary>
@@ -530,6 +538,10 @@ public partial class IslandWindow : Window
             case PInvoke.WM_DISPLAYCHANGE:
             case PInvoke.WM_SETTINGCHANGE:
                 Dispatcher.BeginInvoke(DispatcherPriority.Background, () => DisplayChanged?.Invoke(this, EventArgs.Empty));
+                break;
+            case PInvoke.WM_POWERBROADCAST:
+                if (IslandNative.DisplayOn(wParam, lParam) is { } on)
+                    Dispatcher.BeginInvoke(() => DisplayPowerChanged?.Invoke(this, on));
                 break;
         }
         return 0;
@@ -915,7 +927,7 @@ public partial class IslandWindow : Window
         }
         // The equalizer follows the output's real level while a song plays on the bar and can be seen, and Chippi bobs
         // to its beats there; with the panel out the bars keep still, but the panel's listening Chippis still bob.
-        if (_singing && !paused && (IsVisible || _panel.IsVisible) && !Motion.IsReduced)
+        if (_singing && !paused && (IsVisible || _panel.IsVisible) && !Motion.IsReduced && !Motion.IsUnseen)
             _level?.Start();
         else
             StopLevel();
@@ -1140,7 +1152,7 @@ public partial class IslandWindow : Window
         double full = Math.Ceiling(SongText.DesiredSize.Width);
         double room = _lineRoom;
         bool fits = full <= room;
-        bool scroll = !fits && !Motion.IsReduced && IsVisible && !_panel.IsVisible;
+        bool scroll = !fits && !Motion.IsReduced && !Motion.IsUnseen && IsVisible && !_panel.IsVisible;
         string state = $"{_lineText}\n{full}\n{room}\n{scroll}";
         if (state == _lineState)
             return; // still on its way: a timeline or play-state update doesn't start it over
@@ -1296,6 +1308,7 @@ public partial class IslandWindow : Window
         Menu.IsOpen = false;
         CloseIsland(immediate: true);
         StopSlide();
+        _landing = null; // picked up again mid-slide: this drop lands instead
         _lifted = true;
         _followScale = double.NaN;
         RefreshPuck();
@@ -1349,16 +1362,18 @@ public partial class IslandWindow : Window
 
     /// <summary>
     /// Slides the puck from <paramref name="from"/> to <paramref name="to"/> (its center) over 180ms, at
-    /// once under reduced motion; then the bar takes the side toward the middle, and <paramref name="arrived"/> runs.
+    /// once under reduced motion; then the bar takes the side toward the middle, and <paramref name="arrived"/> runs. A
+    /// placement that cuts it short (a display change) runs it too.
     /// </summary>
     private void SlideTo(Point from, Point to, double scale, bool left, Action arrived)
     {
         StopSlide();
+        _landing = arrived;
         void Arrive()
         {
             ApplySide(left);
             IslandNative.Move(_hwnd, WindowAt(to, scale));
-            arrived();
+            Land();
         }
         if (Motion.IsReduced || (to - from).Length < 0.5)
         {
@@ -1387,6 +1402,14 @@ public partial class IslandWindow : Window
             return;
         CompositionTarget.Rendering -= _slideFrame;
         _slideFrame = null;
+    }
+
+    /// <summary>The drop has landed, or its slide was cut short: Chippi is set down and the place saved, once.</summary>
+    private void Land()
+    {
+        var landing = _landing;
+        _landing = null;
+        landing?.Invoke();
     }
 
     /// <summary>The widget's monitor, as placed (snapshots and tests).</summary>
@@ -1472,6 +1495,7 @@ public partial class IslandWindow : Window
         Motion.Changed -= OnMotionChanged;
         foreach (var part in _tiles.SelectMany(t => t.Parts))
             part.StatusChanged -= OnStatusChanged;
+        IslandNative.StopWatchingDisplayPower(_displayNotice);
         StopSlide();
         _level?.Stop();
         CloseIsland();

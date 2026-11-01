@@ -31,6 +31,10 @@ internal sealed class BeatDetector
     /// </summary>
     public double? Next(float peak, TimeSpan now)
     {
+        // A reading that isn't a level (a driver's NaN, or past full scale) would stay in the average for the whole song.
+        if (!float.IsFinite(peak))
+            return null;
+        peak = Math.Clamp(peak, 0, 1);
         double before = _average;
         double dt = _last is { } last ? Math.Max(0, (now - last).TotalSeconds) : double.PositiveInfinity;
         _last = now;

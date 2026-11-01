@@ -616,6 +616,95 @@ public sealed class IslandMotionTests
     }
 
     [Fact]
+    public void Locked_or_with_the_display_off_the_song_holds_and_seen_again_it_scrolls()
+    {
+        var motion = Chippi.UI.Themes.Motion.Override;
+        WpfTestThread.Run(() => IslandWindowTests.WithShownIsland(window =>
+        {
+            try
+            {
+                Chippi.UI.Themes.Motion.Override = false;
+                window.SetMedia(new IslandPanelTests.FakeMedia
+                {
+                    Sessions = [new("spotify", "Spotify", "Everything In Its Right Place (Live at the Ancient Theatre)", "Radiohead",
+                        true, true, true, true, true, true, TimeSpan.Zero, TimeSpan.FromMinutes(4), DateTimeOffset.Now, null)],
+                });
+                window.SetActivities([new IslandActivity("track", IslandActivityKind.Media, "Everything", "Spotify")], Chippi.UI.Pet.PetMood.Idle);
+                Assert.Equal(Visibility.Visible, window.SongCopy.Visibility);
+                Chippi.UI.Themes.Motion.IsUnseen = true;
+                Assert.Equal(Visibility.Collapsed, window.SongCopy.Visibility);
+                Chippi.UI.Themes.Motion.IsUnseen = false;
+                Assert.Equal(Visibility.Visible, window.SongCopy.Visibility);
+            }
+            finally
+            {
+                Chippi.UI.Themes.Motion.IsUnseen = false;
+                Chippi.UI.Themes.Motion.Override = motion;
+            }
+        }));
+    }
+
+    [Fact]
+    public void A_drop_whose_slide_a_display_change_cuts_short_still_sets_him_down_and_saves_the_place()
+    {
+        var motion = Chippi.UI.Themes.Motion.Override;
+        WpfTestThread.Run(() => IslandWindowTests.WithShownIsland(window =>
+        {
+            try
+            {
+                Chippi.UI.Themes.Motion.Override = false;
+                var area = window.CurrentArea!.Value;
+                IslandPlacementEventArgs? chosen = null;
+                window.PlacementChosen += (_, e) => chosen = e;
+                window.Pet.IsHeld = true; // as a drag holds him
+                window.DropAt(new Point(area.Work.Right - 2, area.Work.Bottom - 2)); // past the corner: it slides in
+                Assert.True(window.Pet.IsHeld); // round-eyed until it lands
+                Assert.Null(chosen);
+
+                window.SetMonitor(area.Handle, fallback: true); // the display changes mid-slide
+                Assert.False(window.Pet.IsHeld);
+                Assert.NotNull(chosen);
+                window.SetMonitor(area.Handle, fallback: false);
+            }
+            finally
+            {
+                Chippi.UI.Themes.Motion.Override = motion;
+            }
+        }));
+    }
+
+    [Fact]
+    public void The_display_power_message_reads_off_on_and_dimmed_and_nothing_else()
+    {
+        const nint change = 0x8013; // PBT_POWERSETTINGCHANGE
+        var display = new Guid("6FE69556-704A-47A0-8F24-C28D936FDA47"); // GUID_CONSOLE_DISPLAY_STATE
+        nint setting = System.Runtime.InteropServices.Marshal.AllocHGlobal(24);
+        try
+        {
+            void Write(Guid guid, uint state)
+            {
+                System.Runtime.InteropServices.Marshal.Copy(guid.ToByteArray(), 0, setting, 16);
+                System.Runtime.InteropServices.Marshal.WriteInt32(setting, 16, 4);
+                System.Runtime.InteropServices.Marshal.WriteInt32(setting, 20, (int)state);
+            }
+            Write(display, 0);
+            Assert.False(IslandNative.DisplayOn(change, setting));
+            Write(display, 1);
+            Assert.True(IslandNative.DisplayOn(change, setting));
+            Write(display, 2);
+            Assert.True(IslandNative.DisplayOn(change, setting)); // dimmed is still seen
+            Assert.Null(IslandNative.DisplayOn(0x000A, setting)); // another power event
+            Write(Guid.NewGuid(), 0);
+            Assert.Null(IslandNative.DisplayOn(change, setting)); // another setting
+            Assert.Null(IslandNative.DisplayOn(change, 0));
+        }
+        finally
+        {
+            System.Runtime.InteropServices.Marshal.FreeHGlobal(setting);
+        }
+    }
+
+    [Fact]
     public void With_reduced_motion_the_unfold_and_the_lift_snap()
     {
         var motion = Chippi.UI.Themes.Motion.Override;

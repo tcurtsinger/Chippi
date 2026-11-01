@@ -122,8 +122,9 @@ public class ChippiPet : UserControl
     public static readonly DependencyProperty MoodProperty = DependencyProperty.Register(
         nameof(Mood), typeof(PetMood), typeof(ChippiPet), new PropertyMetadata(PetMood.Idle, OnMoodChanged));
 
+    // A size that isn't a number, is negative or is endless is refused here, not deep in layout.
     public static readonly DependencyProperty SizeProperty = DependencyProperty.Register(
-        nameof(Size), typeof(double), typeof(ChippiPet), new PropertyMetadata(28.0, OnSizeChanged));
+        nameof(Size), typeof(double), typeof(ChippiPet), new PropertyMetadata(28.0, OnSizeChanged), v => v is double d && double.IsFinite(d) && d >= 0);
 
     /// <summary>
     /// The pet's color. Inherited: set on a host (the island's panel), it reaches every pet inside, including one on a
@@ -283,6 +284,7 @@ public class ChippiPet : UserControl
 
         Loaded += (_, _) =>
         {
+            Motion.Changed -= OnMotionChanged; // WPF can raise Loaded twice: one handler, or the static event holds the pet
             Motion.Changed += OnMotionChanged;
             UpdateBlinkTimer();
             UpdateBreathing();
@@ -380,6 +382,9 @@ public class ChippiPet : UserControl
     internal ScaleTransform YawnMouth => _yawn.MouthScale;
 
     internal Canvas HeldFace => _held.Root;
+
+    /// <summary>How many faces show now: one, whatever overlaps (a boop, a yawn, being picked up mid-change).</summary>
+    internal int FacesShown => Faces.Count(f => f.Root.Opacity > 0);
 
     /// <summary>The glance's shift on the open-eyed faces' pupils (idle, wide awake).</summary>
     internal TranslateTransform? Pupils => FaceFor(_shown).Pupils;
@@ -589,6 +594,7 @@ public class ChippiPet : UserControl
         _bandPulse.BeginAnimation(ScaleTransform.ScaleXProperty, null);
         _bandPulse.BeginAnimation(ScaleTransform.ScaleYProperty, null);
         _yawn.Reset();
+        _yawnEnds = 0;
 
         animate = animate && IsLoaded && !Motion.IsReduced && !small && from is not null && (from != mood || replay);
         // Picked up, the round eyes stay over whatever the mood is until he's set down.
@@ -708,23 +714,28 @@ public class ChippiPet : UserControl
         UpdateBreathing(settle: animate);
     }
 
-    // The hop owns his squish until it lands: a nod, a boop or a beat meanwhile would cut it short.
-    private long _hopEnds;
+    // The hop owns his squish until it lands: a nod, a boop or a beat meanwhile would cut it short. A yawn owns his face
+    // and its stretch until the next face comes in: a glance or a beat waits for it; a boop or being picked up ends it.
+    private long _hopEnds, _yawnEnds;
 
     private bool Hopping => Environment.TickCount64 < _hopEnds;
 
-    /// <summary>Picked up, the round eyes cross-fade over his face; set down, his face comes back and he lands with a squish.</summary>
+    private bool Yawning => Environment.TickCount64 < _yawnEnds;
+
+    /// <summary>Picked up, the round eyes take his face; set down, his face comes back and he lands with a squish.</summary>
     private void ShowHeld(bool held)
     {
         if (IsSmall)
             return;
         bool animate = IsLoaded && !Motion.IsReduced;
-        var face = FaceFor(_shown);
+        var face = held ? _held : FaceFor(_shown);
         if (!held)
             face.Reset();
-        // At once, both ways: a cross-fade would show both faces at the same time.
-        Fade(_held.Root, held ? 1 : 0, TimeSpan.Zero, TimeSpan.Zero);
-        Fade(face.Root, held ? 0 : 1, TimeSpan.Zero, TimeSpan.Zero);
+        // At once, both ways, and every other face with it: a cross-fade, a face still closing as he falls asleep, a grin
+        // or a yawn would show two faces at the same time.
+        _yawnEnds = 0;
+        foreach (var other in Faces)
+            Fade(other.Root, other == face ? 1 : 0, TimeSpan.Zero, TimeSpan.Zero);
         if (!held && animate && !Hopping)
             Squash(1.06, 0.94, LandPeak, LandEnd);
         UpdateBlinkTimer();
@@ -736,7 +747,7 @@ public class ChippiPet : UserControl
     /// </summary>
     public void Glance(int direction)
     {
-        if (!IsLoaded || Motion.IsReduced || IsSmall || IsHeld || direction == 0)
+        if (!IsLoaded || Motion.IsReduced || IsSmall || IsHeld || Yawning || direction == 0)
             return;
         var face = FaceFor(_shown);
         if (face.Pupils is { } pupils)
@@ -761,7 +772,13 @@ public class ChippiPet : UserControl
     {
         if (!IsLoaded || Motion.IsReduced || IsSmall || IsHeld)
             return;
-        FaceFor(_shown).Root.BeginAnimation(OpacityProperty, Swap(0, 1, TimeSpan.Zero, YawnSwap));
+        // His face goes as the yawn comes in and is back as it ends; any other still showing (a boop's grin, a face
+        // still closing as he fell asleep) goes with it.
+        var face = FaceFor(_shown);
+        foreach (var other in Faces)
+            if (other != face && other != _yawn)
+                Fade(other.Root, 0, TimeSpan.Zero, TimeSpan.Zero);
+        face.Root.BeginAnimation(OpacityProperty, Swap(0, 1, TimeSpan.Zero, YawnSwap));
         PlayYawn();
         if (!Hopping)
             Squash(0.97, 1.05, YawnStretch, YawnDuration - MoodFade);
@@ -779,10 +796,15 @@ public class ChippiPet : UserControl
         return swap;
     }
 
+    /// <summary>A face's opacity as it is until <paramref name="at"/>, then <paramref name="to"/>, held.</summary>
+    private static DoubleAnimationUsingKeyFrames Then(double to, TimeSpan at) =>
+        new() { KeyFrames = { new DiscreteDoubleKeyFrame(to, KeyTime.FromTimeSpan(at)) } };
+
     /// <summary>The yawn's face: in at once, the mouth opening wide by 450ms and closing by 1.1s, out at once as the next face comes in.</summary>
     private void PlayYawn()
     {
         _yawn.Reset();
+        _yawnEnds = Environment.TickCount64 + (long)YawnSwap.TotalMilliseconds;
         _yawn.Root.BeginAnimation(OpacityProperty, Swap(1, 0, TimeSpan.Zero, YawnSwap));
         var open = new DoubleAnimationUsingKeyFrames { Duration = new Duration(YawnDuration), FillBehavior = FillBehavior.Stop };
         open.KeyFrames.Add(new DiscreteDoubleKeyFrame(0.3, KeyTime.FromTimeSpan(TimeSpan.Zero)));
@@ -797,25 +819,31 @@ public class ChippiPet : UserControl
     {
         if (IsSmall || IsHeld)
             return;
+        // The grin comes in at the squish's deepest point and goes at once, as the celebration's face does. Whatever shows
+        // until then (his face, a yawn, a face still closing) goes as it comes, so one face shows at a time.
         var face = FaceFor(_shown);
-        if (face != _celebrating)
+        var at = Motion.IsReduced ? TimeSpan.Zero : NodPeak;
+        foreach (var other in Faces)
         {
-            // The grin comes in at the squish's deepest point and goes at once, as the celebration's face does.
-            var at = Motion.IsReduced ? TimeSpan.Zero : NodPeak;
-            face.Root.BeginAnimation(OpacityProperty, Swap(0, 1, at, BoopHold));
-            _celebrating.Root.BeginAnimation(OpacityProperty, Swap(1, 0, at, BoopHold));
+            if (other == _celebrating)
+                other.Root.BeginAnimation(OpacityProperty, face == _celebrating ? Then(1, at) : Swap(1, 0, at, BoopHold));
+            else if (other == face)
+                other.Root.BeginAnimation(OpacityProperty, Swap(0, 1, at, BoopHold));
+            else if (other.Root.Opacity > 0 || other.Root.HasAnimatedProperties)
+                other.Root.BeginAnimation(OpacityProperty, Then(0, at));
         }
+        _yawnEnds = 0;
         if (!Motion.IsReduced && !Hopping)
             Squash(1.08, 0.92, NodPeak, TimeSpan.FromMilliseconds(360));
     }
 
     /// <summary>
     /// A beat in the music he's listening to, <paramref name="strength"/> 0 to 1: a dip from the bottom center and a pulse
-    /// of the headphones' band. Only while listening, with motion, and never over the hop.
+    /// of the headphones' band. Only while listening, with motion, and never over the hop or a yawn.
     /// </summary>
     public void Beat(double strength)
     {
-        if (!IsLoaded || Motion.IsReduced || IsSmall || IsHeld || _shown != PetMood.Listening || Hopping)
+        if (!IsLoaded || Motion.IsReduced || IsSmall || IsHeld || _shown != PetMood.Listening || Hopping || Yawning || !double.IsFinite(strength))
             return;
         double s = Math.Clamp(strength, 0, 1);
         Squash(1 + 0.025 * s, 1 - 0.04 * s, BeatPeak, BeatEnd);
@@ -867,7 +895,8 @@ public class ChippiPet : UserControl
         _sparkBurst.BeginAnimation(ScaleTransform.ScaleYProperty, burst);
     }
 
-    private bool CanBreathe => IsLoaded && IsVisible && !Motion.IsReduced && _shown == PetMood.Sleepy;
+    // Shown, with motion, and seen: locked or with the display off, nobody watches him breathe all night.
+    private bool CanBreathe => IsLoaded && IsVisible && !Motion.IsReduced && !Motion.IsUnseen && _shown == PetMood.Sleepy;
 
     private void UpdateBreathing(bool settle = false) => SetBreathing(CanBreathe, settle);
 
@@ -969,7 +998,7 @@ public class ChippiPet : UserControl
         });
 
     // The small form has one face for every mood, and blinks only in the moods whose eyes are open.
-    private bool CanBlink => IsLoaded && IsVisible && !Motion.IsReduced && (IsSmall ? _shown is PetMood.Idle or PetMood.WideAwake : FaceFor(_shown).CanBlink);
+    private bool CanBlink => IsLoaded && IsVisible && !Motion.IsReduced && !Motion.IsUnseen && (IsSmall ? _shown is PetMood.Idle or PetMood.WideAwake : FaceFor(_shown).CanBlink);
 
     private void UpdateBlinkTimer()
     {

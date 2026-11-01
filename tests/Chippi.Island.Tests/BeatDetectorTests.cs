@@ -54,6 +54,17 @@ public sealed class BeatDetectorTests
         Assert.NotEmpty(Feed(loud, level));
     }
 
+    [Fact]
+    public void A_reading_that_isnt_a_level_is_skipped_and_the_beats_go_on()
+    {
+        // A driver's NaN or infinity among the kicks is skipped, and a negative reads as silence: the kicks beat as before.
+        var beats = new BeatDetector();
+        var level = Enumerable.Range(0, 200).Select(i => i % 17 == 0 ? 0.7f : i % 23 == 0 ? float.NaN : i % 29 == 0 ? float.PositiveInfinity : i % 31 == 0 ? -1f : 0.25f);
+        var found = Feed(beats, level);
+        Assert.InRange(found.Count, 10, 12);
+        Assert.All(found, b => Assert.InRange(b.Strength, 0.3, 1));
+    }
+
     private static List<(TimeSpan At, double Strength)> Feed(BeatDetector beats, IEnumerable<float> level)
     {
         var found = new List<(TimeSpan, double)>();

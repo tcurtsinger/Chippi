@@ -14,6 +14,7 @@ namespace Chippi.UI.Themes;
 public static class Motion
 {
     private static bool? _override;
+    private static bool _unseen;
 
     static Motion() =>
         SystemParameters.StaticPropertyChanged += (_, e) =>
@@ -22,11 +23,27 @@ public static class Motion
                 Changed?.Invoke(null, EventArgs.Empty);
         };
 
-    /// <summary>Raised when <see cref="IsReduced"/> may have changed.</summary>
+    /// <summary>Raised when <see cref="IsReduced"/> or <see cref="IsUnseen"/> may have changed.</summary>
     public static event EventHandler? Changed;
 
     /// <summary>True means no blink, no squish and instant mood and state swaps.</summary>
     public static bool IsReduced => _override ?? !SystemParameters.ClientAreaAnimation;
+
+    /// <summary>
+    /// True while no one can see the screen (the session locked, or the display off): the loops that run on their own,
+    /// Chippi's breathing and blinks and the bar's song and equalizer, rest until it's seen again. The island's host sets it.
+    /// </summary>
+    public static bool IsUnseen
+    {
+        get => _unseen;
+        set
+        {
+            if (_unseen == value)
+                return;
+            _unseen = value;
+            Changed?.Invoke(null, EventArgs.Empty);
+        }
+    }
 
     /// <summary>The user's setting (AppSettings.ReduceMotion): null follows Windows.</summary>
     public static bool? Override
