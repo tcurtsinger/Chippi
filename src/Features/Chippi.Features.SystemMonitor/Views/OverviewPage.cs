@@ -16,17 +16,22 @@ namespace Chippi.Features.SystemMonitor.Views;
 internal sealed class Present(SystemMonitorModule module)
 {
     private int _zoneCount;
+    private SystemSnapshot? _gpusOf;
+    private IReadOnlyList<GpuReading> _gpus = [];
 
     public SystemMonitorSettings Settings => module.Settings;
 
     /// <summary>A series' last 120 readings, which the module keeps for every reading the overview graphs.</summary>
     public IReadOnlyList<HistoryPoint> History(string key) => module.Sampler?.History(key) ?? [];
 
-    /// <summary>The GPUs that have reported load this session, in the order the snapshot lists them.</summary>
+    /// <summary>The GPUs that have reported load this session, in the order the snapshot lists them; worked out once a snapshot.</summary>
     public IReadOnlyList<GpuReading> Gpus(SystemSnapshot s)
     {
+        if (ReferenceEquals(s, _gpusOf))
+            return _gpus;
         foreach (var g in s.Gpus.Value ?? []) if (g.Load is not null) module.GpusWithLoad.Add(g.Id);
-        return [.. (s.Gpus.Value ?? []).Where(g => module.GpusWithLoad.Contains(g.Id))];
+        _gpusOf = s;
+        return _gpus = [.. (s.Gpus.Value ?? []).Where(g => module.GpusWithLoad.Contains(g.Id))];
     }
 
     public GpuReading? Gpu(SystemSnapshot s) => Pick.Gpu(Gpus(s), Settings.GpuId, module.GpusWithLoad);
@@ -61,6 +66,13 @@ internal sealed class Present(SystemMonitorModule module)
         return !Settings.IsOn(Reading.ThermalZone) ? 0
             : s.ThermalZones.Status is ReadingStatus.Unavailable or ReadingStatus.Pending or ReadingStatus.NotRead ? _zoneCount
             : s.ThermalZones.Value?.Count ?? 0;
+    }
+
+    /// <summary>Whether the overview has <paramref name="kind"/>'s widget for the snapshot (a detail page's reading still on).</summary>
+    public bool Shows(SystemSnapshot s, Detail kind)
+    {
+        var (loads, rest, drives) = Plan(s);
+        return kind == Detail.Drives ? drives : loads.Contains(kind) || rest.Contains(kind);
     }
 
     /// <summary>The widgets the snapshot has, in their rows: loads, then the rest, then drives.</summary>
@@ -132,21 +144,22 @@ internal sealed class Present(SystemMonitorModule module)
         w.Set(battery.Percent is { } p ? Format.Percent(p) : "", BatteryLine(battery), battery.Percent / 100.0, module.Alerting("low-battery", "battery"));
     }
 
-    /// <summary>An adapter's receive and send histories, and the scale that fits them both.</summary>
+    /// <summary>An adapter's receive and send histories, and the scale that fits them both in the unit shown.</summary>
     public (IReadOnlyList<HistoryPoint> Down, IReadOnlyList<HistoryPoint> Up, double Scale) NetworkHistory(NetworkReading? adapter)
     {
         var down = adapter is null ? [] : History(Series.NetworkReceive(adapter.Id));
         var up = adapter is null ? [] : History(Series.NetworkSend(adapter.Id));
-        return (down, up, GraphScale.Rate(GraphScale.Busiest(down.Concat(up))));
+        return (down, up, GraphScale.Rate(GraphScale.Busiest(down.Concat(up)), Settings.NetworkSpeed));
     }
 
-    /// <summary>The hottest zone's history in the unit shown, its scale (by 25 °C) and that scale written out.</summary>
+    /// <summary>The hottest zone's history in the unit shown, its scale (by 25 °C or 50 °F) and that scale written out.</summary>
     public (IReadOnlyList<HistoryPoint> Points, double Max, string Label, Func<double, double>? Convert) ZoneHistory(ThermalZoneReading? hottest)
     {
         var points = hottest is null ? [] : History(Series.ThermalZone(hottest.Id));
-        double top = GraphScale.Temperature(GraphScale.Busiest(points));
         bool fahrenheit = Settings.Temperature == TemperatureUnit.Fahrenheit;
-        return (points, fahrenheit ? top * 9 / 5 + 32 : top, Format.Temperature(top, Settings.Temperature), fahrenheit ? c => c * 9 / 5 + 32 : null);
+        double busiest = GraphScale.Busiest(points);
+        double top = fahrenheit ? GraphScale.Temperature(busiest * 9 / 5 + 32, 50) : GraphScale.Temperature(busiest);
+        return (points, top, Format.Temperature(fahrenheit ? (top - 32) * 5 / 9 : top, Settings.Temperature), fahrenheit ? c => c * 9 / 5 + 32 : null);
     }
 
     public static string State(BatteryReading battery) =>

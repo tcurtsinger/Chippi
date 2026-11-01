@@ -119,10 +119,13 @@ public sealed class ModuleTests : IDisposable
 
             Assert.Equal(("system-monitor", "System", "Activity", 60), (tile.Spec.Key, tile.Spec.Name, tile.Spec.Icon, tile.Spec.Order));
             Assert.Equal("", tile.PageNote);
-            // With nothing on screen: the overview's readings for their history, and the drives once.
+            // With nothing on screen: the overview's readings for their history, and the drives and the
+            // GPU's sensors once.
             using var status = new SemaphoreSlim(0);
             tile.StatusChanged += (_, _) => status.Release();
-            Assert.Equal(SystemMonitorModule.HistoryNeed(module.Settings), module.Sampler!.Need & ~SensorNeed.Disks);
+            Assert.Equal(SystemMonitorModule.HistoryNeed(module.Settings), module.Sampler!.Need & ~SystemMonitorModule.FirstNeed(module.Settings));
+            Assert.Equal(SensorNeed.Disks | SensorNeed.GpuSensors, SystemMonitorModule.FirstNeed(module.Settings));
+            Assert.Equal(SensorNeed.Disks, SystemMonitorModule.FirstNeed(module.Settings with { Off = [Reading.Gpu] }));
             while (tile.Status != "CPU 25%")
                 Assert.True(status.Wait(Wait));
             var waited = System.Diagnostics.Stopwatch.StartNew();

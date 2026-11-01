@@ -103,7 +103,7 @@ public sealed class SystemMonitorModule : IFeatureModule
             HandleEscape = () => _view?.Back() == true,
         });
         lock (_gate)
-            _historyWatch = Sampler.Watch(HistoryNeed(Settings) | SensorNeed.Disks); // the drives once, so the page first opens laid out
+            _historyWatch = Sampler.Watch(HistoryNeed(Settings) | FirstNeed(Settings));
         context.Activation.Register(OpenVerb, _ => context.OpenIslandPage(TileKey));
         SystemEvents.PowerModeChanged += OnPowerModeChanged;
         return Task.CompletedTask;
@@ -153,7 +153,7 @@ public sealed class SystemMonitorModule : IFeatureModule
         lock (_gate)
         {
             if (_historyWatch is not null)
-                _historyWatch.Need = HistoryNeed(Settings) | (_drivesKnown ? SensorNeed.None : SensorNeed.Disks);
+                _historyWatch.Need = HistoryNeed(Settings) | (_drivesKnown ? SensorNeed.None : FirstNeed(Settings));
         }
         if (Sampler?.Latest is { } latest)
             UpdateTile(latest);
@@ -162,8 +162,8 @@ public sealed class SystemMonitorModule : IFeatureModule
 
     /// <summary>
     /// What's read all the time: every reading the overview graphs or shows a level of, so its history
-    /// is full when the page opens. It covers the tile's status too, which is always one of them. About
-    /// 5 ms a read on the owner's PC, GPU load 2.8 ms of it (2026-11-01).
+    /// is full when the page opens. It covers the tile's status too, which is always one of them. 1.2 ms
+    /// a read on the owner's PC, the GPU's load without its temperature, fan or processes (2026-11-01).
     /// </summary>
     internal static SensorNeed HistoryNeed(SystemMonitorSettings settings)
     {
@@ -177,18 +177,28 @@ public sealed class SystemMonitorModule : IFeatureModule
         return need;
     }
 
+    /// <summary>
+    /// What the first read adds: the drives, and the GPU's temperature and fan, which the history
+    /// doesn't keep, so the page first opens laid out and whole. After it, only a page reads them.
+    /// </summary>
+    internal static SensorNeed FirstNeed(SystemMonitorSettings settings) =>
+        SensorNeed.Disks | (settings.IsOn(Reading.Gpu) ? SensorNeed.GpuSensors : SensorNeed.None);
+
     /// <summary>The tile's status for <paramref name="snapshot"/>: "CPU 12%", "↓ 1.2 MiB/s"; null when the snapshot doesn't have it.</summary>
     internal static string? TileText(SystemSnapshot snapshot, SystemMonitorSettings settings, string? gpuId, string? adapterId) =>
         settings.EffectiveTileStatus() switch
         {
-            TileStatus.Cpu => snapshot.Cpu.Value is { } cpu ? "CPU " + Format.Percent(cpu.Utility) : null,
-            TileStatus.Memory => snapshot.Memory.Value is { } memory ? "Memory " + Format.Percent(memory.UsedPercent) : null,
-            TileStatus.Gpu => Pick.Gpu(snapshot.Gpus.Value, gpuId, null)?.Load is { } load ? "GPU " + Format.Percent(load) : null,
+            TileStatus.Cpu => snapshot.Cpu.Value is { } cpu ? Status("CPU ", Format.Percent(cpu.Utility)) : null,
+            TileStatus.Memory => snapshot.Memory.Value is { } memory ? Status("Memory ", Format.Percent(memory.UsedPercent)) : null,
+            TileStatus.Gpu => Pick.Gpu(snapshot.Gpus.Value, gpuId, null)?.Load is { } load ? Status("GPU ", Format.Percent(load)) : null,
             TileStatus.Network => Pick.Adapter(snapshot.Network.Value, adapterId) is { Connected: true, ReceiveBytesPerSecond: { } rx }
-                ? "↓ " + Format.Rate(rx, settings.NetworkSpeed)
+                ? Status("↓ ", Format.Rate(rx, settings.NetworkSpeed))
                 : null,
             _ => null,
         };
+
+    // A value that isn't a number (a counter's NaN) is no status, not a name alone.
+    private static string? Status(string name, string value) => value.Length > 0 ? name + value : null;
 
     // On the sampler thread. A reading not in this snapshot leaves the last status (a rate starting over).
     // The first drives read is what the page first opens with; after it, only a page reads them.

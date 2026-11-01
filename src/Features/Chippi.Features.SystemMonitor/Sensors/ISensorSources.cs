@@ -21,9 +21,11 @@ public interface IMemorySource
 
 public interface IGpuSource : IDisposable
 {
-    /// <param name="load">Also read engine load and adapter memory, the costly counters: only while a GPU reading is shown.</param>
+    /// <param name="load">Also read engine load and adapter memory, the costly counters: while GPU load is kept or shown.</param>
+    /// <param name="sensors">Also read temperature and fan (D3DKMT, NVML): what a page and the GPU temperature alert show, not the history.</param>
+    /// <param name="processes">Also each process's load, with the load (a GPU page's top apps).</param>
     /// <returns>Adapters with a display driver, without the Microsoft Basic Render Driver; empty when none.</returns>
-    IReadOnlyList<GpuReading> Read(bool load);
+    IReadOnlyList<GpuReading> Read(bool load, bool sensors = true, bool processes = true);
 }
 
 public interface INetworkSource

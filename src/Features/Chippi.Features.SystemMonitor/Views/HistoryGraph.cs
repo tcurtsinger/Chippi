@@ -18,6 +18,11 @@ internal sealed class HistoryGraph : FrameworkElement
     private IReadOnlyList<double?> _points = [], _second = [];
     private double _max = 100;
     private bool _caution;
+    // Brushes and pens, made again only when a theme brush changes: a redraw every read makes only its geometry.
+    private (Brush? Line, bool Caution, Brush Fill, Pen Pen)? _strokes;
+    private (Brush? Hair, Pen Solid, Pen Dashed)? _hairs;
+    private (Brush? Second, Pen Pen)? _secondPen;
+    private Brush? _fade;
 
     public static readonly DependencyProperty LineProperty = Brush(nameof(Line));
     public static readonly DependencyProperty CautionLineProperty = Brush(nameof(CautionLine));
@@ -62,6 +67,11 @@ internal sealed class HistoryGraph : FrameworkElement
     /// <summary>The scale's top (tests read it).</summary>
     internal double Max => _max;
 
+    /// <summary>Whether there's a line to draw: a graph of failed reads has no scale to write.</summary>
+    public bool Drawn => _points.Any(IsValue) || _second.Any(IsValue);
+
+    private static bool IsValue(double? value) => value is { } v && double.IsFinite(v);
+
     public void Set(IReadOnlyList<HistoryPoint> points, double max, IReadOnlyList<HistoryPoint>? second = null, bool caution = false, Func<double, double>? convert = null)
     {
         _points = [.. points.Select(p => p.Value is { } v ? convert?.Invoke(v) ?? v : (double?)null)];
@@ -85,89 +95,94 @@ internal sealed class HistoryGraph : FrameworkElement
         double w = ActualWidth, h = ActualHeight;
         if (w <= 0 || h <= 0)
             return;
-        if (Hair is { } hair)
+        if (Hair is { } hair && (Midline || Baseline))
         {
+            if (!ReferenceEquals(_hairs?.Hair, hair))
+                _hairs = (hair, Frozen(new Pen(hair, 1)), Frozen(new Pen(hair, 1) { DashStyle = new DashStyle([2, 3], 0) }));
             if (Midline)
-                dc.DrawLine(new Pen(hair, 1) { DashStyle = new DashStyle([2, 3], 0) }, new Point(0, Math.Round(h / 2) + 0.5), new Point(w, Math.Round(h / 2) + 0.5));
+                dc.DrawLine(_hairs!.Value.Dashed, new Point(0, Math.Round(h / 2) + 0.5), new Point(w, Math.Round(h / 2) + 0.5));
             if (Baseline)
-                dc.DrawLine(new Pen(hair, 1), new Point(0, h - 0.5), new Point(w, h - 0.5));
+                dc.DrawLine(_hairs!.Value.Solid, new Point(0, h - 0.5), new Point(w, h - 0.5));
         }
         if (FadeIn > 0)
-        {
-            var mask = new LinearGradientBrush([new GradientStop(Color.FromArgb(0, 0, 0, 0), 0), new GradientStop(Colors.Black, 1)], new Point(0, 0), new Point(FadeIn, 0))
+            dc.PushOpacityMask(_fade ??= Frozen(new LinearGradientBrush([new GradientStop(Color.FromArgb(0, 0, 0, 0), 0), new GradientStop(Colors.Black, 1)], new Point(0, 0), new Point(FadeIn, 0))
             {
                 MappingMode = BrushMappingMode.Absolute,
-            };
-            mask.Freeze();
-            dc.PushOpacityMask(mask);
-        }
-        var line = (_caution ? CautionLine : Line) as SolidColorBrush;
-        if (line is not null)
+            }));
+        if ((_caution ? CautionLine : Line) is SolidColorBrush line)
         {
-            var fill = new LinearGradientBrush(
-                [new GradientStop(WithAlpha(line.Color, _caution ? 0.16 : 0.30), 0), new GradientStop(WithAlpha(line.Color, 0.02), 1)], 90);
-            fill.Freeze();
-            foreach (var run in Runs(_points, w, h))
-                dc.DrawGeometry(fill, null, Area(run, h));
-            var pen = new Pen(line, 1.5) { LineJoin = PenLineJoin.Round };
-            foreach (var run in Runs(_points, w, h))
-                dc.DrawGeometry(null, pen, Polyline(run));
+            if (!ReferenceEquals(_strokes?.Line, line) || _strokes?.Caution != _caution)
+            {
+                var fill = new LinearGradientBrush(
+                    [new GradientStop(WithAlpha(line.Color, _caution ? 0.16 : 0.30), 0), new GradientStop(WithAlpha(line.Color, 0.02), 1)], 90);
+                _strokes = (line, _caution, Frozen(fill), Frozen(new Pen(line, 1.5) { LineJoin = PenLineJoin.Round }));
+            }
+            var (area, stroke) = Trace(_points, w, h, area: true);
+            if (area is not null)
+                dc.DrawGeometry(_strokes!.Value.Fill, null, area);
+            if (stroke is not null)
+                dc.DrawGeometry(null, _strokes!.Value.Pen, stroke);
         }
-        if (Second is { } second && _second.Count > 0)
+        if (Second is { } second && _second.Count > 0 && Trace(_second, w, h, area: false).Line is { } dashed)
         {
-            var pen = new Pen(second, 1.25) { DashStyle = new DashStyle([2.4, 2.4], 0) };
-            foreach (var run in Runs(_second, w, h))
-                dc.DrawGeometry(null, pen, Polyline(run));
+            if (!ReferenceEquals(_secondPen?.Second, second))
+                _secondPen = (second, Frozen(new Pen(second, 1.25) { DashStyle = new DashStyle([2.4, 2.4], 0) }));
+            dc.DrawGeometry(null, _secondPen!.Value.Pen, dashed);
         }
         if (FadeIn > 0)
             dc.Pop();
     }
 
-    // Unbroken stretches of points, each placed in one of 120 slots so the newest is at the right edge.
-    private IEnumerable<List<Point>> Runs(IReadOnlyList<double?> values, double w, double h)
+    // Each unbroken stretch of points as a figure of one line geometry, and with area of one fill down
+    // to the bottom, in one pass. Each point sits in one of 120 slots, so the newest is at the right edge;
+    // a lone point is a dot.
+    private (StreamGeometry? Area, StreamGeometry? Line) Trace(IReadOnlyList<double?> values, double w, double h, bool area)
     {
         double step = w / (SamplerCore.HistoryLength - 1);
         int first = SamplerCore.HistoryLength - values.Count;
-        var run = new List<Point>();
-        for (int i = 0; i < values.Count; i++)
+        StreamGeometry? fill = null, line = null;
+        StreamGeometryContext? fillContext = null, lineContext = null;
+        var last = default(Point);
+        int run = 0;
+        for (int i = 0; i <= values.Count; i++)
         {
-            if (values[i] is not { } v || !double.IsFinite(v))
+            if (i < values.Count && values[i] is { } v && double.IsFinite(v))
             {
-                if (run.Count > 0) yield return run;
-                run = [];
+                var point = new Point((first + i) * step, (h - 1) - Math.Clamp(v / _max, 0, 1) * (h - 2));
+                if (run == 0)
+                {
+                    lineContext ??= (line = new StreamGeometry()).Open();
+                    lineContext.BeginFigure(point, false, false);
+                    if (area)
+                    {
+                        fillContext ??= (fill = new StreamGeometry()).Open();
+                        fillContext.BeginFigure(new Point(point.X, h), true, true);
+                    }
+                }
+                else
+                    lineContext!.LineTo(point, true, true);
+                fillContext?.LineTo(point, false, false);
+                last = point;
+                run++;
                 continue;
             }
-            double y = (h - 1) - Math.Clamp(v / _max, 0, 1) * (h - 2);
-            run.Add(new Point((first + i) * step, y));
+            if (run == 1)
+                lineContext!.LineTo(last with { X = last.X + 0.01 }, true, false);
+            if (run > 0)
+                fillContext?.LineTo(new Point(last.X, h), false, false);
+            run = 0;
         }
-        if (run.Count > 0) yield return run;
+        fillContext?.Close();
+        lineContext?.Close();
+        fill?.Freeze();
+        line?.Freeze();
+        return (fill, line);
     }
 
-    private static StreamGeometry Polyline(List<Point> run)
+    private static T Frozen<T>(T freezable) where T : Freezable
     {
-        var geometry = new StreamGeometry();
-        using (var ctx = geometry.Open())
-        {
-            ctx.BeginFigure(run[0], false, false);
-            if (run.Count == 1)
-                ctx.LineTo(run[0] with { X = run[0].X + 0.01 }, true, false);
-            else
-                ctx.PolyLineTo(run.Skip(1).ToList(), true, true);
-        }
-        geometry.Freeze();
-        return geometry;
-    }
-
-    private static StreamGeometry Area(List<Point> run, double h)
-    {
-        var geometry = new StreamGeometry();
-        using (var ctx = geometry.Open())
-        {
-            ctx.BeginFigure(new Point(run[0].X, h), true, true);
-            ctx.PolyLineTo([.. run, new Point(run[^1].X, h)], false, false);
-        }
-        geometry.Freeze();
-        return geometry;
+        freezable.Freeze();
+        return freezable;
     }
 
     private static Color WithAlpha(Color color, double alpha) => Color.FromArgb((byte)Math.Round(color.A * alpha), color.R, color.G, color.B);
@@ -178,12 +193,13 @@ internal sealed class HistoryGraph : FrameworkElement
 
 /// <summary>
 /// A graph's top. CPU and GPU loads fit their history (10, 25, 50 or 100%), so 4% uses the graph
-/// instead of lying on its floor; rates double from 64 KiB/s; temperatures go by 25 °C. Memory and
-/// battery are levels and stay at 100%: a fitted scale would draw 42% as nearly full.
+/// instead of lying on its floor; rates double from 64 KiB/s (in bits, 500 Kbps then 1, 2 and 5 Mbps
+/// and on); temperatures go by 25 °C (50 °F). Memory and battery are levels and stay at 100%: a fitted
+/// scale would draw 42% as nearly full.
 /// </summary>
 internal static class GraphScale
 {
-    private static readonly double[] Loads = [10, 25, 50, 100];
+    private static readonly double[] Loads = [10, 25, 50, 100], BitSteps = [1, 2, 5];
 
     public static double Load(IReadOnlyList<HistoryPoint> points)
     {
@@ -191,16 +207,30 @@ internal static class GraphScale
         return Loads.FirstOrDefault(step => step >= busiest, 100);
     }
 
-    /// <summary>The next of 64 KiB/s, 128, 256… at or above the busiest point, so lines never clip.</summary>
-    public static double Rate(double busiest)
+    /// <summary>
+    /// The first step at or above the busiest point (bytes a second), so lines never clip: 64 KiB/s,
+    /// 128, 256… in bytes, which read whole in binary units; 500 Kbps, 1, 2, 5, 10, 20 Mbps… in bits,
+    /// which read whole in decimal ones ("1074 Mbps" is no scale to read).
+    /// </summary>
+    public static double Rate(double busiest, NetworkUnit unit = NetworkUnit.Bytes)
     {
-        double scale = 64 * 1024;
-        while (scale < busiest) scale *= 2;
-        return scale;
+        if (unit == NetworkUnit.Bytes)
+        {
+            double scale = 64 * 1024;
+            while (scale < busiest) scale *= 2;
+            return scale;
+        }
+        double bits = busiest * 8;
+        if (bits <= 500_000)
+            return 500_000 / 8.0;
+        for (double decade = 1_000_000; ; decade *= 10)
+            foreach (double step in BitSteps)
+                if (step * decade >= bits)
+                    return step * decade / 8;
     }
 
-    /// <summary>The next 25 °C at or above the hottest point.</summary>
-    public static double Temperature(double hottest) => Math.Max(25, Math.Ceiling(hottest / 25) * 25);
+    /// <summary>The next <paramref name="step"/> at or above the hottest point: 25 for °C, 50 for °F.</summary>
+    public static double Temperature(double hottest, double step = 25) => Math.Max(step, Math.Ceiling(hottest / step) * step);
 
     public static double Busiest(IEnumerable<HistoryPoint> points) =>
         points.Select(p => p.Value ?? 0).Where(double.IsFinite).DefaultIfEmpty(0).Max();

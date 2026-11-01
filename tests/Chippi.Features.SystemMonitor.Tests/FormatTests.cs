@@ -24,6 +24,33 @@ public sealed class FormatTests : IDisposable
     public void Percent_is_whole_and_clamped(double value, string expected) => Assert.Equal(expected, Format.Percent(value));
 
     [Fact]
+    public void A_value_that_isnt_a_number_is_written_as_nothing()
+    {
+        Assert.Equal("", Format.Percent(double.NaN));
+        Assert.Equal("", Format.Temperature(double.NaN, TemperatureUnit.Celsius));
+        Assert.Equal("", Format.Rate(double.PositiveInfinity, NetworkUnit.Bytes));
+        Assert.Equal("", Format.Clock(double.NaN));
+        Assert.Equal("", Format.Watts(double.NaN));
+    }
+
+    // A number that would round up to the next unit (or step) is written in it.
+    [Fact]
+    public void Values_at_a_units_edge_move_up_to_the_next()
+    {
+        Assert.Equal("1.0 MiB/s", Format.Rate(1023.7 * 1024, NetworkUnit.Bytes));
+        Assert.Equal("1023 KiB/s", Format.Rate(1023.4 * 1024, NetworkUnit.Bytes));
+        Assert.Equal("100 MiB/s", Format.Rate(99.97 * 1024 * 1024, NetworkUnit.Bytes));
+        Assert.Equal("1.0 Mbps", Format.Rate(999.7 * 1000 / 8, NetworkUnit.Bits));
+        Assert.Equal("1.00 TiB", Format.Size(1024 * GiB - (1UL << 20)));
+        Assert.Equal("1023 GiB", Format.Size(1023 * GiB));
+        Assert.Equal("100 GiB", Format.Size((ulong)(99.97 * GiB)));
+        Assert.Equal("10.0 TiB", Format.Size((ulong)(9.999 * 1024 * GiB)));
+        Assert.Equal("0 KiB", Format.Size(0));
+        Assert.Equal("1.00 of 1.00 TiB", Format.Of(1024 * GiB - 1, 1024 * GiB - 1));
+        Assert.Equal("128 MiB/s", Format.Rate(128 * 1024 * 1024, NetworkUnit.Bytes, whole: true));
+    }
+
+    [Fact]
     public void Sizes_are_binary_up_to_TiB()
     {
         Assert.Equal("612 GiB", Format.Size(612 * GiB));

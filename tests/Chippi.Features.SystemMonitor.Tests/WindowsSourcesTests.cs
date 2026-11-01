@@ -56,6 +56,9 @@ public sealed class WindowsSourcesTests
             if (g.FanPercent is { } percent)
                 Assert.InRange(percent, 0U, 100U);        });
         Assert.Equal(gpus.Count, gpus.Select(g => g.Id).Distinct(StringComparer.OrdinalIgnoreCase).Count());
+        // The history's read: load without temperature, fan or each process's load.
+        Assert.All(sources.Gpu.Read(load: true, sensors: false, processes: false),
+            g => Assert.True(g is { TemperatureC: null, FanRpm: null, FanPercent: null, ProcessLoads: null }));
 
         Assert.Equal(network.Count, network.Select(n => n.Id).Distinct().Count());
         Assert.All(network, n =>
@@ -92,6 +95,25 @@ public sealed class WindowsSourcesTests
         }
 
         Assert.All(zones, z => Assert.InRange(z.TemperatureC, -50, 150));
+    }
+
+    // Before a rate counter's second collection PDH may say it has no data on either of its calls
+    // (GPU Engine says so only on the second): no values, never a failed read.
+    [Fact]
+    public void A_rate_counter_has_no_values_until_its_second_collection()
+    {
+        using var query = new PdhQuery();
+        nint counter;
+        try { counter = query.Add(@"\GPU Engine(*)\Utilization Percentage"); }
+        catch (PdhException) { counter = query.Add(@"\Processor(*)\% Processor Time"); } // CI's GPU has no engine counters
+        query.Collect();
+        foreach (var instance in query.Instances(counter))
+            Assert.Null(instance.Value);
+        Thread.Sleep(1000);
+        query.Collect();
+        var values = query.Values(counter);
+        Assert.NotEmpty(values);
+        Assert.All(values, v => Assert.False(string.IsNullOrEmpty(v.Name)));
     }
 
     [Fact]

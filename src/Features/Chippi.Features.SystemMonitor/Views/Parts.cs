@@ -57,16 +57,16 @@ internal static class Parts
         return card;
     }
 
-    /// <summary>The top line of a widget: glyph, name, and one fact at the right.</summary>
+    /// <summary>The top line of a widget: glyph, name, and one fact at the right, which trims before the name does (a long adapter name).</summary>
     public static DockPanel TopLine(Geometry glyph, string name, Look look, out TextBlock fact)
     {
-        fact = Text("", look.Small, look.Tertiary);
-        fact.Margin = new Thickness(8, 0, 0, 0);
-        DockPanel.SetDock(fact, Dock.Right);
         var icon = Glyph(glyph, 14, look.Tertiary);
         icon.Margin = new Thickness(0, 0, 6, 0);
         var label = Text(name, look.Name, look.Tertiary);
-        return new DockPanel { Height = 16, LastChildFill = false, Children = { fact, icon, label } };
+        fact = Text("", look.Small, look.Tertiary);
+        fact.Margin = new Thickness(8, 0, 0, 0);
+        fact.TextAlignment = TextAlignment.Right;
+        return new DockPanel { Height = 16, Children = { icon, label, fact } };
     }
 
     /// <summary>"23%" as "23" and "%", "2.4 MiB/s" as "2.4" and "MiB/s"; text that isn't a value has no unit.</summary>
@@ -171,7 +171,8 @@ internal sealed class Hero : TextBlock
         _number.Text = number;
         _unit.Text = unit.Length == 0 ? "" : (spaced ? " " : "") + unit;
         bool reading = unit.Length > 0 || value.Length > 0 && (char.IsDigit(value[0]) || value.Length > 1 && value[0] == '+' && char.IsDigit(value[1]));
-        FontSize = reading ? _size : Math.Min(_look.Name, _size);
+        // A blank value (a rate starting over) keeps the number's line, so the line under it doesn't jump.
+        FontSize = reading || value.Length == 0 ? _size : Math.Min(_look.Name, _size);
         FontWeight = reading ? FontWeights.SemiBold : FontWeights.Normal;
         _unit.FontSize = _unitSize;
         SetResourceReference(ForegroundProperty, caution ? Look.Caution : reading ? _look.Text : _look.Tertiary);

@@ -29,7 +29,7 @@ Bolder and layout pass (2026-11-01; the owner took the recommended set): the det
 - **Top card:** whatever the cards under it leave (174 on CPU, GPU and Memory; the whole body on Network with one adapter).
   - The value at 32 / 600 with one secondary reading on the right.
   - A 120-sample graph from the sampler's history, from under the value out to the card's sides (and its bottom when nothing sits under it): an accent line over an accent fade and a dashed midline. Its scale is written under the secondary reading, where the line can't run over it.
-  - **Scales:** CPU and GPU fit their history: 10, 25, 50 or 100%, so 4% CPU uses the graph instead of lying on its floor. Network doubles from 64 KiB/s. Temperature goes by 25 °C. Memory and Battery are levels and stay at 100%: a fitted scale would draw 42% as nearly full.
+  - **Scales:** CPU and GPU fit their history: 10, 25, 50 or 100%, so 4% CPU uses the graph instead of lying on its floor. Network doubles from 64 KiB/s (in bits: 500 Kbps, then 1, 2 and 5 Mbps and on). Temperature goes by 25 °C (50 °F). Memory and Battery are levels and stay at 100%: a fitted scale would draw 42% as nearly full.
   - One 18 tall strip under the graph. The CPU's bars fill in the accent, at the graph's scale.
 - **Cards under it** take the height their rows need. Top apps (3 rows) sit next to the facts (122 tall), their rows level across the two cards. The facts never repeat the top card.
 

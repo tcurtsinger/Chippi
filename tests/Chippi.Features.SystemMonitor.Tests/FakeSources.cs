@@ -40,10 +40,17 @@ internal sealed class FakeSources :
         return Memory();
     }
 
-    IReadOnlyList<GpuReading> IGpuSource.Read(bool load)
+    IReadOnlyList<GpuReading> IGpuSource.Read(bool load, bool sensors, bool processes)
     {
         Interlocked.Increment(ref _gpuReads);
-        return Gpu(load);
+        // As the real source: no temperature or fan without sensors, no process loads without processes.
+        return [.. Gpu(load).Select(g => g with
+        {
+            TemperatureC = sensors ? g.TemperatureC : null,
+            FanRpm = sensors ? g.FanRpm : null,
+            FanPercent = sensors ? g.FanPercent : null,
+            ProcessLoads = processes ? g.ProcessLoads : null,
+        })];
     }
 
     IReadOnlyList<NetworkReading> INetworkSource.Read()

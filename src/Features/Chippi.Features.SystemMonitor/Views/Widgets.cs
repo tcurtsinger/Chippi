@@ -22,6 +22,7 @@ internal enum Detail { Cpu, Gpu, Memory, Network, Drives, Battery, Temperature }
 internal class Widget
 {
     private readonly TextBlock _fact;
+    private bool? _factCaution;
 
     public Widget(Detail kind, Geometry glyph, string name, Look look, Action<Detail>? open)
     {
@@ -71,7 +72,11 @@ internal class Widget
     {
         _fact.Text = fact;
         _fact.ToolTip = fact.Length > 0 ? fact : null;
-        _fact.SetResourceReference(TextBlock.ForegroundProperty, caution ? Look.Caution : Look.Tertiary);
+        if (_factCaution != caution)
+        {
+            _factCaution = caution;
+            _fact.SetResourceReference(TextBlock.ForegroundProperty, caution ? Look.Caution : Look.Tertiary);
+        }
     }
 
     /// <summary>Names the widget for UI Automation with what it shows ("CPU, 23%, 4.18 GHz").</summary>
@@ -162,11 +167,12 @@ internal sealed class NetworkWidget : Widget
         if (wide)
         {
             // The values' column ends where the graph starts: 245 into the island's 496, 345 into Settings' 760.
+            // Wider values ("1023 KiB/s" both ways) move the graph's start over rather than clip.
             var row = new Grid { Margin = new Thickness(0, look == Look.Island ? 4 : 6, 0, 0) };
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(look == Look.Island ? 233 : 329) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto, MinWidth = look == Look.Island ? 233 : 329 });
             row.ColumnDefinitions.Add(new ColumnDefinition());
             var up = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(16, 0, 0, 0), Children = { _upArrow, _up } };
-            row.Children.Add(new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Top, Children = { down, up } });
+            row.Children.Add(new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 0, 12, 0), Children = { down, up } });
             Graph = new HistoryGraph(look)
             {
                 Midline = false, Baseline = false, BottomRadius = look.InnerRadius, RoundLeft = false, FadeIn = 40,
@@ -327,6 +333,7 @@ internal sealed class DrivesWidget : Widget
         private readonly Run _free = new() { FontWeight = FontWeights.SemiBold }, _rest = new();
         private readonly Meter _meter;
         private readonly Look _look;
+        private bool? _caution;
 
         public DriveCell(Look look)
         {
@@ -352,7 +359,11 @@ internal sealed class DrivesWidget : Widget
         {
             _letter.Text = Letter(volume);
             _free.Text = Format.Size(volume.FreeBytes);
-            _free.SetResourceReference(TextElement.ForegroundProperty, caution ? Look.Caution : _look.Text);
+            if (_caution != caution)
+            {
+                _caution = caution;
+                _free.SetResourceReference(TextElement.ForegroundProperty, caution ? Look.Caution : _look.Text);
+            }
             _rest.Text = solo ? " free of " + Format.Size(volume.TotalBytes) : " free";
             _meter.Set(volume.TotalBytes == 0 ? 0 : 1 - (double)volume.FreeBytes / volume.TotalBytes, caution);
             ToolTip = $"{Letter(volume)} {Format.Size(volume.FreeBytes)} free of {Format.Size(volume.TotalBytes)}";

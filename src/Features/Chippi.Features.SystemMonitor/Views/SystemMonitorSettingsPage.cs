@@ -255,7 +255,9 @@ public sealed class SystemMonitorSettingsPage : UserControl
             _sync.Add(s => summary.Text = _gpus.Keys.Any(s.GpuTemperature.Limits.ContainsKey)
                 ? string.Join(", ", _gpus.Keys.Where(s.GpuTemperature.Limits.ContainsKey).Select(id => Format.Temperature(s.GpuTemperature.Limits[id], s.Temperature)))
                 : "Set a limit");
-            alerts.Children.Add(SettingsLayout.Expander("GPU temperature", summary, toggle, [.. _gpus.Select(g => GpuLimit(g.Key, g.Value))]));
+            // Two of the same card read "#2", as the island names them.
+            var names = Parts.Distinct(_gpus.Values);
+            alerts.Children.Add(SettingsLayout.Expander("GPU temperature", summary, toggle, [.. _gpus.Keys.Select((id, i) => GpuLimit(id, names[i]))]));
         }
         alerts.Children.Add(Row("Repeat interval", Choice("Repeat interval", SystemMonitorSettings.RepeatChoices,
             n => n % 60 == 0 ? $"{n / 60} hour" + (n == 60 ? "" : "s") : $"{n} minutes", s => s.RepeatMinutes, (s, n) => s with { RepeatMinutes = n })));
@@ -366,8 +368,13 @@ public sealed class SystemMonitorSettingsPage : UserControl
         combo.Width = 240;
         var names = Parts.Distinct(choices.Select(c => c.Name));
         for (int i = 0; i < choices.Count; i++)
-            combo.Items.Add(new ComboBoxItem { Tag = choices[i].Id, Content = names[i], ToolTip = choices[i].Name });
-        _sync.Add(s => combo.SelectedItem = combo.Items.Cast<ComboBoxItem>().FirstOrDefault(i => string.Equals((string)i.Tag, get(s), StringComparison.OrdinalIgnoreCase)));
+            combo.Items.Add(new ComboBoxItem { Tag = choices[i].Id, Content = names[i], ToolTip = names[i] });
+        // A long name clips in the box; its tooltip has the whole of it.
+        _sync.Add(s =>
+        {
+            combo.SelectedItem = combo.Items.Cast<ComboBoxItem>().FirstOrDefault(i => string.Equals((string)i.Tag, get(s), StringComparison.OrdinalIgnoreCase));
+            combo.ToolTip = (combo.SelectedItem as ComboBoxItem)?.ToolTip;
+        });
         combo.SelectionChanged += (_, _) => { if (combo.SelectedItem is ComboBoxItem { Tag: string id }) Save(s => set(s, id)); };
         return combo;
     }

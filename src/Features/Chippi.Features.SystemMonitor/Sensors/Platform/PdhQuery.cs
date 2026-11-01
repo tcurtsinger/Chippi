@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 namespace Chippi.Features.SystemMonitor.Sensors.Platform;
 
 /// <summary>
 /// A PDH query with English counter paths, so it works on any display language. Rate counters need
-/// two collections; until then their values are null.
+/// two collections; until then their values are null. Wildcard counters are read into one buffer the
+/// query keeps, so a read of hundreds of instances (GPU Engine) allocates nothing.
 /// </summary>
 internal sealed class PdhQuery : IDisposable
 {
@@ -23,6 +25,8 @@ internal sealed class PdhQuery : IDisposable
     private const uint FormatNoCap100 = 0x00008000;
 
     private nint _query;
+    // Pinned for its life: the instance names PDH writes into it are pointers into it.
+    private byte[] _buffer = [];
 
     public PdhQuery() => Check(PdhOpenQueryW(null, 0, out _query), "PdhOpenQuery");
 
@@ -44,29 +48,79 @@ internal sealed class PdhQuery : IDisposable
     }
 
     /// <summary>Every instance of a wildcard counter; an instance without a valid value yet has a null value.</summary>
-    public unsafe List<(string Name, double? Value)> Values(nint counter)
+    public List<(string Name, double? Value)> Values(nint counter)
+    {
+        var instances = Instances(counter);
+        var list = new List<(string, double?)>(instances.Count);
+        foreach (var instance in instances)
+            list.Add((instance.Name.ToString(), instance.Value));
+        return list;
+    }
+
+    /// <summary>
+    /// Every instance of a wildcard counter, its name read in place: valid until the next read. None
+    /// while the counter has no data (a rate's first collection), however PDH says so.
+    /// </summary>
+    public unsafe InstanceList Instances(nint counter)
     {
         const uint format = FormatDouble | FormatNoCap100;
-        uint size = 0;
-        uint status = PdhGetFormattedCounterArrayW(counter, format, ref size, out _, null);
-        if (status is InvalidData or CounterInvalidData or NegativeDenominator or NoData || size == 0)
-            return [];
-        if (status != MoreData)
-            Check(status, "PdhGetFormattedCounterArray");
-        var buffer = new byte[size];
-        fixed (byte* p = buffer)
+        for (int attempt = 0; attempt < 4; attempt++)
         {
-            Check(PdhGetFormattedCounterArrayW(counter, format, ref size, out uint count, p), "PdhGetFormattedCounterArray");
-            var items = (Item*)p;
-            var list = new List<(string, double?)>((int)count);
-            for (int i = 0; i < count; i++)
-            {
-                // CStatus 0 (valid) or 1 (new data); anything else is no value yet or a failed instance.
-                double? value = items[i].Status <= 1 ? items[i].Value : null;
-                list.Add((new string(items[i].Name), value));
-            }
-            return list;
+            uint size = (uint)_buffer.Length;
+            uint status;
+            uint count;
+            fixed (byte* p = _buffer)
+                status = PdhGetFormattedCounterArrayW(counter, format, ref size, out count, p);
+            if (status == 0)
+                return new InstanceList(_buffer, (int)count);
+            if (status is InvalidData or CounterInvalidData or NegativeDenominator or NoData)
+                return default;
+            if (status != MoreData)
+                Check(status, "PdhGetFormattedCounterArray");
+            // Too small, or the first read. PDH says the size it needs reliably only when asked with
+            // no buffer, and instances come and go between calls, so leave room.
+            size = 0;
+            status = PdhGetFormattedCounterArrayW(counter, format, ref size, out _, null);
+            if (status is InvalidData or CounterInvalidData or NegativeDenominator or NoData || status == 0 || size == 0)
+                return default;
+            if (status != MoreData)
+                Check(status, "PdhGetFormattedCounterArray");
+            _buffer = GC.AllocateUninitializedArray<byte>(checked((int)(size + size / 4)), pinned: true);
         }
+        throw new PdhException("PdhGetFormattedCounterArray", MoreData);
+    }
+
+    /// <summary>A wildcard counter's instances, in the query's buffer.</summary>
+    public readonly ref struct InstanceList(byte[]? buffer, int count)
+    {
+        public int Count => buffer is null ? 0 : count;
+
+        public Enumerator GetEnumerator() => new(buffer, Count);
+
+        public unsafe ref struct Enumerator(byte[]? buffer, int count)
+        {
+            private int _index = -1;
+
+            public bool MoveNext() => ++_index < count;
+
+            public readonly Instance Current
+            {
+                get
+                {
+                    var item = ((Item*)Unsafe.AsPointer(ref MemoryMarshal.GetArrayDataReference(buffer!)))[_index];
+                    // CStatus 0 (valid) or 1 (new data); anything else is no value yet or a failed instance.
+                    return new Instance(MemoryMarshal.CreateReadOnlySpanFromNullTerminated(item.Name), item.Status <= 1 ? item.Value : null);
+                }
+            }
+        }
+    }
+
+    /// <summary>One instance: its name ("pid_4_luid_…_engtype_3D", "0,3") and value.</summary>
+    public readonly ref struct Instance(ReadOnlySpan<char> name, double? value)
+    {
+        public ReadOnlySpan<char> Name { get; } = name;
+
+        public double? Value { get; } = value;
     }
 
     public void Dispose()
