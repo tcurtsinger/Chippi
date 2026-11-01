@@ -154,6 +154,9 @@ internal sealed class NowPlayingView : UserControl
     /// <summary>ChippiPet's color here, the user's choice in Settings › Island &amp; pet.</summary>
     internal void SetPetColor(PetColor color) => _artPet.PetColor = _asleep.PetColor = color;
 
+    /// <summary>A beat in the music: the cover's Chippi, if he's showing, bobs to it.</summary>
+    internal void Beat(double strength) => _artPet.Beat(strength);
+
     private static LucideIcon Glyph(Geometry data, double size) => new() { Data = data, Size = size, Filled = true };
 
     private static Button Transport(LucideIcon icon, double box, string name, Func<Task> run)

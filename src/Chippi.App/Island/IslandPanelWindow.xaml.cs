@@ -276,6 +276,16 @@ public partial class IslandPanelWindow : Window
     /// <summary>The footer's Chippi wears the widget's mood (listening, wide awake…), so the two match where one becomes the other.</summary>
     internal void ShowPetMood(PetMood mood) => _grid.Pet.ShowMood(mood);
 
+    /// <summary>A beat in the music: every Chippi in the panel that's listening bobs to it (each checks for itself).</summary>
+    internal void Beat(double strength)
+    {
+        if (!IsOpen)
+            return;
+        _grid.Pet.Beat(strength);
+        _grid.Media.Beat(strength);
+        _nowPlaying?.Beat(strength);
+    }
+
     /// <summary>The running features' island tiles, in grid order. A page whose tile went away falls back to the grid.</summary>
     public void SetTiles(IReadOnlyList<IslandTileGroup> tiles)
     {

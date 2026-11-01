@@ -49,6 +49,33 @@ public sealed class IslandWindowTests
     }
 
     [Fact]
+    public void The_first_unlock_of_the_day_wakes_chippi_for_a_moment_and_lifting_the_puck_holds_him()
+    {
+        WpfTestThread.Run(() => WithShownIsland(window =>
+        {
+            window.MorningAwake = TimeSpan.FromMilliseconds(50);
+            Assert.Equal(Chippi.UI.Pet.PetMood.Sleepy, window.Pet.Mood);
+            var morning = new DateTime(2026, 11, 2, 8, 0, 0);
+            window.Unlocked(morning);
+            Assert.Equal(Chippi.UI.Pet.PetMood.Idle, window.Pet.Mood); // awake a moment after his yawn
+            Pump(TimeSpan.FromMilliseconds(300));
+            Assert.Equal(Chippi.UI.Pet.PetMood.Sleepy, window.Pet.Mood); // then dozing off as usual
+            window.Unlocked(morning.AddHours(4)); // the same day: no second morning
+            Assert.Equal(Chippi.UI.Pet.PetMood.Sleepy, window.Pet.Mood);
+            window.Unlocked(morning.AddDays(1));
+            Assert.Equal(Chippi.UI.Pet.PetMood.Idle, window.Pet.Mood);
+
+#if DEBUG
+            // Lifted, his eyes go round; set down, he lands.
+            window.ForceLift(true);
+            Assert.True(window.Pet.IsHeld);
+            window.ForceLift(false);
+            Assert.False(window.Pet.IsHeld);
+#endif
+        }));
+    }
+
+    [Fact]
     public void Hovering_brightens_the_rim_and_wakes_the_blob_but_never_grows_the_widget()
     {
         WpfTestThread.Run(() => WithShownIsland(window =>

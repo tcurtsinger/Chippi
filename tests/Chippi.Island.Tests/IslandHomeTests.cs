@@ -297,4 +297,29 @@ public sealed class IslandHomeTests
         Click(Find<Button>(grid, b => AutomationProperties.GetName(b) == "Settings"));
         Assert.Equal(1, asked);
     });
+
+    [Fact]
+    public void The_footer_chippi_is_a_button_that_boops_him_and_sits_where_the_pucks_does() => WpfTestThread.Run(() =>
+    {
+        var grid = Laid(_ => { });
+        var boop = Find<Button>(grid, b => AutomationProperties.GetName(b) == "Chippi");
+        Assert.Same(grid.Pet, boop.Content);
+        Assert.False(grid.Pet.Squish.HasAnimatedProperties);
+        if (!Chippi.UI.Themes.Motion.IsReduced)
+        {
+            Click(boop);
+            Assert.True(grid.Pet.Squish.HasAnimatedProperties); // a squish and a grin
+        }
+
+        // His center stays 25 in from the panel's side and its bottom, where the puck's is, on either side.
+        foreach (bool right in new[] { false, true })
+        {
+            grid.SetPetSide(right);
+            grid.UpdateLayout();
+            var footer = (FrameworkElement)System.Windows.Media.VisualTreeHelper.GetParent(boop);
+            var center = grid.Pet.TranslatePoint(new Point(grid.Pet.ActualWidth / 2, grid.Pet.ActualHeight / 2), footer);
+            Assert.Equal(IslandGrid.FooterPet, Math.Round(right ? footer.ActualWidth - center.X : center.X, 3));
+            Assert.Equal(IslandGrid.FooterPet, Math.Round(footer.ActualHeight - center.Y, 3));
+        }
+    });
 }

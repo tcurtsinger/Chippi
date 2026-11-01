@@ -68,11 +68,37 @@ public class ChippiPet : UserControl
     private static readonly TimeSpan HeadphonesOff = TimeSpan.FromMilliseconds(120);
     private const double HeadphonesDrop = 18; // in the 120 drawing: 6px on the 40 puck
 
+    /// <summary>Perking up for Keep awake: a stretch tall at its peak, settled; the steam rises this far into place.</summary>
+    private static readonly TimeSpan PerkPeak = TimeSpan.FromMilliseconds(120);
+    private static readonly TimeSpan PerkDuration = TimeSpan.FromMilliseconds(260);
+    private static readonly TimeSpan SteamOff = TimeSpan.FromMilliseconds(240);
+    private const double SteamRise = 4;
+
+    /// <summary>A glance toward the bar: the pupils go this far, hold, and come back.</summary>
+    private static readonly TimeSpan GlanceStart = TimeSpan.FromMilliseconds(100);
+    private static readonly TimeSpan GlanceThere = TimeSpan.FromMilliseconds(220);
+    private static readonly TimeSpan GlanceBack = TimeSpan.FromMilliseconds(1100);
+    private static readonly TimeSpan GlanceEnd = TimeSpan.FromMilliseconds(1300);
+    internal const double GlanceShift = 3.5;
+
+    /// <summary>The yawn: eyes squeezed and the mouth opening wide while he stretches, then the face that follows.</summary>
+    private static readonly TimeSpan YawnWide = TimeSpan.FromMilliseconds(450);
+    private static readonly TimeSpan YawnStretch = TimeSpan.FromMilliseconds(500);
+    private static readonly TimeSpan YawnClosing = TimeSpan.FromMilliseconds(850);
+    private static readonly TimeSpan YawnSwap = TimeSpan.FromMilliseconds(1100);
+    internal static readonly TimeSpan YawnDuration = TimeSpan.FromMilliseconds(1250);
+
+    /// <summary>A short squish and back: a nod, a boop, a landing, a beat.</summary>
+    private static readonly TimeSpan NodPeak = TimeSpan.FromMilliseconds(110), NodEnd = TimeSpan.FromMilliseconds(300);
+    private static readonly TimeSpan BoopHold = TimeSpan.FromMilliseconds(600);
+    private static readonly TimeSpan LandPeak = TimeSpan.FromMilliseconds(80), LandEnd = TimeSpan.FromMilliseconds(240);
+    private static readonly TimeSpan BeatPeak = TimeSpan.FromMilliseconds(60), BeatEnd = TimeSpan.FromMilliseconds(220);
+
     /// <summary>
-    /// The breathing loop runs whenever the puck is asleep, so it asks WPF for 30 frames a second, not 60.
-    /// It moves well under a pixel a frame at any size.
+    /// The breathing loop runs whenever the puck is asleep, all day, so it asks WPF for few frames: 10 a second in the
+    /// puck form, where a breath moves about a pixel (at 30 it cost about 5% of a core, measured 2026-11-01), and 30 above.
     /// </summary>
-    private const int BreathFrameRate = 30;
+    internal const int BreathFrameRatePuck = 10, BreathFrameRate = 30;
 
     // Stroke widths in the puck form, then above it (DESIGN.md §7, Sizes).
     internal const double SleepyEyeStrokePuck = 4.6, SleepyEyeStroke = 3.8;
@@ -116,6 +142,9 @@ public class ChippiPet : UserControl
     public static readonly DependencyProperty ShowsSteamProperty = DependencyProperty.Register(
         nameof(ShowsSteam), typeof(bool), typeof(ChippiPet), new PropertyMetadata(true, (d, _) => ((ChippiPet)d).ApplyForm()));
 
+    public static readonly DependencyProperty IsHeldProperty = DependencyProperty.Register(
+        nameof(IsHeld), typeof(bool), typeof(ChippiPet), new PropertyMetadata(false, (d, e) => ((ChippiPet)d).ShowHeld((bool)e.NewValue)));
+
     private readonly Path _shadow;
     private readonly Path _body;
     private readonly ScaleTransform _breath = new(1, 1, 60, 106);
@@ -123,11 +152,15 @@ public class ChippiPet : UserControl
     private readonly TranslateTransform _hop = new();
     private readonly ScaleTransform _shadowSquish = new(1, 1, 60, 108);
     private readonly ScaleTransform _sparkBurst = new(1, 1, 60, 30);
+    private readonly TranslateTransform _steamRise = new();
+    private readonly ScaleTransform _bandPulse = new(1, 1, 60, 45);
     private readonly Face _idle;
     private readonly Face _wideAwake;
     private readonly Face _celebrating;
     private readonly Face _sleepy;
     private readonly Face _small;
+    private readonly Face _yawn;
+    private readonly Face _held;
     private readonly Path _happyEyes;
     private readonly Path _sleepyEyes;
     private readonly Canvas _headphones;
@@ -143,6 +176,7 @@ public class ChippiPet : UserControl
     private bool _hasShown;
     private bool _breathing;
     private PetMood _returnMood = PetMood.Idle;
+    private bool _celebratedAwake; // the celebration began wide awake (a timed Keep awake ran out), so he yawns after it
 
     public ChippiPet()
     {
@@ -158,14 +192,25 @@ public class ChippiPet : UserControl
 
         _happyEyes = Stroked(Shapes.HappyEyes, "PetInkBrush", HappyEyeStroke);
         _sleepyEyes = Stroked(Shapes.SleepyEyes, "PetInkBrush", SleepyEyeStroke);
+        // The open-eyed faces' pupils and highlights move together for a glance; the whites stay.
         _idle = new Face(canBlink: true,
-            eyes: [Whites(Shapes.EyeWhites), Filled(Shapes.IdleEyes, "PetInkBrush"), Filled(Shapes.IdleHighlights, "PetEyeHighlightBrush")],
+            eyes: [Whites(Shapes.EyeWhites)],
             mouth: [Filled(Shapes.OpenSmile, "PetInkBrush"), new Path { Data = Shapes.Tongue, Fill = Frozen(0xFF7FA8) }],
-            lids: Stroked(Shapes.IdleLids, "PetInkBrush", LidStroke));
+            lids: Stroked(Shapes.IdleLids, "PetInkBrush", LidStroke),
+            pupils: [Filled(Shapes.IdleEyes, "PetInkBrush"), Filled(Shapes.IdleHighlights, "PetEyeHighlightBrush")]);
         _wideAwake = new Face(canBlink: true,
-            eyes: [Whites(Shapes.WideEyeWhites), Filled(Shapes.WidePupils, "PetInkBrush"), Filled(Shapes.WideHighlights, "PetEyeHighlightBrush")],
+            eyes: [Whites(Shapes.WideEyeWhites)],
             mouth: [Filled(Shapes.WideMouth, "PetInkBrush")],
-            lids: Stroked(Shapes.WideLids, "PetInkBrush", LidStroke));
+            lids: Stroked(Shapes.WideLids, "PetInkBrush", LidStroke),
+            pupils: [Filled(Shapes.WidePupils, "PetInkBrush"), Filled(Shapes.WideHighlights, "PetEyeHighlightBrush")]);
+        // Picked up: Wide awake's round eyes over a small "o".
+        _held = new Face(canBlink: false,
+            eyes: [Whites(Shapes.WideEyeWhites), Filled(Shapes.WidePupils, "PetInkBrush"), Filled(Shapes.WideHighlights, "PetEyeHighlightBrush")],
+            mouth: [Filled(Shapes.HeldMouth, "PetInkBrush")]);
+        // A yawn: eyes squeezed shut and a tall open mouth with the tongue at its floor.
+        _yawn = new Face(canBlink: false,
+            eyes: [Stroked(Shapes.SqueezedEyes, "PetInkBrush", HappyEyeStroke)],
+            mouth: [Filled(Shapes.YawnMouth, "PetInkBrush"), new Path { Data = Shapes.YawnTongue, Fill = Frozen(0xFF7FA8) }]);
         _celebrating = new Face(canBlink: false,
             eyes: [_happyEyes],
             mouth: [Filled(Shapes.OpenSmile, "PetInkBrush"), new Path { Data = Shapes.Tongue, Fill = Frozen(0xFF7FA8) }]);
@@ -182,8 +227,8 @@ public class ChippiPet : UserControl
         var headphoneInk = Frozen(0x1B1530);
         var headphoneRim = Frozen(0xE6DCFF);
         _headphones = new Canvas { Width = 120, Height = 120 };
-        _headphones.Children.Add(Band(headphoneRim, 10));
-        _headphones.Children.Add(Band(headphoneInk, 5.5));
+        _headphones.Children.Add(Band(headphoneRim, 10, _bandPulse));
+        _headphones.Children.Add(Band(headphoneInk, 5.5, _bandPulse));
         _headphones.Children.Add(new Path { Data = Shapes.HeadphoneCups, Fill = headphoneInk, Stroke = headphoneRim, StrokeThickness = 2.2 });
         _headphones.Children.Add(new Path { Data = Shapes.HeadphonePads, Fill = Frozen(0xD2BEFF) });
 
@@ -194,6 +239,7 @@ public class ChippiPet : UserControl
         // badge takes the corner (the puck's Keep awake badge, while it's lifted).
         _steam = Stroked(Shapes.Steam, "IslandTextSecondaryBrush", SteamStroke);
         _steam.Opacity = 0;
+        _steam.RenderTransform = _steamRise;
 
         // The z's: the outer layer fades with the mood, the glyphs inside drift while the pet breathes.
         _zGlyphs = new Path { RenderTransform = _zDrift };
@@ -296,7 +342,7 @@ public class ChippiPet : UserControl
 
     private static bool IsPuckForm(double size) => size > SmallFormMaxSize && size <= PuckFormMaxSize;
 
-    private IEnumerable<Face> Faces => [_idle, _wideAwake, _celebrating, _sleepy, _small];
+    private IEnumerable<Face> Faces => [_idle, _wideAwake, _celebrating, _sleepy, _small, _yawn, _held];
 
     /// <summary>True while the asleep loop runs: the body and face breathing, the z's drifting.</summary>
     internal bool IsBreathing => _breathing;
@@ -324,6 +370,32 @@ public class ChippiPet : UserControl
     internal UIElement Headphones => _headphones;
 
     internal Path Shadow => _shadow;
+
+    internal TranslateTransform SteamDrift => _steamRise;
+
+    internal ScaleTransform BandPulse => _bandPulse;
+
+    internal Canvas YawnFace => _yawn.Root;
+
+    internal ScaleTransform YawnMouth => _yawn.MouthScale;
+
+    internal Canvas HeldFace => _held.Root;
+
+    /// <summary>The glance's shift on the open-eyed faces' pupils (idle, wide awake).</summary>
+    internal TranslateTransform? Pupils => FaceFor(_shown).Pupils;
+
+    /// <summary>The breathing's frame rate at this size: few frames on the puck, where it runs all day.</summary>
+    internal int BreathRate => Size <= PuckFormMaxSize ? BreathFrameRatePuck : BreathFrameRate;
+
+    /// <summary>
+    /// True while the host holds him up (the puck being dragged): his eyes go round over a small "o", whatever the mood,
+    /// and set down he lands with a squish.
+    /// </summary>
+    public bool IsHeld
+    {
+        get => (bool)GetValue(IsHeldProperty);
+        set => SetValue(IsHeldProperty, value);
+    }
 
     /// <summary>The mood as words, for the accessible name: "idle", "celebrating", "asleep", "wide awake", "listening".</summary>
     public static string Describe(PetMood mood) => mood switch
@@ -369,6 +441,7 @@ public class ChippiPet : UserControl
         if (mood == PetMood.Celebrating)
         {
             pet._returnMood = old == PetMood.Celebrating ? PetMood.Idle : old;
+            pet._celebratedAwake = old == PetMood.WideAwake;
             pet._celebrationTimer.Stop();
             pet._celebrationTimer.Start();
         }
@@ -510,14 +583,21 @@ public class ChippiPet : UserControl
         _hasShown = true;
 
         animate = animate && IsLoaded && !Motion.IsReduced && !small && from is not null && (from != mood || replay);
-        var target = small ? _small : FaceFor(mood);
-        bool fallingAsleep = animate && mood == PetMood.Sleepy && from is PetMood.Idle or PetMood.WideAwake;
+        // Picked up, the round eyes stay over whatever the mood is until he's set down.
+        var target = small ? _small : IsHeld ? _held : FaceFor(mood);
+        // When Keep awake ends he yawns before he sleeps: from wide awake, or after the celebration a timed one ends with.
+        bool yawning = animate && !IsHeld && mood == PetMood.Sleepy && (from == PetMood.WideAwake || (from == PetMood.Celebrating && _celebratedAwake));
+        bool fallingAsleep = animate && !yawning && mood == PetMood.Sleepy && from is PetMood.Idle or PetMood.WideAwake;
         bool waking = animate && from == PetMood.Sleepy && mood is PetMood.Idle or PetMood.WideAwake;
         bool celebrating = animate && mood == PetMood.Celebrating && from != PetMood.Celebrating;
+        bool perking = animate && mood == PetMood.WideAwake && from != PetMood.WideAwake;
         // Falling asleep, the open face closes first. Celebrating, it holds to the squish's deepest point and swaps there
-        // at once, so the two faces never show together.
-        var swapAt = fallingAsleep ? EyesShut : celebrating ? SquishTrough : TimeSpan.Zero;
-        var fade = animate && !celebrating ? MoodFade : TimeSpan.Zero;
+        // at once, so the two faces never show together; perking up, the same at the stretch's peak. Yawning, the old
+        // face goes at once as the yawn comes in, and the sleeping face takes over at once as it ends.
+        var swapAt = yawning ? YawnSwap : fallingAsleep ? EyesShut : celebrating ? SquishTrough : perking ? PerkPeak : TimeSpan.Zero;
+        var fade = animate && !celebrating && !perking && !yawning ? MoodFade : TimeSpan.Zero;
+        var outAt = yawning ? TimeSpan.Zero : swapAt;
+        var outFade = fade;
 
         if (fallingAsleep)
         {
@@ -550,9 +630,11 @@ public class ChippiPet : UserControl
             }
             else
             {
-                Fade(face.Root, 0, fade, swapAt);
+                Fade(face.Root, 0, outFade, outAt);
             }
         }
+        if (yawning)
+            PlayYawn();
 
         // Waking, the eyes open from shut a little past round and settle: falling asleep the other way.
         if (waking)
@@ -571,17 +653,35 @@ public class ChippiPet : UserControl
             Fade(_zs, 1, animate ? ZFade : TimeSpan.Zero, swapAt + fade);
         else
             Fade(_zs, 0, fade, TimeSpan.Zero);
-        bool steam = mood == PetMood.WideAwake;
-        Fade(_steam, steam ? 1 : 0, fade, steam ? swapAt : TimeSpan.Zero);
+        // Wide awake's steam rises 4 into place as it fades in; when he leaves wide awake it drifts on up as it fades.
+        bool steam = mood == PetMood.WideAwake, steamWas = from == PetMood.WideAwake;
+        _steamRise.BeginAnimation(TranslateTransform.YProperty, null);
+        if (steam)
+        {
+            Fade(_steam, 1, animate ? PerkDuration : TimeSpan.Zero, swapAt);
+            if (animate && !steamWas)
+                _steamRise.BeginAnimation(TranslateTransform.YProperty,
+                    new DoubleAnimation(SteamRise, 0, new Duration(PerkDuration)) { BeginTime = swapAt, EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }, FillBehavior = FillBehavior.Stop });
+        }
+        else
+        {
+            bool drift = animate && steamWas;
+            Fade(_steam, 0, drift ? SteamOff : fade, TimeSpan.Zero);
+            if (drift)
+                _steamRise.BeginAnimation(TranslateTransform.YProperty,
+                    new DoubleAnimation(0, -SteamRise, new Duration(SteamOff)) { EasingFunction = new SineEase { EasingMode = EasingMode.EaseIn }, FillBehavior = FillBehavior.Stop });
+        }
 
         // The celebrate hop, from the bottom center (60, 106): squished (1.10, 0.90) at take-off, stretched (0.94, 1.08) on
         // the way up, 12 up at the top, down by 360ms, squished (1.06, 0.94) landing and settled by 500ms. The shadow spreads
-        // with the squishes, and shrinks and fades while he's up.
+        // with the squishes, and shrinks and fades while he's up. Perking up for Keep awake he stretches tall and settles;
+        // yawning he stretches slower.
         _squish.BeginAnimation(ScaleTransform.ScaleXProperty, null);
         _squish.BeginAnimation(ScaleTransform.ScaleYProperty, null);
         _hop.BeginAnimation(TranslateTransform.YProperty, null);
         _shadowSquish.BeginAnimation(ScaleTransform.ScaleXProperty, null);
         _shadow.BeginAnimation(OpacityProperty, null);
+        _hopEnds = 0;
         if (animate && mood == PetMood.Celebrating)
         {
             _squish.BeginAnimation(ScaleTransform.ScaleXProperty, HopScale(1.10, 0.94, 1.06));
@@ -589,10 +689,147 @@ public class ChippiPet : UserControl
             _hop.BeginAnimation(TranslateTransform.YProperty, Leap(0, -HopHeight));
             _shadowSquish.BeginAnimation(ScaleTransform.ScaleXProperty, HopScale(1.10, 0.9, 1.06, apex: 0.8));
             _shadow.BeginAnimation(OpacityProperty, Leap(1, 0.55));
+            _hopEnds = Environment.TickCount64 + (long)HopDuration.TotalMilliseconds;
         }
+        else if (perking)
+            Squash(0.96, 1.06, PerkPeak, PerkDuration);
+        else if (yawning)
+            Squash(0.97, 1.05, YawnStretch, YawnDuration - MoodFade);
 
         UpdateBlinkTimer();
         UpdateBreathing(settle: animate);
+    }
+
+    // The hop owns his squish until it lands: a nod, a boop or a beat meanwhile would cut it short.
+    private long _hopEnds;
+
+    private bool Hopping => Environment.TickCount64 < _hopEnds;
+
+    /// <summary>Picked up, the round eyes cross-fade over his face; set down, his face comes back and he lands with a squish.</summary>
+    private void ShowHeld(bool held)
+    {
+        if (IsSmall)
+            return;
+        bool animate = IsLoaded && !Motion.IsReduced;
+        var face = FaceFor(_shown);
+        if (!held)
+            face.Reset();
+        // At once, both ways: a cross-fade would show both faces at the same time.
+        Fade(_held.Root, held ? 1 : 0, TimeSpan.Zero, TimeSpan.Zero);
+        Fade(face.Root, held ? 0 : 1, TimeSpan.Zero, TimeSpan.Zero);
+        if (!held && animate && !Hopping)
+            Squash(1.06, 0.94, LandPeak, LandEnd);
+        UpdateBlinkTimer();
+    }
+
+    /// <summary>
+    /// He looks toward something new beside him (the bar unfolding, or something new arriving on it): -1 to his left,
+    /// 1 to his right. Open eyes glance there for about a second and come back; closed ones (listening) nod instead.
+    /// </summary>
+    public void Glance(int direction)
+    {
+        if (!IsLoaded || Motion.IsReduced || IsSmall || IsHeld || direction == 0)
+            return;
+        var face = FaceFor(_shown);
+        if (face.Pupils is { } pupils)
+        {
+            double shift = direction < 0 ? -face.GlanceLeft : face.GlanceRight;
+            var look = new DoubleAnimationUsingKeyFrames { Duration = new Duration(GlanceEnd), FillBehavior = FillBehavior.Stop };
+            look.KeyFrames.Add(new DiscreteDoubleKeyFrame(0, KeyTime.FromTimeSpan(GlanceStart)));
+            look.KeyFrames.Add(new EasingDoubleKeyFrame(shift, KeyTime.FromTimeSpan(GlanceThere), new CubicEase { EasingMode = EasingMode.EaseOut }));
+            look.KeyFrames.Add(new LinearDoubleKeyFrame(shift, KeyTime.FromTimeSpan(GlanceBack)));
+            look.KeyFrames.Add(new EasingDoubleKeyFrame(0, KeyTime.FromTimeSpan(GlanceEnd), new SineEase { EasingMode = EasingMode.EaseInOut }));
+            pupils.BeginAnimation(TranslateTransform.XProperty, look);
+        }
+        else if (_shown != PetMood.Sleepy && !Hopping)
+            Squash(1.03, 0.95, NodPeak, NodEnd);
+    }
+
+    /// <summary>
+    /// A yawn and a stretch over whatever he shows, then that face again: the first unlock of the day. Falling asleep
+    /// when Keep awake ends, he yawns on his own.
+    /// </summary>
+    public void Yawn()
+    {
+        if (!IsLoaded || Motion.IsReduced || IsSmall || IsHeld)
+            return;
+        FaceFor(_shown).Root.BeginAnimation(OpacityProperty, Swap(0, 1, TimeSpan.Zero, YawnSwap));
+        PlayYawn();
+        if (!Hopping)
+            Squash(0.97, 1.05, YawnStretch, YawnDuration - MoodFade);
+    }
+
+    /// <summary>
+    /// A face's opacity <paramref name="during"/> from <paramref name="from"/> to <paramref name="until"/>, then
+    /// <paramref name="after"/>, held: swapped at once each way, so two faces never show together.
+    /// </summary>
+    private static DoubleAnimationUsingKeyFrames Swap(double during, double after, TimeSpan from, TimeSpan until)
+    {
+        var swap = new DoubleAnimationUsingKeyFrames();
+        swap.KeyFrames.Add(new DiscreteDoubleKeyFrame(during, KeyTime.FromTimeSpan(from)));
+        swap.KeyFrames.Add(new DiscreteDoubleKeyFrame(after, KeyTime.FromTimeSpan(until)));
+        return swap;
+    }
+
+    /// <summary>The yawn's face: in at once, the mouth opening wide by 450ms and closing by 1.1s, out at once as the next face comes in.</summary>
+    private void PlayYawn()
+    {
+        _yawn.Reset();
+        _yawn.Root.BeginAnimation(OpacityProperty, Swap(1, 0, TimeSpan.Zero, YawnSwap));
+        var open = new DoubleAnimationUsingKeyFrames { Duration = new Duration(YawnDuration), FillBehavior = FillBehavior.Stop };
+        open.KeyFrames.Add(new DiscreteDoubleKeyFrame(0.3, KeyTime.FromTimeSpan(TimeSpan.Zero)));
+        open.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromTimeSpan(YawnWide), new CubicEase { EasingMode = EasingMode.EaseOut }));
+        open.KeyFrames.Add(new LinearDoubleKeyFrame(1, KeyTime.FromTimeSpan(YawnClosing)));
+        open.KeyFrames.Add(new EasingDoubleKeyFrame(0.3, KeyTime.FromTimeSpan(YawnSwap), new SineEase { EasingMode = EasingMode.EaseInOut }));
+        _yawn.MouthScale.BeginAnimation(ScaleTransform.ScaleYProperty, open);
+    }
+
+    /// <summary>A boop (the footer's Chippi clicked): a squish and a grin for a moment, then his face again.</summary>
+    public void Boop()
+    {
+        if (IsSmall || IsHeld)
+            return;
+        var face = FaceFor(_shown);
+        if (face != _celebrating)
+        {
+            // The grin comes in at the squish's deepest point and goes at once, as the celebration's face does.
+            var at = Motion.IsReduced ? TimeSpan.Zero : NodPeak;
+            face.Root.BeginAnimation(OpacityProperty, Swap(0, 1, at, BoopHold));
+            _celebrating.Root.BeginAnimation(OpacityProperty, Swap(1, 0, at, BoopHold));
+        }
+        if (!Motion.IsReduced && !Hopping)
+            Squash(1.08, 0.92, NodPeak, TimeSpan.FromMilliseconds(360));
+    }
+
+    /// <summary>
+    /// A beat in the music he's listening to, <paramref name="strength"/> 0 to 1: a dip from the bottom center and a pulse
+    /// of the headphones' band. Only while listening, with motion, and never over the hop.
+    /// </summary>
+    public void Beat(double strength)
+    {
+        if (!IsLoaded || Motion.IsReduced || IsSmall || IsHeld || _shown != PetMood.Listening || Hopping)
+            return;
+        double s = Math.Clamp(strength, 0, 1);
+        Squash(1 + 0.025 * s, 1 - 0.04 * s, BeatPeak, BeatEnd);
+        var pulse = Pulse(1 + 0.04 * s, BeatPeak, BeatEnd);
+        _bandPulse.BeginAnimation(ScaleTransform.ScaleXProperty, pulse);
+        _bandPulse.BeginAnimation(ScaleTransform.ScaleYProperty, pulse);
+    }
+
+    /// <summary>A short squish from the bottom center: to (<paramref name="x"/>, <paramref name="y"/>) at its peak, round again by its end.</summary>
+    private void Squash(double x, double y, TimeSpan peak, TimeSpan end)
+    {
+        _squish.BeginAnimation(ScaleTransform.ScaleXProperty, Pulse(x, peak, end));
+        _squish.BeginAnimation(ScaleTransform.ScaleYProperty, Pulse(y, peak, end));
+    }
+
+    /// <summary>To <paramref name="to"/> by <paramref name="peak"/>, quick then easing, and back to 1 by <paramref name="end"/>.</summary>
+    internal static DoubleAnimationUsingKeyFrames Pulse(double to, TimeSpan peak, TimeSpan end)
+    {
+        var animation = new DoubleAnimationUsingKeyFrames { Duration = new Duration(end), FillBehavior = FillBehavior.Stop };
+        animation.KeyFrames.Add(new EasingDoubleKeyFrame(to, KeyTime.FromTimeSpan(peak), new QuadraticEase { EasingMode = EasingMode.EaseOut }));
+        animation.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromTimeSpan(end), new SineEase { EasingMode = EasingMode.EaseInOut }));
+        return animation;
     }
 
     /// <summary>
@@ -638,10 +875,11 @@ public class ChippiPet : UserControl
         _breathing = on;
         if (on)
         {
-            Breathe(_breath, ScaleTransform.ScaleXProperty, 1, 1.022);
-            Breathe(_breath, ScaleTransform.ScaleYProperty, 1, 1.04);
-            Breathe(_zDrift, TranslateTransform.YProperty, 2, -3);
-            Breathe(_zGlyphs, OpacityProperty, 0.45, 1);
+            int rate = BreathRate;
+            Breathe(_breath, ScaleTransform.ScaleXProperty, 1, 1.022, rate);
+            Breathe(_breath, ScaleTransform.ScaleYProperty, 1, 1.04, rate);
+            Breathe(_zDrift, TranslateTransform.YProperty, 2, -3, rate);
+            Breathe(_zGlyphs, OpacityProperty, 0.45, 1, rate);
         }
         else
         {
@@ -652,7 +890,7 @@ public class ChippiPet : UserControl
         }
     }
 
-    private static void Breathe(IAnimatable target, DependencyProperty property, double from, double to)
+    private static void Breathe(IAnimatable target, DependencyProperty property, double from, double to, int frameRate)
     {
         var loop = new DoubleAnimation(from, to, new Duration(BreathCycle / 2))
         {
@@ -660,7 +898,7 @@ public class ChippiPet : UserControl
             RepeatBehavior = RepeatBehavior.Forever,
             EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut },
         };
-        Timeline.SetDesiredFrameRate(loop, BreathFrameRate);
+        Timeline.SetDesiredFrameRate(loop, frameRate);
         target.BeginAnimation(property, loop, HandoffBehavior.SnapshotAndReplace);
     }
 
@@ -807,13 +1045,14 @@ public class ChippiPet : UserControl
         return brush;
     }
 
-    private static Path Band(Brush stroke, double thickness) => new()
+    private static Path Band(Brush stroke, double thickness, Transform pulse) => new()
     {
         Data = Shapes.Headphones,
         Stroke = stroke,
         StrokeThickness = thickness,
         StrokeStartLineCap = PenLineCap.Round,
         StrokeEndLineCap = PenLineCap.Round,
+        RenderTransform = pulse,
     };
 
     private static Path Stroked(Geometry data, string brushKey, double thickness)
@@ -836,13 +1075,29 @@ public class ChippiPet : UserControl
     /// </summary>
     private sealed class Face
     {
-        public Face(bool canBlink, IEnumerable<UIElement> eyes, IEnumerable<UIElement> mouth, Path? lids = null, double eyeY = 66)
+        /// <param name="pupils">The open eyes' pupils and highlights, which glance together; the whites stay put.</param>
+        public Face(bool canBlink, IEnumerable<UIElement> eyes, IEnumerable<UIElement> mouth, Path? lids = null, double eyeY = 66,
+            IEnumerable<UIElement>? pupils = null)
         {
             CanBlink = canBlink;
             EyeScale = new ScaleTransform(1, 1, 60, eyeY);
             var eyeLayer = new Canvas { RenderTransform = EyeScale };
             foreach (var part in eyes)
                 eyeLayer.Children.Add(part);
+            if (pupils is not null)
+            {
+                Pupils = new TranslateTransform();
+                // How far they can go each way and stay half a unit inside the whites they sit in.
+                var whites = ((Path)eyeLayer.Children[0]).Data.Bounds;
+                foreach (var part in pupils)
+                {
+                    part.RenderTransform = Pupils;
+                    eyeLayer.Children.Add(part);
+                    var bounds = ((Path)part).Data.Bounds;
+                    GlanceLeft = Math.Min(GlanceLeft, bounds.Left - whites.Left - 0.5);
+                    GlanceRight = Math.Min(GlanceRight, whites.Right - bounds.Right - 0.5);
+                }
+            }
             Root.Children.Add(eyeLayer);
             var mouthLayer = new Canvas { RenderTransform = MouthScale };
             foreach (var part in mouth)
@@ -865,6 +1120,13 @@ public class ChippiPet : UserControl
         public Path? Lids { get; }
 
         public bool CanBlink { get; }
+
+        /// <summary>The glance's shift, for a face with open eyes.</summary>
+        public TranslateTransform? Pupils { get; }
+
+        public double GlanceLeft { get; } = GlanceShift;
+
+        public double GlanceRight { get; } = GlanceShift;
 
         /// <summary>Open eyes, a whole mouth and no lids: where a blink, falling asleep or waking left off.</summary>
         public void Reset()
@@ -922,6 +1184,14 @@ public class ChippiPet : UserControl
         public static Geometry Sparks { get; } = Parse("M14 30 L6 24 M12 44 H3 M24 18 L20 9 M106 30 L114 24 M108 44 H117 M96 18 L100 9");
 
         public static Geometry SleepyEyes { get; } = Parse("M39 67 Q46 72 53 67 M67 67 Q74 72 81 67");
+
+        /// <summary>Picked up: a small "o", 3.2 × 3.8 at (60, 88), under Wide awake's round eyes.</summary>
+        public static Geometry HeldMouth { get; } = Ellipse(60, 88, 3.2, 3.8);
+
+        /// <summary>The yawn: eyes squeezed shut as two chevrons, a tall open mouth 6.5 × 9 at (60, 88), the tongue at its floor.</summary>
+        public static Geometry SqueezedEyes { get; } = Parse("M40 62 L52 67 L40 72 M80 62 L68 67 L80 72");
+        public static Geometry YawnMouth { get; } = Ellipse(60, 88, 6.5, 9);
+        public static Geometry YawnTongue { get; } = Ellipse(60, 93.5, 4, 2.4);
 
         /// <summary>Small form: the tray icon's eyes, whites 12 × 13.5 at (46, 70) and (74, 70) with pupils r 7.5 a little in and down.</summary>
         public static Geometry SmallEyeWhites { get; } = Freeze(new GeometryGroup { Children = { Ellipse(46, 70, 12, 13.5), Ellipse(74, 70, 12, 13.5) } });

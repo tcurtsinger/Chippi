@@ -101,8 +101,9 @@ internal static class PetSheet
     }
 
     /// <summary>
-    /// Renders timed frames of a live 112px pet in an off-screen, non-activating window: the celebrate squish, spark
-    /// burst and fade, falling asleep, a breath while asleep, waking, and a blink. File names carry "reduced" when
+    /// Renders timed frames of a live 112px pet in an off-screen, non-activating window: the celebrate hop, spark
+    /// burst and fade, falling asleep, a breath while asleep, waking, a blink, perking up for Keep awake and the yawn
+    /// after it, a glance, a boop, landing after he's held, and a beat. File names carry "reduced" when
     /// <see cref="Chippi.UI.Themes.Motion.IsReduced"/> is on (then all frames should match).
     /// </summary>
     public static async Task SaveMotionAsync(string directory)
@@ -144,6 +145,32 @@ internal static class PetSheet
         await Task.Delay(500);
         pet.BlinkNow();
         await SaveStripAsync(host, caption, [0, 25, 50, 60, 70, 95, 120, 200], Path.Combine(directory, $"ws3-pet-motion-blink-{mode}.png"));
+
+        // Keep awake: he perks up as it starts, and when it ends the coffee wears off: a yawn, then asleep.
+        await Task.Delay(300);
+        pet.Mood = PetMood.WideAwake;
+        await SaveStripAsync(host, caption, [0, 60, 120, 190, 260, 400], Path.Combine(directory, $"pet-motion-perk-{mode}.png"));
+        await Task.Delay(300);
+        pet.Mood = PetMood.Sleepy;
+        await SaveStripAsync(host, caption, [0, 120, 250, 450, 700, 950, 1100, 1250, 1700], Path.Combine(directory, $"pet-motion-yawn-{mode}.png"));
+
+        // Awake again: a glance to his left (the bar), a boop, picked up and set down.
+        pet.Mood = PetMood.Idle;
+        await Task.Delay(600);
+        pet.Glance(-1);
+        await SaveStripAsync(host, caption, [0, 150, 250, 700, 1200, 1350], Path.Combine(directory, $"pet-motion-glance-{mode}.png"));
+        pet.Boop();
+        await SaveStripAsync(host, caption, [0, 60, 110, 240, 400, 650], Path.Combine(directory, $"pet-motion-boop-{mode}.png"));
+        pet.IsHeld = true;
+        await Task.Delay(300);
+        pet.IsHeld = false;
+        await SaveStripAsync(host, caption, [0, 40, 80, 160, 260], Path.Combine(directory, $"pet-motion-land-{mode}.png"));
+
+        // Listening: a strong beat.
+        pet.Mood = PetMood.Listening;
+        await Task.Delay(500);
+        pet.Beat(1);
+        await SaveStripAsync(host, caption, [0, 30, 60, 120, 220], Path.Combine(directory, $"pet-motion-beat-{mode}.png"));
 
         window.Close();
     }

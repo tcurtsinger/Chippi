@@ -82,6 +82,8 @@ public sealed class IslandHost : IDisposable
                 RefreshPanels();
         });
         _shell.Island.Succeeded += (_, _) => _dispatcher.BeginInvoke(() => _window.Celebrate());
+        // The first unlock of the day, Chippi wakes with a yawn and a stretch.
+        Microsoft.Win32.SystemEvents.SessionSwitch += OnSessionSwitch;
         _shell.Config.SectionChanged += OnSectionChanged;
 
         // The puck's right click is the tray icon's menu, so Quit stays reachable with the icon hidden.
@@ -441,6 +443,7 @@ public sealed class IslandHost : IDisposable
             ("Add Keep awake status", () => keepAwake.Publish(new IslandActivity(DebugWideAwakeKey, IslandActivityKind.Status, "Keep awake", "Until 6:00 PM"))),
             null,
             ("Celebrate", () => debug.ReportSuccess("Debug celebration")),
+            ("Morning", () => _window.Morning()),
             ("Clear all", () =>
             {
                 _shell.Island.ClearModule(DebugModuleId);
@@ -476,12 +479,24 @@ public sealed class IslandHost : IDisposable
         }
     }
 
+    // Raised on the system events' own thread.
+    private void OnSessionSwitch(object? sender, Microsoft.Win32.SessionSwitchEventArgs e)
+    {
+        if (e.Reason == Microsoft.Win32.SessionSwitchReason.SessionUnlock)
+            _dispatcher.BeginInvoke(() =>
+            {
+                if (!_disposed)
+                    _window.Unlocked(DateTime.Now);
+            });
+    }
+
     public void Dispose()
     {
         if (_disposed)
             return;
         _disposed = true;
         _shell.Config.SectionChanged -= OnSectionChanged;
+        Microsoft.Win32.SystemEvents.SessionSwitch -= OnSessionSwitch;
         _media?.Dispose();
         _tracker.Dispose();
         _window.Close();
