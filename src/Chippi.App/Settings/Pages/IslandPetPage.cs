@@ -272,7 +272,8 @@ internal sealed class IslandPetPage : UserControl
         Canvas.SetTop(panel, height - edge - puck / 2 - panelHeight);
         canvas.Children.Add(panel);
 
-        var button = new Border { Width = puck, Height = puck, CornerRadius = new CornerRadius(puck / 2), BorderThickness = new Thickness(1), Child = new ChippiPet { Size = 22, Mood = PetMood.Idle, IsDecorative = true, PetColor = SettingsUi.ReadApp(_shell.Config).PetColor, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center } };
+        // Chippi at his share of the real puck (40 of 50), so the preview draws the puck's face, not the small form's.
+        var button = new Border { Width = puck, Height = puck, CornerRadius = new CornerRadius(puck / 2), BorderThickness = new Thickness(1), Child = new ChippiPet { Size = puck * PetSize.Puck / IslandGeometry.Puck, Mood = PetMood.Idle, IsDecorative = true, PetColor = SettingsUi.ReadApp(_shell.Config).PetColor, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center } };
         button.SetResourceReference(Border.BackgroundProperty, "IslandBrush");
         button.SetResourceReference(Border.BorderBrushProperty, "IslandBorderBrush");
         Canvas.SetLeft(button, width - edge - puck);
@@ -288,12 +289,13 @@ internal sealed class IslandPetPage : UserControl
     internal static readonly PetMood[] PreviewMoods = [PetMood.Idle, PetMood.Sleepy, PetMood.Listening, PetMood.WideAwake, PetMood.Celebrating];
 
     /// <summary>
-    /// Color: a 48 Chippi beside the six swatches. Picking a color, he celebrates in it; clicking him shows his next mood.
+    /// Color: Chippi at his puck size beside the six swatches, in a 44 button so the row keeps a captioned row's 60.
+    /// Picking a color, he celebrates in it; clicking him shows his next mood.
     /// </summary>
     private SettingRow ColorRow(AppSettings app)
     {
-        var pet = new ChippiPet { Size = 48, PetColor = app.PetColor, IsDecorative = true };
-        var preview = SettingsUi.Styled(new Button { Content = pet, Width = 56, Height = 56, Padding = new Thickness(0), Margin = new Thickness(0, 0, 16, 0), ToolTip = "Next mood" }, "SubtleButtonStyle");
+        var pet = new ChippiPet { Size = PetSize.Preview, PetColor = app.PetColor, IsDecorative = true };
+        var preview = SettingsUi.Styled(new Button { Content = pet, Width = 44, Height = 44, Padding = new Thickness(0), Margin = new Thickness(0, 0, 16, 0), ToolTip = "Next mood" }, "SubtleButtonStyle");
         AutomationProperties.SetName(preview, "Next mood");
         int shown = 0;
         preview.Click += (_, _) =>

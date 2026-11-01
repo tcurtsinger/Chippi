@@ -478,11 +478,18 @@ public partial class IslandPanelWindow : Window
     /// <summary>
     /// The page's 496 × 304 body. One section fills it; several stack 8 apart; sections in columns sit
     /// side by side. It never scrolls and never grows the island: what doesn't fit is cut off here, so
-    /// each page fits its content to the body (DESIGN.md §5 Island, revised 2026-10-28).
+    /// each page fits its content to the body (DESIGN.md §5 Island, revised 2026-10-28). The cut is above
+    /// and below; at the sides it reaches into the card's padding, so a Chippi set out to the cards' edge
+    /// (Keep awake's) keeps his sparks, and the panel's own edge cuts there.
     /// </summary>
     private Grid Body(IReadOnlyList<IslandTileContribution> parts)
     {
-        var body = new Grid { ClipToBounds = true };
+        var body = new Grid();
+        body.SizeChanged += (_, e) =>
+        {
+            double side = Card.Padding.Left;
+            body.Clip = new RectangleGeometry(new Rect(-side, 0, e.NewSize.Width + 2 * side, e.NewSize.Height));
+        };
         _attached.Add(body);
         PageBody = body;
         if (parts.Any(p => p.Spec.Column is not null))

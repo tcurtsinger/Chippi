@@ -43,12 +43,22 @@ public class ChippiPet : UserControl
 
     private static readonly TimeSpan MoodFade = TimeSpan.FromMilliseconds(150);
     private static readonly TimeSpan BlinkDuration = TimeSpan.FromMilliseconds(120);
-    private static readonly TimeSpan SquishDuration = TimeSpan.FromMilliseconds(400);
 
-    /// <summary>The squish's deepest point, where the celebrating face and the sparks come in.</summary>
-    private static readonly TimeSpan SquishTrough = TimeSpan.FromMilliseconds(110);
+    /// <summary>
+    /// The celebrate hop: squished at take-off (where the celebrating face and the sparks come in), stretched on the way
+    /// up, the top of the jump, touch down, squished landing, settled.
+    /// </summary>
+    private static readonly TimeSpan SquishTrough = TimeSpan.FromMilliseconds(100);
+    private static readonly TimeSpan HopStretch = TimeSpan.FromMilliseconds(200);
+    private static readonly TimeSpan HopApex = TimeSpan.FromMilliseconds(260);
+    private static readonly TimeSpan HopTouchdown = TimeSpan.FromMilliseconds(360);
+    private static readonly TimeSpan HopLanding = TimeSpan.FromMilliseconds(380);
+    private static readonly TimeSpan HopDuration = TimeSpan.FromMilliseconds(500);
+    internal const double HopHeight = 12; // in the 120 drawing: 4px on the 40 puck
+
     private static readonly TimeSpan SparkIn = TimeSpan.FromMilliseconds(60);
     private static readonly TimeSpan SparkBurst = TimeSpan.FromMilliseconds(220);
+    private const double SparkBurstFrom = 0.6;
     private static readonly TimeSpan SparkHold = TimeSpan.FromMilliseconds(2100);
     private static readonly TimeSpan EyesShut = TimeSpan.FromMilliseconds(600);
     private static readonly TimeSpan MouthShut = TimeSpan.FromMilliseconds(300);
@@ -69,7 +79,19 @@ public class ChippiPet : UserControl
     internal const double HappyEyeStrokePuck = 4.8, HappyEyeStroke = 4.2;
     internal const double SparkStrokePuck = 4.5, SparkStroke = 3.5;
     internal const double LidStrokePuck = 4.4, LidStroke = 3.6;
-    internal const double SteamStroke = 3.4;
+    internal const double SteamStrokePuck = 4.4, SteamStroke = 3.4;
+
+    /// <summary>
+    /// His body's middle is (60, 68.5), below the drawing's, to leave room above him for the headphones, z's and sparks.
+    /// The drawing is lifted by the difference, so whatever box holds him, his body sits in its middle.
+    /// </summary>
+    internal const double BodyLift = 8.5;
+
+    /// <summary>The body's soft shading: from his color at the top to this share of it at the bottom.</summary>
+    internal const double BodyShade = 0.78;
+
+    /// <summary>The body's rim, in the eye whites' faint ink, so a pale color (Frost) keeps its edge on the light island.</summary>
+    internal const double BodyRimStroke = 2;
 
     public static readonly DependencyProperty MoodProperty = DependencyProperty.Register(
         nameof(Mood), typeof(PetMood), typeof(ChippiPet), new PropertyMetadata(PetMood.Idle, OnMoodChanged));
@@ -91,10 +113,14 @@ public class ChippiPet : UserControl
     public static readonly DependencyProperty IsDecorativeProperty = DependencyProperty.Register(
         nameof(IsDecorative), typeof(bool), typeof(ChippiPet), new PropertyMetadata(false));
 
+    public static readonly DependencyProperty ShowsSteamProperty = DependencyProperty.Register(
+        nameof(ShowsSteam), typeof(bool), typeof(ChippiPet), new PropertyMetadata(true, (d, _) => ((ChippiPet)d).ApplyForm()));
+
     private readonly Path _shadow;
     private readonly Path _body;
     private readonly ScaleTransform _breath = new(1, 1, 60, 106);
     private readonly ScaleTransform _squish = new(1, 1, 60, 106);
+    private readonly TranslateTransform _hop = new();
     private readonly ScaleTransform _shadowSquish = new(1, 1, 60, 108);
     private readonly ScaleTransform _sparkBurst = new(1, 1, 60, 30);
     private readonly Face _idle;
@@ -127,7 +153,8 @@ public class ChippiPet : UserControl
         // A soft contact shadow that follows the squish across, so it stays under him.
         _shadow = Filled(Ellipse(60, 108, 34, 5.5), "PetShadowBrush");
         _shadow.RenderTransform = _shadowSquish;
-        _body = new Path { Data = Shapes.Body };
+        _body = new Path { Data = Shapes.Body, StrokeThickness = BodyRimStroke };
+        _body.SetResourceReference(Shape.StrokeProperty, "PetRimBrush");
 
         _happyEyes = Stroked(Shapes.HappyEyes, "PetInkBrush", HappyEyeStroke);
         _sleepyEyes = Stroked(Shapes.SleepyEyes, "PetInkBrush", SleepyEyeStroke);
@@ -163,7 +190,8 @@ public class ChippiPet : UserControl
         _sparks = Stroked(Shapes.Sparks, "PetSparkBrush", SparkStroke);
         _sparks.RenderTransform = _sparkBurst;
 
-        // Wide awake's steam, where the z's sit; above the puck form only, since the puck's Keep awake badge takes that corner.
+        // Wide awake's steam, where the z's sit, so every mood has its sign in that corner. A host hides it while its own
+        // badge takes the corner (the puck's Keep awake badge, while it's lifted).
         _steam = Stroked(Shapes.Steam, "IslandTextSecondaryBrush", SteamStroke);
         _steam.Opacity = 0;
 
@@ -173,13 +201,13 @@ public class ChippiPet : UserControl
         _zs = new Canvas { Width = 120, Height = 120 };
         _zs.Children.Add(_zGlyphs);
 
-        var figure = new Canvas { Width = 120, Height = 120, RenderTransform = new TransformGroup { Children = { _breath, _squish } } };
+        var figure = new Canvas { Width = 120, Height = 120, RenderTransform = new TransformGroup { Children = { _breath, _squish, _hop } } };
         figure.Children.Add(_body);
         figure.Children.Add(_headphones);
         foreach (var face in Faces)
             figure.Children.Add(face.Root);
 
-        var canvas = new Canvas { Width = 120, Height = 120 };
+        var canvas = new Canvas { Width = 120, Height = 120, RenderTransform = new TranslateTransform(0, -BodyLift) };
         canvas.Children.Add(_shadow);
         canvas.Children.Add(figure);
         canvas.Children.Add(_sparks);
@@ -257,6 +285,13 @@ public class ChippiPet : UserControl
         set => SetValue(IsDecorativeProperty, value);
     }
 
+    /// <summary>False while a host's badge takes the corner Wide awake's steam rises in (the lifted puck's Keep awake badge).</summary>
+    public bool ShowsSteam
+    {
+        get => (bool)GetValue(ShowsSteamProperty);
+        set => SetValue(ShowsSteamProperty, value);
+    }
+
     private bool IsSmall => Size <= SmallFormMaxSize;
 
     private static bool IsPuckForm(double size) => size > SmallFormMaxSize && size <= PuckFormMaxSize;
@@ -277,6 +312,10 @@ public class ChippiPet : UserControl
     internal ScaleTransform Breath => _breath;
 
     internal ScaleTransform Squish => _squish;
+
+    internal TranslateTransform Hop => _hop;
+
+    internal Path Body => _body;
 
     internal Path Sparks => _sparks;
 
@@ -378,7 +417,7 @@ public class ChippiPet : UserControl
     private void UpdateBodyBrush()
     {
         var baseColor = ColorOf(PetColor);
-        var shade = Color.FromRgb((byte)(baseColor.R * .88), (byte)(baseColor.G * .88), (byte)(baseColor.B * .88));
+        var shade = Color.FromRgb((byte)(baseColor.R * BodyShade), (byte)(baseColor.G * BodyShade), (byte)(baseColor.B * BodyShade));
         var brush = new LinearGradientBrush(baseColor, shade, 90);
         brush.Freeze();
         _body.Fill = brush;
@@ -386,7 +425,7 @@ public class ChippiPet : UserControl
 
     /// <summary>
     /// Small form drops the mouth, highlights and extras; the puck form draws heavier strokes and one big z;
-    /// the ground shadow and Wide awake's steam show above the puck form, the shadow from 64px.
+    /// the ground shadow shows from 64px.
     /// </summary>
     private void ApplyForm()
     {
@@ -394,7 +433,8 @@ public class ChippiPet : UserControl
         _shadow.Visibility = !small && Size >= GroundShadowMinSize ? Visibility.Visible : Visibility.Collapsed;
         _sparks.Visibility = small ? Visibility.Collapsed : Visibility.Visible;
         _zs.Visibility = small ? Visibility.Collapsed : Visibility.Visible;
-        _steam.Visibility = small || puck ? Visibility.Collapsed : Visibility.Visible;
+        _steam.Visibility = small || !ShowsSteam ? Visibility.Collapsed : Visibility.Visible;
+        _steam.StrokeThickness = puck ? SteamStrokePuck : SteamStroke;
         _happyEyes.StrokeThickness = puck ? HappyEyeStrokePuck : HappyEyeStroke;
         _sleepyEyes.StrokeThickness = puck ? SleepyEyeStrokePuck : SleepyEyeStroke;
         _sparks.StrokeThickness = puck ? SparkStrokePuck : SparkStroke;
@@ -534,16 +574,21 @@ public class ChippiPet : UserControl
         bool steam = mood == PetMood.WideAwake;
         Fade(_steam, steam ? 1 : 0, fade, steam ? swapAt : TimeSpan.Zero);
 
-        // The celebrate squish: (1.10, 0.90) from the bottom center (60, 106), springing back in about 400ms; the
-        // shadow spreads with it.
+        // The celebrate hop, from the bottom center (60, 106): squished (1.10, 0.90) at take-off, stretched (0.94, 1.08) on
+        // the way up, 12 up at the top, down by 360ms, squished (1.06, 0.94) landing and settled by 500ms. The shadow spreads
+        // with the squishes, and shrinks and fades while he's up.
         _squish.BeginAnimation(ScaleTransform.ScaleXProperty, null);
         _squish.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+        _hop.BeginAnimation(TranslateTransform.YProperty, null);
         _shadowSquish.BeginAnimation(ScaleTransform.ScaleXProperty, null);
+        _shadow.BeginAnimation(OpacityProperty, null);
         if (animate && mood == PetMood.Celebrating)
         {
-            _squish.BeginAnimation(ScaleTransform.ScaleXProperty, Spring(1.10, 0.97));
-            _squish.BeginAnimation(ScaleTransform.ScaleYProperty, Spring(0.90, 1.03));
-            _shadowSquish.BeginAnimation(ScaleTransform.ScaleXProperty, Spring(1.10, 0.97));
+            _squish.BeginAnimation(ScaleTransform.ScaleXProperty, HopScale(1.10, 0.94, 1.06));
+            _squish.BeginAnimation(ScaleTransform.ScaleYProperty, HopScale(0.90, 1.08, 0.94));
+            _hop.BeginAnimation(TranslateTransform.YProperty, Leap(0, -HopHeight));
+            _shadowSquish.BeginAnimation(ScaleTransform.ScaleXProperty, HopScale(1.10, 0.9, 1.06, apex: 0.8));
+            _shadow.BeginAnimation(OpacityProperty, Leap(1, 0.55));
         }
 
         UpdateBlinkTimer();
@@ -551,8 +596,8 @@ public class ChippiPet : UserControl
     }
 
     /// <summary>
-    /// Celebrating's sparks. With motion they come in with the celebrating face, bursting out from 75% over 220ms, hold
-    /// to 2.1s and fade over the celebration's last 400ms; without, they show for the whole of it.
+    /// Celebrating's sparks. With motion they come in with the celebrating face as he takes off, bursting out from 60% over
+    /// 220ms, hold to 2.1s and fade over the celebration's last 400ms; without, they show for the whole of it.
     /// </summary>
     private void ShowSparks(bool on, bool animate, TimeSpan at)
     {
@@ -570,8 +615,8 @@ public class ChippiPet : UserControl
         show.KeyFrames.Add(new EasingDoubleKeyFrame(0, KeyTime.FromTimeSpan(CelebrationHold), new QuadraticEase { EasingMode = EasingMode.EaseIn }));
         _sparks.BeginAnimation(OpacityProperty, show);
         var burst = new DoubleAnimationUsingKeyFrames { FillBehavior = FillBehavior.Stop };
-        burst.KeyFrames.Add(new DiscreteDoubleKeyFrame(0.75, KeyTime.FromTimeSpan(TimeSpan.Zero)));
-        burst.KeyFrames.Add(new DiscreteDoubleKeyFrame(0.75, KeyTime.FromTimeSpan(at)));
+        burst.KeyFrames.Add(new DiscreteDoubleKeyFrame(SparkBurstFrom, KeyTime.FromTimeSpan(TimeSpan.Zero)));
+        burst.KeyFrames.Add(new DiscreteDoubleKeyFrame(SparkBurstFrom, KeyTime.FromTimeSpan(at)));
         burst.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromTimeSpan(at + SparkBurst), new CubicEase { EasingMode = EasingMode.EaseOut }));
         _sparkBurst.BeginAnimation(ScaleTransform.ScaleXProperty, burst);
         _sparkBurst.BeginAnimation(ScaleTransform.ScaleYProperty, burst);
@@ -624,13 +669,34 @@ public class ChippiPet : UserControl
             settle ? new DoubleAnimation(rest, new Duration(MoodFade)) { FillBehavior = FillBehavior.Stop } : null,
             HandoffBehavior.SnapshotAndReplace);
 
-    private static DoubleAnimationUsingKeyFrames Spring(double squish, double rebound)
+    /// <summary>
+    /// A scale through the hop: <paramref name="takeOff"/> at the trough, <paramref name="stretch"/> on the way up,
+    /// <paramref name="apex"/> at the top, 1 by touch down, <paramref name="landing"/> as he lands, then 1.
+    /// </summary>
+    internal static DoubleAnimationUsingKeyFrames HopScale(double takeOff, double stretch, double landing, double apex = 1)
     {
-        var ease = new QuadraticEase { EasingMode = EasingMode.EaseOut };
-        var animation = new DoubleAnimationUsingKeyFrames { Duration = new Duration(SquishDuration), FillBehavior = FillBehavior.Stop };
-        animation.KeyFrames.Add(new EasingDoubleKeyFrame(squish, KeyTime.FromTimeSpan(SquishTrough), ease));
-        animation.KeyFrames.Add(new EasingDoubleKeyFrame(rebound, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(260)), new SineEase { EasingMode = EasingMode.EaseInOut }));
-        animation.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromTimeSpan(SquishDuration), new SineEase { EasingMode = EasingMode.EaseInOut }));
+        var ease = new SineEase { EasingMode = EasingMode.EaseInOut };
+        var impact = new QuadraticEase { EasingMode = EasingMode.EaseOut };
+        var animation = new DoubleAnimationUsingKeyFrames { Duration = new Duration(HopDuration), FillBehavior = FillBehavior.Stop };
+        animation.KeyFrames.Add(new EasingDoubleKeyFrame(takeOff, KeyTime.FromTimeSpan(SquishTrough), impact));
+        animation.KeyFrames.Add(new EasingDoubleKeyFrame(stretch, KeyTime.FromTimeSpan(HopStretch), ease));
+        animation.KeyFrames.Add(new EasingDoubleKeyFrame(apex, KeyTime.FromTimeSpan(HopApex), ease));
+        animation.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromTimeSpan(HopTouchdown), ease));
+        animation.KeyFrames.Add(new EasingDoubleKeyFrame(landing, KeyTime.FromTimeSpan(HopLanding), impact));
+        animation.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromTimeSpan(HopDuration), ease));
+        return animation;
+    }
+
+    /// <summary>
+    /// <paramref name="ground"/> until take-off, then to <paramref name="top"/> at the apex, slowing as he rises, and back
+    /// by touch down, quickening as he falls.
+    /// </summary>
+    internal static DoubleAnimationUsingKeyFrames Leap(double ground, double top)
+    {
+        var animation = new DoubleAnimationUsingKeyFrames { Duration = new Duration(HopDuration), FillBehavior = FillBehavior.Stop };
+        animation.KeyFrames.Add(new DiscreteDoubleKeyFrame(ground, KeyTime.FromTimeSpan(SquishTrough)));
+        animation.KeyFrames.Add(new EasingDoubleKeyFrame(top, KeyTime.FromTimeSpan(HopApex), new QuadraticEase { EasingMode = EasingMode.EaseOut }));
+        animation.KeyFrames.Add(new EasingDoubleKeyFrame(ground, KeyTime.FromTimeSpan(HopTouchdown), new QuadraticEase { EasingMode = EasingMode.EaseIn }));
         return animation;
     }
 
@@ -729,7 +795,7 @@ public class ChippiPet : UserControl
     private static Path Whites(Geometry data)
     {
         var path = Filled(data, "PetEyeHighlightBrush");
-        path.SetResourceReference(Shape.StrokeProperty, "PetEyeRimBrush");
+        path.SetResourceReference(Shape.StrokeProperty, "PetRimBrush");
         path.StrokeThickness = 1.5;
         return path;
     }

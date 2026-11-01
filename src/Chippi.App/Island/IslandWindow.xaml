@@ -106,7 +106,7 @@
                             <ScaleTransform x:Name="PetScale" />
                         </Grid.RenderTransform>
                         <!-- Decorative: the button's name and help text carry the state. -->
-                        <pet:ChippiPet x:Name="Pet" Size="40" Mood="Sleepy" IsDecorative="True" IsHitTestVisible="False" />
+                        <pet:ChippiPet x:Name="Pet" Size="{x:Static pet:PetSize.Puck}" Mood="Sleepy" IsDecorative="True" IsHitTestVisible="False" />
                     </Grid>
                     <!-- The badge's own layer, so the open can fade it while Chippi stays (IslandWindow's Morphing). -->
                     <Grid x:Name="BadgeLayer" IsHitTestVisible="False">

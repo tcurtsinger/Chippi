@@ -15,15 +15,19 @@ namespace Chippi.Island.Tests;
 public sealed class CompactOtherPageTests
 {
     [Fact]
-    public void Now_playing_is_a_156_art_card_and_nothing_playing_is_gumdrop_asleep() => WpfTestThread.Run(() =>
+    public void Now_playing_is_a_156_art_card_and_nothing_playing_is_chippi_asleep() => WpfTestThread.Run(() =>
     {
         var playing = new NowPlayingView(new IslandPanelTests.FakeMedia { Sessions = [new("spotify", "Spotify", "Weekend Mix", "Various Artists", true, false, true, true, true, true,
             TimeSpan.FromSeconds(72), TimeSpan.FromSeconds(232), DateTimeOffset.Now, null)] });
         Fit(playing, 496, 336);
         var art = Find<Border>(playing).Single(b => b.Width == 156);
         Assert.Equal(156, art.ActualHeight);
-        Assert.IsType<Chippi.UI.Pet.ChippiPet>(art.Child); // no artwork: ChippiPet in its place
-        Assert.Equal(new Thickness(0), art.BorderThickness);
+        // No artwork: Chippi's own cover, him filling the square on the accent tint, with a cover's hairline.
+        var chippi = Assert.IsType<Chippi.UI.Pet.ChippiPet>(art.Child);
+        Assert.Equal(Chippi.UI.Pet.PetSize.Cover, chippi.ActualWidth);
+        Assert.Equal(Chippi.UI.Pet.PetMood.Listening, chippi.Mood);
+        Assert.Same(Application.Current.FindResource("IslandAccentTintBrush"), art.Background);
+        Assert.Equal(new Thickness(1), art.BorderThickness);
         var cover = System.Windows.Media.Imaging.BitmapSource.Create(1, 1, 96, 96, System.Windows.Media.PixelFormats.Bgra32, null, new byte[4], 4);
         var covered = new NowPlayingView(new IslandPanelTests.FakeMedia { Sessions = [new("spotify", "Spotify", "Weekend Mix", "Various Artists", true, true, true, true, true, true,
             TimeSpan.FromSeconds(72), TimeSpan.FromSeconds(232), DateTimeOffset.Now, cover)] });

@@ -25,7 +25,7 @@ internal sealed class IslandHomeMedia : UserControl
     private static readonly TimeSpan FailedHold = TimeSpan.FromSeconds(4);
 
     private readonly Border _art = new() { Width = 52, Height = 52, CornerRadius = new CornerRadius(4), ClipToBounds = true };
-    private readonly ChippiPet _artPet = new() { Size = 28, Mood = PetMood.Sleepy, IsDecorative = true, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+    private readonly ChippiPet _artPet = new() { Size = PetSize.HomeCover, Mood = PetMood.Sleepy, IsDecorative = true, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
     private readonly LucideIcon _note = new() { Data = LucideIcons.Music, Size = 11, VerticalAlignment = VerticalAlignment.Center };
     private readonly Image _appIcon = new() { Width = 12, Height = 12, VerticalAlignment = VerticalAlignment.Center };
     private readonly TextBlock _source = new() { FontSize = 11, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(5, 0, 0, 0), TextTrimming = TextTrimming.CharacterEllipsis };
@@ -214,8 +214,10 @@ internal sealed class IslandHomeMedia : UserControl
             _art.Child = null;
             return;
         }
-        _art.SetResourceReference(Border.BackgroundProperty, "IslandBrush");
-        _art.BorderThickness = new Thickness(0);
+        // No art: Chippi's own cover, filling the square on the accent tint, with a cover's hairline.
+        _art.SetResourceReference(Border.BackgroundProperty, "IslandAccentTintBrush");
+        _art.BorderThickness = new Thickness(1);
+        _art.SetResourceReference(Border.BorderBrushProperty, "IslandBorderBrush");
         _art.Child = _artPet;
     }
 }

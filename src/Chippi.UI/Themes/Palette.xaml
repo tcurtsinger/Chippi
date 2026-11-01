@@ -11,8 +11,8 @@
     <!-- Chippi, DESIGN.md §7. His body colors are ChippiPet.ColorOf's; his sparks follow the theme. -->
     <SolidColorBrush x:Key="PetInkBrush" Color="#0B0F1F" />
     <SolidColorBrush x:Key="PetEyeHighlightBrush" Color="#FFFFFF" />
-    <!-- The eye whites' rim: ink at 18%. The ground shadow: black at 26%, fading out from the middle. -->
-    <SolidColorBrush x:Key="PetEyeRimBrush" Color="#2E0B0F1F" />
+    <!-- The rim of his body and eye whites: ink at 18%. The ground shadow: black at 26%, fading out from the middle. -->
+    <SolidColorBrush x:Key="PetRimBrush" Color="#2E0B0F1F" />
     <RadialGradientBrush x:Key="PetShadowBrush">
         <GradientStop Color="#42000000" Offset="0" />
         <GradientStop Color="#00000000" Offset="1" />
