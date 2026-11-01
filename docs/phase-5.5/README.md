@@ -17,15 +17,5 @@ Quick actions (planned as Quick toggles), Cleaning mode, Command bar, Radial men
 | Quick actions | [quick-actions.md](quick-actions.md), confirmed 2026-11-01 | [Approved 2026-11-01](https://claude.ai/artifact/HNpG8aciGLWyJecHFyfeeW) |
 | Cleaning mode | [cleaning-mode.md](cleaning-mode.md), confirmed 2026-11-01 | [Approved 2026-11-01](https://claude.ai/artifact/HNpG8aciGLWyJecHFyfeeW) |
 | Command bar | [command-bar.md](command-bar.md), confirmed 2026-11-01 | [Approved 2026-11-01](https://claude.ai/artifact/BnX8BKEJ3XpuQ3oRT2JNsz) |
-| Radial menu | Shaping (answers so far below) | |
+| Radial menu | [radial-menu.md](radial-menu.md), confirmed 2026-11-01 | [Approved 2026-11-01](https://claude.ai/artifact/QFJSjaBzEbZbKmassLftuQ) |
 | AI agent usage | Not shaped yet | |
-
-## Radial menu, shaping so far (Travis, 2026-11-01)
-
-Round 1 answered; no brief yet.
-
-- **Trigger:** customizable in Settings (keyboard shortcut, mouse side buttons, middle-button hold were offered; the user picks).
-- **Position:** opens at the pointer.
-- **Actions:** apps, files and links; key shortcuts; Chippi's actions; media controls; plus other useful kinds Claude should propose.
-- **Organizing:** submenus (a slice opens a second wheel). Not profiles, not per-app wheels.
-- **Next:** propose the extra action kinds, then round 2 (hold-and-release vs press-to-open, slice count, what happens with a fullscreen game in front, the Settings editor), then the brief and its mockup.
