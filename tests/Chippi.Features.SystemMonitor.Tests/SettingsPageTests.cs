@@ -45,11 +45,16 @@ public sealed class SettingsPageTests
     {
         var module = new SystemMonitorModule(() => new FakeSources().Sources);
         var page = new SystemMonitorSettingsPage(module);
-        var tile = Control<ComboBox>(page, "Tile status");
+        var tile = Control<ComboBox>(page, "Home status");
+        Assert.Equal(3, tile.Items.Count); // no GPU found yet: no GPU switch or status
+        Assert.DoesNotContain(Find<SettingRow>(page), r => r.Header is "GPU");
+        page.Hardware(PageTests.Desktop()); // a GPU and a second adapter add rows, so General is built again
+        tile = Control<ComboBox>(page, "Home status");
         Assert.Equal(4, tile.Items.Count);
+        Assert.Equal(["GPU", "Network adapter"], Find<ComboBox>(page).Select(AutomationProperties.GetName).Where(n => n is "GPU" or "Network adapter"));
         Control<ToggleButton>(page, "CPU").IsChecked = false;
         Assert.False(module.Settings.IsOn(Reading.Cpu));
-        Assert.Same(tile, Control<ComboBox>(page, "Tile status"));
+        Assert.Same(tile, Control<ComboBox>(page, "Home status"));
         Assert.Equal(TileStatus.Memory, ((ComboBoxItem)tile.SelectedItem).Tag);
         foreach (string name in new[] { "Memory", "GPU", "Network" }) Control<ToggleButton>(page, name).IsChecked = false;
         Assert.Empty(tile.Items);
@@ -86,10 +91,10 @@ public sealed class SettingsPageTests
     {
         var module = new SystemMonitorModule(() => new FakeSources().Sources);
         var page = new SystemMonitorSettingsPage(module);
-        Assert.DoesNotContain(Find<SettingRow>(page), r => r.Header is "Battery" or "Thermal zone" or "Temperature" or "Low battery" or "GPU temperature");
+        Assert.DoesNotContain(Find<SettingRow>(page), r => r.Header is "Battery" or "Temperature" or "Low battery" or "GPU temperature");
         page.Hardware(Laptop());
         Assert.Contains(Find<SettingRow>(page), r => r.Header == "Battery");
-        Assert.Contains(Find<SettingRow>(page), r => r.Header == "Thermal zone");
+        Assert.Contains(Find<SettingRow>(page), r => r.Header == "Temperature");
         Assert.Equal((5d, 50d), (Control<Slider>(page, "Low battery threshold").Minimum, Control<Slider>(page, "Low battery threshold").Maximum));
         var toggle = Control<ToggleButton>(page, "GPU temperature");
         Assert.False(toggle.IsEnabled);

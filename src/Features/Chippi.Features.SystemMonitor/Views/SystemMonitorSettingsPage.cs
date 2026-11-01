@@ -12,24 +12,32 @@ using Chippi.UI.Controls;
 
 namespace Chippi.Features.SystemMonitor.Views;
 
-/// <summary>Live readings and configuration, using the shared Settings layout.</summary>
+/// <summary>
+/// Settings › System: the island's widgets, every drive as a storage bar, then General, Readings, Units
+/// and Alerts in the shared Settings layout.
+/// </summary>
 public sealed class SystemMonitorSettingsPage : UserControl
 {
     private readonly SystemMonitorModule _module;
     private readonly StackPanel _body = new();
-    private readonly SystemMonitorView _readings;
-    private readonly Border _disks = new() { Padding = new Thickness(16, 2, 16, 2) };
+    private readonly SettingsReadings _readings;
+    private readonly Card _drives = SettingsLayout.Card();
+    private readonly Card _zoneCard = SettingsLayout.Card();
+    private readonly List<TextBlock> _zoneValues = [];
     private readonly List<Action<SystemMonitorSettings>> _sync = [];
     private readonly Dictionary<string, string> _gpus = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, DriveRow> _driveRows = new(StringComparer.OrdinalIgnoreCase);
     private SensorWatch? _discovery;
     private SensorSampler? _sampler;
-    private bool _battery, _zones, _updating, _attached;
+    private bool _battery, _zones, _hasGpu, _updating, _attached;
+    private string _choices = "";
+    private IReadOnlyList<(string Id, string Name)> _gpuChoices = [], _adapterChoices = [];
     private ComboBox _tileStatus = null!;
 
     public SystemMonitorSettingsPage(SystemMonitorModule module)
     {
         _module = module;
-        _readings = new SystemMonitorView(module, settingsPage: true);
+        _readings = new SettingsReadings(module);
         Content = _body;
         Build();
         Loaded += (_, _) => Attach();
@@ -77,15 +85,69 @@ public sealed class SystemMonitorSettingsPage : UserControl
     // Remember discovered capability across NotRead/temporary failures, without keeping stale values on screen.
     internal void Hardware(SystemSnapshot snapshot)
     {
-        _disks.Child = snapshot.Disks.Status == ReadingStatus.Unavailable ? DiskTable.Unavailable(island: false)
-            : DiskTable.Build(snapshot.Disks.Value ?? [], id => _module.Alerting("low-disk", id), island: false);
+        Drives(snapshot);
+        Zones(snapshot);
         bool changed = false;
         if (!_battery && snapshot.Battery.Value is not null) { _battery = true; changed = true; }
         if (!_zones && snapshot.ThermalZones.Value is { Count: > 0 }) { _zones = true; changed = true; }
+        if (!_hasGpu && snapshot.Gpus.Value is { Count: > 0 }) { _hasGpu = true; changed = true; }
         foreach (var gpu in snapshot.Gpus.Value ?? [])
             if (gpu.TemperatureC is not null && (!_gpus.TryGetValue(gpu.Id, out var name) || name != gpu.Name))
             { _gpus[gpu.Id] = gpu.Name; changed = true; }
+        // The GPU and adapter dropdowns show only with a choice to make.
+        foreach (var gpu in snapshot.Gpus.Value ?? []) if (gpu.Load is not null) _module.GpusWithLoad.Add(gpu.Id);
+        if (snapshot.Gpus.Status == ReadingStatus.Ok)
+            _gpuChoices = [.. snapshot.Gpus.Value!.Where(g => _module.GpusWithLoad.Contains(g.Id)).Select(g => (g.Id, g.Name))];
+        if (snapshot.Network.Status is ReadingStatus.Ok)
+            _adapterChoices = [.. snapshot.Network.Value!.Select(a => (a.Id, a.Name))];
+        string choices = string.Join("|", _gpuChoices.Select(g => g.Id + g.Name)) + "/" + string.Join("|", _adapterChoices.Select(a => a.Id + a.Name));
+        if (choices != _choices) { _choices = choices; changed = true; }
         if (changed) Build();
+    }
+
+    // Every thermal zone, which the island's Temperature page lists only up to 8 of.
+    private void Zones(SystemSnapshot snapshot)
+    {
+        if (snapshot.ThermalZones is not { Status: ReadingStatus.Ok, Value: { } zones })
+            return;
+        if (zones.Count != _zoneValues.Count)
+        {
+            _zoneCard.Children.Clear();
+            _zoneValues.Clear();
+            for (int i = 0; i < zones.Count; i++)
+            {
+                var value = Text("");
+                _zoneValues.Add(value);
+                _zoneCard.Children.Add(Row($"Zone {i + 1}", value));
+            }
+            Refresh();
+        }
+        for (int i = 0; i < zones.Count; i++)
+            _zoneValues[i].Text = Format.Temperature(zones[i].TemperatureC, _module.Settings.Temperature);
+    }
+
+    // One storage bar per drive, updated in place while the drives stay the same.
+    private void Drives(SystemSnapshot snapshot)
+    {
+        if (snapshot.Disks.Status == ReadingStatus.Unavailable)
+        {
+            _driveRows.Clear();
+            _drives.Children.Clear();
+            _drives.Children.Add(SettingsLayout.Empty("Unavailable"));
+            return;
+        }
+        if (snapshot.Disks.Value is not { } disks)
+            return;
+        var volumes = DrivesWidget.Volumes(disks);
+        if (!volumes.Select(v => v.Id).SequenceEqual(_driveRows.Keys, StringComparer.OrdinalIgnoreCase))
+        {
+            _driveRows.Clear();
+            _drives.Children.Clear();
+            foreach (var volume in volumes)
+                _drives.Children.Add(_driveRows[volume.Id] = new DriveRow());
+        }
+        foreach (var volume in volumes)
+            _driveRows[volume.Id].Set(volume, _module.Alerting("low-disk", volume.Id));
     }
 
     private void Refresh()
@@ -95,7 +157,7 @@ public sealed class SystemMonitorSettingsPage : UserControl
         try
         {
             var settings = _module.Settings;
-            var choices = Enum.GetValues<TileStatus>().Where(t => settings.IsOn(SystemMonitorSettings.ToReading(t))).ToArray();
+            var choices = Enum.GetValues<TileStatus>().Where(t => settings.IsOn(SystemMonitorSettings.ToReading(t)) && (t != TileStatus.Gpu || _hasGpu)).ToArray();
             var current = _tileStatus.Items.Cast<ComboBoxItem>().Select(i => (TileStatus)i.Tag).ToArray();
             if (!current.SequenceEqual(choices))
             {
@@ -117,28 +179,40 @@ public sealed class SystemMonitorSettingsPage : UserControl
     private void Build()
     {
         _updating = true;
-        if (_disks.Parent is Panel prior) prior.Children.Remove(_disks);
         _body.Children.Clear();
         _sync.Clear();
         if (_readings.Parent is Panel oldReadings) oldReadings.Children.Remove(_readings);
+        if (_drives.Parent is Panel oldDrives) oldDrives.Children.Remove(_drives);
+        if (_zoneCard.Parent is Panel oldZones) oldZones.Children.Remove(_zoneCard);
         _body.Children.Add(_readings);
-        Section("Disks").Children.Add(_disks);
+        var drivesHeader = SettingsLayout.Section("Drives");
+        _body.Children.Add(drivesHeader);
+        _body.Children.Add(_drives);
+        _sync.Add(s => drivesHeader.Visibility = _drives.Visibility = s.IsOn(Reading.Disks) ? Visibility.Visible : Visibility.Collapsed);
+        var zonesHeader = SettingsLayout.Section("Thermal zones");
+        _body.Children.Add(zonesHeader);
+        _body.Children.Add(_zoneCard);
+        _sync.Add(s => zonesHeader.Visibility = _zoneCard.Visibility = s.IsOn(Reading.ThermalZone) && _zoneValues.Count > 1 ? Visibility.Visible : Visibility.Collapsed);
         var first = NewCard();
         first.Children.Add(Row("Update speed", Choice("Update speed", SystemMonitorSettings.UpdateChoices,
             n => n == 1 ? "1 second" : $"{n} seconds", s => s.UpdateSeconds, (s, n) => s with { UpdateSeconds = n })));
-        _tileStatus = Combo("Tile status");
+        _tileStatus = Combo("Home status");
         _tileStatus.SelectionChanged += (_, _) =>
         {
             if (_tileStatus.SelectedItem is ComboBoxItem { Tag: TileStatus status }) Save(s => s with { TileStatus = status });
         };
-        first.Children.Add(Row("Tile status", _tileStatus));
+        first.Children.Add(Row("Home status", _tileStatus));
+        if (_gpuChoices.Count > 1)
+            first.Children.Add(Row("GPU", Device("GPU", _gpuChoices, s => Pick.Gpu(Readings().Gpus.Value, s.GpuId, _module.GpusWithLoad)?.Id, (s, id) => s with { GpuId = id })));
+        if (_adapterChoices.Count > 1)
+            first.Children.Add(Row("Network adapter", Device("Network adapter", _adapterChoices, s => Pick.Adapter(Readings().Network.Value, s.NetworkAdapterId)?.Id, (s, id) => s with { NetworkAdapterId = id })));
         _body.Children.Add(SettingsLayout.Section("General"));
         _body.Children.Add(first);
 
         var readings = Section("Readings");
-        foreach (var reading in Enum.GetValues<Reading>())
+        foreach (var reading in Order)
         {
-            if (reading == Reading.Battery && !_battery || reading == Reading.ThermalZone && !_zones) continue;
+            if (reading == Reading.Battery && !_battery || reading == Reading.ThermalZone && !_zones || reading == Reading.Gpu && !_hasGpu) continue;
             readings.Children.Add(Row(ReadingName(reading), Switch(ReadingName(reading), s => s.IsOn(reading), (s, on) =>
                 s with { Off = on ? s.Off.Where(r => r != reading).ToList() : s.Off.Append(reading).Distinct().ToList() })));
         }
@@ -161,7 +235,10 @@ public sealed class SystemMonitorSettingsPage : UserControl
                 s with { GpuTemperature = s.GpuTemperature with { On = on } });
             _sync.Add(s => toggle.IsEnabled = _gpus.Keys.Any(s.GpuTemperature.Limits.ContainsKey));
             var summary = Text("");
-            _sync.Add(s => summary.Text = string.Join(", ", _gpus.Keys.Where(s.GpuTemperature.Limits.ContainsKey).Select(id => Format.Temperature(s.GpuTemperature.Limits[id], s.Temperature))));
+            // The switch waits for a limit, so say so rather than leave it dim without a reason.
+            _sync.Add(s => summary.Text = _gpus.Keys.Any(s.GpuTemperature.Limits.ContainsKey)
+                ? string.Join(", ", _gpus.Keys.Where(s.GpuTemperature.Limits.ContainsKey).Select(id => Format.Temperature(s.GpuTemperature.Limits[id], s.Temperature)))
+                : "Set a limit");
             alerts.Children.Add(SettingsLayout.Expander("GPU temperature", summary, toggle, [.. _gpus.Select(g => GpuLimit(g.Key, g.Value))]));
         }
         alerts.Children.Add(Row("Repeat interval", Choice("Repeat interval", SystemMonitorSettings.RepeatChoices,
@@ -263,6 +340,22 @@ public sealed class SystemMonitorSettingsPage : UserControl
         return combo;
     }
 
+    // The latest snapshot with readings, for which GPU and adapter the dropdowns show.
+    private SystemSnapshot Readings() => _module.Sampler?.Latest is { } latest ? SystemView.Opening(latest, _module.PageSnapshot) : SystemSnapshot.Empty(DateTimeOffset.Now);
+
+    private ComboBox Device(string name, IReadOnlyList<(string Id, string Name)> choices, Func<SystemMonitorSettings, string?> get,
+        Func<SystemMonitorSettings, string, SystemMonitorSettings> set)
+    {
+        var combo = Combo(name);
+        combo.Width = 240;
+        var names = Parts.Distinct(choices.Select(c => c.Name));
+        for (int i = 0; i < choices.Count; i++)
+            combo.Items.Add(new ComboBoxItem { Tag = choices[i].Id, Content = names[i], ToolTip = choices[i].Name });
+        _sync.Add(s => combo.SelectedItem = combo.Items.Cast<ComboBoxItem>().FirstOrDefault(i => string.Equals((string)i.Tag, get(s), StringComparison.OrdinalIgnoreCase)));
+        combo.SelectionChanged += (_, _) => { if (combo.SelectedItem is ComboBoxItem { Tag: string id }) Save(s => set(s, id)); };
+        return combo;
+    }
+
     private static ComboBox Combo(string name)
     {
         var combo = new ComboBox { Width = SettingsLayout.ComboWidth };
@@ -291,8 +384,34 @@ public sealed class SystemMonitorSettingsPage : UserControl
         return block;
     }
 
+    /// <summary>The readings in the page's order.</summary>
+    internal static readonly Reading[] Order = [Reading.Cpu, Reading.Gpu, Reading.Memory, Reading.Network, Reading.Disks, Reading.Battery, Reading.ThermalZone];
+
     private static string ReadingName(Reading reading) => reading switch
     {
-        Reading.Cpu => "CPU", Reading.Gpu => "GPU", Reading.ThermalZone => "Thermal zone", _ => reading.ToString(),
+        Reading.Cpu => "CPU", Reading.Gpu => "GPU", Reading.Disks => "Drives", Reading.ThermalZone => "Temperature", _ => reading.ToString(),
     };
+
+    /// <summary>One drive in Settings: its letter, "412 GiB free of 931 GiB", and a storage bar of what's used.</summary>
+    private sealed class DriveRow : Border
+    {
+        private readonly TextBlock _letter = Parts.Text("", 14, Look.Settings.Text), _space = Parts.Text("", 12, Look.Settings.Secondary);
+        private readonly Meter _meter = new(Look.Settings) { Margin = new Thickness(0, 8, 0, 0) };
+
+        public DriveRow()
+        {
+            Padding = new Thickness(16, 12, 16, 14);
+            DockPanel.SetDock(_space, Dock.Right);
+            Child = new StackPanel { Children = { new DockPanel { Children = { _space, _letter } }, _meter } };
+        }
+
+        public void Set(VolumeReading volume, bool caution)
+        {
+            _letter.Text = DrivesWidget.Letter(volume);
+            _space.Text = $"{Format.Size(volume.FreeBytes)} free of {Format.Size(volume.TotalBytes)}";
+            _space.SetResourceReference(TextBlock.ForegroundProperty, caution ? Look.Caution : Look.Settings.Secondary);
+            _meter.Set(volume.TotalBytes == 0 ? 0 : 1 - (double)volume.FreeBytes / volume.TotalBytes, caution);
+            AutomationProperties.SetName(this, $"{_letter.Text}, {_space.Text}");
+        }
+    }
 }

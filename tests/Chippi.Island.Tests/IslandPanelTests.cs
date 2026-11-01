@@ -260,9 +260,28 @@ public sealed class IslandPanelTests
     }
 
     [Fact]
+    public void A_page_that_uses_its_back_arrow_stays_and_the_next_back_goes_home()
+    {
+        int backs = 0;
+        var system = new IslandTileContribution("system-monitor", new IslandTileSpec("system-monitor", "System", "Activity", 60, 0,
+            () => new Border { Height = 120 }) { HandleBack = () => ++backs == 1 }); // a detail page, then its overview
+        WpfTestThread.Run(() => WithPanel(panel =>
+        {
+            Open(panel);
+            panel.ShowPage("system-monitor");
+            IslandWindowTests.Settle(panel);
+            Click(Back(panel));
+            Assert.Equal(("system-monitor", 1), (panel.CurrentPage, backs));
+            Click(Back(panel));
+            IslandWindowTests.Settle(panel);
+            Assert.Equal((null, 2), (panel.CurrentPage, backs));
+        }, Tiles(system)));
+    }
+
+    [Fact]
     public void Tiles_are_on_screen_only_while_the_open_grid_shows_them()
     {
-        var monitor = Part("system-monitor", "System monitor", 60);
+        var monitor = Part("system-monitor", "System", 60);
         WpfTestThread.Run(() => WithPanel(panel =>
         {
             Assert.False(monitor.OnScreen);
@@ -282,7 +301,7 @@ public sealed class IslandPanelTests
     [Fact]
     public void A_notice_opens_its_page_once_and_the_header_shows_the_page_note()
     {
-        var monitor = Part("system-monitor", "System monitor", 60, status: "CPU 12%");
+        var monitor = Part("system-monitor", "System", 60, status: "CPU 12%");
         monitor.SetPageNote("Last 4 min");
         WpfTestThread.Run(() => WithPanel(panel =>
         {

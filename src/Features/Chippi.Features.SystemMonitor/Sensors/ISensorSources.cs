@@ -50,6 +50,22 @@ public interface ITemperatureSource : IDisposable
     IReadOnlyList<ThermalZoneReading> Read();
 }
 
+public interface IProcessSource : IDisposable
+{
+    /// <returns>Every process but the kernel's own; CPU is null for a process on its first sample.</returns>
+    IReadOnlyList<ProcessReading> Read();
+}
+
+/// <summary>No process readings, for sources that have none (tests that don't need them).</summary>
+public sealed class NoProcessSource : IProcessSource
+{
+    public static NoProcessSource Instance { get; } = new();
+
+    public IReadOnlyList<ProcessReading> Read() => [];
+
+    public void Dispose() { }
+}
+
 /// <summary>Every source the sampler reads. Tests pass fakes; the app passes <c>WindowsSources.Create()</c>.</summary>
 public sealed record SensorSources(
     ICpuSource Cpu,
@@ -60,11 +76,15 @@ public sealed record SensorSources(
     IBatterySource Battery,
     ITemperatureSource Temperature) : IDisposable
 {
+    /// <summary>The processes behind a detail page's top apps.</summary>
+    public IProcessSource Processes { get; init; } = NoProcessSource.Instance;
+
     public void Dispose()
     {
         Cpu.Dispose();
         Gpu.Dispose();
         Disks.Dispose();
         Temperature.Dispose();
+        Processes.Dispose();
     }
 }

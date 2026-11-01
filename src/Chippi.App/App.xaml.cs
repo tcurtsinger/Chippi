@@ -189,7 +189,7 @@ public partial class App : Application
         shell.Registry.Register(new Chippi.Features.Sound.Volume.AppVolumeModule());
         // The Sound page's Microphone row sets the level of the mic routing has in use, never VB-CABLE's.
         shell.Registry.Register(new Chippi.Features.Sound.Mute.MicMuteModule(microphone: () => routing.InUse(Chippi.Audio.AudioFlow.Capture)));
-        // [Phase 4] System monitor: replaces its catalog placeholder.
+        // [Phase 4] System (the System monitor until 2026-10-31): replaces its catalog placeholder.
         shell.Registry.Register(new Chippi.Features.SystemMonitor.SystemMonitorModule());
         shell.Registry.Register(new Chippi.Features.Scratchpad.ScratchpadModule());
         RegisterClipboardFeatures(shell);

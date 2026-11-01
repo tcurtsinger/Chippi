@@ -259,7 +259,7 @@ internal sealed class IslandGrid : UserControl
         if (tiles.SequenceEqual(_shown))
             return;
         // The same buttons in the same order take a new status, glyph or state in place, so a hover or a press on one
-        // carries on through it (System monitor's status changes every 2 seconds while the home shows).
+        // carries on through it (System's status changes every 2 seconds while the home shows).
         var built = _tiles.Children.OfType<HomeTile>().ToList();
         var shown = tiles.Take(MaxTiles).ToList();
         if (built.Count == shown.Count && built.Zip(shown).All(p => p.First.View.Key == p.Second.Key && p.First.View.Split == p.Second.Split))

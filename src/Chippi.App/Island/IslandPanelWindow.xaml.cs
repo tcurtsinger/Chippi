@@ -155,7 +155,12 @@ public partial class IslandPanelWindow : Window
     internal Core.Clipboard.PasteTarget? PasteTarget { get; private set; }
 
     /// <summary>Lets the page use Esc first (a search to clear): true when it did, and the island stays open.</summary>
-    internal bool PageHandlesEscape()
+    internal bool PageHandlesEscape() => PageHandles(s => s.HandleEscape, "Esc");
+
+    /// <summary>Lets the page use its Back arrow first (a detail page back to its overview): true when it did, and the page stays.</summary>
+    internal bool PageHandlesBack() => PageHandles(s => s.HandleBack, "Back");
+
+    private bool PageHandles(Func<IslandTileSpec, Func<bool>?> handler, string what)
     {
         if (!IsOpen || Group(_page) is not { } group)
             return false;
@@ -163,12 +168,12 @@ public partial class IslandPanelWindow : Window
         {
             try
             {
-                if (part.Spec.HandleEscape?.Invoke() == true)
+                if (handler(part.Spec)?.Invoke() == true)
                     return true;
             }
             catch (Exception ex)
             {
-                Log.Error($"Island: {part.ModuleId} failed to handle Esc", ex);
+                Log.Error($"Island: {part.ModuleId} failed to handle {what}", ex);
             }
         }
         return false;
@@ -433,7 +438,7 @@ public partial class IslandPanelWindow : Window
             header.Margin = new Thickness(0);
             header.VerticalAlignment = VerticalAlignment.Center;
             // Every header gets the same 24 row and the 8 gap below it, so every body is 496 × 304.
-            var back = BackButton(() => ShowPage(null, remember: false));
+            var back = BackButton(() => { if (!PageHandlesBack()) ShowPage(null, remember: false); });
             DockPanel.SetDock(back, Dock.Left);
             var row = new DockPanel { Height = IslandPage.HeaderHeight, Margin = new Thickness(0, 0, 0, IslandPage.Gap), LastChildFill = true, Children = { back, header } };
             DockPanel.SetDock(row, Dock.Top);

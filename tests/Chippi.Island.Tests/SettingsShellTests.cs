@@ -26,7 +26,7 @@ public sealed class SettingsShellTests
         new("paste-plain-text", "Paste as plain text", FeatureGroup.ClipboardText, "ClipboardType"),
         new("clean-url", "Clean URL", FeatureGroup.ClipboardText, "Link"),
         new("clipboard-history", "Clipboard history", FeatureGroup.ClipboardText, "ClipboardList"),
-        new("system-monitor", "System monitor", FeatureGroup.System, "Activity"),
+        new("system-monitor", "System", FeatureGroup.System, "Activity"),
         new("keep-awake", "Keep awake", FeatureGroup.System, "Coffee"),
         new("app-volume", "App volume", FeatureGroup.Sound, "Sliders"),
         new("downloads-organizer", "File organizer", FeatureGroup.Files, "Folder"),

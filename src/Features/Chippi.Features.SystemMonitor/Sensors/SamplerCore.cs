@@ -56,7 +56,8 @@ internal sealed class SamplerCore(SensorSources sources, ILogger log) : IDisposa
         var disks = ReadList("disks", now, need.HasFlag(SensorNeed.Disks), sources.Disks.Read);
         var battery = Read("battery", now, need.HasFlag(SensorNeed.Battery), sources.Battery.Read, nullIsNotSupported: true);
         var zones = ReadList("thermal", now, need.HasFlag(SensorNeed.ThermalZones), sources.Temperature.Read);
-        var snapshot = new SystemSnapshot(now, cpu, memory, gpus, network, disks, battery, zones);
+        var processes = ReadList("processes", now, need.HasFlag(SensorNeed.Processes), sources.Processes.Read);
+        var snapshot = new SystemSnapshot(now, cpu, memory, gpus, network, disks, battery, zones) { Processes = processes };
 
         lock (_gate)
         {
@@ -69,6 +70,8 @@ internal sealed class SamplerCore(SensorSources sources, ILogger log) : IDisposa
                 AppendEach(gpus, g => Series.GpuLoad(g.Id), g => g.Load is { } l ? Math.Min(l, 100) : null, now, interval, "gpu.load:");
             AppendEach(network, n => Series.NetworkReceive(n.Id), n => n.ReceiveBytesPerSecond, now, interval, "net.rx:");
             AppendEach(network, n => Series.NetworkSend(n.Id), n => n.SendBytesPerSecond, now, interval, "net.tx:");
+            AppendOne(Series.Battery, battery, b => b.Percent, now, interval);
+            AppendEach(zones, z => Series.ThermalZone(z.Id), z => z.TemperatureC, now, interval, "thermal:");
             _latest = snapshot;
         }
         return snapshot;
@@ -92,7 +95,7 @@ internal sealed class SamplerCore(SensorSources sources, ILogger log) : IDisposa
             var value = read();
             _retryAt.Remove(name);
             if (_failing.Remove(name))
-                log.LogInformation("System monitor: {Source} reads again", name);
+                log.LogInformation("System: {Source} reads again", name);
             return value is null
                 ? new(nullIsNotSupported ? ReadingStatus.NotSupported : ReadingStatus.Pending, null, now)
                 : new(ReadingStatus.Ok, value, now);
@@ -101,7 +104,7 @@ internal sealed class SamplerCore(SensorSources sources, ILogger log) : IDisposa
         {
             _retryAt[name] = now + RetryAfterFailure;
             if (_failing.Add(name))
-                log.LogWarning(ex, "System monitor: reading {Source} failed", name);
+                log.LogWarning(ex, "System: reading {Source} failed", name);
             return new(ReadingStatus.Unavailable, null, now);
         }
     }
@@ -115,11 +118,11 @@ internal sealed class SamplerCore(SensorSources sources, ILogger log) : IDisposa
 
     // Pending (a rate starting over) adds no point of its own but ends a line already drawn: a series
     // never starts with a gap, and never bridges a sample it didn't get.
-    private void AppendOne<T>(string key, Sample<T> sample, Func<T, double> value, DateTimeOffset now, TimeSpan interval) where T : class
+    private void AppendOne<T>(string key, Sample<T> sample, Func<T, double?> value, DateTimeOffset now, TimeSpan interval) where T : class
     {
         switch (sample.Status)
         {
-            case ReadingStatus.NotRead:
+            case ReadingStatus.NotRead or ReadingStatus.NotSupported:
                 return;
             case ReadingStatus.Pending:
                 Append(key, now, null, interval, force: true);

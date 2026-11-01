@@ -7,7 +7,7 @@ namespace Chippi.Features.SystemMonitor.Tests;
 
 /// <summary>Every source as a settable function, counting reads. Set a function to throw to fail a read.</summary>
 internal sealed class FakeSources :
-    ICpuSource, IMemorySource, IGpuSource, INetworkSource, IDiskSource, IBatterySource, ITemperatureSource
+    ICpuSource, IMemorySource, IGpuSource, INetworkSource, IDiskSource, IBatterySource, ITemperatureSource, IProcessSource
 {
     private int _cpuReads, _memoryReads, _gpuReads, _networkReads;
 
@@ -18,6 +18,7 @@ internal sealed class FakeSources :
     public Func<IReadOnlyList<DiskReading>?> Disks { get; set; } = () => [new DiskReading(0, 5, 0, 0, [new VolumeReading("\\\\?\\Volume{1}\\", "C:", 50, 100)])];
     public Func<BatteryReading?> Battery { get; set; } = () => null;
     public Func<IReadOnlyList<ThermalZoneReading>> Zones { get; set; } = () => [];
+    public Func<IReadOnlyList<ProcessReading>> Processes { get; set; } = () => [];
 
     public int CpuReads => Volatile.Read(ref _cpuReads);
     public int MemoryReads => Volatile.Read(ref _memoryReads);
@@ -25,7 +26,7 @@ internal sealed class FakeSources :
     public int NetworkReads => Volatile.Read(ref _networkReads);
     public bool Disposed { get; private set; }
 
-    public SensorSources Sources => new(this, this, this, this, this, this, this);
+    public SensorSources Sources => new(this, this, this, this, this, this, this) { Processes = this };
 
     CpuReading? ICpuSource.Read(bool perProcessor)
     {
@@ -56,6 +57,8 @@ internal sealed class FakeSources :
     BatteryReading? IBatterySource.Read() => Battery();
 
     IReadOnlyList<ThermalZoneReading> ITemperatureSource.Read() => Zones();
+
+    IReadOnlyList<ProcessReading> IProcessSource.Read() => Processes();
 
     public void Dispose() => Disposed = true;
 }

@@ -4,6 +4,7 @@
 using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using Chippi.Core.Island;
 using Chippi.Core.Modules;
 using Chippi.Features.SystemMonitor.Sensors;
@@ -13,66 +14,271 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Chippi.Features.SystemMonitor.Tests;
 
-/// <summary>The page with fake sources, on a WPF thread, without a window (Karl's review of 6b0b142).</summary>
+/// <summary>The System page with fake sources, on a WPF thread, without a window (Karl's review of 6b0b142).</summary>
 public sealed class PageTests
 {
-    private static readonly DateTimeOffset At = new(2026, 10, 27, 12, 0, 0, TimeSpan.Zero);
+    private const ulong GiB = 1024UL * 1024 * 1024, MiB = 1024UL * 1024;
 
-    private static (SystemMonitorModule Module, SystemMonitorView View) Start()
+    private static (SystemMonitorModule Module, SystemView View, IslandTileSpec Spec) Start(FakeSources? fake = null)
     {
-        var module = new SystemMonitorModule(() => new FakeSources().Sources);
+        fake ??= new FakeSources();
+        var module = new SystemMonitorModule(() => fake.Sources);
         var ui = new Ui();
         module.StartAsync(new ModuleContext("system-monitor", new Settings(), NullLogger.Instance, new Island(), ui), default).GetAwaiter().GetResult();
-        return (module, (SystemMonitorView)ui.Spec!.CreateSection());
+        return (module, (SystemView)ui.Spec!.CreateSection(), ui.Spec);
     }
 
-    private static SystemSnapshot Snapshot(ReadingStatus cpuStatus, CpuReading? cpu, GpuReading gpu, BatteryReading battery) =>
-        SystemSnapshot.Empty(At) with
-        {
-            Cpu = new(cpuStatus, cpu, At),
-            Gpus = new(ReadingStatus.Ok, [gpu], At),
-            Battery = new(ReadingStatus.Ok, battery, At),
-        };
-
-    // The table values use 12 DIP semibold tabular figures.
-    private static List<string> Headlines(DependencyObject root)
+    /// <summary>A desktop: two GPUs, Ethernet and Wi-Fi, <paramref name="drives"/> drives, and the processes behind top apps.</summary>
+    internal static SystemSnapshot Desktop(int drives = 4, bool laptop = false)
     {
-        var found = new List<string>();
-        if (root is TextBlock { FontSize: 12, FontWeight: var weight, Text.Length: > 0 } text && weight == FontWeights.SemiBold)
-            found.Add(text.Text);
-        foreach (var child in LogicalTreeHelper.GetChildren(root).OfType<DependencyObject>())
-            found.AddRange(Headlines(child));
-        return found;
+        var at = DateTimeOffset.UtcNow;
+        return SystemSnapshot.Empty(at) with
+        {
+            Cpu = new(ReadingStatus.Ok, new(23, 16, 4180, [.. Enumerable.Repeat(20d, 16)]), at),
+            Gpus = new(ReadingStatus.Ok, laptop ? [] :
+            [
+                new("rtx", "NVIDIA GeForce RTX 4080", Load: 34, DedicatedUsedBytes: 6 * GiB, DedicatedTotalBytes: 16 * GiB, TemperatureC: 51, FanRpm: 1450,
+                    ProcessLoads: new Dictionary<int, double> { [401] = 26, [101] = 3, [102] = 1 }),
+                new("igpu", "AMD Radeon(TM) Graphics", Load: 3),
+            ], at),
+            Memory = new(ReadingStatus.Ok, new(21 * GiB, 32 * GiB, 26 * GiB, 48 * GiB), at),
+            Network = new(ReadingStatus.Ok, [new("eth", "Ethernet", true, 2.4 * MiB, 180 * 1024), new("wifi", "Wi-Fi", false, null, null)], at),
+            Disks = new(ReadingStatus.Ok, [.. Enumerable.Range(0, drives).Select(i => new DiskReading(i, i, 0, 0,
+                [new VolumeReading("v" + i, (char)('C' + i) + ":", (ulong)(10 + i * 30) * GiB, 300 * GiB)]))], at),
+            Battery = new(laptop ? ReadingStatus.Ok : ReadingStatus.NotSupported, laptop ? new(BatteryState.OnBattery, 80, -12.4, TimeSpan.FromMinutes(190)) : null, at),
+            ThermalZones = new(laptop ? ReadingStatus.Ok : ReadingStatus.NotSupported, laptop ? [new("z1", 52), new("z2", 47)] : [], at),
+            Processes = new(ReadingStatus.Ok,
+            [
+                new(101, "chrome.exe", "Google Chrome", null, 3.2, 1400 * MiB), new(102, "chrome.exe", "Google Chrome", null, 2.9, 1700 * MiB),
+                new(201, "devenv.exe", "Visual Studio", null, 3.4, 1800 * MiB), new(301, "discord.exe", "Discord", null, 1.2, 640 * MiB),
+                new(401, "game.exe", "Game", null, 0.8, 300 * MiB), new(501, "idle.exe", "Idle", null, 0.0, 100 * MiB),
+            ], at),
+        };
     }
 
-    [Fact]
-    public void A_missing_reading_clears_its_headline_and_a_new_one_brings_it_back()
+    private static string Value(SystemView view, Detail kind) => ((ReadingWidget)view.Overview.WidgetFor(kind)!).Hero.Value;
+
+    private static void OnCulture(Action run)
     {
         var culture = CultureInfo.CurrentCulture;
         CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("en-US");
+        try { run(); }
+        finally { CultureInfo.CurrentCulture = culture; }
+    }
+
+    [Fact]
+    public void The_overview_has_a_widget_for_each_reading_the_pc_has_in_its_rows() => WpfTestThread.Run(() =>
+    {
+        var (module, view, _) = Start();
         try
         {
-            WpfTestThread.Run(() =>
-            {
-                var (module, view) = Start();
-                try
-                {
-                    view.Show(Snapshot(ReadingStatus.Ok, new CpuReading(25, 4, null), new GpuReading("dGPU", "RTX", Load: 31),
-                        new BatteryReading(BatteryState.OnBattery, 50, null, null)));
-                    Assert.Equal(["25%", "31%", "50%"], Headlines(view));
-
-                    view.Show(Snapshot(ReadingStatus.Pending, null, new GpuReading("dGPU", "RTX", TemperatureC: 50),
-                        new BatteryReading(BatteryState.OnBattery, null, null, null)));
-                    Assert.Empty(Headlines(view));
-
-                    view.Show(Snapshot(ReadingStatus.Unavailable, null, new GpuReading("dGPU", "RTX", Load: 7),
-                        new BatteryReading(BatteryState.Charging, 51, null, null)));
-                    Assert.Equal(["7%", "51%"], Headlines(view));
-                }
-                finally { module.StopAsync(default).GetAwaiter().GetResult(); }
-            });
+            view.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent)); // a page that shows hears settings change
+            view.Show(Desktop());
+            Assert.Equal([Detail.Cpu, Detail.Gpu, Detail.Memory, Detail.Network, Detail.Drives], view.Overview.Widgets.Select(w => w.Kind));
+            view.Show(Desktop(laptop: true));
+            // No GPU now: CPU and Memory share the top row; battery and zones join the network.
+            Assert.Equal([Detail.Cpu, Detail.Memory, Detail.Network, Detail.Battery, Detail.Temperature, Detail.Drives], view.Overview.Widgets.Select(w => w.Kind));
+            module.Save(module.Settings with { Off = [Reading.Gpu, Reading.Network] });
+            Assert.Equal([Detail.Cpu, Detail.Memory, Detail.Battery, Detail.Temperature, Detail.Drives], view.Overview.Widgets.Select(w => w.Kind));
+            module.Save(module.Settings with { Off = [.. Enum.GetValues<Reading>()] });
+            Assert.Empty(view.Overview.Widgets);
+            Assert.Contains(Find<TextBlock>(view.Overview), t => t.Text == "Every reading is off");
         }
-        finally { CultureInfo.CurrentCulture = culture; }
+        finally { module.StopAsync(default).GetAwaiter().GetResult(); }
+    });
+
+    [Fact]
+    public void Widgets_show_values_context_and_meters_and_clear_a_missing_reading() => WpfTestThread.Run(() => OnCulture(() =>
+    {
+        var (module, view, _) = Start();
+        try
+        {
+            var s = Desktop();
+            view.Show(s);
+            Assert.Equal(("23%", "34%", "66%"), (Value(view, Detail.Cpu), Value(view, Detail.Gpu), Value(view, Detail.Memory)));
+            var gpu = (ReadingWidget)view.Overview.WidgetFor(Detail.Gpu)!;
+            Assert.Equal(("51 °C", "GeForce RTX 4080"), (gpu.Fact, gpu.Context.Text));
+            Assert.Equal(0.34, gpu.Meter!.Value, 3);
+            var network = (NetworkWidget)view.Overview.WidgetFor(Detail.Network)!;
+            Assert.Equal(("Ethernet", "2.4 MiB/s", "180 KiB/s"), (network.Fact, network.Down, network.Up));
+
+            view.Show(s with { Cpu = new(ReadingStatus.Pending, null, s.At), Network = new(ReadingStatus.Ok, [new("eth", "Ethernet", true, null, null)], s.At) });
+            Assert.Equal("", Value(view, Detail.Cpu));
+            Assert.Equal(("", ""), (network.Down, network.Up));
+            view.Show(s with { Cpu = new(ReadingStatus.Unavailable, null, s.At), Network = new(ReadingStatus.Ok, [new("eth", "Ethernet", false, null, null)], s.At) });
+            Assert.Equal(("Unavailable", "Not connected"), (Value(view, Detail.Cpu), network.Down));
+        }
+        finally { module.StopAsync(default).GetAwaiter().GetResult(); }
+    }));
+
+    [Fact]
+    public void Drives_show_up_to_four_then_the_three_fullest_with_an_alerting_one_first() => WpfTestThread.Run(() =>
+    {
+        var volumes = Enumerable.Range(0, 8).Select(i => new VolumeReading("v" + i, (char)('C' + i) + ":", (ulong)(i + 1) * GiB, 10 * GiB)).ToList();
+        Assert.Equal(4, DrivesWidget.Choose(volumes[..4], _ => false).Shown.Count);
+        var (shown, more) = DrivesWidget.Choose(volumes, _ => false);
+        Assert.Equal(("C: D: E:", 5), (string.Join(" ", shown.Select(v => v.Letter)), more));
+        (shown, more) = DrivesWidget.Choose(volumes, id => id == "v7");
+        Assert.Equal(("C: D: J:", 5), (string.Join(" ", shown.Select(v => v.Letter)), more));
+
+        var widget = new DrivesWidget(Look.Island, null, _ => false);
+        widget.Set(Desktop(drives: 8));
+        Assert.Equal(("C: D: E:", "+5", "8 drives"), (string.Join(" ", widget.Shown), widget.More, widget.Fact));
+        widget.Set(Desktop(drives: 1));
+        Assert.Equal(("C:", ""), (widget.Fact, widget.More));
+        widget.Set(Desktop() with { Disks = new(ReadingStatus.Unavailable, null, DateTimeOffset.UtcNow) });
+        Assert.Empty(widget.Shown);
+    });
+
+    [Fact]
+    public void A_widget_opens_its_page_and_back_and_esc_return_to_the_overview_it_reopens_on() => WpfTestThread.Run(() =>
+    {
+        var (module, view, spec) = Start();
+        try
+        {
+            view.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));
+            view.Show(Desktop());
+            var cpu = (Button)view.Overview.WidgetFor(Detail.Cpu)!.Root;
+            cpu.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+            Assert.Equal((Detail.Cpu, "CPU"), (view.Current!.Kind, view.Title));
+            Assert.True(module.Sampler!.Need.HasFlag(SensorNeed.PerProcessor | SensorNeed.Processes));
+            Assert.True(spec.HandleBack!());
+            Assert.Equal((null, "System"), (view.Current, view.Title));
+            Assert.False(module.Sampler.Need.HasFlag(SensorNeed.Processes));
+            Assert.False(spec.HandleBack!()); // on the overview, Back goes home
+            view.Open(Detail.Memory);
+            Assert.True(spec.HandleEscape!());
+            Assert.Null(view.Current);
+            Assert.False(spec.HandleEscape!());
+            view.Open(Detail.Network);
+            view.RaiseEvent(new RoutedEventArgs(FrameworkElement.UnloadedEvent));
+            Assert.Null(view.Current); // the island reopens on the overview
+            Assert.Equal(SensorNeed.None, module.Sampler.Need);
+        }
+        finally { module.StopAsync(default).GetAwaiter().GetResult(); }
+    });
+
+    [Fact]
+    public void A_reading_switched_off_under_its_page_returns_to_the_overview() => WpfTestThread.Run(() =>
+    {
+        var (module, view, _) = Start();
+        try
+        {
+            view.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));
+            view.Show(Desktop());
+            view.Open(Detail.Gpu);
+            module.Save(module.Settings with { Off = [Reading.Gpu] });
+            Assert.Null(view.Current);
+        }
+        finally { module.StopAsync(default).GetAwaiter().GetResult(); }
+    });
+
+    [Fact]
+    public void Detail_pages_show_top_apps_facts_and_the_graph() => WpfTestThread.Run(() => OnCulture(() =>
+    {
+        var (module, view, _) = Start();
+        try
+        {
+            var s = Desktop();
+            view.Show(s);
+            view.Open(Detail.Cpu);
+            var page = view.Current!;
+            Assert.Equal(("23%", "4.18 GHz"), (page.Hero.Value, page.Side));
+            Assert.Equal(["Google Chrome 6.1%", "Visual Studio 3.4%", "Discord 1.2%"], page.Apps!.Shown);
+            Assert.Contains("Logical processors 16", page.Facts!.Shown);
+            Assert.Contains(page.Facts.Shown, f => f.StartsWith("Up time ", StringComparison.Ordinal));
+            Assert.Equal(16, page.Cores!.Values.Count);
+            Assert.Equal("100%", page.Graph.Scale);
+
+            view.Open(Detail.Gpu);
+            page = view.Current!;
+            Assert.Equal(("34%", "51 °C"), (page.Hero.Value, page.Side));
+            Assert.Equal(["Game 26%", "Google Chrome 4.0%"], page.Apps!.Shown);
+            Assert.Contains("Fan 1,450 RPM", page.Facts!.Shown);
+            Assert.Equal(Visibility.Visible, view.GpuPicker.Visibility); // two GPUs: the header names the one shown
+
+            view.Open(Detail.Memory);
+            page = view.Current!;
+            Assert.Equal(["Google Chrome 3.0 GiB", "Visual Studio 1.8 GiB", "Discord 640 MiB"], page.Apps!.Shown);
+            Assert.Equal(Visibility.Collapsed, view.GpuPicker.Visibility);
+
+            // Processes that fail to read say so; the rows don't keep old apps.
+            view.Show(s with { Processes = new(ReadingStatus.Unavailable, null, s.At) });
+            Assert.Equal(("Unavailable", 0), (page.Apps.Status, page.Apps.Shown.Count));
+        }
+        finally { module.StopAsync(default).GetAwaiter().GetResult(); }
+    }));
+
+    [Fact]
+    public void The_network_page_lists_adapters_and_a_click_graphs_another() => WpfTestThread.Run(() => OnCulture(() =>
+    {
+        var (module, view, _) = Start();
+        try
+        {
+            view.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));
+            view.Show(Desktop());
+            view.Open(Detail.Network);
+            var page = view.Current!;
+            Assert.Equal(("2.4 MiB/s", "64 KiB/s"), (page.Hero.Value, page.Graph.Scale));
+            Assert.Equal(["Ethernet, down 2.4 MiB/s, up 180 KiB/s", "Wi-Fi, Not connected"], page.Adapters!.Shown);
+            var wifi = Find<Button>(page.Adapters).Last();
+            wifi.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+            Assert.Equal("wifi", module.Settings.NetworkAdapterId);
+            Assert.Equal("Not connected", view.Current!.Hero.Value);
+        }
+        finally { module.StopAsync(default).GetAwaiter().GetResult(); }
+    }));
+
+    [Fact]
+    public void The_drives_page_fits_whole_rows_and_sends_the_rest_to_settings() => WpfTestThread.Run(() =>
+    {
+        var (module, view, _) = Start();
+        try
+        {
+            view.Show(Desktop());
+            view.Open(Detail.Drives);
+            var drives = view.Current!.Drives!;
+            Assert.Equal((4, "", 4), (drives.Volumes.Count, drives.More, drives.Disks.Count));
+            view.Show(Desktop(drives: 8));
+            Assert.Equal((3, "+5 more in Settings", 4), (drives.Volumes.Count, drives.More, drives.Disks.Count));
+        }
+        finally { module.StopAsync(default).GetAwaiter().GetResult(); }
+    });
+
+    [Fact]
+    public void Laptop_pages_show_battery_and_every_zone_up_to_eight() => WpfTestThread.Run(() => OnCulture(() =>
+    {
+        var (module, view, _) = Start();
+        try
+        {
+            var s = Desktop(laptop: true);
+            view.Show(s);
+            var battery = (ReadingWidget)view.Overview.WidgetFor(Detail.Battery)!;
+            Assert.Equal(("80%", "On battery · 3 hr 10 min"), (battery.Hero.Value, battery.Context.Text));
+            view.Open(Detail.Temperature);
+            Assert.Equal(("52 °C", "Hottest of 2 zones"), (view.Current!.Hero.Value, view.Current.Side));
+            view.Show(s with { ThermalZones = new(ReadingStatus.Ok, [.. Enumerable.Range(0, 12).Select(i => new ThermalZoneReading("z" + i, 40 + i))], s.At) });
+            Assert.Equal(8, view.Current.Zones!.Shown.Count);
+            Assert.Equal("51 °C", view.Current.Hero.Value);
+        }
+        finally { module.StopAsync(default).GetAwaiter().GetResult(); }
+    }));
+
+    // The tile keeps CPU and memory current; the last page's GPU, network and disks fill the rest until the page's own arrive.
+    [Fact]
+    public void A_page_opens_with_the_last_pages_readings_and_the_tiles_current_cpu()
+    {
+        var at = DateTimeOffset.UtcNow;
+        var tile = SystemSnapshot.Empty(at) with { Cpu = new(ReadingStatus.Ok, new(61, 8, 4000), at) };
+        var last = Desktop();
+
+        Assert.Same(tile, SystemView.Opening(tile, null));
+        var opening = SystemView.Opening(tile, last);
+        Assert.Same(tile.Cpu, opening.Cpu);
+        Assert.Same(last.Memory, opening.Memory); // the tile didn't read it
+        Assert.Same(last.Disks, opening.Disks);
+        Assert.Same(last.Network, opening.Network);
+        Assert.Same(last.Gpus, opening.Gpus);
     }
 
     [Fact]
@@ -80,7 +286,7 @@ public sealed class PageTests
     {
         WpfTestThread.Run(() =>
         {
-            var (module, view) = Start();
+            var (module, view, _) = Start();
             view.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));
             Assert.NotEqual(SensorNeed.None, module.Sampler!.Need);
 
@@ -88,6 +294,13 @@ public sealed class PageTests
 
             Assert.Null(Record.Exception(() => view.RaiseEvent(new RoutedEventArgs(FrameworkElement.UnloadedEvent))));
         });
+    }
+
+    internal static IEnumerable<T> Find<T>(DependencyObject root) where T : DependencyObject
+    {
+        if (root is T item) yield return item;
+        foreach (var child in LogicalTreeHelper.GetChildren(root).OfType<DependencyObject>())
+            foreach (var nested in Find<T>(child)) yield return nested;
     }
 
     private sealed class Ui : IModuleUi
@@ -99,8 +312,9 @@ public sealed class PageTests
 
     private sealed class Settings : IModuleSettings
     {
-        public T Get<T>() where T : class, new() => new();
-        public void Save<T>(T value) where T : class { }
+        private object? _value;
+        public T Get<T>() where T : class, new() => _value as T ?? new();
+        public void Save<T>(T value) where T : class => _value = value;
     }
 
     private sealed class Island : IIslandPublisher

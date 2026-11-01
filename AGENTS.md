@@ -1,6 +1,6 @@
 # Chippi
 
-A Windows 11 tray app for the owner's own PC (C#, .NET 10, WPF): a widget on the desktop (a puck with the pet) that opens a panel with a page per feature (Sound, Clipboard, Scratchpad, Shelf, System monitor, Keep awake, File organizer and more), and a Settings window. GitHub: `tcurtsinger/Chippi`.
+A Windows 11 tray app for the owner's own PC (C#, .NET 10, WPF): a widget on the desktop (a puck with the pet) that opens a panel with a page per feature (Sound, Clipboard, Scratchpad, Shelf, System, Keep awake, File organizer and more), and a Settings window. GitHub: `tcurtsinger/Chippi`.
 
 - **Design:** `DESIGN.md` wins over taste. Mockups are under `docs/**/design/`.
 - **Plans:** `PLAN.md` has the phases. Each phase's brief is `docs/phase-N-handoff.md`, with its `behavior-spec.md`, `architecture.md` and report beside it.

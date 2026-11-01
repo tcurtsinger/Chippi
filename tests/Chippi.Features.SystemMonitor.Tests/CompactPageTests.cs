@@ -1,164 +1,73 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Media;
-using System.Windows.Documents;
 using Chippi.Features.SystemMonitor.Sensors;
 using Chippi.Features.SystemMonitor.Views;
-using Chippi.Island.Tests;
 
 namespace Chippi.Features.SystemMonitor.Tests;
 
+/// <summary>The System page's small rules: names, numbers, top apps and the network graph's scale.</summary>
 public sealed class CompactPageTests
 {
-    private const ulong GiB = 1024UL * 1024 * 1024;
-    internal static SystemSnapshot Snapshot(int disks = 8, bool laptop = false)
-    {
-        var at = DateTimeOffset.UtcNow;
-        return SystemSnapshot.Empty(at) with
-        {
-            Cpu = new(ReadingStatus.Ok, new(18, 8, 5290), at),
-            Gpus = new(ReadingStatus.Ok, [new("gpu", "Graphics", Load: 23, DedicatedUsedBytes: 2 * GiB, DedicatedTotalBytes: 16 * GiB, TemperatureC: 52)], at),
-            Memory = new(ReadingStatus.Ok, new(29 * GiB, 62 * GiB, 40 * GiB, 80 * GiB), at),
-            Network = new(ReadingStatus.Ok, [new("net", "Ethernet", true, 1024, 0)], at),
-            Disks = new(ReadingStatus.Ok, [new(0, null, null, null, [.. Enumerable.Range(0, disks).Reverse().Select(i => new VolumeReading("v" + i, ((char)('C' + i)) + ":", 4 * GiB, 10 * GiB))])], at),
-            Battery = new(laptop ? ReadingStatus.Ok : ReadingStatus.NotSupported, laptop ? new(BatteryState.OnBattery, 50, -5, TimeSpan.FromHours(1)) : null, at),
-            ThermalZones = new(laptop ? ReadingStatus.Ok : ReadingStatus.NotSupported, laptop ? [new("zone", 45)] : [], at)
-        };
-    }
-
-    // The tile keeps CPU and memory current; the last page's GPU, network and disks fill the rest until the page's own arrive.
-    [Fact]
-    public void A_page_opens_with_the_last_pages_readings_and_the_tiles_current_cpu()
-    {
-        var at = DateTimeOffset.UtcNow;
-        var tile = SystemSnapshot.Empty(at) with { Cpu = new(ReadingStatus.Ok, new(61, 8, 4000), at) };
-        var last = Snapshot();
-
-        Assert.Same(tile, SystemMonitorView.Opening(tile, null));
-        var opening = SystemMonitorView.Opening(tile, last);
-        Assert.Same(tile.Cpu, opening.Cpu);
-        Assert.Same(last.Memory, opening.Memory); // the tile didn't read it
-        Assert.Same(last.Disks, opening.Disks);
-        Assert.Same(last.Network, opening.Network);
-        Assert.Same(last.Gpus, opening.Gpus);
-    }
-    private static IEnumerable<T> Find<T>(DependencyObject root) where T : DependencyObject
-    {
-        if (root is T item) yield return item;
-        foreach (var child in LogicalTreeHelper.GetChildren(root).OfType<DependencyObject>())
-            foreach (var nested in Find<T>(child)) yield return nested;
-    }
-    private static void Layout(FrameworkElement view)
-    {
-        view.Measure(new Size(496, 304)); view.Arrange(new Rect(0, 0, 496, view.DesiredSize.Height)); view.UpdateLayout();
-    }
-
-    [Fact]
-    public void Desktop_has_seven_whole_drives_at_22_in_a_304_body() => WpfTestThread.Run(() =>
-    {
-        var view = new SystemMonitorView(new SystemMonitorModule());
-        view.Show(Snapshot()); Layout(view);
-        var table = Find<Grid>(view).Single(g => g.ColumnDefinitions.Count == 4);
-        Assert.Equal(8, table.RowDefinitions.Count); // header and seven drives
-        Assert.All(table.RowDefinitions, r => Assert.Equal(22, r.Height.Value));
-        Assert.Equal(8 * 22, table.ActualHeight); // header and every whole drive row
-        Assert.Equal(296, view.DesiredSize.Height); // four 28px readings, 8px gap and the 176px table
-        Assert.DoesNotContain(Find<TextBlock>(view), t => t.Text == "J:");
-        Assert.Empty(Find<ScrollViewer>(view));
-    });
-
-    [Fact]
-    public void Battery_and_thermal_rows_leave_out_drives_without_cutting_them() => WpfTestThread.Run(() =>
-    {
-        var view = new SystemMonitorView(new SystemMonitorModule());
-        view.Show(Snapshot(laptop: true)); Layout(view);
-        var table = Find<Grid>(view).Single(g => g.ColumnDefinitions.Count == 4);
-        Assert.Equal(5, table.RowDefinitions.Count);
-        Assert.True(view.DesiredSize.Height <= 304);
-        Assert.Contains(Find<TextBlock>(view), t => t.Text == "Battery");
-        Assert.Contains(Find<TextBlock>(view), t => t.Text == "Thermal zone");
-    });
-
-    [Fact]
-    public void Disk_values_are_used_free_total_sorted_by_letter_and_only_free_warns() => WpfTestThread.Run(() =>
-    {
-        var table = DiskTable.Build(Snapshot(3).Disks.Value!, id => id == "v1");
-        var rows = table.Children.OfType<TextBlock>().Where(t => Grid.GetRow(t) > 0).ToArray();
-        Assert.Equal(["C:", "D:", "E:"], rows.Where(t => Grid.GetColumn(t) == 0).Select(t => t.Text));
-        Assert.All(rows.Where(t => Grid.GetColumn(t) == 1), t => Assert.Equal(Format.Size(6 * GiB), t.Text));
-        Assert.All(rows.Where(t => Grid.GetColumn(t) == 2), t => Assert.Equal(Format.Size(4 * GiB), t.Text));
-        Assert.All(rows.Where(t => Grid.GetColumn(t) == 3), t => Assert.Equal(Format.Size(10 * GiB), t.Text));
-        var warning = rows.Single(t => Grid.GetRow(t) == 2 && Grid.GetColumn(t) == 2);
-        Assert.Same(warning.FindResource("WarningTextBrush"), warning.Foreground);
-    });
-
-    [Fact]
-    public void Failed_and_restarting_readings_clear_old_values() => WpfTestThread.Run(() =>
-    {
-        var view = new SystemMonitorView(new SystemMonitorModule());
-        var snapshot = Snapshot(1);
-        view.Show(snapshot);
-        Assert.Contains(Find<Run>(view), r => r.Text.Contains("KiB/s"));
-        view.Show(snapshot with
-        {
-            Cpu = new(ReadingStatus.Pending, null, snapshot.At),
-            Network = new(ReadingStatus.Pending, [new("net", "Ethernet", true, null, null)], snapshot.At)
-        });
-        Assert.DoesNotContain(Find<TextBlock>(view), t => t.Text == "18%");
-        Assert.DoesNotContain(Find<Run>(view), r => r.Text.Contains("KiB/s"));
-        view.Show(snapshot with { Cpu = new(ReadingStatus.Unavailable, null, snapshot.At), Disks = new(ReadingStatus.Unavailable, null, snapshot.At) });
-        Assert.Equal(2, Find<TextBlock>(view).Count(t => t.Text == "Unavailable"));
-    });
+    [Theory]
+    [InlineData("NVIDIA GeForce RTX 4080", "GeForce RTX 4080")]
+    [InlineData("AMD Radeon(TM) Graphics", "Radeon Graphics")]
+    [InlineData("Intel(R) Arc(TM) Graphics", "Arc Graphics")]
+    [InlineData("Intel(R) UHD Graphics 770", "UHD Graphics 770")]
+    [InlineData("Microsoft Basic Render Driver", "Microsoft Basic Render Driver")]
+    public void Gpu_names_drop_their_makers_marks(string name, string shown) => Assert.Equal(shown, Parts.ShortName(name));
 
     [Theory]
-    [InlineData(6)]
-    [InlineData(12)]
-    public void Many_thermal_zones_keep_whole_rows_and_hide_a_disk_card_that_cannot_fit(int zones) => WpfTestThread.Run(() =>
-    {
-        var view = new SystemMonitorView(new SystemMonitorModule());
-        var snapshot = Snapshot();
-        view.Show(snapshot with { ThermalZones = new(ReadingStatus.Ok,
-            Enumerable.Range(0, zones).Select(i => new ThermalZoneReading("zone" + i, 45)).ToArray(), snapshot.At) });
-        Layout(view);
-        var table = Find<Grid>(view).Single(g => g.ColumnDefinitions.Count == 4);
-        Assert.Equal(Visibility.Collapsed, ((FrameworkElement)table.Parent).Visibility);
-        Assert.True(view.DesiredSize.Height <= 304);
-        Assert.All(Find<Grid>(view).Where(g => g.ColumnDefinitions.Count == 3), row => Assert.Equal(28, row.ActualHeight));
-    });
-    [Fact]
-    public void Settings_keeps_every_drive_in_the_same_columns() => WpfTestThread.Run(() =>
-    {
-        var page = new SystemMonitorSettingsPage(new SystemMonitorModule());
-        page.Hardware(Snapshot());
-        var table = Find<Grid>(page).Single(g => g.ColumnDefinitions.Count == 4);
-        Assert.Equal(9, table.RowDefinitions.Count);
-        Assert.Contains(Find<TextBlock>(table), t => t.Text == "J:");
-    });
-    [Fact]
-    public void Settings_readings_keep_all_thermal_zones_beyond_the_island_limit() => WpfTestThread.Run(() =>
-    {
-        var view = new SystemMonitorView(new SystemMonitorModule(), settingsPage: true);
-        var s = Snapshot(laptop: true);
-        view.Show(s with { ThermalZones = new(ReadingStatus.Ok,
-            Enumerable.Range(0, 12).Select(i => new ThermalZoneReading("zone" + i, 45)).ToArray(), s.At) });
-        view.Measure(new Size(768, double.PositiveInfinity));
-        view.Arrange(new Rect(view.DesiredSize));
-        Assert.Contains(Find<TextBlock>(view), t => t.Text == "Thermal zone 12");
-        Assert.Equal(17, Find<Grid>(view).Count(g => g.ColumnDefinitions.Count == 3 && g.Height == 48));
-    });
+    [InlineData("AMD Ryzen 9 7950X 16-Core Processor", "AMD Ryzen 9 7950X")]
+    [InlineData("Intel(R) Core(TM) i7-8700K CPU @ 3.70GHz", "Intel Core i7-8700K")]
+    [InlineData("Intel(R) Core(TM) Ultra 7 155H", "Intel Core Ultra 7 155H")]
+    [InlineData("AMD Ryzen 7 7840HS w/ Radeon 780M Graphics", "AMD Ryzen 7 7840HS w/ Radeon 780M Graphics")]
+    [InlineData("AMD Ryzen 5 5600G with Radeon Graphics", "AMD Ryzen 5 5600G")]
+    [InlineData("Snapdragon(R) X Elite - X1E78100 - Qualcomm(R) Oryon(TM) CPU", "Snapdragon X Elite - X1E78100 - Qualcomm Oryon")]
+    public void Processor_names_drop_marks_and_core_counts(string name, string shown) => Assert.Equal(shown, Parts.ProcessorName(name));
 
     [Fact]
-    public void No_enabled_readings_leaves_no_empty_Settings_card() => WpfTestThread.Run(() =>
-    {
-        var module = new SystemMonitorModule();
-        module.Save(module.Settings with { Off = Enum.GetValues<Reading>().ToList() });
-        var view = new SystemMonitorView(module, settingsPage: true);
-        view.Show(Snapshot());
-        view.Measure(new Size(768, double.PositiveInfinity));
-        Assert.Equal(0, view.DesiredSize.Height);
-    });
+    public void Identical_device_names_are_numbered() =>
+        Assert.Equal(["GeForce RTX 4080", "GeForce RTX 4080 #2", "Radeon Graphics"], Parts.Distinct(["GeForce RTX 4080", "GeForce RTX 4080", "Radeon Graphics"]));
 
+    [Theory]
+    [InlineData("23%", "23", "%", false)]
+    [InlineData("2.4 MiB/s", "2.4", "MiB/s", true)]
+    [InlineData("52 °C", "52", "°C", true)]
+    [InlineData("Not connected", "Not connected", "", false)]
+    public void Values_split_into_number_and_unit(string value, string number, string unit, bool spaced) =>
+        Assert.Equal((number, unit, spaced), Parts.Split(value));
+
+    [Theory]
+    [InlineData(12, "12 min")]
+    [InlineData(192, "3 h 12 min")]
+    [InlineData(2760, "1 d 22 h")]
+    public void Up_time_reads_in_days_hours_or_minutes(int minutes, string shown) => Assert.Equal(shown, Parts.UpTime(TimeSpan.FromMinutes(minutes)));
+
+    [Fact]
+    public void Initials_stand_in_for_an_app_without_an_icon() =>
+        Assert.Equal(["GC", "DI", "7Z", "?"], new[] { "Google Chrome", "Discord", "7-Zip", "" }.Select(Parts.Initials));
+
+    [Fact]
+    public void Top_apps_add_up_each_programs_processes_and_keep_the_top_three()
+    {
+        IReadOnlyList<ProcessReading> processes =
+        [
+            new(1, "chrome.exe", "Google Chrome", @"C:\chrome.exe", 2, 100), new(2, "chrome.exe", "Google Chrome", null, 3, 300),
+            new(3, "code.exe", "Visual Studio Code", null, 4, 900), new(4, "teams.exe", "Teams", null, 1, 200),
+            new(5, "idle.exe", "Idle", null, 0.01, 50), new(6, "new.exe", "New", null, null, 10),
+        ];
+        Assert.Equal([("chrome.exe", 5d, @"C:\chrome.exe"), ("code.exe", 4d, null), ("teams.exe", 1d, null)],
+            TopApps.Cpu(processes).Select(a => (a.App, a.Amount, a.Path)));
+        Assert.Equal(["code.exe", "chrome.exe", "teams.exe"], TopApps.Memory(processes).Select(a => a.App));
+        Assert.Equal(["teams.exe", "chrome.exe"], TopApps.Gpu(processes, new Dictionary<int, double> { [4] = 30, [1] = 5, [99] = 50 }).Select(a => a.App));
+        Assert.Empty(TopApps.Gpu(processes, null));
+    }
+
+    [Theory]
+    [InlineData(0, 64 * 1024)]
+    [InlineData(100_000, 128 * 1024)]
+    [InlineData(2.4 * 1024 * 1024, 4 * 1024 * 1024)]
+    public void The_network_graph_scales_to_the_next_doubling_above_its_busiest_point(double busiest, double scale) =>
+        Assert.Equal(scale, DetailPage.RateScale(busiest));
 }

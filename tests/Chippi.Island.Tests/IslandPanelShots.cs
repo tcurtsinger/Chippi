@@ -115,7 +115,7 @@ public sealed class IslandPanelShots
             Section("sound.mixer", "App volume", 20, 200, status: "4 playing"),
             awakeTile,
             Section("downloads", "File organizer", 50, 120, status: "2 to review"),
-            Section("system-monitor", "System monitor", 60, 120, status: "CPU 12%"),
+            Section("system-monitor", "System", 60, 120, status: "CPU 12%"),
             Section("clipboard", "Clipboard", 70, 120, status: "23 items"),
             Section("scratchpad", "Scratchpad", 80, 120, status: "4 notes"),
             Section("shelf", "Shelf", 90, 120, status: "5 items"));

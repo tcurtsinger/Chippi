@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using System.IO;
 using Chippi.Features.SystemMonitor.Sensors.Platform;
 
 namespace Chippi.Features.SystemMonitor.Tests;
@@ -106,5 +107,27 @@ public sealed class WindowsSourcesTests
         Assert.Null(sources.Cpu.Read(perProcessor: false));
         Thread.Sleep(500);
         Assert.NotNull(sources.Cpu.Read(perProcessor: false));
+    }
+
+    [Fact]
+    public void Processes_read_with_names_memory_and_cpu_on_the_second_read()
+    {
+        using var sources = WindowsSources.Create();
+        var first = sources.Processes.Read();
+        Assert.All(first, p => Assert.Null(p.CpuPercent));
+        Thread.Sleep(500);
+        var processes = sources.Processes.Read();
+
+        // This test's own process: the layout reads its ID, program file, memory and CPU time.
+        var self = Assert.Single(processes, p => p.Id == Environment.ProcessId);
+        Assert.Equal(Path.GetFileName(Environment.ProcessPath!).ToLowerInvariant(), self.App);
+        Assert.True(self.PrivateBytes > 1024 * 1024);
+        Assert.NotNull(self.CpuPercent);
+        Assert.Equal(Environment.ProcessPath, self.Path, StringComparer.OrdinalIgnoreCase);
+        Assert.False(string.IsNullOrWhiteSpace(self.Name));
+
+        Assert.True(processes.Count > 10);
+        Assert.DoesNotContain(processes, p => p.Id is 0 or 4 || p.App is "registry" or "memory compression");
+        Assert.All(processes, p => Assert.InRange(p.CpuPercent ?? 0, 0, 100));
     }
 }

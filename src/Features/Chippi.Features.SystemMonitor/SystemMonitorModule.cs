@@ -13,8 +13,9 @@ using Microsoft.Extensions.Logging;
 namespace Chippi.Features.SystemMonitor;
 
 /// <summary>
-/// The System monitor (Phase 4): an island tile whose status is one reading, and a page of every
-/// reading. The sampler reads only for what's on screen (the tile, the page) and the alerts that are on.
+/// System (Phase 4, the System monitor until 2026-10-31): an island tile whose status is one reading, and
+/// a page of widgets that each open a detail page. The sampler reads only for what's on screen (the tile,
+/// the page) and the alerts that are on.
 /// </summary>
 public sealed class SystemMonitorModule : IFeatureModule
 {
@@ -30,13 +31,14 @@ public sealed class SystemMonitorModule : IFeatureModule
     private IIslandTile? _tile;
     private SensorWatch? _tileWatch;
     private MonitorAlerts? _alerts;
+    private SystemView? _view;
 
     public SystemMonitorModule() : this(WindowsSources.Create) { }
 
     /// <param name="createSources">Called on each start and one-time notification discovery; each call must return fresh sources. Tests pass fakes.</param>
     public SystemMonitorModule(Func<SensorSources> createSources) => _createSources = createSources;
 
-    public FeatureDescriptor Descriptor { get; } = new("system-monitor", "System monitor", "CPU, GPU, memory, network and battery, with alerts", FeatureGroup.System)
+    public FeatureDescriptor Descriptor { get; } = new("system-monitor", "System", "CPU, GPU, memory, network, drives and battery, with alerts", FeatureGroup.System)
     {
         Icon = nameof(LucideIcons.Activity),
         Presets = PresetMembership.Essentials | PresetMembership.PowerUser,
@@ -92,8 +94,12 @@ public sealed class SystemMonitorModule : IFeatureModule
         // the tile's status in Caution (design notes #4).
         _alerts = new MonitorAlerts(Sampler, context.Notifier, context.Island, Settings);
         _alerts.Changed += OnAlertsChanged;
-        _tile = context.Ui.AddIslandTile(new IslandTileSpec(TileKey, Descriptor.Name, nameof(LucideIcons.Activity), Order: 60, SectionOrder: 0,
-            () => new SystemMonitorView(this)));
+        _tile = context.Ui.AddIslandTile(new IslandTileSpec(TileKey, Descriptor.Name, nameof(LucideIcons.Activity), Order: 60, SectionOrder: 0, View)
+        {
+            CreateHeader = () => View().Header,
+            HandleBack = () => _view?.Back() == true, // a detail page returns to the overview
+            HandleEscape = () => _view?.Back() == true,
+        });
         _tile.OnScreenChanged += OnTileScreen;
         context.Activation.Register(OpenVerb, _ => context.OpenIslandPage(TileKey));
         SystemEvents.PowerModeChanged += OnPowerModeChanged;
@@ -123,11 +129,18 @@ public sealed class SystemMonitorModule : IFeatureModule
             Sampler = null;
         }
         _tile = null;
+        _view = null;
         _context = null;
         return Task.CompletedTask;
     }
 
-    /// <summary>Saves and applies <paramref name="settings"/> (Settings › System monitor).</summary>
+    /// <summary>The island page, built once and kept, as the island keeps every page.</summary>
+    private SystemView View() => _view ??= new SystemView(this);
+
+    /// <summary>Opens Settings on this feature's page (the island page's empty state).</summary>
+    public void OpenSettings() => _context?.OpenSettings(null);
+
+    /// <summary>Saves and applies <paramref name="settings"/> (Settings › System).</summary>
     public void Save(SystemMonitorSettings settings)
     {
         Settings = settings.Normalized();

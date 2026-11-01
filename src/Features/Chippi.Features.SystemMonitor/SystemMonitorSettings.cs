@@ -3,10 +3,10 @@
 
 namespace Chippi.Features.SystemMonitor;
 
-/// <summary>The cards on the page, each with its own switch in Settings › System monitor › Readings.</summary>
+/// <summary>The widgets on the page, each with its own switch in Settings › System › Readings.</summary>
 public enum Reading { Cpu, Memory, Gpu, Network, Disks, Battery, ThermalZone }
 
-/// <summary>Settings › Tile status: the one reading the island tile shows.</summary>
+/// <summary>Settings › Home status: the one reading the home's System button shows.</summary>
 public enum TileStatus { Cpu, Memory, Gpu, Network }
 
 public enum TemperatureUnit { Celsius, Fahrenheit }
