@@ -109,7 +109,7 @@ The island at the top of the screen becomes a blob widget you drag anywhere, ope
 - Pet passes since (2026-11-01, PRs #174 to #176): bolder and layout, then animate, delight and overdrive, then optimize, harden and polish. See DESIGN.md §7.
 
 ### Phase 5.5: Everyday tools, continued
-Not started. Quick toggles, cleaning mode, command bar, radial menu, AI agent usage in the island (Travis, 2026-10-27, tasks 27 and 28). Quick panel leaves the catalog; keep awake already shipped.
+Shaping since 2026-11-01: [docs/phase-5.5/](docs/phase-5.5/README.md). All five are shaped and their mockups approved (Quick toggles became Quick actions); building them is next. Quick toggles, cleaning mode, command bar, radial menu, AI agent usage in the island (Travis, 2026-10-27, tasks 27 and 28). Quick panel leaves the catalog; keep awake already shipped.
 
 ### Phase 6: Windows and input
 Not started. Window layouts and snapping, app switcher with previews, quit and close protection,
