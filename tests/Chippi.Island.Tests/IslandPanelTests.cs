@@ -110,6 +110,10 @@ public sealed class IslandPanelTests
                 {
                     var body = Assert.IsAssignableFrom<FrameworkElement>(panel.PageBody);
                     Assert.Equal((496, 304), (Math.Round(body.ActualWidth, 3), Math.Round(body.ActualHeight, 3)));
+                    // Cut off above and below; at the sides it reaches into the card's 12 padding, so Keep awake's Chippi,
+                    // set out to the cards' edge, keeps his sparks.
+                    var clip = body.Clip.Bounds;
+                    Assert.Equal((-12, 0, 520, 304), (Math.Round(clip.X, 3), Math.Round(clip.Y, 3), Math.Round(clip.Width, 3), Math.Round(clip.Height, 3)));
                 }
             }
             panel.ShowPage(null, remember: false);

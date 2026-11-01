@@ -47,7 +47,7 @@ internal sealed class AboutPage : UserControl
         DockPanel.SetDock(version, Dock.Right);
         product.Children.Add(version);
         // Decorative: the "Chippi" beside him names him.
-        product.Children.Add(new ChippiPet { Size = 32, IsDecorative = true, Margin = new Thickness(0, 0, 14, 0) });
+        product.Children.Add(new ChippiPet { Size = PetSize.About, IsDecorative = true, Margin = new Thickness(0, 0, 14, 0) });
         var name = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
         name.Children.Add(SettingsUi.Styled(new TextBlock { Text = "Chippi" }, "BodyTextStyle"));
         product.Children.Add(name);

@@ -34,7 +34,7 @@ internal sealed class NowPlayingView : UserControl
     private readonly LucideIcon _chevron = new() { Data = LucideIcons.ChevronDown, Size = 12, Margin = new Thickness(4, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
     private readonly Popup _sources = new() { StaysOpen = false, AllowsTransparency = true, Placement = PlacementMode.Bottom };
     private readonly Border _art = new() { Width = Art, Height = Art, CornerRadius = new CornerRadius(6), ClipToBounds = true };
-    private readonly ChippiPet _artPet = new() { Size = 76, Mood = PetMood.Listening, IsDecorative = true, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+    private readonly ChippiPet _artPet = new() { Size = PetSize.Cover, Mood = PetMood.Listening, IsDecorative = true, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
     private readonly TextBlock _title = new()
     {
         FontSize = 20, FontWeight = FontWeights.SemiBold, LineHeight = 26, LineStackingStrategy = LineStackingStrategy.BlockLineHeight,
@@ -55,7 +55,7 @@ internal sealed class NowPlayingView : UserControl
     private readonly Image _artWas = new(), _wordsWas = new(); // what was there, fading out as a new track arrives
     private string? _shownTrack;
     private bool _shownPlaying;
-    private readonly ChippiPet _asleep = new() { Size = 72, Mood = PetMood.Sleepy, IsDecorative = true, HorizontalAlignment = HorizontalAlignment.Center };
+    private readonly ChippiPet _asleep = new() { Size = PetSize.NothingPlaying, Mood = PetMood.Sleepy, IsDecorative = true, HorizontalAlignment = HorizontalAlignment.Center };
     private readonly StackPanel _empty;
 
     public NowPlayingView(IMediaSessions media, Action? back = null)
@@ -129,7 +129,8 @@ internal sealed class NowPlayingView : UserControl
         // timeline keeps its space without a timeline, so the art never moves.
         _player = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Children = { row, _timeline } };
 
-        var nothing = new TextBlock { Text = "Nothing playing", FontSize = 12, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 8, 0, 0) };
+        // Right under his box: his body sits in its middle, so the box's lower part is already the gap above the words.
+        var nothing = new TextBlock { Text = "Nothing playing", FontSize = 12, HorizontalAlignment = HorizontalAlignment.Center };
         nothing.SetResourceReference(TextBlock.ForegroundProperty, "IslandTextTertiaryBrush");
         _empty = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Children = { _asleep, nothing } };
 
@@ -235,19 +236,19 @@ internal sealed class NowPlayingView : UserControl
     private static void Tip(TextBlock block) =>
         block.ToolTip = block.ActualWidth > 0 && IslandGrid.Cut(block, block.Text) ? block.Text : null;
 
-    // A cover keeps a hairline edge, so a dark one doesn't sink into the island.
+    // A cover keeps a hairline edge, so a dark one doesn't sink into the island. Without one, Chippi's own cover: him,
+    // filling the square on the accent tint.
     private void ShowArt(ImageSource? image)
     {
+        _art.BorderThickness = new Thickness(1);
         if (image is not null)
         {
             if (_art.Background is not ImageBrush { ImageSource: var shown } || shown != image)
                 _art.Background = new ImageBrush(image) { Stretch = Stretch.UniformToFill };
-            _art.BorderThickness = new Thickness(1);
             _art.Child = null;
             return;
         }
-        _art.SetResourceReference(Border.BackgroundProperty, "IslandPanelBrush");
-        _art.BorderThickness = new Thickness(0);
+        _art.SetResourceReference(Border.BackgroundProperty, "IslandAccentTintBrush");
         _art.Child = _artPet;
     }
 

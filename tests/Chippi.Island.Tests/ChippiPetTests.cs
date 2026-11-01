@@ -118,21 +118,55 @@ public sealed class ChippiPetTests
     }
 
     [Fact]
-    public void Wide_awake_steams_above_the_puck_form_only()
+    public void Wide_awake_steams_at_every_size_but_the_small_form_unless_a_badge_takes_the_corner()
     {
-        // The puck's corner is the Keep awake badge's, so the steam is for the bigger Chippi on Keep awake's page.
+        // Every mood has its sign in the top corner: the z's, the steam, the sparks, the headphones' band.
         WpfTestThread.Run(() =>
         {
+            foreach (var (size, stroke) in new[] { (28.0, 4.4), (40.0, 4.4), (44.0, 4.4), (48.0, 3.4), (72.0, 3.4) })
+            {
+                var pet = new ChippiPet { Size = size, Mood = PetMood.WideAwake };
+                Assert.Equal(Visibility.Visible, pet.Steam.Visibility);
+                Assert.Equal(1, pet.Steam.Opacity);
+                Assert.Equal(stroke, pet.Steam.StrokeThickness); // heavier in the puck form, as its other strokes
+            }
             var page = new ChippiPet { Size = 72, Mood = PetMood.WideAwake };
-            Assert.Equal(Visibility.Visible, page.Steam.Visibility);
-            Assert.Equal(1, page.Steam.Opacity);
             var secondary = (SolidColorBrush)Application.Current.FindResource("IslandTextSecondaryBrush");
             Assert.Equal(secondary.Color, ((SolidColorBrush)page.Steam.Stroke).Color);
-
             page.Mood = PetMood.Idle;
             Assert.Equal(0, page.Steam.Opacity);
-            foreach (var size in new[] { 16.0, 28, 40, 44 })
-                Assert.Equal(Visibility.Collapsed, new ChippiPet { Size = size, Mood = PetMood.WideAwake }.Steam.Visibility);
+            Assert.Equal(Visibility.Collapsed, new ChippiPet { Size = 16, Mood = PetMood.WideAwake }.Steam.Visibility);
+
+            // The lifted puck's Keep awake badge takes that corner: the host hides the steam meanwhile.
+            var puck = new ChippiPet { Size = 40, Mood = PetMood.WideAwake, ShowsSteam = false };
+            Assert.Equal(Visibility.Collapsed, puck.Steam.Visibility);
+            puck.ShowsSteam = true;
+            Assert.Equal(Visibility.Visible, puck.Steam.Visibility);
+        });
+    }
+
+    [Fact]
+    public void His_body_sits_in_the_middle_of_his_box_firmly_shaded_and_rimmed()
+    {
+        WpfTestThread.Run(() =>
+        {
+            var pet = new ChippiPet { Size = 72, PetColor = PetColor.Frost };
+            var drawing = (Canvas)((Viewbox)pet.Content).Child;
+            var lift = Assert.IsType<TranslateTransform>(drawing.RenderTransform);
+            var body = ChippiPet.Shapes.Body.Bounds;
+            Assert.Equal(60, body.Y + body.Height / 2 + lift.Y, 3); // the body's middle is the box's, at any size
+            Assert.Equal(60, body.X + body.Width / 2, 3);
+            // Lifted, nothing he draws leaves the box: the sparks' and the small z's tops stay in it.
+            Assert.True(ChippiPet.Shapes.Sparks.Bounds.Top + lift.Y >= 0);
+            Assert.True(Zs(new ChippiPet { Size = 72, Mood = PetMood.Sleepy }).Min(z => z.Bounds.Top) + lift.Y >= 0);
+
+            // His color to 78% of it, top to bottom, with the eye whites' faint ink rim, so Frost keeps his edge.
+            var fill = Assert.IsType<LinearGradientBrush>(pet.Body.Fill);
+            var frost = ChippiPet.ColorOf(PetColor.Frost);
+            Assert.Equal(frost, fill.GradientStops[0].Color);
+            Assert.Equal(Color.FromRgb((byte)(frost.R * 0.78), (byte)(frost.G * 0.78), (byte)(frost.B * 0.78)), fill.GradientStops[1].Color);
+            Assert.Equal(Color.FromArgb(0x2E, 0x0B, 0x0F, 0x1F), ((SolidColorBrush)pet.Body.Stroke).Color);
+            Assert.Equal(2, pet.Body.StrokeThickness);
         });
     }
 
@@ -170,12 +204,13 @@ public sealed class ChippiPetTests
     }
 
     [Fact]
-    public void The_squish_springs_from_the_bottom_of_the_body_and_the_sparks_follow_the_theme()
+    public void The_hop_squishes_from_the_bottom_of_the_body_and_the_sparks_follow_the_theme()
     {
         WpfTestThread.Run(() =>
         {
             var pet = new ChippiPet { Size = 72 };
             Assert.Equal((60.0, 106.0), (pet.Squish.CenterX, pet.Squish.CenterY)); // the body's bottom center, as the breath
+            Assert.Equal(0, pet.Hop.Y); // on the ground at rest
             Assert.Equal((60.0, 106.0), (pet.Breath.CenterX, pet.Breath.CenterY));
             Assert.IsType<RadialGradientBrush>(pet.Shadow.Fill); // a soft contact shadow, not a hard plinth
 
@@ -304,6 +339,47 @@ public sealed class ChippiPetMotionTests
     }
 
     [Fact]
+    public void Celebrating_he_hops_and_lands_and_under_reduced_motion_stays_put()
+    {
+        var motion = Motion.Override;
+        WpfTestThread.Run(() =>
+        {
+            var pet = new ChippiPet { Size = 72, Mood = PetMood.Idle };
+            var window = Offscreen(pet);
+            try
+            {
+                Motion.Override = false;
+                window.Show();
+                IslandWindowTests.Pump(TimeSpan.Zero);
+                pet.Celebrate();
+                Assert.True(pet.Hop.HasAnimatedProperties);
+                Assert.True(pet.Squish.HasAnimatedProperties);
+
+                // The curves, read at their key times rather than by the wall clock: on the ground until take-off, 12 up
+                // at the top, down by 360ms; squished, stretched, round, landing squished, settled.
+                var leap = ChippiPet.Leap(0, -ChippiPet.HopHeight);
+                foreach (var (ms, y) in new[] { (50, 0.0), (100, 0.0), (260, -ChippiPet.HopHeight), (360, 0.0), (450, 0.0) })
+                    Assert.Equal(y, At(leap, ms), 3);
+                var wide = ChippiPet.HopScale(1.10, 0.94, 1.06);
+                foreach (var (ms, x) in new[] { (100, 1.10), (200, 0.94), (260, 1.0), (360, 1.0), (380, 1.06), (499, 1.0) })
+                    Assert.Equal(x, At(wide, ms), 2);
+
+                Motion.Override = true;
+                IslandWindowTests.Pump(TimeSpan.Zero);
+                pet.Celebrate();
+                Assert.False(pet.Hop.HasAnimatedProperties);
+                Assert.False(pet.Squish.HasAnimatedProperties);
+                Assert.Equal(1, pet.Sparks.Opacity); // the sparks just show
+            }
+            finally
+            {
+                window.Close();
+                Motion.Override = motion;
+            }
+        });
+    }
+
+    [Fact]
     public void Under_reduced_motion_the_asleep_pet_never_breathes()
     {
         var motion = Motion.Override;
@@ -368,4 +444,12 @@ public sealed class ChippiPetMotionTests
         SizeToContent = SizeToContent.WidthAndHeight,
         Content = content,
     };
+
+    /// <summary>An animation's value <paramref name="ms"/> into it, from a clock sought there rather than run.</summary>
+    private static double At(System.Windows.Media.Animation.AnimationTimeline animation, int ms)
+    {
+        var clock = animation.CreateClock();
+        clock.Controller!.SeekAlignedToLastTick(TimeSpan.FromMilliseconds(ms), System.Windows.Media.Animation.TimeSeekOrigin.BeginTime);
+        return (double)animation.GetCurrentValue(0.0, 1.0, clock);
+    }
 }

@@ -75,6 +75,9 @@ public partial class IslandWindow : Window
     private IReadOnlyList<IslandActivity> _activities = [];
     private IReadOnlyList<IslandTileGroup> _tiles = [];
     private PetMood _mood = PetMood.Sleepy;
+
+    // What the puck's Chippi shrinks to as the puck becomes the panel: the footer's, 70% of his size here.
+    private const double PetShrunk = IslandGrid.FooterPetSize / PetSize.Puck;
     private double? _x, _y; // the saved place; null is the start, bottom right
     private bool _fallback; // the chosen monitor is gone: the main display's start instead
     private bool _enabled = true;
@@ -158,7 +161,7 @@ public partial class IslandWindow : Window
             PuckEnd.Opacity = !handOver ? pet : opening && t >= 1 ? 0 : 1;
             BadgeLayer.Opacity = handOver ? pet : 1; // the badge fades either way
             // Under reduced motion Chippi only fades; nothing shrinks or grows.
-            PetScale.ScaleX = PetScale.ScaleY = Motion.IsReduced ? 1 : 0.7 + 0.3 * pet;
+            PetScale.ScaleX = PetScale.ScaleY = Motion.IsReduced ? 1 : PetShrunk + (1 - PetShrunk) * pet;
             BarLayer.Opacity = Shown(0.25, 0.55);
         };
         // Clicked into, the panel comes to the front; the widget, faded out over it, stays above it for the close.
@@ -784,7 +787,9 @@ public partial class IslandWindow : Window
         // Keep awake stays in sight while something else holds the bar (a song, a drag, another activity) or the puck is lifted.
         var keepAwake = _activities.FirstOrDefault(a => a.Kind == IslandActivityKind.Status && a.ModuleId == IslandHost.KeepAwakeModuleId);
         bool awakeOnBar = bar && dropTile is null && feedback is null && song is null && ReferenceEquals(top, keepAwake);
-        ShowBadge(AwakeBadge, keepAwake is not null && !awakeOnBar);
+        bool awakeBadge = keepAwake is not null && !awakeOnBar;
+        ShowBadge(AwakeBadge, awakeBadge);
+        Pet.ShowsSteam = !awakeBadge; // the badge takes the corner Chippi's steam rises in
         bool paused = _singing && playing is null;
         // Listening (headphones) while a song plays, the panel out or not; otherwise the mood for the activities, awake on hover or on the bar.
         var mood = playing is not null && !_lifted ? PetMood.Listening : _mood != PetMood.Sleepy ? _mood : awake || bar ? PetMood.Idle : PetMood.Sleepy;

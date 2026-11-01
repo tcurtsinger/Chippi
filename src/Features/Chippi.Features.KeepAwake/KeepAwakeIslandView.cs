@@ -28,7 +28,7 @@ public sealed class KeepAwakeIslandView : UserControl
 
     private readonly KeepAwakeModule _module;
     // His body starts 10 into his 72 box (17 of its 120 units), so he sits 10 out to line up with the cards' edge.
-    private readonly ChippiPet _pet = new() { Size = 72, Mood = PetMood.Sleepy, IsDecorative = true, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(-10, 0, 0, 0) };
+    private readonly ChippiPet _pet = new() { Size = PetSize.Page, Mood = PetMood.Sleepy, IsDecorative = true, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(-10, 0, 0, 0) };
     private readonly TextBlock _state = new() { FontSize = 20, FontWeight = FontWeights.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis };
     private readonly TextBlock _detail = new() { FontSize = 12, Margin = new Thickness(0, 2, 0, 0) };
     private readonly Button _stop = new() { Content = "Stop", VerticalAlignment = VerticalAlignment.Center, Visibility = Visibility.Collapsed };

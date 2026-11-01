@@ -129,7 +129,8 @@ internal static class PetSheet
         string mode = Chippi.UI.Themes.Motion.IsReduced ? "reduced" : "full";
 
         pet.Mood = PetMood.Celebrating;
-        await SaveStripAsync(host, caption, [0, 60, 110, 140, 200, 330, 1300, 2200, 2450], Path.Combine(directory, $"ws3-pet-motion-celebrate-{mode}.png"));
+        // The hop: take-off squish, stretched rising, the top, touch down, the landing squish, settled; then the sparks' hold.
+        await SaveStripAsync(host, caption, [0, 60, 100, 160, 200, 260, 320, 360, 380, 500, 1300, 2450], Path.Combine(directory, $"ws3-pet-motion-celebrate-{mode}.png"));
 
         pet.Mood = PetMood.Idle;
         await Task.Delay(500);

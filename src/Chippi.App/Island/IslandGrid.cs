@@ -43,7 +43,7 @@ internal sealed class IslandGrid : UserControl
     /// the panel opens on a bottom corner (the puck is 50 square on the panel's corner), at the size the puck's Chippi
     /// shrinks to as it becomes the panel (70% of 40).
     /// </summary>
-    internal const double FooterPet = 25, FooterPetSize = 28;
+    internal const double FooterPet = 25, FooterPetSize = PetSize.Footer;
 
     // The wheel's step on the volume, in percent per notch, as on the taskbar's.
     private const double WheelStep = 2;

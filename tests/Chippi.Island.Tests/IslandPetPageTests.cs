@@ -69,6 +69,13 @@ public sealed class IslandPetPageTests
             var pet = Assert.IsType<ChippiPet>(preview.Content);
             Assert.Equal(PetMood.Idle, pet.Mood);
             Assert.True(pet.IsDecorative); // the button carries the name
+            Assert.Equal(PetSize.Preview, pet.Size); // his puck size, in a 44 button: with the row's padding, a captioned row's 60
+            Assert.Equal(44, preview.Height);
+
+            // The tiles' little puck draws the real puck's face, at his share of it (40 of 50), not the small form's.
+            var puck = All<ChippiPet>(page).Single(p => p != pet);
+            Assert.Equal(24, puck.Size);
+            Assert.True(puck.Size > ChippiPet.SmallFormMaxSize);
 
             Named<RadioButton>(page, "Ember").IsChecked = true;
             Assert.Equal(PetColor.Ember, pet.PetColor);
