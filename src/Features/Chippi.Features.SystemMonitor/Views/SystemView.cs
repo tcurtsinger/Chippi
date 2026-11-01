@@ -67,14 +67,14 @@ internal sealed class SystemView : UserControl
 
     /// <summary>
     /// What a page opens with: the latest of every reading the module keeps, and the last page's drives
-    /// (and anything else the latest didn't read), so it opens whole and its first update changes values
-    /// in place, not the layout.
+    /// and GPU temperature and fan (and anything else the latest didn't read), so it opens whole and its
+    /// first update changes values in place, not the layout.
     /// </summary>
     internal static SystemSnapshot Opening(SystemSnapshot latest, SystemSnapshot? page) => page is null ? latest : latest with
     {
         Cpu = Newer(latest.Cpu, page.Cpu),
         Memory = Newer(latest.Memory, page.Memory),
-        Gpus = Newer(latest.Gpus, page.Gpus),
+        Gpus = Sensors(Newer(latest.Gpus, page.Gpus), page.Gpus),
         Network = Newer(latest.Network, page.Network),
         Disks = Newer(latest.Disks, page.Disks),
         Battery = Newer(latest.Battery, page.Battery),
@@ -82,6 +82,19 @@ internal sealed class SystemView : UserControl
     };
 
     private static Sample<T> Newer<T>(Sample<T> latest, Sample<T> page) where T : class => latest.Status == ReadingStatus.NotRead ? page : latest;
+
+    // The history's GPU read leaves out temperature and fan; each GPU takes the page's last until its own arrive.
+    private static Sample<IReadOnlyList<GpuReading>> Sensors(Sample<IReadOnlyList<GpuReading>> latest, Sample<IReadOnlyList<GpuReading>> page)
+    {
+        if (latest.Value is not { } gpus || page.Value is not { Count: > 0 } before || ReferenceEquals(gpus, before))
+            return latest;
+        return latest with
+        {
+            Value = [.. gpus.Select(g => g is { TemperatureC: null, FanRpm: null, FanPercent: null } && before.FirstOrDefault(b => b.Id == g.Id) is { } last
+                ? g with { TemperatureC = last.TemperatureC, FanRpm = last.FanRpm, FanPercent = last.FanPercent }
+                : g)],
+        };
+    }
 
     /// <summary>What the overview reads: every reading that's on.</summary>
     internal static SensorNeed Need(SystemMonitorSettings s)
@@ -164,11 +177,14 @@ internal sealed class SystemView : UserControl
     internal void Show(SystemSnapshot s)
     {
         _shown = s;
-        _overview.Update(s);
+        // The overview fills only while it shows; Back fills it on the way.
+        if (_detail is null)
+            _overview.Update(s);
         // A reading switched off (or gone) under its detail page: back to the overview.
-        if (_detail is not null && !_overview.Widgets.Any(w => w.Kind == _detail.Kind))
+        else if (!_present.Shows(s, _detail.Kind))
             Back(animate: false);
-        _detail?.Update(s);
+        else
+            _detail.Update(s);
         RefreshHeader();
     }
 

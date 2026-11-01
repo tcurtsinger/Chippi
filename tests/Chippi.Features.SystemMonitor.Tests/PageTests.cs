@@ -172,8 +172,8 @@ public sealed class PageTests
             view.Open(Detail.Network);
             view.RaiseEvent(new RoutedEventArgs(FrameworkElement.UnloadedEvent));
             Assert.Null(view.Current); // the island reopens on the overview
-            // Only the module's history reads on (and the drives, until the first read of them).
-            Assert.Equal(SystemMonitorModule.HistoryNeed(module.Settings), module.Sampler.Need & ~SensorNeed.Disks);
+            // Only the module's history reads on (and the drives and the GPU's sensors, until the first read of them).
+            Assert.Equal(SystemMonitorModule.HistoryNeed(module.Settings), module.Sampler.Need & ~SystemMonitorModule.FirstNeed(module.Settings));
         }
         finally { module.StopAsync(default).GetAwaiter().GetResult(); }
     });
@@ -241,9 +241,18 @@ public sealed class PageTests
             view.Show(Desktop());
             view.Open(Detail.Network);
             var page = view.Current!;
-            Assert.Equal(("2.4 MiB/s", "64 KiB/s"), (page.Hero.Value, page.Scale));
+            // No history for this adapter yet: an empty graph writes no scale.
+            Assert.Equal(("2.4 MiB/s", ""), (page.Hero.Value, page.Scale));
             Assert.Equal(["Ethernet, down 2.4 MiB/s, up 180 KiB/s", "Wi-Fi, Not connected"], page.Adapters!.Shown);
             Assert.Equal(Visibility.Visible, page.Under!.Visibility);
+            // A long adapter name trims in the legend; the keys keep their room.
+            const string Long = "Realtek Gaming 2.5GbE Family Controller with an extra long adapter description";
+            view.Show(Desktop() with { Network = new(ReadingStatus.Ok, [new("eth", Long, true, 2.4 * MiB, 180 * 1024)], DateTimeOffset.UtcNow) });
+            page.Measure(new Size(IslandPage.BodyWidth, IslandPage.BodyHeight));
+            page.Arrange(new Rect(0, 0, IslandPage.BodyWidth, IslandPage.BodyHeight));
+            Assert.True(Find<TextBlock>(page).Single(t => t.Text == "Send").ActualWidth > 20);
+            Assert.Equal(Long, Find<TextBlock>(page).Single(t => t.Text == Long && t.TextAlignment == TextAlignment.Right).ToolTip);
+            view.Show(Desktop());
             var wifi = Find<Button>(page.Adapters).Last();
             wifi.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
             Assert.Equal("wifi", module.Settings.NetworkAdapterId);
@@ -256,6 +265,21 @@ public sealed class PageTests
         }
         finally { module.StopAsync(default).GetAwaiter().GetResult(); }
     }));
+
+    [Fact]
+    public void A_blank_value_keeps_its_line() => WpfTestThread.Run(() =>
+    {
+        var hero = new Hero(Look.Island);
+        double Height(string value)
+        {
+            hero.Set(value);
+            hero.Measure(new Size(200, double.PositiveInfinity));
+            return hero.DesiredSize.Height;
+        }
+        double number = Height("23%");
+        Assert.Equal(number, Height("")); // a rate starting over
+        Assert.True(Height("Unavailable") < number); // a failed read is quiet
+    });
 
     [Fact]
     public void The_drives_page_fits_whole_rows_and_sends_the_rest_to_settings() => WpfTestThread.Run(() =>
@@ -271,6 +295,10 @@ public sealed class PageTests
             view.Show(Desktop(drives: 8));
             Assert.Equal((6, "+2 more in Settings", 4), (drives.Volumes.Count, drives.More, drives.Disks.Count));
             Assert.StartsWith("C: ", drives.Volumes[0], StringComparison.Ordinal);
+            // The same drives update their rows in place on every read.
+            var rows = Find<Grid>(drives).ToList();
+            view.Show(Desktop(drives: 8));
+            Assert.Equal(rows, Find<Grid>(drives));
         }
         finally { module.StopAsync(default).GetAwaiter().GetResult(); }
     });
@@ -318,7 +346,53 @@ public sealed class PageTests
         Assert.Same(last.Memory, opening.Memory); // the latest didn't read it
         Assert.Same(last.Disks, opening.Disks);
         Assert.Same(last.Gpus, opening.Gpus);
+
+        // The history's GPU read has no temperature or fan: the last page's fill in until the page's own arrive.
+        var bare = latest with { Gpus = new(ReadingStatus.Ok, [.. last.Gpus.Value!.Select(g => g with { TemperatureC = null, FanRpm = null, Load = 50 })], at) };
+        var rtx = SystemView.Opening(bare, last).Gpus.Value![0];
+        Assert.Equal((50d, 51d, 1450u), (rtx.Load, rtx.TemperatureC, rtx.FanRpm));
     }
+
+    [Fact]
+    public void The_overview_fills_while_it_shows_and_on_the_way_back() => WpfTestThread.Run(() => OnCulture(() =>
+    {
+        var (module, view, spec) = Start();
+        try
+        {
+            var s = Desktop();
+            view.Show(s);
+            view.Open(Detail.Gpu);
+            view.Show(s with { Cpu = new(ReadingStatus.Ok, new(77, 16, 4180), s.At) });
+            Assert.Equal("23%", Value(view, Detail.Cpu)); // the hidden overview waits
+            Assert.True(spec.HandleBack!());
+            Assert.Equal("77%", Value(view, Detail.Cpu));
+        }
+        finally { module.StopAsync(default).GetAwaiter().GetResult(); }
+    }));
+
+    [Fact]
+    public void Long_names_trim_and_wide_values_move_the_graph_over() => WpfTestThread.Run(() => OnCulture(() =>
+    {
+        const string Long = "Realtek Gaming 2.5GbE Family Controller with an extra long adapter description";
+        // Beside other widgets: the adapter's name trims, the widget's name stays.
+        var narrow = new NetworkWidget(Look.Island, null, wide: false);
+        narrow.Set(Long, Format.Rate(1023 * 1024, NetworkUnit.Bytes), Format.Rate(1023 * 1024, NetworkUnit.Bytes));
+        Lay(narrow.Root, 160, 116);
+        Assert.True(Find<TextBlock>(narrow.Root).Single(t => t.Text == "Network").ActualWidth > 30);
+        // Alone in its row: the graph starts after the widest values, never under them.
+        var wide = new NetworkWidget(Look.Island, null, wide: true);
+        wide.Set(Long, "1023 KiB/s", "1023 KiB/s");
+        Lay(wide.Root, IslandPage.BodyWidth, OverviewPage.WideNetworkHeight);
+        var up = Find<Hero>(wide.Root).Last();
+        Assert.True(up.TranslatePoint(new Point(up.ActualWidth, 0), wide.Root).X <= wide.Graph.TranslatePoint(default, wide.Root).X);
+
+        static void Lay(FrameworkElement root, double width, double height)
+        {
+            root.Measure(new Size(width, height));
+            root.Arrange(new Rect(0, 0, width, height));
+            root.UpdateLayout();
+        }
+    }));
 
     [Fact]
     public void A_page_unloading_after_its_module_stopped_lets_go_cleanly()

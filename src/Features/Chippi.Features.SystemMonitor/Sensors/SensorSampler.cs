@@ -16,15 +16,15 @@ public enum SensorNeed
     /// <summary>Each logical processor too (the page's strip while it's open).</summary>
     PerProcessor = 2,
     Memory = 4,
-    /// <summary>GPU temperature and fan only (D3DKMT, NVML): cheap.</summary>
+    /// <summary>GPU temperature and fan (D3DKMT, NVML): the page and the GPU temperature alert, not the history (0.9 ms on the owner's PC).</summary>
     GpuSensors = 8,
-    /// <summary>GPU load and memory too (the GPU Engine counters): the costly read.</summary>
+    /// <summary>GPU load and memory (the GPU Engine counters): the costly read.</summary>
     GpuLoad = 16,
     Network = 32,
     Disks = 64,
     Battery = 128,
     ThermalZones = 256,
-    /// <summary>Every process, for top apps (only while a detail page that lists them is open).</summary>
+    /// <summary>Every process, for top apps, and each one's GPU load (only while a detail page that lists them is open).</summary>
     Processes = 512,
 }
 

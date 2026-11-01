@@ -71,6 +71,21 @@ public sealed class CompactPageTests
     public void The_network_graph_scales_to_the_next_doubling_above_its_busiest_point(double busiest, double scale) =>
         Assert.Equal(scale, GraphScale.Rate(busiest));
 
+    // In bits the steps read whole: 500 Kbps, then 1, 2 and 5 of each power of ten.
+    [Theory]
+    [InlineData(0, "500 Kbps")]
+    [InlineData(80_000, "1 Mbps")]
+    [InlineData(2_000_000, "20 Mbps")]
+    [InlineData(100 * 1024 * 1024, "1000 Mbps")]
+    [InlineData(300 * 1024 * 1024, "5000 Mbps")]
+    public void In_bits_the_network_graph_scales_by_1_2_and_5(double busiest, string scale)
+    {
+        var culture = System.Globalization.CultureInfo.CurrentCulture;
+        System.Globalization.CultureInfo.CurrentCulture = System.Globalization.CultureInfo.GetCultureInfo("en-US");
+        try { Assert.Equal(scale, Format.Rate(GraphScale.Rate(busiest, NetworkUnit.Bits), NetworkUnit.Bits, whole: true)); }
+        finally { System.Globalization.CultureInfo.CurrentCulture = culture; }
+    }
+
     [Theory]
     [InlineData(new double[0], 10)]
     [InlineData(new[] { 3.0, 4.2, 9.9 }, 10)]
@@ -88,6 +103,11 @@ public sealed class CompactPageTests
     [InlineData(20, 25)]
     [InlineData(100, 100)]
     public void Temperature_graphs_go_by_25_degrees(double hottest, double scale) => Assert.Equal(scale, GraphScale.Temperature(hottest));
+
+    [Theory]
+    [InlineData(220, 250)]
+    [InlineData(40, 50)]
+    public void In_fahrenheit_temperature_graphs_go_by_50_degrees(double hottest, double scale) => Assert.Equal(scale, GraphScale.Temperature(hottest, 50));
 
     // Rows of 20 for two drives each, up to 3, giving one up while a graph row would be under 104.
     [Theory]

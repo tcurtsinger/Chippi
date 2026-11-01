@@ -35,6 +35,7 @@ internal sealed class DetailPage : Grid
     private readonly AdapterList? _adapters;
     private readonly ZoneGrid? _zones;
     private readonly DrivesDetail? _drives;
+    private bool? _sideHot;
 
     public DetailPage(Detail kind, SystemMonitorModule module, Present present)
     {
@@ -208,7 +209,11 @@ internal sealed class DetailPage : Grid
                 _hero.Set(s.Gpus.Status == ReadingStatus.Unavailable ? "Unavailable" : gpu?.Load is { } load ? Format.Percent(load) : "");
                 bool hot = gpu is not null && _module.Alerting("gpu-temperature", gpu.Id);
                 _side.Text = gpu?.TemperatureC is { } t ? Format.Temperature(t, settings.Temperature) : "";
-                _side.SetResourceReference(TextBlock.ForegroundProperty, hot ? Look.Caution : Look.Island.Secondary);
+                if (_sideHot != hot)
+                {
+                    _sideHot = hot;
+                    _side.SetResourceReference(TextBlock.ForegroundProperty, hot ? Look.Caution : Look.Island.Secondary);
+                }
                 var points = gpu is null ? [] : History(Series.GpuLoad(gpu.Id));
                 double scale = GraphScale.Load(points);
                 Draw(points, scale, Format.Percent(scale));
@@ -254,8 +259,9 @@ internal sealed class DetailPage : Grid
                 ((FrameworkElement)_hero.Parent).Visibility = Visibility.Visible;
                 foreach (var arrow in ((Panel)_hero.Parent).Children.OfType<LucideIcon>()) arrow.Visibility = rates ? Visibility.Visible : Visibility.Collapsed;
                 var (down, up, scale) = _present.NetworkHistory(adapter);
-                Draw(down, scale, Format.Rate(scale, settings.NetworkSpeed), up);
+                Draw(down, scale, Format.Rate(scale, settings.NetworkSpeed, whole: true), up);
                 _legendName!.Text = adapter is null ? "" : _present.AdapterName(s, adapter);
+                _legendName.ToolTip = _legendName.Text.Length > 0 ? _legendName.Text : null;
                 _adapters!.Set(s, _present);
                 // One adapter: the legend names it, and the graph takes the page.
                 bool many = (s.Network.Value?.Count ?? 0) > 1;
@@ -295,10 +301,11 @@ internal sealed class DetailPage : Grid
         }
     }
 
+    // A graph with nothing to draw (every read failed) writes no scale.
     private void Draw(IReadOnlyList<HistoryPoint> points, double max, string scale, IReadOnlyList<HistoryPoint>? second = null, bool caution = false, Func<double, double>? convert = null)
     {
         _graph.Set(points, max, second, caution, convert);
-        _scale.Text = scale;
+        _scale.Text = _graph.Drawn ? scale : "";
     }
 
     /// <summary>An app's share of the CPU or a GPU: "6.1%" under 10, "26%" above, so a small share never reads "0%".</summary>
@@ -327,9 +334,10 @@ internal sealed class DetailPage : Grid
             swatch.SetResourceReference(System.Windows.Shapes.Shape.StrokeProperty, dashed ? Look.Island.Secondary : "IslandAccentBrush");
             return new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 14, 0), Children = { swatch, Parts.Text(text, 11, Look.Island.Tertiary) } };
         }
+        // The keys keep their room; a long adapter name trims instead.
         _legendName = Parts.Text("", 11, Look.Island.Tertiary);
-        DockPanel.SetDock(_legendName, Dock.Right);
-        return new DockPanel { LastChildFill = false, Children = { _legendName, Key("Receive", false), Key("Send", true) } };
+        _legendName.TextAlignment = TextAlignment.Right;
+        return new DockPanel { Children = { Key("Receive", false), Key("Send", true), _legendName } };
     }
 }
 
@@ -496,6 +504,7 @@ internal sealed class AdapterList : StackPanel
     private readonly CardLabel _label = new("Adapters");
     private readonly StackPanel _rows = new();
     private string _key = "";
+    private string? _tinted;
 
     public AdapterList(SystemMonitorModule module)
     {
@@ -520,6 +529,18 @@ internal sealed class AdapterList : StackPanel
             _rows.Children.Clear();
             foreach (var adapter in shown)
                 _rows.Children.Add(Row(adapter.Id));
+            _tinted = null;
+        }
+        // The graphed adapter's row on the accent tint.
+        if ((chosen?.Id ?? "") != _tinted)
+        {
+            _tinted = chosen?.Id ?? "";
+            for (int i = 0; i < shown.Count; i++)
+            {
+                var row = (Border)_rows.Children[i];
+                if (shown[i].Id == chosen?.Id) row.SetResourceReference(Border.BackgroundProperty, "IslandAccentTintBrush");
+                else row.Background = null;
+            }
         }
         var names = Parts.Distinct(adapters.Select(a => a.Name));
         for (int i = 0; i < shown.Count; i++)
@@ -527,10 +548,8 @@ internal sealed class AdapterList : StackPanel
             var adapter = shown[i];
             var border = (Border)_rows.Children[i];
             var (name, down, up, off) = ((TextBlock, TextBlock, TextBlock, TextBlock))border.Tag;
-            bool on = adapter.Id == chosen?.Id;
-            if (on) border.SetResourceReference(Border.BackgroundProperty, "IslandAccentTintBrush");
-            else border.Background = null;
             name.Text = names[i];
+            name.ToolTip = names[i];
             bool rates = adapter is { Connected: true, ReceiveBytesPerSecond: not null, SendBytesPerSecond: not null };
             down.Text = rates ? Format.Rate(adapter.ReceiveBytesPerSecond!.Value, _module.Settings.NetworkSpeed) : "";
             up.Text = rates ? Format.Rate(adapter.SendBytesPerSecond!.Value, _module.Settings.NetworkSpeed) : "";
@@ -635,6 +654,7 @@ internal sealed class ZoneGrid : StackPanel
 /// <summary>
 /// The drives page: each volume's free space over a meter, two to a row, then each disk's activity.
 /// Both cards take the height their rows need, from the top, since the list grows with the drives.
+/// Rows are built when the drives shown change and updated in place on every read.
 /// </summary>
 internal sealed class DrivesDetail : Grid
 {
@@ -646,6 +666,9 @@ internal sealed class DrivesDetail : Grid
     private readonly CardLabel _spaceLabel = new("Space"), _activityLabel = new("Activity");
     private readonly Border _activityCard;
     private readonly TextBlock _status = Parts.Text("", 12, Look.Island.Tertiary);
+    private readonly List<VolumeCell> _volumes = [];
+    private readonly List<DiskRow> _disks = [];
+    private string _spaceKey = "", _activityKey = "";
 
     public DrivesDetail(SystemMonitorModule module)
     {
@@ -676,15 +699,31 @@ internal sealed class DrivesDetail : Grid
         _status.Visibility = failed ? Visibility.Visible : Visibility.Collapsed;
         if (s.Disks.Value is not { } disks)
         {
-            if (failed) { _space.Children.Clear(); _activity.Children.Clear(); _activityCard.Visibility = Visibility.Collapsed; }
+            if (failed)
+            {
+                _space.Children.Clear(); _activity.Children.Clear(); _volumes.Clear(); _disks.Clear();
+                _spaceKey = _activityKey = _spaceLabel.Note.Text = "";
+                _activityCard.Visibility = Visibility.Collapsed;
+            }
             return;
         }
         // Activity: up to 4 disks, busiest first when there are more.
         var busy = disks.Count <= ActivityRows ? disks : [.. disks.OrderByDescending(d => d.ActivePercent ?? 0).Take(ActivityRows).OrderBy(d => d.Number)];
         _activityCard.Visibility = busy.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
-        _activity.Children.Clear();
+        string activityKey = string.Join("|", busy.Select(d => d.Number));
+        if (activityKey != _activityKey)
+        {
+            _activityKey = activityKey;
+            _activity.Children.Clear();
+            _disks.Clear();
+            for (int i = 0; i < busy.Count; i++)
+            {
+                _disks.Add(new DiskRow(i == 0));
+                _activity.Children.Add(_disks[i].Row);
+            }
+        }
         for (int i = 0; i < busy.Count; i++)
-            _activity.Children.Add(Disk(busy[i], i == 0));
+            _disks[i].Set(busy[i]);
         // Space: two to a row, as many rows of 36 as fit above it, the fullest first when they don't all
         // fit (as the overview keeps them), then "+N more in Settings". Each card is 20 of padding and
         // border and a 16 label over its rows; Space's start 2 under it.
@@ -694,78 +733,108 @@ internal sealed class DrivesDetail : Grid
         int rows = (int)((IslandPage.BodyHeight - activity - 20 - 16 - 2) / VolumeHeight);
         var (shown, more) = DrivesWidget.Choose(volumes, id => _module.Alerting("low-disk", id), Math.Max(0, rows) * across, morePlace: false);
         _spaceLabel.Note.Text = more > 0 ? $"+{more} more in Settings" : "";
-        _space.Children.Clear();
-        _space.ColumnDefinitions.Clear();
-        _space.RowDefinitions.Clear();
-        for (int c = 0; c < across; c++)
+        string spaceKey = across + ":" + string.Join("|", shown.Select(v => v.Id));
+        if (spaceKey != _spaceKey)
         {
-            if (c > 0) _space.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(24) });
-            _space.ColumnDefinitions.Add(new ColumnDefinition());
+            _spaceKey = spaceKey;
+            _space.Children.Clear();
+            _space.ColumnDefinitions.Clear();
+            _space.RowDefinitions.Clear();
+            _volumes.Clear();
+            for (int c = 0; c < across; c++)
+            {
+                if (c > 0) _space.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(24) });
+                _space.ColumnDefinitions.Add(new ColumnDefinition());
+            }
+            for (int r = 0; r < (shown.Count + across - 1) / across; r++)
+                _space.RowDefinitions.Add(new RowDefinition { Height = new GridLength(VolumeHeight) });
+            for (int i = 0; i < shown.Count; i++)
+            {
+                var volume = new VolumeCell();
+                SetRow(volume, i / across);
+                SetColumn(volume, i % across * 2);
+                _space.Children.Add(volume);
+                _volumes.Add(volume);
+            }
         }
-        for (int r = 0; r < (shown.Count + across - 1) / across; r++)
-            _space.RowDefinitions.Add(new RowDefinition { Height = new GridLength(VolumeHeight) });
         for (int i = 0; i < shown.Count; i++)
+            _volumes[i].Set(shown[i], _module.Alerting("low-disk", shown[i].Id));
+    }
+
+    /// <summary>A volume: the letter and "412 GiB free of 931 GiB" over a meter of what's used.</summary>
+    private sealed class VolumeCell : Grid
+    {
+        private readonly TextBlock _letter = Parts.Text("", 12, Look.Island.Secondary);
+        private readonly Run _free = new() { FontSize = 12, FontWeight = FontWeights.SemiBold }, _of = new();
+        private readonly Meter _meter = new(Look.Island);
+        private bool? _caution;
+
+        public VolumeCell()
         {
-            var volume = Volume(shown[i]);
-            SetRow(volume, i / across);
-            SetColumn(volume, i % across * 2);
-            _space.Children.Add(volume);
+            VerticalAlignment = VerticalAlignment.Center;
+            RowDefinitions.Add(new RowDefinition { Height = new GridLength(16) });
+            RowDefinitions.Add(new RowDefinition { Height = new GridLength(6) });
+            RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            var text = Parts.Text("", 11, Look.Island.Tertiary);
+            text.HorizontalAlignment = HorizontalAlignment.Right;
+            text.Inlines.Add(_free);
+            text.Inlines.Add(_of);
+            SetRow(_meter, 2);
+            Children.Add(_letter);
+            Children.Add(text);
+            Children.Add(_meter);
+        }
+
+        public void Set(VolumeReading volume, bool caution)
+        {
+            _letter.Text = DrivesWidget.Letter(volume);
+            _free.Text = Format.Size(volume.FreeBytes);
+            _of.Text = " free of " + Format.Size(volume.TotalBytes);
+            if (_caution != caution)
+            {
+                _caution = caution;
+                _free.SetResourceReference(TextElement.ForegroundProperty, caution ? Look.Caution : Look.Island.Text);
+            }
+            _meter.Set(volume.TotalBytes == 0 ? 0 : 1 - (double)volume.FreeBytes / volume.TotalBytes, caution);
+            AutomationProperties.SetName(this, $"{_letter.Text} {_free.Text}{_of.Text}");
         }
     }
 
-    // The letter and "412 GiB free of 931 GiB" over a meter of what's used.
-    private Grid Volume(VolumeReading volume)
+    /// <summary>A disk's activity: "Disk 0 · C: D:", how active, and read · write.</summary>
+    private sealed class DiskRow
     {
-        bool caution = _module.Alerting("low-disk", volume.Id);
-        var row = new Grid { VerticalAlignment = VerticalAlignment.Center };
-        row.RowDefinitions.Add(new RowDefinition { Height = new GridLength(16) });
-        row.RowDefinitions.Add(new RowDefinition { Height = new GridLength(6) });
-        row.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        var letter = Parts.Text(DrivesWidget.Letter(volume), 12, Look.Island.Secondary);
-        var meter = new Meter(Look.Island);
-        meter.Set(volume.TotalBytes == 0 ? 0 : 1 - (double)volume.FreeBytes / volume.TotalBytes, caution);
-        var text = Parts.Text("", 11, Look.Island.Tertiary);
-        text.HorizontalAlignment = HorizontalAlignment.Right;
-        var free = new Run(Format.Size(volume.FreeBytes)) { FontSize = 12, FontWeight = FontWeights.SemiBold };
-        free.SetResourceReference(TextElement.ForegroundProperty, caution ? Look.Caution : Look.Island.Text);
-        text.Inlines.Add(free);
-        text.Inlines.Add(new Run(" free of " + Format.Size(volume.TotalBytes)));
-        SetRow(meter, 2);
-        row.Children.Add(letter);
-        row.Children.Add(text);
-        row.Children.Add(meter);
-        AutomationProperties.SetName(row, $"{DrivesWidget.Letter(volume)} {Format.Size(volume.FreeBytes)} free of {Format.Size(volume.TotalBytes)}");
-        return row;
-    }
+        private readonly Run _name = new(), _letters = new();
+        private readonly TextBlock _active = Parts.Text("", 12, Look.Island.Secondary), _io = Parts.Text("", 12, Look.Island.Secondary);
 
-    private Grid Disk(DiskReading disk, bool first)
-    {
-        var row = RowLines.Row(first);
-        row.ColumnDefinitions.Add(new ColumnDefinition());
-        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(90) });
-        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(150) });
-        var name = Parts.Text("", 12, Look.Island.Text);
-        name.Inlines.Add(new Run($"Disk {disk.Number}"));
-        string letters = string.Join(" ", disk.Volumes.Where(v => v.Letter.Length > 0).Select(v => v.Letter));
-        if (letters.Length > 0)
+        public DiskRow(bool first)
         {
-            var run = new Run(" · " + letters);
-            run.SetResourceReference(TextElement.ForegroundProperty, Look.Island.Tertiary);
-            name.Inlines.Add(run);
+            Row = RowLines.Row(first);
+            Row.ColumnDefinitions.Add(new ColumnDefinition());
+            Row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(90) });
+            Row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(150) });
+            var name = Parts.Text("", 12, Look.Island.Text);
+            _letters.SetResourceReference(TextElement.ForegroundProperty, Look.Island.Tertiary);
+            name.Inlines.Add(_name);
+            name.Inlines.Add(_letters);
+            _active.TextAlignment = _io.TextAlignment = TextAlignment.Right;
+            Grid.SetColumn(_active, 1);
+            Grid.SetColumn(_io, 2);
+            Row.Children.Add(name);
+            Row.Children.Add(_active);
+            Row.Children.Add(_io);
         }
-        string active = disk.ActivePercent is { } a ? Format.Percent(a) + " active" : "";
-        string io = disk.ReadBytesPerSecond is { } r && disk.WriteBytesPerSecond is { } w
-            ? Format.Rate(r, NetworkUnit.Bytes) + " · " + Format.Rate(w, NetworkUnit.Bytes) : "";
-        var activeText = Parts.Text(active, 12, Look.Island.Secondary);
-        activeText.TextAlignment = TextAlignment.Right;
-        var ioText = Parts.Text(io, 12, Look.Island.Secondary);
-        ioText.TextAlignment = TextAlignment.Right;
-        Grid.SetColumn(activeText, 1);
-        Grid.SetColumn(ioText, 2);
-        row.Children.Add(name);
-        row.Children.Add(activeText);
-        row.Children.Add(ioText);
-        AutomationProperties.SetName(row, string.Join(", ", new[] { disk.Name, active, io }.Where(t => t.Length > 0)));
-        return row;
+
+        public Grid Row { get; }
+
+        public void Set(DiskReading disk)
+        {
+            _name.Text = $"Disk {disk.Number}";
+            string letters = string.Join(" ", disk.Volumes.Where(v => v.Letter.Length > 0).Select(v => v.Letter));
+            _letters.Text = letters.Length > 0 ? " · " + letters : "";
+            _active.Text = disk.ActivePercent is { } a && Format.Percent(a) is { Length: > 0 } percent ? percent + " active" : "";
+            _io.Text = disk.ReadBytesPerSecond is { } r && disk.WriteBytesPerSecond is { } w
+                ? Format.Rate(r, NetworkUnit.Bytes) + " · " + Format.Rate(w, NetworkUnit.Bytes) : "";
+            AutomationProperties.SetName(Row, string.Join(", ", new[] { disk.Name, _active.Text, _io.Text }.Where(t => t.Length > 0)));
+        }
     }
 }

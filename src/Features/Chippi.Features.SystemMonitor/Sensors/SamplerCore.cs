@@ -51,7 +51,7 @@ internal sealed class SamplerCore(SensorSources sources, ILogger log) : IDisposa
             () => sources.Cpu.Read(need.HasFlag(SensorNeed.PerProcessor)));
         var memory = Read("memory", now, need.HasFlag(SensorNeed.Memory), sources.Memory.Read);
         bool gpu = need.HasFlag(SensorNeed.GpuSensors) || need.HasFlag(SensorNeed.GpuLoad);
-        var gpus = ReadList("gpu", now, gpu, () => sources.Gpu.Read(need.HasFlag(SensorNeed.GpuLoad)));
+        var gpus = ReadList("gpu", now, gpu, () => sources.Gpu.Read(need.HasFlag(SensorNeed.GpuLoad), need.HasFlag(SensorNeed.GpuSensors), need.HasFlag(SensorNeed.Processes)));
         var network = ReadList("network", now, need.HasFlag(SensorNeed.Network), sources.Network.Read);
         var disks = ReadList("disks", now, need.HasFlag(SensorNeed.Disks), sources.Disks.Read);
         var battery = Read("battery", now, need.HasFlag(SensorNeed.Battery), sources.Battery.Read, nullIsNotSupported: true);
