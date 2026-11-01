@@ -53,7 +53,7 @@ public sealed class IslandHomeTests
         var toggled = new List<string>();
         grid.TileToggled += (_, key) => toggled.Add(key);
 
-        // System monitor's status every 2 seconds, Keep awake turning on: a hover or a press on a button carries on through it.
+        // System's status every 2 seconds, Keep awake turning on: a hover or a press on a button carries on through it.
         grid.SetTiles([Tile("keep-awake", on: true, split: true) with { Status = "1 hr left" }, Tile("clipboard") with { Status = "24 items" }]);
         Assert.Equal(before, grid.Buttons());
         var main = Assert.IsType<ToggleButton>(before[0]);

@@ -89,7 +89,7 @@ public sealed class MonitorAlerts : IDisposable
             if (_disposed) return;
             _current = _evaluator.Evaluate(snapshot, _settings);
             if (_current.First is { } first)
-                _island.Publish(new(ActivityKey, IslandActivityKind.Status, first.TileText, "System monitor")
+                _island.Publish(new(ActivityKey, IslandActivityKind.Status, first.TileText, "System")
                     { NeedsAttention = true, TileKey = SystemMonitorModule.TileKey });
             else
                 _island.Clear(ActivityKey);

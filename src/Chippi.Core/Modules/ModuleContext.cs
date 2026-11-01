@@ -45,7 +45,7 @@ public sealed class ModuleContext(
     /// <summary>The <see cref="OpenSettings"/> section that opens Add features, where the module's requirement installs.</summary>
     public const string RequirementSection = "requirement";
 
-    /// <summary>Opens the island on a tile's page (a notice click opening the System monitor page): in the island, or docked by the tray.</summary>
+    /// <summary>Opens the island on a tile's page (a notice click opening the System page).</summary>
     public Action<string> OpenIslandPage { get; init; } = _ => { };
 
     /// <summary>The shared clipboard service; no module opens the clipboard itself. Null when the shell has none (tests pass a fake).</summary>

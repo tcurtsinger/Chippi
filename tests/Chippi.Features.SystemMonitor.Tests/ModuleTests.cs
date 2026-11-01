@@ -76,9 +76,9 @@ public sealed class ModuleTests : IDisposable
         Assert.Equal(SensorNeed.Cpu, SystemMonitorModule.TileNeed(settings));
         Assert.Equal(SensorNeed.GpuLoad, SystemMonitorModule.TileNeed(settings with { TileStatus = TileStatus.Gpu }));
         Assert.Equal(SensorNeed.None, SystemMonitorModule.TileNeed(settings with { Off = [Reading.Cpu, Reading.Memory, Reading.Gpu, Reading.Network] }));
-        Assert.Equal((SensorNeed)0b1_1111_1101, SystemMonitorView.Need(settings));
-        Assert.False(SystemMonitorView.Need(settings).HasFlag(SensorNeed.PerProcessor));
-        var some = SystemMonitorView.Need(settings with { Off = [Reading.Gpu, Reading.Battery] });
+        Assert.Equal((SensorNeed)0b1_1111_1101, SystemView.Need(settings));
+        Assert.False(SystemView.Need(settings).HasFlag(SensorNeed.PerProcessor));
+        var some = SystemView.Need(settings with { Off = [Reading.Gpu, Reading.Battery] });
         Assert.False(some.HasFlag(SensorNeed.GpuLoad) || some.HasFlag(SensorNeed.GpuSensors) || some.HasFlag(SensorNeed.Battery));
     }
 
@@ -115,7 +115,7 @@ public sealed class ModuleTests : IDisposable
             await registry.SetInstalledAsync("system-monitor", true);
             var tile = Assert.Single(registry.Find("system-monitor")!.IslandTiles);
 
-            Assert.Equal(("system-monitor", "System monitor", "Activity", 60), (tile.Spec.Key, tile.Spec.Name, tile.Spec.Icon, tile.Spec.Order));
+            Assert.Equal(("system-monitor", "System", "Activity", 60), (tile.Spec.Key, tile.Spec.Name, tile.Spec.Icon, tile.Spec.Order));
             Assert.Equal("", tile.PageNote);
             Assert.Equal(SensorNeed.None, module.Sampler!.Need);
             Assert.Equal(0, fake.CpuReads);
@@ -211,7 +211,7 @@ public sealed class ModuleTests : IDisposable
     {
         var descriptor = new SystemMonitorModule(() => new FakeSources().Sources).Descriptor;
 
-        Assert.Equal(("system-monitor", "System monitor", FeatureGroup.System, "Activity"), (descriptor.Id, descriptor.Name, descriptor.Group, descriptor.Icon));
+        Assert.Equal(("system-monitor", "System", FeatureGroup.System, "Activity"), (descriptor.Id, descriptor.Name, descriptor.Group, descriptor.Icon));
         Assert.DoesNotContain("tray", descriptor.Description, StringComparison.OrdinalIgnoreCase);
     }
 }

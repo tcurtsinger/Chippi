@@ -27,7 +27,7 @@ public static class FeatureCatalog
             Presets = Audio,
         },
 
-        // System (System monitor is a real module since Phase 4: Chippi.Features.SystemMonitor)
+        // System (the System feature is a real module since Phase 4: Chippi.Features.SystemMonitor)
         new("temperatures", "Temperatures", "CPU and GPU temperatures with alerts when they run hot", FeatureGroup.System)
         {
             Icon = "Cpu",

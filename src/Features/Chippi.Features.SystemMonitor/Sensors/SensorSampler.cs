@@ -24,6 +24,8 @@ public enum SensorNeed
     Disks = 64,
     Battery = 128,
     ThermalZones = 256,
+    /// <summary>Every process, for top apps (only while a detail page that lists them is open).</summary>
+    Processes = 512,
 }
 
 /// <summary>A history point; a null value is a gap (sleep, a failed read, a pause in sampling).</summary>
@@ -37,6 +39,8 @@ public static class Series
     public static string GpuLoad(string gpuId) => "gpu.load:" + gpuId;
     public static string NetworkReceive(string adapterId) => "net.rx:" + adapterId;
     public static string NetworkSend(string adapterId) => "net.tx:" + adapterId;
+    public const string Battery = "battery";
+    public static string ThermalZone(string zoneId) => "thermal:" + zoneId;
 }
 
 /// <summary>
@@ -187,7 +191,7 @@ public sealed class SensorSampler : IDisposable
                     }
                     catch (Exception ex)
                     {
-                        _log.LogError(ex, "System monitor tick failed");
+                        _log.LogError(ex, "System tick failed");
                     }
                     last = need;
                     next = now + interval;

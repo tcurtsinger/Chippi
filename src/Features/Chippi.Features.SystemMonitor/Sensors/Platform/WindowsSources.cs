@@ -13,5 +13,8 @@ public static class WindowsSources
         new NetworkSource(),
         new DiskSource(),
         new BatterySource(),
-        new ThermalZoneSource());
+        new ThermalZoneSource())
+    {
+        Processes = new ProcessSource(),
+    };
 }

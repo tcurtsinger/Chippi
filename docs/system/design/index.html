@@ -1,0 +1,498 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>System page mockup</title>
+<style>
+:root {
+  --font: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --display: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+}
+/* Island tokens: the Island* brushes in src/Chippi.UI/Themes/Dark.xaml and Light.xaml. */
+.dark {
+  --backdrop: #141418; --island: rgba(40,40,44,.96); --island-border: rgba(255,255,255,.09);
+  --card: rgba(255,255,255,.05); --card-border: rgba(255,255,255,.06); --hair: rgba(255,255,255,.08);
+  --hover: rgba(255,255,255,.06); --hover-border: rgba(255,255,255,.2); --press: rgba(255,255,255,.04);
+  --track: rgba(255,255,255,.14); --fill: #C9C9C9; --muted: rgba(255,255,255,.18);
+  --text: #FFFFFF; --text2: #C9C9C9; --text3: #9A9A9A;
+  --accent: #B79CFF; --accent-tint: rgba(183,156,255,.14); --caution: #FCE100;
+  --shadow: 0 16px 40px rgba(0,0,0,.5);
+  /* Settings */
+  --s-window: #202020; --s-card: #2B2B2B; --s-stroke: rgba(255,255,255,.03); --s-divider: rgba(255,255,255,.06);
+  --s-text: #FFFFFF; --s-text2: #C5C5C5; --s-caption: #ABABAB; --s-control: rgba(255,255,255,.06);
+  --s-control-stroke: rgba(255,255,255,.09); --s-accent: #4CC2FF; --s-on-accent: #000; --s-track: rgba(255,255,255,.12);
+  --s-off-stroke: rgba(255,255,255,.6); --s-off-knob: rgba(255,255,255,.8);
+  color-scheme: dark;
+}
+.light {
+  --backdrop: #DCDDE3; --island: rgba(245,245,246,.96); --island-border: rgba(0,0,0,.09);
+  --card: rgba(255,255,255,.74); --card-border: rgba(0,0,0,.06); --hair: rgba(0,0,0,.08);
+  --hover: rgba(0,0,0,.043); --hover-border: rgba(0,0,0,.2); --press: rgba(0,0,0,.06);
+  --track: rgba(0,0,0,.12); --fill: #5C5C5C; --muted: rgba(0,0,0,.12);
+  --text: #1A1A1A; --text2: #5C5C5C; --text3: #707070;
+  --accent: #7444F0; --accent-tint: rgba(116,68,240,.10); --caution: #9D5D00;
+  --shadow: 0 16px 40px rgba(0,0,0,.2);
+  --s-window: #F3F3F3; --s-card: #FBFBFB; --s-stroke: rgba(0,0,0,.06); --s-divider: rgba(0,0,0,.07);
+  --s-text: #1A1A1A; --s-text2: #404040; --s-caption: #5D5D5D; --s-control: #FFFFFF;
+  --s-control-stroke: rgba(0,0,0,.1); --s-accent: #005FB8; --s-on-accent: #fff; --s-track: rgba(0,0,0,.1);
+  --s-off-stroke: rgba(0,0,0,.55); --s-off-knob: rgba(0,0,0,.6);
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { font-family: var(--font); font-size: 12px; -webkit-font-smoothing: antialiased; background: #0f0f12; color: #eee; }
+body.review { background: #18181b; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; margin: 0; text-align: left; cursor: pointer; }
+svg.i { width: 14px; height: 14px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.num { font-variant-numeric: tabular-nums; }
+
+/* ---------- Island ---------- */
+.stage { background: var(--backdrop); padding: 24px; display: inline-block; }
+.panel { width: 520px; height: 360px; border-radius: 8px; background: var(--island); color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--island-border), var(--shadow); padding: 12px; overflow: hidden; position: relative; }
+.head { height: 24px; display: flex; align-items: center; gap: 4px; }
+.back { width: 24px; height: 24px; border-radius: 4px; display: grid; place-items: center; color: var(--text2); }
+.back:hover { background: var(--hover); }
+.back svg { width: 16px; height: 16px; }
+.title { font-size: 13px; font-weight: 600; }
+.head .pick { margin-left: auto; display: flex; align-items: center; gap: 4px; height: 24px; padding: 0 6px; border-radius: 4px; color: var(--text3); max-width: 240px; }
+.head .pick span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.head .pick:hover { background: var(--hover); }
+.head .pick svg { width: 12px; height: 12px; }
+.body { margin-top: 8px; width: 496px; height: 304px; position: relative; }
+.page { position: absolute; inset: 0; display: flex; flex-direction: column; gap: 8px; }
+.page.enter { animation: enter 180ms cubic-bezier(.2,.8,.2,1); }
+.page.enter.from-left { animation-name: enter-left; }
+@keyframes enter { from { transform: translateX(12px); opacity: 0; } }
+@keyframes enter-left { from { transform: translateX(-12px); opacity: 0; } }
+.row { display: flex; gap: 8px; }
+
+.card { background: var(--card); border-radius: 6px; box-shadow: inset 0 0 0 1px var(--card-border); padding: 10px 12px; position: relative; }
+button.w { display: flex; flex-direction: column; background: var(--card); border-radius: 6px; box-shadow: inset 0 0 0 1px var(--card-border); padding: 10px 12px; transition: background 120ms, box-shadow 120ms; }
+button.w:hover, button.w.hover { background: linear-gradient(var(--hover), var(--hover)), var(--card); box-shadow: inset 0 0 0 1px var(--hover-border); }
+button.w:active { background: linear-gradient(var(--press), var(--press)), var(--card); }
+button.w:focus-visible { outline: 2px solid var(--text); outline-offset: -2px; }
+.top { display: flex; align-items: center; gap: 6px; height: 16px; color: var(--text3); font-size: 12px; min-width: 0; }
+.top .name { white-space: nowrap; }
+.top .fact { margin-left: auto; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.hero { font-family: var(--display); font-weight: 600; font-size: 24px; line-height: 30px; margin-top: 6px; white-space: nowrap; font-variant-numeric: tabular-nums; letter-spacing: -.01em; display: flex; align-items: baseline; }
+.hero .u { font-size: 14px; color: var(--text2); margin-left: 2px; letter-spacing: 0; }
+.hero .u.sp { margin-left: 4px; }
+.hero svg.arrow { width: 16px; height: 16px; color: var(--text3); align-self: center; margin-right: 4px; stroke-width: 2.25; }
+.ctx { font-size: 11px; line-height: 16px; color: var(--text3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 3px; }
+.ctx svg.arrow { width: 11px; height: 11px; stroke-width: 2.5; }
+.meter { height: 4px; border-radius: 2px; background: var(--track); overflow: hidden; margin-top: auto; }
+.meter i { display: block; height: 100%; border-radius: 2px; background: var(--fill); }
+.caution .hero, .caution .hero .u { color: var(--caution); }
+.caution .meter i, .meter.caution i { background: var(--caution); }
+
+.cols { display: grid; column-gap: 16px; margin-top: 8px; flex: 1; }
+.col { display: flex; flex-direction: column; min-width: 0; }
+.col .top { font-size: 12px; }
+.col .hero { font-size: 18px; line-height: 24px; margin-top: 2px; }
+.col .hero .u { font-size: 12px; }
+.col .meter { margin-top: 6px; }
+.col.more .hero { color: var(--text2); }
+.twin { display: grid; grid-template-columns: 1fr 1fr; column-gap: 16px; margin-top: 8px; }
+.twin .hero { margin-top: 0; }
+
+/* Detail pages */
+.hrow { display: flex; align-items: baseline; gap: 12px; height: 36px; }
+.hrow .hero { font-size: 32px; line-height: 36px; margin: 0; }
+.hrow .hero .u { font-size: 18px; }
+.hrow .side { margin-left: auto; font-size: 12px; color: var(--text2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.graph { display: block; margin-top: 8px; }
+.graph .scale { font-size: 10px; fill: var(--text3); font-family: var(--font); }
+.strip { margin-top: 8px; height: 18px; display: flex; gap: 4px; }
+.strip i { flex: 1; background: var(--track); border-radius: 2px; position: relative; overflow: hidden; }
+.strip i b { position: absolute; left: 0; right: 0; bottom: 0; background: var(--fill); }
+.mline { margin-top: 8px; height: 18px; display: flex; flex-direction: column; justify-content: space-between; }
+.mline .l { display: flex; font-size: 11px; line-height: 12px; color: var(--text3); }
+.mline .l span:last-child { margin-left: auto; color: var(--text2); font-variant-numeric: tabular-nums; }
+.mline .meter { margin: 0; }
+.legend { margin-top: 8px; height: 18px; display: flex; align-items: center; gap: 14px; font-size: 11px; color: var(--text3); }
+.legend .sw { display: inline-block; width: 14px; height: 0; border-top: 2px solid var(--accent); margin-right: 6px; vertical-align: middle; }
+.legend .sw.dash { border-top: 2px dashed var(--text2); }
+.legend .r { margin-left: auto; }
+.lbl { font-size: 11px; line-height: 16px; color: var(--text3); display: flex; }
+.lbl span + span { margin-left: auto; }
+.vol .meter { margin: 0; }
+.boardsheet .stage { background: transparent; padding: 0; }
+.solo { display: flex; align-items: baseline; margin-top: 8px; }
+.solo .hero { margin: 0; }
+.solo .of { margin-left: auto; font-size: 11px; color: var(--text3); font-variant-numeric: tabular-nums; }
+.rows { display: flex; flex-direction: column; margin-top: 2px; }
+.r { height: 28px; display: flex; align-items: center; gap: 8px; border-top: 1px solid var(--hair); min-width: 0; }
+.r:first-child { border-top: 0; }
+.r .k { color: var(--text3); white-space: nowrap; }
+.r .v { margin-left: auto; font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.r .v.reg { font-weight: 400; color: var(--text2); }
+.r .nm { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.tile { width: 16px; height: 16px; border-radius: 4px; flex: none; display: grid; place-items: center; font-size: 8px; font-weight: 700; color: #fff; letter-spacing: -.02em; }
+.adapter { height: 30px; display: flex; align-items: center; gap: 8px; padding: 0 8px; margin: 0 -8px; border-radius: 4px; width: calc(100% + 16px); }
+.adapter:hover { background: var(--hover); }
+.adapter.on { background: var(--accent-tint); }
+.adapter .nm { flex: 1; }
+.adapter .rate { width: 92px; text-align: right; font-variant-numeric: tabular-nums; display: flex; align-items: center; justify-content: flex-end; gap: 3px; color: var(--text2); }
+.adapter .rate svg { width: 11px; height: 11px; color: var(--text3); stroke-width: 2.5; }
+.adapter .off { color: var(--text3); width: 187px; text-align: right; }
+.vol { display: grid; grid-template-columns: 28px 1fr auto; column-gap: 12px; align-items: center; height: 30px; }
+.vol .k { color: var(--text2); }
+.vol .t { font-size: 11px; color: var(--text3); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.vol .t b { font-size: 12px; color: var(--text); font-weight: 600; }
+.vol.caution .t b { color: var(--caution); }
+.zones { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 6px; }
+.zone { border-radius: 4px; background: var(--hover); padding: 6px 8px; }
+.zone .k { font-size: 11px; color: var(--text3); }
+.zone .v { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* ---------- Settings ---------- */
+.settings { width: 824px; background: var(--s-window); color: var(--s-text); padding: 24px 32px 32px; font-size: 14px; }
+.s-title { font-family: var(--display); font-size: 28px; font-weight: 600; line-height: 36px; margin: 0 0 16px; }
+.s-sec { font-size: 14px; font-weight: 600; line-height: 20px; margin: 24px 0 8px; }
+.s-card { background: var(--s-card); border-radius: 8px; box-shadow: inset 0 0 0 1px var(--s-stroke); }
+.s-row { min-height: 48px; padding: 10px 16px; display: flex; align-items: center; gap: 12px; border-top: 1px solid var(--s-divider); }
+.s-row:first-child { border-top: 0; }
+.s-row .lab { flex: 1; }
+.s-row .cap { font-size: 12px; color: var(--s-caption); }
+.combo { width: 240px; height: 32px; border-radius: 4px; background: var(--s-control); box-shadow: inset 0 0 0 1px var(--s-control-stroke); display: flex; align-items: center; padding: 0 12px; font-size: 14px; gap: 8px; }
+.combo span { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.combo svg { width: 12px; height: 12px; color: var(--s-text2); }
+.tog { display: flex; align-items: center; gap: 12px; font-size: 14px; }
+.sw { width: 40px; height: 20px; border-radius: 10px; position: relative; }
+.sw.on { background: var(--s-accent); }
+.sw.on::after { content: ""; position: absolute; width: 12px; height: 12px; border-radius: 50%; background: var(--s-on-accent); top: 4px; right: 4px; }
+.sw.off { box-shadow: inset 0 0 0 1px var(--s-off-stroke); }
+.sw.off::after { content: ""; position: absolute; width: 12px; height: 12px; border-radius: 50%; background: var(--s-off-knob); top: 4px; left: 4px; }
+.sw.dis { opacity: .4; }
+.s-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.s-w { background: var(--s-card); border-radius: 8px; box-shadow: inset 0 0 0 1px var(--s-stroke); padding: 12px 16px; height: 108px; display: flex; flex-direction: column; }
+.s-w .top { color: var(--s-caption); font-size: 12px; }
+.s-w .hero { font-size: 28px; line-height: 34px; color: var(--s-text); margin-top: 4px; }
+.s-w .hero .u { font-size: 16px; color: var(--s-text2); }
+.s-w .ctx { font-size: 12px; color: var(--s-caption); }
+.s-w .meter { background: var(--s-track); }
+.s-w .meter i { background: var(--s-accent); }
+.s-drive { padding: 12px 16px; border-top: 1px solid var(--s-divider); }
+.s-drive:first-child { border-top: 0; }
+.s-drive .l { display: flex; align-items: baseline; }
+.s-drive .l span:last-child { margin-left: auto; font-size: 12px; color: var(--s-caption); font-variant-numeric: tabular-nums; }
+.s-drive .meter { margin-top: 8px; height: 4px; background: var(--s-track); }
+.s-drive .meter i { background: var(--s-accent); }
+.chev { width: 12px; height: 12px; color: var(--s-text2); }
+
+/* ---------- Review page ---------- */
+.bar { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; padding: 16px 24px; color: #ddd; font-size: 13px; }
+.bar b { font-weight: 600; margin-right: 6px; }
+.seg { display: inline-flex; background: rgba(255,255,255,.06); border-radius: 6px; padding: 2px; }
+.seg button { padding: 4px 10px; border-radius: 4px; color: #ccc; }
+.seg button.on { background: rgba(255,255,255,.14); color: #fff; }
+.sheet { display: grid; grid-template-columns: repeat(auto-fill, 568px); gap: 16px 16px; padding: 0 24px 24px; }
+.sheet figure { margin: 0; }
+.sheet figcaption { font-size: 12px; color: #aaa; padding: 6px 2px 0; }
+.boardsheet { padding: 24px; display: grid; width: max-content; gap: 20px 16px; background: #101013; }
+.boardsheet figcaption { font: 600 13px var(--font); color: #bbb; padding: 0 0 8px 2px; }
+.boardsheet.light-sheet { background: #ECECEF; }
+.boardsheet.light-sheet figcaption { color: #444; }
+.boardsheet figure { margin: 0; }
+</style>
+</head>
+<body>
+<script>
+// ---------- Glyphs (Lucide paths; GPU is authored in the same stroke) ----------
+const P = {
+  back: '<path d="m15 18-6-6 6-6"/>',
+  down: '<path d="m6 9 6 6 6-6"/>',
+  cpu: '<rect width="16" height="16" x="4" y="4" rx="2"/><rect width="6" height="6" x="9" y="9" rx="1"/><path d="M15 2v2M15 20v2M2 15h2M2 9h2M20 15h2M20 9h2M9 2v2M9 20v2"/>',
+  gpu: '<path d="M2 6h17a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3H6"/><path d="M2 4v16"/><circle cx="10.5" cy="12" r="3"/><path d="M17 10v4"/>',
+  mem: '<path d="M6 19v-3M10 19v-3M14 19v-3M18 19v-3M8 11V9M16 11V9M12 11V9M2 15h20"/><path d="M2 7a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v1.1a2 2 0 0 0 0 3.837V17a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-5.1a2 2 0 0 0 0-3.837Z"/>',
+  net: '<rect x="16" y="16" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="9" y="2" width="6" height="6" rx="1"/><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3M12 12V8"/>',
+  drive: '<path d="M22 12H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/><path d="M6 16h.01M10 16h.01"/>',
+  battery: '<rect width="16" height="10" x="2" y="7" rx="2" ry="2"/><path d="M22 11v2M6 11v2M10 11v2M14 11v2"/>',
+  temp: '<path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"/>',
+  dn: '<path d="M12 5v14"/><path d="m19 12-7 7-7-7"/>',
+  up: '<path d="m5 12 7-7 7 7"/><path d="M12 19V5"/>',
+};
+const icon = (k, cls = 'i') => `<svg class="${cls}" viewBox="0 0 24 24">${P[k]}</svg>`;
+const arrow = (k) => `<svg class="i arrow" viewBox="0 0 24 24">${P[k]}</svg>`;
+const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+
+// ---------- Fake but realistic data ----------
+function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function series(seed, n, base, swing, lo, hi, spikes = 0) {
+  const r = rng(seed), out = []; let v = base, drift = 0;
+  for (let i = 0; i < n; i++) {
+    drift = drift * .82 + (r() - .5) * swing;
+    v += drift + (base - v) * .06;
+    let x = v;
+    if (spikes && r() < spikes) x += swing * (2 + r() * 3);
+    out.push(Math.max(lo, Math.min(hi, x)));
+  }
+  return out;
+}
+const HIST = 120;
+const desktop = {
+  key: 'desktop', label: 'Desktop',
+  cpu: { load: 23, clock: '4.18 GHz', name: 'AMD Ryzen 9 7950X 16-Core Processor', logical: 16, up: '1 d 22 h',
+    hist: series(3, HIST, 22, 5, 2, 100, .03), cores: [41, 12, 30, 8, 55, 19, 6, 27, 14, 9, 33, 5, 21, 11, 38, 7],
+    apps: [['Chrome', '6.1%', '#4C8BF5'], ['Visual Studio', '3.4%', '#865FC5'], ['Discord', '1.2%', '#5865F2']] },
+  gpus: [{ id: 'rtx', name: 'NVIDIA GeForce RTX 4080', short: 'GeForce RTX 4080', load: 34, temp: '51 °C', used: 6.2, total: 16, fan: '1,450 RPM', shared: '0.4 GiB',
+    hist: series(5, HIST, 30, 7, 0, 100, .02), apps: [['Cyberpunk 2077', '26%', '#E8D100'], ['Chrome', '4%', '#4C8BF5'], ['Desktop Window Manager', '2%', '#0078D4']] },
+    { id: 'igpu', name: 'AMD Radeon(TM) Graphics', short: 'Radeon Graphics', load: 3 }],
+  mem: { pct: 67, used: '21.4', total: '32.0', avail: '10.6 GiB', commit: 26, limit: 48, hist: series(9, HIST, 66, 1.2, 0, 100),
+    apps: [['Chrome', '3.1 GiB', '#4C8BF5'], ['Visual Studio', '1.8 GiB', '#865FC5'], ['Discord', '640 MiB', '#5865F2']] },
+  net: { adapters: [{ name: 'Ethernet', on: true, down: ['2.4', 'MiB/s'], up: ['180', 'KiB/s'] }, { name: 'Wi-Fi', on: false }],
+    down: series(11, HIST, 2.2, .9, 0, 8, .04), up: series(12, HIST, .2, .1, 0, 8, .02), scale: '8 MiB/s' },
+  drives: [{ k: 'C:', free: ['412', 'GiB'], total: '931 GiB', used: 519 / 931 }, { k: 'D:', free: ['1.07', 'TiB'], total: '1.82 TiB', used: .41 },
+    { k: 'E:', free: ['380', 'GiB'], total: '3.64 TiB', used: .898 }, { k: 'F:', free: ['41.0', 'GiB'], total: '465 GiB', used: .912 }],
+  disks: [['Disk 0', 'C:', '4%', '1.2 MiB/s', '640 KiB/s'], ['Disk 1', 'D:', '1%', '0 KiB/s', '64 KiB/s'], ['Disk 2', 'E:', '0%', '0 KiB/s', '0 KiB/s'], ['Disk 3', 'F:', '0%', '0 KiB/s', '0 KiB/s']],
+};
+const laptop = {
+  key: 'laptop', label: 'Laptop',
+  cpu: { ...desktop.cpu, load: 18, clock: '2.91 GHz', name: 'Intel Core Ultra 7 155H', logical: 22, cores: [22, 9, 31, 4, 15, 8, 3, 26, 12, 5, 9, 2, 18, 7, 11, 3, 6, 14, 2, 9, 4, 1], hist: series(4, HIST, 17, 4, 2, 100, .03) },
+  gpus: [{ id: 'arc', name: 'Intel(R) Arc(TM) Graphics', short: 'Arc Graphics', load: 9, temp: null, used: null, total: null, fan: null, shared: '1.2 GiB', hist: series(6, HIST, 8, 3, 0, 100, .02),
+    apps: [['Teams', '5%', '#5B5FC7'], ['Edge', '2%', '#0C9FDE'], ['Desktop Window Manager', '1%', '#0078D4']] }],
+  mem: { ...desktop.mem, pct: 71, used: '11.4', total: '16.0', avail: '4.6 GiB', commit: 15, limit: 24, hist: series(10, HIST, 70, 1.2, 0, 100) },
+  net: { adapters: [{ name: 'Wi-Fi', on: true, down: ['39', 'KiB/s'], up: ['2.8', 'MiB/s'] }], down: series(13, HIST, .2, .2, 0, 4, .05), up: series(14, HIST, 2.6, .5, 0, 4), scale: '4 MiB/s' },
+  drives: [{ k: 'C:', free: ['455', 'GiB'], total: '953 GiB', used: 498 / 953 }],
+  disks: [['Disk 0', 'C:', '3%', '420 KiB/s', '1.1 MiB/s']],
+  battery: { pct: 80, state: 'On battery', left: '3 hr 10 min left', rate: '12.4 W', hist: series(15, HIST, 84, .3, 0, 100).map((v, i) => 92 - i * .1 + (v - 84) * .2) },
+  zones: [52, 47, 41], zoneHist: series(16, HIST, 50, 1.5, 30, 100),
+};
+const alert = { ...desktop, key: 'alert', label: 'Alert', mem: { ...desktop.mem, pct: 92, used: '29.4', avail: '2.6 GiB', hist: series(9, HIST, 88, 1.2, 0, 100) }, alerts: { mem: true, drives: ['F:'] } };
+const crowded = { ...desktop, key: 'crowded', label: 'No GPU, 8 drives', gpus: [],
+  drives: [...desktop.drives, { k: 'G:', free: ['12.5', 'GiB'], total: '238 GiB', used: .947 }, { k: 'H:', free: ['1.6', 'TiB'], total: '1.82 TiB', used: .12 },
+    { k: 'I:', free: ['88', 'GiB'], total: '119 GiB', used: .26 }, { k: 'J:', free: ['601', 'GiB'], total: '931 GiB', used: .35 }] };
+const MACHINES = { desktop, laptop, alert, crowded };
+
+// ---------- Overview widgets ----------
+const pct = (v) => `<span class="num">${v}</span><span class="u">%</span>`;
+const amount = ([n, u]) => `<span class="num">${n}</span><span class="u sp">${u}</span>`;
+const meter = (f, caution) => `<div class="meter${caution ? ' caution' : ''}"><i style="width:${Math.round(f * 1000) / 10}%"></i></div>`;
+function widget({ go, glyph, name, fact = '', hero, ctx = '', m = null, caution = false, w, h, body }) {
+  return `<button class="w${caution ? ' caution' : ''}" data-go="${go}" style="width:${w}px;height:${h}px" aria-label="${esc(name)}">
+    <div class="top">${icon(glyph)}<span class="name">${name}</span>${fact ? `<span class="fact">${esc(fact)}</span>` : ''}</div>
+    ${body ?? `<div class="hero">${hero}</div>${ctx ? `<div class="ctx">${ctx}</div>` : ''}${m === null ? '' : meter(m, caution)}`}
+  </button>`;
+}
+function loadRow(d) {
+  const gpu = d.gpus[0];
+  const items = [
+    { go: 'cpu', glyph: 'cpu', name: 'CPU', hero: pct(d.cpu.load), ctx: d.cpu.clock, m: d.cpu.load / 100 },
+    gpu && { go: 'gpu', glyph: 'gpu', name: 'GPU', fact: gpu.temp ?? '', hero: pct(gpu.load), ctx: esc(gpu.short), m: gpu.load / 100 },
+    { go: 'memory', glyph: 'mem', name: 'Memory', hero: pct(d.mem.pct), ctx: `${d.mem.used} of ${d.mem.total} GiB`, m: d.mem.pct / 100, caution: d.alerts?.mem },
+  ].filter(Boolean);
+  const w = (496 - 8 * (items.length - 1)) / items.length;
+  return `<div class="row">${items.map(i => widget({ ...i, w, h: 96 })).join('')}</div>`;
+}
+function netWidget(d, w, h) {
+  const a = d.net.adapters.find(x => x.on);
+  if (w > 300) {
+    return widget({ go: 'network', glyph: 'net', name: 'Network', fact: a.name, w, h,
+      body: `<div class="twin"><div class="hero">${arrow('dn')}${amount(a.down)}</div><div class="hero">${arrow('up')}${amount(a.up)}</div></div>` });
+  }
+  return widget({ go: 'network', glyph: 'net', name: 'Network', fact: a.name, w, h, hero: arrow('dn') + amount(a.down),
+    ctx: `${arrow('up')}<span class="num">${a.up.join(' ')}</span>` });
+}
+function drivesWidget(d, w, h) {
+  const alerting = new Set(d.alerts?.drives ?? []);
+  let list = d.drives, more = 0;
+  if (list.length > 4) {
+    // The fullest (and any alerting) first, letter order among them; the rest fold into "+N".
+    const keep = [...list].sort((a, b) => (alerting.has(b.k) - alerting.has(a.k)) || b.used - a.used).slice(0, 3);
+    list = list.filter(x => keep.includes(x)); more = d.drives.length - 3;
+  }
+  const n = list.length + (more ? 1 : 0);
+  if (n === 1) {
+    const x = list[0], c = alerting.has(x.k);
+    return widget({ go: 'drives', glyph: 'drive', name: 'Drives', fact: x.k, w, h, caution: c,
+      body: `<div class="solo"><div class="hero">${amount(x.free)}<span class="u sp" style="font-weight:400;font-size:11px;color:var(--text3)">free</span></div><span class="of">of ${x.total}</span></div>${meter(x.used, c)}` });
+  }
+  const cols =list.map(x => `<div class="col${alerting.has(x.k) ? ' caution' : ''}">
+      <div class="top"><span class="name">${x.k}</span><span class="fact">${x.total}</span></div>
+      <div class="hero">${amount(x.free)}<span class="u sp" style="font-weight:400;font-size:11px;color:var(--text3)">free</span></div>
+      ${meter(x.used, alerting.has(x.k))}</div>`).join('')
+    + (more ? `<div class="col more"><div class="top"><span class="name">&nbsp;</span></div><div class="hero">+${more}</div><div class="ctx">more drives</div></div>` : '');
+  return widget({ go: 'drives', glyph: 'drive', name: 'Drives', fact: d.drives.length > 1 ? `${d.drives.length} drives` : '', w, h,
+    body: `<div class="cols" style="grid-template-columns:repeat(${n},1fr)">${cols}</div>` });
+}
+function overview(d) {
+  const rest = [];
+  if (d.net) rest.push('net');
+  if (d.battery) rest.push('battery');
+  if (d.zones) rest.push('temp');
+  if (rest.length === 1) {
+    return `${loadRow(d)}${netWidget(d, 496, 82)}${drivesWidget(d, 496, 110)}`;
+  }
+  const w = (496 - 8 * (rest.length - 1)) / rest.length;
+  const row = rest.map(k => k === 'net' ? netWidget(d, w, 96)
+    : k === 'battery' ? widget({ go: 'battery', glyph: 'battery', name: 'Battery', hero: pct(d.battery.pct), ctx: `${d.battery.state} · ${d.battery.left.replace(' left', '')}`, m: d.battery.pct / 100, w, h: 96 })
+    : widget({ go: 'temperature', glyph: 'temp', name: 'Temperature', hero: `<span class="num">${Math.max(...d.zones)}</span><span class="u sp">°C</span>`, ctx: `Hottest of ${d.zones.length} zones`, w, h: 96 })).join('');
+  return `${loadRow(d)}<div class="row">${row}</div>${drivesWidget(d, 496, 96)}`;
+}
+
+// ---------- Detail pages ----------
+let gid = 0;
+function graph(values, max, { w = 472, h = 76, second = null, scale = '100%', caution = false } = {}) {
+  const id = 'g' + (++gid), step = w / (values.length - 1);
+  const y = (v) => (h - 1) - (v / max) * (h - 2);
+  const line = (vs) => vs.map((v, i) => `${i ? 'L' : 'M'}${(i * step).toFixed(1)},${y(v).toFixed(1)}`).join('');
+  const stroke = caution ? 'var(--caution)' : 'var(--accent)';
+  return `<svg class="graph" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+    <defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${stroke}" stop-opacity="${caution ? '.16' : '.30'}"/><stop offset="1" stop-color="${stroke}" stop-opacity=".02"/></linearGradient></defs>
+    <path d="M0,${h / 2}H${w}" stroke="var(--hair)" stroke-dasharray="2 3"/>
+    <path d="M0,${h - .5}H${w}" stroke="var(--hair)"/>
+    <path d="${line(values)}L${w},${h}L0,${h}Z" fill="url(#${id})"/>
+    <path d="${line(values)}" fill="none" stroke="${stroke}" stroke-width="1.5" stroke-linejoin="round"/>
+    ${second ? `<path d="${line(second)}" fill="none" stroke="var(--text2)" stroke-width="1.25" stroke-dasharray="3 3"/>` : ''}
+    <text class="scale" x="${w}" y="9" text-anchor="end">${scale}</text>
+  </svg>`;
+}
+const appRows = (apps) => apps.map(([n, v, c]) => `<div class="r"><span class="tile" style="background:${c}">${n.split(' ').map(s => s[0]).join('').slice(0, 2)}</span><span class="nm">${esc(n)}</span><span class="v">${v}</span></div>`).join('');
+const factRows = (facts) => facts.map(([k, v]) => `<div class="r"><span class="k">${k}</span><span class="v">${v}</span></div>`).join('');
+const pair = (apps, facts) => `<div class="row" style="height:130px">
+  <div class="card" style="width:244px"><div class="lbl"><span>Top apps</span></div><div class="rows">${appRows(apps)}</div></div>
+  <div class="card" style="width:244px"><div class="rows" style="margin-top:0">${factRows(facts)}</div></div></div>`;
+
+const DETAIL = {
+  cpu: (d) => ({ title: 'CPU', html: `<div class="card" style="height:166px">
+      <div class="hrow"><div class="hero">${pct(d.cpu.load)}</div><span class="side">${d.cpu.clock}</span></div>
+      ${graph(d.cpu.hist, 100)}
+      <div class="strip" title="${d.cpu.logical} logical processors">${d.cpu.cores.map(v => `<i><b style="height:${v}%"></b></i>`).join('')}</div></div>
+      ${pair(d.cpu.apps, [['Processor', `<span style="font-weight:400" title="${d.cpu.name}">${d.cpu.name.replace(/ \d+-Core Processor/, '')}</span>`], ['Logical processors', d.cpu.logical], ['Up time', d.cpu.up]])}` }),
+  gpu: (d) => { const g = d.gpus[0]; return { title: 'GPU', pick: d.gpus.length > 1 ? g.short : null, html: `<div class="card" style="height:166px">
+      <div class="hrow"><div class="hero">${pct(g.load)}</div><span class="side">${g.temp ?? ''}</span></div>
+      ${graph(g.hist, 100)}
+      ${g.used != null ? `<div class="mline"><div class="l"><span>Dedicated memory</span><span>${g.used} of ${g.total.toFixed(1)} GiB</span></div>${meter(g.used / g.total)}</div>` : `<div class="mline"><div class="l"><span>Shared memory</span><span>${g.shared}</span></div>${meter(.15)}</div>`}</div>
+      ${pair(g.apps, [['Fan', g.fan ?? '—'], ['Shared memory', g.shared]].filter(x => x[1] !== '—'))}` }; },
+  memory: (d) => ({ title: 'Memory', html: `<div class="card" style="height:166px">
+      <div class="hrow${d.alerts?.mem ? ' caution' : ''}"><div class="hero">${pct(d.mem.pct)}</div><span class="side">${d.mem.used} of ${d.mem.total} GiB</span></div>
+      ${graph(d.mem.hist, 100, { caution: d.alerts?.mem })}
+      <div class="mline"><div class="l"><span>Committed</span><span>${d.mem.commit.toFixed(1)} of ${d.mem.limit.toFixed(1)} GiB</span></div>${meter(d.mem.commit / d.mem.limit)}</div></div>
+      ${pair(d.mem.apps, [['Available', d.mem.avail], ['Installed', `${d.mem.total} GiB`]])}` }),
+  network: (d) => { const a = d.net.adapters.find(x => x.on); return { title: 'Network', html: `<div class="card" style="height:166px">
+      <div class="hrow"><div class="hero">${arrow('dn')}${amount(a.down)}</div><div class="hero" style="margin-left:24px">${arrow('up')}${amount(a.up)}</div></div>
+      ${graph(d.net.down, parseFloat(d.net.scale), { second: d.net.up, scale: d.net.scale })}
+      <div class="legend"><span><i class="sw"></i>Receive</span><span><i class="sw dash"></i>Send</span><span class="r">${esc(a.name)}</span></div></div>
+      <div class="card" style="height:130px"><div class="lbl"><span>Adapters</span></div><div class="rows">
+      ${d.net.adapters.map(x => `<button class="adapter${x.on ? ' on' : ''}"><span class="nm">${esc(x.name)}</span>${x.on ? `<span class="rate">${icon('dn')}${x.down.join(' ')}</span><span class="rate">${icon('up')}${x.up.join(' ')}</span>` : `<span class="off">Not connected</span>`}</button>`).join('')}
+      </div></div>` }; },
+  drives: (d) => { const al = new Set(d.alerts?.drives ?? []); const shown = d.drives.slice(0, 5); return { title: 'Drives', html: `<div class="card" style="flex:1">
+      <div class="lbl"><span>Space</span></div>
+      ${shown.map(x => `<div class="vol${al.has(x.k) ? ' caution' : ''}"><span class="k">${x.k}</span>${meter(x.used, al.has(x.k)).replace('margin-top:auto', '')}<span class="t"><b>${x.free.join(' ')}</b> free of ${x.total}</span></div>`).join('')}
+      ${d.drives.length > 5 ? `<div class="lbl" style="margin-top:2px"><span>+${d.drives.length - 5} more in Settings</span></div>` : ''}</div>
+      <div class="card" style="height:${Math.min(d.disks.length, 4) * 28 + 38}px"><div class="lbl"><span>Activity</span><span>Read · Write</span></div><div class="rows">
+      ${d.disks.slice(0, 4).map(([n, l, act, r, w]) => `<div class="r"><span class="nm">${n} <span style="color:var(--text3)">· ${l}</span></span><span class="v reg" style="margin-left:auto;width:70px;text-align:right">${act} active</span><span class="v reg num" style="margin-left:0;width:150px;text-align:right">${r} · ${w}</span></div>`).join('')}
+      </div></div>` }; },
+  battery: (d) => ({ title: 'Battery', html: `<div class="card" style="height:192px">
+      <div class="hrow"><div class="hero">${pct(d.battery.pct)}</div><span class="side">${d.battery.left}</span></div>
+      ${graph(d.battery.hist, 100, { h: 128 })}</div>
+      <div class="card" style="flex:1"><div class="rows" style="margin-top:0">${factRows([['State', d.battery.state], ['Rate', d.battery.rate], ['Time left', d.battery.left.replace(' left', '')]])}</div></div>` }),
+  temperature: (d) => ({ title: 'Temperature', html: `<div class="card" style="height:192px">
+      <div class="hrow"><div class="hero"><span class="num">${Math.max(...d.zones)}</span><span class="u sp">°C</span></div><span class="side">Hottest of ${d.zones.length} zones</span></div>
+      ${graph(d.zoneHist, 100, { h: 128, scale: '100 °C' })}</div>
+      <div class="card" style="flex:1"><div class="lbl"><span>Thermal zones</span></div><div class="zones">${d.zones.map((z, i) => `<div class="zone"><div class="k">Zone ${i + 1}</div><div class="v">${z} °C</div></div>`).join('')}</div></div>` }),
+};
+
+function island(d, screen, opts = {}) {
+  const page = screen === 'overview' ? { title: 'System', html: overview(d) } : DETAIL[screen](d);
+  return `<div class="stage ${opts.theme}"><div class="panel" data-screen="${screen}">
+    <div class="head"><button class="back" aria-label="Back">${icon('back')}</button><span class="title">${page.title}</span>
+      ${page.pick ? `<button class="pick"><span>${esc(page.pick)}</span>${icon('down')}</button>` : ''}</div>
+    <div class="body"><div class="page${opts.enter ? ' enter' + (opts.enter === 'back' ? ' from-left' : '') : ''}">${page.html}</div></div>
+  </div></div>`;
+}
+
+// ---------- Settings › System ----------
+function settings(d, theme) {
+  const gpu = d.gpus[0], a = d.net.adapters.find(x => x.on);
+  const sw = (on, dis) => `<span class="sw ${on ? 'on' : 'off'}${dis ? ' dis' : ''}"></span>`;
+  const combo = (v) => `<div class="combo"><span>${esc(v)}</span>${icon('down')}</div>`;
+  const sw4 = [
+    { glyph: 'cpu', name: 'CPU', hero: pct(d.cpu.load), ctx: d.cpu.clock, m: d.cpu.load / 100 },
+    gpu && { glyph: 'gpu', name: 'GPU', fact: gpu.temp, hero: pct(gpu.load), ctx: esc(gpu.short), m: gpu.load / 100 },
+    { glyph: 'mem', name: 'Memory', hero: pct(d.mem.pct), ctx: `${d.mem.used} of ${d.mem.total} GiB`, m: d.mem.pct / 100 },
+    { glyph: 'net', name: 'Network', fact: a.name, hero: arrow('dn') + amount(a.down), ctx: `${arrow('up')}${a.up.join(' ')}` },
+    d.battery && { glyph: 'battery', name: 'Battery', hero: pct(d.battery.pct), ctx: d.battery.left, m: d.battery.pct / 100 },
+    d.zones && { glyph: 'temp', name: 'Temperature', hero: `<span class="num">${Math.max(...d.zones)}</span><span class="u sp">°C</span>`, ctx: `Hottest of ${d.zones.length} zones` },
+  ].filter(Boolean);
+  const readings = ['CPU', gpu && 'GPU', 'Memory', 'Network', 'Drives', d.battery && 'Battery', d.zones && 'Temperature'].filter(Boolean);
+  return `<div class="settings ${theme}">
+    <h1 class="s-title">System</h1>
+    <div class="s-grid">${sw4.map(w => `<div class="s-w"><div class="top">${icon(w.glyph)}<span class="name">${w.name}</span>${w.fact ? `<span class="fact">${esc(w.fact)}</span>` : ''}</div>
+      <div class="hero">${w.hero}</div><div class="ctx">${w.ctx}</div>${w.m != null ? meter(w.m) : ''}</div>`).join('')}</div>
+    <div class="s-sec">Drives</div>
+    <div class="s-card">${d.drives.map(x => `<div class="s-drive"><div class="l"><span>${x.k}</span><span>${x.free.join(' ')} free of ${x.total}</span></div>${meter(x.used)}</div>`).join('')}</div>
+    <div class="s-sec">General</div>
+    <div class="s-card">
+      <div class="s-row"><span class="lab">Update speed</span>${combo('2 seconds')}</div>
+      <div class="s-row"><span class="lab">Home status</span>${combo('CPU')}</div>
+      ${d.gpus.length > 1 ? `<div class="s-row"><span class="lab">GPU</span>${combo(gpu.name)}</div>` : ''}
+      ${d.net.adapters.length > 1 ? `<div class="s-row"><span class="lab">Network adapter</span>${combo(a.name)}</div>` : ''}
+    </div>
+    <div class="s-sec">Readings</div>
+    <div class="s-card">${readings.map(r => `<div class="s-row"><span class="lab">${r}</span><span class="tog">On ${sw(true)}</span></div>`).join('')}</div>
+    <div class="s-sec">Units</div>
+    <div class="s-card"><div class="s-row"><span class="lab">Temperature</span>${combo('Celsius')}</div><div class="s-row"><span class="lab">Network speed</span>${combo('Bytes per second')}</div></div>
+    <div class="s-sec">Alerts</div>
+    <div class="s-card">
+      <div class="s-row"><span class="lab">CPU load</span><span>90%</span><span class="tog">Off ${sw(false)}</span>${icon('down', 'i chev')}</div>
+      <div class="s-row"><span class="lab">Memory in use</span><span>90%</span><span class="tog">Off ${sw(false)}</span>${icon('down', 'i chev')}</div>
+      <div class="s-row"><span class="lab">Low disk space</span><span>10% free</span><span class="tog">Off ${sw(false)}</span>${icon('down', 'i chev')}</div>
+      ${gpu ? `<div class="s-row"><span class="lab">GPU temperature</span><span class="cap">Set a limit</span><span class="tog" style="opacity:.55">Off ${sw(false)}</span>${icon('down', 'i chev')}</div>` : ''}
+      <div class="s-row"><span class="lab">Repeat interval</span>${combo('15 minutes')}</div>
+    </div>
+  </div>`;
+}
+
+// ---------- Boards (render.ps1) and the review page ----------
+const q = new URLSearchParams(location.search);
+const board = q.get('board');
+function finish(el) { const r = el.getBoundingClientRect(); document.body.setAttribute('data-size', `${Math.ceil(r.width)},${Math.ceil(r.height)}`); }
+const SCREENS = ['overview', 'cpu', 'gpu', 'memory', 'network', 'drives'];
+function sheet(theme, items) {
+  return `<div class="boardsheet ${theme === 'light' ? 'light-sheet' : ''}" style="grid-template-columns:repeat(3,568px)">${items.map(([cap, d, s]) => `<figure><figcaption>${cap}</figcaption>${island(d, s, { theme })}</figure>`).join('')}</div>`;
+}
+if (board) {
+  const theme = q.get('theme') || 'dark';
+  let html;
+  if (board === 'overviews') html = sheet(theme, [['Desktop · 2 GPUs, Ethernet, 4 drives', desktop, 'overview'], ['Laptop · battery, 3 thermal zones', laptop, 'overview'], ['Alerts · Memory in use and Low disk on', alert, 'overview'], ['No GPU · 8 drives', crowded, 'overview'], ['Laptop · Battery', laptop, 'battery'], ['Laptop · Temperature', laptop, 'temperature']]);
+  else if (board === 'details') html = sheet(theme, [['CPU', desktop, 'cpu'], ['GPU · picker for 2 GPUs', desktop, 'gpu'], ['Memory', desktop, 'memory'], ['Network', desktop, 'network'], ['Drives', desktop, 'drives'], ['Memory · alert', alert, 'memory']]);
+  else if (board === 'settings') html = settings(MACHINES[q.get('machine') || 'desktop'], theme);
+  else html = island(MACHINES[q.get('machine') || 'desktop'], board, { theme });
+  document.body.innerHTML = html;
+  document.body.style.overflow = 'hidden'; // the panels' shadows would otherwise add scrollbars to the shot
+  finish(document.body.firstElementChild);
+} else {
+  document.body.className = 'review';
+  const state = { theme: 'dark', machine: 'desktop', screen: 'overview' };
+  const root = document.createElement('div');
+  document.body.appendChild(root);
+  const seg = (name, opts) => `<span><b>${name}</b><span class="seg">${opts.map(([k, l]) => `<button data-set="${name}" data-val="${k}" class="${state[name] === k ? 'on' : ''}">${l}</button>`).join('')}</span></span>`;
+  function render(enter) {
+    const d = MACHINES[state.machine];
+    if (!d.gpus.length && state.screen === 'gpu' || !d.battery && state.screen === 'battery' || !d.zones && state.screen === 'temperature') state.screen = 'overview';
+    root.innerHTML = `<div class="bar">${seg('theme', [['dark', 'Dark'], ['light', 'Light']])}${seg('machine', Object.values(MACHINES).map(m => [m.key, m.label]))}
+      <span style="color:#999">Click a widget to open its page; Back or Esc returns.</span></div>
+      <div style="padding:0 24px 8px">${island(d, state.screen, { theme: state.theme, enter })}</div>
+      <div class="bar"><b>Every screen</b></div>
+      <div class="sheet">${[...SCREENS.filter(s => s !== 'gpu' || d.gpus.length), ...(d.battery ? ['battery', 'temperature'] : [])].map(s => `<figure>${island(d, s, { theme: state.theme })}<figcaption>${s === 'overview' ? 'System' : DETAIL[s](d).title}</figcaption></figure>`).join('')}</div>
+      <div class="bar"><b>Settings › System</b></div>
+      <div style="padding:0 24px 24px">${settings(d, state.theme)}</div>`;
+  }
+  root.addEventListener('click', (e) => {
+    const set = e.target.closest('[data-set]');
+    if (set) { state[set.dataset.set] = set.dataset.val; render(); return; }
+    const live = root.querySelector('.panel');
+    if (!live || !live.contains(e.target)) return;
+    const go = e.target.closest('[data-go]');
+    if (go) { state.screen = go.dataset.go; render('in'); return; }
+    if (e.target.closest('.back') && state.screen !== 'overview') { state.screen = 'overview'; render('back'); }
+  });
+  addEventListener('keydown', (e) => { if (e.key === 'Escape' && state.screen !== 'overview') { state.screen = 'overview'; render('back'); } });
+  render();
+}
+</script>
+</body>
+</html>

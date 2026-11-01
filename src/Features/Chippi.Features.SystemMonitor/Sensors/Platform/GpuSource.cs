@@ -46,7 +46,8 @@ internal sealed class GpuSource : IGpuSource
                 counters?.Shared,
                 temperature,
                 fanRpm,
-                fanPercent));
+                fanPercent,
+                counters?.Processes));
         }
         return readings;
     }
@@ -94,7 +95,7 @@ internal sealed class GpuSource : IGpuSource
         return matched;
     }
 
-    private Dictionary<string, (double? Load, ulong? Dedicated, ulong? Shared)> ReadLoad()
+    private Dictionary<string, (double? Load, ulong? Dedicated, ulong? Shared, IReadOnlyDictionary<int, double>? Processes)> ReadLoad()
     {
         if (_load is null)
         {
@@ -109,24 +110,37 @@ internal sealed class GpuSource : IGpuSource
         // Engine instances are "pid_N_luid_0x…_0x…_phys_P_eng_E_engtype_T". Each engine is summed over
         // processes; an adapter's load is its busiest engine, as Task Manager shows it. An instance
         // without a value (a process that just started) adds nothing; an adapter with no valid
-        // instance at all has no load reading, not 0.
-        var loads = rates
+        // instance at all has no load reading, not 0. A process's load is its own busiest engine, as
+        // Task Manager's GPU column shows it.
+        var engines = rates
             ? _load.Values(_engine)
-                .Select(e => (Luid: Between(e.Name, "luid_", "_phys"), Engine: Between(e.Name, "_phys_", "_engtype"), e.Value))
+                .Select(e => (Luid: Between(e.Name, "luid_", "_phys"), Engine: Between(e.Name, "_phys_", "_engtype"),
+                    Pid: int.TryParse(Between(e.Name, "pid_", "_luid"), out int pid) ? pid : -1, e.Value))
                 .Where(e => e.Luid is not null && e.Engine is not null && e.Value is not null)
-                .GroupBy(e => (e.Luid, e.Engine))
-                .Select(g => (g.Key.Luid, Sum: g.Sum(e => e.Value!.Value)))
-                .GroupBy(e => e.Luid!, StringComparer.OrdinalIgnoreCase)
-                .ToDictionary(g => g.Key, g => Math.Min(g.Max(e => e.Sum), 100), StringComparer.OrdinalIgnoreCase)
+                .ToList()
             : [];
+        var loads = engines
+            .GroupBy(e => (e.Luid, e.Engine))
+            .Select(g => (g.Key.Luid, Sum: g.Sum(e => e.Value!.Value)))
+            .GroupBy(e => e.Luid!, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => Math.Min(g.Max(e => e.Sum), 100), StringComparer.OrdinalIgnoreCase);
+        var processes = engines
+            .Where(e => e.Pid > 0)
+            .GroupBy(e => e.Luid!, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => (IReadOnlyDictionary<int, double>)g
+                .GroupBy(e => (e.Pid, e.Engine))
+                .Select(p => (p.Key.Pid, Sum: p.Sum(e => e.Value!.Value)))
+                .GroupBy(p => p.Pid)
+                .ToDictionary(p => p.Key, p => Math.Min(p.Max(e => e.Sum), 100)), StringComparer.OrdinalIgnoreCase);
         var dedicated = Memory(_dedicated);
         var shared = Memory(_shared);
 
-        var result = new Dictionary<string, (double?, ulong?, ulong?)>(StringComparer.OrdinalIgnoreCase);
+        var result = new Dictionary<string, (double?, ulong?, ulong?, IReadOnlyDictionary<int, double>?)>(StringComparer.OrdinalIgnoreCase);
         foreach (var adapter in _adapters)
         {
             double? load = loads.TryGetValue(adapter.Luid, out double l) ? l : null;
-            result[adapter.Luid] = (load, dedicated.TryGetValue(adapter.Luid, out var d) ? d : null, shared.TryGetValue(adapter.Luid, out var s) ? s : null);
+            result[adapter.Luid] = (load, dedicated.TryGetValue(adapter.Luid, out var d) ? d : null, shared.TryGetValue(adapter.Luid, out var s) ? s : null,
+                rates ? processes.GetValueOrDefault(adapter.Luid) ?? new Dictionary<int, double>() : null);
         }
         return result;
     }

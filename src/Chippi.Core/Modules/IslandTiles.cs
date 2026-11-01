@@ -92,6 +92,12 @@ public sealed record IslandTileSpec(string Key, string Name, string Icon, int Or
     public Func<bool>? HandleEscape { get; init; }
 
     /// <summary>
+    /// The page sees its Back arrow first: true when it used it (System's detail page returns to its
+    /// overview), and the page stays. Null for the usual return to the home.
+    /// </summary>
+    public Func<bool>? HandleBack { get; init; }
+
+    /// <summary>
     /// A drag over the closed tab opens this tile's page after 250 ms, without the keyboard, and the tab
     /// shows the tile's glyph meanwhile (the Shelf, Phase 5 notes #48). The tab itself never takes the drop.
     /// </summary>
@@ -106,7 +112,7 @@ public interface IIslandTile
 
     /// <summary>
     /// Text at the right of the page's header instead of the tile's status, for a page that already
-    /// shows its status (the System monitor's "Last 4 min"); empty for none.
+    /// shows its status; empty for none.
     /// </summary>
     void SetPageNote(string note);
 

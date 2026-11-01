@@ -77,7 +77,7 @@ public sealed class SystemMonitorSmokeTests(ITestOutputHelper output)
 
             // The disk list takes two samples a prime delay apart on the sampler's thread: wait for its rows, not a fixed time.
             Until(() => Find<TextBlock>(page).Any(b => b.Text.Contains("C:")));
-            if (disks == 5 && !laptop) Assert.Contains(Find<TextBlock>(page), b => b.Text.Contains("G:"));
+            if (disks == 5 && !laptop) Assert.Contains(Find<TextBlock>(page), b => string.Concat(b.Inlines.OfType<System.Windows.Documents.Run>().Select(r => r.Text)) == "+2"); // 5 drives: the 3 fullest and "+2"
 
             // Use the actual Settings factory and controls, then return to the grid.
             config = Assert.IsAssignableFrom<FrameworkElement>(ui.SettingsFactory!(null));
@@ -85,7 +85,7 @@ public sealed class SystemMonitorSmokeTests(ITestOutputHelper output)
             Until(() => Find<ComboBox>(config).Any(c => AutomationProperties.GetName(c) == "Temperature"));
             var speed = Find<ComboBox>(config).Single(c => AutomationProperties.GetName(c) == "Update speed");
             speed.SelectedIndex = 2;
-            var status = Find<ComboBox>(config).Single(c => AutomationProperties.GetName(c) == "Tile status");
+            var status = Find<ComboBox>(config).Single(c => AutomationProperties.GetName(c) == "Home status");
             status.SelectedIndex = 1;
             Assert.Equal((5, TileStatus.Memory), (settings.Value.UpdateSeconds, settings.Value.TileStatus));
             Assert.Equal("", tile.PageNote);

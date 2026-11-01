@@ -85,7 +85,7 @@ public sealed class IslandTileTests : IDisposable
     [Fact]
     public void A_page_note_replaces_the_status_in_the_header_and_notifies_the_host()
     {
-        var part = new IslandTileContribution("system-monitor", Spec("system-monitor", "System monitor", 60, 0));
+        var part = new IslandTileContribution("system-monitor", Spec("system-monitor", "System", 60, 0));
         int changes = 0;
         part.StatusChanged += (_, _) => changes++;
 
@@ -100,7 +100,7 @@ public sealed class IslandTileTests : IDisposable
     [Fact]
     public void On_screen_changes_are_reported_once_each()
     {
-        var part = new IslandTileContribution("system-monitor", Spec("system-monitor", "System monitor", 60, 0));
+        var part = new IslandTileContribution("system-monitor", Spec("system-monitor", "System", 60, 0));
         var seen = new List<bool>();
         part.OnScreenChanged += (_, _) => seen.Add(part.OnScreen);
 
