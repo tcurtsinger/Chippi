@@ -485,6 +485,47 @@ public sealed class ChippiPetMotionTests
     }
 
     [Fact]
+    public void Reduce_motion_coming_on_mid_glance_mid_beat_or_mid_yawn_snaps_him_to_rest()
+    {
+        var motion = Motion.Override;
+        WpfTestThread.Run(() =>
+        {
+            var idle = new ChippiPet { Size = 40, Mood = PetMood.Idle };
+            var listening = new ChippiPet { Size = 40, Mood = PetMood.Listening };
+            var yawning = new ChippiPet { Size = 72, Mood = PetMood.WideAwake };
+            var window = Offscreen(new StackPanel { Children = { idle, listening, yawning } });
+            try
+            {
+                Motion.Override = false;
+                window.Show();
+                IslandWindowTests.Pump(TimeSpan.Zero);
+                var pupils = idle.Pupils!;
+                idle.Glance(-1);
+                listening.Beat(1);
+                yawning.Mood = PetMood.Sleepy;
+                Assert.True(pupils.HasAnimatedProperties);
+                Assert.True(listening.BandPulse.HasAnimatedProperties);
+                Assert.True(yawning.YawnMouth.HasAnimatedProperties);
+
+                Motion.Override = true;
+                IslandWindowTests.Pump(TimeSpan.Zero);
+                Assert.False(pupils.HasAnimatedProperties);
+                Assert.Equal(0, pupils.X);
+                Assert.False(listening.BandPulse.HasAnimatedProperties);
+                Assert.Equal((1.0, 1.0), (listening.BandPulse.ScaleX, listening.BandPulse.ScaleY));
+                Assert.False(yawning.YawnMouth.HasAnimatedProperties);
+                Assert.Equal(0, yawning.YawnFace.Opacity);
+                Assert.Equal(1, yawning.ShownFace.Opacity); // asleep, at once
+            }
+            finally
+            {
+                window.Close();
+                Motion.Override = motion;
+            }
+        });
+    }
+
+    [Fact]
     public void He_glances_boops_bobs_to_the_beat_and_lands_and_under_reduced_motion_holds_still()
     {
         var motion = Motion.Override;

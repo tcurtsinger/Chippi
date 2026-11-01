@@ -582,6 +582,14 @@ public class ChippiPet : UserControl
         _shown = mood;
         _hasShown = true;
 
+        // A glance, a beat's pulse or a yawn still running stops where the new mood begins, and snaps to rest when
+        // reduced motion comes on (OnMotionChanged applies the mood again).
+        foreach (var face in Faces)
+            face.Pupils?.BeginAnimation(TranslateTransform.XProperty, null);
+        _bandPulse.BeginAnimation(ScaleTransform.ScaleXProperty, null);
+        _bandPulse.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+        _yawn.Reset();
+
         animate = animate && IsLoaded && !Motion.IsReduced && !small && from is not null && (from != mood || replay);
         // Picked up, the round eyes stay over whatever the mood is until he's set down.
         var target = small ? _small : IsHeld ? _held : FaceFor(mood);
