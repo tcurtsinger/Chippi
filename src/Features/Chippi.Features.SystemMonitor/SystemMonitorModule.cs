@@ -14,8 +14,9 @@ namespace Chippi.Features.SystemMonitor;
 
 /// <summary>
 /// System (Phase 4, the System monitor until 2026-10-31): an island tile whose status is one reading, and
-/// a page of widgets that each open a detail page. The sampler reads only for what's on screen (the tile,
-/// the page) and the alerts that are on.
+/// a page of widgets that each open a detail page. The sampler keeps the history of every reading the
+/// overview graphs, all the time, so the page opens with full graphs (the owner, 2026-11-01); a page adds
+/// what only it shows (drives, each processor, the processes) while it's on screen.
 /// </summary>
 public sealed class SystemMonitorModule : IFeatureModule
 {
@@ -29,7 +30,8 @@ public sealed class SystemMonitorModule : IFeatureModule
     private readonly Lock _gate = new();
     private ModuleContext? _context;
     private IIslandTile? _tile;
-    private SensorWatch? _tileWatch;
+    private SensorWatch? _historyWatch;
+    private bool _drivesKnown;
     private MonitorAlerts? _alerts;
     private SystemView? _view;
 
@@ -100,7 +102,8 @@ public sealed class SystemMonitorModule : IFeatureModule
             HandleBack = () => _view?.Back() == true, // a detail page returns to the overview
             HandleEscape = () => _view?.Back() == true,
         });
-        _tile.OnScreenChanged += OnTileScreen;
+        lock (_gate)
+            _historyWatch = Sampler.Watch(HistoryNeed(Settings) | SensorNeed.Disks); // the drives once, so the page first opens laid out
         context.Activation.Register(OpenVerb, _ => context.OpenIslandPage(TileKey));
         SystemEvents.PowerModeChanged += OnPowerModeChanged;
         return Task.CompletedTask;
@@ -109,12 +112,11 @@ public sealed class SystemMonitorModule : IFeatureModule
     public Task StopAsync(CancellationToken ct)
     {
         SystemEvents.PowerModeChanged -= OnPowerModeChanged;
-        if (_tile is not null)
-            _tile.OnScreenChanged -= OnTileScreen;
         lock (_gate)
         {
-            _tileWatch?.Dispose();
-            _tileWatch = null;
+            _historyWatch?.Dispose();
+            _historyWatch = null;
+            _drivesKnown = false;
         }
         if (_alerts is not null)
         {
@@ -150,23 +152,30 @@ public sealed class SystemMonitorModule : IFeatureModule
         _alerts?.Configure(Settings);
         lock (_gate)
         {
-            if (_tileWatch is not null)
-                _tileWatch.Need = TileNeed(Settings);
+            if (_historyWatch is not null)
+                _historyWatch.Need = HistoryNeed(Settings) | (_drivesKnown ? SensorNeed.None : SensorNeed.Disks);
         }
         if (Sampler?.Latest is { } latest)
             UpdateTile(latest);
         Changed?.Invoke();
     }
 
-    /// <summary>What the tile's status needs read; none when no reading it can show is on.</summary>
-    internal static SensorNeed TileNeed(SystemMonitorSettings settings) => settings.EffectiveTileStatus() switch
+    /// <summary>
+    /// What's read all the time: every reading the overview graphs or shows a level of, so its history
+    /// is full when the page opens. It covers the tile's status too, which is always one of them. About
+    /// 5 ms a read on the owner's PC, GPU load 2.8 ms of it (2026-11-01).
+    /// </summary>
+    internal static SensorNeed HistoryNeed(SystemMonitorSettings settings)
     {
-        TileStatus.Cpu => SensorNeed.Cpu,
-        TileStatus.Memory => SensorNeed.Memory,
-        TileStatus.Gpu => SensorNeed.GpuLoad,
-        TileStatus.Network => SensorNeed.Network,
-        _ => SensorNeed.None,
-    };
+        var need = SensorNeed.None;
+        if (settings.IsOn(Reading.Cpu)) need |= SensorNeed.Cpu;
+        if (settings.IsOn(Reading.Memory)) need |= SensorNeed.Memory;
+        if (settings.IsOn(Reading.Gpu)) need |= SensorNeed.GpuLoad;
+        if (settings.IsOn(Reading.Network)) need |= SensorNeed.Network;
+        if (settings.IsOn(Reading.Battery)) need |= SensorNeed.Battery;
+        if (settings.IsOn(Reading.ThermalZone)) need |= SensorNeed.ThermalZones;
+        return need;
+    }
 
     /// <summary>The tile's status for <paramref name="snapshot"/>: "CPU 12%", "↓ 1.2 MiB/s"; null when the snapshot doesn't have it.</summary>
     internal static string? TileText(SystemSnapshot snapshot, SystemMonitorSettings settings, string? gpuId, string? adapterId) =>
@@ -181,24 +190,22 @@ public sealed class SystemMonitorModule : IFeatureModule
             _ => null,
         };
 
-    private void OnTileScreen(object? sender, EventArgs e)
+    // On the sampler thread. A reading not in this snapshot leaves the last status (a rate starting over).
+    // The first drives read is what the page first opens with; after it, only a page reads them.
+    private void OnUpdated(SystemSnapshot snapshot)
     {
-        lock (_gate)
+        if (!_drivesKnown && snapshot.Disks.Status is not ReadingStatus.NotRead and not ReadingStatus.Pending)
         {
-            if (_tile is null || Sampler is null)
-                return;
-            if (_tile.OnScreen)
-                _tileWatch ??= Sampler.Watch(TileNeed(Settings));
-            else
+            lock (_gate)
             {
-                _tileWatch?.Dispose();
-                _tileWatch = null;
+                _drivesKnown = true;
+                PageSnapshot ??= snapshot;
+                if (_historyWatch is not null)
+                    _historyWatch.Need = HistoryNeed(Settings);
             }
         }
+        UpdateTile(snapshot);
     }
-
-    // On the sampler thread. A reading not in this snapshot leaves the last status (a rate starting over).
-    private void OnUpdated(SystemSnapshot snapshot) => UpdateTile(snapshot);
 
     // The alerts evaluate after the tile on each snapshot, so the tile looks again once they have.
     private void OnAlertsChanged(AlertEvaluation evaluation)

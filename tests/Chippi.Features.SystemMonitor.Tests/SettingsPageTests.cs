@@ -124,7 +124,7 @@ public sealed class SettingsPageTests
     });
 
     [Fact]
-    public void Capability_discovery_keeps_only_disks_live_and_settings_unload_detaches() => WpfTestThread.Run(() =>
+    public void Capability_discovery_adds_only_disks_to_the_history_and_settings_unload_detaches() => WpfTestThread.Run(() =>
     {
         string root = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "chippi-settings-" + Guid.NewGuid().ToString("N"));
         var config = new Chippi.Core.Config.ConfigStore(System.IO.Path.Combine(root, "settings.json"));
@@ -147,19 +147,17 @@ public sealed class SettingsPageTests
             timer.Tick += (_, _) =>
             {
                 timedOut = elapsed.Elapsed > TimeSpan.FromSeconds(5);
-                if (module.Sampler!.Need == SensorNeed.Disks || timedOut) frame.Continue = false;
+                if (module.Sampler!.Need == (SystemMonitorModule.HistoryNeed(module.Settings) | SensorNeed.Disks) || timedOut) frame.Continue = false;
             };
             page.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));
             timer.Start();
             System.Windows.Threading.Dispatcher.PushFrame(frame);
             timer.Stop();
             Assert.False(timedOut);
-            Assert.Equal(SensorNeed.Disks, module.Sampler!.Need);
-            Assert.Equal(0, fake.CpuReads);
-            Assert.Equal(0, fake.NetworkReads);
+            Assert.Equal(SystemMonitorModule.HistoryNeed(module.Settings) | SensorNeed.Disks, module.Sampler!.Need);
             Assert.False(Control<ToggleButton>(page, "GPU temperature").IsEnabled);
             page.RaiseEvent(new RoutedEventArgs(FrameworkElement.UnloadedEvent));
-            Assert.Equal(SensorNeed.None, module.Sampler!.Need);
+            Assert.Equal(SystemMonitorModule.HistoryNeed(module.Settings), module.Sampler!.Need & ~SensorNeed.Disks);
             int oldIndex = Control<ComboBox>(page, "Update speed").SelectedIndex;
             module.Save(module.Settings with { UpdateSeconds = 5 });
             Assert.Equal(oldIndex, Control<ComboBox>(page, "Update speed").SelectedIndex);

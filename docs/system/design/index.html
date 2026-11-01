@@ -69,14 +69,14 @@ svg.i { width: 14px; height: 14px; flex: none; fill: none; stroke: currentColor;
 .row { display: flex; gap: 8px; }
 
 .card { background: var(--card); border-radius: 6px; box-shadow: inset 0 0 0 1px var(--card-border); padding: 10px 12px; position: relative; }
-button.w { display: flex; flex-direction: column; background: var(--card); border-radius: 6px; box-shadow: inset 0 0 0 1px var(--card-border); padding: 10px 12px; transition: background 120ms, box-shadow 120ms; }
+button.w { display: flex; flex-direction: column; background: var(--card); border-radius: 6px; box-shadow: inset 0 0 0 1px var(--card-border); padding: 10px 12px; transition: background 120ms, box-shadow 120ms; position: relative; overflow: hidden; }
 button.w:hover, button.w.hover { background: linear-gradient(var(--hover), var(--hover)), var(--card); box-shadow: inset 0 0 0 1px var(--hover-border); }
 button.w:active { background: linear-gradient(var(--press), var(--press)), var(--card); }
 button.w:focus-visible { outline: 2px solid var(--text); outline-offset: -2px; }
 .top { display: flex; align-items: center; gap: 6px; height: 16px; color: var(--text3); font-size: 12px; min-width: 0; }
 .top .name { white-space: nowrap; }
 .top .fact { margin-left: auto; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-.hero { font-family: var(--display); font-weight: 600; font-size: 24px; line-height: 30px; margin-top: 6px; white-space: nowrap; font-variant-numeric: tabular-nums; letter-spacing: -.01em; display: flex; align-items: baseline; }
+.hero { font-family: var(--display); font-weight: 600; font-size: 24px; line-height: 30px; margin-top: 4px; white-space: nowrap; font-variant-numeric: tabular-nums; letter-spacing: -.01em; display: flex; align-items: baseline; }
 .hero .u { font-size: 14px; color: var(--text2); margin-left: 2px; letter-spacing: 0; }
 .hero .u.sp { margin-left: 4px; }
 .hero svg.arrow { width: 16px; height: 16px; color: var(--text3); align-self: center; margin-right: 4px; stroke-width: 2.25; }
@@ -87,41 +87,47 @@ button.w:focus-visible { outline: 2px solid var(--text); outline-offset: -2px; }
 .caution .hero, .caution .hero .u { color: var(--caution); }
 .caution .meter i, .meter.caution i { background: var(--caution); }
 
-.cols { display: grid; column-gap: 16px; margin-top: 8px; flex: 1; }
-.col { display: flex; flex-direction: column; min-width: 0; }
-.col .top { font-size: 12px; }
-.col .hero { font-size: 18px; line-height: 24px; margin-top: 2px; }
-.col .hero .u { font-size: 12px; }
-.col .meter { margin-top: 6px; }
-.col.more .hero { color: var(--text2); }
-.twin { display: grid; grid-template-columns: 1fr 1fr; column-gap: 16px; margin-top: 8px; }
-.twin .hero { margin-top: 0; }
+/* A widget's graph: under the value and its context line, out to the card's edges (inside its 1px border). */
+.spark { position: absolute; left: 1px; bottom: 1px; display: block; }
+.spark.side { left: auto; right: 1px; }
+.pairv { display: flex; gap: 16px; margin-top: 4px; }
+.pairv .hero { margin: 0; }
+
+/* Drives: rows of 20, two to a line, the fullest kept when they don't all fit. */
+.drows { display: grid; grid-template-columns: 1fr 1fr; column-gap: 24px; margin-top: 4px; }
+.drows.one { grid-template-columns: 1fr; }
+.dr { height: 20px; display: grid; grid-template-columns: 20px 1fr auto; column-gap: 8px; align-items: center; min-width: 0; }
+.dr .k { color: var(--text2); }
+.dr .meter { margin: 0; }
+.dr .t { font-size: 11px; color: var(--text3); white-space: nowrap; font-variant-numeric: tabular-nums; text-align: right; min-width: 76px; }
+.dr .t b { font-size: 12px; font-weight: 600; color: var(--text); }
+.dr.caution .t b { color: var(--caution); }
+.dr.more { display: flex; color: var(--text2); }
 
 /* Detail pages */
+.gcard { overflow: hidden; }
+.gcard .graph { position: absolute; left: 1px; top: 46px; }
 .hrow { display: flex; align-items: baseline; gap: 12px; height: 36px; }
 .hrow .hero { font-size: 32px; line-height: 36px; margin: 0; }
 .hrow .hero .u { font-size: 18px; }
-.hrow .side { margin-left: auto; font-size: 12px; color: var(--text2); white-space: nowrap; font-variant-numeric: tabular-nums; }
-.graph { display: block; margin-top: 8px; }
+.hrow .side { margin-left: auto; align-self: flex-end; margin-bottom: 1px; display: flex; flex-direction: column; align-items: flex-end; font-size: 12px; line-height: 16px; color: var(--text2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.hrow .side .sc { font-size: 10px; line-height: 13px; color: var(--text3); }
 .graph .scale { font-size: 10px; fill: var(--text3); font-family: var(--font); }
-.strip { margin-top: 8px; height: 18px; display: flex; gap: 4px; }
+.gfoot { position: absolute; left: 12px; right: 12px; bottom: 10px; height: 18px; }
+.strip { height: 18px; display: flex; gap: 3px; }
 .strip i { flex: 1; background: var(--track); border-radius: 2px; position: relative; overflow: hidden; }
-.strip i b { position: absolute; left: 0; right: 0; bottom: 0; background: var(--fill); }
-.mline { margin-top: 8px; height: 18px; display: flex; flex-direction: column; justify-content: space-between; }
+.strip i b { position: absolute; left: 0; right: 0; bottom: 0; background: var(--accent); }
+.mline { height: 18px; display: flex; flex-direction: column; justify-content: space-between; }
 .mline .l { display: flex; font-size: 11px; line-height: 12px; color: var(--text3); }
 .mline .l span:last-child { margin-left: auto; color: var(--text2); font-variant-numeric: tabular-nums; }
 .mline .meter { margin: 0; }
-.legend { margin-top: 8px; height: 18px; display: flex; align-items: center; gap: 14px; font-size: 11px; color: var(--text3); }
+.legend { height: 18px; display: flex; align-items: center; gap: 14px; font-size: 11px; color: var(--text3); }
 .legend .sw { display: inline-block; width: 14px; height: 0; border-top: 2px solid var(--accent); margin-right: 6px; vertical-align: middle; }
 .legend .sw.dash { border-top: 2px dashed var(--text2); }
 .legend .r { margin-left: auto; }
-.lbl { font-size: 11px; line-height: 16px; color: var(--text3); display: flex; }
+.lbl { font-size: 11px; line-height: 16px; height: 16px; color: var(--text3); display: flex; }
 .lbl span + span { margin-left: auto; }
-.vol .meter { margin: 0; }
 .boardsheet .stage { background: transparent; padding: 0; }
-.solo { display: flex; align-items: baseline; margin-top: 8px; }
-.solo .hero { margin: 0; }
-.solo .of { margin-left: auto; font-size: 11px; color: var(--text3); font-variant-numeric: tabular-nums; }
 .rows { display: flex; flex-direction: column; margin-top: 2px; }
 .r { height: 28px; display: flex; align-items: center; gap: 8px; border-top: 1px solid var(--hair); min-width: 0; }
 .r:first-child { border-top: 0; }
@@ -137,13 +143,17 @@ button.w:focus-visible { outline: 2px solid var(--text); outline-offset: -2px; }
 .adapter .rate { width: 92px; text-align: right; font-variant-numeric: tabular-nums; display: flex; align-items: center; justify-content: flex-end; gap: 3px; color: var(--text2); }
 .adapter .rate svg { width: 11px; height: 11px; color: var(--text3); stroke-width: 2.5; }
 .adapter .off { color: var(--text3); width: 187px; text-align: right; }
-.vol { display: grid; grid-template-columns: 28px 1fr auto; column-gap: 12px; align-items: center; height: 30px; }
+.vols { display: grid; grid-template-columns: 1fr 1fr; column-gap: 24px; margin-top: 2px; }
+.vols.one { grid-template-columns: 1fr; }
+.vol { height: 36px; display: flex; flex-direction: column; justify-content: center; gap: 6px; }
+.vol .l { display: flex; align-items: baseline; gap: 8px; }
 .vol .k { color: var(--text2); }
-.vol .t { font-size: 11px; color: var(--text3); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.vol .t { margin-left: auto; font-size: 11px; color: var(--text3); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .vol .t b { font-size: 12px; color: var(--text); font-weight: 600; }
+.vol .meter { margin: 0; }
 .vol.caution .t b { color: var(--caution); }
-.zones { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 6px; }
-.zone { border-radius: 4px; background: var(--hover); padding: 6px 8px; }
+.zones { display: grid; gap: 8px; margin-top: 2px; }
+.zone { border-radius: 4px; background: var(--hover); padding: 6px 8px; height: 44px; }
 .zone .k { font-size: 11px; color: var(--text3); }
 .zone .v { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
 
@@ -166,16 +176,21 @@ button.w:focus-visible { outline: 2px solid var(--text); outline-offset: -2px; }
 .sw.off { box-shadow: inset 0 0 0 1px var(--s-off-stroke); }
 .sw.off::after { content: ""; position: absolute; width: 12px; height: 12px; border-radius: 50%; background: var(--s-off-knob); top: 4px; left: 4px; }
 .sw.dis { opacity: .4; }
-.s-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-.s-w { background: var(--s-card); border-radius: 8px; box-shadow: inset 0 0 0 1px var(--s-stroke); padding: 12px 16px; height: 108px; display: flex; flex-direction: column; }
+.s-grid { display: flex; flex-direction: column; gap: 8px; }
+.s-w { background: var(--s-card); border-radius: 8px; box-shadow: inset 0 0 0 1px var(--s-stroke); padding: 12px 16px; display: flex; flex-direction: column; position: relative; overflow: hidden; }
 .s-w .top { color: var(--s-caption); font-size: 12px; }
 .s-w .hero { font-size: 28px; line-height: 34px; color: var(--s-text); margin-top: 4px; }
 .s-w .hero .u { font-size: 16px; color: var(--s-text2); }
+.s-w .pairv .hero { margin: 0; }
 .s-w .ctx { font-size: 12px; color: var(--s-caption); }
 .s-w .meter { background: var(--s-track); }
 .s-w .meter i { background: var(--s-accent); }
+.s-drives { display: grid; grid-template-columns: 1fr 1fr; }
 .s-drive { padding: 12px 16px; border-top: 1px solid var(--s-divider); }
-.s-drive:first-child { border-top: 0; }
+.s-drive:nth-child(-n+2) { border-top: 0; }
+.s-drive:nth-child(even) { box-shadow: inset 1px 0 0 var(--s-divider); }
+.s-drives.one { grid-template-columns: 1fr; }
+.s-drives.one .s-drive:nth-child(2) { border-top: 1px solid var(--s-divider); box-shadow: none; }
 .s-drive .l { display: flex; align-items: baseline; }
 .s-drive .l span:last-child { margin-left: auto; font-size: 12px; color: var(--s-caption); font-variant-numeric: tabular-nums; }
 .s-drive .meter { margin-top: 8px; height: 4px; background: var(--s-track); }
@@ -231,9 +246,30 @@ function series(seed, n, base, swing, lo, hi, spikes = 0) {
   }
   return out;
 }
+// Every graph holds the last 120 readings: the sampler keeps them for each reading the overview shows, all the time.
 const HIST = 120;
+// Network history is in KiB/s.
+// This PC, as the 2026-11-01 renders read it: idle loads, Ethernet, 6 drives.
+const yourpc = {
+  key: 'yourpc', label: 'Your PC',
+  cpu: { load: 4, clock: '4.62 GHz', name: 'AMD Ryzen 9 9950X3D 16-Core Processor', logical: 32, up: '9 d 3 h',
+    hist: series(21, HIST, 4, 1.1, 1, 100, .05),
+    cores: [6, 2, 9, 1, 4, 0, 3, 1, 12, 2, 5, 1, 3, 0, 2, 1, 8, 3, 1, 0, 2, 1, 4, 0, 1, 2, 0, 1, 3, 0, 1, 0],
+    apps: [['Claude', '1.5%', '#D97757'], ['Desktop Window Manager', '0.7%', '#0078D4'], ['Chippi', '0.4%', '#8F5CFF']] },
+  gpus: [{ id: 'rtx', name: 'NVIDIA GeForce RTX 4080', short: 'GeForce RTX 4080', load: 1, temp: '50 °C', used: 2.1, total: 15.7, fan: '0%', shared: '116 MiB',
+    hist: series(22, HIST, 1.2, .6, 0, 100, .04), apps: [['Claude', '0.2%', '#D97757'], ['Desktop Window Manager', '0.2%', '#0078D4'], ['Chippi', '0.1%', '#8F5CFF']] },
+    { id: 'igpu', name: 'AMD Radeon(TM) Graphics', short: 'Radeon Graphics', load: 0 }],
+  mem: { pct: 42, used: '25.9', total: '61.7', avail: '35.8 GiB', commit: 41.4, limit: 65.6, hist: series(23, HIST, 42, .35, 0, 100),
+    apps: [['Claude', '2.3 GiB', '#D97757'], ['Google Chrome', '1.4 GiB', '#4C8BF5'], ['.NET Host', '1.2 GiB', '#512BD4']] },
+  net: { adapters: [{ name: 'Ethernet', on: true, down: ['2', 'KiB/s'], up: ['1', 'KiB/s'] }],
+    down: series(24, HIST, 3, 3, 0, 1e6, .08), up: series(25, HIST, 2, 2.5, 0, 1e6, .1) },
+  drives: [{ k: 'C:', free: ['704', 'GiB'], total: '930 GiB', used: 226 / 930 }, { k: 'D:', free: ['477', 'GiB'], total: '477 GiB', used: 0 },
+    { k: 'E:', free: ['954', 'GiB'], total: '954 GiB', used: 0 }, { k: 'F:', free: ['2.29', 'TiB'], total: '2.75 TiB', used: .167 },
+    { k: 'I:', free: ['875', 'GiB'], total: '954 GiB', used: 79 / 954 }, { k: 'X:', free: ['956', 'GiB'], total: '1000 GiB', used: 44 / 1000 }],
+  disks: [['Disk 0', 'D:', '0%', '0 KiB/s', '0 KiB/s'], ['Disk 2', 'X: F:', '0%', '0 KiB/s', '0 KiB/s'], ['Disk 3', 'C:', '3%', '0 KiB/s', '581 KiB/s'], ['Disk 4', 'I:', '0%', '0 KiB/s', '0 KiB/s']],
+};
 const desktop = {
-  key: 'desktop', label: 'Desktop',
+  key: 'desktop', label: 'Busy desktop',
   cpu: { load: 23, clock: '4.18 GHz', name: 'AMD Ryzen 9 7950X 16-Core Processor', logical: 16, up: '1 d 22 h',
     hist: series(3, HIST, 22, 5, 2, 100, .03), cores: [41, 12, 30, 8, 55, 19, 6, 27, 14, 9, 33, 5, 21, 11, 38, 7],
     apps: [['Chrome', '6.1%', '#4C8BF5'], ['Visual Studio', '3.4%', '#865FC5'], ['Discord', '1.2%', '#5865F2']] },
@@ -243,7 +279,7 @@ const desktop = {
   mem: { pct: 67, used: '21.4', total: '32.0', avail: '10.6 GiB', commit: 26, limit: 48, hist: series(9, HIST, 66, 1.2, 0, 100),
     apps: [['Chrome', '3.1 GiB', '#4C8BF5'], ['Visual Studio', '1.8 GiB', '#865FC5'], ['Discord', '640 MiB', '#5865F2']] },
   net: { adapters: [{ name: 'Ethernet', on: true, down: ['2.4', 'MiB/s'], up: ['180', 'KiB/s'] }, { name: 'Wi-Fi', on: false }],
-    down: series(11, HIST, 2.2, .9, 0, 8, .04), up: series(12, HIST, .2, .1, 0, 8, .02), scale: '8 MiB/s' },
+    down: series(11, HIST, 2250, 900, 0, 1e6, .04), up: series(12, HIST, 200, 100, 0, 1e6, .02) },
   drives: [{ k: 'C:', free: ['412', 'GiB'], total: '931 GiB', used: 519 / 931 }, { k: 'D:', free: ['1.07', 'TiB'], total: '1.82 TiB', used: .41 },
     { k: 'E:', free: ['380', 'GiB'], total: '3.64 TiB', used: .898 }, { k: 'F:', free: ['41.0', 'GiB'], total: '465 GiB', used: .912 }],
   disks: [['Disk 0', 'C:', '4%', '1.2 MiB/s', '640 KiB/s'], ['Disk 1', 'D:', '1%', '0 KiB/s', '64 KiB/s'], ['Disk 2', 'E:', '0%', '0 KiB/s', '0 KiB/s'], ['Disk 3', 'F:', '0%', '0 KiB/s', '0 KiB/s']],
@@ -254,145 +290,198 @@ const laptop = {
   gpus: [{ id: 'arc', name: 'Intel(R) Arc(TM) Graphics', short: 'Arc Graphics', load: 9, temp: null, used: null, total: null, fan: null, shared: '1.2 GiB', hist: series(6, HIST, 8, 3, 0, 100, .02),
     apps: [['Teams', '5%', '#5B5FC7'], ['Edge', '2%', '#0C9FDE'], ['Desktop Window Manager', '1%', '#0078D4']] }],
   mem: { ...desktop.mem, pct: 71, used: '11.4', total: '16.0', avail: '4.6 GiB', commit: 15, limit: 24, hist: series(10, HIST, 70, 1.2, 0, 100) },
-  net: { adapters: [{ name: 'Wi-Fi', on: true, down: ['39', 'KiB/s'], up: ['2.8', 'MiB/s'] }], down: series(13, HIST, .2, .2, 0, 4, .05), up: series(14, HIST, 2.6, .5, 0, 4), scale: '4 MiB/s' },
+  net: { adapters: [{ name: 'Wi-Fi', on: true, down: ['39', 'KiB/s'], up: ['2.8', 'MiB/s'] }], down: series(13, HIST, 40, 30, 0, 1e6, .05), up: series(14, HIST, 2600, 500, 0, 1e6) },
   drives: [{ k: 'C:', free: ['455', 'GiB'], total: '953 GiB', used: 498 / 953 }],
   disks: [['Disk 0', 'C:', '3%', '420 KiB/s', '1.1 MiB/s']],
   battery: { pct: 80, state: 'On battery', left: '3 hr 10 min left', rate: '12.4 W', hist: series(15, HIST, 84, .3, 0, 100).map((v, i) => 92 - i * .1 + (v - 84) * .2) },
   zones: [52, 47, 41], zoneHist: series(16, HIST, 50, 1.5, 30, 100),
 };
-const alert = { ...desktop, key: 'alert', label: 'Alert', mem: { ...desktop.mem, pct: 92, used: '29.4', avail: '2.6 GiB', hist: series(9, HIST, 88, 1.2, 0, 100) }, alerts: { mem: true, drives: ['F:'] } };
+const alert = { ...desktop, key: 'alert', label: 'Alerts', mem: { ...desktop.mem, pct: 92, used: '29.4', avail: '2.6 GiB', hist: series(9, HIST, 88, 1.2, 0, 100) }, alerts: { mem: true, drives: ['F:'] } };
 const crowded = { ...desktop, key: 'crowded', label: 'No GPU, 8 drives', gpus: [],
   drives: [...desktop.drives, { k: 'G:', free: ['12.5', 'GiB'], total: '238 GiB', used: .947 }, { k: 'H:', free: ['1.6', 'TiB'], total: '1.82 TiB', used: .12 },
     { k: 'I:', free: ['88', 'GiB'], total: '119 GiB', used: .26 }, { k: 'J:', free: ['601', 'GiB'], total: '931 GiB', used: .35 }] };
-const MACHINES = { desktop, laptop, alert, crowded };
+const MACHINES = { yourpc, desktop, laptop, alert, crowded };
+
+// ---------- Scales ----------
+// CPU and GPU loads fit their history: 10, 25, 50 or 100%. Rates double from 64 KiB/s. Temperatures go by 25 °C.
+// Memory and Battery are levels, so they stay at 100%: a fitted scale would draw 42% as nearly full.
+const fitPct = (vs) => [10, 25, 50, 100].find(s => s >= Math.max(...vs)) ?? 100;
+const fitRate = (...all) => { const top = Math.max(...all.flat()); let s = 64; while (s < top) s *= 2; return s; };
+const rateLabel = (s) => s >= 1024 ? `${s / 1024} MiB/s` : `${s} KiB/s`;
+const fitTemp = (vs) => Math.max(25, Math.ceil(Math.max(...vs) / 25) * 25);
+const scales = (d) => ({
+  cpu: fitPct(d.cpu.hist), gpu: d.gpus[0] && fitPct(d.gpus[0].hist), mem: 100,
+  net: fitRate(d.net.down, d.net.up), temp: d.zones && fitTemp(d.zoneHist),
+});
+
+// ---------- Graphs ----------
+let gid = 0;
+function graph(values, max, { w, h, second = null, scale = null, caution = false, color = 'var(--accent)', color2 = 'var(--text2)', cls = 'graph', mid = false, base = false, fadeIn = false } = {}) {
+  const id = 'g' + (++gid), step = w / (values.length - 1);
+  const y = (v) => (h - 1) - Math.min(v / max, 1) * (h - 2);
+  const line = (vs) => vs.map((v, i) => `${i ? 'L' : 'M'}${(i * step).toFixed(1)},${y(v).toFixed(1)}`).join('');
+  const stroke = caution ? 'var(--caution)' : color;
+  // fadeIn: a graph that starts inside its card lets its oldest readings fade in over 40 px.
+  return `<svg class="${cls}" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+    <defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${stroke}" stop-opacity="${caution ? '.16' : '.30'}"/><stop offset="1" stop-color="${stroke}" stop-opacity=".02"/></linearGradient>
+    ${fadeIn ? `<linearGradient id="${id}m"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset="${(40 / w).toFixed(3)}" stop-color="#fff"/></linearGradient><mask id="${id}k"><rect width="${w}" height="${h}" fill="url(#${id}m)"/></mask>` : ''}</defs>
+    <g${fadeIn ? ` mask="url(#${id}k)"` : ''}>
+      ${mid ? `<path d="M0,${h / 2}H${w}" stroke="var(--hair)" stroke-dasharray="2 3"/>` : ''}
+      ${base ? `<path d="M0,${h - .5}H${w}" stroke="var(--hair)"/>` : ''}
+      <path d="${line(values)}L${w},${h}L0,${h}Z" fill="url(#${id})"/>
+      <path d="${line(values)}" fill="none" stroke="${stroke}" stroke-width="1.5" stroke-linejoin="round"/>
+      ${second ? `<path d="${line(second)}" fill="none" stroke="${color2}" stroke-width="1.25" stroke-dasharray="3 3"/>` : ''}
+    </g>
+    ${scale ? `<text class="scale" x="${w - 11}" y="10" text-anchor="end">${scale}</text>` : ''}
+  </svg>`;
+}
 
 // ---------- Overview widgets ----------
 const pct = (v) => `<span class="num">${v}</span><span class="u">%</span>`;
 const amount = ([n, u]) => `<span class="num">${n}</span><span class="u sp">${u}</span>`;
+const deg = (v) => `<span class="num">${v}</span><span class="u sp">°C</span>`;
 const meter = (f, caution) => `<div class="meter${caution ? ' caution' : ''}"><i style="width:${Math.round(f * 1000) / 10}%"></i></div>`;
-function widget({ go, glyph, name, fact = '', hero, ctx = '', m = null, caution = false, w, h, body }) {
+// A widget's graph starts under its context line: 10 padding, the 16 top line, 4, the 30 value and the 16 context line.
+const GRAPH_TOP = 76;
+function widget({ go, glyph, name, fact = '', hero, ctx = '', m = null, g = null, caution = false, w, h, body }) {
   return `<button class="w${caution ? ' caution' : ''}" data-go="${go}" style="width:${w}px;height:${h}px" aria-label="${esc(name)}">
     <div class="top">${icon(glyph)}<span class="name">${name}</span>${fact ? `<span class="fact">${esc(fact)}</span>` : ''}</div>
     ${body ?? `<div class="hero">${hero}</div>${ctx ? `<div class="ctx">${ctx}</div>` : ''}${m === null ? '' : meter(m, caution)}`}
+    ${g ? graph(g.values, g.max, { w: w - 2, h: h - GRAPH_TOP - 1, second: g.second, caution, cls: 'spark' }) : ''}
   </button>`;
 }
-function loadRow(d) {
-  const gpu = d.gpus[0];
-  const items = [
-    { go: 'cpu', glyph: 'cpu', name: 'CPU', hero: pct(d.cpu.load), ctx: d.cpu.clock, m: d.cpu.load / 100 },
-    gpu && { go: 'gpu', glyph: 'gpu', name: 'GPU', fact: gpu.temp ?? '', hero: pct(gpu.load), ctx: esc(gpu.short), m: gpu.load / 100 },
-    { go: 'memory', glyph: 'mem', name: 'Memory', hero: pct(d.mem.pct), ctx: `${d.mem.used} of ${d.mem.total} GiB`, m: d.mem.pct / 100, caution: d.alerts?.mem },
+function loadItems(d) {
+  const gpu = d.gpus[0], s = scales(d);
+  return [
+    { go: 'cpu', glyph: 'cpu', name: 'CPU', hero: pct(d.cpu.load), ctx: d.cpu.clock, g: { values: d.cpu.hist, max: s.cpu } },
+    gpu && { go: 'gpu', glyph: 'gpu', name: 'GPU', fact: gpu.temp ?? '', hero: pct(gpu.load), ctx: esc(gpu.short), g: { values: gpu.hist, max: s.gpu } },
+    { go: 'memory', glyph: 'mem', name: 'Memory', hero: pct(d.mem.pct), ctx: `${d.mem.used} of ${d.mem.total} GiB`, g: { values: d.mem.hist, max: s.mem }, caution: d.alerts?.mem },
   ].filter(Boolean);
-  const w = (496 - 8 * (items.length - 1)) / items.length;
-  return `<div class="row">${items.map(i => widget({ ...i, w, h: 96 })).join('')}</div>`;
 }
 function netWidget(d, w, h) {
-  const a = d.net.adapters.find(x => x.on);
+  const a = d.net.adapters.find(x => x.on), max = scales(d).net;
   if (w > 300) {
-    return widget({ go: 'network', glyph: 'net', name: 'Network', fact: a.name, w, h,
-      body: `<div class="twin"><div class="hero">${arrow('dn')}${amount(a.down)}</div><div class="hero">${arrow('up')}${amount(a.up)}</div></div>` });
+    // Alone in its row: the two rates on the left, their graph across the rest under the top line, its oldest readings fading in.
+    return `<button class="w" data-go="network" style="width:${w}px;height:${h}px" aria-label="Network">
+      <div class="top">${icon('net')}<span class="name">Network</span><span class="fact">${esc(a.name)}</span></div>
+      <div class="pairv"><div class="hero">${arrow('dn')}${amount(a.down)}</div><div class="hero">${arrow('up')}${amount(a.up)}</div></div>
+      ${graph(d.net.down, max, { w: w - 245, h: h - 31, second: d.net.up, cls: 'spark side', fadeIn: true })}
+    </button>`;
   }
   return widget({ go: 'network', glyph: 'net', name: 'Network', fact: a.name, w, h, hero: arrow('dn') + amount(a.down),
-    ctx: `${arrow('up')}<span class="num">${a.up.join(' ')}</span>` });
+    ctx: `${arrow('up')}<span class="num">${a.up.join(' ')}</span>`, g: { values: d.net.down, second: d.net.up, max } });
 }
-function drivesWidget(d, w, h) {
+// Drives keep their meters: free space changes by the hour, so a graph of 4 minutes would be a flat line.
+function pickDrives(d, cells) {
   const alerting = new Set(d.alerts?.drives ?? []);
-  let list = d.drives, more = 0;
-  if (list.length > 4) {
-    // The fullest (and any alerting) first, letter order among them; the rest fold into "+N".
-    const keep = [...list].sort((a, b) => (alerting.has(b.k) - alerting.has(a.k)) || b.used - a.used).slice(0, 3);
-    list = list.filter(x => keep.includes(x)); more = d.drives.length - 3;
-  }
-  const n = list.length + (more ? 1 : 0);
-  if (n === 1) {
-    const x = list[0], c = alerting.has(x.k);
-    return widget({ go: 'drives', glyph: 'drive', name: 'Drives', fact: x.k, w, h, caution: c,
-      body: `<div class="solo"><div class="hero">${amount(x.free)}<span class="u sp" style="font-weight:400;font-size:11px;color:var(--text3)">free</span></div><span class="of">of ${x.total}</span></div>${meter(x.used, c)}` });
-  }
-  const cols =list.map(x => `<div class="col${alerting.has(x.k) ? ' caution' : ''}">
-      <div class="top"><span class="name">${x.k}</span><span class="fact">${x.total}</span></div>
-      <div class="hero">${amount(x.free)}<span class="u sp" style="font-weight:400;font-size:11px;color:var(--text3)">free</span></div>
-      ${meter(x.used, alerting.has(x.k))}</div>`).join('')
-    + (more ? `<div class="col more"><div class="top"><span class="name">&nbsp;</span></div><div class="hero">+${more}</div><div class="ctx">more drives</div></div>` : '');
-  return widget({ go: 'drives', glyph: 'drive', name: 'Drives', fact: d.drives.length > 1 ? `${d.drives.length} drives` : '', w, h,
-    body: `<div class="cols" style="grid-template-columns:repeat(${n},1fr)">${cols}</div>` });
+  if (d.drives.length <= cells) return { shown: d.drives, more: 0, alerting };
+  // The fullest (and any alerting) first, shown in letter order; the rest fold into "+N more".
+  const keep = [...d.drives].sort((a, b) => (alerting.has(b.k) - alerting.has(a.k)) || b.used - a.used).slice(0, cells - 1);
+  return { shown: d.drives.filter(x => keep.includes(x)), more: d.drives.length - keep.length, alerting };
+}
+const DRIVE_ROW = 20;
+const drivesHeight = (rows) => 10 + 16 + 4 + rows * DRIVE_ROW + 10;
+function drivesWidget(d, w, rows) {
+  const solo = d.drives.length === 1;
+  const { shown, more, alerting } = pickDrives(d, rows * 2);
+  const cells = shown.map(x => `<div class="dr${alerting.has(x.k) ? ' caution' : ''}" title="${x.k} ${x.free.join(' ')} free of ${x.total}"><span class="k">${x.k}</span>${meter(x.used, alerting.has(x.k))}<span class="t"><b>${x.free.join(' ')}</b> free${solo ? ` of ${x.total}` : ''}</span></div>`).join('')
+    + (more ? `<div class="dr more">+${more} more</div>` : '');
+  return widget({ go: 'drives', glyph: 'drive', name: 'Drives', fact: solo ? '' : `${d.drives.length} drives`, w, h: drivesHeight(rows),
+    body: `<div class="drows${solo ? ' one' : ''}">${cells}</div>` });
 }
 function overview(d) {
-  const rest = [];
-  if (d.net) rest.push('net');
-  if (d.battery) rest.push('battery');
-  if (d.zones) rest.push('temp');
-  if (rest.length === 1) {
-    return `${loadRow(d)}${netWidget(d, 496, 82)}${drivesWidget(d, 496, 110)}`;
+  const loads = loadItems(d);
+  const others = [d.net && 'net', d.battery && 'battery', d.zones && 'temp'].filter(Boolean);
+  const wideNet = others.length === 1 && others[0] === 'net';
+  const rowCount = (loads.length ? 1 : 0) + (others.length ? 1 : 0) + (d.drives.length ? 1 : 0);
+  const free = 304 - 8 * (rowCount - 1) - (wideNet ? 72 : 0);
+  const graphRows = (loads.length ? 1 : 0) + (others.length && !wideNet ? 1 : 0);
+  // Drives take up to 3 rows, giving one up while a graph row would be under 104.
+  let rows = Math.min(3, Math.ceil(d.drives.length / 2));
+  while (rows > 1 && (free - drivesHeight(rows)) / graphRows < 104) rows--;
+  const gh = Math.floor((free - drivesHeight(rows)) / graphRows);
+  const lw = (496 - 8 * (loads.length - 1)) / loads.length;
+  const s = scales(d);
+  let html = `<div class="row">${loads.map(i => widget({ ...i, w: lw, h: gh })).join('')}</div>`;
+  if (wideNet) html += netWidget(d, 496, 72);
+  else if (others.length) {
+    const ow = (496 - 8 * (others.length - 1)) / others.length;
+    html += `<div class="row">${others.map(k => k === 'net' ? netWidget(d, ow, gh)
+      : k === 'battery' ? widget({ go: 'battery', glyph: 'battery', name: 'Battery', hero: pct(d.battery.pct), ctx: `${d.battery.state} · ${d.battery.left.replace(' left', '')}`, m: d.battery.pct / 100, w: ow, h: gh })
+      : widget({ go: 'temperature', glyph: 'temp', name: 'Temperature', hero: deg(Math.max(...d.zones)), ctx: `Hottest of ${d.zones.length} zones`, g: { values: d.zoneHist, max: s.temp }, w: ow, h: gh })).join('')}</div>`;
   }
-  const w = (496 - 8 * (rest.length - 1)) / rest.length;
-  const row = rest.map(k => k === 'net' ? netWidget(d, w, 96)
-    : k === 'battery' ? widget({ go: 'battery', glyph: 'battery', name: 'Battery', hero: pct(d.battery.pct), ctx: `${d.battery.state} · ${d.battery.left.replace(' left', '')}`, m: d.battery.pct / 100, w, h: 96 })
-    : widget({ go: 'temperature', glyph: 'temp', name: 'Temperature', hero: `<span class="num">${Math.max(...d.zones)}</span><span class="u sp">°C</span>`, ctx: `Hottest of ${d.zones.length} zones`, w, h: 96 })).join('');
-  return `${loadRow(d)}<div class="row">${row}</div>${drivesWidget(d, 496, 96)}`;
+  return html + drivesWidget(d, 496, rows);
 }
 
 // ---------- Detail pages ----------
-let gid = 0;
-function graph(values, max, { w = 472, h = 76, second = null, scale = '100%', caution = false } = {}) {
-  const id = 'g' + (++gid), step = w / (values.length - 1);
-  const y = (v) => (h - 1) - (v / max) * (h - 2);
-  const line = (vs) => vs.map((v, i) => `${i ? 'L' : 'M'}${(i * step).toFixed(1)},${y(v).toFixed(1)}`).join('');
-  const stroke = caution ? 'var(--caution)' : 'var(--accent)';
-  return `<svg class="graph" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
-    <defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${stroke}" stop-opacity="${caution ? '.16' : '.30'}"/><stop offset="1" stop-color="${stroke}" stop-opacity=".02"/></linearGradient></defs>
-    <path d="M0,${h / 2}H${w}" stroke="var(--hair)" stroke-dasharray="2 3"/>
-    <path d="M0,${h - .5}H${w}" stroke="var(--hair)"/>
-    <path d="${line(values)}L${w},${h}L0,${h}Z" fill="url(#${id})"/>
-    <path d="${line(values)}" fill="none" stroke="${stroke}" stroke-width="1.5" stroke-linejoin="round"/>
-    ${second ? `<path d="${line(second)}" fill="none" stroke="var(--text2)" stroke-width="1.25" stroke-dasharray="3 3"/>` : ''}
-    <text class="scale" x="${w}" y="9" text-anchor="end">${scale}</text>
-  </svg>`;
+// The top card: the value with the second reading over the graph's scale at the right (where the line
+// can't run over it), then the graph out to the card's sides (and bottom when nothing sits under it).
+function gcard({ h, hero, side = '', heroCaution = false, values, max, scale, second = null, caution = false, foot = '' }) {
+  const gh = h - 46 - (foot ? 36 : 1);
+  return `<div class="card gcard" style="height:${h}px;flex:none">
+    <div class="hrow${heroCaution ? ' caution' : ''}"><div class="hero">${hero}</div><span class="side">${side ? `<span>${side}</span>` : ''}<span class="sc">${scale}</span></span></div>
+    ${graph(values, max, { w: 494, h: gh, second, caution, mid: true, base: !!foot })}
+    ${foot ? `<div class="gfoot">${foot}</div>` : ''}</div>`;
 }
-const appRows = (apps) => apps.map(([n, v, c]) => `<div class="r"><span class="tile" style="background:${c}">${n.split(' ').map(s => s[0]).join('').slice(0, 2)}</span><span class="nm">${esc(n)}</span><span class="v">${v}</span></div>`).join('');
+const appRows = (apps) => apps.map(([n, v, c]) => `<div class="r"><span class="tile" style="background:${c}">${n.replace(/[^\p{L}\p{Nd} ]/gu, '').split(' ').map(s => s[0]).join('').slice(0, 2)}</span><span class="nm">${esc(n)}</span><span class="v">${v}</span></div>`).join('');
 const factRows = (facts) => facts.map(([k, v]) => `<div class="r"><span class="k">${k}</span><span class="v">${v}</span></div>`).join('');
-const pair = (apps, facts) => `<div class="row" style="height:130px">
+// Top apps beside the facts, their rows level across the two cards. 10 + 16 label + 2 + 3 rows of 28 + 10.
+const PAIR = 122;
+const pair = (apps, facts) => `<div class="row" style="height:${PAIR}px;flex:none">
   <div class="card" style="width:244px"><div class="lbl"><span>Top apps</span></div><div class="rows">${appRows(apps)}</div></div>
-  <div class="card" style="width:244px"><div class="rows" style="margin-top:0">${factRows(facts)}</div></div></div>`;
+  <div class="card" style="width:244px"><div class="lbl"></div><div class="rows">${factRows(facts)}</div></div></div>`;
+const TOP = 304 - 8 - PAIR;
 
 const DETAIL = {
-  cpu: (d) => ({ title: 'CPU', html: `<div class="card" style="height:166px">
-      <div class="hrow"><div class="hero">${pct(d.cpu.load)}</div><span class="side">${d.cpu.clock}</span></div>
-      ${graph(d.cpu.hist, 100)}
-      <div class="strip" title="${d.cpu.logical} logical processors">${d.cpu.cores.map(v => `<i><b style="height:${v}%"></b></i>`).join('')}</div></div>
-      ${pair(d.cpu.apps, [['Processor', `<span style="font-weight:400" title="${d.cpu.name}">${d.cpu.name.replace(/ \d+-Core Processor/, '')}</span>`], ['Logical processors', d.cpu.logical], ['Up time', d.cpu.up]])}` }),
-  gpu: (d) => { const g = d.gpus[0]; return { title: 'GPU', pick: d.gpus.length > 1 ? g.short : null, html: `<div class="card" style="height:166px">
-      <div class="hrow"><div class="hero">${pct(g.load)}</div><span class="side">${g.temp ?? ''}</span></div>
-      ${graph(g.hist, 100)}
-      ${g.used != null ? `<div class="mline"><div class="l"><span>Dedicated memory</span><span>${g.used} of ${g.total.toFixed(1)} GiB</span></div>${meter(g.used / g.total)}</div>` : `<div class="mline"><div class="l"><span>Shared memory</span><span>${g.shared}</span></div>${meter(.15)}</div>`}</div>
-      ${pair(g.apps, [['Fan', g.fan ?? '—'], ['Shared memory', g.shared]].filter(x => x[1] !== '—'))}` }; },
-  memory: (d) => ({ title: 'Memory', html: `<div class="card" style="height:166px">
-      <div class="hrow${d.alerts?.mem ? ' caution' : ''}"><div class="hero">${pct(d.mem.pct)}</div><span class="side">${d.mem.used} of ${d.mem.total} GiB</span></div>
-      ${graph(d.mem.hist, 100, { caution: d.alerts?.mem })}
-      <div class="mline"><div class="l"><span>Committed</span><span>${d.mem.commit.toFixed(1)} of ${d.mem.limit.toFixed(1)} GiB</span></div>${meter(d.mem.commit / d.mem.limit)}</div></div>
-      ${pair(d.mem.apps, [['Available', d.mem.avail], ['Installed', `${d.mem.total} GiB`]])}` }),
-  network: (d) => { const a = d.net.adapters.find(x => x.on); return { title: 'Network', html: `<div class="card" style="height:166px">
-      <div class="hrow"><div class="hero">${arrow('dn')}${amount(a.down)}</div><div class="hero" style="margin-left:24px">${arrow('up')}${amount(a.up)}</div></div>
-      ${graph(d.net.down, parseFloat(d.net.scale), { second: d.net.up, scale: d.net.scale })}
-      <div class="legend"><span><i class="sw"></i>Receive</span><span><i class="sw dash"></i>Send</span><span class="r">${esc(a.name)}</span></div></div>
-      <div class="card" style="height:130px"><div class="lbl"><span>Adapters</span></div><div class="rows">
+  cpu: (d) => { const s = scales(d).cpu; return { title: 'CPU', html: gcard({ h: TOP, hero: pct(d.cpu.load), side: d.cpu.clock, values: d.cpu.hist, max: s, scale: `${s}%`,
+      foot: `<div class="strip" title="${d.cpu.logical} logical processors">${d.cpu.cores.map(v => `<i><b style="height:${Math.min(100, v / s * 100)}%"></b></i>`).join('')}</div>` })
+      + pair(d.cpu.apps, [['Processor', `<span style="font-weight:400" title="${d.cpu.name}">${d.cpu.name.replace(/ \d+-Core Processor/, '')}</span>`], ['Logical processors', d.cpu.logical], ['Up time', d.cpu.up]]) }; },
+  gpu: (d) => { const g = d.gpus[0], s = scales(d).gpu; return { title: 'GPU', pick: d.gpus.length > 1 ? g.short : null, html: gcard({ h: TOP, hero: pct(g.load), side: g.temp ?? '', values: g.hist, max: s, scale: `${s}%`,
+      foot: g.used != null ? `<div class="mline"><div class="l"><span>Dedicated memory</span><span>${g.used} of ${g.total.toFixed(1)} GiB</span></div>${meter(g.used / g.total)}</div>` : `<div class="mline"><div class="l"><span>Shared memory</span><span>${g.shared}</span></div>${meter(.15)}</div>` })
+      + pair(g.apps, [['Fan', g.fan ?? '—'], ['Shared memory', g.shared]].filter(x => x[1] !== '—')) }; },
+  memory: (d) => { const s = scales(d).mem; return { title: 'Memory', html: gcard({ h: TOP, hero: pct(d.mem.pct), heroCaution: d.alerts?.mem, side: `${d.mem.used} of ${d.mem.total} GiB`, values: d.mem.hist, max: s, scale: `${s}%`, caution: d.alerts?.mem,
+      foot: `<div class="mline"><div class="l"><span>Committed</span><span>${d.mem.commit.toFixed(1)} of ${d.mem.limit.toFixed(1)} GiB</span></div>${meter(d.mem.commit / d.mem.limit)}</div>` })
+      + pair(d.mem.apps, [['Available', d.mem.avail], ['Installed', `${d.mem.total} GiB`]]) }; },
+  network: (d) => {
+    const a = d.net.adapters.find(x => x.on), s = scales(d).net, many = d.net.adapters.length > 1;
+    // One adapter: the legend names it and the graph takes the page. More: a row each, 30 tall.
+    const list = many ? 10 + 16 + 2 + d.net.adapters.length * 30 + 10 : 0;
+    return { title: 'Network', html: gcard({ h: 304 - (many ? list + 8 : 0), hero: `${arrow('dn')}${amount(a.down)}</div><div class="hero" style="margin-left:24px">${arrow('up')}${amount(a.up)}`,
+      values: d.net.down, second: d.net.up, max: s, scale: rateLabel(s),
+      foot: `<div class="legend"><span><i class="sw"></i>Receive</span><span><i class="sw dash"></i>Send</span><span class="r">${esc(a.name)}</span></div>` })
+      + (many ? `<div class="card" style="height:${list}px;flex:none"><div class="lbl"><span>Adapters</span></div><div class="rows">
       ${d.net.adapters.map(x => `<button class="adapter${x.on ? ' on' : ''}"><span class="nm">${esc(x.name)}</span>${x.on ? `<span class="rate">${icon('dn')}${x.down.join(' ')}</span><span class="rate">${icon('up')}${x.up.join(' ')}</span>` : `<span class="off">Not connected</span>`}</button>`).join('')}
-      </div></div>` }; },
-  drives: (d) => { const al = new Set(d.alerts?.drives ?? []); const shown = d.drives.slice(0, 5); return { title: 'Drives', html: `<div class="card" style="flex:1">
-      <div class="lbl"><span>Space</span></div>
-      ${shown.map(x => `<div class="vol${al.has(x.k) ? ' caution' : ''}"><span class="k">${x.k}</span>${meter(x.used, al.has(x.k)).replace('margin-top:auto', '')}<span class="t"><b>${x.free.join(' ')}</b> free of ${x.total}</span></div>`).join('')}
-      ${d.drives.length > 5 ? `<div class="lbl" style="margin-top:2px"><span>+${d.drives.length - 5} more in Settings</span></div>` : ''}</div>
-      <div class="card" style="height:${Math.min(d.disks.length, 4) * 28 + 38}px"><div class="lbl"><span>Activity</span><span>Read · Write</span></div><div class="rows">
-      ${d.disks.slice(0, 4).map(([n, l, act, r, w]) => `<div class="r"><span class="nm">${n} <span style="color:var(--text3)">· ${l}</span></span><span class="v reg" style="margin-left:auto;width:70px;text-align:right">${act} active</span><span class="v reg num" style="margin-left:0;width:150px;text-align:right">${r} · ${w}</span></div>`).join('')}
-      </div></div>` }; },
-  battery: (d) => ({ title: 'Battery', html: `<div class="card" style="height:192px">
-      <div class="hrow"><div class="hero">${pct(d.battery.pct)}</div><span class="side">${d.battery.left}</span></div>
-      ${graph(d.battery.hist, 100, { h: 128 })}</div>
-      <div class="card" style="flex:1"><div class="rows" style="margin-top:0">${factRows([['State', d.battery.state], ['Rate', d.battery.rate], ['Time left', d.battery.left.replace(' left', '')]])}</div></div>` }),
-  temperature: (d) => ({ title: 'Temperature', html: `<div class="card" style="height:192px">
-      <div class="hrow"><div class="hero"><span class="num">${Math.max(...d.zones)}</span><span class="u sp">°C</span></div><span class="side">Hottest of ${d.zones.length} zones</span></div>
-      ${graph(d.zoneHist, 100, { h: 128, scale: '100 °C' })}</div>
-      <div class="card" style="flex:1"><div class="lbl"><span>Thermal zones</span></div><div class="zones">${d.zones.map((z, i) => `<div class="zone"><div class="k">Zone ${i + 1}</div><div class="v">${z} °C</div></div>`).join('')}</div></div>` }),
+      </div></div>` : '') };
+  },
+  drives: (d) => {
+    // Activity for up to 4 disks; Space above it, two drives a row, as many rows of 36 as fit, the same drives the overview keeps.
+    // Both cards take the height their rows need, from the top: the list grows with the drives.
+    const disks = d.disks.slice(0, 4), activity = 10 + 16 + 2 + disks.length * 28 + 10;
+    const solo = d.drives.length === 1, perRow = solo ? 1 : 2;
+    const rows = Math.floor((304 - 8 - activity - 10 - 16 - 2 - 10) / 36);
+    const { shown, alerting } = pickDrives(d, rows * perRow);
+    const more = d.drives.length - shown.length;
+    const space = 10 + 16 + 2 + Math.ceil(shown.length / perRow) * 36 + 10;
+    return { title: 'Drives', html: `<div class="card" style="height:${space}px;flex:none">
+      <div class="lbl"><span>Space</span>${more ? `<span>+${more} more in Settings</span>` : ''}</div>
+      <div class="vols${solo ? ' one' : ''}">${shown.map(x => `<div class="vol${alerting.has(x.k) ? ' caution' : ''}"><div class="l"><span class="k">${x.k}</span><span class="t"><b>${x.free.join(' ')}</b> free of ${x.total}</span></div>${meter(x.used, alerting.has(x.k))}</div>`).join('')}</div></div>
+      <div class="card" style="height:${activity}px;flex:none"><div class="lbl"><span>Activity</span><span>Read · Write</span></div><div class="rows">
+      ${disks.map(([n, l, act, r, w]) => `<div class="r"><span class="nm">${n} <span style="color:var(--text3)">· ${l}</span></span><span class="v reg" style="margin-left:auto;width:70px;text-align:right">${act} active</span><span class="v reg num" style="margin-left:0;width:150px;text-align:right">${r} · ${w}</span></div>`).join('')}
+      </div></div>` };
+  },
+  battery: (d) => {
+    // Time left is the top card's reading, so the facts don't repeat it. 10 + 2 rows of 28 + 10.
+    const facts = 10 + 2 * 28 + 10;
+    return { title: 'Battery', html: gcard({ h: 304 - 8 - facts, hero: pct(d.battery.pct), side: d.battery.left, values: d.battery.hist, max: 100, scale: '100%' })
+      + `<div class="card" style="height:${facts}px;flex:none"><div class="rows" style="margin-top:0">${factRows([['State', d.battery.state], ['Rate', d.battery.rate]])}</div></div>` };
+  },
+  temperature: (d) => {
+    // Zone tiles share the width, 4 to a row, up to 8.
+    const n = Math.min(d.zones.length, 8), across = Math.min(n, 4), tileRows = Math.ceil(n / 4);
+    const card = 10 + 16 + 2 + tileRows * 44 + (tileRows - 1) * 8 + 10, s = scales(d).temp;
+    return { title: 'Temperature', html: gcard({ h: 304 - 8 - card, hero: deg(Math.max(...d.zones)), side: `Hottest of ${d.zones.length} zones`, values: d.zoneHist, max: s, scale: `${s} °C` })
+      + `<div class="card" style="height:${card}px;flex:none"><div class="lbl"><span>Thermal zones</span></div><div class="zones" style="grid-template-columns:repeat(${across},1fr)">${d.zones.slice(0, 8).map((z, i) => `<div class="zone"><div class="k">Zone ${i + 1}</div><div class="v">${z} °C</div></div>`).join('')}</div></div>` };
+  },
 };
 
 function island(d, screen, opts = {}) {
@@ -405,25 +494,37 @@ function island(d, screen, opts = {}) {
 }
 
 // ---------- Settings › System ----------
+// The island's widgets in the island's rows: loads, then Network, Battery and Temperature; graphs in the Windows accent.
+const S_GRAPH_TOP = 12 + 16 + 4 + 34 + 16, S_H = 126;
+function sWidget(x, w, h = S_H) {
+  const g = x.g ? graph(x.g.values, x.g.max, { w: w - 2, h: h - S_GRAPH_TOP - 1, second: x.g.second, color: 'var(--s-accent)', color2: 'var(--s-text2)', cls: 'spark' }) : '';
+  return `<div class="s-w" style="width:${w}px;height:${h}px"><div class="top">${icon(x.glyph)}<span class="name">${x.name}</span>${x.fact ? `<span class="fact">${esc(x.fact)}</span>` : ''}</div>
+    <div class="hero">${x.hero}</div><div class="ctx">${x.ctx}</div>${x.m != null ? meter(x.m) : ''}${g}</div>`;
+}
 function settings(d, theme) {
-  const gpu = d.gpus[0], a = d.net.adapters.find(x => x.on);
+  const gpu = d.gpus[0], a = d.net.adapters.find(x => x.on), s = scales(d);
   const sw = (on, dis) => `<span class="sw ${on ? 'on' : 'off'}${dis ? ' dis' : ''}"></span>`;
   const combo = (v) => `<div class="combo"><span>${esc(v)}</span>${icon('down')}</div>`;
-  const sw4 = [
-    { glyph: 'cpu', name: 'CPU', hero: pct(d.cpu.load), ctx: d.cpu.clock, m: d.cpu.load / 100 },
-    gpu && { glyph: 'gpu', name: 'GPU', fact: gpu.temp, hero: pct(gpu.load), ctx: esc(gpu.short), m: gpu.load / 100 },
-    { glyph: 'mem', name: 'Memory', hero: pct(d.mem.pct), ctx: `${d.mem.used} of ${d.mem.total} GiB`, m: d.mem.pct / 100 },
-    { glyph: 'net', name: 'Network', fact: a.name, hero: arrow('dn') + amount(a.down), ctx: `${arrow('up')}${a.up.join(' ')}` },
+  const W = 760;
+  const loads = loadItems(d);
+  const lw = (W - 8 * (loads.length - 1)) / loads.length;
+  const net = { glyph: 'net', name: 'Network', fact: a.name, hero: arrow('dn') + amount(a.down), ctx: `${arrow('up')}${a.up.join(' ')}`, g: { values: d.net.down, second: d.net.up, max: s.net } };
+  const others = [net,
     d.battery && { glyph: 'battery', name: 'Battery', hero: pct(d.battery.pct), ctx: d.battery.left, m: d.battery.pct / 100 },
-    d.zones && { glyph: 'temp', name: 'Temperature', hero: `<span class="num">${Math.max(...d.zones)}</span><span class="u sp">°C</span>`, ctx: `Hottest of ${d.zones.length} zones` },
-  ].filter(Boolean);
+    d.zones && { glyph: 'temp', name: 'Temperature', hero: deg(Math.max(...d.zones)), ctx: `Hottest of ${d.zones.length} zones`, g: { values: d.zoneHist, max: s.temp } }].filter(Boolean);
+  const ow = (W - 8 * (others.length - 1)) / others.length;
+  const othersRow = others.length === 1
+    ? `<div class="s-w" style="width:${W}px;height:92px"><div class="top">${icon('net')}<span class="name">Network</span><span class="fact">${esc(a.name)}</span></div>
+        <div class="pairv"><div class="hero">${arrow('dn')}${amount(a.down)}</div><div class="hero">${arrow('up')}${amount(a.up)}</div></div>
+        ${graph(d.net.down, s.net, { w: W - 345, h: 92 - 35, second: d.net.up, color: 'var(--s-accent)', color2: 'var(--s-text2)', cls: 'spark side', fadeIn: true })}</div>`
+    : `<div class="row">${others.map(x => sWidget(x, ow)).join('')}</div>`;
   const readings = ['CPU', gpu && 'GPU', 'Memory', 'Network', 'Drives', d.battery && 'Battery', d.zones && 'Temperature'].filter(Boolean);
   return `<div class="settings ${theme}">
     <h1 class="s-title">System</h1>
-    <div class="s-grid">${sw4.map(w => `<div class="s-w"><div class="top">${icon(w.glyph)}<span class="name">${w.name}</span>${w.fact ? `<span class="fact">${esc(w.fact)}</span>` : ''}</div>
-      <div class="hero">${w.hero}</div><div class="ctx">${w.ctx}</div>${w.m != null ? meter(w.m) : ''}</div>`).join('')}</div>
+    <div class="s-grid"><div class="row">${loads.map(x => sWidget(x, lw)).join('')}</div>${othersRow}</div>
     <div class="s-sec">Drives</div>
-    <div class="s-card">${d.drives.map(x => `<div class="s-drive"><div class="l"><span>${x.k}</span><span>${x.free.join(' ')} free of ${x.total}</span></div>${meter(x.used)}</div>`).join('')}</div>
+    <div class="s-card s-drives${d.drives.length === 1 ? ' one' : ''}">${d.drives.map(x => `<div class="s-drive"><div class="l"><span>${x.k}</span><span>${x.free.join(' ')} free of ${x.total}</span></div>${meter(x.used)}</div>`).join('')}</div>
+    ${d.zones ? `<div class="s-sec">Thermal zones</div><div class="s-card">${d.zones.map((z, i) => `<div class="s-row"><span class="lab">Zone ${i + 1}</span><span>${z} °C</span></div>`).join('')}</div>` : ''}
     <div class="s-sec">General</div>
     <div class="s-card">
       <div class="s-row"><span class="lab">Update speed</span>${combo('2 seconds')}</div>
@@ -440,7 +541,8 @@ function settings(d, theme) {
       <div class="s-row"><span class="lab">CPU load</span><span>90%</span><span class="tog">Off ${sw(false)}</span>${icon('down', 'i chev')}</div>
       <div class="s-row"><span class="lab">Memory in use</span><span>90%</span><span class="tog">Off ${sw(false)}</span>${icon('down', 'i chev')}</div>
       <div class="s-row"><span class="lab">Low disk space</span><span>10% free</span><span class="tog">Off ${sw(false)}</span>${icon('down', 'i chev')}</div>
-      ${gpu ? `<div class="s-row"><span class="lab">GPU temperature</span><span class="cap">Set a limit</span><span class="tog" style="opacity:.55">Off ${sw(false)}</span>${icon('down', 'i chev')}</div>` : ''}
+      ${d.battery ? `<div class="s-row"><span class="lab">Low battery</span><span>15%</span><span class="tog">Off ${sw(false)}</span>${icon('down', 'i chev')}</div>` : ''}
+      ${gpu?.temp ? `<div class="s-row"><span class="lab">GPU temperature</span><span class="cap">Set a limit</span><span class="tog" style="opacity:.55">Off ${sw(false)}</span>${icon('down', 'i chev')}</div>` : ''}
       <div class="s-row"><span class="lab">Repeat interval</span>${combo('15 minutes')}</div>
     </div>
   </div>`;
@@ -454,19 +556,25 @@ const SCREENS = ['overview', 'cpu', 'gpu', 'memory', 'network', 'drives'];
 function sheet(theme, items) {
   return `<div class="boardsheet ${theme === 'light' ? 'light-sheet' : ''}" style="grid-template-columns:repeat(3,568px)">${items.map(([cap, d, s]) => `<figure><figcaption>${cap}</figcaption>${island(d, s, { theme })}</figure>`).join('')}</div>`;
 }
+const BOARDS = {
+  overviews: [['Your PC · idle, Ethernet, 6 drives', yourpc, 'overview'], ['Busy desktop · 2 GPUs, 4 drives', desktop, 'overview'], ['Laptop · battery, 3 thermal zones', laptop, 'overview'],
+    ['Alerts · Memory in use and Low disk on', alert, 'overview'], ['No GPU · 8 drives', crowded, 'overview'], ['Busy desktop · Network with 2 adapters', desktop, 'network']],
+  details: [['CPU', yourpc, 'cpu'], ['GPU · picker for 2 GPUs', yourpc, 'gpu'], ['Memory', yourpc, 'memory'], ['Network · one adapter', yourpc, 'network'], ['Drives', yourpc, 'drives'], ['Busy desktop · CPU', desktop, 'cpu']],
+  more: [['Laptop · Battery', laptop, 'battery'], ['Laptop · Temperature', laptop, 'temperature'], ['Laptop · Drives', laptop, 'drives'],
+    ['Busy desktop · GPU', desktop, 'gpu'], ['No GPU · Drives', crowded, 'drives'], ['Alerts · Memory', alert, 'memory']],
+};
 if (board) {
   const theme = q.get('theme') || 'dark';
   let html;
-  if (board === 'overviews') html = sheet(theme, [['Desktop · 2 GPUs, Ethernet, 4 drives', desktop, 'overview'], ['Laptop · battery, 3 thermal zones', laptop, 'overview'], ['Alerts · Memory in use and Low disk on', alert, 'overview'], ['No GPU · 8 drives', crowded, 'overview'], ['Laptop · Battery', laptop, 'battery'], ['Laptop · Temperature', laptop, 'temperature']]);
-  else if (board === 'details') html = sheet(theme, [['CPU', desktop, 'cpu'], ['GPU · picker for 2 GPUs', desktop, 'gpu'], ['Memory', desktop, 'memory'], ['Network', desktop, 'network'], ['Drives', desktop, 'drives'], ['Memory · alert', alert, 'memory']]);
-  else if (board === 'settings') html = settings(MACHINES[q.get('machine') || 'desktop'], theme);
-  else html = island(MACHINES[q.get('machine') || 'desktop'], board, { theme });
+  if (BOARDS[board]) html = sheet(theme, BOARDS[board]);
+  else if (board === 'settings') html = settings(MACHINES[q.get('machine') || 'yourpc'], theme);
+  else html = island(MACHINES[q.get('machine') || 'yourpc'], board, { theme });
   document.body.innerHTML = html;
   document.body.style.overflow = 'hidden'; // the panels' shadows would otherwise add scrollbars to the shot
   finish(document.body.firstElementChild);
 } else {
   document.body.className = 'review';
-  const state = { theme: 'dark', machine: 'desktop', screen: 'overview' };
+  const state = { theme: 'dark', machine: 'yourpc', screen: 'overview' };
   const root = document.createElement('div');
   document.body.appendChild(root);
   const seg = (name, opts) => `<span><b>${name}</b><span class="seg">${opts.map(([k, l]) => `<button data-set="${name}" data-val="${k}" class="${state[name] === k ? 'on' : ''}">${l}</button>`).join('')}</span></span>`;

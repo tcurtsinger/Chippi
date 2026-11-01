@@ -23,9 +23,9 @@ namespace Chippi.Island.Tests;
 public sealed class SystemMonitorSmokeTests(ITestOutputHelper output)
 {
     [Theory]
-    [InlineData(Corner.BottomRight, false, 5)]
-    [InlineData(Corner.TopLeft, false, 5)]
-    [InlineData(Corner.TopRight, false, 5)]
+    [InlineData(Corner.BottomRight, false, 8)]
+    [InlineData(Corner.TopLeft, false, 8)]
+    [InlineData(Corner.TopRight, false, 8)]
     [InlineData(Corner.BottomRight, true, 2)]
     [InlineData(Corner.TopLeft, true, 2)]
     [InlineData(Corner.TopRight, true, 2)]
@@ -77,7 +77,7 @@ public sealed class SystemMonitorSmokeTests(ITestOutputHelper output)
 
             // The disk list takes two samples a prime delay apart on the sampler's thread: wait for its rows, not a fixed time.
             Until(() => Find<TextBlock>(page).Any(b => b.Text.Contains("C:")));
-            if (disks == 5 && !laptop) Assert.Contains(Find<TextBlock>(page), b => string.Concat(b.Inlines.OfType<System.Windows.Documents.Run>().Select(r => r.Text)) == "+2"); // 5 drives: the 3 fullest and "+2"
+            if (disks == 8 && !laptop) Assert.Contains(Find<TextBlock>(page), b => b.Text == "+3 more"); // 8 drives: the 5 fullest and "+3 more"
 
             // Use the actual Settings factory and controls, then return to the grid.
             config = Assert.IsAssignableFrom<FrameworkElement>(ui.SettingsFactory!(null));
@@ -94,7 +94,9 @@ public sealed class SystemMonitorSmokeTests(ITestOutputHelper output)
             panel.ShowPage(null);
             Until(() => tile.Status == "Memory 25%");
             panel.CloseIsland(immediate: true);
-            Until(() => module.Sampler!.Need == SensorNeed.None);
+            // Closed, only the history reads on: none of what the page adds.
+            Until(() => (module.Sampler!.Need & (SensorNeed.Disks | SensorNeed.GpuSensors | SensorNeed.PerProcessor | SensorNeed.Processes)) == SensorNeed.None);
+            Assert.True(module.Sampler!.Need.HasFlag(SensorNeed.Cpu | SensorNeed.Memory));
             Assert.False(tile.OnScreen);
             Open();
             Assert.Equal("system-monitor", panel.CurrentPage);

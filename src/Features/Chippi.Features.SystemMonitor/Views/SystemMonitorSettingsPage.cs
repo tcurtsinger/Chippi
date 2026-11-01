@@ -126,7 +126,8 @@ public sealed class SystemMonitorSettingsPage : UserControl
             _zoneValues[i].Text = Format.Temperature(zones[i].TemperatureC, _module.Settings.Temperature);
     }
 
-    // One storage bar per drive, updated in place while the drives stay the same.
+    // One storage bar per drive, two drives to a row (one across the card when there's one), updated in
+    // place while the drives stay the same.
     private void Drives(SystemSnapshot snapshot)
     {
         if (snapshot.Disks.Status == ReadingStatus.Unavailable)
@@ -143,8 +144,23 @@ public sealed class SystemMonitorSettingsPage : UserControl
         {
             _driveRows.Clear();
             _drives.Children.Clear();
-            foreach (var volume in volumes)
-                _drives.Children.Add(_driveRows[volume.Id] = new DriveRow());
+            int across = volumes.Count == 1 ? 1 : 2;
+            for (int i = 0; i < volumes.Count; i += across)
+            {
+                var pair = new Grid();
+                for (int c = 0; c < across; c++)
+                {
+                    pair.ColumnDefinitions.Add(new ColumnDefinition());
+                    if (i + c >= volumes.Count)
+                        continue;
+                    // The right one has the card's divider on its left.
+                    var row = _driveRows[volumes[i + c].Id] = new DriveRow { BorderThickness = new Thickness(c > 0 ? 1 : 0, 0, 0, 0) };
+                    row.SetResourceReference(Border.BorderBrushProperty, "BorderBrush");
+                    Grid.SetColumn(row, c);
+                    pair.Children.Add(row);
+                }
+                _drives.Children.Add(pair);
+            }
         }
         foreach (var volume in volumes)
             _driveRows[volume.Id].Set(volume, _module.Alerting("low-disk", volume.Id));
@@ -392,7 +408,7 @@ public sealed class SystemMonitorSettingsPage : UserControl
         Reading.Cpu => "CPU", Reading.Gpu => "GPU", Reading.Disks => "Drives", Reading.ThermalZone => "Temperature", _ => reading.ToString(),
     };
 
-    /// <summary>One drive in Settings: its letter, "412 GiB free of 931 GiB", and a storage bar of what's used.</summary>
+    /// <summary>One drive in Settings: its letter, "412 GiB free of 931 GiB", and a storage bar of what's used, two to a row.</summary>
     private sealed class DriveRow : Border
     {
         private readonly TextBlock _letter = Parts.Text("", 14, Look.Settings.Text), _space = Parts.Text("", 12, Look.Settings.Secondary);

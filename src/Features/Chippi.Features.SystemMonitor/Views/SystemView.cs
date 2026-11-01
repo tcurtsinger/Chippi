@@ -16,8 +16,9 @@ namespace Chippi.Features.SystemMonitor.Views;
 
 /// <summary>
 /// The island's System page: the overview of widgets, and the detail page a widget opens. Back and Esc
-/// on a detail page return to the overview, and the island always reopens on it. The page reads only
-/// while it's on screen; a detail page adds what it needs (each processor, the processes).
+/// on a detail page return to the overview, and the island always reopens on it. On top of what the
+/// module reads all the time, the page reads the drives and the GPU's sensors while it's on screen, and
+/// a detail page adds what it needs (each processor, the processes).
 /// </summary>
 internal sealed class SystemView : UserControl
 {
@@ -65,14 +66,22 @@ internal sealed class SystemView : UserControl
     internal Button GpuPicker => _picker;
 
     /// <summary>
-    /// What a page opens with: the last page's GPU, network and disks with the tile's current CPU and
-    /// memory, so it opens whole and its first update changes values in place, not the layout.
+    /// What a page opens with: the latest of every reading the module keeps, and the last page's drives
+    /// (and anything else the latest didn't read), so it opens whole and its first update changes values
+    /// in place, not the layout.
     /// </summary>
-    internal static SystemSnapshot Opening(SystemSnapshot latest, SystemSnapshot? page) => page is null ? latest : page with
+    internal static SystemSnapshot Opening(SystemSnapshot latest, SystemSnapshot? page) => page is null ? latest : latest with
     {
-        Cpu = latest.Cpu.Status == ReadingStatus.NotRead ? page.Cpu : latest.Cpu,
-        Memory = latest.Memory.Status == ReadingStatus.NotRead ? page.Memory : latest.Memory,
+        Cpu = Newer(latest.Cpu, page.Cpu),
+        Memory = Newer(latest.Memory, page.Memory),
+        Gpus = Newer(latest.Gpus, page.Gpus),
+        Network = Newer(latest.Network, page.Network),
+        Disks = Newer(latest.Disks, page.Disks),
+        Battery = Newer(latest.Battery, page.Battery),
+        ThermalZones = Newer(latest.ThermalZones, page.ThermalZones),
     };
+
+    private static Sample<T> Newer<T>(Sample<T> latest, Sample<T> page) where T : class => latest.Status == ReadingStatus.NotRead ? page : latest;
 
     /// <summary>What the overview reads: every reading that's on.</summary>
     internal static SensorNeed Need(SystemMonitorSettings s)

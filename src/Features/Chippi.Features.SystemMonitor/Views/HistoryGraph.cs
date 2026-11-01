@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
-using System.Globalization;
 using System.Windows;
 using System.Windows.Media;
 using Chippi.Features.SystemMonitor.Sensors;
@@ -10,51 +9,75 @@ namespace Chippi.Features.SystemMonitor.Views;
 
 /// <summary>
 /// The last 120 readings as an accent line over an accent fade, filling from the right as readings
-/// arrive; a missing reading is a gap. A second series draws as a dashed line (network send). The
-/// scale's top is written at the top right, and a dashed line marks its middle.
+/// arrive; a missing reading is a gap. A second series draws as a dashed line (network send). On a
+/// detail page a dashed line marks the scale's middle (the page writes the scale's top beside its
+/// value, where the line can't run over it); a widget's graph has none, and reaches its card's edges.
 /// </summary>
 internal sealed class HistoryGraph : FrameworkElement
 {
     private IReadOnlyList<double?> _points = [], _second = [];
     private double _max = 100;
-    private string _scale = "";
     private bool _caution;
 
     public static readonly DependencyProperty LineProperty = Brush(nameof(Line));
     public static readonly DependencyProperty CautionLineProperty = Brush(nameof(CautionLine));
     public static readonly DependencyProperty SecondProperty = Brush(nameof(Second));
     public static readonly DependencyProperty HairProperty = Brush(nameof(Hair));
-    public static readonly DependencyProperty LabelProperty = Brush(nameof(Label));
 
-    public HistoryGraph()
+    public HistoryGraph() : this(Look.Island) { }
+
+    public HistoryGraph(Look look)
     {
-        SetResourceReference(LineProperty, "IslandAccentBrush");
-        SetResourceReference(CautionLineProperty, "WarningTextBrush");
-        SetResourceReference(SecondProperty, "IslandTextSecondaryBrush");
-        SetResourceReference(HairProperty, "IslandHairBrush");
-        SetResourceReference(LabelProperty, "IslandTextTertiaryBrush");
+        SetResourceReference(LineProperty, look.Accent);
+        SetResourceReference(CautionLineProperty, Look.Caution);
+        SetResourceReference(SecondProperty, look.Secondary);
+        SetResourceReference(HairProperty, look.Hair);
         SnapsToDevicePixels = true;
     }
+
+    /// <summary>The dashed line at the scale's middle (a detail page's graph).</summary>
+    public bool Midline { get; init; } = true;
+
+    /// <summary>The hairline along the bottom, where a strip sits under the graph.</summary>
+    public bool Baseline { get; init; } = true;
+
+
+    /// <summary>The oldest readings fade in over this many pixels: a graph that starts inside its card rather than at its edge.</summary>
+    public double FadeIn { get; init; }
+
+    /// <summary>Rounds the bottom corners to the card's, inside its border, where the graph reaches the card's bottom.</summary>
+    public double BottomRadius { get; init; }
+
+    /// <summary>Whether the bottom left corner is rounded too (not when the graph starts inside the card).</summary>
+    public bool RoundLeft { get; init; } = true;
 
     public Brush? Line { get => (Brush?)GetValue(LineProperty); set => SetValue(LineProperty, value); }
     public Brush? CautionLine { get => (Brush?)GetValue(CautionLineProperty); set => SetValue(CautionLineProperty, value); }
     public Brush? Second { get => (Brush?)GetValue(SecondProperty); set => SetValue(SecondProperty, value); }
     public Brush? Hair { get => (Brush?)GetValue(HairProperty); set => SetValue(HairProperty, value); }
-    public Brush? Label { get => (Brush?)GetValue(LabelProperty); set => SetValue(LabelProperty, value); }
 
     /// <summary>The points drawn, oldest first (tests read them).</summary>
     internal IReadOnlyList<double?> Points => _points;
 
-    internal string Scale => _scale;
+    /// <summary>The scale's top (tests read it).</summary>
+    internal double Max => _max;
 
-    public void Set(IReadOnlyList<HistoryPoint> points, double max, string scale, IReadOnlyList<HistoryPoint>? second = null, bool caution = false, Func<double, double>? convert = null)
+    public void Set(IReadOnlyList<HistoryPoint> points, double max, IReadOnlyList<HistoryPoint>? second = null, bool caution = false, Func<double, double>? convert = null)
     {
         _points = [.. points.Select(p => p.Value is { } v ? convert?.Invoke(v) ?? v : (double?)null)];
         _second = second is null ? [] : [.. second.Select(p => p.Value)];
         _max = max > 0 ? max : 1;
-        _scale = scale;
         _caution = caution;
         InvalidateVisual();
+    }
+
+    protected override void OnRenderSizeChanged(SizeChangedInfo sizeInfo)
+    {
+        base.OnRenderSizeChanged(sizeInfo);
+        double r = BottomRadius, w = sizeInfo.NewSize.Width, h = sizeInfo.NewSize.Height;
+        // A rounded rectangle whose top corners sit above the graph, so only the bottom ones show.
+        double left = RoundLeft ? 0 : -2 * r;
+        Clip = r > 0 ? new RectangleGeometry(new Rect(left, -2 * r, w - left, h + 2 * r), r, r) : null;
     }
 
     protected override void OnRender(DrawingContext dc)
@@ -64,9 +87,19 @@ internal sealed class HistoryGraph : FrameworkElement
             return;
         if (Hair is { } hair)
         {
-            var dashed = new Pen(hair, 1) { DashStyle = new DashStyle([2, 3], 0) };
-            dc.DrawLine(dashed, new Point(0, Math.Round(h / 2) + 0.5), new Point(w, Math.Round(h / 2) + 0.5));
-            dc.DrawLine(new Pen(hair, 1), new Point(0, h - 0.5), new Point(w, h - 0.5));
+            if (Midline)
+                dc.DrawLine(new Pen(hair, 1) { DashStyle = new DashStyle([2, 3], 0) }, new Point(0, Math.Round(h / 2) + 0.5), new Point(w, Math.Round(h / 2) + 0.5));
+            if (Baseline)
+                dc.DrawLine(new Pen(hair, 1), new Point(0, h - 0.5), new Point(w, h - 0.5));
+        }
+        if (FadeIn > 0)
+        {
+            var mask = new LinearGradientBrush([new GradientStop(Color.FromArgb(0, 0, 0, 0), 0), new GradientStop(Colors.Black, 1)], new Point(0, 0), new Point(FadeIn, 0))
+            {
+                MappingMode = BrushMappingMode.Absolute,
+            };
+            mask.Freeze();
+            dc.PushOpacityMask(mask);
         }
         var line = (_caution ? CautionLine : Line) as SolidColorBrush;
         if (line is not null)
@@ -86,12 +119,8 @@ internal sealed class HistoryGraph : FrameworkElement
             foreach (var run in Runs(_second, w, h))
                 dc.DrawGeometry(null, pen, Polyline(run));
         }
-        if (_scale.Length > 0 && Label is { } label)
-        {
-            var text = new FormattedText(_scale, CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
-                new Typeface("Segoe UI Variable Text, Segoe UI"), 10, label, VisualTreeHelper.GetDpi(this).PixelsPerDip);
-            dc.DrawText(text, new Point(w - text.Width, -1));
-        }
+        if (FadeIn > 0)
+            dc.Pop();
     }
 
     // Unbroken stretches of points, each placed in one of 120 slots so the newest is at the right edge.
@@ -147,10 +176,41 @@ internal sealed class HistoryGraph : FrameworkElement
         new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender));
 }
 
-/// <summary>One bar per logical processor, filled from the bottom by its load.</summary>
+/// <summary>
+/// A graph's top. CPU and GPU loads fit their history (10, 25, 50 or 100%), so 4% uses the graph
+/// instead of lying on its floor; rates double from 64 KiB/s; temperatures go by 25 °C. Memory and
+/// battery are levels and stay at 100%: a fitted scale would draw 42% as nearly full.
+/// </summary>
+internal static class GraphScale
+{
+    private static readonly double[] Loads = [10, 25, 50, 100];
+
+    public static double Load(IReadOnlyList<HistoryPoint> points)
+    {
+        double busiest = Busiest(points);
+        return Loads.FirstOrDefault(step => step >= busiest, 100);
+    }
+
+    /// <summary>The next of 64 KiB/s, 128, 256… at or above the busiest point, so lines never clip.</summary>
+    public static double Rate(double busiest)
+    {
+        double scale = 64 * 1024;
+        while (scale < busiest) scale *= 2;
+        return scale;
+    }
+
+    /// <summary>The next 25 °C at or above the hottest point.</summary>
+    public static double Temperature(double hottest) => Math.Max(25, Math.Ceiling(hottest / 25) * 25);
+
+    public static double Busiest(IEnumerable<HistoryPoint> points) =>
+        points.Select(p => p.Value ?? 0).Where(double.IsFinite).DefaultIfEmpty(0).Max();
+}
+
+/// <summary>One bar per logical processor, filled from the bottom by its load at the graph's scale.</summary>
 internal sealed class BarStrip : FrameworkElement
 {
     private IReadOnlyList<double> _values = [];
+    private double _max = 100;
 
     public static readonly DependencyProperty TrackProperty = DependencyProperty.Register(nameof(Track), typeof(Brush), typeof(BarStrip),
         new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender));
@@ -160,7 +220,7 @@ internal sealed class BarStrip : FrameworkElement
     public BarStrip()
     {
         SetResourceReference(TrackProperty, "IslandTrackBrush");
-        SetResourceReference(FillProperty, "IslandTextSecondaryBrush");
+        SetResourceReference(FillProperty, "IslandAccentBrush");
         SnapsToDevicePixels = true;
     }
 
@@ -169,9 +229,10 @@ internal sealed class BarStrip : FrameworkElement
 
     internal IReadOnlyList<double> Values => _values;
 
-    public void Set(IReadOnlyList<double>? values)
+    public void Set(IReadOnlyList<double>? values, double max = 100)
     {
         _values = values ?? [];
+        _max = max > 0 ? max : 100;
         InvalidateVisual();
     }
 
@@ -189,7 +250,7 @@ internal sealed class BarStrip : FrameworkElement
         {
             var rect = new Rect(i * (bar + gap), 0, bar, h);
             dc.DrawRoundedRectangle(Track, null, rect, radius, radius);
-            double filled = Math.Clamp(_values[i] / 100, 0, 1) * h;
+            double filled = Math.Clamp(_values[i] / _max, 0, 1) * h;
             if (filled > 0.5)
                 dc.DrawRoundedRectangle(Fill, null, new Rect(rect.X, h - filled, bar, filled), radius, radius);
         }

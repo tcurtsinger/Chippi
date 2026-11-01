@@ -58,6 +58,15 @@ public sealed class PageTests
 
     private static string Value(SystemView view, Detail kind) => ((ReadingWidget)view.Overview.WidgetFor(kind)!).Hero.Value;
 
+    // The module reads the overview's readings from the start; wait for the first of them to reach the history.
+    private static void WaitForHistory(SystemMonitorModule module)
+    {
+        var waited = System.Diagnostics.Stopwatch.StartNew();
+        while (module.Sampler!.History(Series.Cpu).Count == 0 && waited.Elapsed < TimeSpan.FromSeconds(5))
+            Thread.Sleep(20);
+        Assert.NotEmpty(module.Sampler.History(Series.Cpu));
+    }
+
     private static void OnCulture(Action run)
     {
         var culture = CultureInfo.CurrentCulture;
@@ -88,19 +97,24 @@ public sealed class PageTests
     });
 
     [Fact]
-    public void Widgets_show_values_context_and_meters_and_clear_a_missing_reading() => WpfTestThread.Run(() => OnCulture(() =>
+    public void Widgets_show_values_context_and_graphs_and_clear_a_missing_reading() => WpfTestThread.Run(() => OnCulture(() =>
     {
         var (module, view, _) = Start();
         try
         {
+            WaitForHistory(module);
             var s = Desktop();
             view.Show(s);
             Assert.Equal(("23%", "34%", "66%"), (Value(view, Detail.Cpu), Value(view, Detail.Gpu), Value(view, Detail.Memory)));
             var gpu = (ReadingWidget)view.Overview.WidgetFor(Detail.Gpu)!;
             Assert.Equal(("51 °C", "GeForce RTX 4080"), (gpu.Fact, gpu.Context.Text));
-            Assert.Equal(0.34, gpu.Meter!.Value, 3);
+            // Loads draw their history (the fake CPU's 25%, on a 25% scale); a level keeps its meter.
+            var cpu = (ReadingWidget)view.Overview.WidgetFor(Detail.Cpu)!;
+            Assert.Null(cpu.Meter);
+            Assert.Equal(25, Assert.Single(cpu.Graph!.Points.Distinct()));
+            Assert.Equal(25, cpu.Graph.Max);
             var network = (NetworkWidget)view.Overview.WidgetFor(Detail.Network)!;
-            Assert.Equal(("Ethernet", "2.4 MiB/s", "180 KiB/s"), (network.Fact, network.Down, network.Up));
+            Assert.Equal(("Ethernet", "2.4 MiB/s", "180 KiB/s", true), (network.Fact, network.Down, network.Up, network.Wide));
 
             view.Show(s with { Cpu = new(ReadingStatus.Pending, null, s.At), Network = new(ReadingStatus.Ok, [new("eth", "Ethernet", true, null, null)], s.At) });
             Assert.Equal("", Value(view, Detail.Cpu));
@@ -112,20 +126,25 @@ public sealed class PageTests
     }));
 
     [Fact]
-    public void Drives_show_up_to_four_then_the_three_fullest_with_an_alerting_one_first() => WpfTestThread.Run(() =>
+    public void Drives_show_every_drive_that_fits_then_the_fullest_with_an_alerting_one_first() => WpfTestThread.Run(() =>
     {
         var volumes = Enumerable.Range(0, 8).Select(i => new VolumeReading("v" + i, (char)('C' + i) + ":", (ulong)(i + 1) * GiB, 10 * GiB)).ToList();
-        Assert.Equal(4, DrivesWidget.Choose(volumes[..4], _ => false).Shown.Count);
-        var (shown, more) = DrivesWidget.Choose(volumes, _ => false);
-        Assert.Equal(("C: D: E:", 5), (string.Join(" ", shown.Select(v => v.Letter)), more));
-        (shown, more) = DrivesWidget.Choose(volumes, id => id == "v7");
-        Assert.Equal(("C: D: J:", 5), (string.Join(" ", shown.Select(v => v.Letter)), more));
+        Assert.Equal(6, DrivesWidget.Choose(volumes[..6], _ => false, 6).Shown.Count);
+        var (shown, more) = DrivesWidget.Choose(volumes, _ => false, 6);
+        Assert.Equal(("C: D: E: F: G:", 3), (string.Join(" ", shown.Select(v => v.Letter)), more));
+        (shown, more) = DrivesWidget.Choose(volumes, id => id == "v7", 6);
+        Assert.Equal(("C: D: E: F: J:", 3), (string.Join(" ", shown.Select(v => v.Letter)), more));
+        (shown, more) = DrivesWidget.Choose(volumes, _ => false, 6, morePlace: false); // the drives page: "+N more" is in its label
+        Assert.Equal(("C: D: E: F: G: H:", 2), (string.Join(" ", shown.Select(v => v.Letter)), more));
 
         var widget = new DrivesWidget(Look.Island, null, _ => false);
         widget.Set(Desktop(drives: 8));
-        Assert.Equal(("C: D: E:", "+5", "8 drives"), (string.Join(" ", widget.Shown), widget.More, widget.Fact));
+        Assert.Equal(("C: D: E: F: G:", "+3", "8 drives"), (string.Join(" ", widget.Shown), widget.More, widget.Fact));
+        widget.Rows = 1;
+        widget.Set(Desktop(drives: 8));
+        Assert.Equal(("C:", "+7"), (string.Join(" ", widget.Shown), widget.More));
         widget.Set(Desktop(drives: 1));
-        Assert.Equal(("C:", ""), (widget.Fact, widget.More));
+        Assert.Equal(("C:", "", ""), (string.Join(" ", widget.Shown), widget.Fact, widget.More));
         widget.Set(Desktop() with { Disks = new(ReadingStatus.Unavailable, null, DateTimeOffset.UtcNow) });
         Assert.Empty(widget.Shown);
     });
@@ -153,7 +172,8 @@ public sealed class PageTests
             view.Open(Detail.Network);
             view.RaiseEvent(new RoutedEventArgs(FrameworkElement.UnloadedEvent));
             Assert.Null(view.Current); // the island reopens on the overview
-            Assert.Equal(SensorNeed.None, module.Sampler.Need);
+            // Only the module's history reads on (and the drives, until the first read of them).
+            Assert.Equal(SystemMonitorModule.HistoryNeed(module.Settings), module.Sampler.Need & ~SensorNeed.Disks);
         }
         finally { module.StopAsync(default).GetAwaiter().GetResult(); }
     });
@@ -179,6 +199,7 @@ public sealed class PageTests
         var (module, view, _) = Start();
         try
         {
+            WaitForHistory(module);
             var s = Desktop();
             view.Show(s);
             view.Open(Detail.Cpu);
@@ -188,7 +209,7 @@ public sealed class PageTests
             Assert.Contains("Logical processors 16", page.Facts!.Shown);
             Assert.Contains(page.Facts.Shown, f => f.StartsWith("Up time ", StringComparison.Ordinal));
             Assert.Equal(16, page.Cores!.Values.Count);
-            Assert.Equal("100%", page.Graph.Scale);
+            Assert.Equal("25%", page.Scale); // the fake CPU's 25% fits the 25% scale
 
             view.Open(Detail.Gpu);
             page = view.Current!;
@@ -201,6 +222,7 @@ public sealed class PageTests
             page = view.Current!;
             Assert.Equal(["Google Chrome 3.0 GiB", "Visual Studio 1.8 GiB", "Discord 640 MiB"], page.Apps!.Shown);
             Assert.Equal(Visibility.Collapsed, view.GpuPicker.Visibility);
+            Assert.Equal("100%", page.Scale); // a level stays at 100%
 
             // Processes that fail to read say so; the rows don't keep old apps.
             view.Show(s with { Processes = new(ReadingStatus.Unavailable, null, s.At) });
@@ -219,12 +241,18 @@ public sealed class PageTests
             view.Show(Desktop());
             view.Open(Detail.Network);
             var page = view.Current!;
-            Assert.Equal(("2.4 MiB/s", "64 KiB/s"), (page.Hero.Value, page.Graph.Scale));
+            Assert.Equal(("2.4 MiB/s", "64 KiB/s"), (page.Hero.Value, page.Scale));
             Assert.Equal(["Ethernet, down 2.4 MiB/s, up 180 KiB/s", "Wi-Fi, Not connected"], page.Adapters!.Shown);
+            Assert.Equal(Visibility.Visible, page.Under!.Visibility);
             var wifi = Find<Button>(page.Adapters).Last();
             wifi.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
             Assert.Equal("wifi", module.Settings.NetworkAdapterId);
             Assert.Equal("Not connected", view.Current!.Hero.Value);
+            // One adapter: the legend names it, and the graph takes the page.
+            module.Save(module.Settings with { NetworkAdapterId = null });
+            var s = Desktop();
+            view.Show(s with { Network = new(ReadingStatus.Ok, [s.Network.Value![0]], s.At) });
+            Assert.Equal(Visibility.Collapsed, page.Under.Visibility);
         }
         finally { module.StopAsync(default).GetAwaiter().GetResult(); }
     }));
@@ -239,8 +267,10 @@ public sealed class PageTests
             view.Open(Detail.Drives);
             var drives = view.Current!.Drives!;
             Assert.Equal((4, "", 4), (drives.Volumes.Count, drives.More, drives.Disks.Count));
+            // Two to a row above 4 disks' activity: 3 rows, 6 drives, the fullest first.
             view.Show(Desktop(drives: 8));
-            Assert.Equal((3, "+5 more in Settings", 4), (drives.Volumes.Count, drives.More, drives.Disks.Count));
+            Assert.Equal((6, "+2 more in Settings", 4), (drives.Volumes.Count, drives.More, drives.Disks.Count));
+            Assert.StartsWith("C: ", drives.Volumes[0], StringComparison.Ordinal);
         }
         finally { module.StopAsync(default).GetAwaiter().GetResult(); }
     });
@@ -255,6 +285,10 @@ public sealed class PageTests
             view.Show(s);
             var battery = (ReadingWidget)view.Overview.WidgetFor(Detail.Battery)!;
             Assert.Equal(("80%", "On battery · 3 hr 10 min"), (battery.Hero.Value, battery.Context.Text));
+            Assert.Equal((0.8, null), (battery.Meter!.Value, battery.Graph));
+            view.Open(Detail.Battery);
+            Assert.Equal("3 hr 10 min left", view.Current!.Side);
+            Assert.DoesNotContain(view.Current.Facts!.Shown, f => f.StartsWith("Time left", StringComparison.Ordinal)); // the top card has it
             view.Open(Detail.Temperature);
             Assert.Equal(("52 °C", "Hottest of 2 zones"), (view.Current!.Hero.Value, view.Current.Side));
             view.Show(s with { ThermalZones = new(ReadingStatus.Ok, [.. Enumerable.Range(0, 12).Select(i => new ThermalZoneReading("z" + i, 40 + i))], s.At) });
@@ -264,20 +298,25 @@ public sealed class PageTests
         finally { module.StopAsync(default).GetAwaiter().GetResult(); }
     }));
 
-    // The tile keeps CPU and memory current; the last page's GPU, network and disks fill the rest until the page's own arrive.
+    // The module keeps the overview's readings current; the last page's drives (and anything else it
+    // didn't read) fill the rest until the page's own arrive.
     [Fact]
-    public void A_page_opens_with_the_last_pages_readings_and_the_tiles_current_cpu()
+    public void A_page_opens_with_the_latest_readings_and_the_last_pages_drives()
     {
         var at = DateTimeOffset.UtcNow;
-        var tile = SystemSnapshot.Empty(at) with { Cpu = new(ReadingStatus.Ok, new(61, 8, 4000), at) };
+        var latest = SystemSnapshot.Empty(at) with
+        {
+            Cpu = new(ReadingStatus.Ok, new(61, 8, 4000), at),
+            Network = new(ReadingStatus.Ok, [new("eth", "Ethernet", true, 1, 1)], at),
+        };
         var last = Desktop();
 
-        Assert.Same(tile, SystemView.Opening(tile, null));
-        var opening = SystemView.Opening(tile, last);
-        Assert.Same(tile.Cpu, opening.Cpu);
-        Assert.Same(last.Memory, opening.Memory); // the tile didn't read it
+        Assert.Same(latest, SystemView.Opening(latest, null));
+        var opening = SystemView.Opening(latest, last);
+        Assert.Same(latest.Cpu, opening.Cpu);
+        Assert.Same(latest.Network, opening.Network);
+        Assert.Same(last.Memory, opening.Memory); // the latest didn't read it
         Assert.Same(last.Disks, opening.Disks);
-        Assert.Same(last.Network, opening.Network);
         Assert.Same(last.Gpus, opening.Gpus);
     }
 
