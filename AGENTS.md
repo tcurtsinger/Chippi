@@ -31,6 +31,8 @@ A Windows 11 tray app for the owner's own PC (C#, .NET 10, WPF): a widget on the
 - **Snapshots without showing anything:** a Debug build run with `--debug` saves PNGs to a folder with `--island-pages <dir>`, `--island-shots <dir>`, `--settings-snapshot <dir>` or `--flyout-snapshot <dir>` (the tray menu).
   `--island-pages` and `--island-shots` show the widget and the panel on screen; both shoot dark, then light. A click elsewhere closes the panel mid-run, and the widget hides while a fullscreen app is in front on its display, so check the shots. `--island-shots` also drops the widget in each corner and past every edge and checks where it lands (`r6-drop-check.txt`).
 - **Shots in tests:** the offscreen page shots run when `CHIPPI_ISLAND_SHOTS` names an output folder. They render dark; `CHIPPI_SHOTS_THEME=light` renders them light. The island follows the app theme.
+- **The pet's sheets:** `--pet-sheet <dir>` and `--pet-motion <dir>` render offscreen. Seed `"islandEnabled": false` in the dev profile and nothing shows at all. `CHIPPI_PET_SHOTS=<dir>` renders the sheet from the tests.
+- **Measuring the widget's CPU while a fullscreen app holds the main display:** it hides there, so seed the dev profile's widget onto another monitor (`"islandDisplay": "specificMonitor"`, `"islandMonitorId"` the monitor's `\\?\DISPLAY#…` path), and read the process's CPU time over 45 to 60s, three times: single readings swing by half. The owner's own puck may sit in the same corner; end the run as soon as it's read.
 
 ## Done means used, with proof
 

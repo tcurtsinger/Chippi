@@ -6,6 +6,7 @@ using System.Windows;
 using System.Windows.Threading;
 using Chippi.App.Island.Media;
 using Chippi.UI.Pet;
+using Chippi.UI.Themes;
 using Chippi.App.Shell;
 using Chippi.Core.Config;
 using Chippi.Core.Island;
@@ -35,6 +36,7 @@ public sealed class IslandHost : IDisposable
     private SystemMediaSessions? _media;
     private bool _refreshPending;
     private bool _disposed;
+    private bool _locked, _displayOff; // nobody can see the screen: Chippi and the bar rest (Motion.IsUnseen)
 
     public IslandHost(ShellContext shell)
     {
@@ -54,6 +56,11 @@ public sealed class IslandHost : IDisposable
 
     public void Start()
     {
+        _window.DisplayPowerChanged += (_, on) =>
+        {
+            _displayOff = !on;
+            Rest();
+        };
         _window.Initialize();
         _tracker.Ignore = [_window.Handle, _window.PanelHandle];
         _window.SettingsRequested += (_, _) => _shell.Commands.OpenSettings();
@@ -82,7 +89,7 @@ public sealed class IslandHost : IDisposable
                 RefreshPanels();
         });
         _shell.Island.Succeeded += (_, _) => _dispatcher.BeginInvoke(() => _window.Celebrate());
-        // The first unlock of the day, Chippi wakes with a yawn and a stretch.
+        // Locked, Chippi rests; the first unlock of the day, he wakes with a yawn and a stretch.
         Microsoft.Win32.SystemEvents.SessionSwitch += OnSessionSwitch;
         _shell.Config.SectionChanged += OnSectionChanged;
 
@@ -479,15 +486,34 @@ public sealed class IslandHost : IDisposable
         }
     }
 
-    // Raised on the system events' own thread.
+    // Raised on the system events' own thread. Locked, nobody sees him: he and the bar rest until it's unlocked.
     private void OnSessionSwitch(object? sender, Microsoft.Win32.SessionSwitchEventArgs e)
     {
-        if (e.Reason == Microsoft.Win32.SessionSwitchReason.SessionUnlock)
-            _dispatcher.BeginInvoke(() =>
-            {
-                if (!_disposed)
-                    _window.Unlocked(DateTime.Now);
-            });
+        if (e.Reason is not (Microsoft.Win32.SessionSwitchReason.SessionLock or Microsoft.Win32.SessionSwitchReason.SessionUnlock))
+            return;
+        bool locked = e.Reason == Microsoft.Win32.SessionSwitchReason.SessionLock;
+        _dispatcher.BeginInvoke(() =>
+        {
+            if (_disposed)
+                return;
+            _locked = locked;
+            Rest();
+            if (!locked)
+                _window.Unlocked(DateTime.Now);
+        });
+    }
+
+    /// <summary>While the session is locked or the display off, nobody sees Chippi: he and the bar rest (Motion.IsUnseen).</summary>
+    private void Rest()
+    {
+        bool unseen = _locked || _displayOff;
+        if (unseen == Motion.IsUnseen)
+            return;
+        Motion.IsUnseen = unseen;
+        if (unseen)
+            _logger.LogInformation("Island resting: locked {Locked}, display off {DisplayOff}", _locked, _displayOff);
+        else
+            _logger.LogInformation("Island seen again");
     }
 
     public void Dispose()

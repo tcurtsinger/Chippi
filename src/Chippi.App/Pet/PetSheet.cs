@@ -166,6 +166,18 @@ internal static class PetSheet
         pet.IsHeld = false;
         await SaveStripAsync(host, caption, [0, 40, 80, 160, 260], Path.Combine(directory, $"pet-motion-land-{mode}.png"));
 
+        // One face at a time: booped mid-yawn, the grin takes the yawn's place; picked up as he dozes off, the round eyes alone.
+        await Task.Delay(400);
+        pet.Yawn();
+        await Task.Delay(300);
+        pet.Boop();
+        await SaveStripAsync(host, caption, [0, 60, 110, 240, 400, 650], Path.Combine(directory, $"pet-motion-boop-yawn-{mode}.png"));
+        pet.Mood = PetMood.Sleepy;
+        await Task.Delay(200);
+        pet.IsHeld = true;
+        await SaveStripAsync(host, caption, [0, 100, 300, 500, 700], Path.Combine(directory, $"pet-motion-held-dozing-{mode}.png"));
+        pet.IsHeld = false;
+
         // Listening: a strong beat.
         pet.Mood = PetMood.Listening;
         await Task.Delay(500);

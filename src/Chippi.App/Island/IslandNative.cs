@@ -7,6 +7,7 @@ using System.Windows.Interop;
 using Windows.Win32;
 using Windows.Win32.Foundation;
 using Windows.Win32.Graphics.Gdi;
+using Windows.Win32.System.Power;
 using Windows.Win32.UI.HiDpi;
 using Windows.Win32.UI.WindowsAndMessaging;
 
@@ -110,6 +111,35 @@ internal static class IslandNative
 
     public static Rect WindowRect(HWND hwnd) =>
         hwnd != default && PInvoke.GetWindowRect(hwnd, out var r) ? ToRect(r) : Rect.Empty;
+
+    /// <summary>
+    /// Has Windows send the window WM_POWERBROADCAST when the display turns off or on (<see cref="DisplayOn"/> reads it),
+    /// and once at once with how it is now.
+    /// </summary>
+    public static unsafe HPOWERNOTIFY WatchDisplayPower(HWND hwnd)
+    {
+        if (hwnd == default)
+            return default;
+        var display = PInvoke.GUID_CONSOLE_DISPLAY_STATE;
+        return PInvoke.RegisterPowerSettingNotification((HANDLE)hwnd.Value, &display, REGISTER_NOTIFICATION_FLAGS.DEVICE_NOTIFY_WINDOW_HANDLE);
+    }
+
+    public static void StopWatchingDisplayPower(HPOWERNOTIFY notice)
+    {
+        if (notice != default)
+            PInvoke.UnregisterPowerSettingNotification(notice);
+    }
+
+    /// <summary>A WM_POWERBROADCAST's news of the display: on (dimmed counts), off, or null when it's about something else.</summary>
+    public static unsafe bool? DisplayOn(nint wParam, nint lParam)
+    {
+        if ((uint)wParam != PInvoke.PBT_POWERSETTINGCHANGE || lParam == 0)
+            return null;
+        var setting = (POWERBROADCAST_SETTING*)lParam;
+        if (setting->PowerSetting != PInvoke.GUID_CONSOLE_DISPLAY_STATE || setting->DataLength < sizeof(uint))
+            return null;
+        return *(uint*)&setting->Data != 0; // 0 off, 1 on, 2 dimmed
+    }
 
     private static Rect ToRect(RECT r) => new(r.left, r.top, r.right - r.left, r.bottom - r.top);
 }

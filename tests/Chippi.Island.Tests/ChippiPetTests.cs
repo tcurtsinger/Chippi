@@ -266,6 +266,18 @@ public sealed class ChippiPetTests
     }
 
     [Fact]
+    public void A_size_that_isnt_an_edge_is_refused_where_its_set()
+    {
+        WpfTestThread.Run(() =>
+        {
+            foreach (var size in new[] { -1, double.NaN, double.PositiveInfinity })
+                Assert.Throws<ArgumentException>(() => new ChippiPet { Size = size });
+            var none = new ChippiPet { Size = 0 };
+            Assert.Equal(0, none.Width);
+        });
+    }
+
+    [Fact]
     public void The_yawn_squeezes_his_eyes_and_opens_his_mouth_tall()
     {
         AssertBounds(new Rect(40, 62, 40, 10), ChippiPet.Shapes.SqueezedEyes);
@@ -580,6 +592,113 @@ public sealed class ChippiPetMotionTests
                 still.Boop();
                 Assert.False(still.Squish.HasAnimatedProperties);
                 Assert.False(still.BandPulse.HasAnimatedProperties);
+            }
+            finally
+            {
+                window.Close();
+                Motion.Override = motion;
+            }
+        });
+    }
+
+    [Fact]
+    public void Locked_or_with_the_display_off_he_rests_and_seen_again_he_breathes_and_blinks()
+    {
+        var motion = Motion.Override;
+        WpfTestThread.Run(() =>
+        {
+            var asleep = new ChippiPet { Size = 40, Mood = PetMood.Sleepy };
+            var idle = new ChippiPet { Size = 40, Mood = PetMood.Idle };
+            var window = Offscreen(new StackPanel { Children = { asleep, idle } });
+            try
+            {
+                Motion.Override = false;
+                window.Show();
+                IslandWindowTests.Pump(TimeSpan.Zero);
+                Assert.True(asleep.IsBreathing);
+                Assert.True(idle.IsBlinking);
+
+                Motion.IsUnseen = true;
+                IslandWindowTests.Pump(TimeSpan.Zero);
+                Assert.False(asleep.IsBreathing);
+                Assert.False(asleep.Breath.HasAnimatedProperties);
+                Assert.False(idle.IsBlinking);
+                Assert.Equal(1, asleep.ShownFace.Opacity); // still asleep, just still
+
+                Motion.IsUnseen = false;
+                IslandWindowTests.Pump(TimeSpan.Zero);
+                Assert.True(asleep.IsBreathing);
+                Assert.True(idle.IsBlinking);
+            }
+            finally
+            {
+                Motion.IsUnseen = false;
+                window.Close();
+                Motion.Override = motion;
+            }
+        });
+    }
+
+    [Fact]
+    public void One_face_shows_at_a_time_through_a_boop_a_yawn_and_being_picked_up()
+    {
+        var motion = Motion.Override;
+        WpfTestThread.Run(() =>
+        {
+            var pet = new ChippiPet { Size = 72, Mood = PetMood.Idle };
+            var window = Offscreen(pet);
+            try
+            {
+                Motion.Override = false;
+                window.Show();
+                IslandWindowTests.Pump(TimeSpan.Zero);
+
+                // Picked up while he's falling asleep: the closing face goes with the rest, not 600ms later.
+                pet.Mood = PetMood.Sleepy;
+                pet.IsHeld = true;
+                Assert.Equal(1, pet.FacesShown);
+                Assert.Equal(1, pet.HeldFace.Opacity);
+                pet.IsHeld = false;
+                Assert.Equal(1, pet.FacesShown);
+                Assert.Equal(1, pet.ShownFace.Opacity);
+
+                // Booped mid-yawn: the yawn goes as the grin comes in, and his face comes back after it.
+                pet.Mood = PetMood.Idle;
+                IslandWindowTests.Pump(TimeSpan.FromMilliseconds(200));
+                pet.Yawn();
+                IslandWindowTests.Pump(TimeSpan.FromMilliseconds(50));
+                Assert.Equal(1, pet.YawnFace.Opacity);
+                pet.Boop();
+                IslandWindowTests.Pump(TimeSpan.FromMilliseconds(250));
+                Assert.Equal(1, pet.FacesShown);
+                Assert.Equal(0, pet.YawnFace.Opacity);
+                IslandWindowTests.Pump(TimeSpan.FromMilliseconds(600));
+                Assert.Equal(1, pet.FacesShown);
+                Assert.Equal(1, pet.ShownFace.Opacity);
+
+                // A yawn while the grin still shows takes its place.
+                pet.Boop();
+                IslandWindowTests.Pump(TimeSpan.FromMilliseconds(250));
+                pet.Yawn();
+                IslandWindowTests.Pump(TimeSpan.FromMilliseconds(50));
+                Assert.Equal(1, pet.FacesShown);
+                Assert.Equal(1, pet.YawnFace.Opacity);
+
+                // Picked up mid-yawn: the round eyes alone.
+                pet.IsHeld = true;
+                Assert.Equal(1, pet.FacesShown);
+                Assert.Equal(0, pet.YawnFace.Opacity);
+                pet.IsHeld = false;
+
+                // Listening, a beat waits out a yawn, and a beat that isn't a number does nothing.
+                var listening = new ChippiPet { Size = 40, Mood = PetMood.Listening };
+                window.Content = listening;
+                IslandWindowTests.Pump(TimeSpan.Zero);
+                listening.Beat(double.NaN);
+                Assert.False(listening.BandPulse.HasAnimatedProperties);
+                listening.Yawn();
+                listening.Beat(1);
+                Assert.False(listening.BandPulse.HasAnimatedProperties);
             }
             finally
             {
