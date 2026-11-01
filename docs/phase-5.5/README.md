@@ -18,4 +18,6 @@ Quick actions (planned as Quick toggles), Cleaning mode, Command bar, Radial men
 | Cleaning mode | [cleaning-mode.md](cleaning-mode.md), confirmed 2026-11-01 | [Approved 2026-11-01](https://claude.ai/artifact/HNpG8aciGLWyJecHFyfeeW) |
 | Command bar | [command-bar.md](command-bar.md), confirmed 2026-11-01 | [Approved 2026-11-01](https://claude.ai/artifact/BnX8BKEJ3XpuQ3oRT2JNsz) |
 | Radial menu | [radial-menu.md](radial-menu.md), confirmed 2026-11-01 | [Approved 2026-11-01](https://claude.ai/artifact/QFJSjaBzEbZbKmassLftuQ) |
-| AI agent usage | Not shaped yet | |
+| AI agent usage | [ai-agent-usage.md](ai-agent-usage.md), confirmed 2026-11-01 | [Approved 2026-11-01](https://claude.ai/artifact/QiLGvSVj9mfZ16P29hR2U2) |
+
+All five are shaped. Next is building them, each from its brief and mockup.
