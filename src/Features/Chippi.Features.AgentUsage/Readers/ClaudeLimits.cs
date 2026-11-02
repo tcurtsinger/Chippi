@@ -10,7 +10,10 @@ namespace Chippi.Features.AgentUsage.Readers;
 /// Claude Code's limits, as <c>/usage</c> shows them: <c>claude</c> starts for a moment in its headless control mode with
 /// no tools, MCP servers, hooks or settings, answers <c>initialize</c> and <c>get_usage</c>, and ends. Claude Code signs
 /// itself in, and nothing goes to a model. None of this is documented (checked on 2.1.314, 2026-11-01): a request it
-/// doesn't know is Too old, and no sign-in (<c>tokenSource: "none"</c>) is Signed out.
+/// doesn't know is Too old, and no sign-in (<c>tokenSource: "none"</c>, no limits) is Signed out. Signed in, its
+/// <c>rate_limits</c> lists the plan's limits (<c>limits</c>: <c>session</c>, <c>weekly_all</c>, a <c>weekly_scoped</c> one per
+/// model) and also keys them (<c>five_hour</c>, <c>seven_day</c>, <c>seven_day_opus</c>…), beside spend and credits, which
+/// aren't shown.
 /// </summary>
 internal static class ClaudeLimits
 {
@@ -49,8 +52,8 @@ internal static class ClaudeLimits
         "{\"type\":\"control_request\",\"request_id\":\"" + id + "\",\"request\":" + request + "}";
 
     /// <summary>
-    /// <c>get_usage</c>'s answer: <c>subscription_type</c>, <c>rate_limits_available</c> and <c>rate_limits</c>, each window
-    /// an object with its share used and its reset time. Signed out when there's no sign-in to read limits with.
+    /// <c>get_usage</c>'s answer: <c>subscription_type</c> ("team"), <c>rate_limits_available</c> and <c>rate_limits</c>.
+    /// Signed out when there's no sign-in to read limits with.
     /// </summary>
     internal static CheckResult Parse(JsonElement? body, string? tokenSource, DateTimeOffset now)
     {
@@ -66,53 +69,51 @@ internal static class ClaudeLimits
                 return new(CheckState.SignedOut, Error: $"tokenSource {tokenSource ?? "?"}, no rate limits");
             return new(CheckState.Ok, new UsageReading(plan, [], now));
         }
+        var windows = limits.ValueKind == JsonValueKind.Object && limits.TryGetProperty("limits", out var list) && list.ValueKind == JsonValueKind.Array
+            && Listed(list) is { Count: > 0 } listed ? listed : Keyed(limits);
+        return new(CheckState.Ok, new UsageReading(plan, windows, now));
+    }
+
+    // The 5-hour limit, then the weekly one, then a weekly limit per model when the plan has one (Travis): the list names its
+    // model ("Fable"). Spend, credits and anything else aren't shown: tokens and cost weren't chosen.
+    private static List<UsageWindow> Listed(JsonElement list)
+    {
         var windows = new List<(int Order, UsageWindow Window)>();
-        if (limits.ValueKind == JsonValueKind.Object)
+        foreach (var limit in list.EnumerateArray())
         {
-            foreach (var entry in limits.EnumerateObject())
-                if (Window(entry.Name, entry.Value) is { } window)
-                    windows.Add(window);
+            if (limit.ValueKind != JsonValueKind.Object || Number(limit, "percent") is not { } used
+                || !limit.TryGetProperty("kind", out var kind) || kind.ValueKind != JsonValueKind.String)
+                continue;
+            string? label = kind.GetString() switch
+            {
+                "session" => "5-hour",
+                "weekly_all" => "Weekly",
+                "weekly_scoped" => Model(limit) is { } model ? $"{model} weekly" : null,
+                _ => null,
+            };
+            if (label is not null)
+                windows.Add((label == "5-hour" ? 0 : label == "Weekly" ? 1 : 2 + windows.Count, new UsageWindow(label, used, Time(limit, "resets_at"))));
         }
-        else
-        {
-            foreach (var entry in limits.EnumerateArray())
-                if (entry.ValueKind == JsonValueKind.Object && Window(Name(entry), entry) is { } window)
-                    windows.Add(window);
-        }
-        return new(CheckState.Ok, new UsageReading(plan, [.. windows.OrderBy(w => w.Order).Select(w => w.Window)], now));
+        return [.. windows.OrderBy(w => w.Order).Select(w => w.Window)];
     }
 
-    // A window's share and reset, under the names Claude's usage uses (utilization, resets_at) or the ones like it.
-    private static (int, UsageWindow)? Window(string key, JsonElement value)
-    {
-        if (value.ValueKind != JsonValueKind.Object || Number(value, "utilization", "used_percent", "usedPercent", "percent", "used") is not { } used
-            || Label(key, value) is not { } name)
-            return null;
-        return (name.Order, new UsageWindow(name.Label, used, Time(value, "resets_at", "resetsAt", "reset_at", "resetAt")));
-    }
+    // {"scope":{"model":{"display_name":"Fable"}}}
+    private static string? Model(JsonElement limit) =>
+        limit.TryGetProperty("scope", out var scope) && scope.ValueKind == JsonValueKind.Object
+        && scope.TryGetProperty("model", out var model) && model.ValueKind == JsonValueKind.Object
+        && model.TryGetProperty("display_name", out var name) && name.ValueKind == JsonValueKind.String && name.GetString() is { Length: > 0 } shown
+            ? shown : null;
 
-    private static string Name(JsonElement entry)
+    // Without the list: the keyed windows, each {utilization, resets_at}, null when the plan doesn't have it.
+    private static List<UsageWindow> Keyed(JsonElement limits)
     {
-        foreach (string name in new[] { "window", "type", "name", "id", "rate_limit_type" })
-            if (entry.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String)
-                return v.GetString() ?? "";
-        return "";
-    }
-
-    // 5-hour, then weekly, then a weekly limit per model (Opus, Sonnet) when the plan has one (Travis). Anything else (spend,
-    // extra usage) is left out: tokens and cost weren't chosen.
-    private static (int Order, string Label)? Label(string key, JsonElement value)
-    {
-        string k = key.Replace("-", "_", StringComparison.Ordinal).ToLowerInvariant();
-        string model = k.Contains("opus", StringComparison.Ordinal) ? "Opus" : k.Contains("sonnet", StringComparison.Ordinal) ? "Sonnet" : "";
-        bool weekly = k.Contains("seven", StringComparison.Ordinal) || k.Contains("week", StringComparison.Ordinal) || k.Contains("7", StringComparison.Ordinal);
-        if (k.Contains("five", StringComparison.Ordinal) || k.Contains("5h", StringComparison.Ordinal) || k.Contains("5_h", StringComparison.Ordinal) || k.Contains("session", StringComparison.Ordinal))
-            return (0, "5-hour");
-        if (weekly)
-            return model.Length == 0 ? (1, "Weekly") : (model == "Opus" ? 2 : 3, $"{model} weekly");
-        if (Number(value, "window_minutes", "windowMinutes", "windowDurationMins") is { } minutes)
-            return (4, AgentText.WindowName((int)minutes));
-        return null;
+        var windows = new List<UsageWindow>();
+        if (limits.ValueKind != JsonValueKind.Object)
+            return windows;
+        foreach (var (key, label) in new[] { ("five_hour", "5-hour"), ("seven_day", "Weekly"), ("seven_day_opus", "Opus weekly"), ("seven_day_sonnet", "Sonnet weekly") })
+            if (limits.TryGetProperty(key, out var window) && window.ValueKind == JsonValueKind.Object && Number(window, "utilization") is { } used)
+                windows.Add(new UsageWindow(label, used, Time(window, "resets_at")));
+        return windows;
     }
 
     internal static double? Number(JsonElement value, params string[] names)

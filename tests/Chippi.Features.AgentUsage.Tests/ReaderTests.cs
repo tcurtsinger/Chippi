@@ -61,6 +61,22 @@ public sealed class ClaudeLimitsTests
     }
 
     [Fact]
+    public async Task The_owners_signed_in_answer_reads_its_listed_limits_and_leaves_spend_out()
+    {
+        var claude = new ScriptedConversation(line =>
+            line.Contains("\"initialize\"") ? [Answers.ClaudeInitializeSignedIn] : line.Contains("get_usage") ? [Answers.ClaudeUsageTeam] : []);
+        var result = await ClaudeLimits.CheckAsync(claude, Now, default);
+
+        Assert.Equal(CheckState.Ok, result.State);
+        var reading = result.Reading!;
+        Assert.Equal("Team", reading.Plan);
+        Assert.Equal(["5-hour", "Weekly", "Fable weekly"], reading.Windows.Select(w => w.Label));
+        Assert.Equal([0.0, 65.0, 0.0], reading.Windows.Select(w => w.Used));
+        Assert.Null(reading.Windows[0].ResetsAt); // no 5-hour window running
+        Assert.Equal(DateTimeOffset.Parse("2026-11-03T14:00:00.354007+00:00"), reading.Windows[1].ResetsAt);
+    }
+
+    [Fact]
     public void Per_model_weekly_windows_come_after_the_weekly_one()
     {
         using var doc = JsonDocument.Parse("""
