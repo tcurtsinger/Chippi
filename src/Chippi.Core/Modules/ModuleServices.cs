@@ -34,6 +34,9 @@ public sealed class ModuleServices
     /// <summary>Opens the island on a tile key's page. Set by the shell; null in tests.</summary>
     public Action<string>? OpenIslandPage { get; set; }
 
+    /// <summary>Opens the island on a tile key's page, without falling back to Settings: false when the island can't show. Set by the shell; null in tests.</summary>
+    public Func<string, bool>? TryOpenIslandPage { get; set; }
+
     /// <summary>The shared clipboard service (Phase 5). Set by the shell; null in tests. Idle until a feature uses it.</summary>
     public Clipboard.IClipboardHub? Clipboard { get; set; }
     public Func<IDisposable> HoldIslandOpen { get; set; } = () => new IslandOpenHold().Hold();

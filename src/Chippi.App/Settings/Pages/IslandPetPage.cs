@@ -176,7 +176,7 @@ internal sealed class IslandPetPage : UserControl
         {
             _tileKeys = keys;
             _tiles.Children.Clear();
-            // A switch is on when its button is on the home, which holds eight: past that a shown one isn't there, so its
+            // A switch is on when its button is on the home, which holds ten: past that a shown one isn't there, so its
             // switch is off, and the off ones can't be turned on until another is turned off.
             var onHome = layout.Shown(order).Take(IslandGrid.MaxTiles).ToHashSet();
             for (int i = 0; i < order.Count; i++)
@@ -209,7 +209,7 @@ internal sealed class IslandPetPage : UserControl
         var show = SettingsUi.Switch(shown);
         show.IsEnabled = shown || room;
         AutomationProperties.SetName(show, $"Show {tile.Name}");
-        // What shows off stays off: the tiles past the home's eight are saved hidden with it (IslandLayout.Switched).
+        // What shows off stays off: the tiles past the home's ten are saved hidden with it (IslandLayout.Switched).
         SettingsUi.OnSwitched(show, on => Save(s => s.IslandHiddenTiles = IslandLayout.Switched(s.IslandHiddenTiles ?? [], order, tile.Key, on, IslandGrid.MaxTiles)));
         var name = new TextBlock { Text = tile.Name, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
         DockPanel.SetDock(handle, Dock.Left);
@@ -235,7 +235,7 @@ internal sealed class IslandPetPage : UserControl
     // ----- Preview -----
 
     /// <summary>
-    /// A small desktop with the widget at its bottom right: the open panel over the puck, the shown tiles four across.
+    /// A small desktop with the widget at its bottom right: the open panel over the puck, the shown tiles five across.
     /// </summary>
     private void RefreshPreview()
     {

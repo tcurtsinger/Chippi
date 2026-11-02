@@ -47,11 +47,6 @@ public static class FeatureCatalog
             Icon = "Sun",
             Presets = Essentials | PowerUser,
         },
-        new("quick-toggles", "Quick toggles", "Dark mode, hidden files, desktop icons and more in one click", FeatureGroup.System)
-        {
-            Icon = "Power",
-            Presets = PowerUser,
-        },
         new("cleaning-mode", "Cleaning mode", "Locks the keyboard and mouse for a minute so you can wipe them", FeatureGroup.System)
         {
             Icon = "Droplet",

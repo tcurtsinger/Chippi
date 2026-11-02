@@ -194,6 +194,8 @@ public partial class App : Application
         shell.Registry.Register(new Chippi.Features.Scratchpad.ScratchpadModule());
         RegisterClipboardFeatures(shell);
         shell.Registry.Register(new Chippi.Features.Shelf.ShelfModule());
+        // [Phase 5.5] Quick actions: replaces the Quick toggles placeholder.
+        shell.Registry.Register(new Chippi.Features.QuickActions.QuickActionsModule());
         // [Phase 5.5] AI agent usage: replaces its catalog placeholder.
         shell.Registry.Register(new Chippi.Features.AgentUsage.AgentUsageModule());
 

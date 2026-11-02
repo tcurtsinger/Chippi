@@ -89,7 +89,7 @@ public sealed class AppVolumeModule(AudioService? audio = null) : IFeatureModule
             await _audio.RefreshAsync();
             await RefreshOutputsAsync();
             (_outputsRead, _outputsReadAt) = (OutputsShape(Snapshot), Environment.TickCount64);
-            _tile = context.Ui.AddIslandTile(new(TileKey, Descriptor.Name, "Sliders", 20, 0, () => new VolumeView(this, VolumeSurface.Island)));
+            _tile = context.Ui.AddIslandTile(new(TileKey, "Volume", "Sliders", 20, 0, () => new VolumeView(this, VolumeSurface.Island)));
             context.Ui.SetSettingsPage(_ => new VolumeView(this, VolumeSurface.Settings));
             _audio.SnapshotChanged += OnSnapshot;
             UpdateTile();

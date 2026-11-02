@@ -212,7 +212,9 @@ public sealed class KeepAwakeIslandView : UserControl
         button.Unchecked += (_, _) => changed();
     }
 
-    private bool IsSelected(KeepAwakeSettings? length) => _module.Active is { } active && (length is null
+    private bool IsSelected(KeepAwakeSettings? length) => IsSelected(_module.Active, length);
+
+    private static bool IsSelected(KeepAwakeSettings? active, KeepAwakeSettings? length) => active is not null && (length is null
         ? active.Mode == AwakeMode.UntilTime
         : KeepAwakeText.SameLength(active, length));
 
@@ -234,11 +236,13 @@ public sealed class KeepAwakeIslandView : UserControl
         _detail.Visibility = _detail.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
         _pet.ShowMood(on ? PetMood.WideAwake : PetMood.Sleepy);
         var lit = _cards.FirstOrDefault(c => c.Button.IsChecked == true)?.Button;
+        // One read of the session: it can end on another thread between two (a stop as a test finishes).
+        var active = _module.Active;
         foreach (var card in _cards)
         {
-            bool selected = IsSelected(card.Length);
+            bool selected = IsSelected(active, card.Length);
             card.Button.IsChecked = selected;
-            card.Button.Content = selected && card.Length is null ? $"Until {KeepAwakeText.Until(_module.Active!.UntilMinute)}" : card.Label;
+            card.Button.Content = selected && card.Length is null ? $"Until {KeepAwakeText.Until(active!.UntilMinute)}" : card.Label;
         }
         // Stop pressed from the keyboard hides itself: the focus goes to the card that was lit, so Space starts it again,
         // rather than falling back to the panel.
