@@ -66,6 +66,7 @@ internal sealed class WheelHook(IWheelInputSink sink, Dispatcher ui) : IWheelInp
     private bool _virtual;
     private PixelPoint _pointer;
     private bool _movePosted;
+    private Task _replays = Task.CompletedTask;
 
     // The gesture asks which buttons open the wheel through this, under the lock.
     private Gesture Gesture => _gestureWithWatch ??= new Gesture(Watched, Slop());
@@ -272,10 +273,12 @@ internal sealed class WheelHook(IWheelInputSink sink, Dispatcher ui) : IWheelInp
                 _timer?.Dispose();
                 _timer = new Timer(_ => Elapsed(press), null, Hold, Timeout.InfiniteTimeSpan);
                 break;
-            case GestureEffect.ReplayDown or GestureEffect.ReplayClick:
-                // Sent from a worker: input sent from inside a hook comes back through it only once the hook returns anyway.
+            case GestureEffect.ReplayDown or GestureEffect.ReplayUp or GestureEffect.ReplayClick:
+                // Sent from a worker, one after another: a drag's up goes out only after its replayed down. (Input sent
+                // from inside a hook comes back through it only once the hook returns anyway.)
                 var replay = step;
-                ThreadPool.QueueUserWorkItem(_ => Replay(replay.Button, replay.Effect == GestureEffect.ReplayClick));
+                lock (_gate)
+                    _replays = _replays.ContinueWith(_ => Replay(replay.Button, replay.Effect), TaskScheduler.Default);
                 break;
             case GestureEffect.Open:
                 _ui.BeginInvoke(() => sink.Opened(step.At, step.Button));
@@ -316,7 +319,7 @@ internal sealed class WheelHook(IWheelInputSink sink, Dispatcher ui) : IWheelInp
         Act(step);
     }
 
-    private static void Replay(MouseButton button, bool click)
+    private static void Replay(MouseButton button, GestureEffect effect)
     {
         (uint down, uint up, uint data) = button switch
         {
@@ -324,10 +327,10 @@ internal sealed class WheelHook(IWheelInputSink sink, Dispatcher ui) : IWheelInp
             MouseButton.Back => (Native.MouseXDown, Native.MouseXUp, 1u),
             _ => (Native.MouseXDown, Native.MouseXUp, 2u),
         };
-        if (click)
+        if (effect == GestureEffect.ReplayClick)
             Native.Send([Native.Button(down, data), Native.Button(up, data)]);
         else
-            Native.Send([Native.Button(down, data)]);
+            Native.Send([Native.Button(effect == GestureEffect.ReplayDown ? down : up, data)]);
     }
 
     public void Dispose()

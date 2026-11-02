@@ -18,6 +18,9 @@ public enum GestureEffect
     /// <summary>The press moved first: its kept down goes to the app now, so the move stays the app's drag.</summary>
     ReplayDown,
 
+    /// <summary>That drag's release, kept and sent after its replayed down, so the app never sees the up first.</summary>
+    ReplayUp,
+
     /// <summary>A quick click: its kept down and up go to the app as a click.</summary>
     ReplayClick,
 
@@ -51,6 +54,7 @@ public sealed class Gesture(Func<MouseButton, bool> watched, int slop)
     private enum Phase { Idle, Pressed, Held, Open }
 
     private readonly HashSet<MouseButton> _kept = [];
+    private readonly HashSet<MouseButton> _dragging = []; // replayed downs whose ups follow them out
     private Phase _phase;
     private MouseButton _button;
     private PixelPoint _at;
@@ -63,7 +67,7 @@ public sealed class Gesture(Func<MouseButton, bool> watched, int slop)
     public bool IsOpen => _phase is Phase.Held or Phase.Open;
 
     /// <summary>Nothing pressed, held or open: the hook can stop if no button opens the wheel.</summary>
-    public bool IsIdle => _phase == Phase.Idle && _kept.Count == 0 && !_escKept;
+    public bool IsIdle => _phase == Phase.Idle && _kept.Count == 0 && _dragging.Count == 0 && !_escKept;
 
     public GestureStep Down(MouseButton button, PixelPoint at)
     {
@@ -101,6 +105,9 @@ public sealed class Gesture(Func<MouseButton, bool> watched, int slop)
             _kept.Remove(button);
             return new(true, GestureEffect.Release, button, at);
         }
+        // A quick drag can let go before its replayed down has gone out: the up goes out after it, not before.
+        if (_dragging.Remove(button))
+            return new(true, GestureEffect.ReplayUp, button, at);
         // The up of a down kept earlier stays Chippi's too, even once the wheel has gone.
         return _kept.Remove(button) ? new(true) : new(false);
     }
@@ -113,6 +120,7 @@ public sealed class Gesture(Func<MouseButton, bool> watched, int slop)
                 return new(false);
             _phase = Phase.Idle;
             _kept.Remove(_button);
+            _dragging.Add(_button);
             return new(false, GestureEffect.ReplayDown, _button, at);
         }
         return _phase is Phase.Held or Phase.Open ? new(false, GestureEffect.Move, _button, at) : new(false);

@@ -507,6 +507,47 @@ public sealed class HubTests : IDisposable
     }
 
     [Fact]
+    public async Task A_selection_that_cant_be_read_or_put_back_is_still_never_heard()
+    {
+        using var lease = Listen();
+        CopyRich("before");
+        await SettleAsync();
+        _copies.Clear();
+        // Another app holds the clipboard from the moment the selection lands until after the hub gives up.
+        _foreground.OnCopy = () =>
+        {
+            _clipboard.CopyText("Ashen Gate", @"C:\Apps\Browser.exe");
+            _clipboard.BusyOpens = int.MaxValue;
+        };
+        Assert.Null(await _hub.CopySelectionAsync());
+        _clipboard.BusyOpens = 0;
+        Assert.Equal("Ashen Gate", _clipboard.Text); // it couldn't be put back
+        await SettleAsync();
+        Assert.Empty(_copies); // but history never keeps it
+    }
+
+    [Fact]
+    public async Task A_selection_whose_restore_fails_is_never_heard()
+    {
+        using var lease = Listen();
+        CopyRich("before");
+        await SettleAsync();
+        _copies.Clear();
+        _foreground.OnCopy = () => _clipboard.CopyText("Ashen Gate", @"C:\Apps\Browser.exe");
+        // The read gets the clipboard; the restore after it finds it held.
+        _clipboard.AfterClose = () =>
+        {
+            if (_clipboard.Text == "Ashen Gate")
+                _clipboard.BusyOpens = int.MaxValue;
+        };
+        Assert.Equal("Ashen Gate", await _hub.CopySelectionAsync());
+        _clipboard.AfterClose = null;
+        _clipboard.BusyOpens = 0;
+        await SettleAsync();
+        Assert.Empty(_copies);
+    }
+
+    [Fact]
     public async Task An_elevated_window_gets_no_Ctrl_C()
     {
         _foreground.CanSend = false;

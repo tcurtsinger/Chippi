@@ -53,7 +53,12 @@ public sealed class WheelTests
         Assert.False(moved.Keep);
         Assert.Equal(GestureEffect.ReplayDown, moved.Effect);
         Assert.Equal(GestureEffect.None, gesture.Elapsed(gesture.Press).Effect);
-        // Its up is the app's too: the app saw its down.
+        Assert.False(gesture.IsIdle);
+        // Its up goes to the app too, after the replayed down: kept here, and sent behind it.
+        var up = gesture.Up(MouseButton.Middle, new PixelPoint(600, 400));
+        Assert.Equal(new GestureStep(true, GestureEffect.ReplayUp, MouseButton.Middle, new PixelPoint(600, 400)), up);
+        Assert.True(gesture.IsIdle);
+        // The next up of that button is the app's own.
         Assert.False(gesture.Up(MouseButton.Middle, new PixelPoint(600, 400)).Keep);
     }
 

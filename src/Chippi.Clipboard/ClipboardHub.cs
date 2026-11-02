@@ -138,6 +138,10 @@ public sealed class ClipboardHub : IClipboardHub, IDisposable
                     return null; // nothing was selected, or the app doesn't copy on Ctrl+C
                 await Task.Delay(SelectionPoll, _time, cancel).ConfigureAwait(false);
             }
+            // From here the copy is the selection's: no listener gets it, even if reading it or putting the previous
+            // copy back fails (another app holding the clipboard).
+            uint arrived = _clipboard.Sequence;
+            NoteOwn(arrived);
             (string? Text, uint Sequence) copied;
             try
             {
@@ -151,8 +155,11 @@ public sealed class ClipboardHub : IClipboardHub, IDisposable
             }
             catch (ClipboardBusyException)
             {
+                await RestoreAsync(saved, arrived, cancel).ConfigureAwait(false);
                 return null;
             }
+            if (copied.Sequence != arrived)
+                NoteOwn(copied.Sequence);
             await RestoreAsync(saved, copied.Sequence, cancel).ConfigureAwait(false);
             return copied.Text;
         }
@@ -354,20 +361,24 @@ public sealed class ClipboardHub : IClipboardHub, IDisposable
         {
             var written = await _clipboard.WriteAsync(work, cancel).ConfigureAwait(false);
             if (written.Sequence != 0)
-            {
-                lock (_gate)
-                {
-                    _own.Enqueue(written.Sequence);
-                    while (_own.Count > 8)
-                        _own.Dequeue();
-                }
-            }
+                NoteOwn(written.Sequence);
             return written;
         }
         finally
         {
             lock (_gate)
                 _writing--;
+        }
+    }
+
+    /// <summary>A copy no listener gets: one of Chippi's own writes, or a selection's copy (whether or not it was put back).</summary>
+    private void NoteOwn(uint sequence)
+    {
+        lock (_gate)
+        {
+            _own.Enqueue(sequence);
+            while (_own.Count > 8)
+                _own.Dequeue();
         }
     }
 
