@@ -21,6 +21,9 @@ public static class PetSize
     /// <summary>Now Playing with nothing playing, asleep over the words.</summary>
     public const double NothingPlaying = 96;
 
+    /// <summary>Cleaning mode, in the middle of the main screen's black.</summary>
+    public const double Cleaning = 200;
+
     /// <summary>A feature page's top row (Keep awake's).</summary>
     public const double Page = 72;
 

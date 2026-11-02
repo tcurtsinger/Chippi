@@ -54,6 +54,9 @@ public sealed class ModuleContext(
     /// </summary>
     public Func<string, bool> TryOpenIslandPage { get; init; } = _ => false;
 
+    /// <summary>Chippi's colour, as Settings › Island &amp; pet picked it, for a Chippi outside the island (Cleaning mode's).</summary>
+    public Func<Config.PetColor> ChippiColor { get; init; } = () => Config.PetColor.Synth;
+
     /// <summary>The shared clipboard service; no module opens the clipboard itself. Null when the shell has none (tests pass a fake).</summary>
     public Clipboard.IClipboardHub? Clipboard { get; init; }
 

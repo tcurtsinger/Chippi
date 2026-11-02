@@ -48,7 +48,8 @@ public sealed class ShortcutList : UserControl
             return;
         }
         _card.Children.Clear();
-        foreach (var action in _module.Offered)
+        // Cleaning mode's own shortcut is its row, not one of these.
+        foreach (var action in _module.Offered.Where(a => a.Id != QuickActionId.Cleaning))
             _card.Children.Add(SettingsLayout.Row(action.Name, Controls(action)));
     }
 

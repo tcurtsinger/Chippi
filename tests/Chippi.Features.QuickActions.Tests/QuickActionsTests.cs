@@ -53,6 +53,8 @@ public sealed class QuickActionsTests
         public readonly List<string> Opened = [];
         public bool HotkeysAvailable = true;
         public bool IslandShows = true;
+        public Action? Cleaning; // Cleaning mode's start while it's installed
+        public int Closed;
         public readonly QuickActionsModule Module;
 
         public Fixture() => Module = new QuickActionsModule(() => Pc, () =>
@@ -60,7 +62,7 @@ public sealed class QuickActionsTests
             var hotkey = new Hotkey { Available = HotkeysAvailable };
             Hotkeys.Add(hotkey);
             return hotkey;
-        });
+        }, () => Cleaning);
 
         public Task Start() => Module.StartAsync(new ModuleContext(QuickActionsModule.Id, Settings, NullLogger.Instance, new IslandActivityHub().CreatePublisher(QuickActionsModule.Id), Ui)
         {
@@ -71,6 +73,7 @@ public sealed class QuickActionsTests
                 return IslandShows;
             },
             IslandPasteTarget = () => new PasteTarget(1, 42),
+            CloseIsland = () => Closed++,
         }, default);
     }
 
@@ -106,6 +109,35 @@ public sealed class QuickActionsTests
         Assert.DoesNotContain(f.Module.Offered, a => a.Id is QuickActionId.Bluetooth or QuickActionId.Extend);
         Assert.Equal(16, f.Module.Offered.Count);
         Assert.Equal([QuickActionId.WiFi], f.Module.Shown.Select(a => a.Id));
+    }
+
+    [Fact]
+    public async Task Cleaning_is_offered_while_Cleaning_mode_is_installed_and_closes_the_island_to_start_it()
+    {
+        var f = new Fixture();
+        f.Settings.Value = new() { Shown = ["dark", "cleaning"] };
+        await f.Start();
+        Assert.DoesNotContain(f.Module.Offered, a => a.Id == QuickActionId.Cleaning);
+        Assert.Equal([QuickActionId.Dark], f.Module.Shown.Select(a => a.Id));
+        int started = 0;
+        f.Cleaning = () => started++;
+        Assert.Contains(f.Module.Offered, a => a.Id == QuickActionId.Cleaning);
+        WpfTestThread.Run(() =>
+        {
+            var page = new ActionsPage(f.Module);
+            page.Press(QuickActionId.Cleaning);
+        });
+        Assert.Equal((1, 1), (f.Closed, started));
+        Assert.Empty(f.Pc.Calls); // not a Windows action
+        f.Cleaning = () => throw new InvalidOperationException("no screens");
+        WpfTestThread.Run(() =>
+        {
+            var page = new ActionsPage(f.Module);
+            page.Press(QuickActionId.Cleaning);
+            var cleaning = Find<System.Windows.Controls.Primitives.ToggleButton>(page).First(t => Equals(t.Tag, "cleaning"));
+            Assert.Equal("Cleaning, Failed", System.Windows.Automation.AutomationProperties.GetName(cleaning));
+        });
+        Assert.Equal(1, f.Closed); // a start that failed leaves the island open, saying so
     }
 
     [Fact]
