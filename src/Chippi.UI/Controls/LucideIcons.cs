@@ -123,10 +123,19 @@ public static class LucideIcons
     public static Geometry HardDrive { get; } = G("M22,12 H2 M5.45,5.11 L2,12 v6 a2,2 0 0 0 2,2 h16 a2,2 0 0 0 2,-2 v-6 l-3.45,-6.89 A2,2 0 0 0 16.76,4 H7.24 a2,2 0 0 0 -1.79,1.11 Z M6,16 h0.01 M10,16 h0.01");
     public static Geometry LogOut { get; } = G("M9,21 H5 a2,2 0 0 1 -2,-2 V5 a2,2 0 0 1 2,-2 h4 M16,17 l5,-5 l-5,-5 M21,12 H9");
 
+    // Command bar (Phase 5.5): a row's hide button, and a sum's or a conversion's answer.
+    public static Geometry EyeOff { get; } = G("M10.73,5.08 A10.74,10.74 0 0 1 21.94,11.65 a1,1 0 0 1 0,0.7 a10.75,10.75 0 0 1 -1.44,2.49 M14.08,14.16 a3,3 0 0 1 -4.24,-4.24 M17.48,17.5 A10.75,10.75 0 0 1 2.06,12.35 a1,1 0 0 1 0,-0.7 A10.75,10.75 0 0 1 6.51,6.51 M2,2 L22,22");
+    public static Geometry Equal { get; } = G("M5,9 H19 M5,15 H19");
+
     private static readonly FrozenDictionary<string, Geometry> ByKey = typeof(LucideIcons)
         .GetProperties(BindingFlags.Public | BindingFlags.Static)
         .Where(p => p.PropertyType == typeof(Geometry))
         .ToFrozenDictionary(p => p.Name, p => (Geometry)p.GetValue(null)!, StringComparer.OrdinalIgnoreCase);
+
+    private static readonly FrozenDictionary<Geometry, string> ByGeometry = ByKey.ToFrozenDictionary(p => p.Value, p => p.Key);
+
+    /// <summary>The key of one of these icons (Quick actions' commands); "LayoutGrid" for any other geometry.</summary>
+    public static string KeyOf(Geometry geometry) => ByGeometry.GetValueOrDefault(geometry, nameof(LayoutGrid));
 
     /// <summary>Resolves an icon key (a property name, case-insensitive) from a module descriptor. Unknown keys get <see cref="LayoutGrid"/>.</summary>
     public static Geometry Get(string? key) =>

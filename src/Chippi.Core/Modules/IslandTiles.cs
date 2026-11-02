@@ -86,6 +86,15 @@ public sealed record IslandTileSpec(string Key, string Name, string Icon, int Or
     public Func<object?>? InitialFocus { get; init; }
 
     /// <summary>
+    /// Showing the page takes the keyboard at once, as a click into the island does, and focuses <see cref="InitialFocus"/>
+    /// (the Command bar's field). Other pages wait to be clicked.
+    /// </summary>
+    public bool TakesKeyboard { get; init; }
+
+    /// <summary>The header row's height when it isn't the usual 24 (the Command bar's 32 field); the body is that much shorter. 0 for the usual.</summary>
+    public double HeaderHeight { get; init; }
+
+    /// <summary>
     /// The page sees Esc first, from the island and the global Esc alike: true when it used it (Clipboard
     /// clears its search or leaves Clean URL), and the island stays open. Null for the usual close.
     /// </summary>

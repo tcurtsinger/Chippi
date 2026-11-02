@@ -1,16 +1,19 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using System.Globalization;
+using System.Text.RegularExpressions;
 using Chippi.Audio;
 using Chippi.Core.Island;
 using Chippi.Core.Modules;
 using Chippi.Core.Notifications;
 using Chippi.Features.Sound.Mute;
+using Chippi.UI.Controls;
 using Microsoft.Extensions.Logging;
 
 namespace Chippi.Features.Sound.Routing;
 
-public sealed class AudioRoutingModule : IFeatureModule
+public sealed partial class AudioRoutingModule : IFeatureModule
 {
     private static readonly AudioRole[] AllRoles = [AudioRole.Console, AudioRole.Multimedia, AudioRole.Communications];
     private static readonly AudioRole[] WithoutCalls = [AudioRole.Console, AudioRole.Multimedia];
@@ -106,6 +109,8 @@ public sealed class AudioRoutingModule : IFeatureModule
             _tile = context.Ui.AddIslandTile(SoundTile.Section(0, SoundTile.Output, () => new RoutingQuickView(this, AudioFlow.Render))
                 with { Volume = new IslandTileVolume(OutputVolume, SetHomeVolume, OutputMuted, SetHomeMutedAsync) });
             context.Ui.AddIslandTile(SoundTile.Section(20, SoundTile.Microphone, () => new RoutingQuickView(this, AudioFlow.Capture)));
+            context.Ui.AddCommands(Commands);
+            context.Ui.AddCommandSearch(Values);
             context.Ui.SetSettingsPage(section => section switch
             {
                 "microphone" => new RoutingPage(this, AudioFlow.Capture),
@@ -418,6 +423,38 @@ public sealed class AudioRoutingModule : IFeatureModule
 
     private Task SetHomeMutedAsync(bool muted) =>
         InUse(AudioFlow.Render) is { } id ? SetOutputMutedAsync(id, muted) : Task.CompletedTask;
+
+    // The Command bar (docs/phase-5.5/command-bar.md): the output's mute, and values typed in.
+
+    private IReadOnlyList<ChippiCommand> Commands() => InUse(AudioFlow.Render) is null ? [] :
+    [
+        new("audio-routing/mute", OutputMuted() ? "Unmute sound" : "Mute sound", OutputMuted() ? nameof(LucideIcons.Volume) : nameof(LucideIcons.VolumeMuted),
+            () => SetHomeMutedAsync(!OutputMuted())) { Words = "mute unmute sound speakers output volume silence" },
+    ];
+
+    [GeneratedRegex(@"^(?:vol|volume)\s*(\d{1,3})\s*%?$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex VolumeValue();
+
+    [GeneratedRegex(@"^(?:output|out)(?:\s+(.+))?$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex OutputValue();
+
+    /// <summary>"volume 40" → Volume to 40% (with its level); "output buds" → Output to INZONE Buds, and "output" alone each output.</summary>
+    private IReadOnlyList<ChippiCommand> Values(string text)
+    {
+        if (VolumeValue().Match(text) is { Success: true } volume && InUse(AudioFlow.Render) is { } id)
+        {
+            int percent = Math.Min(100, int.Parse(volume.Groups[1].Value, CultureInfo.InvariantCulture));
+            return [new("audio-routing/volume", $"Volume to {percent}%", nameof(LucideIcons.Volume), () => SetOutputVolumeAsync(id, percent / 100f))
+                { Kind = ChippiCommandKind.Value, Level = percent / 100.0 }];
+        }
+        if (OutputValue().Match(text) is not { Success: true } output || (output.Groups[1].Success == false && !text.Equals("output", StringComparison.OrdinalIgnoreCase)))
+            return [];
+        string wanted = output.Groups[1].Value.Trim();
+        return [.. Snapshot.Active(AudioFlow.Render)
+            .Where(e => !_excluded(e) && e.Name.Contains(wanted, StringComparison.CurrentCultureIgnoreCase))
+            .Select(e => new ChippiCommand($"audio-routing/output/{e.Id}", $"Output to {e.Name}", nameof(LucideIcons.Headphones), () => UseAsync(AudioFlow.Render, e.Id))
+                { Kind = ChippiCommandKind.Value })];
+    }
 
     public async Task StopAsync(CancellationToken ct)
     {

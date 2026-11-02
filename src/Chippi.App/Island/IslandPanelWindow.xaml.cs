@@ -151,6 +151,9 @@ public partial class IslandPanelWindow : Window
     /// <summary>The app in front, read just before the island takes the keyboard (Phase 5 notes #62).</summary>
     internal Func<Core.Clipboard.PasteTarget?>? CaptureTarget { get; set; }
 
+    /// <summary>Brings the island in front to take the keyboard; tests stand in for it, so none takes the owner's foreground.</summary>
+    internal Action<HWND> ActivateWindow { get; set; } = IslandNative.Activate;
+
     /// <summary>The app that was in front before the island took the keyboard; null until it has, and after it closes.</summary>
     internal Core.Clipboard.PasteTarget? PasteTarget { get; private set; }
 
@@ -345,6 +348,8 @@ public partial class IslandPanelWindow : Window
         Place();
         Show();
         Begin(Morph.Open);
+        if (TakesKeyboard(_page))
+            TakeKeyboard();
     }
 
     /// <summary>
@@ -403,7 +408,12 @@ public partial class IslandPanelWindow : Window
         Begin(Morph.Page);
         if (_keyboard)
             Dispatcher.BeginInvoke(DispatcherPriority.Input, FocusFirst);
+        else if (TakesKeyboard(key))
+            TakeKeyboard();
     }
+
+    /// <summary>Whether showing <paramref name="key"/>'s page takes the keyboard at once (the Command bar).</summary>
+    private bool TakesKeyboard(string? key) => Group(key)?.Parts.Any(p => p.Spec.TakesKeyboard) == true;
 
     // ----- Pages -----
 
@@ -447,10 +457,12 @@ public partial class IslandPanelWindow : Window
             var header = factory?.Invoke() as FrameworkElement ?? PageHeader(key);
             header.Margin = new Thickness(0);
             header.VerticalAlignment = VerticalAlignment.Center;
-            // Every header gets the same 24 row and the 8 gap below it, so every body is 496 × 304.
+            // Every header gets the same 24 row and the 8 gap below it, so every body is 496 × 304; a page that asks for a
+            // taller row (the Command bar's 32 field) gets it, and its body is that much shorter.
             var back = BackButton(() => { if (!PageHandlesBack()) ShowPage(null, remember: false); });
             DockPanel.SetDock(back, Dock.Left);
-            var row = new DockPanel { Height = IslandPage.HeaderHeight, Margin = new Thickness(0, 0, 0, IslandPage.Gap), LastChildFill = true, Children = { back, header } };
+            double height = Group(key)?.Parts.Max(p => p.Spec.HeaderHeight) is > 0 and var taller ? taller : IslandPage.HeaderHeight;
+            var row = new DockPanel { Height = height, Margin = new Thickness(0, 0, 0, IslandPage.Gap), LastChildFill = true, Children = { back, header } };
             DockPanel.SetDock(row, Dock.Top);
             _attached.Add(row);
             page.Children.Add(row);
@@ -752,7 +764,7 @@ public partial class IslandPanelWindow : Window
         _keyboard = true;
         // Before activating: once the island is in front, the app the user was in is gone from view.
         PasteTarget = CaptureTarget?.Invoke() ?? PasteTarget;
-        IslandNative.Activate(_hwnd);
+        ActivateWindow(_hwnd);
         Dispatcher.BeginInvoke(DispatcherPriority.Input, () =>
         {
             for (var at = pressed; at is not null; at = at is System.Windows.Media.Visual or System.Windows.Media.Media3D.Visual3D ? VisualTreeHelper.GetParent(at) : LogicalTreeHelper.GetParent(at))

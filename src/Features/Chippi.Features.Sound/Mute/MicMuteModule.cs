@@ -5,6 +5,7 @@ using System.Media;
 using Chippi.Audio;
 using Chippi.Core.Island;
 using Chippi.Core.Modules;
+using Chippi.UI.Controls;
 using Microsoft.Extensions.Logging;
 
 namespace Chippi.Features.Sound.Mute;
@@ -123,6 +124,11 @@ public sealed class MicMuteModule : IFeatureModule
             ShortcutError = Settings.Shortcut is null || _hotkey.Register(Settings.Shortcut, OnHotkey) ? null : "Shortcut in use";
             _tile = context.Ui.AddIslandTile(SoundTile.Section(10, SoundTile.Microphone, () => new MicQuickView(this))
                 with { StatusPriority = 100, Toggle = new IslandTileToggle(() => Status.State == MicrophoneMuteState.Muted, ToggleAsync, "Microphone", "Mic", () => StatusText) });
+            // The Command bar: mute or unmute every microphone, as the shortcut does.
+            context.Ui.AddCommands(() => Status.State is MicrophoneMuteState.Muted or MicrophoneMuteState.Live
+                ? [new ChippiCommand("mic-mute/toggle", Status.State == MicrophoneMuteState.Muted ? "Unmute microphone" : "Mute microphone",
+                    Status.State == MicrophoneMuteState.Muted ? nameof(LucideIcons.Mic) : nameof(LucideIcons.MicOff), ToggleAsync) { Words = "mic microphone mute unmute" }]
+                : []);
             // Settings › Microphone: "mute" is the Microphone row at the top, the rest the Mute shortcut section.
             context.Ui.SetSettingsPage(section => new MicMuteView(this, section == "mute" ? MicMuteSurface.Microphone : section == "shortcut-list" ? MicMuteSurface.ShortcutList : MicMuteSurface.Shortcut));
             _audio.SnapshotChanged += OnSnapshot;

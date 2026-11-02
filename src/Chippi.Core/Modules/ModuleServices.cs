@@ -28,14 +28,20 @@ public sealed class ModuleServices
 
     public TimeProvider Time { get; init; } = TimeProvider.System;
 
-    /// <summary>Opens Settings at a page id (<c>module:&lt;id&gt;/&lt;section&gt;</c>). Set by the shell; null in tests.</summary>
-    public Action<string>? OpenSettings { get; set; }
+    /// <summary>Opens Settings at a page id (<c>module:&lt;id&gt;/&lt;section&gt;</c>), or on the last page for null. Set by the shell; null in tests.</summary>
+    public Action<string?>? OpenSettings { get; set; }
 
     /// <summary>Opens the island on a tile key's page. Set by the shell; null in tests.</summary>
     public Action<string>? OpenIslandPage { get; set; }
 
     /// <summary>Opens the island on a tile key's page, without falling back to Settings: false when the island can't show. Set by the shell; null in tests.</summary>
     public Func<string, bool>? TryOpenIslandPage { get; set; }
+
+    /// <summary>
+    /// Opens the island on a tile key's page with the keyboard, over a fullscreen app too, on the widget's screen: false
+    /// only while the island is off. Set by the shell; null in tests.
+    /// </summary>
+    public Func<string, bool>? SummonIslandPage { get; set; }
 
     /// <summary>Chippi's colour, as Settings › Island &amp; pet picked it. Set by the shell; null in tests.</summary>
     public Func<Config.PetColor>? ChippiColor { get; set; }

@@ -19,6 +19,10 @@ Chippi ships VB-Audio's VB-CABLE Driver Pack 45 (`vendor\vb-cable\VBCABLE_Driver
 - VB-CABLE is a donationware, all participations are welcome.
 - Licensing: https://vb-audio.com/Services/licensing.htm
 
+## Bundled data: Unicode emoji names
+
+The Command bar finds emoji by name from a trimmed copy of Unicode's emoji-test.txt 16.0 (`src/Features/Chippi.Features.CommandBar/Data/emoji.txt`: fully-qualified emoji without skin-tone variants or country flags, up to Emoji 15.1, with their names and subgroups). Source: https://unicode.org/Public/emoji/16.0/emoji-test.txt. Unicode License v3, reproduced below.
+
 ## Runtime NuGet packages
 
 The self-contained app embeds these packages, each MIT licensed, copyright Microsoft Corporation:
@@ -36,6 +40,10 @@ File organizer's history database adds:
 - SQLitePCLRaw.bundle_e_sqlite3, SQLitePCLRaw.core, SQLitePCLRaw.lib.e_sqlite3 and SQLitePCLRaw.provider.e_sqlite3 2.1.13, Apache-2.0 licensed, copyright 2014-2024 SourceGear, LLC. Source: https://github.com/ericsink/SQLitePCL.raw. The Apache License 2.0 is reproduced below.
 - SQLite, the native e_sqlite3 library inside SQLitePCLRaw.lib.e_sqlite3, which is in the public domain. Source: https://sqlite.org/copyright.html
 
+The Command bar adds:
+
+- System.Data.OleDb 10.0.13, MIT licensed, copyright Microsoft Corporation (no further packages on .NET 10). It asks Windows Search for files and folders.
+
 Velopack 1.2.161 also ships (MIT), copyright 2021 Caelan Sayler and 2024 Velopack Ltd. The net10.0 library has no additional NuGet dependencies. Its native updater, portable launcher stub, and Setup bootstrapper are supplied by vpk 1.2.161. Source: https://github.com/velopack/velopack/tree/92d6a1c91716729d449034df5c50307dcce39493. The complete Velopack license is reproduced below.
 
 Source: https://github.com/dotnet/dotnet (package nuspec repository commit b0f34d51fccc69fd334253924abd8d6853fad7aa).
@@ -45,6 +53,48 @@ The self-contained .NET 10.0.14 and Windows Desktop 10.0.14 runtimes are MIT lic
 Build-only packages (not shipped as runtime libraries): Microsoft.Windows.CsWin32, Win32Metadata, WDK Win32Metadata, Win32Docs, ILLink.Tasks, Microsoft.NET.Test.Sdk, xUnit and its runner. vpk is a repo-local build tool; packaging adds Velopack's updater components, covered by their notices in the final package.
 
 ## License texts
+
+### Unicode data (emoji names)
+
+UNICODE LICENSE V3
+
+COPYRIGHT AND PERMISSION NOTICE
+
+Copyright © 1991-2026 Unicode, Inc.
+
+NOTICE TO USER: Carefully read the following legal agreement. BY
+DOWNLOADING, INSTALLING, COPYING OR OTHERWISE USING DATA FILES, AND/OR
+SOFTWARE, YOU UNEQUIVOCALLY ACCEPT, AND AGREE TO BE BOUND BY, ALL OF THE
+TERMS AND CONDITIONS OF THIS AGREEMENT. IF YOU DO NOT AGREE, DO NOT
+DOWNLOAD, INSTALL, COPY, DISTRIBUTE OR USE THE DATA FILES OR SOFTWARE.
+
+Permission is hereby granted, free of charge, to any person obtaining a
+copy of data files and any associated documentation (the "Data Files") or
+software and any associated documentation (the "Software") to deal in the
+Data Files or Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, and/or sell
+copies of the Data Files or Software, and to permit persons to whom the
+Data Files or Software are furnished to do so, provided that either (a)
+this copyright and permission notice appear with all copies of the Data
+Files or Software, or (b) this copyright and permission notice appear in
+associated Documentation.
+
+THE DATA FILES AND SOFTWARE ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY
+KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT OF
+THIRD PARTY RIGHTS.
+
+IN NO EVENT SHALL THE COPYRIGHT HOLDER OR HOLDERS INCLUDED IN THIS NOTICE
+BE LIABLE FOR ANY CLAIM, OR ANY SPECIAL INDIRECT OR CONSEQUENTIAL DAMAGES,
+OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,
+WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
+ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THE DATA
+FILES OR SOFTWARE.
+
+Except as contained in this notice, the name of a copyright holder shall
+not be used in advertising or otherwise to promote the sale, use or other
+dealings in these Data Files or Software without prior written
+authorization of the copyright holder.
 
 
 ### Lucide and Feather

@@ -72,6 +72,7 @@ public sealed class IslandHost : IDisposable
         _shell.Commands.RegisterIslandHold(_window.HoldIslandOpen);
         // A second launch and a notice click open the island; with it off or hidden, ShellCommands opens Settings.
         _shell.Commands.RegisterPages(_window.ShowPages, _window.ShowPage);
+        _shell.Commands.RegisterSummon(_window.SummonPage);
         _window.IsVisibleChanged += (_, _) => _shell.Commands.SetIslandShowing(_window.IsVisible);
         StartMedia();
         _tracker.Changed += (_, _) =>

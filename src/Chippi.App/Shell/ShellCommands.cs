@@ -13,6 +13,7 @@ public sealed class ShellCommands
 {
     private Func<bool, bool>? _showPages;
     private Func<string, bool>? _showPage;
+    private Func<string, bool>? _summonPage;
     private Action<string?>? _openSettings;
     private Func<IDisposable> _holdIslandOpen = () => new Chippi.Core.Modules.IslandOpenHold().Hold();
     public void RegisterIslandHold(Func<IDisposable> hold) => _holdIslandOpen = hold;
@@ -37,6 +38,9 @@ public sealed class ShellCommands
         _showPage = showPage;
     }
 
+    /// <summary>WS3 registers this: the island on a tile's page with the keyboard, over a fullscreen app too.</summary>
+    public void RegisterSummon(Func<string, bool> summon) => _summonPage = summon;
+
     /// <summary>WS2 registers this. The page is a sidebar id such as "features", or null for the last page.</summary>
     public void RegisterSettings(Action<string?> open) => _openSettings = open;
 
@@ -56,6 +60,9 @@ public sealed class ShellCommands
 
     /// <summary>The island on a tile's page, and nothing when it can't show: false then.</summary>
     public bool TryShowPage(string key) => _showPage?.Invoke(key) == true;
+
+    /// <summary>The Command bar's shortcut: the island on a tile's page with the keyboard, over a fullscreen app too. False while the island is off.</summary>
+    public bool SummonPage(string key) => _summonPage?.Invoke(key) == true;
 
     /// <summary>WS3 reports whether the island's tab is on screen.</summary>
     public void SetIslandShowing(bool showing)

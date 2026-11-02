@@ -61,12 +61,7 @@ public static class FeatureCatalog
             Presets = PowerUser,
         },
 
-        // Phase 5.5 and 6: Windows and input
-        new("command-bar", "Command bar", "Type to launch apps, run commands and reach any Chippi feature", FeatureGroup.Windows)
-        {
-            Icon = "Search",
-            Presets = PowerUser,
-        },
+        // Phase 5.5 and 6: Windows and input (the Command bar is a real module: Chippi.Features.CommandBar)
         new("radial-menu", "Radial menu", "Hold a mouse button for a ring of actions under the pointer", FeatureGroup.Windows)
         {
             Icon = "Zap",

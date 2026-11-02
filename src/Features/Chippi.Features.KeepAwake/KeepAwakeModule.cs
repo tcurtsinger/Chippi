@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using System.Globalization;
+using System.Text.RegularExpressions;
 using Chippi.Core.Island;
 using Chippi.Core.Modules;
 using Chippi.UI.Controls;
@@ -8,7 +10,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Chippi.Features.KeepAwake;
 
-public sealed class KeepAwakeModule : IFeatureModule
+public sealed partial class KeepAwakeModule : IFeatureModule
 {
     private readonly SemaphoreSlim _gate = new(1);
     private readonly IExecutionState _native;
@@ -82,7 +84,65 @@ public sealed class KeepAwakeModule : IFeatureModule
             Changed?.Invoke();
         });
         context.Ui.SetSettingsPage(() => new KeepAwakePage(this));
+        context.Ui.AddCommands(() => [new ChippiCommand("keep-awake/toggle", IsOn ? "Stop keep awake" : "Keep awake", nameof(LucideIcons.Coffee), () => ToggleAsync())
+            { Words = "keep awake coffee sleep stay on caffeine" }]);
+        context.Ui.AddCommandSearch(Values);
         return Task.CompletedTask;
+    }
+
+    [GeneratedRegex(@"^(?:keep\s*)?awake(?:\s+for)?\s+(\d+(?:\.\d+)?)\s*(h|hr|hrs|hour|hours|m|min|mins|minute|minutes)?$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex ForValue();
+
+    [GeneratedRegex(@"^(?:keep\s*)?awake\s+until\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm|a|p)?$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex UntilValue();
+
+    [GeneratedRegex(@"^(?:keep\s*)?awake\s+(?:no limit|forever|indefinitely)$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex NoLimitValue();
+
+    /// <summary>The Command bar's values (docs/phase-5.5/command-bar.md): a length, an Until time, or no limit, started at once.</summary>
+    internal IReadOnlyList<ChippiCommand> Values(string text)
+    {
+        KeepAwakeSettings? length = null;
+        string name = "";
+        if (ForValue().Match(text) is { Success: true } duration)
+        {
+            double count = double.Parse(duration.Groups[1].Value, CultureInfo.InvariantCulture);
+            // Without a unit, up to 12 is hours ("awake 2") and more is minutes ("awake 45").
+            bool minutes = duration.Groups[2].Success ? duration.Groups[2].Value.StartsWith('m') : count > 12;
+            int total = (int)Math.Round(minutes ? count : count * 60);
+            if (total is < 1 or > 1440)
+                return [];
+            length = new KeepAwakeSettings { Mode = AwakeMode.Duration, DurationMinutes = total };
+            name = $"Keep awake for {KeepAwakeText.Left(TimeSpan.FromMinutes(total))}";
+        }
+        else if (UntilValue().Match(text) is { Success: true } until && Minute(until, DateTime.Now) is { } minute)
+        {
+            length = new KeepAwakeSettings { Mode = AwakeMode.UntilTime, UntilMinute = minute };
+            name = $"Keep awake until {KeepAwakeText.Until(minute)}";
+        }
+        else if (NoLimitValue().IsMatch(text))
+        {
+            length = new KeepAwakeSettings { Mode = AwakeMode.Indefinitely };
+            name = "Keep awake with no limit";
+        }
+        return length is null ? [] : [new ChippiCommand("keep-awake/value", name, nameof(LucideIcons.Coffee), () => StartSessionAsync(length)) { Kind = ChippiCommandKind.Value }];
+    }
+
+    /// <summary>"6 pm" or "18:30" as a minute of the day; "6" alone is the next 6 o'clock, morning or evening.</summary>
+    internal static int? Minute(Match until, DateTime now)
+    {
+        int hour = int.Parse(until.Groups[1].Value, CultureInfo.InvariantCulture);
+        int minute = until.Groups[2].Success ? int.Parse(until.Groups[2].Value, CultureInfo.InvariantCulture) : 0;
+        string half = until.Groups[3].Value.ToLowerInvariant();
+        if (minute > 59 || hour > 23 || (half.Length > 0 && hour is 0 or > 12))
+            return null;
+        if (half.StartsWith('p') && hour < 12)
+            hour += 12;
+        else if (half.StartsWith('a') && hour == 12)
+            hour = 0;
+        else if (half.Length == 0 && hour <= 12 && hour * 60 + minute <= now.Hour * 60 + now.Minute)
+            hour = (hour + 12) % 24; // already past this morning's: this evening's
+        return hour * 60 + minute;
     }
 
     public async Task ApplyAsync(KeepAwakeSettings settings, CancellationToken ct = default)

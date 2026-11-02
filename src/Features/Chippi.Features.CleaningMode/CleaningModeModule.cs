@@ -72,6 +72,11 @@ public sealed class CleaningModeModule : IFeatureModule
         if (Settings.Shortcut is { } shortcut)
             TryRegister(shortcut);
         context.Ui.SetSettingsPage(section => section == "shortcut-list" ? new Views.ShortcutRow(this, Descriptor.Name) : new Views.CleaningModeSettingsPage(this));
+        context.Ui.AddCommands(() => [new ChippiCommand("cleaning-mode/start", "Cleaning mode", nameof(LucideIcons.Droplet), () =>
+        {
+            Start();
+            return Task.CompletedTask;
+        }) { Words = "clean wipe keyboard screens lock" }]);
         return Task.CompletedTask;
     }
 

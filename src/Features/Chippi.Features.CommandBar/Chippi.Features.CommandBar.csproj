@@ -1,0 +1,41 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- The Command bar (Phase 5.5): one shortcut and a few letters to open an app, a window, a file or a Windows Settings page,
+     run anything Chippi does, paste an old copy, get a sum, copy an emoji or search the web. It references Sound for the
+     shortcut type, as Cleaning mode does, and asks Windows Search for files through OLE DB. -->
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>Chippi.Features.CommandBar</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Chippi.Core\Chippi.Core.csproj" />
+    <ProjectReference Include="..\..\Chippi.UI\Chippi.UI.csproj" />
+    <ProjectReference Include="..\Chippi.Features.Sound\Chippi.Features.Sound.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Data.OleDb" />
+  </ItemGroup>
+
+  <!-- Unicode's emoji names (Data/emoji.txt; its license is in THIRD-PARTY-NOTICES.md). -->
+  <ItemGroup>
+    <EmbeddedResource Include="Data\emoji.txt" LogicalName="Chippi.Features.CommandBar.emoji.txt" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Chippi.Features.CommandBar.Tests" />
+  </ItemGroup>
+
+  <!-- P/Invoke via CsWin32, from the NativeMethods.txt in this folder. -->
+  <PropertyGroup>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Windows.CsWin32" PrivateAssets="all" />
+    <AdditionalFiles Include="**\NativeMethods.txt" />
+  </ItemGroup>
+
+</Project>

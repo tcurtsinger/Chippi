@@ -238,6 +238,58 @@ public sealed class ModuleRegistry(ConfigStore config, IslandActivityHub island,
     }
 
     /// <summary>The features a preset installs. Placeholders are never included.</summary>
+    /// <summary>
+    /// Chippi's commands (docs/phase-5.5/command-bar.md): every running feature's, each island page but the asking tile's
+    /// own, and Settings. A feature whose list throws is left out and logged.
+    /// </summary>
+    public IReadOnlyList<ChippiCommand> Commands()
+    {
+        var all = new List<ChippiCommand>();
+        foreach (var entry in _entries.Where(e => e.IsRunning && e.Ui is not null))
+        {
+            foreach (var list in entry.Ui!.Commands)
+            {
+                try { all.AddRange(list()); }
+                catch (Exception ex) { _logger.LogWarning(ex, "{Id}'s commands failed", entry.Id); }
+            }
+        }
+        foreach (var tile in IslandTileContribution.Group(_entries.Where(e => e.IsRunning).SelectMany(e => e.IslandTiles)))
+        {
+            if (tile.Parts.Any(p => p.Spec.TakesKeyboard))
+                continue; // the Command bar's own page
+            string words = string.Join(' ', tile.Parts.Select(p => Find(p.ModuleId)?.Descriptor.Name).Distinct());
+            string key = tile.Key;
+            all.Add(new ChippiCommand("page/" + key, tile.Name, tile.Icon, () =>
+            {
+                _services.OpenIslandPage?.Invoke(key);
+                return Task.CompletedTask;
+            })
+            { Words = words, Detail = "Chippi · page", Kind = ChippiCommandKind.Page });
+        }
+        all.Add(new ChippiCommand("page/settings", "Settings", "Settings", () =>
+        {
+            _services.OpenSettings?.Invoke(null);
+            return Task.CompletedTask;
+        })
+        { Words = "chippi settings options preferences", Detail = "Chippi · Settings", Kind = ChippiCommandKind.Page });
+        return all;
+    }
+
+    /// <summary>What every running feature makes of <paramref name="text"/>, in the order the features were registered.</summary>
+    public IReadOnlyList<ChippiCommand> SearchCommands(string text)
+    {
+        var all = new List<ChippiCommand>();
+        foreach (var entry in _entries.Where(e => e.IsRunning && e.Ui is not null))
+        {
+            foreach (var search in entry.Ui!.Searches)
+            {
+                try { all.AddRange(search(text)); }
+                catch (Exception ex) { _logger.LogWarning(ex, "{Id}'s command search failed", entry.Id); }
+            }
+        }
+        return all;
+    }
+
     public IEnumerable<FeatureEntry> PresetMembers(FeaturePreset preset) => _entries.Where(e => !e.IsComingSoon && preset switch
     {
         FeaturePreset.Everything => true,
@@ -341,6 +393,9 @@ public sealed class ModuleRegistry(ConfigStore config, IslandActivityHub island,
             OpenSettings = section => _services.OpenSettings?.Invoke(section is { Length: > 0 } ? $"module:{id}/{section}" : $"module:{id}"),
             OpenIslandPage = key => _services.OpenIslandPage?.Invoke(key),
             TryOpenIslandPage = key => _services.TryOpenIslandPage?.Invoke(key) == true,
+            SummonIslandPage = key => _services.SummonIslandPage?.Invoke(key) == true,
+            Commands = Commands,
+            SearchCommands = SearchCommands,
             ChippiColor = () => _services.ChippiColor?.Invoke() ?? Config.PetColor.Synth,
             Clipboard = _services.Clipboard,
             HoldIslandOpen = _services.HoldIslandOpen,

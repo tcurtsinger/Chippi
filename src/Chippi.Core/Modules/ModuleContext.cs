@@ -54,6 +54,18 @@ public sealed class ModuleContext(
     /// </summary>
     public Func<string, bool> TryOpenIslandPage { get; init; } = _ => false;
 
+    /// <summary>
+    /// Opens the island on a tile's page with the keyboard, even over a fullscreen app or game, on the widget's screen (the
+    /// Command bar's shortcut). False only while the island is off.
+    /// </summary>
+    public Func<string, bool> SummonIslandPage { get; init; } = _ => false;
+
+    /// <summary>Everything Chippi does, from every running feature, with the island's pages and Settings (the Command bar).</summary>
+    public Func<IReadOnlyList<ChippiCommand>> Commands { get; init; } = () => [];
+
+    /// <summary>What every running feature makes of the Command bar's text: values typed in, and its own matches.</summary>
+    public Func<string, IReadOnlyList<ChippiCommand>> SearchCommands { get; init; } = _ => [];
+
     /// <summary>Chippi's colour, as Settings › Island &amp; pet picked it, for a Chippi outside the island (Cleaning mode's).</summary>
     public Func<Config.PetColor> ChippiColor { get; init; } = () => Config.PetColor.Synth;
 

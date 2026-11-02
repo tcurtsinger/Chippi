@@ -71,8 +71,48 @@ public sealed class ClipboardHistoryModule : IFeatureModule
             StatusPriority = 1, // History's status over Clean URL's (notes #4)
             HandleEscape = () => _view?.HandleEscape() == true, // the first Esc clears a search or leaves Clean URL (notes #59)
         });
+        context.Ui.AddCommandSearch(Copies);
         UpdateStatus();
         _features.History = this;
+    }
+
+    /// <summary>
+    /// The Command bar's clipboard rows (docs/phase-5.5/command-bar.md): the newest copies that match, pinned or not, each
+    /// pasted into the app that was in front, or copied when there was none. Private copies were never saved.
+    /// </summary>
+    private IReadOnlyList<ChippiCommand> Copies(string text)
+    {
+        if (History is not { } history || text.Length < 2)
+            return [];
+        var now = DateTimeOffset.Now;
+        return [.. history.Entries
+            .Where(e => !history.Expired(e) && e.Matches(text))
+            .OrderByDescending(e => e.Recent)
+            .Take(8)
+            .Select(e => new ChippiCommand($"clipboard/{e.Id}", Format.Line(e), nameof(LucideIcons.Clipboard), () => PasteAsync(history, e))
+                { Kind = ChippiCommandKind.Paste, Detail = Copied(e.Recent, now) })];
+    }
+
+    /// <summary>"Copied today, 4:12 PM", "Copied yesterday", "Copied Oct 30".</summary>
+    internal static string Copied(DateTimeOffset at, DateTimeOffset now)
+    {
+        var day = at.ToLocalTime().Date;
+        var today = now.ToLocalTime().Date;
+        return day == today ? $"Copied today, {at.ToLocalTime():t}"
+            : day == today.AddDays(-1) ? "Copied yesterday"
+            : $"Copied {day.ToString("MMM d", System.Globalization.CultureInfo.CurrentCulture)}";
+    }
+
+    private async Task PasteAsync(ClipboardHistory history, HistoryEntry entry)
+    {
+        if (_features.PasteTarget?.Invoke() is not { } target)
+        {
+            if (await history.CopyAsync(entry) != Core.Clipboard.ClipStatus.Ok)
+                throw new InvalidOperationException("Clipboard busy");
+            return;
+        }
+        if (await history.PasteAsync(entry, target) == Core.Clipboard.PasteOutcome.Busy)
+            throw new InvalidOperationException("Clipboard busy");
     }
 
     private ClipboardView View() => _view ??= new ClipboardView(_features);

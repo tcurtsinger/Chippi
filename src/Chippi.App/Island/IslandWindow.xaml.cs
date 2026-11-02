@@ -83,6 +83,7 @@ public partial class IslandWindow : Window
     private bool _fallback; // the chosen monitor is gone: the main display's start instead
     private bool _enabled = true;
     private bool _suppressed;
+    private bool _summoned; // shown over a fullscreen app for the Command bar, until the panel closes
     private bool _hovered;
     private bool _lifted;
     private bool _left; // the bar and the panel grow left from the puck
@@ -435,7 +436,7 @@ public partial class IslandWindow : Window
 
     private void ApplyVisibility()
     {
-        bool visible = _enabled && !_suppressed && _monitor != default && _hwnd != default;
+        bool visible = _enabled && (!_suppressed || _summoned) && _monitor != default && _hwnd != default;
         if (visible && !IsVisible)
         {
             Show();
@@ -657,6 +658,30 @@ public partial class IslandWindow : Window
         return opened;
     }
 
+    /// <summary>
+    /// The Command bar's shortcut: the panel on <paramref name="key"/>'s page with the keyboard, over a fullscreen app or
+    /// game too, on the widget's screen; the widget hides again once the panel closes. False while the widget is off.
+    /// </summary>
+    internal bool SummonPage(string key)
+    {
+        if (!_enabled)
+            return false;
+        if (_suppressed && !_panel.IsOpen)
+        {
+            _summoned = true;
+            ApplyVisibility();
+        }
+        bool shown = ShowPage(key);
+        if (shown)
+            _panel.TakeKeyboard();
+        else if (_summoned)
+        {
+            _summoned = false;
+            ApplyVisibility();
+        }
+        return shown;
+    }
+
     private void OpenIsland()
     {
         if (!IsVisible || _dragging || Area is not { } area)
@@ -691,6 +716,11 @@ public partial class IslandWindow : Window
             return;
         _panel.CloseIsland(immediate, WidgetRect);
         RefreshPuck();
+        if (_summoned)
+        {
+            _summoned = false;
+            ApplyVisibility(); // hidden again while the fullscreen app is still in front
+        }
     }
 
     // ----- A drag from another app (Phase 5 notes #48) -----
