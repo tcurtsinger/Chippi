@@ -20,12 +20,28 @@ public sealed class CleaningModeSettingsPage : UserControl
         var start = new Button { Content = "Start", VerticalAlignment = VerticalAlignment.Center };
         start.SetResourceReference(StyleProperty, "PrimaryButtonStyle");
         AutomationProperties.SetName(start, "Start Cleaning mode");
-        start.Click += (_, _) => module.Start();
-        var name = new TextBlock { Text = "Cleaning mode", VerticalAlignment = VerticalAlignment.Center };
+        var name = new TextBlock { Text = "Cleaning mode" };
         name.SetResourceReference(StyleProperty, "BodyTextStyle");
+        var failed = new TextBlock { Text = "Cleaning mode failed", Visibility = Visibility.Collapsed };
+        failed.SetResourceReference(StyleProperty, "CaptionTextStyle");
+        failed.SetResourceReference(TextBlock.ForegroundProperty, "WarningTextBrush");
+        AutomationProperties.SetLiveSetting(failed, AutomationLiveSetting.Polite);
+        start.Click += (_, _) =>
+        {
+            try
+            {
+                module.Start();
+                failed.Visibility = Visibility.Collapsed;
+            }
+            catch (Exception)
+            {
+                failed.Visibility = Visibility.Visible;
+            }
+        };
         DockPanel.SetDock(glyph, Dock.Left);
         DockPanel.SetDock(start, Dock.Right);
-        var row = new Border { MinHeight = SettingsLayout.RowHeight, Padding = SettingsLayout.RowPadding, Child = new DockPanel { Children = { glyph, start, name } } };
+        var label = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Children = { name, failed } };
+        var row = new Border { MinHeight = SettingsLayout.RowHeight, Padding = SettingsLayout.RowPadding, Child = new DockPanel { Children = { glyph, start, label } } };
         Content = SettingsLayout.Card(row);
     }
 }

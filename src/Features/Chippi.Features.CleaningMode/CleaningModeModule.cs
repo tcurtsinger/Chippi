@@ -30,11 +30,11 @@ public sealed class CleaningModeModule : IFeatureModule
     private ModuleContext? _context;
     private bool _capturing;
 
-    public CleaningModeModule() : this(new KeyboardLock(), () => new CleaningScreens(), GlobalMicHotkey.Create, TimeProvider.System) { }
+    public CleaningModeModule() : this(new KeyboardLock(), () => new CleaningScreens(), GlobalMicHotkey.Create) { }
 
-    public CleaningModeModule(IKeyboardLock keyboard, Func<ICleaningScreens> screens, Func<IMicHotkey> hotkey, TimeProvider time)
+    public CleaningModeModule(IKeyboardLock keyboard, Func<ICleaningScreens> screens, Func<IMicHotkey> hotkey)
     {
-        _session = new CleaningSession(keyboard, screens, time);
+        _session = new CleaningSession(keyboard, screens);
         _session.Changed += () => Changed?.Invoke();
         _createHotkey = hotkey;
     }
@@ -76,20 +76,39 @@ public sealed class CleaningModeModule : IFeatureModule
 
     public Task StopAsync(CancellationToken ct)
     {
-        _session.End();
+        // Its windows are the UI thread's; the registry may stop it from another.
+        var dispatcher = System.Windows.Application.Current?.Dispatcher;
+        if (dispatcher is not null && !dispatcher.CheckAccess())
+            dispatcher.Invoke(_session.End);
+        else
+            _session.End();
         _hotkey?.Dispose();
         _hotkey = null;
         _context = null;
         return Task.CompletedTask;
     }
 
-    /// <summary>Starts Cleaning mode: the keyboard locked and every screen black. Call on the UI thread; a failure is logged.</summary>
+    /// <summary>
+    /// Starts Cleaning mode: every screen black, then the keyboard locked. Call on the UI thread. Throws when it can't start,
+    /// with nothing left locked or shown, so Settings and the Actions page can say so.
+    /// </summary>
     public void Start()
     {
         if (_context is null || _capturing)
             return;
         try { _session.Start(); }
-        catch (Exception ex) { Log.Warn("Cleaning mode: starting failed", ex); }
+        catch (Exception ex)
+        {
+            Log.Warn("Cleaning mode: starting failed", ex);
+            throw;
+        }
+    }
+
+    // The shortcut has nowhere to say it failed; the log has it.
+    private void StartFromShortcut()
+    {
+        try { Start(); }
+        catch (Exception) { }
     }
 
     // Its shortcut: none by default, as Paste as plain text's.
@@ -135,7 +154,7 @@ public sealed class CleaningModeModule : IFeatureModule
         try
         {
             _hotkey ??= _createHotkey();
-            ShortcutError = _hotkey.Register(shortcut, Start) ? null : "Shortcut in use";
+            ShortcutError = _hotkey.Register(shortcut, StartFromShortcut) ? null : "Shortcut in use";
         }
         catch (Exception ex)
         {

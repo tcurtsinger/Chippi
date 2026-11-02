@@ -7,3 +7,8 @@ WM_KEYDOWN
 WM_SYSKEYDOWN
 WM_KEYUP
 WM_SYSKEYUP
+GetMessage
+PostThreadMessage
+GetCurrentThreadId
+GetAsyncKeyState
+WM_QUIT

@@ -231,11 +231,11 @@ public sealed class QuickActionsModule : IFeatureModule
     {
         if (id != QuickActionId.Cleaning)
             return ThenRefresh(Pc.RunAsync(id));
-        // The island closes first, so it isn't open under the black.
+        // Started first, so a failure says Failed on the page; then the island closes under the black.
         if (_cleaning() is { } start)
         {
-            _context?.CloseIsland();
             start();
+            _context?.CloseIsland();
         }
         return Task.CompletedTask;
     }

@@ -12,34 +12,28 @@ namespace Chippi.Features.CleaningMode.Tests;
 
 public sealed class CleaningModeTests
 {
-    private const uint Esc = UnlockCount.Escape, A = 0x41, Shift = 0x10;
+    private const uint Esc = UnlockCount.Escape, A = 0x41, Shift = 0x10, Ctrl = 0xA2;
 
-    /// <summary>A clock a test moves by hand.</summary>
-    private sealed class Clock : TimeProvider
-    {
-        private long _ticks;
-        public override long TimestampFrequency => TimeSpan.TicksPerSecond;
-        public override long GetTimestamp() => _ticks;
-        public void Advance(TimeSpan by) => _ticks += by.Ticks;
-    }
-
-    /// <summary>A keyboard lock that only records: no test takes the owner's keyboard.</summary>
-    private sealed class FakeLock : IKeyboardLock
+    /// <summary>A keyboard lock that only records: no test takes the owner's keyboard. Each press is 100ms after the last.</summary>
+    private sealed class FakeLock(List<string> order) : IKeyboardLock
     {
         public Action<LockedKey>? Key;
         public int Locks, Releases;
+        public uint Time = 5000;
 
         public IDisposable Lock(Action<LockedKey> key)
         {
+            order.Add("lock");
             Locks++;
             Key = key;
             return new Release(this);
         }
 
-        public void Press(uint vk)
+        public void Press(uint vk, uint after = 100)
         {
-            Key!(new LockedKey(vk, true));
-            Key?.Invoke(new LockedKey(vk, false));
+            Time += after;
+            Key!(new LockedKey(vk, true, Time));
+            Key?.Invoke(new LockedKey(vk, false, Time + 30));
         }
 
         private sealed class Release(FakeLock owner) : IDisposable
@@ -53,15 +47,32 @@ public sealed class CleaningModeTests
     }
 
     /// <summary>Screens that only record: nothing goes black on the owner's PC.</summary>
-    private sealed class FakeScreens : ICleaningScreens
+    private sealed class FakeScreens(List<string> order) : ICleaningScreens
     {
         public readonly List<string> Calls = [];
         public Action? Gone;
+        public bool FailUnlock, FailShow;
         public event Action? UnlockClicked;
         public event Action? Interrupted;
-        public void Show() => Calls.Add("show");
+
+        public void Show()
+        {
+            order.Add("show");
+            if (FailShow)
+                throw new InvalidOperationException("no screens");
+            Calls.Add("show");
+        }
+
         public void Count(int presses, bool counted) => Calls.Add($"count {presses}{(counted ? " squish" : "")}");
-        public void Unlock(Action gone) { Calls.Add("unlock"); Gone = gone; }
+
+        public void Unlock(Action gone)
+        {
+            Calls.Add("unlock");
+            if (FailUnlock)
+                throw new InvalidOperationException("the celebration broke");
+            Gone = gone;
+        }
+
         public void Close() => Calls.Add("close");
         public void ClickUnlock() => UnlockClicked?.Invoke();
         public void Interrupt() => Interrupted?.Invoke();
@@ -69,45 +80,55 @@ public sealed class CleaningModeTests
 
     private sealed class Fixture
     {
-        public readonly Clock Time = new();
-        public readonly FakeLock Keyboard = new();
+        public readonly List<string> Order = [];
+        public readonly FakeLock Keyboard;
         public readonly List<FakeScreens> Screens = [];
         public readonly CleaningSession Session;
+        public Action<FakeScreens>? Arrange;
 
-        public Fixture() => Session = new CleaningSession(Keyboard, () =>
+        public Fixture()
         {
-            var screens = new FakeScreens();
-            Screens.Add(screens);
-            return screens;
-        }, Time);
+            Keyboard = new FakeLock(Order);
+            Session = new CleaningSession(Keyboard, () =>
+            {
+                var screens = new FakeScreens(Order);
+                Arrange?.Invoke(screens);
+                Screens.Add(screens);
+                return screens;
+            });
+        }
 
         public FakeScreens Last => Screens[^1];
     }
 
     [Fact]
-    public void Three_Escs_each_within_a_second_unlock()
+    public void Three_Escs_each_within_a_second_of_the_last_unlock()
     {
-        var time = new Clock();
-        var count = new UnlockCount(time);
-        Assert.Equal(1, count.Key(Esc, true));
-        count.Key(Esc, false);
-        time.Advance(TimeSpan.FromMilliseconds(900));
-        Assert.Equal(2, count.Key(Esc, true));
-        count.Key(Esc, false);
-        time.Advance(TimeSpan.FromSeconds(1));
-        Assert.Equal(3, count.Key(Esc, true));
+        var count = new UnlockCount();
+        Assert.Equal(1, count.Key(Esc, true, 1000));
+        count.Key(Esc, false, 1050);
+        Assert.Equal(2, count.Key(Esc, true, 1900));
+        count.Key(Esc, false, 1950);
+        Assert.Equal(3, count.Key(Esc, true, 2900));
         Assert.True(count.Unlocked);
     }
 
     [Fact]
     public void A_wait_over_a_second_starts_the_count_over()
     {
-        var time = new Clock();
-        var count = new UnlockCount(time);
-        count.Key(Esc, true);
-        count.Key(Esc, false);
-        time.Advance(TimeSpan.FromMilliseconds(1001));
-        Assert.Equal(1, count.Key(Esc, true));
+        var count = new UnlockCount();
+        count.Key(Esc, true, 1000);
+        count.Key(Esc, false, 1050);
+        Assert.Equal(1, count.Key(Esc, true, 2001));
+    }
+
+    [Fact]
+    public void The_wait_counts_across_the_tick_wrapping()
+    {
+        var count = new UnlockCount();
+        count.Key(Esc, true, uint.MaxValue - 100);
+        count.Key(Esc, false, uint.MaxValue - 50);
+        Assert.Equal(2, count.Key(Esc, true, 300)); // 400ms later
     }
 
     [Theory]
@@ -115,44 +136,56 @@ public sealed class CleaningModeTests
     [InlineData(Shift)]
     public void Any_other_key_starts_the_count_over(uint other)
     {
-        var count = new UnlockCount(new Clock());
-        count.Key(Esc, true);
-        count.Key(Esc, false);
-        Assert.Equal(0, count.Key(other, true));
-        count.Key(other, false);
-        Assert.Equal(1, count.Key(Esc, true));
+        var count = new UnlockCount();
+        count.Key(Esc, true, 1000);
+        count.Key(Esc, false, 1050);
+        Assert.Equal(0, count.Key(other, true, 1100));
+        count.Key(other, false, 1150);
+        Assert.Equal(1, count.Key(Esc, true, 1200));
     }
 
     [Fact]
     public void A_held_Escs_repeat_starts_the_count_over()
     {
-        var count = new UnlockCount(new Clock());
-        count.Key(Esc, true);
-        Assert.Equal(0, count.Key(Esc, true)); // the repeat, no key-up between
-        count.Key(Esc, false);
-        Assert.Equal(1, count.Key(Esc, true));
+        var count = new UnlockCount();
+        count.Key(Esc, true, 1000);
+        Assert.Equal(0, count.Key(Esc, true, 1500)); // the repeat, no key-up between
+        count.Key(Esc, false, 1600);
+        Assert.Equal(1, count.Key(Esc, true, 1700));
     }
 
     [Fact]
-    public void A_key_held_before_the_lock_still_comes_up()
+    public void A_key_held_before_the_lock_still_comes_up_after_its_repeats()
     {
         var filter = new KeyFilter();
-        Assert.False(filter.Swallow(0x11, down: false)); // the shortcut's Ctrl, pressed before the lock
+        Assert.True(filter.Swallow(Ctrl, down: true, heldBefore: true)); // the shortcut's Ctrl, repeating: Windows has it down
+        Assert.True(filter.Swallow(Ctrl, down: true, heldBefore: true));
+        Assert.False(filter.Swallow(Ctrl, down: false)); // its key-up reaches Windows
         Assert.True(filter.Swallow(A, down: true));
+        Assert.True(filter.Swallow(A, down: true)); // a key pressed during the lock, repeating: Windows never saw it
         Assert.True(filter.Swallow(A, down: false));
         Assert.False(filter.Swallow(A, down: false)); // already up
     }
 
     [Fact]
-    public void Starting_locks_the_keyboard_and_shows_the_screens_once()
+    public void Starting_shows_the_black_before_it_locks_the_keyboard_and_only_once()
     {
         var f = new Fixture();
         f.Session.Start();
         f.Session.Start();
         Assert.True(f.Session.Active);
-        Assert.Equal(1, f.Keyboard.Locks);
+        Assert.Equal(["show", "lock"], f.Order);
         Assert.Single(f.Screens);
-        Assert.Equal(["show"], f.Last.Calls);
+    }
+
+    [Fact]
+    public void A_start_that_fails_leaves_nothing_locked_or_shown()
+    {
+        var f = new Fixture { Arrange = s => s.FailShow = true };
+        Assert.Throws<InvalidOperationException>(f.Session.Start);
+        Assert.False(f.Session.Active);
+        Assert.Equal(0, f.Keyboard.Locks);
+        Assert.Equal(["close"], f.Last.Calls);
     }
 
     [Fact]
@@ -165,6 +198,16 @@ public sealed class CleaningModeTests
         f.Keyboard.Press(A);
         Assert.Equal(["show", "count 1 squish", "count 2 squish", "count 0"], f.Last.Calls);
         Assert.Equal(0, f.Keyboard.Releases);
+    }
+
+    [Fact]
+    public void Escs_more_than_a_second_apart_start_over()
+    {
+        var f = new Fixture();
+        f.Session.Start();
+        f.Keyboard.Press(Esc);
+        f.Keyboard.Press(Esc, after: 1100);
+        Assert.Equal(["show", "count 1 squish", "count 1 squish"], f.Last.Calls);
     }
 
     [Fact]
@@ -189,6 +232,17 @@ public sealed class CleaningModeTests
         f.Last.ClickUnlock();
         Assert.Equal(1, f.Keyboard.Releases);
         Assert.Equal(["show", "unlock"], f.Last.Calls);
+    }
+
+    [Fact]
+    public void An_unlock_that_fails_still_takes_the_black_away()
+    {
+        var f = new Fixture { Arrange = s => s.FailUnlock = true };
+        f.Session.Start();
+        f.Last.ClickUnlock();
+        Assert.False(f.Session.Active);
+        Assert.Equal(1, f.Keyboard.Releases);
+        Assert.Equal(["show", "unlock", "close"], f.Last.Calls);
     }
 
     [Fact]
@@ -240,10 +294,11 @@ public sealed class CleaningModeTests
     [Fact]
     public async Task Its_shortcut_starts_it_but_not_while_Settings_records_one()
     {
-        var keyboard = new FakeLock();
+        var order = new List<string>();
+        var keyboard = new FakeLock(order);
         var hotkey = new Hotkey();
         var settings = new Settings();
-        var module = new CleaningModeModule(keyboard, () => new FakeScreens(), () => hotkey, new Clock());
+        var module = new CleaningModeModule(keyboard, () => new FakeScreens(order), () => hotkey);
         Assert.False(module.Installed);
         module.Start(); // not installed: nothing
         Assert.Equal(0, keyboard.Locks);
@@ -260,6 +315,19 @@ public sealed class CleaningModeTests
         await module.StopAsync(default); // uninstalling ends it
         Assert.False(module.IsOn);
         Assert.Equal(1, keyboard.Releases);
+    }
+
+    [Fact]
+    public async Task A_failed_start_throws_to_who_started_it_but_not_from_the_shortcut()
+    {
+        var order = new List<string>();
+        var hotkey = new Hotkey();
+        var module = new CleaningModeModule(new FakeLock(order), () => new FakeScreens(order) { FailShow = true }, () => hotkey);
+        await module.StartAsync(new ModuleContext(CleaningModeModule.Id, new Settings(), NullLogger.Instance, new IslandActivityHub().CreatePublisher(CleaningModeModule.Id), new Ui()), default);
+        Assert.Throws<InvalidOperationException>(module.Start); // Settings and the Actions page say "… failed"
+        Assert.True(module.ChangeShortcut(new MicShortcut(ShortcutModifiers.Control | ShortcutModifiers.Alt, 0x43)));
+        hotkey.Pressed!(); // logged, nothing thrown into the hotkey's window
+        Assert.False(module.IsOn);
     }
 
     [Fact]

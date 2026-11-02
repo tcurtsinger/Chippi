@@ -129,6 +129,15 @@ public sealed class QuickActionsTests
         });
         Assert.Equal((1, 1), (f.Closed, started));
         Assert.Empty(f.Pc.Calls); // not a Windows action
+        f.Cleaning = () => throw new InvalidOperationException("no screens");
+        WpfTestThread.Run(() =>
+        {
+            var page = new ActionsPage(f.Module);
+            page.Press(QuickActionId.Cleaning);
+            var cleaning = Find<System.Windows.Controls.Primitives.ToggleButton>(page).First(t => Equals(t.Tag, "cleaning"));
+            Assert.Equal("Cleaning, Failed", System.Windows.Automation.AutomationProperties.GetName(cleaning));
+        });
+        Assert.Equal(1, f.Closed); // a start that failed leaves the island open, saying so
     }
 
     [Fact]

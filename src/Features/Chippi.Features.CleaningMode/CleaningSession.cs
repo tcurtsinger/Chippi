@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using Chippi.Core.Diagnostics;
+
 namespace Chippi.Features.CleaningMode;
 
 /// <summary>The black screens. The real ones are windows (<see cref="Screens.CleaningScreens"/>); tests use a fake.</summary>
@@ -26,11 +28,11 @@ public interface ICleaningScreens
 }
 
 /// <summary>
-/// One Cleaning mode (docs/phase-5.5/cleaning-mode.md): the keyboard locked and the screens black until Esc three times or
-/// Unlock, or until Windows takes over. The keyboard comes back the moment it unlocks; the black follows after Chippi's
-/// celebration. Call on the UI thread.
+/// One Cleaning mode (docs/phase-5.5/cleaning-mode.md): the screens black, then the keyboard locked, until Esc three times
+/// or Unlock, or until Windows takes over. The keyboard comes back the moment it unlocks; the black follows after Chippi's
+/// celebration. Whatever fails, the keyboard comes back and the black goes. Call on the UI thread.
 /// </summary>
-internal sealed class CleaningSession(IKeyboardLock keyboard, Func<ICleaningScreens> createScreens, TimeProvider time)
+internal sealed class CleaningSession(IKeyboardLock keyboard, Func<ICleaningScreens> createScreens)
 {
     private IDisposable? _lock;
     private ICleaningScreens? _screens;
@@ -43,19 +45,21 @@ internal sealed class CleaningSession(IKeyboardLock keyboard, Func<ICleaningScre
     /// <summary>It started or ended.</summary>
     public event Action? Changed;
 
+    /// <summary>Starts it; throws, with nothing left locked or shown, when the screens or the lock can't start.</summary>
     public void Start()
     {
         if (Active)
             return;
-        _count = new UnlockCount(time);
+        _count = new UnlockCount();
         _unlocking = false;
         var screens = _screens = createScreens();
         screens.UnlockClicked += Unlock;
         screens.Interrupted += End;
         try
         {
-            _lock = keyboard.Lock(OnKey);
+            // The black first, so building it never holds up a key the lock should take.
             screens.Show();
+            _lock = keyboard.Lock(OnKey);
         }
         catch
         {
@@ -69,7 +73,7 @@ internal sealed class CleaningSession(IKeyboardLock keyboard, Func<ICleaningScre
     {
         if (_count is null || _unlocking)
             return;
-        int presses = _count.Key(key.Vk, key.Down); // a key coming up only tells a new press from a held one's repeat
+        int presses = _count.Key(key.Vk, key.Down, key.Time); // a key coming up only tells a new press from a held one's repeat
         if (!key.Down)
             return;
         if (_count.Unlocked)
@@ -86,13 +90,21 @@ internal sealed class CleaningSession(IKeyboardLock keyboard, Func<ICleaningScre
         _unlocking = true;
         _lock?.Dispose();
         _lock = null;
-        screens.Unlock(() =>
+        try
         {
-            if (!ReferenceEquals(_screens, screens))
-                return;
-            Detach();
-            Changed?.Invoke();
-        });
+            screens.Unlock(() =>
+            {
+                if (!ReferenceEquals(_screens, screens))
+                    return;
+                Detach();
+                Changed?.Invoke();
+            });
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("Cleaning mode: unlocking failed", ex);
+            End();
+        }
     }
 
     /// <summary>Ends at once, nothing shown: Windows took over, or the feature stopped.</summary>
@@ -102,9 +114,12 @@ internal sealed class CleaningSession(IKeyboardLock keyboard, Func<ICleaningScre
         _lock = null;
         if (_screens is not { } screens)
             return;
-        Detach();
-        screens.Close();
-        Changed?.Invoke();
+        try { screens.Close(); }
+        finally
+        {
+            Detach();
+            Changed?.Invoke();
+        }
     }
 
     private void Detach()

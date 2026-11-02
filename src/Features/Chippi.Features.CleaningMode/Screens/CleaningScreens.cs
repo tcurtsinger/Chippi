@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Media;
@@ -12,8 +13,9 @@ namespace Chippi.Features.CleaningMode.Screens;
 
 /// <summary>
 /// The black on every screen (docs/phase-5.5/cleaning-mode.md): one topmost window per monitor, out of Alt+Tab and the
-/// taskbar, catching every click; the main one carries <see cref="CleaningFace"/>. It fades in over 200ms, and after an
-/// unlock holds 700ms for Chippi's celebration, then fades out over 240ms. Under reduced motion it comes and goes at once.
+/// taskbar, catching every click; the main one carries <see cref="CleaningFace"/> and stays the window in front. It fades
+/// in over 200ms, and after an unlock holds 700ms for Chippi's celebration, then fades out over 240ms. Under reduced
+/// motion it comes and goes at once. A screen turned off or on meanwhile gets its black again.
 /// </summary>
 public sealed class CleaningScreens : ICleaningScreens
 {
@@ -22,9 +24,11 @@ public sealed class CleaningScreens : ICleaningScreens
     internal static readonly TimeSpan FadeOut = TimeSpan.FromMilliseconds(240);
 
     private readonly List<CleaningWindow> _windows = [];
+    private CleaningWindow? _main;
     private CleaningFace? _face;
     private SessionWatch? _watch;
     private DispatcherTimer? _hold;
+    private bool _leaving;
 
     public event Action? UnlockClicked;
 
@@ -35,31 +39,58 @@ public sealed class CleaningScreens : ICleaningScreens
         var monitors = Native.Monitors();
         if (monitors.Count == 0)
             throw new InvalidOperationException("Cleaning mode failed: no screens");
-        int main = Math.Max(0, monitors.FindIndex(m => m.Primary));
+        _face = new CleaningFace();
+        _face.Unlock.Click += (_, _) => UnlockClicked?.Invoke();
+        int main = Main(monitors);
+        _main = new CleaningWindow(monitors[main].Bounds, _face);
+        _windows.Add(_main);
+        _main.Show();
         for (int i = 0; i < monitors.Count; i++)
-        {
-            CleaningFace? face = null;
-            if (i == main)
-            {
-                face = _face = new CleaningFace();
-                face.Unlock.Click += (_, _) => UnlockClicked?.Invoke();
-            }
-            var window = new CleaningWindow(monitors[i].Bounds, face);
-            _windows.Add(window);
-            window.Show();
-        }
-        var front = _windows[main];
-        front.Activate();
-        Native.Foreground(front.Handle);
-        _watch = new SessionWatch(front.Handle, () => Interrupted?.Invoke());
+            if (i != main)
+                Add(monitors[i].Bounds);
+        _main.Activate();
+        Native.Foreground(_main.Handle);
+        _watch = new SessionWatch(_main.Handle, () => Interrupted?.Invoke(), Rearrange);
         foreach (var window in _windows)
             window.Fade(1, Motion.IsReduced ? TimeSpan.Zero : FadeIn);
+    }
+
+    private static int Main(List<(Native.Rect Bounds, bool Primary)> monitors) => Math.Max(0, monitors.FindIndex(m => m.Primary));
+
+    private CleaningWindow Add(Native.Rect bounds)
+    {
+        var window = new CleaningWindow(bounds, face: null);
+        _windows.Add(window);
+        window.Show();
+        return window;
+    }
+
+    /// <summary>The screens changed (one turned off to wipe it, or back on): the face to the main screen, plain black on the rest.</summary>
+    private void Rearrange()
+    {
+        if (_main is null || _leaving)
+            return;
+        var monitors = Native.Monitors();
+        if (monitors.Count == 0)
+            return;
+        int main = Main(monitors);
+        _main.Bounds = monitors[main].Bounds;
+        foreach (var window in _windows.Where(w => w != _main).ToList())
+        {
+            _windows.Remove(window);
+            window.CloseNow();
+        }
+        for (int i = 0; i < monitors.Count; i++)
+            if (i != main)
+                Add(monitors[i].Bounds).Fade(1, TimeSpan.Zero);
+        Native.Foreground(_main.Handle);
     }
 
     public void Count(int presses, bool counted) => _face?.Count(presses, counted);
 
     public void Unlock(Action gone)
     {
+        _leaving = true;
         _face?.Celebrate();
         _hold = new DispatcherTimer { Interval = Motion.IsReduced ? TimeSpan.Zero : Hold };
         _hold.Tick += (_, _) =>
@@ -80,20 +111,23 @@ public sealed class CleaningScreens : ICleaningScreens
 
     public void Close()
     {
+        _leaving = true;
         _hold?.Stop();
         _hold = null;
         _watch?.Dispose();
         _watch = null;
         foreach (var window in _windows)
-            window.Close();
+            window.CloseNow();
         _windows.Clear();
+        _main = null;
         _face = null;
     }
 
-    /// <summary>One screen's black. Placed in physical pixels, again whenever its DPI changes.</summary>
+    /// <summary>One screen's black. Placed in physical pixels, again whenever its DPI changes; only Cleaning mode closes it.</summary>
     private sealed class CleaningWindow : Window
     {
-        private readonly Native.Rect _bounds;
+        private Native.Rect _bounds;
+        private bool _closing;
 
         public CleaningWindow(Native.Rect bounds, CleaningFace? face)
         {
@@ -112,7 +146,7 @@ public sealed class CleaningScreens : ICleaningScreens
             SourceInitialized += (_, _) =>
             {
                 Handle = new WindowInteropHelper(this).Handle;
-                Native.MakeToolWindow(Handle);
+                Native.MakeToolWindow(Handle, noActivate: face is null);
                 Place();
             };
             DpiChanged += (_, _) => Dispatcher.BeginInvoke(Place);
@@ -120,10 +154,32 @@ public sealed class CleaningScreens : ICleaningScreens
 
         public IntPtr Handle { get; private set; }
 
+        public Native.Rect Bounds
+        {
+            set
+            {
+                _bounds = value;
+                Place();
+            }
+        }
+
         private void Place()
         {
             if (Handle != IntPtr.Zero)
                 Native.Cover(Handle, _bounds);
+        }
+
+        public void CloseNow()
+        {
+            _closing = true;
+            Close();
+        }
+
+        // Alt+F4 and the like: the keyboard is the lock's, but nothing else closes the black either.
+        protected override void OnClosing(CancelEventArgs e)
+        {
+            e.Cancel = !_closing;
+            base.OnClosing(e);
         }
 
         public void Fade(double to, TimeSpan time, Action? done = null)
@@ -142,7 +198,10 @@ public sealed class CleaningScreens : ICleaningScreens
         }
     }
 
-    /// <summary>Hears Windows take over: the session locking, the PC going to sleep, or Ctrl+Alt+Del's secure desktop.</summary>
+    /// <summary>
+    /// Hears Windows take over (the session locking, the PC going to sleep, Ctrl+Alt+Del's secure desktop) and the screens
+    /// changing, on the main window.
+    /// </summary>
     private sealed class SessionWatch : IDisposable
     {
         private readonly IntPtr _window;
@@ -150,32 +209,36 @@ public sealed class CleaningScreens : ICleaningScreens
         private readonly Native.WinEventProc _proc; // kept alive while hooked
         private readonly IntPtr _desktopHook;
         private readonly Action _interrupted;
+        private readonly Action _screensChanged;
         private readonly Dispatcher _dispatcher = Dispatcher.CurrentDispatcher;
         private bool _disposed;
 
-        public SessionWatch(IntPtr window, Action interrupted)
+        public SessionWatch(IntPtr window, Action interrupted, Action screensChanged)
         {
             _window = window;
             _interrupted = interrupted;
+            _screensChanged = screensChanged;
             _source = HwndSource.FromHwnd(window);
             _source?.AddHook(Message);
             Native.WatchSession(window);
-            _proc = (_, _, _, _, _, _, _) => Raise();
+            _proc = (_, _, _, _, _, _, _) => Later(_interrupted);
             _desktopHook = Native.WatchDesktopSwitch(_proc);
         }
 
         private IntPtr Message(IntPtr hwnd, int message, IntPtr wParam, IntPtr lParam, ref bool handled)
         {
             if ((message == Native.SessionChange && wParam.ToInt32() == Native.SessionLock) || (message == Native.PowerBroadcast && wParam.ToInt32() == Native.Suspend))
-                Raise();
+                Later(_interrupted);
+            else if (message == Native.DisplayChange)
+                Later(_screensChanged);
             return IntPtr.Zero;
         }
 
-        // After the message: the screens close their windows, this one included.
-        private void Raise() => _dispatcher.BeginInvoke(() =>
+        // After the message: the screens close or move their windows, this one included.
+        private void Later(Action action) => _dispatcher.BeginInvoke(() =>
         {
             if (!_disposed)
-                _interrupted();
+                action();
         });
 
         public void Dispose()

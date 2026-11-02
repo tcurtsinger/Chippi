@@ -42,12 +42,16 @@ internal static class Native
     public static void Cover(IntPtr window, Rect bounds) =>
         SetWindowPos(window, new IntPtr(-1), bounds.Left, bounds.Top, bounds.Right - bounds.Left, bounds.Bottom - bounds.Top, 0x0010 | 0x0200);
 
-    /// <summary>Keeps it out of Alt+Tab and the taskbar.</summary>
-    public static void MakeToolWindow(IntPtr window) =>
-        SetWindowLongPtr(window, -20, new IntPtr(GetWindowLongPtr(window, -20).ToInt64() | 0x00000080));
+    /// <summary>
+    /// Keeps it out of Alt+Tab and the taskbar; <paramref name="noActivate"/>, a click on it never makes it the window in
+    /// front (the main screen's stays in front, so nothing on another screen, the island included, comes up over it).
+    /// </summary>
+    public static void MakeToolWindow(IntPtr window, bool noActivate) =>
+        SetWindowLongPtr(window, -20, new IntPtr(GetWindowLongPtr(window, -20).ToInt64() | 0x80L | (noActivate ? 0x08000000L : 0L)));
 
     public static void Foreground(IntPtr window) => SetForegroundWindow(window);
 
+    public const int DisplayChange = 0x007E;
     public const int SessionChange = 0x02B1, SessionLock = 0x7;
     public const int PowerBroadcast = 0x0218, Suspend = 0x4;
     private const uint DesktopSwitch = 0x0020;
