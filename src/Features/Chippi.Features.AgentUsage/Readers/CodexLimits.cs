@@ -40,7 +40,7 @@ internal static class CodexLimits
             if (ErrorOf(account.RootElement) is { } e)
                 return new(e.Code == MethodNotFound ? CheckState.TooOld : CheckState.Failed, Error: "account/read: " + e.Message);
             var result = account.RootElement.GetProperty("result");
-            if (!result.TryGetProperty("account", out var who) || who.ValueKind != JsonValueKind.Object)
+            if (result.ValueKind != JsonValueKind.Object || !result.TryGetProperty("account", out var who) || who.ValueKind != JsonValueKind.Object)
                 return new(CheckState.SignedOut, Error: "no account");
             plan = who.TryGetProperty("planType", out var p) && p.ValueKind == JsonValueKind.String ? p.GetString() : null;
         }
@@ -51,7 +51,8 @@ internal static class CodexLimits
             return new(CheckState.Failed, Error: "account/rateLimits/read: no answer");
         if (ErrorOf(limits.RootElement) is { } error)
             return new(error.Code == MethodNotFound ? CheckState.TooOld : CheckState.Failed, Error: "account/rateLimits/read: " + error.Message);
-        if (!limits.RootElement.GetProperty("result").TryGetProperty("rateLimits", out var snapshot) || snapshot.ValueKind != JsonValueKind.Object)
+        if (limits.RootElement.GetProperty("result") is not { ValueKind: JsonValueKind.Object } answer
+            || !answer.TryGetProperty("rateLimits", out var snapshot) || snapshot.ValueKind != JsonValueKind.Object)
             return new(CheckState.Ok, new UsageReading(AgentText.Plan(plan), [], now));
         var reading = Parse(snapshot, now);
         return new(CheckState.Ok, reading with { Plan = reading.Plan ?? AgentText.Plan(plan) });
@@ -83,7 +84,7 @@ internal static class CodexLimits
 
     private static RpcError? ErrorOf(JsonElement root) =>
         root.TryGetProperty("error", out var e) && e.ValueKind == JsonValueKind.Object
-            ? new(e.TryGetProperty("code", out var c) && c.TryGetInt32(out int code) ? code : 0, e.TryGetProperty("message", out var m) ? m.ToString() : "error")
+            ? new(e.TryGetProperty("code", out var c) && c.ValueKind == JsonValueKind.Number && c.TryGetInt32(out int code) ? code : 0, e.TryGetProperty("message", out var m) ? m.ToString() : "error")
             : null;
 
     /// <summary>The reply to request <paramref name="id"/>, skipping the server's notifications; null if it closes first.</summary>
@@ -107,14 +108,22 @@ internal static class CodexLimits
 /// <summary>
 /// Codex's session logs, <c>~/.codex/sessions/yyyy/MM/dd/rollout-…-&lt;thread&gt;.jsonl</c>: one JSON event a line. The
 /// limits are on each turn's <c>token_count</c> event; a turn runs from <c>task_started</c> to <c>task_complete</c> (or
-/// <c>turn_aborted</c>). Only the end of a log is read, and only again once it has grown.
+/// <c>turn_aborted</c>). A log seen for the first time is read back from its end until both show (as far as
+/// <see cref="Back"/>); after that, only what it has grown by, keeping what the new lines don't change, so a turn that
+/// writes more than a chunk still reads as working.
 /// </summary>
 internal sealed class CodexLogs(string codexHome)
 {
-    /// <summary>How much of a log's end is read for its last limits or turn.</summary>
-    internal const int Tail = 256 * 1024;
+    /// <summary>How much of a log is read at a time, back from its end.</summary>
+    internal const int Chunk = 256 * 1024;
 
-    private readonly Dictionary<string, (long Length, DateTime Written, UsageReading? Limits, Turn? Turn)> _read = new(StringComparer.OrdinalIgnoreCase);
+    /// <summary>How far back a log seen for the first time is read for its last turn and limits.</summary>
+    internal const int Back = 16 * 1024 * 1024;
+
+    private readonly Dictionary<string, Seen> _read = new(StringComparer.OrdinalIgnoreCase);
+
+    // A log as last read: its size and time then, where its last whole line ended, and what it said.
+    private sealed record Seen(long Length, DateTime Written, long Parsed, UsageReading? Limits, Turn? Turn);
 
     public string Sessions => Path.Combine(codexHome, "sessions");
 
@@ -125,14 +134,18 @@ internal sealed class CodexLogs(string codexHome)
     public UsageReading? Limits(IEnumerable<string> also)
     {
         UsageReading? newest = null;
-        foreach (string log in Recent().Concat(also).Distinct(StringComparer.OrdinalIgnoreCase))
-            if (Read(log).Limits is { } limits && (newest is null || limits.At > newest.At))
+        var logs = Recent().Concat(also).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (string log in logs)
+            if (Read(log)?.Limits is { } limits && (newest is null || limits.At > newest.At))
                 newest = limits;
+        // What's neither recent nor open is let go.
+        foreach (string gone in _read.Keys.Where(k => !logs.Contains(k)).ToList())
+            _read.Remove(gone);
         return newest;
     }
 
     /// <summary>The last turn in <paramref name="log"/>, or null when its end shows none.</summary>
-    public Turn? LastTurn(string log) => Read(log).Turn;
+    public Turn? LastTurn(string log) => Read(log)?.Turn;
 
     /// <summary>The log of thread <paramref name="threadId"/>: in its day's folder (a v7 id holds its start time), or searched for.</summary>
     public string? Find(string threadId)
@@ -158,7 +171,8 @@ internal sealed class CodexLogs(string codexHome)
     internal static DateTimeOffset? Started(string threadId)
     {
         string hex = threadId.Replace("-", "", StringComparison.Ordinal);
-        if (hex.Length < 13 || hex[12] != '7' || !long.TryParse(hex[..12], System.Globalization.NumberStyles.HexNumber, null, out long ms))
+        if (hex.Length < 13 || hex[12] != '7' || !long.TryParse(hex[..12], System.Globalization.NumberStyles.HexNumber, null, out long ms)
+            || ms > DateTimeOffset.MaxValue.ToUnixTimeMilliseconds())
             return null;
         return DateTimeOffset.FromUnixTimeMilliseconds(ms);
     }
@@ -181,32 +195,82 @@ internal sealed class CodexLogs(string codexHome)
         return days.SelectMany(d => Directory.EnumerateFiles(d, "rollout-*.jsonl"));
     }
 
-    private (long Length, DateTime Written, UsageReading? Limits, Turn? Turn) Read(string log)
+    private Seen? Read(string log)
     {
         var info = new FileInfo(log);
         if (!info.Exists)
-            return default;
-        if (_read.TryGetValue(log, out var known) && known.Length == info.Length && known.Written == info.LastWriteTimeUtc)
+            return null;
+        _read.TryGetValue(log, out var known);
+        if (known is not null && known.Length == info.Length && known.Written == info.LastWriteTimeUtc)
             return known;
         UsageReading? limits = null;
         Turn? turn = null;
+        long parsed = 0;
         try
         {
             using var stream = new FileStream(log, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
-            long start = Math.Max(0, stream.Length - Tail);
-            stream.Seek(start, SeekOrigin.Begin);
-            using var reader = new StreamReader(stream, Encoding.UTF8);
-            var lines = new List<string>();
-            if (start > 0) reader.ReadLine(); // a line cut by the tail's start
-            while (reader.ReadLine() is { } line)
-                lines.Add(line);
-            for (int i = lines.Count - 1; i >= 0 && (limits is null || turn is null); i--)
-                Event(lines[i], ref limits, ref turn);
+            long length = stream.Length;
+            if (known is not null && length >= known.Length)
+            {
+                // Grown: the lines added since; what they don't mention stays as it was.
+                var lines = Lines(stream, known.Parsed, length, cutHead: false, out _, out int last);
+                parsed = last >= 0 ? known.Parsed + last + 1 : known.Parsed;
+                Events(lines, ref limits, ref turn);
+                limits ??= known.Limits;
+                turn ??= known.Turn;
+            }
+            else
+            {
+                // Seen first (or written anew): back from the end a chunk at a time, a cut line read whole with the next.
+                long end = length;
+                bool newest = true;
+                while (end > 0 && (limits is null || turn is null) && length - end < Back)
+                {
+                    long start = Math.Max(0, end - Chunk);
+                    var lines = Lines(stream, start, end, cutHead: start > 0, out int first, out int last);
+                    if (newest)
+                        parsed = last >= 0 ? start + last + 1 : start;
+                    newest = false;
+                    Events(lines, ref limits, ref turn);
+                    end = start > 0 && first >= 0 ? start + first + 1 : start;
+                }
+            }
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
-        var read = (info.Length, info.LastWriteTimeUtc, limits, turn);
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return known;
+        }
+        var read = new Seen(info.Length, info.LastWriteTimeUtc, parsed, limits, turn);
         _read[log] = read;
         return read;
+    }
+
+    /// <summary>
+    /// The whole lines in bytes [<paramref name="start"/>, <paramref name="end"/>): none past the last line break (a line
+    /// still being written), and none before the first when <paramref name="cutHead"/> (a line the chunk's start cut).
+    /// </summary>
+    private static List<string> Lines(FileStream stream, long start, long end, bool cutHead, out int first, out int last)
+    {
+        var buffer = new byte[end - start];
+        stream.Seek(start, SeekOrigin.Begin);
+        stream.ReadExactly(buffer);
+        first = Array.IndexOf(buffer, (byte)'\n');
+        last = Array.LastIndexOf(buffer, (byte)'\n');
+        var lines = new List<string>();
+        for (int i = cutHead ? first + 1 : 0; last >= 0 && i <= last;)
+        {
+            int next = Array.IndexOf(buffer, (byte)'\n', i, last - i + 1);
+            lines.Add(Encoding.UTF8.GetString(buffer, i, next - i).TrimEnd('\r'));
+            i = next + 1;
+        }
+        return lines;
+    }
+
+    // The newest of each among lines in order: from the last line back, filling only what's still unknown.
+    private static void Events(List<string> lines, ref UsageReading? limits, ref Turn? turn)
+    {
+        for (int i = lines.Count - 1; i >= 0 && (limits is null || turn is null); i--)
+            Event(lines[i], ref limits, ref turn);
     }
 
     // From the end: the first token_count with limits, and the first turn event.

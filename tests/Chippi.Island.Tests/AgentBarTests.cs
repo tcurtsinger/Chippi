@@ -139,10 +139,18 @@ public sealed class AgentBarTests
         try
         {
             window.SetTiles(AgentsTile(out _));
-            window.SetActivities([new IslandActivity("plain-paste", IslandActivityKind.Status, "Plain text copied", "") { ModuleId = "paste-plain-text" }], PetMood.Idle);
+            var plain = new IslandActivity("plain-paste", IslandActivityKind.Status, "Plain text copied", "") { ModuleId = "paste-plain-text" };
+            window.SetActivities([plain], PetMood.Idle);
             Assert.Same(LucideIcons.ClipboardType, window.GlyphIcon.Data);
             Assert.Equal("Plain text copied", window.ChipText);
             Assert.Null(ChipKey(window));
+
+            // An agent's alert that comes during it waits: Plain paste's line keeps the bar.
+            var alert = new IslandActivity("alert", IslandActivityKind.Status, "80% used", "Claude Code · 5-hour") { IsFeedback = true, OpensTile = Key, ModuleId = Key };
+            window.SetActivities([alert, plain], PetMood.Idle);
+            Assert.Equal("Plain text copied", window.ChipText);
+            window.SetActivities([alert], PetMood.Idle);
+            Assert.Equal("80% used · Claude Code · 5-hour", window.ChipText);
         }
         finally { window.Close(); }
     });

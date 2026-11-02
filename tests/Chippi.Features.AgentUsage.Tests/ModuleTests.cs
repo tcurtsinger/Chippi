@@ -83,6 +83,17 @@ public sealed class ModuleTests
     }
 
     [Fact]
+    public void A_check_that_throws_anything_fails_and_still_waits_before_the_next()
+    {
+        using var h = new Harness(p => p.Scripts[AgentKind.Codex] = () => throw new FormatException("odd"));
+        h.Step(First);
+        Assert.Equal(CheckState.Failed, h.Module.All[AgentKind.Codex].Check);
+        h.Step(TimeSpan.FromSeconds(5));
+        h.Step(TimeSpan.FromMinutes(5));
+        Assert.Single(h.Programs.Started);
+    }
+
+    [Fact]
     public async Task A_check_that_hangs_times_out_and_fails()
     {
         using var h = new Harness(p => p.Scripts[AgentKind.Codex] = () => new ScriptedConversation(_ => []) { Hangs = true });
@@ -126,6 +137,61 @@ public sealed class ModuleTests
         var codex = h.Module.Agents.Single(a => a.Agent == AgentKind.Codex);
         Assert.Empty(AgentLines.Rows(codex));
         Assert.Equal(("Signed out", true), AgentLines.State(codex, h.Module.Now));
+    }
+
+    private static string CodexLog(double used, DateTimeOffset at) =>
+        """{"timestamp":"2026-11-01T22:00:00Z","type":"session_meta","payload":{"cwd":"X:\\code\\c"}}""" + "\n"
+        + $$$$"""{"timestamp":"{{{{at.UtcDateTime:O}}}}","type":"event_msg","payload":{"type":"token_count","rate_limits":{"primary":{"used_percent":{{{{used}}}},"window_minutes":10080,"resets_at":1793801690},"plan_type":"pro"}}}""" + "\n";
+
+    [Fact]
+    public void An_agent_not_installed_shows_nothing_from_the_logs_it_left()
+    {
+        using var h = new Harness();
+        h.Write(".codex/sessions/2026/11/01/rollout-x-01a1996d-5825-71d1-8fa7-2fccf5ed27b1.jsonl", CodexLog(90, Harness.Start));
+        h.Step(First);
+        var codex = h.Module.All[AgentKind.Codex];
+        Assert.False(codex.Found);
+        Assert.Null(codex.Reading);
+        Assert.Equal("None", h.Tile.Status);
+    }
+
+    [Fact]
+    public void Codex_signed_out_shows_no_limits_anywhere()
+    {
+        using var h = new Harness(p => p.Scripts[AgentKind.Codex] = () => Answers.Codex(account: """{"id":2,"result":{"account":null}}"""));
+        h.Write(".codex/sessions/2026/11/01/rollout-x-01a1996d-5825-71d1-8fa7-2fccf5ed27b1.jsonl", CodexLog(90, Harness.Start));
+        h.Step(First);
+        var codex = h.Module.Agents.Single(a => a.Agent == AgentKind.Codex);
+        Assert.True(codex.Found);
+        Assert.Null(codex.Reading);
+        Assert.Null(codex.Plan);
+        Assert.Equal(("None", false), (h.Tile.Status, h.Tile.NeedsAttention));
+    }
+
+    [Fact]
+    public void The_Claude_apps_old_file_never_makes_the_first_live_reading_a_reset()
+    {
+        using var h = new Harness(p => p.Scripts[AgentKind.Claude] = () => Answers.SignedInClaude(10, 23));
+        h.Write("Claude/plan-usage-history.json", History(95, 23, Harness.Start.AddDays(-3)));
+        h.Step();
+        h.Step(First);
+        Assert.Equal("Claude 23%", h.Tile.Status);
+        Assert.Null(h.Activity(AgentBar.AlertKey));
+    }
+
+    [Fact]
+    public async Task An_alert_waiting_its_turn_never_shows_after_the_stop()
+    {
+        double used = 70;
+        using var h = new Harness(p => p.Scripts[AgentKind.Claude] = () => Answers.SignedInClaude(used, used));
+        h.Step(First);
+        used = 90; // both windows pass the level: the 5-hour shows, the weekly waits
+        h.Step(TimeSpan.FromMinutes(5));
+        Assert.Equal("Claude Code · 5-hour", h.Activity(AgentBar.AlertKey)!.Source);
+
+        await h.Module.StopAsync(default);
+        h.Time.Advance(AgentUsageModule.AlertTime * 2);
+        Assert.Equal("Claude Code · 5-hour", h.Activity(AgentBar.AlertKey)!.Source); // the registry clears it after the stop
     }
 
     [Fact]

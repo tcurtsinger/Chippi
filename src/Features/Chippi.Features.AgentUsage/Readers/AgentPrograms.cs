@@ -87,6 +87,12 @@ internal sealed class WindowsAgentPrograms(Action<AgentKind, ProgramCost>? coste
     /// <summary>The agent's program: on the PATH or where its installer puts it. Codex's npm wrapper is passed by for its own codex.exe.</summary>
     internal static string? Locate(AgentKind agent)
     {
+        try { return Find(agent); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return null; } // a folder it may not read
+    }
+
+    private static string? Find(AgentKind agent)
+    {
         string profile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         if (agent == AgentKind.Claude)
             return OnPath("claude.exe") ?? Existing(Path.Combine(profile, ".local", "bin", "claude.exe"));

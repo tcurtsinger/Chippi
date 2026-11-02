@@ -160,6 +160,20 @@ public sealed class ClaudeHistoryTests
     }
 
     [Fact]
+    public void Samples_with_odd_values_are_passed_by()
+    {
+        using var folder = new TempFolder();
+        string path = folder.Write("h.json", """
+            {"version":2,"samples":[
+              {"t":null,"u":{"fh":99}}, {"t":"2026-11-01T10:00:00Z","u":{"fh":98}}, {"t":99999999999999999,"u":{"fh":97}},
+              {"t":1793369696878,"u":{"fh":"12","sd":23}}, "not a sample"]}
+            """);
+        var reading = ClaudeHistory.Read(path)!;
+        Assert.Equal(DateTimeOffset.FromUnixTimeMilliseconds(1793369696878), reading.At);
+        Assert.Equal(["Weekly"], reading.Windows.Select(w => w.Label));
+    }
+
+    [Fact]
     public void No_file_gives_nothing() => Assert.Null(ClaudeHistory.Read(Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".json")));
 }
 
@@ -256,17 +270,41 @@ public sealed class CodexLogsTests
         Assert.False(new CodexLogs(home.Path).LastTurn(log)!.Working);
     }
 
+    private static string Filler(int lines) =>
+        string.Concat(Enumerable.Repeat(Line("2026-11-01T23:00:00Z", $$"""{"type":"agent_message","message":"{{new string('x', 4000)}}"}""") + "\n", lines));
+
     [Fact]
-    public void Only_the_end_of_a_long_log_is_read()
+    public void A_turn_that_has_written_more_than_a_chunk_still_works_until_it_ends()
     {
         using var home = new TempFolder();
-        string filler = Line("2026-11-01T23:00:00Z", $$"""{"type":"agent_message","message":"{{new string('x', 4000)}}"}""");
-        string log = home.Write($"sessions/2026/11/01/rollout-x-{Thread}.jsonl", Log(
-            [Line("2026-11-01T23:00:00Z", Limits(70)), .. Enumerable.Repeat(filler, 100), Line("2026-11-01T23:30:00Z", """{"type":"task_complete"}""")]));
-        Assert.True(new FileInfo(log).Length > CodexLogs.Tail);
+        string log = home.Write($"sessions/2026/11/01/rollout-x-{Thread}.jsonl",
+            Log(Line("2026-11-01T23:00:00Z", Limits(70)), Line("2026-11-01T23:00:01Z", """{"type":"task_started"}""")) + Filler(150));
+        Assert.True(new FileInfo(log).Length > 2 * CodexLogs.Chunk);
         var logs = new CodexLogs(home.Path);
-        Assert.Null(logs.Limits([])); // the limits line is past the tail
-        Assert.False(logs.LastTurn(log)!.Working);
+
+        // Seen first: read back past the chunks of output to the turn's start and the limits before it.
+        Assert.Equal(new CodexLogs.Turn(true, DateTimeOffset.Parse("2026-11-01T23:00:01Z")), logs.LastTurn(log));
+        Assert.Equal(70, logs.Limits([log])!.Windows.Single().Used);
+
+        // It grows by more than a chunk with nothing new about the turn: still working, as it was.
+        File.AppendAllText(log, Filler(100));
+        Assert.True(logs.LastTurn(log)!.Working);
+        Assert.Equal(70, logs.Limits([log])!.Windows.Single().Used);
+
+        // A line half written, then finished: read whole once it is.
+        File.AppendAllText(log, """{"timestamp":"2026-11-01T23:40:00Z","type":"event_msg","payload":{"type":"task_comp""");
+        Assert.True(logs.LastTurn(log)!.Working);
+        File.AppendAllText(log, "lete\"}}\n");
+        Assert.Equal(new CodexLogs.Turn(false, DateTimeOffset.Parse("2026-11-01T23:40:00Z")), logs.LastTurn(log));
+    }
+
+    [Fact]
+    public void A_log_seen_first_is_read_back_no_further_than_its_limit()
+    {
+        using var home = new TempFolder();
+        int lines = CodexLogs.Back / 4000 + 50;
+        string log = home.Write($"sessions/2026/11/01/rollout-x-{Thread}.jsonl", Log(Line("2026-11-01T23:00:00Z", """{"type":"task_started"}""")) + Filler(lines));
+        Assert.Null(new CodexLogs(home.Path).LastTurn(log)); // further back than it reads
     }
 
     [Fact]

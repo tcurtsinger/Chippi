@@ -53,7 +53,7 @@ internal sealed partial class ClaudeSessions(string claudeHome, IProcesses proce
     {
         if (root.ValueKind != JsonValueKind.Object)
             return null;
-        int? pid = root.TryGetProperty("pid", out var p) && p.TryGetInt32(out int id) ? id : null;
+        int? pid = root.TryGetProperty("pid", out var p) && p.ValueKind == JsonValueKind.Number && p.TryGetInt32(out int id) ? id : null;
         string sessionId = Text(root, "sessionId") ?? pid?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "";
         string? cwd = Text(root, "cwd");
         string name = Text(root, "name") is { Length: > 0 } named ? named : LeafName(cwd) ?? "Session";
@@ -61,7 +61,7 @@ internal sealed partial class ClaudeSessions(string claudeHome, IProcesses proce
         bool working = status is "busy" or "running" or "working";
         long? since = Millis(root, "statusUpdatedAt") ?? Millis(root, "updatedAt");
         long? started = Text(root, "procStart") is { } ps && long.TryParse(ps, out long ft) ? ft : null;
-        var at = since is { } ms ? DateTimeOffset.FromUnixTimeMilliseconds(ms) : new DateTimeOffset(written, TimeSpan.Zero);
+        var at = since is { } ms && ms <= DateTimeOffset.MaxValue.ToUnixTimeMilliseconds() ? DateTimeOffset.FromUnixTimeMilliseconds(ms) : new DateTimeOffset(written, TimeSpan.Zero);
         return new(new AgentSession(AgentKind.Claude, sessionId, name, working, at, pid, Text(root, "entrypoint")), pid, started);
     }
 
@@ -83,7 +83,11 @@ internal sealed partial class ClaudeSessions(string claudeHome, IProcesses proce
 /// </summary>
 internal sealed class CodexSessions(string codexHome, CodexLogs logs, IProcesses processes)
 {
+    /// <summary>A thread whose log wasn't found is looked for again after this, not every scan.</summary>
+    internal static readonly TimeSpan LookAgain = TimeSpan.FromMinutes(5);
+
     private readonly Dictionary<string, string?> _logs = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, DateTimeOffset> _missing = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, (string Name, string? Source)> _meta = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, int?> _holders = new(StringComparer.OrdinalIgnoreCase);
     private (DateTime Written, Dictionary<string, string> Names) _index = (DateTime.MinValue, []);
@@ -102,18 +106,25 @@ internal sealed class CodexSessions(string codexHome, CodexLogs logs, IProcesses
         }
         var sessions = new List<AgentSession>();
         var open = new List<string>();
+        var threads = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (string lockFile in Directory.EnumerateFiles(Locks, "*.lock"))
         {
             string thread = Path.GetFileNameWithoutExtension(lockFile);
             if (thread.StartsWith('.') || !processes.IsLocked(lockFile))
-            {
-                _holders.Remove(thread);
                 continue;
-            }
+            threads.Add(thread);
             if (!_logs.TryGetValue(thread, out string? log) || log is null || !File.Exists(log))
+            {
+                if (_missing.TryGetValue(thread, out var again) && now < again)
+                    continue;
                 _logs[thread] = log = logs.Find(thread);
-            if (log is null)
-                continue;
+                if (log is null)
+                {
+                    _missing[thread] = now + LookAgain;
+                    continue;
+                }
+                _missing.Remove(thread);
+            }
             open.Add(log);
             if (!_holders.TryGetValue(thread, out int? pid))
                 _holders[thread] = pid = processes.HolderOf(lockFile);
@@ -127,7 +138,18 @@ internal sealed class CodexSessions(string codexHome, CodexLogs logs, IProcesses
                 sessions.Add(session);
         }
         OpenLogs = open;
+        // What's known of threads no longer open is let go.
+        Prune(_logs, threads);
+        Prune(_missing, threads);
+        Prune(_meta, threads);
+        Prune(_holders, threads);
         return sessions;
+    }
+
+    private static void Prune<T>(Dictionary<string, T> known, HashSet<string> open)
+    {
+        foreach (string thread in known.Keys.Where(t => !open.Contains(t)).ToList())
+            known.Remove(thread);
     }
 
     // The thread's name from the index, else its folder's; and where it was started ("vscode", "cli"), from its first line.

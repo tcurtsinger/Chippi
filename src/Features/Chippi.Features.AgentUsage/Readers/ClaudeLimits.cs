@@ -133,7 +133,7 @@ internal static class ClaudeLimits
                 continue;
             if (v.ValueKind == JsonValueKind.String && DateTimeOffset.TryParse(v.GetString(), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var parsed))
                 return parsed;
-            if (v.ValueKind == JsonValueKind.Number && v.TryGetInt64(out long unix) && unix > 0)
+            if (v.ValueKind == JsonValueKind.Number && v.TryGetInt64(out long unix) && unix > 0 && unix <= DateTimeOffset.MaxValue.ToUnixTimeMilliseconds())
                 return unix > 100_000_000_000 ? DateTimeOffset.FromUnixTimeMilliseconds(unix) : DateTimeOffset.FromUnixTimeSeconds(unix);
         }
         return null;
@@ -188,7 +188,7 @@ internal static class ClaudeHistory
             using var doc = JsonDocument.Parse(stream);
             return Parse(doc.RootElement);
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or InvalidOperationException)
         {
             return null;
         }
@@ -202,8 +202,8 @@ internal static class ClaudeHistory
         long newestAt = 0;
         foreach (var sample in samples.EnumerateArray())
         {
-            if (sample.ValueKind == JsonValueKind.Object && sample.TryGetProperty("t", out var t) && t.TryGetInt64(out long at)
-                && at > newestAt && sample.TryGetProperty("u", out var u) && u.ValueKind == JsonValueKind.Object)
+            if (sample.ValueKind == JsonValueKind.Object && sample.TryGetProperty("t", out var t) && t.ValueKind == JsonValueKind.Number && t.TryGetInt64(out long at)
+                && at > newestAt && at <= DateTimeOffset.MaxValue.ToUnixTimeMilliseconds() && sample.TryGetProperty("u", out var u) && u.ValueKind == JsonValueKind.Object)
             {
                 newest = u;
                 newestAt = at;

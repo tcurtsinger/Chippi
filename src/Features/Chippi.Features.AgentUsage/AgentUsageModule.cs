@@ -52,6 +52,7 @@ public sealed class AgentUsageModule : IFeatureModule
     private readonly Func<bool> _unseen;
     private readonly bool _loops;
     private readonly Lock _gate = new();
+    private readonly Lock _alertGate = new(); // the alert queue and its timer, which fires on a timer thread
     private readonly SemaphoreSlim _wake = new(0);
     private readonly Dictionary<AgentKind, Track> _tracks = [];
     private readonly Dictionary<int, SessionApp?> _apps = [];
@@ -164,10 +165,11 @@ public sealed class AgentUsageModule : IFeatureModule
             _stop = null;
             _loop = null;
         }
-        _alertTimer?.Dispose();
-        _alertTimer = null;
-        lock (_gate)
+        lock (_alertGate)
         {
+            // Under the alerts' lock, so a firing timer neither publishes after the stop nor changes a disposed timer.
+            _alertTimer?.Dispose();
+            _alertTimer = null;
             _alertQueue.Clear();
             _alertShowing = false;
         }
@@ -277,7 +279,7 @@ public sealed class AgentUsageModule : IFeatureModule
         }
         var claude = _tracks[AgentKind.Claude];
         if (claude.Last is null && claude.Other is null)
-            claude.Other = ClaudeHistory.Read(_paths.ClaudeHistory); // something to show before the first check
+            claude.Other = Safely(() => ClaudeHistory.Read(_paths.ClaudeHistory), "the Claude app's usage file"); // something to show before the first check
         var now = _time.GetUtcNow();
         ScanSessions(settings, now);
         Publish(settings, now);
@@ -303,13 +305,20 @@ public sealed class AgentUsageModule : IFeatureModule
             sessions.AddRange(Safely(() => _codexSessions!.Read(now, _programs.IsOwn), "Codex's sessions"));
             _tracks[AgentKind.Codex].Other = Safely(() => _codexLogs!.Limits(_codexSessions!.OpenLogs), "Codex's logs");
         }
+        var pids = sessions.Select(s => s.ProcessId).OfType<int>().ToHashSet();
+        List<int> unknown;
         lock (_gate)
         {
-            var pids = sessions.Select(s => s.ProcessId).OfType<int>().ToHashSet();
             foreach (int gone in _apps.Keys.Where(pid => !pids.Contains(pid)).ToList())
                 _apps.Remove(gone);
-            foreach (int pid in pids.Where(pid => !_apps.ContainsKey(pid)))
-                _apps[pid] = Safely(() => _processes.AppOf(pid), "a session's app");
+            unknown = [.. pids.Where(pid => !_apps.ContainsKey(pid))];
+        }
+        // Found outside the lock: a window's title can take a message to the UI thread, which takes the lock too.
+        var found = unknown.ToDictionary(pid => pid, pid => Safely(() => _processes.AppOf(pid), "a session's app"));
+        lock (_gate)
+        {
+            foreach (var (pid, app) in found)
+                _apps[pid] = app;
         }
         Sessions = [.. sessions.OrderByDescending(s => s.Since)];
     }
@@ -330,8 +339,8 @@ public sealed class AgentUsageModule : IFeatureModule
     {
         var now = _time.GetUtcNow();
         _lastCost = null;
+        track.Last = now; // first, so nothing a check does can make it due again at once
         var result = await RunCheckAsync(kind, now, ct).ConfigureAwait(false);
-        track.Last = now;
         track.State = result.State;
         track.Failures = result.State == CheckState.Ok ? 0 : track.Failures + 1;
         track.Installed = result.State != CheckState.NotFound;
@@ -341,7 +350,7 @@ public sealed class AgentUsageModule : IFeatureModule
             track.Plan = reading.Plan ?? track.Plan;
         }
         else if (kind == AgentKind.Claude)
-            track.Other = ClaudeHistory.Read(_paths.ClaudeHistory); // the Claude app's own last check
+            track.Other = Safely(() => ClaudeHistory.Read(_paths.ClaudeHistory), "the Claude app's usage file"); // the Claude app's own last check
         var due = UsageSchedule.Due(_started, track.Last, Seen, track.Failures, track.State);
         _context?.Logger.LogInformation("Agent usage: {Agent} check {State}{Error}{Cost}; next in {Next:0.#} min",
             kind, result.State, result.Error is { } error ? $" ({error})" : "", _lastCost is { } cost ? $" in {cost}" : "", (due - now).TotalMinutes);
@@ -366,24 +375,29 @@ public sealed class AgentUsageModule : IFeatureModule
         {
             return new(CheckState.Failed, Error: "timed out");
         }
-        catch (Exception ex) when (ex is IOException or InvalidOperationException or System.ComponentModel.Win32Exception or System.Text.Json.JsonException or KeyNotFoundException)
+        catch (Exception ex) when (!ct.IsCancellationRequested)
         {
-            return new(CheckState.Failed, Error: ex.Message);
+            return new(CheckState.Failed, Error: $"{ex.GetType().Name}: {ex.Message}"); // the next check may work: it backs off
         }
     }
 
     private static string Version => typeof(AgentUsageModule).Assembly.GetName().Version?.ToString(3) ?? "0.1.0";
 
-    /// <summary>What each agent shows now: the newest reading from any source, and whether it's fresh.</summary>
+    /// <summary>
+    /// What each agent shows now: the newest reading from any source, and whether it's fresh. An agent is found when its
+    /// program is here, a session of it is open, or (Claude Code) the Claude app's own file is; one that isn't shows
+    /// nothing. Codex signed out shows no limits, as its logs are from before. So the card, the home, the bar and the
+    /// alerts all agree.
+    /// </summary>
     private AgentStatus StatusOf(AgentKind kind, DateTimeOffset now)
     {
         var track = _tracks[kind];
-        var reading = new[] { track.Live, track.Other }.Where(r => r is not null).MaxBy(r => r!.At);
-        bool files = kind == AgentKind.Claude
-            ? File.Exists(_paths.ClaudeHistory) || Directory.Exists(Path.Combine(_paths.ClaudeHome, "sessions"))
-            : Directory.Exists(Path.Combine(_paths.CodexHome, "sessions"));
+        bool found = track.Installed || Sessions.Any(s => s.Agent == kind) || kind == AgentKind.Claude && File.Exists(_paths.ClaudeHistory);
+        bool signedOut = track.State == CheckState.SignedOut;
+        var reading = !found || kind == AgentKind.Codex && signedOut ? null
+            : new[] { track.Live, track.Other }.Where(r => r is not null).MaxBy(r => r!.At);
         bool fresh = reading is not null && (now - reading.At < AgentStatus.StaleAfter || (track.State == CheckState.Ok && ReferenceEquals(reading, track.Live)));
-        return new AgentStatus(kind, track.Installed || files || reading is not null, track.State, reading, fresh, reading?.Plan ?? track.Plan);
+        return new AgentStatus(kind, found, track.State, reading, fresh, reading?.Plan ?? (signedOut ? null : track.Plan));
     }
 
     // The home's button, the bar's activities, the alerts and the pages, each only when it changed.
@@ -411,7 +425,8 @@ public sealed class AgentUsageModule : IFeatureModule
         foreach (var agent in agents)
         {
             var track = _tracks[agent.Agent];
-            if (agent.Reading is { } reading && reading.At != track.Alerted)
+            // Only a fresh reading: a days-old one (the Claude app's file) would make the first live one look like a reset.
+            if (agent.Fresh && agent.Reading is { } reading && reading.At != track.Alerted)
             {
                 track.Alerted = reading.At;
                 alerts.AddRange(_alerts.Read(agent.Agent, reading, settings.WarningLevel, now));
@@ -442,31 +457,32 @@ public sealed class AgentUsageModule : IFeatureModule
             _context?.Island.Publish(next);
     }
 
-    // Alerts take turns on the bar, 6 seconds each.
+    // Alerts take turns on the bar, 6 seconds each. The hub only posts its change to the UI thread, so publishing under the
+    // lock can't wait on it.
     private void Queue(UsageAlert alert)
     {
-        lock (_gate)
+        lock (_alertGate)
         {
             _alertQueue.Enqueue(alert);
-            if (_alertShowing)
-                return;
+            if (!_alertShowing)
+                NextAlert();
         }
-        NextAlert();
     }
 
     private void NextAlert()
     {
-        UsageAlert? next;
-        lock (_gate)
+        lock (_alertGate)
         {
-            _alertShowing = _alertQueue.TryDequeue(out next);
+            if (_alertTimer is null || _context is not { } context)
+                return; // stopped
+            _alertShowing = _alertQueue.TryDequeue(out var next);
+            if (next is null)
+            {
+                context.Island.Clear(AgentBar.AlertKey);
+                return;
+            }
+            context.Island.Publish(AgentBar.Alert(next, Settings.WarningLevel));
+            _alertTimer.Change(AlertTime, Timeout.InfiniteTimeSpan);
         }
-        if (next is null)
-        {
-            _context?.Island.Clear(AgentBar.AlertKey);
-            return;
-        }
-        _context?.Island.Publish(AgentBar.Alert(next, Settings.WarningLevel));
-        _alertTimer?.Change(AlertTime, Timeout.InfiniteTimeSpan);
     }
 }

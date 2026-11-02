@@ -813,8 +813,9 @@ public partial class IslandWindow : Window
     /// </summary>
     private void RefreshPuck()
     {
-        // Plain paste's feedback, or another short line like it (an agent's "80% used").
-        var feedback = _activities.FirstOrDefault(a => a.ModuleId == Chippi.Features.PlainPaste.PlainPasteModule.Id || a.IsFeedback);
+        // Plain paste's feedback, or else another short line like it (an agent's "80% used"), which waits while Plain paste's shows.
+        var feedback = _activities.FirstOrDefault(a => a.ModuleId == Chippi.Features.PlainPaste.PlainPasteModule.Id)
+            ?? _activities.FirstOrDefault(a => a.IsFeedback);
         var mic = _activities.FirstOrDefault(a => a.ModuleId == "mic-mute" && a.NeedsAttention);
         var top = _activities.FirstOrDefault(a => a.ModuleId is not Chippi.Features.PlainPaste.PlainPasteModule.Id and not "mic-mute" && !a.IsFeedback);
         bool dropping = _dragKey is not null;

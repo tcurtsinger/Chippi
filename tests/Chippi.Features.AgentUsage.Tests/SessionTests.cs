@@ -74,6 +74,21 @@ public sealed class ClaudeSessionsTests
     }
 
     [Fact]
+    public void A_file_with_odd_values_leaves_the_others_listed()
+    {
+        using var home = new TempFolder();
+        home.Write("sessions/100.json", Session(100, "busy", Now));
+        home.Write("sessions/200.json", """{"pid":"200","status":"busy","statusUpdatedAt":"soon"}""");
+        home.Write("sessions/300.json", """{"pid":300,"status":"busy","statusUpdatedAt":99999999999999999}""");
+        home.Write("sessions/400.json", "[]");
+        var processes = new FakeProcesses { Running = { [100] = 134380504408940117, [200] = null, [300] = null } };
+
+        var sessions = new ClaudeSessions(home.Path, processes).Read(Now, _ => false);
+
+        Assert.Equal([100, 300], sessions.Select(s => s.ProcessId!.Value).Order());
+    }
+
+    [Fact]
     public void No_sessions_folder_is_no_sessions() =>
         Assert.Empty(new ClaudeSessions(Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString()), new FakeProcesses()).Read(Now, _ => false));
 }
@@ -138,6 +153,20 @@ public sealed class CodexSessionsTests
             {"id":"{{Open}}","thread_name":"Archer capability","updated_at":"2026-11-01T23:30:46Z"}
             """);
         Assert.Equal("Archer capability", Assert.Single(new CodexSessions(home.Path, new CodexLogs(home.Path), processes).Read(Now, _ => false)).Name);
+    }
+
+    [Fact]
+    public void A_thread_whose_log_isnt_there_yet_is_looked_for_again_after_5_minutes()
+    {
+        using var home = new TempFolder();
+        home.Write($"thread-writer-locks/{Open}.lock", "");
+        var processes = new FakeProcesses { Locked = { $"{Open}.lock" } };
+        var codex = new CodexSessions(home.Path, new CodexLogs(home.Path), processes);
+
+        Assert.Empty(codex.Read(Now, _ => false));
+        home.Write($"sessions/2026/11/01/rollout-2026-11-01T17-24-02-{Open}.jsonl", CodexLogsTests.Log(Turn("2026-11-01T23:30:35Z", "task_started")));
+        Assert.Empty(codex.Read(Now.AddMinutes(1), _ => false));
+        Assert.Single(codex.Read(Now + CodexSessions.LookAgain, _ => false));
     }
 
     [Fact]
