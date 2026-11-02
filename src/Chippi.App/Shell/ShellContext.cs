@@ -35,6 +35,7 @@ public sealed class ShellContext
         Services.OpenSettings = page => Commands.OpenSettings(page);
         Services.OpenIslandPage = key => Commands.ShowPage(key);
         Services.TryOpenIslandPage = key => Commands.TryShowPage(key);
+        Services.ChippiColor = () => Config.GetSection<AppSettings>(AppSettings.SectionName).PetColor;
         Services.HoldIslandOpen = () => Commands.HoldIslandOpen();
         // Its thread starts on first use; nothing listens until History records or Clean URL cleans automatically.
         Services.Clipboard = Clipboard = new ClipboardHub(new WindowsClipboardSystem(), new WindowsForeground(), log: loggerFactory.CreateLogger("Clipboard"));

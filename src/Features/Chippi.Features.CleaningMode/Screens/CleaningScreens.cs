@@ -7,6 +7,7 @@ using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
+using Chippi.Core.Config;
 using Chippi.UI.Themes;
 
 namespace Chippi.Features.CleaningMode.Screens;
@@ -17,7 +18,7 @@ namespace Chippi.Features.CleaningMode.Screens;
 /// in over 200ms, and after an unlock holds 700ms for Chippi's celebration, then fades out over 240ms. Under reduced
 /// motion it comes and goes at once. A screen turned off or on meanwhile gets its black again.
 /// </summary>
-public sealed class CleaningScreens : ICleaningScreens
+public sealed class CleaningScreens(PetColor color = PetColor.Synth) : ICleaningScreens
 {
     internal static readonly TimeSpan FadeIn = TimeSpan.FromMilliseconds(200);
     internal static readonly TimeSpan Hold = TimeSpan.FromMilliseconds(700);
@@ -39,7 +40,7 @@ public sealed class CleaningScreens : ICleaningScreens
         var monitors = Native.Monitors();
         if (monitors.Count == 0)
             throw new InvalidOperationException("Cleaning mode failed: no screens");
-        _face = new CleaningFace();
+        _face = new CleaningFace(color);
         _face.Unlock.Click += (_, _) => UnlockClicked?.Invoke();
         int main = Main(monitors);
         _main = new CleaningWindow(monitors[main].Bounds, _face);

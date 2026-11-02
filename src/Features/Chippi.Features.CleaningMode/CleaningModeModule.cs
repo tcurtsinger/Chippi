@@ -30,11 +30,12 @@ public sealed class CleaningModeModule : IFeatureModule
     private ModuleContext? _context;
     private bool _capturing;
 
-    public CleaningModeModule() : this(new KeyboardLock(), () => new CleaningScreens(), GlobalMicHotkey.Create) { }
+    public CleaningModeModule() : this(new KeyboardLock(), null, GlobalMicHotkey.Create) { }
 
-    public CleaningModeModule(IKeyboardLock keyboard, Func<ICleaningScreens> screens, Func<IMicHotkey> hotkey)
+    /// <param name="screens">The black screens; null for the real ones, whose Chippi wears the colour picked for him.</param>
+    public CleaningModeModule(IKeyboardLock keyboard, Func<ICleaningScreens>? screens, Func<IMicHotkey> hotkey)
     {
-        _session = new CleaningSession(keyboard, screens);
+        _session = new CleaningSession(keyboard, screens ?? (() => new CleaningScreens(_context?.ChippiColor() ?? Core.Config.PetColor.Synth)));
         _session.Changed += () => Changed?.Invoke();
         _createHotkey = hotkey;
     }

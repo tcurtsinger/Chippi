@@ -331,6 +331,13 @@ public sealed class CleaningModeTests
     }
 
     [Fact]
+    public void Chippi_wears_the_colour_picked_for_him() => WpfTestThread.Run(() =>
+    {
+        Assert.Equal(Core.Config.PetColor.Synth, new CleaningFace().Pet.PetColor);
+        Assert.Equal(Core.Config.PetColor.Azure, new CleaningFace(Core.Config.PetColor.Azure).Pet.PetColor);
+    });
+
+    [Fact]
     public void The_dots_fill_as_Esc_is_pressed_and_all_three_on_unlock() => WpfTestThread.Run(() =>
     {
         var face = new CleaningFace();

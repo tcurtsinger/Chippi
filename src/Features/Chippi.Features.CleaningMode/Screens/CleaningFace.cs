@@ -7,6 +7,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Shapes;
+using Chippi.Core.Config;
 using Chippi.UI.Pet;
 using Chippi.UI.Themes;
 
@@ -15,7 +16,8 @@ namespace Chippi.Features.CleaningMode.Screens;
 /// <summary>
 /// The main screen's middle (docs/phase-5.5/cleaning-mode.md, Screens), top to bottom: Chippi at 200, idle; 32 below him
 /// "Press Esc 3 times to unlock" in 16 Muted; 16 below that three 10 dots, 12 apart, each an outline until its press fills
-/// it with the island's violet; and 32 below, Unlock. The screen is black in either theme, so the colors are fixed.
+/// it with the island's violet; and 32 below, Unlock. The screen is black in either theme, so the colors are fixed. Chippi
+/// wears the colour picked for him in Settings › Island &amp; pet (Travis, 2026-11-01).
 /// </summary>
 internal sealed class CleaningFace : UserControl
 {
@@ -27,13 +29,13 @@ internal sealed class CleaningFace : UserControl
     private readonly StackPanel _dotRow = new() { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 16, 0, 0) };
     private readonly TranslateTransform _rise = new();
 
-    public CleaningFace()
+    public CleaningFace(PetColor color = PetColor.Synth)
     {
         // His face and anything themed draw as on dark, on the black.
         Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri("pack://application:,,,/Chippi.UI;component/Themes/Dark.xaml") });
         Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri("pack://application:,,,/Chippi.Features.CleaningMode;component/Screens/Cleaning.xaml") });
         FontFamily = new FontFamily("Segoe UI Variable Text, Segoe UI");
-        Pet = new ChippiPet { Size = PetSize.Cleaning, Mood = PetMood.Idle, IsDecorative = true, HorizontalAlignment = HorizontalAlignment.Center, RenderTransform = _rise };
+        Pet = new ChippiPet { Size = PetSize.Cleaning, Mood = PetMood.Idle, PetColor = color, IsDecorative = true, HorizontalAlignment = HorizontalAlignment.Center, RenderTransform = _rise };
         var hint = new TextBlock { Text = "Press Esc 3 times to unlock", FontSize = 16, Foreground = Muted, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 32, 0, 0) };
         for (int i = 0; i < _dots.Length; i++)
         {
