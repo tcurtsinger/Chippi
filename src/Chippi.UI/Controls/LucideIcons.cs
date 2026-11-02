@@ -66,6 +66,7 @@ public static class LucideIcons
     public static Geometry Zap { get; } = G("M13,2 L3,14 H12 L11,22 L21,10 H12 Z");
     public static Geometry Cpu { get; } = G("M6,4 H18 a2,2 0 0 1 2,2 V18 a2,2 0 0 1 -2,2 H6 a2,2 0 0 1 -2,-2 V6 a2,2 0 0 1 2,-2 Z M9,9 H15 V15 H9 Z M15,2 v2 M15,20 v2 M2,15 h2 M2,9 h2 M20,15 h2 M20,9 h2 M9,2 v2 M9,20 v2");
     public static Geometry Activity { get; } = G("M22,12 H18 L15,21 L9,3 L6,12 H2");
+    public static Geometry Gauge { get; } = G("M12,14 L16,10 M3.34,19 A10,10 0 1 1 20.66,19");
     public static Geometry Folder { get; } = G("M20,20 a2,2 0 0 0 2,-2 V8 a2,2 0 0 0 -2,-2 H12.1 a2,2 0 0 1 -1.69,-0.9 L9.6,3.9 A2,2 0 0 0 7.93,3 H4 a2,2 0 0 0 -2,2 V18 a2,2 0 0 0 2,2 Z");
     public static Geometry Download { get; } = G("M21,15 v4 a2,2 0 0 1 -2,2 H5 a2,2 0 0 1 -2,-2 v-4 M7,10 L12,15 L17,10 M12,15 V3");
     public static Geometry Clipboard { get; } = G("M9,2 H15 a1,1 0 0 1 1,1 V5 a1,1 0 0 1 -1,1 H9 a1,1 0 0 1 -1,-1 V3 a1,1 0 0 1 1,-1 Z M16,4 h2 a2,2 0 0 1 2,2 v14 a2,2 0 0 1 -2,2 H6 a2,2 0 0 1 -2,-2 V6 a2,2 0 0 1 2,-2 h2");

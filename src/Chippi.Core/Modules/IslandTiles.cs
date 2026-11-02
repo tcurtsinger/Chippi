@@ -122,6 +122,12 @@ public interface IIslandTile
     /// <summary>Asks the home to read the tile's toggle and volume again (they changed without the status changing).</summary>
     void Refresh();
 
+    /// <summary>
+    /// Turns the home's button and its status Caution with nothing on the bar to say so (an agent at its warning level).
+    /// An activity on the tile that needs attention does the same.
+    /// </summary>
+    void SetAttention(bool attention) { }
+
     /// <summary>Raised on the UI thread when <see cref="OnScreen"/> changes, so a status that costs something to keep current runs only while seen.</summary>
     event EventHandler? OnScreenChanged;
 }
@@ -132,6 +138,7 @@ public sealed class IslandTileContribution(string moduleId, IslandTileSpec spec)
     private string _status = "";
     private string _pageNote = "";
     private volatile bool _onScreen;
+    private volatile bool _attention;
 
     public string ModuleId { get; } = moduleId;
 
@@ -143,7 +150,10 @@ public sealed class IslandTileContribution(string moduleId, IslandTileSpec spec)
 
     public bool OnScreen => _onScreen;
 
-    /// <summary>Raised on the thread that set the status or the page note.</summary>
+    /// <summary>Whether the module said the tile needs attention (<see cref="SetAttention"/>).</summary>
+    public bool NeedsAttention => _attention;
+
+    /// <summary>Raised on the thread that set the status, the page note or the attention.</summary>
     public event EventHandler? StatusChanged;
 
     public event EventHandler? OnScreenChanged;
@@ -162,6 +172,14 @@ public sealed class IslandTileContribution(string moduleId, IslandTileSpec spec)
         note ??= "";
         if (Interlocked.Exchange(ref _pageNote, note) != note)
             StatusChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    public void SetAttention(bool attention)
+    {
+        if (_attention == attention)
+            return;
+        _attention = attention;
+        StatusChanged?.Invoke(this, EventArgs.Empty);
     }
 
     /// <summary>The island host reports whether the tile is on screen. Call on the UI thread.</summary>
@@ -192,6 +210,9 @@ public sealed record IslandTileGroup(string Key, IReadOnlyList<IslandTileContrib
     public string Icon => Parts[0].Spec.Icon;
 
     public int Order => Parts.Min(p => p.Spec.Order);
+
+    /// <summary>Whether any part said the tile needs attention.</summary>
+    public bool NeedsAttention => Parts.Any(p => p.NeedsAttention);
 
     /// <summary>The first part's toggle, or null.</summary>
     public IslandTileToggle? Toggle => Parts.Select(p => p.Spec.Toggle).FirstOrDefault(t => t is not null);

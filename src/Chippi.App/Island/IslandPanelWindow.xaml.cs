@@ -613,7 +613,7 @@ public partial class IslandPanelWindow : Window
             return;
         }
         _pageStatus.Text = group.StatusOnPage ? group.Status : "";
-        bool caution = LiveOn(group.Key)?.NeedsAttention == true || Muted(group.Key);
+        bool caution = group.NeedsAttention || LiveOn(group.Key)?.NeedsAttention == true || Muted(group.Key);
         _pageStatus.SetResourceReference(TextBlock.ForegroundProperty, caution ? "WarningTextBrush" : "IslandTextTertiaryBrush");
     }
 
@@ -652,7 +652,7 @@ public partial class IslandPanelWindow : Window
         {
             var toggle = group.Toggle;
             bool muted = Muted(group.Key);
-            bool attention = LiveOn(group.Key)?.NeedsAttention == true || muted;
+            bool attention = group.NeedsAttention || LiveOn(group.Key)?.NeedsAttention == true || muted;
             bool failed = _failed.TryGetValue(group.Key, out long until) && until > now;
             string name = toggle?.Name ?? group.Name;
             var icon = muted ? LucideIcons.MicOff : LucideIcons.Get(toggle?.Icon ?? group.Icon);

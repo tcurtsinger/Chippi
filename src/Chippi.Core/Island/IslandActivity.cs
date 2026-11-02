@@ -10,22 +10,31 @@ public enum IslandActivityKind
     Timer,
     Download,
     Stash,
+
+    /// <summary>
+    /// A coding agent's sessions (AI agent usage): above everything but media while one waits on you
+    /// (<see cref="IslandActivity.NeedsAttention"/>), below everything while they only work.
+    /// </summary>
     Agent,
 
-    /// <summary>Background state such as Keep awake. Lowest priority; a timed session shows its countdown.</summary>
+    /// <summary>Background state such as Keep awake. A timed session shows its countdown.</summary>
     Status,
 }
 
 public static class IslandActivityKindExtensions
 {
-    /// <summary>Lower wins: media, then timer, then download or stash (equal), then agent, then status (DESIGN.md §5).</summary>
-    public static int Priority(this IslandActivityKind kind) => kind switch
+    /// <summary>
+    /// Lower wins: media, then an agent waiting on you, then timer, then download or stash (equal), then status, then an
+    /// agent working (DESIGN.md §5; Travis, 2026-11-01).
+    /// </summary>
+    public static int Priority(this IslandActivity activity) => activity.Kind switch
     {
         IslandActivityKind.Media => 0,
-        IslandActivityKind.Timer => 1,
-        IslandActivityKind.Download or IslandActivityKind.Stash => 2,
-        IslandActivityKind.Agent => 3,
+        IslandActivityKind.Agent when activity.NeedsAttention => 1,
+        IslandActivityKind.Timer => 2,
+        IslandActivityKind.Download or IslandActivityKind.Stash => 3,
         IslandActivityKind.Status => 4,
+        IslandActivityKind.Agent => 5,
         _ => int.MaxValue,
     };
 }
@@ -50,6 +59,22 @@ public sealed record IslandActivity(string Key, IslandActivityKind Kind, string 
     /// tile and <see cref="NeedsAttention"/> (a muted mic) does.
     /// </summary>
     public string? TileKey { get; init; }
+
+    /// <summary>
+    /// The tile page a click on the bar opens when the activity doesn't mark the tile with <see cref="TileKey"/>: an agent's
+    /// session opens Agents, but one waiting on you doesn't turn the home's button Caution. The bar then shows the
+    /// activity's own lines, <see cref="Title"/> over <see cref="Source"/>.
+    /// </summary>
+    public string? OpensTile { get; init; }
+
+    /// <summary>Two letters the bar's lead shows in place of a glyph (an agent's "CC"), in Caution with <see cref="NeedsAttention"/>; null for none.</summary>
+    public string? Monogram { get; init; }
+
+    /// <summary>
+    /// A short-lived line (6 seconds) that shows over a song, as Plain paste's feedback does: an agent's "80% used". The
+    /// publisher clears it.
+    /// </summary>
+    public bool IsFeedback { get; init; }
 
     /// <summary>Set by the hub to the publishing module's id.</summary>
     public string ModuleId { get; init; } = "";

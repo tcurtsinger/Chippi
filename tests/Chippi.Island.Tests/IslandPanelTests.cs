@@ -514,6 +514,31 @@ public sealed class IslandPanelTests
         }, Tiles(awake)));
     }
 
+    [Fact]
+    public void A_tile_that_needs_attention_turns_Caution_and_an_activity_that_only_opens_it_doesnt()
+    {
+        // Agents at its warning level (AI agent usage): no activity says so, the tile does.
+        var agents = new IslandTileContribution("agent-usage", new IslandTileSpec("agent-usage", "Agents", "Gauge", 85, 0, () => new Border()));
+        agents.SetStatus("Claude 42%");
+        WpfTestThread.Run(() => WithPanel(panel =>
+        {
+            Open(panel);
+            var waiting = new IslandActivity("waiting", IslandActivityKind.Agent, "Waiting on you", "Claude Code · packrat") { NeedsAttention = true, OpensTile = "agent-usage", ModuleId = "agent-usage" };
+            panel.SetActivities([waiting]);
+            Assert.NotSame(panel.FindResource("WarningBrush"), TileGlyph(panel, "agent-usage").Brush);
+
+            agents.SetStatus("Claude 86%");
+            agents.SetAttention(true);
+            Pump(TimeSpan.FromMilliseconds(50));
+            Assert.Same(panel.FindResource("WarningBrush"), TileGlyph(panel, "agent-usage").Brush);
+            Assert.Contains(Descendants(Grid(panel)).OfType<TextBlock>(), t => t.Text == "Claude 86%");
+
+            agents.SetAttention(false);
+            Pump(TimeSpan.FromMilliseconds(50));
+            Assert.NotSame(panel.FindResource("WarningBrush"), TileGlyph(panel, "agent-usage").Brush);
+        }, Tiles(agents)));
+    }
+
     private static Geometry TileIcon(IslandPanelWindow panel, string key) => TileGlyph(panel, key).Data!;
 
     private static LucideIcon TileGlyph(IslandPanelWindow panel, string key)
