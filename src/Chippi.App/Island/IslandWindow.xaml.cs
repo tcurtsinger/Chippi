@@ -813,9 +813,11 @@ public partial class IslandWindow : Window
     /// </summary>
     private void RefreshPuck()
     {
-        var feedback = _activities.FirstOrDefault(a => a.ModuleId == Chippi.Features.PlainPaste.PlainPasteModule.Id);
+        // Plain paste's feedback, or else another short line like it (an agent's "80% used"), which waits while Plain paste's shows.
+        var feedback = _activities.FirstOrDefault(a => a.ModuleId == Chippi.Features.PlainPaste.PlainPasteModule.Id)
+            ?? _activities.FirstOrDefault(a => a.IsFeedback);
         var mic = _activities.FirstOrDefault(a => a.ModuleId == "mic-mute" && a.NeedsAttention);
-        var top = _activities.FirstOrDefault(a => a.ModuleId is not Chippi.Features.PlainPaste.PlainPasteModule.Id and not "mic-mute");
+        var top = _activities.FirstOrDefault(a => a.ModuleId is not Chippi.Features.PlainPaste.PlainPasteModule.Id and not "mic-mute" && !a.IsFeedback);
         bool dropping = _dragKey is not null;
         bool awake = dropping || _hovered || _lifted || _panel.IsVisible || _stretching;
         if (_lifted)
@@ -854,7 +856,8 @@ public partial class IslandWindow : Window
         var mood = playing is not null && !_lifted ? PetMood.Listening : _mood != PetMood.Sleepy ? _mood : awake || bar ? PetMood.Idle : PetMood.Sleepy;
         Pet.ShowMood(mood);
         _panel.ShowPetMood(mood);
-        _chipKey = dropTile is not null || feedback is not null ? null : _singing ? IslandPanelWindow.NowPlayingKey : top?.TileKey;
+        _chipKey = dropTile is not null ? null : feedback is not null ? feedback.OpensTile
+            : _singing ? IslandPanelWindow.NowPlayingKey : top?.TileKey ?? top?.OpensTile;
         // What the bar shows, by identity rather than its values ("59 min left" after "1 hr left" is the same activity):
         // a new song or a new activity on a bar that's out and seen arrives (Arrival), the old fading where it was.
         string? content = !bar ? null
@@ -899,8 +902,10 @@ public partial class IslandWindow : Window
         }
         else if (feedback is not null)
         {
-            ShowGlyph(LucideIcons.ClipboardType, feedback.NeedsAttention);
-            ShowLine(feedback.Key, feedback.Title, "");
+            // Plain paste's ClipboardType, or the glyph of the page the line opens (Agents' gauge), over its source if it has one.
+            var opens = feedback.OpensTile is { } page ? _tiles.FirstOrDefault(t => t.Key == page) : null;
+            ShowGlyph(opens is null ? LucideIcons.ClipboardType : LucideIcons.Get(opens.Icon), feedback.NeedsAttention);
+            ShowLine(feedback.Key, feedback.Title, feedback.Source);
         }
         else if (song is not null)
         {
@@ -909,7 +914,9 @@ public partial class IslandWindow : Window
         }
         else if (top is not null)
         {
-            if (tile is not null)
+            if (top.Monogram is { Length: > 0 } letters)
+                ShowMonogram(letters, top.NeedsAttention);
+            else if (tile is not null)
                 ShowGlyph(LucideIcons.Get(tile.Toggle?.Icon ?? tile.Icon), top.NeedsAttention);
             else
                 ShowKindGlyph(top);
@@ -1083,7 +1090,16 @@ public partial class IslandWindow : Window
         GlyphIcon.Data = icon;
         GlyphIcon.SetResourceReference(LucideIcon.BrushProperty, caution ? "IslandCautionBrush" : "IslandAccentBrush");
         GlyphIcon.Visibility = Visibility.Visible;
-        Ring.Visibility = Dot.Visibility = Visibility.Collapsed;
+        Ring.Visibility = Dot.Visibility = Monogram.Visibility = Visibility.Collapsed;
+    }
+
+    /// <summary>An agent's two letters in the lead (Chippi never redraws another company's logo), Caution while it waits on you.</summary>
+    private void ShowMonogram(string letters, bool caution)
+    {
+        Monogram.Text = letters;
+        Monogram.SetResourceReference(TextBlock.ForegroundProperty, caution ? "IslandCautionBrush" : "IslandAccentBrush");
+        Monogram.Visibility = Visibility.Visible;
+        GlyphIcon.Visibility = Ring.Visibility = Dot.Visibility = Visibility.Collapsed;
     }
 
     /// <summary>An activity without a page of its own: the ring for a timer or an agent, a folder for a download or a stash, a note for music, a dot for a status.</summary>
@@ -1093,7 +1109,7 @@ public partial class IslandWindow : Window
         {
             case IslandActivityKind.Timer or IslandActivityKind.Agent:
                 RingArc.Data = Arc(activity.Progress ?? 1);
-                GlyphIcon.Visibility = Dot.Visibility = Visibility.Collapsed;
+                GlyphIcon.Visibility = Dot.Visibility = Monogram.Visibility = Visibility.Collapsed;
                 Ring.Visibility = Visibility.Visible;
                 break;
             case IslandActivityKind.Download or IslandActivityKind.Stash:
@@ -1104,7 +1120,7 @@ public partial class IslandWindow : Window
                 break;
             default:
                 Dot.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, activity.NeedsAttention ? "IslandCautionBrush" : "IslandAccentBrush");
-                GlyphIcon.Visibility = Ring.Visibility = Visibility.Collapsed;
+                GlyphIcon.Visibility = Ring.Visibility = Monogram.Visibility = Visibility.Collapsed;
                 Dot.Visibility = Visibility.Visible;
                 break;
         }

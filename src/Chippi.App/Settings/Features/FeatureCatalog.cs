@@ -27,7 +27,8 @@ public static class FeatureCatalog
             Presets = Audio,
         },
 
-        // System (the System feature is a real module since Phase 4: Chippi.Features.SystemMonitor)
+        // System (the System feature is a real module since Phase 4: Chippi.Features.SystemMonitor, and AI agent usage
+        // since Phase 5.5: Chippi.Features.AgentUsage)
         new("temperatures", "Temperatures", "CPU and GPU temperatures with alerts when they run hot", FeatureGroup.System)
         {
             Icon = "Cpu",
@@ -50,11 +51,6 @@ public static class FeatureCatalog
         {
             Icon = "Droplet",
             Requires = [Capability.InputHooks],
-        },
-        new("agent-usage", "AI agent usage", "Your coding agents' usage and reset times in the island", FeatureGroup.System)
-        {
-            Icon = "Activity",
-            Presets = PowerUser,
         },
         new("port-manager", "Port manager", "Shows which app holds a network port and frees it", FeatureGroup.System)
         {

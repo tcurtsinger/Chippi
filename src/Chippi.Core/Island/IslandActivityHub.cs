@@ -49,7 +49,7 @@ public sealed class IslandActivityHub
     }
 
     private IEnumerable<Entry> Ordered() =>
-        _entries.OrderBy(e => e.Activity.Kind.Priority()).ThenByDescending(e => e.Sequence);
+        _entries.OrderBy(e => e.Activity.Priority()).ThenByDescending(e => e.Sequence);
 
     private void Publish(string moduleId, IslandActivity activity)
     {

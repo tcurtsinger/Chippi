@@ -13,11 +13,13 @@ public sealed class IslandActivityHubTests
     public void Resting_when_nothing_is_published() => Assert.Null(_hub.Current);
 
     [Fact]
-    public void Priority_is_media_then_timer_then_download_or_stash_then_agent()
+    public void Priority_is_media_then_timer_then_download_or_stash_then_status_then_an_agent_working()
     {
         var p = _hub.CreatePublisher("debug");
-        p.Publish(new IslandActivity("agent", IslandActivityKind.Agent, "Claude", "62% of 5h"));
-        Assert.Equal("agent", _hub.Current!.Key);
+        p.Publish(new IslandActivity("working", IslandActivityKind.Agent, "Working · 42%", "Claude Code · chippi"));
+        Assert.Equal("working", _hub.Current!.Key);
+        p.Publish(new IslandActivity("awake", IslandActivityKind.Status, "1 hr left", "Keep awake"));
+        Assert.Equal("awake", _hub.Current!.Key);
         p.Publish(new IslandActivity("stash", IslandActivityKind.Stash, "invoice.pdf", "Downloads"));
         Assert.Equal("stash", _hub.Current!.Key);
         p.Publish(new IslandActivity("timer", IslandActivityKind.Timer, "Focus", "24:10"));
@@ -25,26 +27,39 @@ public sealed class IslandActivityHubTests
         p.Publish(new IslandActivity("media", IslandActivityKind.Media, "Weekend Mix", "Spotify"));
         Assert.Equal("media", _hub.Current!.Key);
 
-        Assert.Equal(["media", "timer", "stash", "agent"], _hub.Activities.Select(a => a.Key));
+        Assert.Equal(["media", "timer", "stash", "awake", "working"], _hub.Activities.Select(a => a.Key));
         p.Clear("media");
         Assert.Equal("timer", _hub.Current!.Key);
     }
 
     [Fact]
-    public void Status_is_shown_only_when_nothing_else_is_live()
+    public void An_agent_waiting_on_you_ranks_under_media_and_over_the_rest()
+    {
+        var p = _hub.CreatePublisher("debug");
+        p.Publish(new IslandActivity("timer", IslandActivityKind.Timer, "Focus", "24:10"));
+        p.Publish(new IslandActivity("awake", IslandActivityKind.Status, "1 hr left", "Keep awake"));
+        p.Publish(new IslandActivity("waiting", IslandActivityKind.Agent, "Waiting on you", "Claude Code · packrat") { NeedsAttention = true });
+        Assert.Equal("waiting", _hub.Current!.Key);
+
+        p.Publish(new IslandActivity("media", IslandActivityKind.Media, "Weekend Mix", "Spotify"));
+        Assert.Equal(["media", "waiting", "timer", "awake"], _hub.Activities.Select(a => a.Key));
+    }
+
+    [Fact]
+    public void Status_is_shown_only_when_nothing_else_but_an_agent_working_is_live()
     {
         var p = _hub.CreatePublisher("keep-awake");
         p.Publish(new IslandActivity("awake", IslandActivityKind.Status, "Keeping awake", "Until 6:00 PM"));
         Assert.Equal("awake", _hub.Current!.Key);
 
-        // Status loses to every other kind, including an agent published before it.
+        // Status loses to every other kind but a working agent, even one published before it.
         var debug = _hub.CreatePublisher("debug");
-        debug.Publish(new IslandActivity("agent", IslandActivityKind.Agent, "Claude", "62% of 5h"));
-        Assert.Equal("agent", _hub.Current!.Key);
-        Assert.Equal(["agent", "awake"], _hub.Activities.Select(a => a.Key));
-        Assert.True(IslandActivityKind.Agent.Priority() < IslandActivityKind.Status.Priority());
+        debug.Publish(new IslandActivity("download", IslandActivityKind.Download, "setup.exe", "Downloads"));
+        Assert.Equal("download", _hub.Current!.Key);
+        debug.Publish(new IslandActivity("agent", IslandActivityKind.Agent, "Working", "Codex · smartwork"));
+        Assert.Equal(["download", "awake", "agent"], _hub.Activities.Select(a => a.Key));
 
-        debug.Clear("agent");
+        debug.Clear("download");
         Assert.Equal("awake", _hub.Current!.Key);
     }
 

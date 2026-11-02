@@ -71,7 +71,7 @@ public partial class SettingsWindow : Window
     [
         "module:downloads-organizer", "module:shelf",
         "now-playing", "page:sound-output", "page:sound-microphone", "module:app-volume",
-        "module:keep-awake", "module:system-monitor", "module:quick-actions",
+        "module:keep-awake", "module:system-monitor", "module:quick-actions", "module:agent-usage",
         "module:clipboard-history", "module:clean-url", "module:paste-plain-text", "module:scratchpad",
     ];
 
