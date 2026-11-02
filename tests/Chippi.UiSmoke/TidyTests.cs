@@ -179,12 +179,12 @@ public sealed class TidyTests(ITestOutputHelper output)
     private static AutomationElement OpenTidy(DesktopSession app)
     {
         var pages = app.OpenPages();
-        if (pages.FindFirst(TreeScope.Descendants, new PropertyCondition(AutomationElement.NameProperty, "File organizer")) is null
+        if (pages.FindFirst(TreeScope.Descendants, new PropertyCondition(AutomationElement.NameProperty, "Organizer")) is null
             || pages.FindFirst(TreeScope.Descendants, new PropertyCondition(AutomationElement.NameProperty, "Folder mode")) is null)
         {
             if (pages.FindFirst(TreeScope.Descendants, new PropertyCondition(AutomationElement.NameProperty, "All features")) is { } grid)
                 DesktopSession.Invoke(grid);
-            DesktopSession.Invoke(DesktopTests.Tile(pages, "File organizer"));
+            DesktopSession.Invoke(DesktopTests.Tile(pages, "Organizer"));
         }
         return pages;
     }

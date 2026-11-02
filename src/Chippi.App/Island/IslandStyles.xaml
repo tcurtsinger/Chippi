@@ -387,6 +387,72 @@
         </Setter>
     </Style>
 
+    <!-- Quick actions' buttons (Phase 5.5): the home's tile, a glyph in the control fill with a 1px edge and 6px
+         corners. On, the accent fill with an on-accent glyph, as the home's toggles; an action never turns on. Off
+         (nothing to act on), the glyph goes tertiary and the button stays plain. -->
+    <Style x:Key="IslandActionTileStyle" TargetType="{x:Type ToggleButton}">
+        <Setter Property="Foreground" Value="{DynamicResource IslandTextBrush}" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource IslandTileFocusVisual}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type ToggleButton}">
+                    <Grid>
+                        <Border x:Name="Chrome" CornerRadius="6" BorderThickness="1" i:FillFade.To="{DynamicResource IslandButtonBrush}" BorderBrush="{DynamicResource IslandControlBorderBrush}" />
+                        <ContentPresenter />
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Chrome" Property="i:FillFade.To" Value="{DynamicResource IslandButtonHoverBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Chrome" Property="i:FillFade.To" Value="{DynamicResource IslandPressedBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Chrome" Property="i:FillFade.To" Value="{DynamicResource IslandAccentFillBrush}" />
+                            <Setter TargetName="Chrome" Property="BorderThickness" Value="0" />
+                            <Setter Property="Foreground" Value="{DynamicResource IslandOnAccentBrush}" />
+                        </Trigger>
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="IsChecked" Value="True" />
+                                <Condition Property="IsMouseOver" Value="True" />
+                            </MultiTrigger.Conditions>
+                            <Setter TargetName="Chrome" Property="i:FillFade.Opacity" Value="0.9" />
+                        </MultiTrigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Foreground" Value="{DynamicResource IslandTextTertiaryBrush}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Quick actions' picker: the same tile, and picked, the accent tint with a 1px accent edge (its check fills). -->
+    <Style x:Key="IslandPickTileStyle" TargetType="{x:Type ToggleButton}">
+        <Setter Property="Foreground" Value="{DynamicResource IslandTextBrush}" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource IslandTileFocusVisual}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type ToggleButton}">
+                    <Grid>
+                        <Border x:Name="Chrome" CornerRadius="6" BorderThickness="1" i:FillFade.To="{DynamicResource IslandButtonBrush}" BorderBrush="{DynamicResource IslandControlBorderBrush}" />
+                        <ContentPresenter />
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Chrome" Property="i:FillFade.To" Value="{DynamicResource IslandButtonHoverBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Chrome" Property="i:FillFade.To" Value="{DynamicResource IslandAccentTintBrush}" />
+                            <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource IslandAccentBrush}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- The home's split button, Quick Settings style: a 44 tall toggle on the left (IslandSplitMainStyle) and a
          28 wide arrow on the right (IslandSplitSideStyle), 6px outer corners, the control fill with a 1px edge and a
          divider between them. On, both take one accent fill edge to edge (IslandGrid spans it across the two with

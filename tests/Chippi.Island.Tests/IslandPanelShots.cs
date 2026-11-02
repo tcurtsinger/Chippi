@@ -97,7 +97,7 @@ public sealed class IslandPanelShots
         });
     }
 
-    /// <summary>The home as the mock shows it: eight buttons, Keep awake on, the volume slider; <paramref name="muted"/>, the mic and the output muted.</summary>
+    /// <summary>The home as the Phase 5.5 mock shows it: nine buttons five across, Awake on, the volume slider; <paramref name="muted"/>, the mic and the output muted.</summary>
     internal static IReadOnlyList<IslandTileGroup> HomeTiles(bool muted = false)
     {
         var mic = Section("sound", "Sound", 10, 220, status: "Live");
@@ -106,19 +106,20 @@ public sealed class IslandPanelShots
             Toggle = new IslandTileToggle(() => muted, () => Task.CompletedTask, "Microphone", "Mic", () => muted ? "Muted" : "Live"),
             Volume = new IslandTileVolume(() => 0.62, _ => { }, () => muted, _ => Task.CompletedTask),
         };
-        var awake = Section("keep-awake", "Keep awake", 40, 96, status: "1 hr left");
+        var awake = Section("keep-awake", "Awake", 40, 96, status: "1 hr left");
         var awakeSpec = awake.Spec with { Toggle = new IslandTileToggle(() => true, () => Task.CompletedTask) };
         var awakeTile = new IslandTileContribution("keep-awake", awakeSpec);
         awakeTile.SetStatus("1 hr left");
         return Tiles(
             new IslandTileContribution("sound", micSpec),
-            Section("sound.mixer", "App volume", 20, 200, status: "4 playing"),
+            Section("sound.mixer", "Volume", 20, 200, status: "4 playing"),
             awakeTile,
-            Section("downloads", "File organizer", 50, 120, status: "2 to review"),
+            Section("downloads", "Organizer", 50, 120, status: "2 to review"),
             Section("system-monitor", "System", 60, 120, status: "CPU 12%"),
             Section("clipboard", "Clipboard", 70, 120, status: "23 items"),
             Section("scratchpad", "Scratchpad", 80, 120, status: "4 notes"),
-            Section("shelf", "Shelf", 90, 120, status: "5 items"));
+            Section("shelf", "Shelf", 90, 120, status: "5 items"),
+            Section("quick-actions", "Actions", 100, 120));
     }
 
     // A stand-in section: a card of the given height (the island draws the page's name above it).
@@ -142,6 +143,7 @@ public sealed class IslandPanelShots
         "clipboard" => "ClipboardList",
         "scratchpad" => "NotebookPen",
         "shelf" => "Inbox",
+        "quick-actions" => "ToggleRight",
         _ => "Folder",
     };
 

@@ -13,6 +13,7 @@
     <Using Include="Xunit" />
     <Compile Include="../Chippi.Features.SystemMonitor.Tests/FakeSources.cs" Link="SystemMonitorFakeSources.cs" />
     <Compile Include="../Chippi.Clipboard.Tests/Fakes/ManualTime.cs" Link="ClipboardManualTime.cs" />
+    <Compile Include="../Chippi.Features.QuickActions.Tests/FakePc.cs" Link="QuickActionsFakePc.cs" />
     <ProjectReference Include="../../src/Chippi.App/Chippi.App.csproj" />
   </ItemGroup>
 </Project>
