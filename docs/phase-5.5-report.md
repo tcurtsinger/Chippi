@@ -1,6 +1,6 @@
 # Chippi Phase 5.5 report: Everyday tools, continued
 
-Phase 5.5 (Quick actions, Cleaning mode, AI agent usage, the Command bar and the Radial menu) is built, one pull request per feature, each built from its confirmed brief and approved mockup in [phase-5.5/](phase-5.5/README.md), in the order of [the handoff](phase-5.5-handoff.md). Each merged with Travis's OK once its CI passed. Phase 5.5 is PRs #178 to #186.
+Phase 5.5 (Quick actions, Cleaning mode, AI agent usage, the Command bar and the Radial menu) is built, one pull request per feature, each built from its confirmed brief and approved mockup in [phase-5.5/](phase-5.5/README.md), in the order of [the handoff](phase-5.5-handoff.md). Each merged with Travis's OK once its CI passed. Phase 5.5 is PRs #178 to #187.
 
 ## What was built
 
@@ -15,6 +15,7 @@ Phase 5.5 (Quick actions, Cleaning mode, AI agent usage, the Command bar and the
 | #184 | Radial menu: hold the middle, Back or Forward button (or a shortcut) for a wheel of up to 8 slices at the pointer, with submenus 3 deep, 12 kinds of slice and Settings' wheel editor. The pet learns to look toward a point and to grin; the clipboard hub copies a selection and puts the clipboard back |
 | #185 | End-of-phase cleanup, and installers with the Command bar and the Radial menu |
 | #186 | From the live checks: Restart Explorer asks the shell to exit, and files rank after apps and windows in the Command bar; this report; installers with both fixes |
+| #187 | The re-test of both fixes passed |
 
 ## How to build and run
 
@@ -33,7 +34,7 @@ At `main` `f6b4372` (CI run 41485459601, push): Release win-x64 and win-arm64, 0
 |---|---|---|
 | Both runtimes build with no warnings; the tests pass | Done | See Test results |
 | Each surface matches its mockup, dark and light, with shots beside it and timings | Done | Shots of every surface in each PR, rendered from the real controls. Timings: the Command bar's rows 0.17ms median per keystroke to find and 2ms to redraw; the Radial menu's wheel on screen about 5ms after the hold (#184) |
-| Travis's live checks pass | Done, two fixes to re-test | See Live checks |
+| Travis's live checks pass | Done | See Live checks |
 
 ## Deviations from the mockups
 
@@ -63,7 +64,7 @@ Steps: the "Live checks" section of each feature's PR (#179, #180, #181, #183, #
 | Command bar | 14 of 16 passed | Check 3: a fullscreen Chrome video leaves fullscreen as the bar opens (accepted; see Deviations). Check 5: typing "chrome" listed only `chrome…` files from a browser tool's caches. #186 ranks files, copies and emoji after apps, windows, Chippi and Settings |
 | Radial menu | 15 of 15 passed | |
 
-Re-test of Restart Explorer and the Command bar's "chrome" on the #186 installers, built from `ab328d1` (x64 Setup 82,866,840 bytes, ARM64 Setup 76,158,064): to do.
+Re-test of Restart Explorer and the Command bar's "chrome" on the #186 installers, built from `ab328d1` (x64 Setup 82,866,840 bytes, ARM64 Setup 76,158,064): Pass (Travis, 2026-11-02).
 
 ## Cleanup
 
