@@ -7,7 +7,7 @@ using Chippi.UI.Controls;
 namespace Chippi.Features.QuickActions;
 
 /// <summary>Each Quick action, in the order the page and Settings list them (docs/phase-5.5/quick-actions.md).</summary>
-public enum QuickActionId { Dark, Hidden, Icons, AutoHide, Extend, Bluetooth, WiFi, Camera, Plan, Lock, Displays, ScreenSaver, Recycle, Eject, Quit, Frozen, Explorer, Power }
+public enum QuickActionId { Dark, Hidden, Icons, AutoHide, Extend, Bluetooth, WiFi, Camera, Plan, Lock, Displays, ScreenSaver, Recycle, Eject, Quit, Frozen, Explorer, Power, Cleaning }
 
 /// <summary>One Quick action.</summary>
 /// <param name="Key">Its name in settings ("dark", "auto-hide"); never changes.</param>
@@ -42,6 +42,7 @@ public sealed record QuickAction(QuickActionId Id, string Key, string Label, str
         new(QuickActionId.Frozen, "frozen", "Frozen", "End frozen apps", false, LucideIcons.Snowflake) { Confirm = ("End frozen apps?", "End") },
         new(QuickActionId.Explorer, "explorer", "Explorer", "Restart Explorer", false, LucideIcons.RefreshCw) { Confirm = ("Restart Explorer?", "Restart") },
         new(QuickActionId.Power, "power", "Power", "Power", false, LucideIcons.Power) { OpensList = true },
+        new(QuickActionId.Cleaning, "cleaning", "Cleaning", "Cleaning mode", false, LucideIcons.Droplet),
     ];
 
     public static QuickAction Of(QuickActionId id) => All[(int)id];

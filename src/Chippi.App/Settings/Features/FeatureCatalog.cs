@@ -47,11 +47,6 @@ public static class FeatureCatalog
             Icon = "Sun",
             Presets = Essentials | PowerUser,
         },
-        new("cleaning-mode", "Cleaning mode", "Locks the keyboard and mouse for a minute so you can wipe them", FeatureGroup.System)
-        {
-            Icon = "Droplet",
-            Requires = [Capability.InputHooks],
-        },
         new("port-manager", "Port manager", "Shows which app holds a network port and frees it", FeatureGroup.System)
         {
             Icon = "Monitor",

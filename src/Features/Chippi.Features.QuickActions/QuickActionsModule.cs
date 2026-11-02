@@ -32,6 +32,7 @@ public sealed class QuickActionsModule : IFeatureModule
 
     private readonly Func<IQuickSystem> _createSystem;
     private readonly Func<IMicHotkey> _createHotkey;
+    private readonly Func<Action?> _cleaning;
     private readonly Dictionary<QuickActionId, IMicHotkey> _hotkeys = [];
     private readonly Dictionary<QuickActionId, string> _shortcutErrors = [];
     private readonly SemaphoreSlim _reading = new(1);
@@ -44,10 +45,12 @@ public sealed class QuickActionsModule : IFeatureModule
     private ActionsPage? _page;
     private bool _capturing;
 
-    public QuickActionsModule() : this(() => new WindowsQuickSystem(), GlobalMicHotkey.Create) { }
+    /// <param name="cleaning">Starts Cleaning mode while it's installed, else null: the page offers Cleaning only then.</param>
+    public QuickActionsModule(Func<Action?>? cleaning = null) : this(() => new WindowsQuickSystem(), GlobalMicHotkey.Create, cleaning) { }
 
-    public QuickActionsModule(Func<IQuickSystem> system, Func<IMicHotkey> hotkey)
+    public QuickActionsModule(Func<IQuickSystem> system, Func<IMicHotkey> hotkey, Func<Action?>? cleaning = null)
     {
+        _cleaning = cleaning ?? (() => null);
         _createSystem = system;
         _createHotkey = hotkey;
     }
@@ -81,7 +84,8 @@ public sealed class QuickActionsModule : IFeatureModule
     }
 
     /// <summary>What this PC can do, in order.</summary>
-    public IReadOnlyList<QuickAction> Offered => [.. QuickAction.All.Where(a => !State.Unsupported.Contains(a.Id))];
+    public IReadOnlyList<QuickAction> Offered =>
+        [.. QuickAction.All.Where(a => !State.Unsupported.Contains(a.Id) && (a.Id != QuickActionId.Cleaning || _cleaning() is not null))];
 
     /// <summary>What the page shows, in order: picked, and possible on this PC.</summary>
     public IReadOnlyList<QuickAction> Shown => [.. Offered.Where(a => Settings.Shows(a.Id))];
@@ -223,7 +227,18 @@ public sealed class QuickActionsModule : IFeatureModule
 
     public Task EndFrozenAppsAsync() => ThenRefresh(Pc.EndFrozenAppsAsync());
 
-    public Task RunAsync(QuickActionId id) => ThenRefresh(Pc.RunAsync(id));
+    public Task RunAsync(QuickActionId id)
+    {
+        if (id != QuickActionId.Cleaning)
+            return ThenRefresh(Pc.RunAsync(id));
+        // The island closes first, so it isn't open under the black.
+        if (_cleaning() is { } start)
+        {
+            _context?.CloseIsland();
+            start();
+        }
+        return Task.CompletedTask;
+    }
 
     public Task PowerAsync(PowerChoice choice) => Pc.PowerAsync(choice);
 

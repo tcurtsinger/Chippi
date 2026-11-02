@@ -194,8 +194,10 @@ public partial class App : Application
         shell.Registry.Register(new Chippi.Features.Scratchpad.ScratchpadModule());
         RegisterClipboardFeatures(shell);
         shell.Registry.Register(new Chippi.Features.Shelf.ShelfModule());
-        // [Phase 5.5] Quick actions: replaces the Quick toggles placeholder.
-        shell.Registry.Register(new Chippi.Features.QuickActions.QuickActionsModule());
+        // [Phase 5.5] Cleaning mode, and Quick actions, which offers it as Cleaning while it's installed.
+        var cleaning = new Chippi.Features.CleaningMode.CleaningModeModule();
+        shell.Registry.Register(cleaning);
+        shell.Registry.Register(new Chippi.Features.QuickActions.QuickActionsModule(() => cleaning.Installed ? cleaning.Start : null));
         // [Phase 5.5] AI agent usage: replaces its catalog placeholder.
         shell.Registry.Register(new Chippi.Features.AgentUsage.AgentUsageModule());
 

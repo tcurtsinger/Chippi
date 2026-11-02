@@ -1,0 +1,31 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Cleaning mode (Phase 5.5): locks the keyboard and blacks out every screen so they can be wiped. It references Sound
+     for the shortcut type, as Paste as plain text does. -->
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>Chippi.Features.CleaningMode</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Chippi.Core\Chippi.Core.csproj" />
+    <ProjectReference Include="..\..\Chippi.UI\Chippi.UI.csproj" />
+    <ProjectReference Include="..\Chippi.Features.Sound\Chippi.Features.Sound.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Chippi.Features.CleaningMode.Tests" />
+  </ItemGroup>
+
+  <!-- P/Invoke via CsWin32, from the NativeMethods.txt in this folder. -->
+  <PropertyGroup>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Windows.CsWin32" PrivateAssets="all" />
+    <AdditionalFiles Include="**\NativeMethods.txt" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,9 @@
+﻿SetWindowsHookEx
+UnhookWindowsHookEx
+CallNextHookEx
+GetModuleHandle
+KBDLLHOOKSTRUCT
+WM_KEYDOWN
+WM_SYSKEYDOWN
+WM_KEYUP
+WM_SYSKEYUP
