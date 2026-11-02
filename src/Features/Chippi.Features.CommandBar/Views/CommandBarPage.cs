@@ -97,7 +97,7 @@ internal sealed class CommandBarPage : UserControl
         if (Field.Text.Length > 0)
             Field.Text = ""; // refreshes
         else
-            Refresh();
+            Refresh(keepSelection: false);
     }
 
     private void OnAppsChanged() => Dispatcher.BeginInvoke(() =>
@@ -111,7 +111,7 @@ internal sealed class CommandBarPage : UserControl
         _failed = null;
         _finding?.Cancel();
         _filesTimer.Stop();
-        Refresh();
+        Refresh(keepSelection: false);
         if (Field.Text.Trim().Length >= 2 && !_module.Settings.Off.Contains(ResultSwitch.Files))
             _filesTimer.Start();
     }
@@ -135,13 +135,16 @@ internal sealed class CommandBarPage : UserControl
         catch (OperationCanceledException) { }
     }
 
-    /// <summary>Finds the rows again, keeping the selected one selected while it still shows.</summary>
-    internal void Refresh()
+    /// <summary>
+    /// Finds the rows again. Typing selects the first row (an answer that appears selects itself); a refresh of the same
+    /// text (files found, the Start menu read) keeps the selected row selected while it still shows.
+    /// </summary>
+    internal void Refresh(bool keepSelection = true)
     {
         if (_module.Search is not { } search)
             return;
         string text = Field.Text.Trim();
-        string? selected = _selected < _shown.Count ? _shown[_selected].Key : null;
+        string? selected = keepSelection && _selected < _shown.Count ? _shown[_selected].Key : null;
         _shown = search.Find(text, _windows, _filesFor == text ? _files : []);
         int at = selected is null ? -1 : IndexOf(selected);
         _selected = at >= 0 && text.Length > 0 ? at : 0;

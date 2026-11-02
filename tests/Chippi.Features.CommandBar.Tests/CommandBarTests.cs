@@ -23,6 +23,10 @@ public sealed class CommandBarTests
     [InlineData("12 x 7", "84", "12 × 7")]
     [InlineData("(3+4)/2", "3.5", "(3 + 4) ÷ 2")]
     [InlineData("2^10", "1,024", "2^10")]
+    [InlineData("-2^2", "-4", "−2^2")]
+    [InlineData("(-2)^2", "4", "(−2)^2")]
+    [InlineData("2^-2", "0.25", "2^−2")]
+    [InlineData("2^3^2", "512", "2^3^2")]
     [InlineData("200*15%", "30", "200 × 15%")]
     [InlineData("10/3", "3.333", "10 ÷ 3")]
     [InlineData("5 km in mi", "3.107 mi", "5 km")]
@@ -250,6 +254,9 @@ public sealed class CommandBarTests
         var f = new Fixture();
         f.StartAsync().GetAwaiter().GetResult();
         var page = (CommandBarPage)f.Ui.Tiles[0].CreateSection();
+        page.Field.Text = "12*"; // only the web row: it's selected
+        page.Field.Text = "12*7"; // typing selects the answer that appears, not the web row still showing
+        Assert.Equal(ResultKind.Answer, page.Shown[page.Selected].Kind);
         page.Field.Text = "chr";
         Assert.Equal(0, page.Selected);
         Press(page, Key.Down);

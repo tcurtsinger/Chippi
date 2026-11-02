@@ -138,7 +138,10 @@ public static partial class Calculator
     /// <summary>What Copy copies: the number as shown, without the grouping.</summary>
     private static string Plain(double value) => Format(value).Replace(CultureInfo.CurrentCulture.NumberFormat.NumberGroupSeparator, "");
 
-    /// <summary>A recursive-descent sum: brackets, ^ (right to left), a unary minus, × and ÷, then + and −.</summary>
+    /// <summary>
+    /// A recursive-descent sum: brackets and a trailing %, then ^ (right to left, so -2^2 is −4 and 2^-2 a quarter), a
+    /// unary minus, × and ÷, then + and −.
+    /// </summary>
     private sealed class Sum(string text)
     {
         private int _at;
@@ -171,30 +174,19 @@ public static partial class Calculator
 
         private double Multiply()
         {
-            double value = Power();
+            double value = Unary();
             while (Next() is '*' or '/' or 'x' or 'X' or '×' or '÷')
             {
                 char op = text[_at++];
                 bool divide = op is '/' or '÷';
                 _shown.Append(divide ? " ÷ " : " × ");
-                double right = Power();
+                double right = Unary();
                 value = divide ? value / right : value * right;
             }
             return value;
         }
 
-        private double Power()
-        {
-            double value = Unary();
-            if (Next() == '^')
-            {
-                _at++;
-                _shown.Append('^');
-                return Math.Pow(value, Power());
-            }
-            return value;
-        }
-
+        // A minus applies to the power after it: -2^2 is −(2^2).
         private double Unary()
         {
             if (Next() == '-')
@@ -203,6 +195,24 @@ public static partial class Calculator
                 _shown.Append('−');
                 return -Unary();
             }
+            return Power();
+        }
+
+        // The exponent may itself be negative: 2^-2.
+        private double Power()
+        {
+            double value = Percent();
+            if (Next() == '^')
+            {
+                _at++;
+                _shown.Append('^');
+                return Math.Pow(value, Unary());
+            }
+            return value;
+        }
+
+        private double Percent()
+        {
             double value = Atom();
             if (Next() == '%')
             {
