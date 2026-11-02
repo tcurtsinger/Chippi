@@ -63,7 +63,7 @@ Steps: the "Live checks" section of each feature's PR (#179, #180, #181, #183, #
 | Command bar | 14 of 16 passed | Check 3: a fullscreen Chrome video leaves fullscreen as the bar opens (accepted; see Deviations). Check 5: typing "chrome" listed only `chrome…` files from a browser tool's caches. #186 ranks files, copies and emoji after apps, windows, Chippi and Settings |
 | Radial menu | 15 of 15 passed | |
 
-Re-test of Restart Explorer and the Command bar's "chrome" on the #186 installers: to do.
+Re-test of Restart Explorer and the Command bar's "chrome" on the #186 installers, built from `ab328d1` (x64 Setup 82,866,840 bytes, ARM64 Setup 76,158,064): to do.
 
 ## Cleanup
 
