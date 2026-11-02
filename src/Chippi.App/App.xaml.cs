@@ -198,6 +198,7 @@ public partial class App : Application
         var cleaning = new Chippi.Features.CleaningMode.CleaningModeModule();
         shell.Registry.Register(cleaning);
         shell.Registry.Register(new Chippi.Features.QuickActions.QuickActionsModule(() => cleaning.Installed ? cleaning.Start : null));
+        shell.Registry.Register(new Chippi.Features.CommandBar.CommandBarModule());
         // [Phase 5.5] AI agent usage: replaces its catalog placeholder.
         shell.Registry.Register(new Chippi.Features.AgentUsage.AgentUsageModule());
 

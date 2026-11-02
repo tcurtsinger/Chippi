@@ -27,6 +27,48 @@ public sealed class KeepAwakeSessionTests : IAsyncLifetime
 
     public Task InitializeAsync() => _registry.StartAsync();
 
+    [Theory]
+    [InlineData("keep awake 2 hr", "Keep awake for 2 hr")]
+    [InlineData("awake 90 min", "Keep awake for 1 hr 30 min")]
+    [InlineData("keep awake for 1.5 hours", "Keep awake for 1 hr 30 min")]
+    [InlineData("awake 45m", "Keep awake for 45 min")]
+    [InlineData("awake no limit", "Keep awake with no limit")]
+    [InlineData("awake 2", "Keep awake for 2 hr")]
+    [InlineData("awake 45", "Keep awake for 45 min")]
+    public void The_Command_bar_reads_a_length_typed_in(string text, string name) =>
+        Assert.Equal(name, Assert.Single(_module.Values(text)).Name);
+
+    [Theory]
+    [InlineData("keep awake")]
+    [InlineData("awake 0 min")]
+    [InlineData("awake 25 hr")]
+    [InlineData("awake until 13 pm")]
+    public void Text_that_isnt_a_length_makes_no_value(string text) => Assert.Empty(_module.Values(text));
+
+    [Theory]
+    [InlineData("awake until 6 pm", 9, 18 * 60)]
+    [InlineData("awake until 6:30am", 9, 6 * 60 + 30)]
+    [InlineData("awake until 18:00", 9, 18 * 60)]
+    [InlineData("awake until 6", 9, 18 * 60)] // already past 6 this morning: this evening's
+    [InlineData("awake until 11", 9, 11 * 60)]
+    [InlineData("awake until 12 am", 9, 0)]
+    public void Until_is_the_next_time_it_names(string text, int hourNow, int minute)
+    {
+        var match = System.Text.RegularExpressions.Regex.Match(text, @"(\d{1,2})(?::(\d{2}))?\s*(am|pm|a|p)?$");
+        Assert.Equal(minute, KeepAwakeModule.Minute(match, DateTime.Today.AddHours(hourNow)));
+    }
+
+    [Fact]
+    public async Task A_value_typed_in_starts_that_length_and_the_list_has_start_or_stop()
+    {
+        await _registry.SetInstalledAsync("keep-awake", true);
+        Assert.Equal("Keep awake", Assert.Single(_registry.Commands(), c => c.Key == "keep-awake/toggle").Name);
+        await Assert.Single(_registry.SearchCommands("keep awake 2 hr")).Run();
+        Assert.True(_module.IsOn);
+        Assert.Equal(120, _module.Active?.DurationMinutes);
+        Assert.Equal("Stop keep awake", Assert.Single(_registry.Commands(), c => c.Key == "keep-awake/toggle").Name);
+    }
+
     public async Task DisposeAsync()
     {
         await _registry.StopAllAsync();

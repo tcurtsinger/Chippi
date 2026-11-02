@@ -1,0 +1,185 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) Chippi contributors
+
+using System.Collections.Concurrent;
+using System.Data.OleDb;
+using System.Diagnostics;
+using System.IO;
+using System.Windows.Media;
+using Chippi.Core.Diagnostics;
+using Chippi.Features.CommandBar.Search;
+using Windows.Win32;
+using Windows.Win32.Foundation;
+using Windows.Win32.Graphics.Dwm;
+using Windows.Win32.System.Threading;
+using Windows.Win32.UI.WindowsAndMessaging;
+
+namespace Chippi.Features.CommandBar.Windows;
+
+/// <summary>The real PC: the Start menu, Alt+Tab's windows, Windows Search, and Explorer's way of opening things.</summary>
+internal sealed class WindowsPc : IPc
+{
+    private const string SearchConnection = "Provider=Search.CollatorDSO;Extended Properties=\"Application=Windows\"";
+
+    private readonly StartMenu _startMenu = new();
+    private readonly ConcurrentDictionary<string, string> _appNames = new(StringComparer.OrdinalIgnoreCase);
+    private IReadOnlyList<StartApp> _apps = [];
+    private int _reading;
+    private bool _searchFailed;
+
+    public IReadOnlyList<StartApp> Apps => Volatile.Read(ref _apps);
+
+    public event Action? AppsChanged;
+
+    public void RefreshApps()
+    {
+        if (Interlocked.Exchange(ref _reading, 1) == 1)
+            return;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                Volatile.Write(ref _apps, await _startMenu.ReadAsync());
+                AppsChanged?.Invoke();
+            }
+            catch (Exception ex) { Log.Warn("Command bar: reading the Start menu failed", ex); }
+            finally { Volatile.Write(ref _reading, 0); }
+        });
+    }
+
+    public Task<ImageSource?> AppIconAsync(StartApp app, int pixels) => _startMenu.IconAsync(app, pixels);
+
+    public unsafe IReadOnlyList<OpenWindow> Windows()
+    {
+        uint self = (uint)Environment.ProcessId;
+        var shell = PInvoke.GetShellWindow();
+        var found = new List<OpenWindow>();
+        PInvoke.EnumWindows((hwnd, _) =>
+        {
+            if (hwnd != shell && AltTab(hwnd) && Title(hwnd) is { Length: > 0 } title)
+            {
+                uint pid;
+                PInvoke.GetWindowThreadProcessId(hwnd, &pid);
+                if (pid != self)
+                    found.Add(new OpenWindow(hwnd, title, AppName(hwnd, pid, title)));
+            }
+            return true;
+        }, 0);
+        return found;
+    }
+
+    /// <summary>Visible, not cloaked (another desktop, a suspended Store app), not a tool window, and owned only if it asks for the taskbar.</summary>
+    private static unsafe bool AltTab(HWND hwnd)
+    {
+        if (!PInvoke.IsWindowVisible(hwnd))
+            return false;
+        var extended = (WINDOW_EX_STYLE)PInvoke.GetWindowLong(hwnd, WINDOW_LONG_PTR_INDEX.GWL_EXSTYLE);
+        if (extended.HasFlag(WINDOW_EX_STYLE.WS_EX_TOOLWINDOW) || extended.HasFlag(WINDOW_EX_STYLE.WS_EX_NOACTIVATE))
+            return false;
+        if (!PInvoke.GetWindow(hwnd, GET_WINDOW_CMD.GW_OWNER).IsNull && !extended.HasFlag(WINDOW_EX_STYLE.WS_EX_APPWINDOW))
+            return false;
+        int cloaked = 0;
+        PInvoke.DwmGetWindowAttribute(hwnd, DWMWINDOWATTRIBUTE.DWMWA_CLOAKED, &cloaked, sizeof(int));
+        return cloaked == 0;
+    }
+
+    private static unsafe string Title(HWND hwnd)
+    {
+        int length = PInvoke.GetWindowTextLength(hwnd);
+        if (length <= 0)
+            return "";
+        char* text = stackalloc char[length + 1];
+        int read = PInvoke.GetWindowText(hwnd, text, length + 1);
+        return new string(text, 0, read);
+    }
+
+    /// <summary>The app's own name ("Google Chrome"), from its program's description; a Store app's frame says its title.</summary>
+    private string AppName(HWND hwnd, uint pid, string title)
+    {
+        if (ImagePath(pid) is not { } path)
+            return "App";
+        if (path.EndsWith(@"\ApplicationFrameHost.exe", StringComparison.OrdinalIgnoreCase))
+            return title;
+        return _appNames.GetOrAdd(path, p =>
+        {
+            try
+            {
+                if (FileVersionInfo.GetVersionInfo(p).FileDescription is { Length: > 0 } description)
+                    return description.Trim();
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+            return Path.GetFileNameWithoutExtension(p);
+        });
+    }
+
+    private static unsafe string? ImagePath(uint pid)
+    {
+        using var process = PInvoke.OpenProcess_SafeHandle(PROCESS_ACCESS_RIGHTS.PROCESS_QUERY_LIMITED_INFORMATION, false, pid);
+        if (process.IsInvalid)
+            return null;
+        char* path = stackalloc char[1024];
+        uint length = 1024;
+        return PInvoke.QueryFullProcessImageName((HANDLE)process.DangerousGetHandle(), PROCESS_NAME_FORMAT.PROCESS_NAME_WIN32, path, &length)
+            ? new string(path, 0, (int)length) : null;
+    }
+
+    public async Task<IReadOnlyList<FoundFile>> FindFilesAsync(string text, int count, CancellationToken ct)
+    {
+        // Each word a prefix of a word in the name: "chr set" finds ChromeSetup.exe's "chromesetup", not "set" inside it.
+        var words = text.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .Select(w => new string([.. w.Where(c => char.IsLetterOrDigit(c) || c is '.' or '-' or '_')]))
+            .Where(w => w.Length > 0)
+            .Select(w => $"\"{w}*\"")
+            .ToList();
+        if (words.Count == 0 || _searchFailed)
+            return [];
+        try { return await Task.Run(() => Query(string.Join(" AND ", words), count, ct), ct); }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex)
+        {
+            // The service off or OLE DB missing: say so once, then leave files out until the next start.
+            Log.Warn("Command bar: Windows Search failed; files are left out", ex);
+            _searchFailed = true;
+            return [];
+        }
+    }
+
+    private static List<FoundFile> Query(string words, int count, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        using var connection = new OleDbConnection(SearchConnection);
+        connection.Open();
+        // Start menu shortcuts are the apps' own rows.
+        using var command = new OleDbCommand(
+            $"SELECT TOP {count} System.ItemPathDisplay, System.ItemNameDisplay, System.ItemFolderNameDisplay, System.ItemType FROM SystemIndex " +
+            $"WHERE SCOPE='file:' AND System.ItemType <> '.lnk' AND CONTAINS(System.FileName, '{words}') ORDER BY System.Search.Rank DESC", connection);
+        using var cancel = ct.Register(() => { try { command.Cancel(); } catch (Exception) { } });
+        using var reader = command.ExecuteReader();
+        var found = new List<FoundFile>();
+        while (reader.Read())
+        {
+            ct.ThrowIfCancellationRequested();
+            if (reader.GetValue(0) is not string path || path.Length == 0)
+                continue;
+            string name = reader.GetValue(1) as string ?? Path.GetFileName(path);
+            string folder = reader.GetValue(2) as string ?? "";
+            bool isFolder = string.Equals(reader.GetValue(3) as string, "Directory", StringComparison.OrdinalIgnoreCase);
+            found.Add(new FoundFile(path, name, folder, isFolder));
+        }
+        return found;
+    }
+
+    public void Open(string target) => Process.Start(new ProcessStartInfo(target) { UseShellExecute = true })?.Dispose();
+
+    public void Switch(nint window)
+    {
+        var hwnd = (HWND)window;
+        if (!PInvoke.IsWindow(hwnd))
+            throw new InvalidOperationException("Window closed");
+        if (PInvoke.IsIconic(hwnd))
+            PInvoke.ShowWindow(hwnd, SHOW_WINDOW_CMD.SW_RESTORE);
+        PInvoke.SetForegroundWindow(hwnd);
+    }
+
+    public void Dispose() => _startMenu.Dispose();
+}

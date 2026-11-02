@@ -27,6 +27,18 @@ public interface IModuleUi
     /// passes "history"; the sidebar and the hub pass null (the page's first section).
     /// </summary>
     void SetSettingsPage(Func<string?, object> createView);
+
+    /// <summary>
+    /// Adds the module's part of Chippi's commands (the Command bar, the Radial menu). <paramref name="commands"/> is read
+    /// each time the list is, so a name can follow the state ("Unmute microphone" while muted). Called on the UI thread.
+    /// </summary>
+    void AddCommands(Func<IReadOnlyList<ChippiCommand>> commands) { }
+
+    /// <summary>
+    /// Adds what the module makes of the Command bar's text: values typed in ("keep awake 2 hr" → Keep awake for 2 hr) or
+    /// its own matches (clipboard copies). Called on the UI thread for every change of the text, so it must be quick.
+    /// </summary>
+    void AddCommandSearch(Func<string, IReadOnlyList<ChippiCommand>> search) { }
 }
 
 public sealed record SettingsPageContribution(string ModuleId, Func<string?, object> CreateSectionView)
@@ -49,6 +61,8 @@ internal sealed class ModuleUi(string moduleId, Action changed) : IModuleUi
 {
     private readonly Lock _gate = new();
     private readonly List<IslandTileContribution> _tiles = [];
+    private readonly List<Func<IReadOnlyList<ChippiCommand>>> _commands = [];
+    private readonly List<Func<string, IReadOnlyList<ChippiCommand>>> _searches = [];
     private SettingsPageContribution? _settingsPage;
 
     public IReadOnlyList<IslandTileContribution> Tiles
@@ -59,6 +73,16 @@ internal sealed class ModuleUi(string moduleId, Action changed) : IModuleUi
     public SettingsPageContribution? SettingsPage
     {
         get { lock (_gate) return _settingsPage; }
+    }
+
+    public IReadOnlyList<Func<IReadOnlyList<ChippiCommand>>> Commands
+    {
+        get { lock (_gate) return [.. _commands]; }
+    }
+
+    public IReadOnlyList<Func<string, IReadOnlyList<ChippiCommand>>> Searches
+    {
+        get { lock (_gate) return [.. _searches]; }
     }
 
     public IIslandTile AddIslandTile(IslandTileSpec spec)
@@ -81,11 +105,25 @@ internal sealed class ModuleUi(string moduleId, Action changed) : IModuleUi
         changed();
     }
 
+    public void AddCommands(Func<IReadOnlyList<ChippiCommand>> commands)
+    {
+        ArgumentNullException.ThrowIfNull(commands);
+        lock (_gate) _commands.Add(commands);
+    }
+
+    public void AddCommandSearch(Func<string, IReadOnlyList<ChippiCommand>> search)
+    {
+        ArgumentNullException.ThrowIfNull(search);
+        lock (_gate) _searches.Add(search);
+    }
+
     public void Clear()
     {
         lock (_gate)
         {
             _tiles.Clear();
+            _commands.Clear();
+            _searches.Clear();
             _settingsPage = null;
         }
         changed();

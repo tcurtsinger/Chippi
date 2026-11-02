@@ -106,6 +106,9 @@ public sealed class QuickActionsModule : IFeatureModule
             HandleEscape = () => _page?.Escape() == true,
         });
         context.Ui.SetSettingsPage(section => section == "shortcut-list" ? new ShortcutList(this) : new QuickActionsSettingsPage(this));
+        // The Command bar runs each as its shortcut does: one that needs a choice or asks first opens its list or its confirm.
+        context.Ui.AddCommands(() => [.. Offered.Where(a => a.Id != QuickActionId.Cleaning).Select(a =>
+            new ChippiCommand($"quick-actions/{a.Key}", a.Name, LucideIcons.KeyOf(a.Icon), () => PressedAsync(a.Id)) { Words = a.Label })]);
         foreach (var action in QuickAction.All)
             if (Settings.ShortcutOf(action.Id) is { IsValid: true } shortcut)
                 TryRegister(action.Id, shortcut);
