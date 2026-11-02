@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Input;
 using Chippi.App.Island;
 using Chippi.App.Island.Media;
 using Chippi.UI.Pet;
@@ -298,6 +299,51 @@ public sealed class IslandHomeTests
         Assert.Equal(1, asked);
     });
 
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, true)]
+    public void Tab_visits_the_home_in_reading_order_in_both_directions(bool features, bool petRight) => WpfTestThread.Run(() =>
+    {
+        var grid = Laid(g =>
+        {
+            g.SetPetSide(petRight);
+            if (features)
+            {
+                g.SetTiles([Tile("awake", split: true), Tile("shelf")]);
+                g.SetVolume(new IslandTileVolume(() => 0.5, _ => { }, () => false, _ => Task.CompletedTask), "sound");
+            }
+        });
+        var host = new Window { Content = grid, ShowActivated = false, ShowInTaskbar = false, Left = -20000, Top = 0, Width = 520, Height = 360 };
+        Control? target = null;
+        host.PreviewGotKeyboardFocus += (_, e) =>
+        {
+            target = e.NewFocus as Control;
+            e.Handled = true; // Observe WPF's destination before Windows is asked to take the keyboard.
+        };
+        try
+        {
+            host.Show();
+            var names = new List<string> { "Now Playing" };
+            if (features)
+                names.AddRange(["awake, Status", "Open awake", "shelf, Status", "Mute", "System volume", "Sound"]);
+            names.AddRange(petRight ? ["Settings", "Chippi"] : ["Chippi", "Settings"]);
+            Control Visit(Control from, FocusNavigationDirection direction, string name)
+            {
+                target = null;
+                from.MoveFocus(new TraversalRequest(direction));
+                Assert.NotNull(target);
+                Assert.Equal(name, AutomationProperties.GetName(target));
+                return target;
+            }
+            var current = Visit(grid, FocusNavigationDirection.First, names[0]);
+            foreach (string name in names.Skip(1))
+                current = Visit(current, FocusNavigationDirection.Next, name);
+            foreach (string name in names.AsEnumerable().Reverse().Skip(1))
+                current = Visit(current, FocusNavigationDirection.Previous, name);
+        }
+        finally { host.Close(); }
+    });
+
     [Fact]
     public void The_footer_chippi_is_a_button_that_boops_him_and_sits_where_the_pucks_does() => WpfTestThread.Run(() =>
     {
@@ -311,7 +357,8 @@ public sealed class IslandHomeTests
             Assert.True(grid.Pet.Squish.HasAnimatedProperties); // a squish and a grin
         }
 
-        // His center stays 25 in from the panel's side and its bottom, where the puck's is, on either side.
+        // Both controls sit 25 in from their outer edges. Chippi meets the puck on either side.
+        var settings = Find<Button>(grid, b => AutomationProperties.GetName(b) == "Settings");
         foreach (bool right in new[] { false, true })
         {
             grid.SetPetSide(right);
@@ -320,6 +367,9 @@ public sealed class IslandHomeTests
             var center = grid.Pet.TranslatePoint(new Point(grid.Pet.ActualWidth / 2, grid.Pet.ActualHeight / 2), footer);
             Assert.Equal(IslandGrid.FooterPet, Math.Round(right ? footer.ActualWidth - center.X : center.X, 3));
             Assert.Equal(IslandGrid.FooterPet, Math.Round(footer.ActualHeight - center.Y, 3));
+            var gear = settings.TranslatePoint(new Point(settings.ActualWidth / 2, settings.ActualHeight / 2), footer);
+            Assert.Equal(footer.ActualWidth - center.X, gear.X, 3);
+            Assert.Equal(center.Y, gear.Y, 3);
         }
     });
 }

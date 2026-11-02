@@ -517,7 +517,7 @@ public partial class IslandWindow : Window
     /// <summary>
     /// The bar's columns from its round far end to Chippi's: 8, the lead (34), 10, the lines, 10, the equalizer, 10 and
     /// Chippi's 46. With Chippi at the left it's the same mirrored, so the two circles always sit in the two round
-    /// ends and the bars always sit by Chippi; the lines still read left to right. They get 123 either way.
+    /// ends and the bars always sit by Chippi. The two lines read left to right as a group beside their cover or glyph.
     /// </summary>
     private void LayOutBar(bool chippiRight)
     {
@@ -528,6 +528,7 @@ public partial class IslandWindow : Window
         Grid.SetColumn(Cover, Column(1));
         Grid.SetColumn(Glyph, Column(1));
         Grid.SetColumn(Lines, Column(3));
+        Lines.HorizontalAlignment = chippiRight ? HorizontalAlignment.Left : HorizontalAlignment.Right;
         Grid.SetColumn(Equalizer, Column(5));
         Grid.SetColumn(PausedMark, Column(5));
     }
@@ -920,8 +921,8 @@ public partial class IslandWindow : Window
                 Arrival.Pop(PausedMark);
             Equalizer.Visibility = Shown(bars);
             PausedMark.Visibility = Shown(paused);
-            // The lines' column: what the rest takes, with the bars three 3s 1 apart and 1 in (15) or the pause mark (14).
-            _lineRoom = IslandGeometry.BarWidth - 8 - 34 - 10 - 10 - 10 - 46 - (_singing ? paused ? 14 : 15 : 0);
+            // The pause mark occupies the same 15 as the bars, so pausing a long title keeps its place in the scroll.
+            _lineRoom = IslandGeometry.BarWidth - 8 - 34 - 10 - 10 - 10 - 46 - (_singing ? 15 : 0);
         }
         if (!bar)
             ShowLine(null, "", "");

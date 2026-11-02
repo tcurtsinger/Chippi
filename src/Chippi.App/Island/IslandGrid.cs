@@ -56,7 +56,7 @@ internal sealed class IslandGrid : UserControl
     private readonly TextBlock _noOutput = new() { Text = "No output", FontSize = 12, Margin = new Thickness(12, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center, Visibility = Visibility.Collapsed };
     private readonly LucideIcon _speakerGlyph = new() { Data = LucideIcons.Volume, Size = 16 };
     private readonly Button _speaker = new();
-    private readonly Button _settings = new() { Width = 32, Height = 32, VerticalAlignment = VerticalAlignment.Center };
+    private readonly Button _settings = new() { Width = 32, Height = 32, VerticalAlignment = VerticalAlignment.Bottom };
     // Chippi himself, a 32 button like Settings across from him: a click boops him.
     private readonly Button _boop = new() { Width = 32, Height = 32, Padding = new Thickness(0), VerticalAlignment = VerticalAlignment.Bottom };
     private readonly DispatcherTimer _volumeFailed = new() { Interval = TimeSpan.FromSeconds(4) };
@@ -74,7 +74,7 @@ internal sealed class IslandGrid : UserControl
         PreviewKeyDown += OnKey;
     }
 
-    private DockPanel Build()
+    private Grid Build()
     {
         // The footer bleeds to the panel's edges (the card pads 12): Chippi on the puck's side, Settings on the other.
         var gear = new LucideIcon { Data = LucideIcons.Settings, Size = 16 };
@@ -90,12 +90,14 @@ internal sealed class IslandGrid : UserControl
         _boop.Click += (_, _) => Pet.Boop();
         var footer = new Border
         {
-            Height = 46, Margin = new Thickness(-12, 0, -12, -12), BorderThickness = new Thickness(0, 1, 0, 0),
+            Height = 46, Margin = new Thickness(-12, 10, -12, -12), BorderThickness = new Thickness(0, 1, 0, 0),
             Child = new Grid { Children = { _boop, _settings } },
         };
         footer.SetResourceReference(Border.BackgroundProperty, "IslandFooterBrush");
         footer.SetResourceReference(Border.BorderBrushProperty, "IslandHairBrush");
-        DockPanel.SetDock(footer, Dock.Bottom);
+        // The two footer buttons can swap sides; their Tab indices apply only inside this row.
+        KeyboardNavigation.SetTabNavigation(footer, KeyboardNavigationMode.Local);
+        KeyboardNavigation.SetControlTabNavigation(footer, KeyboardNavigationMode.Local);
 
         // The speaker mutes, as in Quick Settings; its glyph sits where a bare glyph would (the button is 6 wider each side).
         _speaker.Content = _speakerGlyph;
@@ -149,18 +151,21 @@ internal sealed class IslandGrid : UserControl
             _volumeRow.Children.Add(part);
 
         _media.OpenRequested += (_, _) => TileOpened?.Invoke(this, IslandPanelWindow.NowPlayingKey);
-        // 10 above the footer: the volume row sits midway between the buttons' last status line and the footer's hairline.
-        var body = new Grid { Margin = new Thickness(0, 0, 0, 10) };
+        // The rows are also the Tab order. The footer's top margin keeps the volume row 10 above its hairline.
+        var body = new Grid();
         body.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         body.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         body.RowDefinitions.Add(new RowDefinition());
         body.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        body.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         Grid.SetRow(_tiles, 1);
         Grid.SetRow(_volumeRow, 3);
+        Grid.SetRow(footer, 4);
         body.Children.Add(_media);
         body.Children.Add(_tiles);
         body.Children.Add(_volumeRow);
-        return new DockPanel { Children = { footer, body } };
+        body.Children.Add(footer);
+        return body;
     }
 
     /// <summary>The footer's pet.</summary>
@@ -253,12 +258,14 @@ internal sealed class IslandGrid : UserControl
     /// <summary>Puts Chippi on the puck's side of the footer (the side the panel opened from) and Settings on the other.</summary>
     internal void SetPetSide(bool right)
     {
-        // His button is centered on his center, so he sits where he would without it.
+        // Both buttons sit at the height and inset of the puck's center. Tab reads them left to right.
         double inset = FooterPet - _boop.Width / 2;
+        var buttonInset = new Thickness(inset, 0, inset, inset);
         _boop.HorizontalAlignment = right ? HorizontalAlignment.Right : HorizontalAlignment.Left;
-        _boop.Margin = new Thickness(right ? 0 : inset, 0, right ? inset : 0, inset);
         _settings.HorizontalAlignment = right ? HorizontalAlignment.Left : HorizontalAlignment.Right;
-        _settings.Margin = new Thickness(right ? 10 : 0, 0, right ? 0 : 10, 0);
+        _boop.Margin = _settings.Margin = buttonInset;
+        _boop.TabIndex = right ? 1 : 0;
+        _settings.TabIndex = right ? 0 : 1;
     }
 
     public void SetTiles(IReadOnlyList<IslandTileView> tiles)

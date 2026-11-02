@@ -2,6 +2,7 @@
 // Copyright (C) Chippi contributors
 
 using System.Windows;
+using Chippi.Core.Modules;
 
 namespace Chippi.App.Island;
 
@@ -71,6 +72,17 @@ public static class IslandGeometry
     {
         double width = BarWidth * scale;
         return new Rect(opensLeft ? puck.Right - width : puck.Left, puck.Top, width, puck.Height);
+    }
+
+    /// <summary>The full logical page, scaled down together only when it would cross the work area's inset.</summary>
+    public static Rect PanelRect(Rect puck, Rect work, double scale)
+    {
+        double inset = Gap * scale;
+        double fit = Math.Min(scale, Math.Min(
+            Math.Max(1, work.Width - 2 * inset) / IslandPage.Width,
+            Math.Max(1, work.Height - 2 * inset) / IslandPage.Height));
+        var size = new Size(IslandPage.Width * fit, IslandPage.Height * fit);
+        return new Rect(PanelOrigin(puck, size, work, scale), size);
     }
 
     /// <summary>

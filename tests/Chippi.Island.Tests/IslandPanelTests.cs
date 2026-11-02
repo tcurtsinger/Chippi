@@ -123,6 +123,44 @@ public sealed class IslandPanelTests
     }
 
     [Fact]
+    public void A_short_work_area_keeps_the_whole_home_and_page_reachable_and_reopening_restores_full_size()
+    {
+        WpfTestThread.Run(() => WithPanel(panel =>
+        {
+            var work = new Rect(-20000, 0, 640, 286);
+            var area = new MonitorArea(default, work, work, 1);
+            var puck = IslandGeometry.PuckRect(1, 1, work, 1);
+            panel.Open(puck, area);
+            IslandWindowTests.Settle(panel);
+            var shape = Drawn(panel);
+            Assert.Equal(new Size(390, 270), shape.Size); // 75% scale, with 8 DIPs each side of the short dimension
+            Assert.False(panel.PetMeetsPuck);
+            var root = (FrameworkElement)panel.FindName("Root");
+            var boop = Descendants(Grid(panel)).OfType<Button>().Single(b => AutomationProperties.GetName(b) == "Chippi");
+            var center = boop.TranslatePoint(new Point(boop.ActualWidth / 2, boop.ActualHeight / 2), root);
+            var hit = Assert.IsAssignableFrom<DependencyObject>(root.InputHitTest(center));
+            Assert.True(ReferenceEquals(boop, hit) || boop.IsAncestorOf(hit));
+            Assert.True(shape.Contains(center));
+
+            panel.ShowPage("keep-awake", remember: false);
+            IslandWindowTests.Settle(panel);
+            var body = Assert.IsAssignableFrom<FrameworkElement>(panel.PageBody);
+            var corner = body.TranslatePoint(new Point(body.ActualWidth, body.ActualHeight), root);
+            Assert.Equal(shape.Right - IslandPage.Inset * 0.75, corner.X, 1);
+            Assert.Equal(shape.Bottom - IslandPage.Inset * 0.75, corner.Y, 1);
+            Assert.True(panel.Covers(new Point(panel.Footprint.Right - 1, panel.Footprint.Bottom - 1)));
+            Assert.False(panel.Covers(new Point(panel.Footprint.Right + 1, panel.Footprint.Bottom - 1)));
+
+            panel.CloseIsland();
+            IslandWindowTests.Settle(panel);
+            Open(panel);
+            Assert.Equal((520, 360), Size(panel));
+            Assert.True(panel.PetMeetsPuck);
+            Assert.True(panel.Card.RenderTransform.Value.IsIdentity);
+        }));
+    }
+
+    [Fact]
     public void A_page_change_fades_the_new_page_in()
     {
         if (Chippi.UI.Themes.Motion.IsReduced)
