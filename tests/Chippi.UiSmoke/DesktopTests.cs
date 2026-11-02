@@ -116,10 +116,10 @@ public sealed class DesktopTests(ITestOutputHelper output)
     {
         using var app = new DesktopSession(output);
         var pages = app.OpenPages();
-        DesktopSession.Invoke(Tile(pages, "Keep awake"));
+        DesktopSession.Invoke(Tile(pages, "Awake"));
         DesktopSession.Find(pages, "1 hr", TogglePattern.Pattern);
         DesktopSession.Invoke(DesktopSession.Find(pages, "All features", InvokePattern.Pattern));
-        DesktopSession.Invoke(Tile(pages, "File organizer"));
+        DesktopSession.Invoke(Tile(pages, "Organizer"));
         DesktopSession.Find(pages, "No folders yet");
         DesktopSession.Invoke(DesktopSession.Find(pages, "Settings", InvokePattern.Pattern));
         AutomationElement? settings = null;

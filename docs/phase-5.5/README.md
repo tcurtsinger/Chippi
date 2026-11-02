@@ -20,4 +20,4 @@ Quick actions (planned as Quick toggles), Cleaning mode, Command bar, Radial men
 | Radial menu | [radial-menu.md](radial-menu.md), confirmed 2026-11-01 | [Approved 2026-11-01](https://claude.ai/artifact/QFJSjaBzEbZbKmassLftuQ) |
 | AI agent usage | [ai-agent-usage.md](ai-agent-usage.md), confirmed 2026-11-01 | [Approved 2026-11-01](https://claude.ai/artifact/QiLGvSVj9mfZ16P29hR2U2) |
 
-All five are shaped. Next is building them, each from its brief and mockup.
+All five are shaped. They are being built, each from its brief and mockup, in the order and pull requests of [the handoff](../phase-5.5-handoff.md).

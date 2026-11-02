@@ -19,8 +19,8 @@ public sealed class IslandTests(ITestOutputHelper output)
         DesktopSession.Invoke(tab);
         var panel = Panel(app);
         DesktopSession.Until(() => panel.FindAll(TreeScope.Descendants, Condition.TrueCondition).Cast<AutomationElement>()
-            .Any(e => e.Current.Name == "File organizer, Manual"), "the File organizer tile shows its mode");
-        DesktopSession.Invoke(DesktopTests.Tile(panel, "Keep awake"));
+            .Any(e => e.Current.Name == "Organizer, Manual"), "the File organizer tile shows its mode");
+        DesktopSession.Invoke(DesktopTests.Tile(panel, "Awake"));
         foreach (string name in new[] { "30 min", "1 hr", "2 hr", "4 hr", "No limit", "Until…" })
             DesktopSession.Find(panel, name, TogglePattern.Pattern);
         Assert.DoesNotContain(panel.FindAll(TreeScope.Descendants, Condition.TrueCondition).Cast<AutomationElement>(),
@@ -41,7 +41,7 @@ public sealed class IslandTests(ITestOutputHelper output)
         DesktopSession.Invoke(tab);
         panel = Panel(app); // back on Keep awake, the last page used
         DesktopSession.Invoke(DesktopSession.Find(panel, "All features", InvokePattern.Pattern));
-        DesktopSession.Invoke(DesktopTests.Tile(panel, "File organizer"));
+        DesktopSession.Invoke(DesktopTests.Tile(panel, "Organizer"));
         DesktopSession.Find(panel, "island-inbox");
         DesktopSession.Invoke(DesktopSession.Find(panel, "Organize now", InvokePattern.Pattern));
         AutomationElement? settings = null;

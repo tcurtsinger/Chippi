@@ -54,6 +54,9 @@ public sealed class ShellCommands
             OpenSettings();
     }
 
+    /// <summary>The island on a tile's page, and nothing when it can't show: false then.</summary>
+    public bool TryShowPage(string key) => _showPage?.Invoke(key) == true;
+
     /// <summary>WS3 reports whether the island's tab is on screen.</summary>
     public void SetIslandShowing(bool showing)
     {

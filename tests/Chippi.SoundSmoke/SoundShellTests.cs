@@ -170,7 +170,7 @@ public sealed class SoundShellTests
             var host = (ContentControl)panel.FindName("Page");
             var grid = Assert.IsType<IslandGrid>(host.Content);
             // The mic mute shortcut is the Sound tile's button (a toggle); the volume slider's arrow opens the page too.
-            Assert.Equal(["Microphone", "App volume"], grid.Buttons().Select(b => AutomationProperties.GetName(b).Split(',')[0]));
+            Assert.Equal(["Microphone", "Volume"], grid.Buttons().Select(b => AutomationProperties.GetName(b).Split(',')[0]));
             Assert.IsType<System.Windows.Controls.Primitives.ToggleButton>(grid.Buttons().First());
             Assert.NotNull(Named<Slider>(grid, "System volume"));
 
@@ -190,7 +190,7 @@ public sealed class SoundShellTests
             await scene.Shell.Registry.SetInstalledAsync("app-volume", false);
             panel.SetTiles(Tiles(scene));
             Assert.Null(panel.CurrentPage);
-            Assert.DoesNotContain(Assert.IsType<IslandGrid>(host.Content).Buttons(), b => AutomationProperties.GetName(b).StartsWith("App volume,", StringComparison.Ordinal));
+            Assert.DoesNotContain(Assert.IsType<IslandGrid>(host.Content).Buttons(), b => AutomationProperties.GetName(b).StartsWith("Volume,", StringComparison.Ordinal));
         }
         finally { panel.Close(); media.Dispose(); }
     });

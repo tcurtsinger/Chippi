@@ -66,7 +66,7 @@ public sealed class KeepAwakeModule : IFeatureModule
         StateLine = "Off";
         CreateSession();
         // No status in the page's header: the lit card carries the time left.
-        _tile = context.Ui.AddIslandTile(new IslandTileSpec(TileKey, Descriptor.Name, nameof(LucideIcons.Coffee), Order: 40, SectionOrder: 0, () => _view = new KeepAwakeIslandView(this))
+        _tile = context.Ui.AddIslandTile(new IslandTileSpec(TileKey, "Awake", nameof(LucideIcons.Coffee), Order: 40, SectionOrder: 0, () => _view = new KeepAwakeIslandView(this))
         {
             // The home's button starts the last fixed length, or stops.
             Toggle = new IslandTileToggle(() => IsOn, ToggleFromHomeAsync),

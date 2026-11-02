@@ -178,14 +178,14 @@ public sealed class IslandHomeTests
     [Fact]
     public void The_arrows_reach_a_split_buttons_arrow_and_enter_there_opens_its_page() => WpfTestThread.Run(() =>
     {
-        var grid = Laid(g => g.SetTiles([Tile("a"), Tile("keep-awake", on: true, split: true), Tile("c"), Tile("d"), Tile("e"), Tile("f")]));
+        var grid = Laid(g => g.SetTiles([Tile("a"), Tile("keep-awake", on: true, split: true), Tile("c"), Tile("d"), Tile("e"), Tile("f"), Tile("g")]));
         var buttons = grid.Buttons().ToList();
         var arrow = Find<Button>(grid, b => AutomationProperties.GetName(b) == "Open keep-awake");
         Assert.Same(buttons[1], grid.Next(buttons[0], System.Windows.Input.Key.Right));
         Assert.Same(arrow, grid.Next(buttons[1], System.Windows.Input.Key.Right)); // the toggle, then its arrow
         Assert.Same(buttons[2], grid.Next(arrow, System.Windows.Input.Key.Right));
         Assert.Same(buttons[1], grid.Next(arrow, System.Windows.Input.Key.Left));
-        Assert.Same(buttons[5], grid.Next(arrow, System.Windows.Input.Key.Down)); // a row down from its tile
+        Assert.Same(buttons[6], grid.Next(arrow, System.Windows.Input.Key.Down)); // a row of five down from its tile
         Assert.Null(grid.Next(arrow, System.Windows.Input.Key.Up));
         Assert.Equal("keep-awake", grid.TileOf(arrow)); // so Enter there opens Keep awake
     });

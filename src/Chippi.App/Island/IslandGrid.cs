@@ -27,16 +27,16 @@ internal sealed record IslandTileView(string Key, string Name, Geometry Icon, st
 
 /// <summary>
 /// The island's home, after Windows' Quick Settings (DESIGN.md §5 Island): the Now Playing card, up to
-/// eight labelled buttons four across with each tile's status under its name, the volume row when
+/// ten labelled buttons five across with each tile's status under its name, the volume row when
 /// Sound is installed, and a footer with Chippi on the puck's side and Settings on the other. Arrows move
 /// among the buttons and their arrows once the island has keyboard focus; Enter opens the focused one (a
 /// toggle toggles, as a button does).
 /// </summary>
 internal sealed class IslandGrid : UserControl
 {
-    /// <summary>The home holds two rows of four; a third wouldn't fit without scrolling.</summary>
-    internal const int MaxTiles = 8;
-    internal const int Columns = 4;
+    /// <summary>The home holds two rows of five (Phase 5.5, about 91 wide each); a third wouldn't fit without scrolling.</summary>
+    internal const int MaxTiles = 10;
+    internal const int Columns = 5;
 
     /// <summary>
     /// The footer's Chippi: its center this far in from the panel's side and its bottom, where the puck's center is when
@@ -447,7 +447,7 @@ internal sealed class IslandGrid : UserControl
 
     /// <summary>
     /// Where an arrow key moves from <paramref name="from"/>: left and right through the buttons and the split ones' arrows
-    /// in reading order, up and down to the button a row of four away. Null at an edge.
+    /// in reading order, up and down to the button a row of five away. Null at an edge.
     /// </summary>
     internal ButtonBase? Next(ButtonBase from, Key key)
     {

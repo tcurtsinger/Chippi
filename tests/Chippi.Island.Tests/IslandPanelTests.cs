@@ -142,11 +142,11 @@ public sealed class IslandPanelTests
 
     [Theory]
     [InlineData(1, 1)]
-    [InlineData(4, 1)]
-    [InlineData(5, 2)]
-    [InlineData(8, 2)]
-    [InlineData(12, 2)] // a third row wouldn't fit: only eight show
-    public void The_home_lays_its_buttons_four_across_and_shows_at_most_eight(int count, int rows)
+    [InlineData(5, 1)]
+    [InlineData(6, 2)]
+    [InlineData(10, 2)]
+    [InlineData(12, 2)] // a third row wouldn't fit: only ten show
+    public void The_home_lays_its_buttons_five_across_and_shows_at_most_ten(int count, int rows)
     {
         WpfTestThread.Run(() =>
         {
@@ -157,11 +157,11 @@ public sealed class IslandPanelTests
             grid.Measure(new Size(width, height));
             grid.Arrange(new Rect(0, 0, width, height));
             var buttons = grid.Buttons().ToList();
-            Assert.Equal(Math.Min(count, 8), buttons.Count);
+            Assert.Equal(Math.Min(count, 10), buttons.Count);
             Assert.All(buttons, b => Assert.Equal(44, b.ActualHeight, 2));
             var at = buttons.Select(b => b.TranslatePoint(new Point(), grid)).ToList();
             Assert.Equal(rows, at.Select(p => Math.Round(p.Y, 1)).Distinct().Count());
-            Assert.Equal(Math.Min(count, 4), at.Select(p => Math.Round(p.X, 1)).Distinct().Count());
+            Assert.Equal(Math.Min(count, 5), at.Select(p => Math.Round(p.X, 1)).Distinct().Count());
             // The rows, the card, the slider and the footer all fit the panel.
             Assert.True(grid.DesiredSize.Height <= height + 0.01, $"home is {grid.DesiredSize.Height} tall");
             var last = buttons[^1].TranslatePoint(new Point(0, 44), grid);
