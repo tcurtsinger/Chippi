@@ -88,3 +88,12 @@ Run this once a phase's report is written and the last change is merged and push
 - Moved `chippi-scratch\audit-2026-10-27\code-audit.md` into `docs/code-audit-2026-10-27.md`, unchanged.
 - Sent to the Recycle Bin: `X:\code\chippi-archive` (11 GB: every installer set since Phase 2, the leftover ZIPs and the cleanup records above), `X:\code\chippi-scratch`, `%LOCALAPPDATA%\chippi-work\scratch`, both `Chippi-dev` roots and nine `%TEMP%\chippi*` folders.
 - Left: the installed app (`%LOCALAPPDATA%\ChippiApp`, `%LOCALAPPDATA%\Chippi` and `%APPDATA%\Chippi`), untouched, and this PR's worktree, removed when it merges.
+
+## Phase 5.5 cleanup (2026-11-02)
+
+- Run at Travis's word once the last feature, the Radial menu, merged (#184, main `f6b4372`). The phase report isn't written yet, and the live checks listed in #179, #180, #181, #183 and #184 aren't done.
+- Nothing to remove in worktrees or branches: each PR's worktree and local branch went at its merge, `%LOCALAPPDATA%\chippi-work` held only this PR's worktree, and GitHub had only `main` and the kept `spike/boost-loopback`. `git branch --no-merged main` lists only that spike.
+- The main checkout's only untracked folder is `.impeccable/`, the owner's, left alone; its ignored files are `build/artifacts` and `bin`/`obj`. No Chippi folder but `X:\code\chippi` is in `X:\code`.
+- No dev profiles, dev Run values, dev Explorer keys or dev Start Menu shortcuts were present. Sent to the Recycle Bin: five `%TEMP%\chippi*` folders (`chippi-clipboard-feature-tests`, `chippi-clipboard-tests`, `chippi-s3-tests` and `chippi-tests`, from tests, and `chippi-mockup-edge`, the mockup renderer's Edge profile: 269 files, 11.8 MB) and two `Chippi-view-*.json` files a cut-short Keep awake view test run left. Removed 13 dev notification CLSIDs whose dev builds were gone.
+- The installed Chippi was left alone: `ChippiApp\current` kept running, with its Explorer menu, Start Menu shortcut and notification CLSID. No dev or test Chippi was running.
+- Installers packed from `f6b4372` (with the Command bar and the Radial menu) are in `build\artifacts\releases\0.1.0`, all 12 files checked against each runtime's `artifacts.csv`, and recorded in `phase-1-release-artifacts.csv` by this PR. x64 Setup is 82,868,571 bytes, ARM64 Setup 76,159,996.
