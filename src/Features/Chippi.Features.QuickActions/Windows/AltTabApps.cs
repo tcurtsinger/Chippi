@@ -16,7 +16,7 @@ namespace Chippi.Features.QuickActions.Windows;
 
 /// <summary>One window Alt+Tab lists.</summary>
 /// <param name="Handle">The window to close.</param>
-/// <param name="ProcessId">The app's process: for a UWP app, its own rather than the frame host's, when Windows shows it.</param>
+/// <param name="ProcessId">The app's process: for a UWP app, its own rather than the frame host's.</param>
 /// <param name="WindowProcessId">The process that owns <paramref name="Handle"/>.</param>
 /// <param name="Path">The app's program file.</param>
 /// <param name="Content">A UWP app's own window inside the frame, or null.</param>
@@ -44,12 +44,11 @@ internal sealed partial class AltTabApps
             var content = HWND.Null;
             if (Win32Windows.ClassIs(hwnd, "ApplicationFrameWindow"))
             {
+                // A minimized UWP app's own window leaves its frame; with no way to tell which app it is, it's left out.
                 content = PInvoke.FindWindowEx(hwnd, HWND.Null, "Windows.UI.Core.CoreWindow", null);
-                uint appPid = content.IsNull ? 0 : Win32Windows.ProcessId(content);
-                if (appPid != 0 && appPid != windowPid)
-                    pid = appPid;
-                else
-                    content = HWND.Null;
+                pid = content.IsNull ? 0 : Win32Windows.ProcessId(content);
+                if (pid == 0 || pid == windowPid)
+                    continue;
             }
             if (pid == self || windowPid == self)
                 continue;
@@ -77,16 +76,21 @@ internal sealed partial class AltTabApps
         return [.. paths.Select(p => new OpenApp(p, Name(p), string.Equals(p, front, StringComparison.OrdinalIgnoreCase)))];
     }
 
-    /// <summary>The processes with an Alt+Tab window that has stopped responding.</summary>
+    /// <summary>
+    /// The processes with an Alt+Tab window that has stopped responding. A UWP app is judged by its own window, and
+    /// neither the frame host (it holds every UWP app) nor the shell's explorer.exe is ever one.
+    /// </summary>
     public static HashSet<uint> Frozen(IReadOnlyList<AltTabWindow> windows)
     {
+        uint shell = ExplorerShell.ProcessId();
         var frozen = new HashSet<uint>();
         foreach (var window in windows)
         {
-            if (!window.Content.IsNull && PInvoke.IsHungAppWindow(window.Content))
+            if (window.ProcessId == shell
+                || string.Equals(Path.GetFileName(window.Path), "ApplicationFrameHost.exe", StringComparison.OrdinalIgnoreCase))
+                continue;
+            if (PInvoke.IsHungAppWindow(window.Content.IsNull ? window.Handle : window.Content))
                 frozen.Add(window.ProcessId);
-            else if (PInvoke.IsHungAppWindow(window.Handle))
-                frozen.Add(window.WindowProcessId);
         }
         return frozen;
     }
@@ -100,26 +104,18 @@ internal sealed partial class AltTabApps
             throw new Win32Exception(Marshal.GetLastPInvokeError(), "Quit failed");
     }
 
-    /// <summary>Ends every app that has stopped responding, skipping any Windows won't let Chippi open.</summary>
+    /// <summary>Ends every app that has stopped responding; when one couldn't be ended (an elevated app), throws after the rest.</summary>
     public static void EndFrozen()
     {
-        uint shell = ExplorerShell.ProcessId();
         int failed = 0;
-        bool endedShell = false;
         foreach (uint pid in Frozen(List()))
         {
             using var process = PInvoke.OpenProcess_SafeHandle(PROCESS_ACCESS_RIGHTS.PROCESS_TERMINATE, false, pid);
-            if (process.IsInvalid)
-                continue;
-            if (!PInvoke.TerminateProcess(process, 1))
+            if (process.IsInvalid || !PInvoke.TerminateProcess(process, 1))
                 failed++;
-            else if (pid == shell)
-                endedShell = true;
         }
-        if (endedShell)
-            ExplorerShell.EnsureRunning();
         if (failed > 0)
-            throw new InvalidOperationException($"End frozen apps failed for {failed} app(s)");
+            throw new InvalidOperationException($"End frozen apps failed: {failed} couldn't be ended");
     }
 
     /// <summary>Visible, its own app (unowned, or marked as an app window), not a tool window, not cloaked, with a title.</summary>

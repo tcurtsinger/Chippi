@@ -47,13 +47,19 @@ internal sealed partial class ActionsPage : UserControl
     private string _built = ""; // what _body holds now: "picker", the grid's keys, or a list and its rows
     private QuickActionId? _list;
     private Popup? _confirm;
+    private (string Text, DateTime Until)? _listFailure; // "Eject failed", at a list's foot
+    private readonly TextBlock _listFailed = Ui.Text("", 12, "WarningTextBrush");
 
     public ActionsPage(QuickActionsModule module)
     {
         _module = module;
         _title.FontWeight = FontWeights.SemiBold;
+        _listFailed.VerticalAlignment = VerticalAlignment.Bottom;
+        _listFailed.HorizontalAlignment = HorizontalAlignment.Left;
+        _listFailed.Margin = new Thickness(10, 0, 0, 10);
+        AutomationProperties.SetLiveSetting(_listFailed, AutomationLiveSetting.Polite);
         Content = _body;
-        _refresh.Tick += (_, _) => _ = _module.RefreshAsync();
+        _refresh.Tick += (_, _) => _ = _module.PollAsync();
         Loaded += (_, _) =>
         {
             _module.Changed += OnChanged;
@@ -66,7 +72,7 @@ internal sealed partial class ActionsPage : UserControl
             if (IsVisible)
             {
                 _refresh.Start();
-                _ = _module.RefreshAsync();
+                _ = _module.PollAsync();
                 ShowPending();
             }
             else
@@ -89,6 +95,9 @@ internal sealed partial class ActionsPage : UserControl
 
     /// <summary>What shows: "picker", "grid", or the open list ("quit", "eject", "plan", "power").</summary>
     internal string Showing => _built.Split(':')[0];
+
+    /// <summary>The failure at a list's foot while it shows, else empty.</summary>
+    internal string ListFailure => _listFailed.Visibility == Visibility.Visible ? _listFailed.Text : "";
 
     /// <summary>Presses an action's button, as a click does.</summary>
     internal void Press(QuickActionId id) => Pressed(_cells.First(c => c.Action.Id == id));
@@ -243,11 +252,13 @@ internal sealed partial class ActionsPage : UserControl
         var state = _module.State;
         if (action.Toggle && !action.OpensList)
         {
-            bool on = !(_setting.TryGetValue(id, out var setting) ? setting : state.On.GetValueOrDefault(id));
+            // A press while the last one is still being applied does nothing, as on the home's toggles.
+            if (_setting.ContainsKey(id))
+                return;
+            bool on = !state.On.GetValueOrDefault(id);
             _setting[id] = on;
             Render();
-            try { await _module.SetAsync(id, on); }
-            catch (Exception ex) { Fail(id, ex); }
+            try { await Act(id, () => _module.SetAsync(id, on)); }
             finally
             {
                 _setting.Remove(id);
@@ -269,16 +280,17 @@ internal sealed partial class ActionsPage : UserControl
 
     private async void Run(QuickActionId id) => await Act(id, id == QuickActionId.Frozen ? _module.EndFrozenAppsAsync : () => _module.RunAsync(id));
 
-    private async Task Act(QuickActionId id, Func<Task> work)
+    /// <summary>Runs an action; a failure says "Failed" under its button and, in a list, <paramref name="failure"/> at the list's foot.</summary>
+    private async Task Act(QuickActionId id, Func<Task> work, string? failure = null)
     {
         try { await work(); }
-        catch (Exception ex) { Fail(id, ex); }
-    }
-
-    private void Fail(QuickActionId id, Exception ex)
-    {
-        Log.Warn($"Quick actions: {QuickAction.Of(id).Key} failed", ex);
-        ShowFailed(id);
+        catch (Exception ex)
+        {
+            Log.Warn($"Quick actions: {QuickAction.Of(id).Key} failed", ex);
+            if (failure is not null)
+                _listFailure = (failure, DateTime.UtcNow + FailedFor);
+            ShowFailed(id);
+        }
     }
 
     private void AskFirst(UIElement anchor, string question, string verb, Action confirmed)
@@ -433,10 +445,14 @@ internal sealed partial class ActionsPage : UserControl
             QuickActionId.Plan => "plan:" + string.Join(",", state.Plans.Select(p => $"{p.Id}|{p.Active}")),
             _ => "power",
         };
+        bool failing = _listFailure is { } failure && failure.Until > DateTime.UtcNow;
+        _listFailed.Text = failing ? _listFailure!.Value.Text : "";
+        _listFailed.Visibility = failing ? Visibility.Visible : Visibility.Collapsed;
         if (_built == built)
             return;
         _built = built;
         _body.Children.Clear();
+        _body.Children.Add(_listFailed);
         switch (id)
         {
             case QuickActionId.Quit:
@@ -499,7 +515,7 @@ internal sealed partial class ActionsPage : UserControl
         _body.Children.Add(buttons);
     }
 
-    private async void QuitAll(bool keepFront) => await Act(QuickActionId.Quit, () => _module.QuitAllAsync(keepFront));
+    private async void QuitAll(bool keepFront) => await Act(QuickActionId.Quit, () => _module.QuitAllAsync(keepFront), "Quit failed");
 
     private Border AppRow(OpenApp app)
     {
@@ -507,7 +523,7 @@ internal sealed partial class ActionsPage : UserControl
             ? new Image { Source = icon, Width = 16, Height = 16, VerticalAlignment = VerticalAlignment.Center }
             : Ui.Monogram(app.Name);
         var quit = Ui.Icon(LucideIcons.Close, $"Quit {app.Name}");
-        quit.Click += async (_, _) => await Act(QuickActionId.Quit, () => _module.QuitAsync(app));
+        quit.Click += async (_, _) => await Act(QuickActionId.Quit, () => _module.QuitAsync(app), "Quit failed");
         var parts = new List<UIElement> { quit };
         if (app.Front || _module.Settings.Keeps(app.Path))
             parts.Add(Ui.Badge(app.Front ? "Front" : "Kept"));
@@ -517,7 +533,7 @@ internal sealed partial class ActionsPage : UserControl
     private Border DriveRow(RemovableDrive drive)
     {
         var eject = Ui.Icon(LucideIcons.Eject, $"Eject {drive.Name}");
-        eject.Click += async (_, _) => await Act(QuickActionId.Eject, () => _module.EjectAsync(drive));
+        eject.Click += async (_, _) => await Act(QuickActionId.Eject, () => _module.EjectAsync(drive), "Eject failed");
         var size = Ui.Muted(Size(drive.Size), 11);
         size.Margin = new Thickness(8, 0, 4, 0);
         return Row(Ui.Glyph(LucideIcons.HardDrive), drive.Name, [eject, size]);
@@ -554,7 +570,7 @@ internal sealed partial class ActionsPage : UserControl
             name.FontWeight = FontWeights.SemiBold;
         var row = ListButton(new DockPanel { Children = { mark, name } }, plan.Name);
         AutomationProperties.SetItemStatus(row, plan.Active ? "Active" : "");
-        row.Click += async (_, _) => await Act(QuickActionId.Plan, () => _module.SetPowerPlanAsync(plan.Id));
+        row.Click += async (_, _) => await Act(QuickActionId.Plan, () => _module.SetPowerPlanAsync(plan.Id), "Power plan failed");
         return row;
     }
 
@@ -563,7 +579,7 @@ internal sealed partial class ActionsPage : UserControl
         var label = Ui.Text(name, 12);
         label.Margin = new Thickness(8, 0, 0, 0);
         var row = ListButton(new DockPanel { Children = { Ui.Glyph(icon), label } }, name);
-        row.Click += (_, _) => AskFirst(row, question, name, async () => await Act(QuickActionId.Power, () => _module.PowerAsync(choice)));
+        row.Click += (_, _) => AskFirst(row, question, name, async () => await Act(QuickActionId.Power, () => _module.PowerAsync(choice), $"{name} failed"));
         return row;
     }
 

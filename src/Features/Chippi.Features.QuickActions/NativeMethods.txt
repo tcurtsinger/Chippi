@@ -82,3 +82,9 @@ RM_SHUTDOWN_TYPE
 GetVolumeNameForVolumeMountPoint
 FILE_DEVICE_TYPE
 WaitForSingleObject
+CreateWindowEx
+DestroyWindow
+DefWindowProc
+HWND_MESSAGE
+SC_SCREENSAVE
+SystemParametersInfo

@@ -2,6 +2,7 @@
 // Copyright (C) Chippi contributors
 
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using Microsoft.Win32.SafeHandles;
@@ -14,46 +15,62 @@ namespace Chippi.Features.QuickActions.Windows;
 
 /// <summary>
 /// The drives Windows can eject, as the taskbar's Safely Remove Hardware lists them: removable volumes and disks on USB,
-/// SD or FireWire. Which device a volume sits on is looked up once per volume; a page read then only asks each listed
-/// drive for its label and size, so internal disks are never touched.
+/// SD or FireWire. A page read only lists the lettered volumes, which asks no disk anything; each volume's device, name
+/// and size are read once, when it first appears. Flash media in a reader can change under the same volume, so those
+/// (and a reader with no card) are read again at most every 30 seconds.
 /// </summary>
 internal sealed class RemovableDrives
 {
-    /// <summary>The device to eject for a volume, and its name for a volume without a label; null for a drive that can't be ejected.</summary>
+    /// <summary>The device to eject for a volume, and its name for a volume without a label.</summary>
     private sealed record Device(uint Node, string Name);
 
-    private static readonly string[] DriverSuffixes = [" SCSI Disk Device", " USB Device", " Disk Device"];
+    /// <summary>A volume as last read: the device that ejects it (null for an internal disk), and the drive (null while it has no media).</summary>
+    private sealed record Volume(Device? Device, RemovableDrive? Drive, long ReadAt);
 
-    private readonly ConcurrentDictionary<(string Root, string Volume), Device?> _devices = new();
+    private static readonly string[] DriverSuffixes = [" SCSI Disk Device", " USB Device", " Disk Device"];
+    private static readonly TimeSpan MediaCheck = TimeSpan.FromSeconds(30);
+
+    private readonly ConcurrentDictionary<(string Root, string Volume), Volume> _volumes = new();
 
     public IReadOnlyList<RemovableDrive> Read()
     {
         var drives = new List<RemovableDrive>();
         var seen = new HashSet<(string, string)>();
-        foreach (var drive in Candidates())
+        foreach (var (key, type) in Candidates())
         {
-            seen.Add(drive.Key);
-            if (_devices.GetOrAdd(drive.Key, key => Resolve(key.Root, drive.Type)) is not { } device)
+            seen.Add(key);
+            var volume = _volumes.GetOrAdd(key, k => new Volume(Resolve(k.Root, type), null, 0));
+            if (volume.Device is not { } device)
                 continue;
-            try
-            {
-                var info = new DriveInfo(drive.Key.Root);
-                if (!info.IsReady)
-                    continue; // a card reader with no card
-                string label = info.VolumeLabel;
-                drives.Add(new RemovableDrive(drive.Key.Root, $"{(label.Length > 0 ? label : device.Name)} ({drive.Key.Root[..2]})", info.TotalSize));
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-            {
-                // pulled out while being read
-            }
+            if (volume.ReadAt == 0
+                || ((volume.Drive is null || type == DriveType.Removable) && Stopwatch.GetElapsedTime(volume.ReadAt) > MediaCheck))
+                _volumes[key] = volume = volume with { Drive = Describe(key.Root, device), ReadAt = Stopwatch.GetTimestamp() };
+            if (volume.Drive is { } drive)
+                drives.Add(drive);
         }
-        foreach (var key in _devices.Keys)
+        foreach (var key in _volumes.Keys)
         {
             if (!seen.Contains(key))
-                _devices.TryRemove(key, out _);
+                _volumes.TryRemove(key, out _);
         }
         return drives;
+    }
+
+    /// <summary>"Samsung T7 (E:)" and its capacity, or null when the drive has no media (a card reader with no card).</summary>
+    private static RemovableDrive? Describe(string root, Device device)
+    {
+        try
+        {
+            var info = new DriveInfo(root);
+            if (!info.IsReady)
+                return null;
+            string label = info.VolumeLabel;
+            return new RemovableDrive(root, $"{(label.Length > 0 ? label : device.Name)} ({root[..2]})", info.TotalSize);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return null; // pulled out while being read
+        }
     }
 
     /// <summary>Ejects the drive's device, as Safely Remove Hardware does; throws when Windows says no (files open on it).</summary>

@@ -11,6 +11,12 @@ internal sealed class FakePc : IQuickSystem
     public readonly List<uint> Fronts = [];
     public bool Fail { get; set; }
 
+    /// <summary>Apps that refuse to close, by name (an elevated app).</summary>
+    public HashSet<string> Refuse { get; } = [];
+
+    /// <summary>Holds a toggle's switch until it completes, as a slow radio or screen change does.</summary>
+    public TaskCompletionSource? Hold { get; set; }
+
     public static OpenApp Chrome { get; } = new(@"C:\Program Files\Google\Chrome\Application\chrome.exe", "Google Chrome", Front: true);
     public static OpenApp Spotify { get; } = new(@"C:\Users\me\AppData\Roaming\Spotify\Spotify.exe", "Spotify", Front: false);
     public static OpenApp Discord { get; } = new(@"C:\Users\me\AppData\Local\Discord\app-1.0\Discord.exe", "Discord", Front: false);
@@ -21,11 +27,12 @@ internal sealed class FakePc : IQuickSystem
         return Task.FromResult(State);
     }
 
-    public Task SetAsync(QuickActionId id, bool on)
+    public async Task SetAsync(QuickActionId id, bool on)
     {
         Record($"set {id} {on}");
+        if (Hold is { } hold)
+            await hold.Task;
         State = State with { On = new Dictionary<QuickActionId, bool>(State.On) { [id] = on } };
-        return Task.CompletedTask;
     }
 
     public Task SetPowerPlanAsync(Guid plan)
@@ -44,6 +51,8 @@ internal sealed class FakePc : IQuickSystem
 
     public Task QuitAsync(OpenApp app)
     {
+        if (Refuse.Contains(app.Name))
+            throw new InvalidOperationException("Access denied");
         Record($"quit {app.Name}");
         State = State with { Apps = [.. State.Apps.Where(a => a != app)] };
         return Task.CompletedTask;

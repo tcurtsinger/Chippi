@@ -52,6 +52,7 @@ public sealed class QuickActionsTests
         public readonly List<Hotkey> Hotkeys = [];
         public readonly List<string> Opened = [];
         public bool HotkeysAvailable = true;
+        public bool IslandShows = true;
         public readonly QuickActionsModule Module;
 
         public Fixture() => Module = new QuickActionsModule(() => Pc, () =>
@@ -63,7 +64,12 @@ public sealed class QuickActionsTests
 
         public Task Start() => Module.StartAsync(new ModuleContext(QuickActionsModule.Id, Settings, NullLogger.Instance, new IslandActivityHub().CreatePublisher(QuickActionsModule.Id), Ui)
         {
-            OpenIslandPage = Opened.Add,
+            TryOpenIslandPage = key =>
+            {
+                if (IslandShows)
+                    Opened.Add(key);
+                return IslandShows;
+            },
             IslandPasteTarget = () => new PasteTarget(1, 42),
         }, default);
     }
@@ -164,6 +170,42 @@ public sealed class QuickActionsTests
         Assert.Empty(f.Pc.Calls);
         Assert.Equal(["quick-actions"], f.Opened);
         Assert.Equal(id, f.Module.Pending);
+    }
+
+    [Fact]
+    public async Task A_shortcut_that_needs_the_island_does_nothing_while_it_cant_show()
+    {
+        var f = new Fixture { IslandShows = false }; // off, or a fullscreen app in front
+        await f.Start();
+        Assert.True(f.Module.ChangeShortcut(QuickActionId.Frozen, Keys));
+        f.Hotkeys[0].Pressed!();
+        Assert.Empty(f.Opened);
+        Assert.Null(f.Module.Pending); // nothing pops up the next time Actions opens
+        Assert.Empty(f.Pc.Calls);
+    }
+
+    [Fact]
+    public async Task Quit_all_closes_the_rest_when_one_app_refuses_and_says_it_failed()
+    {
+        var f = new Fixture();
+        var admin = new OpenApp(@"C:\Windows\System32\Taskmgr.exe", "Task Manager", false);
+        f.Pc.State = QuickState.Empty with { Apps = [FakePc.Chrome, admin, FakePc.Spotify, FakePc.Discord] };
+        f.Pc.Refuse.Add("Task Manager");
+        await f.Start();
+        await Assert.ThrowsAsync<AggregateException>(() => f.Module.QuitAllAsync(keepFront: false));
+        Assert.Equal(["quit Google Chrome", "quit Spotify", "quit Discord"], f.Pc.Calls);
+    }
+
+    [Fact]
+    public async Task A_kept_app_stays_kept_when_an_update_moves_it_to_a_new_folder()
+    {
+        var f = new Fixture();
+        f.Pc.State = QuickState.Empty with { Apps = [FakePc.Discord] };
+        f.Settings.Value = new() { Kept = [@"C:\Users\me\AppData\Local\Discord\app-0.9\Discord.exe"] };
+        await f.Start();
+        Assert.Empty(f.Module.Quitting(keepFront: false));
+        f.Module.Keep(FakePc.Discord.Path); // already kept: not added twice
+        Assert.Single(f.Settings.Value.Kept);
     }
 
     [Fact]
@@ -293,6 +335,51 @@ public sealed class QuickActionsTests
             Assert.Equal("grid", page.Showing);
             Assert.False(page.Back()); // the island's own Back takes it home
         });
+    }
+
+    [Fact]
+    public async Task A_toggle_ignores_a_press_while_its_last_one_is_applied()
+    {
+        var f = new Fixture();
+        f.Settings.Value = new() { Shown = ["extend"] };
+        await f.Start();
+        var hold = new TaskCompletionSource();
+        f.Pc.Hold = hold;
+        WpfTestThread.Run(() =>
+        {
+            var page = new ActionsPage(f.Module);
+            page.Press(QuickActionId.Extend);
+            page.Press(QuickActionId.Extend); // a double click
+            Assert.Equal(["set Extend True"], f.Pc.Calls);
+            hold.SetResult();
+        });
+    }
+
+    [Fact]
+    public async Task A_failure_in_a_list_says_so_at_its_foot()
+    {
+        var f = new Fixture();
+        f.Pc.State = QuickState.Empty with { Apps = [FakePc.Chrome, FakePc.Discord] };
+        f.Pc.Refuse.Add("Discord");
+        f.Settings.Value = new() { Shown = ["quit"] };
+        await f.Start();
+        WpfTestThread.Run(() =>
+        {
+            var page = new ActionsPage(f.Module);
+            page.Press(QuickActionId.Quit);
+            var quit = Find<System.Windows.Controls.Button>(page).First(b => System.Windows.Automation.AutomationProperties.GetName(b) == "Quit Discord");
+            quit.RaiseEvent(new System.Windows.RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+            Assert.Equal("quit", page.Showing);
+            Assert.Equal("Quit failed", page.ListFailure);
+        });
+    }
+
+    private static IEnumerable<T> Find<T>(System.Windows.DependencyObject root) where T : System.Windows.DependencyObject
+    {
+        if (root is T value) yield return value;
+        foreach (var child in System.Windows.LogicalTreeHelper.GetChildren(root).OfType<System.Windows.DependencyObject>())
+            foreach (var found in Find<T>(child))
+                yield return found;
     }
 
     [Fact]

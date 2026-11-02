@@ -6,8 +6,8 @@ using System.Diagnostics;
 namespace Chippi.Features.QuickActions.Windows;
 
 /// <summary>
-/// A slow read (a WinRT device query) kept between page reads and redone at most once per <paramref name="every"/>.
-/// Callers share one load in flight; a failed load is retried on the next read after the interval.
+/// A slow read (a WinRT device query, the Recycle Bin on every drive) kept between page reads and redone at most once per
+/// <paramref name="every"/>. Callers share one load in flight; a failed load is retried on the next read after the interval.
 /// </summary>
 internal sealed class Refreshed<T>(Func<Task<T>> load, TimeSpan every)
 {
@@ -28,13 +28,10 @@ internal sealed class Refreshed<T>(Func<Task<T>> load, TimeSpan every)
         }
     }
 
-    /// <summary>Loads again on the next read.</summary>
+    /// <summary>Loads again on the next read, even while a load is in flight (it may have started before the change).</summary>
     public void Expire()
     {
         lock (_gate)
-        {
-            if (_value is { IsCompleted: true })
-                _value = null;
-        }
+            _value = null;
     }
 }

@@ -11,6 +11,7 @@ using Windows.Win32.Foundation;
 using Windows.Win32.Security;
 using Windows.Win32.System.Shutdown;
 using Windows.Win32.UI.Shell;
+using Windows.Win32.UI.WindowsAndMessaging;
 
 namespace Chippi.Features.QuickActions.Windows;
 
@@ -32,10 +33,33 @@ internal static class SystemActions
             throw new Win32Exception();
     }
 
-    /// <summary>Starts the screen saver the user picked, or the blank one when there's none.</summary>
-    public static void StartScreenSaver()
+    /// <summary>
+    /// Starts the screen saver now. The one the user picked starts as Windows starts it after the wait, so "On resume,
+    /// display logon screen" still locks the PC; with none picked (or screen saving off), the file runs by itself.
+    /// </summary>
+    public static unsafe void StartScreenSaver()
     {
-        Process.Start(new ProcessStartInfo(ScreenSaver(), "/s") { UseShellExecute = false })?.Dispose();
+        string? chosen = ChosenScreenSaver();
+        BOOL active = false;
+        if (chosen is null
+            || !PInvoke.SystemParametersInfo(SYSTEM_PARAMETERS_INFO_ACTION.SPI_GETSCREENSAVEACTIVE, 0, &active, 0) || !active)
+        {
+            string file = chosen ?? Path.Combine(Environment.SystemDirectory, "scrnsave.scr");
+            Process.Start(new ProcessStartInfo(file, "/s") { UseShellExecute = false })?.Dispose();
+            return;
+        }
+        // Windows' own way (WM_SYSCOMMAND SC_SCREENSAVE through DefWindowProc) needs a window of this thread; any will do.
+        var window = PInvoke.CreateWindowEx(0, "Static", null, 0, 0, 0, 0, 0, HWND.HWND_MESSAGE, null, null, null);
+        if (window.IsNull)
+            throw new Win32Exception();
+        try
+        {
+            PInvoke.DefWindowProc(window, PInvoke.WM_SYSCOMMAND, PInvoke.SC_SCREENSAVE, 0);
+        }
+        finally
+        {
+            PInvoke.DestroyWindow(window);
+        }
     }
 
     public static Task EmptyRecycleBinAsync() => Win32Windows.RunSta(() =>
@@ -82,20 +106,16 @@ internal static class SystemActions
         }
     }
 
-    private static string ScreenSaver()
+    /// <summary>The screen saver the user picked, or null when there's none.</summary>
+    private static string? ChosenScreenSaver()
     {
-        using (var key = Registry.CurrentUser.OpenSubKey(@"Control Panel\Desktop"))
-        {
-            if (key?.GetValue("SCRNSAVE.EXE") is string chosen && chosen.Trim().Length > 0)
-            {
-                string path = Environment.ExpandEnvironmentVariables(chosen.Trim());
-                if (!Path.IsPathRooted(path))
-                    path = Path.Combine(Environment.SystemDirectory, path);
-                if (File.Exists(path))
-                    return path;
-            }
-        }
-        return Path.Combine(Environment.SystemDirectory, "scrnsave.scr");
+        using var key = Registry.CurrentUser.OpenSubKey(@"Control Panel\Desktop");
+        if (key?.GetValue("SCRNSAVE.EXE") is not string chosen || chosen.Trim().Length == 0)
+            return null;
+        string path = Environment.ExpandEnvironmentVariables(chosen.Trim());
+        if (!Path.IsPathRooted(path))
+            path = Path.Combine(Environment.SystemDirectory, path);
+        return File.Exists(path) ? path : null;
     }
 
     /// <summary>Fast startup is on: shut down the way the Start menu does, as a hybrid shutdown.</summary>

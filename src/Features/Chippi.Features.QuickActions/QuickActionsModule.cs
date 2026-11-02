@@ -24,11 +24,21 @@ public sealed class QuickActionsModule : IFeatureModule
     /// <summary>The page reads the PC again this often while it shows, so a change made elsewhere shows on its button.</summary>
     internal static readonly TimeSpan RefreshEvery = TimeSpan.FromSeconds(2);
 
+    /// <summary>How long a read is waited for. One that runs longer (a stuck drive) is joined by the next read, never started again.</summary>
+    internal static readonly TimeSpan ReadWait = TimeSpan.FromSeconds(5);
+
+    /// <summary>How long a shortcut's list or confirm waits for the page to show it.</summary>
+    internal static readonly TimeSpan PendingFor = TimeSpan.FromSeconds(3);
+
     private readonly Func<IQuickSystem> _createSystem;
     private readonly Func<IMicHotkey> _createHotkey;
     private readonly Dictionary<QuickActionId, IMicHotkey> _hotkeys = [];
     private readonly Dictionary<QuickActionId, string> _shortcutErrors = [];
     private readonly SemaphoreSlim _reading = new(1);
+    private Task<QuickState>? _read; // the PC's read in progress, held under _reading
+    private bool _slow;
+    private QuickActionId? _pending;
+    private long _pendingAt;
     private IQuickSystem? _system;
     private ModuleContext? _context;
     private ActionsPage? _page;
@@ -59,8 +69,16 @@ public sealed class QuickActionsModule : IFeatureModule
     /// <summary>The settings or the state changed. Raised on any thread.</summary>
     public event Action? Changed;
 
-    /// <summary>A list or a confirm a shortcut asked for; the page shows it when it opens, and clears it.</summary>
-    internal QuickActionId? Pending { get; set; }
+    /// <summary>A list or a confirm a shortcut asked for. The page shows it when it opens within a few seconds; after that it's dropped.</summary>
+    internal QuickActionId? Pending
+    {
+        get => _pending is { } id && Environment.TickCount64 - _pendingAt <= PendingFor.TotalMilliseconds ? id : null;
+        set
+        {
+            _pending = value;
+            _pendingAt = Environment.TickCount64;
+        }
+    }
 
     /// <summary>What this PC can do, in order.</summary>
     public IReadOnlyList<QuickAction> Offered => [.. QuickAction.All.Where(a => !State.Unsupported.Contains(a.Id))];
@@ -88,7 +106,7 @@ public sealed class QuickActionsModule : IFeatureModule
             if (Settings.ShortcutOf(action.Id) is { IsValid: true } shortcut)
                 TryRegister(action.Id, shortcut);
         // Read once now, so the page opens already filled.
-        _ = RefreshAsync(CancellationToken.None);
+        _ = PollAsync();
         return Task.CompletedTask;
     }
 
@@ -106,19 +124,39 @@ public sealed class QuickActionsModule : IFeatureModule
         return Task.CompletedTask;
     }
 
-    /// <summary>Reads the PC again; a read already running makes this one a no-op.</summary>
-    public async Task RefreshAsync(CancellationToken ct = default)
+    /// <summary>Reads the PC again once any read already running is done, so an action's refresh shows what it did.</summary>
+    public Task RefreshAsync(CancellationToken ct = default) => ReadAsync(wait: true, ct);
+
+    /// <summary>The page's timer and first look: skipped while a read runs.</summary>
+    internal Task PollAsync() => ReadAsync(wait: false, CancellationToken.None);
+
+    private async Task ReadAsync(bool wait, CancellationToken ct)
     {
-        if (_system is not { } system || !await _reading.WaitAsync(0, ct))
+        if (_system is not { } system)
+            return;
+        if (wait)
+            await _reading.WaitAsync(ct);
+        else if (!await _reading.WaitAsync(0, ct))
             return;
         try
         {
             uint front = _context?.IslandPasteTarget()?.ProcessId ?? 0;
-            State = await system.ReadAsync(front, ct);
+            // A read that outlived its wait is joined, not started again, so a stuck drive can't pile up threads.
+            _read ??= system.ReadAsync(front, CancellationToken.None);
+            State = await _read.WaitAsync(ReadWait, ct);
+            _read = null;
+            _slow = false;
             Changed?.Invoke();
+        }
+        catch (TimeoutException ex)
+        {
+            if (!_slow)
+                Log.Warn("Quick actions: reading the PC is taking long", ex);
+            _slow = true;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
+            _read = null;
             Log.Warn("Quick actions: reading the PC failed", ex);
         }
         finally { _reading.Release(); }
@@ -169,14 +207,18 @@ public sealed class QuickActionsModule : IFeatureModule
 
     public Task QuitAsync(OpenApp app) => ThenRefresh(Pc.QuitAsync(app));
 
+    /// <summary>Asks each app to close, all of them even when one refuses (an elevated app); then throws once if any did.</summary>
     public async Task QuitAllAsync(bool keepFront)
     {
-        try
+        var failed = new List<Exception>();
+        foreach (var app in Quitting(keepFront))
         {
-            foreach (var app in Quitting(keepFront))
-                await Pc.QuitAsync(app);
+            try { await Pc.QuitAsync(app); }
+            catch (Exception ex) { failed.Add(ex); }
         }
-        finally { await RefreshAsync(); }
+        await RefreshAsync();
+        if (failed.Count > 0)
+            throw new AggregateException("Quit all failed", failed);
     }
 
     public Task EndFrozenAppsAsync() => ThenRefresh(Pc.EndFrozenAppsAsync());
@@ -271,7 +313,12 @@ public sealed class QuickActionsModule : IFeatureModule
             else
             {
                 Pending = id;
-                context.OpenIslandPage(TileKey);
+                // With the island off or hidden for a fullscreen app, nothing opens: no Settings, and no confirm later.
+                if (!context.TryOpenIslandPage(TileKey))
+                {
+                    Pending = null;
+                    return;
+                }
                 _page?.ShowPending();
             }
         }

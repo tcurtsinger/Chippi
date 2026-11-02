@@ -190,7 +190,7 @@ public sealed class SoundShellTests
             await scene.Shell.Registry.SetInstalledAsync("app-volume", false);
             panel.SetTiles(Tiles(scene));
             Assert.Null(panel.CurrentPage);
-            Assert.DoesNotContain(Assert.IsType<IslandGrid>(host.Content).Buttons(), b => AutomationProperties.GetName(b).StartsWith("App volume,", StringComparison.Ordinal));
+            Assert.DoesNotContain(Assert.IsType<IslandGrid>(host.Content).Buttons(), b => AutomationProperties.GetName(b).StartsWith("Volume,", StringComparison.Ordinal));
         }
         finally { panel.Close(); media.Dispose(); }
     });

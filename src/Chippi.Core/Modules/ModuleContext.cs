@@ -48,6 +48,12 @@ public sealed class ModuleContext(
     /// <summary>Opens the island on a tile's page (a notice click opening the System page).</summary>
     public Action<string> OpenIslandPage { get; init; } = _ => { };
 
+    /// <summary>
+    /// Opens the island on a tile's page and says whether it could: false while the island is off or hidden for a
+    /// fullscreen app, when nothing opens (no Settings instead). A Quick actions shortcut that needs its confirm.
+    /// </summary>
+    public Func<string, bool> TryOpenIslandPage { get; init; } = _ => false;
+
     /// <summary>The shared clipboard service; no module opens the clipboard itself. Null when the shell has none (tests pass a fake).</summary>
     public Clipboard.IClipboardHub? Clipboard { get; init; }
 

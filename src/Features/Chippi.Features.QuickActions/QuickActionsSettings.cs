@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using System.IO;
 using Chippi.Features.Sound.Mute;
 
 namespace Chippi.Features.QuickActions;
@@ -11,7 +12,7 @@ public sealed record QuickActionsSettings
     /// <summary>The actions on the page, by key; null until the first Done, so the page first opens on the picker.</summary>
     public List<string>? Shown { get; init; }
 
-    /// <summary>Apps "Quit all" never closes, by program path.</summary>
+    /// <summary>Apps "Quit all" never closes, by program path; matched by the file's name, which an update's new folder doesn't change.</summary>
     public List<string> Kept { get; init; } = [];
 
     /// <summary>Each action's shortcut, by key; none by default.</summary>
@@ -19,7 +20,8 @@ public sealed record QuickActionsSettings
 
     public bool Shows(QuickActionId id) => Shown?.Contains(QuickAction.Of(id).Key) == true;
 
-    public bool Keeps(string path) => Kept.Contains(path, StringComparer.OrdinalIgnoreCase);
+    public bool Keeps(string path) =>
+        Kept.Any(kept => string.Equals(Path.GetFileName(kept), Path.GetFileName(path), StringComparison.OrdinalIgnoreCase));
 
     public MicShortcut? ShortcutOf(QuickActionId id) => Shortcuts.GetValueOrDefault(QuickAction.Of(id).Key);
 }

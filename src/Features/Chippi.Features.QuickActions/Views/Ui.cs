@@ -86,6 +86,12 @@ internal static class Ui
         return mark;
     }
 
+    private static TextBlock WithForeground(this TextBlock block, string brush)
+    {
+        block.SetResourceReference(TextBlock.ForegroundProperty, brush);
+        return block;
+    }
+
     /// <summary>A question under <paramref name="anchor"/>: the question, then Cancel and the verb (Critical) (DESIGN.md §3).</summary>
     public static Popup Confirm(UIElement anchor, string question, string verb, Action confirmed)
     {
@@ -104,7 +110,8 @@ internal static class Ui
             Margin = new Thickness(16),
             Children =
             {
-                Text(question),
+                // A long app name in "Quit all but …?" wraps rather than losing the app spared.
+                new TextBlock { Text = question, FontSize = 12, TextWrapping = TextWrapping.Wrap }.WithForeground("IslandTextBrush"),
                 new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 16, 0, 0), Children = { cancel, act } },
             },
         };

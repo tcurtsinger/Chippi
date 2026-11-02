@@ -8,18 +8,20 @@ using Windows.Devices.Radios;
 namespace Chippi.Features.QuickActions.Windows;
 
 /// <summary>
-/// Quick actions on this PC. A read takes a few milliseconds: what can't change quickly (the radios, whether a camera
-/// exists, which device a drive sits on) is kept between reads. A part that fails to read is left out and logged once.
+/// Quick actions on this PC. A read takes a few milliseconds and touches no disk: what can't change quickly (the radios,
+/// whether a camera exists, each drive's device, name and size) is kept between reads, and the Recycle Bin is counted
+/// at most every 30 seconds. A part that fails to read is left out and logged once.
 /// </summary>
 public sealed class WindowsQuickSystem : IQuickSystem
 {
-    /// <summary>How long a read waits on a WinRT device query before leaving its part out.</summary>
-    private static readonly TimeSpan DeviceWait = TimeSpan.FromSeconds(3);
+    /// <summary>How long a read waits on a slow lookup (WinRT, the Recycle Bin) before leaving its part out.</summary>
+    private static readonly TimeSpan SlowWait = TimeSpan.FromSeconds(3);
 
     private readonly WirelessRadios _radios = new();
     private readonly CameraAccess _camera = new();
     private readonly RemovableDrives _drives = new();
     private readonly AltTabApps _apps = new();
+    private readonly Refreshed<long> _recycled = new(() => Task.FromResult(SystemActions.RecycleBinItems()), TimeSpan.FromSeconds(30));
     private readonly ConcurrentDictionary<string, byte> _warned = new();
 
     public Task<QuickState> ReadAsync(uint frontProcessId, CancellationToken ct = default) => Task.Run(async () =>
@@ -45,13 +47,13 @@ public sealed class WindowsQuickSystem : IQuickSystem
         });
         await ReadPartAsync("the radios", async () =>
         {
-            var radios = await _radios.GetAsync().WaitAsync(DeviceWait, ct);
+            var radios = await _radios.GetAsync().WaitAsync(SlowWait, ct);
             AddRadio(QuickActionId.Bluetooth, WirelessRadios.IsOn(radios, RadioKind.Bluetooth));
             AddRadio(QuickActionId.WiFi, WirelessRadios.IsOn(radios, RadioKind.WiFi));
         }, ct);
         await ReadPartAsync("the camera", async () =>
         {
-            if (await _camera.PresentAsync().WaitAsync(DeviceWait, ct))
+            if (await _camera.PresentAsync().WaitAsync(SlowWait, ct))
                 on[QuickActionId.Camera] = CameraAccess.Allowed;
             else
                 unsupported.Add(QuickActionId.Camera);
@@ -71,7 +73,7 @@ public sealed class WindowsQuickSystem : IQuickSystem
             apps = _apps.Apps(windows, frontProcessId);
             frozen = AltTabApps.Frozen(windows).Count;
         });
-        ReadPart("the Recycle Bin", () => recycled = SystemActions.RecycleBinItems());
+        await ReadPartAsync("the Recycle Bin", async () => recycled = await _recycled.GetAsync().WaitAsync(SlowWait, ct), ct);
         return new QuickState(on, unsupported, plans, drives, apps, frozen, recycled);
 
         void AddRadio(QuickActionId id, bool? state)
@@ -112,12 +114,24 @@ public sealed class WindowsQuickSystem : IQuickSystem
         QuickActionId.Lock => Task.Run(SystemActions.Lock),
         QuickActionId.Displays => Task.Run(SystemActions.TurnOffDisplaysAsync),
         QuickActionId.ScreenSaver => Task.Run(SystemActions.StartScreenSaver),
-        QuickActionId.Recycle => SystemActions.EmptyRecycleBinAsync(),
+        QuickActionId.Recycle => EmptyRecycleBinAsync(),
         QuickActionId.Explorer => Task.Run(ExplorerShell.Restart),
         _ => Task.FromException(new ArgumentOutOfRangeException(nameof(id), id, "Not an action Windows runs")),
     };
 
     public Task PowerAsync(PowerChoice choice) => Task.Run(() => SystemActions.Power(choice));
+
+    private async Task EmptyRecycleBinAsync()
+    {
+        try
+        {
+            await SystemActions.EmptyRecycleBinAsync();
+        }
+        finally
+        {
+            _recycled.Expire();
+        }
+    }
 
     private void ReadPart(string part, Action read)
     {
