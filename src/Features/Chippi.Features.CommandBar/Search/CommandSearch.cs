@@ -101,8 +101,11 @@ internal sealed class CommandSearch(
 
         bool web = On(ResultSwitch.Web);
         var rows = first.Take(web ? Rows - 1 : Rows).ToList();
+        // Files, copies and emoji are the long tail: after Chippi, apps, windows and Settings, even when their names start
+        // with the text (Travis's live check, 2026-11-02: seven chrome… files hid Chrome and its windows).
         rows.AddRange(matches
             .OrderByDescending(m => m.Picks)
+            .ThenBy(m => m.Result.Kind >= ResultKind.File ? 1 : 0)
             .ThenBy(m => m.Tier)
             .ThenBy(m => m.Result.Kind)
             .ThenBy(m => m.Result.Name, StringComparer.CurrentCultureIgnoreCase)

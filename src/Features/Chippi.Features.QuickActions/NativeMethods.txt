@@ -62,13 +62,6 @@ GUID_DEVINTERFACE_CDROM
 OpenProcess
 QueryFullProcessImageName
 TerminateProcess
-GetProcessTimes
-RmStartSession
-RmRegisterResources
-RmShutdown
-RmRestart
-RmEndSession
-CCH_RM_SESSION_KEY
 SetSuspendState
 GetPwrCapabilities
 ExitWindowsEx
@@ -78,7 +71,6 @@ AdjustTokenPrivileges
 SE_SHUTDOWN_NAME
 GetWindow
 WINDOW_EX_STYLE
-RM_SHUTDOWN_TYPE
 GetVolumeNameForVolumeMountPoint
 FILE_DEVICE_TYPE
 WaitForSingleObject

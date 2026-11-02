@@ -76,11 +76,23 @@ public sealed class CommandBarTests
     {
         var f = new Fixture();
         var rows = f.Search.Find("chr", f.Pc.OpenWindows, f.Files("chr", new FoundFile(@"C:\Users\t\Downloads\ChromeSetup.exe", "ChromeSetup.exe", "Downloads", false)));
-        // Names that start with "chr" first, the app before the file before the emoji; then the window, found by its app.
-        Assert.Equal(["Chrome", "ChromeSetup.exe", "Christmas tree", "Pull requests · Chippi"], rows.Take(4).Select(r => r.Name));
-        Assert.Equal(["Open", "Open", "Copy", "Switch"], rows.Take(4).Select(r => r.Verb));
-        Assert.Equal("Downloads", rows[1].Detail);
+        // The app, whose name starts with "chr", then the window, found by its app; then the long tail, the file before the emoji.
+        Assert.Equal(["Chrome", "Pull requests · Chippi", "ChromeSetup.exe", "Christmas tree"], rows.Take(4).Select(r => r.Name));
+        Assert.Equal(["Open", "Switch", "Open", "Copy"], rows.Take(4).Select(r => r.Verb));
+        Assert.Equal("Downloads", rows[2].Detail);
         Assert.Equal(("Search the web for \u201cchr\u201d", "Search", "Google"), (rows[^1].Name, rows[^1].Verb, rows[^1].Detail));
+    }
+
+    [Fact]
+    public void Files_named_like_the_text_never_crowd_out_an_app_or_its_windows()
+    {
+        // Travis's live check: "chrome" filled every row with chrome… files from a browser tool's caches.
+        var f = new Fixture();
+        var files = Enumerable.Range(1, 8).Select(i => new FoundFile($@"C:\Tools\chrome-win64-{i}\chrome_{i}.dll", $"chrome_{i}.dll", $"chrome-win64-{i}", false)).ToArray();
+        var rows = f.Search.Find("chrome", f.Pc.OpenWindows, f.Files("chrome", files));
+        Assert.Equal(["Chrome", "Pull requests · Chippi"], rows.Take(2).Select(r => r.Name));
+        Assert.Equal(ResultKind.File, rows[2].Kind);
+        Assert.Equal(ResultKind.Web, rows[^1].Kind);
     }
 
     [Fact]

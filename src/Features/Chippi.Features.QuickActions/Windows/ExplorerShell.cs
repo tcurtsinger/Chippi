@@ -5,7 +5,6 @@ using System.Diagnostics;
 using System.IO;
 using Windows.Win32;
 using Windows.Win32.Foundation;
-using Windows.Win32.System.RestartManager;
 using Windows.Win32.System.Threading;
 
 namespace Chippi.Features.QuickActions.Windows;
@@ -13,6 +12,14 @@ namespace Chippi.Features.QuickActions.Windows;
 /// <summary>The shell's explorer.exe (the taskbar, Start and the desktop), and restarting it as Task Manager's Restart does.</summary>
 internal static class ExplorerShell
 {
+    /// <summary>
+    /// What the taskbar's own Exit Explorer (Ctrl+Shift+right-click) posts to it: the shell saves its state and exits
+    /// cleanly, in a second or two. Task Manager's Restart asks the same way.
+    /// </summary>
+    private const uint ExitExplorer = 0x05B4;
+
+    private static readonly TimeSpan ExitWait = TimeSpan.FromSeconds(5);
+
     /// <summary>The shell's process, or 0 when it isn't running.</summary>
     public static uint ProcessId()
     {
@@ -22,15 +29,34 @@ internal static class ExplorerShell
         return shell.IsNull ? 0 : Win32Windows.ProcessId(shell);
     }
 
+    /// <summary>
+    /// Asks the shell to exit and starts it again. One that doesn't exit within 5 seconds is ended, as Task Manager's End
+    /// task would, and Windows starts it again itself. (Windows' Restart Manager, used before 2026-11-02, took 30 seconds
+    /// to give up on the shell and ended it anyway, which Windows took for a crash: a black screen, then a half-drawn
+    /// taskbar.)
+    /// </summary>
     public static void Restart()
     {
         uint pid = ProcessId();
-        if (pid != 0 && !RestartWithRestartManager(pid))
+        if (pid == 0)
         {
-            using var process = PInvoke.OpenProcess_SafeHandle(PROCESS_ACCESS_RIGHTS.PROCESS_TERMINATE | PROCESS_ACCESS_RIGHTS.PROCESS_SYNCHRONIZE, false, pid);
-            if (!process.IsInvalid && PInvoke.TerminateProcess(process, 1))
-                PInvoke.WaitForSingleObject(process, 5000);
+            EnsureRunning();
+            return;
         }
+        using var process = PInvoke.OpenProcess_SafeHandle(PROCESS_ACCESS_RIGHTS.PROCESS_TERMINATE | PROCESS_ACCESS_RIGHTS.PROCESS_SYNCHRONIZE, false, pid);
+        if (process.IsInvalid)
+            return;
+        var taskbar = Win32Windows.Taskbar;
+        bool exited = !taskbar.IsNull && PInvoke.PostMessage(taskbar, ExitExplorer, default, default)
+            && PInvoke.WaitForSingleObject(process, (uint)ExitWait.TotalMilliseconds) == WAIT_EVENT.WAIT_OBJECT_0;
+        if (exited)
+        {
+            // Windows doesn't restart a shell that exited cleanly: it's Chippi's to start.
+            Start();
+            return;
+        }
+        if (PInvoke.TerminateProcess(process, 1))
+            PInvoke.WaitForSingleObject(process, (uint)ExitWait.TotalMilliseconds);
         EnsureRunning();
     }
 
@@ -43,28 +69,12 @@ internal static class ExplorerShell
                 return;
             Thread.Sleep(100);
         }
-        string explorer = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "explorer.exe");
-        Process.Start(new ProcessStartInfo(explorer) { UseShellExecute = false })?.Dispose();
+        Start();
     }
 
-    private static unsafe bool RestartWithRestartManager(uint pid)
+    private static void Start()
     {
-        using var process = PInvoke.OpenProcess_SafeHandle(PROCESS_ACCESS_RIGHTS.PROCESS_QUERY_LIMITED_INFORMATION, false, pid);
-        if (process.IsInvalid || !PInvoke.GetProcessTimes(process, out var started, out _, out _, out _))
-            return false;
-        Span<char> key = stackalloc char[(int)PInvoke.CCH_RM_SESSION_KEY + 1];
-        if (PInvoke.RmStartSession(out uint session, key) != WIN32_ERROR.ERROR_SUCCESS)
-            return false;
-        try
-        {
-            RM_UNIQUE_PROCESS[] shell = [new() { dwProcessId = pid, ProcessStartTime = started }];
-            return PInvoke.RmRegisterResources(session, [], shell, []) == WIN32_ERROR.ERROR_SUCCESS
-                && PInvoke.RmShutdown(session, (uint)RM_SHUTDOWN_TYPE.RmForceShutdown, null) == WIN32_ERROR.ERROR_SUCCESS
-                && PInvoke.RmRestart(session, null) == WIN32_ERROR.ERROR_SUCCESS;
-        }
-        finally
-        {
-            PInvoke.RmEndSession(session);
-        }
+        string explorer = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "explorer.exe");
+        Process.Start(new ProcessStartInfo(explorer) { UseShellExecute = false })?.Dispose();
     }
 }
