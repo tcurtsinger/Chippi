@@ -8,9 +8,10 @@
     <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
     <UseWPF>true</UseWPF>
     <RootNamespace>Chippi.Features.QuickActions</RootNamespace>
-    <!-- As Chippi.App: a build with no RID (the solution's) gets the machine's own, because CsWin32 cannot generate
-         some APIs (SHAppBarMessage, SHQueryRecycleBin) for AnyCPU. -->
-    <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == ''">$(NETCoreSdkRuntimeIdentifier)</RuntimeIdentifier>
+    <!-- AnyCPU like the other features, so the app's publish profile (which sets its RID inside the app, not for its
+         references) can use it on either CPU. CsWin32 can't generate APPBARDATA and SHQUERYRBINFO for AnyCPU, so it
+         generates them as on x64, whose layouts ARM64 shares; Chippi ships no x86. -->
+    <CsWin32PlatformTarget>x64</CsWin32PlatformTarget>
   </PropertyGroup>
 
   <ItemGroup>
