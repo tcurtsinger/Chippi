@@ -108,8 +108,8 @@ The island at the top of the screen becomes a blob widget you drag anywhere, ope
 - Known cost (2026-10-29): at 165 Hz the panel's open skips about 2 frames (up to 11 on the first open after start), its close about 6 and a page switch about 3. The panel's shadow is 1 or 2 of them. Travis kept the grow-out-of-the-puck open over a cheaper fade and scale (task 167).
 - Pet passes since (2026-11-01, PRs #174 to #176): bolder and layout, then animate, delight and overdrive, then optimize, harden and polish. See DESIGN.md §7.
 
-### Phase 5.5: Everyday tools, continued
-Shaping since 2026-11-01: [docs/phase-5.5/](docs/phase-5.5/README.md). All five are shaped and their mockups approved (Quick toggles became Quick actions). Building since 2026-11-01, one pull request each: [docs/phase-5.5-handoff.md](docs/phase-5.5-handoff.md). Quick toggles, cleaning mode, command bar, radial menu, AI agent usage in the island (Travis, 2026-10-27, tasks 27 and 28). Quick panel leaves the catalog; keep awake already shipped.
+### Phase 5.5: Everyday tools, continued (done)
+Shaped from 2026-11-01: [docs/phase-5.5/](docs/phase-5.5/README.md). All five were shaped and their mockups approved (Quick toggles became Quick actions), then built one pull request each, #178 to #186: [docs/phase-5.5-handoff.md](docs/phase-5.5-handoff.md). Live checks 2026-11-02; report: [docs/phase-5.5-report.md](docs/phase-5.5-report.md). Quick toggles, cleaning mode, command bar, radial menu, AI agent usage in the island (Travis, 2026-10-27, tasks 27 and 28). Quick panel leaves the catalog; keep awake already shipped.
 
 ### Phase 6: Windows and input
 Not started. Window layouts and snapping, app switcher with previews, quit and close protection,
