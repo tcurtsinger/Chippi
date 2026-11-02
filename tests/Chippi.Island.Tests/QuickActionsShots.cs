@@ -127,7 +127,8 @@ public sealed class QuickActionsShots
     private static void Click(IslandPanelWindow panel, string key)
     {
         var button = Find<ToggleButton>(panel).First(b => Equals(b.Tag, key));
-        button.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+        // As a click or UI Automation's Toggle does: the tiles act on Checked and Unchecked.
+        ((System.Windows.Automation.Provider.IToggleProvider)System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(button)).Toggle();
     }
 
     private static void Shoot(IReadOnlyList<IslandTileGroup> tiles, string path, Action<IslandPanelWindow>? arrange = null)

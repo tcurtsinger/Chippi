@@ -356,6 +356,54 @@ public sealed class QuickActionsTests
     }
 
     [Fact]
+    public async Task UI_Automations_Toggle_works_a_button_as_a_click_does()
+    {
+        var f = new Fixture();
+        f.Pc.State = QuickState.Empty with { Apps = [FakePc.Chrome] };
+        f.Settings.Value = new() { Shown = ["dark", "quit"] };
+        await f.Start();
+        WpfTestThread.Run(() =>
+        {
+            var page = new ActionsPage(f.Module);
+            var buttons = Find<System.Windows.Controls.Primitives.ToggleButton>(page).ToList();
+            // UI Automation's Toggle raises no Click: the page acts on Checked and Unchecked.
+            Toggle(buttons.First(b => Equals(b.Tag, "dark")));
+            Assert.Equal(["set Dark True"], f.Pc.Calls);
+            Toggle(buttons.First(b => Equals(b.Tag, "quit")));
+            Assert.Equal("quit", page.Showing);
+        });
+
+        static void Toggle(System.Windows.Controls.Primitives.ToggleButton button) =>
+            ((System.Windows.Automation.Provider.IToggleProvider)System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(button)).Toggle();
+    }
+
+    [Theory]
+    [InlineData(1, 1)]
+    [InlineData(8, 1)]
+    [InlineData(9, 2)]
+    [InlineData(16, 2)]
+    [InlineData(17, 3)]
+    [InlineData(25, 4)]
+    [InlineData(40, 4)]
+    public void A_list_adds_columns_as_it_grows(int count, int columns) => Assert.Equal(columns, ActionsPage.ListColumns(count));
+
+    [Fact]
+    public async Task Every_one_of_twenty_apps_can_be_quit_from_the_list()
+    {
+        var f = new Fixture();
+        f.Pc.State = QuickState.Empty with { Apps = [.. Enumerable.Range(1, 20).Select(i => new OpenApp($@"C:\Apps\app{i}.exe", $"App {i}", i == 1))] };
+        f.Settings.Value = new() { Shown = ["quit"] };
+        await f.Start();
+        WpfTestThread.Run(() =>
+        {
+            var page = new ActionsPage(f.Module);
+            page.Press(QuickActionId.Quit);
+            var names = Find<System.Windows.Controls.Button>(page).Select(b => System.Windows.Automation.AutomationProperties.GetName(b)).Where(n => n.StartsWith("Quit App ", StringComparison.Ordinal));
+            Assert.Equal(20, names.Count());
+        });
+    }
+
+    [Fact]
     public async Task A_failure_in_a_list_says_so_at_its_foot()
     {
         var f = new Fixture();

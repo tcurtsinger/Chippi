@@ -27,8 +27,10 @@ internal sealed partial class ActionsPage : UserControl
 
     internal const int Columns = 5;
 
-    /// <summary>A list's rows: 8 to a column, and Quit apps takes a second column past 8.</summary>
+    /// <summary>A list's rows: 8 to a column; past 8 it takes a second column, and more as it grows, up to 4.</summary>
     internal const int ListRows = 8;
+
+    internal const int MaxListColumns = 4;
 
     /// <summary>How long a button says "Failed".</summary>
     internal static readonly TimeSpan FailedFor = TimeSpan.FromSeconds(4);
@@ -315,6 +317,7 @@ internal sealed partial class ActionsPage : UserControl
         private readonly TextBlock _name = Ui.Text("", 12);
         private readonly TextBlock _status = Ui.Muted("", 11);
         private bool _on;
+        private bool _showing; // the page sets IsChecked itself, which isn't a press
 
         public Cell(QuickAction action, double height, ActionsPage page)
         {
@@ -324,12 +327,10 @@ internal sealed partial class ActionsPage : UserControl
             _glyph.SetBinding(LucideIcon.BrushProperty, new System.Windows.Data.Binding(nameof(Foreground)) { Source = Button });
             _chevron.SetBinding(LucideIcon.BrushProperty, new System.Windows.Data.Binding(nameof(Foreground)) { Source = Button });
             _chevron.Opacity = 0.8;
-            // The page decides: the button follows the PC, not the click.
-            Button.Click += (_, _) =>
-            {
-                Button.IsChecked = _on;
-                page.Pressed(this);
-            };
+            // The page decides: the button follows the PC, not the press. Checked and Unchecked, not Click: a click raises
+            // them too, and UI Automation's Toggle raises no Click.
+            Button.Checked += (_, _) => Pressed(page);
+            Button.Unchecked += (_, _) => Pressed(page);
             _name.Text = action.Label;
             _name.Height = 16;
             _name.Margin = new Thickness(0, 4, 0, 0);
@@ -346,10 +347,25 @@ internal sealed partial class ActionsPage : UserControl
 
         public ToggleButton Button { get; }
 
+        private void Pressed(ActionsPage page)
+        {
+            if (_showing)
+                return;
+            Check(_on);
+            page.Pressed(this);
+        }
+
+        private void Check(bool on)
+        {
+            _showing = true;
+            try { Button.IsChecked = on; }
+            finally { _showing = false; }
+        }
+
         public void Show((string Status, bool Enabled, bool List) look, bool on, bool failed)
         {
             _on = Action.Toggle && !Action.OpensList && on;
-            Button.IsChecked = _on;
+            Check(_on);
             Button.IsEnabled = look.Enabled;
             _glyph.Data = Action.Id == QuickActionId.Camera && !on ? LucideIcons.CameraOff : Action.Icon;
             _chevron.Visibility = look.List ? Visibility.Visible : Visibility.Collapsed;
@@ -459,7 +475,7 @@ internal sealed partial class ActionsPage : UserControl
                 QuitList(state);
                 break;
             case QuickActionId.Eject:
-                Rows(state.Drives.Select(DriveRow), "No drives");
+                Rows(state.Drives.Select(d => DriveRow(d, Compact(state.Drives.Count))), "No drives");
                 break;
             case QuickActionId.Plan:
                 Rows(state.Plans.Select(PlanRow), "");
@@ -475,9 +491,20 @@ internal sealed partial class ActionsPage : UserControl
         }
     }
 
-    private void Rows(IEnumerable<FrameworkElement> rows, string empty, int columns = 1)
+    /// <summary>
+    /// A list's columns: one per 8 rows, up to 4, so the page never scrolls and nothing is left out up to 32 rows. Past
+    /// that the rest aren't listed, and "Quit all" still closes them.
+    /// </summary>
+    internal static int ListColumns(int count) => Math.Clamp((count + ListRows - 1) / ListRows, 1, MaxListColumns);
+
+    /// <summary>Three or four columns are too narrow for a row's badge or detail; its tooltip carries them.</summary>
+    private static bool Compact(int count) => ListColumns(count) >= 3;
+
+    private void Rows(IEnumerable<FrameworkElement> rows, string empty)
     {
-        var list = rows.Take(ListRows * columns).ToList();
+        var all = rows.ToList();
+        int columns = ListColumns(all.Count);
+        var list = all.Take(ListRows * columns).ToList();
         if (list.Count == 0)
         {
             var none = Ui.Muted(empty);
@@ -498,7 +525,8 @@ internal sealed partial class ActionsPage : UserControl
 
     private void QuitList(QuickState state)
     {
-        Rows(state.Apps.Select(AppRow), "No apps open", state.Apps.Count > ListRows ? 2 : 1);
+        bool compact = Compact(state.Apps.Count);
+        Rows(state.Apps.Select(app => AppRow(app, compact)), "No apps open");
         if (_module.Quitting(keepFront: false).Count == 0)
             return;
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 0, 4) };
@@ -517,7 +545,7 @@ internal sealed partial class ActionsPage : UserControl
 
     private async void QuitAll(bool keepFront) => await Act(QuickActionId.Quit, () => _module.QuitAllAsync(keepFront), "Quit failed");
 
-    private Border AppRow(OpenApp app)
+    private Border AppRow(OpenApp app, bool compact)
     {
         UIElement mark = AppIcon.Load(app.Path) is { } icon
             ? new Image { Source = icon, Width = 16, Height = 16, VerticalAlignment = VerticalAlignment.Center }
@@ -525,22 +553,25 @@ internal sealed partial class ActionsPage : UserControl
         var quit = Ui.Icon(LucideIcons.Close, $"Quit {app.Name}");
         quit.Click += async (_, _) => await Act(QuickActionId.Quit, () => _module.QuitAsync(app), "Quit failed");
         var parts = new List<UIElement> { quit };
-        if (app.Front || _module.Settings.Keeps(app.Path))
-            parts.Add(Ui.Badge(app.Front ? "Front" : "Kept"));
-        return Row(mark, app.Name, parts);
+        string? badge = app.Front ? "Front" : _module.Settings.Keeps(app.Path) ? "Kept" : null;
+        if (badge is not null && !compact)
+            parts.Add(Ui.Badge(badge));
+        return Row(mark, app.Name, parts, badge is null ? app.Name : $"{app.Name} · {badge}");
     }
 
-    private Border DriveRow(RemovableDrive drive)
+    private Border DriveRow(RemovableDrive drive, bool compact)
     {
         var eject = Ui.Icon(LucideIcons.Eject, $"Eject {drive.Name}");
         eject.Click += async (_, _) => await Act(QuickActionId.Eject, () => _module.EjectAsync(drive), "Eject failed");
+        if (compact)
+            return Row(Ui.Glyph(LucideIcons.HardDrive), drive.Name, [eject], $"{drive.Name} · {Size(drive.Size)}");
         var size = Ui.Muted(Size(drive.Size), 11);
         size.Margin = new Thickness(8, 0, 4, 0);
         return Row(Ui.Glyph(LucideIcons.HardDrive), drive.Name, [eject, size]);
     }
 
     /// <summary>A list row that isn't a button itself (its buttons are at its end): 30 tall, a hover wash, 4 corners.</summary>
-    private static Border Row(UIElement lead, string name, IReadOnlyList<UIElement> end)
+    private static Border Row(UIElement lead, string name, IReadOnlyList<UIElement> end, string? tip = null)
     {
         var dock = new DockPanel { LastChildFill = true };
         foreach (var part in end)
@@ -552,7 +583,7 @@ internal sealed partial class ActionsPage : UserControl
         dock.Children.Add(lead);
         var label = Ui.Text(name, 12);
         label.Margin = new Thickness(8, 0, 0, 0);
-        label.ToolTip = name;
+        label.ToolTip = tip ?? name;
         dock.Children.Add(label);
         var row = new Border { Height = 30, Padding = new Thickness(10, 0, 3, 0), CornerRadius = new CornerRadius(4), Background = Brushes.Transparent, Child = dock };
         row.MouseEnter += (_, _) => row.SetResourceReference(Border.BackgroundProperty, "IslandHoverBrush");
