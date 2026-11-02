@@ -44,6 +44,9 @@ public sealed class FeatureEntry
 
     internal IFeatureModule? Module { get; }
 
+    /// <summary>The feature's own state for Add features ("No trigger"), or null for its description.</summary>
+    public string? Status => Module?.Status;
+
     /// <summary>What to ask before uninstalling, or null to uninstall at once (<see cref="IFeatureModule.UninstallQuestion"/>).</summary>
     public string? UninstallQuestion() => Module?.UninstallQuestion();
 

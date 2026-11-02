@@ -66,17 +66,22 @@ internal sealed class StartMenu : IDisposable
     });
 
     /// <summary>The app's icon, <paramref name="pixels"/> square; kept once read.</summary>
-    public Task<ImageSource?> IconAsync(StartApp app, int pixels)
+    public Task<ImageSource?> IconAsync(StartApp app, int pixels) => IconOfAsync(@"shell:AppsFolder\" + app.ParsingName, pixels);
+
+    /// <summary>A file's, a folder's or a program's icon (the Radial menu's slices), <paramref name="pixels"/> square; kept once read.</summary>
+    public Task<ImageSource?> PathIconAsync(string path, int pixels) => IconOfAsync(path, pixels);
+
+    private Task<ImageSource?> IconOfAsync(string parsing, int pixels)
     {
-        var key = (app.ParsingName, pixels);
+        var key = (parsing, pixels);
         if (_icons.TryGetValue(key, out var known))
             return Task.FromResult(known);
-        return Run(() => _icons.GetOrAdd(key, _ => Icon(app.ParsingName, pixels)));
+        return Run(() => _icons.GetOrAdd(key, _ => Icon(parsing, pixels)));
     }
 
     private static unsafe ImageSource? Icon(string parsing, int pixels)
     {
-        var item = Item(@"shell:AppsFolder\" + parsing);
+        var item = Item(parsing);
         try
         {
             if (((IShellItemImageFactory)item).GetImage(new Size32(pixels, pixels), IconOnly, out IntPtr bitmap) != 0 || bitmap == IntPtr.Zero)

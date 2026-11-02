@@ -32,7 +32,7 @@ A Windows 11 tray app for the owner's own PC (C#, .NET 10, WPF): a widget on the
 - **AI agent usage in a dev profile** starts the owner's real `claude` and `codex` for its checks (about 1.5 s each, every 5 minutes, every minute while its page shows) and reads his sessions' files. Install it only for a run that needs it, and end the run once it's done. Its tests use fixtures; `CHIPPI_AGENTS_TIMINGS` and `CHIPPI_AGENTS_SCAN_TIMINGS` name reports for the page's open and the 5-second scan.
 - **Snapshots without showing anything:** a Debug build run with `--debug` saves PNGs to a folder with `--island-pages <dir>`, `--island-shots <dir>`, `--settings-snapshot <dir>` or `--flyout-snapshot <dir>` (the tray menu).
   `--island-pages` and `--island-shots` show the widget and the panel on screen; both shoot dark, then light. A click elsewhere closes the panel mid-run, and the widget hides while a fullscreen app is in front on its display, so check the shots. `--island-shots` also drops the widget in each corner and past every edge and checks where it lands (`r6-drop-check.txt`).
-- **Shots in tests:** the offscreen page shots run when `CHIPPI_ISLAND_SHOTS` names an output folder. They render dark; `CHIPPI_SHOTS_THEME=light` renders them light. The island follows the app theme.
+- **Shots in tests:** the offscreen page shots run when `CHIPPI_ISLAND_SHOTS` names an output folder. They render dark; `CHIPPI_SHOTS_THEME=light` renders them light. The island follows the app theme. The Radial menu's shots (`RadialMenuShots`) use the same variables, and `CHIPPI_RADIAL_TIMINGS` names a report of its opening and pointing times.
 - **The pet's sheets:** `--pet-sheet <dir>` and `--pet-motion <dir>` render offscreen. Seed `"islandEnabled": false` in the dev profile and nothing shows at all. `CHIPPI_PET_SHOTS=<dir>` renders the sheet from the tests.
 - **Measuring the widget's CPU while a fullscreen app holds the main display:** it hides there, so seed the dev profile's widget onto another monitor (`"islandDisplay": "specificMonitor"`, `"islandMonitorId"` the monitor's `\\?\DISPLAY#…` path), and read the process's CPU time over 45 to 60s, three times: single readings swing by half. The owner's own puck may sit in the same corner; end the run as soon as it's read.
 
@@ -49,7 +49,7 @@ A Windows 11 tray app for the owner's own PC (C#, .NET 10, WPF): a widget on the
 ## The owner's PC
 
 - **Real input:** never click or type on the desktop while a fullscreen app or Zoom is in front; `build/fullscreen-check.ps1` exits 1 then. Never send keys blind: confirm what's in front first.
-- **Clipboard:** never read, write or log the owner's real clipboard. Clipboard and input checks run only in Windows Sandbox (a `.wsb` with clipboard redirection and networking off).
+- **Clipboard:** never read, write or log the owner's real clipboard. Clipboard and input checks run only in Windows Sandbox (a `.wsb` with clipboard redirection and networking off). A probe there drives the real hooks with `SendInput`: the Radial menu's hooks pass on only input Chippi sends itself (marked in its extra info), so a probe's input counts as a hand's.
 - **Ask first** before installing anything or changing the audio setup.
 - **No sound** without warning.
 - **No CPU stress tests:** one froze the PC.

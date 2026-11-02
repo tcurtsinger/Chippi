@@ -61,13 +61,8 @@ public static class FeatureCatalog
             Presets = PowerUser,
         },
 
-        // Phase 5.5 and 6: Windows and input (the Command bar is a real module: Chippi.Features.CommandBar)
-        new("radial-menu", "Radial menu", "Hold a mouse button for a ring of actions under the pointer", FeatureGroup.Windows)
-        {
-            Icon = "Zap",
-            Requires = [Capability.InputHooks],
-            Presets = PowerUser,
-        },
+        // Phase 5.5 and 6: Windows and input (the Command bar and the Radial menu are real modules: Chippi.Features.CommandBar
+        // and Chippi.Features.RadialMenu)
         new("window-layouts", "Window layouts", "Snap windows into saved layouts with a shortcut or a drag", FeatureGroup.Windows)
         {
             Icon = "LayoutGrid",

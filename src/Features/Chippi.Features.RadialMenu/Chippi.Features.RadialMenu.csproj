@@ -1,0 +1,26 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- The Radial menu (Phase 5.5): hold a mouse button, flick, let go, and what you use most runs where the pointer is. It
+     references Sound for the shortcut type, as Cleaning mode does, and the Command bar for the Start menu's apps, their
+     icons, Windows Settings' pages and the web search. -->
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>Chippi.Features.RadialMenu</RootNamespace>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Chippi.Core\Chippi.Core.csproj" />
+    <ProjectReference Include="..\..\Chippi.UI\Chippi.UI.csproj" />
+    <ProjectReference Include="..\Chippi.Features.Sound\Chippi.Features.Sound.csproj" />
+    <ProjectReference Include="..\Chippi.Features.CommandBar\Chippi.Features.CommandBar.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Chippi.Features.RadialMenu.Tests" />
+    <InternalsVisibleTo Include="Chippi.Island.Tests" />
+  </ItemGroup>
+
+</Project>

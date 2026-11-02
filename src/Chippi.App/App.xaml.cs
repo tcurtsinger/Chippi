@@ -198,7 +198,10 @@ public partial class App : Application
         var cleaning = new Chippi.Features.CleaningMode.CleaningModeModule();
         shell.Registry.Register(cleaning);
         shell.Registry.Register(new Chippi.Features.QuickActions.QuickActionsModule(() => cleaning.Installed ? cleaning.Start : null));
-        shell.Registry.Register(new Chippi.Features.CommandBar.CommandBarModule());
+        var commandBar = new Chippi.Features.CommandBar.CommandBarModule();
+        shell.Registry.Register(commandBar);
+        // [Phase 5.5] The Radial menu: closed during Cleaning mode, wide awake with Keep awake, searching where the Command bar does.
+        shell.Registry.Register(new Chippi.Features.RadialMenu.RadialMenuModule(() => cleaning.IsOn, () => keepAwake.IsOn, () => commandBar.Settings.WebSearch));
         // [Phase 5.5] AI agent usage: replaces its catalog placeholder.
         shell.Registry.Register(new Chippi.Features.AgentUsage.AgentUsageModule());
 

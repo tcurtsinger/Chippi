@@ -50,6 +50,13 @@ public interface IClipboardHub
     /// </summary>
     Task<PasteOutcome> PastePlainTextAsync(CancellationToken cancel = default);
 
+    /// <summary>
+    /// The text selected in the window in front (the Radial menu's Selected text): sends Ctrl+C, reads the copy that
+    /// arrives, then puts the previous copy back unless something newer was copied. No listener receives that copy, so
+    /// Clipboard history never keeps it. Null when nothing came (no selection, an elevated window) or it wasn't text.
+    /// </summary>
+    Task<string?> CopySelectionAsync(CancellationToken cancel = default) => Task.FromResult<string?>(null);
+
     /// <summary>Plays the Windows default beep (plain paste's failure sound, notes #19).</summary>
     void Beep();
 }

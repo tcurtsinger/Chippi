@@ -9,6 +9,17 @@ namespace Chippi.Features.CommandBar;
 /// <summary>Where the web row searches. Windows can't tell an app which engine the browser uses, so Chippi asks.</summary>
 public enum WebEngine { Google, Bing, DuckDuckGo }
 
+public static class WebEngines
+{
+    /// <summary>The engine's results for <paramref name="text"/> (the web row, and the Radial menu's Selected text).</summary>
+    public static string SearchUrl(this WebEngine engine, string text) => engine switch
+    {
+        WebEngine.Bing => "https://www.bing.com/search?q=",
+        WebEngine.DuckDuckGo => "https://duckduckgo.com/?q=",
+        _ => "https://www.google.com/search?q=",
+    } + Uri.EscapeDataString(text);
+}
+
 /// <summary>A hidden result: its key, and its name and what it is, as Settings › Command bar › Hidden lists it.</summary>
 public sealed record HiddenResult(string Key, string Name, string Kind);
 

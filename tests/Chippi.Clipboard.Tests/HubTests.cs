@@ -473,6 +473,88 @@ public sealed class HubTests : IDisposable
         Assert.Null(read.Content);
     }
 
+    // ---- The selection (the Radial menu's Selected text) ----
+
+    [Fact]
+    public async Task A_selection_is_read_and_the_previous_copy_put_back_without_anyone_hearing_it()
+    {
+        using var lease = Listen();
+        CopyRich("before");
+        await SettleAsync();
+        _copies.Clear();
+        _foreground.OnCopy = () => _clipboard.CopyText("Ashen Gate", @"C:\Apps\Browser.exe");
+        Assert.Equal("Ashen Gate", await _hub.CopySelectionAsync());
+        Assert.Equal(1, _foreground.Copies);
+        Assert.Equal("before", _clipboard.Text);
+        Assert.Equal([1, 2, 3], _clipboard.Snapshot()[ClipFormat.Html]);
+        await SettleAsync();
+        Assert.Empty(_copies); // Clipboard history never keeps the selection's copy
+    }
+
+    [Fact]
+    public async Task With_nothing_selected_no_copy_comes_and_the_clipboard_stays()
+    {
+        CopyRich("before");
+        var copy = _hub.CopySelectionAsync();
+        for (int i = 0; i < 200 && !copy.IsCompleted; i++)
+        {
+            _time.Advance(TimeSpan.FromMilliseconds(15));
+            await Task.Delay(1);
+        }
+        Assert.Null(await copy);
+        Assert.Equal(1, _foreground.Copies);
+        Assert.Equal("before", _clipboard.Text);
+    }
+
+    [Fact]
+    public async Task A_selection_that_cant_be_read_or_put_back_is_still_never_heard()
+    {
+        using var lease = Listen();
+        CopyRich("before");
+        await SettleAsync();
+        _copies.Clear();
+        // Another app holds the clipboard from the moment the selection lands until after the hub gives up.
+        _foreground.OnCopy = () =>
+        {
+            _clipboard.CopyText("Ashen Gate", @"C:\Apps\Browser.exe");
+            _clipboard.BusyOpens = int.MaxValue;
+        };
+        Assert.Null(await _hub.CopySelectionAsync());
+        _clipboard.BusyOpens = 0;
+        Assert.Equal("Ashen Gate", _clipboard.Text); // it couldn't be put back
+        await SettleAsync();
+        Assert.Empty(_copies); // but history never keeps it
+    }
+
+    [Fact]
+    public async Task A_selection_whose_restore_fails_is_never_heard()
+    {
+        using var lease = Listen();
+        CopyRich("before");
+        await SettleAsync();
+        _copies.Clear();
+        _foreground.OnCopy = () => _clipboard.CopyText("Ashen Gate", @"C:\Apps\Browser.exe");
+        // The read gets the clipboard; the restore after it finds it held.
+        _clipboard.AfterClose = () =>
+        {
+            if (_clipboard.Text == "Ashen Gate")
+                _clipboard.BusyOpens = int.MaxValue;
+        };
+        Assert.Equal("Ashen Gate", await _hub.CopySelectionAsync());
+        _clipboard.AfterClose = null;
+        _clipboard.BusyOpens = 0;
+        await SettleAsync();
+        Assert.Empty(_copies);
+    }
+
+    [Fact]
+    public async Task An_elevated_window_gets_no_Ctrl_C()
+    {
+        _foreground.CanSend = false;
+        Assert.Null(await _hub.CopySelectionAsync());
+        Assert.Equal(0, _foreground.Copies);
+    }
+
     private static ClipImage Picture(int width, int height) =>
         new(width, height, [.. Enumerable.Range(0, width * height).SelectMany(i => new byte[] { (byte)i, 20, 30, 255 })]);
 }

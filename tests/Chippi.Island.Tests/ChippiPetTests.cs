@@ -497,6 +497,50 @@ public sealed class ChippiPetMotionTests
     }
 
     [Fact]
+    public void He_looks_toward_a_point_and_grins_for_a_moment()
+    {
+        var motion = Motion.Override;
+        WpfTestThread.Run(() =>
+        {
+            var idle = new ChippiPet { Size = 48, Mood = PetMood.Idle };
+            var awake = new ChippiPet { Size = 48, Mood = PetMood.WideAwake };
+            var window = Offscreen(new StackPanel { Children = { idle, awake } });
+            try
+            {
+                Motion.Override = true; // the look turns at once
+                window.Show();
+                IslandWindowTests.Pump(TimeSpan.Zero);
+                // Idle's pupils rest 2 right and 2 down of the whites' middle: looking right, they sit 3.5 right of it.
+                idle.Look(new Vector(1, 0));
+                Assert.Equal((1.5, -2.0), (idle.Pupils!.X, idle.Pupils.Y));
+                idle.Look(new Vector(0, -1));
+                Assert.Equal((-2.0, -5.5), (idle.Pupils.X, idle.Pupils.Y));
+                idle.Look(null);
+                Assert.Equal((0.0, 0.0), (idle.Pupils.X, idle.Pupils.Y));
+                // Wide awake's rest 1 low.
+                awake.Look(new Vector(0, 1));
+                Assert.Equal((0.0, 2.5), (awake.Pupils!.X, awake.Pupils.Y));
+
+                Motion.Override = false;
+                idle.Look(new Vector(-1, 0));
+                Assert.True(idle.Pupils.HasAnimatedProperties); // 120ms ease-out
+                idle.Grin(TimeSpan.FromMilliseconds(150));
+                IslandWindowTests.Pump(TimeSpan.FromMilliseconds(30));
+                Assert.Equal(1, idle.GrinFace.Opacity);
+                Assert.Equal(1, idle.FacesShown);
+                IslandWindowTests.Pump(TimeSpan.FromMilliseconds(300));
+                Assert.Equal(0, idle.GrinFace.Opacity);
+                Assert.Equal(1, idle.ShownFace.Opacity); // his own face again
+            }
+            finally
+            {
+                window.Close();
+                Motion.Override = motion;
+            }
+        });
+    }
+
+    [Fact]
     public void Reduce_motion_coming_on_mid_glance_mid_beat_or_mid_yawn_snaps_him_to_rest()
     {
         var motion = Motion.Override;

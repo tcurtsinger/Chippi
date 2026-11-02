@@ -47,5 +47,16 @@ public sealed class FakeForeground : IForeground
         OnPaste?.Invoke();
     }
 
+    public int Copies { get; private set; }
+
+    /// <summary>Called when Ctrl+C is sent: a test puts the selection on the fake clipboard here.</summary>
+    public Action? OnCopy { get; set; }
+
+    public void SendCopy()
+    {
+        Copies++;
+        OnCopy?.Invoke();
+    }
+
     public void Beep() => Beeps++;
 }

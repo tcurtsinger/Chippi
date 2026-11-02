@@ -25,6 +25,9 @@ public sealed class CommandBarModule : IFeatureModule
     /// <summary>The island tile's key: the home's Search, the tenth button.</summary>
     public const string TileKey = "command-bar";
 
+    /// <summary>Its own command, for the Radial menu's Chippi slices; the Command bar leaves it out of its rows.</summary>
+    public const string OpenCommand = "command-bar/open";
+
     private readonly Func<IPc> _createPc;
     private readonly Func<IMicHotkey> _createHotkey;
     private IMicHotkey? _hotkey;
@@ -70,7 +73,13 @@ public sealed class CommandBarModule : IFeatureModule
         if (Settings.Shortcut is { IsValid: false })
             Settings = Settings with { Shortcut = CommandBarSettings.DefaultShortcut };
         _pc = _createPc();
-        Search = new CommandSearch(_pc, context.Commands, context.SearchCommands, () => Settings, new Uses(Path.Combine(context.DataDirectory, "uses.json")), CopyAsync);
+        Search = new CommandSearch(_pc, () => [.. context.Commands().Where(c => c.Key != OpenCommand)], context.SearchCommands, () => Settings,
+            new Uses(Path.Combine(context.DataDirectory, "uses.json")), CopyAsync);
+        context.Ui.AddCommands(() => [new ChippiCommand(OpenCommand, Descriptor.Name, nameof(LucideIcons.Search), () =>
+        {
+            Summon();
+            return Task.CompletedTask;
+        }) { Words = "search launcher run type" }]);
         // No status: Search is a door to its page, which takes the keyboard as it opens.
         context.Ui.AddIslandTile(new IslandTileSpec(TileKey, "Search", nameof(LucideIcons.Search), Order: 110, SectionOrder: 0, () => Page())
         {
