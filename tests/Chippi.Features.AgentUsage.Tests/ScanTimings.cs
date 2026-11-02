@@ -11,6 +11,37 @@ namespace Chippi.Features.AgentUsage.Tests;
 /// </summary>
 public sealed class ScanTimings
 {
+    /// <summary>
+    /// The app a running process's session would switch to, found the real way and never brought forward: for each pid in
+    /// CHIPPI_AGENTS_APP_OF (comma-separated), its app's name and window title, to the report CHIPPI_AGENTS_APP_REPORT names.
+    /// </summary>
+    [Fact]
+    public void Find_the_app_a_process_runs_in()
+    {
+        if (Environment.GetEnvironmentVariable("CHIPPI_AGENTS_APP_OF") is not { Length: > 0 } pids
+            || Environment.GetEnvironmentVariable("CHIPPI_AGENTS_APP_REPORT") is not { Length: > 0 } report)
+            return;
+        var processes = new Sessions.WindowsProcesses();
+        var lines = new List<string>();
+        foreach (int pid in pids.Split(',').Select(int.Parse))
+        {
+            var watch = Stopwatch.StartNew();
+            var app = processes.AppOf(pid);
+            lines.Add($"{pid}: running {processes.IsRunning(pid, null)}, app {app?.App ?? "none"}, window {(app is null ? "-" : Title(app.Window))}, {watch.Elapsed.TotalMilliseconds:0.0} ms");
+        }
+        File.WriteAllLines(report, lines);
+    }
+
+    private static string Title(nint window)
+    {
+        var text = new System.Text.StringBuilder(256);
+        _ = GetWindowTextW(window, text, text.Capacity);
+        return $"\"{text}\"";
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+    private static extern int GetWindowTextW(nint window, System.Text.StringBuilder text, int max);
+
     [Fact]
     public void Measure()
     {

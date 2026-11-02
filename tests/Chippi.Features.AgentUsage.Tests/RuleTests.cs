@@ -218,6 +218,14 @@ public sealed class AgentTextTests
     }
 
     [Fact]
+    public void A_reset_written_to_the_second_reads_as_its_minute()
+    {
+        var almost = Local(5, 7, 59).AddSeconds(59.6);
+        Assert.Equal($"Resets {Local(5, 8, 0):ddd} {Local(5, 8, 0):t}", AgentText.Resets(new UsageWindow("Weekly", 65, almost), Today));
+        Assert.Equal($"Resets {Local(5, 8, 14):ddd} {Local(5, 8, 14):t}", AgentText.Resets(new UsageWindow("Weekly", 9, Local(5, 8, 14).AddSeconds(20)), Today));
+    }
+
+    [Fact]
     public void A_window_past_its_reset_reads_Reset_not_0()
     {
         var window = new UsageWindow("5-hour", 86, Local(1, 16, 0));

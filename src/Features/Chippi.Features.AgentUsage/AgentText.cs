@@ -21,15 +21,15 @@ public static class AgentText
 
     /// <summary>The island's reset line: "Resets 6:10 PM" today, "Resets Thu 9:00 AM" in the week ahead, "Resets Nov 12" later; empty when the source doesn't say or it has reset.</summary>
     public static string Resets(UsageWindow window, DateTimeOffset now) =>
-        window.ResetsAt is not { } at || window.HasReset(now) ? "" : "Resets " + When(at, now, comma: false);
+        window.ResetsAt is not { } at || window.HasReset(now) ? "" : "Resets " + When(Nearest(at), now, comma: false);
 
     /// <summary>Settings' reset line: "Resets today, 6:10 PM", "Resets Thu, 9:00 AM".</summary>
     public static string ResetsLong(UsageWindow window, DateTimeOffset now)
     {
         if (window.ResetsAt is not { } at || window.HasReset(now))
             return "";
-        var local = at.ToLocalTime();
-        return local.Date == now.ToLocalTime().Date ? $"Resets today, {Time(local)}" : "Resets " + When(at, now, comma: true);
+        var local = Nearest(at).ToLocalTime();
+        return local.Date == now.ToLocalTime().Date ? $"Resets today, {Time(local)}" : "Resets " + When(Nearest(at), now, comma: true);
     }
 
     /// <summary>A row's tooltip: "5-hour limit: resets today at 6:10 PM · 42% used".</summary>
@@ -38,7 +38,7 @@ public static class AgentText
         string used = window.HasReset(now) ? "reset" : $"{window.Percent}% used";
         if (window.ResetsAt is not { } at || window.HasReset(now))
             return $"{window.Label} limit · {used}";
-        var local = at.ToLocalTime();
+        var local = Nearest(at).ToLocalTime();
         var today = now.ToLocalTime().Date;
         string day = local.Date == today ? "today" : local.Date == today.AddDays(1) ? "tomorrow"
             : (local.Date - today).TotalDays < 7 ? local.ToString("dddd", CultureInfo.CurrentCulture)
@@ -87,4 +87,8 @@ public static class AgentText
     }
 
     private static string Time(DateTimeOffset local) => local.ToString("t", CultureInfo.CurrentCulture);
+
+    // A reset at 7:59:59 is the 8:00 one: the agents write theirs to the second.
+    private static DateTimeOffset Nearest(DateTimeOffset at) =>
+        new(at.Ticks - at.Ticks % TimeSpan.TicksPerMinute + (at.Ticks % TimeSpan.TicksPerMinute >= TimeSpan.TicksPerMinute / 2 ? TimeSpan.TicksPerMinute : 0), at.Offset);
 }
