@@ -161,7 +161,8 @@ internal sealed class AddFeaturesPage : UserControl
         {
             toggle.IsChecked = entry.IsInstalled;
             toggle.Content = entry.IsInstalled ? "On" : "Off";
-            row.Description = entry.LastError is { } error ? FailureReason(error) is { } reason ? "Start failed \u00b7 " + reason : "Start failed" : entry.Descriptor.Description;
+            row.Description = entry.LastError is { } error ? FailureReason(error) is { } reason ? "Start failed \u00b7 " + reason : "Start failed"
+                : entry.IsRunning && entry.Status is { } status ? status : entry.Descriptor.Description;
             ShowRequirement(entry, row, toggle, action);
             row.ApplyTemplate();
             if (row.Template?.FindName("Caption", row) is TextBlock caption)

@@ -73,12 +73,16 @@ public sealed class WindowsForeground : IForeground
         static bool Held(int vk) => (GetAsyncKeyState(vk) & 0x8000) != 0;
     }
 
-    public unsafe void SendPaste()
+    public void SendPaste() => SendCtrl(0x56);
+
+    public void SendCopy() => SendCtrl(0x43);
+
+    private static unsafe void SendCtrl(ushort key)
     {
         var inputs = stackalloc Input[4];
         inputs[0] = Key(0x11, up: false);
-        inputs[1] = Key(0x56, up: false);
-        inputs[2] = Key(0x56, up: true);
+        inputs[1] = Key(key, up: false);
+        inputs[2] = Key(key, up: true);
         inputs[3] = Key(0x11, up: true);
         SendInput(4, inputs, sizeof(Input));
     }

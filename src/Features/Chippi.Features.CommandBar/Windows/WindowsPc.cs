@@ -17,7 +17,7 @@ using Windows.Win32.UI.WindowsAndMessaging;
 namespace Chippi.Features.CommandBar.Windows;
 
 /// <summary>The real PC: the Start menu, Alt+Tab's windows, Windows Search, and Explorer's way of opening things.</summary>
-internal sealed class WindowsPc : IPc
+public sealed class WindowsPc : IPc
 {
     private const string SearchConnection = "Provider=Search.CollatorDSO;Extended Properties=\"Application=Windows\"";
 
@@ -48,6 +48,9 @@ internal sealed class WindowsPc : IPc
     }
 
     public Task<ImageSource?> AppIconAsync(StartApp app, int pixels) => _startMenu.IconAsync(app, pixels);
+
+    /// <summary>A file's, a folder's or a program's icon, <paramref name="pixels"/> square, or null; read off the UI thread and kept.</summary>
+    public Task<ImageSource?> PathIconAsync(string path, int pixels) => _startMenu.PathIconAsync(path, pixels);
 
     public unsafe IReadOnlyList<OpenWindow> Windows()
     {

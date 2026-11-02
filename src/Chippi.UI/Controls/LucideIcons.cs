@@ -127,6 +127,26 @@ public static class LucideIcons
     public static Geometry EyeOff { get; } = G("M10.73,5.08 A10.74,10.74 0 0 1 21.94,11.65 a1,1 0 0 1 0,0.7 a10.75,10.75 0 0 1 -1.44,2.49 M14.08,14.16 a3,3 0 0 1 -4.24,-4.24 M17.48,17.5 A10.75,10.75 0 0 1 2.06,12.35 a1,1 0 0 1 0,-0.7 A10.75,10.75 0 0 1 6.51,6.51 M2,2 L22,22");
     public static Geometry Equal { get; } = G("M5,9 H19 M5,15 H19");
 
+    // Radial menu (Phase 5.5): the media, window and text slices, the submenus' Back, and a few to pick from.
+    public static Geometry PlayPause { get; } = G("M3,5 l9,7 l-9,7 V5 Z M16,5 v14 M21,5 v14");
+    public static Geometry VolumeUp { get; } = G("M11,5 L6,9 H2 V15 H6 L11,19 Z M15.54,8.46 a5,5 0 0 1 0,7.07 M19.07,4.93 a10,10 0 0 1 0,14.14");
+    public static Geometry VolumeDown { get; } = G("M11,5 L6,9 H2 V15 H6 L11,19 Z M15.54,8.46 a5,5 0 0 1 0,7.07");
+    public static Geometry SnapLeft { get; } = G("M4,4 h16 a1,1 0 0 1 1,1 v14 a1,1 0 0 1 -1,1 H4 a1,1 0 0 1 -1,-1 V5 a1,1 0 0 1 1,-1 Z M12,4 v16 M8.5,9.5 L6,12 l2.5,2.5");
+    public static Geometry SnapRight { get; } = G("M4,4 h16 a1,1 0 0 1 1,1 v14 a1,1 0 0 1 -1,1 H4 a1,1 0 0 1 -1,-1 V5 a1,1 0 0 1 1,-1 Z M12,4 v16 M15.5,9.5 L18,12 l-2.5,2.5");
+    public static Geometry Maximize { get; } = G("M8,3 H5 a2,2 0 0 0 -2,2 v3 M21,8 V5 a2,2 0 0 0 -2,-2 h-3 M3,16 v3 a2,2 0 0 0 2,2 h3 M16,21 h3 a2,2 0 0 0 2,-2 v-3");
+    public static Geometry OtherScreen { get; } = G("M4,4 h16 a2,2 0 0 1 2,2 v8 a2,2 0 0 1 -2,2 H4 a2,2 0 0 1 -2,-2 V6 a2,2 0 0 1 2,-2 Z M8,20 h8 M12,16 v4 M8,10 h7 M12.5,7.5 L15,10 l-2.5,2.5");
+    public static Geometry ArrowLeft { get; } = G("M12,19 l-7,-7 l7,-7 M19,12 H5");
+    public static Geometry Type { get; } = G("M4,7 V4 h16 v3 M9,20 h6 M12,4 v16");
+    public static Geometry Terminal { get; } = G("M4,17 l6,-6 l-6,-6 M12,19 h8");
+    public static Geometry Scissors { get; } = G("M6,3 a3,3 0 1 1 0,6 a3,3 0 0 1 0,-6 Z M6,15 a3,3 0 1 1 0,6 a3,3 0 0 1 0,-6 Z M20,4 L8.12,15.88 M14.47,14.48 L20,20 M8.12,8.12 L12,12");
+    public static Geometry Star { get; } = G("M12,2 l3.1,6.3 l6.9,1 l-5,4.9 l1.2,6.8 L12,17.8 L5.8,21 l1.2,-6.8 l-5,-4.9 l6.9,-1 Z");
+    public static Geometry Home { get; } = G("M3,10 L12,3 L21,10 V20 a1,1 0 0 1 -1,1 H15 V14 H9 V21 H4 a1,1 0 0 1 -1,-1 Z");
+    public static Geometry Mail { get; } = G("M4,4 H20 a2,2 0 0 1 2,2 V18 a2,2 0 0 1 -2,2 H4 a2,2 0 0 1 -2,-2 V6 a2,2 0 0 1 2,-2 Z M22,7 L12,13 L2,7");
+    public static Geometry Heart { get; } = G("M19,14 c1.49,-1.46 3,-3.21 3,-5.5 A5.5,5.5 0 0 0 16.5,3 c-1.76,0 -3,0.5 -4.5,2 c-1.5,-1.5 -2.74,-2 -4.5,-2 A5.5,5.5 0 0 0 2,8.5 c0,2.3 1.5,4.05 3,5.5 l7,7 Z");
+    public static Geometry Bookmark { get; } = G("M19,21 l-7,-4 l-7,4 V5 a2,2 0 0 1 2,-2 h10 a2,2 0 0 1 2,2 Z");
+    public static Geometry Code { get; } = G("M16,18 l6,-6 l-6,-6 M8,6 l-6,6 l6,6");
+    public static Geometry Gamepad { get; } = G("M6,12 h4 M8,10 v4 M15,13 h.01 M18,11 h.01 M17.32,5 H6.68 a4,4 0 0 0 -3.98,3.59 c-.01,.05 -.02,.1 -.02,.15 C2.6,9.42 2,14.46 2,16 a3,3 0 0 0 3,3 c1,0 1.5,-.5 2,-1 l1.41,-1.41 A2,2 0 0 1 9.83,16 h4.34 a2,2 0 0 1 1.41,.59 L17,18 c.5,.5 1,1 2,1 a3,3 0 0 0 3,-3 c0,-1.55 -.6,-6.58 -.68,-7.26 c-.01,-.05 -.02,-.1 -.02,-.15 A4,4 0 0 0 17.32,5 Z");
+
     private static readonly FrozenDictionary<string, Geometry> ByKey = typeof(LucideIcons)
         .GetProperties(BindingFlags.Public | BindingFlags.Static)
         .Where(p => p.PropertyType == typeof(Geometry))

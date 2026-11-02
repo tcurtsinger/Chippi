@@ -213,12 +213,7 @@ internal sealed class CommandSearch(
 
     private Result Web(string text, WebEngine engine)
     {
-        string url = engine switch
-        {
-            WebEngine.Bing => "https://www.bing.com/search?q=",
-            WebEngine.DuckDuckGo => "https://duckduckgo.com/?q=",
-            _ => "https://www.google.com/search?q=",
-        } + Uri.EscapeDataString(text);
+        string url = engine.SearchUrl(text);
         return new Result("web", ResultKind.Web, $"Search the web for “{text}”", engine switch
         {
             WebEngine.Bing => "Bing",

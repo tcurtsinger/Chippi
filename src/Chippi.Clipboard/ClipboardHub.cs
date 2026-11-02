@@ -26,6 +26,10 @@ public sealed class ClipboardHub : IClipboardHub, IDisposable
     public static readonly TimeSpan FrontTimeout = TimeSpan.FromMilliseconds(500);
     public static readonly TimeSpan ModifiersTimeout = TimeSpan.FromSeconds(1);
 
+    /// <summary>How long a copy of the selection may take to arrive after Ctrl+C, looked for this often.</summary>
+    public static readonly TimeSpan SelectionTimeout = TimeSpan.FromMilliseconds(500);
+    private static readonly TimeSpan SelectionPoll = TimeSpan.FromMilliseconds(15);
+
     private readonly IClipboardSystem _clipboard;
     private readonly IForeground _foreground;
     private readonly TimeProvider _time;
@@ -34,6 +38,7 @@ public sealed class ClipboardHub : IClipboardHub, IDisposable
     private readonly List<Lease> _leases = [];
     private readonly Queue<uint> _own = new();
     private int _writing; // own writes not yet in _own
+    private int _borrowing; // a selection's copy, read and put back, that no listener gets
     private readonly SemaphoreSlim _pasting = new(1, 1);
     private ITimer? _settle;
     private Task _processing = Task.CompletedTask;
@@ -111,6 +116,54 @@ public sealed class ClipboardHub : IClipboardHub, IDisposable
 
     public void Beep() => _foreground.Beep();
 
+    public async Task<string?> CopySelectionAsync(CancellationToken cancel = default)
+    {
+        await _pasting.WaitAsync(cancel).ConfigureAwait(false);
+        lock (_gate)
+            _borrowing++;
+        try
+        {
+            if (_foreground.Current() is not { } target || !_foreground.CanSendInput(target))
+                return null;
+            Saved saved;
+            uint before;
+            try { (saved, before) = await _clipboard.TransactAsync(session => (Save(session), session.Sequence), cancel).ConfigureAwait(false); }
+            catch (ClipboardBusyException) { return null; }
+            await _foreground.WaitForModifiersReleasedAsync(ModifiersTimeout, cancel).ConfigureAwait(false);
+            _foreground.SendCopy();
+            var until = _time.GetUtcNow() + SelectionTimeout;
+            while (_clipboard.Sequence == before)
+            {
+                if (_time.GetUtcNow() >= until)
+                    return null; // nothing was selected, or the app doesn't copy on Ctrl+C
+                await Task.Delay(SelectionPoll, _time, cancel).ConfigureAwait(false);
+            }
+            (string? Text, uint Sequence) copied;
+            try
+            {
+                copied = await _clipboard.TransactAsync(session =>
+                {
+                    string? text = null;
+                    if (session.IsAvailable(ClipFormat.UnicodeText) && session.SizeOf(ClipFormat.UnicodeText) <= ClipLimits.TextRawBytes)
+                        text = ClipCodec.DecodeText(session.Get(ClipFormat.UnicodeText) ?? [], out _);
+                    return (string.IsNullOrWhiteSpace(text) ? null : text, session.Sequence);
+                }, cancel).ConfigureAwait(false);
+            }
+            catch (ClipboardBusyException)
+            {
+                return null;
+            }
+            await RestoreAsync(saved, copied.Sequence, cancel).ConfigureAwait(false);
+            return copied.Text;
+        }
+        finally
+        {
+            lock (_gate)
+                _borrowing--;
+            _pasting.Release();
+        }
+    }
+
     public void Dispose()
     {
         lock (_gate)
@@ -146,8 +199,9 @@ public sealed class ClipboardHub : IClipboardHub, IDisposable
         {
             if (_disposed)
                 return;
-            // An own write between its close and being noted would read as someone else's copy: look again after.
-            if (_writing > 0)
+            // An own write between its close and being noted would read as someone else's copy: look again after. A
+            // selection's copy is put back before anyone hears of it.
+            if (_writing > 0 || _borrowing > 0)
             {
                 _settle?.Change(Settle, Timeout.InfiniteTimeSpan);
                 return;

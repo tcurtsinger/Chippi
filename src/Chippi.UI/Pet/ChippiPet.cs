@@ -81,6 +81,10 @@ public class ChippiPet : UserControl
     private static readonly TimeSpan GlanceEnd = TimeSpan.FromMilliseconds(1300);
     internal const double GlanceShift = 3.5;
 
+    /// <summary>A look toward a point (the Radial menu's pointed slice): the pupils turn this far from the whites' middle, over this long.</summary>
+    internal const double LookReach = 3.5;
+    private static readonly TimeSpan LookTurn = TimeSpan.FromMilliseconds(120);
+
     /// <summary>The yawn: eyes squeezed and the mouth opening wide while he stretches, then the face that follows.</summary>
     private static readonly TimeSpan YawnWide = TimeSpan.FromMilliseconds(450);
     private static readonly TimeSpan YawnStretch = TimeSpan.FromMilliseconds(500);
@@ -382,6 +386,9 @@ public class ChippiPet : UserControl
     internal ScaleTransform YawnMouth => _yawn.MouthScale;
 
     internal Canvas HeldFace => _held.Root;
+
+    /// <summary>The celebrating face, which a grin shows.</summary>
+    internal Canvas GrinFace => _celebrating.Root;
 
     /// <summary>How many faces show now: one, whatever overlaps (a boop, a yawn, being picked up mid-change).</summary>
     internal int FacesShown => Faces.Count(f => f.Root.Opacity > 0);
@@ -765,6 +772,51 @@ public class ChippiPet : UserControl
     }
 
     /// <summary>
+    /// He looks toward <paramref name="direction"/> (screen x and y, up to 1 long), or back ahead for null: the Radial
+    /// menu's hub turns his pupils toward the pointed slice. They turn over 120ms, at once under reduced motion, and stay
+    /// until the next look. Faces with open eyes only (idle, wide awake).
+    /// </summary>
+    public void Look(Vector? direction)
+    {
+        var face = FaceFor(_shown);
+        if (face.Pupils is not { } pupils)
+            return;
+        // From the pupils' rest (idle's sit 2 right and 2 down of the whites' middle) to the whites' middle plus the look.
+        var to = direction is { } d ? LookReach * d - face.Rest : new Vector();
+        if (Motion.IsReduced || !IsLoaded)
+        {
+            pupils.BeginAnimation(TranslateTransform.XProperty, null);
+            pupils.BeginAnimation(TranslateTransform.YProperty, null);
+            pupils.X = to.X;
+            pupils.Y = to.Y;
+            return;
+        }
+        var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+        pupils.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(to.X, new Duration(LookTurn)) { EasingFunction = ease });
+        pupils.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(to.Y, new Duration(LookTurn)) { EasingFunction = ease });
+    }
+
+    /// <summary>
+    /// The celebrating face at once in place of his own, with no hop, squish or sparks, for <paramref name="hold"/>, then
+    /// his face again: the Radial menu's hub as a slice runs and the wheel fades.
+    /// </summary>
+    public void Grin(TimeSpan hold)
+    {
+        if (IsSmall || IsHeld)
+            return;
+        var shown = FaceFor(_shown);
+        foreach (var face in Faces)
+        {
+            if (face == _celebrating)
+                face.Root.BeginAnimation(OpacityProperty, shown == _celebrating ? Then(1, TimeSpan.Zero) : Swap(1, 0, TimeSpan.Zero, hold));
+            else if (face == shown)
+                face.Root.BeginAnimation(OpacityProperty, Swap(0, 1, TimeSpan.Zero, hold));
+            else if (face.Root.Opacity > 0 || face.Root.HasAnimatedProperties)
+                face.Root.BeginAnimation(OpacityProperty, Then(0, TimeSpan.Zero));
+        }
+    }
+
+    /// <summary>
     /// A yawn and a stretch over whatever he shows, then that face again: the first unlock of the day. Falling asleep
     /// when Keep awake ends, he yawns on his own.
     /// </summary>
@@ -1126,6 +1178,8 @@ public class ChippiPet : UserControl
                 Pupils = new TranslateTransform();
                 // How far they can go each way and stay half a unit inside the whites they sit in.
                 var whites = ((Path)eyeLayer.Children[0]).Data.Bounds;
+                var ink = ((Path)pupils.First()).Data.Bounds;
+                Rest = new Point(ink.X + ink.Width / 2, ink.Y + ink.Height / 2) - new Point(whites.X + whites.Width / 2, whites.Y + whites.Height / 2);
                 foreach (var part in pupils)
                 {
                     part.RenderTransform = Pupils;
@@ -1164,6 +1218,9 @@ public class ChippiPet : UserControl
         public double GlanceLeft { get; } = GlanceShift;
 
         public double GlanceRight { get; } = GlanceShift;
+
+        /// <summary>Where the pupils rest from the whites' middle, for a look.</summary>
+        public Vector Rest { get; }
 
         /// <summary>Open eyes, a whole mouth and no lids: where a blink, falling asleep or waking left off.</summary>
         public void Reset()

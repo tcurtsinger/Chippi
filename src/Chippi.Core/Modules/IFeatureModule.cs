@@ -34,4 +34,10 @@ public interface IFeatureModule
     /// Uninstall; null uninstalls at once. Cancel leaves the module and its data alone.
     /// </summary>
     string? UninstallQuestion() => null;
+
+    /// <summary>
+    /// A short state Add features shows in place of the description while the feature runs (the Radial menu's "No
+    /// trigger"), or null for the description.
+    /// </summary>
+    string? Status => null;
 }

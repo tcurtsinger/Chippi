@@ -118,6 +118,9 @@ public interface IForeground
     /// <summary>Ctrl down, V down, V up, Ctrl up, in one SendInput call.</summary>
     void SendPaste();
 
+    /// <summary>Ctrl down, C down, C up, Ctrl up, in one SendInput call.</summary>
+    void SendCopy();
+
     /// <summary>The Windows default beep.</summary>
     void Beep();
 }

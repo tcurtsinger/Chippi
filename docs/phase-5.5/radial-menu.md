@@ -47,7 +47,7 @@ Travis picked the first five kinds in round 1 and the rest from Claude's list.
 | Media | Play/pause, Next, Previous, Mute, Volume up, Volume down | Each one's |
 | Window | On the window under the pointer when the wheel opened: Snap left, Snap right, Maximize, Minimize, Close, Keep on top, Move to other screen | Each one's |
 | Text | Types saved text at the cursor, without touching the clipboard | Text |
-| Command | Runs a PowerShell or cmd line, hidden | Terminal |
+| Command | Runs a PowerShell or cmd line, hidden: a Shell row picks which, PowerShell first (Travis, 2026-11-02) | Terminal |
 | Selected text | Searches the web for it (the Command bar's engine), opens it as a link, or copies it as plain text. It copies the selection, then puts the clipboard back; Clipboard history doesn't keep that copy | Search, Link, Paste |
 | Settings page | Opens a Windows Settings page (Bluetooth & devices, Display, Sound) | Settings |
 | Submenu | Opens a second wheel | One you pick |
@@ -60,7 +60,7 @@ Every slice has a name, shown in the hub, filled in from what it does and change
 - **Wheel** (Travis: edit the wheel itself): one card, the wheel drawn at its real size on the left and the selected slice's fields on the right.
   - It starts empty (Travis): the empty ring with a + at its top, "No slices" under Chippi, and "No slices" where the fields go.
   - Click a slice to select it; drag it onto another to swap them. A + in the next free place adds one, until there are 8.
-  - Fields: Kind, then what that kind needs (an app picker, Browse, the address, the keys recorded, the text, the command line, or a list of Chippi's, the media or the window actions, or the Settings pages), Name, Glyph with Change, and Remove.
+  - Fields: Kind, then what that kind needs (an app picker, Browse, the address, the keys recorded, the text, the shell and the command line, or a list of Chippi's, the media or the window actions, or the Settings pages), Name, Glyph with Change, and Remove.
   - A submenu slice has Open, which steps the editor into its wheel, with the path above it ("Wheel › Media") and Back.
 
 ## States
