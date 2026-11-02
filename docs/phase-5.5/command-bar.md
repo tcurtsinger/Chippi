@@ -35,7 +35,7 @@ Every kind is on by default and has its own switch in Settings › Command bar:
 | Emoji | Copy | By name |
 | Web search | Search | "Search the web for "…"", always the last row, in the default browser |
 
-Values and answers come first, then matches: what you pick most for the same letters ranks higher (stored only on your PC), then names that start with what you typed, then Chippi, apps, windows, Settings, files, clipboard and emoji.
+Values and answers come first, then matches: what you pick most for the same letters ranks higher (stored only on your PC), then names that start with what you typed, then Chippi, apps, windows and Settings. Files, clipboard copies and emoji come after all of those, even when their names start with what you typed (Travis's live check, 2026-11-02: seven `chrome…` files from a browser tool's caches hid Chrome and its windows).
 
 ## Hiding
 
