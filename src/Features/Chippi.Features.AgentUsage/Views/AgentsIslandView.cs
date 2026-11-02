@@ -154,11 +154,11 @@ public sealed class AgentsIslandView : UserControl
         return card;
     }
 
-    // Name 84, the bar, the share 34, the reset 104, 10 apart.
+    // Name 84, the bar, the share 34, the reset 104, 10 apart (the gaps are the bar's and the reset's margins).
     private static RowParts WindowRowFor()
     {
         var grid = new Grid { Height = 22, Margin = new Thickness(0, 2, 0, 0), Background = System.Windows.Media.Brushes.Transparent };
-        foreach (var width in new[] { new GridLength(84), new GridLength(1, GridUnitType.Star), new GridLength(34), new GridLength(104) })
+        foreach (var width in new[] { new GridLength(84), new GridLength(1, GridUnitType.Star), new GridLength(34), new GridLength(114) })
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = width });
         var label = Text("", 12, "IslandTextSecondaryBrush");
         var meter = new Meter { Margin = new Thickness(10, 0, 10, 0), VerticalAlignment = VerticalAlignment.Center };

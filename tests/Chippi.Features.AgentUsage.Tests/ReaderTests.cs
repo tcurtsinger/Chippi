@@ -75,6 +75,21 @@ public sealed class ClaudeLimitsTests
     }
 
     [Fact]
+    public void Spend_and_anything_else_that_isnt_a_limits_window_is_left_out()
+    {
+        using var doc = JsonDocument.Parse("""
+            {"subscription_type":"team","rate_limits_available":true,"rate_limits":{
+              "five_hour":{"utilization":0,"resets_at":null},
+              "seven_day":{"utilization":65,"resets_at":"2026-11-03T14:00:00Z"},
+              "spend":{"utilization":0}}}
+            """);
+        var reading = ClaudeLimits.Parse(doc.RootElement, "claude.ai", Now).Reading!;
+        Assert.Equal("Team", reading.Plan);
+        Assert.Equal(["5-hour", "Weekly"], reading.Windows.Select(w => w.Label));
+        Assert.Null(reading.Windows[0].ResetsAt);
+    }
+
+    [Fact]
     public async Task A_request_it_doesnt_know_is_too_old()
     {
         var claude = new ScriptedConversation(line =>

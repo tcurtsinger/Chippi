@@ -85,10 +85,10 @@ internal static class ClaudeLimits
     // A window's share and reset, under the names Claude's usage uses (utilization, resets_at) or the ones like it.
     private static (int, UsageWindow)? Window(string key, JsonElement value)
     {
-        if (value.ValueKind != JsonValueKind.Object || Number(value, "utilization", "used_percent", "usedPercent", "percent", "used") is not { } used)
+        if (value.ValueKind != JsonValueKind.Object || Number(value, "utilization", "used_percent", "usedPercent", "percent", "used") is not { } used
+            || Label(key, value) is not { } name)
             return null;
-        var (order, label) = Label(key, value);
-        return (order, new UsageWindow(label, used, Time(value, "resets_at", "resetsAt", "reset_at", "resetAt")));
+        return (name.Order, new UsageWindow(name.Label, used, Time(value, "resets_at", "resetsAt", "reset_at", "resetAt")));
     }
 
     private static string Name(JsonElement entry)
@@ -99,8 +99,9 @@ internal static class ClaudeLimits
         return "";
     }
 
-    // 5-hour, then weekly, then a weekly limit per model (Opus, Sonnet) when the plan has one (Travis).
-    private static (int Order, string Label) Label(string key, JsonElement value)
+    // 5-hour, then weekly, then a weekly limit per model (Opus, Sonnet) when the plan has one (Travis). Anything else (spend,
+    // extra usage) is left out: tokens and cost weren't chosen.
+    private static (int Order, string Label)? Label(string key, JsonElement value)
     {
         string k = key.Replace("-", "_", StringComparison.Ordinal).ToLowerInvariant();
         string model = k.Contains("opus", StringComparison.Ordinal) ? "Opus" : k.Contains("sonnet", StringComparison.Ordinal) ? "Sonnet" : "";
@@ -111,8 +112,7 @@ internal static class ClaudeLimits
             return model.Length == 0 ? (1, "Weekly") : (model == "Opus" ? 2 : 3, $"{model} weekly");
         if (Number(value, "window_minutes", "windowMinutes", "windowDurationMins") is { } minutes)
             return (4, AgentText.WindowName((int)minutes));
-        string words = CultureInfo.CurrentCulture.TextInfo.ToLower(key.Replace('_', ' '));
-        return (5, words.Length > 0 ? char.ToUpper(words[0], CultureInfo.CurrentCulture) + words[1..] : "Limit");
+        return null;
     }
 
     internal static double? Number(JsonElement value, params string[] names)

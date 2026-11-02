@@ -17,6 +17,8 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Chippi.Features.AgentUsage.Tests" />
+    <!-- The page's shots and timing run in the island's tests, which load the app's themes. -->
+    <InternalsVisibleTo Include="Chippi.Island.Tests" />
     <!-- WPF leaves System.IO out of the implicit usings; the readers are all files. -->
     <Using Include="System.IO" />
   </ItemGroup>

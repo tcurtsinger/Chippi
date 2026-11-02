@@ -104,6 +104,34 @@ public sealed class AgentBarTests
         finally { window.Close(); }
     });
 
+#if DEBUG
+    /// <summary>The mockup's four bars (agent-bar-&lt;theme&gt;-*.png), when CHIPPI_ISLAND_SHOTS names a folder; the widget shows on the primary display.</summary>
+    [Fact]
+    public void Render()
+    {
+        if (Environment.GetEnvironmentVariable("CHIPPI_ISLAND_SHOTS") is not { Length: > 0 } folder)
+            return;
+        System.IO.Directory.CreateDirectory(folder);
+        var backdrop = WpfTestThread.ShotsTheme == "Light" ? System.Windows.Media.Color.FromRgb(0xF3, 0xF3, 0xF3) : System.Windows.Media.Color.FromRgb(0x20, 0x20, 0x20);
+        string theme = WpfTestThread.ShotsTheme.ToLowerInvariant();
+        IslandActivity Alert(string title, bool near) => new("alert", IslandActivityKind.Status, title, "Claude Code · 5-hour")
+        {
+            IsFeedback = true, NeedsAttention = near, OpensTile = Key, ModuleId = Key,
+        };
+        WpfTestThread.Run(() => IslandWindowTests.WithShownIsland(window =>
+        {
+            window.SetTiles(AgentsTile(out _));
+            foreach (var (name, activity) in new[] { ("working", Session(false)), ("waiting", Session(true)), ("near", Alert("80% used", true)), ("reset", Alert("Reset", false)) })
+            {
+                window.SetActivities([activity], PetMood.Idle);
+                IslandPanelTests.Pump(TimeSpan.FromMilliseconds(500));
+                window.SaveScene(System.IO.Path.Combine(folder, $"agent-bar-{theme}-{name}.png"), backdrop);
+            }
+            window.SetActivities([], PetMood.Sleepy);
+        }));
+    }
+#endif
+
     [Fact]
     public void Plain_pastes_feedback_keeps_its_glyph_and_one_line() => WpfTestThread.Run(() =>
     {
