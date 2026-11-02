@@ -10,7 +10,7 @@ One shortcut, a few letters, Enter: open an app, a window, a file or a Windows S
 
 - **Ctrl+Alt+Space** (Travis's pick; changeable in Settings › Shortcuts), or the home's **Search** button, the tenth in the 5 × 2 grid ([quick-actions.md](quick-actions.md), Surfaces). Search has no status line.
 - The panel grows out of the widget onto the Command bar page as it does for any page, and takes the keyboard at once (the island otherwise never does until it's clicked).
-- With a fullscreen app or game in front it opens anyway, over it, on the widget's screen (Travis).
+- With a fullscreen app or game in front it opens anyway, over it, on the widget's screen (Travis). It takes the keyboard, so an app that leaves fullscreen when it loses the keyboard leaves it then, as it would for Alt+Tab: a fullscreen YouTube video in Chrome does (Travis's live check, 2026-11-02; he accepted it over a bar that never takes the keyboard).
 
 ## The page
 
