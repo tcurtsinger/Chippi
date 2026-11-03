@@ -372,10 +372,12 @@ public partial class IslandPanelWindow : Window
     /// from <paramref name="puck"/>; physical pixels) into the panel on the puck's outer corner, or moves
     /// there when already open.
     /// </summary>
-    internal void Open(Rect puck, Rect widget, MonitorArea area, SolidColorBrush? sourceRim = null)
+    internal void Open(Rect puck, Rect widget, MonitorArea area, SolidColorBrush? sourceRim = null,
+        double tabExtension = 0, bool opensLeft = false)
     {
         _puck = puck;
         _widget = widget;
+        SetWidgetTab(tabExtension, opensLeft);
         _area = area;
         if (IsOpen)
         {
@@ -406,7 +408,7 @@ public partial class IslandPanelWindow : Window
     /// Folds back into the widget, then hides; <paramref name="immediate"/> hides at once. <paramref name="widget"/>
     /// is the widget as it is now (a song may have started or stopped while the panel was open).
     /// </summary>
-    public void CloseIsland(bool immediate = false, Rect? widget = null)
+    public void CloseIsland(bool immediate = false, Rect? widget = null, double tabExtension = 0, bool opensLeft = false)
     {
         if (!IsOpen)
             return;
@@ -415,6 +417,7 @@ public partial class IslandPanelWindow : Window
         {
             _widget = now;
             _widgetLocal = Local(now);
+            SetWidgetTab(tabExtension, opensLeft);
         }
         _keyboard = false;
         PasteTarget = null;
@@ -423,6 +426,12 @@ public partial class IslandPanelWindow : Window
             Collapse();
         else
             Begin(Morph.Close);
+    }
+
+    private void SetWidgetTab(double extension, bool opensLeft)
+    {
+        ShapeFill.SetTab(extension, opensLeft);
+        ShapeShadow.SetTab(extension, opensLeft);
     }
 
     /// <summary>Whether <paramref name="physical"/> is on the open island's shape.</summary>

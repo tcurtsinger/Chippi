@@ -1,13 +1,14 @@
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
 <!-- The widget (DESIGN.md §5): one shape, the 50px puck with Chippi, or the 256 × 50 bar it stretches into toward the
-     screen's middle while there is something to show (the song, or the highest activity), its puck end fixed. Two
-     sizes only, whatever it shows. A borderless, transparent, topmost tool window that never activates, with room
+     screen's middle while there is something to show (the song, or the highest activity), its puck end fixed.
+     Status icons can extend a short side tab from the puck. A borderless, transparent, topmost tool window that never activates, with room
      around the puck for its lift and shadow. Fully transparent pixels click through. -->
 <Window x:Class="Chippi.App.Island.IslandWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:c="urn:chippi-ui"
         xmlns:pet="clr-namespace:Chippi.UI.Pet;assembly=Chippi.UI"
+        xmlns:island="clr-namespace:Chippi.App.Island"
         Title="Chippi widget"
         Style="{StaticResource ChippiWindowStyle}"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
@@ -34,8 +35,8 @@
                 </TransformGroup>
             </Button.RenderTransform>
             <Grid>
-                <Border x:Name="BodyShadow" CornerRadius="25" Background="{DynamicResource IslandBrush}" Effect="{DynamicResource IslandPuckShadow}" />
-                <Border x:Name="Body" CornerRadius="25" Background="{DynamicResource IslandBrush}" BorderBrush="{DynamicResource IslandWidgetBorderBrush}" BorderThickness="1" />
+                <island:PuckSurface x:Name="BodyShadow" IsHitTestVisible="False" CornerRadius="25" Background="{DynamicResource IslandBrush}" Effect="{DynamicResource IslandPuckShadow}" />
+                <island:PuckSurface x:Name="Body" CornerRadius="25" Background="{DynamicResource IslandBrush}" BorderBrush="{DynamicResource IslandWidgetBorderBrush}" BorderThickness="1" />
                 <!-- The bar's content, laid out on the full 256 from the puck's end and clipped while the bar unfolds:
                      the lead (cover or glyph) in the far round end, the two lines, then the bars or the pause mark by
                      Chippi. IslandWindow.LayOutBar mirrors the columns when Chippi is on the left. -->
@@ -101,7 +102,7 @@
                         <Image x:Name="LinesWas" />
                     </Grid>
                 </Grid>
-                <!-- Chippi at the puck's end, 40 in its 50 square, with the muted mic's badge inside that square. -->
+                <!-- Chippi keeps the full 50-DIP end. Status icons occupy their own inward-facing tab. -->
                 <Grid x:Name="PuckEnd" Width="50" Height="50" HorizontalAlignment="Right">
                     <Grid x:Name="PetHolder" RenderTransformOrigin="0.5,0.5" HorizontalAlignment="Center" VerticalAlignment="Center">
                         <Grid.RenderTransform>
@@ -110,35 +111,35 @@
                         <!-- Decorative: the button's name and help text carry the state. -->
                         <pet:ChippiPet x:Name="Pet" Size="{x:Static pet:PetSize.Puck}" Mood="Sleepy" IsDecorative="True" IsHitTestVisible="False" />
                     </Grid>
-                    <!-- The badge's own layer, so the open can fade it while Chippi stays (IslandWindow's Morphing). -->
-                    <Grid x:Name="BadgeLayer" IsHitTestVisible="False">
-                        <Grid x:Name="AgentMark" Width="22" Height="22" HorizontalAlignment="Left" VerticalAlignment="Bottom"
-                              Visibility="Collapsed">
-                            <Ellipse Fill="{DynamicResource IslandBrush}" />
-                            <Ellipse x:Name="AgentMarkPlate" Width="18" Height="18" Fill="{DynamicResource IslandAccentFillBrush}" />
-                            <!-- Keep the product's own colors legible inside the working/waiting ring. -->
-                            <Border x:Name="AgentBadgeFace" Width="15" Height="15" CornerRadius="8" Background="{DynamicResource IslandOnAccentBrush}"
-                                    Visibility="Collapsed">
-                                <Image x:Name="AgentBadgeProvider" Width="14" Height="14" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" />
-                            </Border>
-                            <c:LucideIcon x:Name="AgentMarkIcon" Data="{x:Static c:LucideIcons.Gauge}" Size="11" Thickness="2"
-                                          Brush="{DynamicResource IslandOnAccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                        </Grid>
-                        <Grid x:Name="MicBadge" Width="22" Height="22" HorizontalAlignment="Right" VerticalAlignment="Bottom"
-                              Visibility="Collapsed">
-                            <Ellipse Fill="{DynamicResource IslandBrush}" />
-                            <Ellipse Width="18" Height="18" Fill="{StaticResource IslandBadgeBrush}" />
-                            <c:LucideIcon Data="{x:Static c:LucideIcons.MicOff}" Size="11" Thickness="2" Brush="White" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                        </Grid>
-                        <!-- Keep awake running while a song holds the bar: the accent says it's on and fine. -->
-                        <Grid x:Name="AwakeBadge" Width="22" Height="22" HorizontalAlignment="Right" VerticalAlignment="Top"
-                              Visibility="Collapsed">
-                            <Ellipse Fill="{DynamicResource IslandBrush}" />
-                            <Ellipse Width="18" Height="18" Fill="{DynamicResource IslandAccentFillBrush}" />
-                            <c:LucideIcon Data="{x:Static c:LucideIcons.Coffee}" Size="11" Thickness="2" Brush="{DynamicResource IslandOnAccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                        </Grid>
-                    </Grid>
                 </Grid>
+                <!-- The badges share the widget's surface, shadow and outer rim. -->
+                <Canvas x:Name="BadgeLayer" IsHitTestVisible="False" ClipToBounds="True">
+                    <Grid x:Name="AgentMark" Width="22" Height="22" Canvas.Top="14"
+                          Visibility="Collapsed">
+                        <Ellipse Fill="{DynamicResource IslandBrush}" />
+                        <Ellipse x:Name="AgentMarkPlate" Width="18" Height="18" Fill="{DynamicResource IslandAccentFillBrush}" />
+                        <!-- Keep the product's own colors legible inside the working/waiting ring. -->
+                        <Border x:Name="AgentBadgeFace" Width="15" Height="15" CornerRadius="8" Background="{DynamicResource IslandOnAccentBrush}"
+                                Visibility="Collapsed">
+                            <Image x:Name="AgentBadgeProvider" Width="14" Height="14" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" />
+                        </Border>
+                        <c:LucideIcon x:Name="AgentMarkIcon" Data="{x:Static c:LucideIcons.Gauge}" Size="11" Thickness="2"
+                                      Brush="{DynamicResource IslandOnAccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Grid>
+                    <Grid x:Name="MicBadge" Width="22" Height="22" Canvas.Top="14"
+                          Visibility="Collapsed">
+                        <Ellipse Fill="{DynamicResource IslandBrush}" />
+                        <Ellipse Width="18" Height="18" Fill="{StaticResource IslandBadgeBrush}" />
+                        <c:LucideIcon Data="{x:Static c:LucideIcons.MicOff}" Size="11" Thickness="2" Brush="White" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Grid>
+                    <!-- Keep awake running while a song holds the bar: the accent says it's on and fine. -->
+                    <Grid x:Name="AwakeBadge" Width="22" Height="22" Canvas.Top="14"
+                          Visibility="Collapsed">
+                        <Ellipse Fill="{DynamicResource IslandBrush}" />
+                        <Ellipse Width="18" Height="18" Fill="{DynamicResource IslandAccentFillBrush}" />
+                        <c:LucideIcon Data="{x:Static c:LucideIcons.Coffee}" Size="11" Thickness="2" Brush="{DynamicResource IslandOnAccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Grid>
+                </Canvas>
             </Grid>
         </Button>
 

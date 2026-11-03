@@ -6,6 +6,7 @@
 <Window x:Class="Chippi.App.Island.IslandPanelWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:island="clr-namespace:Chippi.App.Island"
         Title="Chippi"
         Style="{StaticResource ChippiWindowStyle}"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
@@ -23,8 +24,8 @@
     <Canvas x:Name="Root" KeyboardNavigation.TabNavigation="Cycle" KeyboardNavigation.ControlTabNavigation="Cycle">
         <!-- The shape; the shadow sits on its own layer, so the content above it renders without an effect. -->
         <Grid x:Name="Shape">
-            <Border x:Name="ShapeShadow" Background="{DynamicResource IslandBrush}" Effect="{DynamicResource IslandExpandedShadow}" />
-            <Border x:Name="ShapeFill" Background="{DynamicResource IslandBrush}" BorderBrush="{DynamicResource IslandBorderBrush}" BorderThickness="1" />
+            <island:PuckSurface x:Name="ShapeShadow" Background="{DynamicResource IslandBrush}" Effect="{DynamicResource IslandExpandedShadow}" />
+            <island:PuckSurface x:Name="ShapeFill" Background="{DynamicResource IslandBrush}" BorderBrush="{DynamicResource IslandBorderBrush}" BorderThickness="1" />
         </Grid>
         <!-- The gallery or a full 520 × 360 page, placed where the shape is heading. A new page slides in from its side
              inside the card, whose clip keeps it to the shape (IslandPanelWindow.PageShift). -->

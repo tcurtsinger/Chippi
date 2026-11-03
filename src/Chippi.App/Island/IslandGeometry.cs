@@ -84,6 +84,14 @@ public static class IslandGeometry
     internal static Rect PuckEnd(Rect widget, bool opensLeft) =>
         new(opensLeft ? widget.Right - widget.Height : widget.Left, widget.Top, widget.Height, widget.Height);
 
+    /// <summary>A compact tab turns inward around Chippi. A full bar mirrors its contents within its held bounds.</summary>
+    internal static (Rect Bounds, bool OpensLeft) LandWidget(Rect held, Rect work, bool opensLeft, bool compactTab)
+    {
+        var anchor = Inside(compactTab ? PuckEnd(held, opensLeft) : held, work);
+        bool left = OpensLeft(anchor, work);
+        return (compactTab ? Inside(WidgetRect(anchor, left, held.Width), work) : anchor, left);
+    }
+
     /// <summary>The full page or shorter tool gallery, on the same corner and at the same scale.</summary>
     public static Rect PanelRect(Rect puck, Rect work, double scale, double height = IslandPage.Height)
     {
