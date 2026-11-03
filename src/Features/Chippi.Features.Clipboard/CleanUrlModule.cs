@@ -31,6 +31,7 @@ public sealed class CleanUrlModule : IFeatureModule
     };
 
     public CleanUrlSettings Settings { get; private set; } = new();
+    internal string? SettingsError { get; private set; }
 
     /// <summary>Automatic cleaning; null while stopped.</summary>
     public AutoCleaner? Cleaner { get; private set; }
@@ -48,6 +49,7 @@ public sealed class CleanUrlModule : IFeatureModule
         ct.ThrowIfCancellationRequested();
         var hub = context.Clipboard ?? throw new InvalidOperationException("No clipboard service");
         _context = context;
+        SettingsError = null;
         Settings = context.Settings.Get<CleanUrlSettings>().Normalized();
         Cleaner = new AutoCleaner(hub, context.Logger);
         Cleaner.Apply(Settings.Automatic, Settings.SitesToSkip);
@@ -76,13 +78,26 @@ public sealed class CleanUrlModule : IFeatureModule
         return Task.CompletedTask;
     }
 
-    public void Save(CleanUrlSettings settings)
+    public bool Save(CleanUrlSettings settings)
     {
-        Settings = settings.Normalized();
-        _context?.Settings.Save(Settings);
+        var candidate = settings.Normalized();
+        try
+        {
+            var context = _context ?? throw new InvalidOperationException("Clean URL is off");
+            context.Settings.Save(candidate);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            SettingsError = "Save failed";
+            Changed?.Invoke();
+            return false;
+        }
+        Settings = candidate;
+        SettingsError = null;
         Cleaner?.Apply(Settings.Automatic, Settings.SitesToSkip);
         UpdateStatus();
         Changed?.Invoke();
+        return true;
     }
 
     /// <summary>

@@ -65,6 +65,27 @@ public sealed class AutoCleanerTests : IDisposable
     }
 
     [Theory]
+    [InlineData("bücher.example.org")]
+    [InlineData("sub.xn--bcher-kva.example.org.")]
+    public async Task An_international_skip_site_covers_both_spellings(string host)
+    {
+        _cleaner.Apply(true, ["https://bücher.example.org./about"]);
+        await CopyAsync(ClipContent.FromText($"https://{host}/page?utm_source=a"));
+        Assert.Empty(_hub.Written);
+    }
+
+    [Theory]
+    [InlineData("\u0301.example.com")]
+    [InlineData("test\u200c.example.com")]
+    public async Task An_invalid_international_host_is_neither_saved_nor_rewritten(string host)
+    {
+        Assert.Null(Sites.Normalize(host));
+        _cleaner.Apply(true, [host]);
+        await CopyAsync(ClipContent.FromText($"https://{host}/path?utm_source=fixture"));
+        Assert.Empty(_hub.Written);
+    }
+
+    [Theory]
     [InlineData("example.org", "example.org")]
     [InlineData(" WWW.Example.org. ", "www.example.org")]
     [InlineData("https://news.example.org/a?b=1", "news.example.org")]

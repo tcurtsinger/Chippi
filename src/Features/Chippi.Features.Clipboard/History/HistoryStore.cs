@@ -115,18 +115,22 @@ public sealed class HistoryStore : IDisposable
     }
 
     /// <summary>Pins, or unpins with a fresh recent time (it counts as just copied).</summary>
-    public HistoryEntry? SetPinned(long id, bool pinned, DateTimeOffset now)
+    public HistoryEntry? SetPinned(long id, bool pinned, DateTimeOffset now, long? contentHash = null)
     {
         long time = now.ToUnixTimeMilliseconds();
         if (pinned)
-            Execute("UPDATE entry SET pinned = $t WHERE id = $id AND pinned = 0", ("$t", time), ("$id", id));
+            Execute("UPDATE entry SET pinned = $t WHERE id = $id AND pinned = 0 AND ($hash IS NULL OR hash = $hash)",
+                ("$t", time), ("$id", id), ("$hash", (object?)contentHash ?? DBNull.Value));
         else
-            Execute("UPDATE entry SET pinned = 0, recent = $t WHERE id = $id AND pinned <> 0", ("$t", time), ("$id", id));
+            Execute("UPDATE entry SET pinned = 0, recent = $t WHERE id = $id AND pinned <> 0 AND ($hash IS NULL OR hash = $hash)",
+                ("$t", time), ("$id", id), ("$hash", (object?)contentHash ?? DBNull.Value));
         Prune(now);
-        return Get(id);
+        var entry = Get(id);
+        return contentHash is null || entry?.ContentHash == contentHash ? entry : null;
     }
 
-    public void Delete(long id) => Execute("DELETE FROM entry WHERE id = $id", ("$id", id));
+    public void Delete(long id, long? contentHash = null) => Execute("DELETE FROM entry WHERE id = $id AND ($hash IS NULL OR hash = $hash)",
+        ("$id", id), ("$hash", (object?)contentHash ?? DBNull.Value));
 
     /// <summary>Clear history: the unpinned entries among <paramref name="shown"/> (a copy saved while the question was open stays).</summary>
     public void ClearUnpinned(IReadOnlyCollection<HistoryEntry> shown)

@@ -100,17 +100,17 @@ public sealed class ClipboardHistory : IDisposable
         }
     }
 
-    public Task PinAsync(long id, bool pinned) => RunAsync(store =>
+    public Task PinAsync(long id, bool pinned, long? contentHash = null) => RunAsync(store =>
     {
-        store.SetPinned(id, pinned, _time.GetUtcNow());
+        store.SetPinned(id, pinned, _time.GetUtcNow(), contentHash);
         if (!pinned)
             Unfull();
         Publish(store);
     });
 
-    public Task DeleteAsync(long id) => RunAsync(store =>
+    public Task DeleteAsync(long id, long? contentHash = null) => RunAsync(store =>
     {
-        store.Delete(id);
+        store.Delete(id, contentHash);
         Unfull();
         Publish(store);
     });

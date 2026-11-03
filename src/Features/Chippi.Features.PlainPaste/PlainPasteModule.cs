@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
+using System.IO;
 using Chippi.Core.Clipboard;
 using Chippi.Core.Island;
 using Chippi.Core.Modules;
@@ -48,33 +49,72 @@ public sealed class PlainPasteModule : IFeatureModule
         Settings = context.Settings.Get<PlainPasteSettings>();
         if (Settings.Shortcut is { IsValid: false }) Settings = new();
         _timer = _time.CreateTimer(_ => Expire(), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
-        if (Settings.Shortcut is { } shortcut) TryRegister(shortcut);
+        if (Settings.Shortcut is { } shortcut) _hotkey = Reserve(shortcut);
         context.Ui.SetSettingsPage(section => new PlainPasteView(this, section == "shortcut-list" ? Descriptor.Name : "Shortcut"));
         return Task.CompletedTask;
     }
-    private bool TryRegister(MicShortcut shortcut)
+    private IMicHotkey? Reserve(MicShortcut shortcut)
     {
+        IMicHotkey? candidate = null;
         try
         {
-            _hotkey ??= _create();
-            ShortcutError = _hotkey.Register(shortcut, OnShortcut) ? null : "Shortcut in use";
+            candidate = _create();
+            if (candidate.Register(shortcut, () => { if (ReferenceEquals(candidate, _hotkey)) OnShortcut(); }))
+            {
+                ShortcutError = null;
+                return candidate;
+            }
+            ShortcutError = "Shortcut in use";
         }
         catch { ShortcutError = "Shortcut unavailable"; }
-        return ShortcutError is null;
+        candidate?.Dispose();
+        return null;
     }
+
+    private bool Save(MicShortcut? shortcut)
+    {
+        var candidate = Settings with { Shortcut = shortcut };
+        try { _context!.Settings.Save(candidate); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            ShortcutError = "Save failed";
+            return false;
+        }
+        Settings = candidate;
+        ShortcutError = null;
+        return true;
+    }
+
     public bool ChangeShortcut(MicShortcut shortcut)
     {
         if (_stopping) return false;
         if (!shortcut.IsValid) { ShortcutError = "Shortcut unavailable"; Changed?.Invoke(); return false; }
-        if (!TryRegister(shortcut)) { Changed?.Invoke(); return false; }
-        Settings = Settings with { Shortcut = shortcut }; _context!.Settings.Save(Settings);
-        Changed?.Invoke(); return true;
+        if (Settings.Shortcut == shortcut && _hotkey is not null)
+        {
+            ShortcutError = null;
+            Changed?.Invoke();
+            return true;
+        }
+        // Keep the previous combination registered until its replacement is both available and saved.
+        var replacement = Reserve(shortcut);
+        bool saved = replacement is not null && Save(shortcut);
+        if (saved)
+        {
+            _hotkey?.Dispose();
+            _hotkey = replacement;
+        }
+        else replacement?.Dispose();
+        Changed?.Invoke();
+        return saved;
     }
     public void RemoveShortcut()
     {
         if (_stopping) return;
-        _hotkey?.Dispose(); _hotkey = null; ShortcutError = null;
-        Settings = Settings with { Shortcut = null }; _context!.Settings.Save(Settings);
+        if (Save(null))
+        {
+            _hotkey?.Dispose();
+            _hotkey = null;
+        }
         Changed?.Invoke();
     }
     public void CaptureShortcut(bool capture) => _capturing = capture;

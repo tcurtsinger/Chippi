@@ -17,10 +17,19 @@
                             <ScrollViewer x:Name="PART_ContentHost" Focusable="False"
                                           HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Disabled" />
                         </Border>
+                        <TextBlock x:Name="Placeholder" Text="{TemplateBinding Tag}" Margin="10,6"
+                                   Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center"
+                                   IsHitTestVisible="False" Visibility="Collapsed" />
                         <Border x:Name="Bottom" CornerRadius="4" BorderThickness="0,0,0,1" IsHitTestVisible="False"
                                 BorderBrush="{DynamicResource InputStrokeBottomBrush}" />
                     </Grid>
                     <ControlTemplate.Triggers>
+                        <Trigger Property="Text" Value="">
+                            <Setter TargetName="Placeholder" Property="Visibility" Value="Visible" />
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource ButtonHoverBrush}" />
+                        </Trigger>
                         <Trigger Property="IsKeyboardFocused" Value="True">
                             <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource InputFocusBrush}" />
                             <Setter TargetName="Bottom" Property="BorderThickness" Value="0,0,0,2" />

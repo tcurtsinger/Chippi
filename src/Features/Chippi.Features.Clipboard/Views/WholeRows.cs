@@ -72,11 +72,15 @@ internal sealed class WholeRows : Panel
         double y = 0;
         foreach (UIElement row in InternalChildren)
         {
+            if (row.Visibility == Visibility.Collapsed) continue;
             if (!_shown.Contains(row))
             {
-                row.Arrange(new Rect(0, final.Height + 10_000, final.Width, row.DesiredSize.Height)); // out of the clip
+                if (row.Visibility != Visibility.Hidden)
+                    row.Visibility = Visibility.Hidden; // Offscreen buttons must also leave Tab and UI Automation.
                 continue;
             }
+            if (row.Visibility != Visibility.Visible)
+                row.Visibility = Visibility.Visible;
             row.Arrange(new Rect(0, y, final.Width, row.DesiredSize.Height));
             y += row.DesiredSize.Height;
         }

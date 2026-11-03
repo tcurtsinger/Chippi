@@ -29,13 +29,38 @@ internal static class Format
         return day.ToString("MMM d", CultureInfo.CurrentCulture);
     }
 
-    /// <summary>The row's one line: the text's first line, the files' names, or the picture's size.</summary>
-    public static string Line(HistoryEntry entry) => entry.Kind switch
+    /// <summary>A search shows the matching line or filename. The saved content stays intact.</summary>
+    public static string Line(HistoryEntry entry, string search = "")
     {
-        EntryKind.Files => string.Join(", ", (entry.Files ?? []).Select(Path.GetFileName)),
-        EntryKind.Picture => Picture(entry),
-        _ => FirstLine(entry.Text ?? ""),
-    };
+        if (entry.Kind == EntryKind.Picture) return Picture(entry);
+        if (entry.Kind == EntryKind.Files)
+        {
+            var names = (entry.Files ?? []).Select(Path.GetFileName);
+            if (search.Length != 0 && names.FirstOrDefault(name => name?.Contains(search, StringComparison.OrdinalIgnoreCase) == true) is { } match)
+                return Excerpt(match, search);
+            return string.Join(", ", names);
+        }
+        return Excerpt(entry.Text ?? "", search);
+    }
+
+    internal static string Excerpt(string text, string search)
+    {
+        int hit = search.Length == 0 ? -1 : text.IndexOf(search, StringComparison.OrdinalIgnoreCase);
+        if (hit < 0) return FirstLine(text);
+        int start = MatchStart(text, hit);
+        int end = text.IndexOf('\n', hit + search.Length);
+        var snippet = text[start..(end < 0 ? text.Length : end)].Trim().Replace('\r', ' ').Replace('\n', ' ').Replace('\t', ' ');
+        return start > 0 && text[start - 1] != '\n' ? "…" + snippet : snippet;
+    }
+
+    /// <summary>Start at the matching line, with room for the match even on a long unbroken URL.</summary>
+    internal static int MatchStart(string text, int hit)
+    {
+        if (hit == 0) return 0;
+        int start = Math.Max(text.LastIndexOf('\n', hit - 1) + 1, hit - 18);
+        if (start > 0 && char.IsLowSurrogate(text[start]) && char.IsHighSurrogate(text[start - 1])) start--;
+        return start;
+    }
 
     /// <summary>The selected row's kind and details: "Text · 4 lines", "Picture · 1920 × 1080", "3 files", "Link".</summary>
     public static string Details(HistoryEntry entry) => entry.Kind switch
@@ -47,10 +72,10 @@ internal static class Format
     };
 
     /// <summary>A row or its menu, identifiable by a short excerpt while browsing saved history.</summary>
-    public static string AccessibleName(HistoryEntry entry, DateTimeOffset now)
+    public static string AccessibleName(HistoryEntry entry, DateTimeOffset now, string search = "")
     {
         string details = Details(entry);
-        string line = entry.Kind == EntryKind.Picture ? "" : Line(entry);
+        string line = entry.Kind == EntryKind.Picture ? "" : Line(entry, search);
         if (line.Length > 80)
         {
             int end = char.IsHighSurrogate(line[79]) ? 79 : 80;
@@ -90,9 +115,9 @@ internal static class Format
 
     private static string FirstLine(string text)
     {
-        foreach (var line in text.Split('\n'))
+        foreach (var line in text.AsSpan().EnumerateLines())
             if (line.Trim() is { Length: > 0 } trimmed)
-                return trimmed.Replace('\t', ' ');
+                return trimmed.ToString().Replace('\t', ' ');
         return "";
     }
 }

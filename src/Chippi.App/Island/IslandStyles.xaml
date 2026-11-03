@@ -268,6 +268,9 @@
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="Chrome" Property="i:FillFade.To" Value="{DynamicResource IslandHoverBrush}" />
                         </Trigger>
+                        <Trigger Property="Tag" Value="Selected">
+                            <Setter TargetName="Chrome" Property="i:FillFade.To" Value="{DynamicResource IslandAccentTintBrush}" />
+                        </Trigger>
                         <Trigger Property="IsPressed" Value="True">
                             <Setter TargetName="Chrome" Property="i:FillFade.To" Value="{DynamicResource IslandPressedBrush}" />
                         </Trigger>

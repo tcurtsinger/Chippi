@@ -22,13 +22,16 @@ public sealed class CleanUrlSettingsPage : UserControl
     private readonly CleanUrlModule _module;
     private readonly Card _sites = new();
     private readonly Action _syncAutomatic;
-    private readonly TextBox _field = new() { MinWidth = 240, VerticalContentAlignment = VerticalAlignment.Center };
+    private readonly TextBox _field = new() { Tag = "example.org", VerticalContentAlignment = VerticalAlignment.Center };
+    private readonly Button _addSite;
     private readonly Button _addConfirm = SettingsUi.Button("Add", "PrimaryButtonStyle");
-    private readonly TextBox _link = new() { VerticalContentAlignment = VerticalAlignment.Center };
-    private readonly TextBlock _clean = SettingsUi.Text("");
+    private readonly TextBlock _siteMessage = Warning();
+    private readonly TextBlock _saveError = Warning();
+    private readonly CleanLinkField _link = new(14, 20);
+    private readonly MiddleTrimmedText _clean = new(14, 20);
     private readonly TextBlock _copyError = SettingsUi.Text("", "CaptionTextStyle");
     private readonly Button _copy = SettingsUi.Button("Copy", "PrimaryButtonStyle");
-    private DockPanel? _addRow;
+    private readonly FrameworkElement _addRow;
     private bool _adding;
     private int _copyVersion;
 
@@ -36,18 +39,17 @@ public sealed class CleanUrlSettingsPage : UserControl
     {
         _module = module;
         var automatic = SettingsUi.Switch("Automatic cleaning", () => _module.Settings.Automatic, on => _module.Save(_module.Settings with { Automatic = on }), out _syncAutomatic);
-        Button? add = null;
-        add = SettingsLayout.AddButton("site", () =>
+        _addSite = SettingsLayout.AddButton("site", () =>
         {
+            if (!_adding) _field.Text = "";
             _adding = true;
-            _field.Text = "";
             Refresh();
-            Dispatcher.BeginInvoke(() => _field.Focus(), System.Windows.Threading.DispatcherPriority.Input);
+            _field.Focus();
         });
 
         _field.SetResourceReference(StyleProperty, "TextFieldStyle");
         AutomationProperties.SetName(_field, "Site");
-        _field.TextChanged += (_, _) => _addConfirm.IsEnabled = Sites.Normalize(_field.Text) is not null;
+        _field.TextChanged += (_, _) => ValidateSite();
         _field.KeyDown += (_, e) =>
         {
             if (e.Key == Key.Enter)
@@ -60,6 +62,8 @@ public sealed class CleanUrlSettingsPage : UserControl
         };
         _addConfirm.IsEnabled = false;
         _addConfirm.Click += (_, _) => Add();
+        _addRow = AddRow();
+        _sites.Children.Add(_addRow);
 
         Content = new StackPanel
         {
@@ -67,7 +71,8 @@ public sealed class CleanUrlSettingsPage : UserControl
             {
                 Cleaner(),
                 Spaced(SettingsLayout.Card(SettingsLayout.Row("Automatic cleaning", automatic))),
-                SettingsLayout.Section("Sites to skip", add),
+                _saveError,
+                SettingsLayout.Section("Sites to skip", _addSite),
                 _sites,
             },
         };
@@ -83,10 +88,8 @@ public sealed class CleanUrlSettingsPage : UserControl
     /// <summary>The island's cleaner as a card: the link field, then the clean link as you type and Copy (accent).</summary>
     private Card Cleaner()
     {
-        _link.SetResourceReference(StyleProperty, "TextFieldStyle");
-        AutomationProperties.SetName(_link, "Link");
-        _link.TextChanged += (_, _) => ShowClean();
-        _link.KeyDown += (_, e) =>
+        _link.Field.TextChanged += (_, _) => ShowClean();
+        _link.Field.KeyDown += (_, e) =>
         {
             if (e.Key == Key.Enter && _copy.IsEnabled)
             {
@@ -115,20 +118,21 @@ public sealed class CleanUrlSettingsPage : UserControl
         _copyVersion++;
         _copyError.Visibility = Visibility.Collapsed;
         _copyError.Text = "";
-        string text = _link.Text;
+        string text = _link.Field.Text;
         var result = UrlCleaner.Clean(text);
-        _clean.Text = result is { RemovedParameters.Count: > 0 } ? result.Url
+        _clean.FullText = result is { RemovedParameters.Count: > 0 } ? result.Url
             : result is not null ? "Nothing to remove"
             : text.Trim().Length > 0 ? "Not a web link" : "";
-        _clean.SetResourceReference(TextBlock.ForegroundProperty, result is { RemovedParameters.Count: > 0 } ? "TextPrimaryBrush" : "TextSecondaryBrush");
-        _clean.Visibility = _clean.Text.Length > 0 ? Visibility.Visible : Visibility.Hidden;
+        _clean.SetResourceReference(ForegroundProperty, result is { RemovedParameters.Count: > 0 } ? "TextPrimaryBrush" :
+            result is null && text.Trim().Length > 0 ? "WarningTextBrush" : "TextSecondaryBrush");
+        _clean.Visibility = _clean.FullText.Length > 0 ? Visibility.Visible : Visibility.Hidden;
         _copy.IsEnabled = result is { RemovedParameters.Count: > 0 };
         _copy.Content = "Copy";
     }
 
     private async void Copy()
     {
-        if (UrlCleaner.Clean(_link.Text) is not { RemovedParameters.Count: > 0 } result || _module.Hub is not { } hub)
+        if (UrlCleaner.Clean(_link.Field.Text) is not { RemovedParameters.Count: > 0 } result || _module.Hub is not { } hub)
             return;
         int version = ++_copyVersion;
         var status = await hub.WriteAsync(ClipContent.FromText(result.Url));
@@ -157,43 +161,73 @@ public sealed class CleanUrlSettingsPage : UserControl
             return;
         }
         _syncAutomatic();
-        _sites.Children.Clear();
-        if (_adding)
-            _sites.Children.Add(AddRow());
+        _saveError.Text = _module.SettingsError ?? "";
+        _saveError.Visibility = _saveError.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+        _addRow.Visibility = _adding ? Visibility.Visible : Visibility.Collapsed;
+        ValidateSite();
+        // Leave the editor in the tree so a settings notification cannot take its focus or selection.
+        if (_sites.Children.Count > 1)
+            _sites.Children.RemoveRange(1, _sites.Children.Count - 1);
+        double opacity = _module.Settings.Automatic ? 1 : 0.6;
         foreach (var site in _module.Settings.SitesToSkip)
-            _sites.Children.Add(SettingsUi.ListRow(null, site, null, () => Save(_module.Settings.SitesToSkip.Where(s => s != site))));
-        if (_sites.Children.Count == 0)
-            _sites.Children.Add(SettingsLayout.Empty("No sites"));
-        _sites.Opacity = _module.Settings.Automatic ? 1 : 0.6;
+        {
+            var row = SettingsUi.ListRow(null, site, null, () => Save(_module.Settings.SitesToSkip.Where(s => s != site)));
+            row.Opacity = opacity;
+            _sites.Children.Add(row);
+        }
+        if (!_adding && _module.Settings.SitesToSkip.Count == 0)
+        {
+            var empty = SettingsLayout.Empty("No sites");
+            empty.Opacity = opacity;
+            _sites.Children.Add(empty);
+        }
     }
 
-    /// <summary>One row for the page's life: Refresh clears the list it sits in, so it can always go back.</summary>
-    private DockPanel AddRow()
+    private FrameworkElement AddRow()
     {
-        if (_addRow is not null)
-            return _addRow;
         var cancel = SettingsUi.Button("Cancel");
         cancel.Margin = new Thickness(8, 0, 0, 0);
         cancel.Click += (_, _) => Cancel();
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, Children = { _addConfirm, cancel } };
         DockPanel.SetDock(buttons, Dock.Right);
         _field.Margin = new Thickness(0, 0, 12, 0);
-        return _addRow = new DockPanel { MinHeight = SettingsLayout.RowHeight, Margin = new Thickness(16, 8, 16, 8), Children = { buttons, _field } };
+        var fields = new DockPanel { Children = { buttons, _field } };
+        return new Border { MinHeight = SettingsLayout.RowHeight, Padding = SettingsLayout.RowPadding,
+            Child = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Children = { fields, _siteMessage } } };
+    }
+
+    private static TextBlock Warning()
+    {
+        var message = SettingsUi.Text("", "CaptionTextStyle");
+        message.SetResourceReference(TextBlock.ForegroundProperty, "WarningTextBrush");
+        AutomationProperties.SetLiveSetting(message, AutomationLiveSetting.Polite);
+        message.Margin = new Thickness(0, 4, 0, 0);
+        return message;
+    }
+
+    private void ValidateSite()
+    {
+        string? site = Sites.Normalize(_field.Text);
+        bool duplicate = site is not null && _module.Settings.SitesToSkip.Contains(site, StringComparer.OrdinalIgnoreCase);
+        _siteMessage.Text = duplicate ? "Site already listed" : site is null && _field.Text.Trim().Length > 0 ? "Enter a host, like example.org" : "";
+        _siteMessage.Visibility = _siteMessage.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+        AutomationProperties.SetHelpText(_field, _siteMessage.Text);
+        _addConfirm.IsEnabled = site is not null && !duplicate;
     }
 
     private void Add()
     {
-        if (Sites.Normalize(_field.Text) is not { } site)
+        if (!_addConfirm.IsEnabled || Sites.Normalize(_field.Text) is not { } site)
             return;
-        _adding = false;
-        Save([site, .. _module.Settings.SitesToSkip]);
+        if (Save([site, .. _module.Settings.SitesToSkip])) Cancel();
     }
 
     private void Cancel()
     {
         _adding = false;
         Refresh();
+        _addSite.Focus();
     }
 
-    private void Save(IEnumerable<string> sites) => _module.Save(_module.Settings with { SitesToSkip = [.. sites] });
+    private bool Save(IEnumerable<string> sites) => _module.Save(_module.Settings with { SitesToSkip = [.. sites] });
 }

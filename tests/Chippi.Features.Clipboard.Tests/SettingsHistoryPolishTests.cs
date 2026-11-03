@@ -29,7 +29,8 @@ public sealed partial class ModuleTests
             Assert.Equal("terms", search.Text);
             Assert.True(Shows(page, "1 of 2"));
             var menu = Assert.Single(Find<IconButton>(page));
-            Assert.StartsWith("More for Invoice summary, Text · 2 lines", AutomationProperties.GetName(menu));
+            Assert.StartsWith("More for Terms due next month, Text · 2 lines", AutomationProperties.GetName(menu));
+            Assert.True(Shows(page, "Terms due next month"));
             search.Text = "no such clip";
             Assert.True(Shows(page, "0 of 2"));
             Assert.True(Shows(page, "No matches"));
@@ -38,6 +39,11 @@ public sealed partial class ModuleTests
             Assert.Same(menu, Find<IconButton>(page).Single(b => AutomationProperties.GetName(b).Contains("Invoice summary")));
             search.Text = "invoice";
             Assert.Same(menu, Assert.Single(Find<IconButton>(page), IsShown));
+            _hub.CopyText("New invoice");
+            _history.History.IdleAsync().GetAwaiter().GetResult();
+            search.Text = "terms";
+            Assert.Same(menu, Assert.Single(Find<IconButton>(page), IsShown));
+            Assert.True(Shows(page, "1 of 3"));
         });
     }
 
