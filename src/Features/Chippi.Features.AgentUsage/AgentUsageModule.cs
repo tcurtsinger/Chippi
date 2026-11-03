@@ -140,6 +140,7 @@ public sealed class AgentUsageModule : IFeatureModule
             () => _view ??= new AgentsIslandView(this)));
         _tile.SetStatus(_home = "None");
         context.Ui.SetSettingsPage(() => new AgentUsageSettingsPage(this));
+        Publish(Settings, _started); // Installed agents are known before the first scan or usage check.
         Motion.Changed += OnMotionChanged;
         if (_loops)
         {
@@ -281,7 +282,7 @@ public sealed class AgentUsageModule : IFeatureModule
         if (claude.Last is null && claude.Other is null)
             claude.Other = Safely(() => ClaudeHistory.Read(_paths.ClaudeHistory), "the Claude app's usage file"); // something to show before the first check
         var now = _time.GetUtcNow();
-        ScanSessions(settings, now);
+        ScanSessions(settings, now, ct);
         Publish(settings, now);
         foreach (var kind in Kinds)
         {
@@ -295,15 +296,15 @@ public sealed class AgentUsageModule : IFeatureModule
         }
     }
 
-    private void ScanSessions(AgentUsageSettings settings, DateTimeOffset now)
+    private void ScanSessions(AgentUsageSettings settings, DateTimeOffset now, CancellationToken ct)
     {
         var sessions = new List<AgentSession>();
         if (settings.Claude)
             sessions.AddRange(Safely(() => _claudeSessions!.Read(now, _programs.IsOwn), "Claude Code's sessions"));
         if (settings.Codex)
         {
-            sessions.AddRange(Safely(() => _codexSessions!.Read(now, _programs.IsOwn), "Codex's sessions"));
-            _tracks[AgentKind.Codex].Other = Safely(() => _codexLogs!.Limits(_codexSessions!.OpenLogs), "Codex's logs");
+            sessions.AddRange(Safely(() => _codexSessions!.Read(now, _programs.IsOwn, ct), "Codex's sessions"));
+            _tracks[AgentKind.Codex].Other = Safely(() => _codexLogs!.Limits(_codexSessions!.OpenLogs, ct), "Codex's logs");
         }
         var pids = sessions.Select(s => s.ProcessId).OfType<int>().ToHashSet();
         List<int> unknown;
@@ -437,7 +438,7 @@ public sealed class AgentUsageModule : IFeatureModule
 
         string signature = string.Join('|', agents.Select(a => $"{a.Agent}:{a.Found}:{a.Check}:{a.Fresh}:{a.Plan}:{a.Reading?.At.ToUnixTimeSeconds()}:"
                 + string.Join(',', a.Reading?.Windows.Select(w => $"{w.Label}={w.Used}@{w.ResetsAt?.ToUnixTimeSeconds()}:{w.HasReset(now)}") ?? [])))
-            + "#" + string.Join('|', sessions.Select(s => $"{s.Agent}:{s.Id}:{s.Name}:{s.Working}:{s.Since.ToUnixTimeSeconds()}:{AppOf(s)}"))
+            + "#" + string.Join('|', sessions.Select(s => $"{s.Agent}:{s.Id}:{s.Name}:{s.Status}:{s.Since.ToUnixTimeSeconds()}:{AppOf(s)}"))
             + "#" + settings;
         if (signature != _signature)
         {

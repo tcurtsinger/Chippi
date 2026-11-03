@@ -3,6 +3,7 @@
 
 using System.Text.Json;
 using Chippi.Features.AgentUsage.Readers;
+using Chippi.Features.AgentUsage.Sessions;
 
 namespace Chippi.Features.AgentUsage.Tests;
 
@@ -255,19 +256,81 @@ public sealed class CodexLogsTests
         var limits = logs.Limits([])!;
         Assert.Equal(9, limits.Windows.Single().Used);
         Assert.Equal(DateTimeOffset.Parse("2026-11-01T23:25:00.512Z"), limits.At);
-        Assert.Equal(new CodexLogs.Turn(true, DateTimeOffset.Parse("2026-11-01T23:30:35.080Z")), logs.LastTurn(log));
+        Assert.Equal(new CodexLogs.Turn(AgentSessionState.Working, DateTimeOffset.Parse("2026-11-01T23:30:35.080Z")), logs.LastTurn(log));
 
         File.AppendAllText(log, Line("2026-11-01T23:31:00.870Z", """{"type":"task_complete","turn_id":"b"}""") + "\n");
-        Assert.Equal(new CodexLogs.Turn(false, DateTimeOffset.Parse("2026-11-01T23:31:00.870Z")), logs.LastTurn(log));
+        Assert.Equal(new CodexLogs.Turn(AgentSessionState.Idle, DateTimeOffset.Parse("2026-11-01T23:31:00.870Z")), logs.LastTurn(log));
     }
 
     [Fact]
-    public void An_aborted_turn_waits_on_you_and_a_half_written_line_is_passed_by()
+    public void An_aborted_turn_is_idle_and_a_half_written_line_is_passed_by()
     {
         using var home = new TempFolder();
         string log = home.Write($"sessions/2026/11/01/rollout-x-{Thread}.jsonl",
             Log(Line("2026-11-01T23:24:03Z", """{"type":"task_started"}"""), Line("2026-11-01T23:26:00Z", """{"type":"turn_aborted"}""")) + """{"timestamp":"2026-11-01T23:27:00Z","type":"event_msg","payload":{"type":"task_star""");
-        Assert.False(new CodexLogs(home.Path).LastTurn(log)!.Working);
+        Assert.Equal(AgentSessionState.Idle, new CodexLogs(home.Path).LastTurn(log)!.Status);
+    }
+
+    private static string Item(string payload) =>
+        Line("2026-11-01T23:27:00Z", payload).Replace("\"event_msg\"", "\"response_item\"", StringComparison.Ordinal);
+
+    private static string Ask(string id, bool asyncRequest, int count = 1) =>
+        Item(JsonSerializer.Serialize(new { type = "function_call", name = asyncRequest ? "request_user_input_async" : "request_user_input",
+            call_id = id, arguments = JsonSerializer.Serialize(new { questions = Enumerable.Repeat(new { title = "Choose" }, count) }) }));
+
+    private static string Output(string id, string result) =>
+        Item(JsonSerializer.Serialize(new { type = "function_call_output", call_id = id, output = result }));
+
+    private static string Reply(string id, int index, string role = "user")
+    {
+        string key = JsonSerializer.Serialize(new object[] { "request_user_input_async", id, index });
+        string body = "<send_user_message_question_reply>" +
+            JsonSerializer.Serialize(new[] { new { questionItemId = key, answer = "Chosen" } }) + "</send_user_message_question_reply>";
+        return Item(JsonSerializer.Serialize(new { type = "message", role, content = new[] { new { type = "input_text", text = body } } }));
+    }
+
+    [Fact]
+    public void A_delivered_async_question_survives_turn_completion_until_its_own_answers_arrive()
+    {
+        using var home = new TempFolder();
+        string log = home.Write($"sessions/2026/11/01/rollout-x-{Thread}.jsonl", Log(
+            Line("2026-11-01T23:26:00Z", """{"type":"task_started"}"""), Ask("first", true, 2)));
+        var logs = new CodexLogs(home.Path);
+        Assert.Equal(AgentSessionState.Working, logs.LastTurn(log)!.Status);
+        void Append(string line) => File.AppendAllText(log, line + "\n");
+
+        Append(Output("first", """{"accepted":true}"""));
+        Assert.Equal(AgentSessionState.NeedsInput, logs.LastTurn(log)!.Status);
+        Append(Line("2026-11-01T23:28:00Z", """{"type":"task_complete"}"""));
+        Assert.Equal(AgentSessionState.NeedsInput, new CodexLogs(home.Path).LastTurn(log)!.Status);
+        Append(Line("2026-11-01T23:29:00Z", """{"type":"task_started"}"""));
+        Append(Reply("another", 0));
+        Append(Reply("first", 1, "assistant"));
+        Append(Reply("first", 0));
+        Assert.Equal(AgentSessionState.NeedsInput, logs.LastTurn(log)!.Status);
+        Append(Reply("first", 1));
+        Assert.Equal(AgentSessionState.Working, logs.LastTurn(log)!.Status);
+        Append(Line("2026-11-01T23:30:00Z", """{"type":"task_complete"}"""));
+        Assert.Equal(AgentSessionState.Idle, logs.LastTurn(log)!.Status);
+    }
+
+    [Fact]
+    public void Only_an_unanswered_blocking_question_needs_input_and_aborting_clears_pending_requests()
+    {
+        using var home = new TempFolder();
+        string log = home.Write($"sessions/2026/11/01/rollout-x-{Thread}.jsonl",
+            Log(Line("2026-11-01T23:26:00Z", """{"type":"task_started"}"""), Ask("sync", false)));
+        var logs = new CodexLogs(home.Path);
+        Assert.Equal(AgentSessionState.NeedsInput, logs.LastTurn(log)!.Status);
+
+        File.AppendAllText(log, Output("other", "{}") + "\n");
+        Assert.Equal(AgentSessionState.NeedsInput, logs.LastTurn(log)!.Status);
+        File.AppendAllText(log, Output("sync", "{}") + "\n" + Ask("failed", true) + "\n" + Output("failed", """{"accepted":false}""") + "\n");
+        Assert.Equal(AgentSessionState.Working, logs.LastTurn(log)!.Status);
+        File.AppendAllText(log, Ask("delivered", true) + "\n" + Output("delivered", """{"accepted":true}""") + "\n");
+        Assert.Equal(AgentSessionState.NeedsInput, logs.LastTurn(log)!.Status);
+        File.AppendAllText(log, Line("2026-11-01T23:28:00Z", """{"type":"turn_aborted"}""") + "\n");
+        Assert.Equal(AgentSessionState.Idle, logs.LastTurn(log)!.Status);
     }
 
     private static string Filler(int lines) =>
@@ -283,19 +346,19 @@ public sealed class CodexLogsTests
         var logs = new CodexLogs(home.Path);
 
         // Seen first: read back past the chunks of output to the turn's start and the limits before it.
-        Assert.Equal(new CodexLogs.Turn(true, DateTimeOffset.Parse("2026-11-01T23:00:01Z")), logs.LastTurn(log));
+        Assert.Equal(new CodexLogs.Turn(AgentSessionState.Working, DateTimeOffset.Parse("2026-11-01T23:00:01Z")), logs.LastTurn(log));
         Assert.Equal(70, logs.Limits([log])!.Windows.Single().Used);
 
         // It grows by more than a chunk with nothing new about the turn: still working, as it was.
         File.AppendAllText(log, Filler(100));
-        Assert.True(logs.LastTurn(log)!.Working);
+        Assert.Equal(AgentSessionState.Working, logs.LastTurn(log)!.Status);
         Assert.Equal(70, logs.Limits([log])!.Windows.Single().Used);
 
         // A line half written, then finished: read whole once it is.
         File.AppendAllText(log, """{"timestamp":"2026-11-01T23:40:00Z","type":"event_msg","payload":{"type":"task_comp""");
-        Assert.True(logs.LastTurn(log)!.Working);
+        Assert.Equal(AgentSessionState.Working, logs.LastTurn(log)!.Status);
         File.AppendAllText(log, "lete\"}}\n");
-        Assert.Equal(new CodexLogs.Turn(false, DateTimeOffset.Parse("2026-11-01T23:40:00Z")), logs.LastTurn(log));
+        Assert.Equal(new CodexLogs.Turn(AgentSessionState.Idle, DateTimeOffset.Parse("2026-11-01T23:40:00Z")), logs.LastTurn(log));
     }
 
     [Fact]

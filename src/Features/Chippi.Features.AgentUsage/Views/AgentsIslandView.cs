@@ -96,7 +96,11 @@ public sealed class AgentsIslandView : UserControl
             _shape = shape;
             Build(agents, shown.Count);
         }
-        _none.Visibility = agents.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        _none.Visibility = agents.Count == 0 && shown.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        var enabled = Enum.GetValues<AgentKind>().Where(_module.Settings.Reads).ToArray();
+        _none.Text = enabled.Length == 0 ? "Agent checks are off"
+            : enabled.Any(k => !_module.All.TryGetValue(k, out var status) || status.Check == CheckState.None)
+                ? "Checking agents…" : "No agents found";
         int level = _module.Settings.WarningLevel;
         for (int i = 0; i < agents.Count; i++)
             Fill(_cardParts[i], agents[i], level, now);
@@ -239,7 +243,7 @@ public sealed class AgentsIslandView : UserControl
         bool failed = _failed == session.Id;
         string state = failed ? "Switch failed" : session.State(now);
         parts.State.Text = state;
-        parts.State.SetResourceReference(TextBlock.ForegroundProperty, failed || !session.Working ? Caution : "IslandTextTertiaryBrush");
+        parts.State.SetResourceReference(TextBlock.ForegroundProperty, failed || session.NeedsInput ? Caution : "IslandTextTertiaryBrush");
         string app = _module.AppOf(session);
         parts.App.Text = app;
         parts.Row.ToolTip = $"{session.Name} · {state} · {app}";

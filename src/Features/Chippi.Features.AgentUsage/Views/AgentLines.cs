@@ -23,6 +23,7 @@ internal static class AgentLines
             return agent.Fresh ? ("", false) : (AgentText.AsOf(agent.Reading!.At, now), false);
         return agent.Check switch
         {
+            CheckState.None => ("Checking…", false),
             CheckState.SignedOut => ("Signed out", true),
             CheckState.TooOld => ("Too old to read limits", true),
             CheckState.Failed => ("Check failed", true),
@@ -38,6 +39,6 @@ internal static class AgentLines
         CheckState.SignedOut => "Signed out",
         CheckState.TooOld => "Too old to read limits",
         CheckState.Failed => "Check failed",
-        _ => agent.Found ? "" : "Not found",
+        _ => "Not checked yet",
     };
 }

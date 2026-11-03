@@ -36,7 +36,7 @@ public sealed class PageTests
             int pid = 100 + i;
             h.Processes.Running[pid] = null;
             h.Write($".claude/sessions/{pid}.json",
-                $$"""{"pid":{{pid}},"sessionId":"s{{pid}}","name":"session {{i}}","status":"{{(i % 2 == 0 ? "busy" : "idle")}}","statusUpdatedAt":{{Harness.Start.AddMinutes(-i).ToUnixTimeMilliseconds()}},"entrypoint":"claude-desktop"}""");
+                $$"""{"pid":{{pid}},"sessionId":"s{{pid}}","name":"session {{i}}","status":"{{(i % 2 == 0 ? "busy" : i == 1 ? "idle" : "waiting")}}","statusUpdatedAt":{{Harness.Start.AddMinutes(-i).ToUnixTimeMilliseconds()}},"entrypoint":"claude-desktop"}""");
         }
         h.Step(UsageSchedule.First);
         return h;
@@ -69,7 +69,7 @@ public sealed class PageTests
             Assert.Contains("Sessions", texts);
             var rows = Find<Button>(view).ToList();
             Assert.Equal(3, rows.Count); // of 4
-            Assert.Contains("Waiting on you", texts);
+            Assert.Contains("Idle", texts);
             Assert.Contains("Working · 1 min", texts);
             Assert.Contains("Claude", texts);
         });
@@ -105,6 +105,27 @@ public sealed class PageTests
             Assert.Empty(Find<Button>(view));
         });
     }
+
+    [Fact]
+    public void The_empty_page_distinguishes_detection_disabled_and_missing_agents() => WpfTestThread.Run(() =>
+    {
+        using var h = new Harness();
+        var view = new AgentsIslandView(h.Module);
+        Assert.Contains("Checking agents…", Texts(view));
+        h.Module.ApplyAsync(h.Module.Settings with { Claude = false, Codex = false }).GetAwaiter().GetResult();
+        h.Step();
+        view.Refresh();
+        Assert.Contains("Agent checks are off", Texts(view));
+    });
+
+    [Fact]
+    public void Installed_agents_show_before_the_first_usage_check() => WpfTestThread.Run(() =>
+    {
+        using var h = new Harness(p => p.Scripts[AgentKind.Codex] = () => Answers.Codex());
+        var view = new AgentsIslandView(h.Module);
+        Assert.Contains("Codex", Texts(view));
+        Assert.Contains("Checking…", Texts(view));
+    });
 
     [Fact]
     public void Settings_lists_every_session_and_each_agents_state()
