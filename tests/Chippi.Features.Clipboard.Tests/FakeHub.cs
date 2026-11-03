@@ -15,6 +15,7 @@ internal sealed class FakeHub : IClipboardHub
 
     /// <summary>The next on-demand read.</summary>
     public ClipRead Current { get; set; } = new(ClipStatus.Empty);
+    public Task<ClipRead>? PendingRead { get; set; }
 
     public ClipStatus WriteResult { get; set; } = ClipStatus.Ok;
 
@@ -51,7 +52,7 @@ internal sealed class FakeHub : IClipboardHub
         });
     }
 
-    public Task<ClipRead> ReadAsync(CancellationToken cancel = default) => Task.FromResult(Current);
+    public Task<ClipRead> ReadAsync(CancellationToken cancel = default) => PendingRead ?? Task.FromResult(Current);
 
     public Task<ClipStatus> WriteAsync(ClipContent content, CancellationToken cancel = default)
     {

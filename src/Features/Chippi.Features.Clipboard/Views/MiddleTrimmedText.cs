@@ -11,15 +11,20 @@ namespace Chippi.Features.Clipboard.Views;
 /// <summary>A display-only link, at most three lines, retaining both ends. The source is never shortened.</summary>
 internal sealed class MiddleTrimmedText : ContentControl
 {
-    private readonly TextBlock _text = new() { TextWrapping = TextWrapping.Wrap, LineHeight = 16 };
-    private const double LineHeight = 16;
+    private readonly TextBlock _text = new() { TextWrapping = TextWrapping.Wrap, LineStackingStrategy = LineStackingStrategy.BlockLineHeight };
     public static readonly DependencyProperty FullTextProperty = DependencyProperty.Register(nameof(FullText), typeof(string), typeof(MiddleTrimmedText),
         new FrameworkPropertyMetadata("", FrameworkPropertyMetadataOptions.AffectsMeasure, (d, e) => ((MiddleTrimmedText)d)._text.Text = (string)e.NewValue));
     public string FullText { get => (string)GetValue(FullTextProperty); set => SetValue(FullTextProperty, value); }
 
-    public MiddleTrimmedText()
+    public MiddleTrimmedText(double fontSize = 12, double lineHeight = 16)
     {
-        FontSize = 12; MaxHeight = 48; HorizontalContentAlignment = HorizontalAlignment.Stretch; Content = _text;
+        Focusable = false;
+        IsTabStop = false;
+        FontSize = fontSize;
+        _text.LineHeight = lineHeight;
+        MaxHeight = lineHeight * 3;
+        HorizontalContentAlignment = HorizontalAlignment.Stretch;
+        Content = _text;
     }
 
     protected override Size MeasureOverride(Size constraint)
@@ -34,9 +39,15 @@ internal sealed class MiddleTrimmedText : ContentControl
         if (!double.IsFinite(width) || width <= 0 || text.Length == 0) return text;
         bool Fits(string candidate) => new FormattedText(candidate, CultureInfo.CurrentUICulture, FlowDirection,
             new Typeface(FontFamily, FontStyle, FontWeight, FontStretch), FontSize, Brushes.White, VisualTreeHelper.GetDpi(this).PixelsPerDip)
-            { MaxTextWidth = width, LineHeight = LineHeight }.Height <= LineHeight * 3 + 0.1;
+            { MaxTextWidth = width, LineHeight = _text.LineHeight }.Height <= MaxHeight + 0.1;
         if (Fits(text)) return text;
-        string Middle(int keep) => text[..((keep + 1) / 2)] + "\u2026" + (keep / 2 == 0 ? "" : text[^(keep / 2)..]);
+        string Middle(int keep)
+        {
+            int left = (keep + 1) / 2, right = text.Length - keep / 2;
+            if (left > 0 && char.IsHighSurrogate(text[left - 1])) left--;
+            if (right < text.Length && char.IsLowSurrogate(text[right])) right++;
+            return text[..left] + "\u2026" + text[right..];
+        }
         int low = 0, high = text.Length - 1;
         while (low < high)
         {

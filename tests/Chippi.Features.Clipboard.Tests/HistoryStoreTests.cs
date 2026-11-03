@@ -142,6 +142,8 @@ public sealed class HistoryStoreTests : IDisposable
         _store.Delete(gone.Id);
         var arriving = Add("different clip", T0);
         Assert.Equal(gone.Id, arriving.Id);
+        Assert.Null(_store.SetPinned(gone.Id, true, T0, gone.ContentHash));
+        _store.Delete(gone.Id, gone.ContentHash);
         Assert.Equal(again.Id, Add("matching repeat", T0.AddSeconds(1)).Id);
         _store.ClearUnpinned(scope);
         Assert.Equal(["matching repeat", "different clip"], _store.Load(T0.AddSeconds(1)).Select(e => e.Text));

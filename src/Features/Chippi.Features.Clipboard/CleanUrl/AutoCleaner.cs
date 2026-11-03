@@ -63,7 +63,7 @@ public sealed class AutoCleaner : IDisposable
         }
         if (UrlCleaner.Clean(text) is not { RemovedParameters.Count: > 0 } result || !Uri.TryCreate(result.Url, UriKind.Absolute, out var uri))
             return null;
-        return Sites.Covers(skip, uri.Host) ? null : result.Url;
+        return Sites.Host(uri) is { } host && !Sites.Covers(skip, host) ? result.Url : null;
     }
 
     public void Dispose()
@@ -103,7 +103,14 @@ public static class Sites
             text = "https://" + text;
         if (!Uri.TryCreate(text, UriKind.Absolute, out var uri) || uri.HostNameType is not (UriHostNameType.Dns or UriHostNameType.IPv4 or UriHostNameType.IPv6) || !uri.Host.Contains('.'))
             return null;
-        return uri.IdnHost.ToLowerInvariant();
+        return Host(uri);
+    }
+
+    // Uri.TryCreate can accept a host that cannot be converted into its DNS spelling.
+    internal static string? Host(Uri uri)
+    {
+        try { return uri.IdnHost.TrimEnd('.').ToLowerInvariant(); }
+        catch (UriFormatException) { return null; }
     }
 
     public static bool Covers(IEnumerable<string> sites, string host)

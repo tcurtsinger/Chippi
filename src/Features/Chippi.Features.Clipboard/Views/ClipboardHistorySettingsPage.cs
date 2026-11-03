@@ -33,6 +33,7 @@ public sealed class ClipboardHistorySettingsPage : UserControl
     private readonly TextBlock _count = SettingsUi.Text("", "CaptionTextStyle");
     private readonly StackPanel _historySection = new();
     private readonly HistoryThumbnails _thumbnails = new();
+    private IReadOnlyList<string>? _renderedApps;
     private IReadOnlyList<HistoryEntry>? _snapshot;
     private IReadOnlyList<HistoryEntry> _ordered = [];
     private readonly Dictionary<long, HistoryRow> _rows = [];
@@ -125,11 +126,18 @@ public sealed class ClipboardHistorySettingsPage : UserControl
         _syncRecording();
         _settingsError.Text = _module.SettingsError ?? "";
         _settingsError.Visibility = _settingsError.Text.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
-        _apps.Children.Clear();
-        foreach (var path in _module.Settings.AppsToSkip)
-            _apps.Children.Add(SettingsUi.ListRow(Monogram(AppName(path)), AppName(path), path, () => Save(_module.Settings.AppsToSkip.Where(p => p != path))));
-        if (_apps.Children.Count == 0)
-            _apps.Children.Add(SettingsLayout.Empty("No apps"));
+        var apps = _module.Settings.AppsToSkip;
+        if (_renderedApps is null || !_renderedApps.SequenceEqual(apps))
+        {
+            _renderedApps = apps.ToArray();
+            _apps.Children.Clear();
+            foreach (var path in apps)
+            {
+                string name = AppName(path);
+                _apps.Children.Add(SettingsUi.ListRow(Monogram(name), name, path, () => Save(_module.Settings.AppsToSkip.Where(p => p != path))));
+            }
+            if (apps.Count == 0) _apps.Children.Add(SettingsLayout.Empty("No apps"));
+        }
         RefreshHistory();
     }
 
@@ -138,9 +146,24 @@ public sealed class ClipboardHistorySettingsPage : UserControl
     {
         var settings = _module.Settings;
         var entries = _module.History?.Entries ?? [];
+        HistoryEntry? focused = null;
+        int focusAt = 0;
         if (!ReferenceEquals(_snapshot, entries))
         {
-            ForgetRows();
+            // Keep unchanged anchors mounted: a new copy must not close another clip's menu.
+            var current = entries.ToDictionary(e => e.Id);
+            var focusedRow = _list.IsKeyboardFocusWithin ? _rows.Values.FirstOrDefault(r => r.Container.IsKeyboardFocusWithin) : null;
+            if (focusedRow is not null)
+                focusAt = _list.Children.Cast<UIElement>().TakeWhile(c => c != focusedRow.Container).Count(c => c.Visibility == Visibility.Visible);
+            foreach (var row in _rows.Values.ToArray())
+            {
+                var old = row.Entry;
+                if (current.TryGetValue(old.Id, out var next) && old.ContentHash == next.ContentHash &&
+                    old.Recent == next.Recent && old.PinnedAt == next.PinnedAt) continue;
+                if (row == focusedRow) focused = old;
+                _rows.Remove(old.Id);
+                _list.Children.Remove(row.Container);
+            }
             _thumbnails.Retain(entries);
             _snapshot = entries;
             _ordered = [.. entries.Where(e => e.Pinned).OrderByDescending(e => e.PinnedAt), .. entries.Where(e => !e.Pinned)];
@@ -167,19 +190,33 @@ public sealed class ClipboardHistorySettingsPage : UserControl
                 row.Container.Visibility = visibility;
             if (!match) continue;
             shown++;
-            UpdateRow(entry, row, now, HistoryFiles.Missing(entry));
+            UpdateRow(entry, row, now, HistoryFiles.Missing(entry), search);
         }
         _count.Text = search.Length > 0 ? $"{shown:N0} of {entries.Count:N0}"
             : entries.Count == 1 ? "1 item" : $"{entries.Count.ToString(CultureInfo.CurrentCulture)} items";
-        if (shown == 0 && _empty is null)
+        if (shown == 0)
         {
-            _empty = SettingsLayout.Empty(entries.Count == 0 ? "No items" : "No matches");
-            _list.Children.Add(_empty);
+            string message = entries.Count == 0 ? "No items" : "No matches";
+            if (_empty is null || (_empty.Child as TextBlock)?.Text != message)
+            {
+                if (_empty is not null) _list.Children.Remove(_empty);
+                _empty = SettingsLayout.Empty(message);
+                _list.Children.Add(_empty);
+            }
         }
         else if (shown > 0 && _empty is not null)
         {
             _list.Children.Remove(_empty);
             _empty = null;
+        }
+        if (focused is not null)
+        {
+            var remaining = _ordered.Where(e => _rows.TryGetValue(e.Id, out var row) && row.Container.Visibility == Visibility.Visible).ToList();
+            var target = remaining.FirstOrDefault(e => e.Id == focused.Id && e.ContentHash == focused.ContentHash)
+                ?? remaining.ElementAtOrDefault(Math.Min(focusAt, Math.Max(0, remaining.Count - 1)));
+            if (target is not null) _rows[target.Id].More.Focus();
+            else if (_search.IsVisible) _search.Focus();
+            else _add.Focus();
         }
     }
 
@@ -192,10 +229,11 @@ public sealed class ClipboardHistorySettingsPage : UserControl
         _empty = null;
     }
 
-    private sealed record HistoryRow(Border Container, TextBlock When, IconButton More, LucideIcon? FileIcon)
+    private sealed record HistoryRow(HistoryEntry Entry, Border Container, TextBlock Line, TextBlock When, IconButton More, LucideIcon? FileIcon)
     {
         public string? Age { get; set; }
         public string? Status { get; set; }
+        public string? Query { get; set; }
     }
 
     /// <summary>A copy on one 48 row: its glyph, the line, the pin when pinned, when (or how its Copy went), and ⋯.</summary>
@@ -216,7 +254,7 @@ public sealed class ClipboardHistorySettingsPage : UserControl
         kind.HorizontalAlignment = HorizontalAlignment.Center;
         kind.Margin = new Thickness(0, 0, 12, 0);
         Add(grid, kind, 0);
-        var line = SettingsUi.Text(Format.Line(entry));
+        var line = SettingsUi.Text("");
         line.Margin = new Thickness(0, 0, 12, 0);
         Add(grid, line, 1);
         if (entry.Pinned)
@@ -232,14 +270,22 @@ public sealed class ClipboardHistorySettingsPage : UserControl
         more.Click += (_, _) => Menu(more, entry).IsOpen = true;
         Add(grid, more, 4);
         var row = new Border { MinHeight = SettingsLayout.RowHeight, Padding = new Thickness(16, 8, 8, 8), Child = grid };
-        return new HistoryRow(row, when, more, entry.Kind == EntryKind.Files ? (LucideIcon)kind : null);
+        return new HistoryRow(entry, row, line, when, more, entry.Kind == EntryKind.Files ? (LucideIcon)kind : null);
     }
 
-    private void UpdateRow(HistoryEntry entry, HistoryRow row, DateTimeOffset now, int missing)
+    private void UpdateRow(HistoryEntry entry, HistoryRow row, DateTimeOffset now, int missing, string query)
     {
+        bool newLine = false;
+        if (row.Query != query)
+        {
+            row.Query = query;
+            string line = Format.Line(entry, query);
+            newLine = row.Line.Text != line;
+            if (newLine) row.Line.Text = line;
+        }
         string age = Format.When(entry.Recent, now);
         string status = missing > 0 ? Format.Unavailable(missing) : _status == (entry.Id, entry.Recent) ? _statusText : "";
-        if (row.Age == age && row.Status == status) return;
+        if (!newLine && row.Age == age && row.Status == status) return;
         row.Age = age;
         row.Status = status;
         row.When.Text = status.Length > 0 ? status : age;
@@ -247,7 +293,7 @@ public sealed class ClipboardHistorySettingsPage : UserControl
         AutomationProperties.SetLiveSetting(row.When, status.Length > 0 ? AutomationLiveSetting.Polite : AutomationLiveSetting.Off);
         if (row.FileIcon is { } file)
             file.Data = missing > 0 ? LucideIcons.FileX : entry.Files?.Count == 1 ? LucideIcons.File : LucideIcons.Files;
-        string name = Format.AccessibleName(entry, now);
+        string name = Format.AccessibleName(entry, now, query);
         AutomationProperties.SetName(row.More, $"More for {name}");
         AutomationProperties.SetName(row.Container, status.Length > 0 ? $"{name}, {status}" : name);
     }
@@ -257,13 +303,13 @@ public sealed class ClipboardHistorySettingsPage : UserControl
     {
         int missing = HistoryFiles.Missing(entry);
         if (_rows.TryGetValue(entry.Id, out var row))
-            UpdateRow(entry, row, DateTimeOffset.Now, missing);
+            UpdateRow(entry, row, DateTimeOffset.Now, missing, _search.Text.Trim());
         bool usable = missing == 0;
         return SettingsUi.Menu(anchor,
             ("Paste", usable, () => Paste(entry)),
             ("Copy", usable, () => Copy(entry)),
-            (entry.Pinned ? "Unpin" : "Pin", true, () => _ = _module.History?.PinAsync(entry.Id, !entry.Pinned)),
-            ("Delete", true, () => _ = _module.History?.DeleteAsync(entry.Id)));
+            (entry.Pinned ? "Unpin" : "Pin", true, () => _ = _module.History?.PinAsync(entry.Id, !entry.Pinned, entry.ContentHash)),
+            ("Delete", true, () => _ = _module.History?.DeleteAsync(entry.Id, entry.ContentHash)));
     }
 
     /// <summary>

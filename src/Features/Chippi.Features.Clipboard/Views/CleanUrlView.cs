@@ -5,7 +5,6 @@ using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Input;
-using System.Windows.Media;
 using System.Windows.Threading;
 using Chippi.Core.Clipboard;
 using Chippi.UI.Controls;
@@ -20,8 +19,7 @@ namespace Chippi.Features.Clipboard.Views;
 internal sealed class CleanUrlView : UserControl
 {
     private readonly ClipboardFeatures _features;
-    private readonly TextBox _field = new() { TextWrapping = TextWrapping.Wrap, AcceptsReturn = false, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled, MaxLines = 3, MaxHeight = 60, FontSize = 12, HorizontalAlignment = HorizontalAlignment.Stretch, Tag = "Link" };
-    private readonly MiddleTrimmedText _display = new() { IsHitTestVisible = false, Margin = new Thickness(10, 6, 10, 6) };
+    private readonly CleanLinkField _input = new();
     private readonly MiddleTrimmedText _clean = new();
     private readonly Border _result = new() { Margin = new Thickness(0, 8, 0, 0) };
     private readonly StackPanel _caution = Ui.Caution();
@@ -33,28 +31,8 @@ internal sealed class CleanUrlView : UserControl
     public CleanUrlView(ClipboardFeatures features)
     {
         _features = features;
-        Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri("pack://application:,,,/Chippi.Features.Clipboard;component/Views/CleanUrlStyles.xaml") });
-        _field.Style = (Style)Resources["CleanUrlFieldStyle"];
-        TextBlock.SetLineHeight(_field, 16);
-        _field.Foreground = Brushes.Transparent;
-        _display.SetResourceReference(TextBlock.ForegroundProperty, "TextPrimaryBrush");
-        _field.GotKeyboardFocus += (_, _) =>
-        {
-            _display.Visibility = Visibility.Collapsed;
-            _field.SetResourceReference(Control.ForegroundProperty, "TextPrimaryBrush");
-            _field.SelectAll();
-            _field.ScrollToHome();
-        };
-        _field.PreviewMouseLeftButtonDown += (_, e) =>
-        {
-            if (_field.IsKeyboardFocusWithin) return;
-            _field.Focus();
-            e.Handled = true; // Keep SelectAll when the first click gives the field focus.
-        };
-        _field.LostKeyboardFocus += (_, _) => { _field.Foreground = Brushes.Transparent; _display.Visibility = Visibility.Visible; };
-        AutomationProperties.SetName(_field, "Link");
-        _field.TextChanged += (_, _) => Refresh();
-        _field.KeyDown += (_, e) =>
+        Field.TextChanged += (_, _) => Refresh();
+        Field.KeyDown += (_, e) =>
         {
             if (e.Key == Key.Enter && _copy.IsEnabled)
             {
@@ -75,19 +53,20 @@ internal sealed class CleanUrlView : UserControl
         DockPanel.SetDock(_copy, Dock.Right);
         var footer = new DockPanel { Margin = new Thickness(0, 8, 0, 0), LastChildFill = true, Children = { _copy, _copied } };
 
-        var input = new Grid { ClipToBounds = true, Children = { _field, _display } };
-        Content = new StackPanel { Children = { input, _caution, _result, footer } };
+        Content = new StackPanel { Children = { _input, _caution, _result, footer } };
         Refresh();
     }
 
     /// <summary>The field, which takes the keyboard when the view opens (notes #58).</summary>
-    public TextBox Field => _field;
+    public TextBox Field => _input.Field;
 
     /// <summary>Each time the view opens: the copy's link in the field when it qualifies, else an empty field (notes #24).</summary>
     public async void Open()
     {
         int opening = ++_opening;
-        _field.Text = "";
+        if (Field.Text.Length == 0) Refresh(); // Reopening also clears feedback from an earlier empty or busy read.
+        else Field.Clear();
+        int revision = _copyVersion;
         if (_features.CleanUrl?.Hub is not { } hub)
             return;
         ClipRead read;
@@ -100,13 +79,15 @@ internal sealed class CleanUrlView : UserControl
             return;
         }
         // A newer open, or typing meanwhile, wins.
-        if (opening != _opening || _field.Text.Length > 0)
+        if (opening != _opening || revision != _copyVersion)
             return;
+        if (read.Status == ClipStatus.Busy)
+            Ui.Show(_caution, "Clipboard busy");
         if (read is { Status: ClipStatus.Ok, Privacy: ClipPrivacy.None, Content: { Text: { } text, Files: null, Image: null } } && UrlCleaner.Clean(text) is not null)
         {
-            _field.Text = text.Trim();
-            _field.SelectAll();
-            _field.ScrollToHome();
+            Field.Text = text.Trim();
+            Field.SelectAll();
+            Field.ScrollToHome();
         }
     }
 
@@ -114,8 +95,7 @@ internal sealed class CleanUrlView : UserControl
     {
         _copyVersion++;
         _copied.Visibility = Visibility.Collapsed;
-        string text = _field.Text;
-        _display.FullText = text;
+        string text = Field.Text;
         var result = UrlCleaner.Clean(text);
         Ui.Show(_caution, text.Trim().Length > 0 && result is null ? "Not a web link" : null);
         _result.Visibility = result is null ? Visibility.Collapsed : Visibility.Visible;
@@ -134,7 +114,7 @@ internal sealed class CleanUrlView : UserControl
 
     private async void Copy()
     {
-        if (UrlCleaner.Clean(_field.Text) is not { RemovedParameters.Count: > 0 } result || _features.CleanUrl?.Hub is not { } hub)
+        if (UrlCleaner.Clean(Field.Text) is not { RemovedParameters.Count: > 0 } result || _features.CleanUrl?.Hub is not { } hub)
             return;
         int version = ++_copyVersion;
         var status = await hub.WriteAsync(ClipContent.FromText(result.Url));

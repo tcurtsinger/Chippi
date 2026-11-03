@@ -26,6 +26,11 @@ internal sealed class ClipboardView : UserControl
 {
     /// <summary>More rows than the 268 under Search can show, even at a heading's 22: the list never needs the rest.</summary>
     internal const int BuiltRows = 16;
+    private const double ArtWidth = 32, ContentInset = 2 + ArtWidth + 8;
+
+    // A rebuild can follow a clock tick, a newly saved clip, or a click on the row itself.
+    private readonly record struct RowTarget(long Id, long Hash, string Part);
+    private readonly Dictionary<RowTarget, Button> _buttons = [];
 
     private readonly ClipboardFeatures _features;
     private readonly TextBlock _note = new() { FontSize = 11, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 8, 0) };
@@ -46,10 +51,11 @@ internal sealed class ClipboardView : UserControl
     private readonly Dictionary<long, (string Path, BitmapSource? Image)> _fileThumbnails = []; // the same, checked against the path; null while reading or unreadable
     private readonly DispatcherTimer _clock = new() { Interval = TimeSpan.FromSeconds(30) };
     private List<HistoryEntry> _shown = [];
-    private long? _selected;
+    private (long Id, long Hash)? _selected;
     private string? _status; // the selected row's "Clipboard busy" or "Copied"
     private int _actionVersion;
     private bool _cleaning;
+    private bool _watching;
     private ClipboardHistoryModule? _module;
 
     public ClipboardView(ClipboardFeatures features)
@@ -84,7 +90,7 @@ internal sealed class ClipboardView : UserControl
         _firstUse.Children.Add(off);
         _firstUse.Children.Add(_turnOn);
 
-        _search.TextChanged += (_, _) => Refresh(keepScroll: false);
+        _search.TextChanged += (_, _) => Refresh();
         _search.PreviewKeyDown += OnSearchKey;
         AutomationProperties.SetName(_search, "Search");
         _caution.Margin = new Thickness(10, 0, 0, 8);
@@ -119,22 +125,29 @@ internal sealed class ClipboardView : UserControl
         Height = IslandPage.BodyHeight;
         AutomationProperties.SetName(this, "Clipboard");
 
-        _clock.Tick += (_, _) => Refresh(keepScroll: true);
+        _clock.Tick += (_, _) => Refresh();
         Loaded += (_, _) =>
         {
+            _watching = true;
             _features.Changed += OnFeatures;
             Attach();
             _clock.Start();
             _search.Text = "";
             _selected = null;
             SetCleaning(false, focus: false);
-            Refresh(keepScroll: false);
         };
         Unloaded += (_, _) =>
         {
+            _watching = false;
             _features.Changed -= OnFeatures;
             Detach();
             _clock.Stop();
+            _actionVersion++;
+            _selected = null;
+            _status = null;
+            _search.Text = "";
+            _shown.Clear();
+            ClearRows();
             _thumbnails.Clear(); // no picture stays in memory while the page is closed
             _fileThumbnails.Clear();
         };
@@ -176,9 +189,11 @@ internal sealed class ClipboardView : UserControl
 
     private void OnFeatures() => Dispatcher.BeginInvoke(() =>
     {
+        if (!_watching) return;
         Detach();
         Attach();
-        Refresh(keepScroll: true);
+        if (_cleaning && _features.CleanUrl is null) SetCleaning(false);
+        else Refresh();
     });
 
     private void Attach()
@@ -201,7 +216,7 @@ internal sealed class ClipboardView : UserControl
         _module = null;
     }
 
-    private void OnModuleChanged() => Dispatcher.BeginInvoke(() => Refresh(keepScroll: true));
+    private void OnModuleChanged() => Dispatcher.BeginInvoke(() => { if (_module is not null) Refresh(); });
 
     // ---- Views ----
 
@@ -211,19 +226,17 @@ internal sealed class ClipboardView : UserControl
             on = false;
         _cleaning = on;
         // Pressed while Clean URL shows (notes #23).
-        if (on)
-            _cleanButton.SetResourceReference(BackgroundProperty, "ButtonBackgroundBrush");
-        else
-            _cleanButton.ClearValue(BackgroundProperty);
+        _cleanButton.Tag = on ? "Selected" : null;
+        _cleanButton.ToolTip = on ? "Back to Clipboard" : "Clean URL";
         AutomationProperties.SetItemStatus(_cleanButton, on ? "Pressed" : "");
         if (on)
             _clean.Open();
-        Refresh(keepScroll: true);
+        Refresh();
         if (focus)
             Dispatcher.BeginInvoke(DispatcherPriority.Input, () => { if (IsVisible) InitialFocus.Focus(); });
     }
 
-    private void Refresh(bool keepScroll)
+    private void Refresh()
     {
         var history = _module?.History;
         var settings = _module?.Settings ?? new ClipboardHistorySettings();
@@ -251,7 +264,12 @@ internal sealed class ClipboardView : UserControl
             _fileThumbnails.Remove(gone);
         _history.Visibility = !_cleaning && !firstUse ? Visibility.Visible : Visibility.Collapsed;
         if (_history.Visibility != Visibility.Visible)
+        {
+            // Only identity and the search survive Back. Erasing history must also release hidden previews.
+            _shown.Clear();
+            ClearRows();
             return;
+        }
 
         Ui.Show(_caution, history?.Full == true ? Format.Full : Format.Limit(history?.Limit ?? ClipLimit.None));
         string search = _search.Text.Trim();
@@ -259,18 +277,22 @@ internal sealed class ClipboardView : UserControl
         var pinned = _shown.Where(e => e.Pinned).OrderByDescending(e => e.PinnedAt).ToList();
         var recent = _shown.Where(e => !e.Pinned).ToList();
         _shown = [.. pinned, .. recent];
-        if (_selected is { } id && !_shown.Any(e => e.Id == id))
+        if (_selected is { } selected && !_shown.Any(e => Identity(e) == selected))
+        {
             _selected = null;
+            _status = null;
+            _actionVersion++;
+        }
 
         // Pinned first, then Recent, as many whole rows as fit; the selected entry stays in view, and a
         // search shows its best matches that fit, newest first (brief Part D #5). Only the rows that can
         // show are built, up to the selected one: building every copy made each key and click slow.
-        _rows.Children.Clear();
-        _rows.Keep = null;
+        RowTarget? focused = _rows.IsKeyboardFocusWithin && Keyboard.FocusedElement is Button { Tag: RowTarget target } ? target : null;
+        ClearRows();
         _rows.TotalEntries = _shown.Count;
         if (_shown.Count == 0) _allHistory.Visibility = Visibility.Collapsed;
         var now = DateTimeOffset.Now;
-        int selectedAt = _selected is { } kept ? _shown.FindIndex(e => e.Id == kept) : -1;
+        int selectedAt = _selected is { } kept ? _shown.FindIndex(e => Identity(e) == kept) : -1;
         int from = Math.Max(0, selectedAt - BuiltRows + 1), to = Math.Min(_shown.Count, Math.Max(selectedAt + 1, from + BuiltRows));
         for (int i = from; i < to; i++)
         {
@@ -278,7 +300,7 @@ internal sealed class ClipboardView : UserControl
                 _rows.Children.Add(Label("Pinned"));
             if (i == pinned.Count && search.Length == 0 && pinned.Count > 0)
                 _rows.Children.Add(Label("Recent"));
-            _rows.Children.Add(Row(_shown[i], now));
+            _rows.Children.Add(Row(_shown[i], now, search));
         }
         if (search.Length == 0 && pinned.Count > 0 && recent.Count == 0 && to == _shown.Count)
         {
@@ -291,6 +313,28 @@ internal sealed class ClipboardView : UserControl
         _empty.Text = entries.Count == 0 ? "No items" : _shown.Count == 0 ? "No matches" : "";
         _empty.Visibility = _empty.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
         _rows.Visibility = _shown.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        if (focused is { } prior && IsVisible)
+        {
+            _rows.UpdateLayout();
+            if (!_buttons.TryGetValue(prior, out var next) || !next.IsVisible || !next.Focus())
+                InitialFocus.Focus();
+        }
+    }
+
+    private void ClearRows()
+    {
+        _buttons.Clear();
+        _rows.Children.Clear();
+        _rows.Keep = null;
+    }
+
+    private static (long Id, long Hash) Identity(HistoryEntry entry) => (entry.Id, entry.ContentHash);
+
+    private void Track(Button button, HistoryEntry entry, string part)
+    {
+        var key = new RowTarget(entry.Id, entry.ContentHash, part);
+        button.Tag = key;
+        _buttons[key] = button;
     }
 
     /// <summary>"Pinned" or "Recent": 22 tall, 11 / 600, 10 in.</summary>
@@ -306,24 +350,24 @@ internal sealed class ClipboardView : UserControl
     }
 
     /// <summary>A copy on one 30 row: its glyph or picture, the line and when. Selected, it opens in place.</summary>
-    private FrameworkElement Row(HistoryEntry entry, DateTimeOffset now)
+    private FrameworkElement Row(HistoryEntry entry, DateTimeOffset now, string search)
     {
-        bool selected = entry.Id == _selected;
+        bool selected = Identity(entry) == _selected;
         var head = new DockPanel();
         var when = Ui.Muted(Format.When(entry.Recent, now), 11);
         when.Margin = new Thickness(10, 0, 0, 0);
         DockPanel.SetDock(when, Dock.Right);
         head.Children.Add(when);
-        var kind = Kind(entry);
-        kind.Margin = new Thickness(0, 0, 8, 0);
-        head.Children.Add(kind);
-        head.Children.Add(Ui.Text(selected ? Format.Details(entry) : Format.Line(entry), 12));
+        var art = new Grid { Width = ArtWidth, Margin = new Thickness(0, 0, 8, 0), Children = { Kind(entry) } };
+        head.Children.Add(art);
+        head.Children.Add(Ui.Text(selected ? Format.Details(entry) : Format.Line(entry, search), 12));
 
         var button = new Button { Content = head }; // an open row's fill is its card's
         button.SetResourceReference(StyleProperty, "IslandListRowStyle");
-        AutomationProperties.SetName(button, Format.AccessibleName(entry, now));
+        Track(button, entry, "Row");
+        AutomationProperties.SetName(button, Format.AccessibleName(entry, now, search));
         AutomationProperties.SetItemStatus(button, selected ? "Expanded" : "");
-        button.Click += (_, _) => Select(entry.Id);
+        button.Click += (_, _) => Select(entry);
         button.MouseDoubleClick += (_, e) =>
         {
             e.Handled = true;
@@ -333,7 +377,8 @@ internal sealed class ClipboardView : UserControl
             return button;
 
         // Open: the row, at most 3 lines of preview, then the actions. It counts at its full height.
-        var open = new StackPanel { Children = { button, Preview(entry), Actions(entry) } };
+        button.Padding = new Thickness(2, 0, 2, 0); // The card supplies the other 8 DIPs of a normal row's 10.
+        var open = new StackPanel { Children = { button, Preview(entry, search), Actions(entry) } };
         var card = new Border { Child = open, CornerRadius = new CornerRadius(6), Padding = new Thickness(8, 0, 8, 8), Margin = new Thickness(0, 2, 0, 2) };
         card.SetResourceReference(Border.BackgroundProperty, "IslandAccentTintBrush");
         _rows.Keep = card;
@@ -342,13 +387,14 @@ internal sealed class ClipboardView : UserControl
 
     private FrameworkElement Kind(HistoryEntry entry)
     {
-        if ((entry.Kind == EntryKind.Picture ? Thumbnail(entry) : HistoryFiles.Missing(entry) == 0 ? FileThumbnail(entry) : null) is { } thumbnail)
+        int missing = HistoryFiles.Missing(entry);
+        if ((entry.Kind == EntryKind.Picture ? Thumbnail(entry) : missing == 0 ? FileThumbnail(entry) : null) is { } thumbnail)
             return new Image { Source = thumbnail, Width = 32, Height = 20, Stretch = Stretch.UniformToFill, VerticalAlignment = VerticalAlignment.Center };
         var glyph = entry.Kind switch
         {
             EntryKind.Link => LucideIcons.Globe,
             EntryKind.Picture => LucideIcons.Image,
-            EntryKind.Files when HistoryFiles.Missing(entry) == entry.Files?.Count => LucideIcons.FileX,
+            EntryKind.Files when missing > 0 => LucideIcons.FileX,
             EntryKind.Files => entry.Files?.Count == 1 ? LucideIcons.File : LucideIcons.Files,
             _ => LucideIcons.AlignLeft,
         };
@@ -377,7 +423,7 @@ internal sealed class ClipboardView : UserControl
                 return;
             _fileThumbnails[id] = (path, image);
             if (_shown.Any(e => e.Id == id))
-                Refresh(keepScroll: true);
+                Refresh();
         }), TaskScheduler.Default);
         return null;
     }
@@ -386,20 +432,22 @@ internal sealed class ClipboardView : UserControl
     /// At most 3 lines (brief Part D #5): the text with the last line trimmed, the picture 3 lines tall,
     /// or 3 files with their sizes, the third saying how many more when there are (notes #9, #12).
     /// </summary>
-    private FrameworkElement Preview(HistoryEntry entry)
+    private FrameworkElement Preview(HistoryEntry entry, string search)
     {
         const double Line = 18, Lines = 3;
-        var margin = new Thickness(26, 0, 0, 8);
+        var margin = new Thickness(ContentInset, 0, 0, 8);
         switch (entry.Kind)
         {
             case EntryKind.Picture:
                 var image = new Image { MaxWidth = 208, Height = Lines * Line, Stretch = Stretch.Uniform, HorizontalAlignment = HorizontalAlignment.Left, Margin = margin, Source = Thumbnail(entry) };
-                _ = LoadPictureAsync(entry, image);
+                if (image.Source is null) _ = LoadPictureAsync(entry, image);
                 return image;
             case EntryKind.Files:
                 var files = new StackPanel { Margin = margin };
                 var paths = entry.Files ?? [];
-                foreach (var (path, at) in paths.Select((p, i) => (p, i)).Take((int)Lines))
+                IEnumerable<string> display = search.Length == 0 ? paths :
+                    paths.OrderByDescending(p => Path.GetFileName(p).Contains(search, StringComparison.OrdinalIgnoreCase));
+                foreach (var (path, at) in display.Select((p, i) => (p, i)).Take((int)Lines))
                 {
                     var line = new DockPanel { Height = Line };
                     if (at == Lines - 1 && paths.Count > Lines)
@@ -415,14 +463,15 @@ internal sealed class ClipboardView : UserControl
                     var glyph = Ui.Glyph(there ? LucideIcons.File : LucideIcons.FileX, 14, "IslandTextTertiaryBrush");
                     glyph.Margin = new Thickness(0, 0, 8, 0);
                     line.Children.Add(glyph);
-                    line.Children.Add(there ? Ui.Text(Path.GetFileName(path), 12) : Ui.Muted(Path.GetFileName(path), 12));
+                    string name = Format.Excerpt(Path.GetFileName(path), search);
+                    line.Children.Add(there ? Ui.Text(name, 12) : Ui.Muted(name, 12));
                     files.Children.Add(line);
                 }
                 return files;
             default:
                 // Trimming only marks a line cut at its width, so lines past the third end the third with "…";
                 // a wrapped line past the 3 lines is trimmed by the TextBlock itself.
-                var text = Ui.Text(PreviewText(entry.Text ?? "", (int)Lines), 12, "IslandTextSecondaryBrush");
+                var text = Ui.Text(PreviewText(entry.Text ?? "", (int)Lines, search), 12, "IslandTextSecondaryBrush");
                 text.TextWrapping = TextWrapping.Wrap;
                 text.TextTrimming = TextTrimming.CharacterEllipsis;
                 text.LineHeight = Line;
@@ -434,8 +483,13 @@ internal sealed class ClipboardView : UserControl
     }
 
     /// <summary>The first <paramref name="lines"/> lines of <paramref name="text"/>, the last ending in "…" when more follow.</summary>
-    internal static string PreviewText(string text, int lines)
+    internal static string PreviewText(string text, int lines, string search = "")
     {
+        if (search.Length > 0 && text.IndexOf(search, StringComparison.OrdinalIgnoreCase) is >= 0 and var hit)
+        {
+            int start = Format.MatchStart(text, hit);
+            if (start > 0) text = "…" + text[start..];
+        }
         var all = text.TrimEnd('\r', '\n').Split('\n');
         if (all.Length <= lines)
             return string.Join("\n", all.Select(line => line.TrimEnd('\r')));
@@ -464,6 +518,8 @@ internal sealed class ClipboardView : UserControl
         var copy = Ui.Button("Copy");
         copy.Margin = new Thickness(8, 0, 0, 0);
         paste.IsEnabled = copy.IsEnabled = missing == 0;
+        Track(paste, entry, "Paste");
+        Track(copy, entry, "Copy");
         paste.Click += (_, _) => Paste(entry);
         copy.Click += (_, _) => Copy(entry);
 
@@ -471,13 +527,15 @@ internal sealed class ClipboardView : UserControl
         var pin = Ui.Icon(entry.Pinned ? LucideIcons.PinOff : LucideIcons.Pin, entry.Pinned ? "Unpin" : "Pin");
         pin.Click += (_, _) => Pin(entry);
         var delete = Ui.Icon(LucideIcons.Trash, "Delete");
+        Track(pin, entry, "Pin");
+        Track(delete, entry, "Delete");
         delete.Margin = new Thickness(2, 0, -7, 0);
         delete.Click += (_, _) => Delete(entry);
         var icons = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Children = { pin, delete } };
         DockPanel.SetDock(icons, Dock.Right);
 
         string? status = missing > 0 ? Format.Unavailable(missing) : _status;
-        var line = new DockPanel { Margin = new Thickness(26, 0, 0, 0), Children = { icons } };
+        var line = new DockPanel { Margin = new Thickness(ContentInset, 0, 0, 0), Children = { icons } };
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, Children = { paste, copy } };
         if (status is not null)
         {
@@ -502,25 +560,25 @@ internal sealed class ClipboardView : UserControl
 
     // ---- Actions ----
 
-    private void Select(long id)
+    private void Select(HistoryEntry entry)
     {
         _status = null;
-        _selected = _selected == id ? null : id;
-        Refresh(keepScroll: true);
+        _selected = _selected == Identity(entry) ? null : Identity(entry);
+        Refresh();
     }
 
     private void Move(int by)
     {
         if (_shown.Count == 0)
             return;
-        int at = _selected is { } id ? _shown.FindIndex(e => e.Id == id) : -1;
+        int at = _selected is { } selected ? _shown.FindIndex(e => Identity(e) == selected) : -1;
         int next = at < 0 ? (by > 0 ? 0 : _shown.Count - 1) : Math.Clamp(at + by, 0, _shown.Count - 1);
         _status = null;
-        _selected = _shown[next].Id;
-        Refresh(keepScroll: true);
+        _selected = Identity(_shown[next]);
+        Refresh();
     }
 
-    private HistoryEntry? Selected => _selected is { } id ? _shown.FirstOrDefault(e => e.Id == id) : null;
+    private HistoryEntry? Selected => _selected is { } selected ? _shown.FirstOrDefault(e => Identity(e) == selected) : null;
 
     /// <summary>
     /// Hands the copy to the app that was in front before the island took the keyboard, then closes the
@@ -531,7 +589,7 @@ internal sealed class ClipboardView : UserControl
     {
         if (_module?.History is not { } history || Gone(history, entry))
             return;
-        _selected = entry.Id;
+        _selected = Identity(entry);
         if (_features.PasteTarget?.Invoke() is not { } target)
         {
             Copy(entry);
@@ -539,7 +597,7 @@ internal sealed class ClipboardView : UserControl
         }
         int version = ++_actionVersion;
         var outcome = await history.PasteAsync(entry, target);
-        if (version != _actionVersion || _selected != entry.Id) return;
+        if (version != _actionVersion || _selected != Identity(entry)) return;
         if (outcome == PasteOutcome.Sent)
             _features.CloseIsland?.Invoke();
         else
@@ -550,10 +608,10 @@ internal sealed class ClipboardView : UserControl
     {
         if (_module?.History is not { } history || Gone(history, entry))
             return;
-        _selected = entry.Id;
+        _selected = Identity(entry);
         int version = ++_actionVersion;
         var status = await history.CopyAsync(entry);
-        if (version == _actionVersion && _selected == entry.Id)
+        if (version == _actionVersion && _selected == Identity(entry))
             ShowStatus(ClipboardFeedback.ForCopy(status));
     }
 
@@ -564,25 +622,25 @@ internal sealed class ClipboardView : UserControl
             return false;
         _selected = null;
         _status = null;
-        Refresh(keepScroll: true);
+        Refresh();
         return true;
     }
 
     private void ShowStatus(string status)
     {
         _status = status;
-        Refresh(keepScroll: true);
+        Refresh();
     }
 
-    private void Pin(HistoryEntry entry) => _ = _module?.History?.PinAsync(entry.Id, !entry.Pinned);
+    private void Pin(HistoryEntry entry) => _ = _module?.History?.PinAsync(entry.Id, !entry.Pinned, entry.ContentHash);
 
     private void Delete(HistoryEntry entry)
     {
         int at = _shown.FindIndex(e => e.Id == entry.Id);
         var next = _shown.ElementAtOrDefault(at + 1) ?? _shown.ElementAtOrDefault(at - 1);
-        _selected = next?.Id;
+        _selected = next is null ? null : Identity(next);
         _status = null;
-        _ = _module?.History?.DeleteAsync(entry.Id);
+        _ = _module?.History?.DeleteAsync(entry.Id, entry.ContentHash);
     }
 
     private void OpenMore()

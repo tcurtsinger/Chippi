@@ -33,6 +33,7 @@ internal static class SettingsUi
     {
         var stack = new StackPanel();
         var border = new Border { Child = stack, Padding = new Thickness(4), CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(1) };
+        KeyboardNavigation.SetTabNavigation(border, KeyboardNavigationMode.Cycle);
         border.SetResourceReference(Border.BackgroundProperty, "FlyoutBrush");
         border.SetResourceReference(Border.BorderBrushProperty, "BorderBrush");
         border.SetResourceReference(TextElement.ForegroundProperty, "TextPrimaryBrush");
@@ -44,7 +45,13 @@ internal static class SettingsUi
         {
             var button = new Button { Content = text, IsEnabled = enabled, HorizontalContentAlignment = HorizontalAlignment.Left, MinWidth = 160 };
             button.SetResourceReference(FrameworkElement.StyleProperty, "FlyoutRowButtonStyle");
-            button.Click += (_, _) => { popup.IsOpen = false; click(); };
+            button.Click += (_, _) =>
+            {
+                bool returnFocus = popup.IsOpen && border.IsKeyboardFocusWithin;
+                popup.IsOpen = false;
+                if (returnFocus && anchor.IsVisible) anchor.Focus();
+                click();
+            };
             stack.Children.Add(button);
             if (enabled) buttons.Add(button);
         }

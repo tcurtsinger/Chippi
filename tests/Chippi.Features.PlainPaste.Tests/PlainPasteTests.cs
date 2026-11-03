@@ -13,9 +13,13 @@ public sealed class PlainPasteTests
 {
     public sealed class SettingsStore : IModuleSettings
     {
-        public PlainPasteSettings Value = new(); public int Saves;
+        public PlainPasteSettings Value = new(); public int Saves; public bool Reject;
         public T Get<T>() where T : class, new() => (T)(object)Value;
-        public void Save<T>(T value) where T : class { Value = (PlainPasteSettings)(object)value; Saves++; }
+        public void Save<T>(T value) where T : class
+        {
+            if (Reject) throw new System.IO.IOException("fixture");
+            Value = (PlainPasteSettings)(object)value; Saves++;
+        }
     }
     public sealed class Ui : IModuleUi
     {
@@ -47,11 +51,12 @@ public sealed class PlainPasteTests
     public sealed class Fixture : IAsyncDisposable
     {
         public readonly SettingsStore Settings = new(); public readonly Ui Ui = new(); public readonly Hub Hub = new();
-        public readonly Hotkey Hotkey = new(); public readonly ManualTime Clock = new(); public readonly IslandActivityHub Island = new();
+        public readonly Hotkey Hotkey = new(); public Hotkey? Replacement;
+        public readonly ManualTime Clock = new(); public readonly IslandActivityHub Island = new();
         public PlainPasteModule Module; public int Creates;
         public static readonly MicShortcut Shortcut = new(ShortcutModifiers.Control | ShortcutModifiers.Alt, 0x56);
         public Fixture()
-        { Module = new PlainPasteModule(() => { Creates++; return Hotkey; }, Clock); }
+        { Module = new PlainPasteModule(() => ++Creates == 1 ? Hotkey : Replacement = new Hotkey { Available = Hotkey.Available }, Clock); }
         public Task Start() => Module.StartAsync(new ModuleContext(PlainPasteModule.Id, Settings, NullLogger.Instance, Island.CreatePublisher(PlainPasteModule.Id), Ui) { Clipboard = Hub }, default);
         public void Configure() => Assert.True(Module.ChangeShortcut(Shortcut));
         public ValueTask DisposeAsync() => new(Module.StopAsync(default));
@@ -101,6 +106,29 @@ public sealed class PlainPasteTests
         f.Module.RemoveShortcut(); Assert.True(f.Hotkey.Disposed); Assert.Null(f.Module.Settings.Shortcut); Assert.Null(f.Module.ShortcutError);
         await f.Module.InvokeAsync(); Assert.Equal(0, f.Hub.Calls);
     }
+    [Fact]
+    public async Task Rejected_changes_and_removals_keep_the_saved_shortcut_registered()
+    {
+        await using var f = new Fixture();
+        await f.Start();
+        f.Configure();
+        f.Settings.Reject = true;
+        var alternate = new MicShortcut(ShortcutModifiers.Control, 0x42);
+        Assert.False(f.Module.ChangeShortcut(alternate));
+        Assert.True(f.Replacement!.Disposed);
+        Assert.False(f.Hotkey.Disposed);
+        Assert.Equal("Save failed", f.Module.ShortcutError);
+        f.Module.RemoveShortcut();
+        Assert.False(f.Hotkey.Disposed);
+        Assert.Equal(Fixture.Shortcut, f.Module.Settings.Shortcut);
+        Assert.Equal(f.Module.Settings, f.Settings.Value);
+        f.Settings.Reject = false;
+        Assert.True(f.Module.ChangeShortcut(alternate));
+        Assert.True(f.Hotkey.Disposed);
+        Assert.Null(f.Module.ShortcutError);
+        Assert.Equal(alternate, f.Settings.Value.Shortcut);
+    }
+
     [Fact]
     public async Task Shift_only_is_unavailable_and_keeps_the_old_shortcut()
     {
