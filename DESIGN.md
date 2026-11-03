@@ -293,7 +293,7 @@ Brief: [docs/shell-redesign-handoff.md](docs/shell-redesign-handoff.md). Mock: [
   - **Where it starts:** 24 in from the bottom-right corner of the main display's work area, for new and existing installs.
   - **Place:** saved as two fractions (0 to 1) of the room the puck has in its display's work area, so a resolution or taskbar change moves it with the work area and never off screen. Position › Reset puts it back at the start.
   - **Display** (Settings › Island & pet): Main display (default) or One monitor by name. Dropping the widget on another display picks that one monitor. While the chosen monitor is disconnected, the widget sits at the start on the main display. Follow active window is gone: a widget you place yourself doesn't jump between screens (a saved one reads as Main display).
-- **Chippi's mood:** asleep at rest, idle while hovered, open or on the bar, wide awake while Keep awake runs, listening (headphones) while a song plays, and celebrating when Chippi finishes something for you.
+- **Chippi's mood:** asleep on a quiet first launch. After the bar folds, the panel closes or the pointer leaves, Chippi stays idle with his eyes open for 60 seconds. Another interaction or visible activity gives him a fresh minute once it ends. A background agent scan leaves that minute alone. When it expires he yawns into sleep, with the waiting dot still visible if an agent needs input. Keep awake, music and celebrations keep their own expressions.
 - **The bar** (Travis, 2026-10-30, replacing the chip beside the puck): the puck itself stretches toward the screen's middle into a 256 × 50 bar with round ends. Its outer end stays where the puck is, with Chippi there at 40. The bar is the same width whatever it shows. Nothing opens beside the widget. It shows the first that applies:
   - a drag from another app over the puck: the target tile's glyph and name;
   - a 6-second line: Plain paste's feedback (ClipboardType, accent or Caution, §5 Clipboard and text), or an agent's alert, the Gauge over "Claude Code · 5-hour": "80% used" in Caution as a window passes the warning level, "Reset" in the accent when one that had passed it resets (AI agent usage, 2026-11-01). Alerts take turns; a click opens Agents;
@@ -514,10 +514,10 @@ The soft-vinyl character (approved 2026-11-02) is composed on a 120 × 120 viewB
 
 | Mood | Face | Extras | When |
 |---|---|---|---|
-| **Idle** | The eyes and grin above | Blinks | Any activity; the puck while hovered or open |
+| **Idle** | The eyes and grin above | Blinks | A visible activity, hover, the open panel, or the puck’s quiet minute |
 | **Wide awake** | Round open eyes and an "o" mouth | Blinks; steam; perks up as it starts | While Keep awake holds the PC up |
 | **Celebrating** | Two raised, curved lids and the open grin | A hop from the bottom center (60, 106): squished to (1.10, 0.90) at take-off (100ms), stretched to (0.94, 1.08) on the way up (200), 12 up and round at the top (260), down by 360, squished to (1.06, 0.94) landing (380) and settled by 500. The ground shadow spreads with the squishes, and shrinks to 80% and fades to 55% while he's up. Sparks burst out from 60% over 220ms as he takes off and the face swaps, hold to 2.1s and fade by 2.5s (revised 2026-11-01, bolder pass: the squish alone was about 2px on the puck) | Chippi finished something for you (stashed files, a timer, a download). Holds 2.5s, then goes back. During a song he keeps his headphones on |
-| **Asleep** (`Sleepy`) | Shut arcs and a small ellipse mouth | z's; breathes; yawns first when Keep awake ends | Nothing live: the puck at rest, Nothing playing |
+| **Asleep** (`Sleepy`) | Shut arcs and a small ellipse mouth | z's; breathes; yawns as the puck’s quiet minute ends | The resting puck after its quiet minute, or the Nothing playing cover |
 | **Listening** | The celebrating face, no sparks | Headphones; bobs to the beat | A song playing: the puck (not while lifted), Now Playing and the home card without art |
 
 ### Sizes

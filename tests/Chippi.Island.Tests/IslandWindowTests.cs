@@ -92,7 +92,7 @@ public sealed class IslandWindowTests
             Hover(window, Mouse.MouseLeaveEvent);
             Pump(TimeSpan.FromMilliseconds(200));
             Assert.Same(window.FindResource("IslandWidgetBorderBrush"), window.Body.BorderBrush);
-            Assert.Equal(Chippi.UI.Pet.PetMood.Sleepy, window.Pet.Mood);
+            Assert.Equal(Chippi.UI.Pet.PetMood.Idle, window.Pet.Mood); // his eyes stay open for the quiet minute
         }));
     }
 

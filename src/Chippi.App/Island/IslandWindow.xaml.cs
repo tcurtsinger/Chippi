@@ -72,6 +72,7 @@ public partial class IslandWindow : Window
     internal static readonly TimeSpan PauseHold = TimeSpan.FromSeconds(10);
     internal static readonly TimeSpan AgentPeek = TimeSpan.FromSeconds(6);
     internal static readonly TimeSpan AgentHoverDelay = TimeSpan.FromMilliseconds(350);
+    internal static readonly TimeSpan RestDelay = TimeSpan.FromMinutes(1);
     private static readonly IEasingFunction EaseOut = new CubicEase { EasingMode = EasingMode.EaseOut };
 
     private readonly IslandPanelWindow _panel = new();
@@ -80,6 +81,8 @@ public partial class IslandWindow : Window
     private IIslandTimer? _agentPeekTimer, _agentHoverTimer;
     private bool _agentPeeking, _agentHovered, _agentDwelling;
     private Point _agentPeekPointer;
+    private IIslandTimer? _restTimer;
+    private bool _petEngaged, _windingDown;
     private IReadOnlyList<IslandTileGroup> _tiles = [];
     private PetMood _mood = PetMood.Sleepy;
 
@@ -870,7 +873,6 @@ public partial class IslandWindow : Window
         var top = _activities.FirstOrDefault(a => a.ModuleId is not Chippi.Features.PlainPaste.PlainPasteModule.Id and not "mic-mute" && !a.IsFeedback
             && (a.Kind != IslandActivityKind.Agent || _agentPeeking || _agentHovered));
         bool dropping = _dragKey is not null;
-        bool awake = dropping || _hovered || _lifted || _panel.IsVisible || _stretching;
         if (_lifted)
             Pet.IsHeld = true; // set down once the drop has slid into place (DropAt)
         bool pressed = _pressAt is not null && !_dragging && !Motion.IsReduced;
@@ -881,7 +883,10 @@ public partial class IslandWindow : Window
         ShowRim(_hovered && !_lifted ? "IslandWidgetHoverBorderBrush" : "IslandWidgetBorderBrush");
         Body.Visibility = BodyShadow.Visibility = _panel.IsVisible ? Visibility.Hidden : Visibility.Visible;
         if (_heldWidth is not null)
+        {
+            StayAwake(engaged: true);
             return; // keep the shape, its contents and its click destination until it is released
+        }
         ShowBadge(MicBadge, mic is not null);
 
         var current = _media?.Current;
@@ -909,8 +914,14 @@ public partial class IslandWindow : Window
         ShowBadge(AwakeBadge, awakeBadge);
         Pet.ShowsSteam = !awakeBadge; // the badge takes the corner Chippi's steam rises in
         bool paused = _singing && playing is null;
-        // Listening (headphones) while a song plays, the panel out or not; otherwise the mood for the activities, awake on hover or on the bar.
-        var mood = playing is not null && !_lifted ? PetMood.Listening : _mood != PetMood.Sleepy ? _mood : awake || bar ? PetMood.Idle : PetMood.Sleepy;
+        // A background session can still report Idle after its notice folds. Only the visible activity
+        // or an interaction keeps the pet engaged. Progress updates leave his quiet minute alone.
+        bool awake = StayAwake(bar || _hovered || _lifted || _panel.IsVisible || _mood == PetMood.WideAwake);
+        var mood = playing is not null && !_lifted ? PetMood.Listening : _mood switch
+        {
+            PetMood.Idle or PetMood.Sleepy => awake || _stretching ? PetMood.Idle : PetMood.Sleepy,
+            _ => _mood,
+        };
         Pet.ShowMood(mood);
         _panel.ShowPetMood(mood);
         _chipKey = dropTile is not null ? null : feedback is not null ? feedback.OpensTile
@@ -1004,6 +1015,27 @@ public partial class IslandWindow : Window
     }
 
     private static Visibility Shown(bool shown) => shown ? Visibility.Visible : Visibility.Collapsed;
+
+    // Arm once when the last interaction ends. A quiet first launch starts asleep.
+    private bool StayAwake(bool engaged)
+    {
+        if (engaged != _petEngaged)
+        {
+            _petEngaged = engaged;
+            _windingDown = !engaged;
+            if (engaged)
+                _restTimer?.Stop();
+            else
+                (_restTimer ??= CreateTimer(RestDelay, () =>
+                {
+                    _windingDown = false;
+                    RefreshPuck();
+                    if (IsVisible && Pet.Mood == PetMood.Sleepy && !Motion.IsUnseen)
+                        Pet.Yawn();
+                })).Start();
+        }
+        return engaged || _windingDown;
+    }
 
     /// <summary>The rim brightens on hover and dims after, over 83ms, like Windows' own controls.</summary>
     private void ShowRim(string key)
@@ -1702,5 +1734,6 @@ public partial class IslandWindow : Window
         CloseIsland();
         _panel.Close();
         base.OnClosed(e);
+        _restTimer?.Stop();
     }
 }

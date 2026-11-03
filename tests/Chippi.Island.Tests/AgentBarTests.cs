@@ -60,6 +60,43 @@ public sealed class AgentBarTests
     }
 
     [Fact]
+    public void The_quiet_puck_winds_down_for_a_full_minute_after_the_last_bar_panel_or_hover() =>
+        WpfTestThread.Run(() => IslandWindowTests.WithShownIsland(window =>
+        {
+            var timers = Timers(window);
+            window.PointerAt = () => new Point(-30000, -30000);
+            var waiting = Session(waiting: true);
+            window.SetActivities([waiting], PetMood.Idle);
+            timers[IslandWindow.AgentPeek].Fire();
+            Assert.False(window.BarShown);
+            Assert.Equal(PetMood.Idle, window.Pet.Mood);
+            var rest = timers[TimeSpan.FromSeconds(60)];
+            Assert.True(rest.Running);
+
+            window.SetActivities([waiting with { Source = "2 sessions" }], PetMood.Idle);
+            Assert.Equal(1, rest.Starts);
+            Assert.True(window.ShowPages(keyboard: false));
+            IslandWindowTests.Settle(window.Panel);
+            Assert.False(rest.Running);
+            window.Escape();
+            IslandWindowTests.Settle(window.Panel);
+            Assert.True(rest.Running);
+            Assert.Equal(2, rest.Starts);
+
+            void Hover(RoutedEvent e) => window.PuckButton.RaiseEvent(new MouseEventArgs(Mouse.PrimaryDevice, 0) { RoutedEvent = e });
+            Hover(Mouse.MouseEnterEvent);
+            Assert.False(rest.Running);
+            Hover(Mouse.MouseLeaveEvent);
+            Assert.Equal(3, rest.Starts);
+            rest.Fire();
+            Assert.Equal(PetMood.Sleepy, window.Pet.Mood);
+            Assert.Equal(Visibility.Visible, window.WaitingMark.Visibility);
+            window.SetActivities([waiting], PetMood.Idle);
+            Assert.False(rest.Running);
+            Assert.Equal(PetMood.Sleepy, window.Pet.Mood);
+        }));
+
+    [Fact]
     public void A_progress_update_does_not_restart_a_peek_and_a_deliberate_hover_recalls_the_latest_lines() =>
         WpfTestThread.Run(() => IslandWindowTests.WithShownIsland(window =>
         {
