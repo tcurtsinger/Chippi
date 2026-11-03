@@ -8,6 +8,7 @@ using System.Windows.Media;
 using System.Windows.Shapes;
 using System.Windows.Threading;
 using Chippi.App.Island.Media;
+using Chippi.Core.Config;
 using Chippi.UI.Controls;
 
 namespace Chippi.App.Settings.Pages;
@@ -37,7 +38,7 @@ internal sealed class NowPlayingPage : UserControl
     private readonly ComboBox _source = SettingsLayout.Combo([]);
     private bool _showing;
 
-    public NowPlayingPage(IMediaSessions? media)
+    public NowPlayingPage(IMediaSessions? media, ConfigStore config)
     {
         _media = media;
         _tick.Tick += (_, _) => ShowTime();
@@ -87,9 +88,14 @@ internal sealed class NowPlayingPage : UserControl
         var page = new StackPanel();
         page.Children.Add(SettingsUi.Header("Now Playing", ""));
         page.Children.Add(SettingsLayout.Card(player));
-        var source = SettingsLayout.Card(SettingsLayout.Row("Source", _source));
-        source.Margin = new Thickness(0, 8, 0, 0);
-        page.Children.Add(source);
+        var alwaysShow = SettingsUi.Switch(SettingsUi.ReadApp(config).NowPlayingAlwaysShow);
+        const string caption = "Keep the music bar open during playback. When off, hover over Chippi to see the track.";
+        AutomationProperties.SetName(alwaysShow, "Always show");
+        AutomationProperties.SetHelpText(alwaysShow, caption);
+        SettingsUi.OnSwitched(alwaysShow, on => SettingsUi.SaveApp(config, app => app.NowPlayingAlwaysShow = on));
+        var settings = SettingsLayout.Card(SettingsLayout.Row("Source", _source), SettingsLayout.Row("Always show", alwaysShow, caption));
+        settings.Margin = new Thickness(0, 8, 0, 0);
+        page.Children.Add(settings);
         Content = page;
         Loaded += (_, _) =>
         {

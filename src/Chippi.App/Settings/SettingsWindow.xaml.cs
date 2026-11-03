@@ -338,7 +338,7 @@ public partial class SettingsWindow : Window
                     "shortcuts" => new ShortcutsPage(_shell),
                     "permissions" => new PermissionsPage(_shell),
                     "about" => new AboutPage(),
-                    "now-playing" => new NowPlayingPage(_shell.Media),
+                    "now-playing" => new NowPlayingPage(_shell.Media, _shell.Config),
                     _ => new GeneralPage(_shell),
                 };
         }
