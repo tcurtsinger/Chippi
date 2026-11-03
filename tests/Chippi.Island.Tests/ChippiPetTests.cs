@@ -98,21 +98,21 @@ public sealed class ChippiPetTests
             {
                 var parts = Paths(new ChippiPet { Size = size, Mood = PetMood.WideAwake }.ShownFace);
                 var data = parts.Select(p => p.Data).ToList();
-                Assert.Equal(new[] { ChippiPet.Shapes.WideEyeWhites, ChippiPet.Shapes.WidePupils, ChippiPet.Shapes.WideHighlights, ChippiPet.Shapes.WideMouth, ChippiPet.Shapes.WideLids }, data);
+                Geometry[] expected = [.. ChippiPet.Shapes.WideEyeWhites.Children, .. ChippiPet.Shapes.WidePupils.Children, ChippiPet.Shapes.WideMouth, ChippiPet.Shapes.WideLids];
+                Assert.Equal(expected, data);
                 Assert.DoesNotContain(ChippiPet.Shapes.HappyEyes, data); // no longer Listening's face without the headphones
 
-                // White eyes with a faint ink rim, ink pupils and mouth, whatever the pet's color; the lids only show in a blink.
-                Assert.Equal(Colors.White, Fill(parts[0]));
-                Assert.Equal(Color.FromArgb(0x2E, 0x0B, 0x0F, 0x1F), ((SolidColorBrush)parts[0].Stroke).Color);
-                Assert.Equal(Color.FromRgb(0x0B, 0x0F, 0x1F), Fill(parts[1]));
-                Assert.Equal(Colors.White, Fill(parts[2]));
-                Assert.Equal(Color.FromRgb(0x0B, 0x0F, 0x1F), Fill(parts[3]));
-                Assert.Equal(0, parts[4].Opacity);
+                // Each socket shades from ivory to its own rim. Both irises use the approved eye with its catchlight.
+                Assert.All(parts.Take(2), p => Assert.IsType<RadialGradientBrush>(p.Fill));
+                var iris = Assert.IsType<ImageBrush>(parts[2].Fill);
+                Assert.True(iris.IsFrozen);
+                Assert.Same(iris, parts[3].Fill);
+                Assert.Same(parts[2].RenderTransform, parts[3].RenderTransform);
+                Assert.Equal(0, parts[^1].Opacity); // the lids only show in a blink
             }
 
-            AssertBounds(new Rect(34, 51, 52, 28), ChippiPet.Shapes.WideEyeWhites);      // 12 × 14 at (46, 65) and (74, 65)
-            AssertBounds(new Rect(41.6, 61.6, 36.8, 8.8), ChippiPet.Shapes.WidePupils); // r 4.4 at (46, 66) and (74, 66)
-            AssertBounds(new Rect(46.1, 62.2, 31.2, 3.2), ChippiPet.Shapes.WideHighlights); // r 1.6 at (47.7, 63.8) and (75.7, 63.8)
+            AssertBounds(new Rect(30.5, 48.5, 53.5, 32), ChippiPet.Shapes.WideEyeWhites);
+            AssertBounds(new Rect(37, 56.75, 40.5, 17.5), ChippiPet.Shapes.WidePupils);
             AssertBounds(new Rect(55.6, 84, 8.8, 10), ChippiPet.Shapes.WideMouth);       // 4.4 × 5 at (60, 89)
         });
     }
@@ -146,7 +146,7 @@ public sealed class ChippiPetTests
     }
 
     [Fact]
-    public void His_body_sits_in_the_middle_of_his_box_firmly_shaded_and_rimmed()
+    public void His_vinyl_skin_is_centered_and_shared_across_sizes_in_every_pet_color()
     {
         WpfTestThread.Run(() =>
         {
@@ -160,13 +160,17 @@ public sealed class ChippiPetTests
             Assert.True(ChippiPet.Shapes.Sparks.Bounds.Top + lift.Y >= 0);
             Assert.True(Zs(new ChippiPet { Size = 72, Mood = PetMood.Sleepy }).Min(z => z.Bounds.Top) + lift.Y >= 0);
 
-            // His color to 78% of it, top to bottom, with the eye whites' faint ink rim, so Frost keeps his edge.
-            var fill = Assert.IsType<LinearGradientBrush>(pet.Body.Fill);
-            var frost = ChippiPet.ColorOf(PetColor.Frost);
-            Assert.Equal(frost, fill.GradientStops[0].Color);
-            Assert.Equal(Color.FromRgb((byte)(frost.R * 0.78), (byte)(frost.G * 0.78), (byte)(frost.B * 0.78)), fill.GradientStops[1].Color);
-            Assert.Equal(Color.FromArgb(0x2E, 0x0B, 0x0F, 0x1F), ((SolidColorBrush)pet.Body.Stroke).Color);
-            Assert.Equal(2, pet.Body.StrokeThickness);
+            var small = new ChippiPet { Size = 28 };
+            foreach (var color in Enum.GetValues<PetColor>())
+            {
+                pet.PetColor = small.PetColor = color;
+                var skin = Assert.IsType<ImageBrush>(pet.Body.Fill);
+                var bitmap = Assert.IsType<System.Windows.Media.Imaging.BitmapImage>(skin.ImageSource);
+                Assert.EndsWith($"/Vinyl{color}.png", bitmap.UriSource.AbsolutePath);
+                Assert.True(bitmap.PixelWidth >= 192);
+                Assert.True(skin.IsFrozen);
+                Assert.Same(skin, small.Body.Fill);
+            }
         });
     }
 
@@ -177,7 +181,8 @@ public sealed class ChippiPetTests
         {
             var small = new ChippiPet { Size = 16, Mood = PetMood.Listening };
             var data = Paths(small.ShownFace).Select(p => p.Data).ToList();
-            Assert.Equal(new[] { ChippiPet.Shapes.SmallEyeWhites, ChippiPet.Shapes.SmallEyes }, data);
+            Geometry[] smallEyes = [.. ChippiPet.Shapes.SmallEyeWhites.Children, .. ChippiPet.Shapes.SmallEyes.Children];
+            Assert.Equal(smallEyes, data);
             Assert.Equal(Visibility.Collapsed, small.Headphones.Visibility);
 
             small.Size = 40; // grown into the puck form, the headphones go on
@@ -252,7 +257,8 @@ public sealed class ChippiPetTests
                 Assert.Equal(1, pet.HeldFace.Opacity);
                 Assert.Equal(0, pet.ShownFace.Opacity);
                 var held = Paths(pet.HeldFace).Select(p => p.Data).ToList();
-                Assert.Equal(new[] { ChippiPet.Shapes.WideEyeWhites, ChippiPet.Shapes.WidePupils, ChippiPet.Shapes.WideHighlights, ChippiPet.Shapes.HeldMouth }, held);
+                Geometry[] pickedUp = [.. ChippiPet.Shapes.WideEyeWhites.Children, .. ChippiPet.Shapes.WidePupils.Children, ChippiPet.Shapes.HeldMouth];
+                Assert.Equal(pickedUp, held);
 
                 pet.Mood = mood == PetMood.Idle ? PetMood.Sleepy : PetMood.Idle; // a mood change while held keeps the round eyes
                 Assert.Equal(1, pet.HeldFace.Opacity);
@@ -299,8 +305,6 @@ public sealed class ChippiPetTests
     private static List<Geometry> Zs(ChippiPet pet) => [.. ((GeometryGroup)pet.ZGlyphs.Data).Children];
 
     private static double Stroke(ChippiPet pet, Geometry shape) => Paths(pet.ShownFace).Single(p => p.Data == shape).StrokeThickness;
-
-    private static Color Fill(Shape shape) => ((SolidColorBrush)shape.Fill).Color;
 
     /// <summary>The face's shapes in drawing order: its eye layer's, then the rest.</summary>
     private static List<Path> Paths(Panel panel)
@@ -510,11 +514,15 @@ public sealed class ChippiPetMotionTests
                 Motion.Override = true; // the look turns at once
                 window.Show();
                 IslandWindowTests.Pump(TimeSpan.Zero);
-                // Idle's pupils rest 2 right and 2 down of the whites' middle: looking right, they sit 3.5 right of it.
+                // The photographed irises sit off-center at rest. A look reaches 3.5 from the sockets' center.
+                static Point Center(Rect r) => new(r.X + r.Width / 2, r.Y + r.Height / 2);
+                var rest = Center(ChippiPet.Shapes.IdleEyes.Bounds) - Center(ChippiPet.Shapes.EyeWhites.Bounds);
                 idle.Look(new Vector(1, 0));
-                Assert.Equal((1.5, -2.0), (idle.Pupils!.X, idle.Pupils.Y));
+                Assert.Equal(ChippiPet.LookReach - rest.X, idle.Pupils!.X, 3);
+                Assert.Equal(-rest.Y, idle.Pupils.Y, 3);
                 idle.Look(new Vector(0, -1));
-                Assert.Equal((-2.0, -5.5), (idle.Pupils.X, idle.Pupils.Y));
+                Assert.Equal(-rest.X, idle.Pupils.X, 3);
+                Assert.Equal(-ChippiPet.LookReach - rest.Y, idle.Pupils.Y, 3);
                 idle.Look(null);
                 Assert.Equal((0.0, 0.0), (idle.Pupils.X, idle.Pupils.Y));
                 // Wide awake's rest 1 low.

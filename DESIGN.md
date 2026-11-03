@@ -79,13 +79,13 @@ accent:
   pink: { dark: "#FF99A4", light: "#B4235A" }
   on-accent: { dark: "#000000", light: "#FFFFFF" }
 pet:
-  ink: "#0B0F1F"
+  mouth: { light: "#67314C", mid: "#491E3A", dark: "#2A1228" }
   spark: { dark: "#F5C451", light: "#B07800" }
   synth: "#B78FFF"
-  tongue: "#FF7FA8"
-  headphones: "#1B1530"
-  headphone-rim: "#E6DCFF"
-  headphone-pads: "#D2BEFF"
+  tongue: { light: "#D878B6", mid: "#B25398", dark: "#782F66" }
+  headphones: { light: "#776C86", mid: "#3F354F", dark: "#21182D" }
+  headphone-rim: { light: "#F4EBF8", mid: "#AE9AC3", dark: "#6E5D83" }
+  headphone-pads: { light: "#F1E5F7", mid: "#B8A5C8", dark: "#79688B" }
   iris: "#CBB2FF"
   azure: "#8EC0FF"
   signal: "#8EE6C0"
@@ -490,24 +490,24 @@ Every interactive control is custom-templated with the full state set: rest, hov
 Chippi (the pet shares the app's name, Travis 2026-10-29) is a soft rice-cake blob with big shiny eyes and an open grin, no blush, no limbs and no text. It replaced Gumdrop. It is calm by default, pleased when Chippi finishes something for you, asleep when nothing is happening, and wears headphones while music plays. It never interrupts, nags or needs feeding. It is a status light with a face. The control is `ChippiPet` (`src/Chippi.UI/Pet/ChippiPet.cs`, in the shared UI library so a feature's page can show him; moved 2026-10-30). Its color is inherited: the panel sets it once and every pet inside takes it.
 
 ### Geometry
-Drawn on a 120×120 viewBox; WPF `Path.Data` takes the same syntax.
+The soft-vinyl character (approved 2026-11-02) is composed on a 120 × 120 viewBox. The lit body is a static transparent image. Eyes, irises, lids, mouth and headphones move independently over it.
 
 | Part | Spec |
 |---|---|
-| Body | `M17 76 C17 45 36 31 60 31 C84 31 103 45 103 76 C103 98 87 106 60 106 C33 106 17 98 17 76 Z`, one pet color with soft shading: a vertical gradient from the color to 78% of it, and a 2 rim of ink at 18%, as the eye whites have, so a pale color (Frost) keeps its edge on the light island (revised 2026-11-01, bolder pass) |
-| Eyes (idle) | White eye whites 10.5 × 12.5 at (47, 66) and (73, 66); ink pupils r 6 at (49, 68) and (75, 68); white highlights r 2 at (50.6, 65.6) and (76.6, 65.6). Every eye white has a 1.5 rim of ink at 18%, so it keeps its edge on a pale body (Frost) (2026-11-01) |
-| Mouth (idle) | An open grin in ink with a `#FF7FA8` tongue |
-| Eyes (wide awake) | White eye whites 12 × 14 at (46, 65) and (74, 65); ink pupils r 4.4 at (46, 66) and (74, 66); white highlights r 1.6 at (47.7, 63.8) and (75.7, 63.8) |
-| Mouth (wide awake) | An ink "o", 4.4 × 5 at (60, 89) |
-| Lids (idle, wide awake) | The eyes shut, for a blink and for falling asleep: `M38 66 H56 M64 66 H82` (wide awake `M35 65 H57 M63 65 H85`), ink, 3.6 (4.4 in the puck form), round caps |
+| Body | A 96 × 78 silhouette centered at (60, 68.5), with softly modeled cheeks, a warm highlight at upper left, cool reflected light near the base, and a contact edge baked into the skin. The six 320 × 264 skins share their silhouette and lighting. |
+| Eyes (idle) | Two separately lit ivory sockets, centered near (42, 67) and (72, 63). Each plum iris carries the rendered pupil and its single upper-left catchlight. Both follow the gaze within the sockets. |
+| Mouth (idle) | The rendered open grin and its plum tongue occupy 20.3 × 14.05 at (49.6, 77.05). |
+| Eyes (wide awake) | Rounder ivory sockets, 12 × 14 radii at (42.5, 66.5) and (72, 62.5), reveal more ivory around the 11 × 13.5 irises. |
+| Mouth (wide awake) | A shaded plum “o”, 4.4 × 5 radii at (60, 89). |
+| Lids (idle, wide awake) | Plum seams follow the tilted eye line as the sockets close. Round caps, stroke 3.6 at full size and 4.4 in the puck. |
 | Steam (wide awake) | `M95 36 C91 31 99 27 95 21 M105 33 C101 28 109 24 105 18` in secondary island text, 3.4 (4.4 in the puck form), round caps, where the z's sit, so every mood has its sign in that corner. Not in the small form, and hidden while the lifted puck's Keep awake badge takes that corner (revised 2026-11-01) |
-| Eyes (asleep) | Shut arcs `M39 67 Q46 72 53 67 M67 67 Q74 72 81 67`, round caps |
+| Eyes (asleep) | Two gently curved, closed plum lids. The right lid sits a little higher, following the eyes in the awake pose. |
 | Mouth (asleep) | An ink ellipse 4 × 3.4 at (60, 86) |
 | z's (asleep) | "z" in Segoe UI Variable Display SemiBold, in secondary island text (`IslandTextSecondaryBrush`). Puck form: one, 30px at (92, 34). Above it: 22px at (93, 32) and 14px at (106, 16). Points are SVG text origins |
-| Headphones (listening) | Band `M19 70 C19 19 101 19 101 70`, drawn twice with round caps: a `#E6DCFF` rim at 10, then `#1B1530` ink at 5.5. Cups 15 × 26, radius 6, at x 10 and 95, y 57, `#1B1530` with a 2.2 `#E6DCFF` stroke. Pads 6 × 16, radius 3, at the cup's x + 4.5, y 62, `#D2BEFF` |
+| Headphones (listening) | A 9-wide lilac trim under a 6-wide graphite band. Each 15 × 26 cup and 6 × 16 cushion takes its own upper-left light, so the two ends read as padded earpieces at puck size. |
 | Ground shadow | At sizes of 64 and up only: a soft ellipse 34 × 5.5 at (60, 108), black at 26% in the middle fading to clear at its edge, spreading across with the squish (revised 2026-11-01; it was a hard 35% ellipse that read as a gray plinth on light) |
 | Sparks (celebrating) | `M14 30 L6 24 M12 44 H3 M24 18 L20 9 M106 30 L114 24 M108 44 H117 M96 18 L100 9`, round caps, in `PetSparkBrush`: `#F5C451` on the dark island, `#B07800` on the light one, where gold is 1.5:1 (revised 2026-11-01) |
-| Yawn (2026-11-01) | Eyes squeezed shut as two chevrons `M40 62 L52 67 L40 72 M80 62 L68 67 L80 72` in ink at the happy arcs' stroke; a tall open mouth, an ink ellipse 6.5 × 9 at (60, 88), with a `#FF7FA8` tongue 4 × 2.4 at (60, 93.5) at its floor |
+| Yawn (2026-11-01) | Eyes squeezed shut as two chevrons `M40 62 L52 67 L40 72 M80 62 L68 67 L80 72` in ink at the happy arcs' stroke; a tall open mouth, an ink ellipse 6.5 × 9 at (60, 88), with a shaded plum tongue 4 × 2.4 at (60, 93.5) at its floor |
 | Held (2026-11-01) | Picked up: Wide awake's round eyes over a small ink "o", 3.2 × 3.8 at (60, 88) |
 
 ### Moods
@@ -516,19 +516,19 @@ Drawn on a 120×120 viewBox; WPF `Path.Data` takes the same syntax.
 |---|---|---|---|
 | **Idle** | The eyes and grin above | Blinks | Any activity; the puck while hovered or open |
 | **Wide awake** | Round open eyes and an "o" mouth | Blinks; steam; perks up as it starts | While Keep awake holds the PC up |
-| **Celebrating** | Happy arcs `M39 70 Q46 63 53 70 M67 70 Q74 63 81 70` and the grin | A hop from the bottom center (60, 106): squished to (1.10, 0.90) at take-off (100ms), stretched to (0.94, 1.08) on the way up (200), 12 up and round at the top (260), down by 360, squished to (1.06, 0.94) landing (380) and settled by 500. The ground shadow spreads with the squishes, and shrinks to 80% and fades to 55% while he's up. Sparks burst out from 60% over 220ms as he takes off and the face swaps, hold to 2.1s and fade by 2.5s (revised 2026-11-01, bolder pass: the squish alone was about 2px on the puck) | Chippi finished something for you (stashed files, a timer, a download). Holds 2.5s, then goes back. During a song he keeps his headphones on |
+| **Celebrating** | Two raised, curved lids and the open grin | A hop from the bottom center (60, 106): squished to (1.10, 0.90) at take-off (100ms), stretched to (0.94, 1.08) on the way up (200), 12 up and round at the top (260), down by 360, squished to (1.06, 0.94) landing (380) and settled by 500. The ground shadow spreads with the squishes, and shrinks to 80% and fades to 55% while he's up. Sparks burst out from 60% over 220ms as he takes off and the face swaps, hold to 2.1s and fade by 2.5s (revised 2026-11-01, bolder pass: the squish alone was about 2px on the puck) | Chippi finished something for you (stashed files, a timer, a download). Holds 2.5s, then goes back. During a song he keeps his headphones on |
 | **Asleep** (`Sleepy`) | Shut arcs and a small ellipse mouth | z's; breathes; yawns first when Keep awake ends | Nothing live: the puck at rest, Nothing playing |
 | **Listening** | The celebrating face, no sparks | Headphones; bobs to the beat | A song playing: the puck (not while lifted), Now Playing and the home card without art |
 
 ### Sizes
-- **Small form (22 and under):** body and the tray icon's eyes only: whites 12 × 13.5 at (46, 70) and (74, 70), pupils r 7.5 at (47, 71) and (75, 71) (revised 2026-11-01; dots alone didn't read at 16). One face for every mood: no mouth, sparks, z's, steam or headphones, and it blinks only while idle or wide awake.
+- **Small form (22 and under):** enlarged ivory sockets and irises carry the face at 16, with one expression across moods. Extras stay hidden, and the eyes blink while idle or wide awake.
 - **Puck form (23 to 44):** heavier strokes so the face reads at 40: asleep arcs 4.6, happy arcs 4.8 (celebrating and listening), sparks 4.5, lids 4.4, steam 4.4; one big z.
 - **Above 44:** asleep arcs 3.8, happy arcs 4.2, sparks 3.5, lids 3.6, steam 3.4; two z's.
 - **Framing (2026-11-01, layout pass):** his body's middle is (60, 68.5), 8.5 below the drawing's, to leave room above him for the headphones, z's and sparks. The drawing is lifted 8.5, so in any box that holds him his body sits in the middle, and nothing he draws leaves the box, the hop included. A host centers his box; it never nudges him.
 - **Where (revised 2026-11-01, bolder and layout pass; the sizes are named once, in `PetSize`):** **Puck:** 40 in the 50 puck. **Home footer:** 28, the puck form, so its moods read (revised 2026-10-30). **Home media card without art:** 44, his cover. **Now Playing without art:** 120, listening, his cover; **Nothing playing:** 96, asleep. **Keep awake's page:** 72, asleep or wide awake (revised 2026-10-30). **Settings titlebar:** 16. **Settings › Island & pet:** 40, his puck size, beside the color swatches, in a 44 button that shows his next mood (idle, asleep, listening, wide awake, celebrating); picking a color, he celebrates in it (2026-11-01). The tiles preview's little 30 puck draws him at 24, his share of the real one, so it shows the puck's face. **About:** 32.
 
 ### Color option
-Settings › Island & pet › Chippi › Color: **Synth** `#B78FFF` (the default, the accent's violet), **Iris** `#CBB2FF`, **Azure** `#8EC0FF`, **Signal** `#8EE6C0`, **Ember** `#FFC58F` or **Frost** `#E8ECF6`. Every color draws the same way (one color, soft shading), and the face stays pet ink and white on all of them. The six live in one place, `ChippiPet.ColorOf`, which the pet, the Settings swatches and the gallery all read.
+Settings › Island & pet › Chippi › Color: **Synth** `#B78FFF` (the default, the accent's violet), **Iris** `#CBB2FF`, **Azure** `#8EC0FF`, **Signal** `#8EE6C0`, **Ember** `#FFC58F` or **Frost** `#E8ECF6`. Each color has a matching soft-vinyl skin. Chippi keeps his ivory eye sockets, plum irises and mouth in every color. The swatches use `ChippiPet.ColorOf`.
 
 ### Motion
 - **Blink:** every 4 to 7s at random, the eyes scale to 10% height for 120ms (idle and wide awake); while they're shut the lids show over them, so a blink reads as closed eyes, not a white sliver (2026-11-01).
@@ -538,7 +538,7 @@ Settings › Island & pet › Chippi › Color: **Synth** `#B78FFF` (the default
 - **Headphones** (2026-10-30, motion pass): when a song starts they drop 18 (6px on the 40 puck) onto Chippi as they fade in over 180ms, ease-out; they come off lifting the same way as they fade over 120ms.
 - **Perking up** (2026-11-01, animate pass): as Keep awake starts he stretches tall to (0.96, 1.06) from the bottom center by 120ms, where his face swaps at once (as the celebration's does), and settles by 260ms, and the steam rises 4 into place as it fades in. When it stops, the steam drifts 4 on up as it fades over 240ms.
 - **The yawn** (2026-11-01, delight pass: Keep awake is coffee, and it wore off): falling asleep from wide awake, or after the celebration a timed Keep awake ends with, the yawn's face swaps in at once, its mouth opening from 30% to full by 450ms and closing by 1.1s while he stretches to (0.97, 1.05) at 500ms; then the asleep face swaps in at once at 1.1s, and the z's fade in after it. **Morning:** the first unlock of each day (an in-memory day, so a restart may give one more), the puck's Chippi yawns and stretches the same way over his face, stays awake 3s, then dozes off as usual. The debug menu's Morning plays it.
-- **Glance** (2026-11-01, animate pass): when the bar unfolds or something new arrives on it, the pupils and their highlights (not the whites) look toward the bar from 100ms, there by 220, back by 1.3s, as far as stays inside the whites (3.5, and 2 to the right on the idle face, whose pupils already sit right). Closed eyes (listening, celebrating) nod instead: (1.03, 0.95) at 110ms, round by 300.
+- **Glance** (2026-11-01, animate pass): when the bar unfolds or something new arrives on it, the pupils and their highlights (not the whites) look toward the bar from 100ms, there by 220, back by 1.3s, as far as stays inside the whites (up to 3.5, limited by the clearance on each side of the iris). Closed eyes (listening, celebrating) nod instead: (1.03, 0.95) at 110ms, round by 300.
 - **Held and set down** (2026-11-01, delight pass): the held face swaps in over his face at once whatever the mood, and back at once; set down, he lands squished to (1.06, 0.94) at 80ms, round by 240.
 - **Boop** (2026-11-01, delight pass): clicking the footer's Chippi swaps in the celebrating face at once at the squish's deepest point, until 600ms, and squishes him to (1.08, 0.92) at 110ms, round by 360. No sound and nothing else happens.
 - **Look** (2026-11-02, the Radial menu): the pupils and their highlights (not the whites) turn toward a point, 3.5 from the whites' middle, over 120ms ease-out, and stay until the next look; under reduced motion, at once.
@@ -580,6 +580,6 @@ Where text beside it carries the state (the puck, the home, Now Playing, About),
 - **Tabular figures:** `Typography.NumeralAlignment="Tabular"` on any element showing numbers, or on the base text style.
 - **Accent:** read the Windows accent shades with `Windows.UI.ViewManagement.UISettings.GetColorValue` (`AccentLight2` for dark, `AccentDark1` for light) and listen to `ColorValuesChanged`, which fires off the UI thread. Swap one `AccentBrush` and one `OnAccentBrush` when the accent setting, the theme or the Windows accent changes.
 - **Theme:** Follow Windows is the default and reads `AppsUseLightTheme`. Both themes define every key, the island's `Island*` keys included; the island's accent keys stay violet whatever the Accent setting.
-- **Pet control:** `ChippiPet`, with a `Mood` property (`PetMood`: Idle, Celebrating, Sleepy, WideAwake, Listening), `Size`, `PetColor` and `IsDecorative`, drawn from paths on the 120 viewBox.
+- **Pet control:** `ChippiPet` draws the shared character on a 120 × 120 viewBox. A frozen, lazily loaded skin is shared by every pet wearing that color. The existing WPF transforms drive the expressions and movement.
 - **Island window:** borderless, `AllowsTransparency`, topmost, `WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE`, so it never steals focus or shows in Alt+Tab. The widget's window is 340 × 124 around the puck with room for its lift and shadow; fully transparent pixels click through. It sits on the display the Display setting picks and hides while a fullscreen app or game is in front on that display. Because it never activates, dragging uses mouse capture and `SetWindowPos`, not `DragMove`; a drag's moves change only the position (no resize, no z-order), which keeps each under 1 ms. The panel is its own window, sized to the panel and the puck with room for the shadow. While the island is open, low-level keyboard and mouse hooks watch for Esc and for a click elsewhere; they are installed only while it is open and always pass the input on.
 - **Reduced motion:** read `SystemParameters.ClientAreaAnimation` and listen for changes.

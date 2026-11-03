@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using System.Collections.Concurrent;
 using System.Globalization;
 using System.Windows;
 using System.Windows.Automation;
@@ -8,6 +9,7 @@ using System.Windows.Automation.Peers;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
 using System.Windows.Threading;
 using Chippi.Core.Config;
@@ -117,11 +119,8 @@ public class ChippiPet : UserControl
     /// </summary>
     internal const double BodyLift = 8.5;
 
-    /// <summary>The body's soft shading: from his color at the top to this share of it at the bottom.</summary>
-    internal const double BodyShade = 0.78;
-
-    /// <summary>The body's rim, in the eye whites' faint ink, so a pale color (Frost) keeps its edge on the light island.</summary>
-    internal const double BodyRimStroke = 2;
+    // Each skin is decoded once on first use. All the pets wearing it share the frozen material.
+    private static readonly ConcurrentDictionary<PetColor, ImageBrush> Skins = new();
 
     public static readonly DependencyProperty MoodProperty = DependencyProperty.Register(
         nameof(Mood), typeof(PetMood), typeof(ChippiPet), new PropertyMetadata(PetMood.Idle, OnMoodChanged));
@@ -192,50 +191,50 @@ public class ChippiPet : UserControl
         // A soft contact shadow that follows the squish across, so it stays under him.
         _shadow = Filled(Ellipse(60, 108, 34, 5.5), "PetShadowBrush");
         _shadow.RenderTransform = _shadowSquish;
-        _body = new Path { Data = Shapes.Body, StrokeThickness = BodyRimStroke };
-        _body.SetResourceReference(Shape.StrokeProperty, "PetRimBrush");
+        _body = new Path { Data = Shapes.Body };
+        RenderOptions.SetBitmapScalingMode(_body, BitmapScalingMode.HighQuality);
 
-        _happyEyes = Stroked(Shapes.HappyEyes, "PetInkBrush", HappyEyeStroke);
-        _sleepyEyes = Stroked(Shapes.SleepyEyes, "PetInkBrush", SleepyEyeStroke);
-        // The open-eyed faces' pupils and highlights move together for a glance; the whites stay.
+        _happyEyes = Seam(Shapes.HappyEyes, HappyEyeStroke);
+        _sleepyEyes = Seam(Shapes.SleepyEyes, SleepyEyeStroke);
+        // The approved iris carries its pupil and catchlight. Each eye has its own molded ivory socket.
         _idle = new Face(canBlink: true,
-            eyes: [Whites(Shapes.EyeWhites)],
-            mouth: [Filled(Shapes.OpenSmile, "PetInkBrush"), new Path { Data = Shapes.Tongue, Fill = Frozen(0xFF7FA8) }],
-            lids: Stroked(Shapes.IdleLids, "PetInkBrush", LidStroke),
-            pupils: [Filled(Shapes.IdleEyes, "PetInkBrush"), Filled(Shapes.IdleHighlights, "PetEyeHighlightBrush")]);
+            eyes: PaintedPair(Shapes.EyeWhites, Vinyl.Ivory, Vinyl.SocketRim),
+            mouth: [Painted(Shapes.OpenSmile, Vinyl.Smile)],
+            lids: Seam(Shapes.IdleLids, LidStroke),
+            pupils: PaintedPair(Shapes.IdleEyes, Vinyl.Iris));
         _wideAwake = new Face(canBlink: true,
-            eyes: [Whites(Shapes.WideEyeWhites)],
-            mouth: [Filled(Shapes.WideMouth, "PetInkBrush")],
-            lids: Stroked(Shapes.WideLids, "PetInkBrush", LidStroke),
-            pupils: [Filled(Shapes.WidePupils, "PetInkBrush"), Filled(Shapes.WideHighlights, "PetEyeHighlightBrush")]);
+            eyes: PaintedPair(Shapes.WideEyeWhites, Vinyl.Ivory, Vinyl.SocketRim),
+            mouth: [Painted(Shapes.WideMouth, Vinyl.Mouth)],
+            lids: Seam(Shapes.WideLids, LidStroke),
+            pupils: PaintedPair(Shapes.WidePupils, Vinyl.Iris));
         // Picked up: Wide awake's round eyes over a small "o".
         _held = new Face(canBlink: false,
-            eyes: [Whites(Shapes.WideEyeWhites), Filled(Shapes.WidePupils, "PetInkBrush"), Filled(Shapes.WideHighlights, "PetEyeHighlightBrush")],
-            mouth: [Filled(Shapes.HeldMouth, "PetInkBrush")]);
+            eyes: [.. PaintedPair(Shapes.WideEyeWhites, Vinyl.Ivory, Vinyl.SocketRim), .. PaintedPair(Shapes.WidePupils, Vinyl.Iris)],
+            mouth: [Painted(Shapes.HeldMouth, Vinyl.Mouth)]);
         // A yawn: eyes squeezed shut and a tall open mouth with the tongue at its floor.
         _yawn = new Face(canBlink: false,
-            eyes: [Stroked(Shapes.SqueezedEyes, "PetInkBrush", HappyEyeStroke)],
-            mouth: [Filled(Shapes.YawnMouth, "PetInkBrush"), new Path { Data = Shapes.YawnTongue, Fill = Frozen(0xFF7FA8) }]);
+            eyes: [Seam(Shapes.SqueezedEyes, HappyEyeStroke)],
+            mouth: [Painted(Shapes.YawnMouth, Vinyl.Mouth), Painted(Shapes.YawnTongue, Vinyl.Tongue)]);
         _celebrating = new Face(canBlink: false,
             eyes: [_happyEyes],
-            mouth: [Filled(Shapes.OpenSmile, "PetInkBrush"), new Path { Data = Shapes.Tongue, Fill = Frozen(0xFF7FA8) }]);
+            mouth: [Painted(Shapes.OpenSmile, Vinyl.Smile)]);
         _sleepy = new Face(canBlink: false,
             eyes: [_sleepyEyes],
-            mouth: [Filled(Shapes.SleepMouth, "PetInkBrush")]);
-        // The small form's eyes are the tray icon's: whites and big pupils, which read at 16 where dots alone don't.
+            mouth: [Painted(Shapes.SleepMouth, Vinyl.Mouth)]);
+        // At 16 the enlarged eyes and their ivory surrounds carry the face alone.
         _small = new Face(canBlink: true,
-            eyes: [Whites(Shapes.SmallEyeWhites), Filled(Shapes.SmallEyes, "PetInkBrush")],
+            eyes: [.. PaintedPair(Shapes.SmallEyeWhites, Vinyl.Ivory), .. PaintedPair(Shapes.SmallEyes, Vinyl.Iris)],
             mouth: [],
             eyeY: 70);
 
-        // Headphones that read on the dark puck: a light rim under an ink band, ink cups rimmed the same, lilac pads.
-        var headphoneInk = Frozen(0x1B1530);
-        var headphoneRim = Frozen(0xE6DCFF);
+        // A satin graphite headband, molded cups and softly padded inserts, lit from the upper left as the body is.
         _headphones = new Canvas { Width = 120, Height = 120 };
-        _headphones.Children.Add(Band(headphoneRim, 10, _bandPulse));
-        _headphones.Children.Add(Band(headphoneInk, 5.5, _bandPulse));
-        _headphones.Children.Add(new Path { Data = Shapes.HeadphoneCups, Fill = headphoneInk, Stroke = headphoneRim, StrokeThickness = 2.2 });
-        _headphones.Children.Add(new Path { Data = Shapes.HeadphonePads, Fill = Frozen(0xD2BEFF) });
+        _headphones.Children.Add(Band(Vinyl.Trim, 9, _bandPulse));
+        _headphones.Children.Add(Band(Vinyl.Graphite, 6, _bandPulse));
+        foreach (var cup in PaintedPair(Shapes.HeadphoneCups, Vinyl.Graphite, Vinyl.Trim))
+            _headphones.Children.Add(cup);
+        foreach (var pad in PaintedPair(Shapes.HeadphonePads, Vinyl.Cushion))
+            _headphones.Children.Add(pad);
 
         _sparks = Stroked(Shapes.Sparks, "PetSparkBrush", SparkStroke);
         _sparks.RenderTransform = _sparkBurst;
@@ -501,15 +500,11 @@ public class ChippiPet : UserControl
 
     private void UpdateBodyBrush()
     {
-        var baseColor = ColorOf(PetColor);
-        var shade = Color.FromRgb((byte)(baseColor.R * BodyShade), (byte)(baseColor.G * BodyShade), (byte)(baseColor.B * BodyShade));
-        var brush = new LinearGradientBrush(baseColor, shade, 90);
-        brush.Freeze();
-        _body.Fill = brush;
+        _body.Fill = Skins.GetOrAdd(Enum.IsDefined(PetColor) ? PetColor : PetColor.Synth, static color => Vinyl.Artwork(color.ToString()));
     }
 
     /// <summary>
-    /// Small form drops the mouth, highlights and extras; the puck form draws heavier strokes and one big z;
+    /// Small form drops the mouth and extras; the puck form draws heavier strokes and one big z;
     /// the ground shadow shows from 64px.
     /// </summary>
     private void ApplyForm()
@@ -781,7 +776,7 @@ public class ChippiPet : UserControl
         var face = FaceFor(_shown);
         if (face.Pupils is not { } pupils)
             return;
-        // From the pupils' rest (idle's sit 2 right and 2 down of the whites' middle) to the whites' middle plus the look.
+        // From the irises' photographed rest position to the sockets' center plus the look.
         var to = direction is { } d ? LookReach * d - face.Rest : new Vector();
         if (Motion.IsReduced || !IsLoaded)
         {
@@ -1118,20 +1113,53 @@ public class ChippiPet : UserControl
         return path;
     }
 
-    /// <summary>Eye whites with a faint ink rim, so they hold their edge on a pale body (Frost).</summary>
-    private static Path Whites(Geometry data)
+    private static Path Painted(Geometry data, Brush material, Brush? rim = null)
     {
-        var path = Filled(data, "PetEyeHighlightBrush");
-        path.SetResourceReference(Shape.StrokeProperty, "PetRimBrush");
-        path.StrokeThickness = 1.5;
+        var path = new Path { Data = data, Fill = material, Stroke = rim, StrokeThickness = 0.65 };
+        if (material is ImageBrush)
+            RenderOptions.SetBitmapScalingMode(path, BitmapScalingMode.HighQuality);
         return path;
     }
 
-    private static SolidColorBrush Frozen(int rgb)
+    // Separate paths keep the material's light local to each eye or cup.
+    private static Path[] PaintedPair(GeometryGroup pair, Brush material, Brush? rim = null) =>
+        [.. pair.Children.Select(shape => Painted(shape, material, rim))];
+
+    private static class Vinyl
     {
-        var brush = new SolidColorBrush(Color.FromRgb((byte)(rgb >> 16), (byte)(rgb >> 8), (byte)rgb));
-        brush.Freeze();
-        return brush;
+        internal static readonly Brush Iris = Artwork("Eye"), Smile = Artwork("Smile");
+        internal static readonly Brush Ivory = Molded(0xFFFCF2, 0xF6E4DC, 0xC4A7B9);
+        internal static readonly Brush Mouth = Molded(0x67314C, 0x491E3A, 0x2A1228);
+        internal static readonly Brush Tongue = Molded(0xD878B6, 0xB25398, 0x782F66);
+        internal static readonly Brush Graphite = Molded(0x776C86, 0x3F354F, 0x21182D);
+        internal static readonly Brush Cushion = Molded(0xF1E5F7, 0xB8A5C8, 0x79688B);
+        internal static readonly Brush Trim = Molded(0xF4EBF8, 0xAE9AC3, 0x6E5D83);
+        internal static readonly Brush SocketRim = Molded(0xB49AA9, 0xBA9AAE, 0xD4BAD3);
+
+        private static Brush Molded(int light, int mid, int edge)
+        {
+            static Color Rgb(int value) => Color.FromRgb((byte)(value >> 16), (byte)(value >> 8), (byte)value);
+            var brush = new RadialGradientBrush
+            {
+                Center = new Point(0.45, 0.44), GradientOrigin = new Point(0.23, 0.18), RadiusX = 0.70, RadiusY = 0.70,
+                GradientStops = { new GradientStop(Rgb(light), 0.04), new GradientStop(Rgb(mid), 0.63), new GradientStop(Rgb(edge), 1) },
+            };
+            brush.Freeze();
+            return brush;
+        }
+
+        internal static ImageBrush Artwork(string name)
+        {
+            var image = new BitmapImage();
+            image.BeginInit();
+            image.CacheOption = BitmapCacheOption.OnLoad;
+            image.UriSource = new Uri($"pack://application:,,,/Chippi.UI;component/Pet/Assets/Vinyl{name}.png");
+            image.EndInit();
+            image.Freeze();
+            var brush = new ImageBrush(image) { Stretch = Stretch.Fill };
+            brush.Freeze();
+            return brush;
+        }
     }
 
     private static Path Band(Brush stroke, double thickness, Transform pulse) => new()
@@ -1146,17 +1174,23 @@ public class ChippiPet : UserControl
 
     private static Path Stroked(Geometry data, string brushKey, double thickness)
     {
-        var path = new Path
-        {
-            Data = data,
-            StrokeThickness = thickness,
-            StrokeStartLineCap = PenLineCap.Round,
-            StrokeEndLineCap = PenLineCap.Round,
-            StrokeLineJoin = PenLineJoin.Round,
-        };
+        var path = Stroke(data, thickness);
         path.SetResourceReference(Shape.StrokeProperty, brushKey);
         return path;
     }
+
+    private static Path Seam(Geometry data, double thickness)
+    {
+        var path = Stroke(data, thickness);
+        path.Stroke = Vinyl.Mouth;
+        return path;
+    }
+
+    private static Path Stroke(Geometry data, double thickness) => new()
+    {
+        Data = data, StrokeThickness = thickness,
+        StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round, StrokeLineJoin = PenLineJoin.Round,
+    };
 
     /// <summary>
     /// One mood's eyes and mouth (and the lids it blinks with), cross-faded as a layer. The eyes scale about their
@@ -1165,8 +1199,8 @@ public class ChippiPet : UserControl
     private sealed class Face
     {
         /// <param name="pupils">The open eyes' pupils and highlights, which glance together; the whites stay put.</param>
-        public Face(bool canBlink, IEnumerable<UIElement> eyes, IEnumerable<UIElement> mouth, Path? lids = null, double eyeY = 66,
-            IEnumerable<UIElement>? pupils = null)
+        public Face(bool canBlink, Path[] eyes, IEnumerable<UIElement> mouth, Path? lids = null, double eyeY = 66,
+            Path[]? pupils = null)
         {
             CanBlink = canBlink;
             EyeScale = new ScaleTransform(1, 1, 60, eyeY);
@@ -1177,17 +1211,22 @@ public class ChippiPet : UserControl
             {
                 Pupils = new TranslateTransform();
                 // How far they can go each way and stay half a unit inside the whites they sit in.
-                var whites = ((Path)eyeLayer.Children[0]).Data.Bounds;
-                var ink = ((Path)pupils.First()).Data.Bounds;
+                var sockets = new GeometryGroup { Children = new GeometryCollection(eyes.Select(p => p.Data)) };
+                sockets.Freeze();
+                var clipped = new Canvas { Width = 120, Height = 120, Clip = sockets };
+                var whites = sockets.Bounds;
+                var ink = Rect.Union(pupils[0].Data.Bounds, pupils[1].Data.Bounds);
                 Rest = new Point(ink.X + ink.Width / 2, ink.Y + ink.Height / 2) - new Point(whites.X + whites.Width / 2, whites.Y + whites.Height / 2);
-                foreach (var part in pupils)
+                for (int i = 0; i < pupils.Length; i++)
                 {
-                    part.RenderTransform = Pupils;
-                    eyeLayer.Children.Add(part);
-                    var bounds = ((Path)part).Data.Bounds;
-                    GlanceLeft = Math.Min(GlanceLeft, bounds.Left - whites.Left - 0.5);
-                    GlanceRight = Math.Min(GlanceRight, whites.Right - bounds.Right - 0.5);
+                    pupils[i].RenderTransform = Pupils;
+                    clipped.Children.Add(pupils[i]);
+                    var iris = pupils[i].Data.Bounds;
+                    var white = eyes[i].Data.Bounds;
+                    GlanceLeft = Math.Min(GlanceLeft, iris.Left - white.Left - 0.5);
+                    GlanceRight = Math.Min(GlanceRight, white.Right - iris.Right - 0.5);
                 }
+                eyeLayer.Children.Add(clipped);
             }
             Root.Children.Add(eyeLayer);
             var mouthLayer = new Canvas { RenderTransform = MouthScale };
@@ -1241,43 +1280,51 @@ public class ChippiPet : UserControl
     /// <summary>DESIGN.md §7 geometry on the 120×120 viewBox, verbatim.</summary>
     internal static class Shapes
     {
-        public static Geometry Body { get; } = Parse("M17 76 C17 45 36 31 60 31 C84 31 103 45 103 76 C103 98 87 106 60 106 C33 106 17 98 17 76 Z");
+        // The skin carries its own silhouette and soft edge inside these bounds.
+        public static Geometry Body { get; } = Freeze(new RectangleGeometry(new Rect(12, 29.5, 96, 78)));
 
-        public static Geometry EyeWhites { get; } = Freeze(new GeometryGroup { Children = { Ellipse(47, 66, 10.5, 12.5), Ellipse(73, 66, 10.5, 12.5) } });
+        private static GeometryGroup Pair(Geometry left, Geometry right)
+        {
+            var group = new GeometryGroup { Children = { left, right } };
+            group.Freeze();
+            return group;
+        }
+
+        private static Geometry Patch(double x, double y, double width, double height) =>
+            Freeze(new RectangleGeometry(new Rect(x, y, width, height)));
+
+        public static GeometryGroup EyeWhites { get; } = Pair(
+            Parse("M42 55.6 C47.7 55.1 52.5 60.3 52.8 67 C53.2 73.5 49.3 78.3 43.5 78.5 C36.9 78.9 31.2 74.7 31.5 67 C31.6 60.9 36.3 55.9 42 55.6 Z"),
+            Parse("M71.2 51.6 C77.2 51.3 82.3 57.1 82.5 63.2 C83 69.8 79.4 74.9 73.1 75.1 C66.2 75.3 61.4 70.5 61.4 63.4 C61.4 57.1 65.5 52.1 71.2 51.6 Z"));
 
         /// <summary>The idle eyes shut, for the blink: a line across each eye's middle.</summary>
-        public static Geometry IdleLids { get; } = Parse("M38 66 H56 M64 66 H82");
-        public static Geometry IdleEyes { get; } = Freeze(new GeometryGroup { Children = { Ellipse(49, 68, 6, 6), Ellipse(75, 68, 6, 6) } });
-        public static Geometry Tongue { get; } = Parse("M55 87 Q60 91 65 87 Z");
+        public static Geometry IdleLids { get; } = Parse("M33.5 66 Q42 67.5 51 66 M63 65.6 Q71 66.6 81 65.5");
+        public static GeometryGroup IdleEyes { get; } = Pair(Patch(37.5, 58.2, 14.3, 17.25), Patch(65.75, 54.6, 14.3, 17.25));
         public static Geometry SleepMouth { get; } = Ellipse(60, 86, 4, 3.4);
         public static Geometry Headphones { get; } = Parse("M19 70 C19 19 101 19 101 70");
 
         /// <summary>Headphone cups 15 × 26, radius 6, at x 10 and 95, y 57.</summary>
-        public static Geometry HeadphoneCups { get; } = Freeze(new GeometryGroup { Children = { Rounded(10, 57, 15, 26, 6), Rounded(95, 57, 15, 26, 6) } });
+        public static GeometryGroup HeadphoneCups { get; } = Pair(Rounded(10, 57, 15, 26, 6), Rounded(95, 57, 15, 26, 6));
 
         /// <summary>Pads 6 × 16, radius 3, 4.5 in from each cup's left edge, at y 62.</summary>
-        public static Geometry HeadphonePads { get; } = Freeze(new GeometryGroup { Children = { Rounded(14.5, 62, 6, 16, 3), Rounded(99.5, 62, 6, 16, 3) } });
+        public static GeometryGroup HeadphonePads { get; } = Pair(Rounded(14.5, 62, 6, 16, 3), Rounded(99.5, 62, 6, 16, 3));
 
-        /// <summary>White highlights r 2 at (50.6, 65.6) and (76.6, 65.6), up and right in each pupil.</summary>
-        public static Geometry IdleHighlights { get; } = Freeze(new GeometryGroup { Children = { Ellipse(50.6, 65.6, 2, 2), Ellipse(76.6, 65.6, 2, 2) } });
-
-        /// <summary>Wide awake: eye whites 12 × 14 at (46, 65) and (74, 65), pupils r 4.4 a little low, small highlights, an "o" mouth.</summary>
-        public static Geometry WideEyeWhites { get; } = Freeze(new GeometryGroup { Children = { Ellipse(46, 65, 12, 14), Ellipse(74, 65, 12, 14) } });
-        public static Geometry WidePupils { get; } = Freeze(new GeometryGroup { Children = { Ellipse(46, 66, 4.4, 4.4), Ellipse(74, 66, 4.4, 4.4) } });
-        public static Geometry WideHighlights { get; } = Freeze(new GeometryGroup { Children = { Ellipse(47.7, 63.8, 1.6, 1.6), Ellipse(75.7, 63.8, 1.6, 1.6) } });
+        /// <summary>Wide awake exposes more ivory around the same iris; it sits one unit low in the socket.</summary>
+        public static GeometryGroup WideEyeWhites { get; } = Pair(Ellipse(42.5, 66.5, 12, 14), Ellipse(72, 62.5, 12, 14));
+        public static GeometryGroup WidePupils { get; } = Pair(Patch(37, 60.75, 11, 13.5), Patch(66.5, 56.75, 11, 13.5));
         public static Geometry WideMouth { get; } = Ellipse(60, 89, 4.4, 5);
-        public static Geometry WideLids { get; } = Parse("M35 65 H57 M63 65 H85");
+        public static Geometry WideLids { get; } = Parse("M32 66 H53 M61.5 65.5 H82.5");
 
         /// <summary>Wide awake's two wisps of steam, where the z's sit when he's asleep.</summary>
         public static Geometry Steam { get; } = Parse("M95 36 C91 31 99 27 95 21 M105 33 C101 28 109 24 105 18");
 
-        public static Geometry HappyEyes { get; } = Parse("M39 70 Q46 63 53 70 M67 70 Q74 63 81 70");
+        public static Geometry HappyEyes { get; } = Parse("M34.5 69.6 Q41.6 61 50.3 68.5 M64.2 65.8 Q71.2 57.1 80 64.7");
 
-        public static Geometry OpenSmile { get; } = Parse("M50 82 Q60 94 70 82 Z");
+        public static Geometry OpenSmile { get; } = Patch(49.6, 77.05, 20.3, 14.05);
 
         public static Geometry Sparks { get; } = Parse("M14 30 L6 24 M12 44 H3 M24 18 L20 9 M106 30 L114 24 M108 44 H117 M96 18 L100 9");
 
-        public static Geometry SleepyEyes { get; } = Parse("M39 67 Q46 72 53 67 M67 67 Q74 72 81 67");
+        public static Geometry SleepyEyes { get; } = Parse("M34.6 67.6 Q42 73 50.4 66.6 M64 64.1 Q71.5 69.6 80.3 63");
 
         /// <summary>Picked up: a small "o", 3.2 × 3.8 at (60, 88), under Wide awake's round eyes.</summary>
         public static Geometry HeldMouth { get; } = Ellipse(60, 88, 3.2, 3.8);
@@ -1287,9 +1334,9 @@ public class ChippiPet : UserControl
         public static Geometry YawnMouth { get; } = Ellipse(60, 88, 6.5, 9);
         public static Geometry YawnTongue { get; } = Ellipse(60, 93.5, 4, 2.4);
 
-        /// <summary>Small form: the tray icon's eyes, whites 12 × 13.5 at (46, 70) and (74, 70) with pupils r 7.5 a little in and down.</summary>
-        public static Geometry SmallEyeWhites { get; } = Freeze(new GeometryGroup { Children = { Ellipse(46, 70, 12, 13.5), Ellipse(74, 70, 12, 13.5) } });
-        public static Geometry SmallEyes { get; } = Freeze(new GeometryGroup { Children = { Ellipse(47, 71, 7.5, 7.5), Ellipse(75, 71, 7.5, 7.5) } });
+        /// <summary>Small form: enlarged sockets and irises keep their light and dark shapes distinct at 16.</summary>
+        public static GeometryGroup SmallEyeWhites { get; } = Pair(Ellipse(44, 70, 12, 13.5), Ellipse(74, 67, 12, 13.5));
+        public static GeometryGroup SmallEyes { get; } = Pair(Patch(38, 62.5, 15, 17), Patch(67.5, 59.5, 15, 17));
 
         private static Geometry? _zs;
         private static Geometry? _puckZ;
