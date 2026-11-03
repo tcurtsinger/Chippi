@@ -98,6 +98,54 @@ public sealed class IslandPanelShots
     }
 
     [Fact]
+    public void RenderToolGallery()
+    {
+        if (Environment.GetEnvironmentVariable("CHIPPI_ISLAND_SHOTS") is not { Length: > 0 } folder)
+            return;
+        Directory.CreateDirectory(folder);
+        WpfTestThread.Run(() =>
+        {
+            var panel = new IslandPanelWindow { ActivateWindow = _ => { } };
+            try
+            {
+                panel.Initialize();
+                panel.SetMedia(new FakeMedia());
+                var tiles = HomeTiles();
+                panel.SetTiles(tiles);
+                panel.SetActivities([WaitingAgent()]);
+                panel.Open(IslandGeometry.Start(Area.Work, Area.Scale), Area);
+                SaveHome("gallery-full");
+                panel.SetTiles(tiles.Where(t => t.Key is "sound.mixer" or "keep-awake" or "downloads" or "system-monitor" or "clipboard").ToList());
+                SaveHome("gallery-essentials");
+                panel.SetTiles(tiles.Where(t => t.Key is "scratchpad" or "shelf").ToList());
+                SaveHome("gallery-two");
+            }
+            finally { panel.Close(); }
+
+            void SaveHome(string name)
+            {
+                IslandWindowTests.Settle(panel);
+                panel.UpdateLayout();
+                var shape = (FrameworkElement)panel.FindName("Shape");
+                var root = panel.Visual;
+                var top = shape.TranslatePoint(default, root);
+                var image = new RenderTargetBitmap((int)Math.Ceiling(root.ActualWidth), (int)Math.Ceiling(root.ActualHeight), 96, 96, PixelFormats.Pbgra32);
+                image.Render(root);
+                var rect = new Int32Rect((int)Math.Round(top.X), (int)Math.Round(top.Y), (int)Math.Round(shape.Width), (int)Math.Round(shape.Height));
+                var encoder = new PngBitmapEncoder();
+                encoder.Frames.Add(BitmapFrame.Create(new CroppedBitmap(image, rect)));
+                using var stream = File.Create(Path.Combine(folder, name + ".png"));
+                encoder.Save(stream);
+            }
+        });
+    }
+
+    private static IslandActivity WaitingAgent() => new("waiting", IslandActivityKind.Agent, "Waiting on you", "Claude Code · chippi")
+    {
+        OpensTile = "agent-usage", ModuleId = "agent-usage", Monogram = "CC", NeedsAttention = true,
+    };
+
+    [Fact]
     public void RenderPortraitHome()
     {
         if (Environment.GetEnvironmentVariable("CHIPPI_ISLAND_SHOTS") is not { Length: > 0 } folder)
@@ -114,10 +162,12 @@ public sealed class IslandPanelShots
                 panel.SetMedia(new FakeMedia());
                 var tiles = HomeTiles();
                 panel.SetTiles(tiles);
+                panel.SetActivities([WaitingAgent()]);
                 panel.Open(IslandGeometry.Start(area.Work, area.Scale), area);
                 IslandWindowTests.Settle(panel);
                 SavePortrait("portrait-home.png");
                 panel.SetTiles(tiles.Where(t => t.Key is "scratchpad" or "shelf").ToList());
+                IslandWindowTests.Settle(panel);
                 SavePortrait("portrait-home-sparse.png");
             }
             finally { panel.Close(); }
@@ -146,7 +196,7 @@ public sealed class IslandPanelShots
         });
     }
 
-    /// <summary>The home as the Phase 5.5 mock shows it: nine buttons five across, Awake on, the volume slider; <paramref name="muted"/>, the mic and the output muted.</summary>
+    /// <summary>The eleven gallery destinations with their own icons and sample statuses, quick switches and volume.</summary>
     internal static IReadOnlyList<IslandTileGroup> HomeTiles(bool muted = false)
     {
         var mic = Section("sound", "Sound", 10, 220, status: "Live");
@@ -167,8 +217,10 @@ public sealed class IslandPanelShots
             Section("system-monitor", "System", 60, 120, status: "CPU 12%"),
             Section("clipboard", "Clipboard", 70, 120, status: "23 items"),
             Section("scratchpad", "Scratchpad", 80, 120, status: "4 notes"),
+            Section("agent-usage", "Agents", 85, 120, status: "2 sessions"),
             Section("shelf", "Shelf", 90, 120, status: "5 items"),
-            Section("quick-actions", "Actions", 100, 120));
+            Section("quick-actions", "Actions", 100, 120),
+            Section("command-bar", "Search", 110, 120));
     }
 
     // A stand-in section: a card of the given height (the island draws the page's name above it).
@@ -193,6 +245,8 @@ public sealed class IslandPanelShots
         "scratchpad" => "NotebookPen",
         "shelf" => "Inbox",
         "quick-actions" => "ToggleRight",
+        "agent-usage" => "Gauge",
+        "command-bar" => "Search",
         _ => "Folder",
     };
 

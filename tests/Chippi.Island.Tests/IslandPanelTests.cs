@@ -4,6 +4,7 @@
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -39,7 +40,7 @@ public sealed class IslandPanelTests
 
     private static void WithPanel(Action<IslandPanelWindow> test, IReadOnlyList<IslandTileGroup>? tiles = null)
     {
-        var panel = new IslandPanelWindow();
+        var panel = new IslandPanelWindow { ActivateWindow = _ => { } };
         try
         {
             panel.Initialize();
@@ -61,6 +62,12 @@ public sealed class IslandPanelTests
 
     private static IslandGrid Grid(IslandPanelWindow panel) =>
         Assert.IsType<IslandGrid>(((ContentControl)panel.FindName("Page")).Content);
+
+    private static string TileStatus(IslandPanelWindow panel, string key) =>
+        AutomationProperties.GetHelpText(Grid(panel).Buttons().Single(b => (string)b.Tag == key));
+
+    private static ToggleButton QuickSwitch(IslandPanelWindow panel, string key) =>
+        Descendants(Grid(panel)).OfType<ToggleButton>().Single(b => (string?)b.Tag == key);
 
     private static List<string> TileNames(IslandPanelWindow panel) =>
         Grid(panel).Buttons().Select(b => AutomationProperties.GetName(b)).ToList();
@@ -91,20 +98,19 @@ public sealed class IslandPanelTests
     }
 
     [Fact]
-    public void The_grid_and_every_page_share_one_size_and_a_page_change_never_moves_the_shape()
+    public void A_sparse_gallery_grows_to_a_full_page_and_returns_to_the_same_puck_corner()
     {
         WpfTestThread.Run(() => WithPanel(panel =>
         {
             Open(panel);
-            var grid = Drawn(panel);
-            Assert.Equal(new Rect(grid.X, grid.Y, 520, 360), grid);
+            var home = panel.Footprint;
+            Assert.Equal((520, 169), Size(panel));
             foreach (var key in new[] { "keep-awake", IslandPanelWindow.NowPlayingKey, "sound.mixer" })
             {
                 panel.ShowPage(key);
-                if (!Chippi.UI.Themes.Motion.IsReduced)
-                    Assert.Equal(grid, Drawn(panel)); // the first frame of the change: the same shape, no morph
                 IslandWindowTests.Settle(panel);
-                Assert.Equal(grid, Drawn(panel));
+                Assert.Equal((520, 360), Size(panel));
+                Assert.Equal(home.BottomRight, panel.Footprint.BottomRight);
                 Assert.Equal(1, ((FrameworkElement)panel.FindName("Card")).Opacity);
                 if (key != IslandPanelWindow.NowPlayingKey)
                 {
@@ -118,7 +124,7 @@ public sealed class IslandPanelTests
             }
             panel.ShowPage(null, remember: false);
             IslandWindowTests.Settle(panel);
-            Assert.Equal(grid, Drawn(panel));
+            Assert.Equal(home, panel.Footprint);
         }));
     }
 
@@ -127,6 +133,12 @@ public sealed class IslandPanelTests
     {
         WpfTestThread.Run(() => WithPanel(panel =>
         {
+            var parts = Enumerable.Range(0, 10).Select(i => Part($"t{i}", $"Tool {i}", i)).ToList();
+            parts.Add(new IslandTileContribution("keep-awake", new IslandTileSpec("keep-awake", "Keep awake", "Coffee", 40, 0, () => new Border())
+            {
+                Toggle = new IslandTileToggle(() => true, () => Task.CompletedTask),
+            }));
+            panel.SetTiles(Tiles([.. parts]));
             var work = new Rect(-20000, 0, 640, 286);
             var area = new MonitorArea(default, work, work, 1);
             var puck = IslandGeometry.PuckRect(1, 1, work, 1);
@@ -180,11 +192,11 @@ public sealed class IslandPanelTests
 
     [Theory]
     [InlineData(1, 1)]
-    [InlineData(5, 1)]
-    [InlineData(6, 2)]
-    [InlineData(10, 2)]
-    [InlineData(12, 2)] // a third row wouldn't fit: only ten show
-    public void The_home_lays_its_buttons_five_across_and_shows_at_most_ten(int count, int rows)
+    [InlineData(4, 1)]
+    [InlineData(5, 2)]
+    [InlineData(8, 2)]
+    [InlineData(11, 3)]
+    public void The_gallery_lays_out_every_installed_tool_four_across(int count, int rows)
     {
         WpfTestThread.Run(() =>
         {
@@ -195,15 +207,16 @@ public sealed class IslandPanelTests
             grid.Measure(new Size(width, height));
             grid.Arrange(new Rect(0, 0, width, height));
             var buttons = grid.Buttons().ToList();
-            Assert.Equal(Math.Min(count, 10), buttons.Count);
-            Assert.All(buttons, b => Assert.Equal(44, b.ActualHeight, 2));
+            Assert.Equal(count, buttons.Count);
+            Assert.All(buttons, b => Assert.InRange(b.ActualHeight, 44, height));
             var at = buttons.Select(b => b.TranslatePoint(new Point(), grid)).ToList();
             Assert.Equal(rows, at.Select(p => Math.Round(p.Y, 1)).Distinct().Count());
-            Assert.Equal(Math.Min(count, 5), at.Select(p => Math.Round(p.X, 1)).Distinct().Count());
+            Assert.Equal(Math.Min(count, 4), at.Select(p => Math.Round(p.X, 1)).Distinct().Count());
             // The rows, the card, the slider and the footer all fit the panel.
             Assert.True(grid.DesiredSize.Height <= height + 0.01, $"home is {grid.DesiredSize.Height} tall");
-            var last = buttons[^1].TranslatePoint(new Point(0, 44), grid);
-            Assert.True(last.Y <= height - 46 - 32, $"buttons end at {last.Y}");
+            var last = buttons[^1].TranslatePoint(new Point(0, buttons[^1].ActualHeight), grid);
+            var slider = Descendants(grid).OfType<Slider>().Single();
+            Assert.True(last.Y <= slider.TranslatePoint(default, grid).Y, $"buttons end at {last.Y}");
         });
     }
 
@@ -214,7 +227,7 @@ public sealed class IslandPanelTests
         {
             Open(panel);
             Assert.Null(panel.CurrentPage);
-            Assert.Equal(["Volume mixer", "Keep awake"], TileNames(panel));
+            Assert.Equal(["Open Volume mixer", "Open Keep awake"], TileNames(panel));
         }));
     }
 
@@ -226,7 +239,7 @@ public sealed class IslandPanelTests
             var hidden = new HashSet<string> { IslandPanelWindow.NowPlayingKey };
             panel.SetLayout(IslandLayout.Default with { Order = ["keep-awake", "now-playing"], Hidden = hidden });
             Open(panel);
-            Assert.Equal(["Keep awake", "Volume mixer"], TileNames(panel));
+            Assert.Equal(["Open Keep awake", "Open Volume mixer"], TileNames(panel));
             panel.ShowPage(IslandPanelWindow.NowPlayingKey);
             Assert.Equal(IslandPanelWindow.NowPlayingKey, panel.CurrentPage);
         }));
@@ -261,7 +274,8 @@ public sealed class IslandPanelTests
         WpfTestThread.Run(() => WithPanel(panel =>
         {
             Open(panel);
-            Assert.Equal(["Microphone, Muted"], TileNames(panel));
+            Assert.Equal(["Open Microphone"], TileNames(panel));
+            Assert.Contains("Muted", TileStatus(panel, "sound.microphone"));
         }, Tiles(routing, mute)));
     }
 
@@ -437,7 +451,7 @@ public sealed class IslandPanelTests
     }
 
     [Fact]
-    public void A_muted_mic_shows_as_needing_attention_not_as_on_and_a_toggle_that_fails_says_so()
+    public void A_muted_mic_reports_its_actual_toggle_state_and_a_refused_toggle_reports_failure()
     {
         bool muted = true, fail = false;
         var mute = new IslandTileContribution("mic-mute", new IslandTileSpec("sound", "Sound", "AudioLines", 10, 0, () => new Border())
@@ -452,20 +466,21 @@ public sealed class IslandPanelTests
             var activity = new IslandActivity("muted", IslandActivityKind.Status, "Muted", "Microphone") { NeedsAttention = true, TileKey = "sound", ModuleId = "mic-mute" };
             panel.SetActivities([activity]);
             // The accent says on and fine: muted, the button keeps its plain fill and the glyph is MicOff in Caution.
-            var toggle = Assert.IsType<System.Windows.Controls.Primitives.ToggleButton>(Grid(panel).Buttons().Single(b => (string)b.Tag == "sound"));
-            Assert.False(toggle.IsChecked);
+            var toggle = QuickSwitch(panel, "sound");
+            Assert.True(toggle.IsChecked);
             Assert.Same(LucideIcons.MicOff, TileIcon(panel, "sound"));
             Assert.Same(panel.FindResource("WarningBrush"), TileGlyph(panel, "sound").Brush);
-            Assert.Contains(Descendants(Grid(panel)).OfType<Button>(), b => AutomationProperties.GetName(b) == "Open Sound"); // its arrow opens Sound
+            Assert.Contains("Open Microphone", TileNames(panel));
 
-            // A toggle that fails says "Failed" under its button.
+            // A refused change leaves the switch following the device state and exposes its failure.
             muted = false;
             fail = true;
             panel.SetActivities([]);
-            toggle = Assert.IsType<System.Windows.Controls.Primitives.ToggleButton>(Grid(panel).Buttons().Single(b => (string)b.Tag == "sound"));
-            toggle.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+            Assert.False(toggle.IsChecked);
+            IslandHomeTests.ToggleThroughAutomation(toggle);
             Pump(TimeSpan.FromMilliseconds(50));
-            Assert.Contains(Descendants(Grid(panel)).OfType<TextBlock>(), t => t.Text == "Failed");
+            Assert.Contains("Failed", TileStatus(panel, "sound"));
+            Assert.False(toggle.IsChecked);
         }, Tiles(mute)));
     }
 
@@ -483,15 +498,14 @@ public sealed class IslandPanelTests
         WpfTestThread.Run(() => WithPanel(panel =>
         {
             Open(panel);
-            string[] Texts() => [.. Descendants(Grid(panel)).OfType<TextBlock>().Select(t => t.Text)];
             var stopped = new IslandActivity("stopped", IslandActivityKind.Status, "Mic processing stopped", "Microphone") { NeedsAttention = true, TileKey = "sound", ModuleId = "mic-processing" };
             panel.SetActivities([stopped]);
-            Assert.Contains("Mic stopped", Texts()); // why it needs attention, not a Caution "Live"
-            Assert.DoesNotContain("Live", Texts());
+            Assert.Contains("Mic stopped", TileStatus(panel, "sound"));
+            Assert.DoesNotContain("Live", TileStatus(panel, "sound"));
 
             muted = true;
             panel.SetActivities([stopped, new IslandActivity("muted", IslandActivityKind.Status, "Muted", "Microphone") { NeedsAttention = true, TileKey = "sound", ModuleId = "mic-mute" }]);
-            Assert.Contains("Muted", Texts());
+            Assert.Contains("Muted", TileStatus(panel, "sound"));
         }, Tiles(mute, processing)));
     }
 
@@ -508,20 +522,59 @@ public sealed class IslandPanelTests
         WpfTestThread.Run(() => WithPanel(panel =>
         {
             Open(panel);
-            Assert.Equal(["Keep awake", "Clipboard, 23 items"], TileNames(panel));
-            var toggle = Assert.IsType<System.Windows.Controls.Primitives.ToggleButton>(Grid(panel).Buttons().First());
+            Assert.Equal(["Open Keep awake", "Open Clipboard"], TileNames(panel));
+            Assert.Contains("23 items", TileStatus(panel, "clipboard"));
+            var toggle = QuickSwitch(panel, "keep-awake");
             Assert.False(toggle.IsChecked);
 
             clipboard.SetStatus("24 items");
             Pump(TimeSpan.FromMilliseconds(50));
-            Assert.Equal(["Keep awake", "Clipboard, 24 items"], TileNames(panel)); // the others still refresh
+            Assert.Contains("24 items", TileStatus(panel, "clipboard")); // the others still refresh
 
             broken = false; // it reads again
             clipboard.SetStatus("25 items");
             Pump(TimeSpan.FromMilliseconds(50));
-            Assert.Equal(["Keep awake, 1 hr left", "Clipboard, 25 items"], TileNames(panel));
+            Assert.Contains("1 hr left", TileStatus(panel, "keep-awake"));
+            Assert.Contains("25 items", TileStatus(panel, "clipboard"));
             Assert.True(toggle.IsChecked);
         }, Tiles(awake, clipboard)));
+    }
+
+    [Fact]
+    public void Back_restores_the_originating_gallery_tile_and_Escape_dismisses_find_before_the_window()
+    {
+        WpfTestThread.Run(() => WithPanel(panel =>
+        {
+            // Observe the WPF focus target, keeping the real foreground window and keyboard untouched.
+            var targets = new List<object>();
+            panel.PreviewGotKeyboardFocus += (_, e) =>
+            {
+                if (e.NewFocus is Control target) targets.Add(target);
+                e.Handled = true;
+            };
+            Open(panel);
+            panel.TakeKeyboard();
+            var gallery = Grid(panel);
+            var tile = Assert.Single(gallery.Buttons(), b => Equals(b.Tag, "keep-awake"));
+            Click(Assert.IsAssignableFrom<Button>(tile));
+            IslandWindowTests.Settle(panel);
+            targets.Clear();
+            Click(Back(panel));
+            IslandWindowTests.Settle(panel);
+            Assert.Contains(tile, targets);
+
+            int closes = 0;
+            panel.EscapePressed += (_, _) => closes++;
+            var find = Descendants(gallery).OfType<Button>().Single(b => AutomationProperties.GetName(b) == "Find a tool");
+            Click(find);
+            Assert.True(gallery.IsSearching);
+            void Escape() => panel.RaiseEvent(new KeyEventArgs(Keyboard.PrimaryDevice, new UnshownSource(), 0, Key.Escape) { RoutedEvent = UIElement.PreviewKeyDownEvent });
+            Escape();
+            Assert.False(gallery.IsSearching);
+            Assert.Equal(0, closes);
+            Escape();
+            Assert.Equal(1, closes);
+        }));
     }
 
     [Fact]
@@ -540,42 +593,52 @@ public sealed class IslandPanelTests
         WpfTestThread.Run(() => WithPanel(panel =>
         {
             Open(panel);
-            var toggle = Grid(panel).Buttons().Single(b => (string)b.Tag == "keep-awake");
-            toggle.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
-            toggle.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent)); // a double click
+            var toggle = QuickSwitch(panel, "keep-awake");
+            IslandHomeTests.ToggleThroughAutomation(toggle);
+            IslandHomeTests.ToggleThroughAutomation(toggle); // a double click
             Assert.Equal(1, toggles);
 
             applying.SetResult();
             Pump(TimeSpan.FromMilliseconds(50));
-            toggle.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+            IslandHomeTests.ToggleThroughAutomation(toggle);
             Assert.Equal(2, toggles); // applied: the next press toggles again
         }, Tiles(awake)));
     }
 
     [Fact]
-    public void A_tile_that_needs_attention_turns_Caution_and_an_activity_that_only_opens_it_doesnt()
+    public void Only_an_agent_waiting_for_input_gets_the_gallery_dot() => WpfTestThread.Run(() =>
     {
-        // Agents at its warning level (AI agent usage): no activity says so, the tile does.
         var agents = new IslandTileContribution("agent-usage", new IslandTileSpec("agent-usage", "Agents", "Gauge", 85, 0, () => new Border()));
         agents.SetStatus("Claude 42%");
-        WpfTestThread.Run(() => WithPanel(panel =>
+        WithPanel(panel =>
         {
             Open(panel);
-            var waiting = new IslandActivity("waiting", IslandActivityKind.Agent, "Waiting on you", "Claude Code · packrat") { NeedsAttention = true, OpensTile = "agent-usage", ModuleId = "agent-usage" };
-            panel.SetActivities([waiting]);
-            Assert.NotSame(panel.FindResource("WarningBrush"), TileGlyph(panel, "agent-usage").Brush);
+            var button = Assert.Single(Grid(panel).Buttons());
+            var dot = Assert.Single(Descendants(button).OfType<System.Windows.Shapes.Ellipse>());
+            var session = new IslandActivity("waiting", IslandActivityKind.Agent, "Waiting on you", "Claude Code · packrat")
+            {
+                OpensTile = "agent-usage", ModuleId = "agent-usage", NeedsAttention = true, Monogram = "CC",
+            };
+            panel.SetActivities([session]);
+            Assert.Equal(Visibility.Visible, dot.Visibility);
+            Assert.Contains("Waiting on you", AutomationProperties.GetHelpText(button));
 
+            // Working sessions, completion notices and plan-limit warnings have the same destination.
+            panel.SetActivities([session with { NeedsAttention = false }]);
+            Assert.Equal(Visibility.Collapsed, dot.Visibility);
+            panel.SetActivities([new IslandActivity("limit", IslandActivityKind.Status, "80% used", "Claude Code · 5-hour")
+            {
+                IsFeedback = true, OpensTile = "agent-usage", NeedsAttention = true,
+            }]);
             agents.SetStatus("Claude 86%");
             agents.SetAttention(true);
-            Pump(TimeSpan.FromMilliseconds(50));
+            Pump(TimeSpan.Zero);
+            Assert.Equal(Visibility.Collapsed, dot.Visibility);
+            Assert.DoesNotContain("Waiting on you", AutomationProperties.GetHelpText(button));
+            Assert.Contains("Claude 86%", AutomationProperties.GetHelpText(button));
             Assert.Same(panel.FindResource("WarningBrush"), TileGlyph(panel, "agent-usage").Brush);
-            Assert.Contains(Descendants(Grid(panel)).OfType<TextBlock>(), t => t.Text == "Claude 86%");
-
-            agents.SetAttention(false);
-            Pump(TimeSpan.FromMilliseconds(50));
-            Assert.NotSame(panel.FindResource("WarningBrush"), TileGlyph(panel, "agent-usage").Brush);
-        }, Tiles(agents)));
-    }
+        }, Tiles(agents));
+    });
 
     private static Geometry TileIcon(IslandPanelWindow panel, string key) => TileGlyph(panel, key).Data!;
 
@@ -614,7 +677,7 @@ public sealed class IslandPanelTests
             if (!Chippi.UI.Themes.Motion.IsReduced)
                 Assert.Equal(Puck.Width, shape.Width, 3); // the first frame is the puck
             IslandWindowTests.Settle(panel);
-            Assert.Equal((520, 360), Size(panel));
+            Assert.Equal((520, 169), Size(panel));
             Assert.Equal(1, ((FrameworkElement)panel.FindName("Card")).Opacity);
         }));
     }

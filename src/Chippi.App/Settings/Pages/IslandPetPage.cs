@@ -155,7 +155,7 @@ internal sealed class IslandPetPage : UserControl
 
     private sealed record Tile(string Key, string Name, Geometry Icon);
 
-    /// <summary>The running features' home buttons, in their own order. Now Playing is a fixed card.</summary>
+    /// <summary>The running features' home buttons, in their own order. Now Playing always has its own footer link.</summary>
     private List<Tile> AllTiles() =>
     [
         .. IslandTileContribution.Group(_shell.Registry.Features.Where(f => f.IsRunning).SelectMany(f => f.IslandTiles))
@@ -176,16 +176,13 @@ internal sealed class IslandPetPage : UserControl
         {
             _tileKeys = keys;
             _tiles.Children.Clear();
-            // A switch is on when its button is on the home, which holds ten: past that a shown one isn't there, so its
-            // switch is off, and the off ones can't be turned on until another is turned off.
-            var onHome = layout.Shown(order).Take(IslandGrid.MaxTiles).ToHashSet();
             for (int i = 0; i < order.Count; i++)
-                _tiles.Children.Add(TileRow(all.First(t => t.Key == order[i]), i, order, onHome.Contains(order[i]), onHome.Count < IslandGrid.MaxTiles));
+                _tiles.Children.Add(TileRow(all.First(t => t.Key == order[i]), i, order, !layout.Hidden.Contains(order[i])));
         }
         RefreshPreview();
     }
 
-    private FrameworkElement TileRow(Tile tile, int index, IReadOnlyList<string> order, bool shown, bool room)
+    private FrameworkElement TileRow(Tile tile, int index, IReadOnlyList<string> order, bool shown)
     {
         var handle = new DragHandle { Width = 16, Height = 24, Margin = new Thickness(0, 0, 16, 0), ToolTip = "Reorder" };
         AutomationProperties.SetName(handle, $"Reorder {tile.Name}");
@@ -207,10 +204,8 @@ internal sealed class IslandPetPage : UserControl
         var glyph = new LucideIcon { Data = tile.Icon, Size = 16, Margin = new Thickness(0, 0, 16, 0), VerticalAlignment = VerticalAlignment.Center };
         glyph.SetResourceReference(LucideIcon.BrushProperty, "TextSecondaryBrush");
         var show = SettingsUi.Switch(shown);
-        show.IsEnabled = shown || room;
         AutomationProperties.SetName(show, $"Show {tile.Name}");
-        // What shows off stays off: the tiles past the home's ten are saved hidden with it (IslandLayout.Switched).
-        SettingsUi.OnSwitched(show, on => Save(s => s.IslandHiddenTiles = IslandLayout.Switched(s.IslandHiddenTiles ?? [], order, tile.Key, on, IslandGrid.MaxTiles)));
+        SettingsUi.OnSwitched(show, on => Save(s => s.IslandHiddenTiles = IslandLayout.Switched(s.IslandHiddenTiles ?? [], tile.Key, on)));
         var name = new TextBlock { Text = tile.Name, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
         DockPanel.SetDock(handle, Dock.Left);
         DockPanel.SetDock(glyph, Dock.Left);
@@ -235,17 +230,17 @@ internal sealed class IslandPetPage : UserControl
     // ----- Preview -----
 
     /// <summary>
-    /// A small desktop with the widget at its bottom right: the open panel over the puck, the shown tiles five across.
+    /// A small desktop with the open gallery above the bottom-right puck, showing the chosen order.
     /// </summary>
     private void RefreshPreview()
     {
-        const double width = 260, height = 160, edge = 10, puck = 30, panelWidth = 176, inset = 6, gap = 4;
+        const double width = 260, height = 160, edge = 10, puck = 30, panelWidth = 176, inset = 4, gap = 2;
         var all = AllTiles();
         var layout = Layout();
-        var shown = layout.Shown(all.Select(t => t.Key)).Select(k => all.First(t => t.Key == k)).Take(IslandGrid.MaxTiles).ToList();
+        var shown = layout.Shown(all.Select(t => t.Key)).Select(k => all.First(t => t.Key == k)).ToList();
         int rows = Math.Max(1, (shown.Count + IslandGrid.Columns - 1) / IslandGrid.Columns);
-        double tile = 18;
-        double panelHeight = 2 * inset + 22 + rows * tile + (rows - 1) * gap + 14;
+        const double header = 13, tile = 24, footer = 14;
+        double panelHeight = header + rows * (tile + gap) + footer + 2 * inset;
         var canvas = new Canvas { Width = width, Height = height };
 
         var screen = new Border { Width = width, Height = height, CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(1) };
@@ -256,8 +251,8 @@ internal sealed class IslandPetPage : UserControl
         var panel = new Border { Width = panelWidth, Height = panelHeight, CornerRadius = new CornerRadius(6), BorderThickness = new Thickness(1) };
         panel.SetResourceReference(Border.BackgroundProperty, "IslandBrush");
         panel.SetResourceReference(Border.BorderBrushProperty, "IslandBorderBrush");
-        var card = new Border { Height = 22, CornerRadius = new CornerRadius(4), Margin = new Thickness(0, 0, 0, gap) };
-        card.SetResourceReference(Border.BackgroundProperty, "IslandPanelBrush");
+        var title = new TextBlock { Text = "Tools", FontSize = 7, FontWeight = FontWeights.SemiBold, Height = header };
+        title.SetResourceReference(TextBlock.ForegroundProperty, "IslandTextBrush");
         var grid = new UniformGrid { Columns = IslandGrid.Columns, Margin = new Thickness(0, 0, -gap, 0) };
         foreach (var t in shown)
         {
@@ -267,7 +262,12 @@ internal sealed class IslandPetPage : UserControl
             cell.SetResourceReference(Border.BackgroundProperty, "IslandPanelBrush");
             grid.Children.Add(cell);
         }
-        panel.Child = new StackPanel { Margin = new Thickness(inset, inset, inset, 0), Children = { card, grid } };
+        var music = new LucideIcon { Data = LucideIcons.Music, Size = 7, Margin = new Thickness(0, 0, 3, 0) };
+        music.SetResourceReference(LucideIcon.BrushProperty, "IslandTextSecondaryBrush");
+        var label = new TextBlock { Text = "Now Playing", FontSize = 6, VerticalAlignment = VerticalAlignment.Center };
+        label.SetResourceReference(TextBlock.ForegroundProperty, "IslandTextSecondaryBrush");
+        var media = new StackPanel { Height = footer, Orientation = Orientation.Horizontal, Children = { music, label } };
+        panel.Child = new StackPanel { Margin = new Thickness(inset), Children = { title, grid, media } };
         Canvas.SetLeft(panel, width - edge - panelWidth);
         Canvas.SetTop(panel, height - edge - puck / 2 - panelHeight);
         canvas.Children.Add(panel);

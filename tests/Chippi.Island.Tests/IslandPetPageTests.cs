@@ -38,7 +38,7 @@ public sealed class IslandPetPageTests
     }
 
     [Fact]
-    public void The_fixed_now_playing_card_has_no_show_switch()
+    public void The_fixed_now_playing_link_has_no_show_switch()
     {
         WpfTestThread.Run(() => WithPage((page, _) =>
         {
@@ -48,16 +48,17 @@ public sealed class IslandPetPageTests
     }
 
     [Fact]
-    public void Turning_a_tile_off_frees_its_slot_for_the_switch_turned_on_next_not_the_next_tile_in_order()
+    public void Hiding_one_tool_preserves_other_tools_and_saved_choices_for_uninstalled_features()
     {
-        // Ten tiles: "i" is past the home's eight, so its switch shows off; "j" was turned off.
-        string[] order = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"];
-        var hidden = Chippi.App.Island.IslandLayout.Switched(["j"], order, "a", show: false, room: 8);
-        Assert.Equal(["j", "i", "a"], hidden); // "i" stays off rather than taking "a"'s slot
-        hidden = Chippi.App.Island.IslandLayout.Switched(hidden, order, "j", show: true, room: 8);
-        Assert.Equal(["i", "a"], hidden); // so "j" can have it
-        hidden = Chippi.App.Island.IslandLayout.Switched(hidden, order, "b", show: false, room: 8);
-        Assert.Equal(["i", "a", "b"], hidden); // with room, turning one off hides nothing else
+        string[] order = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k"];
+        var hidden = Chippi.App.Island.IslandLayout.Switched(["uninstalled"], "a", show: false);
+        Assert.Equal(["uninstalled", "a"], hidden);
+        var layout = Chippi.App.Island.IslandLayout.Default with { Hidden = hidden.ToHashSet() };
+        Assert.Equal(order.Skip(1), layout.Shown(order));
+
+        hidden = Chippi.App.Island.IslandLayout.Switched(hidden, "a", show: true);
+        Assert.Equal(["uninstalled"], hidden);
+        Assert.Equal(order, (layout with { Hidden = hidden.ToHashSet() }).Shown(order));
     }
 
     [Fact]

@@ -58,7 +58,7 @@ public sealed class SystemMonitorSmokeTests(ITestOutputHelper output)
             Assert.True(tile.OnScreen);
             var grid = Assert.IsType<IslandGrid>(((ContentControl)panel.FindName("Page")).Content);
             var button = Assert.Single(grid.Buttons(), b => (string)b.Tag == "system-monitor");
-            Until(() => AutomationProperties.GetName(Assert.IsType<IslandGrid>(((ContentControl)panel.FindName("Page")).Content).Buttons().Single(b => (string)b.Tag == "system-monitor")).Contains("CPU 25%"));
+            Until(() => AutomationProperties.GetHelpText(Assert.IsType<IslandGrid>(((ContentControl)panel.FindName("Page")).Content).Buttons().Single(b => (string)b.Tag == "system-monitor")).Contains("CPU 25%"));
             button = Assert.IsType<IslandGrid>(((ContentControl)panel.FindName("Page")).Content).Buttons().Single(b => (string)b.Tag == "system-monitor");
             button.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
             Assert.Equal("system-monitor", panel.CurrentPage);

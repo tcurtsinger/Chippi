@@ -4,7 +4,7 @@
 namespace Chippi.Core.Modules;
 
 /// <summary>
-/// The open island's one size, for the grid and every page (DESIGN.md §5 Island, revised 2026-10-28),
+/// The island's full page size and the tool gallery's maximum size (DESIGN.md §5 Island),
 /// in DIPs. Inside the 12 inset and the 24 + 8 header each page has a 496 × 304 body of six 76
 /// columns with 8 gaps. Pages fit their content to the body; nothing scrolls.
 /// </summary>
@@ -25,20 +25,18 @@ public static class IslandPage
 }
 
 /// <summary>
-/// A tile's button on the home that acts without opening the page (Keep awake's start and stop, the
-/// microphone's mute). The home draws the button split: the toggle, and an arrow that opens the page.
+/// A feature's quick switch below the tool gallery (Keep awake or microphone mute). Its tile opens the page.
 /// </summary>
 /// <param name="IsOn">Whether it's on (Keep awake running, the microphone muted). Read each time the home refreshes; the
-/// home draws it in the accent fill unless the tile needs attention (a muted mic shows in Caution instead).</param>
-/// <param name="Toggle">Starts or stops it. Called on the UI thread; when it fails (throws or faults), the home says "Failed" under the button.</param>
+/// switch reports the module's state after the command completes.</param>
+/// <param name="Toggle">Starts or stops it on the UI thread. A failed command shows "Failed" beside the switch.</param>
 /// <param name="Name">The button's name when it isn't the tile's (the Sound tile's mute is "Microphone").</param>
 /// <param name="Icon">Lucide icon key when it isn't the tile's.</param>
-/// <param name="Status">The line under the button when it isn't the tile's status (the microphone's "Live").</param>
+/// <param name="Status">The switch's status for tooltips and accessibility, such as "Live" for the microphone.</param>
 public sealed record IslandTileToggle(Func<bool> IsOn, Func<Task> Toggle, string? Name = null, string? Icon = null, Func<string>? Status = null);
 
 /// <summary>
-/// The home's volume slider, offered by the tile that owns the system volume (Sound). Its arrow opens
-/// that tile's page.
+/// The home's volume slider, offered by the tile that owns the system volume (Sound).
 /// </summary>
 /// <param name="Level">The volume, 0 to 1, or null when there is no output.</param>
 /// <param name="Set">Sets the volume, 0 to 1. Called on the UI thread for every step of a drag, so it coalesces.</param>
@@ -52,7 +50,7 @@ public sealed record IslandTileVolume(Func<double?> Level, Action<double> Set, F
 /// <param name="Key">Identifies the tile, such as "sound". Modules that use the same key share the tile and its page.</param>
 /// <param name="Name">The tile's name, such as "Microphone". A shared tile takes the name and icon of its first section.</param>
 /// <param name="Icon">Lucide icon key, as in <see cref="FeatureDescriptor.Icon"/>.</param>
-/// <param name="Order">Where the tile sits in the grid, lowest first. Now Playing is always first.</param>
+/// <param name="Order">Where the tool sits in the gallery, lowest first before user reordering.</param>
 /// <param name="SectionOrder">Where this module's section sits on a shared page, lowest first.</param>
 /// <param name="CreateSection">This module's section of the page. Must return a WPF FrameworkElement.</param>
 public sealed record IslandTileSpec(string Key, string Name, string Icon, int Order, int SectionOrder, Func<object> CreateSection)

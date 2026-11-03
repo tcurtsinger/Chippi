@@ -88,12 +88,40 @@ public sealed class ShellMotionTests
             now += (long)(Stopwatch.Frequency * IslandPanelWindow.GrowTime.TotalSeconds / 2);
             Frame();
             double across = (panel.Shape.Width - width) / (IslandPage.Width - width);
-            double down = (panel.Shape.Height - puck.Height) / (IslandPage.Height - puck.Height);
+            double down = (panel.Shape.Height - puck.Height) / (panel.Card.Height - puck.Height);
             Assert.InRange(down, 0.49, 0.51);
             Assert.InRange(across, down + 0.1, 0.8);
             Assert.InRange(panel.Card.Opacity, 0.2, 0.8);
             Assert.Equal(Canvas.GetLeft(panel.Card) + IslandPage.Width, Canvas.GetLeft(panel.Shape) + panel.Shape.Width, 3);
-            Assert.Equal(Canvas.GetTop(panel.Card) + IslandPage.Height, Canvas.GetTop(panel.Shape) + panel.Shape.Height, 3);
+            Assert.Equal(Canvas.GetTop(panel.Card) + panel.Card.Height, Canvas.GetTop(panel.Shape) + panel.Shape.Height, 3);
+        })));
+
+    [Fact]
+    public void Outside_clicks_follow_the_visible_edge_while_a_sparse_gallery_changes_height() =>
+        WpfTestThread.Run(() => WithMotion(false, () => WithPanel(panel =>
+        {
+            panel.Open(IslandGeometry.Start(Offscreen.Work, 1), Offscreen);
+            IslandWindowTests.Settle(panel);
+            foreach (var destination in new string?[] { "keep-awake", null })
+            {
+                long now = Stopwatch.GetTimestamp();
+                int frames = 0;
+                panel.Clock = () => { frames++; return now; };
+                double startHeight = panel.Shape.Height;
+                panel.ShowPage(destination);
+                IslandWindowTests.PumpUntil(() => frames > 0);
+                now += Stopwatch.Frequency / 12;
+                IslandWindowTests.PumpUntil(() => Math.Abs(panel.Shape.Height - startHeight) > 1);
+                Assert.InRange(panel.Shape.Height, 170, 359);
+
+                // This bottom-right anchored panel moves its top edge. The final target would swallow
+                // the outside point during growth or reject the inside point while shrinking.
+                var window = IslandNative.WindowRect(panel.Handle);
+                var top = new Point(window.X + Canvas.GetLeft(panel.Shape) + 100, window.Y + Canvas.GetTop(panel.Shape));
+                Assert.True(panel.Covers(new Point(top.X, top.Y + 2)));
+                Assert.False(panel.Covers(new Point(top.X, top.Y - 2)));
+                IslandWindowTests.Settle(panel);
+            }
         })));
 
     [Fact]

@@ -22,14 +22,14 @@ using Windows.Win32.Foundation;
 namespace Chippi.App.Island;
 
 /// <summary>
-/// The open panel (DESIGN.md §5): the home or one tile's page, in one 520 × 360 shape that the widget
+/// The open panel (DESIGN.md §5): the tool gallery or one tile's page, in one anchored shape that the widget
 /// (the puck, or the bar) becomes, on its outer corner; every page starts with a back arrow.
 /// Between pages the shape stays and the new content fades in. <see cref="IslandWindow"/> opens,
 /// places and closes it.
 /// </summary>
 public partial class IslandPanelWindow : Window
 {
-    /// <summary>The shell's Now Playing tile, always on the grid.</summary>
+    /// <summary>The shell's Now Playing destination, always in the gallery footer.</summary>
     public const string NowPlayingKey = "now-playing";
 
     private const double OpenRadius = 8; // the Windows 11 widget look
@@ -43,7 +43,7 @@ public partial class IslandPanelWindow : Window
 
     private enum Morph { Open, Page, Close }
 
-    // A toggle that failed says "Failed" under its button this long.
+    // How long a failed quick switch shows its error.
     private static readonly TimeSpan FailedHold = TimeSpan.FromSeconds(4);
 
     private readonly IslandGrid _grid = new();
@@ -60,6 +60,7 @@ public partial class IslandPanelWindow : Window
     private IMediaSessions? _media;
     private NowPlayingView? _nowPlaying;
     private string? _page; // null is the grid
+    private string? _returnFocusKey; // the gallery destination to focus when returning from a page
     private string? _lastPage;
     private string? _openOn;
     private IReadOnlyList<string> _shownTiles = [];
@@ -90,6 +91,7 @@ public partial class IslandPanelWindow : Window
         InitializeComponent();
         _grid.TileOpened += (_, key) => ShowPage(key);
         _grid.TileToggled += (_, key) => Toggle(key);
+        _grid.SearchRequested += (_, _) => TakeKeyboard();
         _grid.SettingsRequested += (_, _) => SettingsRequested?.Invoke(this, EventArgs.Empty);
         _failedTimer.Tick += (_, _) =>
         {
@@ -161,7 +163,9 @@ public partial class IslandPanelWindow : Window
     internal Core.Clipboard.PasteTarget? PasteTarget { get; private set; }
 
     /// <summary>Lets the page use Esc first (a search to clear): true when it did, and the island stays open.</summary>
-    internal bool PageHandlesEscape() => PageHandles(s => s.HandleEscape, "Esc");
+    internal bool PageHandlesEscape() => IsOpen && _page is null
+        ? _grid.CloseSearch()
+        : PageHandles(s => s.HandleEscape, "Esc");
 
     /// <summary>Lets the page use its Back arrow first (a detail page back to its overview): true when it did, and the page stays.</summary>
     internal bool PageHandlesBack() => PageHandles(s => s.HandleBack, "Back");
@@ -295,7 +299,6 @@ public partial class IslandPanelWindow : Window
         if (!IsOpen)
             return;
         _grid.Pet.Beat(strength);
-        _grid.Media.Beat(strength);
         _nowPlaying?.Beat(strength);
     }
 
@@ -316,7 +319,7 @@ public partial class IslandPanelWindow : Window
             return;
         if (_page is not null && !Exists(_page))
             ShowPage(null, remember: false);
-        else
+        else if (_page is not null)
             Attach(_page);
         Reshape(snap: _frame is null);
     }
@@ -393,7 +396,7 @@ public partial class IslandPanelWindow : Window
         if (!IsOpen)
             return false;
         var local = new Point((physical.X - _window.X) / _area.Scale, (physical.Y - _window.Y) / _area.Scale);
-        return _target.Contains(local);
+        return (_frame is not null && _morph == Morph.Page ? _drawn : _target).Contains(local);
     }
 
     /// <summary>Takes the keyboard without a click (the tray icon chosen with the keyboard, or a second launch).</summary>
@@ -411,6 +414,10 @@ public partial class IslandPanelWindow : Window
         }
         if (key == _page && IsOpen)
             return;
+        if (_page is null && key is not null)
+            _returnFocusKey = key;
+        if (key is null)
+            _returnFocusKey ??= _page;
         _page = key;
         if (!IsOpen)
             return;
@@ -671,6 +678,7 @@ public partial class IslandPanelWindow : Window
     /// <summary>The features' buttons, each with its status, in the chosen order without the hidden ones, and the volume slider. Now Playing is the card, not a button.</summary>
     private void RefreshGrid()
     {
+        double previousHeight = _grid.HomeHeight;
         var tiles = new List<IslandTileView>();
         long now = Stopwatch.GetTimestamp();
         foreach (var group in _groups.Where(g => g.Key != NowPlayingKey))
@@ -687,8 +695,8 @@ public partial class IslandPanelWindow : Window
             string status = failed ? "Failed"
                 : attention && !muted && group.Status.Length > 0 ? group.Status
                 : Read($"{group.Key} status", () => toggle?.Status?.Invoke(), null) ?? group.Status;
-            // The accent says something is on and fine: a muted mic, or anything that needs attention, shows in Caution instead.
-            tiles.Add(new(group.Key, name, icon, status, on && !attention, attention || failed, toggle is not null, group.Name));
+            bool waiting = _activities.Any(a => a.Kind == IslandActivityKind.Agent && a.NeedsAttention && a.OpensTile == group.Key);
+            tiles.Add(new(group.Key, name, icon, status, on, attention || failed, toggle is not null, group.Name, Waiting: waiting));
         }
         var shown = _layout.Shown(tiles.Select(t => t.Key));
         _grid.SetTiles([.. shown.Select(key => tiles.First(t => t.Key == key))]);
@@ -697,6 +705,8 @@ public partial class IslandPanelWindow : Window
         _shownTiles = shown;
         RefreshPageStatus();
         MarkOnScreen();
+        if (IsOpen && IsVisible && _page is null && previousHeight != _grid.HomeHeight)
+            Reshape(snap: _frame is null);
     }
 
     /// <summary>
@@ -721,8 +731,7 @@ public partial class IslandPanelWindow : Window
     }
 
     /// <summary>
-    /// A split button's toggle on the home. A press while the last one is still being applied does nothing, so a double
-    /// click can't turn it on and straight off. When it fails, "Failed" shows under the button for a few seconds.
+    /// A quick switch on the home. While the feature applies a change, a second press is ignored.
     /// </summary>
     private async void Toggle(string key)
     {
@@ -739,11 +748,11 @@ public partial class IslandPanelWindow : Window
             _failed[key] = Stopwatch.GetTimestamp() + (long)(FailedHold.TotalSeconds * Stopwatch.Frequency);
             _failedTimer.Stop();
             _failedTimer.Start();
-            RefreshGrid();
         }
         finally
         {
             _toggling.Remove(key);
+            RefreshGrid();
         }
     }
 
@@ -780,6 +789,8 @@ public partial class IslandPanelWindow : Window
         ActivateWindow(_hwnd);
         Dispatcher.BeginInvoke(DispatcherPriority.Input, () =>
         {
+            if (pressed is null && _page is null && _grid.IsSearching && _grid.FocusTile(null))
+                return;
             for (var at = pressed; at is not null; at = at is System.Windows.Media.Visual or System.Windows.Media.Media3D.Visual3D ? VisualTreeHelper.GetParent(at) : LogicalTreeHelper.GetParent(at))
             {
                 if (at is UIElement { Focusable: true, IsEnabled: true } target && target.Focus())
@@ -792,7 +803,10 @@ public partial class IslandPanelWindow : Window
     private void FocusFirst()
     {
         if (_page is null)
-            _grid.MoveFocus(new TraversalRequest(FocusNavigationDirection.First));
+        {
+            if (!_grid.FocusTile(_returnFocusKey))
+                _grid.FocusTile(null);
+        }
         else
         {
             var focus = Group(_page)?.Parts.Select(p => p.Spec.InitialFocus?.Invoke()).OfType<UIElement>().FirstOrDefault();
@@ -802,9 +816,6 @@ public partial class IslandPanelWindow : Window
 
     // ----- Placement and the morph -----
 
-    /// <summary>The panel's rectangle on the puck's outer corner, in physical pixels.</summary>
-    private Rect PanelRect() => IslandGeometry.PanelRect(_puck, _area.Work, _area.Scale);
-
     /// <summary>
     /// Covers the widget and the panel it becomes, with room for the shadow, while open, so the morph never
     /// moves the window. Kept on the monitor, and no bigger: every frame copies all of it.
@@ -812,7 +823,8 @@ public partial class IslandPanelWindow : Window
     private void Place()
     {
         double s = _area.Scale;
-        var cover = PanelRect();
+        // The host reserves the full page so the HWND stays still when a shorter gallery opens a tool.
+        var cover = IslandGeometry.PanelRect(_puck, _area.Work, s);
         cover.Union(_widget);
         cover.Inflate(ShadowRoom * s, ShadowRoom * s);
         cover.Intersect(_area.Monitor);
@@ -833,7 +845,8 @@ public partial class IslandPanelWindow : Window
     /// </summary>
     private void Reshape(bool snap)
     {
-        _target = Local(PanelRect());
+        Card.Height = _page is null ? _grid.HomeHeight : IslandPage.Height;
+        _target = Local(IslandGeometry.PanelRect(_puck, _area.Work, _area.Scale, Card.Height));
         double fit = _target.Width / IslandPage.Width;
         if (fit != _pageScale)
         {
@@ -881,7 +894,7 @@ public partial class IslandPanelWindow : Window
 
     /// <summary>
     /// Starts from the surface already on screen. Opening and closing share one reversible path.
-    /// Page changes keep the shell still. Reduced motion dissolves the panel in place.
+    /// Page changes keep the corner anchored. Reduced motion dissolves the panel in place.
     /// </summary>
     private void Begin(Morph morph)
     {
@@ -918,6 +931,13 @@ public partial class IslandPanelWindow : Window
         double t = Math.Min(1, _elapsed / time);
         if (_morph == Morph.Page)
         {
+            if (_drawn != _target)
+            {
+                double at = _reduced ? 1 : SmoothStep(t);
+                _drawn = new Rect(Lerp(_from.X, _target.X, at), Lerp(_from.Y, _target.Y, at),
+                    Lerp(_from.Width, _target.Width, at), Lerp(_from.Height, _target.Height, at));
+                Draw();
+            }
             Card.Opacity = t;
             PageShift.X = _reduced ? 0 : _pageFrom * PageSlide * Math.Pow(1 - t, 3);
             Page.RenderTransform = PageShift.X == 0 ? Transform.Identity : PageShift;
@@ -999,6 +1019,8 @@ public partial class IslandPanelWindow : Window
         PageShift.X = 0;
         // Unparented views get Unloaded and stop listening until the island opens again.
         Detach();
+        _grid.CloseSearch();
+        _returnFocusKey = null;
         MarkOnScreen();
     }
 
