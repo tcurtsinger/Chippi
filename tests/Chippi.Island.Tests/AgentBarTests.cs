@@ -213,7 +213,7 @@ public sealed class AgentBarTests
 
     [Theory]
     [InlineData(false, "IslandAccentBrush", "Working · 42% · Claude Code · chippi")]
-    [InlineData(true, "IslandCautionBrush", "Waiting on you · Claude Code · packrat")]
+    [InlineData(true, "IslandWaitingInkBrush", "Waiting on you · Claude Code · packrat")]
     public void An_agent_leads_with_its_letters_over_its_own_lines_and_opens_Agents(bool waiting, string brush, string lines) => WpfTestThread.Run(() =>
     {
         var window = new IslandWindow();

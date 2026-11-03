@@ -95,6 +95,8 @@
     <SolidColorBrush x:Key="IslandTextSecondaryBrush" Color="#5C5C5C" />
     <SolidColorBrush x:Key="IslandTextTertiaryBrush" Color="#707070" />
     <SolidColorBrush x:Key="IslandCautionBrush" Color="#C42B1C" />
+    <SolidColorBrush x:Key="IslandWaitingInkBrush" Color="#815100" />
+    <SolidColorBrush x:Key="IslandWaitingTintBrush" Color="#1AB07800" />
     <SolidColorBrush x:Key="PetSparkBrush" Color="#B07800" />
     <SolidColorBrush x:Key="IslandAccentBrush" Color="#7444F0" />
     <LinearGradientBrush x:Key="IslandAccentFillBrush" StartPoint="0,0" EndPoint="1,1">
@@ -103,6 +105,8 @@
     </LinearGradientBrush>
     <SolidColorBrush x:Key="IslandOnAccentBrush" Color="#FFFFFF" />
     <SolidColorBrush x:Key="IslandAccentTintBrush" Color="#1A7444F0" />
+    <DropShadowEffect x:Key="IslandPuckShadow" Color="#000000" BlurRadius="12" ShadowDepth="3" Direction="270" Opacity="0.13" />
+    <DropShadowEffect x:Key="IslandLiftShadow" Color="#000000" BlurRadius="26" ShadowDepth="11" Direction="270" Opacity="0.21" />
     <DropShadowEffect x:Key="IslandExpandedShadow" Color="#000000" BlurRadius="40" ShadowDepth="16" Direction="270" Opacity="0.2" />
     <DropShadowEffect x:Key="IslandThumbShadow" Color="#000000" BlurRadius="3" ShadowDepth="1" Direction="270" Opacity="0.3" />
 </ResourceDictionary>

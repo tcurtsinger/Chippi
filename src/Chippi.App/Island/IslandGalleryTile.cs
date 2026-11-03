@@ -13,6 +13,7 @@ namespace Chippi.App.Island;
 /// <summary>The entire tile opens its destination. Its live reading is available on hover and to assistive technology.</summary>
 internal sealed class IslandGalleryTile : Button
 {
+    internal const double Gutter = 6;
     private readonly LucideIcon _glyph = new() { Size = 25 };
     private readonly Ellipse _waiting = new() { Width = 8, Height = 8, StrokeThickness = 1.5,
         HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, -1, -4, 0) };
@@ -22,7 +23,7 @@ internal sealed class IslandGalleryTile : Button
     internal IslandGalleryTile(IslandTileView tile, Action<string> open)
     {
         Tag = tile.Key;
-        Margin = new Thickness(0, 0, 5, 5);
+        Margin = new Thickness(0, 0, Gutter, Gutter);
         SetResourceReference(StyleProperty, "IslandTileStyle");
         _waiting.SetResourceReference(Shape.FillProperty, "PetSparkBrush");
         _waiting.SetResourceReference(Shape.StrokeProperty, "IslandBrush");

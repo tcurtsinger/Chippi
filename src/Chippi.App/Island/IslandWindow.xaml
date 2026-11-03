@@ -34,7 +34,7 @@
                 </TransformGroup>
             </Button.RenderTransform>
             <Grid>
-                <Border x:Name="BodyShadow" CornerRadius="25" Background="{DynamicResource IslandBrush}" Effect="{StaticResource IslandPuckShadow}" />
+                <Border x:Name="BodyShadow" CornerRadius="25" Background="{DynamicResource IslandBrush}" Effect="{DynamicResource IslandPuckShadow}" />
                 <Border x:Name="Body" CornerRadius="25" Background="{DynamicResource IslandBrush}" BorderBrush="{DynamicResource IslandWidgetBorderBrush}" BorderThickness="1" />
                 <!-- The bar's content, laid out on the full 256 from the puck's end and clipped while the bar unfolds:
                      the lead (cover or glyph) in the far round end, the two lines, then the bars or the pause mark by
@@ -46,7 +46,6 @@
                             <ColumnDefinition Width="34" />
                             <ColumnDefinition Width="10" />
                             <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="10" />
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="10" />
                             <ColumnDefinition Width="46" />
@@ -60,7 +59,7 @@
                         </Grid>
                         <!-- An activity's glyph in a tinted circle: its page's icon, the progress ring, a dot, or an agent's two letters. -->
                         <Grid x:Name="Glyph" Grid.Column="1" Width="34" Height="34" Visibility="Collapsed">
-                            <Ellipse Fill="{DynamicResource IslandAccentTintBrush}" />
+                            <Ellipse x:Name="GlyphPlate" Fill="{DynamicResource IslandAccentTintBrush}" />
                             <c:LucideIcon x:Name="GlyphIcon" Size="16" Thickness="2" Brush="{DynamicResource IslandAccentBrush}"
                                           HorizontalAlignment="Center" VerticalAlignment="Center" />
                             <Grid x:Name="Ring" Width="14" Height="14">
@@ -88,15 +87,16 @@
                             <TextBlock x:Name="Detail" FontFamily="{StaticResource UiFont}" FontSize="12" LineHeight="16" LineStackingStrategy="BlockLineHeight"
                                        Foreground="{DynamicResource IslandTextSecondaryBrush}" TextTrimming="CharacterEllipsis" />
                         </StackPanel>
-                        <StackPanel x:Name="Equalizer" Grid.Column="5" Orientation="Horizontal" Height="14" VerticalAlignment="Center" Visibility="Collapsed">
-                            <Rectangle Style="{StaticResource IslandEqualizerBarStyle}" Height="8" />
-                            <Rectangle Style="{StaticResource IslandEqualizerBarStyle}" Height="14" />
-                            <Rectangle Style="{StaticResource IslandEqualizerBarStyle}" Height="10" />
-                        </StackPanel>
-                        <!-- Paused: a pause mark in tertiary in the bars' place (three flat bars read as a "more" button),
-                             as wide as the bars (15), so the lines don't move when it takes over. -->
-                        <c:LucideIcon x:Name="PausedMark" Grid.Column="5" Data="{x:Static c:LucideIcons.Pause}" Size="14" Filled="True" Margin="0,0,1,0"
-                                      Brush="{DynamicResource IslandTextTertiaryBrush}" VerticalAlignment="Center" Visibility="Collapsed" />
+                        <!-- The track and pause mark share a lane. Other notices give this space back to the text. -->
+                        <Grid x:Name="PlaybackMark" Grid.Column="4" Width="15" Margin="10,0,0,0" Visibility="Collapsed">
+                            <StackPanel x:Name="Equalizer" Orientation="Horizontal" Height="14" VerticalAlignment="Center" Visibility="Collapsed">
+                                <Rectangle Style="{StaticResource IslandEqualizerBarStyle}" Height="8" />
+                                <Rectangle Style="{StaticResource IslandEqualizerBarStyle}" Height="14" />
+                                <Rectangle Style="{StaticResource IslandEqualizerBarStyle}" Height="10" />
+                            </StackPanel>
+                            <c:LucideIcon x:Name="PausedMark" Data="{x:Static c:LucideIcons.Pause}" Size="14" Filled="True"
+                                          Brush="{DynamicResource IslandTextTertiaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed" />
+                        </Grid>
                         <!-- What the lead and the lines showed, fading out while something new arrives (Arrival). -->
                         <Image x:Name="LeadWas" />
                         <Image x:Name="LinesWas" />
@@ -116,14 +116,14 @@
                         <Ellipse x:Name="WaitingMark" Width="10" Height="10" StrokeThickness="1.5"
                                  Margin="6,0,0,6" HorizontalAlignment="Left" VerticalAlignment="Bottom" Visibility="Collapsed"
                                  Fill="{DynamicResource PetSparkBrush}" Stroke="{DynamicResource IslandBrush}" />
-                        <Grid x:Name="MicBadge" Width="22" Height="22" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,-2,-2"
+                        <Grid x:Name="MicBadge" Width="22" Height="22" HorizontalAlignment="Right" VerticalAlignment="Bottom"
                               Visibility="Collapsed">
                             <Ellipse Fill="{DynamicResource IslandBrush}" />
                             <Ellipse Width="18" Height="18" Fill="{StaticResource IslandBadgeBrush}" />
                             <c:LucideIcon Data="{x:Static c:LucideIcons.MicOff}" Size="11" Thickness="2" Brush="White" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Grid>
                         <!-- Keep awake running while a song holds the bar: the accent says it's on and fine. -->
-                        <Grid x:Name="AwakeBadge" Width="22" Height="22" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-2,-2,0"
+                        <Grid x:Name="AwakeBadge" Width="22" Height="22" HorizontalAlignment="Right" VerticalAlignment="Top"
                               Visibility="Collapsed">
                             <Ellipse Fill="{DynamicResource IslandBrush}" />
                             <Ellipse Width="18" Height="18" Fill="{DynamicResource IslandAccentFillBrush}" />

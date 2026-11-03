@@ -66,8 +66,10 @@ public sealed class MicMuteTabTests
                 window.SetActivities([music, awake], PetMood.WideAwake);
                 Assert.Equal("Track", window.ChipText); // the song takes the bar, and Keep awake stays in sight as the badge
                 Assert.Equal(Visibility.Visible, window.AwakeBadge.Visibility);
+                Assert.Equal("Keep awake is on", AutomationProperties.GetHelpText(window.PuckButton));
                 window.SetActivities([music], PetMood.Idle);
                 Assert.Equal(Visibility.Collapsed, window.AwakeBadge.Visibility);
+                Assert.Empty(AutomationProperties.GetHelpText(window.PuckButton));
             }
             finally { window.Close(); }
         });

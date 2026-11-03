@@ -557,7 +557,7 @@ public partial class IslandWindow : Window
     /// </summary>
     private void LayOutBar(bool chippiRight)
     {
-        GridLength[] widths = [new(8), new(34), new(10), new(1, GridUnitType.Star), new(10), GridLength.Auto, new(10), new(46)];
+        GridLength[] widths = [new(8), new(34), new(10), new(1, GridUnitType.Star), GridLength.Auto, new(10), new(46)];
         int Column(int fromFarEnd) => chippiRight ? fromFarEnd : widths.Length - 1 - fromFarEnd;
         for (int i = 0; i < widths.Length; i++)
             Bar.ColumnDefinitions[Column(i)].Width = widths[i];
@@ -565,8 +565,8 @@ public partial class IslandWindow : Window
         Grid.SetColumn(Glyph, Column(1));
         Grid.SetColumn(Lines, Column(3));
         Lines.HorizontalAlignment = chippiRight ? HorizontalAlignment.Left : HorizontalAlignment.Right;
-        Grid.SetColumn(Equalizer, Column(5));
-        Grid.SetColumn(PausedMark, Column(5));
+        Grid.SetColumn(PlaybackMark, Column(4));
+        PlaybackMark.Margin = chippiRight ? new Thickness(10, 0, 0, 0) : new Thickness(0, 0, 10, 0);
     }
 
     private nint WndProc(nint hwnd, int msg, nint wParam, nint lParam, ref bool handled)
@@ -909,7 +909,6 @@ public partial class IslandWindow : Window
         // A long bar lifts by its shadow alone. A tilt about its center would move the end out of the hand.
         bool heldBar = _heldWidth > IslandGeometry.Puck;
         Grow(heldBar ? 1 : _lifted ? LiftScale : pressed ? PressScale : 1, _lifted && !heldBar ? LiftTilt : 0, pressed ? FillFade.Time : GrowTime);
-        BodyShadow.Effect = (System.Windows.Media.Effects.Effect)FindResource(_lifted ? "IslandLiftShadow" : "IslandPuckShadow");
         ShowRim(_hovered && !_lifted ? "IslandWidgetHoverBorderBrush" : "IslandWidgetBorderBrush");
         bool keepSource = _panel.IsVisible && (!_panel.IsOpen || (_panel.IsMorphing && BarLayer.Opacity > 0));
         if (_heldWidth is not null || keepSource)
@@ -990,8 +989,9 @@ public partial class IslandWindow : Window
                 Arrival.Pop(PausedMark);
             Equalizer.Visibility = Shown(bars);
             PausedMark.Visibility = Shown(paused);
-            // The pause mark occupies the same 15 as the bars, so pausing a long title keeps its place in the scroll.
-            _lineRoom = IslandGeometry.BarWidth - 8 - 34 - 10 - 10 - 10 - 46 - (_singing ? 15 : 0);
+            PlaybackMark.Visibility = Shown(_singing);
+            // Only music uses the 15-DIP indicator and its 10-DIP gap.
+            _lineRoom = IslandGeometry.BarWidth - 8 - 34 - 10 - 10 - 46 - (_singing ? 25 : 0);
         }
         if (!bar)
             ShowLine(null, "", "");
@@ -1039,10 +1039,12 @@ public partial class IslandWindow : Window
         else
             StopLevel();
         AutomationProperties.SetName(PuckButton, bar ? $"Chippi, {_chipText}" : "Chippi");
-        string help = mic is not null ? (mic.Title == "Muted" ? "Microphone muted" : mic.Title) : "";
-        if (waitingMark)
-            help = help.Length == 0 ? "Agent waiting on you" : $"{help}. Agent waiting on you";
-        AutomationProperties.SetHelpText(PuckButton, help);
+        List<string> help = [];
+        if (paused) help.Add("Paused");
+        if (mic is not null) help.Add(mic.Title == "Muted" ? "Microphone muted" : mic.Title);
+        if (awakeBadge) help.Add("Keep awake is on");
+        if (waitingMark) help.Add("Agent waiting on you");
+        AutomationProperties.SetHelpText(PuckButton, string.Join(". ", help));
         AutomationProperties.SetLiveSetting(PuckButton, AutomationLiveSetting.Polite);
     }
 
@@ -1269,17 +1271,19 @@ public partial class IslandWindow : Window
 
     private void ShowGlyph(Geometry icon, bool caution)
     {
+        GlyphPlate.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, "IslandAccentTintBrush");
         GlyphIcon.Data = icon;
         GlyphIcon.SetResourceReference(LucideIcon.BrushProperty, caution ? "IslandCautionBrush" : "IslandAccentBrush");
         GlyphIcon.Visibility = Visibility.Visible;
         Ring.Visibility = Dot.Visibility = Monogram.Visibility = Visibility.Collapsed;
     }
 
-    /// <summary>An agent's two letters in the lead (Chippi never redraws another company's logo), Caution while it waits on you.</summary>
-    private void ShowMonogram(string letters, bool caution)
+    /// <summary>An agent's two letters use the folded puck's amber signal while it waits on you.</summary>
+    private void ShowMonogram(string letters, bool waiting)
     {
         Monogram.Text = letters;
-        Monogram.SetResourceReference(TextBlock.ForegroundProperty, caution ? "IslandCautionBrush" : "IslandAccentBrush");
+        Monogram.SetResourceReference(TextBlock.ForegroundProperty, waiting ? "IslandWaitingInkBrush" : "IslandAccentBrush");
+        GlyphPlate.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, waiting ? "IslandWaitingTintBrush" : "IslandAccentTintBrush");
         Monogram.Visibility = Visibility.Visible;
         GlyphIcon.Visibility = Ring.Visibility = Dot.Visibility = Visibility.Collapsed;
     }
@@ -1290,6 +1294,8 @@ public partial class IslandWindow : Window
         switch (activity.Kind)
         {
             case IslandActivityKind.Timer or IslandActivityKind.Agent:
+                GlyphPlate.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, "IslandAccentTintBrush");
+                RingArc.SetResourceReference(System.Windows.Shapes.Shape.StrokeProperty, activity.NeedsAttention ? "IslandCautionBrush" : "IslandAccentBrush");
                 RingArc.Data = Arc(activity.Progress ?? 1);
                 GlyphIcon.Visibility = Dot.Visibility = Monogram.Visibility = Visibility.Collapsed;
                 Ring.Visibility = Visibility.Visible;
@@ -1301,6 +1307,7 @@ public partial class IslandWindow : Window
                 ShowGlyph(LucideIcons.Music, activity.NeedsAttention);
                 break;
             default:
+                GlyphPlate.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, "IslandAccentTintBrush");
                 Dot.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, activity.NeedsAttention ? "IslandCautionBrush" : "IslandAccentBrush");
                 GlyphIcon.Visibility = Ring.Visibility = Monogram.Visibility = Visibility.Collapsed;
                 Dot.Visibility = Visibility.Visible;
@@ -1550,6 +1557,12 @@ public partial class IslandWindow : Window
         }
     }
 
+    private void SetLifted(bool lifted)
+    {
+        _lifted = lifted;
+        BodyShadow.SetResourceReference(EffectProperty, lifted ? "IslandLiftShadow" : "IslandPuckShadow");
+    }
+
     /// <summary>The picked-up widget lifts where it was held, with a deeper shadow. Its content stays put.</summary>
     private void BeginDrag()
     {
@@ -1557,7 +1570,7 @@ public partial class IslandWindow : Window
         Menu.IsOpen = false;
         StopSlide();
         _landing = null; // picked up again mid-slide: this drop lands instead
-        _lifted = true;
+        SetLifted(true);
         _followScale = double.NaN;
         RefreshPuck();
     }
@@ -1578,7 +1591,7 @@ public partial class IslandWindow : Window
     internal Rect DropAt(Point pointer)
     {
         _dragging = false;
-        _lifted = false;
+        SetLifted(false);
         var monitor = IslandNative.MonitorAt(pointer);
         if (IslandNative.Area(monitor) is not { } area)
         {
@@ -1705,7 +1718,7 @@ public partial class IslandWindow : Window
     {
         if (lifted) _heldWidth = HoldBarMotion();
         else _heldWidth = null;
-        _lifted = lifted;
+        SetLifted(lifted);
         Pet.IsHeld = lifted;
         RefreshPuck();
     }

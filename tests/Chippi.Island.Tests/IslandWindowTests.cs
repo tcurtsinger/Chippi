@@ -197,6 +197,7 @@ public sealed class IslandWindowTests
             window.SetActivities([], Chippi.UI.Pet.PetMood.Sleepy); // paused: the activity goes
             Assert.True(window.BarShown);
             Assert.Equal(Visibility.Visible, window.PausedMark.Visibility);
+            Assert.Equal("Paused", System.Windows.Automation.AutomationProperties.GetHelpText(window.PuckButton));
             Assert.Equal(Visibility.Collapsed, window.Equalizer.Visibility);
             Assert.Same(fade, window.Song.OpacityMask); // the title keeps its place when the equalizer becomes a pause mark
             Assert.Equal(Chippi.UI.Pet.PetMood.Idle, window.Pet.Mood); // the headphones come off
