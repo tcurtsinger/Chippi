@@ -71,11 +71,13 @@ public sealed class VolumeUiTests
     public void Fallback_distinguishes_apps_sharing_the_first_letter(string name, string expected) =>
         Assert.Equal(expected, VolumeView.Initials(name));
 
-    // The island keeps its page: opened again, the strips that still fit are the same ones, not rebuilt.
     [Fact]
-    public async Task Reopening_the_page_keeps_its_strips()
+    public async Task Reopening_the_page_keeps_a_paused_apps_strip()
     {
-        await using var f = new VolumeFixture(); await f.Start();
+        await using var f = new VolumeFixture();
+        f.System.EndSession("one");
+        f.System.WithSession(VolumeFixture.Session("paused", "B", 124, state: SessionState.Inactive));
+        await f.Start();
         await Sta(() =>
         {
             var view = new VolumeView(f.Module, VolumeSurface.Island);
@@ -140,24 +142,40 @@ public sealed class VolumeUiTests
         });
     }
 
-    // The island shows what's playing; Settings lists every app, saying which aren't.
     [Fact]
-    public async Task The_island_shows_playing_apps_and_settings_every_app()
+    public async Task A_silent_app_can_be_adjusted_until_its_last_windows_session_expires()
     {
         await using var f = new VolumeFixture();
-        f.System.WithSession(VolumeFixture.Session("quiet", "A", 300, @"C:\Apps\Quiet.exe", SessionState.Inactive) with { AppName = "Quiet" });
+        var quiet = VolumeFixture.Session("quiet", "A", 300, @"C:\Apps\Quiet.exe", SessionState.Inactive) with { AppName = "Quiet" };
+        f.System.WithSession(quiet);
+        f.System.WithSession(quiet with { SessionId = "quiet-2", EndpointId = "B", ProcessId = 301 });
         await f.Start();
-        await Sta(() =>
+        await Sta(async () =>
         {
             var island = new VolumeView(f.Module, VolumeSurface.Island);
-            Assert.Equal(["Music volume"], Descendants(island).OfType<Slider>().Select(AutomationProperties.GetName));
+            island.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));
+            Slider[] Faders() => Descendants(island).OfType<Slider>().ToArray();
+            Assert.Equal(["Music volume", "Quiet volume"], Faders().Select(AutomationProperties.GetName));
             var settings = new VolumeView(f.Module, VolumeSurface.Settings);
             Assert.Equal(["Music volume", "Quiet volume"], Descendants(settings).OfType<Slider>().Select(AutomationProperties.GetName));
             Assert.Contains(Descendants(settings).OfType<TextBlock>(), t => t.Text == "Not playing" && t.Visibility == Visibility.Visible);
             // Captioned or not, the rows are one height, so a caption coming and going moves nothing.
             var card = Descendants(settings).OfType<Card>().First();
             Assert.All(card.Children.OfType<Border>(), row => Assert.Equal(SettingsLayout.CaptionRowHeight, row.MinHeight));
-            return Task.CompletedTask;
+
+            var fader = Faders()[1];
+            Assert.Equal("Quiet · Not playing · Default", AutomationProperties.GetHelpText(fader));
+            ((IRangeValueProvider)new SliderAutomationPeer(fader)).SetValue(35);
+            await Until(() => f.System.SessionById("quiet").Volume == .35f && f.System.SessionById("quiet-2").Volume == .35f);
+            Assert.Equal(.5f, f.System.SessionById("one").Volume);
+            f.System.EndSession("quiet");
+            await f.Audio.RefreshAsync();
+            Assert.Same(fader, Faders()[1]);
+            f.System.EndSession("quiet-2");
+            await f.Audio.RefreshAsync();
+            await Until(() => Faders().Length == 1);
+            Assert.Equal("Music volume", AutomationProperties.GetName(Faders()[0]));
+            island.RaiseEvent(new RoutedEventArgs(FrameworkElement.UnloadedEvent));
         });
     }
 
@@ -168,7 +186,8 @@ public sealed class VolumeUiTests
         f.System.EndSession("one");
         f.System.WithSession(VolumeFixture.Session("sys", "A", 0) with { IsSystemSounds = true });
         for (int i = 0; i < 14; i++)
-            f.System.WithSession(VolumeFixture.Session($"app{i}", "A", 200 + i, $@"C:\Apps\App{i:00}.exe") with { AppName = $"App {i:00}" });
+            f.System.WithSession(VolumeFixture.Session($"app{i}", "A", 200 + i, $@"C:\Apps\App{i:00}.exe",
+                i % 2 == 0 ? SessionState.Active : SessionState.Inactive) with { AppName = $"App {i:00}" });
         await f.Start();
         await Sta(() =>
         {
@@ -205,7 +224,7 @@ public sealed class VolumeUiTests
             view.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent)); // follows the module, as on screen
             var slider = Descendants(view).OfType<Slider>().Single();
             f.System.SetSessionVolume("one", 0.8f);
-            f.System.WithSession(VolumeFixture.Session("aaa", "A", 301, @"C:\Apps\Aaa.exe") with { AppName = "Aaa" });
+            f.System.WithSession(VolumeFixture.Session("aaa", "A", 301, @"C:\Apps\Aaa.exe", SessionState.Inactive) with { AppName = "Aaa" });
             await f.Audio.RefreshAsync();
             await Until(() => Descendants(view).OfType<Slider>().Count() == 2);
             Assert.Equal(["Aaa volume", "Music volume"], Descendants(view).OfType<Slider>().Select(AutomationProperties.GetName));

@@ -18,7 +18,7 @@ internal sealed class SessionCatalog(int ownProcessId)
     {
         _sessions = activeRender
             .SelectMany(e => system.GetSessions(e.Id))
-            .Where(s => s.State != SessionState.Expired && s.ProcessId != ownProcessId)
+            .Where(s => s.ProcessId != ownProcessId && (s.State != SessionState.Expired || s.IsSystemSounds))
             .ToList();
         Apps = Group(_sessions);
     }
@@ -39,15 +39,17 @@ internal sealed class SessionCatalog(int ownProcessId)
             .GroupBy(KeyOf)
             .Select(g =>
             {
-                var lead = g.FirstOrDefault(s => s.State == SessionState.Active) ?? g.First();
+                var byState = g.OrderByDescending(s => s.State == SessionState.Active)
+                    .ThenBy(s => s.State == SessionState.Expired).ToList();
+                var lead = byState[0];
                 return new AppAudio(
                     g.Key,
-                    g.First().IsSystemSounds ? "System sounds" : lead.AppName,
+                    lead.IsSystemSounds ? "System sounds" : lead.AppName,
                     lead.ExePath,
                     lead.Volume,
                     g.All(s => s.Muted),
-                    g.Any(s => s.State == SessionState.Active),
-                    g.OrderByDescending(s => s.State == SessionState.Active).Select(s => s.EndpointId).Distinct(StringComparer.OrdinalIgnoreCase).ToList()) { ProcessIds = g.Select(s => s.ProcessId).Distinct().ToList() };
+                    lead.State == SessionState.Active,
+                    byState.Select(s => s.EndpointId).Distinct(StringComparer.OrdinalIgnoreCase).ToList()) { ProcessIds = g.Select(s => s.ProcessId).Distinct().ToList() };
             })
             .ToList();
 }

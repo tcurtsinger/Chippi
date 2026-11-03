@@ -54,7 +54,7 @@ public sealed class AppVolumeModule(AudioService? audio = null) : IFeatureModule
     public string? DefaultOutput => Snapshot.Default(AudioFlow.Render, AudioRole.Multimedia) ?? Snapshot.Default(AudioFlow.Render, AudioRole.Console);
 
     /// <summary>Where the app is heard: the output its playing session is on.</summary>
-    public string? PlaysOn(AppKey app) => Snapshot.Apps.FirstOrDefault(a => a.Key == app)?.EndpointIds.FirstOrDefault();
+    public string? PlaysOn(AppKey app) => Snapshot.Apps.FirstOrDefault(a => a.Key == app && a.IsActive)?.EndpointIds.FirstOrDefault();
 
     /// <summary>
     /// The app plays somewhere other than its pick, or than the default when it has none: its open

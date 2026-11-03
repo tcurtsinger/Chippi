@@ -61,16 +61,23 @@ public class SessionCatalogTests
     }
 
     [Fact]
-    public void Expired_sessions_and_chippis_own_are_left_out()
+    public void Expired_apps_and_chippis_own_are_left_out_but_windows_keeps_system_sounds()
     {
         var sys = new FakeDeviceSystem().With(Speaker("Spk"))
             .WithSession(Session("1", "Spk", 10, @"C:\a.exe", "A", SessionState.Expired))
             .WithSession(Session("2", "Spk", 99, @"C:\Chippi.exe", "Chippi"))
-            .WithSession(Session("3", "Spk", 11, @"C:\b.exe", "B"));
+            .WithSession(Session("3", "Spk", 11, @"C:\b.exe", "B", SessionState.Inactive))
+            .WithSession(Session("4", "Spk", 0, null, "System sounds", SessionState.Expired, system: true));
         var catalog = new SessionCatalog(ownProcessId: 99);
 
         catalog.Refresh(sys, sys.GetEndpoints(AudioFlow.Render));
 
-        Assert.Equal("B", Assert.Single(catalog.Apps).Name);
+        Assert.Equal([AppKey.ForExe(@"C:\b.exe"), AppKey.SystemSounds], catalog.Apps.Select(a => a.Key));
+
+        sys.With(Speaker("Hdp")).WithSession(Session("5", "Hdp", 0, null, "System sounds", SessionState.Inactive, volume: 0.3f, system: true));
+        catalog.Refresh(sys, sys.GetEndpoints(AudioFlow.Render));
+        var sounds = Assert.Single(catalog.Apps, a => a.Key == AppKey.SystemSounds);
+        Assert.Equal(0.3f, sounds.Volume);
+        Assert.Equal(["Hdp", "Spk"], sounds.EndpointIds);
     }
 }

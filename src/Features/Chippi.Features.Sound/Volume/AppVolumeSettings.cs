@@ -2,7 +2,7 @@
 // Copyright (C) Chippi contributors
 namespace Chippi.Features.Sound.Volume;
 
-/// <summary>Show apps that aren't playing is gone (2026-10-31): the island shows playing apps, Settings every app.</summary>
+/// <summary>Per-app output preferences, keyed by the app's Windows audio session identity.</summary>
 public sealed record AppVolumeSettings
 {
     public bool RememberOutputs { get; init; } = true;
