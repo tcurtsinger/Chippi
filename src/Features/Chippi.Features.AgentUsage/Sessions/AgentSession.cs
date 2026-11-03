@@ -3,7 +3,7 @@
 
 namespace Chippi.Features.AgentUsage.Sessions;
 
-public enum AgentSessionState { Idle, Working, NeedsInput }
+public enum AgentSessionState { Open, Idle, Working, NeedsInput }
 
 /// <summary>One open, user-facing session. Only an outstanding request for the owner needs attention.</summary>
 public sealed record AgentSession(AgentKind Agent, string Id, string Name, AgentSessionState Status, DateTimeOffset Since,
@@ -13,13 +13,14 @@ public sealed record AgentSession(AgentKind Agent, string Id, string Name, Agent
 
     public bool Working => Status == AgentSessionState.Working;
     public bool NeedsInput => Status == AgentSessionState.NeedsInput;
-    public bool IsIdle(DateTimeOffset now) => Status == AgentSessionState.Idle && now - Since > IdleLimit;
+    public bool IsIdle(DateTimeOffset now) => Status is (AgentSessionState.Idle or AgentSessionState.Open) && now - Since > IdleLimit;
 
     public string State(DateTimeOffset now) => Status switch
     {
         AgentSessionState.Working => $"Working · {AgentText.Minutes(now - Since)}",
         AgentSessionState.NeedsInput => "Waiting on you",
-        _ => "Idle",
+        AgentSessionState.Idle => "Idle",
+        _ => "Open",
     };
 }
 

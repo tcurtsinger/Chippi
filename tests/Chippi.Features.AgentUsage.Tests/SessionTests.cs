@@ -145,6 +145,21 @@ public sealed class CodexSessionsTests
     }
 
     [Fact]
+    public void An_open_thread_without_a_visible_turn_marker_is_neutral()
+    {
+        var (home, processes) = Fixture("task_started", "2026-11-01T23:30:35Z");
+        using var _ = home;
+        var logs = new CodexLogs(home.Path);
+        var path = logs.Find(Open)!;
+        File.WriteAllText(path, CodexLogsTests.Log(Turn("2026-11-01T23:30:35Z", "unrelated")));
+        File.SetLastWriteTimeUtc(path, Now.UtcDateTime);
+        var session = Assert.Single(new CodexSessions(home.Path, logs, processes).Read(Now, _ => false));
+        Assert.Equal("Open", session.State(Now));
+        Assert.False(session.NeedsInput);
+        Assert.False(session.Working);
+    }
+
+    [Fact]
     public void The_threads_own_name_wins_over_its_folder()
     {
         var (home, processes) = Fixture("task_started", "2026-11-01T23:30:35Z");

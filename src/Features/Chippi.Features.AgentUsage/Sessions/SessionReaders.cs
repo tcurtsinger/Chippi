@@ -62,7 +62,8 @@ internal sealed partial class ClaudeSessions(string claudeHome, IProcesses proce
         {
             "busy" or "running" or "working" => AgentSessionState.Working,
             "waiting" => AgentSessionState.NeedsInput,
-            _ => AgentSessionState.Idle,
+            "idle" => AgentSessionState.Idle,
+            _ => AgentSessionState.Open,
         };
         long? since = Millis(root, "statusUpdatedAt") ?? Millis(root, "updatedAt");
         long? started = Text(root, "procStart") is { } ps && long.TryParse(ps, out long ft) ? ft : null;
@@ -145,7 +146,7 @@ internal sealed class CodexSessions(string codexHome, CodexLogs logs, IProcesses
                 continue;
             var turn = logs.LastTurn(log, ct);
             string name = Indexed(thread, ct) ?? origin.Folder ?? "Session";
-            var session = new AgentSession(AgentKind.Codex, thread, name, turn?.Status ?? AgentSessionState.Idle,
+            var session = new AgentSession(AgentKind.Codex, thread, name, turn?.Status ?? AgentSessionState.Open,
                 turn?.Since ?? new DateTimeOffset(File.GetLastWriteTimeUtc(log), TimeSpan.Zero), pid, origin.Entrypoint);
             if (!session.IsIdle(now))
                 sessions.Add(session);
