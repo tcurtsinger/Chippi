@@ -113,8 +113,8 @@ internal sealed class DesktopSession : IDisposable
         try
         {
             Until(() => !IsWindowVisible(handle)
-                    || ((window = WindowOrNull("Chippi")) is not null && (shown = FirstOrNull(window, "Settings", InvokePattern.Pattern) is not null)),
-                "the pages' Settings button, or the pages hidden");
+                    || ((window = WindowOrNull("Chippi")) is not null && (shown = HasPanelControls(window))),
+                "the gallery or feature page, or the panel hidden");
         }
         catch (TimeoutException)
         {
@@ -154,6 +154,9 @@ internal sealed class DesktopSession : IDisposable
 
     public AutomationElement? WindowOrNull(string name) => AutomationElement.RootElement.FindFirst(TreeScope.Children,
         new AndCondition(Named(name), new PropertyCondition(AutomationElement.ProcessIdProperty, Process.Id)));
+    internal static bool HasPanelControls(AutomationElement window) =>
+        FirstOrNull(window, "Settings", InvokePattern.Pattern) is not null || FirstOrNull(window, "Back", InvokePattern.Pattern) is not null;
+
     private static PropertyCondition Named(string name) => new(AutomationElement.NameProperty, name);
 
     public static AutomationElement Find(AutomationElement root, string name, AutomationPattern? pattern = null)

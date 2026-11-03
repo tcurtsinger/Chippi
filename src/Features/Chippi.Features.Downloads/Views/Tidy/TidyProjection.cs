@@ -9,8 +9,8 @@ using System.Windows.Media;
 
 namespace Chippi.Features.Downloads.Views.Tidy;
 
-/// <summary>What a row's button does. <see cref="UndoRun"/> puts back the whole run Organize now just made.</summary>
-public enum TidyRowAction { None, Review, Retry, Undo, RetryUndo, UndoRun }
+/// <summary>What a row's button does. <see cref="Inspect"/> stays in the widget on one held file.</summary>
+public enum TidyRowAction { None, Review, Retry, Undo, RetryUndo, UndoRun, Inspect }
 
 /// <summary>A recent row's immutable display state; no file operation is decided by a visual toggle.</summary>
 public sealed class TidyRow(string name, string detail, string folder, string source,
@@ -27,8 +27,9 @@ public sealed class TidyRow(string name, string detail, string folder, string so
     public TidyRowAction Action { get; } = action;
     public long? OperationId { get; } = operationId;
 
-    /// <summary>The folder's "116 files to review" row, not a file: its Review opens the whole preview.</summary>
+    /// <summary>The folder's "116 files" row. Its Review action opens the batch preview.</summary>
     public bool IsSummary { get; } = isSummary;
+    public bool IsHistory { get; init; }
 
     /// <summary>The run Organize now just made ("116 moved"), with a check and its Undo.</summary>
     public bool IsDone => Action == TidyRowAction.UndoRun;
@@ -41,6 +42,7 @@ public sealed class TidyRow(string name, string detail, string folder, string so
     public string ActionLabel => Action switch
     {
         TidyRowAction.Review => "Review",
+        TidyRowAction.Inspect => "Inspect",
         TidyRowAction.Retry or TidyRowAction.RetryUndo => "Retry",
         TidyRowAction.Undo or TidyRowAction.UndoRun => "Undo",
         _ => "",
@@ -48,15 +50,22 @@ public sealed class TidyRow(string name, string detail, string folder, string so
     public string AccessibleAction => $"{ActionLabel} {Name}";
     public bool HasAction => Action != TidyRowAction.None;
 
-    /// <summary>Held rows get a Review button; other actions are icon buttons.</summary>
     public bool IsReview => Action == TidyRowAction.Review;
-    public bool HasIconAction => HasAction && !IsReview;
+    public bool HasTextAction => IsReview || Action == TidyRowAction.Inspect;
+    public bool HasIconAction => HasAction && !HasTextAction;
+
+    internal bool SameAction(TidyRow other) => Action == other.Action && OperationId == other.OperationId
+        && TidyProjection.SameFolder(Folder, other.Folder) && string.Equals(Source, other.Source, StringComparison.OrdinalIgnoreCase);
+
+    internal bool SameContent(TidyRow other) => SameAction(other) && Name == other.Name && Detail == other.Detail
+        && IsHeld == other.IsHeld && IsWaiting == other.IsWaiting && IsFailed == other.IsFailed
+        && IsSummary == other.IsSummary && NeedsLook == other.NeedsLook;
 
     /// <summary>A check (Organize now's run), an inbox (files to review), a caution triangle (held), a clock (waiting), the info glyph (failed) or a file.</summary>
     public Geometry Lead => IsDone ? LucideIcons.Check : IsSummary ? LucideIcons.Inbox : IsHeld ? LucideIcons.TriangleAlert : IsWaiting ? LucideIcons.Clock : IsFailed ? LucideIcons.Info : LucideIcons.File;
     public Geometry ActionIcon => Action switch
     {
-        TidyRowAction.Review => LucideIcons.Eye,
+        TidyRowAction.Review or TidyRowAction.Inspect => LucideIcons.Eye,
         TidyRowAction.Retry or TidyRowAction.RetryUndo => RetryIcon,
         _ => LucideIcons.Undo,
     };
@@ -78,21 +87,21 @@ internal static class TidyProjection
 
     /// <summary>
     /// The picked folder's rows: its files to review as one row, then held, then waiting, then its latest moves
-    /// ("Documents · 23m", "Restored to Downloads"); <paramref name="history"/> is already that folder's. A held
-    /// row says why ("Check before opening"): its triangle and Review already say it's held.
+    /// ("Documents · 23m", "Restored to Downloads"); <paramref name="history"/> is already that folder's.
+    /// A held row shows its caution icon and an Inspect action; its reason belongs in the detail view.
     /// </summary>
     public static IReadOnlyList<TidyRow> Rows(string folder, IReadOnlyList<PendingFile> pending, IReadOnlyList<OperationRecord> history, DateTimeOffset now)
     {
         var here = pending.Where(p => SameFolder(p.Folder, folder)).ToList();
         int ready = here.Count(p => p.Status == PendingStatus.Ready);
         IEnumerable<TidyRow> review = ready == 0 ? [] :
-            [new TidyRow(ready == 1 ? "1 file to review" : $"{ready} files to review", "", folder, folder, false, false, false, TidyRowAction.Review, isSummary: true)];
+            [new TidyRow(ready == 1 ? "1 file" : $"{ready} files", "", folder, folder, false, false, false, TidyRowAction.Review, isSummary: true)];
         var rows = here.Where(p => p.Status is PendingStatus.Held or PendingStatus.Waiting)
             .OrderBy(p => p.Status == PendingStatus.Held ? 0 : 1)
             .Select(p => new TidyRow(
-                p.Name, p.Status == PendingStatus.Held ? p.Reason ?? "Held" : $"Waiting · {p.Reason ?? "Not ready"}",
+                p.Name, p.Status == PendingStatus.Held ? "" : $"Waiting · {p.Reason ?? "Not ready"}",
                 p.Folder, p.Path, p.Status == PendingStatus.Held, p.Status == PendingStatus.Waiting, false,
-                p.Status == PendingStatus.Held ? TidyRowAction.Review : TidyRowAction.None));
+                p.Status == PendingStatus.Held ? TidyRowAction.Inspect : TidyRowAction.None));
         var recent = history.Where(o => o.State is OperationState.Completed or OperationState.Failed or OperationState.Undone)
             .Where(o => o.Kind != HistoryOperationKind.Restore || o.State == OperationState.Failed)
             .Where(o => !pending.Any(p => string.Equals(p.Path, o.SourcePath, StringComparison.OrdinalIgnoreCase)))
@@ -104,7 +113,7 @@ internal static class TidyProjection
                 Path.GetDirectoryName(o.SourcePath) ?? "", o.SourcePath, false, false, o.State == OperationState.Failed,
                 o.State == OperationState.Failed ? o.Kind == HistoryOperationKind.Restore ? TidyRowAction.RetryUndo : TidyRowAction.Retry :
                     o.State == OperationState.Completed && o.Kind is HistoryOperationKind.Move or HistoryOperationKind.Rename ? TidyRowAction.Undo : TidyRowAction.None,
-                o.Kind == HistoryOperationKind.Restore ? o.UndoOf : o.Id));
+                o.Kind == HistoryOperationKind.Restore ? o.UndoOf : o.Id) { IsHistory = true });
         return [.. review.Concat(rows).Concat(recent).Take(RecentRows)];
     }
 

@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
-using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -110,7 +109,7 @@ internal sealed class PreviewView : UserControl
         };
     }
 
-    /// <summary>A file to show first, open and marked (a held row's Review on the island).</summary>
+    /// <summary>A file to show first, open and marked, from a file-specific Settings deep link.</summary>
     public string? ShowFirst { get; init; }
 
     private async Task LoadAsync()
@@ -492,14 +491,8 @@ internal sealed class PreviewView : UserControl
 
     private void ShowInFolder(string path)
     {
-        try
-        {
-            Process.Start(new ProcessStartInfo("explorer.exe", $"/select,\"{path}\"") { UseShellExecute = false })?.Dispose();
-        }
-        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException)
-        {
+        if (!FileLocation.ShowInFolder(path))
             ShowError("Show in folder failed");
-        }
     }
 
     private async Task UndoAsync(IconButton undo, long operation)

@@ -78,7 +78,7 @@ public sealed class DownloadsPage : UserControl
                 Preview(tail, RunTrigger.Explorer);
                 break;
             case "preview" when tail is { Length: > 0 }:
-                // preview/<folder>*<file>: that file first (a held row's Review). No Windows path holds a '*'.
+                // A file-specific deep link shows that file first. No Windows path holds a '*'.
                 int star = tail.LastIndexOf('*');
                 if (star < 0)
                     Preview(tail);
@@ -130,7 +130,7 @@ public sealed class DownloadsPage : UserControl
         };
     }
 
-    /// <summary>Preview for a folder (Organize now, the Explorer menu, a held row's Review with its <paramref name="focus"/> file).</summary>
+    /// <summary>Preview a folder, optionally focusing a file named by a Settings deep link.</summary>
     public void Preview(string folder, RunTrigger trigger = RunTrigger.Preview, string? focus = null)
     {
         if (_module.Engine is not { } engine)

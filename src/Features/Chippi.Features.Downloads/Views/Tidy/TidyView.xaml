@@ -1,7 +1,6 @@
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
 <!-- File organizer's island page (DESIGN.md §5 Island): the folder card with its picker and mode
-     segment, the picked folder's latest whole rows (what Organize now just did, files to review, held,
-     waiting, moves), then History and Organize now. The page's header shows the status. -->
+     segment, actions for this folder, recent moves, and an in-widget detail for one held file. -->
 <UserControl x:Class="Chippi.Features.Downloads.Views.Tidy.TidyView"
  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:c="urn:chippi-ui"
@@ -35,8 +34,31 @@
     </ControlTemplate>
    </Setter.Value></Setter>
   </Style>
+  <DataTemplate x:Key="OrganizerRowTemplate">
+   <Grid x:Name="Row" Height="36" Margin="10,0">
+    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+    <c:LucideIcon x:Name="Lead" Data="{Binding Lead}" Size="16" Brush="{DynamicResource IslandTextTertiaryBrush}" Margin="0,0,10,0" VerticalAlignment="Center"/>
+    <DockPanel Grid.Column="1" VerticalAlignment="Center">
+     <TextBlock x:Name="Detail" DockPanel.Dock="Right" MaxWidth="180" Margin="8,0,0,0" Text="{Binding Detail}" FontSize="11" Foreground="{DynamicResource IslandTextTertiaryBrush}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Detail}"/>
+     <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Name}"/>
+    </DockPanel>
+    <Button x:Name="RowAction" Grid.Column="2" Content="{Binding ActionLabel}" Style="{DynamicResource IslandButtonStyle}" Width="72" Height="28" Margin="8,0,0,0" VerticalAlignment="Center"
+            Visibility="{Binding HasTextAction, Converter={StaticResource Visible}}" AutomationProperties.Name="{Binding AccessibleAction}" Click="OnRowAction"/>
+    <c:IconButton x:Name="RowIconAction" Height="24" Width="28" Grid.Column="2" Icon="{Binding ActionIcon}" Margin="8,0,0,0" Visibility="{Binding HasIconAction, Converter={StaticResource Visible}}"
+                  ToolTip="{Binding ActionLabel}" AutomationProperties.Name="{Binding AccessibleAction}" Click="OnRowAction"/>
+   </Grid>
+   <DataTemplate.Triggers>
+    <DataTrigger Binding="{Binding IsHistory}" Value="True"><Setter TargetName="Row" Property="Height" Value="30"/></DataTrigger>
+    <DataTrigger Binding="{Binding Detail}" Value=""><Setter TargetName="Detail" Property="Visibility" Value="Collapsed"/></DataTrigger>
+    <DataTrigger Binding="{Binding IsHeld}" Value="True"><Setter TargetName="Lead" Property="Brush" Value="{DynamicResource WarningBrush}"/><Setter TargetName="RowAction" Property="AutomationProperties.ItemStatus" Value="Held"/></DataTrigger>
+    <DataTrigger Binding="{Binding IsFailed}" Value="True"><Setter TargetName="Lead" Property="Brush" Value="{DynamicResource WarningBrush}"/><Setter TargetName="Detail" Property="Foreground" Value="{DynamicResource WarningTextBrush}"/></DataTrigger>
+    <DataTrigger Binding="{Binding IsDone}" Value="True"><Setter TargetName="Lead" Property="Brush" Value="{DynamicResource SuccessBrush}"/></DataTrigger>
+    <DataTrigger Binding="{Binding NeedsLook}" Value="True"><Setter TargetName="Detail" Property="Foreground" Value="{DynamicResource WarningTextBrush}"/></DataTrigger>
+   </DataTemplate.Triggers>
+  </DataTemplate>
  </UserControl.Resources>
  <Grid>
+ <Grid x:Name="ListPage">
  <DockPanel>
   <Border x:Name="FolderCard" DockPanel.Dock="Top" Style="{DynamicResource IslandCardStyle}" Height="44" Padding="10,0">
    <DockPanel>
@@ -53,9 +75,9 @@
   </Border>
 
 
-  <!-- History on the left, Organize now on the right. -->
-  <DockPanel DockPanel.Dock="Bottom" Height="28" x:Name="Actions" Margin="0,8,0,0" LastChildFill="False">
-   <Button x:Name="Organize" DockPanel.Dock="Right" Content="Organize now" Style="{DynamicResource IslandAccentButtonStyle}" Click="OnOrganize" AutomationProperties.Name="Organize now"/>
+  <!-- The right edge matches the actions inside Recent: its 1-DIP border and 10-DIP inset. -->
+  <DockPanel DockPanel.Dock="Bottom" Height="28" x:Name="Actions" Margin="0,8,11,0" LastChildFill="False">
+   <Button x:Name="Organize" DockPanel.Dock="Right" Content="Organize" Width="72" Height="28" Style="{DynamicResource IslandAccentButtonStyle}" Click="OnOrganize" AutomationProperties.Name="Organize"/>
    <Button Style="{StaticResource SubtleButtonStyle}" Padding="10,0" Click="OnHistory" AutomationProperties.Name="History">
     <StackPanel Orientation="Horizontal">
      <TextBlock Text="History" VerticalAlignment="Center"/>
@@ -79,29 +101,13 @@
      <c:LucideIcon Data="{x:Static c:LucideIcons.File}" Size="20" Brush="{DynamicResource IslandTextTertiaryBrush}" HorizontalAlignment="Center"/>
      <TextBlock Text="No recent files" FontSize="12" Foreground="{DynamicResource IslandTextTertiaryBrush}" Margin="0,6,0,0"/>
     </StackPanel>
-    <ItemsControl x:Name="Rows" Focusable="False" VerticalAlignment="Top">
-     <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
-     <ItemsControl.ItemTemplate><DataTemplate>
-      <Grid Height="30" Margin="10,0">
-       <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-       <c:LucideIcon x:Name="Lead" Data="{Binding Lead}" Size="16" Brush="{DynamicResource TextMutedBrush}" Margin="0,0,12,0" VerticalAlignment="Center"/>
-       <DockPanel Grid.Column="1" VerticalAlignment="Center">
-        <TextBlock x:Name="Detail" DockPanel.Dock="Right" MaxWidth="180" Margin="8,0,0,0" Text="{Binding Detail}" FontSize="11" Foreground="{DynamicResource IslandTextTertiaryBrush}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Detail}"/>
-        <TextBlock Text="{Binding Name}" FontSize="12" TextTrimming="CharacterEllipsis" ToolTip="{Binding Name}"/>
-       </DockPanel>
-       <Button Grid.Column="2" Content="Review" Style="{DynamicResource IslandButtonStyle}" Margin="8,0,0,0" VerticalAlignment="Center"
-               Visibility="{Binding IsReview, Converter={StaticResource Visible}}" AutomationProperties.Name="{Binding AccessibleAction}" Click="OnRowAction"/>
-       <c:IconButton Height="24" Width="28" Grid.Column="2" Icon="{Binding ActionIcon}" Margin="8,0,0,0" Visibility="{Binding HasIconAction, Converter={StaticResource Visible}}"
-                     ToolTip="{Binding ActionLabel}" AutomationProperties.Name="{Binding AccessibleAction}" Click="OnRowAction"/>
-      </Grid>
-      <DataTemplate.Triggers>
-       <DataTrigger Binding="{Binding IsHeld}" Value="True"><Setter TargetName="Lead" Property="Brush" Value="{DynamicResource WarningBrush}"/><Setter TargetName="Detail" Property="Foreground" Value="{DynamicResource WarningTextBrush}"/></DataTrigger>
-       <DataTrigger Binding="{Binding IsFailed}" Value="True"><Setter TargetName="Lead" Property="Brush" Value="{DynamicResource WarningBrush}"/><Setter TargetName="Detail" Property="Foreground" Value="{DynamicResource WarningTextBrush}"/></DataTrigger>
-       <DataTrigger Binding="{Binding IsDone}" Value="True"><Setter TargetName="Lead" Property="Brush" Value="{DynamicResource SuccessBrush}"/></DataTrigger>
-       <DataTrigger Binding="{Binding NeedsLook}" Value="True"><Setter TargetName="Detail" Property="Foreground" Value="{DynamicResource WarningTextBrush}"/></DataTrigger>
-      </DataTemplate.Triggers>
-     </DataTemplate></ItemsControl.ItemTemplate>
-    </ItemsControl>
+    <StackPanel VerticalAlignment="Top">
+     <ItemsControl x:Name="Rows" Focusable="False" ItemTemplate="{StaticResource OrganizerRowTemplate}"/>
+     <Border x:Name="RecentHeading" Visibility="Collapsed" Height="24" BorderBrush="{DynamicResource IslandHairBrush}" BorderThickness="0,1,0,0" Margin="10,0">
+      <TextBlock Text="Recent" FontSize="11" Foreground="{DynamicResource IslandTextTertiaryBrush}" VerticalAlignment="Center"/>
+     </Border>
+     <ItemsControl x:Name="HistoryRows" Focusable="False" ItemTemplate="{StaticResource OrganizerRowTemplate}"/>
+    </StackPanel>
    </Grid>
   </Border>
 
@@ -115,5 +121,27 @@
     <Button Content="Choose folder…" Style="{DynamicResource IslandButtonStyle}" Margin="8,0,0,0" Click="OnChooseFolder" AutomationProperties.Name="Choose folder"/>
    </StackPanel>
   </StackPanel>
+ </Grid>
+ <Grid x:Name="InspectPage" Visibility="Collapsed" Focusable="True" AutomationProperties.Name="File details">
+  <Grid.RowDefinitions><RowDefinition/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+  <Border Style="{DynamicResource IslandCardStyle}" Padding="15,16">
+   <StackPanel>
+    <StackPanel Orientation="Horizontal">
+     <c:LucideIcon x:Name="InspectGlyph" Data="{x:Static c:LucideIcons.TriangleAlert}" Size="16" Margin="0,0,8,0" Brush="{DynamicResource WarningBrush}" VerticalAlignment="Center"/>
+     <TextBlock x:Name="InspectStatus" Text="Held" FontWeight="SemiBold" VerticalAlignment="Center" AutomationProperties.LiveSetting="Polite"/>
+    </StackPanel>
+    <TextBlock x:Name="InspectName" FontSize="18" FontWeight="SemiBold" Margin="0,8,0,0" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxHeight="74" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+    <TextBlock x:Name="InspectReason" Visibility="Collapsed" Foreground="{DynamicResource IslandTextSecondaryBrush}" Margin="0,6,0,0" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxHeight="48" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+    <Border BorderBrush="{DynamicResource IslandHairBrush}" BorderThickness="0,1,0,0" Margin="0,14,0,0" Padding="0,12,0,0">
+     <DockPanel>
+      <c:LucideIcon Data="{x:Static c:LucideIcons.Folder}" DockPanel.Dock="Left" Size="16" Brush="{DynamicResource IslandTextSecondaryBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
+      <TextBlock x:Name="InspectFolder" Foreground="{DynamicResource IslandTextSecondaryBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+     </DockPanel>
+    </Border>
+   </StackPanel>
+  </Border>
+  <TextBlock x:Name="InspectError" Grid.Row="1" Visibility="Collapsed" Margin="10,8,10,0" Foreground="{DynamicResource WarningTextBrush}" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
+  <Button x:Name="ShowFile" Grid.Row="2" Content="Show in folder" AutomationProperties.Name="Show in folder" Style="{DynamicResource IslandButtonStyle}" HorizontalAlignment="Right" Margin="0,8,11,0" Click="OnShowFile"/>
+ </Grid>
  </Grid>
 </UserControl>

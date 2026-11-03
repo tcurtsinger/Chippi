@@ -112,8 +112,13 @@ public sealed class DownloadsModule : IFeatureModule
             Raise(new DownloadsRequest(DownloadsRequestKind.Undo, RunId: long.TryParse(args.FirstOrDefault(), NumberStyles.None, CultureInfo.InvariantCulture, out long id) ? id : null)));
 
         context.Ui.SetSettingsPage(section => new Views.Settings.DownloadsPage(this, section));
+        Views.Tidy.TidyView? widget = null;
         _tile = context.Ui.AddIslandTile(new IslandTileSpec(TileKey, "Organizer", nameof(LucideIcons.Folder), Order: 50, SectionOrder: 0,
-            () => new Views.Tidy.TidyView(this, RequestView)));
+            () => widget = new Views.Tidy.TidyView(this, RequestView))
+        {
+            HandleBack = () => widget?.Back() == true,
+            HandleEscape = () => widget?.Back() == true,
+        });
         Engine.PendingChanged += OnPendingChanged;
         UpdateTile();
         return Task.CompletedTask;

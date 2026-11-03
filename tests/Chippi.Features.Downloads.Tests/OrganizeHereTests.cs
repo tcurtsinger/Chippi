@@ -48,10 +48,12 @@ public sealed class OrganizeHereTests : IDisposable
         ];
 
         var rows = TidyProjection.Rows(downloads, pending, [], DateTimeOffset.UtcNow);
-        Assert.Equal(["2 files to review", "c.torrent"], rows.Select(r => r.Name));
+        Assert.Equal(["2 files", "c.torrent"], rows.Select(r => r.Name));
         Assert.True(rows[0].IsSummary);
         Assert.Equal(TidyRowAction.Review, rows[0].Action);
-        Assert.Equal("Check before opening", rows[1].Detail); // the triangle and Review say it's held
+        Assert.Equal("Inspect", rows[1].ActionLabel);
+        Assert.Equal("", rows[1].Detail);
+        Assert.Equal("1 file", TidyProjection.Rows(downloads, pending.Take(1).ToList(), [], DateTimeOffset.UtcNow)[0].Name);
 
         Assert.Equal(["d.torrent"], TidyProjection.Rows(desktop, pending, [], DateTimeOffset.UtcNow).Select(r => r.Name));
     }
@@ -63,8 +65,7 @@ public sealed class OrganizeHereTests : IDisposable
         Directory.CreateDirectory(watched);
         foreach (var name in new[] { "a.pdf", "b.pdf", "setup.pdf.exe", "c.torrent", "notes.txt" })
             System.IO.File.WriteAllText(Path.Combine(watched, name), name);
-        var config = new ConfigStore(Path.Combine(_root, "settings.json"));
-        config.SetModuleSettings("downloads-organizer", new DownloadsSettings
+        WithWidget(new DownloadsSettings
         {
             Initialized = true,
             OrganizeInExplorer = false,
@@ -74,20 +75,9 @@ public sealed class OrganizeHereTests : IDisposable
                 new RuleSetting { Id = "pdf", Name = "PDFs", Order = 0, Extensions = ["pdf", "exe"], Action = RuleActionKind.Move, Template = "Docs" },
                 new RuleSetting { Id = "torrent", Name = "Torrents", Order = 1, Extensions = ["torrent"], Action = RuleActionKind.Hold, HoldReason = "Check before opening" },
             ],
-        });
-        var registration = new ExplorerRegistration("test", _key, @"C:\Tools\Chippi.exe");
-        var module = new DownloadsModule(registration);
-        var registry = new ModuleRegistry(config, new IslandActivityHub(), NullLoggerFactory.Instance, new ModuleServices { DataRoot = Path.Combine(_root, "data") });
-        registry.Register(module);
-        var requests = new List<DownloadsRequest>();
-        Window? window = null;
-        try
+        }, (view, _, _, requests) =>
         {
-            registry.StartAsync().GetAwaiter().GetResult();
-            var view = new TidyView(module, requests.Add);
-            window = new Window { Content = view, Width = 496, Height = 304, Left = -20000, Top = 0, ShowActivated = false, ShowInTaskbar = false, WindowStyle = WindowStyle.None };
-            window.Show();
-            var organize = Descendants(view).OfType<Button>().Single(b => AutomationProperties.GetName(b) == "Organize now");
+            var organize = Descendants(view).OfType<Button>().Single(b => AutomationProperties.GetName(b) == "Organize");
 
             organize.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             Until(() => System.IO.File.Exists(Path.Combine(watched, "Docs", "b.pdf")) && organize.IsEnabled);
@@ -105,6 +95,124 @@ public sealed class OrganizeHereTests : IDisposable
             organize.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             Until(() => requests.Count > 0 && organize.IsEnabled);
             Assert.Equal(new DownloadsRequest(DownloadsRequestKind.Organize, watched), Assert.Single(requests));
+        });
+    });
+
+    [Fact]
+    public void Batch_review_opens_the_selected_folder_and_Inspect_stays_on_one_file() => WpfTestThread.Run(() =>
+    {
+        var personal = Path.Combine(_root, "Personal", "Downloads");
+        var work = Path.Combine(_root, "Work", "Downloads");
+        const string held = "sample.torrent";
+        foreach (string folder in new[] { personal, work })
+        {
+            Directory.CreateDirectory(folder);
+            System.IO.File.WriteAllText(Path.Combine(folder, held), folder);
+        }
+        string ready = Path.Combine(work, "notes.txt");
+        System.IO.File.WriteAllText(ready, "contents");
+        WithWidget(new DownloadsSettings
+        {
+            Initialized = true, OrganizeInExplorer = false,
+            Folders = [.. new[] { personal, work }.Select(path => new WatchedFolder { Path = path, Mode = FolderMode.Manual, GraceSeconds = 0 })],
+            Rules =
+            [
+                new RuleSetting { Id = "notes", Name = "Notes", Extensions = ["txt"], Action = RuleActionKind.Move, Template = "Sorted" },
+                new RuleSetting { Id = "held", Name = "Held", Extensions = ["torrent"], Action = RuleActionKind.Hold, HoldReason = "Verify the sender" },
+            ],
+        }, (view, tile, module, requests) =>
+        {
+            var picker = (ComboBox)view.FindName("Folders");
+            picker.SelectedIndex = 1;
+            Button? Action(string label) => Descendants(view).OfType<Button>().SingleOrDefault(b => b.IsVisible && Equals(b.Content, label));
+            void Press(string label) => Action(label)!.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            var detail = (FrameworkElement)view.FindName("InspectPage");
+            var showFile = (Button)view.FindName("ShowFile");
+            var reveals = new List<string>();
+            view.RevealFile = path => { reveals.Add(path); return false; }; // exercise failure without launching Explorer
+            var focusTargets = new List<object>();
+            view.PreviewGotKeyboardFocus += (_, e) =>
+            {
+                if (e.NewFocus is not null) focusTargets.Add(e.NewFocus);
+                e.Handled = true; // observe the requested target without giving a test the owner's keyboard
+            };
+
+            Until(() => Action("Review") is not null && Action("Inspect") is not null);
+            var review = Action("Review")!;
+            var inspect = Action("Inspect")!;
+            Assert.Equal("Review 1 file", AutomationProperties.GetName(review));
+            Assert.Equal($"Inspect {held}", AutomationProperties.GetName(inspect));
+            Assert.Equal("Held", AutomationProperties.GetItemStatus(inspect));
+            var recent = (Border)view.FindName("Recent");
+            double oldHeight = recent.ActualHeight;
+            Window.GetWindow(view)!.Height += 8;
+            Until(() => recent.ActualHeight > oldHeight);
+            Assert.Same(review, Action("Review"));
+            Assert.Same(inspect, Action("Inspect"));
+            Press("Review");
+            Assert.Equal(new DownloadsRequest(DownloadsRequestKind.Organize, work), Assert.Single(requests));
+            requests.Clear();
+            Assert.False(tile.HandleBack!());
+
+            Press("Inspect");
+            Assert.True(detail.IsVisible);
+            Assert.Equal(held, ((TextBlock)view.FindName("InspectName")).Text);
+            Assert.Equal("Verify the sender", ((TextBlock)view.FindName("InspectReason")).Text);
+            Assert.Equal(work, ((TextBlock)view.FindName("InspectFolder")).ToolTip);
+            Assert.True(showFile.IsVisible && showFile.IsEnabled);
+            Assert.Empty(requests);
+            Assert.Null(Action("Review"));
+            Press("Show in folder");
+            Assert.Equal(Path.Combine(work, held), Assert.Single(reveals));
+            Assert.Equal("Show in folder failed", ((TextBlock)view.FindName("InspectError")).Text);
+
+            focusTargets.Clear();
+            Assert.True(tile.HandleBack());
+            Until(() => Action("Inspect") is { } restored && focusTargets.Contains(restored));
+            Assert.Equal(work, picker.ToolTip);
+            Assert.False(detail.IsVisible);
+            Assert.False(tile.HandleEscape!());
+
+            Press("Inspect");
+            // The same basename is still held in Personal; the stale Work detail must not switch to it.
+            System.IO.File.Delete(Path.Combine(work, held));
+            Until(() => !showFile.IsEnabled && !module.Engine!.Pending.Any(p => p.Path == Path.Combine(work, held)));
+            Assert.True(detail.IsVisible);
+            Assert.NotEqual("Held", ((TextBlock)view.FindName("InspectStatus")).Text);
+            showFile.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Assert.Single(reveals);
+            focusTargets.Clear();
+            Assert.True(tile.HandleEscape());
+            Until(() => focusTargets.Contains(picker));
+            Assert.False(detail.IsVisible);
+            Assert.Equal(work, picker.ToolTip);
+            Assert.True(System.IO.File.Exists(Path.Combine(personal, held)));
+            Assert.True(System.IO.File.Exists(ready));
+            Assert.Empty(module.Engine!.History.Query(new HistoryQuery()));
+            Assert.Empty(requests);
+        });
+    });
+
+    private void WithWidget(DownloadsSettings settings, Action<TidyView, IslandTileSpec, DownloadsModule, List<DownloadsRequest>> check)
+    {
+        var config = new ConfigStore(Path.Combine(_root, "settings.json"));
+        config.SetModuleSettings("downloads-organizer", settings);
+        var registration = new ExplorerRegistration("test", _key, @"C:\Tools\Chippi.exe");
+        var module = new DownloadsModule(registration);
+        var registry = new ModuleRegistry(config, new IslandActivityHub(), NullLoggerFactory.Instance,
+            new ModuleServices { DataRoot = Path.Combine(_root, "data") });
+        registry.Register(module);
+        var requests = new List<DownloadsRequest>();
+        module.Requested += requests.Add;
+        Window? window = null;
+        try
+        {
+            registry.StartAsync().GetAwaiter().GetResult();
+            var spec = Assert.Single(registry.Find("downloads-organizer")!.IslandTiles).Spec;
+            var view = Assert.IsType<TidyView>(spec.CreateSection());
+            window = new Window { Content = view, Width = 496, Height = 304, Left = -20000, Top = 0, ShowActivated = false, ShowInTaskbar = false, WindowStyle = WindowStyle.None };
+            window.Show();
+            check(view, spec, module, requests);
         }
         finally
         {
@@ -112,7 +220,7 @@ public sealed class OrganizeHereTests : IDisposable
             registry.StopAllAsync().GetAwaiter().GetResult();
             registration.SetEnabled(false);
         }
-    });
+    }
 
     [Fact]
     public void A_new_rule_needs_a_condition_and_says_which_earlier_rule_wins_its_files()
@@ -138,7 +246,7 @@ public sealed class OrganizeHereTests : IDisposable
     }
 
     [Fact]
-    public void A_held_rows_Review_opens_Preview_at_that_file()
+    public void An_existing_file_specific_Settings_deep_link_still_opens_Preview_at_that_file()
     {
         var request = new DownloadsRequest(DownloadsRequestKind.Organize, @"C:\Users\me\Downloads", File: "setup.pdf.exe");
         Assert.Equal(@"module:downloads-organizer/preview/C:\Users\me\Downloads*setup.pdf.exe", DownloadsModule.SettingsLink(request));
