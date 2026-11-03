@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Media.Animation;
 using Chippi.App.Island;
 using Chippi.Core.Island;
 using Chippi.UI.Pet;
@@ -57,33 +59,130 @@ public sealed class PuckSideTabInputTests
             Assert.True(window.CoversWidget(pointer));
         });
 
-    [Fact]
-    public void Dragging_the_tab_across_center_turns_it_inward_without_moving_Chippi_on_release() =>
+    [Theory]
+    [InlineData(false)] // pick up Chippi off-center
+    [InlineData(true)]  // pick up his status badge
+    public void Dragging_a_tabbed_puck_previews_each_direction_without_a_jump_on_release(bool fromBadge) =>
         WithWidget(true, window =>
         {
             var area = window.CurrentArea!.Value;
             window.SetPlacement(1, 0.5);
             window.SetActivities([Muted], PetMood.Idle);
             window.UpdateLayout();
-            double width = window.Body.ActualWidth;
-            Assert.True(width > IslandGeometry.Puck);
             Assert.True(window.OpensLeft);
-            var grip = new Point((width - IslandGeometry.Puck) / 2, 25);
-            var pointer = window.Body.PointToScreen(grip);
+            var petGrip = fromBadge ? new Point(25, 25) : new Point(15, 32);
+            var pointer = fromBadge ? window.MicBadge.PointToScreen(new Point(11, 11)) : window.PuckEnd.PointToScreen(petGrip);
             window.PointerAt = () => pointer;
             Press(window, UIElement.PreviewMouseLeftButtonDownEvent);
-            pointer = new Point(area.Work.Left + area.Work.Width / 4, area.Work.Top + area.Work.Height / 2);
+            int saves = 0;
+            window.PlacementChosen += (_, _) => saves++;
+
+            foreach (double fraction in new[] { 0.25, 0.75, 0.25 })
+            {
+                pointer = new Point(area.Work.Left + fraction * area.Work.Width, area.Work.Top + area.Work.Height / 2);
+                window.PuckButton.RaiseEvent(new MouseEventArgs(Mouse.PrimaryDevice, 0) { RoutedEvent = UIElement.PreviewMouseMoveEvent });
+                window.UpdateLayout();
+                bool opensLeft = fraction > 0.5;
+                Assert.Equal(opensLeft, window.OpensLeft);
+                Assert.Equal(75, window.Body.ActualWidth, 2);
+                Assert.True(window.CoversWidget(pointer));
+                Assert.InRange((window.PuckEnd.PointToScreen(petGrip) - pointer).Length, 0, 2);
+                var icon = window.MicBadge.PointToScreen(new Point(11, 11));
+                Assert.True(opensLeft ? icon.X < window.PuckRect.Left : icon.X > window.PuckRect.Right);
+                Assert.Equal(0, saves);
+            }
+            var preview = window.WidgetRect;
+            Press(window, UIElement.PreviewMouseLeftButtonUpEvent);
+            Assert.Equal(preview, window.WidgetRect);
+            Assert.Equal(1, saves);
+            Assert.False(window.Panel.IsOpen);
+            Assert.True(area.Work.Contains(preview));
+        });
+
+    [Fact]
+    public void Picking_up_a_half_opened_agent_notice_immediately_shows_only_the_puck_and_current_badges() =>
+        WithWidget(false, window =>
+        {
+            var agent = new IslandActivity("working", IslandActivityKind.Agent, "Working · 2%", "Claude Code")
+                { ProviderId = "Claude", ModuleId = "agent-usage" };
+            window.SetPlacement(1, 0.5);
+            window.SetActivities([agent, Muted], PetMood.Idle);
+            var button = window.PuckButton;
+            const double partial = 140;
+            // Hold a frame of the bar unfold so the press is reproducible even on a busy runner.
+            button.BeginAnimation(FrameworkElement.WidthProperty,
+                new DoubleAnimation(partial, partial, TimeSpan.FromSeconds(1)));
+            IslandWindowTests.PumpUntil(() => Math.Abs(window.Body.ActualWidth - partial) < 0.01);
+            var pointer = window.PuckEnd.PointToScreen(new Point(17, 27));
+            window.PointerAt = () => pointer;
+            Press(window, UIElement.PreviewMouseLeftButtonDownEvent);
+            Assert.Equal(partial, window.Body.ActualWidth, 2);
+            // Move beyond the four-DIP threshold without crossing the current monitor edge.
+            pointer.X -= 15 * window.CurrentArea!.Value.Scale;
             window.PuckButton.RaiseEvent(new MouseEventArgs(Mouse.PrimaryDevice, 0) { RoutedEvent = UIElement.PreviewMouseMoveEvent });
             window.UpdateLayout();
-            Assert.True(window.CoversWidget(pointer));
-            Assert.InRange((window.Body.PointToScreen(grip) - pointer).Length, 0, 2);
-            Assert.Equal(width, window.Body.ActualWidth, 2);
-            var heldPet = window.PuckRect;
+
+            Assert.Equal(96, window.Body.ActualWidth, 2);
+            Assert.Equal(0, window.Bar.Opacity);
+            Assert.Equal(Visibility.Visible, window.AgentMark.Visibility);
+            Assert.Equal(Visibility.Visible, window.MicBadge.Visibility);
+            Assert.NotNull(window.AgentBadgeProvider.Source);
+            Assert.InRange((window.PuckEnd.PointToScreen(new Point(17, 27)) - pointer).Length, 0, 2);
+            Assert.False(window.Panel.IsVisible);
             Press(window, UIElement.PreviewMouseLeftButtonUpEvent);
-            Assert.Equal(heldPet, window.PuckRect);
-            Assert.False(window.OpensLeft);
             Assert.False(window.Panel.IsOpen);
-            Assert.True(area.Work.Contains(window.WidgetRect));
+        });
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Crossing_the_drag_threshold_dismisses_a_panel_mid_open_or_mid_close(bool closing) =>
+        WithWidget(false, window =>
+        {
+            window.SetActivities([Muted], PetMood.Idle);
+            IslandWindowTests.PumpUntil(() => Math.Abs(window.Body.ActualWidth - 75) < 0.01);
+            var panel = window.Panel;
+            long now = Stopwatch.GetTimestamp();
+            panel.Clock = () => now;
+            int frames = 0;
+            panel.Morphing += (_, _) => frames++;
+            void Frame(int milliseconds)
+            {
+                int before = frames;
+                now += milliseconds * Stopwatch.Frequency / 1000;
+                IslandWindowTests.PumpUntil(() => frames > before);
+            }
+            var pointer = window.PuckEnd.PointToScreen(new Point(25, 25));
+            window.PointerAt = () => pointer;
+            Press(window, UIElement.PreviewMouseLeftButtonDownEvent);
+            Press(window, UIElement.PreviewMouseLeftButtonUpEvent);
+            Frame(0);
+            if (closing)
+            {
+                Frame(500);
+                window.ClosePages();
+                Frame(0);
+            }
+            Frame(80);
+            Assert.True(panel.IsMorphing);
+            Assert.True(panel.IsVisible);
+            Assert.True(panel.Shape.Width > window.Body.ActualWidth);
+
+            Press(window, UIElement.PreviewMouseLeftButtonDownEvent);
+            double scale = window.CurrentArea!.Value.Scale;
+            pointer.X -= 2 * scale;
+            window.PuckButton.RaiseEvent(new MouseEventArgs(Mouse.PrimaryDevice, 0) { RoutedEvent = UIElement.PreviewMouseMoveEvent });
+            Assert.True(panel.IsVisible);
+            pointer.X -= 8 * scale;
+            window.PuckButton.RaiseEvent(new MouseEventArgs(Mouse.PrimaryDevice, 0) { RoutedEvent = UIElement.PreviewMouseMoveEvent });
+            window.UpdateLayout();
+            Assert.False(panel.IsVisible);
+            Assert.False(panel.IsMorphing);
+            Assert.False(window.IsHooked);
+            Assert.Equal(75, window.Body.ActualWidth, 2);
+            Assert.True(window.CoversWidget(pointer));
+            Press(window, UIElement.PreviewMouseLeftButtonUpEvent);
+            Assert.False(panel.IsOpen);
         });
 
     [Theory]
@@ -94,16 +193,15 @@ public sealed class PuckSideTabInputTests
     public void The_tab_lands_inside_the_target_display_after_a_DPI_change(double scale, int edge)
     {
         var work = new Rect(-1920, -1200, 1920, 1160);
-        // Grab one of three icons on the original side, then release just inside the opposite display edge.
-        var grip = new Vector(edge == 1 ? 105 : 12, 25);
+        // A status tab with three slots still leaves the entire outline on the target display.
+        var grip = new Vector(18, 25);
         var pointer = new Point(edge == 1 ? work.Right - 1 : work.Left + 1, work.Bottom - 1);
-        var held = IslandGeometry.HeldRect(pointer, grip, 117, scale);
-        bool startedLeft = edge == 0;
-        var (bounds, left) = IslandGeometry.LandWidget(held, work, startedLeft, compactTab: true);
-        Assert.Equal(!startedLeft, left);
+        var held = IslandGeometry.HeldPuck(pointer, grip, scale);
+        var (bounds, left) = IslandGeometry.LandWidget(held, work, 117 * scale);
+        Assert.Equal(edge == 1, left);
         Assert.True(work.Contains(bounds));
         Assert.Equal(117 * scale, bounds.Width);
-        Assert.Equal(IslandGeometry.Inside(IslandGeometry.PuckEnd(held, startedLeft), work), IslandGeometry.PuckEnd(bounds, left));
+        Assert.Equal(IslandGeometry.Inside(held, work), IslandGeometry.PuckEnd(bounds, left));
     }
 
     private static void WithWidget(bool reduced, Action<IslandWindow> test) => WpfTestThread.Run(() =>

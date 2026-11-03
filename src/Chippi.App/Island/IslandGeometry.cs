@@ -76,20 +76,20 @@ public static class IslandGeometry
     internal static Rect WidgetRect(Rect puck, bool opensLeft, double width) =>
         new(opensLeft ? puck.Right - width : puck.Left, puck.Top, width, puck.Height);
 
-    /// <summary>The shape under the hand. Its grip and width are in DIPs, so the same spot stays held when DPI changes.</summary>
-    internal static Rect HeldRect(Point pointer, Vector grip, double width, double scale) =>
-        new(pointer - grip * scale, new Size(width * scale, Puck * scale));
+    /// <summary>The pet stays under the same point of the hand across side and DPI changes.</summary>
+    internal static Rect HeldPuck(Point pointer, Vector grip, double scale) =>
+        new(pointer - grip * scale, new Size(Puck * scale, Puck * scale));
 
     /// <summary>The 50-DIP square at the outer end of a widget, including a partially unfolded one.</summary>
     internal static Rect PuckEnd(Rect widget, bool opensLeft) =>
         new(opensLeft ? widget.Right - widget.Height : widget.Left, widget.Top, widget.Height, widget.Height);
 
-    /// <summary>A compact tab turns inward around Chippi. A full bar mirrors its contents within its held bounds.</summary>
-    internal static (Rect Bounds, bool OpensLeft) LandWidget(Rect held, Rect work, bool opensLeft, bool compactTab)
+    /// <summary>Keep the pet and its inward-facing status tab inside the work area.</summary>
+    internal static (Rect Bounds, bool OpensLeft) LandWidget(Rect puck, Rect work, double width)
     {
-        var anchor = Inside(compactTab ? PuckEnd(held, opensLeft) : held, work);
+        var anchor = Inside(puck, work);
         bool left = OpensLeft(anchor, work);
-        return (compactTab ? Inside(WidgetRect(anchor, left, held.Width), work) : anchor, left);
+        return (Inside(WidgetRect(anchor, left, width), work), left);
     }
 
     /// <summary>The full page or shorter tool gallery, on the same corner and at the same scale.</summary>

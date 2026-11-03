@@ -411,7 +411,10 @@ public partial class IslandPanelWindow : Window
     public void CloseIsland(bool immediate = false, Rect? widget = null, double tabExtension = 0, bool opensLeft = false)
     {
         if (!IsOpen)
+        {
+            if (immediate && IsVisible) Collapse(); // a pickup can interrupt the closing morph too
             return;
+        }
         IsOpen = false;
         if (widget is { } now && _hwnd != default)
         {

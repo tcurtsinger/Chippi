@@ -105,11 +105,12 @@ public partial class IslandWindow : Window
     private HMONITOR _monitor;
     private Rect _puck; // the puck at rest, physical pixels
     private Point? _pressAt;
-    private Vector _grab; // from the visible widget's top-left to the pointer, in DIPs
-    private double? _heldWidth; // the visible width on press, held through the drop
+    private Vector _grab; // press offset in widget DIPs; becomes pet-local once the drag begins
+    private double? _heldWidth; // freezes a press for its click, or the compact puck for its landing slide
     private bool _resumeBar; // a fold, unfold or content fade was interrupted by the press
     private bool _pressedBar;
     private bool _dragging;
+    private MonitorArea? _dragArea; // reuse the work area for pointer moves on the same display
     private EventHandler? _slideFrame;
     private long _slideTick;
     private Action? _landing; // a drop's slide ending: Chippi set down and the place saved, even when it's cut short
@@ -604,6 +605,7 @@ public partial class IslandWindow : Window
                 break;
             case PInvoke.WM_DISPLAYCHANGE:
             case PInvoke.WM_SETTINGCHANGE:
+                _dragArea = null;
                 Dispatcher.BeginInvoke(DispatcherPriority.Background, () => DisplayChanged?.Invoke(this, EventArgs.Empty));
                 break;
             case PInvoke.WM_POWERBROADCAST:
@@ -791,7 +793,7 @@ public partial class IslandWindow : Window
         _clickHook = null;
         _openedByDrag = false;
         DragCloseTimer.Stop();
-        if (!_panel.IsOpen)
+        if (!_panel.IsOpen && !(immediate && _panel.IsVisible))
             return;
         // A reversal can still have a half-unfolded bar underneath it. Land there first;
         // the remaining unfold or a change of activity takes over after the panel hides.
@@ -921,7 +923,7 @@ public partial class IslandWindow : Window
     /// rim, never the size, and the puck lifts while dragged. The widget is the bar while there is something
     /// to show, in order: a drag from another app (the page it opens), Plain paste's feedback, the song
     /// playing (or paused, for <see cref="PauseHold"/>), or the highest activity. Otherwise it is the puck.
-    /// A drag keeps what was picked up. While the panel is out, the panel is its shape.
+    /// During a drag only the compact puck and its status icons follow the pointer.
     /// </summary>
     private void RefreshPuck()
     {
@@ -1018,6 +1020,7 @@ public partial class IslandWindow : Window
             Arrival.Leave(Lines, LinesWas);
         }
         ShowBar(bar);
+        if (_dragging) SetDragOrigin();
         if (bar)
         {
             // Folding, the bar keeps what it showed while it fades.
@@ -1150,7 +1153,7 @@ public partial class IslandWindow : Window
 
         double extension = count == 0 ? 0 : 25 + 21 * (count - 1);
         _compactWidth = IslandGeometry.Puck + extension;
-        if (extension >= _tabExtension || PuckButton.Width <= _compactWidth || PuckButton.Width >= IslandGeometry.BarWidth)
+        if (_lifted || extension >= _tabExtension || PuckButton.Width <= _compactWidth || PuckButton.Width >= IslandGeometry.BarWidth)
             _tabExtension = extension;
         Body.SetTab(_tabExtension, _left);
         BodyShadow.SetTab(_tabExtension, _left);
@@ -1650,9 +1653,17 @@ public partial class IslandWindow : Window
         BodyShadow.SetResourceReference(EffectProperty, lifted ? "IslandLiftShadow" : "IslandPuckShadow");
     }
 
-    /// <summary>The picked-up widget lifts where it was held, with a deeper shadow. Its content stays put.</summary>
+    /// <summary>A click retains its target until the pointer crosses the threshold. Then only Chippi travels.</summary>
     private void BeginDrag()
     {
+        double size = IslandGeometry.Puck, half = size / 2;
+        if (_left) _grab.X -= (_heldWidth ?? size) - size;
+        var middle = new Vector(half, half);
+        if ((_grab - middle).Length > half)
+            _grab = middle; // the tab or notice under the pointer is giving way to the pet
+        _heldWidth = null;
+        _resumeBar = true; // discard any frozen width or opacity, even mid-unfold
+        _dragArea = null;
         _dragging = true;
         Menu.IsOpen = false;
         StopSlide();
@@ -1662,21 +1673,38 @@ public partial class IslandWindow : Window
         RefreshPuck();
     }
 
-    /// <summary>The widget follows the pointer at its original grip, at the window's current rendering DPI.</summary>
+    private void SetDragOrigin()
+    {
+        double tab = _left ? _compactWidth - IslandGeometry.Puck : 0;
+        PuckButton.RenderTransformOrigin = new Point((tab + _grab.X) / _compactWidth, _grab.Y / IslandGeometry.Puck);
+    }
+
+    /// <summary>Keep Chippi under the pointer while the tab turns toward the middle of the pointer's display.</summary>
     internal void DragTo(Point pointer)
     {
+        var monitor = IslandNative.MonitorAt(pointer);
+        if (_dragArea?.Handle != monitor)
+            _dragArea = IslandNative.Area(monitor);
+        if (_dragArea is not { } area) return;
+        // The pointer determines the side. The layered window keeps its actual scale until WPF's DPI change.
         double scale = VisualTreeHelper.GetDpi(this).DpiScaleX;
-        var held = IslandGeometry.HeldRect(pointer, _grab, _heldWidth ?? IslandGeometry.Puck, scale);
-        _puck = IslandGeometry.PuckEnd(held, _left);
+        _puck = IslandGeometry.HeldPuck(pointer, _grab, scale);
+        bool left = IslandGeometry.OpensLeft(_puck, area.Work);
+        if (left != _left)
+        {
+            ApplySide(left);
+            SetDragOrigin();
+        }
         Follow(Center(_puck), scale);
     }
 
     /// <summary>
-    /// Drops the whole visible widget on the display under the pointer. Its outline slides only
-    /// enough to clear the work area's edges. The puck takes the outer end of that rectangle.
+    /// Lands the same compact preview on the pointer's display, sliding only enough to clear the edges.
     /// </summary>
     internal Rect DropAt(Point pointer)
     {
+        bool wasDragging = _dragging;
+        if (wasDragging) _heldWidth = _compactWidth;
         _dragging = false;
         SetLifted(false);
         var monitor = IslandNative.MonitorAt(pointer);
@@ -1689,10 +1717,9 @@ public partial class IslandWindow : Window
             return _puck;
         }
         double half = IslandGeometry.Puck / 2;
-        var grip = _heldWidth.HasValue ? _grab : new Vector(half, half); // snapshots can also drop a puck directly
-        var held = IslandGeometry.HeldRect(pointer, grip, _heldWidth ?? IslandGeometry.Puck, area.Scale);
-        bool compactTab = !_pressedBar && _heldWidth is > IslandGeometry.Puck && _heldWidth <= IslandGeometry.Puck + Body.TabExtension;
-        var (landed, left) = IslandGeometry.LandWidget(held, area.Work, _left, compactTab);
+        var grip = wasDragging ? _grab : new Vector(half, half); // snapshots can also drop a puck directly
+        var held = IslandGeometry.HeldPuck(pointer, grip, area.Scale);
+        var (landed, left) = IslandGeometry.LandWidget(held, area.Work, _compactWidth * area.Scale);
         var puck = IslandGeometry.PuckEnd(landed, left);
         (_x, _y) = IslandGeometry.Fractions(puck, area.Work);
         _monitor = monitor;
@@ -1702,7 +1729,7 @@ public partial class IslandWindow : Window
         // Saved once it has landed: a save writes settings.json, which mid-slide costs frames.
         var chosen = new IslandPlacementEventArgs(_x.Value, _y.Value, monitor);
         // Chippi's eyes stay round until the puck has slid into place; then he lands.
-        var from = Center(IslandGeometry.PuckEnd(held, compactTab ? _left : left));
+        var from = Center(held);
         ApplySide(left);
         SlideTo(from, Center(puck), area.Scale, () =>
         {
@@ -1802,8 +1829,6 @@ public partial class IslandWindow : Window
     /// <summary>Debug builds: lift the puck as if dragged, for snapshots.</summary>
     internal void ForceLift(bool lifted)
     {
-        if (lifted) _heldWidth = HoldBarMotion();
-        else _heldWidth = null;
         SetLifted(lifted);
         Pet.IsHeld = lifted;
         RefreshPuck();
