@@ -32,6 +32,9 @@ internal sealed class SettingsSection : UserControl
 
     /// <summary>Import archive's Choose file…, off while no watched folder exists to import into.</summary>
     private readonly Button _importChoose = Ui.Button("Choose file…", name: "Import archive");
+    private readonly SettingRow _importRow;
+    private string? _importFolder;
+    private bool _importing;
 
     public SettingsSection(DownloadsModule module, Action<Task<PreviewPlan>> import, Action<string>? preview = null)
     {
@@ -40,6 +43,8 @@ internal sealed class SettingsSection : UserControl
         _import = import;
 
         var add = SettingsLayout.AddButton("folder", AddFolder);
+        _importRow = Ui.Setting("Import archive", "", _importChoose);
+        _importChoose.Click += async (_, _) => await ImportAsync();
 
         _error.Visibility = Visibility.Collapsed;
         _importError.Visibility = Visibility.Collapsed;
@@ -48,17 +53,26 @@ internal sealed class SettingsSection : UserControl
             _folders,
             _error.Margin(0, 6, 0, 0),
             Ui.Section("Options"),
-            Ui.Card(KeepHistoryRow(), ExplorerRow(), ImportRow()));
+            Ui.Card(KeepHistoryRow(), ExplorerRow(), Ui.Stack(_importRow, _importError.Margin(16, 0, 16, 10))));
         Render();
     }
 
     private void Render()
     {
         var folders = _module.Settings.Folders;
-        _importChoose.IsEnabled = folders.Any(f => Directory.Exists(f.Path));
+        RefreshImportFolder();
         _folders.Content = folders.Count == 0
             ? SettingsLayout.Card(NoFolders())
             : Ui.Card([.. folders.Select(FolderRow)]);
+    }
+
+    private void RefreshImportFolder()
+    {
+        _importFolder = _module.Settings.Folders.Select(f => f.Path).FirstOrDefault(Directory.Exists);
+        _importRow.Description = _importFolder is null ? "Add a watched folder to preview an archive." : $"Preview in {Ui.FolderName(_importFolder)}";
+        _importRow.ToolTip = _importFolder;
+        System.Windows.Automation.AutomationProperties.SetHelpText(_importChoose, _importFolder ?? _importRow.Description);
+        _importChoose.IsEnabled = !_importing && _importFolder is not null;
     }
 
     /// <summary>"No folders yet", with the island's one-click Add Downloads when the Downloads folder exists.</summary>
@@ -104,7 +118,13 @@ internal sealed class SettingsSection : UserControl
 
         var options = new Card();
         options.SetResourceReference(StyleProperty, "CardRowsStyle");
-        options.Children.Add(Ui.Setting("Mode", "", mode));
+        string modeDescription = folder.Mode switch
+        {
+            FolderMode.Silent => "Organize matching files automatically.",
+            FolderMode.Manual => "Queue matching files for review.",
+            _ => "Watching is paused.",
+        };
+        options.Children.Add(Ui.Setting("Mode", modeDescription, mode));
         options.Children.Add(Ui.Setting("Wait before moving", "", graceBox));
         options.Children.Add(Ui.Setting("Ignore list", "", ignore));
         options.Children.Add(Ui.Setting("Stop watching", "", remove));
@@ -129,7 +149,7 @@ internal sealed class SettingsSection : UserControl
         return row;
     }
 
-    /// <summary>The mode and Organize now; for a folder that's gone, "Not found" in Caution and Choose folder… to point it elsewhere.</summary>
+    /// <summary>The folder's mode and preview action, or a way to locate a missing folder.</summary>
     private StackPanel FolderActions(WatchedFolder folder, bool exists, out TextBlock state)
     {
         state = Ui.Text(exists ? folder.Mode.DisplayName() : "Not found", brush: exists ? "TextSecondaryBrush" : "WarningTextBrush");
@@ -140,9 +160,10 @@ internal sealed class SettingsSection : UserControl
             relocate.Click += (_, _) => Relocate(folder);
             return Ui.Row(state, relocate);
         }
-        var organize = Ui.Button("Organize now", name: $"Organize {Ui.FolderName(folder.Path)} now");
-        organize.Click += (_, _) => _preview(folder.Path);
-        return Ui.Row(state, organize);
+        var preview = Ui.Button("Preview", name: $"Preview {Ui.FolderName(folder.Path)}");
+        preview.ToolTip = $"Preview changes in {folder.Path}";
+        preview.Click += (_, _) => _preview(folder.Path);
+        return Ui.Row(state, preview);
     }
 
     /// <summary>A watched folder that's gone: watch another in its place, keeping its mode and wait (a new path starts from now).</summary>
@@ -196,31 +217,31 @@ internal sealed class SettingsSection : UserControl
         return Ui.Setting("Organize in Explorer", "", toggle);
     }
 
-    private FrameworkElement ImportRow()
+    private async Task ImportAsync()
     {
-        var choose = _importChoose;
-        choose.Click += async (_, _) => await ImportAsync(choose);
-        var row = Ui.Setting("Import archive", "", choose);
-        return Ui.Stack(row, _importError.Margin(16, 0, 16, 10));
-    }
-
-    private async Task ImportAsync(Button choose)
-    {
+        if (_importing) return;
         _importError.Visibility = Visibility.Collapsed;
-        // Imported files land in the first watched folder that still exists; rules apply as there.
-        string? target = _module.Settings.Folders.Select(f => f.Path).FirstOrDefault(Directory.Exists);
-        if (target is null || _module.Engine is not { } engine || _module.ImportStaging is not { } staging)
+        // Use the folder shown in the row, even if another watched folder has since appeared.
+        if (_importFolder is not { } target || _module.Engine is not { } engine || _module.ImportStaging is not { } staging)
         {
+            Render();
             ShowImportError("Import failed · no folder to import into");
             return;
         }
+        if (!CheckImportFolder(target)) return;
         var dialog = new OpenFileDialog { Title = "Import archive", Filter = "Archives (*.zip;*.tgz;*.tar.gz)|*.zip;*.tgz;*.tar.gz" };
         if (dialog.ShowDialog(Window.GetWindow(this)) != true)
             return;
-        choose.IsEnabled = false;
+        _importing = true;
+        _importChoose.IsEnabled = false;
         try
         {
             var extracted = await Task.Run(() => ArchiveImporter.Extract(dialog.FileName, target, staging));
+            if (!IsLoaded || !CheckImportFolder(target))
+            {
+                ArchiveImporter.DeleteStaging(extracted.Staging, null);
+                return;
+            }
             _import(engine.PreviewImportAsync(target, extracted));
         }
         catch (ArchiveRejectedException ex)
@@ -233,8 +254,17 @@ internal sealed class SettingsSection : UserControl
         }
         finally
         {
-            choose.IsEnabled = true;
+            _importing = false;
+            if (IsLoaded) RefreshImportFolder();
         }
+    }
+
+    private bool CheckImportFolder(string path)
+    {
+        if (_module.Settings.Folders.Any(f => Same(path, f.Path)) && Directory.Exists(path)) return true;
+        RefreshImportFolder();
+        ShowImportError("Import failed · watched folder unavailable");
+        return false;
     }
 
     private void ShowImportError(string message)

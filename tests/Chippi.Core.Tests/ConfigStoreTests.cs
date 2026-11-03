@@ -107,6 +107,39 @@ public sealed class ConfigStoreTests : IDisposable
         Assert.Contains("\"minutes\": 2", File.ReadAllText(path), StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("""{ "version": 1, "app": { "theme": "dark" } }""", 0)]
+    [InlineData("""{ "version": 1, "app": { "theme": "dark" }, "modules": { "downloads": { "minutes": 7, "future": true } } }""", 7)]
+    public void Failed_updates_do_not_change_live_settings_or_leak_into_an_unrelated_save(string original, int minutes)
+    {
+        var path = _dir.File("settings.json");
+        File.WriteAllText(path, original);
+        var store = new ConfigStore(path);
+        store.Load();
+        var changes = new List<string>();
+        store.SectionChanged += (_, e) => changes.Add(e.Name);
+
+        // Deny access to the staging file so the real filesystem write fails before replacement.
+        using (new FileStream(path + ".tmp", FileMode.CreateNew, FileAccess.Write, FileShare.None))
+        {
+            Assert.ThrowsAny<IOException>(() => store.SetModuleSettings("downloads", new SampleSettings { Minutes = 42 }));
+            Assert.ThrowsAny<IOException>(() => store.SetSection(AppSettings.SectionName, new AppSettings { Theme = ThemePreference.Light }));
+        }
+
+        Assert.Empty(changes);
+        Assert.Equal(original, File.ReadAllText(path));
+        Assert.Equal(ThemePreference.Dark, store.GetSection<AppSettings>(AppSettings.SectionName).Theme);
+        Assert.Equal(minutes, store.GetModuleSettings<SampleSettings>("downloads").Minutes);
+        Assert.Equal(minutes != 0, store.HasSection("modules"));
+
+        store.SetSection("unrelated", new SampleSettings { Minutes = 15 });
+        Assert.Equal(["unrelated"], changes);
+        var saved = JsonNode.Parse(File.ReadAllText(path))!.AsObject();
+        Assert.Equal(15, saved["unrelated"]!["minutes"]!.GetValue<int>());
+        saved.Remove("unrelated");
+        Assert.True(JsonNode.DeepEquals(JsonNode.Parse(original), saved));
+    }
+
     [Fact]
     public async Task Readers_never_see_a_partial_file_while_saving()
     {

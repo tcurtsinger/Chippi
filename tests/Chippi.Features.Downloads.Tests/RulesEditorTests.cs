@@ -14,11 +14,11 @@ namespace Chippi.Features.Downloads.Tests;
 /// <summary>The rules editor itself, built on its own UI thread.</summary>
 public sealed class RulesEditorTests
 {
-    private static RulesSection Section(out DownloadsModule module)
+    private static RulesSection Section(out DownloadsModule module, Action<DownloadsSettings>? persist = null)
     {
         module = new DownloadsModule();
         module.Settings.Rules.Add(new RuleSetting { Id = "r", Name = "Dated", Extensions = ["txt"], Action = RuleActionKind.Rename, Template = "{year}-{month}-{day} {filename}" });
-        return new RulesSection(module);
+        return new RulesSection(module, persist ?? (_ => { }));
     }
 
     [Fact]
@@ -30,13 +30,13 @@ public sealed class RulesEditorTests
         {
             var section = Section(out _);
             draft = section.Drafts.Drafts[0];
-            var editor = section.Editor(draft);
-            var action = Named<SegmentedControl>(editor, "Action");
+            Click(section, "Edit Dated");
+            var action = Named<SegmentedControl>(section, "Action");
 
             action.SelectedIndex = (int)RuleActionKind.Move;
             action.SelectedIndex = (int)RuleActionKind.Rename;
 
-            field = Named<TextBox>(editor, "New name").Text;
+            field = Named<TextBox>(section, "New name").Text;
             section.Drafts.Save(draft.Id);
             saved = section.Drafts.Effective()[0];
         });
@@ -101,6 +101,102 @@ public sealed class RulesEditorTests
         Assert.True(left);
         Assert.Equal(1, draftsAfterDiscard);
     }
+
+    [Fact]
+    public void Saving_and_enabling_describe_existing_files_in_their_watched_folders() => OnUiThread(() =>
+    {
+        var module = new DownloadsModule();
+        module.Settings.Folders.AddRange([
+            new() { Path = @"C:\Watch\Incoming", Mode = FolderMode.Silent },
+            new() { Path = @"C:\Watch\Receipts", Mode = FolderMode.Manual },
+            new() { Path = @"C:\Watch\Archive", Mode = FolderMode.Paused },
+        ]);
+        module.Settings.Rules.Add(new RuleSetting { Id = "pdf", Name = "File PDFs", Enabled = false,
+            Extensions = ["pdf"], Action = RuleActionKind.Move, Template = "Documents" });
+        var section = new RulesSection(module, _ => { });
+        const string enabling = "Enabling can move existing matches in Incoming. Existing matches in Receipts wait for review.";
+        Assert.Contains(Descendants(section).OfType<TextBlock>(), t => t.Text == enabling && t.Visibility == Visibility.Visible);
+        Assert.Equal(enabling, AutomationProperties.GetHelpText(Named<ToggleButton>(section, "File PDFs on")));
+        Click(section, "Edit File PDFs");
+        var toggle = Named<ToggleButton>(section, "File PDFs on");
+        toggle.IsChecked = true;
+        Named<SegmentedControl>(section, "Action").SelectedIndex = (int)RuleActionKind.Rename;
+        var save = Named<Button>(section, "Save File PDFs");
+        Assert.True(save.IsEnabled);
+        Assert.Equal("Saving can rename existing matches in Incoming. Existing matches in Receipts wait for review.", AutomationProperties.GetHelpText(save));
+        toggle.IsChecked = false;
+        Assert.Empty(AutomationProperties.GetHelpText(save));
+        Assert.Equal(enabling, AutomationProperties.GetHelpText(toggle)); // enabling uses the saved Move, not the draft Rename
+    });
+
+    [Theory]
+    [InlineData(false, "Saving")]
+    [InlineData(true, "Enabling")]
+    public void Scope_shows_full_paths_only_for_ambiguous_folder_names(bool enabling, string action)
+    {
+        var rule = new RuleSetting { Action = RuleActionKind.Move };
+        var scope = RuleChecks.ExistingScope(rule, [
+            new() { Path = @"C:\Work\Incoming", Mode = FolderMode.Silent },
+            new() { Path = @"D:\Personal\incoming", Mode = FolderMode.Manual },
+            new() { Path = @"C:\Work\Receipts", Mode = FolderMode.Manual },
+        ], enabling);
+        Assert.Equal($@"{action} can move existing matches in C:\Work\Incoming. Existing matches in D:\Personal\incoming, Receipts wait for review.", scope);
+    }
+
+    [Theory]
+    [InlineData("priority.pdf", "Priority → Express", true)]
+    [InlineData("invoice.pdf", "File size needed · Large PDFs", false)]
+    [InlineData("notes.txt", "Modified date needed · Old notes", false)]
+    [InlineData("cover.png", "No rule matches", false)]
+    [InlineData("notes.pdf.exe", "Held", false)]
+    public void A_filename_test_only_claims_a_match_when_the_name_decides_it(string name, string outcome, bool definite) => OnUiThread(() =>
+    {
+        var module = new DownloadsModule();
+        module.Settings.Folders.Add(new() { Path = @"C:\Watch\Incoming", Mode = FolderMode.Manual });
+        module.Settings.Rules.AddRange([
+            new() { Id = "off", Name = "Off", Enabled = false, Order = 0, MinBytes = 512, Action = RuleActionKind.Move, Template = "Unused" },
+            new() { Id = "first", Name = "Priority", Order = 1, NameRegex = "^priority", Action = RuleActionKind.Move, Template = "Express" },
+            new() { Id = "size", Name = "Large PDFs", Order = 2, Extensions = ["pdf"], MinBytes = 2048, Action = RuleActionKind.Move, Template = "Large" },
+            new() { Id = "fallback", Name = "Other PDFs", Order = 3, Extensions = ["pdf"], Action = RuleActionKind.Move, Template = "Other" },
+            new() { Id = "date", Name = "Old notes", Order = 4, Extensions = ["txt"], ModifiedBefore = new DateOnly(2020, 1, 1), Action = RuleActionKind.Move, Template = "Old" },
+        ]);
+        var section = new RulesSection(module);
+        Named<TextBox>(section, "Test a file name").Text = name;
+        Assert.Contains(Descendants(section).OfType<TextBlock>(), t => t.Text.StartsWith(outcome, StringComparison.Ordinal));
+        Assert.Equal(definite, Descendants(section).OfType<Badge>().Any(b => b.Text == "Match"));
+    });
+
+    [Fact]
+    public void A_failed_write_restores_the_switch_and_keeps_the_draft_for_retry() => OnUiThread(() =>
+    {
+        bool reject = true;
+        DownloadsSettings? written = null;
+        var section = Section(out _, settings =>
+        {
+            if (reject) throw new UnauthorizedAccessException();
+            written = settings;
+        });
+        var toggle = Named<ToggleButton>(section, "Dated on");
+        toggle.IsChecked = false;
+        Assert.True(toggle.IsChecked);
+        Assert.True(section.Drafts.Effective()[0].Enabled);
+        Click(section, "Edit Dated");
+        var name = Named<TextBox>(section, "Rule name");
+        name.Text = "Edited";
+        Click(section, "Duplicate Dated");
+        Click(section, "Delete Dated");
+        Assert.Single(section.Drafts.Drafts);
+        Click(section, "Save Dated");
+        Assert.Same(name, Named<TextBox>(section, "Rule name"));
+        Assert.Equal("Dated", section.Drafts.Effective()[0].Name);
+        Assert.True(section.Drafts.HasUnsaved);
+        Assert.Null(written);
+        Assert.Contains(Descendants(section).OfType<TextBlock>(), t => t.Text == "Save failed · access denied" && t.Visibility == Visibility.Visible);
+        reject = false;
+        Click(section, "Save Dated");
+        Assert.Equal("Edited", written!.Rules[0].Name);
+        Assert.False(section.Drafts.HasUnsaved);
+    });
 
     private static void Click(DependencyObject root, string name) =>
         Named<ButtonBase>(root, name).RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));

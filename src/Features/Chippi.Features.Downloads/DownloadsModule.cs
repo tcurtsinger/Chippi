@@ -117,7 +117,7 @@ public sealed class DownloadsModule : IFeatureModule
             () => widget = new Views.Tidy.TidyView(this, RequestView))
         {
             HandleBack = () => widget?.Back() == true,
-            HandleEscape = () => widget?.Back() == true,
+            HandleEscape = () => widget?.Escape() == true,
         });
         Engine.PendingChanged += OnPendingChanged;
         UpdateTile();

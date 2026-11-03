@@ -58,7 +58,10 @@ public sealed record OperationRecord(
     DateTimeOffset? CompletedAt,
     long? UndoOf,
     DateTimeOffset? DestinationModifiedUtc,
-    string? PartialPath = null);
+    string? PartialPath = null)
+{
+    public RunTrigger Trigger { get; init; }
+}
 
 /// <summary>History view filters. All optional; newest first.</summary>
 public sealed record HistoryQuery

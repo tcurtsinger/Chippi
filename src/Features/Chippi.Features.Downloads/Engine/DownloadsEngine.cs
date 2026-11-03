@@ -754,7 +754,7 @@ public sealed class DownloadsEngine : IDisposable
             }
             // An imported file is recorded as coming from the folder it was imported into, so undo
             // has somewhere real to put it back. One that lands right there is an Import: no undo.
-            var kind = item.ImportedAs is { } importedAs && string.Equals(item.Destination, importedAs, StringComparison.OrdinalIgnoreCase)
+            var kind = item.IsDirectImport
                 ? HistoryOperationKind.Import
                 : item.Kind == OperationKind.Rename ? HistoryOperationKind.Rename : HistoryOperationKind.Move;
             var result = _executor.Execute(runId, new ExecutionRequest(

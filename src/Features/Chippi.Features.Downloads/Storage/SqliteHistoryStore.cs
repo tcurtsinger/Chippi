@@ -78,7 +78,7 @@ public sealed class SqliteHistoryStore : IHistoryStore
     public void MarkUndone(long operationId) => SetState(operationId, OperationState.Undone);
 
     public OperationRecord? Get(long operationId) =>
-        Read("SELECT * FROM operations WHERE id = $id", ("$id", operationId)).FirstOrDefault();
+        Read("WHERE operations.id = $id", ("$id", operationId)).FirstOrDefault();
 
     public IReadOnlyList<OperationRecord> Query(HistoryQuery query)
     {
@@ -86,7 +86,7 @@ public sealed class SqliteHistoryStore : IHistoryStore
         var parameters = new List<(string, object?)>();
         if (query.Folder is { Length: > 0 } folder)
         {
-            where.Add("run_id IN (SELECT id FROM runs WHERE folder = $folder COLLATE NOCASE)");
+            where.Add("runs.folder = $folder COLLATE NOCASE");
             parameters.Add(("$folder", folder));
         }
         if (query.Text is { Length: > 0 } text)
@@ -112,20 +112,20 @@ public sealed class SqliteHistoryStore : IHistoryStore
         parameters.Add(("$take", (long)query.Take));
         parameters.Add(("$skip", (long)query.Skip));
         string filter = where.Count == 0 ? "" : "WHERE " + string.Join(" AND ", where);
-        return Read($"SELECT * FROM operations {filter} ORDER BY planned_at DESC, id DESC LIMIT $take OFFSET $skip", [.. parameters]);
+        return Read($"{filter} ORDER BY planned_at DESC, operations.id DESC LIMIT $take OFFSET $skip", [.. parameters]);
     }
 
     public IReadOnlyList<OperationRecord> RunOperations(long runId) =>
-        Read("SELECT * FROM operations WHERE run_id = $run ORDER BY id", ("$run", runId));
+        Read("WHERE run_id = $run ORDER BY operations.id", ("$run", runId));
 
     public IReadOnlyList<OperationRecord> Incomplete() =>
-        Read("SELECT * FROM operations WHERE state IN ($p, $s) ORDER BY id", ("$p", (long)OperationState.Planned), ("$s", (long)OperationState.Started));
+        Read("WHERE state IN ($p, $s) ORDER BY operations.id", ("$p", (long)OperationState.Planned), ("$s", (long)OperationState.Started));
 
     public IReadOnlyList<OperationRecord> WithPartial() =>
-        Read("SELECT * FROM operations WHERE partial_path IS NOT NULL ORDER BY id");
+        Read("WHERE partial_path IS NOT NULL ORDER BY operations.id");
 
     public OperationRecord? LatestOutputAt(string destination) => Read(
-        "SELECT * FROM operations WHERE dest_path = $dest COLLATE NOCASE AND state = $s ORDER BY completed_at DESC, id DESC LIMIT 1",
+        "WHERE dest_path = $dest COLLATE NOCASE AND state = $s ORDER BY completed_at DESC, operations.id DESC LIMIT 1",
         ("$dest", destination), ("$s", (long)OperationState.Completed)).FirstOrDefault();
 
     public int ClearBefore(DateTimeOffset cutoff)
@@ -224,11 +224,11 @@ public sealed class SqliteHistoryStore : IHistoryStore
         }
     }
 
-    private List<OperationRecord> Read(string sql, params (string Name, object? Value)[] parameters)
+    private List<OperationRecord> Read(string filter, params (string Name, object? Value)[] parameters)
     {
         lock (_gate)
         {
-            using var command = Command(sql, null, parameters);
+            using var command = Command($"SELECT operations.*, runs.trigger FROM operations JOIN runs ON runs.id = operations.run_id {filter}", null, parameters);
             using var reader = command.ExecuteReader();
             var result = new List<OperationRecord>();
             while (reader.Read())
@@ -270,6 +270,6 @@ public sealed class SqliteHistoryStore : IHistoryStore
             Time(r, "completed_at"),
             r.IsDBNull(r.GetOrdinal("undo_of")) ? null : r.GetInt64(r.GetOrdinal("undo_of")),
             Time(r, "dest_modified"),
-            Text(r, "partial_path"));
+            Text(r, "partial_path")) { Trigger = (RunTrigger)r.GetInt64(r.GetOrdinal("trigger")) };
     }
 }

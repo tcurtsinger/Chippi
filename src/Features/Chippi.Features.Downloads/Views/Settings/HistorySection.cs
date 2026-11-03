@@ -3,8 +3,10 @@
 
 using System.Globalization;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using Chippi.Features.Downloads.Storage;
@@ -25,6 +27,7 @@ internal sealed class HistorySection : UserControl
     private readonly long? _focusRun;
     private readonly SearchBox _search = new() { Placeholder = "Search history" };
     private readonly ComboBox _folder;
+    private readonly List<string> _folderPaths;
     private readonly StackPanel _runs = new();
     private readonly TextBlock _error = Ui.Warning("");
     private readonly HashSet<long> _expanded = [];
@@ -53,13 +56,19 @@ internal sealed class HistorySection : UserControl
             _searchDelay.Stop();
             Render();
         };
-        var folders = new List<string> { "All folders" };
-        folders.AddRange(module.Settings.Folders.Select(f => Ui.FolderName(f.Path)));
-        int picked = folder is null ? -1 : module.Settings.Folders.FindIndex(f => Views.Tidy.TidyProjection.SameFolder(f.Path, folder));
-        _folder = Ui.Choice(folders, picked + 1, "Folder", 170);
+        _folderPaths = module.Settings.Folders.Select(f => f.Path).ToList();
+        if (folder is not null && !_folderPaths.Any(path => Views.Tidy.TidyProjection.SameFolder(path, folder)))
+            _folderPaths.Add(folder); // A deep link can still show the history of a removed folder.
+        var duplicateNames = OrganizerLabels.RepeatedFolderNames(_folderPaths.Select(Ui.FolderName));
+        var labels = _folderPaths.Select(p => duplicateNames.Contains(Ui.FolderName(p)) ? p : Ui.FolderName(p));
+        int picked = folder is null ? -1 : _folderPaths.FindIndex(p => Views.Tidy.TidyProjection.SameFolder(p, folder));
+        _folder = Ui.Choice(labels.Prepend("All folders"), picked + 1, "Folder", 170);
         _folder.SelectionChanged += (_, _) => Render();
 
-        var clear = Ui.Button("Clear history");
+        var clear = Ui.Button("Clear all history");
+        const string clearHelp = "Files stay where they are. Cleared runs can no longer be undone here.";
+        clear.ToolTip = clearHelp;
+        AutomationProperties.SetHelpText(clear, clearHelp);
         clear.HorizontalAlignment = HorizontalAlignment.Right;
         clear.Click += (_, _) => ShowClearPopover(clear);
 
@@ -96,7 +105,8 @@ internal sealed class HistorySection : UserControl
         _runs.Children.Clear();
         if (_module.Engine is not { } engine)
             return;
-        string? folder = _folder.SelectedIndex > 0 ? _module.Settings.Folders.ElementAtOrDefault(_folder.SelectedIndex - 1)?.Path : null;
+        string? folder = _folder.SelectedIndex > 0 ? _folderPaths[_folder.SelectedIndex - 1] : null;
+        _folder.ToolTip = folder ?? "All folders";
         var operations = engine.History.Query(new HistoryQuery
         {
             Folder = folder,
@@ -110,7 +120,8 @@ internal sealed class HistorySection : UserControl
         var shown = operations.Where(o => o.Kind != HistoryOperationKind.Restore || o.State != OperationState.Completed).ToList();
         if (shown.Count == 0)
         {
-            _runs.Children.Add(Ui.Card(Ui.Pad(Ui.Text(_search.Text.Length > 0 ? "No matches" : "Nothing organized yet", "BodyTextStyle", "TextTertiaryBrush"))).Margin(0, 16, 0, 0));
+            string empty = _search.Text.Trim().Length > 0 ? "No matching runs" : folder is not null ? "No history for this folder" : "Nothing organized yet";
+            _runs.Children.Add(Ui.Card(Ui.Pad(Ui.Text(empty, "BodyTextStyle", "TextTertiaryBrush"))).Margin(0, 16, 0, 0));
             return;
         }
 
@@ -130,7 +141,8 @@ internal sealed class HistorySection : UserControl
         bool collapsed = !_expanded.Contains(runId); // every run starts collapsed; the focused run starts open
         // Undo acts on the whole run, so it counts the whole run: never just the rows a search
         // or the row limit left on screen (Karl's review).
-        int undoable = _module.Engine?.History.RunOperations(runId).Count(Undoable) ?? 0;
+        var wholeRun = _module.Engine?.History.RunOperations(runId) ?? rows;
+        var undoable = wholeRun.Where(Undoable).ToList();
 
         string trigger = run?.Trigger switch
         {
@@ -141,9 +153,9 @@ internal sealed class HistorySection : UserControl
             _ => "Organize now",
         };
         string where = run is null ? "" : $" · {Ui.FolderName(run.Folder)}";
-        int moved = rows.Count(o => o.State == OperationState.Completed && o.Kind != HistoryOperationKind.Restore);
-        int failed = rows.Count(o => o.State == OperationState.Failed);
-        int undone = rows.Count(o => o.State == OperationState.Undone);
+        int Completed(HistoryOperationKind kind) => wholeRun.Count(o => o.State == OperationState.Completed && o.Kind == kind);
+        int failed = wholeRun.Count(o => o.State == OperationState.Failed);
+        int undone = wholeRun.Count(o => o.State == OperationState.Undone);
         string time = Ui.Time(run?.StartedAt ?? rows[0].PlannedAt);
 
         void Toggle()
@@ -162,7 +174,8 @@ internal sealed class HistorySection : UserControl
         head.Children.Add(expand.Margin(-8, 0, 8, 0).At(0));
         // "4:00 PM · 3 moved · 1 failed", the failures in Caution.
         var caption = Ui.Text(time, "CaptionTextStyle");
-        foreach (var (count, what) in new[] { (moved, "moved"), (failed, "failed"), (undone, "undone") }.Where(c => c.Item1 > 0))
+        foreach (var (count, what) in new[] { (Completed(HistoryOperationKind.Move), "moved"), (Completed(HistoryOperationKind.Rename), "renamed"),
+            (Completed(HistoryOperationKind.Import), "imported"), (failed, "failed"), (undone, "undone") }.Where(c => c.Item1 > 0))
         {
             var part = new System.Windows.Documents.Run($" · {count} {what}");
             if (what == "failed")
@@ -175,7 +188,7 @@ internal sealed class HistorySection : UserControl
             if (e.OriginalSource is DependencyObject source && !Ui.IsInside<ButtonBase>(source))
                 Toggle();
         };
-        if (undoable > 0)
+        if (undoable.Count > 0)
         {
             var undoRun = Ui.Button("Undo", icon: LucideIcons.Undo, name: "Undo run");
             undoRun.Click += (_, _) =>
@@ -189,15 +202,15 @@ internal sealed class HistorySection : UserControl
 
         var card = Ui.Card(Ui.Pad(head, 60));
         card.Tag = runId;
-        if (_confirming == runId && undoable > 0)
-            card.Children.Add(Confirm(undoable, () => _ = UndoRunAsync(runId)));
+        if (_confirming == runId && undoable.Count > 0)
+            card.Children.Add(Confirm(UndoQuestion(undoable), () => _ = UndoRunAsync(runId)));
         if (!collapsed)
         {
             foreach (var row in rows)
             {
                 card.Children.Add(Row(row, restores.GetValueOrDefault(row.Id)));
                 if (_confirmingRow == row.Id)
-                    card.Children.Add(Confirm(1, () => _ = UndoRowAsync(row.Id)));
+                    card.Children.Add(Confirm(UndoQuestion([row]), () => _ = UndoRowAsync(row.Id)));
             }
         }
         return card;
@@ -206,15 +219,21 @@ internal sealed class HistorySection : UserControl
     /// <summary>A file row, indented under its run: name over "Downloads › Documents", the state, and undo.</summary>
     private Border Row(OperationRecord op, OperationRecord? restore)
     {
-        string name = Path.GetFileName(op.State == OperationState.Failed ? op.SourcePath : op.DestinationPath);
+        string name = Path.GetFileName(op.State is OperationState.Failed or OperationState.Undone ? op.SourcePath : op.DestinationPath);
         string path = $"{Ui.FolderName(Path.GetDirectoryName(op.SourcePath) ?? "")} › {Destination(op)}";
+        if (op.Kind == HistoryOperationKind.Rename)
+            path = op.State switch
+            {
+                OperationState.Undone => $"Restored from {Path.GetFileName(op.DestinationPath)}",
+                OperationState.Failed => $"Rename to {Path.GetFileName(op.DestinationPath)}",
+                _ => $"From {Path.GetFileName(op.SourcePath)}",
+            };
         var nameBlock = Ui.Text(name);
-        nameBlock.ToolTip = op.DestinationPath;
+        nameBlock.ToolTip = op.State is OperationState.Failed or OperationState.Undone ? op.SourcePath : op.DestinationPath;
 
         TextBlock status = op switch
         {
-            { State: OperationState.Failed, Kind: HistoryOperationKind.Restore } => Ui.Text($"Undo failed · {Lower(op.Error)}", "CaptionTextStyle", "WarningTextBrush"),
-            { State: OperationState.Failed } => Ui.Text($"{(op.Kind == HistoryOperationKind.Rename ? "Rename" : "Move")} failed · {Lower(op.Error)}", "CaptionTextStyle", "WarningTextBrush"),
+            { State: OperationState.Failed } => Ui.Text($"{OrganizerLabels.FailedAction(op.Kind)} · {Lower(op.Error)}", "CaptionTextStyle", "WarningTextBrush"),
             { State: OperationState.Undone } => Ui.Text(restore?.CompletedAt is { } at ? $"Undone · {Ui.Time(at)}" : "Undone", "CaptionTextStyle"),
             { Kind: HistoryOperationKind.Import } => Ui.Text("Imported", "CaptionTextStyle"),
             { Kind: HistoryOperationKind.Rename } => Ui.Text("Renamed", "CaptionTextStyle"),
@@ -244,7 +263,14 @@ internal sealed class HistorySection : UserControl
     }
 
     /// <summary>The inline confirm bar: "Undo 4 moves?" with Cancel and the only accent button on screen.</summary>
-    private Border Confirm(int count, Action undo)
+    private static string UndoQuestion(IReadOnlyList<OperationRecord> operations)
+    {
+        string action = operations.All(o => o.Kind == HistoryOperationKind.Move) ? "move"
+            : operations.All(o => o.Kind == HistoryOperationKind.Rename) ? "rename" : "change";
+        return operations.Count == 1 ? $"Undo this {action}?" : $"Undo {operations.Count} {action}s?";
+    }
+
+    private Border Confirm(string prompt, Action undo)
     {
         var cancel = Ui.Button("Cancel");
         cancel.Click += (_, _) =>
@@ -259,7 +285,7 @@ internal sealed class HistorySection : UserControl
             undo();
         };
         var grid = Ui.Columns("*", "Auto", "Auto");
-        var question = Ui.Text(count == 1 ? "Undo this move?" : $"Undo {count} moves?");
+        var question = Ui.Text(prompt);
         question.VerticalAlignment = VerticalAlignment.Center;
         grid.Children.Add(question.At(0));
         grid.Children.Add(cancel.Margin(0, 0, 8, 0).At(1));
@@ -293,23 +319,40 @@ internal sealed class HistorySection : UserControl
     /// <summary>Clear history: a small popover, the question with Cancel and a Critical Clear.</summary>
     private void ShowClearPopover(Button anchor)
     {
-        var popup = new Popup { PlacementTarget = anchor, Placement = PlacementMode.Bottom, StaysOpen = false, AllowsTransparency = true, HorizontalOffset = -150 };
+        const double width = 288;
+        var popup = new Popup { PlacementTarget = anchor, Placement = PlacementMode.Bottom, StaysOpen = false, AllowsTransparency = true, HorizontalOffset = anchor.ActualWidth - width };
         var cancel = Ui.Button("Cancel");
-        cancel.Click += (_, _) => popup.IsOpen = false;
+        void Close()
+        {
+            popup.IsOpen = false;
+            anchor.Focus();
+        }
+        cancel.Click += (_, _) => Close();
         var clear = Ui.Button("Clear", "CriticalButtonStyle");
         clear.Click += (_, _) =>
         {
-            popup.IsOpen = false;
+            Close();
             Clear();
         };
-        var content = Ui.Stack(
-            Ui.Text("Clear history?", "HeadlineTextStyle").Margin(0, 0, 0, 16),
-            Ui.Row(cancel, clear.Margin(8, 0, 0, 0)));
-        ((FrameworkElement)content.Children[1]).HorizontalAlignment = HorizontalAlignment.Right;
-        var card = new Border { CornerRadius = new CornerRadius(8), Padding = new Thickness(16), BorderThickness = new Thickness(1), Margin = new Thickness(0, 6, 0, 0), Child = content, Width = 240 };
+        var title = Ui.Text("Clear history for all folders?", "HeadlineTextStyle");
+        title.TextWrapping = TextWrapping.Wrap;
+        var actions = Ui.Row(cancel, clear.Margin(8, 0, 0, 0));
+        actions.HorizontalAlignment = HorizontalAlignment.Right;
+        var content = Ui.Stack(title.Margin(0, 0, 0, 16), actions);
+        var card = new Border { CornerRadius = new CornerRadius(8), Padding = new Thickness(16), BorderThickness = new Thickness(1), Margin = new Thickness(0, 6, 0, 0), Child = content, Width = width };
         card.SetResourceReference(Border.BackgroundProperty, "FlyoutBrush");
         card.SetResourceReference(Border.BorderBrushProperty, "WindowBorderBrush");
         popup.Child = card;
+        KeyboardNavigation.SetTabNavigation(card, KeyboardNavigationMode.Cycle);
+        card.PreviewKeyDown += (_, e) =>
+        {
+            if (e.Key != Key.Escape) return;
+            Close();
+            e.Handled = true;
+        };
+        void CloseOnLeave(object sender, RoutedEventArgs e) => popup.IsOpen = false;
+        anchor.Unloaded += CloseOnLeave;
+        popup.Closed += (_, _) => anchor.Unloaded -= CloseOnLeave;
         popup.Opened += (_, _) => cancel.Focus();
         popup.IsOpen = true;
     }
@@ -317,16 +360,23 @@ internal sealed class HistorySection : UserControl
     private void Clear()
     {
         var settings = _module.Settings.Clone();
-        var now = DateTimeOffset.UtcNow;
-        settings.HistoryClearedUtc = now;
+        // History includes the cutoff millisecond. Start with the next one so a row from
+        // this millisecond disappears too, even if the self-trigger guard retains it.
+        var cutoff = DateTimeOffset.FromUnixTimeMilliseconds(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + 1);
+        settings.HistoryClearedUtc = cutoff;
+        bool pruning = false;
         try
         {
-            _module.Engine?.History.ClearBefore(now);
             _module.SaveSettings(settings);
+            pruning = true;
+            _module.Engine?.History.ClearBefore(cutoff);
+            ShowError(null);
         }
-        catch (InvalidOperationException ex)
+        catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException or Microsoft.Data.Sqlite.SqliteException)
         {
-            ShowError(ex.Message);
+            string status = _module.Settings.HistoryClearedUtc != cutoff ? "Clear history failed" :
+                pruning ? "History cleared · storage cleanup failed" : "History cleared · settings refresh failed";
+            ShowError($"{status} · {Lower(ex.Message)}");
         }
         Render();
     }

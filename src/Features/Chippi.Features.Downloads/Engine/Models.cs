@@ -41,6 +41,9 @@ public sealed record PreviewItem(
     /// <summary>Archive import: where the file is planned as being (in the folder), while <see cref="Source"/> is the extracted copy.</summary>
     public string? ImportedAs { get; init; }
 
+    /// <summary>An extracted file placed directly into its import folder, with no original there to restore.</summary>
+    internal bool IsDirectImport => ImportedAs is not null && string.Equals(Destination, ImportedAs, StringComparison.OrdinalIgnoreCase);
+
     /// <summary>Moves and renames start selected; held items and misleading names start unselected (brief §7).</summary>
     public bool Selected => Kind is OperationKind.Move or OperationKind.Rename
         && !Warnings.Any(w => w.Kind == WarningKind.MisleadingName);

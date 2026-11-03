@@ -9,7 +9,7 @@
   <BooleanToVisibilityConverter x:Key="Visible" />
   <!-- The folder name as a picker: name and a small chevron, opening a flyout-colored list. -->
   <Style x:Key="FolderPickerStyle" TargetType="ComboBox" BasedOn="{StaticResource HopperComboBoxStyle}">
-   <Setter Property="Height" Value="22"/>
+   <Setter Property="Height" Value="28"/>
    <Setter Property="HorizontalAlignment" Value="Left"/>
    <Setter Property="Template"><Setter.Value>
     <ControlTemplate TargetType="ComboBox">
@@ -18,7 +18,7 @@
        <ToggleButton.Template><ControlTemplate TargetType="ToggleButton">
         <Border x:Name="Chrome" Background="Transparent" CornerRadius="4" Padding="2,0">
          <StackPanel Orientation="Horizontal">
-          <TextBlock Text="{Binding SelectedItem.Name, RelativeSource={RelativeSource AncestorType=ComboBox}}" TextTrimming="CharacterEllipsis" MaxWidth="180" VerticalAlignment="Center" Foreground="{DynamicResource TextPrimaryBrush}"/>
+          <TextBlock Text="{Binding SelectedItem.DisplayName, RelativeSource={RelativeSource AncestorType=ComboBox}}" TextTrimming="CharacterEllipsis" MaxWidth="180" VerticalAlignment="Center" Foreground="{DynamicResource IslandTextBrush}"/>
           <c:LucideIcon Data="{x:Static c:LucideIcons.ChevronDown}" Size="12" Thickness="2" Margin="6,0,0,0" VerticalAlignment="Center" Brush="{DynamicResource TextSecondaryBrush}"/>
          </StackPanel>
         </Border>
@@ -40,10 +40,10 @@
     <c:LucideIcon x:Name="Lead" Data="{Binding Lead}" Size="16" Brush="{DynamicResource IslandTextTertiaryBrush}" Margin="0,0,10,0" VerticalAlignment="Center"/>
     <DockPanel Grid.Column="1" VerticalAlignment="Center">
      <TextBlock x:Name="Detail" DockPanel.Dock="Right" MaxWidth="180" Margin="8,0,0,0" Text="{Binding Detail}" FontSize="11" Foreground="{DynamicResource IslandTextTertiaryBrush}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Detail}"/>
-     <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Name}"/>
+     <TextBlock x:Name="RowName" Text="{Binding Name}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Name}"/>
     </DockPanel>
-    <Button x:Name="RowAction" Grid.Column="2" Content="{Binding ActionLabel}" Style="{DynamicResource IslandButtonStyle}" Width="72" Height="28" Margin="8,0,0,0" VerticalAlignment="Center"
-            Visibility="{Binding HasTextAction, Converter={StaticResource Visible}}" AutomationProperties.Name="{Binding AccessibleAction}" Click="OnRowAction"/>
+    <Button x:Name="RowAction" Grid.Column="2" Content="{Binding ActionLabel}" Style="{DynamicResource IslandButtonStyle}" Width="72" Height="28" Padding="8,0" Margin="8,0,0,0" VerticalAlignment="Center"
+            Visibility="{Binding HasTextAction, Converter={StaticResource Visible}}" AutomationProperties.Name="{Binding AccessibleAction}" ToolTip="{Binding AccessibleAction}" Click="OnRowAction"/>
     <c:IconButton x:Name="RowIconAction" Height="24" Width="28" Grid.Column="2" Icon="{Binding ActionIcon}" Margin="8,0,0,0" Visibility="{Binding HasIconAction, Converter={StaticResource Visible}}"
                   ToolTip="{Binding ActionLabel}" AutomationProperties.Name="{Binding AccessibleAction}" Click="OnRowAction"/>
    </Grid>
@@ -52,7 +52,7 @@
     <DataTrigger Binding="{Binding Detail}" Value=""><Setter TargetName="Detail" Property="Visibility" Value="Collapsed"/></DataTrigger>
     <DataTrigger Binding="{Binding IsHeld}" Value="True"><Setter TargetName="Lead" Property="Brush" Value="{DynamicResource WarningBrush}"/><Setter TargetName="RowAction" Property="AutomationProperties.ItemStatus" Value="Held"/></DataTrigger>
     <DataTrigger Binding="{Binding IsFailed}" Value="True"><Setter TargetName="Lead" Property="Brush" Value="{DynamicResource WarningBrush}"/><Setter TargetName="Detail" Property="Foreground" Value="{DynamicResource WarningTextBrush}"/></DataTrigger>
-    <DataTrigger Binding="{Binding IsDone}" Value="True"><Setter TargetName="Lead" Property="Brush" Value="{DynamicResource SuccessBrush}"/></DataTrigger>
+    <DataTrigger Binding="{Binding IsDone}" Value="True"><Setter TargetName="Lead" Property="Brush" Value="{DynamicResource SuccessBrush}"/><Setter TargetName="RowName" Property="FontWeight" Value="SemiBold"/></DataTrigger>
     <DataTrigger Binding="{Binding NeedsLook}" Value="True"><Setter TargetName="Detail" Property="Foreground" Value="{DynamicResource WarningTextBrush}"/></DataTrigger>
    </DataTemplate.Triggers>
   </DataTemplate>
@@ -69,7 +69,17 @@
     <TextBlock x:Name="NotFound" DockPanel.Dock="Right" Text="Not found" Visibility="Collapsed" VerticalAlignment="Center" FontSize="12" Foreground="{DynamicResource WarningTextBrush}"/>
     <c:LucideIcon x:Name="FolderChip" Data="{x:Static c:LucideIcons.Folder}" Size="16" Brush="{DynamicResource IslandAccentBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
     <ComboBox x:Name="Folders" MaxWidth="200" Style="{StaticResource FolderPickerStyle}" SelectionChanged="OnFolderChanged" AutomationProperties.Name="Watched folder">
-     <ComboBox.ItemTemplate><DataTemplate><Grid ToolTip="{Binding Path}" Margin="0,4"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis"/><TextBlock Grid.Column="1" Text="{Binding Mode}" Foreground="{DynamicResource TextTertiaryBrush}" Margin="16,0,0,0"/></Grid></DataTemplate></ComboBox.ItemTemplate>
+     <ComboBox.ItemTemplate><DataTemplate>
+      <Grid ToolTip="{Binding Path}" Margin="0,4" MaxWidth="360">
+       <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+       <StackPanel>
+        <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis"/>
+        <TextBlock x:Name="ParentPath" Text="{Binding Parent}" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" TextTrimming="CharacterEllipsis"/>
+       </StackPanel>
+       <TextBlock Grid.Column="1" Text="{Binding Mode}" VerticalAlignment="Center" Foreground="{DynamicResource TextTertiaryBrush}" Margin="16,0,0,0"/>
+      </Grid>
+      <DataTemplate.Triggers><DataTrigger Binding="{Binding Parent}" Value="{x:Null}"><Setter TargetName="ParentPath" Property="Visibility" Value="Collapsed"/></DataTrigger></DataTemplate.Triggers>
+     </DataTemplate></ComboBox.ItemTemplate>
     </ComboBox>
    </DockPanel>
   </Border>

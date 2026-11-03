@@ -47,11 +47,11 @@ public sealed class TidyRow(string name, string detail, string folder, string so
         TidyRowAction.Undo or TidyRowAction.UndoRun => "Undo",
         _ => "",
     };
-    public string AccessibleAction => $"{ActionLabel} {Name}";
+    public string AccessibleAction => Action == TidyRowAction.UndoRun ? $"Undo run · {Name}" : $"{ActionLabel} {Name}";
     public bool HasAction => Action != TidyRowAction.None;
 
     public bool IsReview => Action == TidyRowAction.Review;
-    public bool HasTextAction => IsReview || Action == TidyRowAction.Inspect;
+    public bool HasTextAction => IsReview || Action is TidyRowAction.Inspect or TidyRowAction.UndoRun;
     public bool HasIconAction => HasAction && !HasTextAction;
 
     internal bool SameAction(TidyRow other) => Action == other.Action && OperationId == other.OperationId
@@ -107,12 +107,17 @@ internal static class TidyProjection
             .Where(o => !pending.Any(p => string.Equals(p.Path, o.SourcePath, StringComparison.OrdinalIgnoreCase)))
             .Select(o => new TidyRow(
                 Path.GetFileName(o.State == OperationState.Failed ? o.SourcePath : o.DestinationPath),
-                o.State == OperationState.Failed ? $"{(o.Kind == HistoryOperationKind.Restore ? "Undo" : o.Kind == HistoryOperationKind.Rename ? "Rename" : "Move")} failed{(o.Error is { } error ? $" · {error}" : "")}" :
+                o.State == OperationState.Failed ? $"{OrganizerLabels.FailedAction(o.Kind)}{(o.Error is { } error ? $" · {error}" : "")}" :
                     o.State == OperationState.Undone ? $"Restored to {FolderName(Path.GetDirectoryName(o.SourcePath) ?? "")}" :
                     $"{FolderName(Path.GetDirectoryName(o.DestinationPath) ?? "")} · {Age(now - (o.CompletedAt ?? o.PlannedAt))}",
                 Path.GetDirectoryName(o.SourcePath) ?? "", o.SourcePath, false, false, o.State == OperationState.Failed,
-                o.State == OperationState.Failed ? o.Kind == HistoryOperationKind.Restore ? TidyRowAction.RetryUndo : TidyRowAction.Retry :
-                    o.State == OperationState.Completed && o.Kind is HistoryOperationKind.Move or HistoryOperationKind.Rename ? TidyRowAction.Undo : TidyRowAction.None,
+                (o.State, o.Kind) switch
+                {
+                    (OperationState.Failed, HistoryOperationKind.Move or HistoryOperationKind.Rename) when o.Trigger != RunTrigger.ArchiveImport => TidyRowAction.Retry,
+                    (OperationState.Failed, HistoryOperationKind.Restore) => TidyRowAction.RetryUndo,
+                    (OperationState.Completed, HistoryOperationKind.Move or HistoryOperationKind.Rename) => TidyRowAction.Undo,
+                    _ => TidyRowAction.None,
+                },
                 o.Kind == HistoryOperationKind.Restore ? o.UndoOf : o.Id) { IsHistory = true });
         return [.. review.Concat(rows).Concat(recent).Take(RecentRows)];
     }

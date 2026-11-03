@@ -29,7 +29,7 @@ public partial class TidyView : UserControl
     internal Func<string, bool> RevealFile { get; set; } = FileLocation.ShowInFolder;
 
     /// <summary>What Organize now just did here, shown as the first row until the page closes or it's undone.</summary>
-    private (string Folder, long RunId, int Moved, int Failed, int NeedsLook)? _last;
+    private TidyRow? _last;
 
     public TidyView(DownloadsModule module, Action<DownloadsRequest> request)
     {
@@ -92,7 +92,10 @@ public partial class TidyView : UserControl
             var folders = _module.Settings.Folders;
             if (_selected is null || !folders.Any(f => Same(f.Path, _selected)))
                 _selected = folders.FirstOrDefault()?.Path;
-            var choices = folders.Select(f => new FolderChoice(TidyProjection.FolderName(f.Path), f.Mode.DisplayName(), f.Path)).ToList();
+            var names = folders.Select(f => TidyProjection.FolderName(f.Path)).ToList();
+            var repeated = OrganizerLabels.RepeatedFolderNames(names);
+            var choices = folders.Select((f, i) => new FolderChoice(names[i], f.Mode.DisplayName(), f.Path,
+                repeated.Contains(names[i]) ? Path.GetDirectoryName(Path.TrimEndingDirectorySeparator(f.Path)) : null)).ToList();
             choices.Add(new FolderChoice("Add folder", "", null));
             if (Folders.ItemsSource is not List<FolderChoice> old || !choices.SequenceEqual(old))
                 Folders.ItemsSource = choices;
@@ -132,7 +135,7 @@ public partial class TidyView : UserControl
             var history = engine?.History.Query(new HistoryQuery { Folder = current.Path, Take = 24, From = _module.Settings.HistoryClearedUtc }) ?? [];
             var rows = TidyProjection.Rows(current.Path, pending, history, DateTimeOffset.UtcNow).ToList();
             if (_last is { } last && Same(last.Folder, current.Path))
-                rows.Insert(0, LastRun(last));
+                rows.Insert(0, last);
             SetRows(rows);
             NoRecent.Visibility = rows.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
             FolderCard.IsEnabled = Actions.IsEnabled = engine is not null;
@@ -188,9 +191,7 @@ public partial class TidyView : UserControl
         InspectName.Text = row.Name;
         InspectFolder.Text = TidyProjection.FolderName(row.Folder);
         InspectFolder.ToolTip = row.Folder;
-        string reason = held?.Reason?.Trim() ?? "";
-        if (!available || reason.Equals("Check before opening", StringComparison.OrdinalIgnoreCase) || reason.Equals("Held", StringComparison.OrdinalIgnoreCase))
-            reason = "";
+        string reason = available ? OrganizerLabels.HoldReason(held?.Reason) : "";
         InspectReason.Text = reason;
         InspectReason.Visibility = reason.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
         AutomationProperties.SetName(InspectPage, $"{InspectStatus.Text}, {row.Name}");
@@ -219,6 +220,13 @@ public partial class TidyView : UserControl
         return true;
     }
 
+    internal bool Escape()
+    {
+        if (!Folders.IsDropDownOpen) return Back();
+        Folders.IsDropDownOpen = false;
+        return true;
+    }
+
     private void FocusOrigin(TidyRow origin)
     {
         var list = origin.IsHistory ? HistoryRows : Rows;
@@ -237,16 +245,17 @@ public partial class TidyView : UserControl
         else Empty.MoveFocus(new TraversalRequest(FocusNavigationDirection.First));
     }
 
-    /// <summary>"116 moved" with "2 need a look" (or "3 failed") in Caution, and Undo for the whole run.</summary>
-    private static TidyRow LastRun((string Folder, long RunId, int Moved, int Failed, int NeedsLook) last)
+    /// <summary>A receipt for the actions that actually succeeded; Undo run reverses those changes.</summary>
+    private static TidyRow LastRun(PreviewPlan plan, ApplyResult result, int needsLook)
     {
-        string detail = string.Join(" · ", new[]
-        {
-            last.Failed > 0 ? $"{last.Failed} failed" : null,
-            last.NeedsLook > 0 ? $"{last.NeedsLook} {(last.NeedsLook == 1 ? "needs" : "need")} a look" : null,
-        }.Where(s => s is not null));
-        return new TidyRow($"{last.Moved} moved", detail, last.Folder, last.Folder, false, false, false,
-            last.Moved > 0 ? TidyRowAction.UndoRun : TidyRowAction.None, last.RunId, needsLook: detail.Length > 0);
+        var done = result.Items.Where(i => i.Succeeded).Select(i => i.ItemId).ToHashSet();
+        var outcomes = OrganizerLabels.CompletedCounts(plan.Items.Where(i => done.Contains(i.Id))).ToList();
+        if (done.Count == 0) outcomes.Add($"{result.Failed} failed");
+        var remaining = new List<string>();
+        if (done.Count > 0 && result.Failed > 0) remaining.Add($"{result.Failed} failed");
+        if (needsLook > 0) remaining.Add($"{needsLook} {(needsLook == 1 ? "needs" : "need")} a look");
+        return new TidyRow(string.Join(" · ", outcomes), string.Join(" · ", remaining), plan.Folder, plan.Folder,
+            false, false, done.Count == 0, done.Count > 0 ? TidyRowAction.UndoRun : TidyRowAction.None, result.RunId, needsLook: remaining.Count > 0);
     }
 
     private void OnFolderChanged(object sender, SelectionChangedEventArgs e)
@@ -296,7 +305,7 @@ public partial class TidyView : UserControl
                 return;
             }
             var result = await engine.ApproveAsync(plan.Id, clean);
-            _last = (folder, result.RunId, result.Succeeded, result.Failed, needsLook);
+            _last = LastRun(plan, result, needsLook);
         }
         catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException or ObjectDisposedException)
         {
@@ -449,5 +458,8 @@ public partial class TidyView : UserControl
     }
 
     private static bool Same(string? a, string? b) => TidyProjection.SameFolder(a, b);
-    private sealed record FolderChoice(string Name, string Mode, string? Path);
+    private sealed record FolderChoice(string Name, string Mode, string? Path, string? Parent = null)
+    {
+        public string DisplayName => Parent is null ? Name : $"{Name} · {TidyProjection.FolderName(Parent)}";
+    }
 }

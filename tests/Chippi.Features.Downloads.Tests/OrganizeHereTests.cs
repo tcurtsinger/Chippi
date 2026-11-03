@@ -63,7 +63,7 @@ public sealed class OrganizeHereTests : IDisposable
     {
         var watched = Path.Combine(_root, "Downloads");
         Directory.CreateDirectory(watched);
-        foreach (var name in new[] { "a.pdf", "b.pdf", "setup.pdf.exe", "c.torrent", "notes.txt" })
+        foreach (var name in new[] { "a.pdf", "b.pdf", "setup.pdf.exe", "c.torrent", "notes.txt", "receipt.txt" })
             System.IO.File.WriteAllText(Path.Combine(watched, name), name);
         WithWidget(new DownloadsSettings
         {
@@ -74,6 +74,7 @@ public sealed class OrganizeHereTests : IDisposable
             [
                 new RuleSetting { Id = "pdf", Name = "PDFs", Order = 0, Extensions = ["pdf", "exe"], Action = RuleActionKind.Move, Template = "Docs" },
                 new RuleSetting { Id = "torrent", Name = "Torrents", Order = 1, Extensions = ["torrent"], Action = RuleActionKind.Hold, HoldReason = "Check before opening" },
+                new RuleSetting { Id = "receipt", Name = "Receipt", Order = 2, NameRegex = @"^receipt\.txt$", Action = RuleActionKind.Rename, Template = "Filed receipt.txt" },
             ],
         }, (view, _, _, requests) =>
         {
@@ -87,9 +88,13 @@ public sealed class OrganizeHereTests : IDisposable
                 Assert.True(System.IO.File.Exists(Path.Combine(watched, stays)), stays);
             Assert.Empty(requests); // nothing opened Settings
             var first = Assert.IsType<TidyRow>(((ItemsControl)view.FindName("Rows")).Items[0]);
-            Assert.Equal("2 moved", first.Name);
+            Assert.True(System.IO.File.Exists(Path.Combine(watched, "Filed receipt.txt")));
+            Assert.Equal("2 moved · 1 renamed", first.Name);
             Assert.Equal("2 need a look", first.Detail);
             Assert.Equal(TidyRowAction.UndoRun, first.Action);
+            Assert.True(first.HasTextAction);
+            Assert.Equal("Undo", first.ActionLabel);
+            Assert.StartsWith("Undo run", first.AccessibleAction);
 
             // Only files that need a look are left: Organize now opens Preview for them.
             organize.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
@@ -123,6 +128,9 @@ public sealed class OrganizeHereTests : IDisposable
         }, (view, tile, module, requests) =>
         {
             var picker = (ComboBox)view.FindName("Folders");
+            picker.IsDropDownOpen = true;
+            Assert.True(tile.HandleEscape!());
+            Assert.False(picker.IsDropDownOpen);
             picker.SelectedIndex = 1;
             Button? Action(string label) => Descendants(view).OfType<Button>().SingleOrDefault(b => b.IsVisible && Equals(b.Content, label));
             void Press(string label) => Action(label)!.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));

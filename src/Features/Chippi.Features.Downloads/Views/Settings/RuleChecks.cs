@@ -16,6 +16,68 @@ internal static class RuleChecks
     public static readonly string[] MoveTokens = ["{year}", "{month}", "{day}", "{extension}", "{filename}"];
     public static readonly string[] RenameTokens = ["{year}", "{month}", "{day}", "{stem}", "{extension}", "{filename}"];
 
+    /// <summary>The scope of Save or Enable. Folder modes are known without scanning for files.</summary>
+    public static string ExistingScope(RuleSetting? rule, IReadOnlyList<WatchedFolder> folders, bool enabling)
+    {
+        if (rule is null || rule.Action == RuleActionKind.Hold || folders.Count == 0) return "";
+        var ambiguous = OrganizerLabels.RepeatedFolderNames(folders.Select(f => Ui.FolderName(f.Path)));
+        string Names(FolderMode mode)
+        {
+            var paths = folders.Where(f => f.Mode == mode).Select(f => f.Path).ToList();
+            var names = paths.Take(2).Select(path => ambiguous.Contains(Ui.FolderName(path)) ? path : Ui.FolderName(path));
+            return string.Join(", ", names) + (paths.Count > 2 ? $" and {paths.Count - 2} more" : "");
+        }
+        string auto = Names(FolderMode.Silent), manual = Names(FolderMode.Manual);
+        if (auto.Length == 0 && manual.Length == 0) return "All watched folders are paused.";
+        string when = enabling ? "Enabling" : "Saving";
+        string verb = rule.Action == RuleActionKind.Move ? "move" : "rename";
+        var effects = new List<string>();
+        if (auto.Length > 0) effects.Add($"{when} can {verb} existing matches in {auto}.");
+        if (manual.Length > 0) effects.Add($"Existing matches in {manual} wait for review.");
+        return string.Join(" ", effects);
+    }
+
+    /// <summary>Ask the real planner which rule could win on the name alone, keeping its validation,
+    /// safety checks and order. A size or date on that rule needs facts the field cannot supply.</summary>
+    public static (string Text, string? Match, bool Warning) TestName(string name, string folder, IReadOnlyList<Rule> rules)
+    {
+        var nameRules = rules.Select(r => r with { Conditions = r.Conditions with
+        {
+            MinBytes = null, MaxBytes = null, ModifiedAfter = null, ModifiedBefore = null,
+        }}).ToList();
+        var now = DateTimeOffset.Now;
+        PlannedOperation plan;
+        try
+        {
+            // Model an ordinary non-empty file; only its name participates in the rule conditions.
+            plan = Planner.Plan(new FileFacts(name, Path.Combine(folder, name), 1, now, now), nameRules, new PlanContext(folder, now, TimeZoneInfo.Local, []));
+        }
+        catch (ArgumentException)
+        {
+            return ("Not a valid file name", null, true);
+        }
+        var winner = rules.FirstOrDefault(r => r.Id == plan.RuleId);
+        if (winner is not null)
+        {
+            var c = winner.Conditions;
+            string? needed = (c.MinBytes is not null || c.MaxBytes is not null, c.ModifiedAfter is not null || c.ModifiedBefore is not null) switch
+            {
+                (true, true) => "File size and modified date",
+                (true, false) => "File size",
+                (false, true) => "Modified date",
+                _ => null,
+            };
+            if (needed is not null) return ($"{needed} needed · {winner.Name}", null, false);
+        }
+        return plan.Kind switch
+        {
+            OperationKind.Move or OperationKind.Rename => ($"{winner!.Name} → {Ui.Relative(folder, plan.Destination!)}", plan.RuleId, false),
+            OperationKind.Hold => ($"Held · {plan.HoldReason ?? plan.Warnings.LastOrDefault()?.Detail ?? "held"}", plan.RuleId, true),
+            _ when winner is not null => ($"Already in place · {winner.Name}", plan.RuleId, false),
+            _ => ($"No rule matches · stays in {Ui.FolderName(folder)}", null, false),
+        };
+    }
+
     public static string? Extensions(string text)
     {
         foreach (string part in SplitExtensions(text))
