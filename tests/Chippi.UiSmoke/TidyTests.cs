@@ -22,7 +22,7 @@ public sealed class TidyTests(ITestOutputHelper output)
         DesktopSession.ExpectAbsent(tidy, "New folders start in Manual");
         DesktopSession.Find(tidy, "Add Downloads", InvokePattern.Pattern);
         DesktopSession.Find(tidy, "Choose folder", InvokePattern.Pattern);
-        DesktopSession.ExpectAbsent(tidy, "Organize now");
+        DesktopSession.ExpectAbsent(tidy, "Organize");
         Assert.Empty(app.DownloadsSettings.GetProperty("folders").EnumerateArray());
     }
 
@@ -66,7 +66,7 @@ public sealed class TidyTests(ITestOutputHelper output)
             File.WriteAllText(Path.Combine(root, "Downloads", "invoice.pdf.exe"), "held");
         });
         var tidy = OpenTidy(app);
-        DesktopSession.Invoke(DesktopSession.Find(tidy, "Organize now", InvokePattern.Pattern));
+        DesktopSession.Invoke(DesktopSession.Find(tidy, "Review 1 file", InvokePattern.Pattern));
         var settings = Settings(app);
         var held = DesktopSession.Find(settings, "Include invoice.pdf.exe", TogglePattern.Pattern);
         Assert.Equal(ToggleState.Off, DesktopSession.Toggle(held).Current.ToggleState);
@@ -83,7 +83,7 @@ public sealed class TidyTests(ITestOutputHelper output)
     }
 
     [DesktopFact]
-    public void HeldReviewOpensAnUncheckedPreview()
+    public void InspectShowsTheHeldFileInsideTheWidget()
     {
         using var app = new DesktopSession(output, (path, root) =>
         {
@@ -91,9 +91,12 @@ public sealed class TidyTests(ITestOutputHelper output)
             File.WriteAllText(Path.Combine(root, "Downloads", "invoice.pdf.exe"), "held");
         });
         var tidy = OpenTidy(app);
-        DesktopSession.Invoke(DesktopSession.Find(tidy, "Review invoice.pdf.exe", InvokePattern.Pattern));
-        var settings = Settings(app);
-        Assert.Equal(ToggleState.Off, DesktopSession.Toggle(DesktopSession.Find(settings, "Include invoice.pdf.exe", TogglePattern.Pattern)).Current.ToggleState);
+        DesktopSession.Invoke(DesktopSession.Find(tidy, "Inspect invoice.pdf.exe", InvokePattern.Pattern));
+        DesktopSession.Find(tidy, "Show in folder", InvokePattern.Pattern);
+        Assert.Null(app.WindowOrNull("Chippi Settings"));
+        DesktopSession.Invoke(DesktopSession.Find(tidy, "Back", InvokePattern.Pattern));
+        DesktopSession.Find(tidy, "Inspect invoice.pdf.exe", InvokePattern.Pattern);
+        Assert.True(File.Exists(Path.Combine(app.FixtureRoot, "Downloads", "invoice.pdf.exe")));
     }
 
     [DesktopFact]
@@ -133,9 +136,10 @@ public sealed class TidyTests(ITestOutputHelper output)
             history.EndRun(run);
         });
         var tidy = OpenTidy(app);
-        DesktopSession.Invoke(DesktopSession.Find(tidy, "Review invoice.pdf.exe", InvokePattern.Pattern));
-        Close(Settings(app));
-        tidy = OpenTidy(app);
+        DesktopSession.Invoke(DesktopSession.Find(tidy, "Inspect invoice.pdf.exe", InvokePattern.Pattern));
+        DesktopSession.Find(tidy, "Show in folder", InvokePattern.Pattern);
+        DesktopSession.Invoke(DesktopSession.Find(tidy, "Back", InvokePattern.Pattern));
+        DesktopSession.Find(tidy, "Inspect invoice.pdf.exe", InvokePattern.Pattern);
         Assert.DoesNotContain(tidy.FindAll(TreeScope.Descendants, Condition.TrueCondition).Cast<AutomationElement>(), e => e.Current.Name.Contains('{'));
         DesktopSession.Invoke(DesktopSession.Find(tidy, "Retry budget.bin", InvokePattern.Pattern));
         DesktopSession.Find(Settings(app), "Include budget.bin", TogglePattern.Pattern);
@@ -179,12 +183,13 @@ public sealed class TidyTests(ITestOutputHelper output)
     private static AutomationElement OpenTidy(DesktopSession app)
     {
         var pages = app.OpenPages();
-        if (pages.FindFirst(TreeScope.Descendants, new PropertyCondition(AutomationElement.NameProperty, "Organizer")) is null
-            || pages.FindFirst(TreeScope.Descendants, new PropertyCondition(AutomationElement.NameProperty, "Folder mode")) is null)
+        if (pages.FindFirst(TreeScope.Descendants, new OrCondition(
+            new PropertyCondition(AutomationElement.NameProperty, "Watched folder"),
+            new PropertyCondition(AutomationElement.NameProperty, "No folders yet"))) is null)
         {
-            if (pages.FindFirst(TreeScope.Descendants, new PropertyCondition(AutomationElement.NameProperty, "All features")) is { } grid)
-                DesktopSession.Invoke(grid);
-            DesktopSession.Invoke(DesktopTests.Tile(pages, "Organizer"));
+            if (pages.FindFirst(TreeScope.Descendants, new PropertyCondition(AutomationElement.NameProperty, "Back")) is { } back)
+                DesktopSession.Invoke(back);
+            DesktopSession.Invoke(DesktopSession.Find(pages, "Open Organizer", InvokePattern.Pattern));
         }
         return pages;
     }

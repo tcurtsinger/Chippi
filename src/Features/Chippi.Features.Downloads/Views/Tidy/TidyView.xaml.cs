@@ -2,7 +2,9 @@
 // Copyright (C) Chippi contributors
 
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Threading;
 using Chippi.Features.Downloads.Engine;
 using Chippi.Features.Downloads.Model;
@@ -21,8 +23,10 @@ public partial class TidyView : UserControl
     private readonly DispatcherTimer _ages = new() { Interval = TimeSpan.FromMinutes(1) };
     private DownloadsEngine? _subscribed;
     private string? _selected;
+    private TidyRow? _inspected;
     private bool _refreshing;
     private bool _busy;
+    internal Func<string, bool> RevealFile { get; set; } = FileLocation.ShowInFolder;
 
     /// <summary>What Organize now just did here, shown as the first row until the page closes or it's undone.</summary>
     private (string Folder, long RunId, int Moved, int Failed, int NeedsLook)? _last;
@@ -34,6 +38,7 @@ public partial class TidyView : UserControl
         InitializeComponent();
         _ages.Tick += OnRefresh;
         Recent.SizeChanged += (_, _) => { if (!_refreshing) Refresh(); };
+        Recent.LostMouseCapture += OnRefresh;
         Refresh();
     }
 
@@ -61,6 +66,9 @@ public partial class TidyView : UserControl
             _subscribed = null;
         }
         _last = null; // Undo of the last run lives in History once the page closes
+        _inspected = null;
+        InspectPage.Visibility = Visibility.Collapsed;
+        ListPage.Visibility = Visibility.Visible;
     }
 
     private void OnRefresh(object? sender, EventArgs e)
@@ -73,6 +81,11 @@ public partial class TidyView : UserControl
     private void Refresh()
     {
         if (_busy) return;
+        if (_inspected is { } inspected)
+        {
+            RefreshInspection(inspected);
+            return;
+        }
         _refreshing = true;
         try
         {
@@ -81,8 +94,9 @@ public partial class TidyView : UserControl
                 _selected = folders.FirstOrDefault()?.Path;
             var choices = folders.Select(f => new FolderChoice(TidyProjection.FolderName(f.Path), f.Mode.DisplayName(), f.Path)).ToList();
             choices.Add(new FolderChoice("Add folder", "", null));
-            Folders.ItemsSource = choices;
-            Folders.SelectedItem = choices.FirstOrDefault(f => f.Path is not null && Same(f.Path, _selected));
+            if (Folders.ItemsSource is not List<FolderChoice> old || !choices.SequenceEqual(old))
+                Folders.ItemsSource = choices;
+            Folders.SelectedItem = Folders.Items.Cast<FolderChoice>().FirstOrDefault(f => f.Path is not null && Same(f.Path, _selected));
             var current = folders.FirstOrDefault(f => Same(f.Path, _selected));
             bool missing = current is not null && !Directory.Exists(current.Path);
             FolderCard.Visibility = current is null ? Visibility.Collapsed : Visibility.Visible;
@@ -97,6 +111,7 @@ public partial class TidyView : UserControl
             if (current is null)
             {
                 Rows.ItemsSource = null;
+                HistoryRows.ItemsSource = null;
                 return;
             }
             Folders.ToolTip = current.Path;
@@ -108,6 +123,8 @@ public partial class TidyView : UserControl
                 // Nothing here can be organized or undone: the folder is the news.
                 MissingText.Text = $"{TidyProjection.FolderName(current.Path)} not found";
                 Rows.ItemsSource = null;
+                HistoryRows.ItemsSource = null;
+                RecentHeading.Visibility = Visibility.Collapsed;
                 NoRecent.Visibility = Visibility.Collapsed;
                 return;
             }
@@ -116,7 +133,7 @@ public partial class TidyView : UserControl
             var rows = TidyProjection.Rows(current.Path, pending, history, DateTimeOffset.UtcNow).ToList();
             if (_last is { } last && Same(last.Folder, current.Path))
                 rows.Insert(0, LastRun(last));
-            Rows.ItemsSource = rows.Take(Math.Max(0, (int)(Recent.ActualHeight / 30))).ToList();
+            SetRows(rows);
             NoRecent.Visibility = rows.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
             FolderCard.IsEnabled = Actions.IsEnabled = engine is not null;
         }
@@ -126,6 +143,98 @@ public partial class TidyView : UserControl
             FolderCard.IsEnabled = Actions.IsEnabled = false;
         }
         finally { _refreshing = false; }
+    }
+
+    private void SetRows(List<TidyRow> rows)
+    {
+        // Keep the button under a live press until release. LostMouseCapture requests the latest rows.
+        if (Recent.IsMouseCaptureWithin) return;
+        var previouslyFocused = Recent.IsKeyboardFocusWithin ? (Keyboard.FocusedElement as Button)?.DataContext as TidyRow : null;
+        double available = Math.Max(0, Recent.ActualHeight - Recent.BorderThickness.Top - Recent.BorderThickness.Bottom);
+        var current = rows.Where(r => !r.IsHistory).Take((int)(available / 36)).ToList();
+        int historySlots = Math.Max(0, (int)((available - current.Count * 36 - RecentHeading.Height) / 30));
+        var history = rows.Where(r => r.IsHistory).Take(historySlots).ToList();
+        UpdateRows(Rows, current);
+        UpdateRows(HistoryRows, history);
+        RecentHeading.Visibility = history.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
+        if (previouslyFocused is not null && (Keyboard.FocusedElement as Button)?.DataContext != previouslyFocused)
+            FocusOrigin(previouslyFocused);
+    }
+
+    private static void UpdateRows(ItemsControl list, List<TidyRow> next)
+    {
+        if (list.Items.Count != next.Count || next.Where((row, i) => !row.SameContent((TidyRow)list.Items[i])).Any())
+            list.ItemsSource = next;
+    }
+
+    private void Inspect(TidyRow row)
+    {
+        _inspected = row;
+        ListPage.Visibility = Visibility.Collapsed;
+        InspectPage.Visibility = Visibility.Visible;
+        InspectError.Visibility = Visibility.Collapsed;
+        RefreshInspection(row);
+        InspectPage.Focus();
+    }
+
+    private void RefreshInspection(TidyRow row)
+    {
+        var held = _module.Engine?.Pending.FirstOrDefault(p => p.Status == PendingStatus.Held &&
+            Same(p.Folder, row.Folder) && string.Equals(p.Path, row.Source, StringComparison.OrdinalIgnoreCase));
+        bool exists = File.Exists(row.Source);
+        bool available = exists && held is not null;
+        InspectStatus.Text = available ? "Held" : exists ? "No longer held" : "File no longer here";
+        InspectGlyph.Visibility = available ? Visibility.Visible : Visibility.Collapsed;
+        InspectName.Text = row.Name;
+        InspectFolder.Text = TidyProjection.FolderName(row.Folder);
+        InspectFolder.ToolTip = row.Folder;
+        string reason = held?.Reason?.Trim() ?? "";
+        if (!available || reason.Equals("Check before opening", StringComparison.OrdinalIgnoreCase) || reason.Equals("Held", StringComparison.OrdinalIgnoreCase))
+            reason = "";
+        InspectReason.Text = reason;
+        InspectReason.Visibility = reason.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
+        AutomationProperties.SetName(InspectPage, $"{InspectStatus.Text}, {row.Name}");
+        ShowFile.IsEnabled = available;
+        if (!available) InspectError.Visibility = Visibility.Collapsed;
+    }
+
+    private void OnShowFile(object sender, RoutedEventArgs e)
+    {
+        if (_inspected is not { } row) return;
+        RefreshInspection(row);
+        if (!ShowFile.IsEnabled) return;
+        InspectError.Text = "Show in folder failed";
+        InspectError.Visibility = RevealFile(row.Source) ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    internal bool Back()
+    {
+        if (_inspected is not { } row) return false;
+        _inspected = null;
+        InspectPage.Visibility = Visibility.Collapsed;
+        ListPage.Visibility = Visibility.Visible;
+        Refresh();
+        UpdateLayout();
+        FocusOrigin(row);
+        return true;
+    }
+
+    private void FocusOrigin(TidyRow origin)
+    {
+        var list = origin.IsHistory ? HistoryRows : Rows;
+        var item = list.Items.OfType<TidyRow>().FirstOrDefault(r => r.SameAction(origin));
+        if (item is not null)
+        {
+            list.UpdateLayout();
+            if (list.ItemContainerGenerator.ContainerFromItem(item) is ContentPresenter presenter &&
+                presenter.ContentTemplate.FindName(item.HasTextAction ? "RowAction" : "RowIconAction", presenter) is Button button)
+            {
+                button.Focus();
+                return;
+            }
+        }
+        if (FolderCard.IsVisible) Folders.Focus();
+        else Empty.MoveFocus(new TraversalRequest(FocusNavigationDirection.First));
     }
 
     /// <summary>"116 moved" with "2 need a look" (or "3 failed") in Caution, and Undo for the whole run.</summary>
@@ -204,12 +313,12 @@ public partial class TidyView : UserControl
     /// <summary>Moves or renames by a rule with no warning (a taken name, another drive is fine; a misleading name isn't).</summary>
     private static bool Clean(PreviewItem item) => item.Selected && item.Destination is not null && item.Warnings.Count == 0;
 
-    /// <summary>Opens Preview in Settings (with <paramref name="file"/> shown first). Callers check <see cref="_busy"/>: Organize now opens it mid-run.</summary>
-    private void Navigate(string? folder, string? file = null)
+    /// <summary>Opens the folder's Preview in Settings.</summary>
+    private void Navigate(string? folder)
     {
         if (_module.Engine is null || folder is null) return;
         Error.Visibility = Visibility.Collapsed;
-        try { _request(new DownloadsRequest(DownloadsRequestKind.Organize, Folder: folder, File: file)); }
+        try { _request(new DownloadsRequest(DownloadsRequestKind.Organize, Folder: folder)); }
         catch (Exception ex) when (ex is InvalidOperationException or IOException) { ShowError("Preview failed"); }
     }
 
@@ -223,10 +332,15 @@ public partial class TidyView : UserControl
     private async void OnRowAction(object sender, RoutedEventArgs e)
     {
         if (_busy || _module.Engine is not { } engine || ((FrameworkElement)sender).DataContext is not TidyRow row) return;
+        if (row.Action == TidyRowAction.Inspect)
+        {
+            Inspect(row);
+            return;
+        }
         if (row.Action is TidyRowAction.Review or TidyRowAction.Retry)
         {
             // Retry starts a fresh preview, never blindly replays a stale move or changes a rule.
-            Navigate(row.Folder, row.IsHeld ? row.Name : null);
+            Navigate(row.Folder);
             return;
         }
         if (row.OperationId is not { } operation) return;

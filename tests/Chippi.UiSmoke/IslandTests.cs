@@ -19,8 +19,8 @@ public sealed class IslandTests(ITestOutputHelper output)
         DesktopSession.Invoke(tab);
         var panel = Panel(app);
         DesktopSession.Until(() => panel.FindAll(TreeScope.Descendants, Condition.TrueCondition).Cast<AutomationElement>()
-            .Any(e => e.Current.Name == "Organizer, Manual"), "the File organizer tile shows its mode");
-        DesktopSession.Invoke(DesktopTests.Tile(panel, "Awake"));
+            .Any(e => e.Current.Name == "Open Organizer"), "the File organizer tile appears");
+        DesktopSession.Invoke(DesktopSession.Find(panel, "Open Awake", InvokePattern.Pattern));
         foreach (string name in new[] { "30 min", "1 hr", "2 hr", "4 hr", "No limit", "Until…" })
             DesktopSession.Find(panel, name, TogglePattern.Pattern);
         Assert.DoesNotContain(panel.FindAll(TreeScope.Descendants, Condition.TrueCondition).Cast<AutomationElement>(),
@@ -40,10 +40,10 @@ public sealed class IslandTests(ITestOutputHelper output)
         ExpectClosed(app);
         DesktopSession.Invoke(tab);
         panel = Panel(app); // back on Keep awake, the last page used
-        DesktopSession.Invoke(DesktopSession.Find(panel, "All features", InvokePattern.Pattern));
-        DesktopSession.Invoke(DesktopTests.Tile(panel, "Organizer"));
+        DesktopSession.Invoke(DesktopSession.Find(panel, "Back", InvokePattern.Pattern));
+        DesktopSession.Invoke(DesktopSession.Find(panel, "Open Organizer", InvokePattern.Pattern));
         DesktopSession.Find(panel, "island-inbox");
-        DesktopSession.Invoke(DesktopSession.Find(panel, "Organize now", InvokePattern.Pattern));
+        DesktopSession.Invoke(DesktopSession.Find(panel, "Review 1 file", InvokePattern.Pattern));
         AutomationElement? settings = null;
         DesktopSession.Until(() => (settings = app.WindowOrNull("Chippi Settings")) is not null, "island Tidy opens preview");
         DesktopSession.Find(settings!, "Include island.txt", TogglePattern.Pattern);
@@ -92,13 +92,11 @@ public sealed class IslandTests(ITestOutputHelper output)
             new PropertyCondition(AutomationElement.NameProperty, "Chippi island")))
         .Cast<AutomationElement>().Where(e => !e.Current.IsOffscreen).ToArray();
 
-    // The open island is the pages' window, "Chippi", with its Settings round button.
+    // The open panel has the gallery's Settings action or a feature page's Back action.
     private static AutomationElement? PanelOrNull(DesktopSession app) => AutomationElement.RootElement.FindAll(TreeScope.Children,
         new AndCondition(new PropertyCondition(AutomationElement.ProcessIdProperty, app.Process.Id),
             new PropertyCondition(AutomationElement.NameProperty, "Chippi")))
-        .Cast<AutomationElement>().FirstOrDefault(w => !w.Current.IsOffscreen && w.FindFirst(TreeScope.Descendants, new AndCondition(
-            new PropertyCondition(AutomationElement.NameProperty, "Settings"),
-            new PropertyCondition(AutomationElement.IsInvokePatternAvailableProperty, true))) is not null);
+        .Cast<AutomationElement>().FirstOrDefault(w => !w.Current.IsOffscreen && DesktopSession.HasPanelControls(w));
 
     private static AutomationElement Panel(DesktopSession app)
     {
