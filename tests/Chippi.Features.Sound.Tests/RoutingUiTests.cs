@@ -9,11 +9,11 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Threading;
 using Chippi.Audio;
 using Chippi.Audio.Processing;
 using Chippi.Features.Sound.Routing;
 using static Chippi.Audio.Tests.FakeDeviceSystem;
+using static Chippi.Features.Sound.Tests.SoundUiThread;
 
 namespace Chippi.Features.Sound.Tests;
 
@@ -290,28 +290,4 @@ public sealed class RoutingUiTests
         }
     }
 
-    private static Task Sta(Action run) => Sta(() => { run(); return Task.CompletedTask; });
-
-    private static Task Sta(Func<Task> run)
-    {
-        var done = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var thread = new Thread(() =>
-        {
-            var dispatcher = Dispatcher.CurrentDispatcher;
-            SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(dispatcher));
-            Exception? error = null;
-            dispatcher.BeginInvoke(async () =>
-            {
-                try { await run(); }
-                catch (Exception ex) { error = ex; }
-                finally { dispatcher.BeginInvokeShutdown(DispatcherPriority.Background); }
-            });
-            Dispatcher.Run();
-            if (error is null) done.SetResult();
-            else done.SetException(error);
-        });
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        return done.Task;
-    }
 }
