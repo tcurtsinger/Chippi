@@ -47,13 +47,6 @@ internal static class RoutingUi
         return card;
     }
 
-    /// <summary>
-    /// The top row of a Sound section, the card's line without a frame of its own: the column's card
-    /// frames it. 42 tall and 9 in, so with the card's edge it sits as a 44 card's line does.
-    /// </summary>
-    public static Border IslandRow(LucideIcon glyph, UIElement middle, FrameworkElement right) =>
-        new() { Child = Line(glyph, middle, right), Height = 42, Padding = new Thickness(9, 0, 9, 0) };
-
     /// <summary>The hairline between a section's top row and its list.</summary>
     public static Border Hairline()
     {

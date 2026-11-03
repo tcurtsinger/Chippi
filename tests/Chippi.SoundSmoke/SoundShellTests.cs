@@ -34,23 +34,17 @@ public sealed class SoundShellTests
         {
             var host = (ContentControl)panel.FindName("Page");
             panel.ShowPage(SoundTile.Key);
-            Assert.Equal(2, All<RoutingQuickView>(host).Count()); // Output and Microphone
             Assert.Single(All<ProcessingQuickView>(host));
             Assert.Single(All<MicQuickView>(host));
-            Assert.Empty(All<VolumeView>(host)); // App volume has its own page
-            // Two 244 sections, each one card, inside the 496 x 304 body, nothing to scroll; the cards end level,
-            // and Mic processing is a section of its own, full width under them (DESIGN.md §5, revised 2026-10-31).
+            Assert.Empty(All<VolumeView>(host));
             panel.UpdateLayout();
             var body = panel.PageBody!;
-            Assert.Empty(All<ScrollViewer>(host));
-            Assert.All(All<RoutingQuickView>(host), v => Assert.Equal(242, v.ActualWidth)); // inside the card's 1px edges
-            var bottoms = All<RoutingQuickView>(host).Select(v => v.TranslatePoint(new Point(0, v.ActualHeight), body).Y).ToList();
-            Assert.Equal(bottoms[0], bottoms[1], 1);
+            var output = Named<ComboBox>(host, "Output device");
+            var input = Named<ComboBox>(host, "Microphone device");
             var processing = Assert.Single(All<ProcessingQuickView>(host));
-            Assert.Equal(496, processing.ActualWidth);
-            Assert.Equal(bottoms[0] + 1 + 8, processing.TranslatePoint(default, body).Y, 1); // the card's edge, then 8
+            Assert.True(output.TranslatePoint(default, body).Y < input.TranslatePoint(default, body).Y);
+            Assert.True(input.TranslatePoint(default, body).Y < processing.TranslatePoint(default, body).Y);
             Assert.InRange(processing.TranslatePoint(new Point(0, processing.ActualHeight), body).Y, 0, body.ActualHeight);
-            Assert.Equal(44, Assert.IsType<Border>(((StackPanel)processing.Content).Children[0]).ActualHeight);
             Assert.Contains("Mic processing", Texts(processing));
             Invoke(Named<Button>(host, "Mute all microphones"));
             await SmokeDispatcher.Until(() => scene.Mute.StatusText == "Muted");
@@ -62,7 +56,7 @@ public sealed class SoundShellTests
             await scene.Shell.Registry.SetInstalledAsync("mic-mute", false);
             panel.SetTiles(Tiles(scene));
             Assert.Empty(All<MicQuickView>(host));
-            Assert.Equal(2, All<RoutingQuickView>(host).Count());
+            Assert.Single(All<ComboBox>(host), b => AutomationProperties.GetName(b) == "Microphone device");
             await scene.Shell.Registry.SetInstalledAsync("mic-mute", true);
             panel.SetTiles(Tiles(scene));
             Assert.Single(All<MicQuickView>(host));
@@ -159,7 +153,7 @@ public sealed class SoundShellTests
     });
 
     [Fact]
-    public Task Island_real_sound_sections_share_pages_and_removed_tiles_fall_back_to_grid() => SmokeDispatcher.Run(async () =>
+    public Task Audio_opens_both_views_from_one_tile_remembers_the_tab_and_adapts_to_installed_features() => SmokeDispatcher.Run(async () =>
     {
         await using var scene = new SoundScene();
         await scene.Start();
@@ -169,9 +163,8 @@ public sealed class SoundShellTests
         {
             var host = (ContentControl)panel.FindName("Page");
             var grid = Assert.IsType<IslandGrid>(host.Content);
-            // Either gallery destination opens its page; the separate switch mutes the microphone.
-            Assert.Equal(["Open Sound", "Open Volume"], grid.Buttons().Select(AutomationProperties.GetName));
-            var sound = Named<Button>(grid, "Open Sound");
+            Assert.Equal(["Open Audio"], grid.Buttons().Select(AutomationProperties.GetName));
+            var sound = Named<Button>(grid, "Open Audio");
             Assert.Same(LucideIcons.Speaker, Assert.Single(All<LucideIcon>(sound)).Data);
             Assert.Contains("Microphone live", AutomationProperties.GetHelpText(sound));
             Assert.NotNull(Named<ToggleButton>(grid, "Mute mic"));
@@ -179,23 +172,87 @@ public sealed class SoundShellTests
 
             Invoke(sound);
             await SmokeDispatcher.Until(() => panel.CurrentPage == SoundTile.Key);
-            Assert.Contains("Sound", Texts(host)); // every page starts with its name
+            Assert.Contains("Audio", Texts(host));
             Assert.Contains(SoundTile.Microphone, Texts(host));
 
-            panel.ShowPage(AppVolumeModule.TileKey);
+            panel.UpdateLayout();
+            SelectTab(host, "App volume");
+            await SmokeDispatcher.Until(() => panel.CurrentPage == AppVolumeModule.TileKey);
             Assert.NotNull(Named<Slider>(host, "Music volume"));
             Assert.DoesNotContain(All<Slider>(host), s => AutomationProperties.GetName(s) == "System volume"); // apps only
             Assert.Empty(All<ComboBox>(host));
+            Invoke(Named<Button>(host, "Back"));
+            await SmokeDispatcher.Until(() => panel.CurrentPage is null);
+            Invoke(Named<Button>(host, "Open Audio"));
+            await SmokeDispatcher.Until(() => panel.CurrentPage == AppVolumeModule.TileKey);
             panel.ShowPage("now-playing");
             Invoke(Named<Button>(host, "Play"));
             await SmokeDispatcher.Until(() => media.Plays == 1);
             panel.ShowPage(AppVolumeModule.TileKey);
             await scene.Shell.Registry.SetInstalledAsync("app-volume", false);
             panel.SetTiles(Tiles(scene));
+            Assert.Equal(SoundTile.Key, panel.CurrentPage);
+            Assert.Empty(All<SegmentedControl>(host));
+            Assert.NotNull(Named<Slider>(host, "System volume"));
+            foreach (var id in new[] { "mic-processing", "mic-mute", "audio-routing" })
+                await scene.Shell.Registry.SetInstalledAsync(id, false);
+            panel.SetTiles(Tiles(scene));
             Assert.Null(panel.CurrentPage);
-            Assert.DoesNotContain(Assert.IsType<IslandGrid>(host.Content).Buttons(), b => (string)b.Tag == AppVolumeModule.TileKey);
+            Assert.Empty(Assert.IsType<IslandGrid>(host.Content).Buttons());
+
+            // Essentials may consist of App volume alone. Its only gallery destination still says Audio.
+            await scene.Shell.Registry.SetInstalledAsync("app-volume", true);
+            panel.SetTiles(Tiles(scene));
+            Invoke(Named<Button>(host, "Open Audio"));
+            await SmokeDispatcher.Until(() => panel.CurrentPage == AppVolumeModule.TileKey);
+            Assert.Empty(All<SegmentedControl>(host));
+            Assert.Single(All<VolumeView>(host));
         }
         finally { panel.Close(); media.Dispose(); }
+    });
+
+    [Fact]
+    public Task System_sounds_stays_on_the_left_and_overflow_pages_only_the_apps() => SmokeDispatcher.Run(async () =>
+    {
+        await using var scene = new SoundScene();
+        await scene.Start();
+        await scene.GrowMixerTo(9);
+        var panel = OpenPanel(scene, new FakeMedia());
+        try
+        {
+            var host = (ContentControl)panel.FindName("Page");
+            panel.ShowPage(AppVolumeModule.TileKey);
+            List<string> Order()
+            {
+                panel.UpdateLayout();
+                return All<Slider>(host).Where(s => s.Orientation == Orientation.Vertical && s.IsVisible)
+                    .OrderBy(s => s.TranslatePoint(default, host).X).Select(AutomationProperties.GetName).ToList();
+            }
+
+            var firstNine = Order();
+            Assert.Equal(9, firstNine.Count);
+            Assert.Equal("System sounds volume", firstNine[0]);
+            Assert.DoesNotContain(All<Button>(host), b => b.IsVisible && AutomationProperties.GetName(b) == "Next apps");
+            var system = Named<Slider>(host, "System sounds volume");
+            var systemX = system.TranslatePoint(default, host).X;
+            ((IRangeValueProvider)new SliderAutomationPeer(system).GetPattern(PatternInterface.RangeValue)).SetValue(27);
+            await SmokeDispatcher.Until(() => Math.Abs(scene.Volume.Apps.Single(a => a.Key == Chippi.Audio.AppKey.SystemSounds).Volume - .27f) < .001);
+            Assert.Equal(.68f, scene.Volume.Apps.Single(a => a.Name == "Discord").Volume);
+
+            await scene.GrowMixerTo(15);
+            await SmokeDispatcher.Until(() => All<Button>(host).Any(b => b.IsVisible && AutomationProperties.GetName(b) == "Next apps"));
+            var first = Order();
+            Assert.Equal(9, first.Count);
+            Invoke(Named<Button>(host, "Next apps"));
+            await SmokeDispatcher.Until(() => All<Button>(host).Any(b => b.IsEnabled && AutomationProperties.GetName(b) == "Previous apps"));
+            var second = Order();
+            Assert.Equal(7, second.Count);
+            Assert.Equal("System sounds volume", second[0]);
+            Assert.Equal(15, first.Union(second).Count());
+            Assert.Same(system, Named<Slider>(host, "System sounds volume"));
+            Assert.Equal(systemX, system.TranslatePoint(default, host).X, 1);
+        }
+        finally { panel.Close(); }
     });
 
     [Fact]
@@ -225,8 +282,14 @@ public sealed class SoundShellTests
 
             // Picking another output uses it now and leaves routing's list as it was.
             var order = scene.Routing.Settings.Output.Devices.Select(d => d.Id).ToList();
-            Invoke(Assert.Single(All<Button>(host), b => AutomationProperties.GetName(b)?.EndsWith("Headphones", StringComparison.OrdinalIgnoreCase) == true
-                && AutomationProperties.GetName(b)!.StartsWith("Use ", StringComparison.Ordinal)));
+            var picker = Named<ComboBox>(host, "Output device");
+            picker.IsDropDownOpen = true;
+            await SmokeDispatcher.Until(() => picker.IsDropDownOpen);
+            Assert.True(panel.PageHandlesEscape());
+            Assert.False(picker.IsDropDownOpen);
+            Assert.True(panel.IsOpen);
+            Assert.False(panel.PageHandlesEscape()); // a second Esc is available to the shell
+            picker.SelectedItem = picker.Items.OfType<ComboBoxItem>().Single(i => Equals(i.Tag, "headphones"));
             await SmokeDispatcher.Until(() => scene.Routing.InUse(Chippi.Audio.AudioFlow.Render) == "headphones");
             Assert.Equal(order, scene.Routing.Settings.Output.Devices.Select(d => d.Id));
 
@@ -238,7 +301,7 @@ public sealed class SoundShellTests
     });
 
     [Fact]
-    public Task With_no_microphone_the_microphone_card_holds_only_its_row_with_no_line_under_it() => SmokeDispatcher.Run(async () =>
+    public Task Without_a_microphone_the_input_has_no_live_slider_or_actionable_picker() => SmokeDispatcher.Run(async () =>
     {
         await using var scene = new SoundScene();
         await scene.Start();
@@ -251,11 +314,8 @@ public sealed class SoundShellTests
             panel.ShowPage(SoundTile.Key);
             panel.UpdateLayout();
             Assert.Contains("No microphone", Texts(All<MicQuickView>(host).Single()));
-            var mics = All<RoutingQuickView>(host).Last();
-            Assert.Equal(Visibility.Collapsed, mics.Visibility);
-            var card = (DockPanel)LogicalTreeHelper.GetParent(mics);
-            var hairline = Assert.Single(card.Children.OfType<Border>(), b => b.Height == 1);
-            Assert.Equal(Visibility.Collapsed, hairline.Visibility); // it goes with the list under it
+            Assert.DoesNotContain(All<ComboBox>(host), b => AutomationProperties.GetName(b) == "Microphone device" && b.IsVisible && b.IsEnabled);
+            Assert.DoesNotContain(All<Slider>(host), b => AutomationProperties.GetName(b) == "Microphone volume" && b.IsVisible && b.IsEnabled);
         }
         finally { panel.Close(); }
     });
@@ -266,7 +326,7 @@ public sealed class SoundShellTests
     /// <summary>The island, open on its grid off screen, with the scene's tiles.</summary>
     private static IslandPanelWindow OpenPanel(SoundScene scene, FakeMedia media)
     {
-        var panel = new IslandPanelWindow();
+        var panel = new IslandPanelWindow { ActivateWindow = _ => { } };
         panel.SetMedia(media);
         panel.SetTiles(Tiles(scene));
         panel.Initialize();
@@ -283,6 +343,14 @@ public sealed class SoundShellTests
     }
     private static IEnumerable<string> Texts(DependencyObject root) => All<TextBlock>(root).Select(t => t.Text);
     private static T Named<T>(DependencyObject root, string name) where T : DependencyObject => Assert.Single(All<T>(root), c => AutomationProperties.GetName(c) == name);
+    private static void SelectTab(DependencyObject root, string name)
+    {
+        var tabs = Assert.Single(All<SegmentedControl>(root));
+        var peer = new ListBoxAutomationPeer(tabs);
+        var item = Assert.Single(peer.GetChildren(), p => p.GetName() == name);
+        ((ISelectionItemProvider)item.GetPattern(PatternInterface.SelectionItem)).Select();
+    }
+
     private static void Invoke(ButtonBase button) => ((IInvokeProvider)new ButtonAutomationPeer((Button)button).GetPattern(PatternInterface.Invoke)).Invoke();
     private static void Toggle(ToggleButton button) => ((IToggleProvider)new ToggleButtonAutomationPeer(button).GetPattern(PatternInterface.Toggle)).Toggle();
 }

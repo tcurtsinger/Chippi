@@ -744,4 +744,41 @@
         </Setter>
     </Style>
 
+    <!-- Audio's peer views use one quiet trough; the selected surface stays neutral in both themes. -->
+    <Style x:Key="IslandAudioTabsStyle" TargetType="{x:Type c:SegmentedControl}" BasedOn="{StaticResource {x:Type c:SegmentedControl}}">
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Background" Value="{DynamicResource IslandFooterBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource IslandHairBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="ItemContainerStyle">
+            <Setter.Value>
+                <Style TargetType="ListBoxItem">
+                    <Setter Property="Height" Value="22" />
+                    <Setter Property="Padding" Value="12,0" />
+                    <Setter Property="FontSize" Value="12" />
+                    <Setter Property="Foreground" Value="{DynamicResource IslandTextSecondaryBrush}" />
+                    <Setter Property="FocusVisualStyle" Value="{StaticResource IslandFocusVisual}" />
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="ListBoxItem">
+                                <Border x:Name="Face" CornerRadius="4" i:FillFade.To="Transparent" Padding="{TemplateBinding Padding}">
+                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="Face" Property="i:FillFade.To" Value="{DynamicResource IslandHoverBrush}" />
+                                    </Trigger>
+                                    <Trigger Property="IsSelected" Value="True">
+                                        <Setter TargetName="Face" Property="i:FillFade.To" Value="{DynamicResource IslandButtonBrush}" />
+                                        <Setter Property="Foreground" Value="{DynamicResource IslandTextBrush}" />
+                                        <Setter Property="FontWeight" Value="SemiBold" />
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Style>
+            </Setter.Value>
+        </Setter>
+    </Style>
 </ResourceDictionary>

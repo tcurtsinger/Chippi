@@ -16,6 +16,7 @@ using Chippi.Core.Diagnostics;
 using Chippi.Core.Island;
 using Chippi.Core.Modules;
 using Chippi.Features.Sound;
+using Chippi.Features.Sound.Volume;
 using Chippi.UI.Controls;
 using Chippi.UI.Themes;
 using Windows.Win32.Foundation;
@@ -57,6 +58,9 @@ public partial class IslandPanelWindow : Window
     private readonly TextBlock _pageStatus = new() { FontSize = 12, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
     private IslandLayout _layout = IslandLayout.Default;
     private IReadOnlyList<IslandTileGroup> _groups = [];
+    private IReadOnlyList<IslandTool> _tools = [];
+    private readonly SegmentedControl _audioTabs = new();
+    internal bool? AudioShowsMixer { get; private set; }
     private IReadOnlyList<IslandActivity> _activities = [];
     private IMediaSessions? _media;
     private NowPlayingView? _nowPlaying;
@@ -90,6 +94,16 @@ public partial class IslandPanelWindow : Window
     public IslandPanelWindow()
     {
         InitializeComponent();
+        _audioTabs.SetResourceReference(StyleProperty, "IslandAudioTabsStyle");
+        AutomationProperties.SetName(_audioTabs, "Audio view");
+        _audioTabs.Items.Add("Devices");
+        _audioTabs.Items.Add("App volume");
+        _audioTabs.SelectionChanged += (_, _) =>
+        {
+            string selected = _audioTabs.SelectedIndex == 1 ? AppVolumeModule.TileKey : SoundTile.Key;
+            if (IsOpen && IslandTool.IsAudioPage(_page) && selected != _page)
+                ShowPage(selected);
+        };
         _grid.TileOpened += (_, key) => ShowPage(key);
         _grid.TileToggled += (_, key) => Toggle(key);
         _grid.SearchRequested += (_, _) => TakeKeyboard();
@@ -164,9 +178,21 @@ public partial class IslandPanelWindow : Window
     internal Core.Clipboard.PasteTarget? PasteTarget { get; private set; }
 
     /// <summary>Lets the page use Esc first (a search to clear): true when it did, and the island stays open.</summary>
-    internal bool PageHandlesEscape() => IsOpen && _page is null
-        ? _grid.CloseSearch()
-        : PageHandles(s => s.HandleEscape, "Esc");
+    internal bool PageHandlesEscape()
+    {
+        if (IsOpen && _page == SoundTile.Key)
+        {
+            var picker = Mouse.Captured as ComboBox ?? Keyboard.FocusedElement as ComboBox;
+            if (picker is null && Keyboard.FocusedElement is ComboBoxItem item)
+                picker = ItemsControl.ItemsControlFromItemContainer(item) as ComboBox;
+            if (picker is { IsDropDownOpen: true } && GetWindow(picker) == this)
+            {
+                picker.IsDropDownOpen = false;
+                return true;
+            }
+        }
+        return IsOpen && _page is null ? _grid.CloseSearch() : PageHandles(s => s.HandleEscape, "Esc");
+    }
 
     /// <summary>Lets the page use its Back arrow first (a detail page back to its overview): true when it did, and the page stays.</summary>
     internal bool PageHandlesBack() => PageHandles(s => s.HandleBack, "Back");
@@ -264,7 +290,11 @@ public partial class IslandPanelWindow : Window
     }
 
     /// <summary>AppSettings.IslandLastPage.</summary>
-    internal void SetLastPage(string? key) => _lastPage = key;
+    internal void SetLastPage(string? key, bool? audioShowsMixer = null)
+    {
+        _lastPage = key;
+        AudioShowsMixer = audioShowsMixer ?? (IslandTool.IsAudioPage(key) ? key == AppVolumeModule.TileKey : null);
+    }
 
     /// <summary>The page the next open shows instead of the usual one (a notice click); null for the usual.</summary>
     internal void OpenOn(string? key) => _openOn = key;
@@ -275,6 +305,7 @@ public partial class IslandPanelWindow : Window
         if (layout == _layout)
             return;
         _layout = layout;
+        _tools = _layout.Tools(_groups);
         RefreshGrid();
     }
 
@@ -312,6 +343,7 @@ public partial class IslandPanelWindow : Window
             foreach (var part in group.Parts)
                 part.StatusChanged -= OnStatusChanged;
         _groups = tiles;
+        _tools = _layout.Tools(tiles);
         foreach (var group in _groups)
             foreach (var part in group.Parts)
                 part.StatusChanged += OnStatusChanged;
@@ -319,7 +351,7 @@ public partial class IslandPanelWindow : Window
         if (!IsOpen)
             return;
         if (_page is not null && !Exists(_page))
-            ShowPage(null, remember: false);
+            ShowPage(ResolvePage(_page), remember: false);
         else if (_page is not null)
             Attach(_page);
         Reshape(snap: _frame is null);
@@ -354,10 +386,12 @@ public partial class IslandPanelWindow : Window
         bool shrinking = IsVisible;
         if (!shrinking && (sourceRim ?? TryFindResource("IslandWidgetBorderBrush") as SolidColorBrush) is { } rim)
             _widgetEdge = rim.Color;
-        if (_openOn is not null && Exists(_openOn))
-            _page = _openOn;
-        else if (!shrinking)
-            _page = _layout.OpensOn == IslandOpensOn.LastPage && _lastPage is not null && Exists(_lastPage) ? _lastPage : null;
+        if (ResolvePage(_openOn) is { } requested)
+            _page = requested;
+        else if (shrinking)
+            _page = ResolvePage(_page); // a module may have stopped while the widget was folding
+        else
+            _page = _layout.OpensOn == IslandOpensOn.LastPage ? ResolvePage(_lastPage) : null;
         _openOn = null;
         Attach(_page);
         RefreshGrid(); // the volume and the toggles are read as the home opens
@@ -406,23 +440,28 @@ public partial class IslandPanelWindow : Window
     /// <summary>Shows <paramref name="key"/>'s page, or the grid for null; the new content fades in.</summary>
     internal void ShowPage(string? key, bool remember = true)
     {
-        if (key is not null && !Exists(key))
-            key = null;
-        if (remember && key is not null && key != _lastPage)
-        {
-            _lastPage = key;
-            LastPageChanged?.Invoke(this, key);
-        }
+        key = ResolvePage(key);
+        if (remember && key is not null)
+            RememberPage(key);
         if (key == _page && IsOpen)
             return;
         if (_page is null && key is not null)
-            _returnFocusKey = key;
-        if (key is null)
-            _returnFocusKey ??= _page;
+            _returnFocusKey = IslandTool.GalleryKey(key);
+        if (key is null && _page is not null)
+            _returnFocusKey ??= IslandTool.GalleryKey(_page);
+        bool changeTab = IslandTool.IsAudioPage(_page) && IslandTool.IsAudioPage(key);
+        bool focusTab = changeTab && _audioTabs.IsKeyboardFocusWithin;
         _page = key;
         if (!IsOpen)
             return;
         Attach(key);
+        if (changeTab)
+        {
+            if (focusTab && _audioTabs.IsVisible)
+                Dispatcher.BeginInvoke(DispatcherPriority.Input, () =>
+                    (_audioTabs.ItemContainerGenerator.ContainerFromIndex(_audioTabs.SelectedIndex) as ListBoxItem)?.Focus());
+            return;
+        }
         Reshape(snap: false);
         _pageFrom = key is null ? -1 : 1;
         if (_frame is null || _morph != Morph.Open)
@@ -442,6 +481,25 @@ public partial class IslandPanelWindow : Window
     internal IReadOnlyList<string> PageKeys() => [NowPlayingKey, .. _groups.Where(g => g.Key != NowPlayingKey).Select(g => g.Key)];
 
     private bool Exists(string key) => key == NowPlayingKey || _groups.Any(g => g.Key == key);
+
+    private string? ResolvePage(string? key)
+    {
+        if (key == IslandTool.Audio)
+            key = AudioShowsMixer == true ? AppVolumeModule.TileKey : SoundTile.Key;
+        if (key is null || Exists(key)) return key;
+        if (!IslandTool.IsAudioPage(key)) return null;
+        string other = key == SoundTile.Key ? AppVolumeModule.TileKey : SoundTile.Key;
+        return Exists(other) ? other : null;
+    }
+
+    private void RememberPage(string key)
+    {
+        bool? mixer = IslandTool.IsAudioPage(key) ? key == AppVolumeModule.TileKey : AudioShowsMixer;
+        if (_lastPage == key && AudioShowsMixer == mixer) return;
+        AudioShowsMixer = mixer;
+        _lastPage = key;
+        LastPageChanged?.Invoke(this, key);
+    }
 
     private IslandTileGroup? Group(string? key) => _groups.FirstOrDefault(g => g.Key == key);
 
@@ -475,19 +533,20 @@ public partial class IslandPanelWindow : Window
             // Construct sections first: a module may expose its header and focus through its view.
             foreach (var part in Group(key)?.Parts ?? []) _ = View(part);
             var factory = Group(key)?.Parts.Select(p => p.Spec.CreateHeader).FirstOrDefault(f => f is not null);
-            var header = factory?.Invoke() as FrameworkElement ?? PageHeader(key);
+            var header = IslandTool.IsAudioPage(key) ? AudioHeader(key) : factory?.Invoke() as FrameworkElement ?? PageHeader(key);
             header.Margin = new Thickness(0);
             header.VerticalAlignment = VerticalAlignment.Center;
             // Every header gets the same 24 row and the 8 gap below it, so every body is 496 × 304; a page that asks for a
             // taller row (the Command bar's 32 field) gets it, and its body is that much shorter.
             var back = BackButton(() => { if (!PageHandlesBack()) ShowPage(null, remember: false); });
             DockPanel.SetDock(back, Dock.Left);
-            double height = Group(key)?.Parts.Max(p => p.Spec.HeaderHeight) is > 0 and var taller ? taller : IslandPage.HeaderHeight;
+            double height = IslandTool.IsAudioPage(key) && Exists(SoundTile.Key) && Exists(AppVolumeModule.TileKey) ? 28
+                : Group(key)?.Parts.Max(p => p.Spec.HeaderHeight) is > 0 and var taller ? taller : IslandPage.HeaderHeight;
             var row = new DockPanel { Height = height, Margin = new Thickness(0, 0, 0, IslandPage.Gap), LastChildFill = true, Children = { back, header } };
             DockPanel.SetDock(row, Dock.Top);
             _attached.Add(row);
             page.Children.Add(row);
-            page.Children.Add(Body(Group(key)?.Parts ?? []));
+            page.Children.Add(Body(Group(key)?.Parts ?? [], devices: key == SoundTile.Key));
         }
         Page.Content = page;
         RefreshPageStatus();
@@ -518,6 +577,21 @@ public partial class IslandPanelWindow : Window
         return header;
     }
 
+    private DockPanel AudioHeader(string key)
+    {
+        var row = new DockPanel();
+        if (Exists(SoundTile.Key) && Exists(AppVolumeModule.TileKey))
+        {
+            _audioTabs.SelectedIndex = key == AppVolumeModule.TileKey ? 1 : 0;
+            DockPanel.SetDock(_audioTabs, Dock.Right);
+            row.Children.Add(_audioTabs);
+        }
+        row.Children.Add(new TextBlock { Text = "Audio", FontSize = 15, FontWeight = FontWeights.SemiBold,
+            VerticalAlignment = VerticalAlignment.Center });
+        _attached.Add(row);
+        return row;
+    }
+
     /// <summary>
     /// The page's 496 × 304 body. One section fills it; several stack 8 apart; sections in columns sit
     /// side by side. It never scrolls and never grows the island: what doesn't fit is cut off here, so
@@ -525,7 +599,7 @@ public partial class IslandPanelWindow : Window
     /// and below; at the sides it reaches into the card's padding, so a Chippi set out to the cards' edge
     /// (Keep awake's) keeps his sparks, and the panel's own edge cuts there.
     /// </summary>
-    private Grid Body(IReadOnlyList<IslandTileContribution> parts)
+    private Grid Body(IReadOnlyList<IslandTileContribution> parts, bool devices)
     {
         var body = new Grid();
         body.SizeChanged += (_, e) =>
@@ -535,7 +609,13 @@ public partial class IslandPanelWindow : Window
         };
         _attached.Add(body);
         PageBody = body;
-        if (parts.Any(p => p.Spec.Column is not null))
+        if (devices)
+        {
+            var layout = SoundTile.DevicesBody(parts.Select(View).OfType<FrameworkElement>().ToList());
+            _attached.Add(layout);
+            body.Children.Add(layout);
+        }
+        else if (parts.Any(p => p.Spec.Column is not null))
             body.Children.Add(Columns(parts));
         else if (parts.Count == 1)
         {
@@ -682,15 +762,16 @@ public partial class IslandPanelWindow : Window
         double previousHeight = _grid.HomeHeight;
         var tiles = new List<IslandTileView>();
         long now = Stopwatch.GetTimestamp();
-        foreach (var group in _groups.Where(g => g.Key != NowPlayingKey))
+        foreach (var tool in _tools.Where(t => t.Visible))
         {
+            var group = tool.Source;
             var toggle = group.Toggle;
             bool muted = Muted(group.Key);
             bool attention = group.NeedsAttention || LiveOn(group.Key)?.NeedsAttention == true || muted;
             bool failed = _failed.TryGetValue(group.Key, out long until) && until > now;
             // Sound opens both Output and Microphone. Its quick mute switch has its own identity.
-            var (name, icon) = group.Key == SoundTile.Key
-                ? (group.Name, LucideIcons.Get(group.Icon))
+            var (name, icon) = tool.Key == IslandTool.Audio
+                ? (tool.Name, LucideIcons.Get(tool.Icon))
                 : (toggle?.Name ?? group.Name, muted ? LucideIcons.MicOff : LucideIcons.Get(toggle?.Icon ?? group.Icon));
             // A feature whose state can't be read shows its button plain; the others still refresh.
             bool on = Read($"{group.Key} state", () => toggle?.IsOn() == true, false);
@@ -699,13 +780,12 @@ public partial class IslandPanelWindow : Window
                 : attention && !muted && group.Status.Length > 0 ? group.Status
                 : Read($"{group.Key} status", () => toggle?.Status?.Invoke(), null) ?? group.Status;
             bool waiting = _activities.Any(a => a.Kind == IslandActivityKind.Agent && a.NeedsAttention && a.OpensTile == group.Key);
-            tiles.Add(new(group.Key, name, icon, status, on, attention || failed, toggle is not null, group.Name, Waiting: waiting));
+            tiles.Add(new(tool.Key, name, icon, status, on, attention || failed, toggle is not null, tool.Name, Waiting: waiting));
         }
-        var shown = _layout.Shown(tiles.Select(t => t.Key));
-        _grid.SetTiles([.. shown.Select(key => tiles.First(t => t.Key == key))]);
+        _grid.SetTiles(tiles);
         var volumeGroup = _groups.FirstOrDefault(g => g.Volume is not null);
         Read($"{volumeGroup?.Key} volume", () => { _grid.SetVolume(volumeGroup?.Volume, volumeGroup?.Key); return true; }, false);
-        _shownTiles = shown;
+        _shownTiles = [.. tiles.Select(t => t.Key)];
         RefreshPageStatus();
         MarkOnScreen();
         if (IsOpen && IsVisible && _page is null && previousHeight != _grid.HomeHeight)
@@ -738,6 +818,7 @@ public partial class IslandPanelWindow : Window
     /// </summary>
     private async void Toggle(string key)
     {
+        if (key == IslandTool.Audio) key = SoundTile.Key;
         if (!_toggling.Add(key))
             return;
         try
@@ -765,7 +846,7 @@ public partial class IslandPanelWindow : Window
         bool grid = IsOpen && _page is null;
         foreach (var group in _groups)
             foreach (var part in group.Parts)
-                part.SetOnScreen(grid && _shownTiles.Contains(group.Key));
+                part.SetOnScreen(grid && _shownTiles.Contains(IslandTool.GalleryKey(group.Key)));
     }
 
     private bool Muted(string key) => _activities.Any(a => a.ModuleId == "mic-mute" && a.NeedsAttention && a.TileKey == key);

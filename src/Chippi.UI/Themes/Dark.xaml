@@ -94,6 +94,9 @@
     <SolidColorBrush x:Key="IslandHoverBrush" Color="#0FFFFFFF" />
     <!-- An empty bar or meter, the slider's remainder, its thumb ring, and a muted bar's fill. -->
     <SolidColorBrush x:Key="IslandTrackBrush" Color="#24FFFFFF" />
+    <SolidColorBrush x:Key="IslandMixerTroughBrush" Color="#3D3D43" />
+    <SolidColorBrush x:Key="IslandMixerLevelBrush" Color="#C6B9E1" />
+    <SolidColorBrush x:Key="IslandMixerSystemBrush" Color="#C4C3CD" />
     <SolidColorBrush x:Key="IslandSliderTrackBrush" Color="#9A9A9A" />
     <SolidColorBrush x:Key="IslandThumbBrush" Color="#454545" />
     <SolidColorBrush x:Key="IslandMutedFillBrush" Color="#47FFFFFF" />

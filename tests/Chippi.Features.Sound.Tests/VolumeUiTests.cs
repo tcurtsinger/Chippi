@@ -32,11 +32,10 @@ public sealed class VolumeUiTests
         });
     }
     [Theory]
-    [InlineData(7, 56)]
-    [InlineData(12, 34)]
-    [InlineData(14, 28)]
-    [InlineData(18, 28)]
-    public async Task Strips_fit_the_body_at_each_density_and_leave_overflow_out(int count, double width)
+    [InlineData(3, 3)]
+    [InlineData(8, 8)]
+    [InlineData(15, 8)]
+    public async Task Up_to_eight_app_channels_fit_at_full_height(int count, int visible)
     {
         await using var f = new VolumeFixture();
         f.System.EndSession("one");
@@ -47,11 +46,11 @@ public sealed class VolumeUiTests
         {
             var view = new VolumeView(f.Module, VolumeSurface.Island);
             view.Measure(new Size(496, 304)); view.Arrange(new Rect(0, 0, 496, 304)); view.UpdateLayout();
-            var strips = (StackPanel)((Grid)view.Content).Children[0];
-            Assert.Equal(Math.Min(14, count), strips.Children.Count);
-            foreach (FrameworkElement strip in strips.Children) Assert.Equal(width, strip.Width);
-            Assert.True(strips.DesiredSize.Width <= 496.001);
-            Assert.True(strips.DesiredSize.Height <= 304.001);
+            var bank = (Grid)((Grid)view.Content).Children[0];
+            Assert.Equal(visible, bank.ColumnDefinitions.Count);
+            Assert.Equal(visible, Descendants(bank).OfType<Slider>().Count());
+            Assert.True(bank.DesiredSize.Width <= 496.001);
+            Assert.True(bank.DesiredSize.Height <= 304.001);
             Assert.Empty(Descendants(view).OfType<ScrollViewer>());
             return Task.CompletedTask;
         });
@@ -163,22 +162,34 @@ public sealed class VolumeUiTests
     }
 
     [Fact]
-    public async Task Past_fourteen_the_last_strip_counts_the_rest()
+    public async Task Paging_keeps_system_sounds_in_its_own_column_and_reaches_every_app()
     {
         await using var f = new VolumeFixture();
         f.System.EndSession("one");
-        for (int i = 0; i < 18; i++)
+        f.System.WithSession(VolumeFixture.Session("sys", "A", 0) with { IsSystemSounds = true });
+        for (int i = 0; i < 14; i++)
             f.System.WithSession(VolumeFixture.Session($"app{i}", "A", 200 + i, $@"C:\Apps\App{i:00}.exe") with { AppName = $"App {i:00}" });
         await f.Start();
         await Sta(() =>
         {
             var view = new VolumeView(f.Module, VolumeSurface.Island);
-            var strips = (StackPanel)((Grid)view.Content).Children[0];
-            Assert.Equal(14, strips.Children.Count);
-            var more = Assert.Single(Descendants(strips.Children[^1]).OfType<Button>());
-            Assert.Equal("+5", more.Content);
-            Assert.Equal("5 more apps, open Settings", AutomationProperties.GetName(more));
-            Assert.DoesNotContain(Descendants(strips).OfType<Slider>(), s => AutomationProperties.GetName(s) is "App 17 volume");
+            var sliders = () => Descendants(view).OfType<Slider>().ToArray();
+            Button Page(string name) => Descendants(view).OfType<Button>().Single(b => AutomationProperties.GetName(b) == name);
+            var pinned = sliders()[0];
+            Assert.Equal("System sounds volume", AutomationProperties.GetName(pinned));
+            Assert.DoesNotContain(Descendants(view).OfType<Button>(), b => AutomationProperties.GetName(b) == "System sounds output");
+            Assert.Equal(9, sliders().Length);
+            Assert.False(Page("Previous apps").IsEnabled);
+            Assert.Contains(Descendants(view).OfType<TextBlock>(), t => t.Text == "1–8 of 14 apps");
+            Page("Next apps").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Assert.Same(pinned, sliders()[0]);
+            Assert.Equal(7, sliders().Length);
+            Assert.Equal("App 13 volume", AutomationProperties.GetName(sliders()[^1]));
+            Assert.Contains(Descendants(view).OfType<TextBlock>(), t => t.Text == "9–14 of 14 apps");
+            Assert.False(Page("Next apps").IsEnabled);
+            Page("Previous apps").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Assert.Same(pinned, sliders()[0]);
+            Assert.Equal("App 00 volume", AutomationProperties.GetName(sliders()[1]));
             return Task.CompletedTask;
         });
     }
@@ -210,7 +221,7 @@ public sealed class VolumeUiTests
         await Sta(async () =>
         {
             var view = new VolumeView(f.Module, VolumeSurface.Island);
-            var strips = (StackPanel)((Grid)view.Content).Children[0];
+            var strips = (Grid)((Grid)view.Content).Children[0];
             var strip = (Grid)strips.Children[0];
             strip.RaiseEvent(new MouseWheelEventArgs(Mouse.PrimaryDevice, 0, 120) { RoutedEvent = UIElement.MouseWheelEvent });
             await Until(() => Math.Abs(f.System.SessionById("one").Volume - 0.52f) < 0.001f);
@@ -233,7 +244,7 @@ public sealed class VolumeUiTests
             await f.Module.SetOutputAsync(VolumeFixture.Key, "B");
             await Until(() => Equals(output.ToolTip, "Picked B · still plays on A"));
             var glyph = (Chippi.UI.Controls.LucideIcon)output.Content;
-            Assert.Equal(Chippi.UI.Controls.LucideIcons.Speaker, glyph.Data);
+            Assert.Equal(Chippi.UI.Controls.LucideIcons.Ellipsis, glyph.Data);
         });
     }
 
@@ -258,7 +269,7 @@ public sealed class VolumeUiTests
     }
 
     [Fact]
-    public async Task A_name_past_two_lines_marks_the_second_and_keeps_its_tooltip()
+    public async Task The_icon_only_channel_exposes_its_full_name_and_actual_output()
     {
         const string full = "Microsoft Edge WebView2 Runtime";
         await using var f = new VolumeFixture();
@@ -268,15 +279,10 @@ public sealed class VolumeUiTests
         await Sta(() =>
         {
             var view = new VolumeView(f.Module, VolumeSurface.Island);
-            view.Measure(new Size(496, 304)); view.Arrange(new Rect(0, 0, 496, 304)); view.UpdateLayout();
-            var name = Descendants(view).OfType<TextBlock>().Single(t => Equals(t.ToolTip, full));
-            Assert.EndsWith("\u2026", name.Text);
-            Assert.NotEqual(full, name.Text);
-            Assert.Equal(TextWrapping.WrapWithOverflow, name.TextWrapping);
-            Assert.Equal(TextTrimming.CharacterEllipsis, name.TextTrimming);
-            var measured = new TextBlock { Text = name.Text, FontSize = name.FontSize, FontFamily = name.FontFamily, LineHeight = 14, LineStackingStrategy = LineStackingStrategy.BlockLineHeight, TextWrapping = name.TextWrapping };
-            measured.Measure(new Size(56, double.PositiveInfinity));
-            Assert.Equal(28, measured.DesiredSize.Height);
+            var level = Descendants(view).OfType<Slider>().Single();
+            Assert.Equal(full + " volume", AutomationProperties.GetName(level));
+            Assert.Equal(full + " · Plays on A · Default", AutomationProperties.GetHelpText(level));
+            Assert.DoesNotContain(Descendants(view).OfType<TextBlock>(), t => t.Text == full);
             return Task.CompletedTask;
         });
     }

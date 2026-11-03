@@ -17,15 +17,14 @@ public enum VolumeSurface { Settings, Island }
 
 /// <summary>
 /// App volume's views. On the island's App volume page (DESIGN.md §5 Island) a vertical strip per
-/// app playing, its output on the strip's menu button; the system volume is the Sound page's. In
+/// app playing, with its route on a hover/focus menu. System sounds has a pinned strip. In
 /// Settings (revised 2026-10-28) a row per app, every app, then the options. Each app keeps its strip
 /// or row while it's shown, updated in place, so an app starting or a level changing never rebuilds
 /// the one under a drag.
 /// </summary>
 public sealed class VolumeView : UserControl
 {
-    /// <summary>The island's most strips; past it, the last one is "+N", which opens Settings.</summary>
-    internal const int MostStrips = 14;
+    private const int AppsPerPage = 8;
 
     private readonly AppVolumeModule _module;
     private readonly VolumeSurface _surface;
@@ -36,17 +35,19 @@ public sealed class VolumeView : UserControl
     private readonly TextBlock _error;
     private readonly FrameworkElement _empty;
     private readonly List<Action> _updates = []; // Settings' options
-    private Button? _more;
-    private Grid? _moreStrip;
-    private int _built = -1; // the density (StripWidth) the strips were made at
-    private int _floor = -1; // while the page is open the strips only get narrower
+    private readonly Button _previous = new(), _next = new();
+    private readonly TextBlock _range = new(), _hint = new() { FontSize = 11, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Top,
+        IsHitTestVisible = false, TextTrimming = TextTrimming.CharacterEllipsis };
+    private readonly Grid? _pager;
+    private int _page;
+    private bool _paging;
     private string _watched = "";
     private string? _errorShown; // the error this page showed: seen once the page closes on it
     private IDisposable? _meters;
     private bool _loaded;
     private bool _refreshing;
 
-    private sealed record Item(FrameworkElement View, Action Update, Action<float>? Peak = null);
+    private sealed record Item(FrameworkElement View, Action Update, Action<float>? Peak = null, FrameworkElement? Trough = null);
 
     public VolumeView(AppVolumeModule module, VolumeSurface surface)
     {
@@ -57,14 +58,20 @@ public sealed class VolumeView : UserControl
         _error = RoutingUi.Text("", "CaptionTextStyle", "WarningTextBrush");
         if (surface == VolumeSurface.Island)
         {
-            _list = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center };
+            _list = new Grid();
+            _root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            _pager = BuildPager();
+            Grid.SetRow(_pager, 1);
+            _hint.SetResourceReference(TextBlock.ForegroundProperty, "IslandTextTertiaryBrush");
             var glyph = new LucideIcon { Data = LucideIcons.Sliders, Size = 20, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 0, 0, 6) };
             glyph.SetResourceReference(LucideIcon.BrushProperty, "IslandTextTertiaryBrush");
             _empty = new StackPanel { VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center,
                 Children = { glyph, RoutingUi.Text("No apps playing", "CaptionTextStyle", "IslandTextTertiaryBrush") } };
             _root.Children.Add(_list);
             _root.Children.Add(_empty);
-            Grid.SetRow(_error, 1); _root.Children.Add(_error);
+            _root.Children.Add(_hint);
+            _root.Children.Add(_pager);
+            Grid.SetRow(_error, 2); _root.Children.Add(_error);
         }
         else
         {
@@ -76,9 +83,8 @@ public sealed class VolumeView : UserControl
         bool island = surface == VolumeSurface.Island;
         Loaded += (_, _) =>
         {
-            // The island keeps this page: opened again, it starts from the apps playing now, at their
-            // widest, and keeps the strips it can (a rebuild is 10 to 20 ms for 14).
-            if (_loaded && island) { _shown.Clear(); _floor = -1; }
+            // Start each visit from the sessions still playing; keep their existing controls when possible.
+            if (_loaded && island) { _shown.Clear(); _page = 0; }
             _loaded = true;
             _module.Changed += Refresh;
             ThemeManager.ThemeChanged += OnTheme;
@@ -107,6 +113,7 @@ public sealed class VolumeView : UserControl
         {
             if (_surface == VolumeSurface.Island) Strips(); else Rows();
             foreach (var item in _items.Values) item.Update();
+            if (_surface == VolumeSurface.Island) Hint();
             foreach (var update in _updates) update();
             _errorShown = _module.Error;
             _error.Text = _errorShown ?? "";
@@ -116,42 +123,89 @@ public sealed class VolumeView : UserControl
         finally { _refreshing = false; }
     }
 
-    private void Clear()
+    private Grid BuildPager()
     {
-        _list.Children.Clear(); _items.Clear(); (_more, _moreStrip) = (null, null);
+        var pager = RoutingUi.Columns(new GridLength(1, GridUnitType.Star), GridLength.Auto, GridLength.Auto);
+        pager.Height = 26;
+        var line = RoutingUi.Hairline();
+        line.VerticalAlignment = VerticalAlignment.Top;
+        Grid.SetColumnSpan(line, 3);
+        pager.Children.Add(line);
+        _range.FontSize = 11;
+        _range.Margin = new Thickness(3, 0, 0, 0);
+        _range.VerticalAlignment = VerticalAlignment.Center;
+        _range.SetResourceReference(TextBlock.ForegroundProperty, "IslandTextTertiaryBrush");
+        pager.Children.Add(_range);
+        foreach (var (button, delta, name, icon) in new[]
+        {
+            (_previous, -1, "Previous apps", LucideIcons.ChevronLeft),
+            (_next, 1, "Next apps", LucideIcons.ChevronRight),
+        })
+        {
+            var glyph = new LucideIcon { Data = icon, Size = 15 };
+            glyph.SetResourceReference(LucideIcon.BrushProperty, "IslandTextSecondaryBrush");
+            button.Content = glyph;
+            button.SetResourceReference(StyleProperty, "IslandIconButtonStyle");
+            (button.Width, button.Height) = (28, 24);
+            button.ToolTip = name;
+            AutomationProperties.SetName(button, name);
+            button.Click += (_, _) =>
+            {
+                bool focused = button.IsKeyboardFocused;
+                _page += delta;
+                _paging = true;
+                try { Refresh(); } finally { _paging = false; }
+                if (focused && !button.IsEnabled) (delta > 0 ? _previous : _next).Focus();
+            };
+            RoutingUi.Add(pager, button, delta < 0 ? 1 : 2);
+        }
+        return pager;
     }
 
-    /// <summary>The strips of the apps shown, by name; a new app's strip joins without touching the others.</summary>
+    /// <summary>System sounds keeps its own column. Pages address the remaining apps in name order.</summary>
     private void Strips()
     {
         var apps = _module.Apps;
         _shown.RemoveWhere(k => apps.All(a => a.Key != k));
-        foreach (var app in apps.Where(a => a.IsActive)) _shown.Add(app.Key);
-        var shown = apps.Where(a => _shown.Contains(a.Key)).ToList();
-        if (shown.Count > MostStrips)
+        foreach (var app in apps.Where(a => a.IsActive || a.Key == AppKey.SystemSounds)) _shown.Add(app.Key);
+        // Keep the strip and its vertical track exactly under a live drag. Losing capture refreshes the layout.
+        if (_items.Any(p => p.Value.View.IsMouseCaptureWithin && _shown.Contains(p.Key))) return;
+
+        var other = apps.Where(a => a.Key != AppKey.SystemSounds && _shown.Contains(a.Key)).ToList();
+        var system = apps.FirstOrDefault(a => a.Key == AppKey.SystemSounds);
+        int pages = Math.Max(1, (other.Count + AppsPerPage - 1) / AppsPerPage);
+        _page = Math.Clamp(_page, 0, pages - 1);
+        // A session appearing ahead of a focused strip must not push it off its page.
+        int focusAt = other.FindIndex(a => _items.TryGetValue(a.Key, out var item) && item.View.IsKeyboardFocusWithin);
+        if (focusAt >= 0 && !_paging) _page = focusAt / AppsPerPage;
+
+        int first = _page * AppsPerPage;
+        var visible = other.Skip(first).Take(AppsPerPage).ToList();
+        int onPage = visible.Count;
+        if (system is not null) visible.Insert(0, system);
+        var bank = (Grid)_list;
+        int columns = Math.Min(AppsPerPage, other.Count) + (system is null ? 0 : 1);
+        if (bank.ColumnDefinitions.Count != columns || (columns > 0 && bank.ColumnDefinitions[0].Width.IsAbsolute != (system is not null)))
         {
-            // The apps playing now keep their strips; the rest are behind "+N".
-            var kept = shown.OrderByDescending(a => a.IsActive).Take(MostStrips - 1).Select(a => a.Key).ToHashSet();
-            shown = shown.Where(a => kept.Contains(a.Key)).ToList();
+            bank.ColumnDefinitions.Clear();
+            for (int i = 0; i < columns; i++)
+                bank.ColumnDefinitions.Add(new ColumnDefinition { Width = i == 0 && system is not null ? new GridLength(65) : new GridLength(1, GridUnitType.Star) });
         }
-        int more = _shown.Count - shown.Count;
-        int density = _floor = Math.Max(_floor, Density(shown.Count + (more > 0 ? 1 : 0)));
-        if (density != _built) { Clear(); _built = density; }
-        Sync(shown.Select(a => a.Key).ToList(), key => Strip(key, density));
-        if (more > 0)
+        Sync(visible.Select(a => a.Key).ToList(), Strip);
+        for (int i = 0; i < visible.Count; i++)
         {
-            _moreStrip ??= More(density);
-            if (_list.Children.IndexOf(_moreStrip) != _list.Children.Count - 1) { _list.Children.Remove(_moreStrip); _list.Children.Add(_moreStrip); }
-            _more!.Content = more > 99 ? "99+" : $"+{more}";
-            _more.ToolTip = $"{more} more in Settings";
-            AutomationProperties.SetName(_more, $"{more} more apps, open Settings"); // never fewer than 2: 13 strips are kept
+            var strip = _items[visible[i].Key].View;
+            Grid.SetColumn(strip, i);
+            _items[visible[i].Key].Trough!.Width = other.Count > 6 ? 27 : 33;
         }
-        else if (_moreStrip is not null) { _list.Children.Remove(_moreStrip); (_more, _moreStrip) = (null, null); }
-        foreach (FrameworkElement strip in _list.Children)
-            strip.Margin = new Thickness(0, 0, strip == _list.Children[^1] ? 0 : 8, 0);
-        _empty.Visibility = _list.Children.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-        Watch(shown);
+        _empty.Visibility = visible.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        _pager!.Visibility = pages > 1 ? Visibility.Visible : Visibility.Collapsed;
+        _range.Text = $"{first + 1}–{first + onPage} of {other.Count} apps";
+        _previous.IsEnabled = _page > 0;
+        _next.IsEnabled = _page < pages - 1;
+        Watch(visible);
     }
+
 
     private void Rows()
     {
@@ -197,10 +251,6 @@ public sealed class VolumeView : UserControl
     private (float Volume, bool Muted) Level(AppKey key) => App(key) is { } app ? (app.Volume, app.Muted) : (0, false);
     private string AppName(AppKey key) => App(key) is { } app ? AppVolumeModule.NameOf(app) : "App";
 
-    internal static int Density(int count) => count <= 7 ? 0 : count <= 12 ? 1 : 2;
-    internal static double StripWidth(int count) => Widths[Density(count)];
-    private static readonly double[] Widths = [56, 34, 28];
-
     /// <summary>
     /// "MT" for Microsoft Teams, its words' first letters; a one-word name keeps its first two ("Py" for
     /// Python). Only letters and digits, as whole characters: "SP" for "🎧 Studio Pro", "7Z" for 7-Zip,
@@ -243,86 +293,105 @@ public sealed class VolumeView : UserControl
         return tile;
     }
 
-    /// <summary>A fixed-height strip; narrower ones leave the name and then the percentage out.</summary>
-    private Item Strip(AppKey key, int density)
+    /// <summary>One quiet channel: app icon (mute), vertical level, percentage. Output appears on hover or focus.</summary>
+    private Item Strip(AppKey key)
     {
-        double width = Widths[density], barWidth = density == 0 ? 32 : 24;
-        var strip = new Grid { Width = width, Background = Brushes.Transparent };
-        // The mock's order: the bar, then the app's icon (its mute), the percentage, the name and the output.
-        foreach (var height in new[] { new GridLength(1, GridUnitType.Star), new GridLength(28), new GridLength(20), new GridLength(density == 0 ? 36 : 0), new GridLength(24) })
-            strip.RowDefinitions.Add(new RowDefinition { Height = height });
-
-        // The app's icon is its Mute, and stays the icon when muted: the percentage row says so.
-        var icon = Icon(key, 20, island: true);
-        var mute = new Button { Content = icon, Width = 28, Height = 28, HorizontalAlignment = HorizontalAlignment.Center };
+        bool system = key == AppKey.SystemSounds;
+        var strip = new Grid { Background = Brushes.Transparent, Height = 239, VerticalAlignment = VerticalAlignment.Center };
+        foreach (double height in new double[] { 1, 32, 8, 162, 8, 16, 1 })
+            strip.RowDefinitions.Add(new RowDefinition { Height = height == 1 ? new GridLength(1, GridUnitType.Star) : new GridLength(height) });
+        if (system)
+        {
+            var divider = new Border { Width = 1, HorizontalAlignment = HorizontalAlignment.Right };
+            divider.SetResourceReference(Border.BackgroundProperty, "IslandHairBrush");
+            Grid.SetRowSpan(divider, 7);
+            strip.Children.Add(divider);
+        }
+        var top = new Grid { MaxWidth = 52, Margin = system ? new Thickness(0, 0, 7, 0) : new Thickness(0) };
+        Grid.SetRow(top, 1);
+        strip.Children.Add(top);
+        var icon = Icon(key, system ? 21 : 24, island: true);
+        var mute = new Button { Content = icon, Width = 28, Height = 32, HorizontalAlignment = HorizontalAlignment.Center };
         mute.SetResourceReference(StyleProperty, "IslandIconButtonStyle");
         mute.Click += (_, _) => Run(_module.SetMutedAsync(key, !Level(key).Muted));
-
-        var bar = new Grid { Width = barWidth, Margin = new Thickness(0, 6, 0, 6), Background = Brushes.Transparent };
-        Grid.SetRow(bar, 0); strip.Children.Add(bar);
-        // The trough: the control fill with its 1px edge, 6px corners; the level fills it from the bottom.
-        var track = new Border { CornerRadius = new CornerRadius(6), BorderThickness = new Thickness(1) };
-        track.SetResourceReference(Border.BackgroundProperty, "IslandButtonBrush");
-        track.SetResourceReference(Border.BorderBrushProperty, "IslandControlBorderBrush"); bar.Children.Add(track);
-        var fill = new Border { CornerRadius = new CornerRadius(5), VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(1) };
-        bar.Children.Add(fill);
-        // What the app plays now: a 2px line in the fill at its peak, falling back slowly.
-        var peak = new Border { Height = 2, CornerRadius = new CornerRadius(1), VerticalAlignment = VerticalAlignment.Bottom, Opacity = 0.6, Visibility = Visibility.Collapsed, IsHitTestVisible = false };
-        peak.SetResourceReference(Border.BackgroundProperty, "IslandOnAccentBrush");
-        bar.Children.Add(peak);
-        // The slider holds the value, the keyboard and UI Automation; the bar takes the pointer.
-        var slider = new Slider { Minimum = 0, Maximum = 100, SmallChange = 5, LargeChange = 10, Orientation = Orientation.Vertical, Height = double.NaN, Opacity = 0, IsHitTestVisible = false };
-        slider.SetResourceReference(StyleProperty, "IslandSliderStyle");
-        bar.Children.Add(slider);
-        // Tab reads the strip from the top: the level, then Mute, then the output.
-        Grid.SetRow(mute, 1); strip.Children.Add(mute);
-
-        var percentage = new TextBlock { FontSize = 12, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
-        percentage.SetResourceReference(TextBlock.ForegroundProperty, "IslandTextBrush");
-        var muted = new LucideIcon { Data = LucideIcons.VolumeMuted, Size = 14, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
-        muted.SetResourceReference(LucideIcon.BrushProperty, "WarningBrush");
-        Grid.SetRow(percentage, 2); strip.Children.Add(percentage);
-        Grid.SetRow(muted, 2); strip.Children.Add(muted);
-
-        var name = new TextBlock { FontSize = 11, Width = width, Height = 28, LineHeight = 14, LineStackingStrategy = LineStackingStrategy.BlockLineHeight, MaxHeight = 28, TextWrapping = TextWrapping.WrapWithOverflow, TextTrimming = TextTrimming.CharacterEllipsis, TextAlignment = TextAlignment.Center, Visibility = density == 0 ? Visibility.Visible : Visibility.Collapsed };
-        name.SetResourceReference(TextBlock.ForegroundProperty, "IslandTextSecondaryBrush");
-        Grid.SetRow(name, 3); strip.Children.Add(name);
+        top.Children.Add(mute);
 
         var (output, paintOutput) = OutputButton(key);
-        Grid.SetRow(output, 4); strip.Children.Add(output);
+        if (!system) top.Children.Add(output);
+        void Reveal()
+        {
+            bool reveal = strip.IsMouseOver || strip.IsKeyboardFocusWithin || strip.AreAnyTouchesOver;
+            output.Opacity = reveal ? 1 : 0;
+            output.IsHitTestVisible = reveal;
+            Hint();
+        }
+        strip.MouseEnter += (_, _) => Reveal();
+        strip.MouseLeave += (_, _) => Reveal();
+        strip.IsKeyboardFocusWithinChanged += (_, _) => Reveal();
+        strip.TouchEnter += (_, _) => Reveal();
+        strip.TouchLeave += (_, _) => Reveal();
+        strip.PreviewMouseRightButtonUp += (_, e) =>
+        {
+            if (!system && output.IsEnabled) { output.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); e.Handled = true; }
+        };
 
-        float level = 0; // the peak line's place, 0 to 1
-        bool? painted = null; // the muted state the fill and marks show
+        var bar = new Grid { Width = 44, Background = Brushes.Transparent, Margin = top.Margin };
+        Grid.SetRow(bar, 3);
+        strip.Children.Add(bar);
+        var trough = new Grid { Width = 33, HorizontalAlignment = HorizontalAlignment.Center };
+        trough.SetResourceReference(Panel.BackgroundProperty, "IslandMixerTroughBrush");
+        trough.SizeChanged += (_, _) =>
+        {
+            var radius = trough.ActualWidth <= 27 ? 8 : 9;
+            trough.Clip = new RectangleGeometry(new Rect(trough.RenderSize), radius, radius);
+        };
+        bar.Children.Add(trough);
+        var fill = new Border { VerticalAlignment = VerticalAlignment.Bottom };
+        trough.Children.Add(fill);
+        var peak = new Border { Height = 2, CornerRadius = new CornerRadius(1), VerticalAlignment = VerticalAlignment.Bottom, Opacity = 0.5, Visibility = Visibility.Collapsed, IsHitTestVisible = false };
+        peak.SetResourceReference(Border.BackgroundProperty, "IslandOnAccentBrush");
+        trough.Children.Add(peak);
+
+        var slider = new Slider { Minimum = 0, Maximum = 100, SmallChange = 5, LargeChange = 10, Orientation = Orientation.Vertical, Opacity = 0, IsHitTestVisible = false };
+        slider.SetResourceReference(StyleProperty, "IslandSliderStyle");
+        bar.Children.Add(slider);
+        var focus = new Border { BorderThickness = new Thickness(2), CornerRadius = new CornerRadius(11), Margin = new Thickness(0, -3, 0, -3), Visibility = Visibility.Collapsed, IsHitTestVisible = false };
+        focus.SetResourceReference(Border.BorderBrushProperty, "IslandTextBrush");
+        bar.Children.Add(focus);
+        slider.IsKeyboardFocusedChanged += (_, _) => focus.Visibility = slider.IsKeyboardFocused ? Visibility.Visible : Visibility.Collapsed;
+        var percentage = new TextBlock { FontSize = 12, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Margin = top.Margin };
+        Grid.SetRow(percentage, 5);
+        strip.Children.Add(percentage);
+
+        float level = 0;
+        bool? painted = null;
         void Paint()
         {
             bool isMuted = Level(key).Muted;
-            percentage.Text = $"{Math.Round(slider.Value)}%";
+            percentage.Text = isMuted ? "Muted" : $"{Math.Round(slider.Value)}%";
             if (painted != isMuted)
             {
                 painted = isMuted;
-                percentage.Visibility = isMuted || density == 2 ? Visibility.Collapsed : Visibility.Visible;
-                muted.Visibility = isMuted ? Visibility.Visible : Visibility.Collapsed;
+                percentage.SetResourceReference(TextBlock.ForegroundProperty, isMuted ? "WarningTextBrush" : "IslandTextSecondaryBrush");
                 icon.Opacity = isMuted ? 0.5 : 1;
-                fill.SetResourceReference(Border.BackgroundProperty, isMuted ? "IslandMutedFillBrush" : "IslandAccentFillBrush");
+                fill.SetResourceReference(Border.BackgroundProperty, isMuted ? "IslandMutedFillBrush" : system ? "IslandMixerSystemBrush" : "IslandMixerLevelBrush");
             }
-            fill.Height = Math.Max(0, bar.ActualHeight - 2) * slider.Value / 100;
+            fill.Height = trough.ActualHeight * slider.Value / 100;
             PaintPeak();
         }
         void PaintPeak()
         {
             peak.Visibility = painted == true || level < 0.02 || fill.Height < 8 ? Visibility.Collapsed : Visibility.Visible;
-            peak.Margin = new Thickness(4, 0, 4, 1 + Math.Max(3, fill.Height * level - 3));
+            peak.Margin = new Thickness(4, 0, 4, Math.Max(3, fill.Height * level - 3));
         }
         var write = new LatestWrite();
         slider.ValueChanged += (_, _) => { Paint(); if (!_refreshing) write.Send(() => _module.SetVolumeAsync(key, (float)slider.Value / 100)); };
-        bar.SizeChanged += (_, _) => Paint();
+        trough.SizeChanged += (_, _) => Paint();
 
-        // Pressing the bar doesn't move the level: dragging moves it from where it was, by as far as the
-        // pointer goes, and a click without a drag sets it there.
         double pressY = 0, pressValue = 0;
         bool dragging = false;
-        double Span() => Math.Max(1, bar.ActualHeight - 2);
-        bar.MouseLeftButtonDown += (_, e) => { (pressY, pressValue, dragging) = (e.GetPosition(bar).Y, slider.Value, false); bar.CaptureMouse(); e.Handled = true; };
+        double Span() => Math.Max(1, bar.ActualHeight);
+        bar.MouseLeftButtonDown += (_, e) => { (pressY, pressValue, dragging) = (e.GetPosition(bar).Y, slider.Value, false); slider.Focus(); bar.CaptureMouse(); e.Handled = true; };
         bar.MouseMove += (_, e) =>
         {
             if (!bar.IsMouseCaptured) return;
@@ -334,86 +403,42 @@ public sealed class VolumeView : UserControl
         bar.MouseLeftButtonUp += (_, e) =>
         {
             if (!bar.IsMouseCaptured) return;
+            if (!dragging) slider.Value = Math.Clamp(100 - e.GetPosition(bar).Y / Span() * 100, 0, 100);
             bar.ReleaseMouseCapture();
-            if (!dragging) slider.Value = Math.Clamp((bar.ActualHeight - 1 - e.GetPosition(bar).Y) / Span() * 100, 0, 100);
             e.Handled = true;
         };
-        // The wheel moves 2 a notch; a touchpad's smaller steps move it as far.
+        bar.LostMouseCapture += (_, _) => Dispatcher.BeginInvoke(() => { if (IsLoaded) Refresh(); });
         strip.MouseWheel += (_, e) => { slider.Value = Math.Clamp(slider.Value + e.Delta / 60.0, 0, 100); e.Handled = true; };
 
-        string shownName = "";
         return new Item(strip, () =>
         {
-            // Not while a drag or a write is under way: the level would jump back to a step already passed.
             if (!bar.IsMouseCaptured && !write.Busy) slider.Value = Level(key).Volume * 100;
-            if (AppName(key) != shownName)
-            {
-                shownName = AppName(key);
-                name.Text = density == 0 ? FitName(shownName, name) : shownName; // narrower strips have no name row
-                name.ToolTip = shownName;
-                AutomationProperties.SetName(slider, shownName + " volume");
-            }
-            mute.ToolTip = Level(key).Muted ? "Unmute" : "Mute";
-            AutomationProperties.SetName(mute, $"{mute.ToolTip} {shownName}");
-            paintOutput();
+            string name = AppName(key);
+            string action = Level(key).Muted ? "Unmute" : "Mute";
+            AutomationProperties.SetName(slider, name + " volume");
+            AutomationProperties.SetName(mute, $"{action} {name}");
+            mute.ToolTip = $"{action} {name}";
+            if (!system) paintOutput();
+            string hint = $"{name} · {(system ? "System output" : output.ToolTip)}";
+            AutomationProperties.SetHelpText(strip, hint);
+            AutomationProperties.SetHelpText(slider, hint);
+            bar.ToolTip = hint;
             Paint();
         }, value =>
         {
-            float next = value >= level ? value : Math.Max(value, level - 0.04f); // up at once, down by a 25th a reading
+            float next = value >= level ? value : Math.Max(value, level - 0.04f);
             if (Math.Abs(next - level) < 0.002f) return;
             level = next;
             PaintPeak();
-        });
+        }, trough);
     }
 
-    /// <summary>"+N" in an empty trough where the next bar would be: the apps past the island's room, in Settings.</summary>
-    private Grid More(int density)
+    private void Hint()
     {
-        double barWidth = density == 0 ? 32 : 24;
-        var strip = new Grid { Width = Widths[density] };
-        strip.RowDefinitions.Add(new RowDefinition());
-        strip.RowDefinitions.Add(new RowDefinition { Height = new GridLength(28 + 20 + (density == 0 ? 36 : 0) + 24) });
-        var trough = new Border { Width = barWidth, Margin = new Thickness(0, 6, 0, 6), CornerRadius = new CornerRadius(6), BorderThickness = new Thickness(1) };
-        trough.SetResourceReference(Border.BackgroundProperty, "IslandButtonBrush");
-        trough.SetResourceReference(Border.BorderBrushProperty, "IslandControlBorderBrush");
-        _more = new Button { Width = barWidth, Height = double.NaN, Margin = new Thickness(0, 6, 0, 6), FontSize = 12 };
-        _more.SetResourceReference(StyleProperty, "IslandIconButtonStyle");
-        _more.SetResourceReference(ForegroundProperty, "IslandTextSecondaryBrush");
-        _more.Click += (_, _) => _module.OpenSettings();
-        strip.Children.Add(trough);
-        strip.Children.Add(_more);
-        return strip;
+        var active = _items.Values.FirstOrDefault(i => i.View.IsMouseOver) ?? _items.Values.FirstOrDefault(i => i.View.IsKeyboardFocusWithin);
+        _hint.Text = active is null ? "" : AutomationProperties.GetHelpText(active.View);
     }
 
-    // TextBlock trims a long word at its width, but MaxHeight alone silently hides later lines.
-    // Measure with the same wrapping/font and mark the last visible line when more would follow.
-    private static string FitName(string full, TextBlock target)
-    {
-        var measure = new TextBlock
-        {
-            FontFamily = target.FontFamily, FontSize = target.FontSize, FontWeight = target.FontWeight,
-            LineHeight = target.LineHeight, LineStackingStrategy = target.LineStackingStrategy,
-            TextWrapping = target.TextWrapping,
-        };
-        bool Fits(string text)
-        {
-            measure.Text = text;
-            measure.Measure(new Size(target.Width, double.PositiveInfinity));
-            return measure.DesiredSize.Height <= target.Height + 0.01;
-        }
-        if (Fits(full)) return full;
-        // The longest start that fits with the ellipsis, found by halving, cut between whole characters.
-        var starts = StringInfo.ParseCombiningCharacters(full);
-        string? best = null;
-        for (int low = 1, high = starts.Length - 1; low <= high;)
-        {
-            int middle = (low + high) / 2, length = starts[middle];
-            var candidate = full[..length].TrimEnd() + "\u2026";
-            if (Fits(candidate)) (best, low) = (candidate, middle + 1);
-            else high = middle - 1;
-        }
-        return best ?? "\u2026";
-    }
 
     private string OutputName(string? id, IReadOnlyDictionary<string, string> names) =>
         id is null ? "" : names.TryGetValue(id, out var name) ? name : _module.Snapshot.Find(id) is { } known ? DeviceName.Short(known.Name) : "Unknown output";
@@ -435,18 +460,17 @@ public sealed class VolumeView : UserControl
     }
 
     /// <summary>
-    /// Where the app plays, as a glyph of the device's kind: tertiary while it follows the default,
+    /// The route menu shows where the app plays: tertiary while it follows the default,
     /// accent when it has an output of its own, Caution when it still plays somewhere other than its
     /// pick (an open stream moves only when the app opens a new one, docs/phase-3/architecture.md).
     /// It opens the output menu. System sounds always plays on the default, so it has none.
     /// </summary>
     private (Button Button, Action Paint) OutputButton(AppKey key)
     {
-        var glyph = new LucideIcon { Size = 14 };
-        var button = new Button { Content = glyph, Width = 28, Height = 24, HorizontalAlignment = HorizontalAlignment.Center };
+        var glyph = new LucideIcon { Data = LucideIcons.Ellipsis, Size = 13 };
+        var button = new Button { Content = glyph, Width = 16, Height = 24, Padding = new Thickness(0), Opacity = 0, IsHitTestVisible = false, HorizontalAlignment = HorizontalAlignment.Right };
         button.SetResourceReference(StyleProperty, "IslandIconButtonStyle");
         ToolTipService.SetShowOnDisabled(button, true);
-        button.Visibility = key == AppKey.SystemSounds ? Visibility.Hidden : Visibility.Visible;
         button.Click += (_, _) =>
         {
             var (choices, current) = OutputChoices(key);
@@ -458,7 +482,6 @@ public sealed class VolumeView : UserControl
             var plays = _module.PlaysOn(key);
             var chosen = _module.ChosenOutput(key);
             bool elsewhere = _module.PlaysElsewhere(key), own = chosen is not null && _module.CanPickOutput(key);
-            glyph.Data = DeviceName.Glyph(plays is null ? null : _module.Snapshot.Find(plays));
             glyph.SetResourceReference(LucideIcon.BrushProperty, elsewhere ? "WarningBrush" : own ? "IslandAccentBrush" : "IslandTextTertiaryBrush");
             button.IsEnabled = _module.CanPickOutput(key);
             var where = plays is null ? "" : "plays on " + OutputName(plays, names);

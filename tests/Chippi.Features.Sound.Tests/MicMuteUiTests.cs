@@ -81,7 +81,7 @@ public sealed class MicMuteUiTests
             var row = new MicQuickView(f.Module);
             var level = Children(row).OfType<Slider>().Single();
             Assert.Equal("Microphone volume", AutomationProperties.GetName(level));
-            Assert.Equal(Visibility.Visible, ((FrameworkElement)level.Parent).Visibility);
+            Assert.Equal(Visibility.Visible, level.Visibility);
             Assert.Contains(Children(row).OfType<TextBlock>(), t => t.Text == "50%");
             level.Value = 40;
             await Until(() => Math.Abs(f.System.GetLevel("A").Volume - 0.4f) < 0.001f);
@@ -103,7 +103,7 @@ public sealed class MicMuteUiTests
         await Sta(() =>
         {
             var row = new MicQuickView(f.Module);
-            Assert.Equal(Visibility.Collapsed, ((FrameworkElement)Children(row).OfType<Slider>().Single().Parent).Visibility);
+            Assert.Equal(Visibility.Collapsed, Children(row).OfType<Slider>().Single().Visibility);
             Assert.Contains(Children(row).OfType<TextBlock>(), t => t.Text == "Live" && t.Visibility == Visibility.Visible);
             return Task.CompletedTask;
         });

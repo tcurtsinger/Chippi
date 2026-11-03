@@ -348,6 +348,30 @@ public sealed class IslandWindowTests
     }
 
     [Fact]
+    public void A_settings_refresh_before_close_preserves_the_pending_Audio_tab()
+    {
+        WpfTestThread.Run(() => WithShownIsland(window =>
+        {
+            window.SetTiles(IslandPanelTests.Tiles(IslandPanelTests.Part("sound", "Audio", 10),
+                IslandPanelTests.Part("sound.mixer", "Volume", 20)));
+            window.SetLastPage("sound", false);
+            Click(window);
+            Settle(window.Panel);
+            window.Panel.ShowPage("sound.mixer");
+            window.SetLastPage("sound", false); // an unrelated settings write still has the old values
+            Assert.True(window.Panel.AudioShowsMixer);
+            string? saved = null;
+            window.LastPageChanged += (_, page) => saved = page;
+            window.Escape();
+            Settle(window.Panel);
+            // The save is queued at ContextIdle after the closing frame.
+            Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
+            Assert.Equal("sound.mixer", saved);
+            Assert.True(window.Panel.AudioShowsMixer);
+        }));
+    }
+
+    [Fact]
     public void A_drag_lifts_the_puck_closes_the_panel_and_drops_it_where_it_is_let_go()
     {
         WpfTestThread.Run(() => WithShownIsland(window =>

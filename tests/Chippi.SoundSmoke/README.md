@@ -39,8 +39,9 @@ Coverage:
   pages. Automation changes call-role routing, starts a fake pipeline, changes app volume and mutes.
 - Add features renders all six requirement states and sends Install Driver, Sound settings and the
   Ready switch to their fake actions or real module registry as appropriate.
-- The island grid opens the real shared Microphone page (routing, processing and mute), Output,
-  Volume mixer and Now Playing. Removing App volume while its page is open returns to the grid.
+- The island gallery opens one Audio panel for Devices and App volume. Tests select the real device and tab controls, check that Back returns to the gallery, and remove modules to exercise the one-tab cases. Mixer fixtures include nine visible channels and a fifteen-channel bank with a pinned System sounds strip.
+
+In Debug, `SoundPageShots.RenderAudio` writes native captures and tab-switch timings to `CHIPPI_ISLAND_SHOTS`. Set `CHIPPI_SHOTS_THEME=light` for light captures. The optional `CHIPPI_AUDIO_SHOT_ICONS` folder supplies an icon fixture per sample app, such as `Discord.ico`. The mixer uses its normal initials fallback when an icon is missing.
 
 These checks do not prove physical keyboard/focus behavior, visible animation, actual media
 transport, native shortcut registration, driver installation, real audio routing, packaged RNNoise
