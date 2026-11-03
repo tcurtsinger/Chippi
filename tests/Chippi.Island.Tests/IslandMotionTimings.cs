@@ -63,11 +63,11 @@ public sealed class IslandMotionTimings
                 void Cycle(string suffix)
                 {
                     window.SetLastPage(null);
-                    Time("open" + suffix, 220, () => window.ForceOpen(true));
-                    Time("home to page" + suffix, 150, () => window.Panel.ShowPage("keep-awake", remember: false));
-                    Time("page to Now Playing" + suffix, 150, () => window.Panel.ShowPage(IslandPanelWindow.NowPlayingKey, remember: false));
-                    Time("back to home" + suffix, 150, () => window.Panel.ShowPage(null, remember: false));
-                    Time("close" + suffix, 160, () => window.ForceOpen(false));
+                    Time("open" + suffix, (int)IslandPanelWindow.GrowTime.TotalMilliseconds, () => window.ForceOpen(true));
+                    Time("home to page" + suffix, 180, () => window.Panel.ShowPage("keep-awake", remember: false));
+                    Time("page to Now Playing" + suffix, 180, () => window.Panel.ShowPage(IslandPanelWindow.NowPlayingKey, remember: false));
+                    Time("back to home" + suffix, 180, () => window.Panel.ShowPage(null, remember: false));
+                    Time("close" + suffix, (int)IslandPanelWindow.ShrinkTime.TotalMilliseconds, () => window.ForceOpen(false));
                 }
                 Cycle(" (first)");
                 for (int i = 0; i < Warm; i++)
@@ -82,8 +82,8 @@ public sealed class IslandMotionTimings
                 window.Panel.ShapeShadow.Effect = null;
                 for (int i = 0; i < Warm; i++)
                 {
-                    Time("open, no shadow effect", 220, () => window.ForceOpen(true));
-                    Time("close, no shadow effect", 160, () => window.ForceOpen(false));
+                    Time("open, no shadow effect", (int)IslandPanelWindow.GrowTime.TotalMilliseconds, () => window.ForceOpen(true));
+                    Time("close, no shadow effect", (int)IslandPanelWindow.ShrinkTime.TotalMilliseconds, () => window.ForceOpen(false));
                 }
                 window.Panel.ShapeShadow.Effect = shadow;
 

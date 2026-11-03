@@ -3,8 +3,10 @@
 
 using System.Diagnostics;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using Chippi.App.Island;
 using Chippi.App.Island.Media;
 using Chippi.Core.Island;
@@ -56,6 +58,43 @@ public sealed class ShellMotionTests
             panel.Close();
         }
     }
+
+    [Theory]
+    [InlineData(50)]
+    [InlineData(256)]
+    public void The_first_visible_frame_is_the_source_and_ink_arrives_while_the_outline_is_still_growing(double width) =>
+        WpfTestThread.Run(() => WithMotion(false, () => WithPanel(panel =>
+        {
+            long now = 0;
+            int frames = 0;
+            panel.Clock = () => now;
+            panel.Morphing += (_, _) => frames++;
+            var puck = IslandGeometry.Start(Offscreen.Work, 1);
+            var source = new Rect(puck.Right - width, puck.Top, width, puck.Height);
+            Size? first = null;
+            panel.IsVisibleChanged += (_, _) =>
+            {
+                if (panel.IsVisible)
+                    first = new Size(panel.Shape.Width, panel.Shape.Height);
+            };
+            panel.Open(puck, source, Offscreen);
+            Assert.Equal(source.Size, first);
+            void Frame()
+            {
+                int seen = frames;
+                IslandWindowTests.PumpUntil(() => frames > seen);
+            }
+            Frame(); // establish zero even on a cold first composition
+            now += (long)(Stopwatch.Frequency * IslandPanelWindow.GrowTime.TotalSeconds / 2);
+            Frame();
+            double across = (panel.Shape.Width - width) / (IslandPage.Width - width);
+            double down = (panel.Shape.Height - puck.Height) / (IslandPage.Height - puck.Height);
+            Assert.InRange(down, 0.49, 0.51);
+            Assert.InRange(across, down + 0.1, 0.8);
+            Assert.InRange(panel.Card.Opacity, 0.2, 0.8);
+            Assert.Equal(Canvas.GetLeft(panel.Card) + IslandPage.Width, Canvas.GetLeft(panel.Shape) + panel.Shape.Width, 3);
+            Assert.Equal(Canvas.GetTop(panel.Card) + IslandPage.Height, Canvas.GetTop(panel.Shape) + panel.Shape.Height, 3);
+        })));
 
     [Fact]
     public void A_page_comes_in_from_the_right_and_the_home_from_the_left() => WpfTestThread.Run(() => WithMotion(false, () => WithPanel(panel =>
@@ -211,25 +250,100 @@ public sealed class ShellMotionTests
         }
 
         var puck = window.PuckRect;
-        var pointer = new Point(puck.Left + puck.Width / 2, puck.Top + puck.Height / 2);
+        double scale = window.CurrentArea!.Value.Scale;
+        var pointer = new Point(puck.Left + 8 * scale, puck.Top + 14 * scale);
         window.PointerAt = () => pointer;
         window.PuckButton.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Left) { RoutedEvent = UIElement.PreviewMouseLeftButtonDownEvent });
+        IslandWindowTests.PumpUntil(() => Math.Abs(window.PuckScale.ScaleX - 0.96) < 0.0001);
+        var button = window.PuckButton;
+        var pressed = new Rect(button.PointToScreen(default), button.PointToScreen(new Point(button.ActualWidth, button.ActualHeight)));
         window.PuckButton.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Left) { RoutedEvent = UIElement.PreviewMouseLeftButtonUpEvent });
+        var shape = window.Panel.Shape;
+        var panelWindow = IslandNative.WindowRect(window.Panel.Handle);
+        Assert.Equal(pressed.Width / scale, shape.Width, 3);
+        Assert.Equal(pressed.Height / scale, shape.Height, 3);
+        Assert.Equal(pressed.Left, panelWindow.Left + System.Windows.Controls.Canvas.GetLeft(shape) * scale, 3);
+        Assert.Equal(pressed.Top, panelWindow.Top + System.Windows.Controls.Canvas.GetTop(shape) * scale, 3);
         Assert.True(window.Panel.PetMeetsPuck);
+        var footer = Assert.IsType<IslandGrid>(window.Panel.Page.Content).Pet;
         Frame(); // the clock starts on the first frame
-        Advance(130); // past the first 45% of the 220ms open
-        Assert.Equal(1, window.PuckEnd.Opacity); // Chippi doesn't fade…
-        Assert.Equal(0.7, window.PetScale.ScaleX, 2); // …it's the footer's size
+        Advance(130); // half of the 260ms open
+        Assert.Equal(1, window.PuckEnd.Opacity);
+        Assert.Equal(0, footer.Opacity);
+        Assert.Equal(0.85, window.PetScale.ScaleX, 2); // halfway from 40 to 28
         Advance(300);
-        Assert.Equal(0, window.PuckEnd.Opacity); // and the footer's Chippi has it now
+        Assert.Equal(0, window.PuckEnd.Opacity);
+        Assert.Equal(1, footer.Opacity); // only the footer draws its pet
 
         window.Escape();
         Frame();
-        Advance(20);
-        Assert.Equal(1, window.PuckEnd.Opacity); // closing, the widget's Chippi takes over at once, at the footer's size
+        Assert.Equal(1, window.PuckEnd.Opacity); // closing, the widget owns the pet from frame zero
+        Assert.Equal(0, footer.Opacity);
         Assert.Equal(0.7, window.PetScale.ScaleX, 2);
+        Advance(95); // half of the 190ms close, the same size at the same physical phase
+        Assert.Equal(0.85, window.PetScale.ScaleX, 2);
         Advance(300);
         Assert.Equal(1, window.PetScale.ScaleX, 3);
+    })));
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Reversing_an_open_from_a_partial_bar_hands_back_its_visible_width_before_applying_changes(bool click) => WpfTestThread.Run(() => WithMotion(false, () => IslandWindowTests.WithShownIsland(window =>
+    {
+        window.SetTiles(Tiles(Part("timer", "Focus timer", 0)));
+        window.SetActivities([new IslandActivity("timer", IslandActivityKind.Timer, "18:42", "Focus timer") { TileKey = "timer" }], Chippi.UI.Pet.PetMood.Idle);
+        var button = window.PuckButton;
+        const double partial = 140; // hold an actual animated width between the authored 50 and 256
+        button.BeginAnimation(FrameworkElement.WidthProperty, new DoubleAnimation(partial, partial, TimeSpan.FromMilliseconds(240)));
+        IslandWindowTests.PumpUntil(() => Math.Abs(button.ActualWidth - partial) < 1 && window.Bar.Opacity == 1);
+        var visible = new Rect(button.PointToScreen(default), button.PointToScreen(new Point(button.ActualWidth, button.ActualHeight)));
+        long now = Stopwatch.GetTimestamp();
+        int frames = 0;
+        window.Panel.Clock = () => now;
+        window.Panel.Morphing += (_, _) => frames++;
+        void Frame()
+        {
+            int at = frames;
+            IslandWindowTests.PumpUntil(() => frames > at);
+        }
+        if (click)
+        {
+            var pointer = button.PointToScreen(new Point(70, 25));
+            window.PointerAt = () => pointer;
+            button.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Left) { RoutedEvent = UIElement.PreviewMouseLeftButtonDownEvent });
+            button.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Left) { RoutedEvent = UIElement.PreviewMouseLeftButtonUpEvent });
+        }
+        else
+            Assert.True(window.ShowPage("timer"));
+        Assert.Equal("timer", window.Panel.CurrentPage);
+        Frame();
+        now += (long)(0.052 * Stopwatch.Frequency); // one fifth of the open
+        Frame();
+        double bar = window.BarLayer.Opacity, pet = window.PuckEnd.Opacity;
+        Assert.InRange(bar, 0.42, 0.50);
+        Assert.InRange(pet, 0.60, 0.68); // the bar's lines fade before the pet
+        string originalInk = window.ChipText;
+        window.SetActivities([new IslandActivity("update", IslandActivityKind.Timer, "10:00", "Countdown")], Chippi.UI.Pet.PetMood.Idle);
+        Assert.Equal(originalInk, window.ChipText); // an update cannot replace the still-visible source lines
+
+        window.ClosePages();
+        Frame();
+        Assert.Equal(bar, window.BarLayer.Opacity, 4);
+        Assert.Equal(pet, window.PuckEnd.Opacity, 4);
+        window.SetActivities([], Chippi.UI.Pet.PetMood.Sleepy);
+        Assert.True(window.BarShown); // still returning to the activity bar that started the close
+        IslandWindowTests.Settle(window.Panel);
+        Assert.False(window.BarShown); // the widget handles the change after the handoff
+        double scale = window.CurrentArea!.Value.Scale;
+        var panelWindow = IslandNative.WindowRect(window.Panel.Handle);
+        var last = window.Panel.Shape;
+        Assert.Equal(visible.Left, panelWindow.Left + Canvas.GetLeft(last) * scale, 3);
+        Assert.Equal(visible.Width, last.Width * scale, 3);
+        Assert.Equal(partial, (double)button.GetAnimationBaseValue(FrameworkElement.WidthProperty));
+        Assert.True(DependencyPropertyHelper.GetValueSource(button, FrameworkElement.WidthProperty).IsAnimated); // folds from 140 after landing
+        Assert.Equal(1, window.BarLayer.Opacity);
+        Assert.Equal(1, window.PuckEnd.Opacity);
     })));
 
     [Fact]

@@ -174,22 +174,31 @@ public partial class IslandWindow : Window
                 Dispatcher.BeginInvoke(DispatcherPriority.ContextIdle, () => LastPageChanged?.Invoke(this, page));
             }
         };
-        // While it is out, the panel is the widget's shape: the widget draws only Chippi and the bar's content, above it,
-        // fading as the shape grows and coming back as it folds. Opening, the bar's content goes over the first 25%, and
-        // Chippi shrinks to 70% and fades over the first 45%; closing, they come back over the end. When the home's footer
-        // holds Chippi where the puck's is (a puck on a bottom corner), Chippi doesn't fade: it shrinks onto the footer's,
-        // the same size there, and hands over once the panel is in, so the puck becomes the panel; closing, it takes over again.
+        // Windows presents the two layered windows separately. Keep the source surface lit at frame zero
+        // and pass it to the panel as the edges first separate (the same small overlap on return).
+        // Their visibility follows the same physical phase in both directions, even on a reversal.
         _panel.Morphing += (opening, t) =>
         {
-            // How much of something is showing: gone by `until` opening, back from `from` closing (exactly 1 at the end).
-            double Shown(double until, double from) => opening ? 1 - Math.Clamp(t / until, 0, 1) : t >= 1 ? 1 : Math.Clamp((t - from) / (1 - from), 0, 1);
-            double pet = Shown(0.45, 0.45);
+            double phase = opening ? t : 1 - t;
+            double Fade(double until) => Motion.IsReduced ? 1 - phase : 1 - IslandPanelWindow.SmoothStep(phase / until);
+            bool hadBarInk = BarLayer.Opacity > 0;
+            double surface = Fade(0.11);
+            // Carry the fill across native presents, but let the moving outline own the rim and shadow
+            // as soon as it separates. A second circular stroke inside the new surface reads as a puck.
+            double edge = Fade(0.04);
+            Body.Opacity = surface;
+            Body.BorderThickness = new Thickness(edge);
+            BodyShadow.Opacity = edge;
+            Body.Visibility = BodyShadow.Visibility = surface > 0 ? Visibility.Visible : Visibility.Hidden;
             bool handOver = _panel.PetMeetsPuck && !Motion.IsReduced;
-            PuckEnd.Opacity = !handOver ? pet : opening && t >= 1 ? 0 : 1;
-            BadgeLayer.Opacity = handOver ? pet : 1; // the badge fades either way
-            // Under reduced motion Chippi only fades; nothing shrinks or grows.
-            PetScale.ScaleX = PetScale.ScaleY = Motion.IsReduced ? 1 : PetShrunk + (1 - PetShrunk) * pet;
-            BarLayer.Opacity = Shown(0.25, 0.55);
+            // Where the footer meets the puck, only one pet draws: this one up to the final open frame,
+            // then the footer's. Closing takes ownership back on the first frame at the same size.
+            PuckEnd.Opacity = handOver ? (opening && phase >= 1 ? 0 : 1) : Fade(0.50);
+            BadgeLayer.Opacity = handOver ? Fade(0.50) : 1;
+            PetScale.ScaleX = PetScale.ScaleY = Motion.IsReduced ? 1 : 1 - (1 - PetShrunk) * IslandPanelWindow.SmoothStep(phase);
+            BarLayer.Opacity = Fade(0.38);
+            if (opening && hadBarInk && BarLayer.Opacity == 0)
+                RefreshPuck(); // now a hover-only bar may fold, or new activity replace the original ink
         };
         // Clicked into, the panel comes to the front; the widget, faded out over it, stays above it for the close.
         _panel.Activated += (_, _) => IslandNative.Raise(_hwnd);
@@ -698,18 +707,24 @@ public partial class IslandWindow : Window
         return shown;
     }
 
+    // The saved puck anchors the destination, but the visible button can be dipping about its
+    // off-center grip, partly unfolded, or still sliding. Project the actual outline at handoff.
+    private Rect RenderedWidgetRect()
+    {
+        if (PuckButton.RenderSize.Width <= 0 || PuckButton.RenderSize.Height <= 0 || PresentationSource.FromVisual(Root) is null)
+            return WidgetRect; // a summon can arrive before the widget's first arrange
+        var bounds = PuckButton.TransformToAncestor(Root).TransformBounds(new Rect(PuckButton.RenderSize));
+        return new Rect(Root.PointToScreen(bounds.TopLeft), Root.PointToScreen(bounds.BottomRight));
+    }
+
     private void OpenIsland()
     {
         if (!IsVisible || _dragging || Area is not { } area)
             return;
-        var widget = WidgetRect;
-        if (_slideFrame is not null)
-        {
-            // The saved puck already anchors the destination. The morph starts where the widget is still drawn.
-            var bounds = PuckButton.TransformToAncestor(Root).TransformBounds(new Rect(PuckButton.RenderSize));
-            widget = new Rect(Root.PointToScreen(bounds.TopLeft), Root.PointToScreen(bounds.BottomRight));
-        }
-        _panel.Open(_puck, widget, area);
+        if (!_heldWidth.HasValue && !_panel.IsVisible)
+            HoldBarMotion(); // summoned without a press: keep an interrupted unfold at its visible width too
+        var sourceRim = Body.BorderBrush as SolidColorBrush ?? TryFindResource(_rim ?? "IslandWidgetBorderBrush") as SolidColorBrush;
+        _panel.Open(_puck, RenderedWidgetRect(), area, sourceRim);
         IslandNative.Raise(_hwnd); // Chippi and the bar's content stay above the shape the widget became, fading
         Hook();
     }
@@ -737,7 +752,10 @@ public partial class IslandWindow : Window
         DragCloseTimer.Stop();
         if (!_panel.IsOpen)
             return;
-        _panel.CloseIsland(immediate, WidgetRect);
+        // A reversal can still have a half-unfolded bar underneath it. Land there first;
+        // the remaining unfold or a change of activity takes over after the panel hides.
+        var widget = _resumeBar || _heldWidth.HasValue ? RenderedWidgetRect() : WidgetRect;
+        _panel.CloseIsland(immediate, widget);
         RefreshPuck();
         if (_summoned)
         {
@@ -881,11 +899,13 @@ public partial class IslandWindow : Window
         Grow(heldBar ? 1 : _lifted ? LiftScale : pressed ? PressScale : 1, _lifted && !heldBar ? LiftTilt : 0, pressed ? FillFade.Time : GrowTime);
         BodyShadow.Effect = (System.Windows.Media.Effects.Effect)FindResource(_lifted ? "IslandLiftShadow" : "IslandPuckShadow");
         ShowRim(_hovered && !_lifted ? "IslandWidgetHoverBorderBrush" : "IslandWidgetBorderBrush");
-        Body.Visibility = BodyShadow.Visibility = _panel.IsVisible ? Visibility.Hidden : Visibility.Visible;
-        if (_heldWidth is not null)
+        bool keepSource = _panel.IsVisible && (!_panel.IsOpen || (_panel.IsMorphing && BarLayer.Opacity > 0));
+        if (_heldWidth is not null || keepSource)
         {
+            if (_panel.IsVisible && SongCopy.Visibility == Visibility.Visible)
+                FitTitle(); // hold the current title as soon as the panel opens, even while its ink is fading
             StayAwake(engaged: true);
-            return; // keep the shape, its contents and its click destination until it is released
+            return; // keep the captured or closing shape and its ink until release, handoff, or a reopen
         }
         ShowBadge(MicBadge, mic is not null);
 
@@ -1314,6 +1334,11 @@ public partial class IslandWindow : Window
             Detail.Text = detail;
             Detail.Visibility = Shown(detail.Length > 0);
         }
+        FitTitle();
+    }
+
+    private void FitTitle()
+    {
         SongText.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
         double full = Math.Ceiling(SongText.DesiredSize.Width);
         double room = _lineRoom;
@@ -1421,7 +1446,8 @@ public partial class IslandWindow : Window
         var pointer = PointerAt();
         _pressAt = pointer;
         _pressedBar = _barShown;
-        double width = HoldShape();
+        double width = HoldBarMotion();
+        _heldWidth = width;
         double scale = Area?.Scale ?? 1;
         var at = IslandGeometry.WidgetRect(_puck, _left, width * scale).TopLeft;
         // During an edge slide the saved puck is already at the destination; grab the moving shape itself.
@@ -1440,11 +1466,12 @@ public partial class IslandWindow : Window
 
     // Capture the animated values, including a fold still in progress. An activity update or an
     // animation must not take the object away between pressing and crossing the drag threshold.
-    private double HoldShape()
+    private double HoldBarMotion()
     {
         double width = PuckButton.Width, ink = Bar.Opacity;
-        _heldWidth = width;
         _resumeBar = width != (_barShown ? IslandGeometry.BarWidth : IslandGeometry.Puck) || ink != (_barShown ? 1 : 0);
+        if (!_resumeBar)
+            return width;
         PuckButton.BeginAnimation(WidthProperty, null);
         PuckButton.Width = width;
         Bar.BeginAnimation(OpacityProperty, null);
@@ -1664,7 +1691,7 @@ public partial class IslandWindow : Window
     /// <summary>Debug builds: lift the puck as if dragged, for snapshots.</summary>
     internal void ForceLift(bool lifted)
     {
-        if (lifted) HoldShape();
+        if (lifted) _heldWidth = HoldBarMotion();
         else _heldWidth = null;
         _lifted = lifted;
         Pet.IsHeld = lifted;
