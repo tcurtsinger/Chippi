@@ -78,7 +78,7 @@ public sealed class ScratchpadModuleTests
             add.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
             Flush();
             Assert.Equal(2, Descendants(settings).OfType<Chippi.UI.Controls.SegmentedControl>().First().Items.Count);
-            var popup = settings.ConfirmDelete();
+            var popup = ((ScratchpadWorkspace)settings.Content).ConfirmDelete();
             Assert.False(popup.IsOpen); // never a popup window on the desktop in tests
             Assert.Equal("Delete \"Note 2\"?", Descendants(popup.Child).OfType<System.Windows.Controls.TextBlock>().First().Text);
         }
