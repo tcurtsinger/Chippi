@@ -19,10 +19,10 @@ namespace Chippi.Island.Tests;
 public sealed class DragTabTests
 {
     [Theory]
-    [InlineData(25, false)]
-    [InlineData(128, true)]
-    [InlineData(231, false)]
-    public void Dragging_the_activity_bar_keeps_the_grip_and_lands_the_whole_bar(double gripX, bool loseCapture) => WpfTestThread.Run(() =>
+    [InlineData(25, false)]  // activity icon
+    [InlineData(128, true)]  // title, capture lost at the screen edge
+    [InlineData(231, false)] // pet
+    public void Dragging_an_open_activity_carries_only_Chippi_and_resumes_the_activity_on_drop(double gripX, bool loseCapture) => WpfTestThread.Run(() =>
         IslandWindowTests.WithShownIsland(window =>
         {
             var area = window.CurrentArea!.Value;
@@ -30,39 +30,42 @@ public sealed class DragTabTests
             window.SetPlacement(1, 0.5);
             window.SetActivities([timer], PetMood.Idle);
             IslandWindowTests.PumpUntil(() => window.PuckButton.ActualWidth >= 255.99 && window.Bar.Opacity == 1);
-            var grip = new Vector(gripX, 25);
-            var pointer = window.WidgetRect.TopLeft + grip * area.Scale;
+            var pointer = window.Body.PointToScreen(new Point(gripX, 25));
             window.PointerAt = () => pointer;
             window.PuckButton.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Left) { RoutedEvent = UIElement.PreviewMouseLeftButtonDownEvent });
-            // Drag from the right half to the left. On capture loss, drop with some of the bar hanging off the edge.
-            double left = area.Work.Left + (loseCapture ? -64 : 30) * area.Scale;
-            pointer = new Point(left, area.Work.Top + 80 * area.Scale) + grip * area.Scale;
+
+            pointer = new Point(area.Work.Left + area.Work.Width / 4, area.Work.Top + 120 * area.Scale);
             window.PuckButton.RaiseEvent(new MouseEventArgs(Mouse.PrimaryDevice, 0) { RoutedEvent = UIElement.PreviewMouseMoveEvent });
             window.UpdateLayout();
-            Assert.True(window.BarShown);
-            Assert.Equal("18:42 · Focus timer", window.ChipText);
-            Assert.Equal(IslandGeometry.BarWidth, window.PuckButton.ActualWidth, 2);
-            Assert.Equal(0, window.PuckTiltTarget);
-            Assert.Equal(1, window.PuckScaleTarget);
-            var rendered = window.PuckButton.PointToScreen((Point)grip);
-            Assert.InRange((rendered - pointer).Length, 0, 2); // native positioning rounds to a physical pixel
+            Assert.Equal(IslandGeometry.Puck, window.Body.ActualWidth, 2);
+            Assert.Equal(0, window.Bar.Opacity);
+            Assert.False(window.IsIslandOpen);
+            Assert.False(window.OpensLeft);
+            Assert.True(window.CoversWidget(pointer));
+            if (gripX == 231)
+                Assert.InRange((window.PuckEnd.PointToScreen(new Point(25, 25)) - pointer).Length, 0, 2);
 
-            // An activity update during capture doesn't change what the hand is moving.
             window.SetActivities([], PetMood.Sleepy);
-            Assert.Equal("18:42 · Focus timer", window.ChipText);
-            Assert.True(window.BarShown);
             window.SetActivities([timer], PetMood.Idle);
+            window.UpdateLayout();
+            Assert.Equal(IslandGeometry.Puck, window.Body.ActualWidth, 2);
+            Assert.Equal(0, window.Bar.Opacity);
+            if (loseCapture)
+            {
+                pointer.X = area.Work.Left + 1;
+                window.PuckButton.RaiseEvent(new MouseEventArgs(Mouse.PrimaryDevice, 0) { RoutedEvent = UIElement.PreviewMouseMoveEvent });
+            }
+            var lastPreview = window.PuckRect;
             IslandPlacementEventArgs? chosen = null;
             window.PlacementChosen += (_, e) => chosen = e;
             if (loseCapture) window.PuckButton.ReleaseMouseCapture();
             else window.PuckButton.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Left) { RoutedEvent = UIElement.PreviewMouseLeftButtonUpEvent });
             IslandWindowTests.PumpUntil(() => chosen is not null);
+            Assert.Equal(IslandGeometry.Inside(lastPreview, area.Work), window.PuckRect);
+            Assert.True(area.Work.Contains(window.WidgetRect));
             Assert.False(window.IsIslandOpen);
             Assert.True(window.BarShown);
-            Assert.False(window.OpensLeft);
-            var held = IslandGeometry.HeldRect(pointer, grip, IslandGeometry.BarWidth, area.Scale);
-            Assert.Equal(IslandGeometry.Inside(held, area.Work), window.WidgetRect);
-            Assert.Equal(window.WidgetRect.Left, window.PuckRect.Left);
+            Assert.Equal("18:42 · Focus timer", window.ChipText);
         }));
 
     private static IReadOnlyList<IslandTileGroup> Tiles(bool opensOnDrag) => IslandTileContribution.Group(

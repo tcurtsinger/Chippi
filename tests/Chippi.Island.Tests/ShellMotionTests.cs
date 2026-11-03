@@ -492,8 +492,8 @@ public sealed class ShellMotionTests
             window.SetTiles(Tiles(Part("timer", "Focus timer", 0)));
             window.SetActivities([new IslandActivity("timer", IslandActivityKind.Timer, "18:42", "Focus timer") { TileKey = "timer" }], Chippi.UI.Pet.PetMood.Idle);
             IslandWindowTests.PumpUntil(() => window.PuckButton.ActualWidth >= 255.99 && window.Bar.Opacity == 1);
-            var grip = new Point(128, 25);
-            var pointer = window.PuckButton.PointToScreen(grip);
+            var grip = new Point(25, 25);
+            var pointer = window.PuckButton.PointToScreen(new Point(128, 25)); // pick up the timer bar by its title
             window.PointerAt = () => pointer;
             int saves = 0;
             window.PlacementChosen += (_, _) => saves++;
@@ -530,7 +530,7 @@ public sealed class ShellMotionTests
             Button(UIElement.PreviewMouseLeftButtonUpEvent);
             if (!dragAgain)
             {
-                Assert.Equal("timer", window.Panel.CurrentPage);
+                Assert.True(window.Panel.IsOpen); // a click on the puck in transit opens from its drawn shape
                 window.Panel.UpdateLayout();
                 var shape = window.Panel.Shape;
                 Assert.InRange((shape.PointToScreen(default) - visible.TopLeft).Length, 0, 2);

@@ -504,15 +504,26 @@ public sealed class IslandWindowTests
         public void Stop() { }
     }
 
-    /// <summary>The widget's window holds the puck at <see cref="IslandWindow.PuckRect"/> (its 62 DIP room, in physical pixels).</summary>
+    /// <summary>The pet draws at its saved position and stays inside the display's work area.</summary>
     private static void AssertPuckOnScreen(IslandWindow window)
     {
-        var rect = IslandNative.WindowRect(window.Handle);
-        var puck = window.PuckRect;
-        double scale = window.CurrentArea!.Value.Scale;
-        Assert.Equal(puck.Top + puck.Height / 2 - 62 * scale, rect.Top, 1);
-        double center = window.OpensLeft ? rect.Right - 62 * scale : rect.Left + 62 * scale;
-        Assert.Equal(puck.Left + puck.Width / 2, center, 1);
+        window.UpdateLayout();
+        var pet = window.PuckEnd;
+        var drawn = new Rect(pet.PointToScreen(default), pet.PointToScreen(new Point(pet.ActualWidth, pet.ActualHeight)));
+        var expected = window.PuckRect;
+        Assert.InRange((drawn.TopLeft - expected.TopLeft).Length, 0, 2);
+        Assert.InRange((drawn.BottomRight - expected.BottomRight).Length, 0, 2);
+        var work = window.CurrentArea!.Value.Work;
+        work.Inflate(1, 1); // the HWND rounds its origin to a physical pixel
+        Assert.True(work.Contains(drawn));
+        AssertHostCenter(window, new Point(drawn.Left + drawn.Width / 2, drawn.Top + drawn.Height / 2));
+    }
+
+    internal static void AssertHostCenter(IslandWindow window, Point expected)
+    {
+        var hwnd = IslandNative.WindowRect(window.Handle);
+        var center = new Point(hwnd.Left + hwnd.Width / 2, hwnd.Top + hwnd.Height / 2);
+        Assert.InRange((center - expected).Length, 0, 2);
     }
 
     /// <summary>
