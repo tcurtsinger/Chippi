@@ -77,10 +77,23 @@ internal static class RoutingUi
     }
 
     /// <summary>A popup menu under <paramref name="anchor"/>. With <paramref name="current"/>, that item gets a check and the focus.</summary>
-    public static void Menu(FrameworkElement anchor, IEnumerable<(string Label, Action Action, bool Enabled)> items, int current = -1)
+    public static void Menu(FrameworkElement anchor, IEnumerable<(string Label, Action Action, bool Enabled)> items, int current = -1, string? title = null)
     {
         var stack = new StackPanel();
-        var border = new Border { Child = stack, Padding = new Thickness(4), CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(1) };
+        var border = new Border { Padding = new Thickness(4), CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(1) };
+        if (title is not null)
+        {
+            var name = Text(title, "NavGroupTextStyle", "TextSecondaryBrush");
+            name.Margin = new Thickness(10, 5, 10, 5);
+            name.ToolTip = title;
+            DockPanel.SetDock(name, Dock.Top);
+            var choices = new ScrollViewer { Content = stack, MaxHeight = 224, Focusable = false,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+            border.MaxWidth = 368;
+            border.Child = new DockPanel { Children = { name, choices } };
+            AutomationProperties.SetName(border, title);
+        }
+        else border.Child = stack;
         border.SetResourceReference(Border.BackgroundProperty, "FlyoutBrush");
         border.SetResourceReference(Border.BorderBrushProperty, "BorderBrush");
         border.SetResourceReference(TextElement.ForegroundProperty, "TextPrimaryBrush");
@@ -93,8 +106,9 @@ internal static class RoutingUi
         {
             // A long device name ends in "…" at 360 rather than stretching the menu across the screen.
             var label = new TextBlock { Text = item.Label, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center };
-            var button = new Button { Content = label, IsEnabled = item.Enabled, HorizontalContentAlignment = HorizontalAlignment.Left, MinWidth = 160, MaxWidth = 360 };
+            var button = new Button { IsEnabled = item.Enabled, HorizontalContentAlignment = HorizontalAlignment.Left, MinWidth = 160, MaxWidth = 360 };
             AutomationProperties.SetName(button, item.Label);
+            button.ToolTip = item.Label;
             if (current >= 0)
             {
                 // A 20 column for the check, so the labels line up whichever item has it.
@@ -104,13 +118,20 @@ internal static class RoutingUi
                     var check = new LucideIcon { Data = LucideIcons.Check, Size = 12, VerticalAlignment = VerticalAlignment.Center };
                     check.SetResourceReference(LucideIcon.BrushProperty, "AccentBrush");
                     Add(row, check, 0);
+                    AutomationProperties.SetItemStatus(button, "Selected");
                 }
                 Add(row, label, 1);
                 button.Content = row;
                 if (index == current && item.Enabled) focus = button;
             }
+            else button.Content = label;
             button.SetResourceReference(FrameworkElement.StyleProperty, "FlyoutRowButtonStyle");
-            button.Click += (_, _) => { popup.IsOpen = false; item.Action(); };
+            button.Click += (_, _) =>
+            {
+                popup.IsOpen = false;
+                if (title is not null) anchor.Focus();
+                item.Action();
+            };
             stack.Children.Add(button);
             if (button.IsEnabled) buttons.Add(button);
         }

@@ -51,7 +51,7 @@ public sealed class MicQuickView : UserControl
     private void ShowPercent(bool hasLevel)
     {
         _percent.Text = Warning || !hasLevel ? _module.StatusText : $"{Math.Round(_level.Value).ToString(CultureInfo.CurrentCulture)}%";
-        _percent.SetResourceReference(TextBlock.ForegroundProperty, Warning ? "WarningTextBrush" : "IslandTextBrush");
+        _percent.SetResourceReference(TextBlock.ForegroundProperty, Warning ? "WarningTextBrush" : "IslandTextSecondaryBrush");
         RoutingQuickView.Quiet(_level, Warning);
     }
 
@@ -72,6 +72,7 @@ public sealed class MicQuickView : UserControl
         bool muted = _module.Status.State == MicrophoneMuteState.Muted;
         _mute.Content = muted ? "Unmute" : "Mute";
         AutomationProperties.SetName(_mute, muted ? "Unmute all microphones" : "Mute all microphones");
+        _mute.ToolTip = AutomationProperties.GetName(_mute);
         _mute.IsEnabled = !none;
         AudioDeviceCard.ShowError(_error, _module.Error);
     }

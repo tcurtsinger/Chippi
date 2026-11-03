@@ -6,6 +6,7 @@ using System.Windows.Automation.Peers;
 using System.Windows.Automation.Provider;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Media;
 using Chippi.App.Island;
 using Chippi.App.Island.Media;
 using Chippi.UI.Pet;
@@ -232,6 +233,13 @@ public sealed class SoundShellTests
             var firstNine = Order();
             Assert.Equal(9, firstNine.Count);
             Assert.Equal("System sounds volume", firstNine[0]);
+            // In the tightest bank the app's mute and output actions still have independent hit areas.
+            var mute = Named<Button>(host, "Mute Discord");
+            var output = Named<Button>(host, "Discord output");
+            var muteBounds = new Rect(mute.TranslatePoint(default, host), mute.RenderSize);
+            var outputBounds = new Rect(output.TranslatePoint(default, host), output.RenderSize);
+            Assert.True(outputBounds.Width >= 24 && outputBounds.Height >= 24);
+            Assert.False(muteBounds.IntersectsWith(outputBounds));
             Assert.DoesNotContain(All<Button>(host), b => b.IsVisible && AutomationProperties.GetName(b) == "Next apps");
             var system = Named<Slider>(host, "System sounds volume");
             var systemX = system.TranslatePoint(default, host).X;
@@ -254,6 +262,49 @@ public sealed class SoundShellTests
         }
         finally { panel.Close(); }
     });
+
+    [Fact]
+    public Task An_app_output_menu_identifies_the_channel_and_reaches_the_last_device() => SmokeDispatcher.Run(async () =>
+    {
+        await using var scene = new SoundScene();
+        scene.Devices.With([.. Enumerable.Range(1, 12).Select(i =>
+            Chippi.Audio.Tests.FakeDeviceSystem.Speaker($"usb-{i}", $"USB speaker {i:00}"))]);
+        await scene.Start();
+        var panel = OpenPanel(scene, new FakeMedia());
+        try
+        {
+            panel.ShowPage(AppVolumeModule.TileKey);
+            var route = Named<Button>(panel.PageBody!, "Music output");
+            await SmokeDispatcher.Until(() => route.IsEnabled);
+            Invoke(route);
+
+            // The popup has its own presentation source, separate from the panel.
+            Border? Menu() => PresentationSource.CurrentSources.OfType<PresentationSource>()
+                .Select(s => s.RootVisual).OfType<Visual>().SelectMany(VisualChildren)
+                .OfType<Border>().FirstOrDefault(b => AutomationProperties.GetName(b) == "Music output");
+            await SmokeDispatcher.Until(() => Menu() is not null);
+            var menu = Menu()!;
+            menu.UpdateLayout();
+            var scroller = Assert.Single(All<ScrollViewer>(menu));
+            Assert.True(scroller.ScrollableHeight > 0);
+            var current = Assert.Single(All<Button>(menu), b => AutomationProperties.GetItemStatus(b) == "Selected");
+            Assert.Contains("Default", AutomationProperties.GetName(current));
+            var last = Named<Button>(menu, "USB speaker 12");
+            last.BringIntoView();
+            Invoke(last);
+            await SmokeDispatcher.Until(() => scene.Volume.ChosenOutput(scene.Volume.Apps.Single().Key) == "usb-12");
+            Assert.True(panel.IsOpen);
+            Assert.Equal(AppVolumeModule.TileKey, panel.CurrentPage);
+        }
+        finally { panel.Close(); }
+    });
+
+    private static IEnumerable<DependencyObject> VisualChildren(DependencyObject root)
+    {
+        yield return root;
+        for (int i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
+            foreach (var child in VisualChildren(VisualTreeHelper.GetChild(root, i))) yield return child;
+    }
 
     [Fact]
     public Task Now_playing_is_media_only_and_the_sound_page_sets_the_output_in_use() => SmokeDispatcher.Run(async () =>
@@ -335,14 +386,14 @@ public sealed class SoundShellTests
         return panel;
     }
 
-    private static IEnumerable<T> All<T>(DependencyObject root) where T : DependencyObject
+    internal static IEnumerable<T> All<T>(DependencyObject root) where T : DependencyObject
     {
         if (root is T match) yield return match;
         foreach (var child in LogicalTreeHelper.GetChildren(root).OfType<DependencyObject>())
             foreach (var item in All<T>(child)) yield return item;
     }
     private static IEnumerable<string> Texts(DependencyObject root) => All<TextBlock>(root).Select(t => t.Text);
-    private static T Named<T>(DependencyObject root, string name) where T : DependencyObject => Assert.Single(All<T>(root), c => AutomationProperties.GetName(c) == name);
+    internal static T Named<T>(DependencyObject root, string name) where T : DependencyObject => Assert.Single(All<T>(root), c => AutomationProperties.GetName(c) == name);
     private static void SelectTab(DependencyObject root, string name)
     {
         var tabs = Assert.Single(All<SegmentedControl>(root));

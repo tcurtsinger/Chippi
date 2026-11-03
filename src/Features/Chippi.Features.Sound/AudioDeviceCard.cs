@@ -18,7 +18,7 @@ internal sealed class AudioDeviceCard : Border
     private readonly AudioFlow _flow;
     private readonly ComboBox _picker = new()
     {
-        Height = 27, MinWidth = 0, MaxWidth = 340, HorizontalAlignment = HorizontalAlignment.Left,
+        Height = 28, MinWidth = 0, HorizontalAlignment = HorizontalAlignment.Left,
         FontSize = 15, FontWeight = FontWeights.SemiBold, Margin = new Thickness(-11, 0, 0, 0),
     };
     private readonly TextBlock _display = new()
@@ -27,6 +27,7 @@ internal sealed class AudioDeviceCard : Border
         VerticalAlignment = VerticalAlignment.Center,
     };
     private readonly TextBlock _routingError;
+    private readonly Grid? _controls;
     private AudioRoutingModule? _routing;
     private IReadOnlyList<PriorityEntry> _connected = [];
     private bool _synchronizing;
@@ -37,26 +38,16 @@ internal sealed class AudioDeviceCard : Border
         _flow = flow;
         string label = flow == AudioFlow.Render ? SoundTile.Output : SoundTile.Microphone;
         SetResourceReference(StyleProperty, "IslandCardStyle");
-        Padding = new Thickness(14, 6, 14, 6);
+        Padding = new Thickness(15, 6, 15, 6);
 
         var caption = new TextBlock { Text = label, FontSize = 12, FontWeight = FontWeights.Medium };
         caption.SetResourceReference(TextBlock.ForegroundProperty, "IslandTextSecondaryBrush");
-        icon.Size = 22;
-        icon.Margin = new Thickness(3, 0, 12, 0);
+        icon.Size = 20;
+        icon.Margin = new Thickness(0, 0, 12, 0);
         icon.VerticalAlignment = VerticalAlignment.Center;
         var heading = new DockPanel();
         DockPanel.SetDock(icon, Dock.Left);
         heading.Children.Add(icon);
-        if (value is not null)
-        {
-            value.FontSize = 17;
-            value.MinWidth = 38;
-            value.TextAlignment = TextAlignment.Right;
-            value.VerticalAlignment = VerticalAlignment.Center;
-            Typography.SetNumeralAlignment(value, FontNumeralAlignment.Tabular);
-            DockPanel.SetDock(value, Dock.Right);
-            heading.Children.Add(value);
-        }
         _picker.SetResourceReference(StyleProperty, "HopperComboBoxStyle");
         _picker.SetResourceReference(Control.ForegroundProperty, "IslandTextBrush");
         // Keep the collapsed device name and chevron on the card surface; the menu keeps the normal combo template.
@@ -66,17 +57,25 @@ internal sealed class AudioDeviceCard : Border
         _picker.SelectionChanged += Pick;
         heading.Children.Add(new StackPanel
         {
-            Children = { caption, new Grid { Height = 27, Children = { _display, _picker } } },
+            Children = { caption, new Grid { Height = 28, Children = { _display, _picker } } },
         });
 
         var content = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Children = { heading } };
-        if (slider is not null && mute is not null)
+        if (slider is not null && value is not null && mute is not null)
         {
-            mute.MinWidth = 54;
-            mute.Height = 26;
+            value.FontSize = 13;
+            value.MinWidth = 34;
+            value.TextAlignment = TextAlignment.Right;
+            value.VerticalAlignment = VerticalAlignment.Center;
+            value.Margin = new Thickness(8, 0, 0, 0);
+            Typography.SetNumeralAlignment(value, FontNumeralAlignment.Tabular);
             mute.Margin = new Thickness(12, 0, 0, 0);
-            DockPanel.SetDock(mute, Dock.Right);
-            content.Children.Add(new DockPanel { Margin = new Thickness(0, 7, 0, 0), Children = { mute, slider } });
+            _controls = RoutingUi.Columns(new GridLength(1, GridUnitType.Star), GridLength.Auto, GridLength.Auto);
+            _controls.Margin = new Thickness(0, 8, 0, 0);
+            RoutingUi.Add(_controls, slider, 0);
+            RoutingUi.Add(_controls, value, 1);
+            RoutingUi.Add(_controls, mute, 2);
+            content.Children.Add(_controls);
         }
         _routingError = ErrorText();
         content.Children.Add(_routingError);
@@ -117,6 +116,9 @@ internal sealed class AudioDeviceCard : Border
     {
         _display.Text = name is null ? _flow == AudioFlow.Render ? "No output" : "No microphone" : DeviceName.Short(name);
         _display.ToolTip = name;
+        _display.SetResourceReference(TextBlock.ForegroundProperty, name is null ? "IslandTextSecondaryBrush" : "IslandTextBrush");
+        if (_controls is not null)
+            _controls.Visibility = name is null ? Visibility.Collapsed : Visibility.Visible;
     }
 
     private void RefreshPicker()
@@ -138,8 +140,10 @@ internal sealed class AudioDeviceCard : Border
             }
             var current = _picker.Items.OfType<ComboBoxItem>().FirstOrDefault(i => string.Equals((string)i.Tag, inUse, StringComparison.OrdinalIgnoreCase));
             _picker.SelectedItem = current;
-            _picker.Tag = routing?.Snapshot.Find(inUse ?? "")?.Name ?? (_flow == AudioFlow.Render ? "Choose output" : "Choose microphone");
-            _picker.ToolTip = current?.ToolTip ?? _picker.Tag;
+            string deviceName = current?.ToolTip as string ?? routing?.Snapshot.Find(inUse ?? "")?.Name
+                ?? (_flow == AudioFlow.Render ? "Choose output" : "Choose microphone");
+            _picker.Tag = _picker.ToolTip = deviceName;
+            AutomationProperties.SetHelpText(_picker, deviceName);
             _picker.Visibility = connected.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
             _display.Visibility = connected.Count > 0 ? Visibility.Collapsed : Visibility.Visible;
             ShowError(_routingError, routing?.Error);
@@ -162,7 +166,8 @@ internal sealed class AudioDeviceCard : Border
             var device = connected[i];
             if (!items.TryGetValue(device.Id, out var item))
             {
-                item = new ComboBoxItem { Tag = device.Id };
+                item = new ComboBoxItem { Tag = device.Id, MaxWidth = 400 };
+                item.SetResourceReference(ContentControl.ContentTemplateProperty, "IslandAudioDeviceNameTemplate");
                 _picker.Items.Insert(i, item);
             }
             else if (_picker.Items.IndexOf(item) != i)

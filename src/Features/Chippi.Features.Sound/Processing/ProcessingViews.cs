@@ -349,16 +349,17 @@ public sealed class ProcessingQuickView : UserControl
     {
         _module = module;
         _switch.SetResourceReference(StyleProperty, "SwitchStyle");
-        _switch.LayoutTransform = new System.Windows.Media.ScaleTransform(34 / 40d, 18 / 20d); // the island's 34 x 18 switch, from the 40 x 20 template
         AutomationProperties.SetName(_switch, "Mic processing");
         _switch.Checked += (_, _) => Flip(true);
         _switch.Unchecked += (_, _) => Flip(false);
         var label = RoutingUi.Text("Mic processing");
-        label.FontSize = 12;
+        label.FontSize = 13;
         DockPanel.SetDock(label, Dock.Left);
         var card = RoutingUi.IslandCard(_glyph, new DockPanel { Children = { label, _meter } }, _switch);
+        card.Padding = new Thickness(15, 0, 15, 0);
+        _meter.ToolTip = "Processed microphone level";
         _problem = ProcessingUi.ProblemLine(_warning);
-        _problem.Margin = new Thickness(10, 4, 0, 0);
+        _problem.Margin = new Thickness(16, 4, 0, 0);
         Content = new StackPanel { Children = { card, _problem } };
         ProcessingUi.Meter(this, module, readings => _meter.Level = ProcessingUi.MeterFill(readings.ProcessingOutput));
         Loaded += (_, _) => { _module.Changed += Refresh; Refresh(); };
@@ -381,6 +382,7 @@ public sealed class ProcessingQuickView : UserControl
             _switch.IsChecked = _module.Settings.Enabled;
             var problem = _module.Problem;
             _warning.Text = problem ?? "";
+            _warning.ToolTip = problem;
             _problem.Visibility = problem is null ? Visibility.Collapsed : Visibility.Visible;
             if (_module.Fix != _fix)
             {

@@ -59,13 +59,14 @@ public sealed class RoutingQuickView : UserControl
         var id = Module.InUse(Flow);
         var endpoint = Module.Snapshot.Find(id ?? "");
         _card.ShowName(endpoint?.Name);
-        _glyph.Data = Flow == AudioFlow.Capture ? LucideIcons.Mic : LucideIcons.Speaker;
-        _glyph.SetResourceReference(LucideIcon.BrushProperty, "IslandTextSecondaryBrush");
+        _glyph.Data = Flow == AudioFlow.Capture ? LucideIcons.Mic : DeviceName.Glyph(endpoint);
+        _glyph.SetResourceReference(LucideIcon.BrushProperty, endpoint is null ? "IslandTextTertiaryBrush" : "IslandTextSecondaryBrush");
         if (Flow == AudioFlow.Capture) return;
 
         var known = Module.Snapshot.Levels.TryGetValue(id ?? "", out var level) && endpoint is not null;
         _mute.IsEnabled = _volume.IsEnabled = known;
-        _volume.Visibility = _percent.Visibility = endpoint is null ? Visibility.Collapsed : Visibility.Visible;
+        _volume.Visibility = known ? Visibility.Visible : Visibility.Collapsed;
+        _percent.Visibility = endpoint is null ? Visibility.Collapsed : Visibility.Visible;
         _refreshing = true;
         try { _shown.Show(_volume, known ? id : null, known ? level.Volume : 0); }
         finally { _refreshing = false; }
@@ -82,8 +83,8 @@ public sealed class RoutingQuickView : UserControl
 
     private void ShowPercent(bool muted)
     {
-        _percent.Text = muted ? "Muted" : $"{Math.Round(_volume.Value).ToString(CultureInfo.CurrentCulture)}%";
-        _percent.SetResourceReference(TextBlock.ForegroundProperty, muted ? "WarningTextBrush" : "IslandTextBrush");
+        _percent.Text = _shown.Id is null ? "Level unavailable" : muted ? "Muted" : $"{Math.Round(_volume.Value).ToString(CultureInfo.CurrentCulture)}%";
+        _percent.SetResourceReference(TextBlock.ForegroundProperty, muted ? "WarningTextBrush" : "IslandTextSecondaryBrush");
         Quiet(_volume, muted);
     }
 

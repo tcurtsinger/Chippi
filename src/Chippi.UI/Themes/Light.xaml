@@ -88,8 +88,8 @@
     <SolidColorBrush x:Key="IslandHoverBrush" Color="#0B000000" />
     <SolidColorBrush x:Key="IslandTrackBrush" Color="#1F000000" />
     <SolidColorBrush x:Key="IslandMixerTroughBrush" Color="#E3E3E8" />
-    <SolidColorBrush x:Key="IslandMixerLevelBrush" Color="#9983C5" />
-    <SolidColorBrush x:Key="IslandMixerSystemBrush" Color="#898797" />
+    <SolidColorBrush x:Key="IslandMixerLevelBrush" Color="#8C73BC" />
+    <SolidColorBrush x:Key="IslandMixerSystemBrush" Color="#807E8E" />
     <SolidColorBrush x:Key="IslandSliderTrackBrush" Color="#8A8A8A" />
     <SolidColorBrush x:Key="IslandThumbBrush" Color="#FFFFFF" />
     <SolidColorBrush x:Key="IslandMutedFillBrush" Color="#2E000000" />

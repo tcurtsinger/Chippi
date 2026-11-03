@@ -540,7 +540,7 @@ public partial class IslandPanelWindow : Window
             // taller row (the Command bar's 32 field) gets it, and its body is that much shorter.
             var back = BackButton(() => { if (!PageHandlesBack()) ShowPage(null, remember: false); });
             DockPanel.SetDock(back, Dock.Left);
-            double height = IslandTool.IsAudioPage(key) && Exists(SoundTile.Key) && Exists(AppVolumeModule.TileKey) ? 28
+            double height = IslandTool.IsAudioPage(key) && Exists(SoundTile.Key) && Exists(AppVolumeModule.TileKey) ? 32
                 : Group(key)?.Parts.Max(p => p.Spec.HeaderHeight) is > 0 and var taller ? taller : IslandPage.HeaderHeight;
             var row = new DockPanel { Height = height, Margin = new Thickness(0, 0, 0, IslandPage.Gap), LastChildFill = true, Children = { back, header } };
             DockPanel.SetDock(row, Dock.Top);
@@ -587,7 +587,7 @@ public partial class IslandPanelWindow : Window
             DockPanel.SetDock(_audioTabs, Dock.Right);
             row.Children.Add(_audioTabs);
         }
-        row.Children.Add(new TextBlock { Text = "Audio", FontSize = 15, FontWeight = FontWeights.SemiBold,
+        row.Children.Add(new TextBlock { Text = "Audio", FontSize = 16, FontWeight = FontWeights.SemiBold,
             VerticalAlignment = VerticalAlignment.Center });
         _attached.Add(row);
         return row;

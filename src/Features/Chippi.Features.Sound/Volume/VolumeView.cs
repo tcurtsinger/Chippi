@@ -5,6 +5,8 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Documents;
+using System.Windows.Input;
 using System.Windows.Media;
 using Chippi.Audio;
 using Chippi.Features.Sound.Routing;
@@ -35,8 +37,8 @@ public sealed class VolumeView : UserControl
     private readonly FrameworkElement _empty;
     private readonly List<Action> _updates = []; // Settings' options
     private readonly Button _previous = new(), _next = new();
-    private readonly TextBlock _range = new(), _hint = new() { FontSize = 11, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Top,
-        IsHitTestVisible = false, TextTrimming = TextTrimming.CharacterEllipsis };
+    private readonly TextBlock _range = new();
+    private readonly Run _hintName = new() { FontWeight = FontWeights.SemiBold }, _hintRoute = new();
     private readonly Grid? _pager;
     private int _page;
     private bool _paging;
@@ -51,25 +53,33 @@ public sealed class VolumeView : UserControl
     {
         _module = module; _surface = surface;
         Content = _root;
-        _root.RowDefinitions.Add(new RowDefinition());
-        _root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         _error = RoutingUi.Text("", "CaptionTextStyle", "WarningTextBrush");
         if (surface == VolumeSurface.Island)
         {
             _list = new Grid();
+            _root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(22) });
+            _root.RowDefinitions.Add(new RowDefinition());
+            _root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             _root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             _pager = BuildPager();
-            Grid.SetRow(_pager, 1);
-            _hint.SetResourceReference(TextBlock.ForegroundProperty, "IslandTextTertiaryBrush");
+            var hint = new TextBlock { FontSize = 12, VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(3, 0, 3, 0), TextTrimming = TextTrimming.CharacterEllipsis, IsHitTestVisible = false };
+            hint.SetResourceReference(TextBlock.ForegroundProperty, "IslandTextSecondaryBrush");
+            _hintName.SetResourceReference(TextElement.ForegroundProperty, "IslandTextBrush");
+            hint.Inlines.Add(_hintName);
+            hint.Inlines.Add(_hintRoute);
             var glyph = new LucideIcon { Data = LucideIcons.Sliders, Size = 20, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 0, 0, 6) };
             glyph.SetResourceReference(LucideIcon.BrushProperty, "IslandTextTertiaryBrush");
             _empty = new StackPanel { VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center,
                 Children = { glyph, RoutingUi.Text("No apps in the Windows mixer", "CaptionTextStyle", "IslandTextTertiaryBrush") } };
             _root.Children.Add(_list);
             _root.Children.Add(_empty);
-            _root.Children.Add(_hint);
+            _root.Children.Add(hint);
             _root.Children.Add(_pager);
-            Grid.SetRow(_error, 2); _root.Children.Add(_error);
+            Grid.SetRow(_list, 1);
+            Grid.SetRowSpan(_empty, 2);
+            Grid.SetRow(_pager, 2);
+            Grid.SetRow(_error, 3); _root.Children.Add(_error);
         }
         else
         {
@@ -133,7 +143,8 @@ public sealed class VolumeView : UserControl
         line.VerticalAlignment = VerticalAlignment.Top;
         Grid.SetColumnSpan(line, 3);
         pager.Children.Add(line);
-        _range.FontSize = 11;
+        _range.FontSize = 12;
+        Typography.SetNumeralAlignment(_range, FontNumeralAlignment.Tabular);
         _range.Margin = new Thickness(3, 0, 0, 0);
         _range.VerticalAlignment = VerticalAlignment.Center;
         _range.SetResourceReference(TextBlock.ForegroundProperty, "IslandTextTertiaryBrush");
@@ -291,7 +302,12 @@ public sealed class VolumeView : UserControl
             system.SetResourceReference(LucideIcon.BrushProperty, island ? "IslandTextTertiaryBrush" : "TextSecondaryBrush");
             return system;
         }
-        if (AppIcon.Load(app?.ExePath) is { } icon) return new Image { Source = icon, Width = size, Height = size, VerticalAlignment = VerticalAlignment.Center };
+        if (AppIcon.Load(app?.ExePath) is { } icon)
+        {
+            var image = new Image { Source = icon, Width = size, Height = size, VerticalAlignment = VerticalAlignment.Center, SnapsToDevicePixels = true };
+            RenderOptions.SetBitmapScalingMode(image, BitmapScalingMode.HighQuality);
+            return image;
+        }
         var label = new TextBlock { Text = Initials(AppName(key)), FontSize = island ? 10 : 9, FontWeight = FontWeights.SemiBold, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
         label.SetResourceReference(TextBlock.ForegroundProperty, island ? "IslandTextBrush" : "TextPrimaryBrush");
         var tile = new Border { Width = size, Height = size, CornerRadius = new CornerRadius(island ? 4 : 3), Child = label, VerticalAlignment = VerticalAlignment.Center };
@@ -303,27 +319,29 @@ public sealed class VolumeView : UserControl
     private Item Strip(AppKey key)
     {
         bool system = key == AppKey.SystemSounds;
-        var strip = new Grid { Background = Brushes.Transparent, Height = 239, VerticalAlignment = VerticalAlignment.Center };
-        foreach (double height in new double[] { 1, 32, 8, 162, 8, 16, 1 })
-            strip.RowDefinitions.Add(new RowDefinition { Height = height == 1 ? new GridLength(1, GridUnitType.Star) : new GridLength(height) });
+        var inset = system ? new Thickness(0, 0, 7, 0) : new Thickness(0);
+        var strip = new Grid { Background = Brushes.Transparent, MaxHeight = 250 };
+        strip.RowDefinitions.Add(new RowDefinition { Height = new GridLength(32) }); // mute
+        strip.RowDefinitions.Add(new RowDefinition { Height = new GridLength(6) });
+        strip.RowDefinitions.Add(new RowDefinition { MaxHeight = 162 }); // fader can shorten to make room for an error
+        strip.RowDefinitions.Add(new RowDefinition { Height = new GridLength(6) });
+        strip.RowDefinitions.Add(new RowDefinition { Height = new GridLength(20) }); // value
+        strip.RowDefinitions.Add(new RowDefinition { Height = new GridLength(24) }); // output menu
+        Border? divider = null;
         if (system)
         {
-            var divider = new Border { Width = 1, HorizontalAlignment = HorizontalAlignment.Right };
+            divider = new Border { Width = 1, HorizontalAlignment = HorizontalAlignment.Right };
             divider.SetResourceReference(Border.BackgroundProperty, "IslandHairBrush");
-            Grid.SetRowSpan(divider, 7);
+            Grid.SetRowSpan(divider, 5);
             strip.Children.Add(divider);
         }
-        var top = new Grid { MaxWidth = 52, Margin = system ? new Thickness(0, 0, 7, 0) : new Thickness(0) };
-        Grid.SetRow(top, 1);
-        strip.Children.Add(top);
         var icon = Icon(key, system ? 21 : 24, island: true);
-        var mute = new Button { Content = icon, Width = 28, Height = 32, HorizontalAlignment = HorizontalAlignment.Center };
+        var mute = new Button { Content = icon, Width = 34, Height = 32, Margin = inset, HorizontalAlignment = HorizontalAlignment.Center };
         mute.SetResourceReference(StyleProperty, "IslandIconButtonStyle");
         mute.Click += (_, _) => Run(_module.SetMutedAsync(key, !Level(key).Muted));
-        top.Children.Add(mute);
+        strip.Children.Add(mute);
 
         var (output, paintOutput) = OutputButton(key);
-        if (!system) top.Children.Add(output);
         void Reveal()
         {
             bool reveal = strip.IsMouseOver || strip.IsKeyboardFocusWithin || strip.AreAnyTouchesOver;
@@ -341,8 +359,8 @@ public sealed class VolumeView : UserControl
             if (!system && output.IsEnabled) { output.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); e.Handled = true; }
         };
 
-        var bar = new Grid { Width = 44, Background = Brushes.Transparent, Margin = top.Margin };
-        Grid.SetRow(bar, 3);
+        var bar = new Grid { Width = 44, Background = Brushes.Transparent, Margin = inset };
+        Grid.SetRow(bar, 2);
         strip.Children.Add(bar);
         var trough = new Grid { Width = 33, HorizontalAlignment = HorizontalAlignment.Center };
         trough.SetResourceReference(Panel.BackgroundProperty, "IslandMixerTroughBrush");
@@ -354,45 +372,60 @@ public sealed class VolumeView : UserControl
         bar.Children.Add(trough);
         var fill = new Border { VerticalAlignment = VerticalAlignment.Bottom };
         trough.Children.Add(fill);
-        var peak = new Border { Height = 2, CornerRadius = new CornerRadius(1), VerticalAlignment = VerticalAlignment.Bottom, Opacity = 0.5, Visibility = Visibility.Collapsed, IsHitTestVisible = false };
+        var peak = new Border { Height = 1, VerticalAlignment = VerticalAlignment.Bottom, Opacity = 0.5, Visibility = Visibility.Collapsed, IsHitTestVisible = false };
         peak.SetResourceReference(Border.BackgroundProperty, "IslandOnAccentBrush");
         trough.Children.Add(peak);
+        var grip = new Border { Width = 12, Height = 2, CornerRadius = new CornerRadius(1), VerticalAlignment = VerticalAlignment.Bottom, IsHitTestVisible = false };
+        trough.Children.Add(grip);
 
-        var slider = new Slider { Minimum = 0, Maximum = 100, SmallChange = 5, LargeChange = 10, Orientation = Orientation.Vertical, Opacity = 0, IsHitTestVisible = false };
-        slider.SetResourceReference(StyleProperty, "IslandSliderStyle");
-        bar.Children.Add(slider);
-        var focus = new Border { BorderThickness = new Thickness(2), CornerRadius = new CornerRadius(11), Margin = new Thickness(0, -3, 0, -3), Visibility = Visibility.Collapsed, IsHitTestVisible = false };
-        focus.SetResourceReference(Border.BorderBrushProperty, "IslandTextBrush");
-        bar.Children.Add(focus);
-        slider.IsKeyboardFocusedChanged += (_, _) => focus.Visibility = slider.IsKeyboardFocused ? Visibility.Visible : Visibility.Collapsed;
-        var percentage = new TextBlock { FontSize = 12, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Margin = top.Margin };
-        Grid.SetRow(percentage, 5);
+        var slider = new Slider { Minimum = 0, Maximum = 100, SmallChange = 5, LargeChange = 10, Orientation = Orientation.Vertical, IsHitTestVisible = false };
+        slider.SetResourceReference(StyleProperty, "IslandMixerFaderStyle");
+        trough.Children.Add(slider);
+        var percentage = new TextBlock { FontSize = 12, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Margin = inset };
+        Typography.SetNumeralAlignment(percentage, FontNumeralAlignment.Tabular);
+        Grid.SetRow(percentage, 4);
         strip.Children.Add(percentage);
+        if (!system)
+        {
+            Grid.SetRow(output, 5);
+            strip.Children.Add(output);
+        }
 
         float level = 0;
-        bool? painted = null;
+        (bool Muted, bool Active, bool Low)? painted = null;
         void Paint()
         {
             bool isMuted = Level(key).Muted;
             percentage.Text = isMuted ? "Muted" : $"{Math.Round(slider.Value)}%";
-            if (painted != isMuted)
-            {
-                painted = isMuted;
-                percentage.SetResourceReference(TextBlock.ForegroundProperty, isMuted ? "WarningTextBrush" : "IslandTextSecondaryBrush");
-                icon.Opacity = isMuted ? 0.5 : 1;
-                fill.SetResourceReference(Border.BackgroundProperty, isMuted ? "IslandMutedFillBrush" : system ? "IslandMixerSystemBrush" : "IslandMixerLevelBrush");
-            }
+            bool active = bar.IsMouseOver || bar.IsMouseCaptured || slider.IsKeyboardFocused;
             fill.Height = trough.ActualHeight * slider.Value / 100;
+            // At zero the grip rests on the trough; it never creates a false sliver of volume.
+            bool low = fill.Height < 6;
+            if (painted != (isMuted, active, low))
+            {
+                painted = (isMuted, active, low);
+                percentage.SetResourceReference(TextBlock.ForegroundProperty, isMuted ? "WarningTextBrush" : active ? "IslandTextBrush" : "IslandTextSecondaryBrush");
+                icon.Opacity = isMuted ? 0.5 : 1;
+                fill.SetResourceReference(Border.BackgroundProperty, isMuted ? "IslandMutedFillBrush" : system ? "IslandMixerSystemBrush" :
+                    active ? "IslandAccentBrush" : "IslandMixerLevelBrush");
+                grip.SetResourceReference(Border.BackgroundProperty, low ? "IslandTextSecondaryBrush" : "IslandOnAccentBrush");
+                grip.Opacity = low ? 0.85 : 0.55;
+                grip.Visibility = isMuted ? Visibility.Collapsed : Visibility.Visible;
+            }
+            grip.Margin = new Thickness(0, 0, 0, Math.Max(4, fill.Height - 6));
             PaintPeak();
         }
         void PaintPeak()
         {
-            peak.Visibility = painted == true || level < 0.02 || fill.Height < 8 ? Visibility.Collapsed : Visibility.Visible;
-            peak.Margin = new Thickness(4, 0, 4, Math.Max(3, fill.Height * level - 3));
+            peak.Visibility = painted?.Muted == true || level < 0.02 || fill.Height < 8 ? Visibility.Collapsed : Visibility.Visible;
+            peak.Margin = new Thickness(2, 0, 2, Math.Max(2, fill.Height * level - 1));
         }
         var write = new LatestWrite();
         slider.ValueChanged += (_, _) => { Paint(); if (!_refreshing) write.Send(() => _module.SetVolumeAsync(key, (float)slider.Value / 100)); };
         trough.SizeChanged += (_, _) => Paint();
+        bar.MouseEnter += (_, _) => Paint();
+        bar.MouseLeave += (_, _) => Paint();
+        slider.IsKeyboardFocusedChanged += (_, _) => Paint();
 
         double pressY = 0, pressValue = 0;
         bool dragging = false;
@@ -426,8 +459,11 @@ public sealed class VolumeView : UserControl
             AutomationProperties.SetName(mute, $"{action} {name}");
             mute.ToolTip = $"{action} {name}";
             if (!system) paintOutput();
-            string hint = $"{name} · {(system ? "System output" : output.ToolTip)}";
-            AutomationProperties.SetHelpText(strip, hint);
+            if (divider is not null) divider.Visibility = _module.Snapshot.Apps.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
+            string route = system ? "System output" : AutomationProperties.GetHelpText(output);
+            string hint = $"{name} · {route}";
+            AutomationProperties.SetName(strip, name);
+            AutomationProperties.SetHelpText(strip, route);
             AutomationProperties.SetHelpText(slider, hint);
             bar.ToolTip = hint;
             Paint();
@@ -442,8 +478,11 @@ public sealed class VolumeView : UserControl
 
     private void Hint()
     {
-        var active = _items.Values.FirstOrDefault(i => i.View.IsMouseOver) ?? _items.Values.FirstOrDefault(i => i.View.IsKeyboardFocusWithin);
-        _hint.Text = active is null ? "" : AutomationProperties.GetHelpText(active.View);
+        var hovered = _items.Values.FirstOrDefault(i => i.View.IsMouseOver);
+        var focused = _items.Values.FirstOrDefault(i => i.View.IsKeyboardFocusWithin);
+        var active = InputManager.Current.MostRecentInputDevice is KeyboardDevice ? focused ?? hovered : hovered ?? focused;
+        _hintName.Text = active is null ? "" : AutomationProperties.GetName(active.View);
+        _hintRoute.Text = active is null ? "" : "   " + AutomationProperties.GetHelpText(active.View);
     }
 
 
@@ -475,13 +514,13 @@ public sealed class VolumeView : UserControl
     private (Button Button, Action Paint) OutputButton(AppKey key)
     {
         var glyph = new LucideIcon { Data = LucideIcons.Ellipsis, Size = 13 };
-        var button = new Button { Content = glyph, Width = 16, Height = 24, Padding = new Thickness(0), Opacity = 0, IsHitTestVisible = false, HorizontalAlignment = HorizontalAlignment.Right };
+        var button = new Button { Content = glyph, Width = 32, Height = 24, Padding = new Thickness(0), Opacity = 0, IsHitTestVisible = false, HorizontalAlignment = HorizontalAlignment.Center };
         button.SetResourceReference(StyleProperty, "IslandIconButtonStyle");
         ToolTipService.SetShowOnDisabled(button, true);
         button.Click += (_, _) =>
         {
             var (choices, current) = OutputChoices(key);
-            RoutingUi.Menu(button, choices.Select(c => (c.Label, (Action)(() => Run(_module.SetOutputAsync(key, c.Id))), c.Enabled)), current);
+            RoutingUi.Menu(button, choices.Select(c => (c.Label, (Action)(() => Run(_module.SetOutputAsync(key, c.Id))), c.Enabled)), current, title: $"{AppName(key)} output");
         };
         return (button, () =>
         {

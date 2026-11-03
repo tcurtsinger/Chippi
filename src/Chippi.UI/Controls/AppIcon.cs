@@ -26,7 +26,7 @@ public static class AppIcon
         {
             if (ExtractIconEx(path, 0, out handle, IntPtr.Zero, 1) > 0 && handle != IntPtr.Zero)
             {
-                image = Imaging.CreateBitmapSourceFromHIcon(handle, Int32Rect.Empty, BitmapSizeOptions.FromWidthAndHeight(20, 20));
+                image = Imaging.CreateBitmapSourceFromHIcon(handle, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
                 image.Freeze();
             }
         }
