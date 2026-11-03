@@ -216,7 +216,7 @@ public sealed class AgentUsageSettingsPage : UserControl
             name.Text = session.Name;
             app.Text = appName;
             state.Text = session.State(now);
-            state.SetResourceReference(TextBlock.ForegroundProperty, session.Working ? "TextSecondaryBrush" : "WarningTextBrush");
+            state.SetResourceReference(TextBlock.ForegroundProperty, session.NeedsInput ? "WarningTextBrush" : "TextSecondaryBrush");
             AutomationProperties.SetName(switchTo, $"Switch to {session.Name}");
         }
     }

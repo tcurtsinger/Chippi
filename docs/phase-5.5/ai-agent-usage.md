@@ -22,8 +22,8 @@ Claude Code and Codex only (Travis). Chippi never reads either one's credentials
 
 ## Sessions
 
-- **Working:** a turn is being written. **Waiting on you:** the turn has ended and the agent waits for your next message. A session idle for more than 30 minutes, or whose process has gone, leaves the list.
-- A permission prompt in the middle of a turn can't be told apart from a long-running tool, so it shows as Working.
+- **Working** means a turn is in progress. **Waiting on you** requires an outstanding request for the owner. Completed or aborted turns and quiet sessions are **Idle**. Idle sessions leave the list after 30 minutes and closed sessions leave on the next scan. Codex workers spawned by a chat do not appear as independent sessions.
+- Claude Code reports an open prompt with its session status. Codex questions are matched to their answers by call ID. A tool call without evidence of a user prompt stays Working.
 - **Clicking a session brings its window forward** (Travis): the terminal or the app it runs in.
 
 ## Surfaces
@@ -55,5 +55,5 @@ Each Claude check starts Claude Code for a few seconds; each Codex check starts 
 - **Cursor and GitHub Copilot:** not chosen.
 - **Tokens, cost and Codex's credits:** not chosen.
 - **Codex's banked resets:** vorssaint can use one from its page; not offered here.
-- **Seeing a permission prompt:** would need a hook in Claude Code's settings, which Chippi doesn't change.
+- Claude Code's session file reports `waiting` for an open prompt. Older versions that report only busy or idle cannot identify that prompt.
 - **Chippi's reactions** to limits and resets: not chosen.

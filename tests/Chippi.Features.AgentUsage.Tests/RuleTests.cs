@@ -108,8 +108,8 @@ public sealed class AgentBarTests
 {
     private static readonly DateTimeOffset Now = Harness.Start;
 
-    private static AgentSession Session(AgentKind agent, string name, bool working, int minutesAgo) =>
-        new(agent, name, name, working, Now.AddMinutes(-minutesAgo), 1, null);
+    private static AgentSession Session(AgentKind agent, string name, AgentSessionState state, int minutesAgo) =>
+        new(agent, name, name, state, Now.AddMinutes(-minutesAgo), 1, null);
 
     private static AgentStatus Claude(params (string Label, double Used)[] windows) =>
         new(AgentKind.Claude, true, CheckState.Ok, new UsageReading("Max", [.. windows.Select(w => new UsageWindow(w.Label, w.Used, Now.AddHours(1)))], Now), true, "Max");
@@ -117,7 +117,7 @@ public sealed class AgentBarTests
     [Fact]
     public void Working_shows_the_agents_letters_closest_limit_and_session()
     {
-        var working = AgentBar.Working([Session(AgentKind.Claude, "chippi", true, 12)], [Claude(("5-hour", 42), ("Weekly", 23))], Now)!;
+        var working = AgentBar.Working([Session(AgentKind.Claude, "chippi", AgentSessionState.Working, 12)], [Claude(("5-hour", 42), ("Weekly", 23))], Now)!;
 
         Assert.Equal(IslandActivityKind.Agent, working.Kind);
         Assert.Equal("CC", working.Monogram);
@@ -131,10 +131,10 @@ public sealed class AgentBarTests
     [Fact]
     public void Several_sessions_are_counted()
     {
-        var sessions = new[] { Session(AgentKind.Codex, "a", true, 3), Session(AgentKind.Codex, "b", true, 9) };
+        var sessions = new[] { Session(AgentKind.Codex, "a", AgentSessionState.Working, 3), Session(AgentKind.Codex, "b", AgentSessionState.Working, 9) };
         Assert.Equal("Codex · 2 sessions", AgentBar.Working(sessions, [], Now)!.Source);
         Assert.Equal("Working", AgentBar.Working(sessions, [], Now)!.Title);
-        var mixed = new[] { Session(AgentKind.Claude, "a", false, 3), Session(AgentKind.Codex, "b", false, 9) };
+        var mixed = new[] { Session(AgentKind.Claude, "a", AgentSessionState.NeedsInput, 3), Session(AgentKind.Codex, "b", AgentSessionState.NeedsInput, 9) };
         var waiting = AgentBar.Waiting(mixed)!;
         Assert.Equal("2 sessions", waiting.Source);
         Assert.Equal("CC", waiting.Monogram); // the newest leads
@@ -148,10 +148,10 @@ public sealed class AgentBarTests
         var agents = hub.CreatePublisher(AgentUsageModule.Id);
         others.Publish(new IslandActivity("awake", IslandActivityKind.Status, "1 hr left", "Keep awake"));
         others.Publish(new IslandActivity("download", IslandActivityKind.Download, "setup.exe", "Downloads"));
-        agents.Publish(AgentBar.Working([Session(AgentKind.Claude, "chippi", true, 1)], [], Now)!);
+        agents.Publish(AgentBar.Working([Session(AgentKind.Claude, "chippi", AgentSessionState.Working, 1)], [], Now)!);
         Assert.Equal(["download", "awake", AgentBar.WorkingKey], hub.Activities.Select(a => a.Key));
 
-        var waiting = AgentBar.Waiting([Session(AgentKind.Claude, "packrat", false, 1)])!;
+        var waiting = AgentBar.Waiting([Session(AgentKind.Claude, "packrat", AgentSessionState.NeedsInput, 1)])!;
         Assert.True(waiting.NeedsAttention);
         Assert.Equal("Waiting on you", waiting.Title);
         agents.Publish(waiting);
@@ -165,7 +165,7 @@ public sealed class AgentBarTests
     public void No_sessions_no_activity()
     {
         Assert.Null(AgentBar.Working([], [], Now));
-        Assert.Null(AgentBar.Waiting([Session(AgentKind.Claude, "chippi", true, 1)]));
+        Assert.Null(AgentBar.Waiting([Session(AgentKind.Claude, "chippi", AgentSessionState.Working, 1)]));
     }
 
     [Fact]

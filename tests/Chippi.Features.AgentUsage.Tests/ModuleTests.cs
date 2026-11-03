@@ -267,14 +267,49 @@ public sealed class ModuleTests
         Assert.Equal(("Working · 42%", "Claude Code · chippi"), (working.Title, working.Source));
         Assert.Null(h.Activity(AgentBar.WaitingKey));
 
-        h.Write(".claude/sessions/100.json", ClaudeSession(100, "idle", h.Module.Now));
+        h.Write(".claude/sessions/100.json", ClaudeSession(100, "waiting", h.Module.Now));
         h.Step(TimeSpan.FromSeconds(5));
         Assert.Null(h.Activity(AgentBar.WorkingKey));
         Assert.True(h.Activity(AgentBar.WaitingKey)!.NeedsAttention);
         Assert.False(h.Tile.NeedsAttention); // waiting doesn't mark the home's button
 
         h.Step(TimeSpan.FromMinutes(31));
+        Assert.True(h.Activity(AgentBar.WaitingKey)!.NeedsAttention);
+        h.Write(".claude/sessions/100.json", ClaudeSession(100, "idle", h.Module.Now));
+        h.Step(TimeSpan.FromSeconds(5));
+        Assert.Null(h.Activity(AgentBar.WaitingKey));
+        Assert.Equal("Idle", Assert.Single(h.Module.Sessions).State(h.Module.Now));
+        h.Step(TimeSpan.FromMinutes(31));
         Assert.Empty(h.Module.Sessions);
+        Assert.Null(h.Activity(AgentBar.WaitingKey));
+    }
+
+    [Fact]
+    public void Only_the_visible_Codex_chat_can_request_attention()
+    {
+        using var h = new Harness(p => p.Scripts[AgentKind.Codex] = () => Answers.Codex());
+        string root = "01a1996d-0101-7111-8111-111111111111", child = "01a1996d-0102-7111-8111-111111111111";
+        string Line(string type, object payload) => System.Text.Json.JsonSerializer.Serialize(new { timestamp = Harness.Start, type, payload }) + "\n";
+        string Rollout(string id, object source, string lastEvent)
+        {
+            h.Write($".codex/thread-writer-locks/{id}.lock", "");
+            h.Processes.Locked.Add($"{id}.lock");
+            return h.Write($".codex/sessions/2026/11/01/rollout-x-{id}.jsonl",
+                Line("session_meta", new { id, cwd = "project", source }) + Line("event_msg", new { type = lastEvent }));
+        }
+
+        Rollout(child, new { subagent = new { thread_spawn = new { parent_thread_id = root } } }, "task_started");
+        var log = Rollout(root, "vscode", "task_complete");
+        h.Step(First);
+        Assert.Equal(root, Assert.Single(h.Module.Sessions).Id);
+        Assert.Null(h.Activity(AgentBar.WorkingKey));
+        Assert.Null(h.Activity(AgentBar.WaitingKey));
+
+        File.AppendAllText(log, Line("response_item", new { type = "function_call", name = "request_user_input", call_id = "q", arguments = """{"questions":[{}]}""" }));
+        h.Step();
+        Assert.True(h.Activity(AgentBar.WaitingKey)!.NeedsAttention);
+        File.AppendAllText(log, Line("response_item", new { type = "function_call_output", call_id = "q", output = "answered" }));
+        h.Step();
         Assert.Null(h.Activity(AgentBar.WaitingKey));
     }
 

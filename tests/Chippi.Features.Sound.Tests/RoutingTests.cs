@@ -273,8 +273,8 @@ public sealed class RoutingTests
         f.System.Disconnect("Headset", windowsPicks: "Speakers");
         await Until(() => f.Module.Snapshot.Find("Headset")?.IsActive == false);
         f.System.Connect(Speaker("Headset")); // plugged back in: the list decides, so the headset takes over
-        await Until(() => f.System.DefaultOf(AudioFlow.Render, AudioRole.Multimedia) == "Headset");
-        Assert.Equal("Headset", f.Module.InUse(AudioFlow.Render));
+        await Until(() => f.Module.InUse(AudioFlow.Render) == "Headset"); // Published after the system switches.
+        Assert.Equal("Headset", f.System.DefaultOf(AudioFlow.Render, AudioRole.Multimedia));
     }
 
     [Fact]

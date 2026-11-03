@@ -14,7 +14,7 @@ public sealed class ClaudeSessionsTests
         $$"""{"pid":{{pid}},"sessionId":"s-{{pid}}","cwd":"{{cwd}}","procStart":"{{proc}}","kind":"interactive","entrypoint":"claude-desktop",{{(name is null ? "" : $"\"name\":\"{name}\",")}}"status":"{{status}}","updatedAt":{{since.ToUnixTimeMilliseconds()}},"statusUpdatedAt":{{since.ToUnixTimeMilliseconds()}}}""";
 
     [Fact]
-    public void Busy_works_idle_waits_and_each_names_its_session_or_folder()
+    public void Busy_works_idle_is_quiet_and_each_names_its_session_or_folder()
     {
         using var home = new TempFolder();
         home.Write("sessions/100.json", Session(100, "busy", Now.AddMinutes(-12)));
@@ -30,7 +30,8 @@ public sealed class ClaudeSessionsTests
         Assert.Equal("claude-desktop", sessions[0].Entrypoint);
         Assert.False(sessions[1].Working);
         Assert.Equal("packrat", sessions[1].Name);
-        Assert.Equal("Waiting on you", sessions[1].State(Now));
+        Assert.Equal("Idle", sessions[1].State(Now));
+        Assert.False(sessions[1].NeedsInput);
     }
 
     [Fact]
@@ -48,7 +49,7 @@ public sealed class ClaudeSessionsTests
     }
 
     [Fact]
-    public void Waiting_over_30_minutes_leaves_the_list_but_working_never_does()
+    public void Idle_over_30_minutes_leaves_the_list_but_working_never_does()
     {
         using var home = new TempFolder();
         home.Write("sessions/100.json", Session(100, "idle", Now.AddMinutes(-31)));
@@ -133,14 +134,29 @@ public sealed class CodexSessionsTests
     }
 
     [Fact]
-    public void A_finished_turn_waits_on_you_until_30_minutes_pass()
+    public void A_finished_turn_is_idle_and_leaves_after_30_minutes()
     {
         var (home, processes) = Fixture("task_complete", "2026-11-01T23:31:00Z");
         using var _ = home;
         var codex = new CodexSessions(home.Path, new CodexLogs(home.Path), processes);
 
-        Assert.False(Assert.Single(codex.Read(Now, _ => false)).Working);
+        Assert.Equal(AgentSessionState.Idle, Assert.Single(codex.Read(Now, _ => false)).Status);
         Assert.Empty(codex.Read(Now.AddMinutes(25), _ => false));
+    }
+
+    [Fact]
+    public void An_open_thread_without_a_visible_turn_marker_is_neutral()
+    {
+        var (home, processes) = Fixture("task_started", "2026-11-01T23:30:35Z");
+        using var _ = home;
+        var logs = new CodexLogs(home.Path);
+        var path = logs.Find(Open)!;
+        File.WriteAllText(path, CodexLogsTests.Log(Turn("2026-11-01T23:30:35Z", "unrelated")));
+        File.SetLastWriteTimeUtc(path, Now.UtcDateTime);
+        var session = Assert.Single(new CodexSessions(home.Path, logs, processes).Read(Now, _ => false));
+        Assert.Equal("Open", session.State(Now));
+        Assert.False(session.NeedsInput);
+        Assert.False(session.Working);
     }
 
     [Fact]
@@ -149,24 +165,76 @@ public sealed class CodexSessionsTests
         var (home, processes) = Fixture("task_started", "2026-11-01T23:30:35Z");
         using var _ = home;
         home.Write("session_index.jsonl", $$"""
+            null
             {"id":"{{Closed}}","thread_name":"Other","updated_at":"2026-11-01T20:23:46Z"}
             {"id":"{{Open}}","thread_name":"Archer capability","updated_at":"2026-11-01T23:30:46Z"}
             """);
         Assert.Equal("Archer capability", Assert.Single(new CodexSessions(home.Path, new CodexLogs(home.Path), processes).Read(Now, _ => false)).Name);
     }
 
-    [Fact]
-    public void A_thread_whose_log_isnt_there_yet_is_looked_for_again_after_5_minutes()
+    [Theory]
+    [InlineData(Open)]
+    [InlineData("c26b9a06-6dc3-4aea-84b6-b15add131a11")]
+    public void A_thread_whose_log_arrives_after_its_lock_is_found_on_the_next_scan(string thread)
     {
         using var home = new TempFolder();
-        home.Write($"thread-writer-locks/{Open}.lock", "");
-        var processes = new FakeProcesses { Locked = { $"{Open}.lock" } };
+        home.Write($"thread-writer-locks/{thread}.lock", "");
+        var processes = new FakeProcesses { Locked = { $"{thread}.lock" } };
         var codex = new CodexSessions(home.Path, new CodexLogs(home.Path), processes);
 
         Assert.Empty(codex.Read(Now, _ => false));
-        home.Write($"sessions/2026/11/01/rollout-2026-11-01T17-24-02-{Open}.jsonl", CodexLogsTests.Log(Turn("2026-11-01T23:30:35Z", "task_started")));
-        Assert.Empty(codex.Read(Now.AddMinutes(1), _ => false));
+        home.Write($"sessions/2026/11/01/rollout-2026-11-01T17-24-02-{thread}.jsonl", CodexLogsTests.Log(Turn("2026-11-01T23:30:35Z", "task_started")));
+        Assert.Single(codex.Read(Now.AddSeconds(5), _ => false));
+    }
+
+    [Fact]
+    public void A_missing_legacy_threads_full_history_search_is_throttled()
+    {
+        using var home = new TempFolder();
+        const string old = "c26b9a06-6dc3-4aea-84b6-b15add131a11";
+        home.Write($"thread-writer-locks/{old}.lock", "");
+        var processes = new FakeProcesses { Locked = { $"{old}.lock" } };
+        var codex = new CodexSessions(home.Path, new CodexLogs(home.Path), processes);
+        Assert.Empty(codex.Read(Now, _ => false));
+        home.Write($"sessions/2026/02/10/rollout-elsewhere-{old}.jsonl", CodexLogsTests.Log(Turn("2026-11-01T23:30:35Z", "task_started")));
+        Assert.Empty(codex.Read(Now.AddSeconds(5), _ => false));
         Assert.Single(codex.Read(Now + CodexSessions.LookAgain, _ => false));
+    }
+
+    [Theory]
+    [InlineData("""{"source":{"subagent":{"thread_spawn":{"depth":1}}}}""")]
+    [InlineData("""{"source":"vscode","thread_source":"subagent"}""")]
+    public void An_internal_worker_is_not_a_second_conversation_even_if_its_lock_precedes_its_header(string worker)
+    {
+        var (home, processes) = Fixture("task_started", "2026-11-01T23:30:35Z");
+        using var _ = home;
+        var codex = new CodexSessions(home.Path, new CodexLogs(home.Path), processes);
+        string child = $"sessions/2026/11/01/rollout-2026-11-01T14-23-51-{Closed}.jsonl";
+        processes.Locked.Add($"{Closed}.lock");
+        home.Write(child, """{"type":"session_meta","payload":""");
+        Assert.Equal(Open, Assert.Single(codex.Read(Now, _ => false)).Id);
+        home.Write(child, "{\"type\":\"session_meta\",\"payload\":" + worker + "}\n" + Turn("2026-11-01T23:31:00Z", "task_started") + "\n");
+        Assert.Equal(Open, Assert.Single(codex.Read(Now.AddSeconds(5), _ => false)).Id);
+        Assert.Equal(2, codex.OpenLogs.Count); // Both may carry account usage.
+    }
+
+    [Fact]
+    public void Two_genuine_conversations_can_share_a_host_folder_and_title()
+    {
+        var (home, processes) = Fixture("task_started", "2026-11-01T23:30:35Z");
+        using var _ = home;
+        processes.Locked.Add($"{Closed}.lock");
+        processes.Holders[$"{Closed}.lock"] = 4242;
+        home.Write("session_index.jsonl", $$"""
+            {"id":"{{Open}}","thread_name":"Build"}
+            {"id":"{{Closed}}","thread_name":"Build"}
+            """);
+        home.Write($"sessions/2026/11/01/rollout-2026-11-01T14-23-51-{Closed}.jsonl",
+            $$$"""{"type":"session_meta","payload":{"thread_source":"user","source":"vscode","cwd":"X:\\code\\glidenexus","forked_from_id":"{{{Open}}}"}}""" + "\n"
+            + Turn("2026-11-01T23:31:00Z", "task_started") + "\n");
+        var sessions = new CodexSessions(home.Path, new CodexLogs(home.Path), processes).Read(Now, _ => false);
+        Assert.Equal([Closed, Open], sessions.Select(s => s.Id).Order());
+        Assert.All(sessions, s => Assert.Equal("Build", s.Name));
     }
 
     [Fact]

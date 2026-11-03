@@ -58,11 +58,17 @@ internal sealed partial class ClaudeSessions(string claudeHome, IProcesses proce
         string? cwd = Text(root, "cwd");
         string name = Text(root, "name") is { Length: > 0 } named ? named : LeafName(cwd) ?? "Session";
         string status = Text(root, "status") ?? "";
-        bool working = status is "busy" or "running" or "working";
+        var state = status switch
+        {
+            "busy" or "running" or "working" => AgentSessionState.Working,
+            "waiting" => AgentSessionState.NeedsInput,
+            "idle" => AgentSessionState.Idle,
+            _ => AgentSessionState.Open,
+        };
         long? since = Millis(root, "statusUpdatedAt") ?? Millis(root, "updatedAt");
         long? started = Text(root, "procStart") is { } ps && long.TryParse(ps, out long ft) ? ft : null;
         var at = since is { } ms && ms <= DateTimeOffset.MaxValue.ToUnixTimeMilliseconds() ? DateTimeOffset.FromUnixTimeMilliseconds(ms) : new DateTimeOffset(written, TimeSpan.Zero);
-        return new(new AgentSession(AgentKind.Claude, sessionId, name, working, at, pid, Text(root, "entrypoint")), pid, started);
+        return new(new AgentSession(AgentKind.Claude, sessionId, name, state, at, pid, Text(root, "entrypoint")), pid, started);
     }
 
     /// <summary>A folder's own name: "chippi" for X:\code\chippi.</summary>
@@ -83,12 +89,13 @@ internal sealed partial class ClaudeSessions(string claudeHome, IProcesses proce
 /// </summary>
 internal sealed class CodexSessions(string codexHome, CodexLogs logs, IProcesses processes)
 {
-    /// <summary>A thread whose log wasn't found is looked for again after this, not every scan.</summary>
+    /// <summary>Retry a missing log's full-history search after this. Its expected day is checked every scan.</summary>
     internal static readonly TimeSpan LookAgain = TimeSpan.FromMinutes(5);
 
-    private readonly Dictionary<string, string?> _logs = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, string> _logs = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, DateTimeOffset> _missing = new(StringComparer.OrdinalIgnoreCase);
-    private readonly Dictionary<string, (string Name, string? Source)> _meta = new(StringComparer.OrdinalIgnoreCase);
+    private sealed record Origin(string? Folder, string? Entrypoint, bool IsSubagent);
+    private readonly Dictionary<string, Origin> _meta = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, int?> _holders = new(StringComparer.OrdinalIgnoreCase);
     private (DateTime Written, Dictionary<string, string> Names) _index = (DateTime.MinValue, []);
 
@@ -97,8 +104,9 @@ internal sealed class CodexSessions(string codexHome, CodexLogs logs, IProcesses
     /// <summary>The logs of the threads open now, for the limits they record.</summary>
     public IReadOnlyList<string> OpenLogs { get; private set; } = [];
 
-    public IReadOnlyList<AgentSession> Read(DateTimeOffset now, Func<int, bool> isOwn)
+    public IReadOnlyList<AgentSession> Read(DateTimeOffset now, Func<int, bool> isOwn, CancellationToken ct = default)
     {
+        ct.ThrowIfCancellationRequested();
         if (!Directory.Exists(Locks))
         {
             OpenLogs = [];
@@ -109,31 +117,37 @@ internal sealed class CodexSessions(string codexHome, CodexLogs logs, IProcesses
         var threads = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (string lockFile in Directory.EnumerateFiles(Locks, "*.lock"))
         {
+            ct.ThrowIfCancellationRequested();
             string thread = Path.GetFileNameWithoutExtension(lockFile);
-            if (thread.StartsWith('.') || !processes.IsLocked(lockFile))
+            if (!Guid.TryParseExact(thread, "D", out _) || !processes.IsLocked(lockFile))
                 continue;
             threads.Add(thread);
-            if (!_logs.TryGetValue(thread, out string? log) || log is null || !File.Exists(log))
+            if (!_logs.TryGetValue(thread, out string? log) || !File.Exists(log))
             {
-                if (_missing.TryGetValue(thread, out var again) && now < again)
-                    continue;
-                _logs[thread] = log = logs.Find(thread);
+                bool searchAll = !_missing.TryGetValue(thread, out var again) || now >= again;
+                log = logs.Find(thread, searchAll, now, ct);
                 if (log is null)
                 {
-                    _missing[thread] = now + LookAgain;
+                    if (searchAll)
+                        _missing[thread] = now + LookAgain;
                     continue;
                 }
+                _logs[thread] = log;
+                _meta.Remove(thread);
                 _missing.Remove(thread);
             }
             open.Add(log);
+            // A worker has its own writer lock and rollout. It belongs to its parent conversation.
+            if (Meta(thread, log) is not { IsSubagent: false } origin)
+                continue;
             if (!_holders.TryGetValue(thread, out int? pid))
                 _holders[thread] = pid = processes.HolderOf(lockFile);
             if (pid is { } own && isOwn(own))
                 continue;
-            var turn = logs.LastTurn(log);
-            var (name, source) = Meta(thread, log);
-            var session = new AgentSession(AgentKind.Codex, thread, name, turn?.Working ?? false,
-                turn?.Since ?? new DateTimeOffset(File.GetLastWriteTimeUtc(log), TimeSpan.Zero), pid, source);
+            var turn = logs.LastTurn(log, ct);
+            string name = Indexed(thread, ct) ?? origin.Folder ?? "Session";
+            var session = new AgentSession(AgentKind.Codex, thread, name, turn?.Status ?? AgentSessionState.Open,
+                turn?.Since ?? new DateTimeOffset(File.GetLastWriteTimeUtc(log), TimeSpan.Zero), pid, origin.Entrypoint);
             if (!session.IsIdle(now))
                 sessions.Add(session);
         }
@@ -152,35 +166,35 @@ internal sealed class CodexSessions(string codexHome, CodexLogs logs, IProcesses
             known.Remove(thread);
     }
 
-    // The thread's name from the index, else its folder's; and where it was started ("vscode", "cli"), from its first line.
-    private (string Name, string? Source) Meta(string thread, string log)
+    private Origin? Meta(string thread, string log)
     {
-        string? indexed = Indexed(thread);
-        if (_meta.TryGetValue(thread, out var known) && (indexed is null || known.Name == indexed))
+        if (_meta.TryGetValue(thread, out var known))
             return known;
-        string? cwd = null, source = null;
         try
         {
             using var stream = new FileStream(log, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
             using var reader = new StreamReader(stream);
-            if (reader.ReadLine() is { } first)
-            {
-                using var doc = JsonDocument.Parse(first);
-                if (doc.RootElement.TryGetProperty("payload", out var meta) && meta.ValueKind == JsonValueKind.Object)
-                {
-                    cwd = meta.TryGetProperty("cwd", out var c) && c.ValueKind == JsonValueKind.String ? c.GetString() : null;
-                    source = meta.TryGetProperty("source", out var s) && s.ValueKind == JsonValueKind.String ? s.GetString() : null;
-                }
-            }
+            if (reader.ReadLine() is not { } first)
+                return null;
+            using var doc = JsonDocument.Parse(first);
+            var root = doc.RootElement;
+            if (root.ValueKind != JsonValueKind.Object || Text(root, "type") != "session_meta"
+                || !root.TryGetProperty("payload", out var meta) || meta.ValueKind != JsonValueKind.Object)
+                return null;
+            string? entrypoint = Text(meta, "source");
+            bool subagent = Text(meta, "thread_source") == "subagent" || entrypoint == "subagent"
+                || (meta.TryGetProperty("source", out var source) && source.ValueKind == JsonValueKind.Object && source.TryGetProperty("subagent", out _));
+            return _meta[thread] = new(ClaudeSessions.LeafName(Text(meta, "cwd")), entrypoint, subagent);
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException) { }
-        var found = (indexed ?? ClaudeSessions.LeafName(cwd) ?? "Session", source);
-        _meta[thread] = found;
-        return found;
+        // The writer lock can precede the first complete line. Retry next scan.
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException) { return null; }
     }
 
+    private static string? Text(JsonElement root, string name) =>
+        root.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
+
     // ~/.codex/session_index.jsonl: {id, thread_name, updated_at} a line, the newest last; read again when it changes.
-    private string? Indexed(string thread)
+    private string? Indexed(string thread, CancellationToken ct)
     {
         string path = Path.Combine(codexHome, "session_index.jsonl");
         var written = File.Exists(path) ? File.GetLastWriteTimeUtc(path) : DateTime.MinValue;
@@ -193,18 +207,19 @@ internal sealed class CodexSessions(string codexHome, CodexLogs logs, IProcesses
                 using var reader = new StreamReader(stream);
                 while (reader.ReadLine() is { } line)
                 {
+                    ct.ThrowIfCancellationRequested();
                     try
                     {
                         using var doc = JsonDocument.Parse(line);
                         var root = doc.RootElement;
-                        if (root.TryGetProperty("id", out var id) && id.ValueKind == JsonValueKind.String
+                        if (root.ValueKind == JsonValueKind.Object && root.TryGetProperty("id", out var id) && id.ValueKind == JsonValueKind.String
                             && root.TryGetProperty("thread_name", out var n) && n.ValueKind == JsonValueKind.String && n.GetString() is { Length: > 0 } name)
                             names[id.GetString()!] = name;
                     }
                     catch (JsonException) { }
                 }
             }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return _index.Names.GetValueOrDefault(thread); }
             _index = (written, names);
         }
         return _index.Names.GetValueOrDefault(thread);

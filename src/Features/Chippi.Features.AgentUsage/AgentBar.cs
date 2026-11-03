@@ -20,7 +20,7 @@ internal static class AgentBar
 
     /// <summary>The activity for the sessions waiting on you, or null when none is.</summary>
     public static IslandActivity? Waiting(IReadOnlyList<AgentSession> sessions) =>
-        Of(sessions.Where(s => !s.Working).ToList(), WaitingKey, _ => "Waiting on you", attention: true);
+        Of(sessions.Where(s => s.NeedsInput).ToList(), WaitingKey, _ => "Waiting on you", attention: true);
 
     /// <summary>The activity for the sessions working, or null when none is.</summary>
     public static IslandActivity? Working(IReadOnlyList<AgentSession> sessions, IReadOnlyList<AgentStatus> agents, DateTimeOffset now) =>
