@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Input;
 using System.Windows.Media;
 using Chippi.UI.Controls;
 
@@ -71,7 +72,7 @@ internal static class Ui
     public static Popup Menu(UIElement anchor, params (string Text, bool Enabled, Action Click)[] items)
     {
         var popup = new Popup { PlacementTarget = anchor, Placement = PlacementMode.Bottom, StaysOpen = false, AllowsTransparency = true, PopupAnimation = PopupAnimation.None };
-        var list = new StackPanel { Margin = new Thickness(4) };
+        var list = new StackPanel { Margin = new Thickness(4), Focusable = true };
         foreach (var (text, enabled, click) in items)
         {
             var item = new Button { Content = text, IsEnabled = enabled };
@@ -84,6 +85,15 @@ internal static class Ui
             list.Children.Add(item);
         }
         popup.Child = Panel(list, minWidth: 160);
+        var available = list.Children.OfType<Button>().Where(b => b.IsEnabled).ToList();
+        list.PreviewKeyDown += (_, e) =>
+        {
+            if (available.Count == 0 || e.Key is not (Key.Up or Key.Down)) return;
+            int index = available.FindIndex(b => b.IsKeyboardFocusWithin);
+            available[(index + (e.Key == Key.Up ? available.Count - 1 : 1)) % available.Count].Focus();
+            e.Handled = true;
+        };
+        PopupKeys(popup, list, anchor, available.FirstOrDefault() as UIElement ?? list);
         return popup;
     }
 
@@ -110,8 +120,27 @@ internal static class Ui
             },
         };
         popup.Child = Panel(body, minWidth: 260);
-        popup.Opened += (_, _) => cancel.Focus();
+        PopupKeys(popup, body, anchor, cancel);
         return popup;
+    }
+
+    private static void PopupKeys(Popup popup, FrameworkElement body, UIElement anchor, UIElement first)
+    {
+        KeyboardNavigation.SetTabNavigation(body, KeyboardNavigationMode.Cycle);
+        body.PreviewKeyDown += (_, e) =>
+        {
+            if (e.Key != Key.Escape) return;
+            popup.IsOpen = false;
+            anchor.Focus();
+            e.Handled = true;
+        };
+        popup.Opened += (_, _) => first.Focus();
+        if (anchor is FrameworkElement owner)
+        {
+            void Close(object sender, RoutedEventArgs e) => popup.IsOpen = false;
+            owner.Unloaded += Close;
+            popup.Closed += (_, _) => owner.Unloaded -= Close;
+        }
     }
 
     private static Border Panel(UIElement child, double minWidth)

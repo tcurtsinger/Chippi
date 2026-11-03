@@ -30,6 +30,9 @@ public sealed record HistoryEntry(
 {
     public bool Pinned => PinnedAt is not null;
 
+    // SQLite may reuse an id after deletion. The persisted keyed hash identifies the clip a user saw.
+    internal long ContentHash { get; init; }
+
     /// <summary>Whether the search finds it: its text, or its files' names. Ordinal, ignoring case.</summary>
     public bool Matches(string search) =>
         search.Length == 0

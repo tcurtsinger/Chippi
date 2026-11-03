@@ -28,6 +28,7 @@ internal sealed class CleanUrlView : UserControl
     private readonly StackPanel _copied = new() { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Visibility = Visibility.Collapsed };
     private readonly Button _copy = Ui.Button("Copy", "IslandAccentButtonStyle");
     private int _opening;
+    private int _copyVersion;
 
     public CleanUrlView(ClipboardFeatures features)
     {
@@ -111,6 +112,7 @@ internal sealed class CleanUrlView : UserControl
 
     private void Refresh()
     {
+        _copyVersion++;
         _copied.Visibility = Visibility.Collapsed;
         string text = _field.Text;
         _display.FullText = text;
@@ -134,17 +136,16 @@ internal sealed class CleanUrlView : UserControl
     {
         if (UrlCleaner.Clean(_field.Text) is not { RemovedParameters.Count: > 0 } result || _features.CleanUrl?.Hub is not { } hub)
             return;
+        int version = ++_copyVersion;
         var status = await hub.WriteAsync(ClipContent.FromText(result.Url));
-        if (status == ClipStatus.Ok)
+        if (version == _copyVersion)
         {
-            Ui.Show(_caution, null);
-            _copied.Visibility = Visibility.Visible;
-            // Chippi's own write isn't recorded by the listener; History lists the cleaned link (notes #26).
-            if (_features.History?.History is { } history)
-                await history.RecordAsync(result.Url);
+            _copied.Visibility = status == ClipStatus.Ok ? Visibility.Visible : Visibility.Collapsed;
+            Ui.Show(_caution, status == ClipStatus.Ok ? null : ClipboardFeedback.ForCopy(status));
         }
-        else
-            Ui.Show(_caution, "Clipboard busy");
+        // The listener skips Chippi's writes, including a successful copy whose field has since changed.
+        if (status == ClipStatus.Ok && _features.History?.History is { } history)
+            await history.RecordAsync(result.Url);
     }
 }
 

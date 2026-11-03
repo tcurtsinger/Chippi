@@ -26,9 +26,11 @@ public sealed class CleanUrlSettingsPage : UserControl
     private readonly Button _addConfirm = SettingsUi.Button("Add", "PrimaryButtonStyle");
     private readonly TextBox _link = new() { VerticalContentAlignment = VerticalAlignment.Center };
     private readonly TextBlock _clean = SettingsUi.Text("");
+    private readonly TextBlock _copyError = SettingsUi.Text("", "CaptionTextStyle");
     private readonly Button _copy = SettingsUi.Button("Copy", "PrimaryButtonStyle");
     private DockPanel? _addRow;
     private bool _adding;
+    private int _copyVersion;
 
     public CleanUrlSettingsPage(CleanUrlModule module)
     {
@@ -96,15 +98,23 @@ public sealed class CleanUrlSettingsPage : UserControl
         _copy.Margin = new Thickness(12, 0, 0, 0);
         DockPanel.SetDock(_copy, Dock.Right);
         AutomationProperties.SetLiveSetting(_clean, AutomationLiveSetting.Polite);
+        AutomationProperties.SetLiveSetting(_copyError, AutomationLiveSetting.Polite);
+        _copyError.SetResourceReference(TextBlock.ForegroundProperty, "WarningTextBrush");
+        _copyError.Margin = new Thickness(0, 4, 0, 0);
         ShowClean();
+        var output = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Children = { _clean, _copyError } };
         return SettingsLayout.Card(
             new Border { Padding = SettingsLayout.RowPadding, MinHeight = SettingsLayout.RowHeight, Child = _link },
-            new Border { Padding = SettingsLayout.RowPadding, MinHeight = SettingsLayout.RowHeight, Child = new DockPanel { Children = { _copy, _clean } } });
+            new Border { Padding = SettingsLayout.RowPadding, MinHeight = SettingsLayout.RowHeight,
+                Child = new DockPanel { Children = { _copy, output } } });
     }
 
     /// <summary>The clean link, or why there is none; Copy only when something was removed.</summary>
     private void ShowClean()
     {
+        _copyVersion++;
+        _copyError.Visibility = Visibility.Collapsed;
+        _copyError.Text = "";
         string text = _link.Text;
         var result = UrlCleaner.Clean(text);
         _clean.Text = result is { RemovedParameters.Count: > 0 } ? result.Url
@@ -120,16 +130,16 @@ public sealed class CleanUrlSettingsPage : UserControl
     {
         if (UrlCleaner.Clean(_link.Text) is not { RemovedParameters.Count: > 0 } result || _module.Hub is not { } hub)
             return;
+        int version = ++_copyVersion;
         var status = await hub.WriteAsync(ClipContent.FromText(result.Url));
-        if (status != ClipStatus.Ok)
+        if (version == _copyVersion)
         {
-            _clean.Text = "Clipboard busy";
-            _clean.SetResourceReference(TextBlock.ForegroundProperty, "WarningTextBrush");
-            return;
+            _copy.Content = status == ClipStatus.Ok ? "Copied" : "Copy";
+            _copyError.Text = status == ClipStatus.Ok ? "" : ClipboardFeedback.ForCopy(status);
+            _copyError.Visibility = status == ClipStatus.Ok ? Visibility.Collapsed : Visibility.Visible;
         }
-        _copy.Content = "Copied";
         // Chippi's own write isn't recorded by the listener; History lists the cleaned link (notes #26).
-        if (_module.History?.History is { } history)
+        if (status == ClipStatus.Ok && _module.History?.History is { } history)
             await history.RecordAsync(result.Url);
     }
 

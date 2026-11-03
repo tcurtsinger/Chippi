@@ -27,7 +27,7 @@ public sealed class ClipboardHistory : IDisposable
     private IReadOnlyList<HistoryEntry> _entries = [];
     private ClipLimit _limit;
     private bool _full, _disposed;
-    private int _generation; // moves on Clear and Erase all, so a copy read before them isn't saved after
+    private int _generation; // Erase all also discards copies still waiting to be recorded.
     private int _pruning; // 1 while a prune of expired copies is queued
 
     /// <param name="open">Opens the store; called on first need, so nothing is created while recording has never been on.</param>
@@ -116,9 +116,8 @@ public sealed class ClipboardHistory : IDisposable
     });
 
     /// <summary>Clear history: the unpinned copies among <paramref name="shown"/> (notes #11).</summary>
-    public Task ClearAsync(IReadOnlyCollection<long> shown)
+    public Task ClearAsync(IReadOnlyCollection<HistoryEntry> shown)
     {
-        Interlocked.Increment(ref _generation);
         return RunAsync(store =>
         {
             store.ClearUnpinned(shown);
@@ -175,7 +174,7 @@ public sealed class ClipboardHistory : IDisposable
     }
 
     /// <summary>A saved picture's PNG, for the selected row's preview.</summary>
-    public Task<byte[]?> PictureAsync(long id) => RunAsync(store => store.Picture(id));
+    public Task<byte[]?> PictureAsync(long id, long? contentHash = null) => RunAsync(store => store.Picture(id, contentHash));
 
     /// <summary>Stops listening and closes the store; a store call in progress finishes first.</summary>
     public void Dispose()
@@ -262,7 +261,7 @@ public sealed class ClipboardHistory : IDisposable
             case EntryKind.Files:
                 return entry.Files is { Count: > 0 } files && MissingFiles(entry) == 0 ? ClipContent.FromFiles(files) : null;
             case EntryKind.Picture:
-                return await PictureAsync(entry.Id).ConfigureAwait(false) is { } png ? ClipContent.FromImage(Pictures.Decode(png)) : null;
+                return await PictureAsync(entry.Id, entry.ContentHash).ConfigureAwait(false) is { } png ? ClipContent.FromImage(Pictures.Decode(png)) : null;
             default:
                 return entry.Text is { Length: > 0 } text ? ClipContent.FromText(text) : null;
         }

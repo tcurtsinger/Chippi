@@ -24,6 +24,10 @@ internal sealed class WholeRows : Panel
 
     public WholeRows() => ClipToBounds = true;
 
+    /// <summary>The matching entries include those beyond the bounded set of built rows.</summary>
+    public int TotalEntries { get; set; }
+    public Action<bool>? OverflowChanged { get; set; }
+
     /// <summary>The row that must stay shown, such as the selected entry; null for the rows from the top.</summary>
     public UIElement? Keep
     {
@@ -59,6 +63,7 @@ internal sealed class WholeRows : Panel
             _shown.Remove(last);
             used -= last.DesiredSize.Height;
         }
+        OverflowChanged?.Invoke(TotalEntries > _shown.Count(row => row is Button or Border));
         return new Size(double.IsInfinity(available.Width) ? rows.Select(r => r.DesiredSize.Width).DefaultIfEmpty(0).Max() : available.Width, used);
     }
 

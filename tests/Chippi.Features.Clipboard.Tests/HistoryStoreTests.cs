@@ -126,11 +126,25 @@ public sealed class HistoryStoreTests : IDisposable
         var pin = Add("pin", T0);
         _store.SetPinned(pin.Id, true, T0);
         var shown = Add("shown", T0.AddMinutes(1));
-        var question = _store.Load(T0.AddMinutes(1)).Select(e => e.Id).ToList();
+        var question = _store.Load(T0.AddMinutes(1));
         Add("arrived while asking", T0.AddMinutes(2));
         _store.ClearUnpinned(question);
         Assert.Equal(["arrived while asking", "pin"], _store.Load(T0.AddMinutes(3)).Select(e => e.Text));
         Assert.DoesNotContain(shown.Id, _store.Load(T0.AddMinutes(3)).Select(e => e.Id));
+    }
+
+    [Fact]
+    public void Clear_preserves_a_replacement_clip_and_a_clip_copied_again_during_confirmation()
+    {
+        var again = Add("matching repeat", T0);
+        var gone = Add("matching old", T0);
+        var scope = _store.Load(T0);
+        _store.Delete(gone.Id);
+        var arriving = Add("different clip", T0);
+        Assert.Equal(gone.Id, arriving.Id);
+        Assert.Equal(again.Id, Add("matching repeat", T0.AddSeconds(1)).Id);
+        _store.ClearUnpinned(scope);
+        Assert.Equal(["matching repeat", "different clip"], _store.Load(T0.AddSeconds(1)).Select(e => e.Text));
     }
 
     [Fact]
@@ -146,11 +160,15 @@ public sealed class HistoryStoreTests : IDisposable
     }
 
     [Fact]
-    public void Delete_removes_a_picture_with_its_image()
+    public void A_deleted_picture_cannot_retrieve_the_image_reusing_its_id()
     {
         var picture = _store.Add(HistoryCapture.FromPicture(1, 1, [1], [2, 2]), T0).Entry!;
         _store.Delete(picture.Id);
         Assert.Null(_store.Picture(picture.Id));
         Assert.Equal(0, _store.Size());
+        var replacement = _store.Add(HistoryCapture.FromPicture(1, 1, [1], [3, 3]), T0).Entry!;
+        Assert.Equal(picture.Id, replacement.Id);
+        Assert.Null(_store.Picture(picture.Id, picture.ContentHash));
+        Assert.Equal([3, 3], _store.Picture(replacement.Id, replacement.ContentHash));
     }
 }

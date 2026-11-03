@@ -35,17 +35,20 @@ internal sealed class ClipboardView : UserControl
     private readonly StackPanel _firstUse = new() { VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center };
     private readonly Button _turnOn = Ui.Button("Turn on", "IslandAccentButtonStyle");
     private readonly SearchBox _search = new() { Placeholder = "Search", Height = 28, FontSize = 12, Margin = new Thickness(0, 0, 0, 8) };
+    private readonly Button _allHistory = Ui.Button("All history", "SubtleButtonStyle");
     private readonly StackPanel _caution = Ui.Caution();
+    private readonly StackPanel _saveError = Ui.Caution();
     private readonly WholeRows _rows = new();
     private readonly TextBlock _empty = Ui.Muted("", 12);
     private readonly DockPanel _history = new();
     private readonly CleanUrlView _clean;
-    private readonly Dictionary<long, (byte[] Png, BitmapSource Image)> _thumbnails = []; // by row, checked against its bytes: ids come back after a delete
+    private readonly HistoryThumbnails _thumbnails = new();
     private readonly Dictionary<long, (string Path, BitmapSource? Image)> _fileThumbnails = []; // the same, checked against the path; null while reading or unreadable
     private readonly DispatcherTimer _clock = new() { Interval = TimeSpan.FromSeconds(30) };
     private List<HistoryEntry> _shown = [];
     private long? _selected;
     private string? _status; // the selected row's "Clipboard busy" or "Copied"
+    private int _actionVersion;
     private bool _cleaning;
     private ClipboardHistoryModule? _module;
 
@@ -56,7 +59,12 @@ internal sealed class ClipboardView : UserControl
 
         // Header commands (notes #8): Clean URL (link, pressed while open), Pause or Resume, More.
         _cleanButton.Click += (_, _) => SetCleaning(!_cleaning);
-        _pause.Click += (_, _) => _module?.SetPaused(!_module.Settings.Paused);
+        _pause.Click += (_, _) =>
+        {
+            if (_module is null) return;
+            if (_module.Settings.Recording) _module.SetPaused(!_module.Settings.Paused);
+            else _module.SetRecording(true);
+        };
         _more.Click += (_, _) => OpenMore();
         _note.SetResourceReference(TextBlock.ForegroundProperty, "IslandTextTertiaryBrush");
         var commands = new StackPanel { Orientation = Orientation.Horizontal, Children = { _note, _cleanButton, _pause, _more } };
@@ -83,13 +91,29 @@ internal sealed class ClipboardView : UserControl
         _empty.HorizontalAlignment = HorizontalAlignment.Center;
         _empty.VerticalAlignment = VerticalAlignment.Center;
         _rows.VerticalAlignment = VerticalAlignment.Top;
-        DockPanel.SetDock(_search, Dock.Top);
+        _allHistory.Height = 28;
+        _allHistory.Margin = new Thickness(6, 0, 0, 8);
+        _allHistory.Padding = new Thickness(8, 0, 8, 0);
+        _allHistory.FontSize = 12;
+        _allHistory.SetResourceReference(ForegroundProperty, "IslandTextSecondaryBrush");
+        _allHistory.Visibility = Visibility.Collapsed;
+        _allHistory.Click += (_, _) => _module?.OpenHistory(_search.Text);
+        _rows.OverflowChanged = overflow => _allHistory.Visibility = overflow ? Visibility.Visible : Visibility.Collapsed;
+        var searchBar = new Grid();
+        searchBar.ColumnDefinitions.Add(new ColumnDefinition());
+        searchBar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        Grid.SetColumn(_allHistory, 1);
+        searchBar.Children.Add(_search);
+        searchBar.Children.Add(_allHistory);
+        DockPanel.SetDock(searchBar, Dock.Top);
         DockPanel.SetDock(_caution, Dock.Top);
-        _history.Children.Add(_search);
+        _history.Children.Add(searchBar);
         _history.Children.Add(_caution);
         _history.Children.Add(new Grid { Children = { _rows, _empty } });
 
-        Content = new Grid { Children = { _firstUse, _history, _clean } };
+        DockPanel.SetDock(_saveError, Dock.Top);
+        _saveError.Margin = new Thickness(10, 0, 0, 8);
+        Content = new DockPanel { Children = { _saveError, new Grid { Children = { _firstUse, _history, _clean } } } };
         // The page's whole body, so first use centers in it: the page stacks Clean URL's section under
         // this one, collapsed while History runs, which leaves this one no height of its own.
         Height = IslandPage.BodyHeight;
@@ -103,7 +127,7 @@ internal sealed class ClipboardView : UserControl
             _clock.Start();
             _search.Text = "";
             _selected = null;
-            SetCleaning(false);
+            SetCleaning(false, focus: false);
             Refresh(keepScroll: false);
         };
         Unloaded += (_, _) =>
@@ -131,17 +155,21 @@ internal sealed class ClipboardView : UserControl
     /// <summary>The first Esc: clears a search or leaves Clean URL; true when it did (notes #59).</summary>
     public bool HandleEscape()
     {
-        if (_cleaning)
-        {
-            SetCleaning(false);
+        if (HandleBack())
             return true;
-        }
         if (_search.Text.Length > 0)
         {
             _search.Text = "";
             return true;
         }
         return false;
+    }
+
+    public bool HandleBack()
+    {
+        if (!_cleaning) return false;
+        SetCleaning(false);
+        return true;
     }
 
     // ---- Module ----
@@ -177,7 +205,7 @@ internal sealed class ClipboardView : UserControl
 
     // ---- Views ----
 
-    private void SetCleaning(bool on)
+    private void SetCleaning(bool on, bool focus = true)
     {
         if (_features.CleanUrl is null)
             on = false;
@@ -189,13 +217,10 @@ internal sealed class ClipboardView : UserControl
             _cleanButton.ClearValue(BackgroundProperty);
         AutomationProperties.SetItemStatus(_cleanButton, on ? "Pressed" : "");
         if (on)
-        {
             _clean.Open();
-            Dispatcher.BeginInvoke(DispatcherPriority.Input, () => _clean.Field.Focus());
-        }
-        else if (IsKeyboardFocusWithin)
-            Dispatcher.BeginInvoke(DispatcherPriority.Input, () => _search.Focus());
         Refresh(keepScroll: true);
+        if (focus)
+            Dispatcher.BeginInvoke(DispatcherPriority.Input, () => { if (IsVisible) InitialFocus.Focus(); });
     }
 
     private void Refresh(bool keepScroll)
@@ -203,28 +228,28 @@ internal sealed class ClipboardView : UserControl
         var history = _module?.History;
         var settings = _module?.Settings ?? new ClipboardHistorySettings();
         bool recording = settings.Recording;
+        var entries = history?.Entries ?? [];
+        bool firstUse = !recording && entries.Count == 0;
+        Ui.Show(_saveError, _cleaning ? null : _module?.SettingsError);
 
         _cleanButton.Visibility = _features.CleanUrl is null ? Visibility.Collapsed : Visibility.Visible;
-        // With recording off, only Clean URL shows; in Clean URL, Pause and More go (notes #8, #23).
-        _pause.Visibility = _more.Visibility = recording && !_cleaning ? Visibility.Visible : Visibility.Collapsed;
-        Ui.SetIcon(_pause, settings.Paused ? LucideIcons.Play : LucideIcons.Pause);
-        AutomationProperties.SetName(_pause, settings.Paused ? "Resume" : "Pause");
-        _pause.ToolTip = settings.Paused ? "Resume" : "Pause";
-        _note.Text = recording && settings.Paused ? "Paused" : "";
+        _pause.Visibility = _more.Visibility = !firstUse && !_cleaning ? Visibility.Visible : Visibility.Collapsed;
+        string action = !recording ? "Turn on" : settings.Paused ? "Resume" : "Pause";
+        Ui.SetIcon(_pause, action == "Pause" ? LucideIcons.Pause : LucideIcons.Play);
+        AutomationProperties.SetName(_pause, action);
+        _pause.ToolTip = action;
+        _note.Text = firstUse || _cleaning ? "" : !recording ? "Recording off" : settings.Paused ? "Paused" : "";
         // The last icon button's glyph lines up with the body's right edge.
         foreach (var command in new[] { _cleanButton, _pause, _more })
             command.ClearValue(MarginProperty);
         (_more.Visibility == Visibility.Visible ? _more : _cleanButton).SetResourceReference(MarginProperty, "IslandLastIconButtonMargin");
 
         _clean.Visibility = _cleaning ? Visibility.Visible : Visibility.Collapsed;
-        _firstUse.Visibility = !_cleaning && !recording ? Visibility.Visible : Visibility.Collapsed;
-        // Saved copies stay usable with recording off only when there are some.
-        var entries = history?.Entries ?? [];
-        foreach (var gone in _thumbnails.Keys.Where(id => !entries.Any(e => e.Id == id)).ToList())
-            _thumbnails.Remove(gone);
+        _firstUse.Visibility = !_cleaning && firstUse ? Visibility.Visible : Visibility.Collapsed;
+        _thumbnails.Retain(entries);
         foreach (var gone in _fileThumbnails.Keys.Where(id => !entries.Any(e => e.Id == id)).ToList())
             _fileThumbnails.Remove(gone);
-        _history.Visibility = !_cleaning && (recording || entries.Count > 0) ? Visibility.Visible : Visibility.Collapsed;
+        _history.Visibility = !_cleaning && !firstUse ? Visibility.Visible : Visibility.Collapsed;
         if (_history.Visibility != Visibility.Visible)
             return;
 
@@ -242,6 +267,8 @@ internal sealed class ClipboardView : UserControl
         // show are built, up to the selected one: building every copy made each key and click slow.
         _rows.Children.Clear();
         _rows.Keep = null;
+        _rows.TotalEntries = _shown.Count;
+        if (_shown.Count == 0) _allHistory.Visibility = Visibility.Collapsed;
         var now = DateTimeOffset.Now;
         int selectedAt = _selected is { } kept ? _shown.FindIndex(e => e.Id == kept) : -1;
         int from = Math.Max(0, selectedAt - BuiltRows + 1), to = Math.Min(_shown.Count, Math.Max(selectedAt + 1, from + BuiltRows));
@@ -290,11 +317,12 @@ internal sealed class ClipboardView : UserControl
         var kind = Kind(entry);
         kind.Margin = new Thickness(0, 0, 8, 0);
         head.Children.Add(kind);
-        head.Children.Add(Ui.Text(Format.Line(entry), 12));
+        head.Children.Add(Ui.Text(selected ? Format.Details(entry) : Format.Line(entry), 12));
 
         var button = new Button { Content = head }; // an open row's fill is its card's
         button.SetResourceReference(StyleProperty, "IslandListRowStyle");
-        AutomationProperties.SetName(button, $"{Format.Details(entry)}, {Format.When(entry.Recent, now)}{(entry.Pinned ? ", pinned" : "")}");
+        AutomationProperties.SetName(button, Format.AccessibleName(entry, now));
+        AutomationProperties.SetItemStatus(button, selected ? "Expanded" : "");
         button.Click += (_, _) => Select(entry.Id);
         button.MouseDoubleClick += (_, e) =>
         {
@@ -327,23 +355,7 @@ internal sealed class ClipboardView : UserControl
         return Ui.Glyph(glyph, 16, "IslandTextTertiaryBrush");
     }
 
-    internal BitmapSource? Thumbnail(HistoryEntry entry)
-    {
-        if (entry.Thumbnail is not { Length: > 0 } png)
-            return null;
-        if (_thumbnails.TryGetValue(entry.Id, out var cached) && cached.Png.AsSpan().SequenceEqual(png))
-            return cached.Image;
-        try
-        {
-            var image = Pictures.Load(png);
-            _thumbnails[entry.Id] = (png, image);
-            return image;
-        }
-        catch (Exception)
-        {
-            return null;
-        }
-    }
+    internal BitmapSource? Thumbnail(HistoryEntry entry) => _thumbnails.Get(entry);
 
     /// <summary>
     /// The picture of a row that is one image file, read off the UI thread; null until it's read, or when
@@ -382,7 +394,7 @@ internal sealed class ClipboardView : UserControl
         {
             case EntryKind.Picture:
                 var image = new Image { MaxWidth = 208, Height = Lines * Line, Stretch = Stretch.Uniform, HorizontalAlignment = HorizontalAlignment.Left, Margin = margin, Source = Thumbnail(entry) };
-                _ = LoadPictureAsync(entry.Id, image);
+                _ = LoadPictureAsync(entry, image);
                 return image;
             case EntryKind.Files:
                 var files = new StackPanel { Margin = margin };
@@ -430,9 +442,9 @@ internal sealed class ClipboardView : UserControl
         return string.Join("\n", all.Take(lines).Select(line => line.TrimEnd('\r'))) + "…";
     }
 
-    private async Task LoadPictureAsync(long id, Image image)
+    private async Task LoadPictureAsync(HistoryEntry entry, Image image)
     {
-        if (_module?.History is not { } history || await history.PictureAsync(id) is not { } png)
+        if (_module?.History is not { } history || await history.PictureAsync(entry.Id, entry.ContentHash) is not { } png)
             return;
         try
         {
@@ -469,7 +481,7 @@ internal sealed class ClipboardView : UserControl
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, Children = { paste, copy } };
         if (status is not null)
         {
-            var caution = status == "Clipboard busy" ? Ui.Caution() : null;
+            var caution = status == "Clipboard busy" || status == "Item unavailable" ? Ui.Caution() : null;
             if (caution is not null)
             {
                 Ui.Show(caution, status);
@@ -517,7 +529,7 @@ internal sealed class ClipboardView : UserControl
     /// </summary>
     private async void Paste(HistoryEntry entry)
     {
-        if (_module?.History is not { } history || HistoryFiles.Missing(entry) > 0 || Gone(history, entry))
+        if (_module?.History is not { } history || Gone(history, entry))
             return;
         _selected = entry.Id;
         if (_features.PasteTarget?.Invoke() is not { } target)
@@ -525,27 +537,24 @@ internal sealed class ClipboardView : UserControl
             Copy(entry);
             return;
         }
+        int version = ++_actionVersion;
         var outcome = await history.PasteAsync(entry, target);
-        switch (outcome)
-        {
-            case PasteOutcome.Sent:
-                _features.CloseIsland?.Invoke();
-                break;
-            case PasteOutcome.Busy:
-                ShowStatus("Clipboard busy");
-                break;
-            default:
-                ShowStatus("Copied");
-                break;
-        }
+        if (version != _actionVersion || _selected != entry.Id) return;
+        if (outcome == PasteOutcome.Sent)
+            _features.CloseIsland?.Invoke();
+        else
+            ShowStatus(ClipboardFeedback.ForPaste(outcome));
     }
 
     private async void Copy(HistoryEntry entry)
     {
-        if (_module?.History is not { } history || HistoryFiles.Missing(entry) > 0 || Gone(history, entry))
+        if (_module?.History is not { } history || Gone(history, entry))
             return;
         _selected = entry.Id;
-        ShowStatus(await history.CopyAsync(entry) == ClipStatus.Ok ? "Copied" : "Clipboard busy");
+        int version = ++_actionVersion;
+        var status = await history.CopyAsync(entry);
+        if (version == _actionVersion && _selected == entry.Id)
+            ShowStatus(ClipboardFeedback.ForCopy(status));
     }
 
     /// <summary>A copy past its 7 days: the list drops it instead of copying it (notes #11).</summary>
@@ -580,19 +589,26 @@ internal sealed class ClipboardView : UserControl
     {
         if (_module?.History is not { } history)
             return;
+        string query = _search.Text.Trim();
         var entries = history.Entries;
-        Popup? menu = null;
-        menu = Ui.Menu(_more,
-            ("Clear history", entries.Any(e => !e.Pinned), () => Confirm("Clear unpinned items?", "Clear", () => _ = history.ClearAsync([.. entries.Select(e => e.Id)]))),
-            ("Erase all", entries.Count > 0, () => Confirm("Erase all items and pins?", "Erase", () =>
-            {
-                _selected = null;
-                _ = history.EraseAllAsync();
-            })));
-        menu.IsOpen = true;
+        var unpinned = entries.Where(e => !e.Pinned && e.Matches(query)).ToList();
+        string clips = unpinned.Count == 1 ? "clip" : "clips";
+        string question = query.Length == 0 ? $"Clear {unpinned.Count} unpinned {clips}?" : $"Clear {unpinned.Count} matching unpinned {clips}?";
+        var actions = new List<(string Text, bool Enabled, Action Click)>();
+        if (entries.Count > 0 && _allHistory.Visibility != Visibility.Visible)
+            actions.Add(("All history", true, () => _module?.OpenHistory(_search.Text)));
+        actions.Add((query.Length == 0 ? "Clear history" : "Clear matches", unpinned.Count > 0, () => Confirm(question, "Clear", () => _ = history.ClearAsync(unpinned))));
+        actions.Add(("Erase all", entries.Count > 0, () => Confirm("Erase all items and pins?", "Erase", () =>
+        {
+            _selected = null;
+            _ = history.EraseAllAsync();
+        })));
+        ShowPopup(Ui.Menu(_more, [.. actions]));
     }
 
-    private void Confirm(string question, string verb, Action confirmed) => Ui.Confirm(_more, question, verb, confirmed).IsOpen = true;
+    internal Action<Popup> ShowPopup { get; set; } = popup => popup.IsOpen = true;
+
+    private void Confirm(string question, string verb, Action confirmed) => ShowPopup(Ui.Confirm(_more, question, verb, confirmed));
 
     // ---- Keyboard (notes #59) ----
 
