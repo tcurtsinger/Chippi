@@ -18,8 +18,9 @@ public sealed class ScratchpadPageTests
     {
         public ScratchpadDocument Document = ScratchpadDocument.Empty();
         public bool FailRead, FailWrite;
+        public Action? BeforeWrite;
         public ScratchpadDocument Load() => FailRead ? throw new System.IO.IOException() : Document;
-        public void Save(ScratchpadDocument value) { if (FailWrite) throw new System.IO.IOException(); Document = value; }
+        public void Save(ScratchpadDocument value) { BeforeWrite?.Invoke(); if (FailWrite) throw new System.IO.IOException(); Document = value; }
         public void Dispose() { }
     }
     private static IEnumerable<T> Find<T>(DependencyObject root) where T : DependencyObject
@@ -50,7 +51,13 @@ public sealed class ScratchpadPageTests
         Assert.True(session.State.SaveFailed);
         Assert.Equal("Invented\ttext\r\nnext", editor.Text);
         Assert.Contains(Find<TextBlock>(page.Header), b => b.Text == "Save failed");
+        var retry = Named<Button>(page.Header, "Retry");
+        Assert.Equal(Visibility.Visible, retry.Visibility);
         store.FailWrite = false;
+        retry.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        session.FlushAsync().GetAwaiter().GetResult(); Pump();
+        Assert.Equal(editor.Text, store.Document.Selected.Text);
+        Assert.Equal(Visibility.Collapsed, retry.Visibility);
         editor.Text += " again";
         session.FlushAsync().GetAwaiter().GetResult(); Pump();
         Assert.False(session.State.SaveFailed);
@@ -113,6 +120,164 @@ public sealed class ScratchpadPageTests
     });
 
     [Fact]
+    public void New_note_accepts_typing_and_unloads_while_a_previous_write_is_blocked() => WithPage((store, session, page) =>
+    {
+        var field = Named<TextBox>(page, "Note");
+        field.Text = "Original body";
+        using var entered = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        store.BeforeWrite = () => { entered.Set(); release.Wait(); };
+        var slowSave = session.FlushAsync();
+        try
+        {
+            Assert.True(entered.Wait(TimeSpan.FromSeconds(5)));
+            var mode = Named<SegmentedControl>(page, "View");
+            mode.SelectedIndex = 1;
+            Named<Button>(page, "New note").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Assert.Equal(0, mode.SelectedIndex);
+            Assert.Equal("", field.Text);
+            Assert.Equal("Note 2", session.State.Document!.Selected.Name);
+            field.Text = "First words in the new note";
+            page.RaiseEvent(new RoutedEventArgs(FrameworkElement.UnloadedEvent));
+            var edited = session.State.Document!;
+            Assert.Equal("Original body", edited.Notes[0].Text);
+            Assert.Equal(field.Text, edited.Selected.Text);
+        }
+        finally { release.Set(); slowSave.GetAwaiter().GetResult(); store.BeforeWrite = null; }
+        session.FlushAsync().GetAwaiter().GetResult();
+        Assert.Equal("Original body", store.Document.Notes[0].Text);
+        Assert.Equal("First words in the new note", store.Document.Selected.Text);
+    });
+
+    [Fact]
+    public void Both_views_see_the_same_draft_before_a_blocked_write_returns() => WithPage((store, session, widget) =>
+    {
+        var settings = new ScratchpadSettingsPage(session);
+        settings.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));
+        var field = Named<TextBox>(widget, "Note");
+        var other = Named<TextBox>(settings, "Note");
+        field.Text = "x";
+        using var entered = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        store.BeforeWrite = () => { entered.Set(); release.Wait(); };
+        var save = session.FlushAsync();
+        try
+        {
+            Assert.True(entered.Wait(TimeSpan.FromSeconds(5)));
+            field.Text += "1";
+            Assert.Equal("x1", other.Text);
+            other.Text += "2";
+            Assert.Equal("x12", field.Text);
+            Assert.DoesNotContain(Find<TextBlock>(widget.Header), b => b.Text == "Saved");
+            Assert.DoesNotContain(Find<TextBlock>((FrameworkElement)SettingsLayout.GetTitleAside(settings)!), b => b.Text == "Saved");
+        }
+        finally { release.Set(); save.GetAwaiter().GetResult(); store.BeforeWrite = null; }
+        session.FlushAsync().GetAwaiter().GetResult(); Pump();
+        Assert.Equal("x12", store.Document.Selected.Text);
+        Assert.Contains(Find<TextBlock>(widget.Header), b => b.Text == "Saved");
+        settings.RaiseEvent(new RoutedEventArgs(FrameworkElement.UnloadedEvent));
+    });
+
+    [Fact]
+    public void Reopening_the_cached_widget_reads_the_live_note_while_its_close_save_is_blocked() => WithPage((store, session, widget) =>
+    {
+        var settings = new ScratchpadSettingsPage(session);
+        settings.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));
+        var field = Named<TextBox>(widget, "Note");
+        var other = Named<TextBox>(settings, "Note");
+        field.Text = "x";
+        using var entered = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        store.BeforeWrite = () => { entered.Set(); release.Wait(); };
+        try
+        {
+            widget.RaiseEvent(new RoutedEventArgs(FrameworkElement.UnloadedEvent));
+            Assert.True(entered.Wait(TimeSpan.FromSeconds(5)));
+            other.Text += "1";
+            widget.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));
+            Assert.Equal("x1", field.Text);
+            field.Text += "2";
+            Assert.Equal("x12", other.Text);
+        }
+        finally
+        {
+            release.Set(); session.FlushAsync().GetAwaiter().GetResult(); store.BeforeWrite = null;
+            settings.RaiseEvent(new RoutedEventArgs(FrameworkElement.UnloadedEvent));
+        }
+        Assert.Equal("x12", store.Document.Selected.Text);
+    });
+
+    [Fact]
+    public void Switching_to_another_view_or_note_keeps_the_selection_and_preview_focus_target() => WithPage((store, session, page) =>
+    {
+        session.ChangeAsync(d => d.Edit("A body").Add().Edit("B body").Select(1)).GetAwaiter().GetResult(); Pump();
+        var field = Named<TextBox>(page, "Note");
+        field.Select(2, 3);
+        var tabs = Named<SegmentedControl>(page, "Notes");
+        tabs.SelectedIndex = 1;
+        Assert.Equal("B body", field.Text);
+        tabs.SelectedIndex = 0;
+        Assert.Equal("A body", field.Text);
+        Assert.Equal((2, 3), (field.SelectionStart, field.SelectionLength));
+        Named<SegmentedControl>(page, "View").SelectedIndex = 1;
+        Assert.Same(Named<ScrollViewer>(page, "Note preview"), page.InitialFocus);
+        Named<SegmentedControl>(page, "View").SelectedIndex = 0;
+        Assert.Same(field, page.InitialFocus);
+        Assert.Equal((2, 3), (field.SelectionStart, field.SelectionLength));
+    });
+
+    [Fact]
+    public void Export_and_delete_keep_the_note_that_was_on_screen_when_the_action_started() => WpfTestThread.Run(() =>
+    {
+        var store = new Store { Document = ScratchpadDocument.Empty().Edit("A").Add().Edit("B").Select(1) };
+        var session = new ScratchpadSession(() => store);
+        session.LoadAsync().GetAwaiter().GetResult();
+        ScratchpadNote? exported = null;
+        var settings = new ScratchpadSettingsPage(session, (_, note) => exported = note);
+        settings.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));
+        using var entered = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        try
+        {
+            var workspace = (ScratchpadWorkspace)settings.Content;
+            var confirmation = workspace.ConfirmDelete();
+            var field = Named<TextBox>(settings, "Note");
+            field.Text = "A, revised";
+            store.BeforeWrite = () => { entered.Set(); release.Wait(); };
+            var export = settings.ExportAsync();
+            try
+            {
+                Assert.True(entered.Wait(TimeSpan.FromSeconds(5)));
+                Named<SegmentedControl>(settings, "Notes").SelectedIndex = 1;
+                Assert.Equal("B", field.Text);
+            }
+            finally { release.Set(); }
+            while (!export.IsCompleted) Pump();
+            export.GetAwaiter().GetResult();
+            Assert.Equal(new ScratchpadNote(1, "Note 1", "A, revised"), exported);
+            Named<Button>(confirmation.Child, "Delete").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            session.FlushAsync().GetAwaiter().GetResult(); Pump();
+            var survivor = Assert.Single(store.Document.Notes);
+            Assert.Equal(2, survivor.Id);
+            Assert.Equal("B", survivor.Text);
+        }
+        finally
+        {
+            release.Set();
+            settings.RaiseEvent(new RoutedEventArgs(FrameworkElement.UnloadedEvent));
+            session.DisposeAsync().AsTask().GetAwaiter().GetResult();
+        }
+    });
+
+    [Theory]
+    [InlineData("Standup", "Standup.txt")]
+    [InlineData("Q1: sales/notes", "Q1_ sales_notes.txt")]
+    [InlineData("CON", "_CON.txt")]
+    [InlineData("...", "Note.txt")]
+    public void Export_suggests_a_usable_note_filename(string noteName, string filename) =>
+        Assert.Equal(filename, ScratchpadWorkspace.ExportName(noteName));
+
+    [Fact]
     public void Export_holds_the_island_and_flushes_then_releases_even_on_failure() => WpfTestThread.Run(() =>
     {
         var store = new Store(); var session = new ScratchpadSession(() => store);
@@ -161,11 +326,6 @@ public sealed class ScratchpadPageTests
         Assert.Same(note, page.InitialFocus);
     });
 
-    // Build menus without opening their popup windows on the user's desktop.
-    private static System.Windows.Controls.Primitives.Popup Menu(ScratchpadPage page, string factory, params object[] args) =>
-        (System.Windows.Controls.Primitives.Popup)typeof(ScratchpadPage).GetMethod(factory,
-            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.Invoke(page, args)!;
-
     [Fact]
     public void More_and_tab_actions_use_the_island_menu_and_the_exact_export_label() => WithPage((store, session, page) =>
     {
@@ -177,7 +337,7 @@ public sealed class ScratchpadPageTests
         {
             foreach (FrameworkElement anchor in new FrameworkElement[] { Named<Button>(page, "More"), Named<SegmentedControl>(page, "Notes") })
             {
-                var menu = Menu(page, "CreateActionsMenu", anchor);
+                var menu = ((ScratchpadWorkspace)page.Children[0]).CreateActionsMenu(anchor, session.State.Document!.SelectedId);
                 Assert.Same(anchor, menu.PlacementTarget);
                 Assert.False(menu.IsOpen);
                 var surface = Assert.IsType<Border>(menu.Child);
@@ -194,10 +354,11 @@ public sealed class ScratchpadPageTests
     public void All_notes_uses_the_island_menu_and_selects_the_clicked_note() => WithPage((store, session, page) =>
     {
         session.ChangeAsync(d => d.Add()).GetAwaiter().GetResult(); Pump();
-        var menu = Menu(page, "CreateNotesMenu", session.State.Document!);
+        var menu = ((ScratchpadWorkspace)page.Children[0]).Tabs.BuildNotesMenu();
         Assert.False(menu.IsOpen);
         var rows = Find<Button>(menu.Child).ToArray();
-        Assert.Equal(new[] { "Note 1", "Note 2 \u2713" }, rows.Select(b => b.Content));
+        Assert.Equal(new[] { "Note 1", "Note 2" }, rows.Select(AutomationProperties.GetName));
+        Assert.Equal("Selected", AutomationProperties.GetItemStatus(rows[1]));
         rows[0].RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         session.FlushAsync().GetAwaiter().GetResult(); Pump();
         Assert.Equal("Note 1", session.State.Document!.Selected.Name);

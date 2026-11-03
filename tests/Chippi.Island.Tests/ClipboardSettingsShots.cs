@@ -74,7 +74,7 @@ public sealed class ClipboardSettingsShots
                 //+ new pages
                 var notes = ScratchpadDocument.Empty().Rename("Groceries").Edit("Milk, eggs").Add().Rename("Standup")
                     .Edit("## Standup, Tue\n- Shipped: island fit fix\n- Today: **Shelf** drag-out\n- Blocked: none\n\n- [ ] Book a room for Thursday\nBranch: `release/0.6`")
-                    .Add().Rename("Ideas").Add().Rename("Draft reply").Select(2);
+                    .Add().Rename("Ideas").Add().Rename("Draft reply").Select(ScratchpadSurface.Settings, 2);
                 var scratchUi = new Pages();
                 var scratchpad = new ScratchpadModule(_ => new ScratchpadSmokeTests.Store { Document = notes });
                 scratchpad.StartAsync(new ModuleContext("scratchpad", new ScratchpadSmokeTests.Settings(), NullLogger.Instance, new ScratchpadSmokeTests.Island(), scratchUi), default).GetAwaiter().GetResult();

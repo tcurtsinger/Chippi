@@ -25,7 +25,7 @@ public sealed class ScratchpadModule : IFeatureModule
         ScratchpadPage Page() => _page ??= new ScratchpadPage(_session, context.HoldIslandOpen);
         _tile = context.Ui.AddIslandTile(new IslandTileSpec("scratchpad", "Scratchpad", "NotebookPen", 80, 0, () => Page())
         {
-            CreateHeader = () => Page().Header, InitialFocus = () => Page().InitialFocus,
+            CreateHeader = () => Page().Header, InitialFocus = () => Page().InitialFocus, HandleEscape = () => _page?.HandleEscape() == true,
         });
         var shared = _session; // Settings and the island page edit the same notes
         context.Ui.SetSettingsPage(() => new ScratchpadSettingsPage(shared));

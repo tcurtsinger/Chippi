@@ -24,6 +24,49 @@ public sealed class ScratchpadStoreTests : IDisposable
     }
 
     [Fact]
+    public void Legacy_encrypted_document_starts_both_views_on_the_saved_note_then_remembers_each()
+    {
+        const string legacyJson = """
+            {"SelectedId":8,"Notes":[{"Id":3,"Name":"Draft","Text":"First body"},{"Id":8,"Name":"Plans","Text":"Other body"}]}
+            """;
+        InsertEncryptedPayload(Encoding.UTF8.GetBytes(legacyJson));
+        using (var store = new ScratchpadStore(DatabasePath, _protector))
+        {
+            var original = store.Load();
+            Assert.Equal(8, original.Current(ScratchpadSurface.Settings).Id);
+            Assert.Equal(8, original.Current(ScratchpadSurface.Widget).Id);
+            store.Save(original.Select(ScratchpadSurface.Widget, 3));
+        }
+        using var reopened = new ScratchpadStore(DatabasePath, _protector);
+        var restored = reopened.Load();
+        Assert.Equal("First body", restored.Current(ScratchpadSurface.Widget).Text);
+        Assert.Equal("Other body", restored.Current(ScratchpadSurface.Settings).Text);
+    }
+
+    [Fact]
+    public void Deletion_preserves_the_other_selection_and_never_reuses_a_deleted_id_after_restart()
+    {
+        using (var store = new ScratchpadStore(DatabasePath, _protector))
+        {
+            var document = store.Load().Add(ScratchpadSurface.Settings).Add(ScratchpadSurface.Settings)
+                .Add(ScratchpadSurface.Widget).Select(ScratchpadSurface.Settings, 1);
+            store.Save(document.Rename(2, "Renamed from its menu").Edit(2, "Draft").Delete(4));
+        }
+        using var reopened = new ScratchpadStore(DatabasePath, _protector);
+        var restored = reopened.Load();
+        Assert.Equal(3, restored.Current(ScratchpadSurface.Widget).Id);
+        Assert.Equal(1, restored.Current(ScratchpadSurface.Settings).Id);
+        Assert.Equal(new ScratchpadNote(2, "Renamed from its menu", "Draft"), restored.Notes[1]);
+        var added = restored.Add(ScratchpadSurface.Settings);
+        Assert.Equal(5, added.Current(ScratchpadSurface.Settings).Id);
+        Assert.Equal(3, added.Current(ScratchpadSurface.Widget).Id);
+        Assert.Same(added, added.Edit(4, "Stale text"));
+        Assert.Same(added, added.Rename(4, "Stale name"));
+        Assert.Same(added, added.Select(ScratchpadSurface.Widget, 4));
+        Assert.Same(added, added.Delete(4));
+    }
+
+    [Fact]
     public void Starts_with_one_empty_note_and_requires_load_before_save()
     {
         using var store = new ScratchpadStore(DatabasePath, _protector);
@@ -92,17 +135,20 @@ public sealed class ScratchpadStoreTests : IDisposable
     [Fact]
     public void Valid_encryption_with_an_invalid_document_also_fails_closed()
     {
-        using (var db = SealedDatabase.Open(DatabasePath, _protector))
-        {
-            using var command = db.Connection.CreateCommand();
-            command.CommandText = "CREATE TABLE scratchpad(id INTEGER PRIMARY KEY,payload BLOB); INSERT INTO scratchpad VALUES(1,$body)";
-            command.Parameters.AddWithValue("$body", db.Seal(JsonSerializer.SerializeToUtf8Bytes(
-                new ScratchpadDocument(9, new[] { new ScratchpadNote(1, "Note 1", "Existing text") })), "scratchpad", 1));
-            command.ExecuteNonQuery();
-        }
+        InsertEncryptedPayload(JsonSerializer.SerializeToUtf8Bytes(
+            new ScratchpadDocument(9, new[] { new ScratchpadNote(1, "Note 1", "Existing text") })));
         using var store = new ScratchpadStore(DatabasePath, _protector);
         Assert.Throws<InvalidDataException>(() => store.Load());
         Assert.Throws<InvalidOperationException>(() => store.Save(ScratchpadDocument.Empty()));
+    }
+
+    private void InsertEncryptedPayload(byte[] payload)
+    {
+        using var db = SealedDatabase.Open(DatabasePath, _protector);
+        using var command = db.Connection.CreateCommand();
+        command.CommandText = "CREATE TABLE scratchpad(id INTEGER PRIMARY KEY,payload BLOB); INSERT INTO scratchpad VALUES(1,$body)";
+        command.Parameters.AddWithValue("$body", db.Seal(payload, "scratchpad", 1));
+        command.ExecuteNonQuery();
     }
 
     [Fact]

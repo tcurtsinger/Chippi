@@ -4,7 +4,6 @@
     <Style x:Key="ScratchpadTabStyle" TargetType="ListBoxItem">
         <Setter Property="Height" Value="30" />
         <Setter Property="Padding" Value="10,0" />
-        <Setter Property="AutomationProperties.Name" Value="{Binding Label}" />
         <Setter Property="Foreground" Value="{DynamicResource IslandTextSecondaryBrush}" />
         <Setter Property="FocusVisualStyle" Value="{DynamicResource IslandFocusVisual}" />
         <Setter Property="Template">
@@ -28,6 +27,22 @@
                             <Setter Property="Opacity" Value="0.45" />
                         </Trigger>
                     </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+    <!-- In-place title editing keeps the selected tab's accent and uses the same field inset in both hosts. -->
+    <Style x:Key="ScratchpadNameStyle" TargetType="TextBox">
+        <Setter Property="Padding" Value="4,0" />
+        <Setter Property="Height" Value="24" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TextBox">
+                    <Border CornerRadius="4" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}" Padding="{TemplateBinding Padding}">
+                        <ScrollViewer x:Name="PART_ContentHost" VerticalAlignment="Center" />
+                    </Border>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>

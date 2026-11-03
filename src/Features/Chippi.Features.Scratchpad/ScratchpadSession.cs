@@ -39,7 +39,7 @@ public sealed class ScratchpadSession : IAsyncDisposable
     }
 
     public ScratchpadState State => Volatile.Read(ref _state);
-    /// <summary>Raised on the worker; views marshal the snapshot to their dispatcher.</summary>
+    /// <summary>Edits and navigation notify on the caller; disk results notify on the store worker.</summary>
     public event Action<ScratchpadState>? Changed;
 
     public Task<bool> LoadAsync() => Enqueue(() =>
@@ -62,55 +62,96 @@ public sealed class ScratchpadSession : IAsyncDisposable
         }
     });
 
-    public Task EditAsync(string text) => Enqueue(() =>
-    {
-        if (State.Document is not { } document)
-            return false;
-        if (document.Selected.Text == text)
-            return true;
-        Set(State with { Document = document.Edit(text), HasChanges = true });
-        _due = _time.GetUtcNow() + SaveDelay;
-        _timer.Change(SaveDelay, Timeout.InfiniteTimeSpan);
-        return true;
-    });
+    public Task EditAsync(string text) => State.Document is { } doc
+        ? EditAsync(doc.SelectedId, text) : ApplyAsync(d => d.Edit(text), typing: true);
 
-    public Task<bool> ChangeAsync(Func<ScratchpadDocument, ScratchpadDocument> change) => Enqueue(() =>
+    public Task EditAsync(long id, string text) => ApplyAsync(d => d.Edit(id, text), typing: true);
+
+    public Task<bool> ChangeAsync(Func<ScratchpadDocument, ScratchpadDocument> change) => ApplyAsync(change, typing: false);
+
+    private Task<bool> ApplyAsync(Func<ScratchpadDocument, ScratchpadDocument> change, bool typing)
+    {
+        Task<bool> completion;
+        bool changed;
+        lock (_gate)
+        {
+            if (_stop is not null)
+                return Task.FromException<bool>(new ObjectDisposedException(nameof(ScratchpadSession)));
+            if (State.Document is null)
+            {
+                // A caller can queue a command immediately after starting the initial load.
+                return Enqueue(() =>
+                {
+                    bool applied;
+                    lock (_gate) applied = Apply(change, typing);
+                    if (applied) Changed?.Invoke(State);
+                    return typing ? State.Document is not null : Save();
+                });
+            }
+            try { changed = Apply(change, typing); }
+            catch (Exception error) { return Task.FromException<bool>(error); }
+            completion = typing ? Enqueue(() => true) : Enqueue(Save);
+        }
+        if (changed) Changed?.Invoke(State);
+        return completion;
+    }
+
+    // Publish the logical document under the lock; only the immutable snapshot goes to disk.
+    private bool Apply(Func<ScratchpadDocument, ScratchpadDocument> change, bool typing)
     {
         if (State.Document is not { } document)
             return false;
         var next = change(document);
+        if (ReferenceEquals(document, next))
+            return false;
         next.Validate();
-        Set(State with { Document = next, HasChanges = true });
-        return Save();
-    });
+        Volatile.Write(ref _state, State with { Document = next, HasChanges = true });
+        if (typing)
+        {
+            _due = _time.GetUtcNow() + SaveDelay;
+            _timer.Change(SaveDelay, Timeout.InfiniteTimeSpan);
+        }
+        return true;
+    }
 
     public Task<bool> FlushAsync() => Enqueue(Save);
 
-    private bool Save()
+    private bool Save() => Save(onlyWhenDue: false);
+
+    private bool Save(bool onlyWhenDue)
     {
-        _due = DateTimeOffset.MaxValue;
-        _timer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
-        if (_store is null || State.Document is null)
-            return false;
-        if (!State.HasChanges)
-            return true;
-        try
+        IScratchpadStore store;
+        ScratchpadDocument snapshot;
+        lock (_gate)
         {
-            _store.Save(State.Document);
-            Set(State with { SaveFailed = false, HasChanges = false });
-            return true;
+            if (onlyWhenDue && _time.GetUtcNow() < _due) return true;
+            _due = DateTimeOffset.MaxValue;
+            _timer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+            if (_store is null || State.Document is not { } document) return false;
+            if (!State.HasChanges) return true;
+            store = _store;
+            snapshot = document;
         }
-        catch
+        bool saved;
+        try { store.Save(snapshot); saved = true; }
+        catch { saved = false; }
+        lock (_gate)
         {
-            Set(State with { SaveFailed = true });
-            return false;
+            var latest = State;
+            Volatile.Write(ref _state, latest with
+            {
+                SaveFailed = !saved,
+                HasChanges = !saved || !ReferenceEquals(latest.Document, snapshot)
+            });
         }
+        Changed?.Invoke(State);
+        return saved;
     }
 
     private void Set(ScratchpadState state)
     {
-        Volatile.Write(ref _state, state);
-        Changed?.Invoke(state);
+        lock (_gate) Volatile.Write(ref _state, state);
+        Changed?.Invoke(State);
     }
 
     private Task<T> Enqueue<T>(Func<T> work)
@@ -134,7 +175,7 @@ public sealed class ScratchpadSession : IAsyncDisposable
         lock (_gate)
         {
             if (_stop is null)
-                _queue.Add(() => { if (_time.GetUtcNow() >= _due) Save(); });
+                _queue.Add(() => Save(onlyWhenDue: true));
         }
     }
 
