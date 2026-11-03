@@ -17,7 +17,7 @@ public enum VolumeSurface { Settings, Island }
 
 /// <summary>
 /// App volume's views. On the island's App volume page (DESIGN.md §5 Island) a vertical strip per
-/// app playing, with its route on a hover/focus menu. System sounds has a pinned strip. In
+/// app in the Windows mixer, with its route on a hover/focus menu. System sounds has a pinned strip. In
 /// Settings (revised 2026-10-28) a row per app, every app, then the options. Each app keeps its strip
 /// or row while it's shown, updated in place, so an app starting or a level changing never rebuilds
 /// the one under a drag.
@@ -31,7 +31,6 @@ public sealed class VolumeView : UserControl
     private readonly Grid _root = new();
     private readonly Panel _list; // the strips, or the Settings card
     private readonly Dictionary<AppKey, Item> _items = [];
-    private readonly HashSet<AppKey> _shown = []; // the island's apps: playing when the page opened or since, until they close
     private readonly TextBlock _error;
     private readonly FrameworkElement _empty;
     private readonly List<Action> _updates = []; // Settings' options
@@ -41,10 +40,9 @@ public sealed class VolumeView : UserControl
     private readonly Grid? _pager;
     private int _page;
     private bool _paging;
-    private string _watched = "";
+    private HashSet<AppKey> _watched = [];
     private string? _errorShown; // the error this page showed: seen once the page closes on it
     private IDisposable? _meters;
-    private bool _loaded;
     private bool _refreshing;
 
     private sealed record Item(FrameworkElement View, Action Update, Action<float>? Peak = null, FrameworkElement? Trough = null);
@@ -66,7 +64,7 @@ public sealed class VolumeView : UserControl
             var glyph = new LucideIcon { Data = LucideIcons.Sliders, Size = 20, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 0, 0, 6) };
             glyph.SetResourceReference(LucideIcon.BrushProperty, "IslandTextTertiaryBrush");
             _empty = new StackPanel { VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center,
-                Children = { glyph, RoutingUi.Text("No apps playing", "CaptionTextStyle", "IslandTextTertiaryBrush") } };
+                Children = { glyph, RoutingUi.Text("No apps in the Windows mixer", "CaptionTextStyle", "IslandTextTertiaryBrush") } };
             _root.Children.Add(_list);
             _root.Children.Add(_empty);
             _root.Children.Add(_hint);
@@ -83,9 +81,7 @@ public sealed class VolumeView : UserControl
         bool island = surface == VolumeSurface.Island;
         Loaded += (_, _) =>
         {
-            // Start each visit from the sessions still playing; keep their existing controls when possible.
-            if (_loaded && island) { _shown.Clear(); _page = 0; }
-            _loaded = true;
+            _page = 0;
             _module.Changed += Refresh;
             ThemeManager.ThemeChanged += OnTheme;
             if (island) _module.Meters += OnMeters;
@@ -96,7 +92,9 @@ public sealed class VolumeView : UserControl
             _module.Changed -= Refresh;
             ThemeManager.ThemeChanged -= OnTheme;
             if (island) _module.Meters -= OnMeters;
-            _meters?.Dispose(); (_meters, _watched) = (null, "");
+            _meters?.Dispose();
+            _meters = null;
+            _watched.Clear();
             // An error this page showed has been seen: the next visit starts clean, unless a newer one came.
             if (_errorShown is not null) _module.ClearError(_errorShown);
         };
@@ -113,7 +111,11 @@ public sealed class VolumeView : UserControl
         {
             if (_surface == VolumeSurface.Island) Strips(); else Rows();
             foreach (var item in _items.Values) item.Update();
-            if (_surface == VolumeSurface.Island) Hint();
+            if (_surface == VolumeSurface.Island)
+            {
+                Watch();
+                Hint();
+            }
             foreach (var update in _updates) update();
             _errorShown = _module.Error;
             _error.Text = _errorShown ?? "";
@@ -166,12 +168,10 @@ public sealed class VolumeView : UserControl
     private void Strips()
     {
         var apps = _module.Apps;
-        _shown.RemoveWhere(k => apps.All(a => a.Key != k));
-        foreach (var app in apps.Where(a => a.IsActive || a.Key == AppKey.SystemSounds)) _shown.Add(app.Key);
         // Keep the strip and its vertical track exactly under a live drag. Losing capture refreshes the layout.
-        if (_items.Any(p => p.Value.View.IsMouseCaptureWithin && _shown.Contains(p.Key))) return;
+        if (_items.Any(p => p.Value.View.IsMouseCaptureWithin && apps.Any(a => a.Key == p.Key))) return;
 
-        var other = apps.Where(a => a.Key != AppKey.SystemSounds && _shown.Contains(a.Key)).ToList();
+        var other = apps.Where(a => a.Key != AppKey.SystemSounds).ToList();
         var system = apps.FirstOrDefault(a => a.Key == AppKey.SystemSounds);
         int pages = Math.Max(1, (other.Count + AppsPerPage - 1) / AppsPerPage);
         _page = Math.Clamp(_page, 0, pages - 1);
@@ -203,7 +203,6 @@ public sealed class VolumeView : UserControl
         _range.Text = $"{first + 1}–{first + onPage} of {other.Count} apps";
         _previous.IsEnabled = _page > 0;
         _next.IsEnabled = _page < pages - 1;
-        Watch(visible);
     }
 
 
@@ -229,22 +228,29 @@ public sealed class VolumeView : UserControl
         }
     }
 
-    // The island's peaks, for the apps it shows and only while it shows them.
-    private void Watch(IReadOnlyList<AppAudio> apps)
+    // Idle apps keep their controls without keeping the meter timer running.
+    private void Watch()
     {
         if (!IsLoaded) return;
-        var watched = string.Join("|", apps.Select(a => a.Key.Value));
-        if (watched == _watched) return;
-        _meters?.Dispose(); (_meters, _watched) = (null, watched);
-        if (apps.Count == 0) return;
-        try { _meters = _module.WatchMeters(apps.Select(a => a.Key).ToList()); }
+        var active = _module.Snapshot.Apps.Where(a => a.IsActive && _items.ContainsKey(a.Key)).Select(a => a.Key).ToHashSet();
+        if (_watched.SetEquals(active)) return;
+        _meters?.Dispose();
+        _meters = null;
+        _watched = [];
+        if (active.Count == 0) return;
+        try
+        {
+            _meters = _module.WatchMeters(active);
+            _watched = active;
+        }
         catch (InvalidOperationException) { } // audio isn't running: the bars show no level
     }
 
     private void OnMeters(object? sender, MeterReadings readings)
     {
         if (!Dispatcher.CheckAccess()) { Dispatcher.BeginInvoke(() => OnMeters(sender, readings)); return; }
-        foreach (var (key, item) in _items) item.Peak?.Invoke(readings.Apps.GetValueOrDefault(key));
+        foreach (var key in _watched)
+            if (_items.TryGetValue(key, out var item)) item.Peak?.Invoke(readings.Apps.GetValueOrDefault(key));
     }
 
     private AppAudio? App(AppKey key) => _module.Snapshot.Apps.FirstOrDefault(a => a.Key == key);
@@ -412,6 +418,7 @@ public sealed class VolumeView : UserControl
 
         return new Item(strip, () =>
         {
+            if (App(key) is not { IsActive: true }) level = 0;
             if (!bar.IsMouseCaptured && !write.Busy) slider.Value = Level(key).Volume * 100;
             string name = AppName(key);
             string action = Level(key).Muted ? "Unmute" : "Mute";
@@ -486,13 +493,12 @@ public sealed class VolumeView : UserControl
             button.IsEnabled = _module.CanPickOutput(key);
             var where = plays is null ? "" : "plays on " + OutputName(plays, names);
             var connected = _module.Outputs.Any(o => string.Equals(o.Id, chosen, StringComparison.OrdinalIgnoreCase));
-            string tip = !button.IsEnabled ? (where.Length == 0 ? "Output" : char.ToUpperInvariant(where[0]) + where[1..])
-                    // Off, it says why: per-app output is off here, or this app has no program to set it for.
-                    + " · " + (_module.OutputsOff ?? "Its output can't be set")
-                : !elsewhere ? (where.Length == 0 ? "Output" : char.ToUpperInvariant(where[0]) + where[1..] + (own ? "" : " · Default"))
+            string tip = plays is null ? "Not playing · " + (chosen is null ? "Default" : OutputName(chosen, names) + (connected ? "" : " not connected"))
+                : !elsewhere ? $"Plays on {OutputName(plays, names)}" + (button.IsEnabled && !own ? " · Default" : "")
                 : chosen is null ? $"Default · {OutputName(_module.DefaultOutput, names)} · still {where}"
                 : connected ? $"Picked {OutputName(chosen, names)} · still {where}"
                 : $"{OutputName(chosen, names)} not connected · {where}";
+            if (!button.IsEnabled) tip += " · " + (_module.OutputsOff ?? "Its output can't be set");
             button.ToolTip = tip;
             AutomationProperties.SetName(button, $"{AppName(key)} output");
             AutomationProperties.SetHelpText(button, tip);
