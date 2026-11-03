@@ -202,4 +202,19 @@ public sealed class IslandGeometryTests
         Assert.Equal(start.Right, panel.Right);
         Assert.Equal(new Rect(start.Right - 512, start.Top, 512, 100), IslandGeometry.BarRect(start, opensLeft: true, 2));
     }
+
+    [Theory]
+    [InlineData(1, 25)]
+    [InlineData(1.25, 128)]
+    [InlineData(2, 231)]
+    public void A_bar_grip_keeps_its_local_point_at_any_display_scale(double scale, double gripX)
+    {
+        var pointer = new Point(-30, 640);
+        var grip = new Vector(gripX, 38);
+        var rect = IslandGeometry.HeldRect(pointer, grip, IslandGeometry.BarWidth, scale);
+        Assert.Equal(pointer, rect.TopLeft + grip * scale);
+        Assert.Equal(new Size(256 * scale, 50 * scale), rect.Size);
+        foreach (bool left in new[] { true, false })
+            Assert.Equal(rect, IslandGeometry.BarRect(IslandGeometry.PuckEnd(rect, left), left, scale));
+    }
 }

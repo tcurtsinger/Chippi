@@ -336,4 +336,49 @@ public sealed class ShellMotionTests
         window.Escape();
         IslandWindowTests.Pump(TimeSpan.FromMilliseconds(300));
     })));
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Grabbing_a_widget_during_its_edge_slide_holds_that_frame_until_the_next_drag_or_release(bool dragAgain) =>
+        WpfTestThread.Run(() => WithMotion(false, () => IslandWindowTests.WithShownIsland(window =>
+        {
+            var area = window.CurrentArea!.Value;
+            long now = 0;
+            window.SlideClock = () => now;
+            var pointer = new Point(area.Work.Left + 1, area.Work.Top + 90 * area.Scale);
+            window.PointerAt = () => pointer;
+            int saves = 0;
+            window.PlacementChosen += (_, _) => saves++;
+            var firstDrop = window.DropAt(pointer);
+            var start = IslandNative.WindowRect(window.Handle);
+            now += Stopwatch.Frequency / 30;
+            IslandWindowTests.PumpUntil(() => IslandNative.WindowRect(window.Handle) != start);
+            var held = IslandNative.WindowRect(window.Handle);
+            var grip = new Point(25, 25);
+            pointer = window.PuckButton.PointToScreen(grip);
+            void Button(RoutedEvent routed) => window.PuckButton.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Left) { RoutedEvent = routed });
+            Button(UIElement.PreviewMouseLeftButtonDownEvent);
+            now += Stopwatch.Frequency; // longer than the whole slide while the pointer stays still
+            bool drawn = false;
+            EventHandler frame = (_, _) => drawn = true;
+            CompositionTarget.Rendering += frame;
+            try { IslandWindowTests.PumpUntil(() => drawn); }
+            finally { CompositionTarget.Rendering -= frame; }
+            Assert.Equal(held, IslandNative.WindowRect(window.Handle));
+            Assert.Equal(0, saves);
+
+            if (dragAgain)
+            {
+                pointer.X += 160 * area.Scale;
+                window.PuckButton.RaiseEvent(new MouseEventArgs(Mouse.PrimaryDevice, 0) { RoutedEvent = UIElement.PreviewMouseMoveEvent });
+                Assert.InRange((window.PuckButton.PointToScreen(grip) - pointer).Length, 0, 2);
+            }
+            Button(UIElement.PreviewMouseLeftButtonUpEvent);
+            now += Stopwatch.Frequency;
+            IslandWindowTests.PumpUntil(() => saves > 0);
+            Assert.Equal(1, saves);
+            Assert.Equal(!dragAgain, window.IsIslandOpen);
+            Assert.Equal(!dragAgain, firstDrop == window.PuckRect);
+        })));
 }
