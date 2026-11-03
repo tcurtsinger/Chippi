@@ -2,6 +2,7 @@
 // Copyright (C) Chippi contributors
 
 #if DEBUG
+using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using System.Windows.Media;
@@ -23,6 +24,76 @@ namespace Chippi.SoundSmoke;
 /// </summary>
 public sealed class SoundPageShots
 {
+    /// <summary>Native Audio tab and paging captures from a private profile, using only fake endpoints and sessions.</summary>
+    [Fact]
+    public Task RenderAudio() => SmokeDispatcher.Run(async () =>
+    {
+        if (Environment.GetEnvironmentVariable("CHIPPI_ISLAND_SHOTS") is not { Length: > 0 } folder)
+            return;
+        Directory.CreateDirectory(folder);
+        await using var scene = new SoundScene();
+        scene.Devices.With(Speaker("speakers", "Speakers (Realtek USB2.0 Audio)"), Speaker("headphones", "Speakers (INZONE Buds - Game)"),
+            Mic("desk", "Microphone (RØDE VideoMic GO II)"), Mic("chat", "Headset Microphone (INZONE Buds - Chat)"));
+        scene.Devices.ChangeLevel("speakers", new(.30f, false));
+        scene.Devices.ChangeLevel("desk", new(.64f, false));
+        await scene.Start();
+        await scene.Processing.SetEnabledAsync(true);
+        string? icons = Environment.GetEnvironmentVariable("CHIPPI_AUDIO_SHOT_ICONS");
+        await scene.GrowMixerTo(4, icons);
+        var area = new Rect(-20000, 0, 1920, 1080);
+        var work = new Rect(-20000, 0, 1920, 1032);
+        var panel = new IslandPanelWindow { ActivateWindow = _ => { } };
+        try
+        {
+            panel.Initialize();
+            panel.SetMedia(new FakeMedia());
+            panel.SetTiles(Chippi.Core.Modules.IslandTileContribution.Group(scene.Shell.Registry.Features.SelectMany(e => e.IslandTiles)));
+            panel.Open(IslandGeometry.Start(work, 1), new MonitorArea(default, area, work, 1));
+            await SmokeDispatcher.Until(() => !panel.IsMorphing);
+            List<string> timings = [];
+            async Task Show(string key)
+            {
+                var watch = Stopwatch.StartNew();
+                panel.ShowPage(key);
+                panel.UpdateLayout();
+                double layout = watch.Elapsed.TotalMilliseconds;
+                await SmokeDispatcher.Until(() => !panel.IsMorphing);
+                timings.Add($"{key} render and layout {layout:F2} ms; settled {watch.Elapsed.TotalMilliseconds:F1} ms");
+            }
+            await Show(SoundTile.Key);
+            SavePanel("devices");
+            await Show(AppVolumeModule.TileKey);
+            SavePanel("mixer-four");
+            await scene.GrowMixerTo(9, icons);
+            await SmokeDispatcher.Until(() => scene.Volume.Apps.Count == 9);
+            await Show(SoundTile.Key);
+            await Show(AppVolumeModule.TileKey);
+            SavePanel("mixer-nine");
+            await scene.GrowMixerTo(15, icons);
+            await SmokeDispatcher.Until(() => scene.Volume.Apps.Count == 15);
+            await Show(SoundTile.Key);
+            await Show(AppVolumeModule.TileKey);
+            SavePanel("mixer-overflow");
+            File.WriteAllLines(Path.Combine(folder, "audio-timings.txt"), timings);
+
+            void SavePanel(string name)
+            {
+                panel.UpdateLayout();
+                var root = panel.Visual;
+                var shape = (FrameworkElement)panel.FindName("Shape");
+                var p = shape.TranslatePoint(default, root);
+                var pixels = new RenderTargetBitmap((int)Math.Ceiling(root.ActualWidth), (int)Math.Ceiling(root.ActualHeight), 96, 96, PixelFormats.Pbgra32);
+                pixels.Render(root);
+                var encoder = new PngBitmapEncoder();
+                encoder.Frames.Add(BitmapFrame.Create(new CroppedBitmap(pixels, new Int32Rect((int)Math.Round(p.X), (int)Math.Round(p.Y),
+                    (int)Math.Round(shape.Width), (int)Math.Round(shape.Height)))));
+                using var stream = File.Create(Path.Combine(folder, $"audio-{name}.png"));
+                encoder.Save(stream);
+            }
+        }
+        finally { panel.Close(); }
+    });
+
     [Fact]
     public Task Render() => SmokeDispatcher.Run(async () =>
     {

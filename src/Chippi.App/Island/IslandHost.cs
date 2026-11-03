@@ -64,7 +64,11 @@ public sealed class IslandHost : IDisposable
         _window.Initialize();
         _tracker.Ignore = [_window.Handle, _window.PanelHandle];
         _window.SettingsRequested += (_, _) => _shell.Commands.OpenSettings();
-        _window.LastPageChanged += (_, key) => UpdateSettings(s => s.IslandLastPage = key);
+        _window.LastPageChanged += (_, key) => UpdateSettings(s =>
+        {
+            s.IslandLastPage = key;
+            s.IslandAudioShowsMixer = _window.Panel.AudioShowsMixer;
+        });
         // A page's Paste goes to the app that was in front before the island took the keyboard (Phase 5 notes #62).
         _window.CaptureTarget = () => _shell.Clipboard.CaptureTarget();
         _shell.Services.IslandPasteTarget = () => _window.PasteTarget;
@@ -254,7 +258,7 @@ public sealed class IslandHost : IDisposable
                 Chippi.UI.Themes.ThemeManager.Apply(theme);
                 var color = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(backdrop);
                 string prefix = $"s6-top-{theme}".ToLowerInvariant();
-                UpdateSettings(s => (s.IslandX, s.IslandY, s.IslandLastPage) = (null, null, null));
+                UpdateSettings(s => (s.IslandX, s.IslandY, s.IslandLastPage, s.IslandAudioShowsMixer) = (null, null, null, null));
                 await Task.Delay(settle);
                 _window.ForceOpen(true);
                 await Task.Delay(settle);
@@ -285,7 +289,8 @@ public sealed class IslandHost : IDisposable
         finally
         {
             _shell.Island.ClearModule(DebugModuleId);
-            UpdateSettings(s => (s.IslandX, s.IslandY, s.IslandLastPage) = (original.IslandX, original.IslandY, original.IslandLastPage));
+            UpdateSettings(s => (s.IslandX, s.IslandY, s.IslandLastPage, s.IslandAudioShowsMixer) =
+                (original.IslandX, original.IslandY, original.IslandLastPage, original.IslandAudioShowsMixer));
             Chippi.UI.Themes.ThemeManager.Apply(original.Theme);
         }
     }
@@ -398,7 +403,7 @@ public sealed class IslandHost : IDisposable
         var settings = _shell.Config.GetSection<AppSettings>(AppSettings.SectionName);
         _window.SetPetColor(settings.PetColor);
         _window.SetPlacement(settings.IslandX, settings.IslandY);
-        _window.SetLastPage(settings.IslandLastPage);
+        _window.SetLastPage(settings.IslandLastPage, settings.IslandAudioShowsMixer);
         _window.SetLayout(IslandLayout.From(settings));
         _window.SetEnabled(settings.IslandEnabled);
         _tracker.SetPlacement(settings.IslandDisplay, settings.IslandMonitorId);

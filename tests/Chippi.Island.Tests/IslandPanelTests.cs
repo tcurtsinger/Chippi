@@ -227,7 +227,7 @@ public sealed class IslandPanelTests
         {
             Open(panel);
             Assert.Null(panel.CurrentPage);
-            Assert.Equal(["Open Volume mixer", "Open Keep awake"], TileNames(panel));
+            Assert.Equal(["Open Audio", "Open Keep awake"], TileNames(panel));
         }));
     }
 
@@ -239,7 +239,7 @@ public sealed class IslandPanelTests
             var hidden = new HashSet<string> { IslandPanelWindow.NowPlayingKey };
             panel.SetLayout(IslandLayout.Default with { Order = ["keep-awake", "now-playing"], Hidden = hidden });
             Open(panel);
-            Assert.Equal(["Open Keep awake", "Open Volume mixer"], TileNames(panel));
+            Assert.Equal(["Open Keep awake", "Open Audio"], TileNames(panel));
             panel.ShowPage(IslandPanelWindow.NowPlayingKey);
             Assert.Equal(IslandPanelWindow.NowPlayingKey, panel.CurrentPage);
         }));
@@ -255,6 +255,27 @@ public sealed class IslandPanelTests
             Open(panel);
             Assert.Null(panel.CurrentPage);
         }));
+    }
+
+    [Theory]
+    [InlineData("sound.mixer", null, "sound.mixer")] // An installation predating the Audio tab preference.
+    [InlineData("keep-awake", true, "sound.mixer")]
+    [InlineData("keep-awake", false, "sound")]
+    public void Reopening_Audio_uses_its_preferred_tab_independently_of_the_last_tool(string lastPage, bool? mixer, string expected)
+    {
+        WpfTestThread.Run(() => WithPanel(panel =>
+        {
+            panel.SetLayout(IslandLayout.Default with { OpensOn = IslandOpensOn.AllFeatures });
+            panel.SetLastPage(lastPage, mixer);
+            Open(panel);
+            var home = Grid(panel);
+            Click(Assert.IsAssignableFrom<Button>(home.Buttons().Single(b => Equals(b.Tag, "audio"))));
+            IslandWindowTests.Settle(panel);
+            Assert.Equal(expected, panel.CurrentPage);
+            Click(Back(panel));
+            IslandWindowTests.Settle(panel);
+            Assert.Null(panel.CurrentPage);
+        }, Tiles(Part("sound", "Audio", 10), Part("sound.mixer", "Volume", 20), Part("keep-awake", "Awake", 40))));
     }
 
     [Fact]
@@ -287,7 +308,7 @@ public sealed class IslandPanelTests
             string? saved = null;
             panel.LastPageChanged += (_, key) => saved = key;
             Open(panel);
-            Grid(panel).Buttons().Single(b => (string)b.Tag == "sound.mixer").RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+            Grid(panel).Buttons().Single(b => (string)b.Tag == "audio").RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
             IslandWindowTests.Settle(panel);
             Assert.Equal("sound.mixer", panel.CurrentPage);
             Assert.Equal("sound.mixer", saved);
@@ -465,22 +486,22 @@ public sealed class IslandPanelTests
             Open(panel);
             var activity = new IslandActivity("muted", IslandActivityKind.Status, "Muted", "Microphone") { NeedsAttention = true, TileKey = "sound", ModuleId = "mic-mute" };
             panel.SetActivities([activity]);
-            var toggle = QuickSwitch(panel, "sound");
+            var toggle = QuickSwitch(panel, "audio");
             Assert.True(toggle.IsChecked);
             Assert.Equal("Mute mic", AutomationProperties.GetName(toggle));
-            Assert.Same(LucideIcons.Speaker, TileIcon(panel, "sound"));
-            Assert.Same(panel.FindResource("WarningBrush"), TileGlyph(panel, "sound").Brush);
-            Assert.Contains("Open Sound", TileNames(panel));
-            Assert.Contains("Microphone muted", TileStatus(panel, "sound"));
+            Assert.Same(LucideIcons.Speaker, TileIcon(panel, "audio"));
+            Assert.Same(panel.FindResource("WarningBrush"), TileGlyph(panel, "audio").Brush);
+            Assert.Contains("Open Audio", TileNames(panel));
+            Assert.Contains("Microphone muted", TileStatus(panel, "audio"));
 
             // A refused change leaves the switch following the device state and exposes its failure.
             muted = false;
             fail = true;
             panel.SetActivities([]);
             Assert.False(toggle.IsChecked);
-            Assert.Same(LucideIcons.Speaker, TileIcon(panel, "sound"));
+            Assert.Same(LucideIcons.Speaker, TileIcon(panel, "audio"));
             IslandHomeTests.ToggleThroughAutomation(toggle);
-            Assert.Contains("Failed", TileStatus(panel, "sound"));
+            Assert.Contains("Failed", TileStatus(panel, "audio"));
             Assert.False(toggle.IsChecked);
         }, Tiles(mute)));
     }
@@ -501,12 +522,12 @@ public sealed class IslandPanelTests
             Open(panel);
             var stopped = new IslandActivity("stopped", IslandActivityKind.Status, "Mic processing stopped", "Microphone") { NeedsAttention = true, TileKey = "sound", ModuleId = "mic-processing" };
             panel.SetActivities([stopped]);
-            Assert.Contains("Mic stopped", TileStatus(panel, "sound"));
-            Assert.DoesNotContain("Live", TileStatus(panel, "sound"));
+            Assert.Contains("Mic stopped", TileStatus(panel, "audio"));
+            Assert.DoesNotContain("Live", TileStatus(panel, "audio"));
 
             muted = true;
             panel.SetActivities([stopped, new IslandActivity("muted", IslandActivityKind.Status, "Muted", "Microphone") { NeedsAttention = true, TileKey = "sound", ModuleId = "mic-mute" }]);
-            Assert.Contains("Microphone muted", TileStatus(panel, "sound"));
+            Assert.Contains("Microphone muted", TileStatus(panel, "audio"));
         }, Tiles(mute, processing)));
     }
 

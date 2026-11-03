@@ -153,36 +153,26 @@ internal sealed class IslandPetPage : UserControl
 
     // ----- Tiles -----
 
-    private sealed record Tile(string Key, string Name, Geometry Icon);
-
-    /// <summary>The running features' home buttons, in their own order. Now Playing always has its own footer link.</summary>
-    private List<Tile> AllTiles() =>
-    [
-        .. IslandTileContribution.Group(_shell.Registry.Features.Where(f => f.IsRunning).SelectMany(f => f.IslandTiles))
-            .Where(g => g.Key != IslandPanelWindow.NowPlayingKey)
-            .Select(g => new Tile(g.Key, g.Name, LucideIcons.Get(g.Icon))),
-    ];
-
-    private IslandLayout Layout() => IslandLayout.From(SettingsUi.ReadApp(_shell.Config));
+    private IReadOnlyList<IslandTool> AllTiles() => IslandLayout.From(SettingsUi.ReadApp(_shell.Config)).Tools(
+        IslandTileContribution.Group(_shell.Registry.Features.Where(f => f.IsRunning).SelectMany(f => f.IslandTiles)));
 
     /// <summary>A row per tile in the island's order, with its grip and its switch; then the preview.</summary>
     private void RefreshTiles()
     {
         var all = AllTiles();
-        var layout = Layout();
-        var order = layout.Sorted(all.Select(t => t.Key));
-        string keys = string.Join("|", order) + "/" + string.Join("|", layout.Hidden);
+        var order = all.Select(t => t.Key).ToList();
+        string keys = string.Join("|", all.Select(t => $"{t.Key}:{t.Visible}"));
         if (keys != _tileKeys)
         {
             _tileKeys = keys;
             _tiles.Children.Clear();
             for (int i = 0; i < order.Count; i++)
-                _tiles.Children.Add(TileRow(all.First(t => t.Key == order[i]), i, order, !layout.Hidden.Contains(order[i])));
+                _tiles.Children.Add(TileRow(all[i], i, order));
         }
         RefreshPreview();
     }
 
-    private FrameworkElement TileRow(Tile tile, int index, IReadOnlyList<string> order, bool shown)
+    private FrameworkElement TileRow(IslandTool tile, int index, IReadOnlyList<string> order)
     {
         var handle = new DragHandle { Width = 16, Height = 24, Margin = new Thickness(0, 0, 16, 0), ToolTip = "Reorder" };
         AutomationProperties.SetName(handle, $"Reorder {tile.Name}");
@@ -201,9 +191,9 @@ internal sealed class IslandPetPage : UserControl
             if (!e.Canceled)
                 Move(order, index, target, tile.Key);
         };
-        var glyph = new LucideIcon { Data = tile.Icon, Size = 16, Margin = new Thickness(0, 0, 16, 0), VerticalAlignment = VerticalAlignment.Center };
+        var glyph = new LucideIcon { Data = LucideIcons.Get(tile.Icon), Size = 16, Margin = new Thickness(0, 0, 16, 0), VerticalAlignment = VerticalAlignment.Center };
         glyph.SetResourceReference(LucideIcon.BrushProperty, "TextSecondaryBrush");
-        var show = SettingsUi.Switch(shown);
+        var show = SettingsUi.Switch(tile.Visible);
         AutomationProperties.SetName(show, $"Show {tile.Name}");
         SettingsUi.OnSwitched(show, on => Save(s => s.IslandHiddenTiles = IslandLayout.Switched(s.IslandHiddenTiles ?? [], tile.Key, on)));
         var name = new TextBlock { Text = tile.Name, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
@@ -235,9 +225,7 @@ internal sealed class IslandPetPage : UserControl
     private void RefreshPreview()
     {
         const double width = 260, height = 160, edge = 10, puck = 30, panelWidth = 176, inset = 4, gap = 2;
-        var all = AllTiles();
-        var layout = Layout();
-        var shown = layout.Shown(all.Select(t => t.Key)).Select(k => all.First(t => t.Key == k)).ToList();
+        var shown = AllTiles().Where(t => t.Visible).ToList();
         int rows = Math.Max(1, (shown.Count + IslandGrid.Columns - 1) / IslandGrid.Columns);
         const double header = 13, tile = 24, footer = 14;
         double panelHeight = header + rows * (tile + gap) + footer + 2 * inset;
@@ -256,7 +244,7 @@ internal sealed class IslandPetPage : UserControl
         var grid = new UniformGrid { Columns = IslandGrid.Columns, Margin = new Thickness(0, 0, -gap, 0) };
         foreach (var t in shown)
         {
-            var glyph = new LucideIcon { Data = t.Icon, Size = 10, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+            var glyph = new LucideIcon { Data = LucideIcons.Get(t.Icon), Size = 10, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
             glyph.SetResourceReference(LucideIcon.BrushProperty, "IslandTextBrush");
             var cell = new Border { Height = tile, CornerRadius = new CornerRadius(4), Margin = new Thickness(0, 0, gap, gap), Child = glyph };
             cell.SetResourceReference(Border.BackgroundProperty, "IslandPanelBrush");

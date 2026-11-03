@@ -74,6 +74,7 @@ internal sealed class SoundScene : IAsyncDisposable
 {
     private readonly string _profile = "s7-" + Guid.NewGuid().ToString("N");
     private readonly string _root;
+    private int _channels;
     public FakeDeviceSystem Devices { get; } = new() { AppPolicyAvailable = true };
     public FakePipelines Pipelines { get; } = new();
     public FakeHotkey Hotkey { get; } = new();
@@ -114,6 +115,32 @@ internal sealed class SoundScene : IAsyncDisposable
     {
         await Shell.Registry.StartAsync();
         Assert.All(Shell.Registry.Features, e => Assert.True(e.IsRunning, e.Id + ": " + e.LastError));
+    }
+
+    /// <summary>Adds playing sessions to the fake engine, including Windows' separate sounds channel.</summary>
+    public async Task GrowMixerTo(int count, string? iconFolder = null)
+    {
+        (string Name, float Level)[] samples =
+        [
+            ("Discord", .68f), ("Microsoft Edge", .44f), ("VLC", .80f), ("Google Chrome", .54f),
+            ("Steam", .36f), ("Zoom", .48f), ("Windows Media Player", .71f), ("Spotify", .57f),
+            ("Audacity", .41f), ("Clipchamp", .66f), ("Firefox", .74f), ("OBS Studio", .26f),
+            ("Teams", .52f), ("Webex", .63f),
+        ];
+        if (_channels == 0)
+        {
+            Devices.EndSession("music-session");
+            Devices.WithSession(new("system", "speakers", 0, null, "System sounds", true, SessionState.Active, .2f, false));
+        }
+        for (int i = Math.Max(0, _channels - 1); i < count - 1; i++)
+        {
+            var (name, level) = samples[i];
+            // Captures may provide icon fixtures. No app or audio session is opened on Windows.
+            string path = iconFolder is null ? $@"C:\Fake\{name}.exe" : Path.Combine(iconFolder, name + ".ico");
+            Devices.WithSession(new(name, "speakers", int.MaxValue - i, path, name, false, SessionState.Active, level, false));
+        }
+        _channels = count;
+        await Audio.RefreshAsync();
     }
 
     public async ValueTask DisposeAsync()

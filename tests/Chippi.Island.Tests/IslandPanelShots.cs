@@ -196,10 +196,10 @@ public sealed class IslandPanelShots
         });
     }
 
-    /// <summary>The eleven gallery destinations with their own icons and sample statuses, quick switches and volume.</summary>
+    /// <summary>The installed tool contributions with their own icons and sample statuses, quick switches and volume.</summary>
     internal static IReadOnlyList<IslandTileGroup> HomeTiles(bool muted = false)
     {
-        var mic = Section("sound", "Sound", 10, 220, status: "Live");
+        var mic = Section("sound", "Audio", 10, 220, status: "Live");
         var micSpec = mic.Spec with
         {
             Toggle = new IslandTileToggle(() => muted, () => Task.CompletedTask, "Microphone", "Mic", () => muted ? "Microphone muted" : "Microphone live"),

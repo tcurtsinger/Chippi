@@ -2,8 +2,22 @@
 // Copyright (C) Chippi contributors
 
 using Chippi.Core.Config;
+using Chippi.Core.Modules;
+using Chippi.Features.Sound;
+using Chippi.Features.Sound.Volume;
+using Chippi.UI.Controls;
 
 namespace Chippi.App.Island;
+
+/// <summary>A gallery destination. The two independently installed audio pages share one entry.</summary>
+internal sealed record IslandTool(string Key, IslandTileGroup Source, bool Visible)
+{
+    public const string Audio = "audio";
+    public string Name => Key == Audio ? "Audio" : Source.Name;
+    public string Icon => Key == Audio ? nameof(LucideIcons.Speaker) : Source.Icon;
+    public static bool IsAudioPage(string? key) => key is SoundTile.Key or AppVolumeModule.TileKey;
+    public static string GalleryKey(string key) => IsAudioPage(key) ? Audio : key;
+}
 
 /// <summary>
 /// What Settings › Island &amp; pet says about the island's content: which page it opens on, the
@@ -23,16 +37,41 @@ internal sealed record IslandLayout(IslandOpensOn OpensOn, IReadOnlyList<string>
     {
         var all = keys.ToList();
         var order = Order.ToList();
-        return [.. all.OrderBy(k => order.IndexOf(k) is >= 0 and var at ? at : order.Count + all.IndexOf(k))];
+        // OrderBy is stable: unlisted keys keep the feature registry's order.
+        return [.. all.OrderBy(k =>
+        {
+            int at = order.IndexOf(IslandTool.GalleryKey(k));
+            if (at < 0) at = order.IndexOf(k);
+            return at < 0 ? int.MaxValue : at;
+        })];
     }
 
     /// <summary>The grid's tiles: <see cref="Sorted"/>, without the hidden ones.</summary>
     public IReadOnlyList<string> Shown(IEnumerable<string> keys) => [.. Sorted(keys).Where(k => !Hidden.Contains(k))];
 
+    /// <summary>Use the earliest visible legacy audio entry's position. Keep the device controls when both pages exist.</summary>
+    public IReadOnlyList<IslandTool> Tools(IReadOnlyList<IslandTileGroup> groups)
+    {
+        var byKey = groups.Where(g => g.Key != IslandPanelWindow.NowPlayingKey).ToDictionary(g => g.Key);
+        var order = Sorted(byKey.Keys);
+        var audio = order.Where(IslandTool.IsAudioPage).ToList();
+        string? audioSlot = audio.FirstOrDefault(k => !Hidden.Contains(k)) ?? audio.FirstOrDefault();
+        var tools = new List<IslandTool>();
+        foreach (string key in order)
+        {
+            if (!IslandTool.IsAudioPage(key))
+                tools.Add(new IslandTool(key, byKey[key], !Hidden.Contains(key)));
+            else if (key == audioSlot)
+                tools.Add(new IslandTool(IslandTool.Audio, byKey.GetValueOrDefault(SoundTile.Key) ?? byKey[key],
+                    !Hidden.Contains(IslandTool.Audio) && !Hidden.Contains(key)));
+        }
+        return tools;
+    }
+
     /// <summary>Changes the visibility of one tool and preserves saved choices for uninstalled tools.</summary>
     public static List<string> Switched(IEnumerable<string> hidden, string key, bool show)
     {
-        var next = hidden.Where(k => k != key).ToList();
+        var next = hidden.Where(k => IslandTool.GalleryKey(k) != key).ToList();
         if (!show)
             next.Add(key);
         return next;

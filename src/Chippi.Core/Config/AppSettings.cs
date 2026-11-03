@@ -109,6 +109,9 @@ public sealed class AppSettings
     /// <summary>The island page last opened (a tile key), which the next open restores while that tile exists; null for the grid.</summary>
     public string? IslandLastPage { get; set; }
 
+    /// <summary>The last view selected inside Audio, remembered independently of the last gallery tool.</summary>
+    public bool? IslandAudioShowsMixer { get; set; }
+
     /// <summary>Settings › Island &amp; pet › Opens on.</summary>
     public IslandOpensOn IslandOpensOn { get; set; } = IslandOpensOn.LastPage;
 

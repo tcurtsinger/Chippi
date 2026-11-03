@@ -67,7 +67,7 @@ internal sealed class IslandGallerySwitch : ToggleButton
     {
         string action = tile.Key switch
         {
-            "sound" or "sound.microphone" => "Mute mic",
+            IslandTool.Audio or "sound" or "sound.microphone" => "Mute mic",
             "keep-awake" => "Keep awake",
             _ => tile.Name,
         };

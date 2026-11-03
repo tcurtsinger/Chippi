@@ -168,11 +168,11 @@ public partial class IslandWindow : Window
         {
             // The panel covered the widget, so the widget never saw the pointer come or go.
             SetHover(!_panel.IsVisible && IsVisible && WidgetRect.Contains(PointerAt()));
-            if (!_panel.IsVisible && _lastPage is { } page)
-            {
-                _lastPage = null;
-                Dispatcher.BeginInvoke(DispatcherPriority.ContextIdle, () => LastPageChanged?.Invoke(this, page));
-            }
+            if (!_panel.IsVisible && _lastPage is not null)
+                Dispatcher.BeginInvoke(DispatcherPriority.ContextIdle, () =>
+                {
+                    if (!_panel.IsVisible) SaveLastPage();
+                });
         };
         // Windows presents the two layered windows separately. Keep the source surface lit at frame zero
         // and pass it to the panel as the edges first separate (the same small overlap on return).
@@ -291,13 +291,25 @@ public partial class IslandWindow : Window
     /// <summary>The user opened a page (a tile key): save it as AppSettings.IslandLastPage.</summary>
     public event EventHandler<string>? LastPageChanged;
 
+    private void SaveLastPage()
+    {
+        if (_lastPage is not { } page) return;
+        _lastPage = null;
+        LastPageChanged?.Invoke(this, page);
+    }
+
     internal HWND Handle => _hwnd;
 
     /// <summary>The open panel's window.</summary>
     internal HWND PanelHandle => _panel.Handle;
 
     /// <summary>AppSettings.IslandLastPage: the page the next open restores while its tile exists.</summary>
-    public void SetLastPage(string? key) => _panel.SetLastPage(key);
+    public void SetLastPage(string? key, bool? audioShowsMixer = null)
+    {
+        // A config write from another feature may arrive before the pending navigation is saved on close.
+        if (_lastPage is null)
+            _panel.SetLastPage(key, audioShowsMixer);
+    }
 
     /// <summary>Settings › Island &amp; pet: where the panel opens, and its buttons.</summary>
     internal void SetLayout(IslandLayout layout) => _panel.SetLayout(layout);
@@ -1760,6 +1772,7 @@ public partial class IslandWindow : Window
         _level?.Stop();
         CloseIsland();
         _panel.Close();
+        SaveLastPage(); // quitting with Audio open may leave no idle dispatcher turn
         base.OnClosed(e);
         _restTimer?.Stop();
     }
