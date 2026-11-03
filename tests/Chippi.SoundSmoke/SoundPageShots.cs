@@ -90,30 +90,37 @@ public sealed class SoundPageShots
             // Match the owner's desktop: four channels at full level, including an idle Steam session.
             var sessions = scene.Devices.GetSessions("speakers");
             var steam = sessions.Single(s => s.AppName == "Steam");
+            var chrome = sessions.Single(s => s.AppName == "Google Chrome") with { SessionId = "chrome-returned", Volume = 1 };
             foreach (var session in sessions)
             {
-                if (session.IsSystemSounds || session.AppName is "Google Chrome" or "Zoom")
+                if (session.IsSystemSounds || session.AppName == "Zoom")
                     scene.Devices.SetSessionVolume(session.SessionId, 1);
                 else
                     scene.Devices.EndSession(session.SessionId);
             }
             scene.Devices.WithSession(steam with { SessionId = "steam-idle", State = Chippi.Audio.SessionState.Inactive, Volume = 1 });
             await scene.Audio.RefreshAsync();
-            await SmokeDispatcher.Until(() => scene.Volume.Apps.Count == 4 && !scene.Volume.Apps.Single(a => a.Name == "Steam").IsActive);
+            await SmokeDispatcher.Until(() => scene.Volume.Apps.Count == 3 && !scene.Volume.Apps.Single(a => a.Name == "Steam").IsActive);
             await Show(SoundTile.Key);
             await Show(AppVolumeModule.TileKey);
             bool AtVolume(string app, int value) => SoundShellTests.All<Slider>(host).Any(s =>
                 AutomationProperties.GetName(s) == app + " volume" && Math.Round(s.Value) == value);
+            await WaitBank(3);
+            await SmokeDispatcher.Until(() => AtVolume("Steam", 100) && AtVolume("Zoom", 100));
+            SavePanel("mixer-two-apps");
+            scene.Devices.WithSession(chrome);
+            await scene.Audio.RefreshAsync();
+            await WaitBank(4);
             await SmokeDispatcher.Until(() => AtVolume("Google Chrome", 100) && AtVolume("Steam", 100));
             SavePanel("mixer-full");
-            scene.Devices.SetSessionVolume("Google Chrome", .96f);
+            scene.Devices.SetSessionVolume(chrome.SessionId, .96f);
             scene.Devices.SetSessionMute("Zoom", true);
             await scene.Audio.RefreshAsync();
             await SmokeDispatcher.Until(() => scene.Volume.Apps.Single(a => a.Name == "Zoom").Muted);
             await SmokeDispatcher.Until(() => AtVolume("Google Chrome", 96) &&
                 SoundShellTests.All<Button>(host).Any(b => AutomationProperties.GetName(b) == "Unmute Zoom"));
             SavePanel("mixer-muted");
-            scene.Devices.SetSessionVolume("Google Chrome", 0);
+            scene.Devices.SetSessionVolume(chrome.SessionId, 0);
             await scene.Audio.RefreshAsync();
             await SmokeDispatcher.Until(() => AtVolume("Google Chrome", 0));
             SavePanel("mixer-zero");
