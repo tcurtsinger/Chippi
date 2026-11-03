@@ -67,8 +67,8 @@ public sealed record IslandActivity(string Key, IslandActivityKind Kind, string 
     /// </summary>
     public string? OpensTile { get; init; }
 
-    /// <summary>Two letters the bar's lead shows in place of a glyph (an agent's "CC"), in Caution with <see cref="NeedsAttention"/>; null for none.</summary>
-    public string? Monogram { get; init; }
+    /// <summary>The provider this activity represents, if any. The shell uses its mark and accessible name.</summary>
+    public string? ProviderId { get; init; }
 
     /// <summary>
     /// A short-lived line (6 seconds) that shows over a song, as Plain paste's feedback does: an agent's "80% used". The

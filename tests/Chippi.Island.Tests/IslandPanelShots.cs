@@ -142,7 +142,7 @@ public sealed class IslandPanelShots
 
     private static IslandActivity WaitingAgent() => new("waiting", IslandActivityKind.Agent, "Waiting on you", "Claude Code · chippi")
     {
-        OpensTile = "agent-usage", ModuleId = "agent-usage", Monogram = "CC", NeedsAttention = true,
+        OpensTile = "agent-usage", ModuleId = "agent-usage", ProviderId = "Claude", NeedsAttention = true,
     };
 
     [Fact]

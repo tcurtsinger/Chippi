@@ -639,7 +639,7 @@ public sealed class IslandPanelTests
             var dot = Assert.Single(Descendants(button).OfType<System.Windows.Shapes.Ellipse>());
             var session = new IslandActivity("waiting", IslandActivityKind.Agent, "Waiting on you", "Claude Code · packrat")
             {
-                OpensTile = "agent-usage", ModuleId = "agent-usage", NeedsAttention = true, Monogram = "CC",
+                OpensTile = "agent-usage", ModuleId = "agent-usage", NeedsAttention = true, ProviderId = "Claude",
             };
             panel.SetActivities([session]);
             Assert.Equal(Visibility.Visible, dot.Visibility);

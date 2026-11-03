@@ -13,6 +13,7 @@ using Chippi.UI.Pet;
 using Chippi.Core.Config;
 using Chippi.Core.Island;
 using Chippi.Core.Modules;
+using Chippi.Features.AgentUsage;
 using Chippi.UI.Controls;
 using Chippi.UI.Themes;
 using Windows.Win32;
@@ -950,8 +951,14 @@ public partial class IslandWindow : Window
         bool bar = !_lifted && (dropTile is not null || feedback is not null || song is not null || top is not null);
         var puckAgent = bar ? null : _activities.FirstOrDefault(a => a.Kind == IslandActivityKind.Agent && a.NeedsAttention)
             ?? _activities.FirstOrDefault(a => a.Kind == IslandActivityKind.Agent);
+        var puckProvider = AgentNames.FromId(puckAgent?.ProviderId);
         if (puckAgent is not null)
+        {
             AgentMarkPlate.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, puckAgent.NeedsAttention ? "PetSparkBrush" : "IslandAccentFillBrush");
+            AgentBadgeProvider.Source = puckProvider is { } kind ? AgentIcons.Source(kind) : null;
+            AgentBadgeFace.Visibility = Shown(puckProvider.HasValue);
+            AgentMarkIcon.Visibility = Shown(!puckProvider.HasValue);
+        }
         ShowBadge(AgentMark, puckAgent is not null);
         _singing = bar && dropTile is null && feedback is null && song is not null;
         // Keep awake stays in sight while something else holds the bar (a song, a drag, another activity) or the puck is lifted.
@@ -1018,9 +1025,13 @@ public partial class IslandWindow : Window
         }
         else if (feedback is not null)
         {
-            // Plain paste's ClipboardType, or the glyph of the page the line opens (Agents' gauge), over its source if it has one.
-            var opens = feedback.OpensTile is { } page ? _tiles.FirstOrDefault(t => t.Key == page) : null;
-            ShowGlyph(opens is null ? LucideIcons.ClipboardType : LucideIcons.Get(opens.Icon), feedback.NeedsAttention);
+            if (AgentNames.FromId(feedback.ProviderId) is { } provider)
+                ShowProvider(provider, feedback.NeedsAttention);
+            else
+            {
+                var opens = feedback.OpensTile is { } page ? _tiles.FirstOrDefault(t => t.Key == page) : null;
+                ShowGlyph(opens is null ? LucideIcons.ClipboardType : LucideIcons.Get(opens.Icon), feedback.NeedsAttention);
+            }
             ShowLine(feedback.Key, feedback.Title, feedback.Source);
         }
         else if (song is not null)
@@ -1030,8 +1041,8 @@ public partial class IslandWindow : Window
         }
         else if (top is not null)
         {
-            if (top.Monogram is { Length: > 0 } letters)
-                ShowMonogram(letters, top.NeedsAttention);
+            if (AgentNames.FromId(top.ProviderId) is { } provider)
+                ShowProvider(provider, top.NeedsAttention);
             else if (tile is not null)
                 ShowGlyph(LucideIcons.Get(tile.Toggle?.Icon ?? tile.Icon), top.NeedsAttention);
             else
@@ -1061,7 +1072,8 @@ public partial class IslandWindow : Window
             help.Add($"Now Playing · {(playing.Title.Length > 0 ? playing.Title : playing.Source)}");
         if (mic is not null) help.Add(mic.Title == "Muted" ? "Microphone muted" : mic.Title);
         if (awakeBadge) help.Add("Keep awake is on");
-        if (puckAgent is not null) help.Add(puckAgent.NeedsAttention ? "Agent waiting on you" : "Agent working");
+        if (puckAgent is not null)
+            help.Add($"{puckProvider?.Name() ?? "Agent"} {(puckAgent.NeedsAttention ? "waiting on you" : "working")}");
         AutomationProperties.SetHelpText(PuckButton, string.Join(". ", help));
         AutomationProperties.SetLiveSetting(PuckButton, AutomationLiveSetting.Polite);
     }
@@ -1296,16 +1308,14 @@ public partial class IslandWindow : Window
         GlyphIcon.Data = icon;
         GlyphIcon.SetResourceReference(LucideIcon.BrushProperty, caution ? "IslandCautionBrush" : "IslandAccentBrush");
         GlyphIcon.Visibility = Visibility.Visible;
-        Ring.Visibility = Dot.Visibility = Monogram.Visibility = Visibility.Collapsed;
+        Ring.Visibility = Dot.Visibility = ProviderMark.Visibility = Visibility.Collapsed;
     }
 
-    /// <summary>An agent's two letters use the folded puck's amber signal while it waits on you.</summary>
-    private void ShowMonogram(string letters, bool waiting)
+    private void ShowProvider(AgentKind provider, bool waiting)
     {
-        Monogram.Text = letters;
-        Monogram.SetResourceReference(TextBlock.ForegroundProperty, waiting ? "IslandWaitingInkBrush" : "IslandAccentBrush");
+        ProviderMark.Source = AgentIcons.Source(provider);
         GlyphPlate.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, waiting ? "IslandWaitingTintBrush" : "IslandAccentTintBrush");
-        Monogram.Visibility = Visibility.Visible;
+        ProviderMark.Visibility = Visibility.Visible;
         GlyphIcon.Visibility = Ring.Visibility = Dot.Visibility = Visibility.Collapsed;
     }
 
@@ -1318,7 +1328,7 @@ public partial class IslandWindow : Window
                 GlyphPlate.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, "IslandAccentTintBrush");
                 RingArc.SetResourceReference(System.Windows.Shapes.Shape.StrokeProperty, activity.NeedsAttention ? "IslandCautionBrush" : "IslandAccentBrush");
                 RingArc.Data = Arc(activity.Progress ?? 1);
-                GlyphIcon.Visibility = Dot.Visibility = Monogram.Visibility = Visibility.Collapsed;
+                GlyphIcon.Visibility = Dot.Visibility = ProviderMark.Visibility = Visibility.Collapsed;
                 Ring.Visibility = Visibility.Visible;
                 break;
             case IslandActivityKind.Download or IslandActivityKind.Stash:
@@ -1330,7 +1340,7 @@ public partial class IslandWindow : Window
             default:
                 GlyphPlate.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, "IslandAccentTintBrush");
                 Dot.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, activity.NeedsAttention ? "IslandCautionBrush" : "IslandAccentBrush");
-                GlyphIcon.Visibility = Ring.Visibility = Monogram.Visibility = Visibility.Collapsed;
+                GlyphIcon.Visibility = Ring.Visibility = ProviderMark.Visibility = Visibility.Collapsed;
                 Dot.Visibility = Visibility.Visible;
                 break;
         }
