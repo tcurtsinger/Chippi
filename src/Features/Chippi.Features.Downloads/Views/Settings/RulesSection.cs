@@ -3,6 +3,7 @@
 
 using System.Globalization;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
@@ -25,6 +26,7 @@ internal sealed class RulesSection : UserControl, ISettingsLeaveGuard
     private static readonly (string Label, long Bytes)[] Units = [("KB", 1024), ("MB", 1024 * 1024), ("GB", 1024L * 1024 * 1024)];
 
     private readonly DownloadsModule _module;
+    private readonly Action<DownloadsSettings> _persist;
 
     /// <summary>Drafts on screen and the saved rules that run and are tested.</summary>
     private readonly RuleDrafts _drafts;
@@ -39,22 +41,26 @@ internal sealed class RulesSection : UserControl, ISettingsLeaveGuard
     private string? _match;
     private readonly Dictionary<string, ContentControl> _badges = [];
     private readonly Dictionary<string, TextBlock> _summaries = [];
+    private readonly Dictionary<string, TextBlock> _rowErrors = [];
 
     /// <summary>Editors kept while their rule has a draft, so collapsing one keeps what was typed (even text the draft can't hold yet).</summary>
-    private readonly Dictionary<string, StackPanel> _editors = [];
+    private readonly Dictionary<string, (StackPanel Panel, Action UpdateScope)> _editors = [];
     private int _dragFrom = -1;
     private int _dragTo = -1;
 
-    public RulesSection(DownloadsModule module)
+    public RulesSection(DownloadsModule module, Action<DownloadsSettings>? persist = null)
     {
         _module = module;
+        _persist = persist ?? module.SaveSettings;
         _drafts = new RuleDrafts(module.Settings.Rules);
 
         // The test card: a search glyph, the field across the card, and where the file would go on the right.
         _test.TextChanged += (_, _) => RunTest();
         _testResult.Margin = new Thickness(14, 0, 0, 0);
         _testResult.VerticalAlignment = VerticalAlignment.Center;
-        var testGrid = Ui.Columns("Auto", "*", "Auto");
+        _testResult.SetResourceReference(StyleProperty, "CaptionTextStyle");
+        AutomationProperties.SetLiveSetting(_testResult, AutomationLiveSetting.Polite);
+        var testGrid = Ui.Columns("Auto", "*", "*");
         testGrid.Children.Add(Ui.Glyph(LucideIcons.Search, "TextSecondaryBrush", 16).Margin(0, 0, 12, 0).At(0));
         testGrid.Children.Add(_test.At(1));
         testGrid.Children.Add(_testResult.At(2));
@@ -115,6 +121,7 @@ internal sealed class RulesSection : UserControl, ISettingsLeaveGuard
     {
         _badges.Clear();
         _summaries.Clear();
+        _rowErrors.Clear();
         _rows.Clear();
         if (_rules.Count == 0)
         {
@@ -151,15 +158,37 @@ internal sealed class RulesSection : UserControl, ISettingsLeaveGuard
         var title = Ui.Stack(Ui.Text(rule.Name.Length > 0 ? rule.Name : "New rule", "TitleTextStyle"), summary);
         var enabled = Ui.Switch($"{rule.Name} on", rule.Enabled);
         enabled.SetResourceReference(StyleProperty, "SwitchWithLabelStyle"); // "On" or "Off" left of the switch (DESIGN.md §5 Rows)
+        var enableScope = ScopeNote();
+        var rowError = Hidden(Ui.Warning(""));
+        _rowErrors[rule.Id] = rowError;
+        void UpdateEnableScope()
+        {
+            // Switching on runs the saved rule, even when this row also holds a different unsaved draft.
+            SetScope(enableScope, !rule.Enabled ? _drafts.Saved(rule.Id) : null, enabling: true);
+            AutomationProperties.SetHelpText(enabled, enableScope.Text);
+        }
+        UpdateEnableScope();
         void Enable()
         {
             if (enabled.IsChecked == rule.Enabled)
                 return;
-            _drafts.SetEnabled(rule, enabled.IsChecked == true);
+            bool on = enabled.IsChecked == true;
+            if (_drafts.IsSaved(rule.Id))
+            {
+                var next = _drafts.Effective();
+                next.Single(r => r.Id == rule.Id).Enabled = on;
+                if (!TrySave(next, rowError))
+                {
+                    enabled.IsChecked = rule.Enabled;
+                    return;
+                }
+            }
+            _drafts.SetEnabled(rule, on);
             title.Opacity = rule.Enabled ? 1 : 0.6;
-            SaveNow();
             if (rule.Enabled && _drafts.IsSaved(rule.Id))
                 _module.SortExisting(rule.Id);
+            UpdateEnableScope();
+            if (_editors.TryGetValue(rule.Id, out var editor)) editor.UpdateScope();
             RunTest();
         }
         // Checked/Unchecked, so a UI Automation toggle reaches the rule too.
@@ -187,13 +216,15 @@ internal sealed class RulesSection : UserControl, ISettingsLeaveGuard
                 Toggle(rule);
         };
 
-        var stack = Ui.Stack(head);
+        enableScope.Margin = new Thickness(50, 4, 0, 0);
+        var stack = Ui.Stack(head, enableScope, rowError);
         if (open)
         {
             if (!_editors.TryGetValue(rule.Id, out var editor))
                 _editors[rule.Id] = editor = Editor(rule);
-            (editor.Parent as Panel)?.Children.Remove(editor); // from the row it was in before this render
-            stack.Children.Add(editor);
+            (editor.Panel.Parent as Panel)?.Children.Remove(editor.Panel); // from the row it was in before this render
+            editor.UpdateScope();
+            stack.Children.Add(editor.Panel);
         }
         // The border is the drop line while a drag targets this row.
         // Padding plus the 2px border makes the 10 / 16 row padding.
@@ -224,11 +255,8 @@ internal sealed class RulesSection : UserControl, ISettingsLeaveGuard
         int target = index + delta;
         if (target < 0 || target >= _rules.Count)
             return;
-        var rule = _rules[index];
-        _rules.RemoveAt(index);
-        _rules.Insert(target, rule);
-        SaveNow();
-        Render(focusHandleOf: rule.Id);
+        string id = _rules[index].Id;
+        if (Reorder(index, target)) Render(focusHandleOf: id);
     }
 
     private void DragTo(int index, double handleHeight, DragDeltaEventArgs e)
@@ -271,11 +299,20 @@ internal sealed class RulesSection : UserControl, ISettingsLeaveGuard
         _dragFrom = _dragTo = -1;
         if (from < 0 || to < 0 || from == to)
             return;
+        string id = _rules[from].Id;
+        if (Reorder(from, to))
+            Dispatcher.BeginInvoke(() => Render(focusHandleOf: id)); // after the thumb finishes its own drag
+    }
+
+    private bool Reorder(int from, int to)
+    {
         var rule = _rules[from];
         _rules.RemoveAt(from);
         _rules.Insert(to, rule);
-        SaveNow();
-        Dispatcher.BeginInvoke(() => Render(focusHandleOf: rule.Id)); // after the thumb finishes its own drag
+        if (TrySave(_drafts.Effective(), _rowErrors[rule.Id])) return true;
+        _rules.RemoveAt(to);
+        _rules.Insert(from, rule);
+        return false;
     }
 
     /// <summary>
@@ -301,11 +338,18 @@ internal sealed class RulesSection : UserControl, ISettingsLeaveGuard
     /// <summary>The drafts and saved rules (tests drive the editor through these).</summary>
     internal RuleDrafts Drafts => _drafts;
 
-    internal StackPanel Editor(RuleSetting rule)
+    private (StackPanel Panel, Action UpdateScope) Editor(RuleSetting rule)
     {
         var editor = new StackPanel { Margin = new Thickness(48, 14, 6, 4) };
         var save = Ui.Button("Save", "PrimaryButtonStyle", name: $"Save {rule.Name}");
         save.IsEnabled = false;
+        var saveScope = ScopeNote();
+        var saveError = Hidden(Ui.Warning(""));
+        void UpdateScope()
+        {
+            SetScope(saveScope, _drafts.IsChanged(rule.Id) && rule.Enabled ? rule : null, enabling: false);
+            AutomationProperties.SetHelpText(save, saveScope.Text);
+        }
         // Under Conditions: that the rule needs one, or which earlier rule wins its files first.
         var conditionsNote = Hidden(Ui.Warning(""));
         void Changed()
@@ -319,6 +363,7 @@ internal sealed class RulesSection : UserControl, ISettingsLeaveGuard
             conditionsNote.Text = note ?? "";
             conditionsNote.Visibility = note is null ? Visibility.Collapsed : Visibility.Visible;
             save.IsEnabled = _drafts.CanSave(rule.Id);
+            UpdateScope();
             RunTest();
         }
 
@@ -523,11 +568,11 @@ internal sealed class RulesSection : UserControl, ISettingsLeaveGuard
         Changed();
         save.Click += (_, _) =>
         {
-            if (!_drafts.Save(rule.Id))
+            if (!_drafts.CanSave(rule.Id) || !TrySave(_drafts.Testing(rule.Id), saveError))
                 return;
+            _drafts.Save(rule.Id);
             _editors.Remove(rule.Id);
             _open = null;
-            SaveNow();
             _module.SortExisting(rule.Id); // the files already there that it wins
             Render();
         };
@@ -545,29 +590,53 @@ internal sealed class RulesSection : UserControl, ISettingsLeaveGuard
         {
             if (_drafts.Duplicate(rule) is not { } copy)
                 return;
+            if (!TrySave(_drafts.Effective(), saveError))
+            {
+                _drafts.Remove(copy);
+                return;
+            }
             _open = copy.Id;
-            SaveNow();
             Render();
         };
         var delete = Ui.Button("Delete", icon: LucideIcons.Trash, name: $"Delete {rule.Name}");
         delete.Click += (_, _) =>
         {
+            if (_drafts.IsSaved(rule.Id) && !TrySave(_drafts.Effective().Where(r => r.Id != rule.Id).ToList(), saveError)) return;
             _drafts.Remove(rule);
             _editors.Remove(rule.Id);
             _open = null;
-            SaveNow();
             Render();
         };
         var divider = new Border { Height = 1, Margin = new Thickness(0, 14, 0, 12) };
         divider.SetResourceReference(Border.BackgroundProperty, "BorderBrush");
         editor.Children.Add(divider);
+        saveScope.Margin = new Thickness(0, 0, 0, 8);
+        editor.Children.Add(saveScope);
         var buttons = Ui.Columns("Auto", "Auto", "*", "Auto", "Auto");
         buttons.Children.Add(save.At(0));
         buttons.Children.Add(cancel.Margin(8, 0, 0, 0).At(1));
         buttons.Children.Add(duplicate.At(3));
         buttons.Children.Add(delete.Margin(8, 0, 0, 0).At(4));
         editor.Children.Add(buttons);
-        return editor;
+        editor.Children.Add(saveError);
+        return (editor, UpdateScope);
+    }
+
+    private static TextBlock ScopeNote()
+    {
+        var note = Ui.Text("", "CaptionTextStyle", "TextSecondaryBrush");
+        note.TextWrapping = TextWrapping.Wrap;
+        note.Visibility = Visibility.Collapsed;
+        return note;
+    }
+
+    private void SetScope(TextBlock note, RuleSetting? rule, bool enabling)
+    {
+        var folders = _module.Settings.Folders;
+        string text = RuleChecks.ExistingScope(rule, folders, enabling);
+        note.Text = text;
+        note.ToolTip = text.Length == 0 ? null : string.Join(Environment.NewLine, folders.Select(f => $"{f.Mode.DisplayName()} · {f.Path}"));
+        note.Visibility = text.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
     }
 
     /// <summary>Under the template: the amber problem, or a check and where a sample file would go.</summary>
@@ -625,25 +694,23 @@ internal sealed class RulesSection : UserControl, ISettingsLeaveGuard
 
     private static Grid Condition(CheckBox toggle, string label, FrameworkElement fields, Action apply)
     {
-        var head = Ui.Row(toggle, Ui.Text(label, "BodyTextStyle").Margin(10, 0, 0, 0));
-        void Dim()
-        {
-            fields.IsEnabled = toggle.IsChecked == true;
-            fields.Opacity = fields.IsEnabled ? 1 : 0.45;
-        }
+        toggle.Content = label;
+        toggle.MinHeight = 28;
+        toggle.HorizontalAlignment = HorizontalAlignment.Left;
+        void ShowFields() => fields.Visibility = toggle.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
         // Checked/Unchecked, so a UI Automation toggle applies the condition too.
         void Flipped()
         {
-            Dim();
+            ShowFields();
             apply();
         }
         toggle.Checked += (_, _) => Flipped();
         toggle.Unchecked += (_, _) => Flipped();
-        Dim();
+        ShowFields();
         var grid = Ui.Columns("164", "*");
-        grid.Children.Add(head.At(0));
+        grid.Children.Add(toggle.At(0));
         grid.Children.Add(fields.At(1));
-        grid.Margin = new Thickness(0, 0, 0, 10);
+        grid.Margin = new Thickness(0, 0, 0, 4);
         return grid;
     }
 
@@ -654,34 +721,19 @@ internal sealed class RulesSection : UserControl, ISettingsLeaveGuard
         string name = _test.Text.Trim();
         _match = null;
         _testResult.Text = "";
+        _testResult.ToolTip = null;
+        Grid.SetColumnSpan(_test, name.Length == 0 ? 2 : 1);
+        _testResult.Visibility = name.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
         if (name.Length > 0)
         {
             string folder = SampleFolder();
             // The saved rules, with the one being edited as it stands: what would run once it's saved.
             var rules = RuleDrafts.Valid(_drafts.Testing(_open)).Select((r, i) => r.ToRule() with { Order = i }).ToList();
-            PlannedOperation plan;
-            try
-            {
-                var now = DateTimeOffset.Now;
-                plan = Planner.Plan(new FileFacts(name, Path.Combine(folder, name), 1024, now, now), rules, new PlanContext(folder, now, TimeZoneInfo.Local, []));
-            }
-            catch (ArgumentException)
-            {
-                plan = new PlannedOperation(OperationKind.Hold, name, null, null, [new PlanWarning(WarningKind.InvalidPath, "Not a valid file name")]);
-            }
-            _match = plan.Kind is OperationKind.Move or OperationKind.Rename or OperationKind.Hold ? plan.RuleId : null;
-            int index = _rules.FindIndex(r => r.Id == plan.RuleId);
-            // DESIGN.md §5: "Txt Files → Documents" in Secondary, a hold in caution, no match in Caption.
-            (string text, string style, string brush) = plan.Kind switch
-            {
-                OperationKind.Move or OperationKind.Rename =>
-                    ($"{(index >= 0 ? _rules[index].Name : "Rule")} → {Ui.Relative(folder, plan.Destination!)}", "BodyTextStyle", "TextSecondaryBrush"),
-                OperationKind.Hold => ($"Held · {plan.HoldReason ?? plan.Warnings.LastOrDefault()?.Detail ?? "held"}", "BodyTextStyle", "WarningTextBrush"),
-                _ => ($"No rule matches · stays in {Ui.FolderName(folder)}", "CaptionTextStyle", "TextTertiaryBrush"),
-            };
-            _testResult.Text = text;
-            _testResult.SetResourceReference(StyleProperty, style);
-            _testResult.SetResourceReference(TextBlock.ForegroundProperty, brush);
+            var result = RuleChecks.TestName(name, folder, rules);
+            _match = result.Match;
+            _testResult.Text = result.Text;
+            _testResult.ToolTip = $"{result.Text}\n{folder}";
+            _testResult.SetResourceReference(TextBlock.ForegroundProperty, result.Warning ? "WarningTextBrush" : "TextSecondaryBrush");
         }
         // The winning rule gets a neutral Match badge, in place, so a field being edited keeps focus.
         foreach (var (id, host) in _badges)
@@ -720,17 +772,21 @@ internal sealed class RulesSection : UserControl, ISettingsLeaveGuard
     // ---- saving
 
     /// <summary>Saves the saved rules in list order. Drafts are not in it until their Save.</summary>
-    private void SaveNow()
+    private bool TrySave(List<RuleSetting> rules, TextBlock error)
     {
         var settings = _module.Settings.Clone();
-        settings.Rules = _drafts.Effective();
+        for (int i = 0; i < rules.Count; i++) rules[i].Order = i;
+        settings.Rules = rules;
         try
         {
-            _module.SaveSettings(settings);
+            _persist(settings);
+            Show(error, null);
+            return true;
         }
-        catch (InvalidOperationException)
+        catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException or System.Security.SecurityException)
         {
-            // The organizer stopped; the page goes with it.
+            Show(error, ex is UnauthorizedAccessException or System.Security.SecurityException ? "Save failed · access denied" : "Save failed");
+            return false;
         }
     }
 

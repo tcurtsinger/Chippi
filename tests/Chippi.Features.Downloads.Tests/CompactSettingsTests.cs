@@ -88,7 +88,7 @@ public sealed class CompactSettingsTests
     });
 
     [Fact]
-    public void A_folder_header_organizes_that_folder_without_changing_its_mode() => WpfTestThread.Run(() =>
+    public void A_folder_header_opens_preview_and_names_the_archive_target() => WpfTestThread.Run(() =>
     {
         string folder = Path.Combine(Path.GetTempPath(), "chippi-folder-row-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(folder);
@@ -99,8 +99,12 @@ public sealed class CompactSettingsTests
             string? requested = null;
             var section = new SettingsSection(module, _ => { }, path => requested = path);
             var row = Find<ExpanderRow>(section).Single();
-            var organize = Find<Button>((DependencyObject)row.Value!).Single();
-            organize.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            var preview = Find<Button>((DependencyObject)row.Value!).Single();
+            Assert.Equal("Preview", preview.Content);
+            var import = Find<SettingRow>(section).Single(r => r.Header == "Import archive");
+            Assert.Equal($"Preview in {Path.GetFileName(folder)}", import.Description);
+            Assert.Equal(folder, import.ToolTip);
+            preview.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             Assert.Equal(folder, requested);
             Assert.Equal(Chippi.Features.Downloads.Model.FolderMode.Manual, module.Settings.Folders.Single().Mode);
             Assert.False(row.IsExpanded);

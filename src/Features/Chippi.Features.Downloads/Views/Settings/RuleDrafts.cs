@@ -28,6 +28,7 @@ internal sealed class RuleDrafts
     public List<RuleSetting> Drafts { get; }
 
     public bool IsSaved(string id) => _saved.ContainsKey(id);
+    public RuleSetting? Saved(string id) => _saved.GetValueOrDefault(id);
 
     /// <summary>Records whether <paramref name="field"/> of a rule shows a problem right now.</summary>
     public void SetError(string id, string field, bool problem)

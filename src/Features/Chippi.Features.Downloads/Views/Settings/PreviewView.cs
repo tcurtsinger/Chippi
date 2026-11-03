@@ -39,6 +39,7 @@ internal sealed class PreviewView : UserControl
     private readonly Border _bar;
     private readonly TranslateTransform _pin = new();
     private readonly TextBlock _summary = Ui.Text("", "CaptionTextStyle", "TextSecondaryBrush");
+    private readonly Button _approve = Ui.Button("Approve", "PrimaryButtonStyle");
     private readonly TextBlock _error = Ui.Warning("");
     private readonly CheckBox _all = Ui.Check("Select all");
     private readonly Dictionary<int, CheckBox> _checks = [];
@@ -58,6 +59,7 @@ internal sealed class PreviewView : UserControl
         _canPreviewAgain = canPreviewAgain;
         _close = close;
         _addRule = addRule;
+        _approve.Click += async (_, _) => await ApproveAsync();
 
         // The shell has no back button, so Preview has its own; Cancel and Done also return.
         var back = Ui.Icon(LucideIcons.ChevronLeft, "Back");
@@ -114,6 +116,9 @@ internal sealed class PreviewView : UserControl
 
     private async Task LoadAsync()
     {
+        _footer.Children.Clear(); // A refresh gets exactly one new plan.
+        _error.Visibility = Visibility.Collapsed;
+        _rows.IsEnabled = true;
         _rows.Content = Ui.Card(Ui.Pad(Ui.Text("Planning…", "BodyTextStyle", "TextTertiaryBrush")));
         try
         {
@@ -122,6 +127,7 @@ internal sealed class PreviewView : UserControl
         catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException)
         {
             _rows.Content = null;
+            RenderFinishActions();
             ShowError("Preview failed");
             return;
         }
@@ -154,7 +160,8 @@ internal sealed class PreviewView : UserControl
         {
             var names = SettingsLayout.Card([.. unmatched.Select(i => SettingsLayout.Empty(i.Name))]);
             names.SetResourceReference(StyleProperty, "CardRowsStyle");
-            card.Children.Add(new ExpanderRow { Header = $"{unmatched.Count} {(unmatched.Count == 1 ? "file" : "files")} · no rule matches", Description = $"They stay in {Ui.FolderName(preview.Folder)}", Content = names });
+            card.Children.Add(new ExpanderRow { Header = $"{Files(unmatched.Count)} · no rule matches",
+                Description = $"{(unmatched.Count == 1 ? "It stays" : "They stay")} in {Ui.FolderName(preview.Folder)}", Content = names });
         }
         RenderPlanFooter();
         Sync();
@@ -167,28 +174,37 @@ internal sealed class PreviewView : UserControl
             .OrderBy(g => g.Key.Length == 0 ? 1 : 0)
             .ThenBy(g => g.Key, StringComparer.CurrentCultureIgnoreCase);
 
-    private static string Title(PreviewPlan preview, string folder, OperationKind kind) =>
-        kind == OperationKind.Rename || folder.Length == 0 ? "Renamed"
+    private string Title(PreviewPlan preview, string folder, OperationKind kind) =>
+        kind == OperationKind.Rename || folder.Length == 0 ? (_applied ? "Renamed" : "Rename in place")
         : string.Equals(folder, Path.TrimEndingDirectorySeparator(preview.Folder), StringComparison.OrdinalIgnoreCase) ? Ui.FolderName(preview.Folder)
         : Ui.Relative(preview.Folder, folder);
 
     private void RenderPlanFooter()
     {
         _footer.Children.Clear();
+        _footer.Children.Add(_summary.At(0));
+        int held = _preview!.Items.Count(i => i.Kind == OperationKind.Hold);
+        if (_checks.Count == 0)
+        {
+            _summary.Text = held > 0 ? $"{Files(held)} held" : "Nothing to organize";
+            if (_addRule is null || !_preview.Items.Any(i => i.Kind == OperationKind.NoMatch) && held > 0)
+            {
+                var done = Ui.Button("Done", "PrimaryButtonStyle");
+                done.Click += (_, _) => Leave();
+                _footer.Children.Add(done.At(2));
+                return;
+            }
+        }
         var cancel = Ui.Button("Cancel");
         cancel.Click += (_, _) => Leave();
-        var approve = Ui.Button("Approve", "PrimaryButtonStyle");
-        approve.Click += async (_, _) => await ApproveAsync(approve);
-        bool nothing = _checks.Count == 0;
-        _summary.Text = nothing ? "Nothing to organize" : _summary.Text;
-        if (nothing && _addRule is not null)
-        {
-            approve = SettingsLayout.AddButton("rule", () => { Release(); _addRule(); });
-            approve.SetResourceReference(StyleProperty, "PrimaryButtonStyle");
-        }
-        _footer.Children.Add(_summary.At(0));
         _footer.Children.Add(cancel.Margin(0, 0, 8, 0).At(1));
-        _footer.Children.Add(approve.At(2));
+        if (_checks.Count == 0 && _addRule is not null)
+        {
+            var add = SettingsLayout.AddButton("rule", () => { Release(); _addRule(); });
+            add.SetResourceReference(StyleProperty, "PrimaryButtonStyle");
+            _footer.Children.Add(add.At(2));
+        }
+        else _footer.Children.Add(_approve.At(2));
     }
 
     /// <summary>
@@ -242,8 +258,7 @@ internal sealed class PreviewView : UserControl
         long bytes = entries.Sum(e => e.Item.Bytes);
         int failed = entries.Count(e => e.Outcome is { Succeeded: false });
         string count = entries.All(e => e.Outcome is null) ? $"{Files(entries.Count)} · {Ui.Size(bytes)}"
-            : failed == entries.Count ? Files(failed)
-            : $"{entries.Count - failed} {(entries.Any(e => e.Item.Kind == OperationKind.Rename) ? "renamed" : "moved")}";
+            : failed == entries.Count ? Files(failed) : string.Join(" · ", OrganizerLabels.CompletedCounts(entries.Select(e => e.Item)));
         var caption = Ui.Row(Ui.Text(count, "CaptionTextStyle", "TextSecondaryBrush"));
         if (folder is { Length: > 0 } && !SameDrive(preview.Folder, folder))
             caption.Children.Add(Ui.Badge("Other drive", BadgeKind.Needs).Margin(8, 0, 0, 0));
@@ -289,9 +304,11 @@ internal sealed class PreviewView : UserControl
             int on = checks.Count(c => c.IsChecked == true);
             box.IsChecked = on == 0 ? false : on == checks.Count ? true : null;
         }
-        _summary.Text = _checks.Count == 0 ? "Nothing to organize" : $"{chosen.Count} of {_checks.Count} selected · {Ui.Size(chosen.Sum(i => i.Bytes))}";
-        if (_footer.Children.OfType<Button>().LastOrDefault() is { } approve)
-            approve.IsEnabled = chosen.Count > 0 || _checks.Count == 0 && _addRule is not null;
+        if (_checks.Count > 0)
+        {
+            _summary.Text = $"{chosen.Count} of {_checks.Count} selected · {Ui.Size(chosen.Sum(i => i.Bytes))}";
+            _approve.IsEnabled = chosen.Count > 0;
+        }
         _syncing = false;
     }
 
@@ -352,28 +369,34 @@ internal sealed class PreviewView : UserControl
             _bar.BorderBrush = Brushes.Transparent;
     }
 
-    private async Task ApproveAsync(Button approve)
+    private async Task ApproveAsync()
     {
         if (_preview is null || _module.Engine is not { } engine)
             return;
         var selected = _checks.Where(c => c.Value.IsChecked == true).Select(c => c.Key).ToList();
-        approve.IsEnabled = false;
+        _footer.Children.Clear();
+        _summary.Text = "Applying…";
+        _footer.Children.Add(_summary.At(0));
+        _rows.IsEnabled = false;
         _error.Visibility = Visibility.Collapsed;
         try
         {
             var result = await engine.ApproveAsync(_preview.Id, selected);
+            if (_released) return;
             _applied = true;
+            _rows.IsEnabled = true;
             RenderResult(result);
         }
         catch (ObjectDisposedException)
         {
+            RenderFinishActions();
             ShowError("File organizer is off");
         }
         catch (InvalidOperationException ex)
         {
             // Used or expired: say so; Refresh plans afresh.
             ShowError($"Approve failed · {Lower(ex.Message)}");
-            RenderDone(_preview.Items.Count(i => i.Kind == OperationKind.Hold), 0, 0);
+            RenderFinishActions();
         }
     }
 
@@ -383,9 +406,10 @@ internal sealed class PreviewView : UserControl
         _subtitle.Text = $"{Ui.FolderName(preview.Folder)} · applied {Ui.Time(DateTimeOffset.Now)}";
         var card = NewCard();
         _all.Visibility = Visibility.Hidden;
-        var entries = result.Items.Select(outcome =>
+        var outcomes = result.Items.ToDictionary(r => r.ItemId);
+        var entries = preview.Items.Where(i => outcomes.ContainsKey(i.Id)).Select(item =>
         {
-            var item = preview.Items.First(i => i.Id == outcome.ItemId);
+            var outcome = outcomes[item.Id];
             return (Item: item with { Destination = outcome.Destination ?? item.Destination }, Outcome: (ItemResult?)outcome);
         }).ToList();
         var failed = entries.Where(e => e.Outcome is { Succeeded: false }).ToList();
@@ -394,29 +418,25 @@ internal sealed class PreviewView : UserControl
         bool open = entries.Count <= OpenUpTo;
         foreach (var group in ByDestination(entries.Where(e => e.Outcome is { Succeeded: true }).Select(e => e.Item), i => i.Destination ?? i.Source, i => i.Kind))
         {
-            var ids = group.Select(i => i.Id).ToHashSet();
-            AddGroup(card, Title(preview, group.Key, group.First().Kind), group.Key, [.. entries.Where(e => ids.Contains(e.Item.Id) && e.Outcome is { Succeeded: true })], open, look: false);
+            AddGroup(card, Title(preview, group.Key, group.First().Kind), group.Key, [.. group.Select(i => (i, (ItemResult?)outcomes[i.Id]))], open, look: false);
         }
-        int held = preview.Items.Count(i => i.Kind == OperationKind.Hold || i.Warnings.Any(w => w.Kind == WarningKind.MisleadingName) && !result.Items.Any(r => r.ItemId == i.Id));
-        RenderDone(held, result.Succeeded, result.Failed);
-    }
-
-    private void RenderDone(int held, int moved, int failed)
-    {
-        _footer.Children.Clear();
-        var summary = new TextBlock { VerticalAlignment = VerticalAlignment.Center };
-        summary.SetResourceReference(StyleProperty, "CaptionTextStyle");
-        summary.SetResourceReference(TextBlock.ForegroundProperty, "TextSecondaryBrush");
-        summary.Inlines.Add($"{moved} moved");
-        if (failed > 0)
+        int held = preview.Items.Count(i => i.Kind == OperationKind.Hold || i.Warnings.Any(w => w.Kind == WarningKind.MisleadingName) && !outcomes.ContainsKey(i.Id));
+        RenderFinishActions();
+        var summary = Ui.Text(string.Join(" · ", OrganizerLabels.CompletedCounts(entries.Where(e => e.Outcome is { Succeeded: true }).Select(e => e.Item))), "CaptionTextStyle", "TextSecondaryBrush");
+        if (result.Failed > 0)
         {
-            var count = new System.Windows.Documents.Run($" · {failed} failed");
+            var count = new System.Windows.Documents.Run($"{(summary.Text.Length == 0 ? "" : " · ")}{result.Failed} failed");
             count.SetResourceReference(System.Windows.Documents.TextElement.ForegroundProperty, "WarningTextBrush");
             summary.Inlines.Add(count);
         }
         if (held > 0)
-            summary.Inlines.Add($" · {held} held");
+            summary.Inlines.Add($"{(summary.Text.Length == 0 ? "" : " · ")}{held} held");
         _footer.Children.Add(summary.At(0));
+    }
+
+    private void RenderFinishActions()
+    {
+        _footer.Children.Clear();
         if (_canPreviewAgain)
         {
             var again = Ui.Button("Refresh");
@@ -444,16 +464,22 @@ internal sealed class PreviewView : UserControl
             lead = Ui.Glyph(LucideIcons.Check, "SuccessBrush", 16);
         else
             lead = Ui.Glyph(LucideIcons.Info, "WarningBrush", 16);
-        var name = Ui.Text(outcome?.Destination is { } moved && item.Kind == OperationKind.Move ? Path.GetFileName(moved) : item.Name, "TitleTextStyle", noMatch ? "TextTertiaryBrush" : null);
-        name.ToolTip = item.Source;
+        string displayName = outcome is { Succeeded: true, Destination: { } destination } ? Path.GetFileName(destination) : item.Name;
+        var name = Ui.Text(displayName, "TitleTextStyle", noMatch ? "TextTertiaryBrush" : null);
+        name.ToolTip = outcome is { Succeeded: true } ? item.Destination : item.Source;
         var nameStack = Ui.Stack(name);
         nameStack.VerticalAlignment = VerticalAlignment.Center;
         if (outcome is { Succeeded: false })
-            nameStack.Children.Add(Ui.Warning($"{(item.Kind == OperationKind.Rename ? "Rename" : "Move")} failed · {Lower(outcome.Error)}"));
+        {
+            string verb = item.IsDirectImport ? "Import" : item.Kind == OperationKind.Rename ? "Rename" : "Move";
+            nameStack.Children.Add(Ui.Warning($"{verb} failed · {Lower(outcome.Error)}"));
+        }
         else if (outcome is null && Note(item) is { } note)
             nameStack.Children.Add(WarningLine(note));
         else if (item.Kind == OperationKind.Rename && item.Destination is { } renamed && outcome is null)
             nameStack.Children.Add(Ui.Text($"→ {Path.GetFileName(renamed)}", "CaptionTextStyle", "TextSecondaryBrush"));
+        else if (outcome is { Succeeded: true } && displayName != item.Name)
+            nameStack.Children.Add(Ui.Text($"From {item.Name}", "CaptionTextStyle", "TextSecondaryBrush"));
         var size = Right(Ui.Number(Ui.Size(item.Bytes), "TextTertiaryBrush"));
         size.VerticalAlignment = VerticalAlignment.Center;
         string ruleName = noMatch ? "No match" : item.RuleName ?? (preview.Archive is not null && item.RuleId is null ? "Import" : "Safety check");
@@ -470,9 +496,9 @@ internal sealed class PreviewView : UserControl
         grid.Children.Add(nameStack.At(1));
         grid.Children.Add(size.At(2));
         grid.Children.Add(rule.At(3));
-        if (outcome is { Succeeded: true, OperationId: { } operation })
+        if (outcome is { Succeeded: true, OperationId: { } operation } && !item.IsDirectImport)
         {
-            var undo = Ui.Icon(LucideIcons.Undo, $"Undo {item.Name}");
+            var undo = Ui.Icon(LucideIcons.Undo, $"Undo {displayName}");
             undo.Click += async (_, _) => await UndoAsync(undo, operation);
             grid.Children.Add(undo.At(4));
         }
@@ -509,7 +535,7 @@ internal sealed class PreviewView : UserControl
         else
         {
             undo.IsEnabled = true;
-            ShowError("Undo failed");
+            ShowError($"Undo failed · {Lower(result.Error)}");
         }
     }
 
@@ -524,7 +550,11 @@ internal sealed class PreviewView : UserControl
         if (item.Warnings.FirstOrDefault(w => w.Kind == WarningKind.MisleadingName) is { } disguise)
             return $"Held · {Lower(disguise.Detail)}";
         if (item.Kind == OperationKind.Hold)
-            return item.Warnings.Any(w => w.Kind == WarningKind.IgnoreMatch) ? "Held · in ignore file" : $"Held · {Lower(item.HoldReason ?? item.Warnings.LastOrDefault()?.Detail)}";
+        {
+            if (item.Warnings.Any(w => w.Kind == WarningKind.IgnoreMatch)) return "Held · in ignore file";
+            string reason = OrganizerLabels.HoldReason(item.HoldReason ?? item.Warnings.LastOrDefault()?.Detail);
+            return reason.Length == 0 ? "Held" : $"Held · {Lower(reason)}";
+        }
         if (item.Warnings.LastOrDefault() is { } warning)
             return warning.Detail;
         if (item.Kind == OperationKind.Move && item.Destination is { } dest && !string.Equals(Path.GetFileName(dest), item.Name, StringComparison.OrdinalIgnoreCase))

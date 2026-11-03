@@ -166,7 +166,7 @@ public sealed class TidyTests(ITestOutputHelper output)
         DesktopSession.Invoke(DesktopSession.Find(tidy, "History", InvokePattern.Pattern));
         var settings = Settings(app);
         DesktopSession.Select(DesktopSession.Find(settings, "Section"), "History");
-        DesktopSession.Invoke(DesktopSession.Find(settings, "Clear history", InvokePattern.Pattern));
+        DesktopSession.Invoke(DesktopSession.Find(settings, "Clear all history", InvokePattern.Pattern));
         DesktopSession.Invoke(DesktopSession.Find(settings, "Clear", InvokePattern.Pattern));
         DesktopSession.Until(() => app.DownloadsSettings.TryGetProperty("historyClearedUtc", out var at) && at.ValueKind == JsonValueKind.String, "history clear marker saved");
         var marker = app.DownloadsSettings.GetProperty("historyClearedUtc").GetString();

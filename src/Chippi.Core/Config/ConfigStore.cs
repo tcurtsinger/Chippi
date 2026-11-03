@@ -125,8 +125,9 @@ public sealed class ConfigStore
     {
         lock (_gate)
         {
-            _root[name] = Merge(_root[name] as JsonObject, ToNode(value));
-            WriteAtomic(FilePath, _root.ToJsonString(JsonOptions));
+            var candidate = _root.DeepClone().AsObject();
+            candidate[name] = Merge(candidate[name] as JsonObject, ToNode(value));
+            Commit(candidate);
         }
         RaiseSectionChanged(name);
     }
@@ -134,22 +135,24 @@ public sealed class ConfigStore
     public bool HasModuleSettings(string moduleId)
     {
         lock (_gate)
-            return Modules(create: false)?[moduleId] is not null;
+            return (_root[ModulesKey] as JsonObject)?[moduleId] is not null;
     }
 
     public T GetModuleSettings<T>(string moduleId) where T : class, new()
     {
         lock (_gate)
-            return Read<T>(Modules(create: false)?[moduleId], $"{ModulesKey}.{moduleId}");
+            return Read<T>((_root[ModulesKey] as JsonObject)?[moduleId], $"{ModulesKey}.{moduleId}");
     }
 
     public void SetModuleSettings<T>(string moduleId, T value) where T : class
     {
         lock (_gate)
         {
-            var modules = Modules(create: true)!;
+            var candidate = _root.DeepClone().AsObject();
+            if (candidate[ModulesKey] is not JsonObject modules)
+                candidate[ModulesKey] = modules = new JsonObject();
             modules[moduleId] = Merge(modules[moduleId] as JsonObject, ToNode(value));
-            WriteAtomic(FilePath, _root.ToJsonString(JsonOptions));
+            Commit(candidate);
         }
         RaiseSectionChanged($"{ModulesKey}.{moduleId}");
     }
@@ -233,15 +236,10 @@ public sealed class ConfigStore
         }
     }
 
-    private JsonObject? Modules(bool create)
+    private void Commit(JsonObject candidate)
     {
-        if (_root[ModulesKey] is JsonObject modules)
-            return modules;
-        if (!create)
-            return null;
-        modules = [];
-        _root[ModulesKey] = modules;
-        return modules;
+        WriteAtomic(FilePath, candidate.ToJsonString(JsonOptions));
+        _root = candidate;
     }
 
     private static JsonObject NewRoot() => new() { [VersionKey] = CurrentVersion };
