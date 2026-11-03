@@ -872,8 +872,12 @@ public partial class IslandPanelWindow : Window
         // Before activating: once the island is in front, the app the user was in is gone from view.
         PasteTarget = CaptureTarget?.Invoke() ?? PasteTarget;
         ActivateWindow(_hwnd);
+        var focusAtActivation = Keyboard.FocusedElement;
         Dispatcher.BeginInvoke(DispatcherPriority.Input, () =>
         {
+            // A composite control can focus its slider during the bubbling press, after our preview.
+            if (pressed is not null && IsKeyboardFocusWithin && Keyboard.FocusedElement != focusAtActivation)
+                return;
             if (pressed is null && _page is null && _grid.IsSearching && _grid.FocusTile(null))
                 return;
             for (var at = pressed; at is not null; at = at is System.Windows.Media.Visual or System.Windows.Media.Media3D.Visual3D ? VisualTreeHelper.GetParent(at) : LogicalTreeHelper.GetParent(at))
