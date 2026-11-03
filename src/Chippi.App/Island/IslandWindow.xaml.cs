@@ -699,7 +699,14 @@ public partial class IslandWindow : Window
     {
         if (!IsVisible || _dragging || Area is not { } area)
             return;
-        _panel.Open(_puck, WidgetRect, area);
+        var widget = WidgetRect;
+        if (_slideFrame is not null)
+        {
+            // The saved puck already anchors the destination. The morph starts where the widget is still drawn.
+            var bounds = PuckButton.TransformToAncestor(Root).TransformBounds(new Rect(PuckButton.RenderSize));
+            widget = new Rect(Root.PointToScreen(bounds.TopLeft), Root.PointToScreen(bounds.BottomRight));
+        }
+        _panel.Open(_puck, widget, area);
         IslandNative.Raise(_hwnd); // Chippi and the bar's content stay above the shape the widget became, fading
         Hook();
     }

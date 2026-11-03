@@ -346,18 +346,27 @@ public sealed class ShellMotionTests
             var area = window.CurrentArea!.Value;
             long now = 0;
             window.SlideClock = () => now;
-            var pointer = new Point(area.Work.Left + 1, area.Work.Top + 90 * area.Scale);
+            window.Panel.Clock = () => now;
+            window.SetTiles(Tiles(Part("timer", "Focus timer", 0)));
+            window.SetActivities([new IslandActivity("timer", IslandActivityKind.Timer, "18:42", "Focus timer") { TileKey = "timer" }], Chippi.UI.Pet.PetMood.Idle);
+            IslandWindowTests.PumpUntil(() => window.PuckButton.ActualWidth >= 255.99 && window.Bar.Opacity == 1);
+            var grip = new Point(128, 25);
+            var pointer = window.PuckButton.PointToScreen(grip);
             window.PointerAt = () => pointer;
             int saves = 0;
             window.PlacementChosen += (_, _) => saves++;
-            var firstDrop = window.DropAt(pointer);
+            void Button(RoutedEvent routed) => window.PuckButton.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Left) { RoutedEvent = routed });
+            void Move() => window.PuckButton.RaiseEvent(new MouseEventArgs(Mouse.PrimaryDevice, 0) { RoutedEvent = UIElement.PreviewMouseMoveEvent });
+            Button(UIElement.PreviewMouseLeftButtonDownEvent);
+            pointer = new Point(area.Work.Left + 1, area.Work.Top + 90 * area.Scale);
+            Move();
+            Button(UIElement.PreviewMouseLeftButtonUpEvent);
+            var firstDrop = window.PuckRect;
             var start = IslandNative.WindowRect(window.Handle);
             now += Stopwatch.Frequency / 30;
             IslandWindowTests.PumpUntil(() => IslandNative.WindowRect(window.Handle) != start);
             var held = IslandNative.WindowRect(window.Handle);
-            var grip = new Point(25, 25);
             pointer = window.PuckButton.PointToScreen(grip);
-            void Button(RoutedEvent routed) => window.PuckButton.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Left) { RoutedEvent = routed });
             Button(UIElement.PreviewMouseLeftButtonDownEvent);
             now += Stopwatch.Frequency; // longer than the whole slide while the pointer stays still
             bool drawn = false;
@@ -371,10 +380,20 @@ public sealed class ShellMotionTests
             if (dragAgain)
             {
                 pointer.X += 160 * area.Scale;
-                window.PuckButton.RaiseEvent(new MouseEventArgs(Mouse.PrimaryDevice, 0) { RoutedEvent = UIElement.PreviewMouseMoveEvent });
+                Move();
                 Assert.InRange((window.PuckButton.PointToScreen(grip) - pointer).Length, 0, 2);
             }
+            var button = window.PuckButton;
+            var visible = new Rect(button.PointToScreen(default), button.PointToScreen(new Point(button.ActualWidth, button.ActualHeight)));
             Button(UIElement.PreviewMouseLeftButtonUpEvent);
+            if (!dragAgain)
+            {
+                Assert.Equal("timer", window.Panel.CurrentPage);
+                window.Panel.UpdateLayout();
+                var shape = window.Panel.Shape;
+                Assert.InRange((shape.PointToScreen(default) - visible.TopLeft).Length, 0, 2);
+                Assert.InRange((shape.PointToScreen(new Point(shape.ActualWidth, shape.ActualHeight)) - visible.BottomRight).Length, 0, 2);
+            }
             now += Stopwatch.Frequency;
             IslandWindowTests.PumpUntil(() => saves > 0);
             Assert.Equal(1, saves);
