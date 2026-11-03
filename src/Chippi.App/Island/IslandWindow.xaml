@@ -113,9 +113,13 @@
                     </Grid>
                     <!-- The badge's own layer, so the open can fade it while Chippi stays (IslandWindow's Morphing). -->
                     <Grid x:Name="BadgeLayer" IsHitTestVisible="False">
-                        <Ellipse x:Name="WaitingMark" Width="10" Height="10" StrokeThickness="1.5"
-                                 Margin="6,0,0,6" HorizontalAlignment="Left" VerticalAlignment="Bottom" Visibility="Collapsed"
-                                 Fill="{DynamicResource PetSparkBrush}" Stroke="{DynamicResource IslandBrush}" />
+                        <Grid x:Name="AgentMark" Width="22" Height="22" HorizontalAlignment="Left" VerticalAlignment="Bottom"
+                              Visibility="Collapsed">
+                            <Ellipse Fill="{DynamicResource IslandBrush}" />
+                            <Ellipse x:Name="AgentMarkPlate" Width="18" Height="18" Fill="{DynamicResource IslandAccentFillBrush}" />
+                            <c:LucideIcon x:Name="AgentMarkIcon" Data="{x:Static c:LucideIcons.Gauge}" Size="11" Thickness="2"
+                                          Brush="{DynamicResource IslandOnAccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Grid>
                         <Grid x:Name="MicBadge" Width="22" Height="22" HorizontalAlignment="Right" VerticalAlignment="Bottom"
                               Visibility="Collapsed">
                             <Ellipse Fill="{DynamicResource IslandBrush}" />

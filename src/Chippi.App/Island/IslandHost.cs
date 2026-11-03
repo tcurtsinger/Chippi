@@ -405,6 +405,7 @@ public sealed class IslandHost : IDisposable
         _window.SetPlacement(settings.IslandX, settings.IslandY);
         _window.SetLastPage(settings.IslandLastPage, settings.IslandAudioShowsMixer);
         _window.SetLayout(IslandLayout.From(settings));
+        _window.SetNowPlayingAlwaysShow(settings.NowPlayingAlwaysShow);
         _window.SetEnabled(settings.IslandEnabled);
         _tracker.SetPlacement(settings.IslandDisplay, settings.IslandMonitorId);
     }

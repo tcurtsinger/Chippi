@@ -116,6 +116,8 @@ public partial class IslandWindow : Window
     private double _followScale = double.NaN; // the scale of the last full move during a drag or slide
     private double _scaleTarget = 1, _tiltTarget;
     private Media.IMediaSessions? _media;
+    private bool _nowPlayingAlwaysShow = true;
+    private bool _musicHovered; // entered through Chippi; keep the reveal over the whole bar until the pointer leaves
     private bool _singing; // the bar names a song, playing or just paused
     private bool _barShown; // the widget is the bar (or unfolding into it), not the puck
     private string? _heldSong; // the song last shown playing, which keeps the bar for PauseHold after it pauses
@@ -355,6 +357,13 @@ public partial class IslandWindow : Window
         _media = media;
         media.Changed += (_, _) => RefreshPuck(); // a new track, its artist or its cover arriving
         _panel.SetMedia(media);
+    }
+
+    internal void SetNowPlayingAlwaysShow(bool alwaysShow)
+    {
+        if (_nowPlayingAlwaysShow == alwaysShow) return;
+        _nowPlayingAlwaysShow = alwaysShow;
+        RefreshPuck();
     }
 
     /// <summary>Creates the window handles with the no-activate tool-window styles, before anything is shown.</summary>
@@ -900,8 +909,6 @@ public partial class IslandWindow : Window
         var feedback = _activities.FirstOrDefault(a => a.ModuleId == Chippi.Features.PlainPaste.PlainPasteModule.Id)
             ?? _activities.FirstOrDefault(a => a.IsFeedback);
         var mic = _activities.FirstOrDefault(a => a.ModuleId == "mic-mute" && a.NeedsAttention);
-        var top = _activities.FirstOrDefault(a => a.ModuleId is not Chippi.Features.PlainPaste.PlainPasteModule.Id and not "mic-mute" && !a.IsFeedback
-            && (a.Kind != IslandActivityKind.Agent || _agentPeeking || _agentHovered));
         bool dropping = _dragKey is not null;
         if (_lifted)
             Pet.IsHeld = true; // set down once the drop has slid into place (DropAt)
@@ -921,7 +928,7 @@ public partial class IslandWindow : Window
         ShowBadge(MicBadge, mic is not null);
 
         var current = _media?.Current;
-        var playing = top?.Kind == IslandActivityKind.Media && current is { Playing: true } ? current : null;
+        var playing = current is { Playing: true } && _activities.Any(a => a.Kind == IslandActivityKind.Media) ? current : null;
         if (playing is not null)
         {
             _heldSong = playing.Id;
@@ -932,11 +939,20 @@ public partial class IslandWindow : Window
             }
         }
         var song = playing ?? HeldSong(current);
+        _musicHovered = !_nowPlayingAlwaysShow && song is not null && CanHoverMusic && (_musicHovered || _puck.Contains(PointerAt()));
+        bool showMusic = _nowPlayingAlwaysShow || _musicHovered;
+        if (!showMusic) song = null;
+        var top = _activities.FirstOrDefault(a => a.ModuleId is not Chippi.Features.PlainPaste.PlainPasteModule.Id and not "mic-mute" && !a.IsFeedback
+            && (showMusic || a.Kind != IslandActivityKind.Media)
+            && (a.Kind != IslandActivityKind.Agent || _agentPeeking || _agentHovered));
         var tile = top?.TileKey is { } key ? _tiles.FirstOrDefault(t => t.Key == key) : null;
         var dropTile = dropping ? _tiles.FirstOrDefault(t => t.Key == _dragKey) : null;
         bool bar = !_lifted && (dropTile is not null || feedback is not null || song is not null || top is not null);
-        bool waitingMark = !bar && _activities.Any(a => a.Kind == IslandActivityKind.Agent && a.NeedsAttention);
-        WaitingMark.Visibility = Shown(waitingMark);
+        var puckAgent = bar ? null : _activities.FirstOrDefault(a => a.Kind == IslandActivityKind.Agent && a.NeedsAttention)
+            ?? _activities.FirstOrDefault(a => a.Kind == IslandActivityKind.Agent);
+        if (puckAgent is not null)
+            AgentMarkPlate.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, puckAgent.NeedsAttention ? "PetSparkBrush" : "IslandAccentFillBrush");
+        ShowBadge(AgentMark, puckAgent is not null);
         _singing = bar && dropTile is null && feedback is null && song is not null;
         // Keep awake stays in sight while something else holds the bar (a song, a drag, another activity) or the puck is lifted.
         var keepAwake = _activities.FirstOrDefault(a => a.Kind == IslandActivityKind.Status && a.ModuleId == IslandHost.KeepAwakeModuleId);
@@ -947,7 +963,7 @@ public partial class IslandWindow : Window
         bool paused = _singing && playing is null;
         // A background session can still report Idle after its notice folds. Only the visible activity
         // or an interaction keeps the pet engaged. Progress updates leave his quiet minute alone.
-        bool awake = StayAwake(bar || _hovered || _lifted || _panel.IsVisible || _mood == PetMood.WideAwake);
+        bool awake = StayAwake(playing is not null || bar || _hovered || _lifted || _panel.IsVisible || _mood == PetMood.WideAwake);
         var mood = playing is not null && !_lifted ? PetMood.Listening : _mood switch
         {
             PetMood.Idle or PetMood.Sleepy => awake || _stretching ? PetMood.Idle : PetMood.Sleepy,
@@ -1034,16 +1050,18 @@ public partial class IslandWindow : Window
         }
         // The equalizer follows the output's real level while a song plays on the bar and can be seen, and Chippi bobs
         // to its beats there; with the panel out the bars keep still, but the panel's listening Chippis still bob.
-        if (_singing && !paused && (IsVisible || _panel.IsVisible) && !Motion.IsReduced && !Motion.IsUnseen)
+        if (playing is not null && !_lifted && (_singing || !bar) && (IsVisible || _panel.IsVisible) && !Motion.IsReduced && !Motion.IsUnseen)
             _level?.Start();
         else
             StopLevel();
         AutomationProperties.SetName(PuckButton, bar ? $"Chippi, {_chipText}" : "Chippi");
         List<string> help = [];
         if (paused) help.Add("Paused");
+        if (!bar && playing is not null && !_nowPlayingAlwaysShow)
+            help.Add($"Now Playing · {(playing.Title.Length > 0 ? playing.Title : playing.Source)}");
         if (mic is not null) help.Add(mic.Title == "Muted" ? "Microphone muted" : mic.Title);
         if (awakeBadge) help.Add("Keep awake is on");
-        if (waitingMark) help.Add("Agent waiting on you");
+        if (puckAgent is not null) help.Add(puckAgent.NeedsAttention ? "Agent waiting on you" : "Agent working");
         AutomationProperties.SetHelpText(PuckButton, string.Join(". ", help));
         AutomationProperties.SetLiveSetting(PuckButton, AutomationLiveSetting.Polite);
     }
@@ -1085,7 +1103,7 @@ public partial class IslandWindow : Window
     }
 
     /// <summary>
-    /// A badge on the puck (the muted mic's, Keep awake's) scales in from 0.6 as it fades in over 160ms, and fades out over
+    /// A badge on the puck (microphone, Keep awake or Agents) scales in from 0.6 as it fades in over 160ms, and fades out over
     /// 100ms when it goes; under reduced motion it only fades. It never changes the widget's size. Its Tag is whether it's up.
     /// </summary>
     private void ShowBadge(FrameworkElement badge, bool shown)
@@ -1149,9 +1167,12 @@ public partial class IslandWindow : Window
     private bool CanHoverAgent => _agentState.HasValue && _hovered && IsVisible && !_panel.IsVisible
         && !Menu.IsOpen && !_lifted && _pressAt is null && _dragKey is null && !Motion.IsUnseen;
 
+    private bool CanHoverMusic => _hovered && !_panel.IsVisible && !_lifted && _dragKey is null && !Menu.IsOpen;
+
     private void SetHover(bool hovered)
     {
         _hovered = hovered;
+        if (!hovered) _musicHovered = false;
         _agentHovered = false;
         TrackAgentDwell();
         RefreshPuck();
@@ -1386,9 +1407,12 @@ public partial class IslandWindow : Window
 
     private void ShowLevel(float peak)
     {
-        var heights = _bars.Next(peak);
-        for (int i = 0; i < heights.Count; i++)
-            ((FrameworkElement)Equalizer.Children[i]).Height = 2 + Math.Round(12 * heights[i]);
+        if (_singing)
+        {
+            var heights = _bars.Next(peak);
+            for (int i = 0; i < heights.Count; i++)
+                ((FrameworkElement)Equalizer.Children[i]).Height = 2 + Math.Round(12 * heights[i]);
+        }
         if (_beats.Next(peak, TimeSpan.FromMilliseconds(Environment.TickCount64)) is { } beat)
         {
             Pet.Beat(beat);
@@ -1503,6 +1527,9 @@ public partial class IslandWindow : Window
         if (_pressAt is not { } start)
         {
             TrackAgentDwell();
+            if (!_nowPlayingAlwaysShow && !_musicHovered && (_media?.Current?.Playing == true || _holdingPause)
+                && CanHoverMusic && _puck.Contains(PointerAt()))
+                RefreshPuck();
             return;
         }
         var pointer = PointerAt();
