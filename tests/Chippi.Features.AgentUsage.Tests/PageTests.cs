@@ -2,6 +2,7 @@
 // Copyright (C) Chippi contributors
 
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using Chippi.Features.AgentUsage.Views;
@@ -71,9 +72,42 @@ public sealed class PageTests
             Assert.Equal(3, rows.Count); // of 4
             Assert.Contains("Idle", texts);
             Assert.Contains("Working · 1 min", texts);
-            Assert.Contains("Claude", texts);
+            Assert.DoesNotContain("Claude", texts);
+            foreach (var row in rows)
+            {
+                var grid = Assert.IsType<Grid>(row.Content);
+                var state = Assert.Single(grid.Children.OfType<TextBlock>(), t => Grid.GetColumn(t) == grid.ColumnDefinitions.Count - 1);
+                Assert.Equal(TextAlignment.Right, state.TextAlignment);
+                Assert.Same(AgentIcons.Source(AgentKind.Claude), Assert.Single(Find<Image>(row)).Source);
+                Assert.Contains("Claude Code", AutomationProperties.GetName(row));
+                Assert.Contains("Claude", row.ToolTip?.ToString());
+            }
+            Assert.Contains(Find<Image>(view), icon => icon.Source == AgentIcons.Source(AgentKind.Codex));
         });
     }
+
+    [Fact]
+    public void A_reused_session_row_changes_its_icon_when_the_provider_changes() => WpfTestThread.Run(() =>
+    {
+        using var h = Busy(1);
+        var view = new AgentsIslandView(h.Module);
+        var row = Assert.Single(Find<Button>(view));
+        var icon = Assert.Single(Find<Image>(row));
+        Assert.Same(AgentIcons.Source(AgentKind.Claude), icon.Source);
+
+        h.Processes.Running.Clear();
+        const string thread = "01a1996d-0102-7111-8111-111111111111";
+        h.Processes.Locked.Add($"{thread}.lock");
+        h.Write($".codex/thread-writer-locks/{thread}.lock", "");
+        h.Write($".codex/sessions/2026/11/01/rollout-1-{thread}.jsonl", CodexLogsTests.Log(
+            """{"timestamp":"2026-11-01T22:52:10Z","type":"event_msg","payload":{"type":"task_started"}}"""));
+        h.Step(TimeSpan.FromSeconds(5));
+        view.Refresh();
+
+        Assert.Same(row, Assert.Single(Find<Button>(view)));
+        Assert.Same(AgentIcons.Source(AgentKind.Codex), icon.Source);
+        Assert.Contains("Codex", AutomationProperties.GetName(row));
+    });
 
     [Fact]
     public void Clicking_a_session_brings_its_window_forward_and_closes_the_island()
@@ -136,7 +170,15 @@ public sealed class PageTests
             var page = (AgentUsageSettingsPage)h.Ui.SettingsPage!(null);
 
             var texts = Texts(page).ToList();
-            Assert.Equal(5, Find<Button>(page).Count(b => Equals(b.Content, "Switch to")));
+            var switches = Find<Button>(page).Where(b => Equals(b.Content, "Switch to")).ToArray();
+            Assert.Equal(5, switches.Length);
+            var grid = Assert.IsType<Grid>(switches[0].Parent);
+            var state = Assert.Single(grid.Children.OfType<TextBlock>(), t => Grid.GetColumn(t) == grid.ColumnDefinitions.Count - 1);
+            Assert.Equal(TextAlignment.Right, state.TextAlignment);
+            Assert.Same(AgentIcons.Source(AgentKind.Claude), Assert.Single(Find<Image>(grid)).Source);
+            Assert.Contains("Claude Code", AutomationProperties.GetHelpText(switches[0]));
+            Assert.Equal(2, Find<Image>(page).Count(i => i.Source == AgentIcons.Source(AgentKind.Codex)));
+            Assert.DoesNotContain("Claude", texts);
             Assert.Contains("Claude Code", texts);
             var rows = Find<UI.Controls.SettingRow>(page).ToList();
             Assert.Equal("Signed in · Max", rows.Single(r => r.Header == "Claude Code").Description);

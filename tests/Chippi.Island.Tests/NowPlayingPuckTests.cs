@@ -89,7 +89,7 @@ public sealed class NowPlayingPuckTests
             Move(window, outside, Mouse.MouseLeaveEvent);
             Assert.Equal("Focus · Timer", window.ChipText);
 
-            var agent = new IslandActivity("working", IslandActivityKind.Agent, "Working", "Codex") { Monogram = "Cx" };
+            var agent = new IslandActivity("working", IslandActivityKind.Agent, "Working", "Codex") { ProviderId = "Codex" };
             window.SetActivities([Music, agent], PetMood.Idle);
             Assert.Equal("Working · Codex", window.ChipText);
         }));

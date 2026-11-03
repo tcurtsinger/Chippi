@@ -11,6 +11,14 @@ Chippi uses fonts installed on Windows: Segoe UI Variable (with Segoe UI fallbac
 - Lucide geometry: ISC, including the upstream Feather/MIT notice. Source: https://github.com/lucide-icons/lucide
 - Hopper: theme, icon, tray, logging, config, startup, startup-hardening and audio engine code adapted into Chippi. The original author has authorized GPL-3.0-or-later relicensing for Chippi (phase-1-handoff.md). Hopper's separate repository is unchanged. Source: https://github.com/tcurtsinger/Hopper
 
+## Coding agent product icons
+
+The Claude Code icon is Anthropic’s orange Spark. Chippi bundles a raster rendering of the original geometry and fill from `resources/claude-logo.svg` in Anthropic’s Claude Code for VS Code 2.1.317 extension. [Official extension](https://marketplace.visualstudio.com/items?itemName=Anthropic.claude-code) · [Claude Code documentation](https://code.claude.com/docs/en/vs-code#spark-icon-not-visible)
+
+The Codex icon is OpenAI’s blue cloud with a terminal prompt. Chippi bundles the original transparent 104 × 104 PNG distributed as `webview/assets/3e5209898ca3.png` in OpenAI’s Codex Windows package 26.1027.6604.0. [Official Windows distribution](https://apps.microsoft.com/detail/9PLM9XGG6VKS)
+
+The product names and icons identify the corresponding providers and remain the property of their respective owners.
+
 ## Bundled driver package: VB-CABLE
 
 Chippi ships VB-Audio's VB-CABLE Driver Pack 45 (`vendor\vb-cable\VBCABLE_Driver_Pack45.zip`) unmodified, as its license requires, for Mic processing. It is installed only when the user presses Install Driver, by VB-Audio's own setup. Uninstalling Chippi never removes it. Bundled with VB-Audio's agreement.

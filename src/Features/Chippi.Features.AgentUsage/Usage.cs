@@ -14,8 +14,12 @@ public static class AgentNames
     /// <summary>"Claude", "Codex": the home button's status ("Claude 42%").</summary>
     public static string ShortName(this AgentKind agent) => agent == AgentKind.Claude ? "Claude" : "Codex";
 
-    /// <summary>"CC", "Cx": the agent's letters on the accent tint. Chippi never redraws another company's logo.</summary>
-    public static string Monogram(this AgentKind agent) => agent == AgentKind.Claude ? "CC" : "Cx";
+    public static AgentKind? FromId(string? id) => id switch
+    {
+        nameof(AgentKind.Claude) => AgentKind.Claude,
+        nameof(AgentKind.Codex) => AgentKind.Codex,
+        _ => null,
+    };
 }
 
 /// <summary>One limit: its name ("5-hour", "Weekly", "Opus weekly"), the share used (0 to 100) and when it resets.</summary>

@@ -46,7 +46,10 @@ public sealed class AgentUsageSettingsPage : UserControl
                 ? _module.Settings with { Claude = toggle.IsChecked == true }
                 : _module.Settings with { Codex = toggle.IsChecked == true }));
             _agents[kind] = (toggle, row);
-            agents.Children.Add(row);
+            var padding = SettingsLayout.RowPadding;
+            var icon = new AgentImage(20, kind) { Margin = new Thickness(padding.Left, 0, 12, 0) };
+            row.Padding = new Thickness(0, padding.Top, padding.Right, padding.Bottom);
+            agents.Children.Add(new DockPanel { Children = { icon, row } });
         }
         body.Children.Add(agents);
         body.Children.Add(SettingsLayout.Section("Alerts"));
@@ -139,7 +142,8 @@ public sealed class AgentUsageSettingsPage : UserControl
             var state = new TextBlock { Tag = "state", VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 0, 1) };
             state.SetResourceReference(StyleProperty, "CaptionTextStyle");
             DockPanel.SetDock(state, Dock.Right);
-            _limits.Children.Add(new DockPanel { Height = 20, Margin = new Thickness(0, first ? 0 : 24, 0, 8), Tag = agent.Agent, Children = { state, name, plan } });
+            var icon = new AgentImage(18, agent.Agent) { Margin = new Thickness(0, 0, 8, 0) };
+            _limits.Children.Add(new DockPanel { Height = 20, Margin = new Thickness(0, first ? 0 : 24, 0, 8), Tag = agent.Agent, Children = { state, icon, name, plan } });
             first = false;
             var card = SettingsLayout.Card();
             foreach (var window in AgentLines.Rows(agent))
@@ -158,10 +162,11 @@ public sealed class AgentUsageSettingsPage : UserControl
         _sessions.Children.Clear();
         _sessions.Children.Add(SettingsLayout.Section("Sessions", first: agents.Count == 0));
         var list = SettingsLayout.Card();
+        Grid.SetIsSharedSizeScope(list, true);
         if (sessions.Count == 0)
             list.Children.Add(SettingsLayout.Empty("No sessions"));
-        foreach (var session in sessions)
-            list.Children.Add(SessionRow(session));
+        foreach (var _ in sessions)
+            list.Children.Add(SessionRow());
         _sessions.Children.Add(list);
     }
 
@@ -206,57 +211,53 @@ public sealed class AgentUsageSettingsPage : UserControl
         }
     }
 
-    private sealed class SessionParts(TextBlock name, TextBlock app, TextBlock state, Button switchTo)
+    private sealed class SessionParts(AgentImage icon, TextBlock name, TextBlock state, Button switchTo)
     {
         public AgentSession? Session { get; private set; }
 
         public void Fill(AgentSession session, string appName, DateTimeOffset now)
         {
             Session = session;
+            icon.Source = AgentIcons.Source(session.Agent);
             name.Text = session.Name;
-            app.Text = appName;
             state.Text = session.State(now);
             state.SetResourceReference(TextBlock.ForegroundProperty, session.NeedsInput ? "WarningTextBrush" : "TextSecondaryBrush");
+            switchTo.ToolTip = $"{session.Name} · {state.Text} · {appName}";
             AutomationProperties.SetName(switchTo, $"Switch to {session.Name}");
+            AutomationProperties.SetHelpText(switchTo, $"{session.Agent.Name()}, {state.Text}, {appName}");
         }
     }
 
-    // The agent's letters, the session's name over the app it runs in, its state, then Switch to.
-    private FrameworkElement SessionRow(AgentSession session)
+    // The name gets the available width. Session status lines up at the trailing edge.
+    private FrameworkElement SessionRow()
     {
-        var letters = new TextBlock { Text = session.Agent.Monogram(), FontSize = 10, FontWeight = FontWeights.SemiBold, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
-        letters.SetResourceReference(TextBlock.ForegroundProperty, "AccentBrush");
-        var mono = new Border { Width = 24, Height = 24, CornerRadius = new CornerRadius(4), Child = letters, Margin = new Thickness(0, 0, 12, 0), VerticalAlignment = VerticalAlignment.Center };
-        mono.SetResourceReference(Border.BackgroundProperty, "ChipBrush"); // as Add features' icon chips
-        var name = new TextBlock { TextTrimming = TextTrimming.CharacterEllipsis };
+        var icon = new AgentImage(24) { Margin = new Thickness(0, 0, 12, 0) };
+        var name = new TextBlock { TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center };
         name.SetResourceReference(StyleProperty, "BodyTextStyle");
-        var app = new TextBlock();
-        app.SetResourceReference(StyleProperty, "CaptionTextStyle");
-        var state = new TextBlock { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 12, 0) };
+        var state = new TextBlock { TextAlignment = TextAlignment.Right, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 0, 0) };
         state.SetResourceReference(StyleProperty, "BodyTextStyle");
         Typography.SetNumeralAlignment(state, FontNumeralAlignment.Tabular);
-        var switchTo = new Button { Content = "Switch to", VerticalAlignment = VerticalAlignment.Center };
+        var switchTo = new Button { Content = "Switch to", Margin = new Thickness(12, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
         switchTo.SetResourceReference(StyleProperty, "SecondaryButtonStyle");
-        var parts = new SessionParts(name, app, state, switchTo);
+        var parts = new SessionParts(icon, name, state, switchTo);
         switchTo.Click += (_, _) =>
         {
             if (parts.Session is { } s && !_module.SwitchTo(s))
                 state.Text = "Switch failed";
         };
         var grid = new Grid();
-        foreach (var width in new[] { GridLength.Auto, new GridLength(1, GridUnitType.Star), GridLength.Auto, GridLength.Auto })
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = width });
-        var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Children = { name, app } };
-        Grid.SetColumn(text, 1);
-        Grid.SetColumn(state, 2);
-        Grid.SetColumn(switchTo, 3);
-        grid.Children.Add(mono);
-        grid.Children.Add(text);
-        grid.Children.Add(state);
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        grid.ColumnDefinitions.Add(new ColumnDefinition());
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto, SharedSizeGroup = "SessionStatus" });
+        Grid.SetColumn(name, 1);
+        Grid.SetColumn(switchTo, 2);
+        Grid.SetColumn(state, 3);
+        grid.Children.Add(icon);
+        grid.Children.Add(name);
         grid.Children.Add(switchTo);
-        var row = new Border { MinHeight = SettingsLayout.CaptionRowHeight, Padding = SettingsLayout.RowPadding, Child = grid, Tag = parts };
-        parts.Fill(session, _module.AppOf(session), _module.Now);
-        return row;
+        grid.Children.Add(state);
+        return new Border { MinHeight = SettingsLayout.RowHeight, Padding = SettingsLayout.RowPadding, Child = grid, Tag = parts };
     }
 
     private static TextBlock Value(double width)

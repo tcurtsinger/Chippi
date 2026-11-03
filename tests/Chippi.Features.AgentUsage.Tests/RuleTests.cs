@@ -120,7 +120,7 @@ public sealed class AgentBarTests
         var working = AgentBar.Working([Session(AgentKind.Claude, "chippi", AgentSessionState.Working, 12)], [Claude(("5-hour", 42), ("Weekly", 23))], Now)!;
 
         Assert.Equal(IslandActivityKind.Agent, working.Kind);
-        Assert.Equal("CC", working.Monogram);
+        Assert.Equal(nameof(AgentKind.Claude), working.ProviderId);
         Assert.Equal("Working · 42%", working.Title);
         Assert.Equal("Claude Code · chippi", working.Source);
         Assert.False(working.NeedsAttention);
@@ -137,7 +137,7 @@ public sealed class AgentBarTests
         var mixed = new[] { Session(AgentKind.Claude, "a", AgentSessionState.NeedsInput, 3), Session(AgentKind.Codex, "b", AgentSessionState.NeedsInput, 9) };
         var waiting = AgentBar.Waiting(mixed)!;
         Assert.Equal("2 sessions", waiting.Source);
-        Assert.Equal("CC", waiting.Monogram); // the newest leads
+        Assert.Equal(nameof(AgentKind.Claude), waiting.ProviderId); // the newest leads
     }
 
     [Fact]

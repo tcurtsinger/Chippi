@@ -57,7 +57,7 @@
                                           HorizontalAlignment="Center" VerticalAlignment="Center" />
                             <Ellipse Stroke="{DynamicResource IslandBorderBrush}" StrokeThickness="1" />
                         </Grid>
-                        <!-- An activity's glyph in a tinted circle: its page's icon, the progress ring, a dot, or an agent's two letters. -->
+                        <!-- An activity's glyph in a tinted circle: its page's icon, the progress ring, a dot, or the agent's provider icon. -->
                         <Grid x:Name="Glyph" Grid.Column="1" Width="34" Height="34" Visibility="Collapsed">
                             <Ellipse x:Name="GlyphPlate" Fill="{DynamicResource IslandAccentTintBrush}" />
                             <c:LucideIcon x:Name="GlyphIcon" Size="16" Thickness="2" Brush="{DynamicResource IslandAccentBrush}"
@@ -67,9 +67,8 @@
                                 <Path x:Name="RingArc" Stroke="{DynamicResource IslandAccentBrush}" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
                             </Grid>
                             <Ellipse x:Name="Dot" Width="7" Height="7" Fill="{DynamicResource IslandAccentBrush}" />
-                            <TextBlock x:Name="Monogram" FontFamily="{StaticResource UiFont}" FontSize="11" FontWeight="SemiBold"
-                                       Foreground="{DynamicResource IslandAccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"
-                                       Visibility="Collapsed" />
+                            <Image x:Name="ProviderMark" Width="22" Height="22" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"
+                                   Visibility="Collapsed" />
                         </Grid>
                         <!-- The title (scrolling when it doesn't fit, IslandWindow.ShowLine) over the artist or the feature. -->
                         <StackPanel x:Name="Lines" Grid.Column="3" VerticalAlignment="Center">
@@ -117,6 +116,11 @@
                               Visibility="Collapsed">
                             <Ellipse Fill="{DynamicResource IslandBrush}" />
                             <Ellipse x:Name="AgentMarkPlate" Width="18" Height="18" Fill="{DynamicResource IslandAccentFillBrush}" />
+                            <!-- Keep the product's own colors legible inside the working/waiting ring. -->
+                            <Border x:Name="AgentBadgeFace" Width="15" Height="15" CornerRadius="8" Background="{DynamicResource IslandOnAccentBrush}"
+                                    Visibility="Collapsed">
+                                <Image x:Name="AgentBadgeProvider" Width="14" Height="14" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" />
+                            </Border>
                             <c:LucideIcon x:Name="AgentMarkIcon" Data="{x:Static c:LucideIcons.Gauge}" Size="11" Thickness="2"
                                           Brush="{DynamicResource IslandOnAccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Grid>

@@ -6,10 +6,10 @@ using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Input;
-using System.Windows.Media;
 using Chippi.App.Island;
 using Chippi.Core.Island;
 using Chippi.Core.Modules;
+using Chippi.Features.AgentUsage;
 using Chippi.UI.Controls;
 using Chippi.UI.Pet;
 
@@ -27,16 +27,14 @@ public sealed class AgentBarTests
         return IslandPanelTests.Tiles(tile);
     }
 
-    private static IslandActivity Session(bool waiting) =>
-        new(waiting ? "waiting" : "working", IslandActivityKind.Agent, waiting ? "Waiting on you" : "Working · 42%", waiting ? "Claude Code · packrat" : "Claude Code · chippi")
+    private static IslandActivity Session(bool waiting, AgentKind agent = AgentKind.Claude) =>
+        new(waiting ? "waiting" : "working", IslandActivityKind.Agent, waiting ? "Waiting on you" : "Working · 42%", $"{agent.Name()} · {(waiting ? "packrat" : "chippi")}")
         {
-            Monogram = "CC", NeedsAttention = waiting, OpensTile = Key, ModuleId = Key,
+            ProviderId = agent.ToString(), NeedsAttention = waiting, OpensTile = Key, ModuleId = Key,
         };
 
     private static string? ChipKey(IslandWindow window) =>
         (string?)typeof(IslandWindow).GetField("_chipKey", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(window);
-
-    private static Color Color(IslandWindow window, string key) => ((SolidColorBrush)window.FindResource(key)).Color;
 
     private sealed class ManualTimer(Action tick) : IIslandTimer
     {
@@ -111,14 +109,15 @@ public sealed class AgentBarTests
             window.SetActivities([working], PetMood.Idle);
             var peek = timers[IslandWindow.AgentPeek];
             Hover(Mouse.MouseEnterEvent);
-            var updated = working with { Title = "Working · 43%", Source = "2 sessions", Monogram = "Cx" };
+            var updated = working with { Title = "Working · 43%", Source = "2 sessions", ProviderId = nameof(AgentKind.Codex) };
             window.SetActivities([updated], PetMood.Idle);
             Assert.Equal(1, peek.Starts);
+            Assert.Same(AgentIcons.Source(AgentKind.Codex), window.ProviderMark.Source);
             peek.Fire();
             Assert.False(window.BarShown);
             Assert.Null(ChipKey(window));
             Assert.Equal(Visibility.Visible, window.AgentMark.Visibility);
-            Assert.Equal("Agent working", AutomationProperties.GetHelpText(window.PuckButton));
+            Assert.Equal("Codex working", AutomationProperties.GetHelpText(window.PuckButton));
 
             // A quick pass leaves the puck alone. A dwell reveals the current reading and leaving folds it.
             Hover(Mouse.MouseLeaveEvent);
@@ -201,19 +200,19 @@ public sealed class AgentBarTests
             Assert.False(window.BarShown);
             Assert.Equal(Visibility.Visible, window.AgentMark.Visibility);
             Assert.Equal(Visibility.Visible, window.MicBadge.Visibility);
-            Assert.Equal("Microphone muted. Agent waiting on you", AutomationProperties.GetHelpText(window.PuckButton));
+            Assert.Equal("Microphone muted. Claude Code waiting on you", AutomationProperties.GetHelpText(window.PuckButton));
             window.SetActivities([working], PetMood.Idle);
             Assert.True(window.BarShown);
             Assert.Equal(3, peek.Starts);
             peek.Fire();
             Assert.Equal(Visibility.Visible, window.AgentMark.Visibility);
-            Assert.Equal("Agent working", AutomationProperties.GetHelpText(window.PuckButton));
+            Assert.Equal("Claude Code working", AutomationProperties.GetHelpText(window.PuckButton));
             window.SetActivities([mic, working with { Title = "Working · 50%" }], PetMood.Idle);
             Assert.Equal(3, peek.Starts);
             Assert.False(window.BarShown);
             Assert.Equal(Visibility.Visible, window.AgentMark.Visibility);
             Assert.Equal(Visibility.Visible, window.MicBadge.Visibility);
-            Assert.Equal("Microphone muted. Agent working", AutomationProperties.GetHelpText(window.PuckButton));
+            Assert.Equal("Microphone muted. Claude Code working", AutomationProperties.GetHelpText(window.PuckButton));
 
             window.SetActivities([mic], PetMood.Idle);
             Assert.Equal(Visibility.Collapsed, window.AgentMark.Visibility);
@@ -231,7 +230,7 @@ public sealed class AgentBarTests
     [Theory]
     [InlineData("Dark")]
     [InlineData("Light")]
-    public void The_puck_uses_a_legible_gauge_badge_for_both_agent_states(string theme) => WpfTestThread.Run(() =>
+    public void The_puck_uses_the_provider_mark_for_both_agent_states(string theme) => WpfTestThread.Run(() =>
     {
         var window = new IslandWindow();
         try
@@ -248,37 +247,27 @@ public sealed class AgentBarTests
             Assert.Same(window.FindResource("IslandBrush"), rim.Fill);
             Assert.Equal((HorizontalAlignment.Left, VerticalAlignment.Bottom), (badge.HorizontalAlignment, badge.VerticalAlignment));
             Assert.False(badge.IsHitTestVisible);
-            Assert.Equal(11d, window.AgentMarkIcon.Size);
-            Assert.Same(LucideIcons.Gauge, window.AgentMarkIcon.Data);
-
-            foreach (bool waiting in new[] { false, true })
+            Assert.Equal((14d, 14d), (window.AgentBadgeProvider.Width, window.AgentBadgeProvider.Height));
+            foreach (var (provider, waiting) in new[] { (AgentKind.Claude, false), (AgentKind.Codex, true) })
             {
-                window.SetActivities([Session(waiting)], PetMood.Idle);
+                window.SetActivities([Session(waiting, provider)], PetMood.Idle);
                 timers[IslandWindow.AgentPeek].Fire();
                 Assert.Equal(Visibility.Visible, badge.Visibility);
                 Assert.Same(window.FindResource(waiting ? "PetSparkBrush" : "IslandAccentFillBrush"), window.AgentMarkPlate.Fill);
-                var ink = Assert.IsType<SolidColorBrush>(window.AgentMarkIcon.Brush).Color;
-                Assert.Equal(Color(window, "IslandOnAccentBrush"), ink);
-                var fills = waiting
-                    ? new[] { ((SolidColorBrush)window.AgentMarkPlate.Fill).Color }
-                    : ((LinearGradientBrush)window.AgentMarkPlate.Fill).GradientStops.Select(stop => stop.Color).ToArray();
-                Assert.All(fills, fill => Assert.True(Contrast(ink, fill) >= 3, $"{theme} gauge {ink} on {fill}"));
+                Assert.Same(AgentIcons.Source(provider), window.AgentBadgeProvider.Source);
+                Assert.Equal(Visibility.Visible, window.AgentBadgeFace.Visibility);
+                Assert.Same(window.FindResource("IslandOnAccentBrush"), window.AgentBadgeFace.Background);
+                Assert.Equal(Visibility.Collapsed, window.AgentMarkIcon.Visibility);
             }
         }
         finally { window.Close(); }
 
-        static double Contrast(Color a, Color b)
-        {
-            static double Luminance(Color c) => 0.2126 * c.ScR + 0.7152 * c.ScG + 0.0722 * c.ScB;
-            double first = Luminance(a), second = Luminance(b);
-            return (Math.Max(first, second) + 0.05) / (Math.Min(first, second) + 0.05);
-        }
     });
 
     [Theory]
-    [InlineData(false, "IslandAccentBrush", "Working · 42% · Claude Code · chippi")]
-    [InlineData(true, "IslandWaitingInkBrush", "Waiting on you · Claude Code · packrat")]
-    public void An_agent_leads_with_its_letters_over_its_own_lines_and_opens_Agents(bool waiting, string brush, string lines) => WpfTestThread.Run(() =>
+    [InlineData(false, "IslandAccentTintBrush", "Working · 42% · Claude Code · chippi")]
+    [InlineData(true, "IslandWaitingTintBrush", "Waiting on you · Claude Code · packrat")]
+    public void An_agent_leads_with_its_icon_over_its_own_lines_and_opens_Agents(bool waiting, string brush, string lines) => WpfTestThread.Run(() =>
     {
         var window = new IslandWindow();
         try
@@ -287,9 +276,9 @@ public sealed class AgentBarTests
             window.SetActivities([Session(waiting)], PetMood.Idle);
 
             Assert.True(window.BarShown);
-            Assert.Equal(Visibility.Visible, window.Monogram.Visibility);
-            Assert.Equal("CC", window.Monogram.Text);
-            Assert.Equal(Color(window, brush), ((SolidColorBrush)window.Monogram.Foreground).Color);
+            Assert.Equal(Visibility.Visible, window.ProviderMark.Visibility);
+            Assert.Same(AgentIcons.Source(AgentKind.Claude), window.ProviderMark.Source);
+            Assert.Same(window.FindResource(brush), window.GlyphPlate.Fill);
             Assert.Equal(Visibility.Collapsed, window.GlyphIcon.Visibility);
             Assert.Equal(Visibility.Collapsed, window.Ring.Visibility);
             // Its own lines, not the tile's status over its name.
@@ -300,7 +289,7 @@ public sealed class AgentBarTests
     });
 
     [Fact]
-    public void A_glyph_after_the_letters_hides_them() => WpfTestThread.Run(() =>
+    public void A_glyph_after_the_provider_icon_hides_it() => WpfTestThread.Run(() =>
     {
         var window = new IslandWindow();
         try
@@ -308,14 +297,14 @@ public sealed class AgentBarTests
             window.SetTiles(AgentsTile(out _));
             window.SetActivities([Session(waiting: false)], PetMood.Idle);
             window.SetActivities([new IslandActivity("t", IslandActivityKind.Timer, "Focus", "24:10")], PetMood.Idle);
-            Assert.Equal(Visibility.Collapsed, window.Monogram.Visibility);
+            Assert.Equal(Visibility.Collapsed, window.ProviderMark.Visibility);
             Assert.Equal(Visibility.Visible, window.Ring.Visibility);
         }
         finally { window.Close(); }
     });
 
     [Fact]
-    public void An_alert_shows_over_a_song_with_the_gauge_and_gives_the_bar_back() => WpfTestThread.Run(() =>
+    public void An_alert_shows_its_provider_over_a_song_and_gives_the_bar_back() => WpfTestThread.Run(() =>
     {
         var window = new IslandWindow();
         try
@@ -328,12 +317,12 @@ public sealed class AgentBarTests
             var media = new IslandActivity("track", IslandActivityKind.Media, "Invented track", "Player");
             var alert = new IslandActivity("alert", IslandActivityKind.Status, "80% used", "Claude Code · 5-hour")
             {
-                IsFeedback = true, NeedsAttention = true, OpensTile = Key, ModuleId = Key,
+                ProviderId = nameof(AgentKind.Claude), IsFeedback = true, NeedsAttention = true, OpensTile = Key, ModuleId = Key,
             };
             window.SetActivities([media, alert], PetMood.Idle);
 
-            Assert.Same(LucideIcons.Gauge, window.GlyphIcon.Data);
-            Assert.Equal(Color(window, "IslandCautionBrush"), ((SolidColorBrush)window.GlyphIcon.Brush).Color);
+            Assert.Equal(Visibility.Visible, window.ProviderMark.Visibility);
+            Assert.Same(AgentIcons.Source(AgentKind.Claude), window.ProviderMark.Source);
             Assert.Equal("80% used · Claude Code · 5-hour", window.ChipText);
             Assert.Equal(Key, ChipKey(window));
 
@@ -355,7 +344,7 @@ public sealed class AgentBarTests
         string theme = WpfTestThread.ShotsTheme.ToLowerInvariant();
         IslandActivity Alert(string title, bool near) => new("alert", IslandActivityKind.Status, title, "Claude Code · 5-hour")
         {
-            IsFeedback = true, NeedsAttention = near, OpensTile = Key, ModuleId = Key,
+            ProviderId = nameof(AgentKind.Claude), IsFeedback = true, NeedsAttention = near, OpensTile = Key, ModuleId = Key,
         };
         WpfTestThread.Run(() => IslandWindowTests.WithShownIsland(window =>
         {

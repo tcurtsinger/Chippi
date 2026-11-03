@@ -38,7 +38,7 @@ public sealed class AgentsIslandView : UserControl
 
     private sealed record CardParts(AgentKind Agent, TextBlock Plan, TextBlock State, List<RowParts> Rows);
     private sealed record RowParts(Grid Row, TextBlock Label, Meter Meter, TextBlock Value, TextBlock Reset);
-    private sealed record SessionParts(Button Row, TextBlock Mono, TextBlock Name, TextBlock State, TextBlock App) { public AgentSession? Session { get; set; } }
+    private sealed record SessionParts(Button Row, AgentImage Icon, TextBlock Name, TextBlock State) { public AgentSession? Session { get; set; } }
 
     public AgentsIslandView(AgentUsageModule module)
     {
@@ -126,7 +126,7 @@ public sealed class AgentsIslandView : UserControl
         list.Children.Add(head);
         for (int i = 0; i < sessions; i++)
             list.Children.Add(SessionRowFor());
-        // 4 in at the sides, so a row's highlight keeps its corners and its letters sit 10 in as the cards' content does.
+        // 4 in at the sides, so a row's highlight keeps its corners and its icon sits 10 in as the cards' content does.
         var card = new Border { Padding = new Thickness(3, 6, 3, 4), Child = list };
         card.SetResourceReference(StyleProperty, "IslandCardStyle");
         AutomationProperties.SetName(list, "Sessions");
@@ -142,7 +142,8 @@ public sealed class AgentsIslandView : UserControl
         var state = Text("", 11, "IslandTextTertiaryBrush");
         state.Margin = new Thickness(8, 0, 0, 0);
         DockPanel.SetDock(state, Dock.Right);
-        var head = new DockPanel { Height = 20, LastChildFill = false, Children = { state, name, plan } };
+        var icon = new AgentImage(16, agent.Agent) { Margin = new Thickness(0, 0, 6, 0) };
+        var head = new DockPanel { Height = 20, LastChildFill = false, Children = { state, icon, name, plan } };
         var body = new StackPanel { Children = { head } };
         var rows = new List<RowParts>();
         foreach (var _ in AgentLines.Rows(agent))
@@ -183,31 +184,22 @@ public sealed class AgentsIslandView : UserControl
 
     private Button SessionRowFor()
     {
-        var mono = Text("", 9, "IslandAccentBrush");
-        mono.FontWeight = FontWeights.SemiBold;
-        mono.HorizontalAlignment = HorizontalAlignment.Center;
-        var tile = new Border { Width = 20, Height = 20, CornerRadius = new CornerRadius(4), Child = mono };
-        tile.SetResourceReference(Border.BackgroundProperty, "IslandAccentTintBrush");
+        var icon = new AgentImage(20);
         var name = Text("", 12, "IslandTextBrush");
         name.Margin = new Thickness(10, 0, 10, 0);
         var state = Text("", 11, "IslandTextTertiaryBrush");
-        var app = Text("", 11, "IslandTextTertiaryBrush");
-        app.Width = 78;
-        app.TextAlignment = TextAlignment.Right;
-        app.Margin = new Thickness(10, 0, 0, 0);
+        state.TextAlignment = TextAlignment.Right;
         var grid = new Grid();
-        foreach (var width in new[] { GridLength.Auto, new GridLength(1, GridUnitType.Star), GridLength.Auto, GridLength.Auto })
+        foreach (var width in new[] { GridLength.Auto, new GridLength(1, GridUnitType.Star), GridLength.Auto })
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = width });
         Grid.SetColumn(name, 1);
         Grid.SetColumn(state, 2);
-        Grid.SetColumn(app, 3);
-        grid.Children.Add(tile);
+        grid.Children.Add(icon);
         grid.Children.Add(name);
         grid.Children.Add(state);
-        grid.Children.Add(app);
         var row = new Button { Content = grid, Height = SessionRow, Padding = new Thickness(6, 0, 6, 0) };
         row.SetResourceReference(StyleProperty, "IslandListRowStyle");
-        var parts = new SessionParts(row, mono, name, state, app);
+        var parts = new SessionParts(row, icon, name, state);
         row.Click += (_, _) => Switch(parts.Session);
         _sessionParts.Add(parts);
         return row;
@@ -238,14 +230,13 @@ public sealed class AgentsIslandView : UserControl
     private void Fill(SessionParts parts, AgentSession session, DateTimeOffset now)
     {
         parts.Session = session;
-        parts.Mono.Text = session.Agent.Monogram();
+        parts.Icon.Source = AgentIcons.Source(session.Agent);
         parts.Name.Text = session.Name;
         bool failed = _failed == session.Id;
         string state = failed ? "Switch failed" : session.State(now);
         parts.State.Text = state;
         parts.State.SetResourceReference(TextBlock.ForegroundProperty, failed || session.NeedsInput ? Caution : "IslandTextTertiaryBrush");
         string app = _module.AppOf(session);
-        parts.App.Text = app;
         parts.Row.ToolTip = $"{session.Name} · {state} · {app}";
         AutomationProperties.SetName(parts.Row, $"{session.Agent.Name()}, {session.Name}, {state}, {app}");
     }

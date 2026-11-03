@@ -7,9 +7,9 @@ using Chippi.Features.AgentUsage.Sessions;
 namespace Chippi.Features.AgentUsage;
 
 /// <summary>
-/// What the bar and the home show for the agents (the brief's Surfaces 1, 3 and 4). While an agent works: its letters in
+/// What the bar and the home show for the agents (the brief's Surfaces 1, 3 and 4). While an agent works: its provider icon in
 /// the lead, "Working · 42%" (its closest limit) over "Claude Code · chippi" ("2 sessions" when several), ranked below
-/// every other activity. Waiting on you: the letters in Caution, "Waiting on you", ranked above all but a song. Neither
+/// every other activity. Waiting on you: the provider mark on an amber tint, "Waiting on you", ranked above all but a song. Neither
 /// marks the home's button, which is Caution only at the warning level; a click on the bar opens Agents.
 /// </summary>
 internal static class AgentBar
@@ -28,10 +28,11 @@ internal static class AgentBar
             agents.FirstOrDefault(a => a.Agent == agent)?.Closest(now) is { } closest ? $"Working · {closest.Percent}%" : "Working",
             attention: false);
 
-    /// <summary>An alert, on the bar for 6 seconds over a song as Plain paste's feedback is: the gauge, Caution for a near limit.</summary>
+    /// <summary>An alert, on the bar for 6 seconds over a song as Plain paste's feedback is: the provider mark, Caution for a near limit.</summary>
     public static IslandActivity Alert(UsageAlert alert, int level) =>
         new(AlertKey, IslandActivityKind.Status, alert.Title(level), alert.Source)
         {
+            ProviderId = alert.Agent.ToString(),
             IsFeedback = true,
             NeedsAttention = alert.Near,
             OpensTile = AgentUsageModule.TileKey,
@@ -60,7 +61,7 @@ internal static class AgentBar
             : $"{sessions.Count} sessions";
         return new IslandActivity(key, IslandActivityKind.Agent, title(lead.Agent), source)
         {
-            Monogram = lead.Agent.Monogram(),
+            ProviderId = lead.Agent.ToString(),
             NeedsAttention = attention,
             OpensTile = AgentUsageModule.TileKey,
         };
