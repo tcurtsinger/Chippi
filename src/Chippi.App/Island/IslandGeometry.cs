@@ -84,14 +84,14 @@ public static class IslandGeometry
     internal static Rect PuckEnd(Rect widget, bool opensLeft) =>
         new(opensLeft ? widget.Right - widget.Height : widget.Left, widget.Top, widget.Height, widget.Height);
 
-    /// <summary>The full logical page, scaled down together only when it would cross the work area's inset.</summary>
-    public static Rect PanelRect(Rect puck, Rect work, double scale)
+    /// <summary>The full page or shorter tool gallery, on the same corner and at the same scale.</summary>
+    public static Rect PanelRect(Rect puck, Rect work, double scale, double height = IslandPage.Height)
     {
         double inset = Gap * scale;
         double fit = Math.Min(scale, Math.Min(
             Math.Max(1, work.Width - 2 * inset) / IslandPage.Width,
             Math.Max(1, work.Height - 2 * inset) / IslandPage.Height));
-        var size = new Size(IslandPage.Width * fit, IslandPage.Height * fit);
+        var size = new Size(IslandPage.Width * fit, height * fit);
         return new Rect(PanelOrigin(puck, size, work, scale), size);
     }
 

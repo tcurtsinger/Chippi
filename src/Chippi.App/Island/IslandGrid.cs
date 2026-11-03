@@ -11,53 +11,41 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using Chippi.App.Island.Media;
-using Chippi.UI.Pet;
 using Chippi.Core.Diagnostics;
 using Chippi.Core.Modules;
 using Chippi.UI.Controls;
+using Chippi.UI.Pet;
 
 namespace Chippi.App.Island;
 
-/// <summary>One button on the home, as it shows.</summary>
-/// <param name="On">The accent fill: its toggle is on, and it doesn't need attention.</param>
-/// <param name="Caution">The glyph and the status in Caution (a muted mic, a feature that needs attention, a toggle that failed).</param>
-/// <param name="Split">A toggle with an arrow that opens the page; otherwise the button just opens it.</param>
-/// <param name="Page">The page the button opens, when it isn't named like the button (Microphone opens Sound).</param>
-internal sealed record IslandTileView(string Key, string Name, Geometry Icon, string Status, bool On = false, bool Caution = false, bool Split = false, string? Page = null);
+/// <summary>One destination and its live state. On is the module's actual switch state, independent of Caution.</summary>
+internal sealed record IslandTileView(string Key, string Name, Geometry Icon, string Status, bool On = false,
+    bool Caution = false, bool HasSwitch = false, string? Page = null, bool Waiting = false);
 
-/// <summary>
-/// The island's home, after Windows' Quick Settings (DESIGN.md §5 Island): the Now Playing card, up to
-/// ten labelled buttons five across with each tile's status under its name, the volume row when
-/// Sound is installed, and a footer with Chippi on the puck's side and Settings on the other. Arrows move
-/// among the buttons and their arrows once the island has keyboard focus; Enter opens the focused one (a
-/// toggle toggles, as a button does).
-/// </summary>
+/// <summary>The tool gallery, its separate quick controls, and the media and pet footer.</summary>
 internal sealed class IslandGrid : UserControl
 {
-    /// <summary>The home holds two rows of five (Phase 5.5, about 91 wide each); a third wouldn't fit without scrolling.</summary>
-    internal const int MaxTiles = 10;
-    internal const int Columns = 5;
-
-    /// <summary>
-    /// The footer's Chippi: its center this far in from the panel's side and its bottom, where the puck's center is when
-    /// the panel opens on a bottom corner (the puck is 50 square on the panel's corner), at the size the puck's Chippi
-    /// shrinks to as it becomes the panel (70% of 40).
-    /// </summary>
+    internal const int Columns = 4;
+    // The footer pet meets the widget on its opening corner.
     internal const double FooterPet = 25, FooterPetSize = PetSize.Footer;
-
-    // The wheel's step on the volume, in percent per notch, as on the taskbar's.
     private const double WheelStep = 2;
 
-    private readonly UniformGrid _tiles = new() { Columns = Columns, Margin = new Thickness(0, 12, -10, -12) };
+    private readonly UniformGrid _tiles = new() { Columns = Columns, Rows = 1, Margin = new Thickness(0, 0, -5, 0) };
+    private readonly StackPanel _switches = new() { Orientation = Orientation.Horizontal };
     private readonly IslandHomeMedia _media = new();
-    private readonly Grid _volumeRow = new() { Height = 32, Margin = new Thickness(2, 0, 2, 0), Visibility = Visibility.Collapsed };
-    private readonly Slider _volume = new() { Minimum = 0, Maximum = 100, SmallChange = 5, LargeChange = 10, IsMoveToPointEnabled = true, VerticalAlignment = VerticalAlignment.Center };
-    private readonly TextBlock _percent = new() { FontSize = 12, Width = 34, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 0, 0) };
-    private readonly TextBlock _noOutput = new() { Text = "No output", FontSize = 12, Margin = new Thickness(12, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center, Visibility = Visibility.Collapsed };
-    private readonly LucideIcon _speakerGlyph = new() { Data = LucideIcons.Volume, Size = 16 };
+    private readonly TextBlock _heading = new() { Text = "Tools", FontSize = 17, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center };
+    private readonly TextBlock _empty = new() { Text = "No tools to show", FontSize = 13, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+    private readonly Button _find = IconButton(LucideIcons.Search, "Find a tool");
+    private readonly Button _back = IconButton(LucideIcons.ChevronLeft, "Back to tools");
+    private readonly SearchBox _search = new() { Placeholder = "Find a tool", Height = 28, FontSize = 13 };
+    private readonly Border _quickRow = new() { Height = 39, BorderThickness = new Thickness(0, 1, 0, 0), Visibility = Visibility.Collapsed };
+    private readonly Grid _volumeRow = new() { VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Right, Visibility = Visibility.Collapsed };
+    private readonly Slider _volume = new() { Width = 84, Minimum = 0, Maximum = 100, SmallChange = 5, LargeChange = 10, IsMoveToPointEnabled = true, VerticalAlignment = VerticalAlignment.Center };
+    private readonly TextBlock _percent = new() { FontSize = 11, Width = 30, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 0, 0) };
+    private readonly TextBlock _noOutput = new() { Text = "No output", FontSize = 11, VerticalAlignment = VerticalAlignment.Center, Visibility = Visibility.Collapsed };
+    private readonly LucideIcon _speakerGlyph = new() { Data = LucideIcons.Volume, Size = 15 };
     private readonly Button _speaker = new();
-    private readonly Button _settings = new() { Width = 32, Height = 32, VerticalAlignment = VerticalAlignment.Bottom };
-    // Chippi himself, a 32 button like Settings across from him: a click boops him.
+    private readonly Button _settings = IconButton(LucideIcons.Settings, "Settings");
     private readonly Button _boop = new() { Width = 32, Height = 32, Padding = new Thickness(0), VerticalAlignment = VerticalAlignment.Bottom };
     private readonly DispatcherTimer _volumeFailed = new() { Interval = TimeSpan.FromSeconds(4) };
     private IReadOnlyList<IslandTileView> _shown = [];
@@ -67,135 +55,177 @@ internal sealed class IslandGrid : UserControl
 
     public IslandGrid()
     {
-        Pet = new ChippiPet { Size = FooterPetSize, Mood = PetMood.Idle, IsDecorative = true, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
-        Content = Build();
+        Pet = new ChippiPet { Size = FooterPetSize, Mood = PetMood.Idle, IsDecorative = true,
+            HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+        _empty.SetResourceReference(TextBlock.ForegroundProperty, "IslandTextSecondaryBrush");
+        var body = new Grid { Margin = new Thickness(0, -12, 0, -12) };
+        body.RowDefinitions.Add(new RowDefinition { Height = new GridLength(41) });
+        body.RowDefinitions.Add(new RowDefinition());
+        body.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        body.RowDefinitions.Add(new RowDefinition { Height = new GridLength(45) });
+
+        var gallery = new Grid { Children = { _tiles, _empty } };
+        Grid.SetRow(gallery, 1);
+        Grid.SetRow(_quickRow, 2);
+        var footer = BuildFooter();
+        Grid.SetRow(footer, 3);
+        body.Children.Add(BuildHeader());
+        body.Children.Add(gallery);
+        body.Children.Add(_quickRow);
+        body.Children.Add(footer);
+        BuildQuickRow();
+        Content = body;
         SetPetSide(right: false);
         KeyboardNavigation.SetDirectionalNavigation(_tiles, KeyboardNavigationMode.None);
         PreviewKeyDown += OnKey;
     }
 
-    private Grid Build()
+    public ChippiPet Pet { get; }
+    internal IslandHomeMedia Media => _media;
+    public event EventHandler<string>? TileOpened;
+    public event EventHandler<string>? TileToggled;
+    public event EventHandler? SettingsRequested;
+    internal event EventHandler? SearchRequested;
+    internal bool IsSearching => _search.Visibility == Visibility.Visible;
+    // The card sizes to the unfiltered tool set so typing a query doesn't move the widget or its controls.
+    internal double HomeHeight => Math.Min(IslandPage.Height, 92 + 77 * _tiles.Rows + (_quickRow.Visibility == Visibility.Visible ? 39 : 0));
+
+    internal void SetMedia(IMediaSessions? media) => _media.SetMedia(media);
+
+    private static Button IconButton(Geometry icon, string name)
     {
-        // The footer bleeds to the panel's edges (the card pads 12): Chippi on the puck's side, Settings on the other.
-        var gear = new LucideIcon { Data = LucideIcons.Settings, Size = 16 };
-        gear.SetResourceReference(LucideIcon.BrushProperty, "IslandTextSecondaryBrush");
-        _settings.Content = gear;
-        _settings.SetResourceReference(StyleProperty, "IslandIconButtonStyle");
-        AutomationProperties.SetName(_settings, "Settings");
-        _settings.ToolTip = "Settings";
+        var glyph = new LucideIcon { Data = icon, Size = 16 };
+        glyph.SetResourceReference(LucideIcon.BrushProperty, "IslandTextSecondaryBrush");
+        var button = new Button { Content = glyph, ToolTip = name };
+        button.SetResourceReference(StyleProperty, "IslandIconButtonStyle");
+        AutomationProperties.SetName(button, name);
+        return button;
+    }
+
+    private Grid BuildHeader()
+    {
+        var bar = new Grid();
+        bar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        bar.ColumnDefinitions.Add(new ColumnDefinition());
+        bar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        _search.Visibility = _back.Visibility = Visibility.Collapsed;
+        AutomationProperties.SetName(_search, "Find a tool");
+        _search.TextChanged += (_, _) => Filter();
+        _find.Click += (_, _) =>
+        {
+            _heading.Visibility = _find.Visibility = Visibility.Collapsed;
+            _back.Visibility = _search.Visibility = Visibility.Visible;
+            SearchRequested?.Invoke(this, EventArgs.Empty);
+            _search.Focus();
+        };
+        _back.Click += (_, _) => CloseSearch();
+        Grid.SetColumn(_heading, 1);
+        Grid.SetColumn(_search, 1);
+        Grid.SetColumn(_find, 2);
+        foreach (var item in new UIElement[] { _back, _heading, _search, _find }) bar.Children.Add(item);
+        return bar;
+    }
+
+    internal bool CloseSearch()
+    {
+        if (!IsSearching) return false;
+        _back.Visibility = _search.Visibility = Visibility.Collapsed;
+        _heading.Visibility = _find.Visibility = Visibility.Visible;
+        _search.Clear();
+        if (IsKeyboardFocusWithin) _find.Focus();
+        return true;
+    }
+
+    internal bool FocusTile(string? key)
+    {
+        if (key == IslandPanelWindow.NowPlayingKey)
+            return _media.MoveFocus(new TraversalRequest(FocusNavigationDirection.First));
+        if (Buttons().FirstOrDefault(b => Equals(b.Tag, key)) is { } tile) return tile.Focus();
+        if (IsSearching) return _search.Focus();
+        return (Buttons().FirstOrDefault() ?? _find).Focus();
+    }
+
+    private Border BuildFooter()
+    {
+        _settings.Width = _settings.Height = 32;
+        _settings.VerticalAlignment = VerticalAlignment.Bottom;
         _settings.Click += (_, _) => SettingsRequested?.Invoke(this, EventArgs.Empty);
         _boop.Content = Pet;
         _boop.SetResourceReference(StyleProperty, "IslandIconButtonStyle");
         AutomationProperties.SetName(_boop, "Chippi");
         _boop.Click += (_, _) => Pet.Boop();
-        var footer = new Border
-        {
-            Height = 46, Margin = new Thickness(-12, 10, -12, -12), BorderThickness = new Thickness(0, 1, 0, 0),
-            Child = new Grid { Children = { _boop, _settings } },
-        };
+        _media.VerticalAlignment = VerticalAlignment.Center;
+        _media.OpenRequested += (_, _) => TileOpened?.Invoke(this, IslandPanelWindow.NowPlayingKey);
+        var footer = new Border { BorderThickness = new Thickness(0, 1, 0, 0), Margin = new Thickness(-12, 0, -12, 0),
+            Child = new Grid { Children = { _media, _settings, _boop } } };
         footer.SetResourceReference(Border.BackgroundProperty, "IslandFooterBrush");
         footer.SetResourceReference(Border.BorderBrushProperty, "IslandHairBrush");
-        // The two footer buttons can swap sides; their Tab indices apply only inside this row.
         KeyboardNavigation.SetTabNavigation(footer, KeyboardNavigationMode.Local);
         KeyboardNavigation.SetControlTabNavigation(footer, KeyboardNavigationMode.Local);
+        return footer;
+    }
 
-        // The speaker mutes, as in Quick Settings; its glyph sits where a bare glyph would (the button is 6 wider each side).
+    internal void SetPetSide(bool right)
+    {
+        double inset = FooterPet - _boop.Width / 2;
+        _boop.HorizontalAlignment = _settings.HorizontalAlignment = right ? HorizontalAlignment.Right : HorizontalAlignment.Left;
+        _boop.Margin = new Thickness(inset, 0, inset, inset);
+        _settings.Margin = new Thickness(inset + 36, 0, inset + 36, inset);
+        _media.Margin = right ? new Thickness(12, 0, 82, 0) : new Thickness(82, 0, 12, 0);
+        _boop.TabIndex = right ? 2 : 0;
+        _settings.TabIndex = 1;
+        _media.TabIndex = right ? 0 : 2;
+        // WPF uses the Button inside the media control as a tab stop. The wrapper is its local order group.
+        KeyboardNavigation.SetTabNavigation(_media, KeyboardNavigationMode.Local);
+        KeyboardNavigation.SetControlTabNavigation(_media, KeyboardNavigationMode.Local);
+    }
+
+    private void BuildQuickRow()
+    {
+        _quickRow.SetResourceReference(Border.BorderBrushProperty, "IslandHairBrush");
+        var controls = new Grid();
+        controls.ColumnDefinitions.Add(new ColumnDefinition());
+        controls.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        Grid.SetColumn(_volumeRow, 1);
+        controls.Children.Add(_switches);
+        controls.Children.Add(_volumeRow);
+        _quickRow.Child = controls;
+
         _speaker.Content = _speakerGlyph;
-        _speaker.Margin = new Thickness(-6, 0, 0, 0);
         _speaker.SetResourceReference(StyleProperty, "IslandIconButtonStyle");
         _speaker.Click += async (_, _) => await ToggleMuteAsync();
-        _volumeFailed.Tick += (_, _) =>
-        {
-            _volumeFailed.Stop();
-            SetVolume(_volumeSource, _volumeKey);
-        };
+        _volumeFailed.Tick += (_, _) => { _volumeFailed.Stop(); SetVolume(_volumeSource, _volumeKey); };
         _volume.SetResourceReference(StyleProperty, "IslandSliderStyle");
-        _volume.Margin = new Thickness(12, 0, 0, 0);
         AutomationProperties.SetName(_volume, "System volume");
         _volume.ValueChanged += (_, e) =>
         {
             ShowPercent();
-            if (!_refreshing)
-                _volumeSource?.Set(e.NewValue / 100);
+            if (!_refreshing) _volumeSource?.Set(e.NewValue / 100);
         };
-        _noOutput.SetResourceReference(TextBlock.ForegroundProperty, "IslandTextTertiaryBrush");
-        Typography.SetNumeralAlignment(_percent, FontNumeralAlignment.Tabular);
-        var arrowGlyph = new LucideIcon { Data = LucideIcons.ChevronRight, Size = 14 };
-        arrowGlyph.SetResourceReference(LucideIcon.BrushProperty, "IslandTextSecondaryBrush");
-        // Mirrors the speaker: its glyph sits where a bare glyph would at the row's end (the button is 7 wider each side).
-        var arrow = new Button { Content = arrowGlyph, Margin = new Thickness(6, 0, -7, 0), ToolTip = "Sound" };
-        arrow.SetResourceReference(StyleProperty, "IslandIconButtonStyle");
-        AutomationProperties.SetName(arrow, "Sound");
-        arrow.Click += (_, _) =>
-        {
-            if (_volumeKey is { } key)
-                TileOpened?.Invoke(this, key);
-        };
-        // The wheel anywhere on the row moves the volume, as on the taskbar's speaker.
         _volumeRow.PreviewMouseWheel += (_, e) =>
         {
-            if (!_volume.IsEnabled || _volume.Visibility != Visibility.Visible)
-                return;
+            if (!_volume.IsEnabled) return;
             _volume.Value = Math.Clamp(_volume.Value + e.Delta / 120.0 * WheelStep, _volume.Minimum, _volume.Maximum);
             e.Handled = true;
         };
+        _noOutput.SetResourceReference(TextBlock.ForegroundProperty, "IslandTextTertiaryBrush");
+        Typography.SetNumeralAlignment(_percent, FontNumeralAlignment.Tabular);
         _volumeRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        _volumeRow.ColumnDefinitions.Add(new ColumnDefinition());
         _volumeRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         _volumeRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         Grid.SetColumn(_volume, 1);
         Grid.SetColumn(_noOutput, 1);
         Grid.SetColumn(_percent, 2);
-        Grid.SetColumn(arrow, 3);
-        foreach (var part in new UIElement[] { _speaker, _volume, _noOutput, _percent, arrow })
-            _volumeRow.Children.Add(part);
-
-        _media.OpenRequested += (_, _) => TileOpened?.Invoke(this, IslandPanelWindow.NowPlayingKey);
-        // The rows are also the Tab order. The footer's top margin keeps the volume row 10 above its hairline.
-        var body = new Grid();
-        body.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        body.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        body.RowDefinitions.Add(new RowDefinition());
-        body.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        body.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        Grid.SetRow(_tiles, 1);
-        Grid.SetRow(_volumeRow, 3);
-        Grid.SetRow(footer, 4);
-        body.Children.Add(_media);
-        body.Children.Add(_tiles);
-        body.Children.Add(_volumeRow);
-        body.Children.Add(footer);
-        return body;
+        foreach (var p in new UIElement[] { _speaker, _volume, _noOutput, _percent }) _volumeRow.Children.Add(p);
     }
 
-    /// <summary>The footer's pet.</summary>
-    public ChippiPet Pet { get; }
-
-    /// <summary>The Now Playing card.</summary>
-    internal IslandHomeMedia Media => _media;
-
-    /// <summary>A button was clicked (or its arrow), or Enter pressed on it: the tile's key.</summary>
-    public event EventHandler<string>? TileOpened;
-
-    /// <summary>A split button's toggle was pressed: the tile's key.</summary>
-    public event EventHandler<string>? TileToggled;
-
-    /// <summary>The footer's Settings button.</summary>
-    public event EventHandler? SettingsRequested;
-
-    internal void SetMedia(IMediaSessions? media) => _media.SetMedia(media);
-
-    /// <summary>
-    /// The volume row: shown when a tile offers the system volume, with its arrow opening <paramref name="key"/>'s page.
-    /// Muted, the speaker and "Muted" are in Caution; with no output, "No output" takes the slider's place.
-    /// </summary>
     internal void SetVolume(IslandTileVolume? volume, string? key)
     {
         _volumeSource = volume;
         _volumeKey = key;
         _volumeRow.Visibility = volume is null ? Visibility.Collapsed : Visibility.Visible;
-        if (volume is null)
-            return;
+        ShowQuickRow();
+        if (volume is null) return;
         var level = volume.Level();
         bool none = level is null;
         bool muted = !none && volume.Muted?.Invoke() == true;
@@ -208,7 +238,6 @@ internal sealed class IslandGrid : UserControl
         string action = muted ? "Unmute" : "Mute";
         AutomationProperties.SetName(_speaker, action);
         _speaker.ToolTip = volume.SetMuted is null ? null : action;
-        // Muted, the slider keeps its level in tertiary instead of the accent, as on Sound's page.
         foreach (var brush in new[] { "IslandAccentFillBrush", "IslandAccentBrush" })
         {
             if (muted) _volume.Resources[brush] = TryFindResource("IslandTextTertiaryBrush");
@@ -227,22 +256,16 @@ internal sealed class IslandGrid : UserControl
 
     private void ShowPercent()
     {
-        if (_volumeFailed.IsEnabled)
-            return; // "Failed" holds a moment
+        if (_volumeFailed.IsEnabled) return;
         bool muted = Muted;
         _percent.Text = !_volume.IsEnabled ? "" : muted ? "Muted" : $"{Math.Round(_volume.Value).ToString(CultureInfo.CurrentCulture)}%";
         _percent.SetResourceReference(TextBlock.ForegroundProperty, muted ? "WarningTextBrush" : "IslandTextSecondaryBrush");
     }
 
-    // The speaker: mutes or unmutes; a failure says so where the percentage is, for a few seconds.
     private async Task ToggleMuteAsync()
     {
-        if (_volumeSource?.SetMuted is not { } setMuted)
-            return;
-        try
-        {
-            await setMuted(!Muted);
-        }
+        if (_volumeSource?.SetMuted is not { } setMuted) return;
+        try { await setMuted(!Muted); }
         catch (Exception ex)
         {
             Log.Warn("Island: muting the output from the home failed", ex);
@@ -255,222 +278,99 @@ internal sealed class IslandGrid : UserControl
         SetVolume(_volumeSource, _volumeKey);
     }
 
-    /// <summary>Puts Chippi on the puck's side of the footer (the side the panel opened from) and Settings on the other.</summary>
-    internal void SetPetSide(bool right)
-    {
-        // Both buttons sit at the height and inset of the puck's center. Tab reads them left to right.
-        double inset = FooterPet - _boop.Width / 2;
-        var buttonInset = new Thickness(inset, 0, inset, inset);
-        _boop.HorizontalAlignment = right ? HorizontalAlignment.Right : HorizontalAlignment.Left;
-        _settings.HorizontalAlignment = right ? HorizontalAlignment.Left : HorizontalAlignment.Right;
-        _boop.Margin = _settings.Margin = buttonInset;
-        _boop.TabIndex = right ? 1 : 0;
-        _settings.TabIndex = right ? 0 : 1;
-    }
-
     public void SetTiles(IReadOnlyList<IslandTileView> tiles)
     {
-        if (tiles.SequenceEqual(_shown))
-            return;
-        // The same buttons in the same order take a new status, glyph or state in place, so a hover or a press on one
-        // carries on through it (System's status changes every 2 seconds while the home shows).
-        var built = _tiles.Children.OfType<HomeTile>().ToList();
-        var shown = tiles.Take(MaxTiles).ToList();
-        if (built.Count == shown.Count && built.Zip(shown).All(p => p.First.View.Key == p.Second.Key && p.First.View.Split == p.Second.Split))
+        if (tiles.SequenceEqual(_shown)) return;
+        string? refocusTile = null;
+        string? refocusSwitch = null;
+        var built = _tiles.Children.OfType<IslandGalleryTile>().ToList();
+        var switches = _switches.Children.OfType<IslandGallerySwitch>().ToList();
+        var quick = tiles.Where(t => t.HasSwitch).ToList();
+        if (tiles.Select(t => t.Key).SequenceEqual(_shown.Select(t => t.Key)))
         {
-            _shown = tiles;
-            for (int i = 0; i < shown.Count; i++)
-                built[i].Show(shown[i]);
-            return;
+            for (int i = 0; i < built.Count; i++)
+                if (tiles[i] != _shown[i]) built[i].Show(tiles[i]);
         }
-        // The focus comes back to the same part (a button or its arrow) of the same tile.
-        var parts = Parts();
-        int focusedAt = parts.FindIndex(p => p.Part.IsKeyboardFocused);
-        string? focusedKey = focusedAt < 0 ? null : _shown[parts[focusedAt].Tile].Key;
-        bool focusedArrow = focusedAt > 0 && parts[focusedAt - 1].Tile == parts[focusedAt].Tile;
+        else
+        {
+            refocusTile = built.FirstOrDefault(b => b.IsKeyboardFocused)?.Tag as string;
+            _tiles.Children.Clear();
+            foreach (var tile in tiles)
+                _tiles.Children.Add(new IslandGalleryTile(tile, key => TileOpened?.Invoke(this, key)));
+            _tiles.Rows = Math.Max(1, (tiles.Count + Columns - 1) / Columns);
+        }
+        if (quick.Select(t => t.Key).SequenceEqual(switches.Select(b => (string)b.Tag)))
+        {
+            for (int i = 0; i < quick.Count; i++) switches[i].Show(quick[i]);
+        }
+        else
+        {
+            refocusSwitch = switches.FirstOrDefault(b => b.IsKeyboardFocused)?.Tag as string;
+            _switches.Children.Clear();
+            foreach (var tile in quick)
+                _switches.Children.Add(new IslandGallerySwitch(tile, key => TileToggled?.Invoke(this, key)));
+        }
         _shown = tiles;
-        _tiles.Rows = Math.Max(1, (Math.Min(tiles.Count, MaxTiles) + Columns - 1) / Columns);
-        _tiles.Children.Clear();
-        foreach (var tile in shown)
-            _tiles.Children.Add(new HomeTile(tile, key => TileOpened?.Invoke(this, key), key => TileToggled?.Invoke(this, key)));
-        if (focusedKey is not null && Parts().Where(p => _shown[p.Tile].Key == focusedKey).ToList() is { Count: > 0 } again)
-            again[focusedArrow ? again.Count - 1 : 0].Part.Focus();
+        Filter();
+        ShowQuickRow();
+        if (refocusTile is not null) FocusTile(refocusTile);
+        if (refocusSwitch is not null && _switches.Children.OfType<IslandGallerySwitch>()
+            .FirstOrDefault(b => Equals(b.Tag, refocusSwitch))?.Focus() != true) FocusTile(null);
     }
 
-    /// <summary>The buttons in order: each tile's own (its toggle, when it has one).</summary>
-    internal IEnumerable<ButtonBase> Buttons() => _tiles.Children.OfType<Panel>().Select(c => ((Panel)c.Children[0]).Children.OfType<ButtonBase>().First());
+    private void ShowQuickRow() => _quickRow.Visibility = _switches.Children.Count > 0 || _volumeSource is not null
+        ? Visibility.Visible : Visibility.Collapsed;
 
-    /// <summary>Everything the arrows move through, in reading order: each tile's button, then its arrow when it's split.</summary>
-    private List<(int Tile, ButtonBase Part)> Parts() =>
-        [.. _tiles.Children.OfType<Panel>().SelectMany((c, i) => ((Panel)c.Children[0]).Children.OfType<ButtonBase>().Select(b => (i, b)))];
-
-    /// <summary>
-    /// One button with its name and status under it. It keeps its controls while its key and split stay, and shows a new
-    /// status, glyph or state on them (Show).
-    /// </summary>
-    private sealed class HomeTile : StackPanel
+    private void Filter()
     {
-        private readonly LucideIcon _glyph = new() { Size = 16, HorizontalAlignment = HorizontalAlignment.Center };
-        private readonly TextBlock _name = new() { FontSize = 12, Margin = new Thickness(0, 5, 0, 0), HorizontalAlignment = HorizontalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
-        private readonly TextBlock _status = new() { FontSize = 11, Margin = new Thickness(0, 1, 0, 0), HorizontalAlignment = HorizontalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
-        private readonly ButtonBase _main;
-        private readonly Button? _side;
-
-        public HomeTile(IslandTileView tile, Action<string> open, Action<string> toggled)
-        {
-            View = tile;
-            var box = new Grid { Height = 44 };
-            if (tile.Split)
-            {
-                var toggle = new ToggleButton { Content = _glyph, Tag = tile.Key };
-                toggle.SetResourceReference(StyleProperty, "IslandSplitMainStyle");
-                // The module decides: the button follows its state, not the click.
-                toggle.Click += (_, _) =>
-                {
-                    toggle.IsChecked = View.On;
-                    toggled(View.Key);
-                };
-                var arrowGlyph = new LucideIcon { Data = LucideIcons.ChevronRight, Size = 13 };
-                var side = new Button { Content = arrowGlyph };
-                side.SetResourceReference(StyleProperty, "IslandSplitSideStyle");
-                arrowGlyph.SetBinding(LucideIcon.BrushProperty, new System.Windows.Data.Binding(nameof(Foreground)) { Source = side });
-                side.Click += (_, _) => open(View.Key);
-                box.ColumnDefinitions.Add(new ColumnDefinition());
-                box.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-                Grid.SetColumn(side, 1);
-                box.Children.Add(toggle);
-                box.Children.Add(side);
-                box.SizeChanged += (_, _) => Span(toggle, side);
-                _main = toggle;
-                _side = side;
-            }
-            else
-            {
-                var button = new Button { Content = _glyph, Tag = tile.Key };
-                button.SetResourceReference(StyleProperty, "IslandTileStyle");
-                button.Click += (_, _) => open(View.Key);
-                box.Children.Add(button);
-                _main = button;
-            }
-            _name.SetResourceReference(TextBlock.ForegroundProperty, "IslandTextBrush");
-            _name.SizeChanged += (_, _) => Tip();
-            _status.SizeChanged += (_, _) => Tip();
-            Margin = new Thickness(0, 0, 10, 12);
-            Children.Add(box);
-            Children.Add(_name);
-            Children.Add(_status);
-            Show(tile);
-        }
-
-        /// <summary>The tile as it shows now.</summary>
-        public IslandTileView View { get; private set; }
-
-        public void Show(IslandTileView tile)
-        {
-            View = tile;
-            _glyph.Data = tile.Icon;
-            _glyph.SetResourceReference(LucideIcon.BrushProperty, tile.On ? "IslandOnAccentBrush" : tile.Caution ? "WarningBrush" : "IslandTextBrush");
-            if (_main is ToggleButton toggle)
-                toggle.IsChecked = tile.On;
-            if (_side is not null)
-            {
-                string page = tile.Page ?? tile.Name;
-                _side.Tag = tile.On ? "On" : null;
-                _side.ToolTip = page;
-                AutomationProperties.SetName(_side, $"Open {page}");
-            }
-            AutomationProperties.SetName(_main, tile.Status.Length > 0 ? $"{tile.Name}, {tile.Status}" : tile.Name);
-            _name.Text = tile.Name;
-            _status.Text = tile.Status;
-            _status.SetResourceReference(TextBlock.ForegroundProperty, tile.Caution ? "WarningTextBrush" : "IslandTextTertiaryBrush");
-            // The lines keep their width when only the text changes (a new status cut off like the last), so the tooltip is
-            // worked out again here, not only when they change size.
-            Tip();
-        }
-
-        // A long name or status is cut off under the button; the tooltip carries all of it.
-        private void Tip()
-        {
-            bool cut = Cut(_name, View.Name) || Cut(_status, View.Status);
-            _main.ToolTip = !cut ? null : View.Status.Length == 0 ? View.Name : $"{View.Name} · {View.Status}";
-        }
+        string query = _search.Text.Trim();
+        for (int i = 0; i < _shown.Count; i++)
+            _tiles.Children[i].Visibility = _shown[i].Name.Contains(query, StringComparison.CurrentCultureIgnoreCase)
+                ? Visibility.Visible : Visibility.Collapsed;
+        _empty.Visibility = Buttons().Any() ? Visibility.Collapsed : Visibility.Visible;
+        _empty.Text = query.Length == 0 ? "No tools to show" : "No matching tools";
     }
 
-    /// <summary>
-    /// Runs one fill across a split's toggle and its arrow (FillFade.Span), so on, the accent gradient doesn't start
-    /// again at the arrow and the split reads as one button with a divider.
-    /// </summary>
-    private static void Span(FrameworkElement main, FrameworkElement side)
+    internal IEnumerable<ButtonBase> Buttons() => _tiles.Children.OfType<ButtonBase>().Where(b => b.Visibility == Visibility.Visible);
+    internal string? TileOf(ButtonBase button) => button is IslandGalleryTile ? button.Tag as string : null;
+
+    internal ButtonBase? Next(ButtonBase from, Key key)
     {
-        double m = main.ActualWidth, s = side.ActualWidth;
-        if (m <= 0 || s <= 0)
+        var buttons = Buttons().ToList();
+        int at = buttons.IndexOf(from);
+        if (at < 0) return null;
+        int next = key switch { Key.Left => at - 1, Key.Right => at + 1, Key.Up => at - Columns, Key.Down => at + Columns, _ => -1 };
+        return next >= 0 && next < buttons.Count ? buttons[next] : null;
+    }
+
+    private void OnKey(object sender, KeyEventArgs e)
+    {
+        if (IsSearching && e.Key == Key.Escape)
+        {
+            e.Handled = CloseSearch();
             return;
-        var toMain = new ScaleTransform((m + s) / m, 1);
-        var toSide = new MatrixTransform((m + s) / s, 0, 0, 1, -m / s, 0);
-        toMain.Freeze();
-        toSide.Freeze();
-        FillFade.SetSpan(main, toMain);
-        FillFade.SetSpan(side, toSide);
+        }
+        if (_search.IsKeyboardFocused && e.Key == Key.Enter)
+        {
+            if (Buttons().FirstOrDefault()?.Tag is string key) TileOpened?.Invoke(this, key);
+            e.Handled = true;
+            return;
+        }
+        if (e.Key is Key.Left or Key.Right or Key.Up or Key.Down && Keyboard.FocusedElement is IslandGalleryTile from)
+        {
+            Next(from, e.Key)?.Focus();
+            e.Handled = true;
+        }
     }
 
-    /// <summary>Whether <paramref name="text"/> is cut off in <paramref name="block"/>: wider than one line, or taller than a wrapping block's MaxHeight.</summary>
     internal static bool Cut(TextBlock block, string text)
     {
         var full = new FormattedText(text, CultureInfo.CurrentCulture, block.FlowDirection,
             new Typeface(block.FontFamily, block.FontStyle, block.FontWeight, block.FontStretch), block.FontSize, Brushes.White,
             VisualTreeHelper.GetDpi(block).PixelsPerDip);
-        if (block.TextWrapping == TextWrapping.NoWrap)
-            return full.Width > block.ActualWidth + 0.5;
+        if (block.TextWrapping == TextWrapping.NoWrap) return full.Width > block.ActualWidth + 0.5;
         full.MaxTextWidth = block.ActualWidth;
-        if (!double.IsNaN(block.LineHeight))
-            full.LineHeight = block.LineHeight;
+        if (!double.IsNaN(block.LineHeight)) full.LineHeight = block.LineHeight;
         return full.Height > block.MaxHeight + 0.5;
-    }
-
-    // Enter opens the focused tile (on a split's arrow too; a toggle toggles); the arrow keys move (Next). Tab still leaves the grid.
-    private void OnKey(object sender, KeyEventArgs e)
-    {
-        if (Keyboard.FocusedElement is not ButtonBase focused || TileOf(focused) is not { } key)
-            return;
-        if (e.Key == Key.Enter && focused is Button)
-        {
-            TileOpened?.Invoke(this, key);
-            e.Handled = true;
-        }
-        else if (e.Key is Key.Left or Key.Right or Key.Up or Key.Down)
-        {
-            Next(focused, e.Key)?.Focus();
-            e.Handled = true;
-        }
-    }
-
-    /// <summary>The tile a button or a split's arrow belongs to; null for anything else.</summary>
-    internal string? TileOf(ButtonBase part)
-    {
-        var parts = Parts();
-        int at = parts.FindIndex(p => p.Part == part);
-        return at < 0 ? null : _shown[parts[at].Tile].Key;
-    }
-
-    /// <summary>
-    /// Where an arrow key moves from <paramref name="from"/>: left and right through the buttons and the split ones' arrows
-    /// in reading order, up and down to the button a row of five away. Null at an edge.
-    /// </summary>
-    internal ButtonBase? Next(ButtonBase from, Key key)
-    {
-        var parts = Parts();
-        int at = parts.FindIndex(p => p.Part == from);
-        if (at < 0)
-            return null;
-        int tile = parts[at].Tile;
-        ButtonBase? Row(int to) => parts.FirstOrDefault(p => p.Tile == to).Part;
-        return key switch
-        {
-            Key.Left => at > 0 ? parts[at - 1].Part : null,
-            Key.Right => at + 1 < parts.Count ? parts[at + 1].Part : null,
-            Key.Up => Row(tile - Columns),
-            Key.Down => Row(tile + Columns),
-            _ => null,
-        };
     }
 }

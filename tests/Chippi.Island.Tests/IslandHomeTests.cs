@@ -3,6 +3,8 @@
 
 using System.Windows;
 using System.Windows.Automation;
+using System.Windows.Automation.Peers;
+using System.Windows.Automation.Provider;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
@@ -15,7 +17,7 @@ using Xunit;
 
 namespace Chippi.Island.Tests;
 
-/// <summary>The island's home: split toggle buttons, the volume slider, the Now Playing card and the footer.</summary>
+/// <summary>The island's home: the tool gallery, quick switches, volume and the media footer.</summary>
 public sealed class IslandHomeTests
 {
     private static IslandTileView Tile(string key, bool on = false, bool split = false) =>
@@ -46,69 +48,74 @@ public sealed class IslandHomeTests
 
     private static void Click(ButtonBase button) => button.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
 
-    [Fact]
-    public void A_new_status_or_state_shows_on_the_same_buttons_and_only_a_new_set_builds_them_again() => WpfTestThread.Run(() =>
+    internal static void ToggleThroughAutomation(ToggleButton button)
     {
+        var peer = UIElementAutomationPeer.CreatePeerForElement(button);
+        Assert.IsAssignableFrom<IToggleProvider>(peer.GetPattern(PatternInterface.Toggle)).Toggle();
+    }
+
+    [Fact]
+    public void A_status_refresh_preserves_the_launch_button_and_an_automation_switch_toggles_only_its_feature() => WpfTestThread.Run(() =>
+    {
+        bool awake = false;
         var grid = Laid(g => g.SetTiles([Tile("keep-awake", split: true), Tile("clipboard")]));
-        var before = grid.Buttons().ToList();
-        var toggled = new List<string>();
-        grid.TileToggled += (_, key) => toggled.Add(key);
-
-        // System's status every 2 seconds, Keep awake turning on: a hover or a press on a button carries on through it.
-        grid.SetTiles([Tile("keep-awake", on: true, split: true) with { Status = "1 hr left" }, Tile("clipboard") with { Status = "24 items" }]);
-        Assert.Equal(before, grid.Buttons());
-        var main = Assert.IsType<ToggleButton>(before[0]);
-        Assert.True(main.IsChecked);
-        Assert.Equal("On", Find<Button>(grid, b => AutomationProperties.GetName(b) == "Open keep-awake").Tag);
-        Assert.Equal("keep-awake, 1 hr left", AutomationProperties.GetName(main));
-        Assert.NotNull(Find<TextBlock>(grid, t => t.Text == "24 items"));
-        Click(main);
-        Assert.Equal(["keep-awake"], toggled); // the kept button toggles the tile it shows now
-        Assert.True(main.IsChecked);
-
-        // Another set or order builds them again.
-        grid.SetTiles([Tile("clipboard"), Tile("keep-awake", split: true)]);
-        Assert.DoesNotContain(grid.Buttons(), before.Contains);
-        Assert.Equal(["clipboard", "keep-awake"], grid.Buttons().Select(b => (string)b.Tag));
-    });
-
-    [Fact]
-    public void A_split_button_toggles_without_opening_and_its_arrow_opens_without_toggling() => WpfTestThread.Run(() =>
-    {
-        var grid = Laid(g => g.SetTiles([Tile("keep-awake", on: true, split: true), Tile("clipboard")]));
+        var original = grid.Buttons().ToList();
         var opened = new List<string>();
         var toggled = new List<string>();
         grid.TileOpened += (_, key) => opened.Add(key);
-        grid.TileToggled += (_, key) => toggled.Add(key);
+        grid.TileToggled += (_, key) =>
+        {
+            toggled.Add(key);
+            awake = !awake;
+            grid.SetTiles([Tile("keep-awake", awake, split: true), Tile("clipboard") with { Status = "24 items" }]);
+        };
 
-        var main = Assert.IsType<ToggleButton>(grid.Buttons().First());
-        Assert.True(main.IsChecked);
-        Click(main);
+        var toggle = Find<ToggleButton>(grid, b => AutomationProperties.GetName(b) == "Keep awake");
+        Assert.False(toggle.IsChecked);
+        ToggleThroughAutomation(toggle);
+        Assert.True(awake);
+        Assert.True(toggle.IsChecked);
         Assert.Equal(["keep-awake"], toggled);
         Assert.Empty(opened);
-        Assert.True(main.IsChecked); // it follows the module's state, not the click
+        Assert.Equal(original, grid.Buttons());
+        Assert.Contains("24 items", AutomationProperties.GetHelpText(original[1]));
 
-        var arrow = Find<Button>(grid, b => AutomationProperties.GetName(b) == "Open keep-awake");
-        Click(arrow);
+        var button = original[0];
+        var label = Find<TextBlock>(button, t => t.Text == "keep-awake");
+        var center = label.TranslatePoint(new Point(label.ActualWidth / 2, label.ActualHeight / 2), grid);
+        var hit = System.Windows.Media.VisualTreeHelper.HitTest(grid, center).VisualHit;
+        Assert.True(ReferenceEquals(hit, button) || button.IsAncestorOf(hit));
+        Click(button);
         Assert.Equal(["keep-awake"], opened);
         Assert.Single(toggled);
+        Assert.True(awake);
 
-        // On, one accent gradient runs across both halves: the arrow's continues the toggle's, not starting again.
-        static System.Windows.Media.Matrix Fill(Control part) =>
-            Assert.IsAssignableFrom<System.Windows.Media.GradientBrush>(((Border)part.Template.FindName("Chrome", part)).Background).RelativeTransform.Value;
-        double whole = main.ActualWidth + arrow.ActualWidth;
-        Assert.Equal(whole, Fill(main).Transform(new Point(1, 1)).X * main.ActualWidth, 1); // the toggle's ends past its edge
-        Assert.Equal(-main.ActualWidth, Fill(arrow).Transform(new Point(0, 0)).X * arrow.ActualWidth, 1); // the arrow's starts at the toggle's
-        Assert.Equal(new Thickness(0), ((Border)main.Template.FindName("Chrome", main)).BorderThickness); // edge to edge, level with the arrow's
+        grid.SetTiles([Tile("clipboard"), Tile("keep-awake", on: true, split: true)]);
+        Assert.Equal(["clipboard", "keep-awake"], grid.Buttons().Select(b => (string)b.Tag));
+        Assert.Single(toggled); // restating the module's value never issues a second command
+    });
 
-        // Its glyph sits in the middle of the whole button, arrow included, where a plain button's glyph sits.
-        double Middle(FrameworkElement e) => e.TranslatePoint(new Point(e.ActualWidth / 2, 0), grid).X;
-        Assert.Equal(Middle((FrameworkElement)main.Parent), Middle((FrameworkElement)main.Content), 1);
+    [Fact]
+    public void Find_filters_the_gallery_without_resizing_it_or_losing_the_query_on_refresh() => WpfTestThread.Run(() =>
+    {
+        var tiles = new[] { Tile("clipboard"), Tile("scratchpad"), Tile("search"), Tile("shelf"), Tile("system") };
+        var grid = Laid(g => g.SetTiles(tiles));
+        double height = grid.HomeHeight;
+        Click(Find<Button>(grid, b => AutomationProperties.GetName(b) == "Find a tool"));
+        var field = Find<TextBox>(grid, _ => true);
+        field.Text = "ScR";
+        Assert.Equal("scratchpad", Assert.Single(grid.Buttons()).Tag);
+        grid.SetTiles([.. tiles.Select(t => t with { Status = "Updated" })]);
+        Assert.Equal("ScR", field.Text);
+        Assert.Contains("Updated", AutomationProperties.GetHelpText(Assert.Single(grid.Buttons())));
+        Assert.Equal(height, grid.HomeHeight);
 
-        // A plain button only opens.
-        Click(grid.Buttons().Last());
-        Assert.Equal(["keep-awake", "clipboard"], opened);
-        Assert.Single(toggled);
+        field.Text = "unmatched";
+        Assert.Empty(grid.Buttons());
+        Assert.Equal(Visibility.Visible, Find<TextBlock>(grid, t => t.Text == "No matching tools").Visibility);
+        Assert.True(grid.CloseSearch());
+        Assert.False(grid.IsSearching);
+        Assert.Equal(tiles.Length, grid.Buttons().Count());
     });
 
     [Fact]
@@ -129,23 +136,12 @@ public sealed class IslandHomeTests
         slider.Value = 30;
         Assert.Equal([0.3], set);
 
-        // The row's two ends mirror each other: the arrow's glyph as far in from the right as the speaker's from the left.
-        var row = (FrameworkElement)slider.Parent;
-        var speaker = Find<LucideIcon>(row, i => i.Data == LucideIcons.Volume);
-        var arrow = Find<LucideIcon>(row, i => i.Data == LucideIcons.ChevronRight);
-        double left = speaker.TranslatePoint(default, row).X, right = row.ActualWidth - arrow.TranslatePoint(new Point(arrow.ActualWidth, 0), row).X;
-        Assert.Equal(left, right, 1);
-
         level = null; // no output: it says so in the slider's place
         grid.SetVolume(new IslandTileVolume(() => level, set.Add), "sound");
         Assert.False(slider.IsEnabled);
         Assert.Equal(Visibility.Collapsed, slider.Visibility);
         Assert.Equal(Visibility.Visible, Find<TextBlock>(grid, t => t.Text == "No output").Visibility);
 
-        var opened = new List<string>();
-        grid.TileOpened += (_, key) => opened.Add(key);
-        Click(Find<Button>(grid, b => AutomationProperties.GetName(b) == "Sound"));
-        Assert.Equal(["sound"], opened);
     });
 
     [Fact]
@@ -177,116 +173,50 @@ public sealed class IslandHomeTests
     });
 
     [Fact]
-    public void The_arrows_reach_a_split_buttons_arrow_and_enter_there_opens_its_page() => WpfTestThread.Run(() =>
+    public void The_arrows_follow_four_columns_of_launch_targets() => WpfTestThread.Run(() =>
     {
-        var grid = Laid(g => g.SetTiles([Tile("a"), Tile("keep-awake", on: true, split: true), Tile("c"), Tile("d"), Tile("e"), Tile("f"), Tile("g")]));
+        var grid = Laid(g => g.SetTiles([Tile("a"), Tile("keep-awake", split: true), Tile("c"), Tile("d"), Tile("e"), Tile("f"), Tile("g")]));
         var buttons = grid.Buttons().ToList();
-        var arrow = Find<Button>(grid, b => AutomationProperties.GetName(b) == "Open keep-awake");
-        Assert.Same(buttons[1], grid.Next(buttons[0], System.Windows.Input.Key.Right));
-        Assert.Same(arrow, grid.Next(buttons[1], System.Windows.Input.Key.Right)); // the toggle, then its arrow
-        Assert.Same(buttons[2], grid.Next(arrow, System.Windows.Input.Key.Right));
-        Assert.Same(buttons[1], grid.Next(arrow, System.Windows.Input.Key.Left));
-        Assert.Same(buttons[6], grid.Next(arrow, System.Windows.Input.Key.Down)); // a row of five down from its tile
-        Assert.Null(grid.Next(arrow, System.Windows.Input.Key.Up));
-        Assert.Equal("keep-awake", grid.TileOf(arrow)); // so Enter there opens Keep awake
+        Assert.Same(buttons[1], grid.Next(buttons[0], Key.Right));
+        Assert.Same(buttons[2], grid.Next(buttons[1], Key.Right));
+        Assert.Same(buttons[0], grid.Next(buttons[1], Key.Left));
+        Assert.Same(buttons[5], grid.Next(buttons[1], Key.Down));
+        Assert.Null(grid.Next(buttons[1], Key.Up));
+        Assert.Equal("keep-awake", grid.TileOf(buttons[1]));
     });
 
     [Fact]
-    public void The_card_shows_the_track_its_transport_works_and_pressing_it_opens_now_playing() => WpfTestThread.Run(() =>
+    public void The_footer_names_the_track_or_idle_state_and_opens_now_playing() => WpfTestThread.Run(() =>
     {
-        var media = new IslandPanelTests.FakeMedia
-        {
-            Sessions = [new MediaTrack("Spotify.exe", "Spotify", "Weekend Mix", "Various Artists", true, true, true, true, true, true,
-                TimeSpan.FromSeconds(72), TimeSpan.FromSeconds(232), DateTimeOffset.Now, null)],
-        };
+        var media = new IslandPanelTests.FakeMedia();
         var grid = Laid(g => g.SetMedia(media));
-        var texts = new List<string>();
-        void Collect(DependencyObject o)
-        {
-            if (o is TextBlock { Text.Length: > 0 } t)
-                texts.Add(t.Text);
-            for (int i = 0; i < System.Windows.Media.VisualTreeHelper.GetChildrenCount(o); i++)
-                Collect(System.Windows.Media.VisualTreeHelper.GetChild(o, i));
-        }
-        Collect(grid.Media);
-        Assert.Contains("Weekend Mix", texts);
-        Assert.Contains("Various Artists", texts);
-        Assert.Contains("Spotify", texts);
-        Assert.Equal(PetMood.Listening, Find<ChippiPet>(grid.Media, _ => true).Mood);
-        Assert.True(Find<Button>(grid, b => AutomationProperties.GetName(b) == "Pause").IsEnabled);
-        // The 52 art fits the 68 card whole, 8 from its outside at the top and the bottom.
-        var art = Find<Border>(grid.Media, b => b.Width == 52);
-        double top = art.TranslatePoint(default, grid.Media).Y;
-        Assert.Equal(8, top, 1);
-        Assert.Equal(8, 68 - top - art.ActualHeight, 1);
+        var card = Find<Button>(grid.Media, b => AutomationProperties.GetName(b) == "Now Playing");
+        Assert.Contains("Nothing playing", AutomationProperties.GetHelpText(card));
+        var bounds = card.TranslatePoint(default, grid);
 
-        var opened = new List<string>();
-        grid.TileOpened += (_, key) => opened.Add(key);
-        Click(Find<Button>(grid, b => AutomationProperties.GetName(b) == "Now Playing"));
-        Assert.Equal([IslandPanelWindow.NowPlayingKey], opened);
-        // The transport sits on the card: its presses don't open Now Playing too.
-        var next = Find<Button>(grid, b => AutomationProperties.GetName(b) == "Next track");
-        Click(next);
-        Assert.Single(opened);
-        // A cut-off title shows in full in the card's tooltip, and the next one cut off the same replaces it.
-        var card = Find<Button>(grid, b => AutomationProperties.GetName(b) == "Now Playing");
-        string longTitle = "A title far too long to fit beside the art and the transport";
-        media.Sessions = [media.Sessions[0] with { Title = longTitle }];
-        grid.Media.SetMedia(media);
+        var track = new MediaTrack("Spotify.exe", "Spotify", "Weekend Mix", "Various Artists", true,
+            true, true, true, true, true, TimeSpan.Zero, TimeSpan.Zero, DateTimeOffset.Now, null);
+        media.Sessions = [track];
+        grid.SetMedia(media);
         grid.UpdateLayout();
-        Assert.Contains(longTitle, (string)card.ToolTip);
-        media.Sessions = [media.Sessions[0] with { Title = "Another title far too long to fit beside the art and the transport" }];
-        grid.Media.SetMedia(media);
-        grid.UpdateLayout();
-        Assert.Contains("Another title", (string)card.ToolTip);
-        media.Sessions = [media.Sessions[0] with { Title = "Weekend Mix" }];
-        grid.Media.SetMedia(media);
-        grid.UpdateLayout();
-        Assert.Null(card.ToolTip);
+        Assert.Equal(bounds.Y, card.TranslatePoint(default, grid).Y);
+        Assert.Contains("Weekend Mix", Find<TextBlock>(grid.Media, t => t.Text.Contains("Weekend Mix")).Text);
+        Assert.Contains("Various Artists", AutomationProperties.GetHelpText(card));
+        Assert.Null(Find<Button>(grid.Media, b => AutomationProperties.GetName(b) == "Pause"));
 
-        // A press the player declines says so on the app's line, in Caution.
-        media.Refuse = true;
-        Click(next);
-        Assert.Same(grid.FindResource("WarningTextBrush"), Find<TextBlock>(grid.Media, t => t.Text == "Failed").Foreground);
-        Assert.Single(opened);
-        media.Refuse = false;
+        string title = string.Concat(Enumerable.Repeat("A long track title ", 10)).Trim();
+        media.Sessions = [track with { Playing = false, Title = title }];
+        grid.SetMedia(media);
+        Assert.Contains(title, AutomationProperties.GetHelpText(card));
+        Assert.Contains(title, card.ToolTip?.ToString());
+        media.Sessions = [track with { Title = "", Artist = "" }];
+        grid.SetMedia(media);
+        Assert.Contains("Spotify", AutomationProperties.GetHelpText(card));
 
-        // Nothing playing: the card says so, on its own line level with the art, and the transport is dimmed.
-        media.Sessions = [];
-        media.Raise();
-        grid.Media.SetMedia(media);
-        grid.UpdateLayout();
-        var pet = Find<ChippiPet>(grid.Media, _ => true);
-        Assert.Equal(PetMood.Sleepy, pet.Mood);
-        Assert.False(Find<Button>(grid, b => AutomationProperties.GetName(b) == "Play").IsEnabled);
-        var nothing = Find<TextBlock>(grid.Media, t => t.Text == "Nothing playing");
-        Assert.Equal(FontWeights.Normal, nothing.FontWeight); // a state, not a song's title
-        var note = Find<LucideIcon>(grid.Media, i => i.Data == LucideIcons.Music);
-        Assert.Equal(Visibility.Collapsed, ((FrameworkElement)note.Parent).Visibility); // no app line without an app
-        double Middle(FrameworkElement e) => e.TranslatePoint(new Point(0, e.ActualHeight / 2), grid.Media).Y;
-        Assert.Equal(Middle(Find<Border>(grid.Media, b => b.Width == 52)), Middle(nothing), 1); // the art's square
-        // No buttons, as on the page, with their room kept so nothing moves when a song starts.
-        Assert.Equal(Visibility.Hidden, ((FrameworkElement)Find<Button>(grid, b => AutomationProperties.GetName(b) == "Play").Parent).Visibility);
-
-        // A track with no title shows the app as its title, and no app line over it to say it twice.
-        media.Sessions = [new MediaTrack("chrome.exe", "Chrome", "", "", true, true, true, true, true, true, TimeSpan.Zero, TimeSpan.Zero, DateTimeOffset.Now, null)];
-        grid.Media.SetMedia(media);
-        grid.UpdateLayout();
-        Assert.Equal("Chrome", Find<TextBlock>(grid.Media, t => t.FontSize == 14).Text);
-        Assert.Equal(Visibility.Collapsed, ((FrameworkElement)note.Parent).Visibility);
-
-        // A long app name ends in an ellipsis inside the text's column, not cut mid-letter where the transport starts.
-        string longName = string.Concat(Enumerable.Repeat("Windows Media Player Legacy ", 4)).Trim();
-        media.Sessions = [new MediaTrack("wmplayer.exe", longName, "Song", "", true, true, true, true, true, true, TimeSpan.Zero, TimeSpan.Zero, DateTimeOffset.Now, null)];
-        grid.Media.SetMedia(media);
-        grid.UpdateLayout();
-        var source = Find<TextBlock>(grid.Media, t => t.Text == longName);
-        Assert.True(IslandGrid.Cut(source, longName));
-        var pause = Find<Button>(grid, b => AutomationProperties.GetName(b) == "Pause");
-        Assert.Equal("Pause", pause.ToolTip); // the transport names itself, as the other icon buttons do
-        Assert.Equal("Next track", Find<Button>(grid, b => AutomationProperties.GetName(b) == "Next track").ToolTip);
-        var transport = (FrameworkElement)pause.Parent;
-        Assert.True(source.TranslatePoint(new Point(source.ActualWidth, 0), grid.Media).X <= transport.TranslatePoint(default, grid.Media).X);
+        string? opened = null;
+        grid.TileOpened += (_, key) => opened = key;
+        Click(card);
+        Assert.Equal(IslandPanelWindow.NowPlayingKey, opened);
     });
 
     [Fact]
@@ -309,7 +239,7 @@ public sealed class IslandHomeTests
             g.SetPetSide(petRight);
             if (features)
             {
-                g.SetTiles([Tile("awake", split: true), Tile("shelf")]);
+                g.SetTiles([Tile("keep-awake", split: true), Tile("shelf")]);
                 g.SetVolume(new IslandTileVolume(() => 0.5, _ => { }, () => false, _ => Task.CompletedTask), "sound");
             }
         });
@@ -323,10 +253,10 @@ public sealed class IslandHomeTests
         try
         {
             host.Show();
-            var names = new List<string> { "Now Playing" };
+            var names = new List<string> { "Find a tool" };
             if (features)
-                names.AddRange(["awake, Status", "Open awake", "shelf, Status", "Mute", "System volume", "Sound"]);
-            names.AddRange(petRight ? ["Settings", "Chippi"] : ["Chippi", "Settings"]);
+                names.AddRange(["Open keep-awake", "Open shelf", "Keep awake", "Mute", "System volume"]);
+            names.AddRange(petRight ? ["Now Playing", "Settings", "Chippi"] : ["Chippi", "Settings", "Now Playing"]);
             Control Visit(Control from, FocusNavigationDirection direction, string name)
             {
                 target = null;
@@ -357,7 +287,7 @@ public sealed class IslandHomeTests
             Assert.True(grid.Pet.Squish.HasAnimatedProperties); // a squish and a grin
         }
 
-        // Both controls sit 25 in from their outer edges. Chippi meets the puck on either side.
+        // Chippi meets the puck at either outer edge. Settings stays beside him.
         var settings = Find<Button>(grid, b => AutomationProperties.GetName(b) == "Settings");
         foreach (bool right in new[] { false, true })
         {
@@ -368,7 +298,7 @@ public sealed class IslandHomeTests
             Assert.Equal(IslandGrid.FooterPet, Math.Round(right ? footer.ActualWidth - center.X : center.X, 3));
             Assert.Equal(IslandGrid.FooterPet, Math.Round(footer.ActualHeight - center.Y, 3));
             var gear = settings.TranslatePoint(new Point(settings.ActualWidth / 2, settings.ActualHeight / 2), footer);
-            Assert.Equal(footer.ActualWidth - center.X, gear.X, 3);
+            Assert.InRange(right ? center.X - gear.X : gear.X - center.X, 30, 45);
             Assert.Equal(center.Y, gear.Y, 3);
         }
     });
