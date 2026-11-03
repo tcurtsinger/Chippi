@@ -5,6 +5,7 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -378,9 +379,12 @@ public sealed class VolumeView : UserControl
         var grip = new Border { Width = 12, Height = 2, CornerRadius = new CornerRadius(1), VerticalAlignment = VerticalAlignment.Bottom, IsHitTestVisible = false };
         trough.Children.Add(grip);
 
-        var slider = new Slider { Minimum = 0, Maximum = 100, SmallChange = 5, LargeChange = 10, Orientation = Orientation.Vertical, IsHitTestVisible = false };
+        var slider = new Slider { Minimum = 0, Maximum = 100, SmallChange = 5, LargeChange = 10, Orientation = Orientation.Vertical,
+            IsHitTestVisible = false, HorizontalAlignment = HorizontalAlignment.Center };
         slider.SetResourceReference(StyleProperty, "IslandMixerFaderStyle");
-        trough.Children.Add(slider);
+        // The fill clips at the track edge. Keyboard focus needs the space just outside it.
+        slider.SetBinding(WidthProperty, new Binding(nameof(Width)) { Source = trough });
+        bar.Children.Add(slider);
         var percentage = new TextBlock { FontSize = 12, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Margin = inset };
         Typography.SetNumeralAlignment(percentage, FontNumeralAlignment.Tabular);
         Grid.SetRow(percentage, 4);
