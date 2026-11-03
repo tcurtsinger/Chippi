@@ -935,8 +935,11 @@ public partial class IslandWindow : Window
         var tile = top?.TileKey is { } key ? _tiles.FirstOrDefault(t => t.Key == key) : null;
         var dropTile = dropping ? _tiles.FirstOrDefault(t => t.Key == _dragKey) : null;
         bool bar = !_lifted && (dropTile is not null || feedback is not null || song is not null || top is not null);
-        bool waitingMark = !bar && _activities.Any(a => a.Kind == IslandActivityKind.Agent && a.NeedsAttention);
-        WaitingMark.Visibility = Shown(waitingMark);
+        var puckAgent = bar ? null : _activities.FirstOrDefault(a => a.Kind == IslandActivityKind.Agent && a.NeedsAttention)
+            ?? _activities.FirstOrDefault(a => a.Kind == IslandActivityKind.Agent);
+        AgentMark.Visibility = Shown(puckAgent is not null);
+        if (puckAgent is not null)
+            AgentMark.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, puckAgent.NeedsAttention ? "PetSparkBrush" : "IslandAccentBrush");
         _singing = bar && dropTile is null && feedback is null && song is not null;
         // Keep awake stays in sight while something else holds the bar (a song, a drag, another activity) or the puck is lifted.
         var keepAwake = _activities.FirstOrDefault(a => a.Kind == IslandActivityKind.Status && a.ModuleId == IslandHost.KeepAwakeModuleId);
@@ -1043,7 +1046,7 @@ public partial class IslandWindow : Window
         if (paused) help.Add("Paused");
         if (mic is not null) help.Add(mic.Title == "Muted" ? "Microphone muted" : mic.Title);
         if (awakeBadge) help.Add("Keep awake is on");
-        if (waitingMark) help.Add("Agent waiting on you");
+        if (puckAgent is not null) help.Add(puckAgent.NeedsAttention ? "Agent waiting on you" : "Agent working");
         AutomationProperties.SetHelpText(PuckButton, string.Join(". ", help));
         AutomationProperties.SetLiveSetting(PuckButton, AutomationLiveSetting.Polite);
     }

@@ -90,7 +90,7 @@ public sealed class AgentBarTests
             Assert.Equal(3, rest.Starts);
             rest.Fire();
             Assert.Equal(PetMood.Sleepy, window.Pet.Mood);
-            Assert.Equal(Visibility.Visible, window.WaitingMark.Visibility);
+            Assert.Equal(Visibility.Visible, window.AgentMark.Visibility);
             window.SetActivities([waiting], PetMood.Idle);
             Assert.False(rest.Running);
             Assert.Equal(PetMood.Sleepy, window.Pet.Mood);
@@ -117,7 +117,8 @@ public sealed class AgentBarTests
             peek.Fire();
             Assert.False(window.BarShown);
             Assert.Null(ChipKey(window));
-            Assert.Equal(Visibility.Collapsed, window.WaitingMark.Visibility);
+            Assert.Equal(Visibility.Visible, window.AgentMark.Visibility);
+            Assert.Equal("Agent working", AutomationProperties.GetHelpText(window.PuckButton));
 
             // A quick pass leaves the puck alone. A dwell reveals the current reading and leaving folds it.
             Hover(Mouse.MouseLeaveEvent);
@@ -131,11 +132,14 @@ public sealed class AgentBarTests
             dwell.Fire();
             Assert.True(window.BarShown);
             Assert.Equal("Working · 43% · 2 sessions", window.ChipText);
+            Assert.Equal(Visibility.Collapsed, window.AgentMark.Visibility);
             Assert.Equal(Key, ChipKey(window));
             Hover(Mouse.MouseLeaveEvent);
             Assert.False(window.BarShown);
             window.SetActivities([working], PetMood.Idle);
             Assert.False(window.BarShown);
+            Assert.Equal(1, peek.Starts);
+            Assert.Equal(Visibility.Visible, window.AgentMark.Visibility);
         }));
 
     [Fact]
@@ -173,7 +177,7 @@ public sealed class AgentBarTests
         }));
 
     [Fact]
-    public void Waiting_previews_then_yields_to_the_next_activity_or_leaves_an_accessible_mark() => WpfTestThread.Run(() =>
+    public void The_closed_puck_shows_waiting_ahead_of_working_and_clears_the_mark_when_the_agent_finishes() => WpfTestThread.Run(() =>
     {
         var window = new IslandWindow();
         try
@@ -191,19 +195,34 @@ public sealed class AgentBarTests
             peek.Fire();
             Assert.True(window.BarShown);
             Assert.Equal("18:42 · Focus timer", window.ChipText);
-            Assert.Equal(Visibility.Collapsed, window.WaitingMark.Visibility);
+            Assert.Equal(Visibility.Collapsed, window.AgentMark.Visibility);
 
             window.SetActivities([waiting, mic, working], PetMood.Idle);
             Assert.False(window.BarShown);
-            Assert.Equal(Visibility.Visible, window.WaitingMark.Visibility);
+            Assert.Equal(Visibility.Visible, window.AgentMark.Visibility);
+            Assert.Equal(Color(window, "PetSparkBrush"), ((SolidColorBrush)window.AgentMark.Fill).Color);
+            Assert.Equal(Visibility.Visible, window.MicBadge.Visibility);
             Assert.Equal("Microphone muted. Agent waiting on you", AutomationProperties.GetHelpText(window.PuckButton));
             window.SetActivities([working], PetMood.Idle);
             Assert.True(window.BarShown);
             Assert.Equal(3, peek.Starts);
             peek.Fire();
-            Assert.Equal(Visibility.Collapsed, window.WaitingMark.Visibility);
-            Assert.Empty(AutomationProperties.GetHelpText(window.PuckButton));
+            Assert.Equal(Visibility.Visible, window.AgentMark.Visibility);
+            Assert.Equal(Color(window, "IslandAccentBrush"), ((SolidColorBrush)window.AgentMark.Fill).Color);
+            Assert.Equal("Agent working", AutomationProperties.GetHelpText(window.PuckButton));
+            window.SetActivities([mic, working with { Title = "Working · 50%" }], PetMood.Idle);
+            Assert.Equal(3, peek.Starts);
+            Assert.False(window.BarShown);
+            Assert.Equal(Visibility.Visible, window.AgentMark.Visibility);
+            Assert.Equal(Visibility.Visible, window.MicBadge.Visibility);
+            Assert.Equal("Microphone muted. Agent working", AutomationProperties.GetHelpText(window.PuckButton));
+
+            window.SetActivities([mic], PetMood.Idle);
+            Assert.Equal(Visibility.Collapsed, window.AgentMark.Visibility);
+            Assert.Equal("Microphone muted", AutomationProperties.GetHelpText(window.PuckButton));
             window.SetActivities([], PetMood.Sleepy);
+            Assert.Equal(Visibility.Collapsed, window.AgentMark.Visibility);
+            Assert.Empty(AutomationProperties.GetHelpText(window.PuckButton));
             window.SetActivities([working], PetMood.Idle);
             Assert.True(window.BarShown);
             Assert.Equal(4, peek.Starts);
