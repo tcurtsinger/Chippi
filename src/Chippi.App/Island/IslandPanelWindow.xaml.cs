@@ -558,7 +558,7 @@ public partial class IslandPanelWindow : Window
     {
         var glyph = new LucideIcon { Data = LucideIcons.ChevronLeft, Size = 16 };
         glyph.SetResourceReference(LucideIcon.BrushProperty, "IslandTextSecondaryBrush");
-        var button = new Button { Content = glyph, Margin = new Thickness(-4, 0, 4, 0) };
+        var button = new Button { Content = glyph, Margin = new Thickness(-4, 0, 4, 0), ToolTip = "Back" };
         button.SetResourceReference(StyleProperty, "IslandIconButtonStyle");
         AutomationProperties.SetName(button, "Back");
         DockPanel.SetDock(button, Dock.Left);
@@ -571,8 +571,9 @@ public partial class IslandPanelWindow : Window
     {
         var name = new TextBlock { Text = TileName(key), FontSize = 13, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center };
         _pageStatus.Margin = new Thickness(12, 0, 0, 0);
-        DockPanel.SetDock(_pageStatus, Dock.Right);
-        var header = new DockPanel { Children = { _pageStatus, name } };
+        _pageStatus.TextAlignment = TextAlignment.Right;
+        DockPanel.SetDock(name, Dock.Left);
+        var header = new DockPanel { Children = { name, _pageStatus } };
         _attached.Add(header);
         return header;
     }

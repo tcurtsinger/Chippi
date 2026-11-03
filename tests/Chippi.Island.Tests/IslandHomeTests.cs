@@ -289,6 +289,7 @@ public sealed class IslandHomeTests
 
         // Chippi meets the puck at either outer edge. Settings stays beside him.
         var settings = Find<Button>(grid, b => AutomationProperties.GetName(b) == "Settings");
+        var mediaLink = Find<Button>(grid.Media, b => AutomationProperties.GetName(b) == "Now Playing");
         foreach (bool right in new[] { false, true })
         {
             grid.SetPetSide(right);
@@ -300,6 +301,8 @@ public sealed class IslandHomeTests
             var gear = settings.TranslatePoint(new Point(settings.ActualWidth / 2, settings.ActualHeight / 2), footer);
             Assert.InRange(right ? center.X - gear.X : gear.X - center.X, 30, 45);
             Assert.Equal(center.Y, gear.Y, 3);
+            Assert.Equal(grid.Media.ActualWidth, mediaLink.ActualWidth, 3);
+            Assert.Equal(center.Y, mediaLink.TranslatePoint(new Point(0, mediaLink.ActualHeight / 2), footer).Y, 3);
         }
     });
 }

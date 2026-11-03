@@ -30,7 +30,7 @@ internal sealed class IslandGrid : UserControl
     internal const double FooterPet = 25, FooterPetSize = PetSize.Footer;
     private const double WheelStep = 2;
 
-    private readonly UniformGrid _tiles = new() { Columns = Columns, Rows = 1, Margin = new Thickness(0, 0, -5, 0) };
+    private readonly UniformGrid _tiles = new() { Columns = Columns, Rows = 1, Margin = new Thickness(0, 0, -IslandGalleryTile.Gutter, 0) };
     private readonly StackPanel _switches = new() { Orientation = Orientation.Horizontal };
     private readonly IslandHomeMedia _media = new();
     private readonly TextBlock _heading = new() { Text = "Tools", FontSize = 17, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center };
@@ -41,7 +41,8 @@ internal sealed class IslandGrid : UserControl
     private readonly Border _quickRow = new() { Height = 39, BorderThickness = new Thickness(0, 1, 0, 0), Visibility = Visibility.Collapsed };
     private readonly Grid _volumeRow = new() { VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Right, Visibility = Visibility.Collapsed };
     private readonly Slider _volume = new() { Width = 84, Minimum = 0, Maximum = 100, SmallChange = 5, LargeChange = 10, IsMoveToPointEnabled = true, VerticalAlignment = VerticalAlignment.Center };
-    private readonly TextBlock _percent = new() { FontSize = 11, Width = 30, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 0, 0) };
+    private readonly TextBlock _percent = new() { FontSize = 11, Width = 32, TextAlignment = TextAlignment.Right,
+        VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 0, 0) };
     private readonly TextBlock _noOutput = new() { Text = "No output", FontSize = 11, VerticalAlignment = VerticalAlignment.Center, Visibility = Visibility.Collapsed };
     private readonly LucideIcon _speakerGlyph = new() { Data = LucideIcons.Volume, Size = 15 };
     private readonly Button _speaker = new();
@@ -129,10 +130,11 @@ internal sealed class IslandGrid : UserControl
     internal bool CloseSearch()
     {
         if (!IsSearching) return false;
-        _back.Visibility = _search.Visibility = Visibility.Collapsed;
+        // Move focus while the field is still visible, before WPF drops its keyboard focus.
         _heading.Visibility = _find.Visibility = Visibility.Visible;
-        _search.Clear();
         if (IsKeyboardFocusWithin) _find.Focus();
+        _back.Visibility = _search.Visibility = Visibility.Collapsed;
+        _search.Clear();
         return true;
     }
 
@@ -154,7 +156,7 @@ internal sealed class IslandGrid : UserControl
         _boop.SetResourceReference(StyleProperty, "IslandIconButtonStyle");
         AutomationProperties.SetName(_boop, "Chippi");
         _boop.Click += (_, _) => Pet.Boop();
-        _media.VerticalAlignment = VerticalAlignment.Center;
+        _media.VerticalAlignment = VerticalAlignment.Bottom;
         _media.OpenRequested += (_, _) => TileOpened?.Invoke(this, IslandPanelWindow.NowPlayingKey);
         var footer = new Border { BorderThickness = new Thickness(0, 1, 0, 0), Margin = new Thickness(-12, 0, -12, 0),
             Child = new Grid { Children = { _media, _settings, _boop } } };
@@ -171,7 +173,7 @@ internal sealed class IslandGrid : UserControl
         _boop.HorizontalAlignment = _settings.HorizontalAlignment = right ? HorizontalAlignment.Right : HorizontalAlignment.Left;
         _boop.Margin = new Thickness(inset, 0, inset, inset);
         _settings.Margin = new Thickness(inset + 36, 0, inset + 36, inset);
-        _media.Margin = right ? new Thickness(12, 0, 82, 0) : new Thickness(82, 0, 12, 0);
+        _media.Margin = right ? new Thickness(8, 0, 82, inset) : new Thickness(82, 0, 8, inset);
         _boop.TabIndex = right ? 2 : 0;
         _settings.TabIndex = 1;
         _media.TabIndex = right ? 0 : 2;

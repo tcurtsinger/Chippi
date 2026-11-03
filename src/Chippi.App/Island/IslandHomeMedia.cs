@@ -13,7 +13,7 @@ namespace Chippi.App.Island;
 /// <summary>The gallery footer opens Now Playing and shows the current track and artist on one line.</summary>
 internal sealed class IslandHomeMedia : UserControl
 {
-    private readonly Button _link = new() { Height = 32, Padding = new Thickness(5, 0, 5, 0), HorizontalAlignment = HorizontalAlignment.Left };
+    private readonly Button _link = new() { Height = 32, Padding = new Thickness(6, 0, 6, 0) };
     private readonly LucideIcon _glyph = new() { Size = 16 };
     private readonly Run _title = new() { FontWeight = FontWeights.SemiBold };
     private readonly Run _detail = new();
