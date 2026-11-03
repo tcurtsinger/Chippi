@@ -9,11 +9,11 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Threading;
 using Chippi.Audio;
 using Chippi.Audio.Processing;
 using Chippi.Features.Sound.Routing;
 using static Chippi.Audio.Tests.FakeDeviceSystem;
+using static Chippi.Features.Sound.Tests.SoundUiThread;
 
 namespace Chippi.Features.Sound.Tests;
 
@@ -73,30 +73,29 @@ public sealed class RoutingUiTests
     }
 
     [Fact]
-    public async Task A_pick_works_with_priority_switching_off_and_only_connected_devices_are_listed()
+    public Task A_pick_works_with_priority_switching_off_and_only_connected_devices_are_listed() => Sta(async () =>
     {
+        // The picker command resumes on this dispatcher. Dispose the fixture before the dispatcher shuts down.
         await using var f = new RoutingFixture();
         f.System.With(Speaker("A"), Speaker("B"), Speaker("Gone")).WithDefault("A");
         await f.Start();
         await f.Module.SetEnabledAsync(AudioFlow.Render, false);
         f.System.Disconnect("Gone");
         await f.Audio.RefreshAsync();
-        await Sta(async () =>
-        {
-            var page = new RoutingQuickView(f.Module, AudioFlow.Render);
-            var picker = Picker(page);
-            Assert.Equal("Output device", AutomationProperties.GetName(picker));
-            Assert.Equal(["A", "B"], picker.Items.OfType<ComboBoxItem>().Select(i => (string)i.Content));
-            picker.SelectedIndex = 1;
-            await Until(() => f.Module.InUse(AudioFlow.Render) == "B");
-        });
+        var page = new RoutingQuickView(f.Module, AudioFlow.Render);
+        var picker = Picker(page);
+        Assert.Equal("Output device", AutomationProperties.GetName(picker));
+        Assert.Equal(["A", "B"], picker.Items.OfType<ComboBoxItem>().Select(i => (string)i.Content));
+        picker.SelectedIndex = 1;
+        await Until(() => f.Module.InUse(AudioFlow.Render) == "B"
+            && f.Audio.Snapshot.Owner(AudioFlow.Render, AudioRole.Multimedia) == RoleOwner.None);
         Assert.Equal("B", f.System.DefaultOf(AudioFlow.Render, AudioRole.Multimedia));
         Assert.Equal(["A", "B", "Gone"], f.Module.Settings.Output.Devices.Select(d => d.Id)); // a pick leaves the order alone
         Assert.False(f.Module.Settings.Output.Enabled); // the pick is set once; switching stays off
         f.System.ChangeDefault("A");
         await f.Audio.RefreshAsync();
         Assert.Equal("A", f.System.DefaultOf(AudioFlow.Render, AudioRole.Multimedia));
-    }
+    });
     [Fact]
     public async Task Both_device_pickers_offer_the_complete_connected_list()
     {
@@ -291,28 +290,4 @@ public sealed class RoutingUiTests
         }
     }
 
-    private static Task Sta(Action run) => Sta(() => { run(); return Task.CompletedTask; });
-
-    private static Task Sta(Func<Task> run)
-    {
-        var done = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var thread = new Thread(() =>
-        {
-            var dispatcher = Dispatcher.CurrentDispatcher;
-            SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(dispatcher));
-            Exception? error = null;
-            dispatcher.BeginInvoke(async () =>
-            {
-                try { await run(); }
-                catch (Exception ex) { error = ex; }
-                finally { dispatcher.BeginInvokeShutdown(DispatcherPriority.Background); }
-            });
-            Dispatcher.Run();
-            if (error is null) done.SetResult();
-            else done.SetException(error);
-        });
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        return done.Task;
-    }
 }

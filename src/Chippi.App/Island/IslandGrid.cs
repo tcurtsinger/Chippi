@@ -28,19 +28,21 @@ internal sealed class IslandGrid : UserControl
     internal const int Columns = 4;
     // The footer pet meets the widget on its opening corner.
     internal const double FooterPet = 25, FooterPetSize = PetSize.Footer;
+    private const double HeaderHeight = 44, QuickHeight = 42, FooterHeight = 45, TileRowHeight = 77;
     private const double WheelStep = 2;
 
     private readonly UniformGrid _tiles = new() { Columns = Columns, Rows = 1, Margin = new Thickness(0, 0, -IslandGalleryTile.Gutter, 0) };
     private readonly StackPanel _switches = new() { Orientation = Orientation.Horizontal };
     private readonly IslandHomeMedia _media = new();
-    private readonly TextBlock _heading = new() { Text = "Tools", FontSize = 17, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center };
-    private readonly TextBlock _empty = new() { Text = "No tools to show", FontSize = 13, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
-    private readonly Button _find = IconButton(LucideIcons.Search, "Find a tool");
+    private readonly TextBlock _heading = new() { Text = "Tools", FontSize = 18, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center };
+    private readonly TextBlock _empty = new() { FontSize = 13, HorizontalAlignment = HorizontalAlignment.Center };
+    private readonly Button _emptyAction = new() { HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 6, 0, 0) };
+    private readonly Button _find = new();
     private readonly Button _back = IconButton(LucideIcons.ChevronLeft, "Back to tools");
     private readonly SearchBox _search = new() { Placeholder = "Find a tool", Height = 28, FontSize = 13 };
-    private readonly Border _quickRow = new() { Height = 39, BorderThickness = new Thickness(0, 1, 0, 0), Visibility = Visibility.Collapsed };
+    private readonly Border _quickRow = new() { Height = QuickHeight, Visibility = Visibility.Collapsed };
     private readonly Grid _volumeRow = new() { VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Right, Visibility = Visibility.Collapsed };
-    private readonly Slider _volume = new() { Width = 84, Minimum = 0, Maximum = 100, SmallChange = 5, LargeChange = 10, IsMoveToPointEnabled = true, VerticalAlignment = VerticalAlignment.Center };
+    private readonly Slider _volume = new() { Width = 96, Minimum = 0, Maximum = 100, SmallChange = 5, LargeChange = 10, IsMoveToPointEnabled = true, VerticalAlignment = VerticalAlignment.Center };
     private readonly TextBlock _percent = new() { FontSize = 11, Width = 32, TextAlignment = TextAlignment.Right,
         VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 0, 0) };
     private readonly TextBlock _noOutput = new() { Text = "No output", FontSize = 11, VerticalAlignment = VerticalAlignment.Center, Visibility = Visibility.Collapsed };
@@ -59,13 +61,24 @@ internal sealed class IslandGrid : UserControl
         Pet = new ChippiPet { Size = FooterPetSize, Mood = PetMood.Idle, IsDecorative = true,
             HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
         _empty.SetResourceReference(TextBlock.ForegroundProperty, "IslandTextSecondaryBrush");
+        _emptyAction.SetResourceReference(StyleProperty, "IslandButtonStyle");
+        _emptyAction.Click += (_, _) =>
+        {
+            if (IsSearching && !string.IsNullOrWhiteSpace(_search.Text))
+            {
+                _search.Focus();
+                _search.Clear();
+            }
+            else SettingsRequested?.Invoke(this, EventArgs.Empty);
+        };
         var body = new Grid { Margin = new Thickness(0, -12, 0, -12) };
-        body.RowDefinitions.Add(new RowDefinition { Height = new GridLength(41) });
+        body.RowDefinitions.Add(new RowDefinition { Height = new GridLength(HeaderHeight) });
         body.RowDefinitions.Add(new RowDefinition());
         body.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        body.RowDefinitions.Add(new RowDefinition { Height = new GridLength(45) });
+        body.RowDefinitions.Add(new RowDefinition { Height = new GridLength(FooterHeight) });
 
-        var gallery = new Grid { Children = { _tiles, _empty } };
+        var emptyState = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Children = { _empty, _emptyAction } };
+        var gallery = new Grid { Children = { _tiles, emptyState } };
         Grid.SetRow(gallery, 1);
         Grid.SetRow(_quickRow, 2);
         var footer = BuildFooter();
@@ -76,8 +89,10 @@ internal sealed class IslandGrid : UserControl
         body.Children.Add(footer);
         BuildQuickRow();
         Content = body;
+        Filter();
         SetPetSide(right: false);
         KeyboardNavigation.SetDirectionalNavigation(_tiles, KeyboardNavigationMode.None);
+        CommandBindings.Add(new CommandBinding(ApplicationCommands.Find, (_, e) => { OpenSearch(); e.Handled = true; }));
         PreviewKeyDown += OnKey;
     }
 
@@ -89,7 +104,8 @@ internal sealed class IslandGrid : UserControl
     internal event EventHandler? SearchRequested;
     internal bool IsSearching => _search.Visibility == Visibility.Visible;
     // The card sizes to the unfiltered tool set so typing a query doesn't move the widget or its controls.
-    internal double HomeHeight => Math.Min(IslandPage.Height, 92 + 77 * _tiles.Rows + (_quickRow.Visibility == Visibility.Visible ? 39 : 0));
+    internal double HomeHeight => Math.Min(IslandPage.Height, HeaderHeight + FooterHeight + IslandGalleryTile.Gutter
+        + TileRowHeight * _tiles.Rows + (_quickRow.Visibility == Visibility.Visible ? QuickHeight : 0));
 
     internal void SetMedia(IMediaSessions? media) => _media.SetMedia(media);
 
@@ -112,19 +128,30 @@ internal sealed class IslandGrid : UserControl
         _search.Visibility = _back.Visibility = Visibility.Collapsed;
         AutomationProperties.SetName(_search, "Find a tool");
         _search.TextChanged += (_, _) => Filter();
-        _find.Click += (_, _) =>
-        {
-            _heading.Visibility = _find.Visibility = Visibility.Collapsed;
-            _back.Visibility = _search.Visibility = Visibility.Visible;
-            SearchRequested?.Invoke(this, EventArgs.Empty);
-            _search.Focus();
-        };
+        var findGlyph = new LucideIcon { Data = LucideIcons.Search, Size = 14, Margin = new Thickness(0, 0, 6, 0) };
+        findGlyph.SetResourceReference(LucideIcon.BrushProperty, "IslandTextSecondaryBrush");
+        _find.Content = new StackPanel { Orientation = Orientation.Horizontal, Children = { findGlyph, new TextBlock { Text = "Find a tool" } } };
+        _find.SetResourceReference(StyleProperty, "IslandButtonStyle");
+        _find.Padding = new Thickness(9, 0, 9, 0);
+        _find.ToolTip = "Find a tool (Ctrl+F)";
+        AutomationProperties.SetName(_find, "Find a tool");
+        AutomationProperties.SetAcceleratorKey(_find, "Ctrl+F");
+        _find.Click += (_, _) => OpenSearch();
         _back.Click += (_, _) => CloseSearch();
         Grid.SetColumn(_heading, 1);
         Grid.SetColumn(_search, 1);
         Grid.SetColumn(_find, 2);
         foreach (var item in new UIElement[] { _back, _heading, _search, _find }) bar.Children.Add(item);
         return bar;
+    }
+
+    private void OpenSearch()
+    {
+        _heading.Visibility = _find.Visibility = Visibility.Collapsed;
+        _back.Visibility = _search.Visibility = Visibility.Visible;
+        SearchRequested?.Invoke(this, EventArgs.Empty);
+        _search.Focus();
+        _search.SelectAll();
     }
 
     internal bool CloseSearch()
@@ -184,7 +211,6 @@ internal sealed class IslandGrid : UserControl
 
     private void BuildQuickRow()
     {
-        _quickRow.SetResourceReference(Border.BorderBrushProperty, "IslandHairBrush");
         var controls = new Grid();
         controls.ColumnDefinitions.Add(new ColumnDefinition());
         controls.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -237,7 +263,7 @@ internal sealed class IslandGrid : UserControl
         _speaker.IsEnabled = !none && volume.SetMuted is not null;
         _speakerGlyph.Data = muted || none ? LucideIcons.VolumeMuted : LucideIcons.Volume;
         _speakerGlyph.SetResourceReference(LucideIcon.BrushProperty, none ? "IslandTextTertiaryBrush" : muted ? "WarningBrush" : "IslandTextBrush");
-        string action = muted ? "Unmute" : "Mute";
+        string action = muted ? "Unmute system volume" : "Mute system volume";
         AutomationProperties.SetName(_speaker, action);
         _speaker.ToolTip = volume.SetMuted is null ? null : action;
         foreach (var brush in new[] { "IslandAccentFillBrush", "IslandAccentBrush" })
@@ -254,10 +280,11 @@ internal sealed class IslandGrid : UserControl
         ShowPercent();
     }
 
-    private bool Muted => _volumeSource?.Muted?.Invoke() == true && _volume.IsEnabled;
+    private bool Muted => _volume.IsEnabled && _volumeSource?.Muted?.Invoke() == true;
 
     private void ShowPercent()
     {
+        _percent.Visibility = _volume.IsEnabled ? Visibility.Visible : Visibility.Collapsed;
         if (_volumeFailed.IsEnabled) return;
         bool muted = Muted;
         _percent.Text = !_volume.IsEnabled ? "" : muted ? "Muted" : $"{Math.Round(_volume.Value).ToString(CultureInfo.CurrentCulture)}%";
@@ -329,8 +356,12 @@ internal sealed class IslandGrid : UserControl
         for (int i = 0; i < _shown.Count; i++)
             _tiles.Children[i].Visibility = _shown[i].Name.Contains(query, StringComparison.CurrentCultureIgnoreCase)
                 ? Visibility.Visible : Visibility.Collapsed;
-        _empty.Visibility = Buttons().Any() ? Visibility.Collapsed : Visibility.Visible;
-        _empty.Text = query.Length == 0 ? "No tools to show" : "No matching tools";
+        _empty.Visibility = _emptyAction.Visibility = Buttons().Any() ? Visibility.Collapsed : Visibility.Visible;
+        bool filtering = query.Length > 0;
+        _empty.Text = filtering ? "No matching tools" : "No tools to show";
+        string action = filtering ? "Clear search" : "Open settings";
+        _emptyAction.Content = action;
+        AutomationProperties.SetName(_emptyAction, action);
     }
 
     internal IEnumerable<ButtonBase> Buttons() => _tiles.Children.OfType<ButtonBase>().Where(b => b.Visibility == Visibility.Visible);
@@ -358,9 +389,16 @@ internal sealed class IslandGrid : UserControl
             e.Handled = true;
             return;
         }
+        if (_search.IsKeyboardFocused && e.Key == Key.Down && Buttons().FirstOrDefault() is { } first)
+        {
+            first.Focus();
+            e.Handled = true;
+            return;
+        }
         if (e.Key is Key.Left or Key.Right or Key.Up or Key.Down && Keyboard.FocusedElement is IslandGalleryTile from)
         {
-            Next(from, e.Key)?.Focus();
+            if (Next(from, e.Key) is { } next) next.Focus();
+            else if (IsSearching && e.Key == Key.Up) _search.Focus();
             e.Handled = true;
         }
     }

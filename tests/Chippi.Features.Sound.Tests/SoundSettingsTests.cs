@@ -6,7 +6,6 @@ using System.Windows.Automation;
 using System.Windows.Automation.Peers;
 using System.Windows.Automation.Provider;
 using System.Windows.Controls;
-using System.Windows.Threading;
 using Chippi.Audio;
 using Chippi.Audio.Processing;
 using Chippi.Features.Sound.Mute;
@@ -15,6 +14,7 @@ using Chippi.Features.Sound.Routing;
 using Chippi.Features.Sound.Volume;
 using Chippi.UI.Controls;
 using static Chippi.Audio.Tests.FakeDeviceSystem;
+using static Chippi.Features.Sound.Tests.SoundUiThread;
 
 namespace Chippi.Features.Sound.Tests;
 
@@ -175,17 +175,21 @@ public sealed class SoundSettingsTests
         {
             var view = Assert.IsType<MicMuteView>(f.Ui.Page!("mute"));
             view.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent)); // follow the module, as a shown page does
-            string Header() => (string)Descendants(view).OfType<SettingRow>().Single().Header;
-            Assert.Equal("Volume", Header());
-            f.System.ChangeDefault("CableOut"); // VB-CABLE as the default mic, with routing off: no level to tell
-            await Until(() => Header() == "Microphone");
-            f.System.ChangeDefault("A");
-            await Until(() => Header() == "Volume");
+            try
+            {
+                string Header() => (string)Descendants(view).OfType<SettingRow>().Single().Header;
+                Assert.Equal("Volume", Header());
+                f.System.ChangeDefault("CableOut"); // VB-CABLE as the default mic, with routing off: no level to tell
+                await Until(() => Header() == "Microphone");
+                f.System.ChangeDefault("A");
+                await Until(() => Header() == "Volume");
 
-            var mute = Descendants(view).OfType<Button>().Single(b => AutomationProperties.GetName(b) == "Mute all microphones");
-            ((IInvokeProvider)new ButtonAutomationPeer(mute)).Invoke();
-            await Until(() => view.IsEnabled && f.Module.Status.State == MicrophoneMuteState.Muted);
-            Assert.Equal("Unmute", Descendants(view).OfType<Button>().Single(b => AutomationProperties.GetName(b) == "Unmute all microphones").Content);
+                var mute = Descendants(view).OfType<Button>().Single(b => AutomationProperties.GetName(b) == "Mute all microphones");
+                ((IInvokeProvider)new ButtonAutomationPeer(mute)).Invoke();
+                await Until(() => view.IsEnabled && f.Module.Status.State == MicrophoneMuteState.Muted);
+                Assert.Equal("Unmute", Descendants(view).OfType<Button>().Single(b => AutomationProperties.GetName(b) == "Unmute all microphones").Content);
+            }
+            finally { view.RaiseEvent(new RoutedEventArgs(FrameworkElement.UnloadedEvent)); }
         });
     }
 
@@ -305,28 +309,4 @@ public sealed class SoundSettingsTests
         }
     }
 
-    private static Task Sta(Action run) => Sta(() => { run(); return Task.CompletedTask; });
-
-    private static Task Sta(Func<Task> run)
-    {
-        var done = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var thread = new Thread(() =>
-        {
-            var dispatcher = Dispatcher.CurrentDispatcher;
-            SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(dispatcher));
-            Exception? error = null;
-            dispatcher.BeginInvoke(async () =>
-            {
-                try { await run(); }
-                catch (Exception ex) { error = ex; }
-                finally { dispatcher.BeginInvokeShutdown(DispatcherPriority.Background); }
-            });
-            Dispatcher.Run();
-            if (error is null) done.SetResult();
-            else done.SetException(error);
-        });
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        return done.Task;
-    }
 }

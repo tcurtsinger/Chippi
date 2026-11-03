@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Documents;
+using System.Windows.Media;
 using Chippi.App.Island.Media;
 using Chippi.UI.Controls;
 
@@ -15,6 +16,8 @@ internal sealed class IslandHomeMedia : UserControl
 {
     private readonly Button _link = new() { Height = 32, Padding = new Thickness(6, 0, 6, 0) };
     private readonly LucideIcon _glyph = new() { Size = 16 };
+    private readonly Border _cover = new() { Width = 22, Height = 22, CornerRadius = new CornerRadius(4),
+        BorderThickness = new Thickness(1), Visibility = Visibility.Collapsed };
     private readonly Run _title = new() { FontWeight = FontWeights.SemiBold };
     private readonly Run _detail = new();
     private readonly TextBlock _line = new() { FontSize = 12, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center };
@@ -25,6 +28,7 @@ internal sealed class IslandHomeMedia : UserControl
     {
         _link.SetResourceReference(StyleProperty, "IslandListRowStyle");
         _glyph.SetResourceReference(LucideIcon.BrushProperty, "IslandTextSecondaryBrush");
+        _cover.SetResourceReference(Border.BorderBrushProperty, "IslandBorderBrush");
         _title.SetResourceReference(TextElement.ForegroundProperty, "IslandTextBrush");
         _detail.SetResourceReference(TextElement.ForegroundProperty, "IslandTextSecondaryBrush");
         _line.Inlines.Add(_title);
@@ -35,7 +39,8 @@ internal sealed class IslandHomeMedia : UserControl
         var overlay = new Canvas { IsHitTestVisible = false, Children = { _previousLine } };
         var text = new Grid { Margin = new Thickness(8, 0, 0, 0), ClipToBounds = true, Children = { _line, overlay } };
         DockPanel.SetDock(arrow, Dock.Right);
-        _link.Content = new DockPanel { VerticalAlignment = VerticalAlignment.Center, Children = { _glyph, arrow, text } };
+        var art = new Grid { Width = 22, Height = 22, Children = { _glyph, _cover } };
+        _link.Content = new DockPanel { VerticalAlignment = VerticalAlignment.Center, Children = { art, arrow, text } };
         _link.Click += (_, _) => OpenRequested?.Invoke(this, EventArgs.Empty);
         AutomationProperties.SetName(_link, "Now Playing");
         Content = _link;
@@ -72,9 +77,14 @@ internal sealed class IslandHomeMedia : UserControl
     {
         var track = _media?.Current;
         _glyph.Data = track?.Playing == true ? LucideIcons.AudioLines : LucideIcons.Music;
+        var artwork = track?.Artwork;
+        if ((_cover.Background as ImageBrush)?.ImageSource != artwork)
+            _cover.Background = artwork is null ? null : new ImageBrush(artwork) { Stretch = Stretch.UniformToFill };
+        _cover.Visibility = artwork is null ? Visibility.Collapsed : Visibility.Visible;
+        _glyph.Visibility = artwork is null ? Visibility.Visible : Visibility.Collapsed;
         string title = track is null ? "Now Playing" : track.Title.Length > 0 ? track.Title : track.Source;
         string detail = track is null ? "Nothing playing" : track.Artist;
-        string second = detail.Length > 0 ? "\u2002\u2002" + detail : "";
+        string second = detail.Length == 0 ? "" : (track is null ? "\u2002\u2002" : " · ") + detail;
         if (_title.Text == title && _detail.Text == second)
             return;
 

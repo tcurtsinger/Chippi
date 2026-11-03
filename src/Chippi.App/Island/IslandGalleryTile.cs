@@ -13,12 +13,12 @@ namespace Chippi.App.Island;
 /// <summary>The entire tile opens its destination. Its live reading is available on hover and to assistive technology.</summary>
 internal sealed class IslandGalleryTile : Button
 {
-    internal const double Gutter = 6;
-    private readonly LucideIcon _glyph = new() { Size = 25 };
+    internal const double Gutter = 8;
+    private readonly LucideIcon _glyph = new() { Size = 24 };
     private readonly Ellipse _waiting = new() { Width = 8, Height = 8, StrokeThickness = 1.5,
         HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, -1, -4, 0) };
-    private readonly TextBlock _name = new() { FontSize = 12, FontWeight = FontWeights.Medium,
-        TextAlignment = TextAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(3, 6, 3, 0) };
+    private readonly TextBlock _name = new() { FontSize = 13, FontWeight = FontWeights.Medium,
+        TextAlignment = TextAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(4, 4, 4, 0) };
 
     internal IslandGalleryTile(IslandTileView tile, Action<string> open)
     {
@@ -37,7 +37,7 @@ internal sealed class IslandGalleryTile : Button
     {
         _glyph.Data = tile.Icon;
         _glyph.SetResourceReference(LucideIcon.BrushProperty,
-            tile.Caution && !tile.Waiting ? "WarningBrush" : tile.On ? "IslandAccentBrush" : "IslandTextBrush");
+            tile.Caution && !tile.Waiting ? "WarningBrush" : tile.On ? "IslandAccentBrush" : "IslandTextSecondaryBrush");
         _waiting.Visibility = tile.Waiting ? Visibility.Visible : Visibility.Collapsed;
         _name.Text = tile.Name;
         string destination = tile.Page is { } page && page != tile.Name ? $"{tile.Name} · {page}" : tile.Name;

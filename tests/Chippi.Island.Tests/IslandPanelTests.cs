@@ -104,7 +104,7 @@ public sealed class IslandPanelTests
         {
             Open(panel);
             var home = panel.Footprint;
-            Assert.Equal((520, 169), Size(panel));
+            Assert.Equal((520, 174), Size(panel));
             foreach (var key in new[] { "keep-awake", IslandPanelWindow.NowPlayingKey, "sound.mixer" })
             {
                 panel.ShowPage(key);
@@ -699,7 +699,7 @@ public sealed class IslandPanelTests
             if (!Chippi.UI.Themes.Motion.IsReduced)
                 Assert.Equal(Puck.Width, shape.Width, 3); // the first frame is the puck
             IslandWindowTests.Settle(panel);
-            Assert.Equal((520, 169), Size(panel));
+            Assert.Equal((520, 174), Size(panel));
             Assert.Equal(1, ((FrameworkElement)panel.FindName("Card")).Opacity);
         }));
     }

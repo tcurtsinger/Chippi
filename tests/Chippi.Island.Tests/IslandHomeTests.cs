@@ -113,9 +113,23 @@ public sealed class IslandHomeTests
         field.Text = "unmatched";
         Assert.Empty(grid.Buttons());
         Assert.Equal(Visibility.Visible, Find<TextBlock>(grid, t => t.Text == "No matching tools").Visibility);
+        Click(Find<Button>(grid, b => Equals(b.Content, "Clear search")));
+        Assert.True(grid.IsSearching);
+        Assert.Equal("", field.Text);
+        Assert.Equal(tiles.Length, grid.Buttons().Count());
         Assert.True(grid.CloseSearch());
         Assert.False(grid.IsSearching);
         Assert.Equal(tiles.Length, grid.Buttons().Count());
+
+        // The standard Windows Find command routes from a tool to the same field as the header button.
+        ApplicationCommands.Find.Execute(null, grid.Buttons().First());
+        Assert.True(grid.IsSearching);
+        grid.CloseSearch();
+        grid.SetTiles([]);
+        bool settingsOpened = false;
+        grid.SettingsRequested += (_, _) => settingsOpened = true;
+        Click(Find<Button>(grid, b => Equals(b.Content, "Open settings")));
+        Assert.True(settingsOpened);
     });
 
     [Fact]
@@ -155,11 +169,11 @@ public sealed class IslandHomeTests
         Assert.NotNull(Find<TextBlock>(grid, t => t.Text == "50%"));
 
         // The speaker mutes, as in Quick Settings; muted, the speaker and "Muted" are in Caution.
-        Click(Find<Button>(grid, b => AutomationProperties.GetName(b) == "Mute"));
+        Click(Find<Button>(grid, b => AutomationProperties.GetName(b) == "Mute system volume"));
         Assert.True(muted);
         var percent = Find<TextBlock>(grid, t => t.Text == "Muted");
         Assert.Same(grid.FindResource("WarningTextBrush"), percent.Foreground);
-        var speaker = Find<Button>(grid, b => AutomationProperties.GetName(b) == "Unmute");
+        var speaker = Find<Button>(grid, b => AutomationProperties.GetName(b) == "Unmute system volume");
         Assert.Same(LucideIcons.VolumeMuted, ((LucideIcon)speaker.Content).Data);
         Click(speaker);
         Assert.False(muted);
@@ -204,9 +218,16 @@ public sealed class IslandHomeTests
         Assert.Contains("Various Artists", AutomationProperties.GetHelpText(card));
         Assert.Null(Find<Button>(grid.Media, b => AutomationProperties.GetName(b) == "Pause"));
 
+        // Artwork can arrive after the title. It replaces the glyph without moving the footer.
+        var cover = new System.Windows.Media.DrawingImage();
+        media.Sessions = [track with { Artwork = cover }];
+        grid.SetMedia(media);
+        var coverFace = Find<Border>(grid.Media, b => b.Background is System.Windows.Media.ImageBrush art && art.ImageSource == cover);
+        Assert.Equal(Visibility.Visible, coverFace.Visibility);
         string title = string.Concat(Enumerable.Repeat("A long track title ", 10)).Trim();
         media.Sessions = [track with { Playing = false, Title = title }];
         grid.SetMedia(media);
+        Assert.Equal(Visibility.Collapsed, coverFace.Visibility);
         Assert.Contains(title, AutomationProperties.GetHelpText(card));
         Assert.Contains(title, card.ToolTip?.ToString());
         media.Sessions = [track with { Title = "", Artist = "" }];
@@ -255,7 +276,9 @@ public sealed class IslandHomeTests
             host.Show();
             var names = new List<string> { "Find a tool" };
             if (features)
-                names.AddRange(["Open keep-awake", "Open shelf", "Keep awake", "Mute", "System volume"]);
+                names.AddRange(["Open keep-awake", "Open shelf", "Keep awake", "Mute system volume", "System volume"]);
+            else
+                names.Add("Open settings");
             names.AddRange(petRight ? ["Now Playing", "Settings", "Chippi"] : ["Chippi", "Settings", "Now Playing"]);
             Control Visit(Control from, FocusNavigationDirection direction, string name)
             {

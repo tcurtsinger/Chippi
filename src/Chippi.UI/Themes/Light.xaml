@@ -78,6 +78,8 @@
     <SolidColorBrush x:Key="IslandFooterBrush" Color="#09000000" />
     <SolidColorBrush x:Key="IslandHairBrush" Color="#14000000" />
     <SolidColorBrush x:Key="IslandPanelBrush" Color="#BDFFFFFF" />
+    <SolidColorBrush x:Key="IslandGalleryFaceBrush" Color="#73FFFFFF" />
+    <SolidColorBrush x:Key="IslandGalleryHoverBrush" Color="#FFFFFF" />
     <SolidColorBrush x:Key="IslandCardBorderBrush" Color="#0F000000" />
     <SolidColorBrush x:Key="IslandButtonBrush" Color="#DBFFFFFF" />
     <SolidColorBrush x:Key="IslandButtonHoverBrush" Color="#F6F6F6" />

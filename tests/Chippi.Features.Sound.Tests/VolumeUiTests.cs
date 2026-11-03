@@ -6,11 +6,12 @@ using System.Windows.Automation;
 using System.Windows.Automation.Peers;
 using System.Windows.Automation.Provider;
 using System.Windows.Input;
-using System.Windows.Threading;
 using Chippi.Audio;
 using Chippi.Features.Sound.Volume;
 using Chippi.UI.Controls;
 using static Chippi.Features.Sound.Tests.RoutingFixture;
+using static Chippi.Features.Sound.Tests.SoundUiThread;
+
 namespace Chippi.Features.Sound.Tests;
 public sealed class VolumeUiTests
 {
@@ -82,10 +83,12 @@ public sealed class VolumeUiTests
         {
             var view = new VolumeView(f.Module, VolumeSurface.Island);
             view.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));
-            var slider = Descendants(view).OfType<Slider>().Single();
-            view.RaiseEvent(new RoutedEventArgs(FrameworkElement.UnloadedEvent));
+            Slider slider;
+            try { slider = Descendants(view).OfType<Slider>().Single(); }
+            finally { view.RaiseEvent(new RoutedEventArgs(FrameworkElement.UnloadedEvent)); }
             view.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));
-            Assert.Same(slider, Descendants(view).OfType<Slider>().Single());
+            try { Assert.Same(slider, Descendants(view).OfType<Slider>().Single()); }
+            finally { view.RaiseEvent(new RoutedEventArgs(FrameworkElement.UnloadedEvent)); }
             return Task.CompletedTask;
         });
     }
@@ -99,9 +102,12 @@ public sealed class VolumeUiTests
         {
             var view = new VolumeView(f.Module, VolumeSurface.Island);
             view.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));
-            await Assert.ThrowsAnyAsync<InvalidOperationException>(() => f.Module.SetOutputAsync(VolumeFixture.Key, "B"));
-            await Until(() => Descendants(view).OfType<TextBlock>().Any(t => t.Text == "Switch failed · Music" && t.Visibility == Visibility.Visible));
-            view.RaiseEvent(new RoutedEventArgs(FrameworkElement.UnloadedEvent));
+            try
+            {
+                await Assert.ThrowsAnyAsync<InvalidOperationException>(() => f.Module.SetOutputAsync(VolumeFixture.Key, "B"));
+                await Until(() => Descendants(view).OfType<TextBlock>().Any(t => t.Text == "Switch failed · Music" && t.Visibility == Visibility.Visible));
+            }
+            finally { view.RaiseEvent(new RoutedEventArgs(FrameworkElement.UnloadedEvent)); }
             Assert.Null(f.Module.Error);
 
             view.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));
@@ -154,28 +160,31 @@ public sealed class VolumeUiTests
         {
             var island = new VolumeView(f.Module, VolumeSurface.Island);
             island.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));
-            Slider[] Faders() => Descendants(island).OfType<Slider>().ToArray();
-            Assert.Equal(["Music volume", "Quiet volume"], Faders().Select(AutomationProperties.GetName));
-            var settings = new VolumeView(f.Module, VolumeSurface.Settings);
-            Assert.Equal(["Music volume", "Quiet volume"], Descendants(settings).OfType<Slider>().Select(AutomationProperties.GetName));
-            Assert.Contains(Descendants(settings).OfType<TextBlock>(), t => t.Text == "Not playing" && t.Visibility == Visibility.Visible);
-            // Captioned or not, the rows are one height, so a caption coming and going moves nothing.
-            var card = Descendants(settings).OfType<Card>().First();
-            Assert.All(card.Children.OfType<Border>(), row => Assert.Equal(SettingsLayout.CaptionRowHeight, row.MinHeight));
+            try
+            {
+                Slider[] Faders() => Descendants(island).OfType<Slider>().ToArray();
+                Assert.Equal(["Music volume", "Quiet volume"], Faders().Select(AutomationProperties.GetName));
+                var settings = new VolumeView(f.Module, VolumeSurface.Settings);
+                Assert.Equal(["Music volume", "Quiet volume"], Descendants(settings).OfType<Slider>().Select(AutomationProperties.GetName));
+                Assert.Contains(Descendants(settings).OfType<TextBlock>(), t => t.Text == "Not playing" && t.Visibility == Visibility.Visible);
+                // Captioned or not, the rows are one height, so a caption coming and going moves nothing.
+                var card = Descendants(settings).OfType<Card>().First();
+                Assert.All(card.Children.OfType<Border>(), row => Assert.Equal(SettingsLayout.CaptionRowHeight, row.MinHeight));
 
-            var fader = Faders()[1];
-            Assert.Equal("Quiet · Not playing · Default", AutomationProperties.GetHelpText(fader));
-            ((IRangeValueProvider)new SliderAutomationPeer(fader)).SetValue(35);
-            await Until(() => f.System.SessionById("quiet").Volume == .35f && f.System.SessionById("quiet-2").Volume == .35f);
-            Assert.Equal(.5f, f.System.SessionById("one").Volume);
-            f.System.EndSession("quiet");
-            await f.Audio.RefreshAsync();
-            Assert.Same(fader, Faders()[1]);
-            f.System.EndSession("quiet-2");
-            await f.Audio.RefreshAsync();
-            await Until(() => Faders().Length == 1);
-            Assert.Equal("Music volume", AutomationProperties.GetName(Faders()[0]));
-            island.RaiseEvent(new RoutedEventArgs(FrameworkElement.UnloadedEvent));
+                var fader = Faders()[1];
+                Assert.Equal("Quiet · Not playing · Default", AutomationProperties.GetHelpText(fader));
+                ((IRangeValueProvider)new SliderAutomationPeer(fader)).SetValue(35);
+                await Until(() => f.System.SessionById("quiet").Volume == .35f && f.System.SessionById("quiet-2").Volume == .35f);
+                Assert.Equal(.5f, f.System.SessionById("one").Volume);
+                f.System.EndSession("quiet");
+                await f.Audio.RefreshAsync();
+                Assert.Same(fader, Faders()[1]);
+                f.System.EndSession("quiet-2");
+                await f.Audio.RefreshAsync();
+                await Until(() => Faders().Length == 1);
+                Assert.Equal("Music volume", AutomationProperties.GetName(Faders()[0]));
+            }
+            finally { island.RaiseEvent(new RoutedEventArgs(FrameworkElement.UnloadedEvent)); }
         });
     }
 
@@ -222,14 +231,18 @@ public sealed class VolumeUiTests
         {
             var view = new VolumeView(f.Module, VolumeSurface.Island);
             view.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent)); // follows the module, as on screen
-            var slider = Descendants(view).OfType<Slider>().Single();
-            f.System.SetSessionVolume("one", 0.8f);
-            f.System.WithSession(VolumeFixture.Session("aaa", "A", 301, @"C:\Apps\Aaa.exe", SessionState.Inactive) with { AppName = "Aaa" });
-            await f.Audio.RefreshAsync();
-            await Until(() => Descendants(view).OfType<Slider>().Count() == 2);
-            Assert.Equal(["Aaa volume", "Music volume"], Descendants(view).OfType<Slider>().Select(AutomationProperties.GetName));
-            Assert.Same(slider, Descendants(view).OfType<Slider>().Last());
-            Assert.Equal(80, slider.Value, 3);
+            try
+            {
+                var slider = Descendants(view).OfType<Slider>().Single();
+                f.System.SetSessionVolume("one", 0.8f);
+                f.System.WithSession(VolumeFixture.Session("aaa", "A", 301, @"C:\Apps\Aaa.exe", SessionState.Inactive) with { AppName = "Aaa" });
+                await f.Audio.RefreshAsync();
+                await Until(() => Descendants(view).OfType<Slider>().Count() == 2);
+                Assert.Equal(["Aaa volume", "Music volume"], Descendants(view).OfType<Slider>().Select(AutomationProperties.GetName));
+                Assert.Same(slider, Descendants(view).OfType<Slider>().Last());
+                Assert.Equal(80, slider.Value, 3);
+            }
+            finally { view.RaiseEvent(new RoutedEventArgs(FrameworkElement.UnloadedEvent)); }
         });
     }
 
@@ -258,12 +271,16 @@ public sealed class VolumeUiTests
         {
             var view = new VolumeView(f.Module, VolumeSurface.Island);
             view.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent)); // follows the module, as on screen
-            var output = Descendants(view).OfType<Button>().Single(b => AutomationProperties.GetName(b) == "Music output");
-            Assert.Equal("Plays on A · Default", output.ToolTip);
-            await f.Module.SetOutputAsync(VolumeFixture.Key, "B");
-            await Until(() => Equals(output.ToolTip, "Picked B · still plays on A"));
-            var glyph = (Chippi.UI.Controls.LucideIcon)output.Content;
-            Assert.Equal(Chippi.UI.Controls.LucideIcons.Ellipsis, glyph.Data);
+            try
+            {
+                var output = Descendants(view).OfType<Button>().Single(b => AutomationProperties.GetName(b) == "Music output");
+                Assert.Equal("Plays on A · Default", output.ToolTip);
+                await f.Module.SetOutputAsync(VolumeFixture.Key, "B");
+                await Until(() => Equals(output.ToolTip, "Picked B · still plays on A"));
+                var glyph = (Chippi.UI.Controls.LucideIcon)output.Content;
+                Assert.Equal(Chippi.UI.Controls.LucideIcons.Ellipsis, glyph.Data);
+            }
+            finally { view.RaiseEvent(new RoutedEventArgs(FrameworkElement.UnloadedEvent)); }
         });
     }
 
@@ -311,24 +328,5 @@ public sealed class VolumeUiTests
         yield return root;
         foreach(var child in LogicalTreeHelper.GetChildren(root).OfType<DependencyObject>())
             foreach(var item in Descendants(child)) yield return item;
-    }
-    private static Task Sta(Func<Task> run)
-    {
-        var done=new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var thread=new Thread(()=>
-        {
-            var dispatcher=Dispatcher.CurrentDispatcher;
-            SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(dispatcher));
-            Exception? error=null;
-            dispatcher.BeginInvoke(async()=>
-            {
-                try { await run(); } catch(Exception ex) { error=ex; }
-                finally { dispatcher.BeginInvokeShutdown(DispatcherPriority.Background); }
-            });
-            Dispatcher.Run();
-            if(error is null) done.SetResult(); else done.SetException(error);
-        });
-        thread.SetApartmentState(ApartmentState.STA); thread.Start();
-        return done.Task;
     }
 }
