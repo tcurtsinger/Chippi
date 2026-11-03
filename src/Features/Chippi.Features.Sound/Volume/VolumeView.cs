@@ -10,6 +10,7 @@ using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using Chippi.Audio;
+using Chippi.Core.Modules;
 using Chippi.Features.Sound.Routing;
 using Chippi.UI.Controls;
 using Chippi.UI.Themes;
@@ -28,6 +29,7 @@ public enum VolumeSurface { Settings, Island }
 public sealed class VolumeView : UserControl
 {
     private const int AppsPerPage = 8;
+    private const double SystemStripWidth = 65;
 
     private readonly AppVolumeModule _module;
     private readonly VolumeSurface _surface;
@@ -196,18 +198,21 @@ public sealed class VolumeView : UserControl
         int onPage = visible.Count;
         if (system is not null) visible.Insert(0, system);
         var bank = (Grid)_list;
-        int columns = Math.Min(AppsPerPage, other.Count) + (system is null ? 0 : 1);
-        if (bank.ColumnDefinitions.Count != columns || (columns > 0 && bank.ColumnDefinitions[0].Width.IsAbsolute != (system is not null)))
+        // Matching gutters center just the apps on the panel; System sounds hugs the outer edge of the left gutter.
+        double gutter = system is null ? 0 : SystemStripWidth;
+        if (bank.ColumnDefinitions.Count != onPage + 2 || bank.ColumnDefinitions[0].MinWidth != gutter)
         {
             bank.ColumnDefinitions.Clear();
-            for (int i = 0; i < columns; i++)
-                bank.ColumnDefinitions.Add(new ColumnDefinition { Width = i == 0 && system is not null ? new GridLength(65) : new GridLength(1, GridUnitType.Star) });
+            bank.ColumnDefinitions.Add(new ColumnDefinition { MinWidth = gutter });
+            for (int i = 0; i < onPage; i++)
+                bank.ColumnDefinitions.Add(new ColumnDefinition { MaxWidth = IslandPage.ColumnWidth });
+            bank.ColumnDefinitions.Add(new ColumnDefinition { MinWidth = gutter });
         }
         Sync(visible.Select(a => a.Key).ToList(), Strip);
         for (int i = 0; i < visible.Count; i++)
         {
             var strip = _items[visible[i].Key].View;
-            Grid.SetColumn(strip, i);
+            Grid.SetColumn(strip, system is null ? i + 1 : i);
             _items[visible[i].Key].Trough!.Width = other.Count > 6 ? 27 : 33;
         }
         _empty.Visibility = visible.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
@@ -331,6 +336,8 @@ public sealed class VolumeView : UserControl
         Border? divider = null;
         if (system)
         {
+            strip.Width = SystemStripWidth;
+            strip.HorizontalAlignment = HorizontalAlignment.Left;
             divider = new Border { Width = 1, HorizontalAlignment = HorizontalAlignment.Right };
             divider.SetResourceReference(Border.BackgroundProperty, "IslandHairBrush");
             Grid.SetRowSpan(divider, 5);

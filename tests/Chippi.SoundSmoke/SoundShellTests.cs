@@ -213,26 +213,51 @@ public sealed class SoundShellTests
     });
 
     [Fact]
-    public Task System_sounds_stays_on_the_left_and_overflow_pages_only_the_apps() => SmokeDispatcher.Run(async () =>
+    public Task Apps_center_on_the_panel_as_sessions_join_and_overflow_while_system_sounds_stays_pinned() => SmokeDispatcher.Run(async () =>
     {
         await using var scene = new SoundScene();
         await scene.Start();
-        await scene.GrowMixerTo(9);
         var panel = OpenPanel(scene, new FakeMedia());
         try
         {
             var host = (ContentControl)panel.FindName("Page");
             panel.ShowPage(AppVolumeModule.TileKey);
-            List<string> Order()
+            double? pinnedCenter = null;
+            double Center(Slider slider) => slider.TranslatePoint(new Point(slider.ActualWidth / 2, 0), host).X;
+            IEnumerable<Slider> Sliders() => All<Slider>(host).Where(s => s.Orientation == Orientation.Vertical && s.IsVisible);
+            async Task<List<string>> CheckBank(int appCount, bool hasSystem = true)
             {
+                await SmokeDispatcher.Until(() => Sliders().Count() == appCount + (hasSystem ? 1 : 0)
+                    && Sliders().Any(s => AutomationProperties.GetName(s) == "System sounds volume") == hasSystem);
                 panel.UpdateLayout();
-                return All<Slider>(host).Where(s => s.Orientation == Orientation.Vertical && s.IsVisible)
-                    .OrderBy(s => s.TranslatePoint(default, host).X).Select(AutomationProperties.GetName).ToList();
+                var visible = Sliders().OrderBy(Center).ToList();
+                var centers = visible.Select(Center).ToList();
+                for (int i = 1; i < centers.Count; i++)
+                    Assert.True(centers[i] - centers[i - 1] >= 44, "Adjacent fader hit areas overlap");
+                if (hasSystem)
+                {
+                    Assert.Equal("System sounds volume", AutomationProperties.GetName(visible[0]));
+                    pinnedCenter ??= centers[0];
+                    Assert.InRange(Math.Abs(centers[0] - pinnedCenter.Value), 0, 1);
+                    centers.RemoveAt(0);
+                }
+                Assert.InRange(Math.Abs((centers[0] + centers[^1]) / 2 - host.ActualWidth / 2), 0, 1);
+                for (int i = 2; i < centers.Count; i++)
+                    Assert.InRange(Math.Abs((centers[i] - centers[i - 1]) - (centers[1] - centers[0])), 0, 1);
+                return visible.Select(AutomationProperties.GetName).ToList();
             }
 
-            var firstNine = Order();
-            Assert.Equal(9, firstNine.Count);
-            Assert.Equal("System sounds volume", firstNine[0]);
+            await CheckBank(1, hasSystem: false); // The initial Music session has no System sounds companion.
+            var music = scene.Devices.SessionById("music-session");
+            scene.Devices.WithSession(music with { SessionId = "notes", ProcessId = 124, ExePath = @"C:\Fake\Notes.exe", AppName = "Notes" });
+            await scene.Audio.RefreshAsync();
+            await CheckBank(2, hasSystem: false);
+            scene.Devices.EndSession("notes");
+            foreach (int appCount in new[] { 1, 2, 3, 8 })
+            {
+                await scene.GrowMixerTo(appCount + 1);
+                await CheckBank(appCount);
+            }
             // In the tightest bank the app's mute and output actions still have independent hit areas.
             var mute = Named<Button>(host, "Mute Discord");
             var output = Named<Button>(host, "Discord output");
@@ -242,23 +267,18 @@ public sealed class SoundShellTests
             Assert.False(muteBounds.IntersectsWith(outputBounds));
             Assert.DoesNotContain(All<Button>(host), b => b.IsVisible && AutomationProperties.GetName(b) == "Next apps");
             var system = Named<Slider>(host, "System sounds volume");
-            var systemX = system.TranslatePoint(default, host).X;
             ((IRangeValueProvider)new SliderAutomationPeer(system).GetPattern(PatternInterface.RangeValue)).SetValue(27);
             await SmokeDispatcher.Until(() => Math.Abs(scene.Volume.Apps.Single(a => a.Key == Chippi.Audio.AppKey.SystemSounds).Volume - .27f) < .001);
             Assert.Equal(.68f, scene.Volume.Apps.Single(a => a.Name == "Discord").Volume);
 
             await scene.GrowMixerTo(15);
             await SmokeDispatcher.Until(() => All<Button>(host).Any(b => b.IsVisible && AutomationProperties.GetName(b) == "Next apps"));
-            var first = Order();
-            Assert.Equal(9, first.Count);
+            var first = await CheckBank(8);
             Invoke(Named<Button>(host, "Next apps"));
             await SmokeDispatcher.Until(() => All<Button>(host).Any(b => b.IsEnabled && AutomationProperties.GetName(b) == "Previous apps"));
-            var second = Order();
-            Assert.Equal(7, second.Count);
-            Assert.Equal("System sounds volume", second[0]);
+            var second = await CheckBank(6);
             Assert.Equal(15, first.Union(second).Count());
             Assert.Same(system, Named<Slider>(host, "System sounds volume"));
-            Assert.Equal(systemX, system.TranslatePoint(default, host).X, 1);
         }
         finally { panel.Close(); }
     });

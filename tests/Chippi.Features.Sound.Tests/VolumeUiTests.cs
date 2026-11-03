@@ -48,7 +48,7 @@ public sealed class VolumeUiTests
             var view = new VolumeView(f.Module, VolumeSurface.Island);
             view.Measure(new Size(496, 304)); view.Arrange(new Rect(0, 0, 496, 304)); view.UpdateLayout();
             var bank = (Grid)((Grid)view.Content).Children[0];
-            Assert.Equal(visible, bank.ColumnDefinitions.Count);
+            Assert.Equal(visible, bank.Children.Count);
             Assert.Equal(visible, Descendants(bank).OfType<Slider>().Count());
             Assert.True(bank.DesiredSize.Width <= 496.001);
             Assert.True(bank.DesiredSize.Height <= 304.001);
