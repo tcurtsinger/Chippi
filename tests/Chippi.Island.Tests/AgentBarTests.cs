@@ -132,7 +132,7 @@ public sealed class AgentBarTests
             dwell.Fire();
             Assert.True(window.BarShown);
             Assert.Equal("Working · 43% · 2 sessions", window.ChipText);
-            Assert.Equal(Visibility.Collapsed, window.AgentMark.Visibility);
+            Assert.False(window.AgentMark.Tag is true); // the badge fades as the bar opens
             Assert.Equal(Key, ChipKey(window));
             Hover(Mouse.MouseLeaveEvent);
             Assert.False(window.BarShown);
@@ -200,7 +200,6 @@ public sealed class AgentBarTests
             window.SetActivities([waiting, mic, working], PetMood.Idle);
             Assert.False(window.BarShown);
             Assert.Equal(Visibility.Visible, window.AgentMark.Visibility);
-            Assert.Equal(Color(window, "PetSparkBrush"), ((SolidColorBrush)window.AgentMark.Fill).Color);
             Assert.Equal(Visibility.Visible, window.MicBadge.Visibility);
             Assert.Equal("Microphone muted. Agent waiting on you", AutomationProperties.GetHelpText(window.PuckButton));
             window.SetActivities([working], PetMood.Idle);
@@ -208,7 +207,6 @@ public sealed class AgentBarTests
             Assert.Equal(3, peek.Starts);
             peek.Fire();
             Assert.Equal(Visibility.Visible, window.AgentMark.Visibility);
-            Assert.Equal(Color(window, "IslandAccentBrush"), ((SolidColorBrush)window.AgentMark.Fill).Color);
             Assert.Equal("Agent working", AutomationProperties.GetHelpText(window.PuckButton));
             window.SetActivities([mic, working with { Title = "Working · 50%" }], PetMood.Idle);
             Assert.Equal(3, peek.Starts);
@@ -228,6 +226,53 @@ public sealed class AgentBarTests
             Assert.Equal(4, peek.Starts);
         }
         finally { window.Close(); }
+    });
+
+    [Theory]
+    [InlineData("Dark")]
+    [InlineData("Light")]
+    public void The_puck_uses_a_legible_gauge_badge_for_both_agent_states(string theme) => WpfTestThread.Run(() =>
+    {
+        var window = new IslandWindow();
+        try
+        {
+            window.Resources.MergedDictionaries.Add(new ResourceDictionary
+            {
+                Source = new Uri($"pack://application:,,,/Chippi.UI;component/Themes/{theme}.xaml"),
+            });
+            var timers = Timers(window);
+            var badge = window.AgentMark;
+            var rim = Assert.IsType<System.Windows.Shapes.Ellipse>(badge.Children[0]);
+            Assert.Equal((22d, 22d), (badge.Width, badge.Height));
+            Assert.Equal((18d, 18d), (window.AgentMarkPlate.Width, window.AgentMarkPlate.Height));
+            Assert.Same(window.FindResource("IslandBrush"), rim.Fill);
+            Assert.Equal((HorizontalAlignment.Left, VerticalAlignment.Bottom), (badge.HorizontalAlignment, badge.VerticalAlignment));
+            Assert.False(badge.IsHitTestVisible);
+            Assert.Equal(11d, window.AgentMarkIcon.Size);
+            Assert.Same(LucideIcons.Gauge, window.AgentMarkIcon.Data);
+
+            foreach (bool waiting in new[] { false, true })
+            {
+                window.SetActivities([Session(waiting)], PetMood.Idle);
+                timers[IslandWindow.AgentPeek].Fire();
+                Assert.Equal(Visibility.Visible, badge.Visibility);
+                Assert.Same(window.FindResource(waiting ? "PetSparkBrush" : "IslandAccentFillBrush"), window.AgentMarkPlate.Fill);
+                var ink = Assert.IsType<SolidColorBrush>(window.AgentMarkIcon.Brush).Color;
+                Assert.Equal(Color(window, "IslandOnAccentBrush"), ink);
+                var fills = waiting
+                    ? new[] { ((SolidColorBrush)window.AgentMarkPlate.Fill).Color }
+                    : ((LinearGradientBrush)window.AgentMarkPlate.Fill).GradientStops.Select(stop => stop.Color).ToArray();
+                Assert.All(fills, fill => Assert.True(Contrast(ink, fill) >= 3, $"{theme} gauge {ink} on {fill}"));
+            }
+        }
+        finally { window.Close(); }
+
+        static double Contrast(Color a, Color b)
+        {
+            static double Luminance(Color c) => 0.2126 * c.ScR + 0.7152 * c.ScG + 0.0722 * c.ScB;
+            double first = Luminance(a), second = Luminance(b);
+            return (Math.Max(first, second) + 0.05) / (Math.Min(first, second) + 0.05);
+        }
     });
 
     [Theory]

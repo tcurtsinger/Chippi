@@ -937,9 +937,9 @@ public partial class IslandWindow : Window
         bool bar = !_lifted && (dropTile is not null || feedback is not null || song is not null || top is not null);
         var puckAgent = bar ? null : _activities.FirstOrDefault(a => a.Kind == IslandActivityKind.Agent && a.NeedsAttention)
             ?? _activities.FirstOrDefault(a => a.Kind == IslandActivityKind.Agent);
-        AgentMark.Visibility = Shown(puckAgent is not null);
         if (puckAgent is not null)
-            AgentMark.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, puckAgent.NeedsAttention ? "PetSparkBrush" : "IslandAccentBrush");
+            AgentMarkPlate.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, puckAgent.NeedsAttention ? "PetSparkBrush" : "IslandAccentFillBrush");
+        ShowBadge(AgentMark, puckAgent is not null);
         _singing = bar && dropTile is null && feedback is null && song is not null;
         // Keep awake stays in sight while something else holds the bar (a song, a drag, another activity) or the puck is lifted.
         var keepAwake = _activities.FirstOrDefault(a => a.Kind == IslandActivityKind.Status && a.ModuleId == IslandHost.KeepAwakeModuleId);
@@ -1088,7 +1088,7 @@ public partial class IslandWindow : Window
     }
 
     /// <summary>
-    /// A badge on the puck (the muted mic's, Keep awake's) scales in from 0.6 as it fades in over 160ms, and fades out over
+    /// A badge on the puck (microphone, Keep awake or Agents) scales in from 0.6 as it fades in over 160ms, and fades out over
     /// 100ms when it goes; under reduced motion it only fades. It never changes the widget's size. Its Tag is whether it's up.
     /// </summary>
     private void ShowBadge(FrameworkElement badge, bool shown)
