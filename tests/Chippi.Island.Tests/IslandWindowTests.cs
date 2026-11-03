@@ -263,8 +263,9 @@ public sealed class IslandWindowTests
             Click(window);
             Assert.True(window.IsIslandOpen);
             Assert.True(window.IsHooked);
-            Assert.Equal(Visibility.Hidden, window.Body.Visibility); // the panel is the widget's shape now
+            Assert.Equal(Visibility.Visible, window.Body.Visibility); // the source carries the first native presentation
             Settle(window.Panel); // the morph out of the puck
+            Assert.Equal(Visibility.Hidden, window.Body.Visibility);
             Assert.Equal(0, window.PuckEnd.Opacity); // nothing of the puck left over the panel
             var area = window.CurrentArea!.Value;
             var panel = window.Panel.Footprint;
