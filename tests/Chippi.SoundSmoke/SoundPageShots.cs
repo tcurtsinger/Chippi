@@ -5,6 +5,8 @@
 using System.Diagnostics;
 using System.IO;
 using System.Windows;
+using System.Windows.Automation;
+using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Chippi.App.Flyout;
@@ -50,6 +52,7 @@ public sealed class SoundPageShots
             panel.SetTiles(Chippi.Core.Modules.IslandTileContribution.Group(scene.Shell.Registry.Features.SelectMany(e => e.IslandTiles)));
             panel.Open(IslandGeometry.Start(work, 1), new MonitorArea(default, area, work, 1));
             await SmokeDispatcher.Until(() => !panel.IsMorphing);
+            var host = (ContentControl)panel.FindName("Page");
             List<string> timings = [];
             async Task Show(string key)
             {
@@ -60,20 +63,67 @@ public sealed class SoundPageShots
                 await SmokeDispatcher.Until(() => !panel.IsMorphing);
                 timings.Add($"{key} render and layout {layout:F2} ms; settled {watch.Elapsed.TotalMilliseconds:F1} ms");
             }
+            Task WaitBank(int strips, string? range = null) => SmokeDispatcher.Until(() =>
+                SoundShellTests.All<Slider>(host).Count(s => s.IsVisible && s.Orientation == Orientation.Vertical) == strips &&
+                (range is null || SoundShellTests.All<TextBlock>(host).Any(t => t.IsVisible && t.Text == range)));
             await Show(SoundTile.Key);
             SavePanel("devices");
             await Show(AppVolumeModule.TileKey);
+            await WaitBank(4);
             SavePanel("mixer-four");
             await scene.GrowMixerTo(9, icons);
             await SmokeDispatcher.Until(() => scene.Volume.Apps.Count == 9);
             await Show(SoundTile.Key);
             await Show(AppVolumeModule.TileKey);
+            await WaitBank(9);
             SavePanel("mixer-nine");
             await scene.GrowMixerTo(15, icons);
             await SmokeDispatcher.Until(() => scene.Volume.Apps.Count == 15);
             await Show(SoundTile.Key);
             await Show(AppVolumeModule.TileKey);
+            await WaitBank(9, "1–8 of 14 apps");
             SavePanel("mixer-overflow");
+            SoundShellTests.Named<Button>(host, "Next apps").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            await WaitBank(7, "9–14 of 14 apps");
+            SavePanel("mixer-overflow-next");
+
+            // Match the owner's desktop: four channels at full level, including an idle Steam session.
+            var sessions = scene.Devices.GetSessions("speakers");
+            var steam = sessions.Single(s => s.AppName == "Steam");
+            foreach (var session in sessions)
+            {
+                if (session.IsSystemSounds || session.AppName is "Google Chrome" or "Zoom")
+                    scene.Devices.SetSessionVolume(session.SessionId, 1);
+                else
+                    scene.Devices.EndSession(session.SessionId);
+            }
+            scene.Devices.WithSession(steam with { SessionId = "steam-idle", State = Chippi.Audio.SessionState.Inactive, Volume = 1 });
+            await scene.Audio.RefreshAsync();
+            await SmokeDispatcher.Until(() => scene.Volume.Apps.Count == 4 && !scene.Volume.Apps.Single(a => a.Name == "Steam").IsActive);
+            await Show(SoundTile.Key);
+            await Show(AppVolumeModule.TileKey);
+            bool AtVolume(string app, int value) => SoundShellTests.All<Slider>(host).Any(s =>
+                AutomationProperties.GetName(s) == app + " volume" && Math.Round(s.Value) == value);
+            await SmokeDispatcher.Until(() => AtVolume("Google Chrome", 100) && AtVolume("Steam", 100));
+            SavePanel("mixer-full");
+            scene.Devices.SetSessionVolume("Google Chrome", .96f);
+            scene.Devices.SetSessionMute("Zoom", true);
+            await scene.Audio.RefreshAsync();
+            await SmokeDispatcher.Until(() => scene.Volume.Apps.Single(a => a.Name == "Zoom").Muted);
+            await SmokeDispatcher.Until(() => AtVolume("Google Chrome", 96) &&
+                SoundShellTests.All<Button>(host).Any(b => AutomationProperties.GetName(b) == "Unmute Zoom"));
+            SavePanel("mixer-muted");
+            scene.Devices.SetSessionVolume("Google Chrome", 0);
+            await scene.Audio.RefreshAsync();
+            await SmokeDispatcher.Until(() => AtVolume("Google Chrome", 0));
+            SavePanel("mixer-zero");
+            scene.Devices.Remove("speakers");
+            await scene.Audio.RefreshAsync();
+            await SmokeDispatcher.Until(() => scene.Volume.Apps.Count == 0);
+            await Show(SoundTile.Key);
+            await Show(AppVolumeModule.TileKey);
+            await SmokeDispatcher.Until(() => !SoundShellTests.All<Slider>(host).Any());
+            SavePanel("mixer-empty");
             File.WriteAllLines(Path.Combine(folder, "audio-timings.txt"), timings);
 
             void SavePanel(string name)

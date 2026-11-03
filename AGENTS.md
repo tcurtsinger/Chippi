@@ -29,6 +29,7 @@ A Windows 11 tray app for the owner's own PC (C#, .NET 10, WPF): a widget on the
 ## Run it
 
 - **Never against the real profile.** `CHIPPI_DEV_PROFILE=<name>` (or `--dev-profile <name>`) gives a run its own instance, settings (`%APPDATA%\Chippi-dev\<name>`) and logs (`%LOCALAPPDATA%\Chippi-dev\<name>\logs`). A dev profile is single-instance.
+- Seed a dev profile before starting it: `{"version":1,"modules":{},"features":{"preset":"custom","installed":["scratchpad"],"capabilitiesUsed":[]}}` starts just Scratchpad. Use an empty installed list for a shell-only run. A missing version makes the settings unreadable and starts the Essentials preset instead.
 - **Never install Sound modules in a dev profile:** routing claims the owner's default devices.
 - **AI agent usage in a dev profile** starts the owner's real `claude` and `codex` for its checks (about 1.5 s each, every 5 minutes, every minute while its page shows) and reads his sessions' files. Install it only for a run that needs it, and end the run once it's done. Its tests use fixtures; `CHIPPI_AGENTS_TIMINGS` and `CHIPPI_AGENTS_SCAN_TIMINGS` name reports for the page's open and the 5-second scan.
 - **Snapshots without showing anything:** a Debug build run with `--debug` saves PNGs to a folder with `--island-pages <dir>`, `--island-shots <dir>`, `--settings-snapshot <dir>` or `--flyout-snapshot <dir>` (the tray menu).
