@@ -92,7 +92,7 @@ public sealed class IslandWindowTests
             Hover(window, Mouse.MouseLeaveEvent);
             Pump(TimeSpan.FromMilliseconds(200));
             Assert.Same(window.FindResource("IslandWidgetBorderBrush"), window.Body.BorderBrush);
-            Assert.Equal(Chippi.UI.Pet.PetMood.Sleepy, window.Pet.Mood);
+            Assert.Equal(Chippi.UI.Pet.PetMood.Idle, window.Pet.Mood); // his eyes stay open for the quiet minute
         }));
     }
 
@@ -169,7 +169,11 @@ public sealed class IslandWindowTests
                 Assert.True(chippiRight
                     ? Left(window.Cover) < Left(window.Lines) && Left(window.Lines) < Left(window.Equalizer) && Left(window.Equalizer) < Left(window.PuckEnd)
                     : Left(window.PuckEnd) < Left(window.Equalizer) && Left(window.Equalizer) < Left(window.Lines) && Left(window.Lines) < Left(window.Cover));
-                Assert.Equal(123, window.Lines.ActualWidth, 1); // the same room either way
+                // Short lines stay together beside their cover instead of stranding it across the empty title column.
+                double gap = chippiRight ? Left(window.Lines) - Left(window.Cover) - window.Cover.ActualWidth
+                    : Left(window.Cover) - Left(window.Lines) - window.Lines.ActualWidth;
+                Assert.Equal(10, gap, 1);
+                Assert.Equal(Left(window.Song), Left(window.Detail), 1);
             }
         }));
     }
@@ -181,16 +185,20 @@ public sealed class IslandWindowTests
         {
             var timers = new List<(TimeSpan Interval, Action Tick)>();
             window.CreateTimer = (interval, tick) => { timers.Add((interval, tick)); return new StillTimer(); };
-            var media = new IslandPanelTests.FakeMedia { Sessions = [Track("Creep")] };
+            const string title = "Everything In Its Right Place (Live at the Ancient Theatre)";
+            var media = new IslandPanelTests.FakeMedia { Sessions = [Track(title)] };
             window.SetMedia(media);
             window.SetActivities([Playing], Chippi.UI.Pet.PetMood.Idle);
             Assert.Equal(Chippi.UI.Pet.PetMood.Listening, window.Pet.Mood);
 
-            media.Sessions = [Track("Creep", playing: false)];
+            var fade = window.Song.OpacityMask;
+            Assert.NotNull(fade);
+            media.Sessions = [Track(title, playing: false)];
             window.SetActivities([], Chippi.UI.Pet.PetMood.Sleepy); // paused: the activity goes
             Assert.True(window.BarShown);
             Assert.Equal(Visibility.Visible, window.PausedMark.Visibility);
             Assert.Equal(Visibility.Collapsed, window.Equalizer.Visibility);
+            Assert.Same(fade, window.Song.OpacityMask); // the title keeps its place when the equalizer becomes a pause mark
             Assert.Equal(Chippi.UI.Pet.PetMood.Idle, window.Pet.Mood); // the headphones come off
 
             var hold = Assert.Single(timers, t => t.Interval == IslandWindow.PauseHold);

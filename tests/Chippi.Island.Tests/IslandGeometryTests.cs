@@ -114,15 +114,23 @@ public sealed class IslandGeometryTests
         Assert.True(inside.Contains(panel), $"{panel} not inside {inside}");
     }
 
-    [Fact]
-    public void On_a_screen_too_small_for_the_panel_the_panel_stays_inside()
+    [Theory]
+    [InlineData(960, 492, 1, 520, 360)] // fits at the display's scale
+    [InlineData(812, 900, 2, 780, 540)] // narrow work area at 200%
+    [InlineData(960, 429, 1.5, 585, 405)] // short work area at 150%
+    public void The_panel_fits_the_inset_at_the_same_proportions(double width, double height, double scale, double expectedWidth, double expectedHeight)
     {
-        var work = new Rect(0, 0, 960, 492);
-        var puck = IslandGeometry.PuckRect(0.5, 0.5, work, 1);
-        var panel = new Rect(IslandGeometry.PanelOrigin(puck, Panel, work, 1), Panel);
+        var work = new Rect(-2000, -100, width, height);
         var inside = work;
-        inside.Inflate(-8, -8);
-        Assert.True(inside.Contains(panel));
+        inside.Inflate(-8 * scale, -8 * scale);
+        foreach (var x in new[] { 0.0, 0.5, 1.0 })
+        foreach (var y in new[] { 0.0, 0.5, 1.0 })
+        {
+            var puck = IslandGeometry.PuckRect(x, y, work, scale);
+            var panel = IslandGeometry.PanelRect(puck, work, scale);
+            Assert.Equal(new Size(expectedWidth, expectedHeight), panel.Size);
+            Assert.True(inside.Contains(panel));
+        }
     }
 
     [Theory]
@@ -193,5 +201,20 @@ public sealed class IslandGeometryTests
         Assert.Equal(start.Bottom, panel.Bottom);
         Assert.Equal(start.Right, panel.Right);
         Assert.Equal(new Rect(start.Right - 512, start.Top, 512, 100), IslandGeometry.BarRect(start, opensLeft: true, 2));
+    }
+
+    [Theory]
+    [InlineData(1, 25)]
+    [InlineData(1.25, 128)]
+    [InlineData(2, 231)]
+    public void A_bar_grip_keeps_its_local_point_at_any_display_scale(double scale, double gripX)
+    {
+        var pointer = new Point(-30, 640);
+        var grip = new Vector(gripX, 38);
+        var rect = IslandGeometry.HeldRect(pointer, grip, IslandGeometry.BarWidth, scale);
+        Assert.Equal(pointer, rect.TopLeft + grip * scale);
+        Assert.Equal(new Size(256 * scale, 50 * scale), rect.Size);
+        foreach (bool left in new[] { true, false })
+            Assert.Equal(rect, IslandGeometry.BarRect(IslandGeometry.PuckEnd(rect, left), left, scale));
     }
 }

@@ -3,7 +3,9 @@
 
 using System.Reflection;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using Chippi.App.Island;
 using Chippi.Core.Island;
@@ -35,6 +37,179 @@ public sealed class AgentBarTests
         (string?)typeof(IslandWindow).GetField("_chipKey", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(window);
 
     private static Color Color(IslandWindow window, string key) => ((SolidColorBrush)window.FindResource(key)).Color;
+
+    private sealed class ManualTimer(Action tick) : IIslandTimer
+    {
+        public int Starts { get; private set; }
+        public bool Running { get; private set; }
+        public void Start() { Starts++; Running = true; }
+        public void Stop() => Running = false;
+        public void Fire()
+        {
+            Assert.True(Running);
+            Running = false;
+            tick();
+        }
+    }
+
+    private static Dictionary<TimeSpan, ManualTimer> Timers(IslandWindow window)
+    {
+        var timers = new Dictionary<TimeSpan, ManualTimer>();
+        window.CreateTimer = (delay, tick) => timers[delay] = new ManualTimer(tick);
+        return timers;
+    }
+
+    [Fact]
+    public void The_quiet_puck_winds_down_for_a_full_minute_after_the_last_bar_panel_or_hover() =>
+        WpfTestThread.Run(() => IslandWindowTests.WithShownIsland(window =>
+        {
+            var timers = Timers(window);
+            window.PointerAt = () => new Point(-30000, -30000);
+            var waiting = Session(waiting: true);
+            window.SetActivities([waiting], PetMood.Idle);
+            timers[IslandWindow.AgentPeek].Fire();
+            Assert.False(window.BarShown);
+            Assert.Equal(PetMood.Idle, window.Pet.Mood);
+            var rest = timers[TimeSpan.FromSeconds(60)];
+            Assert.True(rest.Running);
+
+            window.SetActivities([waiting with { Source = "2 sessions" }], PetMood.Idle);
+            Assert.Equal(1, rest.Starts);
+            Assert.True(window.ShowPages(keyboard: false));
+            IslandWindowTests.Settle(window.Panel);
+            Assert.False(rest.Running);
+            window.Escape();
+            IslandWindowTests.Settle(window.Panel);
+            Assert.True(rest.Running);
+            Assert.Equal(2, rest.Starts);
+
+            void Hover(RoutedEvent e) => window.PuckButton.RaiseEvent(new MouseEventArgs(Mouse.PrimaryDevice, 0) { RoutedEvent = e });
+            Hover(Mouse.MouseEnterEvent);
+            Assert.False(rest.Running);
+            Hover(Mouse.MouseLeaveEvent);
+            Assert.Equal(3, rest.Starts);
+            rest.Fire();
+            Assert.Equal(PetMood.Sleepy, window.Pet.Mood);
+            Assert.Equal(Visibility.Visible, window.WaitingMark.Visibility);
+            window.SetActivities([waiting], PetMood.Idle);
+            Assert.False(rest.Running);
+            Assert.Equal(PetMood.Sleepy, window.Pet.Mood);
+        }));
+
+    [Fact]
+    public void A_progress_update_does_not_restart_a_peek_and_a_deliberate_hover_recalls_the_latest_lines() =>
+        WpfTestThread.Run(() => IslandWindowTests.WithShownIsland(window =>
+        {
+            var timers = Timers(window);
+            var puck = window.PuckRect;
+            // Stationary just outside the puck, where the right-hand widget's growing bar can trip MouseEnter.
+            var pointer = new Point(puck.Left - 15, puck.Top + puck.Height / 2);
+            window.PointerAt = () => pointer;
+            void Hover(RoutedEvent e) => window.PuckButton.RaiseEvent(new MouseEventArgs(Mouse.PrimaryDevice, 0) { RoutedEvent = e });
+            window.SetTiles(AgentsTile(out _));
+            var working = Session(false);
+            window.SetActivities([working], PetMood.Idle);
+            var peek = timers[IslandWindow.AgentPeek];
+            Hover(Mouse.MouseEnterEvent);
+            var updated = working with { Title = "Working · 43%", Source = "2 sessions", Monogram = "Cx" };
+            window.SetActivities([updated], PetMood.Idle);
+            Assert.Equal(1, peek.Starts);
+            peek.Fire();
+            Assert.False(window.BarShown);
+            Assert.Null(ChipKey(window));
+            Assert.Equal(Visibility.Collapsed, window.WaitingMark.Visibility);
+
+            // A quick pass leaves the puck alone. A dwell reveals the current reading and leaving folds it.
+            Hover(Mouse.MouseLeaveEvent);
+            pointer = new Point(puck.Left + puck.Width / 2, puck.Top + puck.Height / 2);
+            Hover(Mouse.MouseEnterEvent);
+            var dwell = timers[IslandWindow.AgentHoverDelay];
+            Assert.False(window.BarShown);
+            Hover(Mouse.MouseLeaveEvent);
+            Assert.False(dwell.Running);
+            Hover(Mouse.MouseEnterEvent);
+            dwell.Fire();
+            Assert.True(window.BarShown);
+            Assert.Equal("Working · 43% · 2 sessions", window.ChipText);
+            Assert.Equal(Key, ChipKey(window));
+            Hover(Mouse.MouseLeaveEvent);
+            Assert.False(window.BarShown);
+            window.SetActivities([working], PetMood.Idle);
+            Assert.False(window.BarShown);
+        }));
+
+    [Fact]
+    public void Crossing_from_a_timers_text_onto_Chippi_starts_one_dwell_and_leaving_the_bar_returns_the_timer() =>
+        WpfTestThread.Run(() => IslandWindowTests.WithShownIsland(window =>
+        {
+            var timers = Timers(window);
+            var puck = window.PuckRect;
+            var text = new Point(puck.Left - 35, puck.Top + puck.Height / 2);
+            var pet = new Point(puck.Left + puck.Width / 2, text.Y);
+            var pointer = text;
+            window.PointerAt = () => pointer;
+            void Move(Point to, RoutedEvent e)
+            {
+                pointer = to;
+                window.PuckButton.RaiseEvent(new MouseEventArgs(Mouse.PrimaryDevice, 0) { RoutedEvent = e });
+            }
+            window.SetActivities([Session(true), new IslandActivity("timer", IslandActivityKind.Timer, "18:42", "Focus timer")], PetMood.Idle);
+            timers[IslandWindow.AgentPeek].Fire();
+            Assert.Equal("18:42 · Focus timer", window.ChipText);
+            Move(text, Mouse.MouseEnterEvent);
+            Assert.DoesNotContain(IslandWindow.AgentHoverDelay, timers.Keys);
+            Move(pet, Mouse.PreviewMouseMoveEvent);
+            var dwell = timers[IslandWindow.AgentHoverDelay];
+            Move(text, Mouse.PreviewMouseMoveEvent);
+            Assert.False(dwell.Running);
+            Move(pet, Mouse.PreviewMouseMoveEvent);
+            Move(new Point(pet.X + 2, pet.Y), Mouse.PreviewMouseMoveEvent);
+            Assert.Equal(2, dwell.Starts);
+            dwell.Fire();
+            Move(text, Mouse.PreviewMouseMoveEvent);
+            Assert.Equal(Key, ChipKey(window));
+            Move(text, Mouse.MouseLeaveEvent);
+            Assert.Equal("18:42 · Focus timer", window.ChipText);
+        }));
+
+    [Fact]
+    public void Waiting_previews_then_yields_to_the_next_activity_or_leaves_an_accessible_mark() => WpfTestThread.Run(() =>
+    {
+        var window = new IslandWindow();
+        try
+        {
+            var timers = Timers(window);
+            var working = Session(false);
+            var waiting = Session(true);
+            var timer = new IslandActivity("timer", IslandActivityKind.Timer, "18:42", "Focus timer");
+            var mic = new IslandActivity("mic", IslandActivityKind.Status, "Muted", "Microphone") { ModuleId = "mic-mute", NeedsAttention = true };
+            window.SetActivities([working], PetMood.Idle);
+            window.SetActivities([waiting, timer, working], PetMood.Idle);
+            var peek = timers[IslandWindow.AgentPeek];
+            Assert.Equal(2, peek.Starts);
+            Assert.Equal(Key, ChipKey(window));
+            peek.Fire();
+            Assert.True(window.BarShown);
+            Assert.Equal("18:42 · Focus timer", window.ChipText);
+            Assert.Equal(Visibility.Collapsed, window.WaitingMark.Visibility);
+
+            window.SetActivities([waiting, mic, working], PetMood.Idle);
+            Assert.False(window.BarShown);
+            Assert.Equal(Visibility.Visible, window.WaitingMark.Visibility);
+            Assert.Equal("Microphone muted. Agent waiting on you", AutomationProperties.GetHelpText(window.PuckButton));
+            window.SetActivities([working], PetMood.Idle);
+            Assert.True(window.BarShown);
+            Assert.Equal(3, peek.Starts);
+            peek.Fire();
+            Assert.Equal(Visibility.Collapsed, window.WaitingMark.Visibility);
+            Assert.Empty(AutomationProperties.GetHelpText(window.PuckButton));
+            window.SetActivities([], PetMood.Sleepy);
+            window.SetActivities([working], PetMood.Idle);
+            Assert.True(window.BarShown);
+            Assert.Equal(4, peek.Starts);
+        }
+        finally { window.Close(); }
+    });
 
     [Theory]
     [InlineData(false, "IslandAccentBrush", "Working · 42% · Claude Code · chippi")]
@@ -120,12 +295,20 @@ public sealed class AgentBarTests
         };
         WpfTestThread.Run(() => IslandWindowTests.WithShownIsland(window =>
         {
+            var timers = Timers(window);
+            window.PointerAt = () => new Point(-20000, -20000);
             window.SetTiles(AgentsTile(out _));
             foreach (var (name, activity) in new[] { ("working", Session(false)), ("waiting", Session(true)), ("near", Alert("80% used", true)), ("reset", Alert("Reset", false)) })
             {
                 window.SetActivities([activity], PetMood.Idle);
                 IslandPanelTests.Pump(TimeSpan.FromMilliseconds(500));
                 window.SaveScene(System.IO.Path.Combine(folder, $"agent-bar-{theme}-{name}.png"), backdrop);
+                if (activity.Kind == IslandActivityKind.Agent)
+                {
+                    timers[IslandWindow.AgentPeek].Fire();
+                    IslandPanelTests.Pump(TimeSpan.FromMilliseconds(300));
+                    window.SaveScene(System.IO.Path.Combine(folder, $"agent-puck-{theme}-{name}.png"), backdrop);
+                }
             }
             window.SetActivities([], PetMood.Sleepy);
         }));

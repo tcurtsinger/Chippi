@@ -97,6 +97,55 @@ public sealed class IslandPanelShots
         });
     }
 
+    [Fact]
+    public void RenderPortraitHome()
+    {
+        if (Environment.GetEnvironmentVariable("CHIPPI_ISLAND_SHOTS") is not { Length: > 0 } folder)
+            return;
+        Directory.CreateDirectory(folder);
+        WpfTestThread.Run(() =>
+        {
+            // A 900 × 1600 portrait display at 200%, with a 48 DIP taskbar.
+            var area = new MonitorArea(default, new Rect(-20000, 0, 900, 1600), new Rect(-20000, 0, 900, 1504), 2);
+            var panel = new IslandPanelWindow();
+            try
+            {
+                panel.Initialize();
+                panel.SetMedia(new FakeMedia());
+                var tiles = HomeTiles();
+                panel.SetTiles(tiles);
+                panel.Open(IslandGeometry.Start(area.Work, area.Scale), area);
+                IslandWindowTests.Settle(panel);
+                SavePortrait("portrait-home.png");
+                panel.SetTiles(tiles.Where(t => t.Key is "scratchpad" or "shelf").ToList());
+                SavePortrait("portrait-home-sparse.png");
+            }
+            finally { panel.Close(); }
+
+            void SavePortrait(string name)
+            {
+                panel.UpdateLayout();
+                // Capture the same 420-DIP strip at the bottom of the work area, including its visible desktop.
+                var size = new Size(area.Work.Width / area.Scale, 420);
+                var window = IslandNative.WindowRect(panel.Handle);
+                var position = new Point((window.Left - area.Work.Left) / area.Scale,
+                    size.Height + (window.Top - area.Work.Bottom) / area.Scale);
+                var root = panel.Visual;
+                // The host can center this 200%-scale canvas in a 100%-scale HWND. A VisualBrush sees its parent's coordinates.
+                var box = new Rect(root.RenderSize);
+                var parent = (Visual)VisualTreeHelper.GetParent(root);
+                var brush = new VisualBrush(root) { ViewboxUnits = BrushMappingMode.Absolute, Viewbox = root.TransformToVisual(parent).TransformBounds(box) };
+                var scene = new DrawingVisual();
+                using (var dc = scene.RenderOpen())
+                {
+                    dc.DrawRectangle(new SolidColorBrush(Color.FromRgb(0x20, 0x20, 0x20)), null, new Rect(size));
+                    dc.DrawRectangle(brush, null, new Rect(position, root.RenderSize));
+                }
+                WritePng(scene, size, Path.Combine(folder, name));
+            }
+        });
+    }
+
     /// <summary>The home as the Phase 5.5 mock shows it: nine buttons five across, Awake on, the volume slider; <paramref name="muted"/>, the mic and the output muted.</summary>
     internal static IReadOnlyList<IslandTileGroup> HomeTiles(bool muted = false)
     {
@@ -166,7 +215,12 @@ public sealed class IslandPanelShots
             dc.DrawRectangle(null, new Pen(new SolidColorBrush(Color.FromArgb(0x80, 0x80, 0x80, 0x80)), 1), work);
             dc.DrawImage(pixels, new Rect(window.X - region.X, window.Y - region.Y, pixels.PixelWidth, pixels.PixelHeight));
         }
-        var image = new RenderTargetBitmap((int)region.Width, (int)region.Height, 96, 96, PixelFormats.Pbgra32);
+        WritePng(visual, region.Size, path);
+    }
+
+    private static void WritePng(DrawingVisual visual, Size size, string path)
+    {
+        var image = new RenderTargetBitmap((int)size.Width, (int)size.Height, 96, 96, PixelFormats.Pbgra32);
         image.Render(visual);
         var encoder = new PngBitmapEncoder();
         encoder.Frames.Add(BitmapFrame.Create(image));

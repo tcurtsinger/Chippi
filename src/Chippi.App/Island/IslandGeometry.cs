@@ -2,6 +2,7 @@
 // Copyright (C) Chippi contributors
 
 using System.Windows;
+using Chippi.Core.Modules;
 
 namespace Chippi.App.Island;
 
@@ -69,8 +70,29 @@ public static class IslandGeometry
     /// <summary>The bar: the puck stretched to <see cref="BarWidth"/> toward the middle, its outer end where the puck's is.</summary>
     public static Rect BarRect(Rect puck, bool opensLeft, double scale)
     {
-        double width = BarWidth * scale;
-        return new Rect(opensLeft ? puck.Right - width : puck.Left, puck.Top, width, puck.Height);
+        return WidgetRect(puck, opensLeft, BarWidth * scale);
+    }
+
+    internal static Rect WidgetRect(Rect puck, bool opensLeft, double width) =>
+        new(opensLeft ? puck.Right - width : puck.Left, puck.Top, width, puck.Height);
+
+    /// <summary>The shape under the hand. Its grip and width are in DIPs, so the same spot stays held when DPI changes.</summary>
+    internal static Rect HeldRect(Point pointer, Vector grip, double width, double scale) =>
+        new(pointer - grip * scale, new Size(width * scale, Puck * scale));
+
+    /// <summary>The 50-DIP square at the outer end of a widget, including a partially unfolded one.</summary>
+    internal static Rect PuckEnd(Rect widget, bool opensLeft) =>
+        new(opensLeft ? widget.Right - widget.Height : widget.Left, widget.Top, widget.Height, widget.Height);
+
+    /// <summary>The full logical page, scaled down together only when it would cross the work area's inset.</summary>
+    public static Rect PanelRect(Rect puck, Rect work, double scale)
+    {
+        double inset = Gap * scale;
+        double fit = Math.Min(scale, Math.Min(
+            Math.Max(1, work.Width - 2 * inset) / IslandPage.Width,
+            Math.Max(1, work.Height - 2 * inset) / IslandPage.Height));
+        var size = new Size(IslandPage.Width * fit, IslandPage.Height * fit);
+        return new Rect(PanelOrigin(puck, size, work, scale), size);
     }
 
     /// <summary>

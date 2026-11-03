@@ -4,17 +4,67 @@
 using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Threading;
 using Chippi.App.Island;
 using Chippi.Core.Config;
+using Chippi.Core.Island;
 using Chippi.Core.Modules;
 using Chippi.UI.Controls;
+using Chippi.UI.Pet;
 
 namespace Chippi.Island.Tests;
 
 /// <summary>A drag from another app over the closed widget (Phase 5 notes #48). Run fullscreen-check first: two tests show it.</summary>
 public sealed class DragTabTests
 {
+    [Theory]
+    [InlineData(25, false)]
+    [InlineData(128, true)]
+    [InlineData(231, false)]
+    public void Dragging_the_activity_bar_keeps_the_grip_and_lands_the_whole_bar(double gripX, bool loseCapture) => WpfTestThread.Run(() =>
+        IslandWindowTests.WithShownIsland(window =>
+        {
+            var area = window.CurrentArea!.Value;
+            var timer = new IslandActivity("timer", IslandActivityKind.Timer, "18:42", "Focus timer");
+            window.SetPlacement(1, 0.5);
+            window.SetActivities([timer], PetMood.Idle);
+            IslandWindowTests.PumpUntil(() => window.PuckButton.ActualWidth >= 255.99 && window.Bar.Opacity == 1);
+            var grip = new Vector(gripX, 25);
+            var pointer = window.WidgetRect.TopLeft + grip * area.Scale;
+            window.PointerAt = () => pointer;
+            window.PuckButton.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Left) { RoutedEvent = UIElement.PreviewMouseLeftButtonDownEvent });
+            // Drag from the right half to the left. On capture loss, drop with some of the bar hanging off the edge.
+            double left = area.Work.Left + (loseCapture ? -64 : 30) * area.Scale;
+            pointer = new Point(left, area.Work.Top + 80 * area.Scale) + grip * area.Scale;
+            window.PuckButton.RaiseEvent(new MouseEventArgs(Mouse.PrimaryDevice, 0) { RoutedEvent = UIElement.PreviewMouseMoveEvent });
+            window.UpdateLayout();
+            Assert.True(window.BarShown);
+            Assert.Equal("18:42 · Focus timer", window.ChipText);
+            Assert.Equal(IslandGeometry.BarWidth, window.PuckButton.ActualWidth, 2);
+            Assert.Equal(0, window.PuckTiltTarget);
+            Assert.Equal(1, window.PuckScaleTarget);
+            var rendered = window.PuckButton.PointToScreen((Point)grip);
+            Assert.InRange((rendered - pointer).Length, 0, 2); // native positioning rounds to a physical pixel
+
+            // An activity update during capture doesn't change what the hand is moving.
+            window.SetActivities([], PetMood.Sleepy);
+            Assert.Equal("18:42 · Focus timer", window.ChipText);
+            Assert.True(window.BarShown);
+            window.SetActivities([timer], PetMood.Idle);
+            IslandPlacementEventArgs? chosen = null;
+            window.PlacementChosen += (_, e) => chosen = e;
+            if (loseCapture) window.PuckButton.ReleaseMouseCapture();
+            else window.PuckButton.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Left) { RoutedEvent = UIElement.PreviewMouseLeftButtonUpEvent });
+            IslandWindowTests.PumpUntil(() => chosen is not null);
+            Assert.False(window.IsIslandOpen);
+            Assert.True(window.BarShown);
+            Assert.False(window.OpensLeft);
+            var held = IslandGeometry.HeldRect(pointer, grip, IslandGeometry.BarWidth, area.Scale);
+            Assert.Equal(IslandGeometry.Inside(held, area.Work), window.WidgetRect);
+            Assert.Equal(window.WidgetRect.Left, window.PuckRect.Left);
+        }));
+
     private static IReadOnlyList<IslandTileGroup> Tiles(bool opensOnDrag) => IslandTileContribution.Group(
     [
         new IslandTileContribution("shelf", new IslandTileSpec("shelf", "Shelf", nameof(LucideIcons.Inbox), 90, 0, () => new Border { Height = 100 }) { OpensOnDrag = opensOnDrag }),

@@ -70,6 +70,7 @@ public partial class IslandPanelWindow : Window
     private Rect _window; // the window while open, physical pixels
     private Rect _widgetLocal; // the widget, in the window's DIPs
     private Rect _target; // where the shape is heading, likewise
+    private double _pageScale = 1; // the authored page's DIPs to window DIPs on a small work area
     private Rect _drawn; // where it is drawn now
     private Rect _from;
     private double _radiusFrom;
@@ -779,7 +780,7 @@ public partial class IslandPanelWindow : Window
     private void FocusFirst()
     {
         if (_page is null)
-            _grid.Buttons().FirstOrDefault()?.Focus();
+            _grid.MoveFocus(new TraversalRequest(FocusNavigationDirection.First));
         else
         {
             var focus = Group(_page)?.Parts.Select(p => p.Spec.InitialFocus?.Invoke()).OfType<UIElement>().FirstOrDefault();
@@ -790,12 +791,7 @@ public partial class IslandPanelWindow : Window
     // ----- Placement and the morph -----
 
     /// <summary>The panel's rectangle on the puck's outer corner, in physical pixels.</summary>
-    private Rect PanelRect()
-    {
-        double s = _area.Scale;
-        var size = new Size(IslandPage.Width * s, IslandPage.Height * s);
-        return new Rect(IslandGeometry.PanelOrigin(_puck, size, _area.Work, s), size);
-    }
+    private Rect PanelRect() => IslandGeometry.PanelRect(_puck, _area.Work, _area.Scale);
 
     /// <summary>
     /// Covers the widget and the panel it becomes, with room for the shadow, while open, so the morph never
@@ -820,12 +816,18 @@ public partial class IslandPanelWindow : Window
         new((physical.X - _window.X) / _area.Scale, (physical.Y - _window.Y) / _area.Scale, physical.Width / _area.Scale, physical.Height / _area.Scale);
 
     /// <summary>
-    /// Puts the 520 × 360 panel beside the puck, inside the work area.
+    /// Places the 520 × 360 page on the puck's corner, fitting it uniformly inside the work area.
     /// <paramref name="snap"/> also draws it there at once (no morph running).
     /// </summary>
     private void Reshape(bool snap)
     {
         _target = Local(PanelRect());
+        double fit = _target.Width / IslandPage.Width;
+        if (fit != _pageScale)
+        {
+            _pageScale = fit;
+            Card.RenderTransform = fit == 1 ? Transform.Identity : new ScaleTransform(fit, fit);
+        }
         Canvas.SetLeft(Card, _target.X);
         Canvas.SetTop(Card, _target.Y);
         // The home's Chippi sits on the puck's side of the footer. On a bottom corner that's where the puck's own Chippi is,
@@ -835,10 +837,12 @@ public partial class IslandPanelWindow : Window
         bool right = puckCenter.X > _target.X + _target.Width / 2;
         _grid.SetPetSide(right);
         var pet = new Point(right ? _target.Right - IslandGrid.FooterPet : _target.X + IslandGrid.FooterPet, _target.Bottom - IslandGrid.FooterPet);
-        _petAtPuck = (pet - puckCenter).Length < 1;
+        // The seamless handoff needs the same size as well as the same center. A fitted footer fades in.
+        _petAtPuck = _pageScale == 1 && (pet - puckCenter).Length < 1;
         if (snap && _morph != Morph.Close)
         {
             _drawn = _target;
+            _radius = OpenRadius * _pageScale;
             Draw();
         }
     }
@@ -876,7 +880,7 @@ public partial class IslandPanelWindow : Window
         bool fromWidget = morph == Morph.Open && _frame is null && !_reduced;
         bool inPlace = morph == Morph.Open && _reduced;
         _from = fromWidget ? _widgetLocal : inPlace ? _target : _drawn;
-        _radiusFrom = fromWidget ? WidgetRadius : inPlace ? OpenRadius : _radius;
+        _radiusFrom = fromWidget ? WidgetRadius : inPlace ? OpenRadius * _pageScale : _radius;
         _fadeFrom = Card.Opacity;
         // Opening from closed starts clear; opening again mid-close carries on from where the fade is.
         _rootFrom = morph == Morph.Open && _frame is null ? 0 : Root.Opacity;
@@ -906,7 +910,7 @@ public partial class IslandPanelWindow : Window
         bool shrink = _morph == Morph.Close && !_reduced;
         var to = shrink ? _widgetLocal : _target;
         _drawn = new Rect(Lerp(_from.X, to.X, eased), Lerp(_from.Y, to.Y, eased), Lerp(_from.Width, to.Width, eased), Lerp(_from.Height, to.Height, eased));
-        _radius = Lerp(_radiusFrom, shrink ? WidgetRadius : OpenRadius, eased);
+        _radius = Lerp(_radiusFrom, shrink ? WidgetRadius : OpenRadius * _pageScale, eased);
         if (_reduced)
         {
             // In place: the panel fades in or out as one piece, and a page fades in.
@@ -993,8 +997,10 @@ public partial class IslandPanelWindow : Window
         Shape.Height = Math.Max(0, _drawn.Height);
         ShapeShadow.CornerRadius = ShapeFill.CornerRadius = new CornerRadius(_radius);
         // Mid-morph the content already sits at its final place; only what's inside the shape shows.
-        var inside = new Rect(_drawn.X - Canvas.GetLeft(Card), _drawn.Y - Canvas.GetTop(Card), Math.Max(0, _drawn.Width), Math.Max(0, _drawn.Height));
-        Card.Clip = new RectangleGeometry(inside, _radius, _radius);
+        // The clip belongs to the card, before its transform into the shape's coordinate system.
+        var inside = new Rect((_drawn.X - _target.X) / _pageScale, (_drawn.Y - _target.Y) / _pageScale,
+            _drawn.Width / _pageScale, _drawn.Height / _pageScale);
+        Card.Clip = new RectangleGeometry(inside, _radius / _pageScale, _radius / _pageScale);
         // Nothing half-faded takes a click (a double-click on a tile would reach the new page's controls).
         Card.IsHitTestVisible = Card.Opacity >= 1;
     }
