@@ -89,11 +89,14 @@ public sealed class MicMuteTests
         var group = Assert.Single(IslandTileContribution.Group([processing, mute]));
 
         Assert.Equal("Mic stopped", group.Status);
+        Assert.Equal("Microphone live", group.Toggle?.Status?.Invoke());
         await f.Module.ToggleAsync();
         Assert.Equal("Mic muted", group.Status);
+        Assert.Equal("Microphone muted", group.Toggle?.Status?.Invoke());
         f.System.ChangeLevel("B", new(.5f, false));
         await f.Audio.RefreshAsync();
         Assert.Equal("Partly muted", group.Status);
+        Assert.Equal("Microphone partly muted", group.Toggle?.Status?.Invoke());
         f.System.ChangeLevel("A", new(.5f, false));
         await f.Audio.RefreshAsync();
         Assert.Equal("Mic stopped", group.Status);

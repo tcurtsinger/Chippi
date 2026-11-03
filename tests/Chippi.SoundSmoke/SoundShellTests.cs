@@ -170,11 +170,14 @@ public sealed class SoundShellTests
             var host = (ContentControl)panel.FindName("Page");
             var grid = Assert.IsType<IslandGrid>(host.Content);
             // Either gallery destination opens its page; the separate switch mutes the microphone.
-            Assert.Equal(["Open Microphone", "Open Volume"], grid.Buttons().Select(AutomationProperties.GetName));
+            Assert.Equal(["Open Sound", "Open Volume"], grid.Buttons().Select(AutomationProperties.GetName));
+            var sound = Named<Button>(grid, "Open Sound");
+            Assert.Same(LucideIcons.Speaker, Assert.Single(All<LucideIcon>(sound)).Data);
+            Assert.Contains("Microphone live", AutomationProperties.GetHelpText(sound));
             Assert.NotNull(Named<ToggleButton>(grid, "Mute mic"));
             Assert.NotNull(Named<Slider>(grid, "System volume"));
 
-            Invoke(Named<Button>(grid, "Open Microphone"));
+            Invoke(sound);
             await SmokeDispatcher.Until(() => panel.CurrentPage == SoundTile.Key);
             Assert.Contains("Sound", Texts(host)); // every page starts with its name
             Assert.Contains(SoundTile.Microphone, Texts(host));
