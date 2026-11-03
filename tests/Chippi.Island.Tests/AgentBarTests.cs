@@ -119,9 +119,12 @@ public sealed class AgentBarTests
             Assert.Equal(Visibility.Visible, window.AgentMark.Visibility);
             Assert.Equal("Codex working", AutomationProperties.GetHelpText(window.PuckButton));
 
-            // A quick pass leaves the puck alone. A dwell reveals the current reading and leaving folds it.
+            // Enter through the provider's tab. A quick pass leaves it closed; a dwell recalls the reading.
             Hover(Mouse.MouseLeaveEvent);
-            pointer = new Point(puck.Left + puck.Width / 2, puck.Top + puck.Height / 2);
+            IslandWindowTests.PumpUntil(() => Math.Abs(window.Body.ActualWidth - 75) < 0.01);
+            pointer = window.AgentMark.PointToScreen(new Point(11, 11));
+            Assert.False(puck.Contains(pointer));
+            Assert.True(window.CoversWidget(pointer));
             Hover(Mouse.MouseEnterEvent);
             var dwell = timers[IslandWindow.AgentHoverDelay];
             Assert.False(window.BarShown);
@@ -227,6 +230,37 @@ public sealed class AgentBarTests
         finally { window.Close(); }
     });
 
+    [Fact]
+    public void The_tab_grows_outside_the_pet_and_an_expanded_bar_reserves_the_same_icon_slots() => WpfTestThread.Run(() =>
+    {
+        var window = new IslandWindow();
+        try
+        {
+            var timers = Timers(window);
+            var agent = Session(false);
+            var mic = new IslandActivity("mic", IslandActivityKind.Status, "Muted", "Microphone") { ModuleId = "mic-mute", NeedsAttention = true };
+            window.SetActivities([agent], PetMood.Idle);
+            timers[IslandWindow.AgentPeek].Fire();
+            Assert.Equal(75, window.PuckButton.Width);
+            double FromPet(UIElement badge) => window.OpensLeft ? Canvas.GetRight(badge) : Canvas.GetLeft(badge);
+            Assert.Equal(51.5, FromPet(window.AgentMark));
+            Assert.Equal(14, Canvas.GetTop(window.AgentMark));
+            window.SetActivities([agent, mic], PetMood.Idle);
+            Assert.Equal(96, window.PuckButton.Width);
+            Assert.Equal(72.5, FromPet(window.MicBadge));
+            Assert.Equal(50, window.PuckEnd.Width);
+
+            var timer = new IslandActivity("timer", IslandActivityKind.Timer, "Focus", "Timer");
+            window.SetActivities([timer, mic], PetMood.Idle);
+            Assert.Equal(256, window.PuckButton.Width);
+            Assert.Equal(51.5, FromPet(window.MicBadge));
+            Assert.Equal(75, window.Bar.ColumnDefinitions[window.OpensLeft ? 6 : 0].Width.Value);
+            window.SetActivities([], PetMood.Idle);
+            Assert.Equal(50, window.PuckButton.Width);
+        }
+        finally { window.Close(); }
+    });
+
     [Theory]
     [InlineData("Dark")]
     [InlineData("Light")]
@@ -245,7 +279,8 @@ public sealed class AgentBarTests
             Assert.Equal((22d, 22d), (badge.Width, badge.Height));
             Assert.Equal((18d, 18d), (window.AgentMarkPlate.Width, window.AgentMarkPlate.Height));
             Assert.Same(window.FindResource("IslandBrush"), rim.Fill);
-            Assert.Equal((HorizontalAlignment.Left, VerticalAlignment.Bottom), (badge.HorizontalAlignment, badge.VerticalAlignment));
+            Assert.Same(window.BadgeLayer, badge.Parent);
+            Assert.Same(window.PuckEnd.Parent, window.BadgeLayer.Parent);
             Assert.False(badge.IsHitTestVisible);
             Assert.Equal((14d, 14d), (window.AgentBadgeProvider.Width, window.AgentBadgeProvider.Height));
             foreach (var (provider, waiting) in new[] { (AgentKind.Claude, false), (AgentKind.Codex, true) })
