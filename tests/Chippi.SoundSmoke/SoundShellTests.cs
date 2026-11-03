@@ -227,7 +227,8 @@ public sealed class SoundShellTests
             IEnumerable<Slider> Sliders() => All<Slider>(host).Where(s => s.Orientation == Orientation.Vertical && s.IsVisible);
             async Task<List<string>> CheckBank(int appCount, bool hasSystem = true)
             {
-                await SmokeDispatcher.Until(() => Sliders().Count() == appCount + (hasSystem ? 1 : 0));
+                await SmokeDispatcher.Until(() => Sliders().Count() == appCount + (hasSystem ? 1 : 0)
+                    && Sliders().Any(s => AutomationProperties.GetName(s) == "System sounds volume") == hasSystem);
                 panel.UpdateLayout();
                 var visible = Sliders().OrderBy(Center).ToList();
                 var centers = visible.Select(Center).ToList();
@@ -247,6 +248,11 @@ public sealed class SoundShellTests
             }
 
             await CheckBank(1, hasSystem: false); // The initial Music session has no System sounds companion.
+            var music = scene.Devices.SessionById("music-session");
+            scene.Devices.WithSession(music with { SessionId = "notes", ProcessId = 124, ExePath = @"C:\Fake\Notes.exe", AppName = "Notes" });
+            await scene.Audio.RefreshAsync();
+            await CheckBank(2, hasSystem: false);
+            scene.Devices.EndSession("notes");
             foreach (int appCount in new[] { 1, 2, 3, 8 })
             {
                 await scene.GrowMixerTo(appCount + 1);
@@ -273,9 +279,6 @@ public sealed class SoundShellTests
             var second = await CheckBank(6);
             Assert.Equal(15, first.Union(second).Count());
             Assert.Same(system, Named<Slider>(host, "System sounds volume"));
-            scene.Devices.EndSession("system");
-            await scene.Audio.RefreshAsync();
-            await CheckBank(6, hasSystem: false);
         }
         finally { panel.Close(); }
     });
