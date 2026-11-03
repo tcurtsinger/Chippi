@@ -41,18 +41,17 @@ internal sealed class IslandPlacementEventArgs(double x, double y, HMONITOR moni
 /// The widget on the desktop (DESIGN.md §5, §9), and the controller for the open panel and the drag:
 /// one shape that is the puck with Chippi, or the bar it stretches into toward the screen's middle while
 /// there is something to show (the song, or the highest activity), with the red badge for a muted mic.
-/// Two sizes only: the 50 puck and the 256 × 50 bar. Every window here never activates (WS_EX_NOACTIVATE
+/// Status icons extend the compact puck into a side tab. Every window here never activates (WS_EX_NOACTIVATE
 /// plus WM_MOUSEACTIVATE) and never shows in Alt+Tab or the taskbar, and is placed in physical pixels on
 /// the monitor it is given. Hovering brightens the rim and wakes the blob; a click becomes the panel,
-/// which stays open until a click outside it or Esc. A press that moves 4px lifts the puck or its
-/// activity bar in place and drags it. It drops whole inside the work area. The tray icon opens
+/// which stays open until a click outside it or Esc. Moving 4 DIPs picks up only the compact puck.
+/// Its tab turns inward while held and it lands inside the work area. The tray icon opens
 /// Settings. <see cref="IslandHost"/> feeds it activities, the mood, the monitor, the saved place and
 /// whether to hide.
 /// </summary>
 public partial class IslandWindow : Window
 {
     private const double DragThreshold = 4;
-    private const double Room = 62; // the puck's center, in from the window's top and its near side: room for the lift and its shadow
     private const double SongGap = 40; // between one pass and the next
     private const double SongSpeed = 30; // DIPs a second
     private const double LiftScale = 1.12;
@@ -524,9 +523,10 @@ public partial class IslandWindow : Window
     /// <summary>Whether the bar and the panel grow left from the puck (it sits right of the middle).</summary>
     internal bool OpensLeft => _left;
 
-    /// <summary>The window around a puck centered on <paramref name="center"/>, with the bar's room on its side.</summary>
+    // A layered HWND can present its previous pixels just after a move. Keep the pet at the same local
+    // center in both directions, with room for a full bar (256 − 25) and its shadow (37) on either side.
     private Rect WindowAt(Point center, double scale) =>
-        new(center.X - (_left ? Root.Width - Room : Room) * scale, center.Y - Room * scale, Root.Width * scale, Root.Height * scale);
+        new(center.X - Root.Width * scale / 2, center.Y - Root.Height * scale / 2, Root.Width * scale, Root.Height * scale);
 
     private static Point Center(Rect rect) => new(rect.X + rect.Width / 2, rect.Y + rect.Height / 2);
 
@@ -564,7 +564,7 @@ public partial class IslandWindow : Window
     private void ApplySide(bool left)
     {
         _left = left;
-        double outer = Room - IslandGeometry.Puck / 2;
+        double outer = (Root.Width - IslandGeometry.Puck) / 2;
         Canvas.SetLeft(PuckButton, left ? double.NaN : outer);
         Canvas.SetRight(PuckButton, left ? outer : double.NaN);
         Bar.HorizontalAlignment = PuckEnd.HorizontalAlignment = left ? HorizontalAlignment.Right : HorizontalAlignment.Left;

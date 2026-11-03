@@ -70,17 +70,25 @@ public sealed class PuckSideTabInputTests
             window.SetActivities([Muted], PetMood.Idle);
             window.UpdateLayout();
             Assert.True(window.OpensLeft);
-            var petGrip = fromBadge ? new Point(25, 25) : new Point(15, 32);
+            var petCenter = new Point(window.PuckEnd.ActualWidth / 2, window.PuckEnd.ActualHeight / 2);
+            var restingCenter = window.PuckEnd.PointToScreen(petCenter);
+            IslandWindowTests.AssertHostCenter(window, restingCenter);
+            var petGrip = fromBadge ? petCenter : new Point(15, 32);
             var pointer = fromBadge ? window.MicBadge.PointToScreen(new Point(11, 11)) : window.PuckEnd.PointToScreen(petGrip);
             window.PointerAt = () => pointer;
             Press(window, UIElement.PreviewMouseLeftButtonDownEvent);
+            IslandWindowTests.AssertHostCenter(window, restingCenter);
             int saves = 0;
             window.PlacementChosen += (_, _) => saves++;
 
-            foreach (double fraction in new[] { 0.25, 0.75, 0.25 })
+            var gripOffset = (petGrip - petCenter) * area.Scale;
+            foreach (double fraction in new[] { 0.25, 0.49, 0.51, 0.75, 0.49 })
             {
-                pointer = new Point(area.Work.Left + fraction * area.Work.Width, area.Work.Top + area.Work.Height / 2);
+                var center = new Point(area.Work.Left + fraction * area.Work.Width, area.Work.Top + area.Work.Height / 2);
+                pointer = center + gripOffset;
                 window.PuckButton.RaiseEvent(new MouseEventArgs(Mouse.PrimaryDevice, 0) { RoutedEvent = UIElement.PreviewMouseMoveEvent });
+                // Check the native move directly, before WPF can repaint a mirrored layer at a different local offset.
+                IslandWindowTests.AssertHostCenter(window, center);
                 window.UpdateLayout();
                 bool opensLeft = fraction > 0.5;
                 Assert.Equal(opensLeft, window.OpensLeft);
@@ -94,6 +102,7 @@ public sealed class PuckSideTabInputTests
             var preview = window.WidgetRect;
             Press(window, UIElement.PreviewMouseLeftButtonUpEvent);
             Assert.Equal(preview, window.WidgetRect);
+            IslandWindowTests.AssertHostCenter(window, pointer - gripOffset);
             Assert.Equal(1, saves);
             Assert.False(window.Panel.IsOpen);
             Assert.True(area.Work.Contains(preview));

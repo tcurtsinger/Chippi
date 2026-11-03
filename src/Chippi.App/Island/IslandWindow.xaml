@@ -14,7 +14,7 @@
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         ResizeMode="NoResize" ShowInTaskbar="False" ShowActivated="False" Topmost="True"
         SizeToContent="Manual" WindowStartupLocation="Manual"
-        Left="-32000" Top="-32000" Width="340" Height="124">
+        Left="-32000" Top="-32000" Width="536" Height="124">
     <Window.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
@@ -23,9 +23,9 @@
         </ResourceDictionary>
     </Window.Resources>
 
-    <Canvas x:Name="Root" Width="340" Height="124">
+    <Canvas x:Name="Root" Width="536" Height="124">
         <!-- The widget: the puck, or the bar it unfolds into. Canvas.Left or Canvas.Right, the puck's outer side, is set
-             in code, so the bar grows toward the middle. It lifts while dragged (the render transform, around its center). -->
+             in code, so the bar grows in either direction from the same local pet center. The grip is its transform origin. -->
         <Button x:Name="PuckButton" Canvas.Top="37" Width="50" Height="50" Style="{StaticResource IslandPuckButtonStyle}"
                 AutomationProperties.Name="Chippi" RenderTransformOrigin="0.5,0.5">
             <Button.RenderTransform>
