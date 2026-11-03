@@ -882,10 +882,11 @@ public partial class IslandPanelWindow : Window
                 return;
             for (var at = pressed; at is not null; at = at is System.Windows.Media.Visual or System.Windows.Media.Media3D.Visual3D ? VisualTreeHelper.GetParent(at) : LogicalTreeHelper.GetParent(at))
             {
-                if (at is UIElement { Focusable: true, IsEnabled: true } target && target.Focus())
+                if (at is UIElement { Focusable: true, IsEnabled: true } target && (target.IsKeyboardFocusWithin || target.Focus()))
                     return;
             }
-            FocusFirst();
+            if (pressed is null || !IsKeyboardFocusWithin)
+                FocusFirst();
         });
     }
 
