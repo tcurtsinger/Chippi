@@ -301,19 +301,24 @@
         </Setter>
     </Style>
 
-    <!-- Grid tiles: they fill the body (IslandGrid), 6px corners, the control fill with a 1px edge. -->
+    <!-- Tool destinations: quiet at rest. A hover or keyboard focus lifts one face within the gallery. -->
     <Style x:Key="IslandTileStyle" TargetType="{x:Type Button}">
         <Setter Property="Foreground" Value="{DynamicResource IslandTextBrush}" />
         <Setter Property="FocusVisualStyle" Value="{StaticResource IslandTileFocusVisual}" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type Button}">
-                    <Border x:Name="Chrome" CornerRadius="6" BorderThickness="1" i:FillFade.To="{DynamicResource IslandPanelBrush}" BorderBrush="{DynamicResource IslandCardBorderBrush}">
+                    <Border x:Name="Chrome" CornerRadius="6" BorderThickness="1" i:FillFade.To="{DynamicResource IslandGalleryFaceBrush}" BorderBrush="{DynamicResource IslandCardBorderBrush}">
                         <ContentPresenter />
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Chrome" Property="i:FillFade.To" Value="{DynamicResource IslandButtonHoverBrush}" />
+                            <Setter TargetName="Chrome" Property="i:FillFade.To" Value="{DynamicResource IslandGalleryHoverBrush}" />
+                            <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource IslandTabBorderBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="Chrome" Property="i:FillFade.To" Value="{DynamicResource IslandGalleryHoverBrush}" />
+                            <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource IslandTabBorderBrush}" />
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
                             <Setter TargetName="Chrome" Property="i:FillFade.To" Value="{DynamicResource IslandPressedBrush}" />
@@ -435,18 +440,18 @@
     <Style x:Key="IslandGallerySwitchStyle" TargetType="{x:Type ToggleButton}">
         <Setter Property="FontSize" Value="12" />
         <Setter Property="FocusVisualStyle" Value="{StaticResource IslandFocusVisual}" />
-        <Setter Property="Height" Value="30" />
-        <Setter Property="Margin" Value="0,0,4,0" />
+        <Setter Property="Height" Value="32" />
+        <Setter Property="Margin" Value="0,0,6,0" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type ToggleButton}">
                     <Border x:Name="Chrome" i:FillFade.To="Transparent" CornerRadius="4" Padding="5,0">
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                             <ContentPresenter VerticalAlignment="Center" Margin="0,0,7,0" />
-                            <Grid Width="27" Height="15">
+                            <Grid Width="30" Height="16">
                                 <Border x:Name="Track" CornerRadius="8" BorderThickness="1" i:FillFade.To="Transparent" BorderBrush="{DynamicResource IslandTextTertiaryBrush}" />
-                                <Ellipse x:Name="Knob" Width="7" Height="7" HorizontalAlignment="Left" Margin="4,0,0,0"
-                                         Fill="{DynamicResource IslandTextSecondaryBrush}" c:SwitchKnob.Distance="12"
+                                <Ellipse x:Name="Knob" Width="8" Height="8" HorizontalAlignment="Left" Margin="4,0,0,0"
+                                         Fill="{DynamicResource IslandTextSecondaryBrush}" c:SwitchKnob.Distance="14"
                                          c:SwitchKnob.IsOn="{Binding IsChecked, RelativeSource={RelativeSource TemplatedParent}}" />
                             </Grid>
                         </StackPanel>

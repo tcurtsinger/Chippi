@@ -86,6 +86,8 @@
     <SolidColorBrush x:Key="IslandHairBrush" Color="#14FFFFFF" />
     <!-- Cards inside the panel, and controls (buttons, tiles, segments) on it. -->
     <SolidColorBrush x:Key="IslandPanelBrush" Color="#0DFFFFFF" />
+    <SolidColorBrush x:Key="IslandGalleryFaceBrush" Color="#06FFFFFF" />
+    <SolidColorBrush x:Key="IslandGalleryHoverBrush" Color="#1AFFFFFF" />
     <SolidColorBrush x:Key="IslandCardBorderBrush" Color="#0FFFFFFF" />
     <SolidColorBrush x:Key="IslandButtonBrush" Color="#12FFFFFF" />
     <SolidColorBrush x:Key="IslandButtonHoverBrush" Color="#17FFFFFF" />
