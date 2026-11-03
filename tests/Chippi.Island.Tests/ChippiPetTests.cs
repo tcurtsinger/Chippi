@@ -692,6 +692,32 @@ public sealed class ChippiPetMotionTests
     }
 
     [Fact]
+    public void The_sleep_symbol_waits_for_the_yawning_face_and_returns_with_reduced_motion()
+    {
+        var motion = Motion.Override;
+        WpfTestThread.Run(() =>
+        {
+            var pet = new ChippiPet { Size = 40, Mood = PetMood.Sleepy };
+            var window = Offscreen(pet);
+            try
+            {
+                Motion.Override = false;
+                window.Show();
+                IslandWindowTests.Pump(TimeSpan.Zero);
+                var sleep = (Canvas)pet.ZGlyphs.Parent;
+                Assert.Equal(1, sleep.Opacity);
+                pet.Yawn();
+                Assert.Equal(0, sleep.Opacity);
+                Motion.Override = true;
+                IslandWindowTests.Pump(TimeSpan.Zero);
+                Assert.Equal(1, sleep.Opacity);
+                Assert.Equal(0, pet.YawnFace.Opacity);
+            }
+            finally { window.Close(); Motion.Override = motion; }
+        });
+    }
+
+    [Fact]
     public void One_face_shows_at_a_time_through_a_boop_a_yawn_and_being_picked_up()
     {
         var motion = Motion.Override;

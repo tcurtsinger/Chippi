@@ -826,6 +826,12 @@ public class ChippiPet : UserControl
             if (other != face && other != _yawn)
                 Fade(other.Root, 0, TimeSpan.Zero, TimeSpan.Zero);
         face.Root.BeginAnimation(OpacityProperty, Swap(0, 1, TimeSpan.Zero, YawnSwap));
+        if (_shown == PetMood.Sleepy)
+        {
+            // After a quiet minute the sleeping face returns at the end of this yawn. Its z follows it.
+            Fade(_zs, 0, TimeSpan.Zero, TimeSpan.Zero);
+            Fade(_zs, 1, ZFade, YawnSwap);
+        }
         PlayYawn();
         if (!Hopping)
             Squash(0.97, 1.05, YawnStretch, YawnDuration - MoodFade);
