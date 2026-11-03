@@ -454,31 +454,32 @@ public sealed class IslandPanelTests
     public void A_muted_mic_reports_its_actual_toggle_state_and_a_refused_toggle_reports_failure()
     {
         bool muted = true, fail = false;
-        var mute = new IslandTileContribution("mic-mute", new IslandTileSpec("sound", "Sound", "AudioLines", 10, 0, () => new Border())
+        var mute = new IslandTileContribution("mic-mute", new IslandTileSpec("sound", "Sound", "Speaker", 10, 0, () => new Border())
         {
             StatusPriority = 100,
             Toggle = new IslandTileToggle(() => muted, () => fail ? Task.FromException(new InvalidOperationException("No microphone")) : Task.CompletedTask,
-                "Microphone", "Mic", () => muted ? "Muted" : "Live"),
+                "Microphone", "Mic", () => muted ? "Microphone muted" : "Microphone live"),
         });
         WpfTestThread.Run(() => WithPanel(panel =>
         {
             Open(panel);
             var activity = new IslandActivity("muted", IslandActivityKind.Status, "Muted", "Microphone") { NeedsAttention = true, TileKey = "sound", ModuleId = "mic-mute" };
             panel.SetActivities([activity]);
-            // The accent says on and fine: muted, the button keeps its plain fill and the glyph is MicOff in Caution.
             var toggle = QuickSwitch(panel, "sound");
             Assert.True(toggle.IsChecked);
-            Assert.Same(LucideIcons.MicOff, TileIcon(panel, "sound"));
+            Assert.Equal("Mute mic", AutomationProperties.GetName(toggle));
+            Assert.Same(LucideIcons.Speaker, TileIcon(panel, "sound"));
             Assert.Same(panel.FindResource("WarningBrush"), TileGlyph(panel, "sound").Brush);
-            Assert.Contains("Open Microphone", TileNames(panel));
+            Assert.Contains("Open Sound", TileNames(panel));
+            Assert.Contains("Microphone muted", TileStatus(panel, "sound"));
 
             // A refused change leaves the switch following the device state and exposes its failure.
             muted = false;
             fail = true;
             panel.SetActivities([]);
             Assert.False(toggle.IsChecked);
+            Assert.Same(LucideIcons.Speaker, TileIcon(panel, "sound"));
             IslandHomeTests.ToggleThroughAutomation(toggle);
-            Pump(TimeSpan.FromMilliseconds(50));
             Assert.Contains("Failed", TileStatus(panel, "sound"));
             Assert.False(toggle.IsChecked);
         }, Tiles(mute)));
@@ -488,12 +489,12 @@ public sealed class IslandPanelTests
     public void Stopped_mic_processing_says_mic_stopped_on_the_home_and_a_muted_mic_still_says_muted()
     {
         bool muted = false;
-        var mute = new IslandTileContribution("mic-mute", new IslandTileSpec("sound", "Sound", "AudioLines", 10, 10, () => new Border())
+        var mute = new IslandTileContribution("mic-mute", new IslandTileSpec("sound", "Sound", "Speaker", 10, 10, () => new Border())
         {
             StatusPriority = 100,
-            Toggle = new IslandTileToggle(() => muted, () => Task.CompletedTask, "Microphone", "Mic", () => muted ? "Muted" : "Live"),
+            Toggle = new IslandTileToggle(() => muted, () => Task.CompletedTask, "Microphone", "Mic", () => muted ? "Microphone muted" : "Microphone live"),
         });
-        var processing = new IslandTileContribution("mic-processing", new IslandTileSpec("sound", "Sound", "AudioLines", 10, 30, () => new Border()) { StatusPriority = 10 });
+        var processing = new IslandTileContribution("mic-processing", new IslandTileSpec("sound", "Sound", "Speaker", 10, 30, () => new Border()) { StatusPriority = 10 });
         processing.SetStatus("Mic stopped");
         WpfTestThread.Run(() => WithPanel(panel =>
         {
@@ -505,7 +506,7 @@ public sealed class IslandPanelTests
 
             muted = true;
             panel.SetActivities([stopped, new IslandActivity("muted", IslandActivityKind.Status, "Muted", "Microphone") { NeedsAttention = true, TileKey = "sound", ModuleId = "mic-mute" }]);
-            Assert.Contains("Muted", TileStatus(panel, "sound"));
+            Assert.Contains("Microphone muted", TileStatus(panel, "sound"));
         }, Tiles(mute, processing)));
     }
 

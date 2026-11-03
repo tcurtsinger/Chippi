@@ -15,6 +15,7 @@ using Chippi.Core.Config;
 using Chippi.Core.Diagnostics;
 using Chippi.Core.Island;
 using Chippi.Core.Modules;
+using Chippi.Features.Sound;
 using Chippi.UI.Controls;
 using Chippi.UI.Themes;
 using Windows.Win32.Foundation;
@@ -687,8 +688,10 @@ public partial class IslandPanelWindow : Window
             bool muted = Muted(group.Key);
             bool attention = group.NeedsAttention || LiveOn(group.Key)?.NeedsAttention == true || muted;
             bool failed = _failed.TryGetValue(group.Key, out long until) && until > now;
-            string name = toggle?.Name ?? group.Name;
-            var icon = muted ? LucideIcons.MicOff : LucideIcons.Get(toggle?.Icon ?? group.Icon);
+            // Sound opens both Output and Microphone. Its quick mute switch has its own identity.
+            var (name, icon) = group.Key == SoundTile.Key
+                ? (group.Name, LucideIcons.Get(group.Icon))
+                : (toggle?.Name ?? group.Name, muted ? LucideIcons.MicOff : LucideIcons.Get(toggle?.Icon ?? group.Icon));
             // A feature whose state can't be read shows its button plain; the others still refresh.
             bool on = Read($"{group.Key} state", () => toggle?.IsOn() == true, false);
             // Needing attention for another reason than mute, the tile's status says why ("Mic stopped"), not the toggle's "Live".

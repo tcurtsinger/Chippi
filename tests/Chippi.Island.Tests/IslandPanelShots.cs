@@ -202,7 +202,7 @@ public sealed class IslandPanelShots
         var mic = Section("sound", "Sound", 10, 220, status: "Live");
         var micSpec = mic.Spec with
         {
-            Toggle = new IslandTileToggle(() => muted, () => Task.CompletedTask, "Microphone", "Mic", () => muted ? "Muted" : "Live"),
+            Toggle = new IslandTileToggle(() => muted, () => Task.CompletedTask, "Microphone", "Mic", () => muted ? "Microphone muted" : "Microphone live"),
             Volume = new IslandTileVolume(() => 0.62, _ => { }, () => muted, _ => Task.CompletedTask),
         };
         var awake = Section("keep-awake", "Awake", 40, 96, status: "1 hr left");
@@ -237,7 +237,7 @@ public sealed class IslandPanelShots
 
     private static string Icon(string key) => key switch
     {
-        "sound" => "AudioLines",
+        "sound" => "Speaker",
         "sound.mixer" => "Sliders",
         "keep-awake" => "Coffee",
         "system-monitor" => "Activity",

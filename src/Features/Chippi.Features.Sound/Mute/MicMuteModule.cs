@@ -106,6 +106,15 @@ public sealed class MicMuteModule : IFeatureModule
         MicrophoneMuteState.NoMicrophone => "No microphone",
         _ => "Live",
     };
+
+    // The Sound destination also contains playback controls, so name the input in its live reading.
+    private string GalleryStatus() => Status.State switch
+    {
+        MicrophoneMuteState.Live => "Microphone live",
+        MicrophoneMuteState.Muted => "Microphone muted",
+        MicrophoneMuteState.Mixed => "Microphone partly muted",
+        _ => StatusText,
+    };
     public event Action? Changed;
 
     public async Task StartAsync(ModuleContext context, CancellationToken ct)
@@ -123,7 +132,7 @@ public sealed class MicMuteModule : IFeatureModule
             _hotkey = _createHotkey();
             ShortcutError = Settings.Shortcut is null || _hotkey.Register(Settings.Shortcut, OnHotkey) ? null : "Shortcut in use";
             _tile = context.Ui.AddIslandTile(SoundTile.Section(10, SoundTile.Microphone, () => new MicQuickView(this))
-                with { StatusPriority = 100, Toggle = new IslandTileToggle(() => Status.State == MicrophoneMuteState.Muted, ToggleAsync, "Microphone", "Mic", () => StatusText) });
+                with { StatusPriority = 100, Toggle = new IslandTileToggle(() => Status.State == MicrophoneMuteState.Muted, ToggleAsync, "Microphone", "Mic", GalleryStatus) });
             // The Command bar: mute or unmute every microphone, as the shortcut does.
             context.Ui.AddCommands(() => Status.State is MicrophoneMuteState.Muted or MicrophoneMuteState.Live
                 ? [new ChippiCommand("mic-mute/toggle", Status.State == MicrophoneMuteState.Muted ? "Unmute microphone" : "Mute microphone",
