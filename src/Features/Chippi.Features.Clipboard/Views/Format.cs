@@ -46,6 +46,19 @@ internal static class Format
         _ => "Text · " + Count(Lines(entry.Text ?? ""), "line"),
     };
 
+    /// <summary>A row or its menu, identifiable by a short excerpt while browsing saved history.</summary>
+    public static string AccessibleName(HistoryEntry entry, DateTimeOffset now)
+    {
+        string details = Details(entry);
+        string line = entry.Kind == EntryKind.Picture ? "" : Line(entry);
+        if (line.Length > 80)
+        {
+            int end = char.IsHighSurrogate(line[79]) ? 79 : 80;
+            line = line[..end].TrimEnd() + "…";
+        }
+        return $"{(line.Length == 0 ? "" : line + ", ")}{details}, {When(entry.Recent, now)}{(entry.Pinned ? ", pinned" : "")}";
+    }
+
     /// <summary>The Caution line for a copy that wasn't saved (notes #13).</summary>
     public static string? Limit(ClipLimit limit) => limit switch
     {

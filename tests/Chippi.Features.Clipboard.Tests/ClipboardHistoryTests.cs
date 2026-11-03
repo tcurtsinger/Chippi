@@ -168,7 +168,7 @@ public sealed class ClipboardHistoryTests : IDisposable
         await CopyAsync("recent");
         var pin = _history.Entries.First(e => e.Text == "pin me");
         await _history.PinAsync(pin.Id, true);
-        await _history.ClearAsync([.. _history.Entries.Select(e => e.Id)]);
+        await _history.ClearAsync(_history.Entries);
         Assert.Equal("pin me", Assert.Single(_history.Entries).Text);
         Assert.True(_history.Any());
     }

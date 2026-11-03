@@ -6,6 +6,7 @@ using System.Text.Json.Serialization;
 using System.Windows;
 using System.Windows.Controls;
 using Chippi.Core.Island;
+using Chippi.Core.Clipboard;
 using Chippi.Core.Modules;
 using Chippi.Features.Clipboard.Views;
 using Chippi.Island.Tests;
@@ -14,7 +15,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Chippi.Features.Clipboard.Tests;
 
-public sealed class ModuleTests : IDisposable
+public sealed partial class ModuleTests : IDisposable
 {
     private readonly TempFolder _folder = new();
     private readonly FakeHub _hub = new();
@@ -555,7 +556,7 @@ public sealed class ModuleTests : IDisposable
             Assert.Contains(Find<Button>(page), b => b.Content as string == "Pause");
             var search = Find<SearchBox>(page).Single();
             search.Text = "note 1";
-            Assert.Equal(11, Find<Border>(page).Count(b => b.MinHeight == SettingsLayout.RowHeight && b.Child is Grid)); // 1, 10 to 19
+            Assert.Equal(11, Find<Border>(page).Count(b => b.MinHeight == SettingsLayout.RowHeight && b.Child is Grid && IsShown(b))); // 1, 10 to 19
             search.Text = "nothing like it";
             Assert.True(Shows(page, "No matches"));
         });
@@ -647,10 +648,36 @@ public sealed class ModuleTests : IDisposable
         });
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Clean_copy_retries_keep_the_URL_and_show_only_the_latest_outcome(bool inSettings)
+    {
+        await StartCleanAsync();
+        WpfTestThread.Run(() =>
+        {
+            FrameworkElement view = inSettings ? new CleanUrlSettingsPage(_clean) : new CleanUrlView(_features);
+            var link = Find<TextBox>(view).Single(t => System.Windows.Automation.AutomationProperties.GetName(t) == "Link");
+            var copy = Find<Button>(view).Single(b => Equals(b.Content, "Copy"));
+            const string clean = "https://example.org/docs";
+            link.Text = clean + "?utm_source=fixture";
+            foreach (var status in new[] { ClipStatus.Ok, ClipStatus.Busy, ClipStatus.Ok })
+            {
+                _hub.WriteResult = status;
+                copy.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                Flush(view);
+                Assert.True(Shows(view, clean));
+                Assert.Equal(status == ClipStatus.Busy, Shows(view, "Clipboard busy"));
+                Assert.Equal(status == ClipStatus.Ok, Equals(copy.Content, "Copied") || Shows(view, "Copied"));
+            }
+        });
+    }
+
     private sealed class Ui : IModuleUi
     {
         public IslandTileSpec? Spec;
         public IslandTileContribution? Tile;
+        public Func<string?, object>? SettingsPage;
 
         public IIslandTile AddIslandTile(IslandTileSpec spec)
         {
@@ -658,17 +685,22 @@ public sealed class ModuleTests : IDisposable
             return Tile = new IslandTileContribution("test", spec);
         }
 
-        public void SetSettingsPage(Func<string?, object> createView) { }
+        public void SetSettingsPage(Func<string?, object> createView) => SettingsPage = createView;
     }
 
     /// <summary>One settings section per type, kept between starts like settings.json.</summary>
     private sealed class Settings : IModuleSettings
     {
         private readonly Dictionary<Type, object> _saved = [];
+        public bool RejectWrites { get; set; }
 
         public T Get<T>() where T : class, new() => _saved.TryGetValue(typeof(T), out var value) ? (T)value : new();
 
-        public void Save<T>(T value) where T : class => _saved[typeof(T)] = value;
+        public void Save<T>(T value) where T : class
+        {
+            if (RejectWrites) throw new IOException("Fixture write rejected");
+            _saved[typeof(T)] = value;
+        }
     }
 
     private sealed class Island : IIslandPublisher

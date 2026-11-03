@@ -23,6 +23,7 @@ public sealed class ClipboardHistoryModule : IFeatureModule
     private ModuleContext? _context;
     private IIslandTile? _tile;
     private ClipboardView? _view;
+    private string? _historySearch;
 
     /// <param name="dataDirectory">This module's data folder, so uninstalling can erase it without a start.</param>
     public ClipboardHistoryModule(ClipboardFeatures features, string? dataDirectory = null)
@@ -38,6 +39,7 @@ public sealed class ClipboardHistoryModule : IFeatureModule
     };
 
     public ClipboardHistorySettings Settings { get; private set; } = new();
+    public string? SettingsError { get; private set; }
 
     /// <summary>What it shares with Clean URL, for the Settings page's Paste.</summary>
     internal ClipboardFeatures Features => _features;
@@ -53,13 +55,20 @@ public sealed class ClipboardHistoryModule : IFeatureModule
         ct.ThrowIfCancellationRequested();
         var hub = context.Clipboard ?? throw new InvalidOperationException("No clipboard service");
         _context = context;
+        SettingsError = null;
         Settings = context.Settings.Get<ClipboardHistorySettings>().Normalized();
         string path = Path.Combine(context.DataDirectory, FileName);
         History = new ClipboardHistory(hub, () => HistoryStore.Open(path, new DpapiKeyProtector()), _features.AutoCleaned, log: context.Logger);
         History.Changed += UpdateStatus;
         await History.LoadAsync(File.Exists(path)).ConfigureAwait(false);
         History.Apply(Settings.Recording, Settings.Paused, Settings.AppsToSkip);
-        context.Ui.SetSettingsPage(() => new ClipboardHistorySettingsPage(this));
+        context.Ui.SetSettingsPage(section =>
+        {
+            // The query is a one-time handoff; routes can appear in logs.
+            string? query = section == "history" ? _historySearch ?? "" : null;
+            if (section == "history") _historySearch = null;
+            return new ClipboardHistorySettingsPage(this, query);
+        });
         _features.PasteTarget = context.IslandPasteTarget;
         _features.SettingsPasteTarget = context.SettingsPasteTarget;
         _features.CloseIsland = context.CloseIsland;
@@ -70,6 +79,7 @@ public sealed class ClipboardHistoryModule : IFeatureModule
             InitialFocus = () => View().InitialFocus, // Search, or the link field in Clean URL (notes #58)
             StatusPriority = 1, // History's status over Clean URL's (notes #4)
             HandleEscape = () => _view?.HandleEscape() == true, // the first Esc clears a search or leaves Clean URL (notes #59)
+            HandleBack = () => _view?.HandleBack() == true,
         });
         context.Ui.AddCommandSearch(Copies);
         UpdateStatus();
@@ -107,15 +117,23 @@ public sealed class ClipboardHistoryModule : IFeatureModule
     {
         if (_features.PasteTarget?.Invoke() is not { } target)
         {
-            if (await history.CopyAsync(entry) != Core.Clipboard.ClipStatus.Ok)
-                throw new InvalidOperationException("Clipboard busy");
+            var status = await history.CopyAsync(entry);
+            if (status != Core.Clipboard.ClipStatus.Ok)
+                throw new InvalidOperationException(ClipboardFeedback.ForCopy(status));
             return;
         }
-        if (await history.PasteAsync(entry, target) == Core.Clipboard.PasteOutcome.Busy)
-            throw new InvalidOperationException("Clipboard busy");
+        var outcome = await history.PasteAsync(entry, target);
+        if (outcome is Core.Clipboard.PasteOutcome.Busy or Core.Clipboard.PasteOutcome.NoText)
+            throw new InvalidOperationException(ClipboardFeedback.ForPaste(outcome));
     }
 
     private ClipboardView View() => _view ??= new ClipboardView(_features);
+
+    internal void OpenHistory(string search)
+    {
+        _historySearch = search;
+        _context?.OpenSettings("history");
+    }
 
     public Task StopAsync(CancellationToken ct)
     {
@@ -131,6 +149,7 @@ public sealed class ClipboardHistoryModule : IFeatureModule
         _features.CloseIsland = null;
         _tile = null;
         _view = null;
+        _historySearch = null;
         _context = null;
         return Task.CompletedTask;
     }
@@ -154,8 +173,20 @@ public sealed class ClipboardHistoryModule : IFeatureModule
 
     public void Save(ClipboardHistorySettings settings)
     {
-        Settings = settings.Normalized();
-        _context?.Settings.Save(Settings);
+        var candidate = settings.Normalized();
+        try
+        {
+            var context = _context ?? throw new InvalidOperationException("Clipboard history is off");
+            context.Settings.Save(candidate);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            SettingsError = "Save failed";
+            Changed?.Invoke();
+            return;
+        }
+        Settings = candidate;
+        SettingsError = null;
         History?.Apply(Settings.Recording, Settings.Paused, Settings.AppsToSkip);
         UpdateStatus();
         Changed?.Invoke();

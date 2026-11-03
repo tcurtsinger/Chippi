@@ -56,7 +56,7 @@ public sealed class HistoryStore : IDisposable
         Prune(now);
         var entries = new List<HistoryEntry>();
         var broken = new List<long>();
-        using (var cmd = Command("SELECT id, kind, recent, pinned, bytes, body FROM entry ORDER BY recent DESC, id DESC"))
+        using (var cmd = Command("SELECT id, kind, recent, pinned, bytes, body, hash FROM entry ORDER BY recent DESC, id DESC"))
         using (var reader = cmd.ExecuteReader())
         {
             while (reader.Read())
@@ -64,7 +64,8 @@ public sealed class HistoryStore : IDisposable
                 long id = reader.GetInt64(0);
                 try
                 {
-                    entries.Add(Decode(id, (EntryKind)reader.GetInt32(1), reader.GetInt64(2), reader.GetInt64(3), reader.GetInt64(4), (byte[])reader[5]));
+                    entries.Add(Decode(id, (EntryKind)reader.GetInt32(1), reader.GetInt64(2), reader.GetInt64(3),
+                        reader.GetInt64(4), (byte[])reader[5]) with { ContentHash = reader.GetInt64(6) });
                 }
                 catch (System.Security.Cryptography.CryptographicException)
                 {
@@ -128,12 +129,13 @@ public sealed class HistoryStore : IDisposable
     public void Delete(long id) => Execute("DELETE FROM entry WHERE id = $id", ("$id", id));
 
     /// <summary>Clear history: the unpinned entries among <paramref name="shown"/> (a copy saved while the question was open stays).</summary>
-    public void ClearUnpinned(IReadOnlyCollection<long> shown)
+    public void ClearUnpinned(IReadOnlyCollection<HistoryEntry> shown)
     {
         using (var tx = Begin())
         {
-            foreach (long id in shown)
-                Execute("DELETE FROM entry WHERE id = $id AND pinned = 0", ("$id", id));
+            foreach (var entry in shown)
+                Execute("DELETE FROM entry WHERE id = $id AND hash = $hash AND recent = $recent AND pinned = 0",
+                    ("$id", entry.Id), ("$hash", entry.ContentHash), ("$recent", entry.Recent.ToUnixTimeMilliseconds()));
             tx.Commit();
         }
         _db.Compact();
@@ -147,10 +149,11 @@ public sealed class HistoryStore : IDisposable
     }
 
     /// <summary>A picture's full PNG, or null when it's gone.</summary>
-    public byte[]? Picture(long id)
+    public byte[]? Picture(long id, long? contentHash = null)
     {
-        using var cmd = Command("SELECT data FROM blob WHERE id = $id");
+        using var cmd = Command("SELECT blob.data FROM blob JOIN entry USING (id) WHERE id = $id AND ($hash IS NULL OR hash = $hash)");
         cmd.Parameters.AddWithValue("$id", id);
+        cmd.Parameters.AddWithValue("$hash", (object?)contentHash ?? DBNull.Value);
         return cmd.ExecuteScalar() is byte[] data ? _db.Unseal(data, Blobs, id) : null;
     }
 
@@ -221,10 +224,11 @@ public sealed class HistoryStore : IDisposable
 
     private HistoryEntry? Get(long id)
     {
-        using var cmd = Command("SELECT kind, recent, pinned, bytes, body FROM entry WHERE id = $id");
+        using var cmd = Command("SELECT kind, recent, pinned, bytes, body, hash FROM entry WHERE id = $id");
         cmd.Parameters.AddWithValue("$id", id);
         using var reader = cmd.ExecuteReader();
-        return reader.Read() ? Decode(id, (EntryKind)reader.GetInt32(0), reader.GetInt64(1), reader.GetInt64(2), reader.GetInt64(3), (byte[])reader[4]) : null;
+        return reader.Read() ? Decode(id, (EntryKind)reader.GetInt32(0), reader.GetInt64(1), reader.GetInt64(2),
+            reader.GetInt64(3), (byte[])reader[4]) with { ContentHash = reader.GetInt64(5) } : null;
     }
 
     private HistoryEntry Decode(long id, EntryKind kind, long recent, long pinned, long bytes, byte[] sealedBody)
