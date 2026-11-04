@@ -15,6 +15,8 @@ The specialized Impeccable reviewer/documenter roles were unavailable. Separate 
 
 Both native runtimes include pinned yt-dlp and Node helpers with complete upstream license texts. Helper preparation verifies official archive sizes/hashes and extracted executable sizes/hashes. The x64 helpers passed offline version/flag checks. No installer, driver or app was launched for packaging verification. See the root release manifest for the final installer hashes.
 
+The 0.1.0 x64 and ARM64 packages were built from source `33e6f14c03cd397f7d09b8c356b289cafed8b390`. All twelve release artifact sizes and SHA-256 hashes were verified, along with both app/setup PE architectures, embedded source versions, all four archive CRCs, exact license contents, pinned VB-CABLE ZIP/setup, both RNNoise architectures, and each runtime's native yt-dlp/Node binaries. Verified copies are under `X:/code/chippi/build/artifacts/releases/0.1.0`. x64 Setup is 147,058,124 bytes; ARM64 Setup is 135,382,268 bytes. The publish hook contributes helpers before single-file bundling and copy classification so each helper and license keeps its own relative path.
+
 ## Owner checks
 
 Live audio, game/call integration, native dragging/focus, real website imports and ARM64 execution remain untested locally at the owner's request.
