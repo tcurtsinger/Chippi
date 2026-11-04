@@ -85,6 +85,7 @@ internal static class Ui
     public static Border Swatch(Geometry glyph, ImageSource? image = null)
     {
         FrameworkElement shown = image is not null ? new Image { Source = image, Width = 24, Height = 24 } : new LucideIcon { Data = glyph, Size = 20 };
+        if (shown is Image appImage) AppIcon.Configure(appImage);
         if (shown is LucideIcon icon)
             icon.SetResourceReference(LucideIcon.BrushProperty, "IslandTextBrush");
         shown.HorizontalAlignment = HorizontalAlignment.Center;

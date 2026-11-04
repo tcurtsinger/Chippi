@@ -2,6 +2,8 @@
 // Copyright (C) Chippi contributors
 
 using Chippi.App.Island;
+using Chippi.Features.AgentUsage;
+using System.Windows.Media.Imaging;
 
 namespace Chippi.Island.Tests;
 
@@ -9,5 +11,9 @@ namespace Chippi.Island.Tests;
 internal static partial class WpfTestThread
 {
     // A real click or Esc on the PC while the tests run must not close a test's panel; tests press for themselves.
-    static partial void Prepare() => IslandWindow.WatchesInput = false;
+    static partial void Prepare()
+    {
+        IslandWindow.WatchesInput = false;
+        AgentIcons.UseLoaderForTests(_ => Task.FromResult<BitmapSource?>(null));
+    }
 }

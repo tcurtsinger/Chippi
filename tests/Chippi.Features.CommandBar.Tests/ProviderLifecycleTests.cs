@@ -61,6 +61,58 @@ public sealed class ProviderLifecycleTests(ITestOutputHelper output)
     }
 
     [Fact]
+    public async Task App_icons_keep_packaged_shell_identity_and_display_scale()
+    {
+        const string appId = "Publisher.App_family!App";
+        var image = FrozenImage();
+        var reads = new List<(string, int)>();
+        using var menu = new StartMenu(() => [], (parsing, pixels) => { reads.Add((parsing, pixels)); return image; }, (_, _) => null);
+
+        Assert.Same(image, await menu.IconAsync(new StartApp("Packaged app", appId), 30));
+
+        Assert.Equal((@"shell:AppsFolder\" + appId, 30), Assert.Single(reads));
+    }
+
+    [Fact]
+    public async Task Window_icons_prefer_the_executable_source_over_small_window_artwork()
+    {
+        var executable = FrozenImage();
+        var windowIcon = FrozenImage();
+        int windowReads = 0;
+        var reads = new List<(string, int)>();
+        using var menu = new StartMenu(() => [], (path, pixels) => { reads.Add((path, pixels)); return executable; }, (_, _) => { windowReads++; return windowIcon; });
+        var window = new OpenWindow(42, "Document", "Editor") { IconPath = @"C:\Apps\Editor.exe" };
+
+        Assert.Same(executable, await menu.WindowIconAsync(window, 40));
+
+        Assert.Equal((window.IconPath, 40), Assert.Single(reads));
+        Assert.Equal(0, windowReads);
+    }
+
+    [Theory]
+    [InlineData(null, false)]
+    [InlineData("", false)]
+    [InlineData(@"C:\Windows\System32\ApplicationFrameHost.exe", false)]
+    [InlineData(@"C:\Windows\System32\APPLICATIONFRAMEHOST.EXE", false)]
+    [InlineData(@"C:\Apps\Unavailable.exe", true)]
+    public async Task Window_icons_fall_back_without_using_the_packaged_app_host(string? path, bool readsExecutable)
+    {
+        var image = FrozenImage();
+        var reads = new List<string>();
+        using var menu = new StartMenu(() => [], (source, _) => { reads.Add(source); return null; }, (handle, pixels) =>
+        {
+            Assert.Equal((nint)42, handle);
+            Assert.Equal(30, pixels);
+            reads.Add("window");
+            return image;
+        });
+
+        Assert.Same(image, await menu.WindowIconAsync(new OpenWindow(42, "Document", "Editor") { IconPath = path }, 30));
+
+        Assert.Equal(readsExecutable ? new[] { path!, "window" } : ["window"], reads);
+    }
+
+    [Fact]
     public async Task Missing_icons_retry_after_apps_refresh()
     {
         int reads = 0;

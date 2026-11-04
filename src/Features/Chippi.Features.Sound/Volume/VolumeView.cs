@@ -308,17 +308,11 @@ public sealed class VolumeView : UserControl
             system.SetResourceReference(LucideIcon.BrushProperty, island ? "IslandTextTertiaryBrush" : "TextSecondaryBrush");
             return system;
         }
-        if (AppIcon.Load(app?.ExePath) is { } icon)
-        {
-            var image = new Image { Source = icon, Width = size, Height = size, VerticalAlignment = VerticalAlignment.Center, SnapsToDevicePixels = true };
-            RenderOptions.SetBitmapScalingMode(image, BitmapScalingMode.HighQuality);
-            return image;
-        }
         var label = new TextBlock { Text = Initials(AppName(key)), FontSize = island ? 10 : 9, FontWeight = FontWeights.SemiBold, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
         label.SetResourceReference(TextBlock.ForegroundProperty, island ? "IslandTextBrush" : "TextPrimaryBrush");
         var tile = new Border { Width = size, Height = size, CornerRadius = new CornerRadius(island ? 4 : 3), Child = label, VerticalAlignment = VerticalAlignment.Center };
         tile.SetResourceReference(Border.BackgroundProperty, island ? "IslandTrackBrush" : "ChipBrush");
-        return tile;
+        return AppIcon.View(app?.ExePath, size, tile);
     }
 
     /// <summary>One quiet channel: app icon (mute), vertical level, percentage. Output appears on hover or focus.</summary>

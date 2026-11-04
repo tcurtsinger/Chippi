@@ -440,13 +440,11 @@ internal sealed class AppList : StackPanel
     // The program's own icon, or its initials on a quiet tile.
     private static FrameworkElement Icon(AppUse app)
     {
-        if (AppIcon.Load(app.Path) is { } image)
-            return new Image { Source = image, Width = 16, Height = 16 };
         var tile = new Border { Width = 16, Height = 16, CornerRadius = new CornerRadius(4) };
         tile.SetResourceReference(Border.BackgroundProperty, "IslandMutedFillBrush");
         tile.Child = new TextBlock { Text = Parts.Initials(app.Name), FontSize = 8, FontWeight = FontWeights.Bold, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
         ((TextBlock)tile.Child).SetResourceReference(TextBlock.ForegroundProperty, Look.Island.Text);
-        return tile;
+        return AppIcon.View(app.Path, 16, tile);
     }
 }
 

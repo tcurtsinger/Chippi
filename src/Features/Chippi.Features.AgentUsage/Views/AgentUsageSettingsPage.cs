@@ -218,7 +218,7 @@ public sealed class AgentUsageSettingsPage : UserControl
         public void Fill(AgentSession session, string appName, DateTimeOffset now)
         {
             Session = session;
-            icon.Source = AgentIcons.Source(session.Agent);
+            AgentIcons.SetSource(icon, session.Agent);
             name.Text = session.Name;
             state.Text = session.State(now);
             state.SetResourceReference(TextBlock.ForegroundProperty, session.NeedsInput ? "WarningTextBrush" : "TextSecondaryBrush");

@@ -18,6 +18,7 @@
   <ItemGroup>
     <InternalsVisibleTo Include="Chippi" />
     <InternalsVisibleTo Include="Chippi.Island.Tests" />
+    <InternalsVisibleTo Include="Chippi.Features.CommandBar.Tests" />
   </ItemGroup>
 
   <!-- The control gallery is a development tool: compiled into Debug builds only. -->

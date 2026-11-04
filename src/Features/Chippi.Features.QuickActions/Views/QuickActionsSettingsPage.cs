@@ -263,13 +263,13 @@ public sealed class QuickActionsSettingsPage : UserControl
 
     private static UIElement Mark(string path, string name)
     {
-        if (AppIcon.Load(path) is { } icon)
-            return new System.Windows.Controls.Image { Source = icon, Width = 20, Height = 20, Margin = new Thickness(0, 0, 14, 0), VerticalAlignment = VerticalAlignment.Center };
         var letters = Text(Ui.Initials(name), "CaptionTextStyle");
         letters.HorizontalAlignment = HorizontalAlignment.Center;
-        var box = new Border { Width = 20, Height = 20, CornerRadius = new CornerRadius(4), Margin = new Thickness(0, 0, 14, 0), Child = letters, VerticalAlignment = VerticalAlignment.Center };
+        var box = new Border { Width = 20, Height = 20, CornerRadius = new CornerRadius(4), Child = letters, VerticalAlignment = VerticalAlignment.Center };
         box.SetResourceReference(Border.BackgroundProperty, "ChipBrush");
-        return box;
+        var icon = AppIcon.View(path, 20, box);
+        icon.Margin = new Thickness(0, 0, 14, 0);
+        return icon;
     }
 
     private static Border Row(UIElement? lead, TextBlock label, Button end)
