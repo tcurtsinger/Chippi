@@ -21,10 +21,14 @@ Window layouts and snapping, app switcher, close protection, focus follows mouse
   - Caps Lock combos: Right Alt isn't offered, and Win isn't in the default set.
   - Text snippets are typed out, never pasted, so the clipboard is untouched. No paste mode and no import or export at first.
 
+- **Actions regroup (tasks 224 and 225):** option B. Lock, Turn off displays and Screen saver move into the Power menu, and End frozen apps moves into Quit apps, where a frozen app shows "Not responding" with End. Lock doesn't stay as a tile of its own. Phase 6 adds Snap, Input and Switcher as each feature is installed, which makes 18 tiles. Mockup: Lumen's Actions option B and menus (task 212).
+- **Start state (task 226):** what acts on your input in the background is off until you switch it on, even once it's installed: Close protection, Focus follows mouse, Smooth scrolling and Debounce (the four Travis was asked about), and by the same rule Snap's Shift+drag zones, Caps Lock combos and snippet expansion while typing. What you trigger yourself works once installed: the Snap menu, the App switcher's tile and Search, snippets picked in Search, and shortcuts you bind. The App switcher's shortcut is unassigned until you set one.
+- **Wave 1 calls (task 227):** Always on lives in Settings › General under Fullscreen apps. A "Pause in these apps" list covers games that run in a window. Shortcuts from before Phase 6 (mic mute and the rest) never pause.
+
 ## Lead calls (Marge)
 
 - **Build order, three waves:**
-  1. The shared input layer (`Chippi.Input`: one keyboard hook and one mouse hook with a watchdog), shared actions, the shortcut service and the pause with Always on. Then Debounce, Focus follows mouse and Close protection.
+  1. The shared input layer (`Chippi.Input`: one keyboard hook and one mouse hook with a watchdog), shared actions, the shortcut service and the pause with Always on. The Actions regroup (option B, keeping your tile order). Then Debounce, Focus follows mouse and Close protection.
   2. Shortcuts and Smooth scrolling.
   3. Text snippets, Snap and the App switcher.
 - **Focus follows mouse** uses Windows' built-in setting (250 ms, the window raised) and puts the original setting back when it's off or paused.
