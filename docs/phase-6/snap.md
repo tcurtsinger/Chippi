@@ -2,7 +2,7 @@
 
 Draft for Travis's confirmation. Wave 3. Actions mockup is Lumen's task 212; zone/editor mockups follow. [Decisions](README.md); [reference evidence](behavior-spec-a.md#1-window-layouts-and-snapping).
 
-Decided (Travis, task 226): off until switched on, even once installed.
+Decided (Travis, task 226): Shift+drag zones are off until switched on, even once installed. The Snap menu works as soon as Snap is installed.
 
 ## Job and surface
 

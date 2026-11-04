@@ -2,7 +2,7 @@
 
 Draft for Travis's confirmation. Wave 3. Overlay mockups follow. [Decisions](README.md); [reference evidence](behavior-spec-a.md#2-app-switcher-with-previews).
 
-Decided (Travis, task 226): off until switched on, even once installed.
+Decided (Travis, task 226): the App switcher's tile and Search entry work as soon as it is installed. Its shortcut is unassigned until you set one.
 
 ## Job and invocation
 
