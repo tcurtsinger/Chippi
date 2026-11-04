@@ -20,7 +20,7 @@ Give every Phase 6 feature one way to listen to the keyboard and mouse, one list
 - **Pause in these apps:** apps that count as fullscreen even in a window, for games that don't cover the screen.
 - **Never paused:** the Radial menu (its own switch, below), shortcuts that existed before Phase 6 (mic mute, the output switch, Paste as plain text, Quick actions, Cleaning mode, Search's Ctrl+Alt+Space), Cleaning mode's lock, and Search itself (the Command bar): a snippet picked in Search is typed into the window Search opened over even when that's a fullscreen app, since it was chosen on purpose (Marge's call).
 - Always on is also a switch in Actions' Input menu; Lumen's mockup (task 212) names it there.
-- **Every Phase 6 feature starts off,** even once installed, until Travis switches it on (task 226). Always on starts off too.
+- **What acts on input in the background starts off,** even once installed, until Travis switches it on (task 226, the rule in [README.md](README.md)): Close protection, Focus follows mouse, Smooth scrolling, Debounce, Snap's Shift+drag zones, Caps Lock combos and snippet expansion while typing. What he triggers himself works once installed: the Snap menu, the App switcher's tile and Search, snippets picked in Search, and shortcuts he binds; the App switcher's shortcut is unassigned until he sets one. Always on starts off too.
 
 **Settings › Radial menu › Opening:** a new switch row, **Open over fullscreen apps**, on by default, which keeps today's behavior. Off, the triggers reach the game as plain clicks and keys while a fullscreen app is in front.
 

@@ -74,7 +74,7 @@ Travis (task 208): every verb is one shared action, and any door can fire it: an
 
 ## 5. The pause and Always on
 
-Travis (tasks 198, 211): one **Always on** switch covers every Phase 6 input feature, Debounce included, off by default. Off, they pause while a fullscreen game or app is in front. Each Phase 6 feature also starts off, even once installed, until Travis switches it on (task 226).
+Travis (tasks 198, 211): one **Always on** switch covers every Phase 6 input feature, Debounce included, off by default. Off, they pause while a fullscreen game or app is in front. What acts on input in the background also starts off, even once installed, until Travis switches it on (task 226, the rule in [README.md](README.md)); what he triggers himself (the Snap menu, the App switcher's tile and Search, snippets picked in Search, shortcuts he binds) works once installed.
 
 - **The check:** `ForegroundTracker`'s fullscreen test moves to Core: D3D fullscreen, presentation mode, or a foreground window covering its whole monitor (catches borderless games). The island keeps its own rule (it hides only on its display) on top of the same test.
 - **Paused** means the foreground window is fullscreen and Always on is off. Keyboard input goes to the foreground app and a fullscreen game holds the mouse, so the foreground window is the right test on two monitors: click the browser on the Samsung and the browser is in front, so nothing pauses.
