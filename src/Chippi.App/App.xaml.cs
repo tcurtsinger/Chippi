@@ -187,6 +187,9 @@ public partial class App : Application
             Path.Combine(shell.Services.DataRoot, Chippi.Features.Sound.Processing.MicProcessingModule.Id)));
 
         shell.Registry.Register(new Chippi.Features.Sound.Volume.AppVolumeModule());
+        shell.Registry.Register(new Chippi.Features.Sound.Soundboard.SoundboardModule(
+            Path.Combine(shell.Services.DataRoot, Chippi.Features.Sound.Soundboard.SoundboardModule.Id),
+            () => routing.Order(Chippi.Audio.AudioFlow.Capture)));
         // The Sound page's Microphone row sets the level of the mic routing has in use, never VB-CABLE's.
         shell.Registry.Register(new Chippi.Features.Sound.Mute.MicMuteModule(microphone: () => routing.InUse(Chippi.Audio.AudioFlow.Capture)));
         // [Phase 4] System (the System monitor until 2026-10-31): replaces its catalog placeholder.

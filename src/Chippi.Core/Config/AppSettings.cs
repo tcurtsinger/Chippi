@@ -112,6 +112,9 @@ public sealed class AppSettings
     /// <summary>The last view selected inside Audio, remembered independently of the last gallery tool.</summary>
     public bool? IslandAudioShowsMixer { get; set; }
 
+    /// <summary>The last Audio page key. Supersedes the legacy two-view boolean.</summary>
+    public string? IslandAudioPage { get; set; }
+
     /// <summary>Settings › Now Playing: expand the music bar during playback, even when the pointer is away.</summary>
     public bool NowPlayingAlwaysShow { get; set; } = true;
 

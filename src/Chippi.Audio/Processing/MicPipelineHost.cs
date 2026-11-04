@@ -57,6 +57,8 @@ internal sealed class MicPipelineHost(ILogger log, MicPipelineFactory factory, A
     private static readonly AudioRole[] CaptureRoles = [AudioRole.Console, AudioRole.Multimedia, AudioRole.Communications];
 
     private ProcessingRequest? _request;
+    private ProcessingRequest? _soundboardVoice;
+    private MicSettings? _pipelineSettings;
     private Action<ProcessingMarker?>? _saveMarker;
     private IMicPipeline? _pipeline;
     private string? _source;
@@ -67,6 +69,10 @@ internal sealed class MicPipelineHost(ILogger log, MicPipelineFactory factory, A
     private bool _claimed;
 
     public ProcessingStatus Status { get; private set; } = ProcessingStatus.Off;
+
+    public ProcessingStatus VoiceStatus { get; private set; } = ProcessingStatus.Off;
+
+    private ProcessingRequest? EffectiveRequest => _request ?? _soundboardVoice;
 
     public float InputLevel => _pipeline?.InputLevel ?? 0f;
 
@@ -79,6 +85,25 @@ internal sealed class MicPipelineHost(ILogger log, MicPipelineFactory factory, A
         if (request is not null)
             _saveMarker = request.SaveMarker;
         _failedSource = _failedError = null;
+    }
+
+    public void SetSoundboardVoice(RoleTarget? source)
+    {
+        _soundboardVoice = source is null ? null : new(source,
+            new MicSettings { Suppression = false, Gate = false, Agc = false }, false, _ => { });
+        _failedSource = _failedError = null;
+    }
+
+    public void UpdateVoiceMute(IReadOnlyDictionary<string, EndpointLevel> levels)
+    {
+        if (_pipelineSettings is { } settings)
+            settings.VoiceMuted = _source is null || !levels.TryGetValue(_source, out var level) || level.Muted;
+    }
+
+    private void SetStatus(ProcessingStatus value)
+    {
+        VoiceStatus = value;
+        Status = _request is null ? ProcessingStatus.Off : value;
     }
 
     /// <summary>
@@ -95,7 +120,8 @@ internal sealed class MicPipelineHost(ILogger log, MicPipelineFactory factory, A
 
     public void Update(RoleArbiter arbiter, DeviceCatalog catalog, IDeviceSystem system)
     {
-        if (_request is null)
+        var request = EffectiveRequest;
+        if (request is null)
         {
             Halt(ProcessingStatus.Off, arbiter, catalog, system);
             return;
@@ -114,7 +140,7 @@ internal sealed class MicPipelineHost(ILogger log, MicPipelineFactory factory, A
             return;
         }
 
-        var source = _request.Source(catalog.Active(AudioFlow.Capture).Where(e => !VbCable.IsCable(e)).ToList());
+        var source = request.Source(catalog.Active(AudioFlow.Capture).Where(e => !VbCable.IsCable(e)).ToList());
         if (source is null)
         {
             _failedSource = _failedError = null; // the mic left: its return is a fresh try
@@ -128,18 +154,23 @@ internal sealed class MicPipelineHost(ILogger log, MicPipelineFactory factory, A
             return;
         }
 
-        if (_pipeline is null || !PriorityPolicy.Eq(source, _source) || !PriorityPolicy.Eq(pair!.RenderId, _sink))
+        if (_pipeline is null || !PriorityPolicy.Eq(source, _source) || !PriorityPolicy.Eq(pair!.RenderId, _sink)
+            || !ReferenceEquals(_pipelineSettings, request.Settings))
         {
             DisposePipeline();
-            if (!StartPipeline(source, pair!.RenderId))
+            // Set silence before capture/render starts, so a muted microphone cannot leak buffered
+            // speech during a handoff from unprocessed voice to the processing chain.
+            try { request.Settings.VoiceMuted = system.GetLevel(source).Muted; }
+            catch { request.Settings.VoiceMuted = true; }
+            if (!StartPipeline(source, pair!.RenderId, request.Settings))
             {
                 Halt(new(ProcessingState.Stopped, StopReason.Failed, source, _failedError), arbiter, catalog, system);
                 return;
             }
         }
 
-        Status = new(ProcessingState.Live, SourceId: source);
-        if (_request.SetDefault)
+        SetStatus(new(ProcessingState.Live, SourceId: source));
+        if (request.SetDefault)
             TakeRoles(pair!.CaptureId, arbiter, catalog);
         else
             ReleaseRoles(arbiter, catalog, system);
@@ -149,19 +180,21 @@ internal sealed class MicPipelineHost(ILogger log, MicPipelineFactory factory, A
     public void Shutdown(RoleArbiter arbiter, DeviceCatalog catalog, IDeviceSystem system)
     {
         _request = null;
+        _soundboardVoice = null;
         Halt(ProcessingStatus.Off, arbiter, catalog, system);
     }
 
-    private bool StartPipeline(string source, string sink)
+    private bool StartPipeline(string source, string sink, MicSettings settings)
     {
         IMicPipeline? pipeline = null;
         try
         {
-            pipeline = factory(source, sink, _request!.Settings);
+            pipeline = factory(source, sink, settings);
             var started = pipeline;
             pipeline.Failed += error => enqueue(() => OnFailed(started, error));
             pipeline.Start();
             _pipeline = pipeline;
+            _pipelineSettings = settings;
             _source = source;
             _sink = sink;
             _failedSource = _failedError = null;
@@ -194,7 +227,7 @@ internal sealed class MicPipelineHost(ILogger log, MicPipelineFactory factory, A
     {
         DisposePipeline();
         ReleaseRoles(arbiter, catalog, system);
-        Status = status;
+        SetStatus(status);
     }
 
     private void DisposePipeline()
@@ -204,6 +237,7 @@ internal sealed class MicPipelineHost(ILogger log, MicPipelineFactory factory, A
         try { _pipeline.Dispose(); }
         catch (Exception ex) { log.LogWarning(ex, "Disposing the mic pipeline failed"); }
         _pipeline = null;
+        _pipelineSettings = null;
         _source = _sink = null;
     }
 
@@ -239,7 +273,7 @@ internal sealed class MicPipelineHost(ILogger log, MicPipelineFactory factory, A
             _claimed = false;
             cableJustLost = !catalog.Active(AudioFlow.Capture).Any(e => PriorityPolicy.Eq(e.Id, _marker.CableCaptureId));
         }
-        var preferred = _request?.Source(catalog.Active(AudioFlow.Capture).Where(e => !VbCable.IsCable(e)).ToList());
+        var preferred = EffectiveRequest?.Source(catalog.Active(AudioFlow.Capture).Where(e => !VbCable.IsCable(e)).ToList());
         if (!arbiter.Recover(_marker, preferred, catalog, system, cableJustLost))
             return;
         _marker = null;

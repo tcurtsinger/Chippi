@@ -21,6 +21,9 @@ public sealed record AudioSnapshot(
     /// <summary>Where Mic processing actually is.</summary>
     public ProcessingStatus Processing { get; init; } = ProcessingStatus.Off;
 
+    /// <summary>The shared voice bridge, including unprocessed voice used by Soundboard.</summary>
+    public ProcessingStatus SoundboardVoice { get; init; } = ProcessingStatus.Off;
+
     public MicrophoneMuteStatus MicrophoneMute { get; init; } = MicrophoneMuteStatus.Empty;
 
     public static AudioSnapshot Empty { get; } = new(

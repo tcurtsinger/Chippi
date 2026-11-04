@@ -27,6 +27,15 @@ Chippi ships VB-Audio's VB-CABLE Driver Pack 45 (`vendor\vb-cable\VBCABLE_Driver
 - VB-CABLE is a donationware, all participations are welcome.
 - Licensing: https://vb-audio.com/Services/licensing.htm
 
+## Soundboard import tools
+
+Soundboard bundles native Windows x64 or ARM64 copies of the following tools under `vendor/soundboard`. They run only to prepare a sound explicitly added by the user. No global installation, self-update, user configuration, plugins, browser cookies, or remote solver components are used. Versions, download sizes, archive SHA-256 and extracted executable SHA-256 are pinned in `build/vendor/soundboard-tools.json`.
+
+- **yt-dlp 2026.10.26:** source code is Unlicense; the official standalone executable is a combined GPL-3.0-or-later work because of its bundled dependencies. The upstream source license and complete third-party license collection are shipped as `licenses/yt-dlp-LICENSE.txt` and `licenses/yt-dlp-THIRD-PARTY-LICENSES.txt`. Release and corresponding source: https://github.com/yt-dlp/yt-dlp/releases/tag/2026.10.26. Dependency sources and notices are identified in that upstream license collection. The official executable includes yt-dlp-ejs and its JavaScript dependencies; Chippi disables downloading remote components.
+- **Node.js 26.13.0 LTS:** MIT licensed, with third-party components under their own licenses. The unmodified consolidated LICENSE from the official Windows release is shipped as `licenses/Node-LICENSE.txt`. Release: https://nodejs.org/dist/v26.13.0/. Corresponding source: https://nodejs.org/dist/v26.13.0/node-v26.13.0.tar.xz. Node is used only as yt-dlp's explicitly selected local JavaScript runtime.
+
+Chippi selects an audio format supported by Windows and decodes the saved file with NAudio/Windows Media Foundation. FFmpeg is not bundled. Playback uses the prepared local PCM WAV and does not contact the source website.
+
 ## Bundled data: Unicode emoji names
 
 The Command bar finds emoji by name from a trimmed copy of Unicode's emoji-test.txt 16.0 (`src/Features/Chippi.Features.CommandBar/Data/emoji.txt`: fully-qualified emoji without skin-tone variants or country flags, up to Emoji 15.1, with their names and subgroups). Source: https://unicode.org/Public/emoji/16.0/emoji-test.txt. Unicode License v3, reproduced below.

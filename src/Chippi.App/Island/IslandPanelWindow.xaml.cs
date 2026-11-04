@@ -60,7 +60,10 @@ public partial class IslandPanelWindow : Window
     private IReadOnlyList<IslandTileGroup> _groups = [];
     private IReadOnlyList<IslandTool> _tools = [];
     private readonly IslandAudioTabs _audioTabs = new();
+    private IReadOnlyList<string> _audioPageKeys = [];
+    private bool _syncAudioTabs;
     internal bool? AudioShowsMixer { get; private set; }
+    internal string? AudioPage { get; private set; }
     private IReadOnlyList<IslandActivity> _activities = [];
     private IMediaSessions? _media;
     private NowPlayingView? _nowPlaying;
@@ -96,11 +99,10 @@ public partial class IslandPanelWindow : Window
         InitializeComponent();
         _audioTabs.SetResourceReference(StyleProperty, "IslandAudioTabsStyle");
         AutomationProperties.SetName(_audioTabs, "Audio view");
-        _audioTabs.Items.Add("Devices");
-        _audioTabs.Items.Add("App volume");
         _audioTabs.SelectionChanged += (_, _) =>
         {
-            string selected = _audioTabs.SelectedIndex == 1 ? AppVolumeModule.TileKey : SoundTile.Key;
+            if (_syncAudioTabs || _audioTabs.SelectedIndex < 0 || _audioTabs.SelectedIndex >= _audioPageKeys.Count) return;
+            string selected = _audioPageKeys[_audioTabs.SelectedIndex];
             if (IsOpen && IslandTool.IsAudioPage(_page) && selected != _page)
                 ShowPage(selected);
         };
@@ -293,10 +295,11 @@ public partial class IslandPanelWindow : Window
     }
 
     /// <summary>AppSettings.IslandLastPage.</summary>
-    internal void SetLastPage(string? key, bool? audioShowsMixer = null)
+    internal void SetLastPage(string? key, bool? audioShowsMixer = null, string? audioPage = null)
     {
         _lastPage = key;
-        AudioShowsMixer = audioShowsMixer ?? (IslandTool.IsAudioPage(key) ? key == AppVolumeModule.TileKey : null);
+        AudioPage = IslandTool.RememberedAudioPage(audioPage, key, audioShowsMixer);
+        AudioShowsMixer = AudioPage is null ? null : AudioPage == AppVolumeModule.TileKey;
     }
 
     /// <summary>The page the next open shows instead of the usual one (a notice click); null for the usual.</summary>
@@ -506,18 +509,19 @@ public partial class IslandPanelWindow : Window
     private string? ResolvePage(string? key)
     {
         if (key == IslandTool.Audio)
-            key = AudioShowsMixer == true ? AppVolumeModule.TileKey : SoundTile.Key;
+            key = IslandTool.ResolveAudioPage(AudioPage, _groups.Select(g => g.Key));
         if (key is null || Exists(key)) return key;
         if (!IslandTool.IsAudioPage(key)) return null;
-        string other = key == SoundTile.Key ? AppVolumeModule.TileKey : SoundTile.Key;
-        return Exists(other) ? other : null;
+        return IslandTool.ResolveAudioPage(key, _groups.Select(g => g.Key));
     }
 
     private void RememberPage(string key)
     {
         bool? mixer = IslandTool.IsAudioPage(key) ? key == AppVolumeModule.TileKey : AudioShowsMixer;
-        if (_lastPage == key && AudioShowsMixer == mixer) return;
+        string? audioPage = IslandTool.IsAudioPage(key) ? key : AudioPage;
+        if (_lastPage == key && AudioPage == audioPage && AudioShowsMixer == mixer) return;
         AudioShowsMixer = mixer;
+        AudioPage = audioPage;
         _lastPage = key;
         LastPageChanged?.Invoke(this, key);
     }
@@ -561,7 +565,7 @@ public partial class IslandPanelWindow : Window
             // taller row (the Command bar's 32 field) gets it, and its body is that much shorter.
             var back = BackButton(() => { if (!PageHandlesBack()) ShowPage(null, remember: false); });
             DockPanel.SetDock(back, Dock.Left);
-            double height = IslandTool.IsAudioPage(key) && Exists(SoundTile.Key) && Exists(AppVolumeModule.TileKey) ? 32
+            double height = IslandTool.IsAudioPage(key) && (IslandTool.AudioPages.Count(Exists) > 1 || key == "sound.board") ? 32
                 : Group(key)?.Parts.Max(p => p.Spec.HeaderHeight) is > 0 and var taller ? taller : IslandPage.HeaderHeight;
             var row = new DockPanel { Height = height, Margin = new Thickness(0, 0, 0, IslandPage.Gap), LastChildFill = true, Children = { back, header } };
             DockPanel.SetDock(row, Dock.Top);
@@ -602,9 +606,21 @@ public partial class IslandPanelWindow : Window
     private DockPanel AudioHeader(string key)
     {
         var row = new DockPanel();
-        if (Exists(SoundTile.Key) && Exists(AppVolumeModule.TileKey))
+        var available = IslandTool.AudioPages.Where(Exists).ToList();
+        if (available.Count > 1)
         {
-            _audioTabs.SelectedIndex = key == AppVolumeModule.TileKey ? 1 : 0;
+            _syncAudioTabs = true;
+            try
+            {
+                if (!_audioPageKeys.SequenceEqual(available))
+                {
+                    _audioTabs.Items.Clear();
+                    _audioPageKeys = available;
+                    foreach (string page in available) _audioTabs.Items.Add(IslandTool.AudioPageName(page));
+                }
+                _audioTabs.SelectedIndex = available.IndexOf(key);
+            }
+            finally { _syncAudioTabs = false; }
             DockPanel.SetDock(_audioTabs, Dock.Right);
             row.Children.Add(_audioTabs);
         }

@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "ytDlpVersion": "2026.10.26",
+  "nodeVersion": "26.13.0",
+  "runtimes": {
+    "win-x64": {
+      "yt-dlp.exe": {
+        "url": "https://github.com/yt-dlp/yt-dlp/releases/download/2026.10.26/yt-dlp.exe",
+        "archive": "yt-dlp-2026.10.26-win-x64.exe",
+        "archiveBytes": 23575744,
+        "archiveSHA256": "F5389D3698ECDE4EF06F4E6B1CE0294FE9AC1396228C8990B8D3416D6D177A7D",
+        "entry": null,
+        "bytes": 23575744,
+        "sha256": "F5389D3698ECDE4EF06F4E6B1CE0294FE9AC1396228C8990B8D3416D6D177A7D"
+      },
+      "node.exe": {
+        "url": "https://nodejs.org/dist/v26.13.0/node-v26.13.0-win-x64.zip",
+        "archive": "node-v26.13.0-win-x64.zip",
+        "archiveBytes": 41157375,
+        "archiveSHA256": "DCC60D59A0746999F99064A01C020445D54D84228C691CDBF25B49AC3B59150A",
+        "entry": "node-v26.13.0-win-x64/node.exe",
+        "bytes": 100097864,
+        "sha256": "14319838B3F355E0398C13569A90270BCE4FC68F25189F58C59B03DADAE0E6D5"
+      }
+    },
+    "win-arm64": {
+      "yt-dlp.exe": {
+        "url": "https://github.com/yt-dlp/yt-dlp/releases/download/2026.10.26/yt-dlp_arm64.exe",
+        "archive": "yt-dlp-2026.10.26-win-arm64.exe",
+        "archiveBytes": 22809590,
+        "archiveSHA256": "0066DBAC3C124028E2DCAE2A197FCCEE33CD91F456313D24F7AF89FD54590E98",
+        "entry": null,
+        "bytes": 22809590,
+        "sha256": "0066DBAC3C124028E2DCAE2A197FCCEE33CD91F456313D24F7AF89FD54590E98"
+      },
+      "node.exe": {
+        "url": "https://nodejs.org/dist/v26.13.0/node-v26.13.0-win-arm64.zip",
+        "archive": "node-v26.13.0-win-arm64.zip",
+        "archiveBytes": 37005985,
+        "archiveSHA256": "A9427139595156EF484E1FB08957676E09D4232368DD1743A2A9F93F3D241B14",
+        "entry": "node-v26.13.0-win-arm64/node.exe",
+        "bytes": 88331080,
+        "sha256": "4C9BAA047C4AE555050179F25A63153F1C962AF32E2AAD97735FB550750C5E7A"
+      }
+    }
+  }
+}

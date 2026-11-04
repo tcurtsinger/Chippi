@@ -38,6 +38,14 @@ Our own default writes echo back as a notification; the reconcile it causes find
 
 Tests use `FakePipelines` from AudioFakes.cs: nothing captures, renders or plays.
 
+## Soundboard
+
+`SoundboardPlayer` owns one trimmed WAV playback with independent send and local-monitor levels. Each branch streams through shared-mode WASAPI. The send branch renders to the verified CABLE Input after voice processing; the monitor follows the real Windows multimedia output and never selects a cable endpoint. Preview has no send branch. New playback replaces the old clip, stale callbacks are fenced, and Stop leaves voice capture running. Route changes resume from the consumed clip position. An explicit Windows mute on the virtual endpoint is respected.
+
+`SetSoundboardVoiceAsync` supplies an unprocessed fallback request to the existing `MicPipelineHost`. Processing takes precedence, so there is still only one physical mic capture pipeline. The fallback never owns default-device roles. `AudioSnapshot.SoundboardVoice` reports the effective voice bridge independently from the Mic processing switch. The post-DSP `VoiceMuteProvider` gates buffered speech; the shared physical-microphone mute latch excludes VB-CABLE so clips remain audible while voice is muted.
+
+Soundboard tests inject a playback factory, fake device system and clock. Provider tests read isolated WAV fixtures without opening endpoints. They do not validate a real driver, headphones, game or call.
+
 ## App volume
 
 `AudioService.GetAppOutputAsync` performs a read-only capability probe for an app with a session;

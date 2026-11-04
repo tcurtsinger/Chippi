@@ -5,17 +5,34 @@ using Chippi.Core.Config;
 using Chippi.Core.Modules;
 using Chippi.Features.Sound;
 using Chippi.Features.Sound.Volume;
+using Chippi.Features.Sound.Soundboard;
 using Chippi.UI.Controls;
 
 namespace Chippi.App.Island;
 
-/// <summary>A gallery destination. The two independently installed audio pages share one entry.</summary>
+/// <summary>A gallery destination. Independently installed audio pages share one entry.</summary>
 internal sealed record IslandTool(string Key, IslandTileGroup Source, bool Visible)
 {
     public const string Audio = "audio";
     public string Name => Key == Audio ? "Audio" : Source.Name;
     public string Icon => Key == Audio ? nameof(LucideIcons.Speaker) : Source.Icon;
-    public static bool IsAudioPage(string? key) => key is SoundTile.Key or AppVolumeModule.TileKey;
+    public static IReadOnlyList<string> AudioPages { get; } = [SoundTile.Key, AppVolumeModule.TileKey, SoundboardModule.TileKey];
+    public static bool IsAudioPage(string? key) => key is not null && AudioPages.Contains(key);
+    public static string AudioPageName(string key) => key switch
+    {
+        SoundTile.Key => "Devices",
+        AppVolumeModule.TileKey => "App volume",
+        SoundboardModule.TileKey => "Soundboard",
+        _ => throw new ArgumentOutOfRangeException(nameof(key)),
+    };
+    internal static string? RememberedAudioPage(string? page, string? lastPage, bool? legacyMixer) =>
+        IsAudioPage(page) ? page : IsAudioPage(lastPage) ? lastPage
+        : legacyMixer is { } mixer ? mixer ? AppVolumeModule.TileKey : SoundTile.Key : null;
+    internal static string? ResolveAudioPage(string? preferred, IEnumerable<string> available)
+    {
+        var keys = available.ToHashSet(StringComparer.Ordinal);
+        return preferred is not null && IsAudioPage(preferred) && keys.Contains(preferred) ? preferred : AudioPages.FirstOrDefault(keys.Contains);
+    }
     public static string GalleryKey(string key) => IsAudioPage(key) ? Audio : key;
 }
 
