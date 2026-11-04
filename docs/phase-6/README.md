@@ -28,7 +28,7 @@ Window layouts and snapping, app switcher, close protection, focus follows mouse
 ## Lead calls (Marge)
 
 - **Build order, three waves:**
-  1. The shared input layer (`Chippi.Input`: one keyboard hook and one mouse hook with a watchdog), shared actions, the shortcut service and the pause with Always on. The Actions regroup (option B, keeping your tile positions). Then Debounce, Focus follows mouse and Close protection.
+  1. The shared input layer (`Chippi.Input`: one keyboard hook and one mouse hook with a watchdog), shared actions, the shortcut service and the pause with Always on. The Actions regroup (option B, keeping your tile order). Then Debounce, Focus follows mouse and Close protection.
   2. Shortcuts and Smooth scrolling.
   3. Text snippets, Snap and the App switcher.
 - **Focus follows mouse** uses Windows' built-in setting (250 ms, the window raised) and puts the original setting back when it's off or paused.
