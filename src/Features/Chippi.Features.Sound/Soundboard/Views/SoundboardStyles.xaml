@@ -47,9 +47,6 @@
                         <ContentPresenter HorizontalAlignment="Stretch" VerticalAlignment="Stretch" />
                     </Border>
                     <ControlTemplate.Triggers>
-                        <Trigger Property="IsKeyboardFocused" Value="True">
-                            <Setter TargetName="Face" Property="BorderBrush" Value="{DynamicResource IslandAccentBrush}" />
-                        </Trigger>
                         <Trigger Property="IsPressed" Value="True"><Setter TargetName="Face" Property="Opacity" Value="0.8" /></Trigger>
                         <Trigger Property="IsEnabled" Value="False"><Setter TargetName="Face" Property="Opacity" Value="0.5" /></Trigger>
                     </ControlTemplate.Triggers>
@@ -61,6 +58,7 @@
         </Style.Triggers>
     </Style>
     <Style x:Key="SoundboardQuietButtonStyle" TargetType="Button">
+        <Setter Property="FocusVisualStyle" Value="{DynamicResource IslandFocusVisual}" />
         <Setter Property="Foreground" Value="{DynamicResource IslandTextSecondaryBrush}" />
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="BorderThickness" Value="0" />
@@ -77,10 +75,6 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Face" Property="Background" Value="{DynamicResource IslandGalleryHoverBrush}" /></Trigger>
-                        <Trigger Property="IsKeyboardFocused" Value="True">
-                            <Setter TargetName="Face" Property="BorderBrush" Value="{DynamicResource IslandAccentBrush}" />
-                            <Setter TargetName="Face" Property="BorderThickness" Value="1" />
-                        </Trigger>
                         <Trigger Property="IsPressed" Value="True"><Setter TargetName="Face" Property="Opacity" Value="0.8" /></Trigger>
                         <Trigger Property="IsEnabled" Value="False"><Setter TargetName="Face" Property="Opacity" Value="0.45" /></Trigger>
                     </ControlTemplate.Triggers>
