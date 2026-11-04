@@ -246,9 +246,7 @@ internal sealed partial class ActionsPage
 
     private Border AppRow(OpenApp app)
     {
-        UIElement mark = AppIcon.Load(app.Path) is { } icon
-            ? new Image { Source = icon, Width = 16, Height = 16, VerticalAlignment = VerticalAlignment.Center }
-            : Ui.Monogram(app.Name);
+        UIElement mark = AppIcon.View(app.Path, 16, Ui.Monogram(app.Name));
         bool failing = _rowFailures.ContainsKey((QuickActionId.Quit, app.Path));
         var quit = Ui.Icon(failing ? LucideIcons.RefreshCw : LucideIcons.Close, failing ? $"Retry quitting {app.Name}" : $"Quit {app.Name}");
         quit.Tag = "quit:" + app.Path.ToUpperInvariant();

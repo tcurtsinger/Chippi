@@ -976,7 +976,7 @@ public partial class IslandWindow : Window
         if (puckAgent is not null)
         {
             AgentMarkPlate.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, puckAgent.NeedsAttention ? "PetSparkBrush" : "IslandAccentFillBrush");
-            AgentBadgeProvider.Source = puckProvider is { } kind ? AgentIcons.Source(kind) : null;
+            AgentIcons.SetSource(AgentBadgeProvider, puckProvider);
             AgentBadgeFace.Visibility = Shown(puckProvider.HasValue);
             AgentMarkIcon.Visibility = Shown(!puckProvider.HasValue);
         }
@@ -1366,7 +1366,7 @@ public partial class IslandWindow : Window
 
     private void ShowProvider(AgentKind provider, bool waiting)
     {
-        ProviderMark.Source = AgentIcons.Source(provider);
+        AgentIcons.SetSource(ProviderMark, provider);
         GlyphPlate.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, waiting ? "IslandWaitingTintBrush" : "IslandAccentTintBrush");
         ProviderMark.Visibility = Visibility.Visible;
         GlyphIcon.Visibility = Ring.Visibility = Dot.Visibility = Visibility.Collapsed;

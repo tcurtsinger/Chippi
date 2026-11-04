@@ -230,7 +230,7 @@ public sealed class AgentsIslandView : UserControl
     private void Fill(SessionParts parts, AgentSession session, DateTimeOffset now)
     {
         parts.Session = session;
-        parts.Icon.Source = AgentIcons.Source(session.Agent);
+        AgentIcons.SetSource(parts.Icon, session.Agent);
         parts.Name.Text = session.Name;
         bool failed = _failed == session.Id;
         string state = failed ? "Switch failed" : session.State(now);

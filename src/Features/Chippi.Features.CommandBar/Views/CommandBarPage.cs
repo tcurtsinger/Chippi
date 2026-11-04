@@ -616,19 +616,20 @@ internal sealed class CommandBarPage : UserControl
         if (result.Emoji is { } emoji)
             return new TextBlock { Text = emoji, FontFamily = new FontFamily("Segoe UI Emoji"), FontSize = 16, Width = 20, TextAlignment = TextAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
         if (result.App is { } parsing)
-            return AppIcon(result.Name, (pc, pixels) => pc.AppIconAsync(new StartApp(result.Name, parsing), pixels));
+            return AppMark(result.Name, (pc, pixels) => pc.AppIconAsync(new StartApp(result.Name, parsing), pixels));
         if (result.Window is { } window)
-            return AppIcon(window.App, (pc, pixels) => pc.WindowIconAsync(window, pixels));
+            return AppMark(window.App, (pc, pixels) => pc.WindowIconAsync(window, pixels));
         var box = new Grid { Width = 20, Height = 20, VerticalAlignment = VerticalAlignment.Center };
         box.Children.Add(Ui.Glyph(LucideIcons.Get(result.Icon), 16, "IslandTextSecondaryBrush"));
         return box;
     }
 
     /// <summary>The app's icon, its letters on the tint until it's read (at once when already read).</summary>
-    private FrameworkElement AppIcon(string name, Func<IPc, int, Task<ImageSource?>> read)
+    private FrameworkElement AppMark(string name, Func<IPc, int, Task<ImageSource?>> read)
     {
         var mark = Ui.Monogram(name);
         var image = new Image { Width = 20, Height = 20 };
+        AppIcon.Configure(image);
         var box = new Grid { Width = 20, Height = 20, VerticalAlignment = VerticalAlignment.Center, Children = { mark, image } };
         if (_module.Pc is not { } pc)
             return box;

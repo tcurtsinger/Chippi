@@ -484,7 +484,7 @@ Every interactive control is custom-templated with the full state set: rest, hov
 - **Status dot:** 7px. Success for active, caution for attention, Muted for offline. No glow.
 - **Drag handle:** a 16px six-dot grip in Muted. Alt+Up/Down moves the row.
 - **Sound glyphs.** The Audio tool uses `Speaker`, a speaker cone with two sound waves. Its App volume view uses the same glyph for System sounds. Mic processing uses `AudioWaveform` on the Sound page and `Mic` in Add features. The Mic mute shortcut, muted-microphone badge and mute controls use `MicOff`.
-- **Icons:** Lucide on a 24px grid, round caps and joins, drawn at 16px (20px for a Settings row lead glyph). The stroke is 30 / size in the grid, so every size draws the same 1.25px line (revised 2026-10-28). Each feature has its own glyph; no glyph is reused for two features. Brand logos are never redrawn: an app shows its real icon, or a monogram tile when no icon is available.
+- **Icons:** Lucide on a 24px grid, round caps and joins, drawn at 16px (20px for a Settings row lead glyph). The stroke is 30 / size in the grid, so every size draws the same 1.25px line (revised 2026-10-28). Each feature has its own glyph; no glyph is reused for two features. Brand logos are never redrawn: an app shows its real icon, or a monogram tile when no icon is available. Search, Audio, Actions, System and Radial use the same Windows artwork loader and high-quality scaling. Agent cards, session rows and puck marks use the installed provider app's Windows icon, resolved by app identity, with neutral initials when it is unavailable; bundled brand substitutes are not used.
 
 ## 7. The pet: Chippi
 

@@ -176,7 +176,10 @@ public sealed class WheelView : Canvas
             var glyphAt = At(new Point(Middle, Middle), GlyphRadius, angle);
             double size = 24;
             if (slot.Image is { } image)
+            {
                 _glyph = new Image { Source = image, Width = size, Height = size };
+                AppIcon.Configure((Image)_glyph);
+            }
             else
             {
                 // Glyphs 20, the editor's + 16; an app's or a file's own icon 24.

@@ -13,11 +13,4 @@ SetForegroundWindow
 DwmGetWindowAttribute
 OpenProcess
 QueryFullProcessImageName
-DeleteObject
-GetObject
-GetDIBits
-GetDC
-ReleaseDC
-BITMAP
-BITMAPINFO
 WINDOW_EX_STYLE

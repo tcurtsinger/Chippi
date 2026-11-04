@@ -18,7 +18,7 @@ internal sealed class AgentImage : Image
         IsHitTestVisible = false;
         SnapsToDevicePixels = true;
         RenderOptions.SetBitmapScalingMode(this, BitmapScalingMode.HighQuality);
-        if (provider.HasValue) Source = AgentIcons.Source(provider.Value);
+        if (provider.HasValue) AgentIcons.SetSource(this, provider.Value);
     }
 
     protected override AutomationPeer? OnCreateAutomationPeer() => null;

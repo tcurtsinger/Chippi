@@ -236,17 +236,28 @@ public sealed class CommandBarPageTests
     });
 
     [Fact]
-    public void App_and_window_rows_show_their_providers_actual_icons() => WpfTestThread.Run(() =>
+    public void App_and_window_rows_keep_the_native_source_and_scale_it_cleanly() => WpfTestThread.Run(() =>
     {
         using var f = new Fixture();
-        f.Pc.Icon = BitmapSource.Create(1, 1, 96, 96, PixelFormats.Bgra32, null, new byte[] { 30, 100, 200, 255 }, 4);
+        f.Pc.Icon = BitmapSource.Create(64, 64, 96, 96, PixelFormats.Bgra32, null, new byte[64 * 64 * 4], 64 * 4);
         f.Pc.Icon.Freeze();
         f.Page.Field.Text = "Chrome";
         Drain();
 
         Assert.Contains("Chrome", f.Pc.AppIconRequests);
         Assert.Contains((nint)42, f.Pc.WindowIconRequests);
-        Assert.Equal(2, Elements(f.Page).OfType<Image>().Count(image => ReferenceEquals(image.Source, f.Pc.Icon)));
+        var icons = Elements(f.Page).OfType<Image>().Where(image => ReferenceEquals(image.Source, f.Pc.Icon)).ToArray();
+        Assert.Equal(2, icons.Length);
+        Assert.All(icons, image =>
+        {
+            Assert.Equal(20, image.Width);
+            Assert.Equal(20, image.Height);
+            Assert.Equal(BitmapScalingMode.HighQuality, RenderOptions.GetBitmapScalingMode(image));
+            Assert.True(image.SnapsToDevicePixels);
+            Assert.True(image.UseLayoutRounding);
+        });
+        int displayPixels = (int)Math.Round(20 * VisualTreeHelper.GetDpi(f.Page).DpiScaleX);
+        Assert.All(f.Pc.IconPixelRequests, pixels => Assert.Equal(displayPixels, pixels));
     });
 
     [Fact]
@@ -533,6 +544,7 @@ public sealed class CommandBarPageTests
         public List<string> AppIconRequests { get; } = [];
         public List<string> Opened { get; } = [];
         public List<nint> WindowIconRequests { get; } = [];
+        public List<int> IconPixelRequests { get; } = [];
         public IReadOnlyList<StartApp> Apps { get; } = [new("Chrome", "Chrome")];
         private Action? _appsChanged;
         public int AppSubscribers => _appsChanged?.GetInvocationList().Length ?? 0;
@@ -553,11 +565,13 @@ public sealed class CommandBarPageTests
         public Task<ImageSource?> AppIconAsync(StartApp app, int pixels)
         {
             AppIconRequests.Add(app.ParsingName);
+            IconPixelRequests.Add(pixels);
             return Task.FromResult<ImageSource?>(Icon);
         }
         public Task<ImageSource?> WindowIconAsync(OpenWindow window, int pixels)
         {
             WindowIconRequests.Add(window.Handle);
+            IconPixelRequests.Add(pixels);
             return Task.FromResult<ImageSource?>(Icon);
         }
         public void Dispose() { }

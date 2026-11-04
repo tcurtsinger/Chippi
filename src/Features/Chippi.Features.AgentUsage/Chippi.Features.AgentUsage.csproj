@@ -16,7 +16,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Resource Include="Assets\ClaudeCode.png;Assets\Codex.png" />
     <InternalsVisibleTo Include="Chippi.Features.AgentUsage.Tests" />
     <!-- The page's shots and timing run in the island's tests, which load the app's themes. -->
     <InternalsVisibleTo Include="Chippi.Island.Tests" />
