@@ -10,6 +10,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Effects;
 using System.Windows.Shapes;
+using Chippi.Core.Diagnostics;
 using Chippi.UI.Controls;
 
 namespace Chippi.Features.QuickActions.Views;
@@ -22,6 +23,7 @@ internal sealed partial class ActionsPage
     private readonly List<ToggleButton> _picks = [];
     private readonly List<Border> _slots = [];
     private readonly TextBlock _pickedText = Ui.Muted("", 11);
+    private readonly TextBlock _saveFailure = Ui.Text("Save failed", 11, "WarningTextBrush");
     private List<string?> _draft = [];
     private Grid? _editorGrid;
     private Canvas? _dragLayer;
@@ -30,7 +32,7 @@ internal sealed partial class ActionsPage
     private TranslateTransform? _ghostAt;
     private (int Slot, Point At)? _gesture;
     private int _target = -1;
-    private bool _editing, _choosing, _updatingPicks, _dragging;
+    private bool _editing, _choosing, _updatingPicks, _dragging, _saveFailed;
 
     internal IReadOnlyList<string?> EditorLayout => _draft;
     internal IReadOnlyCollection<QuickActionId> EditorSelection => _picking;
@@ -52,6 +54,7 @@ internal sealed partial class ActionsPage
         CancelEditorDrag();
         _editing = true;
         _choosing = first;
+        _saveFailed = false;
         _draft = [.. _module.Layout];
         _picking.Clear();
         foreach (var action in QuickAction.All.Where(a => _module.Settings.Shows(a.Id))) _picking.Add(action.Id);
@@ -72,8 +75,16 @@ internal sealed partial class ActionsPage
         if (!_editing || !_module.Offered.Any(a => _picking.Contains(a.Id))) return;
         var selected = _picking.ToArray();
         var layout = _draft.ToArray();
+        try { _module.SaveLayout(selected, layout); }
+        catch (Exception ex)
+        {
+            Log.Warn("Quick actions: layout save failed", ex);
+            _saveFailed = true;
+            RenderPicker();
+            UIElementAutomationPeer.FromElement(_saveFailure)?.RaiseAutomationEvent(AutomationEvents.LiveRegionChanged);
+            return;
+        }
         DiscardEdit();
-        _module.SaveLayout(selected, layout);
         Render();
         _edit.Focus();
     }
@@ -90,6 +101,7 @@ internal sealed partial class ActionsPage
             _slots.Clear();
             _body.Children.Clear();
             if (_pickedText.Parent is Panel prior) prior.Children.Remove(_pickedText);
+            if (_saveFailure.Parent is Panel previous) previous.Children.Remove(_saveFailure);
             var editor = new Grid { ClipToBounds = true };
             editor.RowDefinitions.Add(new RowDefinition { Height = new GridLength(24) });
             editor.RowDefinitions.Add(new RowDefinition());
@@ -123,12 +135,20 @@ internal sealed partial class ActionsPage
             _dragLayer = new Canvas { IsHitTestVisible = false, ClipToBounds = true };
             Grid.SetRow(_dragLayer, 1);
             editor.Children.Add(_dragLayer);
-            _pickedText.VerticalAlignment = VerticalAlignment.Bottom;
-            Grid.SetRow(_pickedText, 2);
+            var footer = new DockPanel { VerticalAlignment = VerticalAlignment.Bottom };
+            _saveFailure.Visibility = Visibility.Collapsed;
+            _saveFailure.ToolTip = "Retry save";
+            AutomationProperties.SetHelpText(_saveFailure, "Your changes are still here. Choose Done to retry.");
+            AutomationProperties.SetLiveSetting(_saveFailure, AutomationLiveSetting.Polite);
+            DockPanel.SetDock(_saveFailure, Dock.Right);
+            footer.Children.Add(_saveFailure);
+            footer.Children.Add(_pickedText);
+            Grid.SetRow(footer, 2);
             AutomationProperties.SetLiveSetting(_pickedText, AutomationLiveSetting.Polite);
-            editor.Children.Add(_pickedText);
+            editor.Children.Add(footer);
             _editorGrid.PreviewMouseLeftButtonDown += (_, e) =>
             {
+                if (_gesture is not null) { e.Handled = true; return; }
                 int slot = SlotAt(e.GetPosition(_editorGrid));
                 if (!EditorPointerDown(slot, e.GetPosition(_editorGrid))) return;
                 if (!_editorGrid.CaptureMouse()) CancelEditorDrag();
@@ -158,6 +178,7 @@ internal sealed partial class ActionsPage
         finally { _updatingPicks = false; }
         int count = _module.Offered.Count(a => _picking.Contains(a.Id));
         _pickedText.Text = $"{count} shown";
+        _saveFailure.Visibility = _saveFailed ? Visibility.Visible : Visibility.Collapsed;
         _done.IsEnabled = count > 0;
     }
 
@@ -174,6 +195,7 @@ internal sealed partial class ActionsPage
         void Changed()
         {
             bool selected = button.IsChecked == true;
+            content.Label.SetResourceReference(TextBlock.ForegroundProperty, selected ? "IslandTextBrush" : "IslandTextSecondaryBrush");
             content.Ring.Visibility = selected ? Visibility.Collapsed : Visibility.Visible;
             content.Fill.Visibility = content.Check.Visibility = selected ? Visibility.Visible : Visibility.Collapsed;
             if (_updatingPicks) return;
@@ -192,11 +214,11 @@ internal sealed partial class ActionsPage
         return button;
     }
 
-    private static (Grid Root, Ellipse Ring, Ellipse Fill, LucideIcon Check) PickContents(QuickAction action, bool selected)
+    private static (Grid Root, Ellipse Ring, Ellipse Fill, LucideIcon Check, TextBlock Label) PickContents(QuickAction action, bool selected)
     {
         var glyph = Ui.Glyph(action.Icon, 17);
         glyph.HorizontalAlignment = HorizontalAlignment.Center;
-        var name = Ui.Text(action.Label, 11, "IslandTextSecondaryBrush");
+        var name = Ui.Text(action.Label, 11, selected ? "IslandTextBrush" : "IslandTextSecondaryBrush");
         name.HorizontalAlignment = HorizontalAlignment.Center;
         name.Margin = new Thickness(2, 4, 2, 0);
         var stack = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Children = { glyph, name } };
@@ -211,13 +233,13 @@ internal sealed partial class ActionsPage
         mark.Children.Add(ring);
         mark.Children.Add(fill);
         mark.Children.Add(check);
-        return (new Grid { Children = { stack, mark } }, ring, fill, check);
+        return (new Grid { Children = { stack, mark } }, ring, fill, check, name);
     }
 
     /// <summary>Pointer handlers share this path with the fixture probe; no native input or clipboard is needed.</summary>
     internal bool EditorPointerDown(int slot, Point point)
     {
-        if (!_editing || slot < 0 || slot >= _draft.Count || _draft[slot] is not { } key || !_module.Offered.Any(a => a.Key == key)) return false;
+        if (!_editing || _gesture is not null || slot < 0 || slot >= _draft.Count || _draft[slot] is not { } key || !_module.Offered.Any(a => a.Key == key)) return false;
         CancelEditorDrag();
         (_slots[slot].Child as ToggleButton)?.Focus();
         _gesture = (slot, point);
