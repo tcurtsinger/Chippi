@@ -12,7 +12,7 @@ Proposed initial state: off. Use native Windows active-window tracking with 250 
 
 Capture the original tracking, raise and delay values before changing them. Restore them on disable, feature removal, orderly exit and fullscreen pause. Resume reapplies Chippi values without replacing the original snapshot. Failures appear as "Focus change failed" and in logs.
 
-Proposed crash recovery: persist ownership and recover on next startup. Compare current values before restoring so a newer external change is not overwritten. Kayla must resolve system-wide native tracking against display-specific pause. Proposed conservative fallback is global tracking pause whenever a qualifying display requires pause. This limitation needs confirmation before implementation acceptance; native tracking is not claimed to be per-display.
+Proposed crash recovery: persist ownership and recover on next startup. Compare current values before restoring so a newer external change is not overwritten. Pause follows the window in front, on every display, as settled in the [decisions](README.md) and [shared pause architecture](architecture.md#5-the-pause-and-always-on). With Always on off, a fullscreen foreground app pauses native tracking globally; resume reapplies Chippi values. Native tracking is system-wide.
 
 Always on defaults off. Pause on lock too. Installing the feature does not enable it automatically.
 
@@ -30,4 +30,4 @@ Check menus, dragging and modal dialogs, fullscreen pause with Always on off/on,
 
 ## Approval and dependencies
 
-Uses Kayla's [architecture](architecture.md#7-per-feature) and [input-layer brief](input-layer.md) for shared pause and ownership policy. The system-wide tracking versus per-display pause question above remains unresolved pending Kayla's answer. Travis confirms the brief, proposed off default and global-pause limitation. Settings rows need design confirmation before code.
+Uses Kayla's [architecture](architecture.md#7-per-feature) and [input-layer brief](input-layer.md) for shared pause and ownership policy. The global pause follows the settled shared rule above. Travis confirms the brief and proposed off default. Settings rows need design confirmation before code.
