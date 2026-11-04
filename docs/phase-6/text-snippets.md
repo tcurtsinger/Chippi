@@ -1,6 +1,6 @@
 # Text snippets: brief
 
-For Travis to confirm. Research: [behavior-spec-b.md](behavior-spec-b.md) section 4. Shared hub and pause: `input-layer.md` (Kayla). Mockup: the Settings page, and the quick menu if Travis keeps it (question below). DESIGN.md wins where it speaks.
+For Travis to confirm. Research: [behavior-spec-b.md](behavior-spec-b.md) section 4. Shared hub and pause: `input-layer.md` (Kayla). Mockup: the Settings page. DESIGN.md wins where it speaks.
 
 ## Job
 
@@ -30,7 +30,6 @@ Snippets are typed out, never pasted, so the clipboard is untouched. No paste mo
 | Enabled | Yes |
 | Ignore capitalization | Off |
 | Folder | Plain text; folders exist only because snippets name them |
-| Show in the quick menu | On |
 
 Storage: one JSON list in Chippi's settings, stable ids, unknown fields read as defaults.
 
@@ -55,9 +54,14 @@ Empty: "No snippets yet. Add the first one."
 
 Every snippet is also a shared action, **Insert snippet**, so any Shortcuts door (a key, a Caps Lock combo, a mouse button) or a Radial slice can type one. This reuses the Radial menu's Text action.
 
-## Question for Travis: the quick menu
+## No quick menu; Search inserts
 
-vorssaint has a small search overlay that inserts a snippet at the cursor. With Insert snippet as an action, Shortcuts already covers one-key use of a favorite. The menu is a whole new overlay (it must not take focus from the app) and a separate mockup. My pick: leave it out of the first build, ship the list and the action, add the menu later if Travis misses it. Say if you want it in.
+Decided (Marge, after review): vorssaint's quick menu overlay is not in the first build. Snippets are reached two ways instead:
+
+- **Insert snippet**, a shared action that any Shortcuts door can fire.
+- **Search.** Snippets appear in the island's Search by name and trigger. Choosing one types it into the window Search was opened over, not into Search. Chippi records that window when Search opens. When Search closes, it hands focus back to that window, then types the text as Unicode key events. If that window is gone or has changed owner by then, nothing is typed and Search says "Snippet not inserted". Over an admin window Search shows the snippet but nothing is typed, and says "Not working in admin windows".
+
+A quick menu can come later with its own mockup.
 
 ## Edge cases
 

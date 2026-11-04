@@ -14,7 +14,7 @@ set; snippets are typed, never pasted, with no import or export. The briefs (`de
 ## Shared rules (all five)
 
 - One setting per feature, off by default. Each has a Settings page and no home button (they are switches that run
-  in the background). Text snippets' quick menu is the one overlay (below).
+  in the background). Text snippets' quick menu is the one overlay in vorssaint; Chippi's first build leaves it out (see section 4).
 - **Fullscreen (Travis, tasks 198 and 211 #1):** one shared **Always on** setting for all of Phase 6's input
   features, off by default. Off: every feature here pauses while a fullscreen game or app is in front on that
   display, **Debounce included** ("No if the Always on switch is off, then it shouldn't"). On: they keep acting
@@ -171,7 +171,7 @@ alternative on a row. Its takeover of macOS system shortcuts has no Windows twin
 
 - **Where:** Settings › Shortcuts exists already (`SimplePages.cs:14`) and lists only some features. Extend it.
 - **Lists today:** Mic mute (Ctrl+Shift+M), Command bar (Ctrl+Alt+Space), Plain paste, Radial menu, Cleaning mode,
-  Audio output, each Quick action. Phase 6 adds the Snippets quick menu, Window layouts and the rest as they land.
+  Audio output, each Quick action. Phase 6 adds Window layouts and the rest as they land.
   Mouse button shortcuts show as read-only rows ("Back button: Ctrl+W").
 - **Row:** feature, shortcut (recorder to change, Remove to clear), and a state: Active, Inactive (feature off),
   "In use by another app" (registration failed), "Used twice" (two Chippi features), "Windows keeps this one".
