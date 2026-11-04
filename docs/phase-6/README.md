@@ -12,7 +12,7 @@ Window layouts and snapping, app switcher, close protection, focus follows mouse
 - **Snapping lives in Actions (task 209):** no new home tile; the home stays at 11 tools.
 - **Shortcuts (tasks 210 and 211, #3):** Mouse buttons, Super key and Shortcut manager become one feature, **Shortcuts**, with one Settings page. It binds any action to a key, a Caps Lock combo or a mouse button and flags clashes.
 - **Feature calls (task 211, #4 to #11, all as recommended):**
-  - Snap comes first. Saved app arrangements with relaunch are a separate step later in the phase.
+  - Within Snap, placing windows comes first. Saved app arrangements with relaunch are a separate step after it, later in the phase.
   - Chippi's zones show on Shift+drag, and Windows' own Snap bar keeps the plain drag to the top.
   - The App switcher gets its own shortcut first. Taking over Alt+Tab becomes an option once it has proven itself.
   - Close protection: press Alt+F4 twice. The first press shows "Press Alt+F4 again to close" on the bar, and Chippi sends no keys. It's on in every app, and Ctrl+W protection is turned on per app. It covers keys only.
