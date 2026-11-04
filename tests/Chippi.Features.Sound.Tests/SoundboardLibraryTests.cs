@@ -69,6 +69,60 @@ public sealed class SoundboardLibraryTests : IDisposable
     }
 
     [Fact]
+    public void Missing_primary_recovers_saved_collections_and_sounds_from_backup()
+    {
+        var store = new SoundboardStore(_root);
+        var clip = new SoundClip { Name = "Saved sound", CollectionId = "games", AudioFile = Guid.NewGuid().ToString("N") + ".wav",
+            DurationSeconds = 3, EndSeconds = 3 };
+        var library = new SoundboardLibrary { Collections = [new("games", "Games")], Clips = [clip], SelectedCollectionId = "games" };
+        store.Save(library);
+        store.Save(library with { HearVolume = .25f });
+        File.Delete(Path.Combine(_root, "library.json"));
+
+        var recovered = store.Load();
+
+        Assert.Equal("Games", Assert.Single(recovered.Collections).Name);
+        Assert.Equal(clip.Id, Assert.Single(recovered.Clips).Id);
+        Assert.Equal("games", recovered.SelectedCollectionId);
+        Assert.Equal("Library restored from backup", store.RecoveryNotice);
+        store.Save(recovered);
+        Assert.Equal(clip.Id, Assert.Single(store.Load().Clips).Id);
+        Assert.True(File.Exists(Path.Combine(_root, "library.json.bak")));
+    }
+
+    [Fact]
+    public void Missing_primary_with_unreadable_backup_does_not_start_an_empty_library()
+    {
+        Directory.CreateDirectory(_root);
+        string backup = Path.Combine(_root, "library.json.bak");
+        File.WriteAllText(backup, "{broken");
+
+        Assert.Throws<SoundboardException>(() => new SoundboardStore(_root).Load());
+
+        Assert.Equal("{broken", File.ReadAllText(backup));
+        Assert.False(File.Exists(Path.Combine(_root, "library.json")));
+    }
+
+    [Fact]
+    public void Oversized_save_preserves_the_readable_primary_and_backup()
+    {
+        var store = new SoundboardStore(_root);
+        store.Save(new() { HearVolume = .25f });
+        store.Save(new() { HearVolume = .5f });
+        byte[] primary = File.ReadAllBytes(Path.Combine(_root, "library.json"));
+        byte[] backup = File.ReadAllBytes(Path.Combine(_root, "library.json.bak"));
+        var clip = new SoundClip { AudioFile = Guid.NewGuid().ToString("N") + ".wav", DurationSeconds = 3, EndSeconds = 3,
+            Source = new string('x', 16 * 1024 * 1024) };
+
+        Assert.Throws<SoundboardException>(() => store.Save(new() { Clips = [clip] }));
+
+        Assert.Equal(primary, File.ReadAllBytes(Path.Combine(_root, "library.json")));
+        Assert.Equal(backup, File.ReadAllBytes(Path.Combine(_root, "library.json.bak")));
+        Assert.Equal(.5f, store.Load().HearVolume);
+        Assert.Empty(Directory.GetFiles(_root, "*.tmp"));
+    }
+
+    [Fact]
     public void Corrupt_library_without_backup_is_not_silently_replaced()
     {
         Directory.CreateDirectory(_root);
@@ -106,6 +160,22 @@ public sealed class SoundboardLibraryTests : IDisposable
         Assert.Throws<SoundboardException>(() => SoundboardStore.Normalize(normalized with { Clips = [clip with { StartSeconds = 4 }] }));
         Assert.Throws<SoundboardException>(() => SoundboardStore.ValidateRange(3, 0, double.NaN));
         Assert.Throws<SoundboardException>(() => SoundboardStore.ValidateRange(3, 0, 4));
+    }
+
+    [Theory]
+    [InlineData("\U0001F642")]
+    [InlineData("e\u0301")]
+    [InlineData("\U0001F469\u200D\U0001F4BB")]
+    public void Name_limit_preserves_whole_text_elements_through_storage(string element)
+    {
+        string fitting = new string('a', 99) + element;
+        Assert.Equal(fitting, SoundboardStore.CleanName(fitting));
+        string name = SoundboardStore.CleanName(fitting + "tail");
+        Assert.Equal(fitting, name);
+
+        var store = new SoundboardStore(_root);
+        store.Save(new() { Collections = [new("named", name)] });
+        Assert.Equal(fitting, Assert.Single(store.Load().Collections).Name);
     }
 
     [Fact]

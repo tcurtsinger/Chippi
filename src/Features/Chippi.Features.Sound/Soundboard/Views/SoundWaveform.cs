@@ -23,21 +23,44 @@ internal sealed class SoundWaveform : FrameworkElement
         AutomationProperties.SetHelpText(this, "Drag either edge to trim, or edit the Start and End fields.");
         MouseLeftButtonDown += (_, e) =>
         {
-            var seconds = Seconds(e.GetPosition(this).X);
-            _dragStart = Math.Abs(seconds - _start) <= Math.Abs(seconds - _end);
-            CaptureMouse(); Update(seconds); e.Handled = true;
+            if (!CaptureMouse()) return;
+            BeginDrag(e.GetPosition(this).X); e.Handled = true;
         };
-        MouseMove += (_, e) => { if (_dragStart is not null && e.LeftButton == MouseButtonState.Pressed) Update(Seconds(e.GetPosition(this).X)); };
-        MouseLeftButtonUp += (_, e) => { if (_dragStart is not null) { _dragStart = null; ReleaseMouseCapture(); e.Handled = true; } };
-        LostMouseCapture += (_, _) => _dragStart = null;
+        MouseMove += (_, e) => MoveDrag(e.GetPosition(this).X, e.LeftButton == MouseButtonState.Pressed);
+        MouseLeftButtonUp += (_, e) => { if (_dragStart is not null) { EndDrag(); e.Handled = true; } };
+        LostMouseCapture += (_, _) => EndDrag();
+        Unloaded += (_, _) => EndDrag();
+        IsEnabledChanged += (_, _) => { if (!IsEnabled) EndDrag(); };
     }
 
     internal void Set(float[] samples, double duration, double start, double end)
     {
         _samples = samples;
         _duration = Math.Max(.01, double.IsFinite(duration) ? duration : 1);
-        _start = Math.Clamp(start, 0, _duration); _end = Math.Clamp(end, _start, _duration);
+        _start = Math.Clamp(double.IsFinite(start) ? start : 0, 0, _duration);
+        _end = Math.Clamp(double.IsFinite(end) ? end : _duration, _start, _duration);
         InvalidateVisual();
+    }
+
+    // Kept independent from desktop capture so interruption behavior can be exercised unhosted.
+    internal void BeginDrag(double x)
+    {
+        if (_dragStart is not null || !IsEnabled) return;
+        var seconds = Seconds(x);
+        _dragStart = Math.Abs(seconds - _start) <= Math.Abs(seconds - _end);
+        Update(seconds);
+    }
+
+    internal void MoveDrag(double x, bool pressed)
+    {
+        if (!pressed) { EndDrag(); return; }
+        if (_dragStart is not null) Update(Seconds(x));
+    }
+
+    internal void EndDrag()
+    {
+        _dragStart = null;
+        if (IsMouseCaptured) ReleaseMouseCapture();
     }
 
     private double Seconds(double x) => Math.Clamp((x - 4) / Math.Max(1, ActualWidth - 8), 0, 1) * _duration;

@@ -62,6 +62,122 @@ public sealed class SoundboardModuleTests
         Assert.Single(f.Player.Plays);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Deleting_fences_pending_play_and_rejects_replay_until_removal(bool preview)
+    {
+        await using var f = await Fixture.Start();
+        using var draft = f.Draft();
+        await f.Module.AddAsync(draft, new() { EndSeconds = 2 }, null, default);
+        var clip = Assert.Single(f.Module.Library.Clips);
+        var playReleased = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var stopReleased = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        f.Player.PendingPlay = playReleased.Task;
+        f.Player.PendingStop = stopReleased.Task;
+        Task playing = preview ? f.Module.PreviewClipAsync(clip.Id, 0, 2, default) : f.Module.PlayAsync(clip.Id);
+        Assert.False(f.Module.Playback.IsPlaying);
+        var deleting = f.Module.DeleteClipAsync(clip.Id);
+        try
+        {
+            Assert.Equal(1, f.Player.Stops);
+            Assert.False(deleting.IsCompleted);
+            await Assert.ThrowsAsync<SoundboardException>(() => f.Module.PlayAsync(clip.Id));
+            await Assert.ThrowsAsync<SoundboardException>(() => f.Module.PreviewClipAsync(clip.Id, 0, 2, default));
+            Assert.Single(f.Player.Plays);
+        }
+        finally { stopReleased.TrySetResult(); playReleased.TrySetResult(); }
+        await deleting;
+        await playing;
+        Assert.False(f.Module.Playback.IsPlaying);
+        Assert.Empty(f.Module.Library.Clips);
+        Assert.False(File.Exists(f.Store.AudioPath(clip)));
+    }
+
+    [Fact]
+    public async Task Deleting_another_sound_keeps_the_current_sound_playing()
+    {
+        await using var f = await Fixture.Start();
+        using var draft = f.Draft();
+        await f.Module.AddAsync(draft, new() { Name = "First", EndSeconds = 2 }, null, default);
+        await f.Module.AddAsync(draft, new() { Name = "Second", EndSeconds = 2 }, null, default);
+        var clips = f.Module.Library.Clips.ToArray();
+        await f.Module.PlayAsync(clips[1].Id);
+
+        await f.Module.DeleteClipAsync(clips[0].Id);
+
+        Assert.Equal(clips[1].Id, f.Module.Playback.ClipId);
+        Assert.True(f.Module.Playback.IsPlaying);
+        Assert.Equal(0, f.Player.Stops);
+    }
+
+    [Fact]
+    public async Task Deleting_the_previous_sound_preserves_a_pending_replacement()
+    {
+        await using var f = await Fixture.Start();
+        using var draft = f.Draft();
+        await f.Module.AddAsync(draft, new() { Name = "First", EndSeconds = 2 }, null, default);
+        await f.Module.AddAsync(draft, new() { Name = "Second", EndSeconds = 2 }, null, default);
+        var clips = f.Module.Library.Clips.ToArray();
+        await f.Module.PlayAsync(clips[0].Id);
+        var released = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        f.Player.PendingPlay = released.Task;
+        var replacement = f.Module.PlayAsync(clips[1].Id);
+        try
+        {
+            Assert.Equal(clips[0].Id, f.Module.Playback.ClipId);
+            await f.Module.DeleteClipAsync(clips[0].Id);
+            Assert.Equal(0, f.Player.Stops);
+        }
+        finally { released.TrySetResult(); }
+
+        await replacement;
+
+        Assert.Equal(clips[1].Id, f.Module.Playback.ClipId);
+        Assert.True(f.Module.Playback.IsPlaying);
+        Assert.Equal(clips[1].Id, Assert.Single(f.Module.Library.Clips).Id);
+    }
+
+    [Fact]
+    public async Task Preview_commands_have_unique_ownership_and_saved_clip_edits_stop_their_preview()
+    {
+        await using var f = await Fixture.Start();
+        using var draft = f.Draft();
+        string firstDraft = await f.Module.PreviewAsync(draft, 0, 2, default);
+        string secondDraft = await f.Module.PreviewAsync(draft, 0, 2, default);
+        Assert.NotEqual(firstDraft, secondDraft);
+        Assert.Equal(secondDraft, f.Module.Playback.ClipId);
+        await f.Module.AddAsync(draft, new() { EndSeconds = 2 }, null, default);
+        Assert.Equal(1, f.Player.Stops);
+        var clip = Assert.Single(f.Module.Library.Clips);
+        string firstClip = await f.Module.PreviewClipAsync(clip.Id, 0, 2, default);
+        string secondClip = await f.Module.PreviewClipAsync(clip.Id, 0, 2, default);
+        Assert.NotEqual(firstClip, secondClip);
+        Assert.NotEqual(clip.Id, secondClip);
+
+        await f.Module.SaveClipAsync(clip with { Name = "Renamed" });
+
+        Assert.Equal(2, f.Player.Stops);
+        Assert.False(f.Module.Playback.IsPlaying);
+    }
+
+    [Fact]
+    public async Task Adding_a_different_draft_preserves_another_views_preview()
+    {
+        await using var f = await Fixture.Start();
+        using var draft = f.Draft();
+        string otherPath = Path.Combine(f.Directory, "other.wav");
+        File.Copy(draft.LocalAudioPath, otherPath);
+        using var other = new SoundImportDraft(otherPath, "Other", "File", 4, []);
+        string previewId = await f.Module.PreviewAsync(draft, 0, 2, default);
+
+        await f.Module.AddAsync(other, new() { EndSeconds = 2 }, null, default);
+
+        Assert.Equal(previewId, f.Module.Playback.ClipId);
+        Assert.True(f.Module.Playback.IsPlaying);
+        Assert.Equal(0, f.Player.Stops);
+    }
+
     [Fact]
     public async Task Editing_cannot_replace_media_identity_and_persists_presentation()
     {
@@ -80,6 +196,33 @@ public sealed class SoundboardModuleTests
         Assert.Equal(collection, updated.CollectionId);
         Assert.True(updated.Favorite);
         Assert.Equal(updated, Assert.Single(f.Store.Load().Clips) with { Waveform = updated.Waveform });
+    }
+
+    [Fact]
+    public async Task Queued_stale_edits_cannot_overwrite_a_newer_save()
+    {
+        await using var f = await Fixture.Start();
+        using var draft = f.Draft();
+        await f.Module.AddAsync(draft, new() { Name = "Original", EndSeconds = 4 }, null, default);
+        var original = Assert.Single(f.Module.Library.Clips);
+        var released = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        f.Player.PendingLevels = released.Task;
+        var levels = f.Module.SetLevelsAsync(.4f, .5f); // Occupies the metadata gate deterministically.
+        var rename = f.Module.SaveClipAsync(original with { Name = "Renamed" }, expected: original);
+        var staleFavorite = f.Module.SaveClipAsync(original with { Favorite = true }, expected: original);
+        released.SetResult();
+        await levels;
+        await rename;
+        var error = await Assert.ThrowsAsync<SoundboardException>(() => staleFavorite);
+        Assert.Contains("changed in another view", error.Message);
+        var saved = Assert.Single(f.Store.Load().Clips);
+        Assert.Equal("Renamed", saved.Name);
+        Assert.False(saved.Favorite);
+        // Unrelated level changes and normalization do not create a false edit conflict.
+        var current = Assert.Single(f.Module.Library.Clips);
+        await f.Module.SetLevelsAsync(.6f, .7f);
+        await f.Module.SaveClipAsync(current with { Favorite = true }, expected: current);
+        Assert.True(Assert.Single(f.Module.Library.Clips).Favorite);
     }
 
     [Fact]
@@ -137,6 +280,29 @@ public sealed class SoundboardModuleTests
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => preparing);
         Assert.True(f.Player.Disposed);
         await Assert.ThrowsAsync<SoundboardException>(() => f.Module.StopAsync());
+    }
+
+    [Fact]
+    public async Task Stopping_waits_for_import_cleanup_and_discards_a_cancelled_late_draft()
+    {
+        await using var f = await Fixture.Start();
+        var cleanup = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        f.Importer.Cleanup = cleanup.Task;
+        using var draft = new SoundImportDraft(Path.Combine(f.Directory, "late.wav"), "Late", "File", 4, []);
+        f.Importer.ResultAfterCancellation = draft;
+        var preparing = f.Module.PrepareAsync(new("https://example.invalid/sound.mp3", true), null, default);
+        await f.Importer.Started.Task;
+        var stopping = f.Module.StopAsync(CancellationToken.None);
+        try
+        {
+            await f.Importer.Cancelled.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.False(stopping.IsCompleted);
+            Assert.False(draft.IsDisposed);
+        }
+        finally { cleanup.TrySetResult(); }
+        await stopping;
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => preparing);
+        Assert.True(draft.IsDisposed);
     }
 
     [Fact]
@@ -229,11 +395,24 @@ public sealed class SoundboardModuleTests
     private sealed class WaitingImporter : ISoundboardImporter
     {
         public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource Cancelled { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public Task Cleanup { get; set; } = Task.CompletedTask;
+        public SoundImportDraft? ResultAfterCancellation { get; set; }
         public async Task<SoundImportDraft> PrepareAsync(SoundImportSource source, IProgress<SoundImportProgress>? progress, CancellationToken cancellationToken)
         {
             Started.TrySetResult();
-            await Task.Delay(Timeout.Infinite, cancellationToken);
-            throw new InvalidOperationException("Cancelled import completed unexpectedly");
+            try
+            {
+                await Task.Delay(Timeout.Infinite, cancellationToken);
+                throw new InvalidOperationException("Cancelled import completed unexpectedly");
+            }
+            catch (OperationCanceledException)
+            {
+                Cancelled.TrySetResult();
+                if (ResultAfterCancellation is { } draft) return draft;
+                throw;
+            }
+            finally { await Cleanup; }
         }
     }
     private sealed class FakePlayer : ISoundboardPlayer
@@ -244,21 +423,35 @@ public sealed class SoundboardModuleTests
         public int Initializations, Stops;
         public bool Disposed, FailDispose, FailInitialize;
         public (float Send, float Hear) Levels;
+        public Task? PendingLevels;
+        public Task? PendingPlay, PendingStop;
+        private long _revision;
         public Task InitializeAsync(CancellationToken ct = default)
         {
             Initializations++; Disposed = false;
             if (FailInitialize) throw new InvalidOperationException("Initialize failed");
             return Task.CompletedTask;
         }
-        public Task PlayAsync(string clipId, string path, TimeSpan start, TimeSpan end, bool preview = false, CancellationToken ct = default)
+        public async Task PlayAsync(string clipId, string path, TimeSpan start, TimeSpan end, bool preview = false, CancellationToken ct = default)
         {
+            long revision = Interlocked.Increment(ref _revision);
             Plays.Add((path, start, end, preview));
+            if (PendingPlay is { } pending) await pending;
+            ct.ThrowIfCancellationRequested();
+            if (revision != Interlocked.Read(ref _revision)) return;
             State = new(clipId, true, preview, TimeSpan.Zero, end - start);
             Changed?.Invoke();
-            return Task.CompletedTask;
         }
-        public Task StopAsync(CancellationToken ct = default) { Stops++; State = SoundboardPlaybackState.Idle; Changed?.Invoke(); return Task.CompletedTask; }
-        public Task SetLevelsAsync(float send, float hear, CancellationToken ct = default) { Levels = (send, hear); return Task.CompletedTask; }
+        public async Task StopAsync(CancellationToken ct = default)
+        {
+            long revision = Interlocked.Increment(ref _revision);
+            Stops++;
+            if (PendingStop is { } pending) await pending;
+            if (revision != Interlocked.Read(ref _revision)) return;
+            State = SoundboardPlaybackState.Idle;
+            Changed?.Invoke();
+        }
+        public Task SetLevelsAsync(float send, float hear, CancellationToken ct = default) { Levels = (send, hear); return PendingLevels ?? Task.CompletedTask; }
         public ValueTask DisposeAsync()
         {
             Disposed = true;

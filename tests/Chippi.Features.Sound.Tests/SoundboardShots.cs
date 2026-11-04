@@ -62,6 +62,9 @@ public sealed class SoundboardShots
             page.HandleBack();
             fake.SendUnavailableReason = "Virtual mic is not installed"; fake.Notify();
             Shoot(page, Path.Combine(folder, "missing-mic.png"));
+            fake.SendUnavailableReason = null;
+            fake.Error = "Voice capture failed · sounds can still play. Check your microphone in Devices."; fake.Notify();
+            Shoot(page, Path.Combine(folder, "voice-warning.png"));
             SoundboardUiTests.Close(page);
             var empty = SoundboardUiTests.Open(new SoundboardViewFake()); Shoot(empty, Path.Combine(folder, "empty.png")); SoundboardUiTests.Close(empty);
             var many = SoundboardViewFake.WithClips(64);
@@ -75,6 +78,26 @@ public sealed class SoundboardShots
             SoundboardUiTests.Descendants(importPage).OfType<SoundboardEditor>().Single().QueueFiles(["fixture.wav"]);
             await Dispatcher.Yield(DispatcherPriority.Background);
             Shoot(importPage, Path.Combine(folder, "preparing.png")); SoundboardUiTests.Close(importPage);
+            var reviewData = Sample();
+            reviewData.Library = reviewData.Library with { Collections = [new("default", "A very long collection name for reactions and game sounds"), new("games", "Games")] };
+            var review = SoundboardUiTests.Open(reviewData);
+            SoundboardUiTests.Click(SoundboardUiTests.Named<Button>(review, "+ Add"));
+            SoundboardUiTests.Descendants(review).OfType<SoundboardEditor>().Single().QueueFiles(["fixture.wav"]);
+            await Dispatcher.Yield(DispatcherPriority.Background);
+            SoundboardUiTests.Named<TextBox>(review, "Sound name").Text = "Victory · 勝利 · انتصار";
+            Shoot(review, Path.Combine(folder, "import-review.png"));
+            SoundboardUiTests.Named<TextBox>(review, "End time").Text = "0:00";
+            SoundboardUiTests.Click(SoundboardUiTests.Named<Button>(review, "Add"));
+            Shoot(review, Path.Combine(folder, "trim-error.png")); SoundboardUiTests.Close(review);
+            var failure = Sample();
+            failure.Prepare = (_, _, _) => Task.FromException<SoundImportDraft>(new SoundboardException("This link is unavailable. Check the URL or choose a local file."));
+            var failedPage = SoundboardUiTests.Open(failure);
+            SoundboardUiTests.Click(SoundboardUiTests.Named<Button>(failedPage, "+ Add"));
+            SoundboardUiTests.Click(SoundboardUiTests.Named<Button>(failedPage, "Link"));
+            SoundboardUiTests.Named<TextBox>(failedPage, "Audio link").Text = "https://example.invalid/unavailable.mp3";
+            SoundboardUiTests.Click(SoundboardUiTests.Named<Button>(failedPage, "Continue"));
+            await Dispatcher.Yield(DispatcherPriority.Background);
+            Shoot(failedPage, Path.Combine(folder, "import-error.png")); SoundboardUiTests.Close(failedPage);
         }
     });
 
@@ -118,11 +141,22 @@ public sealed class SoundboardShots
         shell.SetResourceReference(Border.BackgroundProperty, "IslandBrush");
         shell.SetResourceReference(TextElement.FontFamilyProperty, "UiFont");
         shell.Measure(new Size(520, 360)); shell.Arrange(new Rect(0, 0, 520, 360)); shell.UpdateLayout();
-        Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.Loaded); shell.UpdateLayout();
+        Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.ContextIdle); shell.UpdateLayout();
+        // An unhosted visual has no composition target to flush pending drawing content.
+        // Invalidate the settled tree explicitly before the single offscreen render.
+        Redraw(shell);
+        shell.UpdateLayout();
+        Assert.True(header.ActualWidth > 0 && header.ActualHeight > 0 && title.ActualWidth > 0);
         Assert.Null(PresentationSource.FromVisual(shell));
         var bitmap = new RenderTargetBitmap(1040, 720, 192, 192, PixelFormats.Pbgra32); bitmap.Render(shell);
         var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
         using var file = File.Create(path); encoder.Save(file);
         SoundboardUi.Detach(body); body.Margin = new Thickness(0);
+    }
+
+    private static void Redraw(DependencyObject root)
+    {
+        if (root is UIElement element) element.InvalidateVisual();
+        for (int i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++) Redraw(VisualTreeHelper.GetChild(root, i));
     }
 }

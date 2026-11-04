@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using System.Globalization;
 using System.Windows;
 using System.Windows.Automation;
+using System.Windows.Automation.Peers;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Documents;
@@ -22,6 +24,8 @@ public sealed class SoundboardPage : UserControl
     private readonly Grid _root = new();
     private readonly Grid _stage = new();
     private readonly Grid _gallery = new();
+    private readonly ScrollViewer _galleryScroll = new() { HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+        VerticalScrollBarVisibility = ScrollBarVisibility.Auto, CanContentScroll = false, Focusable = false };
     private readonly Grid _toolbar = new();
     private readonly StackPanel _tabs = new() { Orientation = Orientation.Horizontal };
     private readonly TextBlock _error = SoundboardUi.Text("", 11, "WarningTextBrush");
@@ -32,6 +36,11 @@ public sealed class SoundboardPage : UserControl
     private readonly Button _stop;
     private readonly LatestWrite _levelWrites = new();
     private readonly Dictionary<string, Cell> _cells = [];
+    private IReadOnlyList<SoundClip> _visibleClips = [];
+    private string? _gallerySelection;
+    private SoundboardLibrary? _playbackLibrary;
+    private SoundClip? _playbackClip;
+    private string? _playbackClipId;
     private SoundboardEditor? _editor;
     private string? _localError;
     private string _shape = "";
@@ -44,6 +53,10 @@ public sealed class SoundboardPage : UserControl
     private string? _renderedSelection, _renderedAvailability, _activeTile;
     private bool _formActive;
     private TextBlock? _formError;
+    private bool _savingOrder;
+    private int _savingOrderView;
+    private Button? _done;
+    private int _viewVersion;
     private sealed record Cell(Button Button, TextBlock Name, TextBlock Duration, LucideIcon? Glyph, Grid Track, Border Progress);
 
     public SoundboardPage(ISoundboardController controller)
@@ -61,13 +74,20 @@ public sealed class SoundboardPage : UserControl
         var footer = Playback();
         Grid.SetRow(footer, 1); _root.Children.Add(footer);
         _error.ToolTip = "";
+        _error.TextWrapping = TextWrapping.Wrap; _error.LineHeight = 16; _error.MaxHeight = 32;
         AutomationProperties.SetLiveSetting(_error, AutomationLiveSetting.Polite);
         _error.Margin = new Thickness(0, 0, 0, 5);
         Content = _root;
+        _galleryScroll.Content = _gallery;
+        _galleryScroll.ScrollChanged += (_, e) =>
+        {
+            if (e.VerticalChange != 0 || e.ViewportHeightChange != 0) RealizeTiles(_galleryScroll.VerticalOffset);
+        };
         Loaded += (_, _) => { _loaded = true; _controller.Changed += OnChanged; Refresh(); };
         Unloaded += (_, _) =>
         {
             _loaded = false; _controller.Changed -= OnChanged;
+            ChangeView();
             _editor?.Dispose(); _editor = null; _editing = false; _order = null; _shape = "";
             _formActive = false; _formError = null;
             _press = null; _pressedId = null;
@@ -81,7 +101,7 @@ public sealed class SoundboardPage : UserControl
     {
         if (_editor is not null) { CloseEditor(); return true; }
         if (_formActive) { CloseForm(); return true; }
-        if (_editing) { _editing = false; _order = null; _shape = ""; Refresh(); return true; }
+        if (_editing) { ChangeView(); _editing = false; _order = null; _shape = ""; Refresh(); return true; }
         return false;
     }
 
@@ -115,7 +135,7 @@ public sealed class SoundboardPage : UserControl
                     _renderedLibrary = _controller.Library; _renderedSelection = Selected; _renderedAvailability = _controller.SendUnavailableReason;
                 }
                 var message = _localError ?? _controller.Error ?? _controller.SendUnavailableReason;
-                _error.Text = message ?? ""; _error.ToolTip = message;
+                ShowError(_error, message);
                 _error.Visibility = message is null ? Visibility.Collapsed : Visibility.Visible;
                 UpdateTiles();
             }
@@ -130,14 +150,20 @@ public sealed class SoundboardPage : UserControl
         if (_editing && _order is not null)
         {
             var byId = clips.ToDictionary(c => c.Id);
-            return [.. _order.Where(byId.ContainsKey).Select(id => byId[id]), .. clips.Where(c => !_order.Contains(c.Id))];
+            var ordered = _order.ToHashSet();
+            // Another open view can delete, move or add a sound while this draft is open.
+            _order = [.. _order.Where(byId.ContainsKey), .. clips.Where(c => !ordered.Contains(c.Id)).Select(c => c.Id)];
+            return [.. _order.Select(id => byId[id])];
         }
         return clips;
     }
 
     private void BuildGallery(IReadOnlyList<SoundClip> clips)
     {
-        SoundboardUi.Detach(_gallery); SoundboardUi.Detach(_error);
+        double offset = _gallerySelection == Selected ? _galleryScroll.VerticalOffset : 0;
+        var focusedId = _cells.FirstOrDefault(pair => pair.Value.Button.IsKeyboardFocusWithin).Key;
+        _gallerySelection = Selected; _visibleClips = clips;
+        SoundboardUi.Detach(_galleryScroll); SoundboardUi.Detach(_error);
         _stage.Children.Clear(); _stage.RowDefinitions.Clear();
         _stage.RowDefinitions.Add(new RowDefinition { Height = new GridLength(30) });
         _stage.RowDefinitions.Add(new RowDefinition());
@@ -175,14 +201,42 @@ public sealed class SoundboardPage : UserControl
         }
         int rows = (clips.Count + 3) / 4;
         for (int row = 0; row < rows; row++) _gallery.RowDefinitions.Add(new RowDefinition { Height = new GridLength(row == rows - 1 ? 66 : 73) });
-        foreach (var (clip, index) in clips.Select((clip, index) => (clip, index)))
+        RealizeTiles(offset);
+        body.Children.Add(_galleryScroll);
+        _galleryScroll.ScrollToVerticalOffset(offset);
+        if (focusedId is not null && _cells.TryGetValue(focusedId, out var focused)) focused.Button.Focus();
+    }
+
+    private void RealizeTiles(double offset)
+    {
+        if (_visibleClips.Count == 0) return;
+        // Keep the existing pixel-scrolling grid and its exact 66 + 7 DIP geometry, but
+        // create only the viewport and a small buffer. Row definitions are inexpensive;
+        // each tile's visual tree, cover decoder and context menu are not.
+        int rows = (_visibleClips.Count + 3) / 4;
+        int visibleRows = Math.Max(6, (int)Math.Ceiling(_galleryScroll.ViewportHeight / 73) + 2);
+        int firstRow = Math.Clamp((int)(offset / 73) - 1, 0, Math.Max(0, rows - visibleRows));
+        int first = firstRow * 4, last = Math.Min(_visibleClips.Count, (firstRow + visibleRows) * 4);
+        var wanted = _visibleClips.Skip(first).Take(last - first).Select(clip => clip.Id).ToHashSet();
+        foreach (var (id, cell) in _cells.ToArray())
         {
+            // Scrolling with the pointer must not discard the keyboard's focused button.
+            if (wanted.Contains(id) || cell.Button.IsKeyboardFocusWithin) continue;
+            _gallery.Children.Remove(cell.Button); _cells.Remove(id);
+        }
+        for (int index = first; index < last; index++)
+        {
+            var clip = _visibleClips[index];
+            if (_cells.ContainsKey(clip.Id)) continue;
+            if (_activeTile == clip.Id) _activeTile = null;
             var tile = Tile(clip);
             tile.Margin = new Thickness(0, 0, index % 4 == 3 ? 0 : 7, index / 4 == rows - 1 ? 0 : 7);
+            KeyboardNavigation.SetTabIndex(tile, index);
+            AutomationProperties.SetPositionInSet(tile, index + 1);
+            AutomationProperties.SetSizeOfSet(tile, _visibleClips.Count);
             SoundboardUi.At(_gallery, tile, index % 4, index / 4);
         }
-        body.Children.Add(new ScrollViewer { Content = _gallery, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
-            VerticalScrollBarVisibility = ScrollBarVisibility.Auto, CanContentScroll = false, Focusable = false });
+        UpdateTiles();
     }
 
     private void BuildTabs()
@@ -193,7 +247,8 @@ public sealed class SoundboardPage : UserControl
         var actions = new StackPanel { Orientation = Orientation.Horizontal };
         if (_editing)
         {
-            var done = SoundboardUi.Button("Done", () => _ = SaveOrder(), true); actions.Children.Add(done);
+            _done = SoundboardUi.Button("Done", () => _ = SaveOrder(), true);
+            _done.IsEnabled = !_savingOrder; actions.Children.Add(_done);
         }
         else
         {
@@ -285,6 +340,7 @@ public sealed class SoundboardPage : UserControl
     private void Select(string id)
     {
         if (_editing) return;
+        ChangeView();
         _selectedOverride = id; _controller.SelectCollection(id); _localError = null; _shape = ""; Refresh();
     }
 
@@ -315,11 +371,11 @@ public sealed class SoundboardPage : UserControl
         AutomationProperties.SetName(button, $"{clip.Name}, {SoundboardUi.Time(clip.EndSeconds - clip.StartSeconds)}");
         button.ToolTip = _editing ? $"{clip.Name} · Drag to reorder, or Alt+arrow keys" : clip.Name;
         button.Click += (_, _) => { if (_editing) BeginClipEdit(clip); else _ = Run(() => _controller.PlayAsync(clip.Id)); };
-        button.PreviewMouseLeftButtonDown += (_, e) => { if (_editing) { _press = e.GetPosition(this); _pressedId = clip.Id; } };
+        button.PreviewMouseLeftButtonDown += (_, e) => { if (_editing && !SavingCurrentOrder) { _press = e.GetPosition(this); _pressedId = clip.Id; } };
         button.PreviewMouseLeftButtonUp += (_, _) => { _press = null; _pressedId = null; };
         button.MouseMove += (_, e) =>
         {
-            if (!_editing || _press is not { } start || _pressedId != clip.Id || e.LeftButton != MouseButtonState.Pressed) return;
+            if (!_editing || SavingCurrentOrder || _press is not { } start || _pressedId != clip.Id || e.LeftButton != MouseButtonState.Pressed) return;
             var point = e.GetPosition(this);
             if (Math.Abs(point.X - start.X) < SystemParameters.MinimumHorizontalDragDistance && Math.Abs(point.Y - start.Y) < SystemParameters.MinimumVerticalDragDistance) return;
             _press = null; _pressedId = null;
@@ -334,11 +390,17 @@ public sealed class SoundboardPage : UserControl
         };
         button.PreviewKeyDown += (_, e) =>
         {
-            e.Handled = ReorderWithKey(clip.Id, e.Key, e.SystemKey, Keyboard.Modifiers);
+            e.Handled = ReorderWithKey(clip.Id, e.Key, e.SystemKey, Keyboard.Modifiers)
+                || NavigateWithKey(clip.Id, e.Key, Keyboard.Modifiers);
         };
         var menu = new ContextMenu();
         MenuItem(menu, "Edit", () => BeginClipEdit(clip));
-        MenuItem(menu, clip.Favorite ? "Remove favorite" : "Favorite", () => _ = Run(() => _controller.SaveClipAsync(clip with { Favorite = !clip.Favorite })));
+        MenuItem(menu, clip.Favorite ? "Remove favorite" : "Favorite", () => _ = Run(() =>
+        {
+            var current = _controller.Library.Clips.FirstOrDefault(item => item.Id == clip.Id)
+                ?? throw new SoundboardException("Saving sound failed: this sound was removed");
+            return _controller.SaveClipAsync(current with { Favorite = !current.Favorite }, expected: current);
+        }));
         MenuItem(menu, "Delete", () => Confirm($"Delete {clip.Name}?", () => _controller.DeleteClipAsync(clip.Id)));
         button.ContextMenu = menu;
         _cells[clip.Id] = new(button, name, duration, glyph, track, progress);
@@ -346,7 +408,9 @@ public sealed class SoundboardPage : UserControl
         return button;
     }
 
-    private bool ValidDrag(DragEventArgs e) => _editing && _order is not null && e.Data.GetDataPresent(DragFormat)
+    private bool SavingCurrentOrder => _savingOrder && _savingOrderView == _viewVersion;
+
+    private bool ValidDrag(DragEventArgs e) => _editing && !SavingCurrentOrder && _order is not null && e.Data.GetDataPresent(DragFormat)
         && e.Data.GetData(DragFormat) is string id && _order.Contains(id);
 
     internal bool ReorderWithKey(string clipId, Key key, Key systemKey, ModifierKeys modifiers)
@@ -356,15 +420,54 @@ public sealed class SoundboardPage : UserControl
         var actualKey = key == Key.System ? systemKey : key;
         int delta = actualKey switch { Key.Left => -1, Key.Right => 1, Key.Up => -4, Key.Down => 4, _ => 0 };
         if (delta == 0) return false;
+        if (SavingCurrentOrder) return true;
+        if (!ReferenceEquals(_renderedLibrary, _controller.Library)) Refresh();
         int index = _order.IndexOf(clipId), target = index + delta;
         if (index >= 0 && target >= 0 && target < _order.Count)
-        { Move(clipId, _order[target]); _cells.GetValueOrDefault(clipId)?.Button.Focus(); }
+        {
+            Move(clipId, _order[target]);
+            for (int i = 0; i < _visibleClips.Count; i++)
+                if (_visibleClips[i].Id == clipId) { FocusClip(i); break; }
+        }
         return true;
+    }
+
+    internal bool NavigateWithKey(string clipId, Key key, ModifierKeys modifiers)
+    {
+        if ((modifiers & (ModifierKeys.Alt | ModifierKeys.Control)) != 0) return false;
+        int index = -1;
+        for (int i = 0; i < _visibleClips.Count; i++) if (_visibleClips[i].Id == clipId) { index = i; break; }
+        if (index < 0) return false;
+        int target = key switch
+        {
+            Key.Left => index - 1, Key.Right => index + 1,
+            Key.Up => index - 4, Key.Down => index + 4,
+            Key.Home => 0, Key.End => _visibleClips.Count - 1,
+            Key.PageUp => index - 12, Key.PageDown => index + 12,
+            Key.Tab => index + ((modifiers & ModifierKeys.Shift) != 0 ? -1 : 1),
+            _ => -1,
+        };
+        if (key is not (Key.Left or Key.Right or Key.Up or Key.Down or Key.Home or Key.End or Key.PageUp or Key.PageDown or Key.Tab)) return false;
+        // Tab at either end continues into the surrounding toolbar/footer normally.
+        if (key == Key.Tab && (target < 0 || target >= _visibleClips.Count)) return false;
+        FocusClip(Math.Clamp(target, 0, _visibleClips.Count - 1)); return true;
+    }
+
+    private void FocusClip(int index)
+    {
+        double top = index / 4 * 73, bottom = top + 66;
+        double viewport = _galleryScroll.ViewportHeight > 0 ? _galleryScroll.ViewportHeight : 219;
+        double offset = _galleryScroll.VerticalOffset;
+        if (top < offset) offset = top;
+        else if (bottom > offset + viewport) offset = bottom - viewport;
+        _galleryScroll.ScrollToVerticalOffset(offset); RealizeTiles(offset);
+        _cells.GetValueOrDefault(_visibleClips[index].Id)?.Button.Focus();
     }
 
     internal void Move(string id, string before)
     {
-        if (_order is null || id == before) return;
+        if (_order is null || id == before || SavingCurrentOrder) return;
+        if (!ReferenceEquals(_renderedLibrary, _controller.Library)) Refresh();
         int from = _order.IndexOf(id), target = _order.IndexOf(before);
         if (from < 0 || target < 0) return;
         _order.RemoveAt(from); _order.Insert(target, id); _shape = ""; Refresh();
@@ -372,15 +475,24 @@ public sealed class SoundboardPage : UserControl
 
     private void BeginEdit()
     {
+        ChangeView();
         _editing = true; _order = VisibleClips().Select(c => c.Id).ToList(); _shape = ""; Refresh();
     }
 
     private async Task SaveOrder()
     {
+        if (_savingOrder) return;
+        if (!ReferenceEquals(_renderedLibrary, _controller.Library)) Refresh();
         var order = _order?.ToArray();
         if (order is null) return;
-        if (await Run(() => _controller.ReorderClipsAsync(Selected, order)))
-        { _editing = false; _order = null; _shape = ""; Refresh(); }
+        _savingOrder = true; _savingOrderView = _viewVersion; _press = null; _pressedId = null;
+        if (_done is not null) _done.IsEnabled = false;
+        try
+        {
+            if (await Run(() => _controller.ReorderClipsAsync(Selected, order)))
+            { ChangeView(); _editing = false; _order = null; _shape = ""; Refresh(); }
+        }
+        finally { _savingOrder = false; if (_done is not null) _done.IsEnabled = true; }
     }
 
     private void UpdateTiles()
@@ -451,8 +563,12 @@ public sealed class SoundboardPage : UserControl
     private void UpdatePlayback()
     {
         var state = _controller.Playback;
-        var clip = _controller.Library.Clips.FirstOrDefault(c => c.Id == state.ClipId);
-        _playingName.Text = state.IsPlaying ? state.IsPreview ? "Preview" : clip?.Name ?? "Sound" : "Nothing playing";
+        if (!ReferenceEquals(_playbackLibrary, _controller.Library) || _playbackClipId != state.ClipId)
+        {
+            _playbackLibrary = _controller.Library; _playbackClipId = state.ClipId;
+            _playbackClip = state.ClipId is null ? null : _controller.Library.Clips.FirstOrDefault(c => c.Id == state.ClipId);
+        }
+        _playingName.Text = state.IsPlaying ? state.IsPreview ? "Preview" : _playbackClip?.Name ?? "Sound" : "Nothing playing";
         _playingName.ToolTip = _playingName.Text;
         _time.Text = state.IsPlaying ? $"{SoundboardUi.Time(state.Position.TotalSeconds)} / {SoundboardUi.Time(state.Duration.TotalSeconds)}" : "";
         _time.Visibility = state.IsPlaying ? Visibility.Visible : Visibility.Collapsed;
@@ -467,52 +583,69 @@ public sealed class SoundboardPage : UserControl
 
     private void ShowEditor(SoundboardEditor editor)
     {
+        ChangeView();
         _editor?.Dispose(); _editor = editor; _shape = "";
         _stage.Children.Clear(); _stage.RowDefinitions.Clear(); _stage.Children.Add(editor);
     }
 
     private void CloseEditor()
     {
+        ChangeView();
         _editor?.Dispose(); _editor = null; _shape = ""; Refresh();
     }
 
     private void CollectionForm(SoundCollection? collection)
     {
+        ChangeView();
         _formActive = true;
         var form = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(56, 0, 56, 0) };
         var title = SoundboardUi.Text(collection is null ? "Add collection" : "Rename collection", 14); title.FontWeight = FontWeights.SemiBold;
         form.Children.Add(title);
         var input = SoundboardUi.Input("Collection name", collection?.Name ?? ""); input.Margin = new Thickness(0, 10, 0, 12); form.Children.Add(input);
+        input.MaxLength = 0; AutomationProperties.SetHelpText(input, "Up to 100 characters");
+        var formError = _formError = FormError();
         var actions = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
         var cancel = SoundboardUi.Button("Cancel", CloseForm); cancel.Margin = new Thickness(0, 0, 8, 0); actions.Children.Add(cancel);
         actions.Children.Add(SoundboardUi.Button(collection is null ? "Add" : "Save", () => _ = Save(), true)); form.Children.Add(actions);
-        _formError = SoundboardUi.Text("", 11, "WarningTextBrush"); _formError.Margin = new Thickness(0, 8, 0, 0); form.Children.Add(_formError);
+        form.Children.Add(formError);
         _stage.Children.Clear(); _stage.RowDefinitions.Clear(); _stage.Children.Add(form);
         async Task Save()
         {
             if (!actions.IsEnabled) return;
             string name = input.Text.Trim();
-            if (name.Length == 0) { AutomationProperties.SetHelpText(input, "Enter a collection name"); input.Focus(); return; }
+            if (name.Length == 0)
+            {
+                ShowError(formError, "Enter a collection name");
+                AutomationProperties.SetHelpText(input, formError.Text); input.Focus(); return;
+            }
+            if (new StringInfo(name).LengthInTextElements > 100)
+            {
+                ShowError(formError, "Use a collection name with up to 100 characters");
+                AutomationProperties.SetHelpText(input, formError.Text); input.Focus(); return;
+            }
+            ShowError(formError, null); AutomationProperties.SetHelpText(input, "Up to 100 characters");
             actions.IsEnabled = false; input.IsEnabled = false;
+            string? created = null;
             bool ok = await Run(async () =>
             {
-                if (collection is null) Select(await _controller.CreateCollectionAsync(name));
+                if (collection is null) created = await _controller.CreateCollectionAsync(name);
                 else await _controller.RenameCollectionAsync(collection.Id, name);
             });
             actions.IsEnabled = true; input.IsEnabled = true;
-            if (ok) CloseForm();
+            if (ok) { if (created is not null) Select(created); CloseForm(); }
         }
     }
 
     private void Confirm(string question, Func<Task> action)
     {
+        ChangeView();
         _formActive = true;
         var panel = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(40, 0, 40, 0) };
         var title = SoundboardUi.Text(question, 14); title.TextWrapping = TextWrapping.Wrap; title.TextTrimming = TextTrimming.None; panel.Children.Add(title);
         var controls = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 14, 0, 0) };
         var cancel = SoundboardUi.Button("Cancel", CloseForm); cancel.Margin = new Thickness(0, 0, 8, 0); controls.Children.Add(cancel);
         controls.Children.Add(SoundboardUi.Button("Delete", () => _ = Delete(), true)); panel.Children.Add(controls);
-        _formError = SoundboardUi.Text("", 11, "WarningTextBrush"); _formError.Margin = new Thickness(0, 8, 0, 0); panel.Children.Add(_formError);
+        _formError = FormError(); panel.Children.Add(_formError);
         _stage.Children.Clear(); _stage.RowDefinitions.Clear(); _stage.Children.Add(panel);
         async Task Delete()
         {
@@ -524,7 +657,24 @@ public sealed class SoundboardPage : UserControl
         }
     }
 
-    private void CloseForm() { _formActive = false; _formError = null; _shape = ""; Refresh(); }
+    private void CloseForm() { ChangeView(); _formActive = false; _formError = null; _shape = ""; Refresh(); }
+
+    private void ChangeView() { _viewVersion++; _localError = null; }
+
+    private static TextBlock FormError()
+    {
+        var error = SoundboardUi.Text("", 11, "WarningTextBrush");
+        error.Margin = new Thickness(0, 8, 0, 0); error.TextWrapping = TextWrapping.Wrap; error.LineHeight = 16; error.MaxHeight = 32;
+        AutomationProperties.SetLiveSetting(error, AutomationLiveSetting.Polite); return error;
+    }
+
+    private static void ShowError(TextBlock target, string? message)
+    {
+        string text = message ?? "";
+        if (target.Text == text) return;
+        target.Text = text; target.ToolTip = message;
+        (UIElementAutomationPeer.FromElement(target) ?? UIElementAutomationPeer.CreatePeerForElement(target))?.RaiseAutomationEvent(AutomationEvents.LiveRegionChanged);
+    }
 
     private static MenuItem MenuItem(ContextMenu menu, string text, Action action)
     {
@@ -533,12 +683,19 @@ public sealed class SoundboardPage : UserControl
 
     private async Task<bool> Run(Func<Task> command)
     {
-        try { _localError = null; await command(); Refresh(); return true; }
+        int version = _viewVersion;
+        try
+        {
+            _localError = null; await command();
+            if (version != _viewVersion) return false;
+            Refresh(); return true;
+        }
         catch (OperationCanceledException) { return false; }
         catch (Exception ex)
         {
+            if (version != _viewVersion) return false;
             _localError = ex.Message;
-            if (_formError is not null) { _formError.Text = ex.Message; _formError.ToolTip = ex.Message; }
+            if (_formError is not null) ShowError(_formError, ex.Message);
             Refresh(); return false;
         }
     }

@@ -26,6 +26,12 @@ public sealed class SoundboardModule : IFeatureModule, ISoundboardController
     private readonly Func<ISoundboardPlayer>? _createPlayer;
     private readonly Func<string?>? _sendUnavailable;
     private readonly SemaphoreSlim _gate = new(1, 1);
+    private readonly object _importsGate = new();
+    private readonly HashSet<Task> _imports = [];
+    private readonly object _playbackGate = new();
+    private readonly HashSet<string> _deletingClips = new(StringComparer.Ordinal);
+    private string? _playbackClipId;
+    private string? _previewPath;
     private AudioService? _audio;
     private ISoundboardPlayer? _player;
     private ModuleContext? _context;
@@ -143,6 +149,11 @@ public sealed class SoundboardModule : IFeatureModule, ISoundboardController
         finally
         {
             _lifetime?.Cancel();
+            Task[] imports;
+            lock (_importsGate) imports = [.. _imports];
+            // Import completions include cancellation cleanup and draft disposal. Keep the owned
+            // downloader alive until its helpers have exited, including during tray Quit.
+            await Task.WhenAll(imports);
             _lifetime?.Dispose(); _lifetime = null;
             try { DisposeImporter(); }
             finally { _context = null; _page = null; }
@@ -172,10 +183,10 @@ public sealed class SoundboardModule : IFeatureModule, ISoundboardController
     {
         var clip = Find(clipId);
         if (SendUnavailableReason is { } reason) throw new SoundboardException(reason);
-        await player.PlayAsync(clip.Id, _store.AudioPath(clip), TimeSpan.FromSeconds(clip.StartSeconds), TimeSpan.FromSeconds(clip.EndSeconds), ct: _lifetime!.Token);
+        await PlayTracked(player, clip.Id, clip.Id, _store.AudioPath(clip), clip.StartSeconds, clip.EndSeconds, false, _lifetime!.Token);
     });
 
-    public Task StopAsync() => PlaybackChange(player => player.StopAsync());
+    public Task StopAsync() => PlaybackChange(StopPlayback);
 
     public Task SetLevelsAsync(float send, float hear) => Change(async () =>
     {
@@ -212,16 +223,21 @@ public sealed class SoundboardModule : IFeatureModule, ISoundboardController
         return Save(_library with { Collections = remaining, SelectedCollectionId = _library.SelectedCollectionId == id ? remaining[0].Id : _library.SelectedCollectionId });
     });
 
-    public Task SaveClipAsync(SoundClip clip, string? newImagePath = null) => Change(async () =>
+    public Task SaveClipAsync(SoundClip clip, string? newImagePath = null, SoundClip? expected = null) => Change(async () =>
     {
         var current = Find(clip.Id);
+        // Check inside the mutation gate: a form or menu may have waited behind another view's save.
+        if (expected is not null && (expected.Id != current.Id || expected.Name != current.Name
+            || expected.CollectionId != current.CollectionId || expected.StartSeconds != current.StartSeconds
+            || expected.EndSeconds != current.EndSeconds || expected.Favorite != current.Favorite || expected.ImageFile != current.ImageFile))
+            throw new SoundboardException("Sound changed in another view. Reopen it before saving.");
         RequireCollection(clip.CollectionId);
         SoundboardStore.ValidateRange(current.DurationSeconds, clip.StartSeconds, clip.EndSeconds);
         // A view can edit presentation/trim only; the stored source and media identity stay authoritative.
         var updated = current with { Name = SoundboardStore.CleanName(clip.Name), CollectionId = clip.CollectionId,
             StartSeconds = clip.StartSeconds, EndSeconds = clip.EndSeconds, Favorite = clip.Favorite,
             ImageFile = clip.ImageFile is null ? null : current.ImageFile };
-        if (Playback.ClipId == clip.Id) await _player!.StopAsync();
+        await StopClipPlayback(_player!, clip.Id);
         if (newImagePath is not null) updated = updated with { ImageFile = await Task.Run(() => _store.ImportCover(newImagePath)) };
         try { await Save(_library with { Clips = [.. _library.Clips.Select(c => c.Id == clip.Id ? updated : c)] }); }
         catch
@@ -235,9 +251,16 @@ public sealed class SoundboardModule : IFeatureModule, ISoundboardController
     public Task DeleteClipAsync(string id) => Change(async () =>
     {
         var clip = Find(id);
-        if (Playback.ClipId == id) await _player!.StopAsync();
-        await Save(_library with { Clips = [.. _library.Clips.Where(c => c.Id != id)] });
-        await Task.Run(() => _store.DeleteMedia(clip));
+        lock (_playbackGate) _deletingClips.Add(id);
+        try
+        {
+            // State may still be idle while a play waits for the audio engine. Fence the
+            // recorded intent now and reject further plays until metadata is removed.
+            await StopClipPlayback(_player!, id);
+            await Save(_library with { Clips = [.. _library.Clips.Where(c => c.Id != id)] });
+            await Task.Run(() => _store.DeleteMedia(clip));
+        }
+        finally { lock (_playbackGate) _deletingClips.Remove(id); }
     });
 
     public Task ReorderClipsAsync(string collectionId, IReadOnlyList<string> ids) => Change(() =>
@@ -252,31 +275,67 @@ public sealed class SoundboardModule : IFeatureModule, ISoundboardController
 
     public async Task<SoundImportDraft> PrepareAsync(SoundImportSource source, IProgress<SoundImportProgress>? progress, CancellationToken ct)
     {
-        RequireRunning();
-        using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, _lifetime!.Token);
-        return await _importer!.PrepareAsync(source, progress, linked.Token);
+        var completed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        CancellationTokenSource linked;
+        ISoundboardImporter importer;
+        lock (_importsGate)
+        {
+            RequireRunning();
+            linked = CancellationTokenSource.CreateLinkedTokenSource(ct, _lifetime!.Token);
+            importer = _importer!;
+            _imports.Add(completed.Task);
+        }
+        try
+        {
+            var draft = await importer.PrepareAsync(source, progress, linked.Token);
+            if (linked.IsCancellationRequested)
+            {
+                draft.Dispose();
+                linked.Token.ThrowIfCancellationRequested();
+            }
+            return draft;
+        }
+        finally
+        {
+            linked.Dispose();
+            lock (_importsGate) _imports.Remove(completed.Task);
+            completed.SetResult();
+        }
     }
 
-    public Task PreviewAsync(SoundImportDraft draft, double startSeconds, double endSeconds, CancellationToken ct) => PlaybackChange(async player =>
+    public async Task<string> PreviewAsync(SoundImportDraft draft, double startSeconds, double endSeconds, CancellationToken ct)
     {
-        SoundboardStore.ValidateRange(draft.DurationSeconds, startSeconds, endSeconds);
-        using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, _lifetime!.Token);
-        await player.PlayAsync("@preview", draft.LocalAudioPath, TimeSpan.FromSeconds(startSeconds), TimeSpan.FromSeconds(endSeconds), preview: true, ct: linked.Token);
-    });
+        string playbackId = "@preview/" + Guid.NewGuid().ToString("N");
+        await PlaybackChange(async player =>
+        {
+            SoundboardStore.ValidateRange(draft.DurationSeconds, startSeconds, endSeconds);
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, _lifetime!.Token);
+            await PlayTracked(player, null, playbackId, draft.LocalAudioPath, startSeconds, endSeconds, true, linked.Token);
+        });
+        return playbackId;
+    }
 
-    public Task PreviewClipAsync(string clipId, double startSeconds, double endSeconds, CancellationToken ct) => PlaybackChange(async player =>
+    public async Task<string> PreviewClipAsync(string clipId, double startSeconds, double endSeconds, CancellationToken ct)
     {
-        var clip = Find(clipId);
-        SoundboardStore.ValidateRange(clip.DurationSeconds, startSeconds, endSeconds);
-        using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, _lifetime!.Token);
-        await player.PlayAsync(clip.Id, _store.AudioPath(clip), TimeSpan.FromSeconds(startSeconds), TimeSpan.FromSeconds(endSeconds), preview: true, ct: linked.Token);
-    });
+        string playbackId = "@preview/" + Guid.NewGuid().ToString("N");
+        await PlaybackChange(async player =>
+        {
+            var clip = Find(clipId);
+            SoundboardStore.ValidateRange(clip.DurationSeconds, startSeconds, endSeconds);
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, _lifetime!.Token);
+            await PlayTracked(player, clip.Id, playbackId, _store.AudioPath(clip), startSeconds, endSeconds, true, linked.Token);
+        });
+        return playbackId;
+    }
 
     public Task AddAsync(SoundImportDraft draft, SoundClip details, string? imagePath, CancellationToken ct) => Change(async () =>
     {
         ct.ThrowIfCancellationRequested();
         RequireCollection(details.CollectionId);
-        if (Playback.IsPreview) await _player!.StopAsync();
+        Task stopped;
+        lock (_playbackGate)
+            stopped = string.Equals(_previewPath, draft.LocalAudioPath, StringComparison.OrdinalIgnoreCase) ? StopPlayback(_player!) : Task.CompletedTask;
+        await stopped;
         var clip = await Task.Run(() => _store.CommitDraft(draft, details.Name, details.CollectionId,
             details.StartSeconds, details.EndSeconds, imagePath, details.Favorite), ct);
         try
@@ -289,6 +348,39 @@ public sealed class SoundboardModule : IFeatureModule, ISoundboardController
     });
 
     private SoundClip Find(string id) => _library.Clips.FirstOrDefault(c => c.Id == id) ?? throw new SoundboardException("Sound is no longer available");
+    private Task PlayTracked(ISoundboardPlayer player, string? clipId, string playbackId, string path,
+        double start, double end, bool preview, CancellationToken ct)
+    {
+        lock (_playbackGate)
+        {
+            if (clipId is not null)
+            {
+                if (_deletingClips.Contains(clipId)) throw new SoundboardException("Sound is being deleted");
+                Find(clipId);
+            }
+            ct.ThrowIfCancellationRequested();
+            _playbackClipId = clipId;
+            _previewPath = preview ? path : null;
+            // Only command submission is locked, never file work or an awaited operation.
+            return player.PlayAsync(playbackId, path, TimeSpan.FromSeconds(start), TimeSpan.FromSeconds(end), preview, ct);
+        }
+    }
+    private Task StopPlayback(ISoundboardPlayer player)
+    {
+        lock (_playbackGate)
+        {
+            _playbackClipId = null;
+            _previewPath = null;
+            return player.StopAsync();
+        }
+    }
+    private Task StopClipPlayback(ISoundboardPlayer player, string clipId)
+    {
+        lock (_playbackGate)
+            // A replacement may already be pending while State still names the old sound.
+            // Only the latest intent can be stopped without cancelling that replacement.
+            return _playbackClipId == clipId ? StopPlayback(player) : Task.CompletedTask;
+    }
     private void RequireCollection(string id)
     {
         if (!_library.Collections.Any(c => c.Id == id)) throw new SoundboardException("Choose a collection");

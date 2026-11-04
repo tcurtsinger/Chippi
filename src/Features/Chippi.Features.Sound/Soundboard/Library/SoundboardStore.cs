@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using System.Globalization;
 using System.IO;
 using System.Text.Json;
 using System.Windows.Media;
@@ -11,6 +12,7 @@ namespace Chippi.Features.Sound.Soundboard.Library;
 /// <summary>Atomic library metadata and a closed media directory; imported originals are never modified.</summary>
 public sealed class SoundboardStore
 {
+    private const long MaxLibraryBytes = 16 * 1024 * 1024;
     private static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
     private readonly object _gate = new();
     private readonly string _file;
@@ -31,7 +33,7 @@ public sealed class SoundboardStore
         lock (_gate)
         {
             RecoveryNotice = null;
-            if (!File.Exists(_file)) return new();
+            if (!File.Exists(_file) && !File.Exists(_file + ".bak")) return new();
             try { return Read(_file); }
             catch (Exception ex) when (ex is JsonException or IOException or SoundboardException)
             {
@@ -52,7 +54,7 @@ public sealed class SoundboardStore
 
     private static SoundboardLibrary Read(string file)
     {
-        if (new FileInfo(file).Length > 16 * 1024 * 1024)
+        if (new FileInfo(file).Length > MaxLibraryBytes)
             throw new SoundboardException("Library is too large");
         return Normalize(JsonSerializer.Deserialize<SoundboardLibrary>(File.ReadAllBytes(file), Json)
             ?? throw new SoundboardException("Library is empty"));
@@ -70,6 +72,7 @@ public sealed class SoundboardStore
                 using (var stream = new FileStream(pending, FileMode.CreateNew, FileAccess.Write, FileShare.None))
                 {
                     JsonSerializer.Serialize(stream, normalized, Json);
+                    if (stream.Length > MaxLibraryBytes) throw new SoundboardException("Library is too large");
                     stream.Flush(flushToDisk: true);
                 }
                 // Preserve a known-good previous library, never a corrupt primary after recovery.
@@ -184,7 +187,12 @@ public sealed class SoundboardStore
     {
         string printable = new((name ?? "").Select(c => char.IsControl(c) ? ' ' : c).ToArray());
         string value = string.Join(" ", printable.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
-        return value.Length == 0 ? "Sound" : value[..Math.Min(value.Length, 100)];
+        if (value.Length == 0) return "Sound";
+        if (value.Length <= 100) return value;
+        // Count visible characters so an emoji, combining accent or joined glyph stays
+        // intact and uses the same name limit as the editor.
+        int[] elements = StringInfo.ParseCombiningCharacters(value);
+        return elements.Length <= 100 ? value : value[..elements[100]];
     }
 
     public static void ValidateRange(double duration, double start, double end)

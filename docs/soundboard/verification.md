@@ -1,5 +1,25 @@
 # Soundboard verification
 
+## Harden, optimize and polish — 2026-11-04
+
+The approved B collection-tabs design is preserved. The finish pass adds safeguards for simultaneous views, pending saves, import shutdown, preview ownership, deleted sounds during reorder, interrupted trim gestures and retryable setup failures. Library recovery handles a missing primary file, and oversized writes preserve the previous readable library and backup. Names use complete Unicode text elements; time fields accept locale decimals and keep untouched trim precision.
+
+- **272 Sound feature tests and 151 Audio tests passed in Release.** All local audio uses fakes; UI tests construct unhosted controls. Gated tasks exercise cancellation and concurrent saves/deletes without timing sleeps or real input.
+- **26 offscreen captures** cover both themes at 520 × 360 DIP, rendered at 200% scale. In addition to gallery/edit/import/empty/overflow/setup states, these include voice warnings, Unicode titles, long collection names, invalid trims and link-import failure with Retry. The harness explicitly flushes the unhosted visual tree so the full Audio header renders consistently.
+- The native composition remains unchanged; clearer bounded errors, collection ellipsis/tooltips, keyboard focus targets and precise time fields are the visual refinements. No global tokens changed.
+
+The opt-in `SoundboardGalleryTimings` probe measures creation, layout and one offscreen render on the UI thread. These are medians of three bounded samples after one small warmup, using fixture clips and no native window or audio. Allocations are cumulative UI-thread allocations for that operation, not retained process memory.
+
+| Library / operation | Before | After |
+| --- | ---: | ---: |
+| Open/render 12 sounds | 17.182 ms | 15.488 ms |
+| Open/render 1,000 sounds | 1,142.611 ms | 23.897 ms |
+| UI allocation, 1,000 sounds | 121.45 MB | 3.94 MB |
+| Realized tiles, 1,000 sounds | 1,000 | 24 |
+| Playback update, 1,000 sounds | 0.0309 ms | 0.0016 ms |
+
+The improvement comes from creating nearby tile controls, retaining scroll position and caching the playing sound lookup. Every clip remains reachable through scrolling and keyboard navigation. Tests also cover reordering beyond the first viewport. These measurements do not prove native presentation frame rate; live dragging, focus, screen-reader navigation and playback remain owner checks.
+
 ## Local evidence
 
 - **151 Audio tests passed.** Fake devices, pipelines, players and clocks cover voice-only mute, shared processing/bypass ownership, rapid replacement/Stop ordering, local-only preview, route changes, virtual-endpoint mute, stream teardown failures, surround-output channel mapping and bounded WAV reads.

@@ -88,15 +88,19 @@ internal static class SoundboardUi
     internal static bool TryTime(string text, out double seconds)
     {
         seconds = 0;
-        if (double.TryParse(text, NumberStyles.Float, CultureInfo.CurrentCulture, out seconds) && double.IsFinite(seconds)) return true;
         var parts = text.Split(':');
-        if (parts.Length is < 2 or > 3) return false;
+        if (parts.Length is < 1 or > 3) return false;
         double total = 0;
-        foreach (var part in parts)
+        for (int i = 0; i < parts.Length; i++)
         {
-            if (!double.TryParse(part, NumberStyles.Float, CultureInfo.InvariantCulture, out var segment) || !double.IsFinite(segment) || segment < 0) return false;
+            const NumberStyles style = NumberStyles.AllowDecimalPoint | NumberStyles.AllowLeadingWhite | NumberStyles.AllowTrailingWhite;
+            if ((!double.TryParse(parts[i], style, CultureInfo.CurrentCulture, out var segment)
+                && !double.TryParse(parts[i], style, CultureInfo.InvariantCulture, out segment))
+                || !double.IsFinite(segment) || segment < 0 || (i > 0 && segment >= 60)
+                || (i < parts.Length - 1 && segment != Math.Truncate(segment))) return false;
             total = total * 60 + segment;
         }
+        if (!double.IsFinite(total)) return false;
         seconds = total;
         return true;
     }
