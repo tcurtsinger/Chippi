@@ -5,12 +5,12 @@ Window layouts and snapping, app switcher, close protection, focus follows mouse
 ## Decided (Travis, 2026-11-04)
 
 - **Scope (task 197):** all ten, each in full. Travis relies on none of PowerToys, Snap layouts, AutoHotkey, a mouse app or a text expander, so nothing is skipped or reduced because another tool covers it. Other tools are the bar to beat.
-- **Games (tasks 198 and 211, #1):** one **Always on** switch covers every Phase 6 input feature, Debounce included. It's off by default: while a fullscreen game or app is in front on that display, they pause. On means they act everywhere. There's no per-feature switch.
+- **Games (tasks 198 and 211, #1):** one **Always on** switch covers every Phase 6 input feature, Debounce included. It's off by default: while the window in front is a fullscreen game or app, they pause, on every display. On means they act everywhere. There's no per-feature switch.
 - **Radial menu (task 211, #2):** stays outside Always on. Settings › Radial menu gets its own switch for opening over fullscreen apps, on by default, which keeps the 5.5 behavior.
 - **One action model (task 208):** every verb (snap left, next monitor, open the App switcher, a snippet) is one shared action that any door can fire: an Actions tile, Search, a Radial slice, a key shortcut, a Caps Lock combo or a mouse button. A background feature's on/off can also be an Actions tile.
 - **Actions are grouped (task 208):** new tiles go into menus inside Actions by topic, like Plan, Power and Quit, not as loose tiles.
 - **Snapping lives in Actions (task 209):** no new home tile; the home stays at 11 tools.
-- **Shortcuts (tasks 210 and 211, #3):** Mouse buttons, Super key and Shortcut manager become one feature, **Shortcuts**, with one Settings page. It binds any action to a key, a Caps Lock combo or a mouse button and flags clashes.
+- **Shortcuts (tasks 210 and 211, #3):** Mouse buttons, Super key and Shortcut manager become one feature, **Shortcuts**: one entry in Add features and one Settings page. It binds any action to a key, a Caps Lock combo or a mouse button and flags clashes.
 - **Feature calls (task 211, #4 to #11, all as recommended):**
   - Within Snap, placing windows comes first. Saved app arrangements with relaunch are a separate step after it, later in the phase.
   - Chippi's zones show on Shift+drag, and Windows' own Snap bar keeps the plain drag to the top.
@@ -38,7 +38,7 @@ Window layouts and snapping, app switcher, close protection, focus follows mouse
 ## Hard limits
 
 - **Admin windows:** hook features can't act on a window running as admin. Over one, Caps Lock is plain Caps Lock and Snap can't move it.
-- **Anti-cheat:** untested on Travis's games. With Always on off, Chippi sends no input into a fullscreen game.
+- **Anti-cheat:** untested on Travis's games. With Always on off, no Phase 6 feature sends input into a fullscreen game. The Radial menu is the exception: its Open over fullscreen apps switch is on by default, and over a game it can send key shortcuts, text and its pointer.
 
 ## Briefs
 
