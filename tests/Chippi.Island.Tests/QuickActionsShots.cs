@@ -4,6 +4,9 @@
 #if DEBUG
 using System.IO;
 using System.Windows;
+using System.Windows.Automation;
+using System.Windows.Automation.Peers;
+using System.Windows.Automation.Provider;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Media;
@@ -21,8 +24,8 @@ using static Chippi.Island.Tests.IslandPanelTests;
 namespace Chippi.Island.Tests;
 
 /// <summary>
-/// Renders the Actions page and Settings › Quick actions off screen on a fake PC, in the states the Phase 5.5 mockup
-/// shows: the picker, all 18 picked, 6 picked and Quit apps. Runs only when CHIPPI_ISLAND_SHOTS names an output folder.
+/// Renders the approved Actions gallery and editor, saved gaps, paged lists and scoped failures off screen on a fake
+/// PC. Runs only when CHIPPI_ISLAND_SHOTS names an output folder. No command affects the owner's Windows session.
 /// </summary>
 public sealed class QuickActionsShots
 {
@@ -49,9 +52,43 @@ public sealed class QuickActionsShots
                 Shoot(tiles, Path.Combine(folder, "actions-picker.png"));
                 module.Pick(QuickAction.All.Select(a => a.Id));
                 Shoot(tiles, Path.Combine(folder, "actions-all.png"));
+                pc.Fail = true;
+                Shoot(tiles, Path.Combine(folder, "actions-toggle-failed.png"), panel => Click(panel, "dark"));
+                pc.Fail = false;
+                // Successful retry returns the page to the normal fixture before the remaining shots.
+                Shoot(tiles, Path.Combine(folder, "actions-toggle-retried.png"), panel => Click(panel, "dark"));
+                pc.State = MockState();
+                module.RefreshAsync().GetAwaiter().GetResult();
                 Shoot(tiles, Path.Combine(folder, "actions-quit.png"), panel => Click(panel, "quit"));
                 module.Pick([QuickActionId.Dark, QuickActionId.Hidden, QuickActionId.Icons, QuickActionId.Bluetooth, QuickActionId.Lock, QuickActionId.Recycle]);
                 Shoot(tiles, Path.Combine(folder, "actions-few.png"));
+                Shoot(tiles, Path.Combine(folder, "actions-edit.png"), panel => ClickNamed(panel, "Edit actions"));
+                var slots = module.Layout.ToArray();
+                int dark = Array.IndexOf(slots, "dark");
+                (slots[dark], slots[19]) = (slots[19], slots[dark]);
+                module.SaveLayout(module.Shown.Select(a => a.Id).ToArray(), slots);
+                Shoot(tiles, Path.Combine(folder, "actions-saved-gaps.png"));
+                Shoot(tiles, Path.Combine(folder, "actions-edit-gaps.png"), panel => ClickNamed(panel, "Edit actions"));
+
+                module.Pick(QuickAction.All.Select(a => a.Id));
+                pc.State = pc.State with { Apps = [.. pc.State.Apps, .. Enumerable.Range(10, 24).Select(i => new OpenApp($@"C:\Apps\workbench{i}.exe", $"Workbench {i}", false))] };
+                module.RefreshAsync().GetAwaiter().GetResult();
+                Shoot(tiles, Path.Combine(folder, "actions-quit-33.png"), panel => Click(panel, "quit"));
+                Shoot(tiles, Path.Combine(folder, "actions-quit-last.png"), panel =>
+                {
+                    Click(panel, "quit");
+                    for (int i = 0; i < 3; i++) ClickNamed(panel, "Next apps");
+                });
+                pc.State = MockState();
+                module.RefreshAsync().GetAwaiter().GetResult();
+                pc.Fail = true;
+                Shoot(tiles, Path.Combine(folder, "actions-eject-failed.png"), panel =>
+                {
+                    Click(panel, "eject");
+                    ClickNamed(panel, "Eject Samsung T7 (E:)");
+                });
+                pc.Fail = false;
+                Shoot(tiles, Path.Combine(folder, "actions-power-after-eject.png"), panel => Click(panel, "power"));
                 module.Pick([QuickActionId.Dark, QuickActionId.Hidden, QuickActionId.Icons, QuickActionId.Extend, QuickActionId.Bluetooth, QuickActionId.WiFi,
                     QuickActionId.Plan, QuickActionId.Lock, QuickActionId.Displays, QuickActionId.Recycle, QuickActionId.Eject, QuickActionId.Quit,
                     QuickActionId.Explorer, QuickActionId.Power]);
@@ -92,6 +129,14 @@ public sealed class QuickActionsShots
                     Pump(TimeSpan.FromMilliseconds(300));
                 }
             }
+            var edit = System.Diagnostics.Stopwatch.StartNew();
+            ClickNamed(panel, "Edit actions");
+            panel.UpdateLayout();
+            lines.Add($"Edit actions, build and layout (20 positions): {edit.Elapsed.TotalMilliseconds:0.0} ms");
+            var save = System.Diagnostics.Stopwatch.StartNew();
+            ClickNamed(panel, "Done");
+            panel.UpdateLayout();
+            lines.Add($"Done, save and gallery layout: {save.Elapsed.TotalMilliseconds:0.0} ms");
             var list = System.Diagnostics.Stopwatch.StartNew();
             Click(panel, "quit");
             panel.UpdateLayout();
@@ -124,11 +169,24 @@ public sealed class QuickActionsShots
         0,
         12);
 
-    private static void Click(IslandPanelWindow panel, string key)
+    private static void Click(IslandPanelWindow panel, string key) =>
+        Press(Find<ButtonBase>(panel).First(b => Equals(b.Tag, key)));
+
+    private static void ClickNamed(IslandPanelWindow panel, string name) =>
+        Press(Find<ButtonBase>(panel).First(b => AutomationProperties.GetName(b) == name || Equals(b.Content, name)));
+
+    private static void Press(ButtonBase button)
     {
-        var button = Find<ToggleButton>(panel).First(b => Equals(b.Tag, key));
-        // As a click or UI Automation's Toggle does: the tiles act on Checked and Unchecked.
-        ((System.Windows.Automation.Provider.IToggleProvider)System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(button)).Toggle();
+        var peer = UIElementAutomationPeer.CreatePeerForElement(button);
+        if (button is ToggleButton)
+            Assert.IsAssignableFrom<IToggleProvider>(peer.GetPattern(PatternInterface.Toggle)).Toggle();
+        else
+            Assert.IsAssignableFrom<IInvokeProvider>(peer.GetPattern(PatternInterface.Invoke)).Invoke();
+        // Invoke can queue the click. Drain it before capture or stopping a construction/layout timer.
+        var frame = new System.Windows.Threading.DispatcherFrame();
+        button.Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background, new Action(() => frame.Continue = false));
+        System.Windows.Threading.Dispatcher.PushFrame(frame);
+        button.UpdateLayout();
     }
 
     private static void Shoot(IReadOnlyList<IslandTileGroup> tiles, string path, Action<IslandPanelWindow>? arrange = null)
@@ -173,6 +231,7 @@ public sealed class QuickActionsShots
         encoder.Frames.Add(BitmapFrame.Create(bitmap));
         using var file = File.Create(path);
         encoder.Save(file);
+        view.RaiseEvent(new RoutedEventArgs(FrameworkElement.UnloadedEvent));
     }
 
     private static IEnumerable<T> Find<T>(DependencyObject root) where T : DependencyObject

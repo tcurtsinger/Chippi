@@ -1,6 +1,8 @@
 # Quick actions: brief
 
-Confirmed by Travis, 2026-11-01, and its mockup approved the same day: [Chippi Phase 5.5: Quick actions and Cleaning mode](https://claude.ai/artifact/HNpG8aciGLWyJecHFyfeeW). DESIGN.md wins where it speaks.
+Confirmed by Travis, 2026-11-01, and its mockup approved the same day: [Chippi Phase 5.5: Quick actions and Cleaning mode](https://claude.ai/artifact/HNpG8aciGLWyJecHFyfeeW). DESIGN.md wins where it speaks. The one-page gallery, in-widget editor and drag-and-drop positions were approved on 2026-11-03.
+
+**Mode:** Operate.
 
 **Name:** the feature was planned as Quick toggles. It's **Quick actions** everywhere (Settings, the catalog, Add features, the docs), and **Actions** on the island.
 
@@ -41,26 +43,27 @@ Each has a one-word label on the island (Travis: every island label is one word)
 | Power | Power | Sleep, restart, shut down or sign out, from a list |
 | Cleaning | Cleaning mode | Starts it ([cleaning-mode.md](cleaning-mode.md)); offered while that feature is installed |
 
-**Confirms,** each a short question with Cancel and a verb (DESIGN.md §3): "Empty Recycle Bin?", "Sleep?", "Restart?", "Shut down?", "Sign out?", "Quit all apps?", "Quit all but Chrome?", "End frozen apps?" and "Restart Explorer?". Both "all" buttons ask (Travis, 2026-11-01). Quitting one app from its row doesn't.
+**Confirms,** each a short question with Cancel and a verb (DESIGN.md §3): "Empty Recycle Bin?", "Sleep?", "Restart?", "Shut down?", "Sign out?", "Quit N apps?", "End frozen apps?" and "Restart Explorer?". Both "all" buttons ask (Travis, 2026-11-01). The count and exceptions describe the exact app set captured when the question opens; a newly opened app cannot be added after confirmation. Quitting one app from its row doesn't ask.
 
 ## Surfaces
 
 1. **The home (changes for everything, Travis 2026-11-01):** 5 columns instead of 4, so 10 buttons fit, about 91 wide. Every name under a home button is one word: Microphone, Volume, Awake, Organizer, System, Clipboard, Scratchpad, Shelf, Actions, and Search for the Command bar ([command-bar.md](command-bar.md)). Their Settings pages keep the full names. Names and statuses stay centered under their buttons. Actions has no status line: it's a door to its page.
-2. **The Actions page:** the home's grid, carried over: 5 columns, 10 between columns and 12 between rows, each button holding only its glyph, with the label centered under it and the status under that. With 16 or more picked, the four rows take 34-tall buttons so they fit; with fewer, the home's 44. The block sits in the body's vertical middle and never scrolls. On/off buttons take the accent fill while on, as the home's toggles do; the label and status under them keep their colors. A button that opens a list (Plan, Eject with two or more drives, Quit, Power) has a small chevron at its right.
-3. **First open:** the page shows all 19 as buttons with a check in each corner, nothing picked, and "None picked" with a disabled Done under them. Picking lights a button on the accent tint with an accent edge and fills its check; Done turns on with the first pick.
-4. **The small lists step into the page** (Travis chose this over a pop-over): the list takes the page's place, the header names it ("‹ Quit apps"), and Back returns to the buttons. Quit apps runs in two columns past 8 apps, each row an app's icon, its name, a "Front" or "Kept" badge, and an X to quit it; "Quit all but Chrome" and "Quit all" sit at the bottom right. Eject's rows have the drive, its size and an Eject button. Power plan's are radio rows, the active one filled and semibold. Power's are Sleep, Restart, Shut down and Sign out.
-5. **Settings › Quick actions:** the pick as two sections of switch rows, Toggles and Actions, each row the glyph (accent while shown), the full name and On or Off; then **Kept apps**, with a Remove for each and Add app. **Settings › Shortcuts:** a shortcut for any of them, off by default, clashes flagged as today.
+2. **The Actions page (revised 2026-11-03):** one gallery, five columns, all selected actions visible together without scrolling or paging. Each whole tile is clickable, including its glyph, short label and state. Only true Windows toggles use toggle semantics and an active accent. Commands are ordinary buttons; list openers (Plan, Eject with two or more drives, Quit, Power) have a small chevron. Full names appear in tooltips and accessibility labels. Intentional empty positions remain empty.
+3. **Choose and edit:** first open is "Choose actions", with nothing selected. A configured gallery has a pencil-only header button named "Edit actions", opening the same editor in the widget. All available actions sit in a five-column, 20-position grid. Click to show or hide; drag to an empty position to move, or onto another tile to swap. Alt+arrow keys provide the same placement with focus following the tile. Selected tiles take the accent tint and check. The count reads "N shown". Done is disabled with no selection; otherwise it saves the selection and exact positions, including gaps. Back or Esc discards the draft. Hidden and temporarily unavailable actions keep their positions.
+4. **The small lists step into the page** (Travis chose this over a pop-over): the list takes the page's place, the header names it, and Back returns to the gallery. Quit apps uses at most two readable columns of five 42-tall rows, paging past ten so every app is reachable. A range with previous/next buttons sits above the list. Each row has the app icon, name, visible Front and Kept markers when applicable, and an X to quit it. "Quit all but Chrome" and "Quit all" sit at the bottom. Both review a precise app count and name the exceptions before proceeding. A kept app is excluded from bulk Quit but can still be quit individually. Eject lists every drive, its size and Eject control, paging as needed. Power plan uses radio rows, active filled and semibold. Power lists Sleep, Restart, Shut down and Sign out.
+5. **Settings › Quick actions:** **Show in Actions** lists the available actions with their full names, glyphs and **Shown / Hidden** switches. These switches only control gallery visibility. **Keep open during Quit all** lists the bulk-quit exceptions, with Remove for each and Add app. **Settings › Shortcuts:** a shortcut for any action, off by default, with conflicts flagged.
 
 ## Feedback
 
-The button's state is the only feedback, from a click or a shortcut: no bar notice, and Chippi doesn't react.
+Feedback stays on the affected tile or list row, from a click or a shortcut. No bar notice, and Chippi doesn't react. A failed operation names its action and leaves its control available to retry. An Eject failure never appears in Power, or under a different drive.
 
 ## States
 
 - What your PC can't do is left out of the pick: no Bluetooth adapter, one screen only.
 - With nothing to act on, the button turns off and its status says so ("No drives", "None").
 - A change made elsewhere (Windows Settings, a shortcut) shows on the button.
-- Errors read "… failed" (DESIGN.md §3).
+- Errors read "… failed" (DESIGN.md §3), remain with the affected action, and clear when that operation succeeds.
+- Editor changes never run a Windows action. Done commits the draft; Back and Esc leave the saved gallery intact.
 
 ## Left out, and why
 

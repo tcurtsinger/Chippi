@@ -14,15 +14,14 @@ using Microsoft.Win32;
 namespace Chippi.Features.QuickActions.Views;
 
 /// <summary>
-/// Settings › Quick actions (docs/phase-5.5/quick-actions.md, Surfaces 5): the pick as two sections of switch rows,
-/// Toggles and Actions, each row the glyph (accent while shown), the full name and On or Off; then Kept apps, with a
-/// Remove for each and Add app. What this PC can't do is left out.
+/// Settings › Quick actions: Show in Actions controls gallery visibility, never the Windows setting itself.
+/// Each row names its action and says Shown or Hidden. Keep open during Quit all lists the bulk-quit exceptions.
+/// What this PC can't do is left out.
 /// </summary>
 public sealed class QuickActionsSettingsPage : UserControl
 {
     private readonly QuickActionsModule _module;
-    private readonly Card _toggles = SettingsLayout.Card();
-    private readonly Card _actions = SettingsLayout.Card();
+    private readonly Card _shown = SettingsLayout.Card();
     private readonly Card _kept = SettingsLayout.Card();
     private readonly Dictionary<QuickActionId, (ToggleButton Switch, LucideIcon Glyph)> _rows = [];
     private string _offered = "", _keptShown = "";
@@ -35,9 +34,8 @@ public sealed class QuickActionsSettingsPage : UserControl
         {
             Children =
             {
-                SettingsLayout.Section("Toggles", first: true), _toggles,
-                SettingsLayout.Section("Actions"), _actions,
-                SettingsLayout.Section("Kept apps"), _kept,
+                SettingsLayout.Section("Show in Actions", first: true), _shown,
+                SettingsLayout.Section("Keep open during Quit all"), _kept,
             },
         };
         Loaded += (_, _) =>
@@ -63,10 +61,9 @@ public sealed class QuickActionsSettingsPage : UserControl
         {
             _offered = key;
             _rows.Clear();
-            _toggles.Children.Clear();
-            _actions.Children.Clear();
+            _shown.Children.Clear();
             foreach (var action in offered)
-                (action.Toggle ? _toggles : _actions).Children.Add(PickRow(action));
+                _shown.Children.Add(PickRow(action));
         }
         _updating = true;
         try
@@ -75,6 +72,8 @@ public sealed class QuickActionsSettingsPage : UserControl
             {
                 bool shown = _module.Settings.Shows(id);
                 row.Switch.IsChecked = shown;
+                row.Switch.Content = shown ? "Shown" : "Hidden";
+                AutomationProperties.SetItemStatus(row.Switch, shown ? "Shown" : "Hidden");
                 row.Glyph.SetResourceReference(LucideIcon.BrushProperty, shown ? "AccentBrush" : "TextTertiaryBrush");
             }
         }
@@ -87,7 +86,8 @@ public sealed class QuickActionsSettingsPage : UserControl
         var glyph = new LucideIcon { Data = action.Icon, Size = 16, Margin = new Thickness(0, 0, 14, 0), VerticalAlignment = VerticalAlignment.Center };
         var toggle = new ToggleButton { VerticalAlignment = VerticalAlignment.Center };
         toggle.SetResourceReference(StyleProperty, "SwitchWithLabelStyle");
-        AutomationProperties.SetName(toggle, action.Name);
+        AutomationProperties.SetName(toggle, $"Show {action.Name} in Actions");
+        AutomationProperties.SetHelpText(toggle, "Changes the Actions gallery, not the Windows setting.");
         // Checked and Unchecked, not Click: UI Automation's Toggle raises no Click.
         toggle.Checked += (_, _) => { if (!_updating) _module.SetShown(action.Id, true); };
         toggle.Unchecked += (_, _) => { if (!_updating) _module.SetShown(action.Id, false); };
@@ -110,7 +110,8 @@ public sealed class QuickActionsSettingsPage : UserControl
         {
             string name = AppName(path);
             var remove = Button("Remove");
-            AutomationProperties.SetName(remove, $"Remove {name}");
+            AutomationProperties.SetName(remove, $"Remove {name} from kept apps");
+            remove.ToolTip = $"Allow {name} in Quit all";
             remove.Click += (_, _) => _module.Unkeep(path);
             _kept.Children.Add(Row(Mark(path, name), Text(name), remove));
         }

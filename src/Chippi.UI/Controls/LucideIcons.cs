@@ -106,6 +106,7 @@ public static class LucideIcons
     public static Geometry SkipForward { get; } = G("M5,4 L15,12 L5,20 Z M19,5 V19");
 
     // Quick actions (Phase 5.5).
+    public static Geometry Pencil { get; } = G("M21.174,6.812 a1,1 0 0 0 -3.986,-3.987 L3.842,16.174 a2,2 0 0 0 -.5,.83 l-1.321,4.352 a.5,.5 0 0 0 .623,.622 l4.353,-1.32 a2,2 0 0 0 .83,-.497 Z M15,5 l4,4");
     public static Geometry ToggleRight { get; } = G("M7,5 h10 a7,7 0 0 1 0,14 H7 A7,7 0 0 1 7,5 Z M14,12 a3,3 0 1 0 6,0 a3,3 0 1 0 -6,0");
     public static Geometry PanelBottom { get; } = G("M5,3 h14 a2,2 0 0 1 2,2 v14 a2,2 0 0 1 -2,2 H5 a2,2 0 0 1 -2,-2 V5 a2,2 0 0 1 2,-2 Z M3,15 h18");
     public static Geometry Screens { get; } = G("M8,3 h12 a2,2 0 0 1 2,2 v8 a2,2 0 0 1 -2,2 h-2 M4,7 h10 a2,2 0 0 1 2,2 v7 a2,2 0 0 1 -2,2 H4 a2,2 0 0 1 -2,-2 V9 a2,2 0 0 1 2,-2 Z M6,22 h6 M9,18 v4");
