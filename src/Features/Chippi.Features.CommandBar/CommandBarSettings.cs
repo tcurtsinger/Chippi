@@ -3,6 +3,7 @@
 
 using Chippi.Features.CommandBar.Search;
 using Chippi.Features.Sound.Mute;
+using System.Text.Json.Serialization;
 
 namespace Chippi.Features.CommandBar;
 
@@ -21,7 +22,21 @@ public static class WebEngines
 }
 
 /// <summary>A hidden result: its key, and its name and what it is, as Settings › Command bar › Hidden lists it.</summary>
-public sealed record HiddenResult(string Key, string Name, string Kind);
+public sealed record HiddenResult(string Key, string Name, string Kind)
+{
+    /// <summary>The original category, also recovered for hidden entries saved before category recovery existed.</summary>
+    [JsonIgnore]
+    public ResultSwitch Switch => Kind.Split(" · ")[0] switch
+    {
+        "App" => ResultSwitch.Apps,
+        "Window" => ResultSwitch.Windows,
+        "File" => ResultSwitch.Files,
+        "Windows Settings" => ResultSwitch.Settings,
+        "Clipboard" => ResultSwitch.Clipboard,
+        "Emoji" => ResultSwitch.Emoji,
+        _ => ResultSwitch.Chippi,
+    };
+}
 
 /// <summary>Settings › Command bar, and its shortcut in Settings › Shortcuts.</summary>
 public sealed record CommandBarSettings
@@ -34,7 +49,7 @@ public sealed record CommandBarSettings
     /// <summary>The kinds switched off in Results; every kind is on by default.</summary>
     public List<ResultSwitch> Off { get; init; } = [];
 
-    /// <summary>Hidden results, oldest first. Each stays hidden until Show.</summary>
+    /// <summary>Hidden results, oldest first. Each stays hidden until Show or inline Undo.</summary>
     public List<HiddenResult> Hidden { get; init; } = [];
 
     /// <summary>The shortcut; null once removed.</summary>

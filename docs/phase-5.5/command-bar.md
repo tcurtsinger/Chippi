@@ -15,9 +15,12 @@ One shortcut, a few letters, Enter: open an app, a window, a file or a Windows S
 ## The page
 
 - **The field is the header:** Back, then a 32-tall search field across the rest of the top row, its placeholder "Search", a search glyph at its start, the accent underline of a focused field. No title row.
-- **Results** under it: whole rows only, never scrolling, 8 at most. Each row is 34 tall: a 20 lead (an app's icon; a window, file, folder, Settings, Chippi, clipboard or math glyph; the emoji itself), the name in 12 over a second line in 11 tertiary saying what it is or where it lives ("App", "Chrome", "Downloads", "Windows Settings", "Chippi", "Copied today, 4:12 PM", "12 × 7"). The selected row sits on the accent tint with its verb at the right in the accent: Open, Switch, Run, Paste, Copy, Search.
+- **Results** under it: whole rows only, never scrolling, 8 at most. Each row is 34 tall: a 20 lead (the real app icon for apps and open windows; a file, folder, Settings, Chippi, clipboard or math glyph; the emoji itself), the name in 12 over a second line in 11 secondary saying what it is or where it lives ("App", "Chrome", "Downloads", "Windows Settings", "Chippi", "Copied today, 4:12 PM", "12 × 7"). App letters are the fallback while an icon loads or is unavailable. The selected row sits on the accent tint with its verb at the right in primary semibold ink: Open, Switch, Run, Paste, Copy, Search. Its detail uses primary ink at 82% opacity so it remains legible in either theme.
 - **Keys:** Up and Down move the selection; the pointer moves it too. Enter runs it and the panel closes. Esc clears the field, then closes the panel. Shift+Delete hides the selected result.
+- **Selection:** arriving results update the automatic first choice; once the user chooses a row, refreshes keep that result selected, including on the empty field. A pending command runs once. Its completion cannot close a newer Search visit or query. Keyboard focus stays in the field while accessibility exposes the result selection, action, position and failure.
 - **Empty field:** your most used, the same rows, no label.
+- **Feedback:** a temporary 24-tall line below results says "Searching files…", "No results", or "Files unavailable" with Retry. Other usable results remain available. A failed action keeps the result's identity and detail and gives its reason below when known, otherwise "Open failed · Try again" (or its corresponding verb). Nothing adds a permanent toolbar.
+- **Files:** same-name files with matching folder names show enough of their parent paths to distinguish them. Tooltips and accessibility names carry the full path.
 
 ## What it finds
 
@@ -39,13 +42,14 @@ Values and answers come first, then matches: what you pick most for the same let
 
 ## Hiding
 
-The selected row has an eye-off button at its end (Travis: the button and Shift+Delete). A hidden result never shows again until Settings › Command bar › Hidden brings it back. Values, answers and the web row can't be hidden.
+The selected row has an eye-off button at its end (Travis: the button and Shift+Delete). Hiding shows "Hidden" with Undo below the results until the query changes or the page closes. Undo restores and selects the result. Settings › Command bar › Hidden remains the later recovery path. Values, answers and the web row can't be hidden. Failed saves leave the result unchanged and show inline feedback.
 
 ## Settings › Command bar
 
-- **Web search:** Google (default), Bing or DuckDuckGo. Windows can't tell an app which engine the browser uses, so Chippi asks.
+- **Search engine:** Google (default), Bing or DuckDuckGo. Windows can't tell an app which engine the browser uses, so Chippi asks. The separate Web search switch controls whether web results appear.
 - **Results:** a switch per kind, all on.
-- **Hidden:** each hidden result, with what it is under it, and Show. "None" when there are none.
+- **Hidden:** each hidden result, with what it is under it, and Show. "None" when there are none. Show moves focus predictably to the next row. If its category is off, an explicit Enable action is available before and after restoring; Show never silently enables a category.
+- **Saving:** a failure restores the saved controls with inline feedback. Shortcut capture exits on Tab, Escape, Cancel, lost focus or unload. The saved keys stay visible alongside any error. Changing a shortcut restores its saved registration if persistence fails; if restoration also fails, it reports that the shortcut is inactive.
 
 ## Left out
 

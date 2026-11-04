@@ -266,6 +266,7 @@ public sealed class CommandBarTests
         var f = new Fixture();
         f.StartAsync().GetAwaiter().GetResult();
         var page = (CommandBarPage)f.Ui.Tiles[0].CreateSection();
+        typeof(CommandBarPage).GetMethod("Opened", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.Invoke(page, null);
         page.Field.Text = "12*"; // only the web row: it's selected
         page.Field.Text = "12*7"; // typing selects the answer that appears, not the web row still showing
         Assert.Equal(ResultKind.Answer, page.Shown[page.Selected].Kind);

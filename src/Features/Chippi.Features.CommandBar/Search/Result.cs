@@ -12,7 +12,7 @@ public enum ResultSwitch { Apps, Windows, Files, Settings, Chippi, Clipboard, Ma
 /// <summary>One row of the Command bar (docs/phase-5.5/command-bar.md, The page).</summary>
 /// <param name="Key">Identifies it across runs, for the uses that rank it and for hiding it ("app:Chrome").</param>
 /// <param name="Name">The row's name, in 12.</param>
-/// <param name="Detail">The second line, in 11 tertiary: what it is or where it lives.</param>
+/// <param name="Detail">The second line, in 11 secondary: what it is or where it lives.</param>
 /// <param name="Run">What Enter does. Called on the UI thread; a failure throws.</param>
 public sealed record Result(string Key, ResultKind Kind, string Name, string Detail, Func<Task> Run)
 {
@@ -28,13 +28,19 @@ public sealed record Result(string Key, ResultKind Kind, string Name, string Det
     /// <summary>The app whose icon is the lead: its Start menu parsing name.</summary>
     public string? App { get; init; }
 
+    /// <summary>The open window whose app icon is the lead.</summary>
+    public OpenWindow? Window { get; init; }
+
+    /// <summary>The full file or folder path, retained for tooltips and assistive technology.</summary>
+    public string? FullPath { get; init; }
+
     /// <summary>A small level bar beside the name, 0 to 1 ("Volume to 40%").</summary>
     public double? Level { get; init; }
 
     /// <summary>One of Chippi's pages or Settings: Open, not Run.</summary>
     public bool Opens { get; init; }
 
-    /// <summary>What the selected row says at its right, in the accent.</summary>
+    /// <summary>What the selected row says at its right.</summary>
     public string Verb => Kind switch
     {
         ResultKind.Value => "Run",

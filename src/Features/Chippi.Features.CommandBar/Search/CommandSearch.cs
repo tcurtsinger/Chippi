@@ -153,12 +153,39 @@ internal sealed class CommandSearch(
     public void Picked(string text, Result result) => uses.Picked(text, result.Key);
 
     // The fixed lists' rows run nothing until here, where the PC is at hand.
-    private IReadOnlyList<Result> Live(List<Result> rows) => [.. rows.Select(r => r.Kind switch
+    private IReadOnlyList<Result> Live(List<Result> rows)
     {
-        ResultKind.Settings => r with { Run = Open(r.Key["settings:".Length..]) },
-        ResultKind.Emoji => r with { Run = () => copy(r.Emoji!) },
-        _ => r,
-    })];
+        // A bare parent name is useful until two equally named files share it. Keep their identity visible.
+        var details = rows.Where(r => r.Kind == ResultKind.File)
+            .GroupBy(r => r.Name + "\0" + r.Detail, StringComparer.CurrentCultureIgnoreCase)
+            .Where(group => group.Count() > 1)
+            .SelectMany(group => group.Select(r => (r.Key, Detail: FileDetail(r, group))))
+            .ToDictionary(r => r.Key, r => r.Detail, StringComparer.Ordinal);
+        return [.. rows.Select(r => r.Kind switch
+        {
+            ResultKind.Settings => r with { Run = Open(r.Key["settings:".Length..]) },
+            ResultKind.Emoji => r with { Run = () => copy(r.Emoji!) },
+            ResultKind.File when details.TryGetValue(r.Key, out string? detail) => r with { Detail = detail },
+            _ => r,
+        })];
+    }
+
+    private static string FileDetail(Result file, IEnumerable<Result> peers)
+    {
+        static string Parent(Result row) => row.FullPath is { } path
+            ? Path.GetDirectoryName(path.TrimEnd('\\', '/')) ?? row.Detail : row.Detail;
+        string parent = Parent(file);
+        string[] parts = parent.Split(['\\', '/'], StringSplitOptions.RemoveEmptyEntries);
+        string[] otherParents = [.. peers.Where(r => r.Key != file.Key).Select(Parent)];
+        for (int count = 2; count <= parts.Length; count++)
+        {
+            string detail = string.Join("\\", parts[^count..]);
+            if (otherParents.All(other => !other.Equals(detail, StringComparison.OrdinalIgnoreCase)
+                && !other.EndsWith("\\" + detail, StringComparison.OrdinalIgnoreCase)))
+                return detail;
+        }
+        return parent;
+    }
 
     private List<Candidate> Apps()
     {
@@ -196,10 +223,11 @@ internal sealed class CommandSearch(
             pc.Switch(window.Handle);
             return Task.CompletedTask;
         })
-        { Words = window.App, Icon = "AppWindow" };
+        { Words = window.App, Window = window };
 
     private Result File(FoundFile file) =>
-        new("file:" + file.Path, ResultKind.File, file.Name, file.Folder, Open(file.Path)) { Icon = file.IsFolder ? "Folder" : "File" };
+        new("file:" + file.Path, ResultKind.File, file.Name, file.Folder, Open(file.Path))
+        { Icon = file.IsFolder ? "Folder" : "File", FullPath = file.Path };
 
     /// <summary>A file from your most used, while it's still there.</summary>
     private Result? FileFromKey(string key)

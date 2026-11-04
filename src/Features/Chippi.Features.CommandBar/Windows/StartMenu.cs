@@ -2,8 +2,10 @@
 // Copyright (C) Chippi contributors
 
 using System.Collections.Concurrent;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
+using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Chippi.Core.Diagnostics;
@@ -28,6 +30,7 @@ internal sealed class StartMenu : IDisposable
     private readonly BlockingCollection<Action> _work = [];
     private readonly Thread _thread;
     private readonly ConcurrentDictionary<(string, int), ImageSource?> _icons = new();
+    private readonly ConcurrentDictionary<(OpenWindow, int), ImageSource?> _windowIcons = new();
 
     public StartMenu()
     {
@@ -71,13 +74,81 @@ internal sealed class StartMenu : IDisposable
     /// <summary>A file's, a folder's or a program's icon (the Radial menu's slices), <paramref name="pixels"/> square; kept once read.</summary>
     public Task<ImageSource?> PathIconAsync(string path, int pixels) => IconOfAsync(path, pixels);
 
+    /// <summary>The window's own icon, then its executable's shell icon. Window messages are bounded and never on the UI thread.</summary>
+    public Task<ImageSource?> WindowIconAsync(OpenWindow window, int pixels)
+    {
+        var key = (window, pixels);
+        if (_windowIcons.TryGetValue(key, out var known))
+            return Task.FromResult(known);
+        return Run(() =>
+        {
+            // Titles can change frequently; old windows must not grow this cache for the life of the app.
+            if (_windowIcons.Count >= 128)
+                _windowIcons.Clear();
+            return _windowIcons.GetOrAdd(key, _ =>
+            {
+                if (WindowIcon(window.Handle, pixels) is { } icon)
+                    return icon;
+                // ApplicationFrameHost's own icon is not the hosted app's identity.
+                return window.IconPath is { Length: > 0 } path && !path.EndsWith(@"\ApplicationFrameHost.exe", StringComparison.OrdinalIgnoreCase)
+                    ? _icons.GetOrAdd((path, pixels), _ => TryIcon(path, pixels)) : null;
+            });
+        });
+    }
+
     private Task<ImageSource?> IconOfAsync(string parsing, int pixels)
     {
         var key = (parsing, pixels);
         if (_icons.TryGetValue(key, out var known))
             return Task.FromResult(known);
-        return Run(() => _icons.GetOrAdd(key, _ => Icon(parsing, pixels)));
+        return Run(() => _icons.GetOrAdd(key, _ => TryIcon(parsing, pixels)));
     }
+
+    private static ImageSource? TryIcon(string parsing, int pixels)
+    {
+        try { return Icon(parsing, pixels); }
+        catch (Exception ex) when (ex is COMException or IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            return null; // the app may have been removed since the Start menu was read
+        }
+    }
+
+    private static ImageSource? WindowIcon(nint window, int pixels)
+    {
+        const uint getIcon = 0x007F, abortIfHung = 0x0002, errorOnExit = 0x0020;
+        const int classIcon = -14, classSmallIcon = -34;
+        nint handle = 0;
+        foreach (nuint size in new nuint[] { 1, 2 }) // ICON_BIG, then ICON_SMALL2
+        {
+            if (SendMessageTimeout(window, getIcon, size, (nint)Math.Round(96d * pixels / 20), abortIfHung | errorOnExit, 100, out nuint found) == 0)
+                return null;
+            if (found != 0)
+            {
+                handle = (nint)found;
+                break;
+            }
+        }
+        if (handle == 0)
+            handle = ClassIcon(window, classIcon);
+        if (handle == 0)
+            handle = ClassIcon(window, classSmallIcon);
+        if (handle == 0)
+            return null;
+        nint owned = CopyIcon(handle);
+        if (owned == 0)
+            return null;
+        try
+        {
+            var image = Imaging.CreateBitmapSourceFromHIcon(owned, Int32Rect.Empty, BitmapSizeOptions.FromWidthAndHeight(pixels, pixels));
+            image.Freeze();
+            return image;
+        }
+        catch (Exception ex) when (ex is ArgumentException or COMException or InvalidOperationException) { return null; }
+        finally { DestroyIcon(owned); }
+    }
+
+    private static nint ClassIcon(nint window, int index) => IntPtr.Size == 8
+        ? GetClassLongPtr(window, index) : (nint)GetClassLong(window, index);
 
     private static unsafe ImageSource? Icon(string parsing, int pixels)
     {
@@ -160,6 +231,22 @@ internal sealed class StartMenu : IDisposable
 
     [StructLayout(LayoutKind.Sequential)]
     private readonly record struct Size32(int Width, int Height);
+
+    [DllImport("user32.dll", EntryPoint = "SendMessageTimeoutW")]
+    private static extern nint SendMessageTimeout(nint window, uint message, nuint wParam, nint lParam, uint flags, uint timeout, out nuint result);
+
+    [DllImport("user32.dll", EntryPoint = "GetClassLongPtrW")]
+    private static extern nint GetClassLongPtr(nint window, int index);
+
+    [DllImport("user32.dll", EntryPoint = "GetClassLongW")]
+    private static extern uint GetClassLong(nint window, int index);
+
+    [DllImport("user32.dll")]
+    private static extern nint CopyIcon(nint icon);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool DestroyIcon(nint icon);
 
     [DllImport("shell32.dll", CharSet = CharSet.Unicode, PreserveSig = false)]
     private static extern void SHCreateItemFromParsingName(string path, IntPtr bindContext, [MarshalAs(UnmanagedType.LPStruct)] Guid riid, [MarshalAs(UnmanagedType.Interface)] out object item);
