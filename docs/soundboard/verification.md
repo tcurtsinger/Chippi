@@ -22,6 +22,8 @@ The opt-in `SoundboardGalleryTimings` probe measures creation, layout and one of
 
 The improvement comes from creating nearby tile controls, retaining scroll position and caching the playing sound lookup. Every clip remains reachable through scrolling and keyboard navigation. Tests also cover reordering beyond the first viewport. These measurements do not prove native presentation frame rate; live dragging, focus, screen-reader navigation and playback remain owner checks.
 
+The owner's follow-up capture showed a violet outline after playback had ended. This was the template's unconditional focus border, not playback state. Tiles and quiet collection controls now use standard keyboard-only focus visuals, preserving focus and keyboard activation without a persistent mouse-click outline. The small style diff received independent review; all 272 Sound tests and both native Release builds passed again. No desktop input was used to verify it locally.
+
 ## Local evidence
 
 - **151 Audio tests passed.** Fake devices, pipelines, players and clocks cover voice-only mute, shared processing/bypass ownership, rapid replacement/Stop ordering, local-only preview, route changes, virtual-endpoint mute, stream teardown failures, surround-output channel mapping and bounded WAV reads.
@@ -37,7 +39,7 @@ The specialized Impeccable reviewer/documenter roles were unavailable. Separate 
 
 Both native runtimes include pinned yt-dlp and Node helpers with complete upstream license texts. Helper preparation verifies official archive sizes/hashes and extracted executable sizes/hashes. The x64 helpers passed offline version/flag checks. No installer, driver or app was launched for packaging verification. See the root release manifest for the final installer hashes.
 
-The refreshed 0.1.0 x64 and ARM64 packages were built from source `679095b12648966b8ebcacffe4a39f32c24c7ac1`. All twelve release artifact sizes and SHA-256 hashes were verified, along with both app/setup PE architectures, embedded source versions, all four archive CRCs, exact license contents, pinned VB-CABLE ZIP/setup, both RNNoise architectures, and each runtime's native yt-dlp/Node binaries. Verified copies are under `X:/code/chippi/build/artifacts/releases/0.1.0`. x64 Setup is 147,063,938 bytes; ARM64 Setup is 135,388,079 bytes. The publish hook contributes helpers before single-file bundling and copy classification so each helper and license keeps its own relative path.
+The refreshed 0.1.0 x64 and ARM64 packages were built from source `e00ff312ad9652f8a72f6d2824f9a686fb29b991`. All twelve release artifact sizes and SHA-256 hashes were verified, along with both app/setup PE architectures, embedded source versions, all four archive CRCs, exact license contents, pinned VB-CABLE ZIP/setup, both RNNoise architectures, and each runtime's native yt-dlp/Node binaries. Verified copies are under `X:/code/chippi/build/artifacts/releases/0.1.0`. x64 Setup is 147,063,994 bytes; ARM64 Setup is 135,388,027 bytes. The publish hook contributes helpers before single-file bundling and copy classification so each helper and license keeps its own relative path.
 
 ## Owner checks
 
