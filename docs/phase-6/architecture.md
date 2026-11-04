@@ -45,7 +45,9 @@ Rules for filters (the hub enforces what it can; review enforces the rest):
 - Actions run on the UI thread or a worker after the hook returns, as `WheelHook` does now.
 - A hook is installed only while an active filter needs its device, and comes off once the last swallowed key or button is up.
 - **Modifier masking:** after swallowing a chord that used Alt or Win, the hub sends one unassigned key (VK 0xE8) before the modifier's up, so Alt doesn't open the app's menu bar and Win doesn't open Start. PowerToys and AutoHotkey do the same. Shortcuts needs it.
+- **One clock:** filters time events with `Stopwatch.GetTimestamp()` taken on entry to the hook, never the event's own `time` field, which is millisecond-coarse and may tick at the system timer's 10 to 16 ms (as long as Debounce's windows). Tests inject a clock that wraps `Stopwatch`.
 - **Watchdog:** when `GetLastInputInfo` shows input the hub hasn't seen for 5 s while a hook should be in, reinstall it and log it, at most once a minute. Over an admin window the hub sees nothing by design (section 6), so a reinstall there costs nothing but a log line.
+- **Nothing stays held.** The hub keeps the set of modifiers Chippi has sent down and not yet up (Shortcuts' held modifiers, section 7). It sends their ups, as one batch marked as Chippi's, when the key that held them goes up, the filter turns off, Chippi quits, the watchdog finds the hook gone, the session locks or the desktop switches (`WTS_SESSION_LOCK`, `EVENT_SYSTEM_DESKTOPSWITCH`), a pause begins, or no key event arrives for 5 s while one is held. A crash skips all of these; a modifier it leaves down clears the next time that key is pressed and released. (A held key keeps repeating, so the 5 s timeout never cuts a real hold short.)
 
 Measure in the hub PR: the hook's time per event (target p99 under 50 microseconds) and Chippi's CPU over 60 s with the mouse moving, three readings, as AGENTS.md describes.
 
@@ -64,7 +66,8 @@ Travis (task 208): every verb is one shared action, and any door can fire it: an
 
 - It knows every shortcut Chippi owns, with its owner and name, so Settings › Shortcuts lists them from the service and flags clashes between Chippi's own, instead of seven hard-coded ids.
 - A failed `RegisterHotKey` means another app holds it, and the row says so.
-- `RegisterHotKey` works over admin windows and needs no hook. Win combos Windows reserves need the hub. Win+L and Ctrl+Alt+Del can't be taken at all.
+- `RegisterHotKey` works over admin windows and needs no hook.
+- **Win combos can be bound** (Marge's call). The service keeps a list of the combos Windows itself uses (Win+L, Ctrl+Alt+Del, Alt+Tab, Alt+F4 and Windows' own Win combos, Herb's `shortcuts.md`): one saves, shows "In use by Windows" and doesn't act. A free Win combo goes through `RegisterHotKey`, or through the hub when `RegisterHotKey` refuses it, with Win masked (section 2).
 - Clashes are found only with apps that also use `RegisterHotKey`; a game's own key binding isn't visible to Windows.
 - Shortcuts (Herb's brief) adds custom bindings, Caps Lock combos and mouse buttons on top. The App switcher's own shortcut is one of its rows.
 
@@ -77,11 +80,12 @@ Travis (tasks 198, 211): one **Always on** switch covers every Phase 6 input fea
 - **Windowed games** that don't cover their monitor aren't detected. Recommended (a call in [input-layer.md](input-layer.md)): one shared list, "Pause in these apps", that counts as fullscreen.
 - **Pause only stops new gestures.** A key or button swallowed before the game came to front still has its up swallowed, so nothing sticks.
 - **While paused,** a filter that's paused passes everything; when no unpaused filter needs a device, its hook comes off, so a game's input doesn't pass through Chippi at all.
-- **Covered:** Debounce, Close protection, Smooth scrolling, Shortcuts (key shortcuts too: they're unregistered while paused, so the game gets the key), Text snippets, Snap's Shift+drag zones, the App switcher's shortcut, Focus follows mouse.
+- **Covered:** Debounce, Close protection, Smooth scrolling, Shortcuts (key shortcuts too: they're unregistered while paused, so the game gets the key), Text snippets' typed abbreviations, Snap's Shift+drag zones, the App switcher's shortcut, Focus follows mouse.
 - **Focus follows mouse** uses Windows' own setting (section 7), so pausing it means Chippi turns that setting off while a fullscreen app is in front and back on after. Otherwise moving to the other monitor would pull focus out of the game.
 - **Not covered:**
   - The Radial menu. Settings › Radial menu gets its own switch for opening over fullscreen apps, on by default (task 211, #2). Off, its gesture filter passes everything while a fullscreen app is in front.
-  - Shortcuts that existed before Phase 6 (mic mute, output switch, Paste as plain text, Quick actions, Cleaning mode, Command bar). Mic mute in a game is their point.
+  - Shortcuts that existed before Phase 6 (mic mute, output switch, Paste as plain text, Quick actions, Cleaning mode, Search's Ctrl+Alt+Space). Mic mute in a game is their point.
+  - Search (the Command bar feature, the home's Search tile), and a snippet picked there (Marge's call): it's typed into the window Search opened over even when that's a fullscreen app, because it was chosen on purpose.
   - Cleaning mode's lock and the key recorder.
 
 ## 6. Limits every hook feature shares
@@ -105,11 +109,11 @@ Sizes: **S** about a day, **M** a few days, **L** a week or more, each one PR.
 
 **Smooth and linear scrolling: M, plus an app matrix.** The hub swallows a hardware wheel notch and sends small wheel deltas, marked as Chippi's, over the scroll's duration from a high-resolution timer at about the display rate. Ctrl+wheel and Shift+wheel pass untouched. Apps that treat every wheel message as a whole notch scroll far too fast, and browsers already smooth-scroll, so smoothing stacks: per-app speeds and the excluded-apps list ship in the first build (task 211, #8). Linear is a curve inside Smooth scrolling, not its own feature. Only wheel mice; touchpads and pens pass.
 
-**Debounce: S.** Second filter in the hub. Drops a down that follows the same button's or key's up within the threshold, and that down's up. Key auto-repeat (downs with no up) always passes. Sends nothing. Key debounce tops out at 200 ms.
+**Debounce: S.** Second filter in the hub. Drops a down that follows the same button's or key's up within the threshold, and that down's up, timed on the hub's `Stopwatch` clock (section 2). Key auto-repeat (downs with no up) always passes. Sends nothing. Key debounce tops out at 200 ms.
 
 **Shortcuts (Mouse buttons, Super key and Shortcut manager as one feature): L, in two PRs.**
 - Key shortcuts on the shortcut service, plus the Settings › Shortcuts page with every binding and its clashes.
-- Hook triggers: Caps Lock combos and mouse buttons (Middle, Back, Forward, wheel tilt, optionally with a held modifier, per app). The hub swallows Caps Lock (no toggle, no light) and its repeats, and a button's down and up; the binding runs a `ChippiAction`. A sent chord is one `SendInput` batch, down and up together, so a crash can't leave a modifier stuck. No mouse-button drag gestures (task 211, #9). Right Alt isn't offered and Win isn't in the default set (#10). If a binding sends Ctrl+Alt+Shift+Win, that's Windows' "Office key", which opens Office apps with W, X, P and others; Herb's brief settles it. Over admin windows Caps Lock toggles as normal.
+- Hook triggers: Caps Lock combos and mouse buttons (Middle, Back, Forward, wheel tilt, optionally with a held modifier, per app). The hub swallows Caps Lock (no toggle, no light) and its repeats, and a button's down and up; the binding runs a `ChippiAction`. A key with no binding passes with the held modifiers down (Ctrl+Alt+Shift by default, or the ones set in Hold modifiers), always while the Caps Lock door is on: the modifiers go down with the key and up with it, and the hub's release path (section 2) covers every other way out. A chord a binding sends is one `SendInput` batch, down and up together. No mouse-button drag gestures (task 211, #9). Right Alt isn't offered and Win isn't in the default set (#10). If a binding sends Ctrl+Alt+Shift+Win, that's Windows' "Office key", which opens Office apps with W, X, P and others; Herb's brief settles it. Over admin windows Caps Lock toggles as normal.
 
 **Text snippets: M engine, M editor.** The hub's snippet watcher reads typed characters into a buffer as long as the longest abbreviation, using `ToUnicodeEx` with the flag that leaves keyboard state alone (Windows 10 1607 and later), so dead keys and accents keep working. It never swallows a key. On a match the UI thread checks the focused field isn't a password (UI Automation `IsPassword`), then sends backspaces and types the text with `KEYEVENTF_UNICODE` (the Text action), in chunks, since one long batch drops characters in some apps (Remote Desktop, some terminals). Never pasted, so the clipboard is untouched (task 211, #11). The buffer is memory only, never logged, and clears on a click, a focus change and after each expansion. Skipped while an IME is composing.
 
@@ -118,7 +122,7 @@ Sizes: **S** about a day, **M** a few days, **L** a week or more, each one PR.
 | Level | Runs where | Covers |
 |---|---|---|
 | Pure filters on an injected clock | CI | Debounce timing, Caps Lock tap and hold, snippet matching, the double Alt+F4, the scroll curve, button sharing with the Radial gesture, pause rules |
-| The hub with a fake input source and a recording sender | CI | Order, swallowed down means swallowed up, Chippi's marker passes, masking, hooks coming off, the watchdog |
+| The hub with a fake input source and a recording sender | CI | Order, swallowed down means swallowed up, Chippi's marker passes, masking, hooks coming off, the watchdog, the held-modifier release on every way out |
 | Test-owned windows on the desktop | Local and CI | Snap's math and `SetWindowPos` on the tests' own windows, the switcher's list and thumbnails of its own windows, switcher shots |
 | Windows Sandbox (`.wsb`, clipboard redirection and networking off; the hub PR builds the runner) | Local, by an agent | Real hooks: a probe sends `SendInput` without Chippi's marker, so it counts as a hand's, into a test app and reads what arrived. Snippets in Notepad, Caps Lock combos, debounce on fast synthetic double clicks, the scroll stream into a test view, Shift+drag to a zone, the Focus follows mouse setting |
 | Travis's live checks | His desk, at a time he sets | How scrolling feels, his real buttons, both monitors and their scales, the app matrix, a game with Always on off and on |

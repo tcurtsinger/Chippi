@@ -18,7 +18,7 @@ Give every Phase 6 feature one way to listen to the keyboard and mouse, one list
 - **Always on off:** while a fullscreen game or app is the window in front, every Phase 6 input feature pauses: Debounce, Close protection, Smooth scrolling, Shortcuts' bindings, Text snippets, Snap's Shift+drag zones, the App switcher's shortcut and Focus follows mouse. Clicking a window on the other monitor brings it to front, so they act there again.
 - **Always on on:** they act everywhere, games included.
 - **Pause in these apps:** apps that count as fullscreen even in a window, for games that don't cover the screen.
-- **Never paused:** the Radial menu (its own switch, below), shortcuts that existed before Phase 6 (mic mute, the output switch, Paste as plain text, Quick actions, Cleaning mode, Search), Cleaning mode's lock.
+- **Never paused:** the Radial menu (its own switch, below), shortcuts that existed before Phase 6 (mic mute, the output switch, Paste as plain text, Quick actions, Cleaning mode, Search's Ctrl+Alt+Space), Cleaning mode's lock, and Search itself (the Command bar): a snippet picked in Search is typed into the window Search opened over even when that's a fullscreen app, since it was chosen on purpose (Marge's call).
 - Always on is also a switch in Actions' menu of Phase 6 switches; Lumen's mockup (task 212) names it there.
 
 **Settings › Radial menu › Opening:** a new switch row, **Open over fullscreen apps**, on by default, which keeps today's behavior. Off, the triggers reach the game as plain clicks and keys while a fullscreen app is in front.
@@ -29,6 +29,8 @@ Give every Phase 6 feature one way to listen to the keyboard and mouse, one list
 
 - **The Radial menu is unchanged:** same triggers, same 250 ms hold, the click still reaches the app, the same virtual pointer in games. Cleaning mode's lock and recording a shortcut in Settings are unchanged too.
 - **Pausing never leaves anything stuck.** A key or button Chippi swallowed before a game came to front still has its release swallowed.
+- **No modifier stays held.** Any modifier Chippi has sent down (Shortcuts' Caps Lock combos, wave 2: with Caps Lock held, a key with no binding passes with the held modifiers, Ctrl+Alt+Shift by default) is released with its key, and also when the feature turns off, Chippi quits, the hook is found gone, the session locks or the desktop switches, a pause begins, or no key event arrives for 5 seconds. Wave 1 builds and tests this release path; the hub owns it ([architecture.md](architecture.md) §2).
+- **Timing:** filters time each key and button on Chippi's own high-resolution clock, taken as the hook is called, not the coarse timestamp Windows attaches. Debounce depends on it.
 - **While paused, the game's input doesn't pass through Chippi at all** when nothing unpaused needs that device: the hook comes off.
 - **Shortcuts that pause are released to the game:** while paused, Chippi gives the key back, so the game sees it.
 - **Focus follows mouse** is Windows' own setting, so pausing it turns that setting off while the fullscreen app is in front and back on after.
@@ -46,7 +48,7 @@ Give every Phase 6 feature one way to listen to the keyboard and mouse, one list
 
 Three PRs, in order. All three change shared code (Core, App, Chippi.UI and the Radial menu), and the first adds two projects to `Chippi.slnx`.
 
-1. **The hub:** new `Chippi.Input` and `Chippi.Input.Tests`. One keyboard and one mouse hook on one thread, filters in a fixed order, modifier masking, the watchdog. The Radial gesture, the key recorder and Cleaning mode's lock move onto it. The Windows Sandbox runner for real-hook checks.
+1. **The hub:** new `Chippi.Input` and `Chippi.Input.Tests`. One keyboard and one mouse hook on one thread, filters in a fixed order, one `Stopwatch` clock (injected in tests), modifier masking, the held-modifier release path, the watchdog. The Radial gesture, the key recorder and Cleaning mode's lock move onto it. The Windows Sandbox runner for real-hook checks.
 2. **Shared actions and shortcuts:** the Radial menu's action kinds, runner and picker lifted to Core and `Chippi.UI`; window verbs take a target (under the pointer, in front, or in front before the island opened); `IsOn` on Chippi's commands; Actions accepts tiles other features add. `GlobalMicHotkey` becomes Core's shortcut service, and Settings › Shortcuts reads its list.
 3. **The pause:** the fullscreen check lifted from the island to Core, Always on and Pause in these apps, the Radial menu's new switch.
 
@@ -56,6 +58,7 @@ Three PRs, in order. All three change shared code (Core, App, Chippi.UI and the 
 - **Cost:** the hook's time per event, p99 under 50 microseconds, and Chippi's CPU over 60 s with the mouse moving, three readings, against main.
 - **Pause:** in the Sandbox, with a borderless window covering the screen in front, a paused filter passes everything and the hook comes off; with Always on, it acts; a key held across the switch has no stuck release. Same for an app on Pause in these apps.
 - **Watchdog:** a test unhooks the hub behind its back and sees it reinstalled.
+- **Release path:** hub tests with a fake source and a recording sender hold a modifier, then trigger each way out (its key up, the filter off, quit, the hook gone, a lock, a desktop switch, a pause, 5 s without key events) and see exactly one up for it each time.
 - **Shots:** the three Settings rows, dark and light, next to Lumen's mockup if there is one.
 - **Not run here:** admin windows (needs a UAC prompt) and anti-cheat.
 
