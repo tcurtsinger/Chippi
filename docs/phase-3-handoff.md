@@ -38,7 +38,7 @@ Research behind this brief, archived at the end of the phase: `X:\code\chippi-sc
 - **VB-CABLE is recognized by device identity**, not by "cable" in a name.
 - **Gate default** −36.5 dB (Hopper's). The mockup's −50 is sample data.
 - **Crash recovery:** before taking a capture role, processing records what it replaced. A normal stop, module removal and app uninstall restore it; the next launch restores it after a crash. No watchdog process. Limit, documented: after a crash the cable stays the default mic until Chippi runs again.
-- **Fights over defaults** with other software: repair as Hopper does, back off after 3 repairs in 10 s, and log it.
+- **Default changes (revised 2026-11-03):** output routing honors a new active output selected outside Chippi until an output connects or disconnects, an explicit output routing action in Chippi, or restart. Capture and Processing retain drift repair, backing off after 3 repairs in 10 s. See [Audio recovery verification](audio-recovery-verification.md).
 
 **Mute**
 - The shortcut mutes every mic unless all are already muted, then it unmutes all. New mics are muted while the latch is on, and a pipeline rebuild never unmutes.

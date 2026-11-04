@@ -104,11 +104,13 @@ public sealed class AudioService
     /// <paramref name="owner"/> claims <paramref name="roles"/> of <paramref name="flow"/> (and gives up
     /// that flow's other roles). <paramref name="target"/> runs on the engine thread at every
     /// reconcile, so it must only read its argument and data it captured.
+    /// Background list refreshes can preserve an output choice made in Windows; explicit user
+    /// choices should leave <paramref name="preserveExternalChoice"/> false to apply their target now.
     /// </summary>
-    public Task ClaimRolesAsync(RoleOwner owner, AudioFlow flow, IReadOnlyCollection<AudioRole> roles, RoleTarget target) =>
+    public Task ClaimRolesAsync(RoleOwner owner, AudioFlow flow, IReadOnlyCollection<AudioRole> roles, RoleTarget target, bool preserveExternalChoice = false) =>
         Run(e =>
         {
-            e.Arbiter.Claim(owner, flow, roles, target);
+            e.Arbiter.Claim(owner, flow, roles, target, preserveExternalChoice);
             e.Reconcile();
             return true;
         });

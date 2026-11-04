@@ -40,7 +40,7 @@ public sealed class IslandPanelTests
 
     private static void WithPanel(Action<IslandPanelWindow> test, IReadOnlyList<IslandTileGroup>? tiles = null)
     {
-        var panel = new IslandPanelWindow { ActivateWindow = _ => { } };
+        var panel = new IslandPanelWindow { ActivateWindow = _ => { }, IsForegroundWindow = _ => true };
         try
         {
             panel.Initialize();

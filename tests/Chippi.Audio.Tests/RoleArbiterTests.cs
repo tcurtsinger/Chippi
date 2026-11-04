@@ -54,10 +54,10 @@ public class RoleArbiterTests
     }
 
     [Fact]
-    public void Only_drifted_roles_are_repaired()
+    public void Only_drifted_capture_roles_are_repaired()
     {
-        _sys.With(Speaker("A"), Speaker("B")).WithDefault("A");
-        _arbiter.Claim(RoleOwner.Routing, AudioFlow.Render, All, List("A"));
+        _sys.With(Mic("A"), Mic("B")).WithDefault("A");
+        _arbiter.Claim(RoleOwner.Routing, AudioFlow.Capture, All, List("A"));
         Enforce();
         _sys.ChangeDefault("B", AudioRole.Communications);
 
@@ -110,7 +110,9 @@ public class RoleArbiterTests
         Assert.Equal("Phone", Default(AudioFlow.Render, AudioRole.Communications));
 
         _sys.ChangeDefault("Phone", AudioRole.Console);
-        Assert.Equal([AudioRole.Console], Assert.Single(Enforce()).Roles);
+        Assert.Empty(Enforce());
+        Assert.Equal("Phone", Default(AudioFlow.Render, AudioRole.Console));
+        Assert.Equal("A", Default(AudioFlow.Render, AudioRole.Multimedia));
     }
 
     [Fact]
@@ -142,8 +144,8 @@ public class RoleArbiterTests
     public void Repeated_repairs_back_off_then_resume()
     {
         AudioRole[] mm = [AudioRole.Multimedia];
-        _sys.With(Speaker("A"), Speaker("B")).WithDefault("A");
-        _arbiter.Claim(RoleOwner.Routing, AudioFlow.Render, mm, List("A"));
+        _sys.With(Mic("A"), Mic("B")).WithDefault("A");
+        _arbiter.Claim(RoleOwner.Routing, AudioFlow.Capture, mm, List("A"));
         Enforce();
 
         for (var i = 0; i < RoleArbiter.MaxRepairs; i++)
@@ -156,19 +158,19 @@ public class RoleArbiterTests
         _clock.Advance(TimeSpan.FromSeconds(1));
         _sys.ChangeDefault("B", mm);
         Assert.Empty(Enforce());
-        Assert.Equal("B", Default(AudioFlow.Render));
+        Assert.Equal("B", Default(AudioFlow.Capture));
 
         _clock.Advance(RoleArbiter.BackoffPeriod);
         Assert.Equal(RoleChangeKind.Repair, Assert.Single(Enforce()).Kind);
-        Assert.Equal("A", Default(AudioFlow.Render));
+        Assert.Equal("A", Default(AudioFlow.Capture));
     }
 
     [Fact]
     public void Back_off_expires_even_when_the_role_is_already_right_again()
     {
         AudioRole[] mm = [AudioRole.Multimedia];
-        _sys.With(Speaker("A"), Speaker("B")).WithDefault("A");
-        _arbiter.Claim(RoleOwner.Routing, AudioFlow.Render, mm, List("A"));
+        _sys.With(Mic("A"), Mic("B")).WithDefault("A");
+        _arbiter.Claim(RoleOwner.Routing, AudioFlow.Capture, mm, List("A"));
         Enforce();
         for (var i = 0; i <= RoleArbiter.MaxRepairs; i++)
         {
@@ -188,8 +190,8 @@ public class RoleArbiterTests
     public void Repairs_spread_over_more_than_the_window_never_back_off()
     {
         AudioRole[] mm = [AudioRole.Multimedia];
-        _sys.With(Speaker("A"), Speaker("B")).WithDefault("A");
-        _arbiter.Claim(RoleOwner.Routing, AudioFlow.Render, mm, List("A"));
+        _sys.With(Mic("A"), Mic("B")).WithDefault("A");
+        _arbiter.Claim(RoleOwner.Routing, AudioFlow.Capture, mm, List("A"));
         Enforce();
 
         for (var i = 0; i < 6; i++)
@@ -275,5 +277,79 @@ public class RoleArbiterTests
 
         Assert.Empty(Enforce());
         Assert.Equal("B", Default(AudioFlow.Render));
+
+        // The unchanged default is not an external pick: retry the failed request.
+        _sys.Failing.Clear();
+        Assert.Single(Enforce());
+        Assert.Equal("A", Default(AudioFlow.Render));
+    }
+
+    [Fact]
+    public void Windows_output_choices_hold_per_role_without_writes_or_notifications()
+    {
+        _sys.With(Speaker("A"), Speaker("B"), Speaker("C")).WithDefault("A");
+        _arbiter.Claim(RoleOwner.Routing, AudioFlow.Render, All, List("A", "B", "C"));
+        Enforce();
+
+        foreach (var id in new[] { "B", "C" })
+        {
+            _sys.ChangeDefault(id, AudioRole.Multimedia);
+            Assert.Empty(Enforce());
+            Assert.Empty(Enforce());
+            Assert.Equal(id, Default(AudioFlow.Render));
+            Assert.Equal("A", Default(AudioFlow.Render, AudioRole.Console));
+        }
+        Assert.Empty(_sys.Writes);
+    }
+
+    [Fact]
+    public void Output_topology_changes_end_external_choices_and_restore_priority()
+    {
+        _sys.With(Speaker("A"), Speaker("B")).WithDefault("A");
+        _arbiter.Claim(RoleOwner.Routing, AudioFlow.Render, All, List("A", "B"));
+        Enforce();
+        _sys.ChangeDefault("B");
+        Assert.Empty(Enforce());
+
+        // Even a lower-priority output arriving ends the temporary choice.
+        _sys.Connect(Speaker("C"));
+        Assert.Single(Enforce());
+        Assert.Equal("A", Default(AudioFlow.Render));
+        _sys.ChangeDefault("B");
+        Assert.Empty(Enforce());
+        _sys.Disconnect("C");
+        Assert.Single(Enforce());
+        Assert.Equal("A", Default(AudioFlow.Render));
+    }
+
+    [Fact]
+    public void Explicit_claim_ends_external_choice_but_a_background_refresh_preserves_it()
+    {
+        _sys.With(Speaker("A"), Speaker("B"), Speaker("C")).WithDefault("A");
+        _arbiter.Claim(RoleOwner.Routing, AudioFlow.Render, All, List("A"));
+        Enforce();
+        _sys.ChangeDefault("B");
+        Assert.Empty(Enforce());
+
+        _arbiter.Claim(RoleOwner.Routing, AudioFlow.Render, All, List("A"), preserveExternalChoice: true);
+        Assert.Empty(Enforce());
+        Assert.Equal("B", Default(AudioFlow.Render));
+
+        _arbiter.Claim(RoleOwner.Routing, AudioFlow.Render, All, List("C"));
+        Assert.Equal(RoleChangeKind.Claim, Assert.Single(Enforce()).Kind);
+        Assert.Equal("C", Default(AudioFlow.Render));
+        Assert.Empty(Enforce()); // The successful write's echo is not a new override.
+    }
+
+    [Fact]
+    public void An_inactive_default_is_not_adopted_as_an_external_choice()
+    {
+        _sys.With(Speaker("A"), Speaker("B") with { State = EndpointState.Unplugged }).WithDefault("A");
+        _arbiter.Claim(RoleOwner.Routing, AudioFlow.Render, All, List("A"));
+        Enforce();
+        _sys.ChangeDefault("B");
+
+        Assert.Single(Enforce());
+        Assert.Equal("A", Default(AudioFlow.Render));
     }
 }
