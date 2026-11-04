@@ -36,6 +36,13 @@ internal sealed class CommandBarPage : UserControl
     private readonly Grid _status = new() { Height = 24, Margin = new Thickness(10, 0, 6, 0), Visibility = Visibility.Collapsed };
     private readonly TextBlock _statusText = Ui.Text(size: 11, brush: "IslandTextSecondaryBrush");
     private readonly DispatcherTimer _filesTimer;
+    private readonly List<RowView> _rendered = [];
+    private IPc? _subscribedPc;
+    private Action? _appsChanged;
+    private Action? _settingsChanged;
+    private bool _filesEnabled;
+    private Button? _statusButton;
+    private string? _statusActionKey;
     private IReadOnlyList<Result> _shown = [];
     private IReadOnlyList<OpenWindow> _windows = [];
     private IReadOnlyList<FoundFile> _files = [];
@@ -49,6 +56,7 @@ internal sealed class CommandBarPage : UserControl
     private long _visit;
     private long _queryVersion;
     private long _runVersion;
+    private long _renderVersion;
     private string? _running;
     private string? _failed; // the key of the row whose run failed, until the next change
     private string? _failure;
@@ -77,12 +85,7 @@ internal sealed class CommandBarPage : UserControl
             else
                 Deactivate();
         };
-        Loaded += (_, _) => { if (_module.Pc is { } pc) pc.AppsChanged += OnAppsChanged; };
-        Unloaded += (_, _) =>
-        {
-            if (_module.Pc is { } pc) pc.AppsChanged -= OnAppsChanged;
-            Deactivate();
-        };
+        Unloaded += (_, _) => Deactivate();
     }
 
     /// <summary>The page's header, the field: it takes the keyboard as the page opens.</summary>
@@ -113,6 +116,7 @@ internal sealed class CommandBarPage : UserControl
     {
         Deactivate();
         _active = true;
+        Subscribe();
         _failed = null;
         _failure = null;
         _saveFailure = null;
@@ -139,26 +143,68 @@ internal sealed class CommandBarPage : UserControl
     internal void Deactivate()
     {
         _active = false;
-        _visit++;
+        Interlocked.Increment(ref _visit);
         _running = null;
         CancelFiles();
+        if (_subscribedPc is { } pc && _appsChanged is { } appsChanged)
+            pc.AppsChanged -= appsChanged;
+        _subscribedPc = null;
+        _appsChanged = null;
+        if (_settingsChanged is { } settingsChanged)
+            _module.Changed -= settingsChanged;
+        _settingsChanged = null;
     }
 
     private void CancelFiles()
     {
         _filesTimer.Stop();
-        _finding?.Cancel();
-        _finding = null; // the request owns and disposes its cancellation source
+        // A module stop can arrive off the UI thread as a completed request disposes its own source.
+        var finding = Interlocked.Exchange(ref _finding, null);
+        try { finding?.Cancel(); }
+        catch (ObjectDisposedException) { }
     }
 
-    private void OnAppsChanged() => Dispatcher.BeginInvoke(() =>
+    private void Subscribe()
     {
-        if (IsVisible)
-            Refresh();
-    });
+        long visit = _visit;
+        _filesEnabled = !_module.Settings.Off.Contains(ResultSwitch.Files);
+        if (_module.Pc is { } pc)
+        {
+            _subscribedPc = pc;
+            _appsChanged = () => Dispatch(() => { if (_active && visit == _visit) Refresh(); });
+            pc.AppsChanged += _appsChanged;
+        }
+        _settingsChanged = () => Dispatch(() => { if (_active && visit == _visit) SettingsChanged(); });
+        _module.Changed += _settingsChanged;
+    }
+
+    private void Dispatch(Action action)
+    {
+        if (Dispatcher.CheckAccess()) action();
+        else Dispatcher.BeginInvoke(action);
+    }
+
+    private void SettingsChanged()
+    {
+        bool filesEnabled = !_module.Settings.Off.Contains(ResultSwitch.Files);
+        if (_filesEnabled != filesEnabled)
+        {
+            _filesEnabled = filesEnabled;
+            CancelFiles();
+            _files = [];
+            _filesFor = "";
+            _filesUnavailable = false;
+            _searchingFiles = filesEnabled && Field.Text.Trim().Length >= 2;
+            if (_searchingFiles) _filesTimer.Start();
+        }
+        if (_hidden is { } hidden && !_module.Settings.Hidden.Exists(result => result.Key == hidden.Key))
+            _hidden = null;
+        Refresh();
+    }
 
     private void Typed()
     {
+        if (!_active) return;
         _queryVersion++;
         _failed = null;
         _failure = null;
@@ -175,7 +221,7 @@ internal sealed class CommandBarPage : UserControl
     private async void FindFiles()
     {
         CancelFiles();
-        if (_module.Pc is not { } pc)
+        if (!_active || _module.Pc is not { } pc)
             return;
         string text = Field.Text.Trim();
         if (text.Length < 2 || _module.Settings.Off.Contains(ResultSwitch.Files))
@@ -197,7 +243,7 @@ internal sealed class CommandBarPage : UserControl
             _searchingFiles = false;
             Refresh();
         }
-        catch (OperationCanceledException) { }
+        catch (OperationCanceledException) when (finding.IsCancellationRequested || visit != _visit || queryVersion != _queryVersion) { }
         catch (Exception ex)
         {
             if (finding.IsCancellationRequested || visit != _visit || queryVersion != _queryVersion)
@@ -229,7 +275,7 @@ internal sealed class CommandBarPage : UserControl
         _shown = search.Find(text, _windows, _filesFor == text ? _files : []);
         int at = selected is null ? -1 : IndexOf(selected);
         _selected = at >= 0 ? at : 0;
-        Render();
+        Render(rebuild: true);
     }
 
     private int IndexOf(string key)
@@ -265,6 +311,7 @@ internal sealed class CommandBarPage : UserControl
 
     private void Select(int index)
     {
+        if (_running is not null) return;
         _deliberateSelection = true;
         if (index == _selected)
             return;
@@ -361,12 +408,24 @@ internal sealed class CommandBarPage : UserControl
         Field.Focus();
     }
 
-    private void Render()
+    private void Render(bool rebuild = false)
     {
-        _rows.Children.Clear();
-        _rows.Items.Clear();
-        for (int i = 0; i < _shown.Count; i++)
-            _rows.Children.Add(Row(_shown[i], i));
+        if (rebuild)
+        {
+            _renderVersion++;
+            _rows.Children.Clear();
+            _rows.Items.Clear();
+            _rendered.Clear();
+            foreach (var result in _shown)
+            {
+                var row = Row(result);
+                _rendered.Add(row);
+                _rows.Children.Add(row.Root);
+                _rows.Items.Add(row.Button);
+            }
+        }
+        for (int i = 0; i < _rendered.Count; i++)
+            UpdateRow(_rendered[i], i);
         RenderStatus();
         AnnounceSelection();
     }
@@ -376,7 +435,9 @@ internal sealed class CommandBarPage : UserControl
         string text;
         string? action = null;
         Action? invoke = null;
-        if (_saveFailure is { } saveFailure)
+        if (_running is not null && !_shown.Any(result => result.Key == _running))
+            text = "Working…";
+        else if (_saveFailure is { } saveFailure)
         {
             text = saveFailure;
             if (_hidden is not null) { action = "Undo"; invoke = UndoHidden; }
@@ -404,16 +465,31 @@ internal sealed class CommandBarPage : UserControl
         _statusText.Text = text;
         _statusText.ToolTip = text;
         _status.Visibility = text.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
-        while (_status.Children.Count > 1)
-            _status.Children.RemoveAt(1);
-        if (action is not null && invoke is not null)
+        string? actionKey = action is null ? null : $"{_visit}|{_queryVersion}|{action}|{_hidden?.Key}";
+        if (actionKey != _statusActionKey)
         {
-            var button = new Button { Content = action, Height = 24, MinWidth = 44, Padding = new Thickness(8, 0, 8, 0), FontSize = 11 };
-            button.SetResourceReference(StyleProperty, "IslandListRowStyle");
-            AutomationProperties.SetName(button, action == "Undo" ? $"Undo hiding {_hidden?.Name}" : "Retry file search");
-            button.Click += (_, _) => invoke();
-            Grid.SetColumn(button, 1);
-            _status.Children.Add(button);
+            bool focused = _statusButton?.IsKeyboardFocusWithin == true;
+            if (_statusButton is not null) _status.Children.Remove(_statusButton);
+            _statusButton = null;
+            _statusActionKey = actionKey;
+            if (action is not null && invoke is not null)
+            {
+                long visit = _visit, queryVersion = _queryVersion;
+                string? hiddenKey = _hidden?.Key;
+                var button = new Button { Content = action, Height = 24, MinWidth = 44, Padding = new Thickness(8, 0, 8, 0), FontSize = 11 };
+                button.SetResourceReference(StyleProperty, "IslandListRowStyle");
+                AutomationProperties.SetName(button, action == "Undo" ? $"Undo hiding {_hidden?.Name}" : "Retry file search");
+                button.Click += (_, _) =>
+                {
+                    if (ReferenceEquals(_statusButton, button) && _active && visit == _visit && queryVersion == _queryVersion
+                        && (action == "Undo" ? hiddenKey == _hidden?.Key : _filesUnavailable))
+                        invoke();
+                };
+                Grid.SetColumn(button, 1);
+                _status.Children.Add(button);
+                _statusButton = button;
+            }
+            if (focused) Field.Focus();
         }
         if (changed)
             UIElementAutomationPeer.FromElement(_statusText)?.RaiseAutomationEvent(AutomationEvents.LiveRegionChanged);
@@ -421,7 +497,8 @@ internal sealed class CommandBarPage : UserControl
 
     private void AnnounceSelection()
     {
-        string help = _selected < _shown.Count
+        string help = _running is not null ? "Working. Wait for this action to finish."
+            : _selected < _shown.Count
             ? $"{AccessibleName(_shown[_selected])}, {_selected + 1} of {_shown.Count}. Up and Down to choose; Enter to {_shown[_selected].Verb.ToLowerInvariant()}."
             : _statusText.Text;
         bool changed = AutomationProperties.GetHelpText(Field) != help;
@@ -437,23 +514,20 @@ internal sealed class CommandBarPage : UserControl
 
     // A row: the 20 lead, the name in 12 over its detail in 11, a level bar for a volume, and the selected row's
     // verb in primary semibold ink at its right with the eye-off button at its end.
-    private UIElement Row(Result result, int index)
+    private RowView Row(Result result)
     {
-        long visit = _visit;
-        long queryVersion = _queryVersion;
+        long visit = _visit, queryVersion = _queryVersion, renderVersion = _renderVersion;
         void Choose()
         {
             int at = IndexOf(result.Key);
-            if (_active && visit == _visit && queryVersion == _queryVersion && at >= 0) Select(at);
+            if (_active && visit == _visit && queryVersion == _queryVersion && renderVersion == _renderVersion && at >= 0) Select(at);
         }
         void Execute()
         {
-            if (_active && visit == _visit && queryVersion == _queryVersion && IndexOf(result.Key) >= 0) Run(result);
+            if (_active && visit == _visit && queryVersion == _queryVersion && renderVersion == _renderVersion && IndexOf(result.Key) >= 0) Run(result);
         }
-        bool selected = index == _selected;
         var name = Ui.Text(result.Name, 12);
-        var detail = Ui.Text(result.Detail, 11, selected ? "IslandTextBrush" : "IslandTextSecondaryBrush");
-        if (selected) detail.Opacity = 0.82;
+        var detail = Ui.Text(result.Detail, 11, "IslandTextSecondaryBrush");
         var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Children = { name, detail } };
         var line = new Grid();
         line.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -471,26 +545,16 @@ internal sealed class CommandBarPage : UserControl
             Grid.SetColumn(bar, 2);
             line.Children.Add(bar);
         }
-        if (selected)
-        {
-            var verb = Ui.Text(_running == result.Key ? "Working…" : result.Verb, 11);
-            verb.FontWeight = FontWeights.SemiBold;
-            verb.Margin = new Thickness(10, 0, result.CanHide ? 28 : 0, 0);
-            Grid.SetColumn(verb, 3);
-            line.Children.Add(verb);
-        }
+        var verb = Ui.Text(result.Verb, 11);
+        verb.FontWeight = FontWeights.SemiBold;
+        Grid.SetColumn(verb, 3);
+        line.Children.Add(verb);
         var button = new SearchResultButton(_rows, Choose, Execute)
         {
             Content = line, Height = RowHeight, Padding = new Thickness(10, 0, 10, 0), Focusable = false,
-            ToolTip = result.FullPath ?? $"{result.Name}\n{result.Detail}", Tag = selected ? "Selected" : null,
-            IsSelected = selected, IsEnabled = _running is null,
+            ToolTip = result.FullPath ?? $"{result.Name}\n{result.Detail}",
         };
-        _rows.Items.Add(button);
         button.SetResourceReference(StyleProperty, "IslandListRowStyle");
-        AutomationProperties.SetName(button, AccessibleName(result));
-        AutomationProperties.SetPositionInSet(button, index + 1);
-        AutomationProperties.SetSizeOfSet(button, _shown.Count);
-        AutomationProperties.SetItemStatus(button, result.Key == _failed ? _failure : _running == result.Key ? "Working" : selected ? "Selected" : "");
         if (result.CanHide)
             AutomationProperties.SetHelpText(button, "Shift+Delete to hide. Undo is available after hiding.");
         button.Click += (_, _) => Execute();
@@ -503,16 +567,49 @@ internal sealed class CommandBarPage : UserControl
             _pointer = at;
             Choose();
         };
-        if (!selected || !result.CanHide || _running is not null)
-            return button;
+        if (!result.CanHide)
+            return new RowView(result, button, button, detail, verb, null);
         var hide = Ui.Icon(LucideIcons.EyeOff, $"Hide {result.Name}", "Hide");
         hide.HorizontalAlignment = HorizontalAlignment.Right;
         hide.VerticalAlignment = VerticalAlignment.Center;
         hide.Margin = new Thickness(0, 0, 6, 0);
-        hide.Click += (_, _) => { if (_active && visit == _visit && queryVersion == _queryVersion) Hide(result); };
+        hide.Click += (_, _) =>
+        {
+            if (_active && visit == _visit && queryVersion == _queryVersion && renderVersion == _renderVersion) Hide(result);
+        };
         button.HideAction = hide;
-        return new Grid { Children = { button, hide } };
+        return new RowView(result, new Grid { Children = { button, hide } }, button, detail, verb, hide);
     }
+
+    private void UpdateRow(RowView row, int index)
+    {
+        bool selected = index == _selected;
+        bool running = _running == row.Result.Key;
+        bool hide = selected && row.Result.CanHide && _running is null;
+        row.Detail.SetResourceReference(TextBlock.ForegroundProperty, selected ? "IslandTextBrush" : "IslandTextSecondaryBrush");
+        row.Detail.Opacity = selected ? 0.82 : 1;
+        row.Verb.Text = running ? "Working…" : row.Result.Verb;
+        row.Verb.Visibility = selected && (_running is null || running) ? Visibility.Visible : Visibility.Collapsed;
+        row.Verb.Margin = new Thickness(10, 0, hide ? 28 : 0, 0);
+        if (row.Hide is not null)
+        {
+            var visibility = hide ? Visibility.Visible : Visibility.Collapsed;
+            bool changed = row.Hide.Visibility != visibility;
+            row.Hide.Visibility = visibility;
+            if (changed) UIElementAutomationPeer.FromElement(row.Button)?.InvalidatePeer();
+        }
+        row.Button.Tag = selected ? "Selected" : null;
+        row.Button.IsEnabled = _running is null;
+        row.Button.SetSelected(selected);
+        AutomationProperties.SetName(row.Button, AccessibleName(row.Result));
+        AutomationProperties.SetPositionInSet(row.Button, index + 1);
+        AutomationProperties.SetSizeOfSet(row.Button, _shown.Count);
+        AutomationProperties.SetItemStatus(row.Button, row.Result.Key == _failed ? _failure : running ? "Working" : selected ? "Selected" : "");
+        if (row.Result.CanHide)
+            AutomationProperties.SetHelpText(row.Button, _running is null ? "Shift+Delete to hide. Undo is available after hiding." : "");
+    }
+
+    private sealed record RowView(Result Result, UIElement Root, SearchResultButton Button, TextBlock Detail, TextBlock Verb, Button? Hide);
 
     private FrameworkElement Lead(Result result)
     {

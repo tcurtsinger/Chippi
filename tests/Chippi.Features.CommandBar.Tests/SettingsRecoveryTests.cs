@@ -2,6 +2,7 @@
 // Copyright (C) Chippi contributors
 
 using System.IO;
+using System.Text.Json;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
@@ -22,6 +23,44 @@ namespace Chippi.Features.CommandBar.Tests;
 /// <summary>Settings recovery using in-memory storage and shortcuts; no windows or system actions.</summary>
 public sealed class SettingsRecoveryTests
 {
+    [Theory]
+    [InlineData("{\"Off\":null,\"Hidden\":null,\"WebSearch\":99}")]
+    [InlineData("{\"Off\":[999,999],\"Hidden\":[null,{\"Key\":null,\"Name\":\"Broken\",\"Kind\":\"App\"}]}")]
+    public void Incomplete_saved_settings_open_safely_without_overwriting_the_saved_file(string json) => WpfTestThread.Run(() =>
+    {
+        var saved = JsonSerializer.Deserialize<CommandBarSettings>(json)!;
+        using var f = new Fixture(saved);
+        Assert.Empty(f.Module.Settings.Off);
+        Assert.Empty(f.Module.Settings.Hidden);
+        Assert.Equal(WebEngine.Google, f.Module.Settings.WebSearch);
+        var view = new CommandBarSettingsPage(f.Module);
+        Assert.Single(Find<ComboBox>(view));
+        Assert.NotNull(f.Module.Search!.Find("hello", [], []));
+        Assert.Same(saved, f.Store.Value);
+        Assert.Equal(0, f.Store.Writes);
+    });
+
+    [Fact]
+    public void Normalization_preserves_valid_choices_and_one_copy_of_each_hidden_result() => WpfTestThread.Run(() =>
+    {
+        var saved = JsonSerializer.Deserialize<CommandBarSettings>("""
+            {"WebSearch":1,"Shortcut":null,"Off":[0,0,999],"Hidden":[
+              {"Key":"app:Chrome","Name":"Chrome","Kind":"App"},
+              {"Key":"app:Chrome","Name":"Chrome duplicate","Kind":"App"},
+              {"Key":"app:Bad","Name":"Bad","Kind":null},
+              {"Key":"app:Blank","Name":" ","Kind":"App"}]}
+            """)!;
+        using var f = new Fixture(saved);
+        Assert.Equal(WebEngine.Bing, f.Module.Settings.WebSearch);
+        Assert.Null(f.Module.Settings.Shortcut);
+        Assert.Equal([ResultSwitch.Apps], f.Module.Settings.Off);
+        Assert.Equal("Chrome", Assert.Single(f.Module.Settings.Hidden).Name);
+        var view = new CommandBarSettingsPage(f.Module);
+        Assert.Single(Find<Button>(view), b => AutomationProperties.GetName(b) == "Show Chrome");
+        Assert.Equal(4, saved.Hidden.Count);
+        Assert.Equal(0, f.Store.Writes);
+    });
+
     [Fact]
     public void A_failed_engine_or_category_write_restores_the_control_and_retry_clears_its_error() => WpfTestThread.Run(() =>
     {
@@ -272,8 +311,9 @@ public sealed class SettingsRecoveryTests
         internal FakeHotkey Hotkey { get; } = new();
         internal CommandBarModule Module { get; }
         internal int Summoned;
-        internal Fixture()
+        internal Fixture(CommandBarSettings? saved = null)
         {
+            if (saved is not null) Store.Value = saved;
             Module = new CommandBarModule(() => new NoPc(), () => Hotkey);
             Module.StartAsync(new ModuleContext(CommandBarModule.Id, Store, NullLogger.Instance,
                 new IslandActivityHub().CreatePublisher(CommandBarModule.Id), new NoUi())

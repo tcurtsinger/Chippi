@@ -29,11 +29,21 @@ internal sealed class StartMenu : IDisposable
 
     private readonly BlockingCollection<Action> _work = [];
     private readonly Thread _thread;
-    private readonly ConcurrentDictionary<(string, int), ImageSource?> _icons = new();
-    private readonly ConcurrentDictionary<(OpenWindow, int), ImageSource?> _windowIcons = new();
+    private readonly object _iconsGate = new();
+    private readonly Dictionary<(string, int), Task<ImageSource?>> _icons = [];
+    private readonly Dictionary<(nint, string?, int), Task<ImageSource?>> _windowIcons = [];
+    private readonly Func<IReadOnlyList<StartApp>> _readApps;
+    private readonly Func<string, int, ImageSource?> _readIcon;
+    private readonly Func<nint, int, ImageSource?> _readWindowIcon;
+    private int _stopped;
 
-    public StartMenu()
+    public StartMenu() : this(Read, TryIcon, WindowIcon) { }
+
+    internal StartMenu(Func<IReadOnlyList<StartApp>> readApps, Func<string, int, ImageSource?> readIcon, Func<nint, int, ImageSource?> readWindowIcon)
     {
+        _readApps = readApps;
+        _readIcon = readIcon;
+        _readWindowIcon = readWindowIcon;
         _thread = new Thread(() =>
         {
             foreach (var work in _work.GetConsumingEnumerable())
@@ -48,25 +58,53 @@ internal sealed class StartMenu : IDisposable
     }
 
     /// <summary>Every app, by name, without duplicates of the same name and target.</summary>
-    public Task<IReadOnlyList<StartApp>> ReadAsync() => Run<IReadOnlyList<StartApp>>(() =>
+    public Task<IReadOnlyList<StartApp>> ReadAsync() => Run(() =>
+    {
+        var apps = _readApps();
+        // A fresh app list can recover an icon that was unavailable during installation or startup.
+        lock (_iconsGate)
+        {
+            RemoveMissing(_icons);
+            RemoveMissing(_windowIcons);
+        }
+        return apps;
+    });
+
+    private static void RemoveMissing<TKey>(Dictionary<TKey, Task<ImageSource?>> icons) where TKey : notnull
+    {
+        foreach (var key in icons.Where(pair => pair.Value.IsCompleted
+            && (!pair.Value.IsCompletedSuccessfully || pair.Value.Result is null)).Select(pair => pair.Key).ToArray())
+            icons.Remove(key);
+    }
+
+    private static IReadOnlyList<StartApp> Read()
     {
         var folder = Item("shell:AppsFolder");
-        folder.BindToHandler(IntPtr.Zero, EnumItems, typeof(IEnumShellItems).GUID, out object found);
-        var items = (IEnumShellItems)found;
         var apps = new List<StartApp>();
-        var one = new IShellItem[1];
-        while (items.Next(1, one, out uint fetched) == 0 && fetched == 1)
+        try
         {
-            var item = one[0];
-            string? name = Name(item, NormalDisplay), parsing = Name(item, ParentRelativeParsing);
-            if (!string.IsNullOrWhiteSpace(name) && !string.IsNullOrWhiteSpace(parsing))
-                apps.Add(new StartApp(name, parsing));
-            Marshal.ReleaseComObject(item);
+            folder.BindToHandler(IntPtr.Zero, EnumItems, typeof(IEnumShellItems).GUID, out object found);
+            try
+            {
+                var items = (IEnumShellItems)found;
+                var one = new IShellItem[1];
+                while (items.Next(1, one, out uint fetched) == 0 && fetched == 1)
+                {
+                    var item = one[0];
+                    try
+                    {
+                        string? name = Name(item, NormalDisplay), parsing = Name(item, ParentRelativeParsing);
+                        if (!string.IsNullOrWhiteSpace(name) && !string.IsNullOrWhiteSpace(parsing))
+                            apps.Add(new StartApp(name, parsing));
+                    }
+                    finally { Marshal.ReleaseComObject(item); }
+                }
+            }
+            finally { Marshal.ReleaseComObject(found); }
         }
-        Marshal.ReleaseComObject(items);
-        Marshal.ReleaseComObject(folder);
+        finally { Marshal.ReleaseComObject(folder); }
         return [.. apps.DistinctBy(a => (a.Name, a.ParsingName)).OrderBy(a => a.Name, StringComparer.CurrentCultureIgnoreCase)];
-    });
+    }
 
     /// <summary>The app's icon, <paramref name="pixels"/> square; kept once read.</summary>
     public Task<ImageSource?> IconAsync(StartApp app, int pixels) => IconOfAsync(@"shell:AppsFolder\" + app.ParsingName, pixels);
@@ -77,31 +115,35 @@ internal sealed class StartMenu : IDisposable
     /// <summary>The window's own icon, then its executable's shell icon. Window messages are bounded and never on the UI thread.</summary>
     public Task<ImageSource?> WindowIconAsync(OpenWindow window, int pixels)
     {
-        var key = (window, pixels);
-        if (_windowIcons.TryGetValue(key, out var known))
-            return Task.FromResult(known);
-        return Run(() =>
+        lock (_iconsGate)
         {
-            // Titles can change frequently; old windows must not grow this cache for the life of the app.
+            // The icon belongs to the app, not its changing document title. Keep pending reads shared too.
+            var key = (window.Handle, window.IconPath, pixels);
+            if (_windowIcons.TryGetValue(key, out var known))
+                return known;
             if (_windowIcons.Count >= 128)
-                _windowIcons.Clear();
-            return _windowIcons.GetOrAdd(key, _ =>
+                foreach (var old in _windowIcons.Where(pair => pair.Value.IsCompleted).Select(pair => pair.Key).ToArray())
+                    _windowIcons.Remove(old);
+            return _windowIcons[key] = Run(() =>
             {
-                if (WindowIcon(window.Handle, pixels) is { } icon)
+                if (_readWindowIcon(window.Handle, pixels) is { } icon)
                     return icon;
                 // ApplicationFrameHost's own icon is not the hosted app's identity.
                 return window.IconPath is { Length: > 0 } path && !path.EndsWith(@"\ApplicationFrameHost.exe", StringComparison.OrdinalIgnoreCase)
-                    ? _icons.GetOrAdd((path, pixels), _ => TryIcon(path, pixels)) : null;
+                    ? _readIcon(path, pixels) : null;
             });
-        });
+        }
     }
 
     private Task<ImageSource?> IconOfAsync(string parsing, int pixels)
     {
-        var key = (parsing, pixels);
-        if (_icons.TryGetValue(key, out var known))
-            return Task.FromResult(known);
-        return Run(() => _icons.GetOrAdd(key, _ => TryIcon(parsing, pixels)));
+        lock (_iconsGate)
+        {
+            var key = (parsing, pixels);
+            if (_icons.TryGetValue(key, out var known))
+                return known;
+            return _icons[key] = Run(() => _readIcon(parsing, pixels));
+        }
     }
 
     private static ImageSource? TryIcon(string parsing, int pixels)
@@ -215,11 +257,19 @@ internal sealed class StartMenu : IDisposable
     private Task<T> Run<T>(Func<T> read)
     {
         var done = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
+        if (Volatile.Read(ref _stopped) != 0)
+            return Task.FromException<T>(new ObjectDisposedException(nameof(StartMenu)));
         try
         {
             _work.Add(() =>
             {
-                try { done.SetResult(read()); }
+                try
+                {
+                    ObjectDisposedException.ThrowIf(Volatile.Read(ref _stopped) != 0, this);
+                    T result = read();
+                    ObjectDisposedException.ThrowIf(Volatile.Read(ref _stopped) != 0, this);
+                    done.SetResult(result);
+                }
                 catch (Exception ex) { done.SetException(ex); }
             });
         }
@@ -227,7 +277,18 @@ internal sealed class StartMenu : IDisposable
         return done.Task;
     }
 
-    public void Dispose() => _work.CompleteAdding();
+    public void Dispose()
+    {
+        if (Interlocked.Exchange(ref _stopped, 1) != 0) return;
+        _work.CompleteAdding();
+        // Settle queued callers now; the stop guard prevents their shell delegates from running.
+        while (_work.TryTake(out var skipped)) skipped();
+        lock (_iconsGate)
+        {
+            _icons.Clear();
+            _windowIcons.Clear();
+        }
+    }
 
     [StructLayout(LayoutKind.Sequential)]
     private readonly record struct Size32(int Width, int Height);

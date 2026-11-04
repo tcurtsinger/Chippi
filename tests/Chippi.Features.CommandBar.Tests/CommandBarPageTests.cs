@@ -315,6 +315,134 @@ public sealed class CommandBarPageTests
         Assert.Equal("Chrome", f.Page.Field.Text);
     });
 
+    [Fact]
+    public void Selection_preserves_result_controls_icon_requests_and_the_undo_control() => WpfTestThread.Run(() =>
+    {
+        using var f = new Fixture();
+        f.Page.Field.Text = "Chrome";
+        var rows = Elements(f.Page).OfType<SearchResultButton>().ToArray();
+        int appIcons = f.Pc.AppIconRequests.Count, windowIcons = f.Pc.WindowIconRequests.Count;
+        Press(f.Page, Key.Down);
+        Press(f.Page, Key.Up);
+        Assert.Equal(rows, Elements(f.Page).OfType<SearchResultButton>().ToArray());
+        Assert.Equal(appIcons, f.Pc.AppIconRequests.Count);
+        Assert.Equal(windowIcons, f.Pc.WindowIconRequests.Count);
+
+        Press(f.Page, Key.Delete, ModifierKeys.Shift);
+        var undo = Assert.Single(Elements(f.Page).OfType<Button>(), button => Equals(button.Content, "Undo"));
+        Press(f.Page, Key.Down);
+        Press(f.Page, Key.Up);
+        Assert.Same(undo, Assert.Single(Elements(f.Page).OfType<Button>(), button => Equals(button.Content, "Undo")));
+    });
+
+    [Fact]
+    public void Stopping_the_module_detaches_the_page_from_the_original_provider_before_unload() => WpfTestThread.Run(() =>
+    {
+        using var f = new Fixture();
+        Assert.Equal(1, f.Pc.AppSubscribers);
+        f.Module.StopAsync(default).GetAwaiter().GetResult();
+        Assert.Equal(0, f.Pc.AppSubscribers);
+        f.Page.RaiseEvent(new RoutedEventArgs(FrameworkElement.UnloadedEvent));
+        Assert.Equal(0, f.Pc.AppSubscribers);
+    });
+
+    [Fact]
+    public void A_provider_cancellation_that_we_did_not_request_offers_retry_instead_of_loading_forever() => WpfTestThread.Run(() =>
+    {
+        using var f = new Fixture();
+        f.Pc.Find = (_, _) => Task.FromException<IReadOnlyList<FoundFile>>(new OperationCanceledException("Provider timed out"));
+        f.Page.Field.Text = "budget";
+        FindFiles(f.Page);
+        Assert.Contains("Files unavailable", Texts(f.Page));
+        Assert.DoesNotContain(Texts(f.Page), text => text.StartsWith("Searching files", StringComparison.Ordinal));
+        Assert.Contains(Elements(f.Page).OfType<Button>(), button => Equals(button.Content, "Retry"));
+    });
+
+    [Fact]
+    public void Changing_file_settings_while_searching_cancels_old_work_and_reenabling_searches_again() => WpfTestThread.Run(() =>
+    {
+        using var f = new Fixture();
+        var old = new TaskCompletionSource<IReadOnlyList<FoundFile>>();
+        f.Pc.Find = (_, _) => old.Task;
+        f.Page.Field.Text = "budget";
+        FindFiles(f.Page);
+        f.Module.SetOn(ResultSwitch.Files, false);
+        old.SetResult([Budget]);
+        Drain();
+        Assert.DoesNotContain(f.Page.Shown, result => result.Kind == ResultKind.File);
+        Assert.DoesNotContain(Texts(f.Page), text => text.StartsWith("Searching files", StringComparison.Ordinal));
+
+        f.Pc.Find = (_, _) => Task.FromResult<IReadOnlyList<FoundFile>>([Budget]);
+        f.Module.SetOn(ResultSwitch.Files, true);
+        FindFiles(f.Page);
+        Assert.Contains(f.Page.Shown, result => result.Kind == ResultKind.File);
+    });
+
+    [Fact]
+    public void Changing_the_engine_updates_live_results_and_invalidates_a_queued_old_destination() => WpfTestThread.Run(() =>
+    {
+        using var f = new Fixture();
+        f.Page.Field.Text = "budget";
+        var old = Assert.Single(Elements(f.Page).OfType<SearchResultButton>());
+        Assert.IsAssignableFrom<IInvokeProvider>(UIElementAutomationPeer.CreatePeerForElement(old).GetPattern(PatternInterface.Invoke)).Invoke();
+        f.Module.SetWebSearch(WebEngine.Bing);
+        Drain();
+        Assert.Empty(f.Pc.Opened);
+        Assert.Equal("Bing", f.Selected.Detail);
+        f.Page.Run(f.Selected);
+        Assert.Equal("https://www.bing.com/search?q=budget", Assert.Single(f.Pc.Opened));
+    });
+
+    [Fact]
+    public void Pending_work_keeps_its_selection_and_remains_visible_after_typing_a_new_query() => WpfTestThread.Run(() =>
+    {
+        using var f = new Fixture();
+        var finished = new TaskCompletionSource();
+        f.Alpha = () => finished.Task;
+        f.Page.Run(f.Selected);
+        string running = f.Selected.Key;
+        Press(f.Page, Key.Down);
+        Assert.Equal(running, f.Selected.Key);
+        Assert.Contains("Working…", Texts(f.Page));
+        Assert.DoesNotContain("Enter", AutomationProperties.GetHelpText(f.Page.Field), StringComparison.Ordinal);
+        f.Page.Field.Text = "Chrome";
+        Assert.Contains("Working…", Texts(f.Page));
+        Assert.All(Elements(f.Page).OfType<SearchResultButton>(), button => Assert.False(button.IsEnabled));
+        finished.SetResult();
+        Drain();
+        Assert.Equal(0, f.Closed);
+        Assert.All(Elements(f.Page).OfType<SearchResultButton>(), button => Assert.True(button.IsEnabled));
+    });
+
+    [Fact]
+    public void A_queued_retry_cannot_start_a_different_query() => WpfTestThread.Run(() =>
+    {
+        using var f = new Fixture();
+        f.Pc.Find = (_, _) => Task.FromException<IReadOnlyList<FoundFile>>(new IOException("Unavailable"));
+        f.Page.Field.Text = "budget";
+        FindFiles(f.Page);
+        var retry = Assert.Single(Elements(f.Page).OfType<Button>(), button => Equals(button.Content, "Retry"));
+        Assert.IsAssignableFrom<IInvokeProvider>(UIElementAutomationPeer.CreatePeerForElement(retry).GetPattern(PatternInterface.Invoke)).Invoke();
+        f.Page.Field.Text = "c"; // Does not start file search itself.
+        Drain();
+        Assert.Equal(1, f.Pc.FindCalls);
+    });
+
+    [Fact]
+    public void A_queued_undo_cannot_restore_a_more_recently_hidden_result() => WpfTestThread.Run(() =>
+    {
+        using var f = new Fixture();
+        f.Page.Field.Text = "Chrome";
+        Press(f.Page, Key.Delete, ModifierKeys.Shift);
+        var undo = Assert.Single(Elements(f.Page).OfType<Button>(), button => Equals(button.Content, "Undo"));
+        Assert.IsAssignableFrom<IInvokeProvider>(UIElementAutomationPeer.CreatePeerForElement(undo).GetPattern(PatternInterface.Invoke)).Invoke();
+        f.Page.Field.Text = "Alpha";
+        Press(f.Page, Key.Delete, ModifierKeys.Shift);
+        Drain();
+        Assert.Contains(f.Settings.Value.Hidden, result => result.Name == "Alpha");
+        Assert.Contains(f.Settings.Value.Hidden, result => result.Name == "Chrome");
+    });
+
     private static readonly FoundFile Budget = new(@"C:\Work\Reports\Budget.xlsx", "Budget.xlsx", "Reports", false);
 
     private static void FindFiles(CommandBarPage page) => Invoke(page, "FindFiles");
@@ -406,7 +534,9 @@ public sealed class CommandBarPageTests
         public List<string> Opened { get; } = [];
         public List<nint> WindowIconRequests { get; } = [];
         public IReadOnlyList<StartApp> Apps { get; } = [new("Chrome", "Chrome")];
-        public event Action? AppsChanged { add { } remove { } }
+        private Action? _appsChanged;
+        public int AppSubscribers => _appsChanged?.GetInvocationList().Length ?? 0;
+        public event Action? AppsChanged { add => _appsChanged += value; remove => _appsChanged -= value; }
         public void RefreshApps() { }
         public IReadOnlyList<OpenWindow> Windows() => [new(42, "Project notes", "Chrome")];
         public Task<IReadOnlyList<FoundFile>> FindFilesAsync(string text, int count, CancellationToken ct)

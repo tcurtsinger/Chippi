@@ -17,10 +17,11 @@ One shortcut, a few letters, Enter: open an app, a window, a file or a Windows S
 - **The field is the header:** Back, then a 32-tall search field across the rest of the top row, its placeholder "Search", a search glyph at its start, the accent underline of a focused field. No title row.
 - **Results** under it: whole rows only, never scrolling, 8 at most. Each row is 34 tall: a 20 lead (the real app icon for apps and open windows; a file, folder, Settings, Chippi, clipboard or math glyph; the emoji itself), the name in 12 over a second line in 11 secondary saying what it is or where it lives ("App", "Chrome", "Downloads", "Windows Settings", "Chippi", "Copied today, 4:12 PM", "12 × 7"). App letters are the fallback while an icon loads or is unavailable. The selected row sits on the accent tint with its verb at the right in primary semibold ink: Open, Switch, Run, Paste, Copy, Search. Its detail uses primary ink at 82% opacity so it remains legible in either theme.
 - **Keys:** Up and Down move the selection; the pointer moves it too. Enter runs it and the panel closes. Esc clears the field, then closes the panel. Shift+Delete hides the selected result.
-- **Selection:** arriving results update the automatic first choice; once the user chooses a row, refreshes keep that result selected, including on the empty field. A pending command runs once. Its completion cannot close a newer Search visit or query. Keyboard focus stays in the field while accessibility exposes the result selection, action, position and failure.
+- **Selection:** arriving results update the automatic first choice; once the user chooses a row, refreshes keep that result selected, including on the empty field. Selection updates reuse the row controls and loaded icons. A pending command runs once and retains its Working feedback until completion. Its completion cannot close a newer Search visit or query. Keyboard focus stays in the field while accessibility exposes the result selection, action, position and failure.
 - **Empty field:** your most used, the same rows, no label.
 - **Feedback:** a temporary 24-tall line below results says "Searching files…", "No results", or "Files unavailable" with Retry. Other usable results remain available. A failed action keeps the result's identity and detail and gives its reason below when known, otherwise "Open failed · Try again" (or its corresponding verb). Nothing adds a permanent toolbar.
 - **Files:** same-name files with matching folder names show enough of their parent paths to distinguish them. Tooltips and accessibility names carry the full path.
+- **Background work:** file lookups have a five-second deadline and a single native query at a time. Retry remains available after an unexpected cancellation or timeout; changing text or closing Search cancels quietly. Icon requests for the same app share pending work, and a later app refresh retries missing icons. Closed views detach their subscriptions; changed Settings apply to an open Search view.
 
 ## What it finds
 
@@ -50,6 +51,7 @@ The selected row has an eye-off button at its end (Travis: the button and Shift+
 - **Results:** a switch per kind, all on.
 - **Hidden:** each hidden result, with what it is under it, and Show. "None" when there are none. Show moves focus predictably to the next row. If its category is off, an explicit Enable action is available before and after restoring; Show never silently enables a category.
 - **Saving:** a failure restores the saved controls with inline feedback. Shortcut capture exits on Tab, Escape, Cancel, lost focus or unload. The saved keys stay visible alongside any error. Changing a shortcut restores its saved registration if persistence fails; if restoration also fails, it reports that the shortcut is inactive.
+- **Recovery on load:** incomplete collections, duplicate or invalid hidden entries, and invalid saved enum values are normalized in memory while valid choices are retained. Loading does not rewrite the saved file.
 
 ## Left out
 

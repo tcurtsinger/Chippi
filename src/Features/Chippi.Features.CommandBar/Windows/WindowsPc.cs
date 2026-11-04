@@ -21,15 +21,24 @@ public sealed class WindowsPc : IPc
 {
     private const string SearchConnection = "Provider=Search.CollatorDSO;Extended Properties=\"Application=Windows\"";
 
-    private readonly StartMenu _startMenu = new();
+    private readonly StartMenu _startMenu;
     private readonly ConcurrentDictionary<string, string> _appNames = new(StringComparer.OrdinalIgnoreCase);
     private IReadOnlyList<StartApp> _apps = [];
     private int _reading;
     private readonly Func<string, int, CancellationToken, IReadOnlyList<FoundFile>> _query;
+    private readonly SemaphoreSlim _fileQuery = new(1, 1);
+    private readonly CancellationTokenSource _stopping = new();
+    private readonly TimeSpan _fileTimeout;
+    private int _disposed;
 
     public WindowsPc() : this(Query) { }
 
-    internal WindowsPc(Func<string, int, CancellationToken, IReadOnlyList<FoundFile>> query) => _query = query;
+    internal WindowsPc(Func<string, int, CancellationToken, IReadOnlyList<FoundFile>> query, StartMenu? startMenu = null, TimeSpan? fileTimeout = null)
+    {
+        _query = query;
+        _startMenu = startMenu ?? new();
+        _fileTimeout = fileTimeout ?? TimeSpan.FromSeconds(5);
+    }
 
     public IReadOnlyList<StartApp> Apps => Volatile.Read(ref _apps);
 
@@ -37,15 +46,20 @@ public sealed class WindowsPc : IPc
 
     public void RefreshApps()
     {
-        if (Interlocked.Exchange(ref _reading, 1) == 1)
+        if (Volatile.Read(ref _disposed) != 0 || Interlocked.Exchange(ref _reading, 1) == 1)
             return;
         _ = Task.Run(async () =>
         {
             try
             {
-                Volatile.Write(ref _apps, await _startMenu.ReadAsync());
-                AppsChanged?.Invoke();
+                var apps = await _startMenu.ReadAsync();
+                if (Volatile.Read(ref _disposed) == 0)
+                {
+                    Volatile.Write(ref _apps, apps);
+                    AppsChanged?.Invoke();
+                }
             }
+            catch (ObjectDisposedException) when (Volatile.Read(ref _disposed) != 0) { }
             catch (Exception ex) { Log.Warn("Command bar: reading the Start menu failed", ex); }
             finally { Volatile.Write(ref _reading, 0); }
         });
@@ -137,6 +151,11 @@ public sealed class WindowsPc : IPc
 
     public async Task<IReadOnlyList<FoundFile>> FindFilesAsync(string text, int count, CancellationToken ct)
     {
+        ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
+        var caller = ct;
+        using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(ct, _stopping.Token);
+        lifetime.CancelAfter(_fileTimeout);
+        ct = lifetime.Token;
         ct.ThrowIfCancellationRequested();
         // Each word a prefix of a word in the name: "chr set" finds ChromeSetup.exe's "chromesetup", not "set" inside it.
         var words = text.Split(' ', StringSplitOptions.RemoveEmptyEntries)
@@ -146,7 +165,23 @@ public sealed class WindowsPc : IPc
             .ToList();
         if (words.Count == 0 || count <= 0)
             return [];
-        try { return await Task.Run(() => _query(string.Join(" AND ", words), count, ct), ct); }
+        // A canceled native query can take a moment to stop. New typing waits asynchronously instead of stacking workers.
+        try
+        {
+            await _fileQuery.WaitAsync(ct);
+            var query = Task.Run(() => _query(string.Join(" AND ", words), count, ct), ct);
+            // Keep the gate until native work really ends, even if the caller timed out or changed the text.
+            _ = query.ContinueWith(completed =>
+            {
+                if (completed.IsFaulted) _ = completed.Exception;
+                _fileQuery.Release();
+            }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+            return await query.WaitAsync(ct);
+        }
+        catch (OperationCanceledException ex) when (!caller.IsCancellationRequested && Volatile.Read(ref _disposed) == 0)
+        {
+            throw new FileSearchUnavailableException(new TimeoutException("Windows Search timed out", ex));
+        }
         catch (OperationCanceledException) { throw; }
         catch (Exception ex)
         {
@@ -162,11 +197,19 @@ public sealed class WindowsPc : IPc
         using var connection = new OleDbConnection(SearchConnection);
         connection.Open();
         // Start menu shortcuts are the apps' own rows.
-        using var command = new OleDbCommand(
+        ct.ThrowIfCancellationRequested();
+        var command = new OleDbCommand(
             $"SELECT TOP {count} System.ItemPathDisplay, System.ItemNameDisplay, System.ItemFolderNameDisplay, System.ItemType FROM SystemIndex " +
-            $"WHERE SCOPE='file:' AND System.ItemType <> '.lnk' AND CONTAINS(System.FileName, '{words}') ORDER BY System.Search.Rank DESC", connection);
-        using var cancel = ct.Register(() => { try { command.Cancel(); } catch (Exception) { } });
-        using var reader = command.ExecuteReader();
+            $"WHERE SCOPE='file:' AND System.ItemType <> '.lnk' AND CONTAINS(System.FileName, '{words}') ORDER BY System.Search.Rank DESC", connection)
+        { CommandTimeout = 5 };
+        OleDbDataReader? reader = null;
+        using var cancel = new QueryCancellation(ct, command.Cancel, () =>
+        {
+            try { reader?.Dispose(); }
+            finally { command.Dispose(); }
+        });
+        ct.ThrowIfCancellationRequested();
+        reader = command.ExecuteReader();
         var found = new List<FoundFile>();
         while (reader.Read())
         {
@@ -193,5 +236,44 @@ public sealed class WindowsPc : IPc
         PInvoke.SetForegroundWindow(hwnd);
     }
 
-    public void Dispose() => _startMenu.Dispose();
+    public void Dispose()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
+        _stopping.Cancel();
+        _startMenu.Dispose();
+    }
+
+    /// <summary>Never run a native Cancel on the caller's UI thread, or overlap it with native object disposal.</summary>
+    internal sealed class QueryCancellation : IDisposable
+    {
+        private readonly object _gate = new();
+        private readonly Action _cleanup;
+        private readonly CancellationTokenRegistration _registration;
+        private bool _finished;
+
+        internal QueryCancellation(CancellationToken token, Action cancel, Action cleanup)
+        {
+            _cleanup = cleanup;
+            _registration = token.Register(() => ThreadPool.QueueUserWorkItem(_ =>
+            {
+                lock (_gate)
+                {
+                    if (_finished) return;
+                    try { cancel(); }
+                    catch (Exception ex) { Log.Warn("Command bar: canceling Windows Search failed", ex); }
+                }
+            }));
+        }
+
+        public void Dispose()
+        {
+            _registration.Dispose();
+            lock (_gate)
+            {
+                if (_finished) return;
+                _finished = true;
+                _cleanup();
+            }
+        }
+    }
 }
