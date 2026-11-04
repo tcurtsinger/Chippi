@@ -13,6 +13,7 @@ using Chippi.Core.Island;
 namespace Chippi.Island.Tests;
 
 /// <summary>The widget's window itself, built on its own UI thread with the app's resources. Run fullscreen-check first: most show it.</summary>
+[Collection("ReducedMotion")] // The hover test owns FillFade.Clock while pumping dispatcher frames.
 public sealed class IslandWindowTests
 {
     private static Chippi.App.Island.Media.MediaTrack Track(string title, bool playing = true) =>
