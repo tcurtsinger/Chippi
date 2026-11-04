@@ -152,6 +152,54 @@ public sealed class GalleryTests
     });
 
     [Fact]
+    public void Failed_save_preserves_the_exact_draft_and_Done_can_retry() => WpfTestThread.Run(() =>
+    {
+        using var f = new Fixture();
+        f.Page.BeginEdit();
+        var original = f.Module.Layout.ToArray();
+        f.Page.MoveEditor(0, 19);
+        var draft = f.Page.EditorLayout.ToArray();
+        f.Settings.FailSave = true;
+        f.Page.FinishEdit();
+        Assert.True(f.Page.IsEditing);
+        Assert.Equal(original, f.Module.Layout);
+        Assert.Equal(draft, f.Page.EditorLayout);
+        Assert.Contains(Find<TextBlock>(f.Page), t => t.Text == "Save failed" && t.Visibility == Visibility.Visible);
+        f.Settings.FailSave = false;
+        f.Page.FinishEdit();
+        Assert.False(f.Page.IsEditing);
+        Assert.Equal(draft, f.Module.Layout);
+        Assert.Empty(f.Pc.Calls);
+    });
+
+    [Fact]
+    public void An_extra_pointer_cannot_steal_an_in_progress_drag_and_unload_cancels_it() => WpfTestThread.Run(() =>
+    {
+        using var f = new Fixture();
+        var page = f.Page;
+        page.BeginEdit();
+        Arrange(page);
+        string? first = page.EditorLayout[0];
+        Assert.True(page.EditorPointerDown(0, Center(page.EditorSlotBounds(0))));
+        page.EditorPointerMove(Center(page.EditorSlotBounds(1)));
+        Assert.False(page.EditorPointerDown(2, Center(page.EditorSlotBounds(2))));
+        page.EditorPointerUp(Center(page.EditorSlotBounds(1)));
+        Assert.Equal(first, page.EditorLayout[1]);
+        Arrange(page);
+        var savedDraft = page.EditorLayout.ToArray();
+        Assert.True(page.EditorPointerDown(1, Center(page.EditorSlotBounds(1))));
+        page.EditorPointerMove(Center(page.EditorSlotBounds(2)));
+        page.RaiseEvent(new RoutedEventArgs(FrameworkElement.UnloadedEvent));
+        page.EditorPointerUp(Center(page.EditorSlotBounds(2)));
+        Assert.False(page.IsDragging);
+        Assert.Equal(savedDraft, page.EditorLayout);
+        Assert.True(page.EditorPointerDown(1, Center(page.EditorSlotBounds(1))));
+        page.EditorPointerMove(Center(page.EditorSlotBounds(2)));
+        page.EditorPointerUp(Center(page.EditorSlotBounds(2)));
+        Assert.Equal(first, page.EditorLayout[2]);
+    });
+
+    [Fact]
     public void Command_tiles_expose_Invoke_and_state_tiles_expose_Toggle_with_full_names() => WpfTestThread.Run(() =>
     {
         using var f = new Fixture();
@@ -214,13 +262,13 @@ public sealed class GalleryTests
     private sealed class Fixture : IDisposable
     {
         internal FakePc Pc { get; } = new();
+        internal Store Settings { get; } = new();
         internal QuickActionsModule Module { get; }
         internal ActionsPage Page { get; }
         internal Fixture(bool firstRun = false)
         {
             Module = new QuickActionsModule(() => Pc, () => new Hotkey());
-            var settings = new Store();
-            Module.StartAsync(new ModuleContext(QuickActionsModule.Id, settings, NullLogger.Instance, new IslandActivityHub().CreatePublisher(QuickActionsModule.Id), new Pages()), default).GetAwaiter().GetResult();
+            Module.StartAsync(new ModuleContext(QuickActionsModule.Id, Settings, NullLogger.Instance, new IslandActivityHub().CreatePublisher(QuickActionsModule.Id), new Pages()), default).GetAwaiter().GetResult();
             if (!firstRun) Module.Pick([QuickActionId.Dark, QuickActionId.Lock]);
             Page = new ActionsPage(Module);
         }
@@ -229,8 +277,13 @@ public sealed class GalleryTests
     private sealed class Store : IModuleSettings
     {
         private QuickActionsSettings _value = new();
+        internal bool FailSave { get; set; }
         public T Get<T>() where T : class, new() => (T)(object)_value;
-        public void Save<T>(T value) where T : class => _value = (QuickActionsSettings)(object)value;
+        public void Save<T>(T value) where T : class
+        {
+            if (FailSave) throw new System.IO.IOException("Fixture disk failure");
+            _value = (QuickActionsSettings)(object)value;
+        }
     }
     private sealed class Pages : IModuleUi
     {

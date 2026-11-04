@@ -13,6 +13,7 @@ internal sealed partial class ActionsPage
     private readonly HashSet<(QuickActionId Action, string Key)> _running = [];
     private Popup? _confirm;
     internal Popup? Confirmation => _confirm;
+    internal Action<Popup> OpenConfirmation { get; set; } = popup => popup.IsOpen = true;
 
     /// <summary>A shortcut's action failed. It stays marked until that action succeeds.</summary>
     public void ShowFailed(QuickActionId id)
@@ -68,7 +69,11 @@ internal sealed partial class ActionsPage
     /// <summary>Runs once at a time per target, with persistent, target-specific feedback and a retry at that target.</summary>
     private async Task Act(QuickActionId id, Func<Task> work, string? failure = null, string? item = null)
     {
-        var target = (id, item ?? "");
+        var target = (Action: id, Key: item ?? "");
+        // Removed buttons may still have a queued invocation. Enforce operation ownership here as well as visually.
+        if (_running.Any(r => r.Action == id &&
+            (id is QuickActionId.Plan or QuickActionId.Power || id == QuickActionId.Quit && (r.Key == "bulk" || target.Key == "bulk"))))
+            return;
         if (!_running.Add(target))
             return;
         Render();
@@ -105,7 +110,11 @@ internal sealed partial class ActionsPage
     {
         CloseConfirm();
         ConfirmationQuestion = question;
-        var popup = Ui.Confirm(anchor, question, verb, confirmed, detail);
+        var popup = Ui.Confirm(anchor, question, verb, () =>
+        {
+            CloseConfirm();
+            confirmed();
+        }, detail);
         _confirm = popup;
         popup.Closed += (_, _) =>
         {
@@ -116,7 +125,7 @@ internal sealed partial class ActionsPage
             ConfirmedApps = null;
             Render();
         };
-        popup.IsOpen = true;
+        OpenConfirmation(popup);
     }
 
     private void CloseConfirm()
@@ -125,7 +134,7 @@ internal sealed partial class ActionsPage
         _confirm = null;
         ConfirmationQuestion = null;
         ConfirmedApps = null;
-        if (popup?.IsOpen == true)
+        if (popup is not null)
         {
             popup.IsOpen = false;
             Render();

@@ -20,6 +20,11 @@ internal sealed partial class ActionsPage
     private int _listPage;
     private QuickActionId? _pagedList;
     private ButtonBase? _firstRow;
+    private string? _deferredListFocus;
+
+    // Focus is injected by background fixtures; production uses the actual keyboard and never activates a window.
+    internal Func<UIElement?> CurrentListFocus { get; set; } = () => Keyboard.FocusedElement as UIElement;
+    internal Action<UIElement> SetListFocus { get; set; } = element => element.Focus();
 
     internal int ListPage => _listPage;
     internal int ListPageCount { get; private set; } = 1;
@@ -30,12 +35,13 @@ internal sealed partial class ActionsPage
     {
         _listPage = 0;
         _pagedList = null;
+        _deferredListFocus = null;
     }
 
     private void RenderList(QuickActionId id)
     {
         // Keep the reviewed list stable while its confirmation is open. The command owns its exact snapshot.
-        if (_confirm?.IsOpen == true)
+        if (_confirm is not null)
             return;
         if (_pagedList != id)
         {
@@ -66,8 +72,10 @@ internal sealed partial class ActionsPage
         _listFailed.Visibility = _listFailed.Text.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
         if (_built == built)
             return;
-        var oldFocus = Buttons(_body).FirstOrDefault(b => b.IsKeyboardFocusWithin);
-        string? focusName = oldFocus is null ? null : AutomationProperties.GetName(oldFocus);
+        var focused = CurrentListFocus();
+        var oldFocus = Buttons(_body).FirstOrDefault(b => ReferenceEquals(b, focused) || b.IsKeyboardFocusWithin);
+        string? focusKey = oldFocus?.Tag as string ?? (ReferenceEquals(focused, _body) ? _deferredListFocus : null);
+        _deferredListFocus = null;
         _built = built;
         _body.Children.Clear();
         _firstRow = null;
@@ -92,8 +100,22 @@ internal sealed partial class ActionsPage
                 }, choice => PowerRow(choice.Item1, choice.Item2, choice.Item3, choice.Item4), "", "actions");
                 break;
         }
-        if (focusName is not null)
-            (Buttons(_body).FirstOrDefault(b => AutomationProperties.GetName(b) == focusName && b.IsEnabled) ?? _firstRow)?.Focus();
+        if (focusKey is not null)
+        {
+            var target = Buttons(_body).FirstOrDefault(b => Equals(b.Tag, focusKey));
+            if (target is null || !target.IsEnabled)
+            {
+                // A pending action must not move Enter onto a different app's Quit button. Park focus safely until
+                // its target is available again, unless the user moves it elsewhere while the work is running.
+                // A removed target leaves focus here too, so completing bulk Quit cannot focus a kept app's Quit.
+                _deferredListFocus = target is null ? null : focusKey;
+                _body.Focusable = true;
+                KeyboardNavigation.SetIsTabStop(_body, false);
+                SetListFocus(_body);
+            }
+            else
+                SetListFocus(target);
+        }
     }
 
     /// <summary>Readable columns, five rows each. More entries get another page, never a narrower column.</summary>
@@ -107,7 +129,7 @@ internal sealed partial class ActionsPage
         CloseConfirm();
         _listPage = next;
         Render();
-        _firstRow?.Focus();
+        if (_firstRow is { } first) SetListFocus(first);
     }
 
     private void Rows<T>(IReadOnlyList<T> all, Func<T, FrameworkElement> make, string empty, string noun)
@@ -127,9 +149,11 @@ internal sealed partial class ActionsPage
         if (ListPageCount > 1)
         {
             var previous = Ui.Icon(LucideIcons.ChevronLeft, $"Previous {noun}");
+            previous.Tag = "previous-page";
             previous.IsEnabled = _listPage > 0;
             previous.Click += (_, _) => TurnListPage(-1);
             var next = Ui.Icon(LucideIcons.ChevronRight, $"Next {noun}");
+            next.Tag = "next-page";
             next.IsEnabled = _listPage < ListPageCount - 1;
             next.Click += (_, _) => TurnListPage(1);
             var range = Ui.Muted($"{start + 1}\u2013{start + visible.Count} of {count}", 11);
@@ -171,6 +195,7 @@ internal sealed partial class ActionsPage
         if (state.Apps.FirstOrDefault(a => a.Front) is { } front && !_module.Settings.Keeps(front.Path) && _module.Quitting(keepFront: true).Count > 0)
         {
             var allBut = Ui.Button($"Quit all but {front.Name}");
+            allBut.Tag = "quit-others";
             allBut.Content = Ui.Text($"Quit all but {front.Name}");
             allBut.MaxWidth = 300;
             allBut.ToolTip = $"Quit all but {front.Name}";
@@ -179,6 +204,7 @@ internal sealed partial class ActionsPage
             buttons.Children.Add(allBut);
         }
         var all = Ui.Button("Quit all");
+        all.Tag = "quit-all";
         all.Click += (_, _) => ConfirmQuit(all, keepFront: false);
         buttons.Children.Add(all);
         foreach (Button button in buttons.Children)
@@ -225,6 +251,7 @@ internal sealed partial class ActionsPage
             : Ui.Monogram(app.Name);
         bool failing = _rowFailures.ContainsKey((QuickActionId.Quit, app.Path));
         var quit = Ui.Icon(failing ? LucideIcons.RefreshCw : LucideIcons.Close, failing ? $"Retry quitting {app.Name}" : $"Quit {app.Name}");
+        quit.Tag = "quit:" + app.Path.ToUpperInvariant();
         quit.IsEnabled = !Running(QuickActionId.Quit, app.Path) && !Running(QuickActionId.Quit, "bulk");
         quit.Click += async (_, _) => await Act(QuickActionId.Quit, () => _module.QuitAsync(app), "Quit failed", app.Path);
         var parts = new List<UIElement> { quit };
@@ -242,6 +269,7 @@ internal sealed partial class ActionsPage
     {
         bool failing = _rowFailures.ContainsKey((QuickActionId.Eject, drive.Id));
         var eject = Ui.Icon(failing ? LucideIcons.RefreshCw : LucideIcons.Eject, failing ? $"Retry ejecting {drive.Name}" : $"Eject {drive.Name}");
+        eject.Tag = "eject:" + drive.Id;
         eject.IsEnabled = !Running(QuickActionId.Eject, drive.Id);
         eject.Click += async (_, _) => await Act(QuickActionId.Eject, () => _module.EjectAsync(drive), "Eject failed", drive.Id);
         return Row(Ui.Glyph(LucideIcons.HardDrive), drive.Name, [eject], failing ? "Eject failed" : Size(drive.Size), failing);
@@ -295,6 +323,7 @@ internal sealed partial class ActionsPage
         if (plan.Active)
             ((TextBlock)name.Children[0]).FontWeight = FontWeights.SemiBold;
         var row = ListButton(new DockPanel { Children = { mark, name } }, plan.Name);
+        row.Tag = "plan:" + plan.Id;
         row.IsEnabled = !_running.Any(r => r.Action == QuickActionId.Plan);
         AutomationProperties.SetItemStatus(row, failed ? "Power plan failed" : plan.Active ? "Active" : "");
         row.Click += async (_, _) => await Act(QuickActionId.Plan, () => _module.SetPowerPlanAsync(plan.Id), "Power plan failed", plan.Id.ToString());
@@ -307,6 +336,7 @@ internal sealed partial class ActionsPage
         var labels = Labels(name, failed ? $"{name} failed" : "", failed);
         labels.Margin = new Thickness(8, 0, 0, 0);
         var row = ListButton(new DockPanel { Children = { Ui.Glyph(icon), labels } }, name);
+        row.Tag = "power:" + choice;
         row.IsEnabled = !_running.Any(r => r.Action == QuickActionId.Power);
         row.Click += (_, _) => AskFirst(row, question, name, async () => await Act(QuickActionId.Power, () => _module.PowerAsync(choice), $"{name} failed", choice.ToString()));
         return row;

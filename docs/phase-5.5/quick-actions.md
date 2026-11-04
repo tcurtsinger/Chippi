@@ -64,6 +64,10 @@ Feedback stays on the affected tile or list row, from a click or a shortcut. No 
 - A change made elsewhere (Windows Settings, a shortcut) shows on the button.
 - Errors read "… failed" (DESIGN.md §3), remain with the affected action, and clear when that operation succeeds.
 - Editor changes never run a Windows action. Done commits the draft; Back and Esc leave the saved gallery intact.
+- A failed save preserves the editor draft for Done to retry. Unload, lost capture and Escape cancel a drag without toggling its tile; an extra pointer cannot replace the current gesture.
+- Pending list actions retain the identity of their focused target. A failed action restores focus to that target's Retry control; a successful removal leaves focus on the list body.
+- Settings shortcut rows retain their controls across unchanged polls. Capture releases on Tab, outside focus, an unavailable action or unload. A failed shortcut save restores the prior registration.
+- Background reads coalesce while Windows is slow. Closing the feature cancels waits, and a late completion cannot update a later installation or dispatch a delayed shortcut.
 
 ## Left out, and why
 

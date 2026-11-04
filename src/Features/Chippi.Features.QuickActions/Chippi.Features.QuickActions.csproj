@@ -22,6 +22,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Chippi.Features.QuickActions.Tests" />
+    <InternalsVisibleTo Include="Chippi.Island.Tests" />
   </ItemGroup>
 
   <!-- P/Invoke via CsWin32, from the NativeMethods.txt in this folder. -->

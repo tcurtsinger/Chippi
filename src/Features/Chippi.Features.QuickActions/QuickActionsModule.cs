@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using System.Collections.Concurrent;
 using Chippi.Core.Diagnostics;
 using Chippi.Core.Modules;
 using Chippi.Features.QuickActions.Views;
@@ -35,13 +36,22 @@ public sealed class QuickActionsModule : IFeatureModule
     private readonly Func<Action?> _cleaning;
     private readonly Dictionary<QuickActionId, IMicHotkey> _hotkeys = [];
     private readonly Dictionary<QuickActionId, string> _shortcutErrors = [];
-    private readonly SemaphoreSlim _reading = new(1);
-    private Task<QuickState>? _read; // the PC's read in progress, held under _reading
-    private bool _slow;
+    private sealed class Running(ModuleContext context, IQuickSystem system)
+    {
+        public ModuleContext Context { get; } = context;
+        public IQuickSystem System { get; } = system;
+        public CancellationTokenSource Stop { get; } = new();
+        public SemaphoreSlim Reading { get; } = new(1);
+        public ConcurrentDictionary<QuickActionId, byte> Pressing { get; } = new();
+        public Task<QuickState>? Read;
+        public int Revision, ReadRevision;
+        public bool Slow;
+    }
+
+    private Running? _run;
     private QuickActionId? _pending;
     private long _pendingAt;
-    private IQuickSystem? _system;
-    private ModuleContext? _context;
+    private ModuleContext? Context => _run?.Context;
     private ActionsPage? _page;
     private bool _capturing;
 
@@ -103,9 +113,8 @@ public sealed class QuickActionsModule : IFeatureModule
     public Task StartAsync(ModuleContext context, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        _context = context;
         Settings = context.Settings.Get<QuickActionsSettings>();
-        _system ??= _createSystem();
+        _run = new Running(context, _createSystem());
         _capturing = false;
         // No status on the home: Actions is a door to its page.
         context.Ui.AddIslandTile(new IslandTileSpec(TileKey, "Actions", nameof(LucideIcons.ToggleRight), Order: 100, SectionOrder: 0, () => Page())
@@ -131,57 +140,88 @@ public sealed class QuickActionsModule : IFeatureModule
 
     public Task StopAsync(CancellationToken ct)
     {
+        // Stop waiting immediately even if a Windows lookup ignores cancellation. A later completion belongs only to this run.
+        var run = _run;
+        _run = null;
+        run?.Stop.Cancel();
         foreach (var hotkey in _hotkeys.Values)
             hotkey.Dispose();
         _hotkeys.Clear();
         _shortcutErrors.Clear();
-        _context = null;
         _page = null;
         Pending = null;
         return Task.CompletedTask;
     }
 
-    /// <summary>Reads the PC again once any read already running is done, so an action's refresh shows what it did.</summary>
-    public Task RefreshAsync(CancellationToken ct = default) => ReadAsync(wait: true, ct);
+    /// <summary>Reads the PC afresh, joining an older lookup before replacing it so a stuck drive cannot pile up threads.</summary>
+    public Task RefreshAsync(CancellationToken ct = default) => _run is { } run ? ReadAsync(run, wait: true, ct) : Task.CompletedTask;
 
     /// <summary>The page's timer and first look: skipped while a read runs.</summary>
-    internal Task PollAsync() => ReadAsync(wait: false, CancellationToken.None);
+    internal Task PollAsync() => _run is { } run ? ReadAsync(run, wait: false, CancellationToken.None) : Task.CompletedTask;
 
-    private async Task ReadAsync(bool wait, CancellationToken ct)
+    private bool Current(Running run) => ReferenceEquals(_run, run) && !run.Stop.IsCancellationRequested;
+
+    private async Task ReadAsync(Running run, bool wait, CancellationToken ct)
     {
-        if (_system is not { } system)
-            return;
-        if (wait)
-            await _reading.WaitAsync(ct);
-        else if (!await _reading.WaitAsync(0, ct))
-            return;
+        using var cancelled = CancellationTokenSource.CreateLinkedTokenSource(ct, run.Stop.Token);
+        bool entered = false;
         try
         {
-            uint front = _context?.IslandPasteTarget()?.ProcessId ?? 0;
-            // A read that outlived its wait is joined, not started again, so a stuck drive can't pile up threads.
-            _read ??= system.ReadAsync(front, CancellationToken.None);
-            State = await _read.WaitAsync(ReadWait, ct);
-            _read = null;
-            _slow = false;
-            Changed?.Invoke();
+            if (wait)
+            {
+                await run.Reading.WaitAsync(cancelled.Token);
+                entered = true;
+            }
+            else
+                entered = await run.Reading.WaitAsync(0, cancelled.Token);
+            if (!entered || !Current(run)) return;
+            bool older = wait && run.Read is not null;
+            // At most one replacement read. Another action can invalidate that too; the next poll will try again.
+            for (int attempt = 0; attempt < 2 && Current(run); attempt++)
+            {
+                if (run.Read is null)
+                {
+                    uint front = run.Context.IslandPasteTarget()?.ProcessId ?? 0;
+                    run.ReadRevision = Volatile.Read(ref run.Revision);
+                    run.Read = run.System.ReadAsync(front, run.Stop.Token);
+                    // Observe a late failure even when stop/cancellation has already ended our wait.
+                    _ = run.Read.ContinueWith(task => _ = task.Exception, CancellationToken.None,
+                        TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+                }
+                var state = await run.Read.WaitAsync(ReadWait, cancelled.Token);
+                run.Read = null;
+                if (!Current(run)) return;
+                if (older || run.ReadRevision != Volatile.Read(ref run.Revision))
+                {
+                    older = false;
+                    continue;
+                }
+                State = state;
+                run.Slow = false;
+                Changed?.Invoke();
+                return;
+            }
+        }
+        catch (OperationCanceledException) when (run.Stop.IsCancellationRequested)
+        {
+            // Uninstalled or exiting. Neither a stale state nor a delayed shortcut may escape this run.
         }
         catch (TimeoutException ex)
         {
-            if (!_slow)
-                Log.Warn("Quick actions: reading the PC is taking long", ex);
-            _slow = true;
+            if (!run.Slow) Log.Warn("Quick actions: reading the PC is taking long", ex);
+            run.Slow = true;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _read = null;
+            run.Read = null;
             Log.Warn("Quick actions: reading the PC failed", ex);
         }
-        finally { _reading.Release(); }
+        finally { if (entered) run.Reading.Release(); }
     }
 
     public void Save(QuickActionsSettings settings)
     {
-        _context?.Settings.Save(settings);
+        Active.Context.Settings.Save(settings);
         Settings = settings;
         Changed?.Invoke();
     }
@@ -224,17 +264,13 @@ public sealed class QuickActionsModule : IFeatureModule
 
     // Each of these throws when Windows refuses; the page says "Failed".
 
-    public async Task SetAsync(QuickActionId id, bool on)
-    {
-        try { await Pc.SetAsync(id, on); }
-        finally { await RefreshAsync(); }
-    }
+    public Task SetAsync(QuickActionId id, bool on) => ThenRefresh(pc => pc.SetAsync(id, on));
 
-    public Task SetPowerPlanAsync(Guid plan) => ThenRefresh(Pc.SetPowerPlanAsync(plan));
+    public Task SetPowerPlanAsync(Guid plan) => ThenRefresh(pc => pc.SetPowerPlanAsync(plan));
 
-    public Task EjectAsync(RemovableDrive drive) => ThenRefresh(Pc.EjectAsync(drive));
+    public Task EjectAsync(RemovableDrive drive) => ThenRefresh(pc => pc.EjectAsync(drive));
 
-    public Task QuitAsync(OpenApp app) => ThenRefresh(Pc.QuitAsync(app));
+    public Task QuitAsync(OpenApp app) => ThenRefresh(pc => pc.QuitAsync(app));
 
     /// <summary>Asks each app to close, all of them even when one refuses (an elevated app); then throws once if any did.</summary>
     public Task QuitAllAsync(bool keepFront) => QuitAllAsync(Quitting(keepFront));
@@ -242,48 +278,60 @@ public sealed class QuickActionsModule : IFeatureModule
     /// <summary>Close only the exact app set reviewed in a confirmation, even if another app opens meanwhile.</summary>
     public async Task QuitAllAsync(IReadOnlyList<OpenApp> apps)
     {
-        var failed = new List<Exception>();
-        var refused = new List<OpenApp>();
-        foreach (var app in apps.ToArray())
+        var reviewed = apps.ToArray();
+        var run = Active;
+        await ThenRefresh(async pc =>
         {
-            try { await Pc.QuitAsync(app); }
-            catch (Exception ex) { failed.Add(ex); refused.Add(app); }
-        }
-        await RefreshAsync();
-        if (failed.Count > 0)
-            throw new QuitAppsException(refused, failed);
+            var failed = new List<Exception>();
+            var refused = new List<OpenApp>();
+            foreach (var app in reviewed)
+            {
+                if (!Current(run)) break;
+                try { await pc.QuitAsync(app); }
+                catch (Exception ex) { failed.Add(ex); refused.Add(app); }
+            }
+            if (failed.Count > 0) throw new QuitAppsException(refused, failed);
+        }, run);
     }
 
-    public Task EndFrozenAppsAsync() => ThenRefresh(Pc.EndFrozenAppsAsync());
+    public Task EndFrozenAppsAsync() => ThenRefresh(pc => pc.EndFrozenAppsAsync());
 
     public Task RunAsync(QuickActionId id)
     {
+        var run = Active;
         if (id != QuickActionId.Cleaning)
-            return ThenRefresh(Pc.RunAsync(id));
+            return ThenRefresh(pc => pc.RunAsync(id), run);
         // Started first, so a failure says Failed on the page; then the island closes under the black.
         if (_cleaning() is { } start)
         {
             start();
-            _context?.CloseIsland();
+            if (Current(run)) run.Context.CloseIsland();
         }
         return Task.CompletedTask;
     }
 
-    public Task PowerAsync(PowerChoice choice) => Pc.PowerAsync(choice);
+    public Task PowerAsync(PowerChoice choice) => Active.System.PowerAsync(choice);
 
-    private IQuickSystem Pc => _system ?? throw new InvalidOperationException("Quick actions uninstalled");
+    private Running Active => _run ?? throw new InvalidOperationException("Quick actions uninstalled");
 
-    private async Task ThenRefresh(Task work)
+    private async Task ThenRefresh(Func<IQuickSystem, Task> work, Running? owner = null)
     {
-        try { await work; }
-        finally { await RefreshAsync(); }
+        var run = owner ?? Active;
+        if (!Current(run)) return;
+        Interlocked.Increment(ref run.Revision);
+        try { await work(run.System); }
+        finally
+        {
+            Interlocked.Increment(ref run.Revision);
+            if (Current(run)) await ReadAsync(run, wait: true, CancellationToken.None);
+        }
     }
 
     // Shortcuts: none by default, one per action at most.
 
     public bool ChangeShortcut(QuickActionId id, MicShortcut shortcut)
     {
-        if (_context is null)
+        if (Context is null)
             return false;
         if (!shortcut.IsValid)
         {
@@ -296,20 +344,42 @@ public sealed class QuickActionsModule : IFeatureModule
             Changed?.Invoke();
             return false;
         }
-        Save(Settings with { Shortcuts = new(Settings.Shortcuts) { [QuickAction.Of(id).Key] = shortcut } });
-        return true;
+        var previous = Settings.ShortcutOf(id);
+        try
+        {
+            Save(Settings with { Shortcuts = new(Settings.Shortcuts) { [QuickAction.Of(id).Key] = shortcut } });
+            return true;
+        }
+        catch (Exception ex)
+        {
+            // Registration happened first so a clash never reaches settings. A failed save must restore that registration too.
+            bool restored = previous is not null && TryRegister(id, previous);
+            // The old chord might have been claimed after we released it. Never leave the unsaved new chord active.
+            if (!restored && _hotkeys.Remove(id, out var added))
+                added.Dispose();
+            Log.Warn("Quick actions: saving shortcut failed", ex);
+            _shortcutErrors[id] = "Save failed";
+            Changed?.Invoke();
+            return false;
+        }
     }
 
     public void RemoveShortcut(QuickActionId id)
     {
-        if (_context is null)
+        if (Context is null)
             return;
-        if (_hotkeys.Remove(id, out var hotkey))
-            hotkey.Dispose();
-        _shortcutErrors.Remove(id);
         var shortcuts = new Dictionary<string, MicShortcut>(Settings.Shortcuts);
         shortcuts.Remove(QuickAction.Of(id).Key);
-        Save(Settings with { Shortcuts = shortcuts });
+        try { Save(Settings with { Shortcuts = shortcuts }); }
+        catch (Exception ex)
+        {
+            Log.Warn("Quick actions: removing shortcut failed", ex);
+            _shortcutErrors[id] = "Save failed";
+            Changed?.Invoke();
+            return;
+        }
+        if (_hotkeys.Remove(id, out var hotkey)) hotkey.Dispose();
+        if (_shortcutErrors.Remove(id)) Changed?.Invoke();
     }
 
     /// <summary>While Settings records a shortcut, pressing one of ours doesn't run it.</summary>
@@ -340,38 +410,39 @@ public sealed class QuickActionsModule : IFeatureModule
     /// </summary>
     internal async Task PressedAsync(QuickActionId id)
     {
-        if (_capturing || _context is not { } context)
-            return;
-        await RefreshAsync();
-        if (State.Unsupported.Contains(id))
-            return;
+        var run = _run;
+        if (_capturing || run is null || !run.Pressing.TryAdd(id, 0)) return;
         var action = QuickAction.Of(id);
         try
         {
+            await ReadAsync(run, wait: true, CancellationToken.None);
+            if (!Current(run) || _capturing || State.Unsupported.Contains(id)) return;
             if (action.Toggle && !action.OpensList)
-                await SetAsync(id, !State.On.GetValueOrDefault(id));
+                await ThenRefresh(pc => pc.SetAsync(id, !State.On.GetValueOrDefault(id)), run);
             else if (id is QuickActionId.Lock or QuickActionId.Displays or QuickActionId.ScreenSaver)
-                await RunAsync(id);
+                await ThenRefresh(pc => pc.RunAsync(id), run);
             else if (id == QuickActionId.Eject && State.Drives is [var only])
-                await EjectAsync(only);
+                await ThenRefresh(pc => pc.EjectAsync(only), run);
             else
             {
                 Pending = id;
                 // With the island off or hidden for a fullscreen app, nothing opens: no Settings, and no confirm later.
-                if (!context.TryOpenIslandPage(TileKey))
+                if (!run.Context.TryOpenIslandPage(TileKey))
                 {
                     Pending = null;
                     return;
                 }
-                _page?.ShowPending();
+                if (Current(run)) _page?.ShowPending();
                 return;
             }
-            _page?.ShowSucceeded(id);
+            if (Current(run)) _page?.ShowSucceeded(id);
         }
         catch (Exception ex)
         {
+            if (!Current(run)) return;
             Log.Warn($"Quick actions: the {action.Key} shortcut failed", ex);
             _page?.ShowFailed(id);
         }
+        finally { run.Pressing.TryRemove(id, out _); }
     }
 }

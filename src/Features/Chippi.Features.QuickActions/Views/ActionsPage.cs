@@ -29,9 +29,6 @@ internal sealed partial class ActionsPage : UserControl
 
     internal const int MaxListColumns = 2;
 
-    /// <summary>How long a button says "Failed".</summary>
-    internal static readonly TimeSpan FailedFor = TimeSpan.FromSeconds(4);
-
     private readonly QuickActionsModule _module;
     private readonly TextBlock _title = Ui.Text("Actions", 14);
     private readonly DockPanel _header = new();
@@ -70,7 +67,7 @@ internal sealed partial class ActionsPage : UserControl
             _module.Changed += OnChanged;
             Render();
         };
-        Unloaded += (_, _) => { _module.Changed -= OnChanged; CancelEditorDrag(); };
+        Unloaded += (_, _) => { _refresh.Stop(); _module.Changed -= OnChanged; CancelEditorDrag(); };
         // Reading the PC runs only while the page shows; it opens on the buttons, not a list left open last time.
         IsVisibleChanged += (_, _) =>
         {
@@ -85,6 +82,7 @@ internal sealed partial class ActionsPage : UserControl
                 _refresh.Stop();
                 CloseConfirm();
                 _list = null;
+                ResetListPage();
                 DiscardEdit();
                 Render();
             }
@@ -145,7 +143,7 @@ internal sealed partial class ActionsPage : UserControl
             CancelEditorDrag();
             return true;
         }
-        if (_confirm?.IsOpen == true)
+        if (_confirm is not null)
         {
             CloseConfirm();
             return true;
