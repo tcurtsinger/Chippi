@@ -70,8 +70,9 @@
           Condition="'$(RuntimeIdentifier)' == 'win-x64' Or '$(RuntimeIdentifier)' == 'win-arm64'">
     <Exec Command="pwsh -NoProfile -File &quot;$(MSBuildProjectDirectory)\..\..\build\prepare-soundboard-tools.ps1&quot; -Runtime $(RuntimeIdentifier)" />
     <ItemGroup>
-      <ResolvedFileToPublish Include="$(MSBuildProjectDirectory)\..\..\build\artifacts\soundboard\$(RuntimeIdentifier)\**\*">
-        <RelativePath>vendor\soundboard\%(RecursiveDir)%(Filename)%(Extension)</RelativePath>
+      <_SoundboardPublishFile Include="$(MSBuildProjectDirectory)\..\..\build\artifacts\soundboard\$(RuntimeIdentifier)\**\*" />
+      <ResolvedFileToPublish Include="@(_SoundboardPublishFile)">
+        <RelativePath>vendor\soundboard\%(_SoundboardPublishFile.RecursiveDir)%(_SoundboardPublishFile.Filename)%(_SoundboardPublishFile.Extension)</RelativePath>
         <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
         <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
       </ResolvedFileToPublish>
