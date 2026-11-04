@@ -10,7 +10,7 @@ Bind any action to a key, a Caps Lock combo or a mouse button, in one place, and
 
 Each door runs one shared action (task 208): any verb the Radial menu or Actions has, plus Phase 6's (Snap, Insert a snippet, the switches).
 
-- **Key.** A global shortcut through `RegisterHotKey` (the shortcut service). Works over admin windows. Windows-reserved combinations are refused up front (any Win combination, Ctrl+Alt+Del, Alt+Tab, Alt+F4).
+- **Key.** A global shortcut through `RegisterHotKey` (the shortcut service). Works over admin windows. Win combinations can be bound (Marge's call). A combination Windows reserves (Win+L, Ctrl+Alt+Del, Alt+Tab, Alt+F4, and the Win combinations Windows already uses) saves but shows "In use by Windows" and doesn't act.
 - **Caps Lock combo (the Super key).** Hold Caps Lock, press a key: the bound action runs and the key is swallowed. Caps Lock itself never toggles while this is on (the hub swallows its down, up and repeats).
 - **Mouse button.** Middle, Back, Forward, side wheel left and right (one press per notch). Left, right and wheel up and down are never offered. A button with a binding no longer does its old job. Buttons 6 and up aren't visible to a Windows hook, so they're out.
 
@@ -42,7 +42,7 @@ Empty state: "No shortcuts yet. Add the first one."
 - **Used twice:** two Chippi bindings on one door. The second doesn't save: "{action} already uses this." For a mouse button: "That button or direction is already on the list."
 - **In use by another app:** `RegisterHotKey` failed. This is the only way to learn another app holds a combination.
 - **Held by the Radial menu:** "That button already opens the Radial menu. Pick another one, or free it there first." A button the Radial menu holds shows "This button opens the Radial menu now, so the shortcut waits." Radial wins until it's freed; both live in the hub (click for the binding, hold for the wheel).
-- **Windows keeps this one:** the reserved combinations.
+- **In use by Windows:** a reserved combination, listed above. The row shows it and the binding doesn't act. Win combinations Windows doesn't use work, through the hub where `RegisterHotKey` can't take them.
 - Honest scope: Windows has no call that lists other apps' global shortcuts, so the page says "Shortcuts Chippi uses, with clashes flagged". The catalog blurb is reworded from "Every shortcut Chippi and your apps use".
 
 ## Edge cases
@@ -57,7 +57,7 @@ Empty state: "No shortcuts yet. Add the first one."
 ## Tests
 
 - Pure state machines on an injected clock: tap and hold, hold modifiers, repeats, the 500 ms solo hold, release on every safety path, the button-versus-Radial arbitration, the clash rules.
-- Shortcut service tests with a fake registrar: registration failure shows "In use by another app", twice-used is refused, reserved combos refused.
+- Shortcut service tests with a fake registrar: registration failure shows "In use by another app", twice-used is refused, reserved combos show "In use by Windows", a free Win combination binds.
 - Hub tests with a fake source: Caps Lock swallowed with its repeats, swallowed down means swallowed up, tagged input passes.
 - Windows Sandbox probes: Caps+key reaches a test window as the bound action and the plain key does not; held modifiers arrive as a chord; Caps Lock's light never changes; middle, Back and Forward presses (`SendInput`) run the action and the target sees no click.
 - Screenshots of the page: dark and light, empty and with a dozen bindings including each state.

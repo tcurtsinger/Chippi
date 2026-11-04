@@ -59,7 +59,7 @@ Every snippet is also a shared action, **Insert snippet**, so any Shortcuts door
 Decided (Marge, after review): vorssaint's quick menu overlay is not in the first build. Snippets are reached two ways instead:
 
 - **Insert snippet**, a shared action that any Shortcuts door can fire.
-- **Search.** Snippets appear in the island's Search by name and trigger. Choosing one types it into the window Search was opened over, not into Search. Chippi records that window when Search opens. When Search closes, it hands focus back to that window, then types the text as Unicode key events. If that window is gone or has changed owner by then, nothing is typed and Search says "Snippet not inserted". Over an admin window Search shows the snippet but nothing is typed, and says "Not working in admin windows".
+- **Search.** Snippets appear in the island's Search by name and trigger. Choosing one types it into the window Search was opened over, not into Search. Chippi records that window when Search opens. When Search closes, it hands focus back to that window, then types the text as Unicode key events. Search never pauses (Marge's call): a snippet picked there is typed even over a fullscreen app, because it was chosen on purpose, with Always on off too. If that window is gone or has changed owner by then, nothing is typed and Search says "Snippet not inserted". Over an admin window Search shows the snippet but nothing is typed, and says "Not working in admin windows".
 
 A quick menu can come later with its own mockup.
 
