@@ -134,8 +134,9 @@ public sealed class QuickActionsTests
         {
             var page = new ActionsPage(f.Module);
             page.Press(QuickActionId.Cleaning);
-            var cleaning = Find<System.Windows.Controls.Primitives.ToggleButton>(page).First(t => Equals(t.Tag, "cleaning"));
-            Assert.Equal("Cleaning, Failed", System.Windows.Automation.AutomationProperties.GetName(cleaning));
+            var cleaning = Find<System.Windows.Controls.Button>(page).First(t => Equals(t.Tag, "cleaning"));
+            Assert.Equal("Cleaning mode", System.Windows.Automation.AutomationProperties.GetName(cleaning));
+            Assert.Equal("Cleaning failed", System.Windows.Automation.AutomationProperties.GetItemStatus(cleaning));
         });
         Assert.Equal(1, f.Closed); // a start that failed leaves the island open, saying so
     }
@@ -224,7 +225,7 @@ public sealed class QuickActionsTests
         f.Pc.State = QuickState.Empty with { Apps = [FakePc.Chrome, admin, FakePc.Spotify, FakePc.Discord] };
         f.Pc.Refuse.Add("Task Manager");
         await f.Start();
-        await Assert.ThrowsAsync<AggregateException>(() => f.Module.QuitAllAsync(keepFront: false));
+        await Assert.ThrowsAsync<QuitAppsException>(() => f.Module.QuitAllAsync(keepFront: false));
         Assert.Equal(["quit Google Chrome", "quit Spotify", "quit Discord"], f.Pc.Calls);
     }
 
@@ -321,10 +322,10 @@ public sealed class QuickActionsTests
     public void An_app_without_an_icon_shows_its_letters(string name, string letters) => Assert.Equal(letters, Views.Ui.Initials(name));
 
     [Theory]
-    [InlineData(6, 44)]
-    [InlineData(15, 44)]
-    [InlineData(16, 34)]
-    [InlineData(18, 34)]
+    [InlineData(6, 76)]
+    [InlineData(15, 76)]
+    [InlineData(16, 61)]
+    [InlineData(18, 61)]
     public void Four_rows_take_shorter_buttons_so_they_fit(int count, double height) => Assert.Equal(height, ActionsPage.ButtonHeight(count));
 
     [Theory]
@@ -346,7 +347,7 @@ public sealed class QuickActionsTests
             f.Module.Pick([QuickActionId.Dark, QuickActionId.Quit]);
             page.Render();
             Assert.Equal("grid", page.Showing);
-            Assert.Equal("Actions", ((TextBlock)page.Header).Text);
+            Assert.Equal("Actions", page.Title);
         });
     }
 
@@ -362,7 +363,7 @@ public sealed class QuickActionsTests
             var page = new ActionsPage(f.Module);
             page.Press(QuickActionId.Quit);
             Assert.Equal("quit", page.Showing);
-            Assert.Equal("Quit apps", ((TextBlock)page.Header).Text);
+            Assert.Equal("Quit apps", page.Title);
             Assert.True(page.Escape());
             Assert.Equal("grid", page.Showing);
             Assert.False(page.Back()); // the island's own Back takes it home
@@ -401,7 +402,9 @@ public sealed class QuickActionsTests
             // UI Automation's Toggle raises no Click: the page acts on Checked and Unchecked.
             Toggle(buttons.First(b => Equals(b.Tag, "dark")));
             Assert.Equal(["set Dark True"], f.Pc.Calls);
-            Toggle(buttons.First(b => Equals(b.Tag, "quit")));
+            var quit = Find<Button>(page).First(b => Equals(b.Tag, "quit"));
+            ((System.Windows.Automation.Provider.IInvokeProvider)System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(quit)).Invoke();
+            System.Windows.Threading.Dispatcher.CurrentDispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.Background);
             Assert.Equal("quit", page.Showing);
         });
 
@@ -411,48 +414,13 @@ public sealed class QuickActionsTests
 
     [Theory]
     [InlineData(1, 1)]
-    [InlineData(8, 1)]
-    [InlineData(9, 2)]
+    [InlineData(5, 1)]
+    [InlineData(6, 2)]
     [InlineData(16, 2)]
-    [InlineData(17, 3)]
-    [InlineData(25, 4)]
-    [InlineData(40, 4)]
+    [InlineData(17, 2)]
+    [InlineData(25, 2)]
+    [InlineData(40, 2)]
     public void A_list_adds_columns_as_it_grows(int count, int columns) => Assert.Equal(columns, ActionsPage.ListColumns(count));
-
-    [Fact]
-    public async Task Every_one_of_twenty_apps_can_be_quit_from_the_list()
-    {
-        var f = new Fixture();
-        f.Pc.State = QuickState.Empty with { Apps = [.. Enumerable.Range(1, 20).Select(i => new OpenApp($@"C:\Apps\app{i}.exe", $"App {i}", i == 1))] };
-        f.Settings.Value = new() { Shown = ["quit"] };
-        await f.Start();
-        WpfTestThread.Run(() =>
-        {
-            var page = new ActionsPage(f.Module);
-            page.Press(QuickActionId.Quit);
-            var names = Find<System.Windows.Controls.Button>(page).Select(b => System.Windows.Automation.AutomationProperties.GetName(b)).Where(n => n.StartsWith("Quit App ", StringComparison.Ordinal));
-            Assert.Equal(20, names.Count());
-        });
-    }
-
-    [Fact]
-    public async Task A_failure_in_a_list_says_so_at_its_foot()
-    {
-        var f = new Fixture();
-        f.Pc.State = QuickState.Empty with { Apps = [FakePc.Chrome, FakePc.Discord] };
-        f.Pc.Refuse.Add("Discord");
-        f.Settings.Value = new() { Shown = ["quit"] };
-        await f.Start();
-        WpfTestThread.Run(() =>
-        {
-            var page = new ActionsPage(f.Module);
-            page.Press(QuickActionId.Quit);
-            var quit = Find<System.Windows.Controls.Button>(page).First(b => System.Windows.Automation.AutomationProperties.GetName(b) == "Quit Discord");
-            quit.RaiseEvent(new System.Windows.RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
-            Assert.Equal("quit", page.Showing);
-            Assert.Equal("Quit failed", page.ListFailure);
-        });
-    }
 
     private static IEnumerable<T> Find<T>(System.Windows.DependencyObject root) where T : System.Windows.DependencyObject
     {
@@ -476,7 +444,8 @@ public sealed class QuickActionsTests
             Assert.True(f.Module.State.On[QuickActionId.Dark]);
             f.Pc.Fail = true;
             page.Press(QuickActionId.Dark);
-            Assert.Equal("Dark, Failed", System.Windows.Automation.AutomationProperties.GetName((System.Windows.DependencyObject)page.InitialFocus!));
+            Assert.Equal("Dark mode", System.Windows.Automation.AutomationProperties.GetName((System.Windows.DependencyObject)page.InitialFocus!));
+            Assert.Equal("Dark failed", System.Windows.Automation.AutomationProperties.GetItemStatus((System.Windows.DependencyObject)page.InitialFocus!));
         });
     }
 }

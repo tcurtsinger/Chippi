@@ -12,6 +12,9 @@ public sealed record QuickActionsSettings
     /// <summary>The actions on the page, by key; null until the first Done, so the page first opens on the picker.</summary>
     public List<string>? Shown { get; init; }
 
+    /// <summary>The gallery's twenty positions, including hidden actions and intentional empty slots. Null migrates the old packed gallery.</summary>
+    public List<string?>? Layout { get; init; }
+
     /// <summary>Apps "Quit all" never closes, by program path; matched by the file's name, which an update's new folder doesn't change.</summary>
     public List<string> Kept { get; init; } = [];
 

@@ -87,8 +87,18 @@ public sealed class QuickActionsModule : IFeatureModule
     public IReadOnlyList<QuickAction> Offered =>
         [.. QuickAction.All.Where(a => !State.Unsupported.Contains(a.Id) && (a.Id != QuickActionId.Cleaning || _cleaning() is not null))];
 
-    /// <summary>What the page shows, in order: picked, and possible on this PC.</summary>
-    public IReadOnlyList<QuickAction> Shown => [.. Offered.Where(a => Settings.Shows(a.Id))];
+    /// <summary>All gallery positions, including hidden actions so hiding one never moves its neighbors.</summary>
+    public IReadOnlyList<string?> Layout => QuickActionsLayout.Normalize(Settings.Layout, Settings.Shown);
+
+    /// <summary>What the page shows, in the saved order: picked, and possible on this PC.</summary>
+    public IReadOnlyList<QuickAction> Shown
+    {
+        get
+        {
+            var offered = Offered.ToDictionary(a => a.Key);
+            return [.. Layout.OfType<string>().Where(offered.ContainsKey).Select(key => offered[key]).Where(a => Settings.Shows(a.Id))];
+        }
+    }
 
     public Task StartAsync(ModuleContext context, CancellationToken ct)
     {
@@ -177,14 +187,26 @@ public sealed class QuickActionsModule : IFeatureModule
     }
 
     /// <summary>The picker's Done: the page shows these from now on.</summary>
-    public void Pick(IEnumerable<QuickActionId> ids) =>
-        Save(Settings with { Shown = [.. ids.Distinct().Order().Select(id => QuickAction.Of(id).Key)] });
+    public void Pick(IEnumerable<QuickActionId> ids)
+    {
+        var shown = ids.Distinct().Order().Select(id => QuickAction.Of(id).Key).ToList();
+        Save(Settings with { Shown = shown, Layout = QuickActionsLayout.Normalize(null, shown) });
+    }
+
+    /// <summary>Commit the editor's selection and exact positions together; unavailable actions keep their saved choice.</summary>
+    public void SaveLayout(IEnumerable<QuickActionId> selected, IEnumerable<string?> slots)
+    {
+        var offered = Offered.Select(a => a.Id).ToHashSet();
+        var chosen = selected.ToHashSet();
+        var shown = QuickAction.All.Where(a => offered.Contains(a.Id) ? chosen.Contains(a.Id) : Settings.Shows(a.Id)).Select(a => a.Key).ToList();
+        Save(Settings with { Shown = shown, Layout = QuickActionsLayout.Normalize(slots, shown) });
+    }
 
     /// <summary>Settings' switch for one action: shown on the page or not.</summary>
     public void SetShown(QuickActionId id, bool shown)
     {
         var keys = QuickAction.All.Where(a => a.Id == id ? shown : Settings.Shows(a.Id)).Select(a => a.Key);
-        Save(Settings with { Shown = [.. keys] });
+        Save(Settings with { Shown = [.. keys], Layout = [.. Layout] });
     }
 
     public void Keep(string path)
@@ -215,17 +237,21 @@ public sealed class QuickActionsModule : IFeatureModule
     public Task QuitAsync(OpenApp app) => ThenRefresh(Pc.QuitAsync(app));
 
     /// <summary>Asks each app to close, all of them even when one refuses (an elevated app); then throws once if any did.</summary>
-    public async Task QuitAllAsync(bool keepFront)
+    public Task QuitAllAsync(bool keepFront) => QuitAllAsync(Quitting(keepFront));
+
+    /// <summary>Close only the exact app set reviewed in a confirmation, even if another app opens meanwhile.</summary>
+    public async Task QuitAllAsync(IReadOnlyList<OpenApp> apps)
     {
         var failed = new List<Exception>();
-        foreach (var app in Quitting(keepFront))
+        var refused = new List<OpenApp>();
+        foreach (var app in apps.ToArray())
         {
             try { await Pc.QuitAsync(app); }
-            catch (Exception ex) { failed.Add(ex); }
+            catch (Exception ex) { failed.Add(ex); refused.Add(app); }
         }
         await RefreshAsync();
         if (failed.Count > 0)
-            throw new AggregateException("Quit all failed", failed);
+            throw new QuitAppsException(refused, failed);
     }
 
     public Task EndFrozenAppsAsync() => ThenRefresh(Pc.EndFrozenAppsAsync());
@@ -338,7 +364,9 @@ public sealed class QuickActionsModule : IFeatureModule
                     return;
                 }
                 _page?.ShowPending();
+                return;
             }
+            _page?.ShowSucceeded(id);
         }
         catch (Exception ex)
         {

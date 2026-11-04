@@ -1,0 +1,60 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- The whole Actions tile is a target. Local styles keep this feature independent of the shell's icon-only tiles. -->
+    <Style x:Key="ActionGalleryBaseStyle" TargetType="ButtonBase">
+        <Setter Property="Background" Value="{DynamicResource IslandGalleryFaceBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource IslandTextBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource IslandCardBorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="FocusVisualStyle" Value="{DynamicResource IslandTileFocusVisual}" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="VerticalContentAlignment" Value="Stretch" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ButtonBase">
+                    <Border x:Name="Chrome" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6">
+                        <ContentPresenter HorizontalAlignment="Stretch" VerticalAlignment="Stretch" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource IslandAccentBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Chrome" Property="Opacity" Value="0.82" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="Chrome" Property="Opacity" Value="0.5" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="{DynamicResource IslandGalleryHoverBrush}" />
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+    <Style x:Key="ActionGalleryButtonStyle" TargetType="Button" BasedOn="{StaticResource ActionGalleryBaseStyle}" />
+    <Style x:Key="ActionGalleryToggleStyle" TargetType="ToggleButton" BasedOn="{StaticResource ActionGalleryBaseStyle}">
+        <Style.Triggers>
+            <Trigger Property="IsChecked" Value="True">
+                <Setter Property="Background" Value="{DynamicResource IslandAccentFillBrush}" />
+                <Setter Property="BorderBrush" Value="Transparent" />
+                <Setter Property="Foreground" Value="{DynamicResource IslandOnAccentBrush}" />
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+    <Style x:Key="ActionEditorTileStyle" TargetType="ToggleButton" BasedOn="{StaticResource ActionGalleryBaseStyle}">
+        <Setter Property="Foreground" Value="{DynamicResource IslandTextSecondaryBrush}" />
+        <Style.Triggers>
+            <Trigger Property="IsChecked" Value="True">
+                <Setter Property="Background" Value="{DynamicResource IslandAccentTintBrush}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource IslandAccentBrush}" />
+                <Setter Property="Foreground" Value="{DynamicResource IslandTextBrush}" />
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+</ResourceDictionary>

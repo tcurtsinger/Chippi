@@ -35,10 +35,11 @@ internal static class Ui
     {
         var button = new Button { Content = text };
         button.SetResourceReference(FrameworkElement.StyleProperty, style);
+        AutomationProperties.SetName(button, text);
         return button;
     }
 
-    /// <summary>A row's icon button, 24 × 24 with a 14 glyph, with its name for Narrator.</summary>
+    /// <summary>A row's icon button, 24 x 24 with a 14 glyph, with its name for Narrator.</summary>
     public static Button Icon(Geometry icon, string name)
     {
         var button = new Button { Content = Glyph(icon, 14, "IslandTextSecondaryBrush"), ToolTip = name, Width = 24 };
@@ -92,8 +93,8 @@ internal static class Ui
         return block;
     }
 
-    /// <summary>A question under <paramref name="anchor"/>: the question, then Cancel and the verb (Critical) (DESIGN.md §3).</summary>
-    public static Popup Confirm(UIElement anchor, string question, string verb, Action confirmed)
+    /// <summary>A question under <paramref name="anchor"/>: the question, then Cancel and the verb (Critical).</summary>
+    public static Popup Confirm(UIElement anchor, string question, string verb, Action confirmed, string? detail = null)
     {
         var popup = new Popup { PlacementTarget = anchor, Placement = PlacementMode.Bottom, VerticalOffset = 2, StaysOpen = false, AllowsTransparency = true, PopupAnimation = PopupAnimation.None };
         var cancel = Button("Cancel");
@@ -110,14 +111,22 @@ internal static class Ui
             Margin = new Thickness(16),
             Children =
             {
-                // A long app name in "Quit all but …?" wraps rather than losing the app spared.
+                // A long app name wraps rather than losing the app spared.
                 new TextBlock { Text = question, FontSize = 12, TextWrapping = TextWrapping.Wrap }.WithForeground("IslandTextBrush"),
                 new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 16, 0, 0), Children = { cancel, act } },
             },
         };
-        var panel = new Border { Width = 260, CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(1), Child = body };
+        if (!string.IsNullOrEmpty(detail))
+        {
+            var kept = new TextBlock { Text = detail, FontSize = 11, TextWrapping = TextWrapping.Wrap, TextTrimming = TextTrimming.CharacterEllipsis, MaxHeight = 96, ToolTip = detail, Margin = new Thickness(0, 6, 0, 0) }.WithForeground("IslandTextSecondaryBrush");
+            // Exception names stay with the reviewed choice, including the full names in the tooltip.
+            body.Children.Insert(1, kept);
+        }
+        var panel = new Border { Width = 280, CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(1), Child = body };
         panel.SetResourceReference(Border.BackgroundProperty, "IslandBrush");
         panel.SetResourceReference(Border.BorderBrushProperty, "IslandBorderBrush");
+        KeyboardNavigation.SetTabNavigation(panel, KeyboardNavigationMode.Cycle);
+        KeyboardNavigation.SetControlTabNavigation(panel, KeyboardNavigationMode.Cycle);
         panel.PreviewKeyDown += (_, e) =>
         {
             if (e.Key != Key.Escape)
@@ -127,6 +136,7 @@ internal static class Ui
         };
         popup.Child = panel;
         popup.Opened += (_, _) => cancel.Focus();
+        popup.Closed += (_, _) => { if (anchor.IsVisible && anchor.IsEnabled) anchor.Focus(); };
         return popup;
     }
 }
