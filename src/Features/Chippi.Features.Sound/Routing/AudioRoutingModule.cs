@@ -156,7 +156,7 @@ public sealed partial class AudioRoutingModule : IFeatureModule
         return settings;
     }
 
-    private Task EnforceAsync(AudioFlow flow)
+    private Task EnforceAsync(AudioFlow flow, bool preserveExternalChoice = false)
     {
         var list = Settings.For(flow);
         var pick = PickFor(flow);
@@ -169,7 +169,7 @@ public sealed partial class AudioRoutingModule : IFeatureModule
                     IReadOnlyList<PriorityEntry> order = pick is not null && pick.Holds(available.Select(e => e.Id)) ? [new(pick.Id, pick.Id), .. list.Devices] : list.Devices;
                     var id = PriorityPolicy.Resolve(order, available);
                     return available.FirstOrDefault(e => Eq(e.Id, id))?.Id;
-                })
+                }, preserveExternalChoice)
             : _audio!.ReleaseRolesAsync(RoleOwner.Routing, flow);
     }
 
@@ -326,24 +326,27 @@ public sealed partial class AudioRoutingModule : IFeatureModule
         {
             if (_context is null || _stopping) return;
             var refreshed = RefreshLists(Settings, Snapshot);
-            bool listed = !ReferenceEquals(refreshed.Output, Settings.Output) || !ReferenceEquals(refreshed.Microphone, Settings.Microphone);
-            if (listed)
+            bool outputListed = !ReferenceEquals(refreshed.Output, Settings.Output);
+            bool micListed = !ReferenceEquals(refreshed.Microphone, Settings.Microphone);
+            if (outputListed || micListed)
             {
                 _context.Settings.Save(refreshed);
                 Settings = refreshed;
             }
             // A device came or went: a pick made before it is spent, so the list decides again.
-            bool spent = false;
             foreach (var flow in new[] { AudioFlow.Render, AudioFlow.Capture })
+            {
+                bool listed = flow == AudioFlow.Render ? outputListed : micListed;
+                bool spent = false;
                 if (PickFor(flow) is { } pick && !pick.Holds(Connected(flow)))
                 {
                     SetPick(flow, null);
                     spent = true;
                 }
-            if (listed || spent)
-            {
-                await EnforceAsync(AudioFlow.Render);
-                await EnforceAsync(AudioFlow.Capture);
+                // A microphone change must not reset an output choice, nor should a device rename
+                // look like an explicit routing edit. The arbiter detects actual output topology.
+                if (listed || spent)
+                    await EnforceAsync(flow, preserveExternalChoice: true);
             }
             UpdateTiles();
         }

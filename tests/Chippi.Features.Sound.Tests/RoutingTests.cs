@@ -126,7 +126,7 @@ public sealed class RoutingTests
         await f.Module.SetCallsAsync(flow, false);
         f.System.ChangeDefault("B");
         await f.Audio.RefreshAsync();
-        Assert.Equal("A", f.System.DefaultOf(flow, AudioRole.Multimedia));
+        Assert.Equal(flow == AudioFlow.Render ? "B" : "A", f.System.DefaultOf(flow, AudioRole.Multimedia));
         Assert.Equal("B", f.System.DefaultOf(flow, AudioRole.Communications));
         await f.Module.SetEnabledAsync(flow, false);
         f.System.ChangeDefault("B");
@@ -266,7 +266,10 @@ public sealed class RoutingTests
         await f.Module.UseAsync(AudioFlow.Render, "Speakers");
         Assert.Equal("Speakers", f.System.DefaultOf(AudioFlow.Render, AudioRole.Multimedia));
         Assert.Equal(["Headset", "Speakers"], f.Module.Settings.Output.Devices.Select(d => d.Id)); // the order stays
-        f.System.ChangeDefault("Headset"); // Windows drifts: switching puts the pick back
+        f.System.ChangeDefault("Headset"); // A newer Windows choice supersedes the Chippi pick.
+        await f.Audio.RefreshAsync();
+        Assert.Equal("Headset", f.System.DefaultOf(AudioFlow.Render, AudioRole.Multimedia));
+        f.System.ChangeDefault("Speakers");
         await f.Audio.RefreshAsync();
         Assert.Equal("Speakers", f.System.DefaultOf(AudioFlow.Render, AudioRole.Multimedia));
 
@@ -288,6 +291,77 @@ public sealed class RoutingTests
         await f.Module.MoveAsync(AudioFlow.Render, "B", 0);
         Assert.Equal("B", f.System.DefaultOf(AudioFlow.Render, AudioRole.Multimedia));
         Assert.Equal(["B", "A", "C"], f.Module.Order(AudioFlow.Render).Select(e => e.Id));
+    }
+
+    [Fact]
+    public async Task Windows_output_choice_survives_microphone_changes_and_device_label_refreshes()
+    {
+        await using var f = new RoutingFixture();
+        f.System.With(Speaker("Speakers"), Speaker("Earbuds"), Mic("Mic")).WithDefault("Speakers").WithDefault("Mic");
+        await f.Start();
+        f.System.ChangeDefault("Earbuds");
+        await f.Audio.RefreshAsync();
+        Assert.Equal("Earbuds", f.Module.InUse(AudioFlow.Render));
+
+        f.System.Connect(Mic("Headset mic"));
+        await Until(() => f.Module.Settings.Microphone.Devices.Count == 2);
+        await f.Module.UseAsync(AudioFlow.Capture, "Headset mic"); // Waits for the background refresh gate, too.
+        f.System.With(Speaker("Earbuds", "Renamed earbuds"));
+        f.System.Raise(DeviceChange.Devices);
+        await Until(() => f.Module.Settings.Output.Devices.Any(e => e.Name == "Renamed earbuds"));
+        await f.Module.SetCallsAsync(AudioFlow.Capture, false);
+        f.System.Disconnect("Headset mic");
+        await f.Audio.RefreshAsync();
+        await Until(() => f.Module.InUse(AudioFlow.Capture) == "Mic");
+
+        Assert.Equal("Earbuds", f.Module.InUse(AudioFlow.Render));
+        Assert.Equal("Renamed earbuds", f.Module.CurrentName(AudioFlow.Render));
+        Assert.Equal(["Speakers", "Earbuds"], f.Settings.Value.Output.Devices.Select(e => e.Id));
+        Assert.DoesNotContain(f.System.Writes, w => w.Id is "Speakers" or "Earbuds");
+        Assert.DoesNotContain(f.Notices.Sent, n => n.Kind == "output-switched");
+    }
+
+    [Fact]
+    public async Task Windows_output_choice_ends_on_explicit_pick_or_output_settings_edit()
+    {
+        await using var f = new RoutingFixture();
+        f.System.With(Speaker("A"), Speaker("B"), Speaker("C")).WithDefault("A");
+        await f.Start();
+        f.System.ChangeDefault("B");
+        await f.Audio.RefreshAsync();
+        Assert.Equal("B", f.Module.InUse(AudioFlow.Render));
+        await f.Module.UseAsync(AudioFlow.Render, "C");
+        Assert.Equal("C", f.Module.InUse(AudioFlow.Render));
+
+        f.System.ChangeDefault("B");
+        await f.Audio.RefreshAsync();
+        Assert.Equal("B", f.Module.InUse(AudioFlow.Render));
+        await f.Module.SetCallsAsync(AudioFlow.Render, false);
+        Assert.Equal("A", f.Module.InUse(AudioFlow.Render));
+        Assert.Equal(["A", "B", "C"], f.Settings.Value.Output.Devices.Select(e => e.Id));
+    }
+
+    [Fact]
+    public async Task Windows_output_choice_ends_when_render_devices_disconnect_or_reconnect()
+    {
+        await using var f = new RoutingFixture();
+        f.System.With(Speaker("A"), Speaker("B"), Speaker("C")).WithDefault("A");
+        await f.Start();
+        f.System.ChangeDefault("B");
+        await f.Audio.RefreshAsync();
+        Assert.Equal("B", f.Module.InUse(AudioFlow.Render));
+
+        f.System.Disconnect("A");
+        await f.Audio.RefreshAsync();
+        Assert.Equal("B", f.Module.InUse(AudioFlow.Render));
+        f.System.Connect(Speaker("A"));
+        await f.Audio.RefreshAsync();
+        Assert.Equal("A", f.Module.InUse(AudioFlow.Render));
+        f.System.ChangeDefault("B");
+        await f.Audio.RefreshAsync();
+        f.System.Disconnect("C"); // Losing a lower priority device also spends the choice.
+        await f.Audio.RefreshAsync();
+        Assert.Equal("A", f.Module.InUse(AudioFlow.Render));
     }
 
     [Fact]

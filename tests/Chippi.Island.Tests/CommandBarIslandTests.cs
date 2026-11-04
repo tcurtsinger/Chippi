@@ -30,7 +30,9 @@ public sealed class CommandBarIslandTests
         WpfTestThread.Run(() => IslandWindowTests.WithShownIsland(window =>
         {
             int activated = 0;
-            window.Panel.ActivateWindow = _ => activated++;
+            bool foreground = false;
+            window.Panel.IsForegroundWindow = _ => foreground;
+            window.Panel.ActivateWindow = _ => { activated++; foreground = true; };
             var field = new TextBox { Height = 32 };
             window.SetTiles(Tiles(field));
             Assert.True(window.ShowPage("other"));
@@ -48,7 +50,9 @@ public sealed class CommandBarIslandTests
     {
         WpfTestThread.Run(() => IslandWindowTests.WithShownIsland(window =>
         {
-            window.Panel.ActivateWindow = _ => { };
+            bool foreground = false;
+            window.Panel.IsForegroundWindow = _ => foreground;
+            window.Panel.ActivateWindow = _ => foreground = true;
             window.SetTiles(Tiles(new TextBox { Height = 32 }));
             window.SetSuppressed(true);
             Assert.False(window.IsVisible);

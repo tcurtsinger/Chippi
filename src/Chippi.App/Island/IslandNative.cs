@@ -109,6 +109,9 @@ internal static class IslandNative
             PInvoke.SetForegroundWindow(hwnd);
     }
 
+    /// <summary>Whether the window actually owns the foreground, including after a refused activation.</summary>
+    public static bool IsForeground(HWND hwnd) => hwnd != default && PInvoke.GetForegroundWindow() == hwnd;
+
     public static Rect WindowRect(HWND hwnd) =>
         hwnd != default && PInvoke.GetWindowRect(hwnd, out var r) ? ToRect(r) : Rect.Empty;
 

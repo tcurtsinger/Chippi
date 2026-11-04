@@ -11,8 +11,9 @@ namespace Chippi.Audio;
 /// Processing wins while it claims, and a role nobody claims is left to Windows. Engine thread only.
 /// </summary>
 /// <remarks>
-/// Every enforce compares the target with the default Windows reports now, so the notification
-/// echo of our own write finds nothing to do and is never counted as someone else's change.
+/// Output routing respects a new default chosen outside Chippi until the connected output devices
+/// change or the user makes an explicit routing choice. Capture and Processing keep enforcing their
+/// targets. Successful writes become the observed default, so their notification echoes are ignored.
 /// </remarks>
 internal sealed class RoleArbiter(ILogger logger, TimeProvider time, TimeSpan? backoff = null)
 {
@@ -28,10 +29,16 @@ internal sealed class RoleArbiter(ILogger logger, TimeProvider time, TimeSpan? b
 
     private sealed class OwnerClaim(RoleTarget target)
     {
-        public RoleTarget Target { get; } = target;
+        public RoleTarget Target { get; set; } = target;
 
         // Set until the first enforce after the claim, so that write is reported as Claim, not Switch.
         public bool Fresh { get; set; } = true;
+
+        // Render routing only. An actual default change is a temporary choice, just like a pick in
+        // Chippi; a persistent mismatch after a failed write is not a new choice.
+        public HashSet<string>? Connected { get; set; }
+        public string? ObservedDefault { get; set; }
+        public string? ExternalChoice { get; set; }
     }
 
     private readonly Dictionary<RoleKey, Dictionary<RoleOwner, OwnerClaim>> _claims = [];
@@ -49,7 +56,7 @@ internal sealed class RoleArbiter(ILogger logger, TimeProvider time, TimeSpan? b
     /// <paramref name="owner"/> claims <paramref name="roles"/> of <paramref name="flow"/> and drops
     /// any other role of that flow it held, so turning "Communications device" off frees Communications.
     /// </summary>
-    public void Claim(RoleOwner owner, AudioFlow flow, IReadOnlyCollection<AudioRole> roles, RoleTarget target)
+    public void Claim(RoleOwner owner, AudioFlow flow, IReadOnlyCollection<AudioRole> roles, RoleTarget target, bool preserveExternalChoice = false)
     {
         ArgumentOutOfRangeException.ThrowIfEqual(owner, RoleOwner.None);
         foreach (var role in AllRoles)
@@ -59,7 +66,10 @@ internal sealed class RoleArbiter(ILogger logger, TimeProvider time, TimeSpan? b
             {
                 if (!_claims.TryGetValue(key, out var owners))
                     _claims[key] = owners = [];
-                owners[owner] = new OwnerClaim(target);
+                if (preserveExternalChoice && owner == RoleOwner.Routing && flow == AudioFlow.Render && owners.TryGetValue(owner, out var existing))
+                    existing.Target = target;
+                else
+                    owners[owner] = new OwnerClaim(target);
                 _repairs.Remove(key);
                 _backoffUntil.Remove(key);
             }
@@ -142,7 +152,22 @@ internal sealed class RoleArbiter(ILogger logger, TimeProvider time, TimeSpan? b
             var fresh = claim.Fresh;
             claim.Fresh = false;
 
-            var target = claim.Target(catalog.Active(key.Flow));
+            var active = catalog.Active(key.Flow);
+            var current = catalog.Default(key);
+            var respectExternalChoice = owner == RoleOwner.Routing && key.Flow == AudioFlow.Render;
+            if (respectExternalChoice)
+            {
+                var connected = active.Select(e => e.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
+                var sameDevices = claim.Connected?.SetEquals(connected) == true;
+                if (!sameDevices)
+                    claim.ExternalChoice = null;
+                else if (!fresh && !PriorityPolicy.Eq(current, claim.ObservedDefault) && current is not null && connected.Contains(current))
+                    claim.ExternalChoice = current;
+                claim.Connected = connected;
+                claim.ObservedDefault = current;
+            }
+
+            var target = claim.ExternalChoice ?? claim.Target(active);
             if (target is null)
             {
                 // Nothing listed is available: leave Windows' choice alone. Forgetting the last
@@ -153,7 +178,7 @@ internal sealed class RoleArbiter(ILogger logger, TimeProvider time, TimeSpan? b
 
             var hadLast = _last.TryGetValue(key, out var last);
             _last[key] = (owner, target);
-            if (PriorityPolicy.Eq(catalog.Default(key), target))
+            if (PriorityPolicy.Eq(current, target))
                 continue;
 
             var kind = fresh || (hadLast && last.Owner != owner) ? RoleChangeKind.Claim
@@ -163,7 +188,11 @@ internal sealed class RoleArbiter(ILogger logger, TimeProvider time, TimeSpan? b
                 continue;
 
             if (Write(target, key, owner, kind.ToString(), system))
+            {
+                if (respectExternalChoice)
+                    claim.ObservedDefault = target;
                 applied.Add((key, target, owner, kind));
+            }
         }
 
         return applied

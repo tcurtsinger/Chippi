@@ -59,7 +59,7 @@ public partial class IslandPanelWindow : Window
     private IslandLayout _layout = IslandLayout.Default;
     private IReadOnlyList<IslandTileGroup> _groups = [];
     private IReadOnlyList<IslandTool> _tools = [];
-    private readonly SegmentedControl _audioTabs = new();
+    private readonly IslandAudioTabs _audioTabs = new();
     internal bool? AudioShowsMixer { get; private set; }
     private IReadOnlyList<IslandActivity> _activities = [];
     private IMediaSessions? _media;
@@ -89,7 +89,7 @@ public partial class IslandPanelWindow : Window
     private double _fadeFrom;
     private long? _lastFrame;
     private EventHandler? _frame;
-    private bool _keyboard;
+    private readonly IslandKeyboardHandoff _keyboard = new();
 
     public IslandPanelWindow()
     {
@@ -165,8 +165,8 @@ public partial class IslandPanelWindow : Window
     /// <summary>The page showing: a tile key, or null for the grid.</summary>
     internal string? CurrentPage => _page;
 
-    /// <summary>Whether the island took the keyboard after the user clicked into it.</summary>
-    internal bool HasKeyboard => _keyboard;
+    /// <summary>Whether the user requested the keyboard during this opening (Windows may refuse activation).</summary>
+    internal bool HasKeyboard => _keyboard.Requested;
 
     /// <summary>The app in front, read just before the island takes the keyboard (Phase 5 notes #62).</summary>
     internal Func<Core.Clipboard.PasteTarget?>? CaptureTarget { get; set; }
@@ -174,8 +174,11 @@ public partial class IslandPanelWindow : Window
     /// <summary>Brings the island in front to take the keyboard; tests stand in for it, so none takes the owner's foreground.</summary>
     internal Action<HWND> ActivateWindow { get; set; } = IslandNative.Activate;
 
+    /// <summary>Checks the real foreground instead of treating an activation attempt as success.</summary>
+    internal Func<HWND, bool> IsForegroundWindow { get; set; } = IslandNative.IsForeground;
+
     /// <summary>The app that was in front before the island took the keyboard; null until it has, and after it closes.</summary>
-    internal Core.Clipboard.PasteTarget? PasteTarget { get; private set; }
+    internal Core.Clipboard.PasteTarget? PasteTarget => _keyboard.PasteTarget;
 
     /// <summary>Lets the page use Esc first (a search to clear): true when it did, and the island stays open.</summary>
     internal bool PageHandlesEscape()
@@ -422,8 +425,7 @@ public partial class IslandPanelWindow : Window
             _widgetLocal = Local(now);
             SetWidgetTab(tabExtension, opensLeft);
         }
-        _keyboard = false;
-        PasteTarget = null;
+        _keyboard.Reset();
         MarkOnScreen();
         if (immediate)
             Collapse();
@@ -471,15 +473,22 @@ public partial class IslandPanelWindow : Window
         {
             if (focusTab && _audioTabs.IsVisible)
                 Dispatcher.BeginInvoke(DispatcherPriority.Input, () =>
-                    (_audioTabs.ItemContainerGenerator.ContainerFromIndex(_audioTabs.SelectedIndex) as ListBoxItem)?.Focus());
+                {
+                    if (IsOpen && IsForegroundWindow(_hwnd))
+                        (_audioTabs.ItemContainerGenerator.ContainerFromIndex(_audioTabs.SelectedIndex) as ListBoxItem)?.Focus();
+                });
             return;
         }
         Reshape(snap: false);
         _pageFrom = key is null ? -1 : 1;
         if (_frame is null || _morph != Morph.Open)
             Begin(Morph.Page); // a shortcut during the open reveals the requested page through the same growing outline
-        if (_keyboard)
-            Dispatcher.BeginInvoke(DispatcherPriority.Input, FocusFirst);
+        if (_keyboard.Requested && IsForegroundWindow(_hwnd))
+            Dispatcher.BeginInvoke(DispatcherPriority.Input, () =>
+            {
+                if (IsOpen && IsForegroundWindow(_hwnd))
+                    FocusFirst();
+            });
         else if (TakesKeyboard(key))
             TakeKeyboard();
     }
@@ -872,21 +881,21 @@ public partial class IslandPanelWindow : Window
     // ----- Keyboard -----
 
     /// <summary>
-    /// The first press inside the island: it becomes the foreground window, so Tab, arrows and Enter
-    /// reach it the normal way. Until then only the Esc hook watches the keyboard (no global hook takes
-    /// keys from the app in front).
+    /// A press inside the island requests the foreground, so Tab, arrows and Enter reach it normally.
+    /// Retry on a later press if Windows refused activation or another app reclaimed the foreground.
+    /// Until activation only the Esc hook watches the keyboard (no global hook takes other apps' keys).
     /// </summary>
     private void TakeKeyboard(DependencyObject? pressed)
     {
-        if (_keyboard || !IsOpen)
+        if (!IsOpen || !_keyboard.Take(_hwnd, IsForegroundWindow, CaptureTarget, ActivateWindow))
             return;
-        _keyboard = true;
-        // Before activating: once the island is in front, the app the user was in is gone from view.
-        PasteTarget = CaptureTarget?.Invoke() ?? PasteTarget;
-        ActivateWindow(_hwnd);
         var focusAtActivation = Keyboard.FocusedElement;
         Dispatcher.BeginInvoke(DispatcherPriority.Input, () =>
         {
+            // Focus() itself can activate a WPF window. Do not use it to fight a game that kept
+            // or reclaimed the foreground; the next deliberate press can retry the handoff.
+            if (!IsOpen || !IsForegroundWindow(_hwnd))
+                return;
             // A composite control can focus its slider during the bubbling press, after our preview.
             if (pressed is not null && IsKeyboardFocusWithin && Keyboard.FocusedElement != focusAtActivation)
                 return;
