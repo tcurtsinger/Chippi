@@ -44,7 +44,7 @@ Unknown tags stay as typed, so a typo shows. `{{date}}`, `{{time}}`, `{{datetime
 
 Under Clipboard & text: **Text snippets.**
 
-1. Switch "Expand snippets while typing".
+1. Switch "Expand snippets while typing". Off until Travis turns it on, even once Text snippets is installed (decided, task 226).
 2. The list, grouped by folder, with a search; each row: name, trigger, Expand, enabled switch.
 3. **Add snippet** opens the editor (New snippet, Edit snippet) with the fields above, Save, Delete (a confirm: "Delete this snippet?" with Cancel and Delete) and Cancel.
 4. Apps to leave alone (Add an app, Remove).

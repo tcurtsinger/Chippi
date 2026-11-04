@@ -32,7 +32,7 @@ Settings › Shortcuts, top to bottom:
 2. **Add shortcut.** Pick an action (the Radial menu's picker), then a door: "Press a shortcut" (recorder), "Caps +" then a key, or "Press a mouse button" ("Now press an extra button or move the side wheel." with Cancel; the press is taken and swallowed). Save and Cancel.
 3. **Caps Lock section:** the held key, Hold modifiers and its checkboxes, the tap action, apps to leave alone.
 4. **Mouse buttons section:** Apps to leave alone ("Your extra mouse buttons stay quiet in these apps, and the press reaches them instead."), Add an app, Remove.
-5. A section's switch is off by default. Always on (Kayla's brief) is not repeated here.
+5. A section's switch is off until Travis turns it on, even once Shortcuts is installed (decided, task 226). Always on (Kayla's brief) is not repeated here.
 
 Empty state: "No shortcuts yet. Add the first one."
 

@@ -22,11 +22,11 @@ Time each event with `Stopwatch.GetTimestamp()` on entry to the hook, not the ev
 
 ## Fullscreen
 
-Debounce follows the one **Always on** switch like every Phase 6 input feature (Travis, task 211 #1): off, it pauses while a fullscreen game or app is in front on that display; on, it acts everywhere. A swallowed down still has its up swallowed after a pause begins, so nothing sticks. Kayla suggested it ignore the pause, since it only drops input; Travis said no.
+Debounce follows the one **Always on** switch like every Phase 6 input feature (Travis, task 211 #1): off, it pauses whenever the window in front is a fullscreen game or app, on every display; on, it acts everywhere. A swallowed down still has its up swallowed after a pause begins, so nothing sticks. Kayla suggested it ignore the pause, since it only drops input; Travis said no.
 
 ## Settings
 
-No page of its own, no home tile, no action tile. Rows, off by default:
+No page of its own, no home tile, no action tile. Rows. Decided (Travis, task 226): each switch is off until he turns it on, including right after Debounce is installed.
 
 - **Settings › Windows › Mouse:** "Ignore accidental double clicks", a switch, and its window (the number with a slider, in ms).
 - **Settings › Windows › Keyboard:** "Ignore key chatter", a switch, its window, and "Keys with their own window" (Add key, then the key and its window, Remove). Key capture is the existing recorder.
