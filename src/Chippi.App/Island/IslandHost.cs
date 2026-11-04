@@ -68,6 +68,7 @@ public sealed class IslandHost : IDisposable
         {
             s.IslandLastPage = key;
             s.IslandAudioShowsMixer = _window.Panel.AudioShowsMixer;
+            s.IslandAudioPage = _window.Panel.AudioPage;
         });
         // A page's Paste goes to the app that was in front before the island took the keyboard (Phase 5 notes #62).
         _window.CaptureTarget = () => _shell.Clipboard.CaptureTarget();
@@ -258,7 +259,7 @@ public sealed class IslandHost : IDisposable
                 Chippi.UI.Themes.ThemeManager.Apply(theme);
                 var color = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(backdrop);
                 string prefix = $"s6-top-{theme}".ToLowerInvariant();
-                UpdateSettings(s => (s.IslandX, s.IslandY, s.IslandLastPage, s.IslandAudioShowsMixer) = (null, null, null, null));
+                UpdateSettings(s => (s.IslandX, s.IslandY, s.IslandLastPage, s.IslandAudioShowsMixer, s.IslandAudioPage) = (null, null, null, null, null));
                 await Task.Delay(settle);
                 _window.ForceOpen(true);
                 await Task.Delay(settle);
@@ -289,8 +290,8 @@ public sealed class IslandHost : IDisposable
         finally
         {
             _shell.Island.ClearModule(DebugModuleId);
-            UpdateSettings(s => (s.IslandX, s.IslandY, s.IslandLastPage, s.IslandAudioShowsMixer) =
-                (original.IslandX, original.IslandY, original.IslandLastPage, original.IslandAudioShowsMixer));
+            UpdateSettings(s => (s.IslandX, s.IslandY, s.IslandLastPage, s.IslandAudioShowsMixer, s.IslandAudioPage) =
+                (original.IslandX, original.IslandY, original.IslandLastPage, original.IslandAudioShowsMixer, original.IslandAudioPage));
             Chippi.UI.Themes.ThemeManager.Apply(original.Theme);
         }
     }
@@ -403,7 +404,7 @@ public sealed class IslandHost : IDisposable
         var settings = _shell.Config.GetSection<AppSettings>(AppSettings.SectionName);
         _window.SetPetColor(settings.PetColor);
         _window.SetPlacement(settings.IslandX, settings.IslandY);
-        _window.SetLastPage(settings.IslandLastPage, settings.IslandAudioShowsMixer);
+        _window.SetLastPage(settings.IslandLastPage, settings.IslandAudioShowsMixer, settings.IslandAudioPage);
         _window.SetLayout(IslandLayout.From(settings));
         _window.SetNowPlayingAlwaysShow(settings.NowPlayingAlwaysShow);
         _window.SetEnabled(settings.IslandEnabled);

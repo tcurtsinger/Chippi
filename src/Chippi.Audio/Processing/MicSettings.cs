@@ -10,6 +10,9 @@ namespace Chippi.Audio.Processing;
 /// </summary>
 public sealed class MicSettings
 {
+    /// <summary>Voice-only silence after DSP; soundboard audio joins the cable in a separate stream.</summary>
+    public bool VoiceMuted { get; internal set; }
+
     /// <summary>RNNoise neural noise suppression.</summary>
     public bool Suppression { get; set; } = true;
 

@@ -22,11 +22,12 @@ public sealed class MicrophoneMuteTests : IAsyncDisposable
     private bool Muted(string id) => _system.GetLevel(id).Muted;
 
     [Fact]
-    public async Task Toggle_mutes_every_capture_including_cable_but_never_speakers_then_unmutes_all()
+    public async Task Toggle_mutes_physical_mics_but_leaves_virtual_audio_and_speakers_independent()
     {
         _system.With(Mic("A"), Mic("B"), CableOutput(), Speaker("Output"));
         await _audio.ToggleMicrophoneMuteAsync();
-        Assert.All(new[] { "A", "B", "CableOut" }, id => Assert.True(Muted(id)));
+        Assert.All(new[] { "A", "B" }, id => Assert.True(Muted(id)));
+        Assert.False(Muted("CableOut"));
         Assert.False(Muted("Output"));
         Assert.Equal(MicrophoneMuteState.Muted, _audio.Snapshot.MicrophoneMute.State);
         await _audio.ToggleMicrophoneMuteAsync();
@@ -106,6 +107,7 @@ public sealed class MicrophoneMuteTests : IAsyncDisposable
     public async Task Pipeline_rebuild_does_not_unmute_source_or_transport()
     {
         _system.With(Mic("A"), CableInput(), CableOutput()).WithDefault("A");
+        _system.ChangeLevel("CableOut", new(1, true)); // An external cable mute belongs to Windows.
         await _audio.ToggleMicrophoneMuteAsync();
         var request = new ProcessingRequest(active => active.Last().Id, new(), false, _ => { });
         await _audio.SetProcessingAsync(request);

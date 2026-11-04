@@ -141,6 +141,7 @@ public sealed class MicPipeline : IMicPipeline
         _suppressor = new RnnoiseSuppressor(chain, settings);
         chain = new NoiseGate(_suppressor, settings);
         chain = new AutoGain(chain, settings);
+        chain = new VoiceMuteProvider(chain, settings);
         chain = _outputMeter = new MeterTap(chain);
 
         var mix = transport.MixFormat;
@@ -222,5 +223,19 @@ public sealed class MicPipeline : IMicPipeline
         _capture.Dispose();
         _captureDevice.Dispose();
         _enumerator.Dispose();
+    }
+}
+
+/// <summary>Clears buffered speech immediately when the selected physical microphone is muted.</summary>
+internal sealed class VoiceMuteProvider(ISampleProvider source, MicSettings settings) : ISampleProvider
+{
+    public WaveFormat WaveFormat => source.WaveFormat;
+
+    public int Read(float[] buffer, int offset, int count)
+    {
+        int read = source.Read(buffer, offset, count);
+        if (settings.VoiceMuted)
+            Array.Clear(buffer, offset, read);
+        return read;
     }
 }

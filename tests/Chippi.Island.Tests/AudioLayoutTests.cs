@@ -47,6 +47,7 @@ public sealed class AudioLayoutTests
     [Theory]
     [InlineData("sound")]
     [InlineData("sound.mixer")]
+    [InlineData("sound.board")]
     public void Single_installed_view_respects_its_previous_visibility(string key)
     {
         var layout = IslandLayout.Default with { Hidden = new HashSet<string> { key } };
@@ -71,5 +72,32 @@ public sealed class AudioLayoutTests
     {
         var layout = IslandLayout.Default with { Order = ["clipboard", "audio"] };
         Assert.Equal(["clipboard", "audio"], layout.Tools([Tool("sound.mixer"), Tool("clipboard"), Tool("sound")]).Select(t => t.Key));
+    }
+
+    [Fact]
+    public void Three_audio_pages_share_the_existing_gallery_position()
+    {
+        var layout = IslandLayout.Default with { Order = ["clipboard", "audio"] };
+        var tools = layout.Tools([Tool("sound.board"), Tool("sound.mixer"), Tool("clipboard"), Tool("sound")]);
+        Assert.Equal(["clipboard", "audio"], tools.Select(t => t.Key));
+        Assert.Equal("sound", tools[1].Source.Key);
+        Assert.Equal(["Devices", "App volume", "Soundboard"], IslandTool.AudioPages.Select(IslandTool.AudioPageName));
+    }
+
+    [Theory]
+    [InlineData("sound.board", "clipboard", true, "sound.board")]
+    [InlineData(null, "sound.board", true, "sound.board")]
+    [InlineData("unknown", "clipboard", true, "sound.mixer")]
+    [InlineData(null, "clipboard", false, "sound")]
+    public void New_audio_memory_wins_and_legacy_settings_migrate(string? saved, string last, bool mixer, string expected) =>
+        Assert.Equal(expected, IslandTool.RememberedAudioPage(saved, last, mixer));
+
+    [Fact]
+    public void Removing_a_page_falls_back_to_an_installed_audio_view()
+    {
+        Assert.Equal("sound.board", IslandTool.ResolveAudioPage("sound.board", ["sound", "sound.board"]));
+        Assert.Equal("sound", IslandTool.ResolveAudioPage("sound.board", ["sound", "sound.mixer"]));
+        Assert.Equal("sound.board", IslandTool.ResolveAudioPage("sound", ["sound.board"]));
+        Assert.Null(IslandTool.ResolveAudioPage("sound.board", ["clipboard"]));
     }
 }

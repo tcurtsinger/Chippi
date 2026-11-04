@@ -12,6 +12,8 @@ dotnet publish src\Chippi.App\Chippi.App.csproj -p:PublishProfile=win-arm64
 
 Both profiles are self-contained and single-file, with native libraries extracted by .NET and trimming disabled for WPF. Output: build/artifacts/publish/<RID>. No architecture-specific PlatformTarget is introduced.
 
+Publishing prepares native Soundboard link-import helpers for the selected runtime using `build/prepare-soundboard-tools.ps1`. Versions, official download URLs, sizes and SHA-256 hashes are pinned in `build/vendor/soundboard-tools.json`; both the archives and extracted executables are checked. `vendor/soundboard` contains `yt-dlp.exe`, `node.exe`, `tools.json` and complete upstream licenses. Regular builds/tests do not download or execute these helpers. Packaging checks their presence, and the app rechecks executable hashes before site imports. Update the pins and tracked license texts together when upgrading either helper.
+
 The tracker approves the integration in build/integration-proposal.md. The repo-local vpk tool is pinned to 1.2.161. Its manifest enables roll-forward because this host has only .NET 10 while vpk targets .NET 8. It does not install another runtime.
 
 ```powershell

@@ -20,7 +20,7 @@ internal sealed class MicrophoneMute
 
     public void Toggle(IDeviceSystem system, DeviceCatalog catalog)
     {
-        var mics = catalog.Active(AudioFlow.Capture);
+        var mics = catalog.Active(AudioFlow.Capture).Where(m => !VbCable.IsCable(m)).ToList();
         bool allMuted = mics.Count > 0;
         foreach (var mic in mics)
         {
@@ -45,7 +45,7 @@ internal sealed class MicrophoneMute
     public void Refresh(IDeviceSystem system, DeviceCatalog catalog, List<string>? failures = null)
     {
         var failed = failures ?? [];
-        var active = catalog.Active(AudioFlow.Capture);
+        var active = catalog.Active(AudioFlow.Capture).Where(m => !VbCable.IsCable(m)).ToList();
         _seen.IntersectWith(active.Select(m => m.Id));
         foreach (var mic in active)
         {
@@ -66,8 +66,9 @@ internal sealed class MicrophoneMute
             }
             catch { failed.Add(mic.Id); }
         }
-        // VB-CABLE's capture side mutes with the rest, but alone it isn't a microphone.
-        Status = new(active.All(VbCable.IsCable) ? MicrophoneMuteState.NoMicrophone
+        // The virtual mic carries clips too. Voice mute owns physical microphones only and never
+        // overrides an external cable mute, including when the user plays a soundboard clip.
+        Status = new(active.Count == 0 ? MicrophoneMuteState.NoMicrophone
             : readable != active.Count ? MicrophoneMuteState.Unavailable
             : muted == active.Count ? MicrophoneMuteState.Muted
             : muted == 0 ? MicrophoneMuteState.Live : MicrophoneMuteState.Mixed,

@@ -311,11 +311,11 @@ public partial class IslandWindow : Window
     internal HWND PanelHandle => _panel.Handle;
 
     /// <summary>AppSettings.IslandLastPage: the page the next open restores while its tile exists.</summary>
-    public void SetLastPage(string? key, bool? audioShowsMixer = null)
+    public void SetLastPage(string? key, bool? audioShowsMixer = null, string? audioPage = null)
     {
         // A config write from another feature may arrive before the pending navigation is saved on close.
         if (_lastPage is null)
-            _panel.SetLastPage(key, audioShowsMixer);
+            _panel.SetLastPage(key, audioShowsMixer, audioPage);
     }
 
     /// <summary>Settings › Island &amp; pet: where the panel opens, and its buttons.</summary>

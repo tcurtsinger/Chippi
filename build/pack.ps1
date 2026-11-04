@@ -34,7 +34,7 @@ try {
         dotnet publish src/Chippi.App/Chippi.App.csproj "-p:PublishProfile=$rid" "-p:Version=$Version" -o $staging
         if ($LASTEXITCODE -ne 0) { throw "Publish failed for $rid." }
         Copy-Item -LiteralPath $vbZip -Destination (Join-Path $staging "vendor/vb-cable/$($pin.file)")
-        foreach ($required in 'Chippi.exe', 'LICENSE', 'THIRD-PARTY-NOTICES.md', 'vendor/vb-cable/vb-cable.json', "vendor/vb-cable/$($pin.file)", 'runtimes/win-x64/native/rnnoise.dll', 'runtimes/win-arm64/native/rnnoise.dll') {
+        foreach ($required in 'Chippi.exe', 'LICENSE', 'THIRD-PARTY-NOTICES.md', 'vendor/vb-cable/vb-cable.json', "vendor/vb-cable/$($pin.file)", 'runtimes/win-x64/native/rnnoise.dll', 'runtimes/win-arm64/native/rnnoise.dll', 'vendor/soundboard/yt-dlp.exe', 'vendor/soundboard/node.exe', 'vendor/soundboard/tools.json', 'vendor/soundboard/licenses/Node-LICENSE.txt', 'vendor/soundboard/licenses/yt-dlp-LICENSE.txt', 'vendor/soundboard/licenses/yt-dlp-THIRD-PARTY-LICENSES.txt') {
             if (!(Test-Path -LiteralPath (Join-Path $staging $required))) { throw "Missing published file: $required" }
         }
         # Offline packaging: no update feed, framework downloads, signing or upload commands.

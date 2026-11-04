@@ -64,5 +64,19 @@
     <Content Include="..\..\build\vendor\vb-cable.json" Link="vendor\vb-cable\vb-cable.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
   </ItemGroup>
 
+  <!-- Link imports use pinned native helpers. Build/test never invokes them; publish verifies and
+       includes each runtime's tools and complete upstream licenses. No global installation. -->
+  <Target Name="PublishSoundboardTools" AfterTargets="ComputeResolvedFilesToPublishList"
+          Condition="'$(RuntimeIdentifier)' == 'win-x64' Or '$(RuntimeIdentifier)' == 'win-arm64'">
+    <Exec Command="pwsh -NoProfile -File &quot;$(MSBuildProjectDirectory)\..\..\build\prepare-soundboard-tools.ps1&quot; -Runtime $(RuntimeIdentifier)" />
+    <ItemGroup>
+      <_SoundboardPublishFile Include="$(MSBuildProjectDirectory)\..\..\build\artifacts\soundboard\$(RuntimeIdentifier)\**\*" />
+      <ResolvedFileToPublish Include="@(_SoundboardPublishFile)">
+        <RelativePath>vendor\soundboard\%(_SoundboardPublishFile.RecursiveDir)%(_SoundboardPublishFile.Filename)%(_SoundboardPublishFile.Extension)</RelativePath>
+        <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+        <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+      </ResolvedFileToPublish>
+    </ItemGroup>
+  </Target>
 </Project>
 

@@ -134,7 +134,7 @@ public sealed class AudioService
         return true;
     });
 
-    /// <summary>Mutes all active capture endpoints unless all are muted, then unmutes all.</summary>
+    /// <summary>Mutes physical microphones unless all are muted, then unmutes them. Virtual audio remains independent.</summary>
     public Task ToggleMicrophoneMuteAsync() => Run(e =>
     {
         e.Catalog.Refresh(e.System);
@@ -224,6 +224,17 @@ public sealed class AudioService
             e.Reconcile();
             return e.Processing.Status;
         });
+
+    /// <summary>
+    /// Keeps an unprocessed real-mic bridge available for Soundboard while Mic processing is off.
+    /// It never claims default roles. An active processing request always takes precedence.
+    /// </summary>
+    public Task<ProcessingStatus> SetSoundboardVoiceAsync(RoleTarget? source) => Run(e =>
+    {
+        e.Processing.SetSoundboardVoice(source);
+        e.Reconcile();
+        return e.Processing.VoiceStatus;
+    });
 
     /// <summary>
     /// After a crash: capture roles still on the marker's cable go back to what it replaced, or to
@@ -518,6 +529,7 @@ public sealed class AudioService
             var system = System;
             Microphones.Refresh(system, Catalog);
             Controls.Refresh(system, Catalog.Active(AudioFlow.Render).Concat(Catalog.Active(AudioFlow.Capture)));
+            Processing.UpdateVoiceMute(Controls.Levels);
             try { Sessions.Refresh(system, Catalog.Active(AudioFlow.Render)); }
             catch (Exception ex) { Log.LogWarning(ex, "Reading sessions failed"); }
         }
@@ -530,7 +542,7 @@ public sealed class AudioService
                 new Dictionary<RoleKey, string>(Catalog.Defaults),
                 Arbiter.Owners,
                 Controls.Levels,
-                Sessions.Apps) { Processing = Processing.Status, MicrophoneMute = Microphones.Status };
+                Sessions.Apps) { Processing = Processing.Status, SoundboardVoice = Processing.VoiceStatus, MicrophoneMute = Microphones.Status };
             _service.Publish(snapshot, changes);
         }
 
