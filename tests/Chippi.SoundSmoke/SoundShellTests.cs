@@ -50,7 +50,9 @@ public sealed class SoundShellTests
             Invoke(Named<Button>(host, "Mute all microphones"));
             await SmokeDispatcher.Until(() => scene.Mute.StatusText == "Muted");
             Assert.True(scene.Devices.GetLevel("desk").Muted);
-            Assert.True(scene.Devices.GetLevel("CableOut").Muted);
+            // Voice mute must leave the virtual soundboard route open in both directions.
+            Assert.False(scene.Devices.GetLevel("CableOut").Muted);
+            Assert.False(scene.Devices.GetLevel("CableIn").Muted);
             Assert.Contains(scene.Shell.Island.Activities, a => a.TileKey == SoundTile.Key && a.NeedsAttention);
             Assert.Equal("Mic muted", Assert.Single(Tiles(scene), t => t.Key == SoundTile.Key).Status);
             // A registry refresh must not double or lose a section.
