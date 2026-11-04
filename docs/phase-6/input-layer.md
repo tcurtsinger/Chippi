@@ -34,7 +34,7 @@ Give every Phase 6 feature one way to listen to the keyboard and mouse, one list
 - **Focus follows mouse** is Windows' own setting, so pausing it turns that setting off while the fullscreen app is in front and back on after.
 - **If Windows drops Chippi's hook** (it does that silently to a hook it thinks is slow), Chippi puts it back within 5 seconds. Today the Radial menu would stop until Chippi restarts.
 - **Admin windows:** while one is in front, hook features don't act on it, and Caps Lock is plain Caps Lock. Key shortcuts still work. Nothing in Chippi can change this without a signed installer (architecture §6).
-- **Games and anti-cheat:** with Always on off, Chippi sends no input into a fullscreen game. Untested on Travis's games either way.
+- **Games and anti-cheat:** with Always on off, Phase 6 features send no input into a fullscreen game. The Radial menu still can (key shortcut and text slices, its virtual pointer) while Open over fullscreen apps is on, its default. Untested on Travis's games either way.
 
 ## Calls for Travis
 
