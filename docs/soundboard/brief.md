@@ -26,6 +26,12 @@ Choose one or several local files, or paste a direct audio, YouTube or SoundClou
 
 Source files are never modified. Deleting a sound removes only Chippi's owned copy. Imported clips are limited to 250 MB of source media and 30 minutes. Protected, unavailable and sign-in-only links show an actionable error; no account cookies are imported. No sample sounds are installed.
 
+## Finish pass (2026-11-04)
+
+Preserve the approved collection tabs and twelve-tile composition. Large collections create only nearby tile controls; scrolling, keyboard navigation and reordering still reach every sound. Preserve the scroll position across library changes. Use bounded, readable error messages and full-name tooltips where text is trimmed.
+
+Pending saves and previews are single-flight. Navigating away cancels unfinished preparation and releases its draft after any in-flight review operation finishes. Each editor owns only its own preview. Reject stale edits from another view instead of overwriting newer metadata. Keep exact stored trim values when only the name or collection changes; accept local decimal separators in explicit time fields. Names retain complete Unicode text elements.
+
 ## Required states
 
 Populated and empty collections, Favorites, collection overflow, long titles, playing/idle, edit/reorder, file/link import, preparation/cancel, trim review, errors, missing/disabled virtual mic and failed voice capture. Missing virtual mic blocks sending, while import and local preview stay available. A voice-capture error allows clip-only playback and is reported visibly.

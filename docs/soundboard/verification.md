@@ -1,5 +1,29 @@
 # Soundboard verification
 
+## Harden, optimize and polish — 2026-11-04
+
+The approved B collection-tabs design is preserved. The finish pass adds safeguards for simultaneous views, pending saves, import shutdown, preview ownership, deleted sounds during reorder, interrupted trim gestures and retryable setup failures. Library recovery handles a missing primary file, and oversized writes preserve the previous readable library and backup. Names use complete Unicode text elements; time fields accept locale decimals and keep untouched trim precision.
+
+- **272 Sound feature tests and 151 Audio tests passed in Release.** All local audio uses fakes; UI tests construct unhosted controls. Gated tasks exercise cancellation and concurrent saves/deletes without timing sleeps or real input.
+- **26 offscreen captures** cover both themes at 520 × 360 DIP, rendered at 200% scale. In addition to gallery/edit/import/empty/overflow/setup states, these include voice warnings, Unicode titles, long collection names, invalid trims and link-import failure with Retry. The harness explicitly flushes the unhosted visual tree so the full Audio header renders consistently.
+- The native composition remains unchanged; clearer bounded errors, collection ellipsis/tooltips, keyboard focus targets and precise time fields are the visual refinements. No global tokens changed.
+- Both native Release builds passed with zero warnings/errors. Independent code review found two reorder defects (moves during a pending save and stale indexes after another view removes a sound); both were fixed with regression coverage. The independent fallback Impeccable review inspected all 26 captures and returned **ship**, with no remaining material fixes.
+- The first full CI run passed Soundboard but exposed an existing puck-hover test timing assumption: a 200 ms wait did not guarantee the fade had received its first frame. The test now uses the existing controlled `FillFade.Clock` and rendered-frame pattern. Only the test changed; it was compiled locally and left to CI to execute because it shows a window.
+
+The opt-in `SoundboardGalleryTimings` probe measures creation, layout and one offscreen render on the UI thread. These are medians of three bounded samples after one small warmup, using fixture clips and no native window or audio. Allocations are cumulative UI-thread allocations for that operation, not retained process memory.
+
+| Library / operation | Before | After |
+| --- | ---: | ---: |
+| Open/render 12 sounds | 17.182 ms | 15.488 ms |
+| Open/render 1,000 sounds | 1,142.611 ms | 23.897 ms |
+| UI allocation, 1,000 sounds | 121.45 MB | 3.94 MB |
+| Realized tiles, 1,000 sounds | 1,000 | 24 |
+| Playback update, 1,000 sounds | 0.0309 ms | 0.0016 ms |
+
+The improvement comes from creating nearby tile controls, retaining scroll position and caching the playing sound lookup. Every clip remains reachable through scrolling and keyboard navigation. Tests also cover reordering beyond the first viewport. These measurements do not prove native presentation frame rate; live dragging, focus, screen-reader navigation and playback remain owner checks.
+
+The owner's follow-up capture showed a violet outline after playback had ended. This was the template's unconditional focus border, not playback state. Tiles and quiet collection controls now use standard keyboard-only focus visuals, preserving focus and keyboard activation without a persistent mouse-click outline. The small style diff received independent review; all 272 Sound tests and both native Release builds passed again. No desktop input was used to verify it locally.
+
 ## Local evidence
 
 - **151 Audio tests passed.** Fake devices, pipelines, players and clocks cover voice-only mute, shared processing/bypass ownership, rapid replacement/Stop ordering, local-only preview, route changes, virtual-endpoint mute, stream teardown failures, surround-output channel mapping and bounded WAV reads.
@@ -15,7 +39,7 @@ The specialized Impeccable reviewer/documenter roles were unavailable. Separate 
 
 Both native runtimes include pinned yt-dlp and Node helpers with complete upstream license texts. Helper preparation verifies official archive sizes/hashes and extracted executable sizes/hashes. The x64 helpers passed offline version/flag checks. No installer, driver or app was launched for packaging verification. See the root release manifest for the final installer hashes.
 
-The 0.1.0 x64 and ARM64 packages were built from source `33e6f14c03cd397f7d09b8c356b289cafed8b390`. All twelve release artifact sizes and SHA-256 hashes were verified, along with both app/setup PE architectures, embedded source versions, all four archive CRCs, exact license contents, pinned VB-CABLE ZIP/setup, both RNNoise architectures, and each runtime's native yt-dlp/Node binaries. Verified copies are under `X:/code/chippi/build/artifacts/releases/0.1.0`. x64 Setup is 147,058,124 bytes; ARM64 Setup is 135,382,268 bytes. The publish hook contributes helpers before single-file bundling and copy classification so each helper and license keeps its own relative path.
+The refreshed 0.1.0 x64 and ARM64 packages were built from source `e00ff312ad9652f8a72f6d2824f9a686fb29b991`. All twelve release artifact sizes and SHA-256 hashes were verified, along with both app/setup PE architectures, embedded source versions, all four archive CRCs, exact license contents, pinned VB-CABLE ZIP/setup, both RNNoise architectures, and each runtime's native yt-dlp/Node binaries. Verified copies are under `X:/code/chippi/build/artifacts/releases/0.1.0`. x64 Setup is 147,063,994 bytes; ARM64 Setup is 135,388,027 bytes. The publish hook contributes helpers before single-file bundling and copy classification so each helper and license keeps its own relative path.
 
 ## Owner checks
 

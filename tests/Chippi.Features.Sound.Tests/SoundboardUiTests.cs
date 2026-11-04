@@ -248,6 +248,9 @@ internal sealed class SoundboardViewFake : ISoundboardController
     public event Action? Changed;
     public int Plays, Stops, Saves, Reorders, DisposedDrafts;
     public Func<SoundImportSource, IProgress<SoundImportProgress>?, CancellationToken, Task<SoundImportDraft>>? Prepare;
+    public Func<string, Task<string>>? CreateCollection;
+    public Func<string, Task>? DeleteClip;
+    public Func<string, IReadOnlyList<string>, Task>? ReorderClips;
     public void Notify() => Changed?.Invoke();
     public string? CoverPath { get; set; }
     public string? ImagePath(SoundClip clip) => clip.ImageFile is null ? null : CoverPath;
@@ -258,23 +261,25 @@ internal sealed class SoundboardViewFake : ISoundboardController
     public Task SetLevelsAsync(float send, float hear) { Library = Library with { SendVolume = send, HearVolume = hear }; Notify(); return Task.CompletedTask; }
     public Task<string> CreateCollectionAsync(string name)
     {
+        if (CreateCollection is not null) return CreateCollection(name);
         var id = Guid.NewGuid().ToString("N"); Library = Library with { Collections = [.. Library.Collections, new(id, name)] }; Notify(); return Task.FromResult(id);
     }
     public Task RenameCollectionAsync(string id, string name) { Library = Library with { Collections = [.. Library.Collections.Select(c => c.Id == id ? c with { Name = name } : c)] }; Notify(); return Task.CompletedTask; }
     public Task DeleteCollectionAsync(string id) { Library = Library with { Collections = [.. Library.Collections.Where(c => c.Id != id)] }; Notify(); return Task.CompletedTask; }
-    public Task SaveClipAsync(SoundClip clip, string? newImagePath = null) { Saves++; Library = Library with { Clips = [.. Library.Clips.Select(c => c.Id == clip.Id ? clip : c)] }; Notify(); return Task.CompletedTask; }
-    public Task DeleteClipAsync(string id) { Library = Library with { Clips = [.. Library.Clips.Where(c => c.Id != id)] }; Notify(); return Task.CompletedTask; }
+    public Task SaveClipAsync(SoundClip clip, string? newImagePath = null, SoundClip? expected = null) { Saves++; Library = Library with { Clips = [.. Library.Clips.Select(c => c.Id == clip.Id ? clip : c)] }; Notify(); return Task.CompletedTask; }
+    public Task DeleteClipAsync(string id) { if (DeleteClip is not null) return DeleteClip(id); Library = Library with { Clips = [.. Library.Clips.Where(c => c.Id != id)] }; Notify(); return Task.CompletedTask; }
     public Task ReorderClipsAsync(string collectionId, IReadOnlyList<string> ids)
     {
+        if (ReorderClips is not null) return ReorderClips(collectionId, ids);
         Reorders++; Library = Library with { Clips = [.. ids.Select(id => Library.Clips.Single(c => c.Id == id))] }; Notify(); return Task.CompletedTask;
     }
     public Task<SoundImportDraft> PrepareAsync(SoundImportSource source, IProgress<SoundImportProgress>? progress, CancellationToken ct) =>
         Prepare?.Invoke(source, progress, ct) ?? Task.FromResult(new SoundImportDraft(source.Value, System.IO.Path.GetFileNameWithoutExtension(source.Value), "File", 12,
             [.. Enumerable.Range(0, 120).Select(i => (float)(.15 + Math.Abs(Math.Sin(i * .3)) * .6))], () => DisposedDrafts++));
-    public Task PreviewAsync(SoundImportDraft draft, double startSeconds, double endSeconds, CancellationToken ct)
-    { Playback = new("preview", true, true, TimeSpan.Zero, TimeSpan.FromSeconds(endSeconds - startSeconds)); Notify(); return Task.CompletedTask; }
-    public Task PreviewClipAsync(string clipId, double startSeconds, double endSeconds, CancellationToken ct)
-    { Playback = new(clipId, true, true, TimeSpan.Zero, TimeSpan.FromSeconds(endSeconds - startSeconds)); Notify(); return Task.CompletedTask; }
+    public Task<string> PreviewAsync(SoundImportDraft draft, double startSeconds, double endSeconds, CancellationToken ct)
+    { Playback = new("preview", true, true, TimeSpan.Zero, TimeSpan.FromSeconds(endSeconds - startSeconds)); Notify(); return Task.FromResult("preview"); }
+    public Task<string> PreviewClipAsync(string clipId, double startSeconds, double endSeconds, CancellationToken ct)
+    { Playback = new(clipId, true, true, TimeSpan.Zero, TimeSpan.FromSeconds(endSeconds - startSeconds)); Notify(); return Task.FromResult(clipId); }
     public Task AddAsync(SoundImportDraft draft, SoundClip details, string? imagePath, CancellationToken ct)
     { Library = Library with { Clips = [.. Library.Clips, details] }; Notify(); return Task.CompletedTask; }
     public void OpenSetup() { }

@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Threading;
 using Chippi.App.Island;
 using Chippi.Core.Island;
@@ -12,6 +13,7 @@ using Chippi.Core.Island;
 namespace Chippi.Island.Tests;
 
 /// <summary>The widget's window itself, built on its own UI thread with the app's resources. Run fullscreen-check first: most show it.</summary>
+[Collection("ReducedMotion")] // The hover test owns FillFade.Clock while pumping dispatcher frames.
 public sealed class IslandWindowTests
 {
     private static Chippi.App.Island.Media.MediaTrack Track(string title, bool playing = true) =>
@@ -80,19 +82,46 @@ public sealed class IslandWindowTests
     {
         WpfTestThread.Run(() => WithShownIsland(window =>
         {
-            Assert.Equal(1, window.PuckScaleTarget);
-            Assert.Equal(Chippi.UI.Pet.PetMood.Sleepy, window.Pet.Mood);
-            Hover(window, Mouse.MouseEnterEvent);
-            Assert.Equal(1, window.PuckScaleTarget);
-            Assert.Equal(50, window.PuckButton.Width);
-            Assert.IsType<System.Windows.Media.DrawingBrush>(window.Body.BorderBrush); // the rim blends over 83ms, like Windows' own controls
-            Pump(TimeSpan.FromMilliseconds(200));
-            Assert.Same(window.FindResource("IslandWidgetHoverBorderBrush"), window.Body.BorderBrush);
-            Assert.Equal(Chippi.UI.Pet.PetMood.Idle, window.Pet.Mood);
-            Hover(window, Mouse.MouseLeaveEvent);
-            Pump(TimeSpan.FromMilliseconds(200));
-            Assert.Same(window.FindResource("IslandWidgetBorderBrush"), window.Body.BorderBrush);
-            Assert.Equal(Chippi.UI.Pet.PetMood.Idle, window.Pet.Mood); // his eyes stay open for the quiet minute
+            var wall = FillFade.Clock;
+            long now = Stopwatch.GetTimestamp();
+            int frames = 0;
+            EventHandler counted = (_, _) => frames++;
+            void Frame()
+            {
+                int at = frames;
+                PumpUntil(() => frames > at);
+            }
+            void Advance(double ms)
+            {
+                now += (long)(ms * Stopwatch.Frequency / 1000);
+                Frame();
+            }
+
+            FillFade.Clock = () => now;
+            CompositionTarget.Rendering += counted;
+            try
+            {
+                Assert.Equal(1, window.PuckScaleTarget);
+                Assert.Equal(Chippi.UI.Pet.PetMood.Sleepy, window.Pet.Mood);
+                Hover(window, Mouse.MouseEnterEvent);
+                Assert.Equal(1, window.PuckScaleTarget);
+                Assert.Equal(50, window.PuckButton.Width);
+                Assert.IsType<DrawingBrush>(window.Body.BorderBrush); // the rim blends over 83ms, like Windows' own controls
+                Frame(); // the fade starts on its first rendered frame, however late the runner draws it
+                Advance(100);
+                Assert.Same(window.FindResource("IslandWidgetHoverBorderBrush"), window.Body.BorderBrush);
+                Assert.Equal(Chippi.UI.Pet.PetMood.Idle, window.Pet.Mood);
+                Hover(window, Mouse.MouseLeaveEvent);
+                Frame();
+                Advance(100);
+                Assert.Same(window.FindResource("IslandWidgetBorderBrush"), window.Body.BorderBrush);
+                Assert.Equal(Chippi.UI.Pet.PetMood.Idle, window.Pet.Mood); // his eyes stay open for the quiet minute
+            }
+            finally
+            {
+                CompositionTarget.Rendering -= counted;
+                FillFade.Clock = wall;
+            }
         }));
     }
 

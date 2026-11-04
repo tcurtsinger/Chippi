@@ -4,7 +4,9 @@
 using System.Globalization;
 using System.Windows;
 using System.Windows.Automation;
+using System.Windows.Automation.Peers;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Media;
 using Chippi.Features.Sound.Soundboard.Library;
 using Chippi.UI.Controls;
@@ -32,15 +34,18 @@ internal sealed class SoundboardEditor : UserControl, IDisposable
     private readonly TextBox _url = SoundboardUi.Input("Audio link");
     private readonly TextBox _name = SoundboardUi.Input("Sound name");
     private readonly TextBox _start = SoundboardUi.Input("Start time"), _end = SoundboardUi.Input("End time");
-    private readonly ComboBox _collections = new() { Height = 28, FontSize = 12, DisplayMemberPath = nameof(SoundCollection.Name), SelectedValuePath = nameof(SoundCollection.Id) };
+    private readonly ComboBox _collections = new() { Height = 28, FontSize = 12, SelectedValuePath = nameof(SoundCollection.Id) };
     private readonly CheckBox _favorite = new() { Content = "Favorite", FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
     private readonly SoundWaveform _waveform = new();
     private readonly Button _cover;
     private SoundImportDraft? _draft;
     private CancellationTokenSource? _operation;
-    private string? _newImage;
+    private TaskCompletionSource? _reviewCompletion;
+    private FrameworkElement? _initialFocus;
+    private string? _newImage, _previewId;
+    private string _formattedStart = "", _formattedEnd = "";
     private bool _removeImage, _urlMode, _busy, _disposed, _updating;
-    private double _startSeconds, _endSeconds, _duration;
+    private double _startSeconds, _endSeconds, _duration, _displayStartSeconds, _displayEndSeconds;
     private int _totalFiles, _completedFiles;
 
     internal SoundboardEditor(ISoundboardController controller, string collectionId, SoundClip? clip, Action close)
@@ -57,33 +62,49 @@ internal sealed class SoundboardEditor : UserControl, IDisposable
         _root.Children.Add(_heading);
         Grid.SetRow(_body, 1); _root.Children.Add(_body);
         _error.Margin = new Thickness(0, 3, 0, 4); _error.Visibility = Visibility.Collapsed;
+        _error.TextWrapping = TextWrapping.Wrap; _error.MaxHeight = 32;
         AutomationProperties.SetLiveSetting(_error, AutomationLiveSetting.Polite);
         Grid.SetRow(_error, 2); _root.Children.Add(_error);
         Grid.SetRow(_actions, 3); _root.Children.Add(_actions);
         _url.MaxLength = 4096;
+        _name.MaxLength = 0;
+        _name.TextChanged += (_, _) => _name.ToolTip = _name.Text;
+        AutomationProperties.SetHelpText(_name, "Up to 100 characters");
+        AutomationProperties.SetHelpText(_start, "Seconds or minutes:seconds, including decimals");
+        AutomationProperties.SetHelpText(_end, "Seconds or minutes:seconds, including decimals");
         AutomationProperties.SetName(_collections, "Collection");
         _collections.SetResourceReference(StyleProperty, "HopperComboBoxStyle");
+        var collectionText = new FrameworkElementFactory(typeof(TextBlock));
+        collectionText.SetBinding(TextBlock.TextProperty, new Binding(nameof(SoundCollection.Name)));
+        collectionText.SetBinding(ToolTipProperty, new Binding(nameof(SoundCollection.Name)));
+        collectionText.SetValue(TextBlock.TextTrimmingProperty, TextTrimming.CharacterEllipsis);
+        collectionText.SetValue(MaxWidthProperty, 120d);
+        _collections.ItemTemplate = new DataTemplate { VisualTree = collectionText };
+        TextSearch.SetTextPath(_collections, nameof(SoundCollection.Name));
         _favorite.SetResourceReference(StyleProperty, "SoundboardFavoriteStyle");
+        AutomationProperties.SetName(_favorite, "Favorite");
         _collections.ItemsSource = controller.Library.Collections;
         _collections.SelectedValue = collectionId == SoundboardPage.Favorites ? controller.Library.Collections.FirstOrDefault()?.Id : collectionId;
         _cover = SoundboardUi.Icon(LucideIcons.Image, "Choose sound image", ChooseImage);
         _cover.Width = _cover.Height = 42;
         var coverMenu = new ContextMenu();
         var clear = new MenuItem { Header = "Remove image" };
-        clear.Click += (_, _) => { _newImage = null; _removeImage = true; UpdateCover(); }; coverMenu.Items.Add(clear); _cover.ContextMenu = coverMenu;
+        clear.Click += (_, _) => { if (_busy || _disposed) return; _newImage = null; _removeImage = true; UpdateCover(); }; coverMenu.Items.Add(clear); _cover.ContextMenu = coverMenu;
         _start.TextChanged += (_, _) => ReadRange(); _end.TextChanged += (_, _) => ReadRange();
         _waveform.RangeChanged += (start, end) =>
         {
             _startSeconds = start; _endSeconds = end; UpdateRangeFields(); ClearError();
         };
         Content = _root;
+        _controller.Changed += PlaybackChanged;
         if (clip is null) Source(); else { _heading.Text = "Edit sound"; Review(); }
     }
 
-    internal object? InitialFocus => _clip is not null || _draft is not null ? _name : _urlMode ? _url : _body;
+    internal object? InitialFocus => _initialFocus;
 
     private void Source()
     {
+        bool restoreFocus = IsKeyboardFocusWithin;
         SoundboardUi.Detach(_url);
         _body.Children.Clear(); _body.RowDefinitions.Clear(); _actions.Children.Clear(); ClearError();
         var stack = new StackPanel { Margin = new Thickness(0, 4, 0, 0) };
@@ -93,8 +114,9 @@ internal sealed class SoundboardEditor : UserControl, IDisposable
         {
             var label = SoundboardUi.Text("Link", 11, "IslandTextSecondaryBrush"); label.Margin = new Thickness(0, 0, 0, 4); stack.Children.Add(label);
             stack.Children.Add(_url);
+            _initialFocus = _url;
             var hint = SoundboardUi.Text("Audio link, YouTube or SoundCloud", 11, "IslandTextSecondaryBrush"); hint.Margin = new Thickness(0, 6, 0, 0); stack.Children.Add(hint);
-            _actions.Children.Add(SoundboardUi.Button("Cancel", _close));
+            _actions.Children.Add(SoundboardUi.Button("Cancel", Close));
             var next = SoundboardUi.Button("Continue", () => _ = Prepare(new(_url.Text.Trim(), true)), true); next.Margin = new Thickness(8, 0, 0, 0); _actions.Children.Add(next);
         }
         else
@@ -105,17 +127,23 @@ internal sealed class SoundboardEditor : UserControl, IDisposable
             var hint = SoundboardUi.Text("Drop audio files here", 12); hint.HorizontalAlignment = HorizontalAlignment.Center;
             center.Children.Add(hint);
             var browse = SoundboardUi.Button("Browse", ChooseFiles); browse.Margin = new Thickness(0, 10, 0, 0); center.Children.Add(browse); drop.Child = center;
+            _initialFocus = browse;
             drop.DragOver += (_, e) => { e.Effects = e.Data.GetDataPresent(DataFormats.FileDrop) && !_busy ? DragDropEffects.Copy : DragDropEffects.None; e.Handled = true; };
             drop.Drop += (_, e) => { if (!_busy && e.Data.GetData(DataFormats.FileDrop) is string[] files) QueueFiles(files); e.Handled = true; };
             stack.Children.Add(drop);
-            _actions.Children.Add(SoundboardUi.Button("Cancel", _close));
+            _actions.Children.Add(SoundboardUi.Button("Cancel", Close));
         }
         _body.Children.Add(stack);
+        if (restoreFocus) _initialFocus?.Focus();
     }
 
     private Button SourceTab(string label, bool url)
     {
-        var button = SoundboardUi.Button(label, () => { _urlMode = url; Source(); });
+        var button = SoundboardUi.Button(label, () =>
+        {
+            if (_busy || _disposed) return;
+            _urlMode = url; _files.Clear(); _totalFiles = _completedFiles = 0; Source();
+        });
         button.Width = 78; button.Margin = new Thickness(0, 0, 6, 0);
         if (_urlMode == url) { button.FontWeight = FontWeights.SemiBold; button.SetResourceReference(Control.BackgroundProperty, "IslandGalleryHoverBrush"); }
         AutomationProperties.SetName(button, label + (_urlMode == url ? ", selected" : ""));
@@ -124,7 +152,7 @@ internal sealed class SoundboardEditor : UserControl, IDisposable
 
     private void ChooseFiles()
     {
-        if (_busy) return;
+        if (_busy || _disposed) return;
         using var held = _controller.HoldOpen();
         var picker = new OpenFileDialog { Title = "Add sounds", Multiselect = true, CheckFileExists = true,
             Filter = "Audio files|*.wav;*.mp3;*.m4a;*.aac;*.flac;*.ogg;*.opus;*.wma;*.aiff;*.aif;*.webm;*.mp4|All files|*.*" };
@@ -146,27 +174,33 @@ internal sealed class SoundboardEditor : UserControl, IDisposable
     {
         if (_busy || _disposed) return;
         if (string.IsNullOrWhiteSpace(source.Value)) { Error("Enter an audio link"); return; }
+        bool restoreFocus = IsKeyboardFocusWithin;
         _busy = true; ClearError();
         _draft?.Dispose(); _draft = null;
-        _operation?.Dispose(); _operation = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
+        using var operation = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
+        _operation = operation;
         _body.Children.Clear(); _actions.Children.Clear();
         SoundboardUi.Detach(_status); SoundboardUi.Detach(_progress);
         var status = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(40, 0, 40, 0) };
         _status.Text = "Preparing sound"; _status.HorizontalAlignment = HorizontalAlignment.Center; _status.Margin = new Thickness(0, 0, 0, 12);
         status.Children.Add(_status); _progress.IsIndeterminate = true; status.Children.Add(_progress); _body.Children.Add(status);
         AutomationProperties.SetLiveSetting(_status, AutomationLiveSetting.Polite);
-        _actions.Children.Add(SoundboardUi.Button("Cancel", _close));
+        var cancel = SoundboardUi.Button("Cancel", Close); _actions.Children.Add(cancel); _initialFocus = cancel;
+        if (restoreFocus) cancel.Focus();
         try
         {
             var progress = new Progress<SoundImportProgress>(value =>
             {
-                if (_disposed) return;
+                if (_disposed || !ReferenceEquals(_operation, operation)) return;
+                bool changed = _status.Text != value.Stage;
                 _status.Text = value.Stage;
-                _progress.IsIndeterminate = value.Fraction is null;
+                _status.ToolTip = value.Stage;
+                if (changed) UIElementAutomationPeer.FromElement(_status)?.RaiseAutomationEvent(AutomationEvents.LiveRegionChanged);
+                _progress.IsIndeterminate = value.Fraction is null || !double.IsFinite(value.Fraction.Value);
                 _progress.Value = value.Fraction is { } fraction && double.IsFinite(fraction) ? Math.Clamp(fraction, 0, 1) : 0;
             });
-            var draft = await _controller.PrepareAsync(source, progress, _operation.Token);
-            if (_disposed || _operation.IsCancellationRequested) { draft.Dispose(); return; }
+            var draft = await _controller.PrepareAsync(source, progress, operation.Token);
+            if (_disposed || operation.IsCancellationRequested) { draft.Dispose(); return; }
             _draft = draft; _newImage = null; _removeImage = false; Review();
         }
         catch (OperationCanceledException) { if (!_disposed) Source(); }
@@ -174,18 +208,19 @@ internal sealed class SoundboardEditor : UserControl, IDisposable
         {
             if (!_disposed)
             {
-                Source(); Error(ex.Message);
+                Source(); Error("Preparation failed. " + ex.Message);
                 _actions.Children.Clear();
-                _actions.Children.Add(SoundboardUi.Button("Cancel", _close));
+                _actions.Children.Add(SoundboardUi.Button("Cancel", Close));
                 var retry = SoundboardUi.Button("Retry", () => _ = Prepare(_urlMode ? new(_url.Text.Trim(), true) : source), true);
                 retry.Margin = new Thickness(8, 0, 0, 0); _actions.Children.Add(retry);
             }
         }
-        finally { _busy = false; }
+        finally { _operation = null; _busy = false; }
     }
 
     private void Review()
     {
+        bool restoreFocus = IsKeyboardFocusWithin;
         foreach (var control in new FrameworkElement[] { _cover, _name, _collections, _waveform, _start, _end, _favorite, _durationLabel }) SoundboardUi.Detach(control);
         _body.Children.Clear(); _body.RowDefinitions.Clear(); _actions.Children.Clear(); ClearError();
         _heading.Text = _clip is not null ? "Edit sound" : _totalFiles > 1 ? $"Add sound · {_completedFiles + 1} of {_totalFiles}" : "Add sound";
@@ -193,7 +228,9 @@ internal sealed class SoundboardEditor : UserControl, IDisposable
         _startSeconds = _clip?.StartSeconds ?? 0;
         _endSeconds = _clip?.EndSeconds ?? _duration;
         _name.Text = _clip?.Name ?? _draft?.Title ?? "Sound";
+        _initialFocus = _name;
         _favorite.IsChecked = _clip?.Favorite ?? _collectionId == SoundboardPage.Favorites;
+        _collections.ItemsSource = _controller.Library.Collections;
         _collections.SelectedValue = _clip?.CollectionId ?? (_collectionId == SoundboardPage.Favorites ? _controller.Library.Collections.FirstOrDefault()?.Id : _collectionId);
         var content = new StackPanel { Margin = new Thickness(0, 3, 0, 0) };
         var identity = SoundboardUi.Columns(new GridLength(50), new GridLength(1, GridUnitType.Star), new GridLength(165));
@@ -216,8 +253,9 @@ internal sealed class SoundboardEditor : UserControl, IDisposable
         _favorite.HorizontalAlignment = HorizontalAlignment.Right; DockPanel.SetDock(_favorite, Dock.Right); audition.Children.Add(_favorite);
         var onlyYou = SoundboardUi.Text("Only you hear this", 11, "IslandTextSecondaryBrush"); onlyYou.Margin = new Thickness(9, 0, 0, 0); audition.Children.Add(onlyYou); content.Children.Add(audition);
         _body.Children.Add(content);
-        _actions.Children.Add(SoundboardUi.Button("Cancel", _close));
+        _actions.Children.Add(SoundboardUi.Button("Cancel", Close));
         var save = SoundboardUi.Button(_clip is null ? "Add" : "Save", () => _ = Save(), true); save.Margin = new Thickness(8, 0, 0, 0); _actions.Children.Add(save);
+        if (restoreFocus) _name.Focus();
     }
 
     private static FrameworkElement Field(string label, FrameworkElement control)
@@ -237,7 +275,8 @@ internal sealed class SoundboardEditor : UserControl, IDisposable
         _updating = true;
         try
         {
-            _start.Text = SecondsText(_startSeconds); _end.Text = SecondsText(_endSeconds);
+            _displayStartSeconds = _startSeconds; _displayEndSeconds = _endSeconds;
+            _start.Text = _formattedStart = SecondsText(_startSeconds); _end.Text = _formattedEnd = SecondsText(_endSeconds);
             _durationLabel.Text = $"{SoundboardUi.Time(Math.Max(0, _endSeconds - _startSeconds))} selected";
             _waveform.Set(_clip?.Waveform ?? _draft?.Waveform ?? [], _duration, _startSeconds, _endSeconds);
         }
@@ -246,15 +285,27 @@ internal sealed class SoundboardEditor : UserControl, IDisposable
 
     private static string SecondsText(double seconds)
     {
-        var time = TimeSpan.FromSeconds(Math.Max(0, seconds));
-        return $"{(int)time.TotalMinutes}:{time.Seconds:00}.{time.Milliseconds / 10:00}";
+        var time = TimeSpan.FromSeconds(Math.Round(Math.Max(0, seconds), 3));
+        return ((int)time.TotalMinutes).ToString(CultureInfo.CurrentCulture) + ":"
+            + (time.Seconds + time.Milliseconds / 1000d).ToString("00.###", CultureInfo.CurrentCulture);
+    }
+
+    private bool ReadTimes(out double start, out double end)
+    {
+        bool validStart = _start.Text == _formattedStart;
+        start = _displayStartSeconds;
+        if (!validStart) validStart = SoundboardUi.TryTime(_start.Text, out start);
+        bool validEnd = _end.Text == _formattedEnd;
+        end = _displayEndSeconds;
+        if (!validEnd) validEnd = SoundboardUi.TryTime(_end.Text, out end);
+        return validStart && validEnd;
     }
 
     private void ReadRange()
     {
         if (_updating) return;
-        if (SoundboardUi.TryTime(_start.Text, out var start) && SoundboardUi.TryTime(_end.Text, out var end)
-            && start >= 0 && end > start && end <= _duration + .001)
+        if (ReadTimes(out var start, out var end)
+            && start >= 0 && Math.Min(end, _duration) - start >= .02 && end <= _duration + .001)
         {
             _startSeconds = start; _endSeconds = Math.Min(end, _duration);
             _durationLabel.Text = $"{SoundboardUi.Time(Math.Max(0, _endSeconds - _startSeconds))} selected";
@@ -265,29 +316,34 @@ internal sealed class SoundboardEditor : UserControl, IDisposable
     private bool Validate()
     {
         if (string.IsNullOrWhiteSpace(_name.Text)) { Error("Enter a sound name"); _name.Focus(); return false; }
-        if (_collections.SelectedValue is not string) { Error("Choose a collection"); return false; }
-        if (!SoundboardUi.TryTime(_start.Text, out var start) || !SoundboardUi.TryTime(_end.Text, out var end)
-            || start < 0 || end <= start || end > _duration + .001)
-        { Error($"Choose a range within {SoundboardUi.Time(_duration)}"); return false; }
+        if (new StringInfo(_name.Text.Trim()).LengthInTextElements > 100)
+        { Error("Use a sound name with up to 100 characters"); _name.Focus(); return false; }
+        if (_collections.SelectedValue is not string id || !_controller.Library.Collections.Any(collection => collection.Id == id))
+        { Error("Choose a collection"); _collections.ItemsSource = _controller.Library.Collections; _collections.Focus(); return false; }
+        if (!ReadTimes(out var start, out var end) || start < 0 || Math.Min(end, _duration) - start < .02 || end > _duration + .001)
+        { Error($"Choose a range of at least 0.02 seconds within {SoundboardUi.Time(_duration)}"); _start.Focus(); return false; }
         _startSeconds = start; _endSeconds = Math.Min(end, _duration); ClearError(); return true;
     }
 
     private async Task Preview()
     {
         if (_busy || _disposed || !Validate()) return;
+        var completed = BeginReviewWork(saving: false);
         try
         {
-            if (_clip is not null) await _controller.PreviewClipAsync(_clip.Id, _startSeconds, _endSeconds, _lifetime.Token);
-            else if (_draft is not null) await _controller.PreviewAsync(_draft, _startSeconds, _endSeconds, _lifetime.Token);
+            if (_clip is not null) _previewId = await _controller.PreviewClipAsync(_clip.Id, _startSeconds, _endSeconds, _lifetime.Token);
+            else if (_draft is not null) _previewId = await _controller.PreviewAsync(_draft, _startSeconds, _endSeconds, _lifetime.Token);
         }
         catch (OperationCanceledException) { }
-        catch (Exception ex) { if (!_disposed) Error(ex.Message); }
+        catch (Exception ex) { if (!_disposed) Error("Preview failed. " + ex.Message); }
+        finally { EndReviewWork(completed); }
     }
 
     private async Task Save()
     {
         if (_busy || _disposed || !Validate()) return;
-        _busy = true; _actions.IsEnabled = false; _body.IsEnabled = false;
+        var completed = BeginReviewWork(saving: true);
+        var token = _lifetime.Token;
         string? nextFile = null;
         bool saved = false;
         try
@@ -299,21 +355,50 @@ internal sealed class SoundboardEditor : UserControl, IDisposable
                 DurationSeconds = _duration, Favorite = _favorite.IsChecked == true,
                 ImageFile = _removeImage ? null : _clip?.ImageFile,
             };
-            if (_controller.Playback.IsPreview) await _controller.StopAsync();
-            if (_clip is not null) await _controller.SaveClipAsync(details, _newImage);
-            else if (_draft is not null) await _controller.AddAsync(_draft, details, _newImage, _lifetime.Token);
+            if (OwnsPreview) await _controller.StopAsync();
+            token.ThrowIfCancellationRequested();
+            if (_clip is not null) await _controller.SaveClipAsync(details, _newImage, _clip);
+            else if (_draft is not null) await _controller.AddAsync(_draft, details, _newImage, token);
             if (_disposed) return;
             _draft?.Dispose(); _draft = null; _completedFiles++;
             _files.TryDequeue(out nextFile); saved = true;
         }
         catch (OperationCanceledException) { }
-        catch (Exception ex) { if (!_disposed) Error(ex.Message); }
-        finally { _busy = false; _actions.IsEnabled = true; _body.IsEnabled = true; }
+        catch (Exception ex) { if (!_disposed) Error("Save failed. " + ex.Message); }
+        finally { EndReviewWork(completed); }
         if (saved && !_disposed)
         {
             if (nextFile is not null) await Prepare(new(nextFile));
-            else _close();
+            else Close();
         }
+    }
+
+    private TaskCompletionSource BeginReviewWork(bool saving)
+    {
+        _busy = true; _body.IsEnabled = false;
+        foreach (var button in _actions.Children.OfType<Button>())
+            button.IsEnabled = !saving && AutomationProperties.GetName(button) == "Cancel";
+        return _reviewCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+    }
+
+    private void EndReviewWork(TaskCompletionSource completed)
+    {
+        _busy = false; _body.IsEnabled = !_disposed;
+        foreach (var button in _actions.Children.OfType<Button>()) button.IsEnabled = !_disposed;
+        _reviewCompletion = null; completed.SetResult();
+    }
+
+    private bool OwnsPreview => _previewId is not null && _controller.Playback.IsPreview && _controller.Playback.ClipId == _previewId;
+
+    private void PlaybackChanged()
+    {
+        if (_previewId is not null && !OwnsPreview) _previewId = null;
+    }
+
+    private void Close()
+    {
+        if (_disposed) return;
+        Dispose(); _close();
     }
 
     private void ChooseImage()
@@ -337,22 +422,28 @@ internal sealed class SoundboardEditor : UserControl, IDisposable
     private void Error(string message)
     {
         _error.Text = message; _error.ToolTip = message; _error.Visibility = Visibility.Visible;
+        UIElementAutomationPeer.FromElement(_error)?.RaiseAutomationEvent(AutomationEvents.LiveRegionChanged);
     }
 
-    private void ClearError() { _error.Text = ""; _error.Visibility = Visibility.Collapsed; }
+    private void ClearError() { _error.Text = ""; _error.ToolTip = null; _error.Visibility = Visibility.Collapsed; }
 
     public void Dispose()
     {
         if (_disposed) return;
         _disposed = true; _lifetime.Cancel(); _operation?.Cancel();
+        _controller.Changed -= PlaybackChanged;
         var draft = _draft; _draft = null;
-        _ = ReleaseDraft(draft, _controller.Playback.IsPreview);
-        _operation?.Dispose(); _lifetime.Dispose();
+        _ = ReleaseDraft(draft, _reviewCompletion?.Task);
+        _lifetime.Dispose();
     }
 
-    private async Task ReleaseDraft(SoundImportDraft? draft, bool stop)
+    private async Task ReleaseDraft(SoundImportDraft? draft, Task? pending)
     {
-        try { if (stop) await _controller.StopAsync(); }
+        try
+        {
+            if (pending is not null) await pending;
+            if (OwnsPreview) await _controller.StopAsync();
+        }
         catch { /* the module keeps a playback failure; navigation must still finish */ }
         finally { draft?.Dispose(); }
     }
