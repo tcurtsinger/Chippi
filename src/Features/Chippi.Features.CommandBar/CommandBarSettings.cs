@@ -54,4 +54,15 @@ public sealed record CommandBarSettings
 
     /// <summary>The shortcut; null once removed.</summary>
     public MicShortcut? Shortcut { get; init; } = DefaultShortcut;
+
+    /// <summary>Recover structurally valid but incomplete settings without rewriting the saved file on load.</summary>
+    internal CommandBarSettings Normalize() => this with
+    {
+        WebSearch = Enum.IsDefined(WebSearch) ? WebSearch : WebEngine.Google,
+        Shortcut = Shortcut is { IsValid: false } ? DefaultShortcut : Shortcut,
+        Off = [.. (Off ?? []).Where(kind => Enum.IsDefined(kind)).Distinct()],
+        Hidden = [.. (Hidden ?? []).Where(result => result is not null
+            && !string.IsNullOrWhiteSpace(result.Key) && !string.IsNullOrWhiteSpace(result.Name)
+            && !string.IsNullOrWhiteSpace(result.Kind)).DistinctBy(result => result.Key, StringComparer.Ordinal)],
+    };
 }

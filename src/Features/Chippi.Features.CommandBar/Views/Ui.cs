@@ -49,7 +49,7 @@ internal static class Ui
             1 => words[0][..Math.Min(2, words[0].Length)],
             _ => string.Concat(words.Take(2).Select(w => char.ToUpper(w[0], System.Globalization.CultureInfo.CurrentCulture))),
         };
-        var label = Text(letters, 9, "IslandAccentBrush");
+        var label = Text(letters, 9);
         label.FontWeight = FontWeights.SemiBold;
         label.HorizontalAlignment = HorizontalAlignment.Center;
         var mark = new Border { Width = 20, Height = 20, CornerRadius = new CornerRadius(4), Child = label };

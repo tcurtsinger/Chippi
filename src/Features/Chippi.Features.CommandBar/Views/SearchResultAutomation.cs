@@ -4,6 +4,7 @@
 using System.Windows.Automation;
 using System.Windows.Automation.Peers;
 using System.Windows.Automation.Provider;
+using System.Windows;
 using System.Windows.Controls;
 
 namespace Chippi.Features.CommandBar.Views;
@@ -32,10 +33,22 @@ internal sealed class SearchResultList : StackPanel
 
 internal sealed class SearchResultButton(SearchResultList list, Action select, Action run) : Button
 {
-    internal bool IsSelected { get; init; }
+    internal bool IsSelected { get; private set; }
     internal Button? HideAction { get; set; }
 
     protected override AutomationPeer OnCreateAutomationPeer() => new ResultPeer(this, list, select, run);
+
+    internal void SetSelected(bool selected)
+    {
+        if (IsSelected == selected) return;
+        bool previous = IsSelected;
+        IsSelected = selected;
+        if (UIElementAutomationPeer.FromElement(this) is { } peer)
+        {
+            peer.RaisePropertyChangedEvent(SelectionItemPatternIdentifiers.IsSelectedProperty, previous, selected);
+            peer.InvalidatePeer();
+        }
+    }
 
     internal void AnnounceSelected() =>
         UIElementAutomationPeer.FromElement(this)?.RaiseAutomationEvent(AutomationEvents.SelectionItemPatternOnElementSelected);
@@ -46,7 +59,7 @@ internal sealed class SearchResultButton(SearchResultList list, Action select, A
         protected override string GetClassNameCore() => "SearchResult";
         protected override AutomationControlType GetAutomationControlTypeCore() => AutomationControlType.ListItem;
         // The name carries the icon, two lines and primary action as one item; hiding stays a separate control.
-        protected override List<AutomationPeer>? GetChildrenCore() => owner.HideAction is { } hide
+        protected override List<AutomationPeer>? GetChildrenCore() => owner.HideAction is { Visibility: Visibility.Visible } hide
             ? [CreatePeerForElement(hide)] : null;
         public override object? GetPattern(PatternInterface patternInterface) =>
             patternInterface is PatternInterface.SelectionItem or PatternInterface.Invoke ? this : base.GetPattern(patternInterface);

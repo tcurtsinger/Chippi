@@ -73,9 +73,7 @@ public sealed class CommandBarModule : IFeatureModule
         _capturing = false;
         ShortcutError = null;
         SettingsError = null;
-        Settings = context.Settings.Get<CommandBarSettings>();
-        if (Settings.Shortcut is { IsValid: false })
-            Settings = Settings with { Shortcut = CommandBarSettings.DefaultShortcut };
+        Settings = context.Settings.Get<CommandBarSettings>().Normalize();
         _pc = _createPc();
         Search = new CommandSearch(_pc, () => [.. context.Commands().Where(c => c.Key != OpenCommand)], context.SearchCommands, () => Settings,
             new Uses(Path.Combine(context.DataDirectory, "uses.json")), CopyAsync);
