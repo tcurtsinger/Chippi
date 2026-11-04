@@ -282,7 +282,7 @@ public sealed class AgentBarTests
             Assert.Same(window.BadgeLayer, badge.Parent);
             Assert.Same(window.PuckEnd.Parent, window.BadgeLayer.Parent);
             Assert.False(badge.IsHitTestVisible);
-            Assert.Equal((14d, 14d), (window.AgentBadgeProvider.Width, window.AgentBadgeProvider.Height));
+            Assert.Equal((15d, 15d), (window.AgentBadgeProvider.Width, window.AgentBadgeProvider.Height));
             foreach (var (provider, waiting) in new[] { (AgentKind.Claude, false), (AgentKind.Codex, true) })
             {
                 window.SetActivities([Session(waiting, provider)], PetMood.Idle);

@@ -118,10 +118,13 @@
                           Visibility="Collapsed">
                         <Ellipse Fill="{DynamicResource IslandBrush}" />
                         <Ellipse x:Name="AgentMarkPlate" Width="18" Height="18" Fill="{DynamicResource IslandAccentFillBrush}" />
-                        <!-- Keep the product's own colors legible inside the working/waiting ring. -->
+                        <!-- Fill the round badge with the app artwork; square icon corners are cropped. -->
                         <Border x:Name="AgentBadgeFace" Width="15" Height="15" CornerRadius="8" Background="{DynamicResource IslandOnAccentBrush}"
                                 Visibility="Collapsed">
-                            <Image x:Name="AgentBadgeProvider" Width="14" Height="14" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" />
+                            <Border.Clip>
+                                <EllipseGeometry Center="7.5,7.5" RadiusX="7.5" RadiusY="7.5" />
+                            </Border.Clip>
+                            <Image x:Name="AgentBadgeProvider" Width="15" Height="15" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" />
                         </Border>
                         <c:LucideIcon x:Name="AgentMarkIcon" Data="{x:Static c:LucideIcons.Gauge}" Size="11" Thickness="2"
                                       Brush="{DynamicResource IslandOnAccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
