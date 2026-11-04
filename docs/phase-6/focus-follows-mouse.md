@@ -30,4 +30,4 @@ Check menus, dragging and modal dialogs, fullscreen pause with Always on off/on,
 
 ## Approval and dependencies
 
-Uses Kayla's shared pause and ownership policy. Travis confirms the brief, proposed off default and global-pause limitation. Settings rows need design confirmation before code.
+Uses Kayla's [architecture](architecture.md#7-per-feature) and [input-layer brief](input-layer.md) for shared pause and ownership policy. The system-wide tracking versus per-display pause question above remains unresolved pending Kayla's answer. Travis confirms the brief, proposed off default and global-pause limitation. Settings rows need design confirmation before code.

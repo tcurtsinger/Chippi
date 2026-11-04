@@ -89,6 +89,8 @@ MouseSettings.swift defaults this feature off, with raise-window and wait-for-po
 
 Sources: [settings](https://github.com/vorssaint/vorssaint-utils/blob/3857e560d6e19b3170d432c2038c60b542810852/Sources/Vorssaint/UI/Settings/MouseSettings.swift), [timing state](https://github.com/vorssaint/vorssaint-utils/blob/3857e560d6e19b3170d432c2038c60b542810852/Sources/Vorssaint/Services/FocusFollowsMouse/FocusFollowsMouseSupport.swift), [activation safeguards](https://github.com/vorssaint/vorssaint-utils/blob/3857e560d6e19b3170d432c2038c60b542810852/Sources/Vorssaint/Services/FocusFollowsMouse/FocusFollowsMouseService.swift).
 
+First-build scope: the [Focus follows mouse brief](focus-follows-mouse.md) uses native Windows tracking. Per-app exclusions and wait-for-pointer-stop behavior described below are research proposals, outside the first build.
+
 ### Windows baseline and Chippi proposal
 
 Windows already supports active-window tracking, separate raise behavior and a delay through SystemParametersInfo. Match these choices. Chippi can improve control with per-app exclusions, the shared fullscreen pause and explicit wait-for-stop behavior. This is keyboard focus transfer, not simply scrolling an inactive window. [Windows tracking parameters](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-systemparametersinfow).
