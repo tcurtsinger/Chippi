@@ -21,6 +21,10 @@ Window layouts and snapping, app switcher, close protection, focus follows mouse
   - Caps Lock combos: Right Alt isn't offered, and Win isn't in the default set.
   - Text snippets are typed out, never pasted, so the clipboard is untouched. No paste mode and no import or export at first.
 
+- **Actions regroup (tasks 224 and 225):** option B. Lock, Turn off displays and Screen saver move into the Power menu, and End frozen apps moves into Quit apps, where a frozen app shows "Not responding" with End. Lock doesn't stay as a tile of its own. Phase 6 adds Snap, Input and Switcher as each feature is installed, which makes 18 tiles. Mockup: Lumen's Actions option B and menus (task 212).
+- **Start state (task 226):** every Phase 6 feature is off until you switch it on, even once it's installed.
+- **Wave 1 calls (task 227):** Always on lives in Settings › General under Fullscreen apps. A "Pause in these apps" list covers games that run in a window. Shortcuts from before Phase 6 (mic mute and the rest) never pause.
+
 ## Lead calls (Marge)
 
 - **Build order, three waves:**
