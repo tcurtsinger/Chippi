@@ -2,6 +2,8 @@
 
 Draft for Travis's confirmation. Wave 3. Overlay mockups follow. [Decisions](README.md); [reference evidence](behavior-spec-a.md#2-app-switcher-with-previews).
 
+Decided (Travis, task 226): off until switched on, even once installed.
+
 ## Job and invocation
 
 Find and activate an open window quickly. One App switcher tile in Actions opens its overlay. Settings > Windows > App switcher owns presentation and filters. No home tile.

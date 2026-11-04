@@ -8,7 +8,7 @@ Give keyboard focus to the window under the pointer without clicking. Settings >
 
 ## Behavior
 
-Proposed initial state: off. Use native Windows active-window tracking with 250 ms delay and raising enabled, as Marge specified. Do not build a competing activation engine or promise per-app exclusions and wait-for-stop behavior that native tracking cannot supply.
+Decided (Travis, task 226): off until switched on, even once installed. Use native Windows active-window tracking with 250 ms delay and raising enabled, as Marge specified. Do not build a competing activation engine or promise per-app exclusions and wait-for-stop behavior that native tracking cannot supply.
 
 Capture the original tracking, raise and delay values before changing them. Restore them on disable, feature removal, orderly exit and fullscreen pause. Resume reapplies Chippi values without replacing the original snapshot. Failures appear as "Focus change failed" and in logs.
 
@@ -30,4 +30,4 @@ Check menus, dragging and modal dialogs, fullscreen pause with Always on off/on,
 
 ## Approval and dependencies
 
-Uses Kayla's [architecture](architecture.md#7-per-feature) and [input-layer brief](input-layer.md) for shared pause and ownership policy. The global pause follows the settled shared rule above. Travis confirms the brief and proposed off default. Settings rows need design confirmation before code.
+Uses Kayla's [architecture](architecture.md#7-per-feature) and [input-layer brief](input-layer.md) for shared pause and ownership policy. The global pause follows the settled shared rule above. Travis confirms the brief; the initial off state is decided. Settings rows need design confirmation before code.

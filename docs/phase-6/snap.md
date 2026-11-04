@@ -2,6 +2,8 @@
 
 Draft for Travis's confirmation. Wave 3. Actions mockup is Lumen's task 212; zone/editor mockups follow. [Decisions](README.md); [reference evidence](behavior-spec-a.md#1-window-layouts-and-snapping).
 
+Decided (Travis, task 226): off until switched on, even once installed.
+
 ## Job and surface
 
 Place the current window without hunting for edges. Snap is a menu inside Actions: Left, Right, Maximize, Center, Next monitor, Restore and named zones. No new home tile. Settings > Windows > Window layouts owns zone editing, gaps and exclusions. Shortcuts owns bindings.

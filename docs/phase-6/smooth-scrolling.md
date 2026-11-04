@@ -8,7 +8,7 @@ Make wheel motion smooth and predictable, with speed suited to each app. Setting
 
 ## Behavior
 
-Both start off (proposed). Smooth interpolates wheel movement. Linear removes speed-dependent acceleration so equal notch counts give equal distance at different spin rates. Either can run independently. Per-app speeds and exclusions ship in the first build.
+Decided (Travis, task 226): both stay off until switched on, even once installed. Smooth interpolates wheel movement. Linear removes speed-dependent acceleration so equal notch counts give equal distance at different spin rates. Either can run independently. Per-app speeds and exclusions ship in the first build.
 
 Preserve horizontal input, fine deltas and Ctrl+wheel zoom. Avoid double animation of touchpad gestures. Small deltas alone cannot identify touchpads because precision wheels produce them too. Kayla's implementation must define and verify device classification.
 

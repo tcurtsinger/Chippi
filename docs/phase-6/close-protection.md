@@ -16,7 +16,7 @@ Ctrl+W is protected only for selected apps and uses "Press Ctrl+W again to close
 
 Title-bar X, taskbar Close window, menus, shutdown, crashes and Task Manager are outside coverage. Desktop Alt+F4 passes through. Elevated targets pass through. Remote desktop and VM hosts need exclusions until forwarding is verified.
 
-Proposed initial state: off until enabled. Once enabled, Alt+F4 scope is every eligible app. Always on off pauses protection in fullscreen apps, letting native input through. No per-feature fullscreen override.
+Decided (Travis, task 226): off until switched on, even once installed. Once enabled, Alt+F4 scope is every eligible app. Always on off pauses protection in fullscreen apps, letting native input through. No per-feature fullscreen override.
 
 ## Reference bar
 
@@ -32,4 +32,4 @@ Record feedback latency and bar screenshots. No input checks have run for this d
 
 ## Approval and dependencies
 
-Shared hook, app identity, actions and pause belong to Kayla's architecture. Travis confirms the proposed interval and initial off state with this brief; the bar mockup needs approval before code.
+Shared hook, app identity, actions and pause belong to Kayla's architecture. Travis confirms the proposed interval with this brief; the initial off state is decided, and the bar mockup needs approval before code.
