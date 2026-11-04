@@ -58,7 +58,8 @@ Travis (task 208): every verb is one shared action, and any door can fire it: an
 - **Chippi's commands stay the list of what Chippi does.** Phase 6 features add their verbs through `IModuleUi.AddCommands` (keys like `snap/left`, `app-switcher/open`, `snippets/<id>`) and their on/off as commands too. Search and the Radial menu's Chippi slice see them with no further work. A command that is an on/off gains an `IsOn` state, so a tile and a Search row can show it.
 - **The Radial menu's action kinds become Core's action model** (`ChippiAction`: kind, value, name, glyph), with its runner and its `IRadialPc` behind a Core interface. Submenu stays the Radial menu's own. Shortcuts binds a key, Caps Lock combo or mouse button to a `ChippiAction` and uses the same picker, lifted out of the Radial menu's slice editor into `Chippi.UI`.
 - **One home for window verbs.** The Window kind is the only place a window verb lives. Snap adds its verbs to it (Center, Restore, Next monitor, its zones), so "Snap left" exists once, whichever door fires it. Its target depends on the door: the window under the pointer (Radial, mouse buttons), the foreground window (keys, Caps Lock combos), or the window that was in front before the island opened (Actions tiles, Search).
-- **Actions tiles from other features** (Travis: grouped into menus, like Plan, Power and Quit). Today's gallery holds a fixed `QuickActionId` list. It gains tiles that other features add: a tile is a command, a command with `IsOn`, or a menu of commands that steps into the page like Plan. Phase 6 adds three: a Snap menu, a menu of Phase 6 switches, and the App switcher. A tile whose feature isn't installed is offered nowhere, and keeps its gallery position while it's gone, as Cleaning does now. Lumen's mockup (task 212) sets their look.
+- **Actions tiles from other features** (Travis: grouped into menus, like Plan, Power and Quit). Today's gallery holds a fixed `QuickActionId` list. It gains tiles that other features add: a tile is a command, a command with `IsOn`, or a menu of commands that steps into the page like Plan. Phase 6 adds three: a Snap menu, Input (a menu of Phase 6 switches), and the App switcher. A tile whose feature isn't installed is offered nowhere, and keeps its gallery position while it's gone, as Cleaning does now. Lumen's mockup (task 212) sets their look.
+- **Actions regroups in wave 1** (Travis, tasks 224 and 225, option B). Lock, Turn off displays and Screen saver become rows in Power; End frozen apps becomes Quit apps' End on a row that shows "Not responding", still confirmed first. Their four tiles leave the gallery and Lock keeps no tile of its own, so the gallery is 18 tiles with Snap, Input and Switcher. The four stay `QuickActionId`s with the same command keys (`quick-actions/lock` and the rest), so Search, Radial slices and their shortcuts keep working. `QuickActionsLayout` keeps every remaining tile's saved slot, frees the four, and puts a new tile in the first empty one. The brief's Actions section has the details.
 
 ## 4. One shortcut service
 
@@ -73,11 +74,11 @@ Travis (task 208): every verb is one shared action, and any door can fire it: an
 
 ## 5. The pause and Always on
 
-Travis (tasks 198, 211): one **Always on** switch covers every Phase 6 input feature, Debounce included, off by default. Off, they pause while a fullscreen game or app is in front.
+Travis (tasks 198, 211): one **Always on** switch covers every Phase 6 input feature, Debounce included, off by default. Off, they pause while a fullscreen game or app is in front. Each Phase 6 feature also starts off, even once installed, until Travis switches it on (task 226).
 
 - **The check:** `ForegroundTracker`'s fullscreen test moves to Core: D3D fullscreen, presentation mode, or a foreground window covering its whole monitor (catches borderless games). The island keeps its own rule (it hides only on its display) on top of the same test.
 - **Paused** means the foreground window is fullscreen and Always on is off. Keyboard input goes to the foreground app and a fullscreen game holds the mouse, so the foreground window is the right test on two monitors: click the browser on the Samsung and the browser is in front, so nothing pauses.
-- **Windowed games** that don't cover their monitor aren't detected. Recommended (a call in [input-layer.md](input-layer.md)): one shared list, "Pause in these apps", that counts as fullscreen.
+- **Windowed games** that don't cover their monitor aren't detected, so one shared list, "Pause in these apps", counts as fullscreen (Travis, task 227; Always on's place in Settings › General and pre-Phase 6 shortcuts never pausing were decided with it).
 - **Pause only stops new gestures.** A key or button swallowed before the game came to front still has its up swallowed, so nothing sticks.
 - **While paused,** a filter that's paused passes everything; when no unpaused filter needs a device, its hook comes off, so a game's input doesn't pass through Chippi at all.
 - **Covered:** Debounce, Close protection, Smooth scrolling, Shortcuts (key shortcuts too: they're unregistered while paused, so the game gets the key), Text snippets' typed abbreviations, Snap's Shift+drag zones, the App switcher's shortcut, Focus follows mouse.
@@ -135,7 +136,7 @@ The waves are Marge's ([README.md](README.md)).
 
 **Wave 1:**
 1. The input hub: `Chippi.Input` and `Chippi.Input.Tests` (new in `Chippi.slnx`); the Radial gesture, the key recorder and Cleaning mode's lock moved onto it; the watchdog; the Sandbox runner. Shared code with Radial menu regression risk, so its tests come along.
-2. Shared actions, the shortcut service, the pause and Always on, and the Radial menu's fullscreen switch.
+2. Shared actions, the shortcut service, the pause and Always on, the Radial menu's fullscreen switch, and the Actions regroup.
 3. Debounce (S), Focus follows mouse (S), Close protection (S).
 
 **Wave 2:** Shortcuts (L, two PRs), Smooth scrolling (M, the app matrix in its live check).

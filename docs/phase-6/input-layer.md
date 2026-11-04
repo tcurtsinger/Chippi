@@ -4,7 +4,7 @@ Draft by Kayla, 2026-11-04, for Travis to confirm. Wave 1's shared parts, which 
 
 ## Job
 
-Give every Phase 6 feature one way to listen to the keyboard and mouse, one list of things Chippi can do, one place shortcuts are kept, and one rule for when they stand down in games. Done right, nothing changes that Travis can see except three Settings rows, and the Radial menu works exactly as it does today.
+Give every Phase 6 feature one way to listen to the keyboard and mouse, one list of things Chippi can do, one place shortcuts are kept, and one rule for when they stand down in games. Done right, Travis sees three new Settings rows and Actions regrouped (task 224), and the Radial menu works exactly as it does today.
 
 ## What Travis sees
 
@@ -19,11 +19,20 @@ Give every Phase 6 feature one way to listen to the keyboard and mouse, one list
 - **Always on on:** they act everywhere, games included.
 - **Pause in these apps:** apps that count as fullscreen even in a window, for games that don't cover the screen.
 - **Never paused:** the Radial menu (its own switch, below), shortcuts that existed before Phase 6 (mic mute, the output switch, Paste as plain text, Quick actions, Cleaning mode, Search's Ctrl+Alt+Space), Cleaning mode's lock, and Search itself (the Command bar): a snippet picked in Search is typed into the window Search opened over even when that's a fullscreen app, since it was chosen on purpose (Marge's call).
-- Always on is also a switch in Actions' menu of Phase 6 switches; Lumen's mockup (task 212) names it there.
+- Always on is also a switch in Actions' Input menu; Lumen's mockup (task 212) names it there.
+- **Every Phase 6 feature starts off,** even once installed, until Travis switches it on (task 226). Always on starts off too.
 
 **Settings › Radial menu › Opening:** a new switch row, **Open over fullscreen apps**, on by default, which keeps today's behavior. Off, the triggers reach the game as plain clicks and keys while a fullscreen app is in front.
 
 **Settings › Shortcuts:** looks the same as today. Its rows now come from one list that knows every shortcut Chippi holds, so a new feature's shortcuts show up there without changing the page. Herb's Shortcuts brief and Lumen's mockup reshape the page in wave 2.
+
+**Actions** regroups (tasks 224 and 225, Lumen's option B and menus, task 212):
+
+- **Power** gains Lock, Turn off displays and Screen saver as rows, beside Sleep, Restart, Shut down and Sign out. Lock is no longer a tile of its own.
+- **Quit apps** gains End frozen apps: an app that isn't responding shows "Not responding", and its row's button is End instead of Quit. Ending still asks first, as End frozen apps does today, now naming the app ("End Outlook?", Cancel and End).
+- **The gallery** drops the Lock, Displays, Screensaver and Frozen tiles. Phase 6 adds Snap (a menu), Input (a menu of the Phase 6 switches) and Switcher, each shown once its feature is installed; Input shows once any Phase 6 input feature is. With all three, that's 18 tiles.
+- **Travis's saved positions stay.** Every tile that remains keeps its slot in his saved layout; the four slots freed go empty, and a new tile takes the first empty slot when its feature is installed. He can move them in the editor as today.
+- **Nothing bound to the four moved actions breaks.** Their commands (`quick-actions/lock`, `displays`, `screensaver`, `frozen`) keep their keys, so Search, Radial slices and their shortcuts in Settings › Quick actions still run them.
 
 ## Behavior
 
@@ -38,18 +47,18 @@ Give every Phase 6 feature one way to listen to the keyboard and mouse, one list
 - **Admin windows:** while one is in front, hook features don't act on it, and Caps Lock is plain Caps Lock. Key shortcuts still work. Nothing in Chippi can change this without a signed installer (architecture §6).
 - **Games and anti-cheat:** with Always on off, Phase 6 features send no input into a fullscreen game. The Radial menu still can (key shortcut and text slices, its virtual pointer) while Open over fullscreen apps is on, its default. Untested on Travis's games either way.
 
-## Calls for Travis
+## Decided (Travis, task 227)
 
-1. **Always on lives in Settings › General,** under Fullscreen apps, since it covers features in three groups (Windows, Clipboard & text, Shortcuts). Recommended. The other option is a row on each Phase 6 page, all tied to one setting.
-2. **Pause in these apps,** for windowed games: add it. Recommended; without it, a game that runs in a window never pauses anything.
-3. **Shortcuts from before Phase 6 never pause** (mic mute in a game is their point). Recommended.
+1. **Always on lives in Settings › General,** under Fullscreen apps, since it covers features in three groups (Windows, Clipboard & text, Shortcuts).
+2. **Pause in these apps,** for windowed games: without it, a game that runs in a window never pauses anything.
+3. **Shortcuts from before Phase 6 never pause** (mic mute in a game is their point).
 
 ## How it's built
 
 Three PRs, in order. All three change shared code (Core, App, Chippi.UI and the Radial menu), and the first adds two projects to `Chippi.slnx`.
 
 1. **The hub:** new `Chippi.Input` and `Chippi.Input.Tests`. One keyboard and one mouse hook on one thread, filters in a fixed order, one `Stopwatch` clock (injected in tests), modifier masking, the held-modifier release path, the watchdog. The Radial gesture, the key recorder and Cleaning mode's lock move onto it. The Windows Sandbox runner for real-hook checks.
-2. **Shared actions and shortcuts:** the Radial menu's action kinds, runner and picker lifted to Core and `Chippi.UI`; window verbs take a target (under the pointer, in front, or in front before the island opened); `IsOn` on Chippi's commands; Actions accepts tiles other features add. `GlobalMicHotkey` becomes Core's shortcut service, and Settings › Shortcuts reads its list.
+2. **Shared actions and shortcuts:** the Radial menu's action kinds, runner and picker lifted to Core and `Chippi.UI`; window verbs take a target (under the pointer, in front, or in front before the island opened); `IsOn` on Chippi's commands; Actions accepts tiles other features add, and regroups (Power, Quit apps, the gallery as above). `GlobalMicHotkey` becomes Core's shortcut service, and Settings › Shortcuts reads its list.
 3. **The pause:** the fullscreen check lifted from the island to Core, Always on and Pause in these apps, the Radial menu's new switch.
 
 ## Done means
@@ -59,7 +68,8 @@ Three PRs, in order. All three change shared code (Core, App, Chippi.UI and the 
 - **Pause:** in the Sandbox, with a borderless window covering the screen in front, a paused filter passes everything and the hook comes off; with Always on, it acts; a key held across the switch has no stuck release. Same for an app on Pause in these apps.
 - **Watchdog:** a test unhooks the hub behind its back and sees it reinstalled.
 - **Release path:** hub tests with a fake source and a recording sender hold a modifier, then trigger each way out (its key up, the filter off, quit, the hook gone, a lock, a desktop switch, a pause, 5 s without key events) and see exactly one up for it each time.
-- **Shots:** the three Settings rows, dark and light, next to Lumen's mockup if there is one.
+- **Actions regroup:** a test loads a saved layout from main (all 19 tiles, in a custom order) and sees every remaining tile in its old slot, the four moved ones gone from the gallery, and a new tile in the first empty slot. Lock, Turn off displays and Screen saver run from Power, a test app that stops responding shows "Not responding" in Quit apps and End ends it after the confirm, and `quick-actions/lock` still runs Lock from Search.
+- **Shots:** the three Settings rows, the Actions gallery, Power and Quit apps, dark and light, next to Lumen's mockup (task 212, option B).
 - **Not run here:** admin windows (needs a UAC prompt) and anti-cheat.
 
 ## Left out, and why
