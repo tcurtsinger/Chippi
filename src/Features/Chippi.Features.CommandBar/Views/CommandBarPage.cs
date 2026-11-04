@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using System.ComponentModel;
+using System.IO;
 using System.Windows;
 using System.Windows.Automation;
+using System.Windows.Automation.Peers;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -29,7 +32,9 @@ internal sealed class CommandBarPage : UserControl
     private const double RowHeight = 34;
 
     private readonly CommandBarModule _module;
-    private readonly StackPanel _rows = new() { VerticalAlignment = VerticalAlignment.Top };
+    private readonly SearchResultList _rows = new() { VerticalAlignment = VerticalAlignment.Top };
+    private readonly Grid _status = new() { Height = 24, Margin = new Thickness(10, 0, 6, 0), Visibility = Visibility.Collapsed };
+    private readonly TextBlock _statusText = Ui.Text(size: 11, brush: "IslandTextSecondaryBrush");
     private readonly DispatcherTimer _filesTimer;
     private IReadOnlyList<Result> _shown = [];
     private IReadOnlyList<OpenWindow> _windows = [];
@@ -37,7 +42,18 @@ internal sealed class CommandBarPage : UserControl
     private string _filesFor = "";
     private CancellationTokenSource? _finding;
     private int _selected;
+    private bool _deliberateSelection;
+    private bool _active;
+    private bool _searchingFiles;
+    private bool _filesUnavailable;
+    private long _visit;
+    private long _queryVersion;
+    private long _runVersion;
+    private string? _running;
     private string? _failed; // the key of the row whose run failed, until the next change
+    private string? _failure;
+    private string? _saveFailure;
+    private Result? _hidden;
     private Point? _pointer;
 
     public CommandBarPage(CommandBarModule module)
@@ -47,17 +63,26 @@ internal sealed class CommandBarPage : UserControl
         AutomationProperties.SetName(Field, "Search");
         Field.TextChanged += (_, _) => Typed();
         Field.PreviewKeyDown += OnKey;
-        Content = _rows;
+        AutomationProperties.SetName(_rows, "Search results");
+        AutomationProperties.SetLiveSetting(_statusText, AutomationLiveSetting.Polite);
+        _status.ColumnDefinitions.Add(new ColumnDefinition());
+        _status.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        _status.Children.Add(_statusText);
+        Content = new StackPanel { Children = { _rows, _status } };
         _filesTimer = new DispatcherTimer(FilesAfter, DispatcherPriority.Input, (_, _) => FindFiles(), Dispatcher) { IsEnabled = false };
         IsVisibleChanged += (_, e) =>
         {
             if (e.NewValue is true)
                 Opened();
             else
-                _finding?.Cancel();
+                Deactivate();
         };
         Loaded += (_, _) => { if (_module.Pc is { } pc) pc.AppsChanged += OnAppsChanged; };
-        Unloaded += (_, _) => { if (_module.Pc is { } pc) pc.AppsChanged -= OnAppsChanged; };
+        Unloaded += (_, _) =>
+        {
+            if (_module.Pc is { } pc) pc.AppsChanged -= OnAppsChanged;
+            Deactivate();
+        };
     }
 
     /// <summary>The page's header, the field: it takes the keyboard as the page opens.</summary>
@@ -86,7 +111,17 @@ internal sealed class CommandBarPage : UserControl
     /// <summary>Each open starts empty, on your most used, with the windows open now and the Start menu read again.</summary>
     private void Opened()
     {
+        Deactivate();
+        _active = true;
         _failed = null;
+        _failure = null;
+        _saveFailure = null;
+        _hidden = null;
+        _files = [];
+        _filesFor = "";
+        _filesUnavailable = false;
+        _searchingFiles = false;
+        _pointer = null;
         try { _windows = _module.Pc?.Windows() ?? []; }
         catch (Exception ex)
         {
@@ -100,6 +135,22 @@ internal sealed class CommandBarPage : UserControl
             Refresh(keepSelection: false);
     }
 
+    /// <summary>Invalidate work from this visit before the page is hidden or its module stops.</summary>
+    internal void Deactivate()
+    {
+        _active = false;
+        _visit++;
+        _running = null;
+        CancelFiles();
+    }
+
+    private void CancelFiles()
+    {
+        _filesTimer.Stop();
+        _finding?.Cancel();
+        _finding = null; // the request owns and disposes its cancellation source
+    }
+
     private void OnAppsChanged() => Dispatcher.BeginInvoke(() =>
     {
         if (IsVisible)
@@ -108,46 +159,76 @@ internal sealed class CommandBarPage : UserControl
 
     private void Typed()
     {
+        _queryVersion++;
         _failed = null;
-        _finding?.Cancel();
-        _filesTimer.Stop();
+        _failure = null;
+        _saveFailure = null;
+        _hidden = null;
+        _filesUnavailable = false;
+        CancelFiles();
+        _searchingFiles = Field.Text.Trim().Length >= 2 && !_module.Settings.Off.Contains(ResultSwitch.Files);
         Refresh(keepSelection: false);
-        if (Field.Text.Trim().Length >= 2 && !_module.Settings.Off.Contains(ResultSwitch.Files))
+        if (_searchingFiles)
             _filesTimer.Start();
     }
 
     private async void FindFiles()
     {
-        _filesTimer.Stop();
+        CancelFiles();
         if (_module.Pc is not { } pc)
             return;
         string text = Field.Text.Trim();
-        var finding = _finding = new CancellationTokenSource();
+        if (text.Length < 2 || _module.Settings.Off.Contains(ResultSwitch.Files))
+            return;
+        long visit = _visit;
+        long queryVersion = _queryVersion;
+        using var finding = new CancellationTokenSource();
+        _finding = finding;
+        _searchingFiles = true;
+        _filesUnavailable = false;
+        RenderStatus();
         try
         {
             var files = await pc.FindFilesAsync(text, FileCount, finding.Token);
-            if (finding.IsCancellationRequested || Field.Text.Trim() != text)
+            if (finding.IsCancellationRequested || visit != _visit || queryVersion != _queryVersion)
                 return;
             _files = files;
             _filesFor = text;
+            _searchingFiles = false;
             Refresh();
         }
         catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            if (finding.IsCancellationRequested || visit != _visit || queryVersion != _queryVersion)
+                return;
+            Log.Warn("Command bar: finding files failed", ex);
+            _searchingFiles = false;
+            _filesUnavailable = true;
+            RenderStatus();
+        }
+        finally
+        {
+            if (ReferenceEquals(_finding, finding))
+                _finding = null;
+        }
     }
 
     /// <summary>
-    /// Finds the rows again. Typing selects the first row (an answer that appears selects itself); a refresh of the same
-    /// text (files found, the Start menu read) keeps the selected row selected while it still shows.
+    /// Typing chooses the first row; arriving local results can replace that automatic choice. Once the user navigates,
+    /// refreshes preserve the chosen identity, including the empty-query list and an explicitly chosen web fallback.
     /// </summary>
     internal void Refresh(bool keepSelection = true)
     {
         if (_module.Search is not { } search)
             return;
         string text = Field.Text.Trim();
-        string? selected = keepSelection && _selected < _shown.Count ? _shown[_selected].Key : null;
+        if (!keepSelection)
+            _deliberateSelection = false;
+        string? selected = _deliberateSelection && _selected < _shown.Count ? _shown[_selected].Key : null;
         _shown = search.Find(text, _windows, _filesFor == text ? _files : []);
         int at = selected is null ? -1 : IndexOf(selected);
-        _selected = at >= 0 && text.Length > 0 ? at : 0;
+        _selected = at >= 0 ? at : 0;
         Render();
     }
 
@@ -184,52 +265,195 @@ internal sealed class CommandBarPage : UserControl
 
     private void Select(int index)
     {
+        _deliberateSelection = true;
         if (index == _selected)
             return;
         _selected = index;
+        _failed = null;
+        _failure = null;
         Render();
     }
 
     /// <summary>Runs <paramref name="result"/>: the panel closes after, unless the row moved the island to another page.</summary>
     internal async void Run(Result result)
     {
+        if (!_active || _running is not null)
+            return;
+        long visit = _visit;
+        long queryVersion = _queryVersion;
+        long runVersion = ++_runVersion;
+        var search = _module.Search;
         string text = Field.Text;
+        _running = result.Key;
+        _failed = null;
+        _failure = null;
+        Render();
         try
         {
             await result.Run();
-            _module.Search?.Picked(text, result);
-            if (IsVisible)
+            if (ReferenceEquals(search, _module.Search))
+                search?.Picked(text, result);
+            if (_active && visit == _visit && queryVersion == _queryVersion)
                 _module.Close();
         }
         catch (Exception ex)
         {
             Log.Warn($"Command bar: {result.Verb} failed", ex);
+            if (!_active || visit != _visit || queryVersion != _queryVersion)
+                return;
             _failed = result.Key;
-            Render();
+            _failure = Failure(result, ex);
+        }
+        finally
+        {
+            if (visit == _visit && runVersion == _runVersion)
+            {
+                _running = null;
+                Render();
+            }
         }
     }
 
+    private static string Failure(Result result, Exception ex) => ex switch
+    {
+        FileNotFoundException => "File not found",
+        DirectoryNotFoundException => "Folder not found",
+        UnauthorizedAccessException => "Access denied",
+        Win32Exception { NativeErrorCode: 2 or 3 } => "File not found",
+        Win32Exception { NativeErrorCode: 5 } => "Access denied",
+        InvalidOperationException { Message: "Window closed" } => "Window closed",
+        InvalidOperationException { Message: "Clipboard unavailable" } => "Clipboard unavailable",
+        _ => $"{result.Verb} failed · Try again",
+    };
+
     private void Hide(Result result)
     {
-        _module.Hide(result);
+        if (_running is not null)
+            return;
+        if (_module.Hide(result))
+        {
+            _hidden = result;
+            _saveFailure = null;
+            _failed = null;
+            _failure = null;
+        }
+        else
+            _saveFailure = _module.SettingsError ?? "Couldn’t hide result";
         Refresh();
+    }
+
+    internal void UndoHidden()
+    {
+        if (_hidden is not { } hidden)
+            return;
+        if (!_module.Unhide(hidden.Key))
+        {
+            _saveFailure = _module.SettingsError ?? "Couldn’t restore result";
+            RenderStatus();
+            return;
+        }
+        _hidden = null;
+        _saveFailure = null;
+        Refresh();
+        int index = IndexOf(hidden.Key);
+        if (index >= 0)
+            Select(index);
+        Field.Focus();
     }
 
     private void Render()
     {
         _rows.Children.Clear();
+        _rows.Items.Clear();
         for (int i = 0; i < _shown.Count; i++)
             _rows.Children.Add(Row(_shown[i], i));
+        RenderStatus();
+        AnnounceSelection();
     }
 
-    // A row: the 20 lead, the name in 12 over its detail in 11 tertiary, a level bar for a volume, and the selected row's
-    // verb in the accent at its right with the eye-off button at its end.
+    private void RenderStatus()
+    {
+        string text;
+        string? action = null;
+        Action? invoke = null;
+        if (_saveFailure is { } saveFailure)
+        {
+            text = saveFailure;
+            if (_hidden is not null) { action = "Undo"; invoke = UndoHidden; }
+        }
+        else if (_failure is { } failure)
+            text = failure;
+        else if (_hidden is not null)
+        {
+            text = "Hidden";
+            action = "Undo";
+            invoke = UndoHidden;
+        }
+        else if (_filesUnavailable)
+        {
+            text = "Files unavailable";
+            action = "Retry";
+            invoke = () => { FindFiles(); Field.Focus(); };
+        }
+        else if (_searchingFiles)
+            text = "Searching files…";
+        else
+            text = _shown.Count == 0 ? "No results" : "";
+
+        bool changed = _statusText.Text != text;
+        _statusText.Text = text;
+        _statusText.ToolTip = text;
+        _status.Visibility = text.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
+        while (_status.Children.Count > 1)
+            _status.Children.RemoveAt(1);
+        if (action is not null && invoke is not null)
+        {
+            var button = new Button { Content = action, Height = 24, MinWidth = 44, Padding = new Thickness(8, 0, 8, 0), FontSize = 11 };
+            button.SetResourceReference(StyleProperty, "IslandListRowStyle");
+            AutomationProperties.SetName(button, action == "Undo" ? $"Undo hiding {_hidden?.Name}" : "Retry file search");
+            button.Click += (_, _) => invoke();
+            Grid.SetColumn(button, 1);
+            _status.Children.Add(button);
+        }
+        if (changed)
+            UIElementAutomationPeer.FromElement(_statusText)?.RaiseAutomationEvent(AutomationEvents.LiveRegionChanged);
+    }
+
+    private void AnnounceSelection()
+    {
+        string help = _selected < _shown.Count
+            ? $"{AccessibleName(_shown[_selected])}, {_selected + 1} of {_shown.Count}. Up and Down to choose; Enter to {_shown[_selected].Verb.ToLowerInvariant()}."
+            : _statusText.Text;
+        bool changed = AutomationProperties.GetHelpText(Field) != help;
+        AutomationProperties.SetHelpText(Field, help);
+        if (changed && UIElementAutomationPeer.FromElement(Field) is { } fieldPeer)
+            fieldPeer.RaiseNotificationEvent(AutomationNotificationKind.Other, AutomationNotificationProcessing.MostRecent, help, "Search selection");
+        if (_selected < _rows.Items.Count)
+            _rows.Items[_selected].AnnounceSelected();
+    }
+
+    private string AccessibleName(Result result) => $"{result.Name}, {result.FullPath ?? result.Detail}, {result.Verb}" +
+        (result.Key == _failed && _failure is not null ? $", {_failure}" : "");
+
+    // A row: the 20 lead, the name in 12 over its detail in 11, a level bar for a volume, and the selected row's
+    // verb in primary semibold ink at its right with the eye-off button at its end.
     private UIElement Row(Result result, int index)
     {
+        long visit = _visit;
+        long queryVersion = _queryVersion;
+        void Choose()
+        {
+            int at = IndexOf(result.Key);
+            if (_active && visit == _visit && queryVersion == _queryVersion && at >= 0) Select(at);
+        }
+        void Execute()
+        {
+            if (_active && visit == _visit && queryVersion == _queryVersion && IndexOf(result.Key) >= 0) Run(result);
+        }
         bool selected = index == _selected;
-        bool failed = result.Key == _failed;
         var name = Ui.Text(result.Name, 12);
-        var detail = Ui.Text(failed ? $"{result.Verb} failed" : result.Detail, 11, failed ? "IslandCautionBrush" : "IslandTextTertiaryBrush");
+        var detail = Ui.Text(result.Detail, 11, selected ? "IslandTextBrush" : "IslandTextSecondaryBrush");
+        if (selected) detail.Opacity = 0.82;
         var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Children = { name, detail } };
         var line = new Grid();
         line.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -249,15 +473,27 @@ internal sealed class CommandBarPage : UserControl
         }
         if (selected)
         {
-            var verb = Ui.Text(result.Verb, 11, "IslandAccentBrush");
+            var verb = Ui.Text(_running == result.Key ? "Working…" : result.Verb, 11);
+            verb.FontWeight = FontWeights.SemiBold;
             verb.Margin = new Thickness(10, 0, result.CanHide ? 28 : 0, 0);
             Grid.SetColumn(verb, 3);
             line.Children.Add(verb);
         }
-        var button = new Button { Content = line, Height = RowHeight, Padding = new Thickness(10, 0, 10, 0), Focusable = false, ToolTip = result.Name, Tag = selected ? "Selected" : null };
+        var button = new SearchResultButton(_rows, Choose, Execute)
+        {
+            Content = line, Height = RowHeight, Padding = new Thickness(10, 0, 10, 0), Focusable = false,
+            ToolTip = result.FullPath ?? $"{result.Name}\n{result.Detail}", Tag = selected ? "Selected" : null,
+            IsSelected = selected, IsEnabled = _running is null,
+        };
+        _rows.Items.Add(button);
         button.SetResourceReference(StyleProperty, "IslandListRowStyle");
-        AutomationProperties.SetName(button, $"{result.Name}, {result.Detail}");
-        button.Click += (_, _) => Run(result);
+        AutomationProperties.SetName(button, AccessibleName(result));
+        AutomationProperties.SetPositionInSet(button, index + 1);
+        AutomationProperties.SetSizeOfSet(button, _shown.Count);
+        AutomationProperties.SetItemStatus(button, result.Key == _failed ? _failure : _running == result.Key ? "Working" : selected ? "Selected" : "");
+        if (result.CanHide)
+            AutomationProperties.SetHelpText(button, "Shift+Delete to hide. Undo is available after hiding.");
+        button.Click += (_, _) => Execute();
         button.MouseMove += (_, e) =>
         {
             // Only a pointer that moved selects: rows changing under a still pointer leave the selection alone.
@@ -265,15 +501,16 @@ internal sealed class CommandBarPage : UserControl
             if (_pointer == at)
                 return;
             _pointer = at;
-            Select(index);
+            Choose();
         };
-        if (!selected || !result.CanHide)
+        if (!selected || !result.CanHide || _running is not null)
             return button;
         var hide = Ui.Icon(LucideIcons.EyeOff, $"Hide {result.Name}", "Hide");
         hide.HorizontalAlignment = HorizontalAlignment.Right;
         hide.VerticalAlignment = VerticalAlignment.Center;
         hide.Margin = new Thickness(0, 0, 6, 0);
-        hide.Click += (_, _) => Hide(result);
+        hide.Click += (_, _) => { if (_active && visit == _visit && queryVersion == _queryVersion) Hide(result); };
+        button.HideAction = hide;
         return new Grid { Children = { button, hide } };
     }
 
@@ -282,29 +519,31 @@ internal sealed class CommandBarPage : UserControl
         if (result.Emoji is { } emoji)
             return new TextBlock { Text = emoji, FontFamily = new FontFamily("Segoe UI Emoji"), FontSize = 16, Width = 20, TextAlignment = TextAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
         if (result.App is { } parsing)
-            return AppIcon(new StartApp(result.Name, parsing));
+            return AppIcon(result.Name, (pc, pixels) => pc.AppIconAsync(new StartApp(result.Name, parsing), pixels));
+        if (result.Window is { } window)
+            return AppIcon(window.App, (pc, pixels) => pc.WindowIconAsync(window, pixels));
         var box = new Grid { Width = 20, Height = 20, VerticalAlignment = VerticalAlignment.Center };
         box.Children.Add(Ui.Glyph(LucideIcons.Get(result.Icon), 16, "IslandTextSecondaryBrush"));
         return box;
     }
 
     /// <summary>The app's icon, its letters on the tint until it's read (at once when already read).</summary>
-    private FrameworkElement AppIcon(StartApp app)
+    private FrameworkElement AppIcon(string name, Func<IPc, int, Task<ImageSource?>> read)
     {
-        var mark = Ui.Monogram(app.Name);
+        var mark = Ui.Monogram(name);
         var image = new Image { Width = 20, Height = 20 };
         var box = new Grid { Width = 20, Height = 20, VerticalAlignment = VerticalAlignment.Center, Children = { mark, image } };
         if (_module.Pc is not { } pc)
             return box;
         int pixels = (int)Math.Round(20 * VisualTreeHelper.GetDpi(this).DpiScaleX);
-        _ = Show(pc.AppIconAsync(app, pixels));
+        _ = Show();
         return box;
 
-        async Task Show(Task<ImageSource?> reading)
+        async Task Show()
         {
             try
             {
-                if (await reading is { } icon)
+                if (await read(pc, pixels) is { } icon)
                 {
                     image.Source = icon;
                     mark.Visibility = Visibility.Collapsed;

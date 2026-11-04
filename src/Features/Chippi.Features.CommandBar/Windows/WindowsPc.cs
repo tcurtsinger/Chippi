@@ -25,7 +25,11 @@ public sealed class WindowsPc : IPc
     private readonly ConcurrentDictionary<string, string> _appNames = new(StringComparer.OrdinalIgnoreCase);
     private IReadOnlyList<StartApp> _apps = [];
     private int _reading;
-    private bool _searchFailed;
+    private readonly Func<string, int, CancellationToken, IReadOnlyList<FoundFile>> _query;
+
+    public WindowsPc() : this(Query) { }
+
+    internal WindowsPc(Func<string, int, CancellationToken, IReadOnlyList<FoundFile>> query) => _query = query;
 
     public IReadOnlyList<StartApp> Apps => Volatile.Read(ref _apps);
 
@@ -49,6 +53,8 @@ public sealed class WindowsPc : IPc
 
     public Task<ImageSource?> AppIconAsync(StartApp app, int pixels) => _startMenu.IconAsync(app, pixels);
 
+    public Task<ImageSource?> WindowIconAsync(OpenWindow window, int pixels) => _startMenu.WindowIconAsync(window, pixels);
+
     /// <summary>A file's, a folder's or a program's icon, <paramref name="pixels"/> square, or null; read off the UI thread and kept.</summary>
     public Task<ImageSource?> PathIconAsync(string path, int pixels) => _startMenu.PathIconAsync(path, pixels);
 
@@ -64,7 +70,10 @@ public sealed class WindowsPc : IPc
                 uint pid;
                 PInvoke.GetWindowThreadProcessId(hwnd, &pid);
                 if (pid != self)
-                    found.Add(new OpenWindow(hwnd, title, AppName(hwnd, pid, title)));
+                {
+                    string? path = ImagePath(pid);
+                    found.Add(new OpenWindow(hwnd, title, AppName(path, title)) { IconPath = path });
+                }
             }
             return true;
         }, 0);
@@ -97,9 +106,9 @@ public sealed class WindowsPc : IPc
     }
 
     /// <summary>The app's own name ("Google Chrome"), from its program's description; a Store app's frame says its title.</summary>
-    private string AppName(HWND hwnd, uint pid, string title)
+    private string AppName(string? path, string title)
     {
-        if (ImagePath(pid) is not { } path)
+        if (path is null)
             return "App";
         if (path.EndsWith(@"\ApplicationFrameHost.exe", StringComparison.OrdinalIgnoreCase))
             return title;
@@ -128,22 +137,22 @@ public sealed class WindowsPc : IPc
 
     public async Task<IReadOnlyList<FoundFile>> FindFilesAsync(string text, int count, CancellationToken ct)
     {
+        ct.ThrowIfCancellationRequested();
         // Each word a prefix of a word in the name: "chr set" finds ChromeSetup.exe's "chromesetup", not "set" inside it.
         var words = text.Split(' ', StringSplitOptions.RemoveEmptyEntries)
             .Select(w => new string([.. w.Where(c => char.IsLetterOrDigit(c) || c is '.' or '-' or '_')]))
             .Where(w => w.Length > 0)
             .Select(w => $"\"{w}*\"")
             .ToList();
-        if (words.Count == 0 || _searchFailed)
+        if (words.Count == 0 || count <= 0)
             return [];
-        try { return await Task.Run(() => Query(string.Join(" AND ", words), count, ct), ct); }
+        try { return await Task.Run(() => _query(string.Join(" AND ", words), count, ct), ct); }
         catch (OperationCanceledException) { throw; }
         catch (Exception ex)
         {
-            // The service off or OLE DB missing: say so once, then leave files out until the next start.
-            Log.Warn("Command bar: Windows Search failed; files are left out", ex);
-            _searchFailed = true;
-            return [];
+            ct.ThrowIfCancellationRequested();
+            Log.Warn("Command bar: Windows Search failed", ex);
+            throw new FileSearchUnavailableException(ex);
         }
     }
 

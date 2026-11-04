@@ -55,6 +55,9 @@ public sealed class CommandBarModule : IFeatureModule
     /// <summary>Why the shortcut didn't register ("Shortcut in use"), or null.</summary>
     public string? ShortcutError { get; private set; }
 
+    /// <summary>The last settings write failed; the saved values are still in effect.</summary>
+    public string? SettingsError { get; private set; }
+
     /// <summary>The settings changed. Raised on the UI thread.</summary>
     public event Action? Changed;
 
@@ -69,6 +72,7 @@ public sealed class CommandBarModule : IFeatureModule
         _context = context;
         _capturing = false;
         ShortcutError = null;
+        SettingsError = null;
         Settings = context.Settings.Get<CommandBarSettings>();
         if (Settings.Shortcut is { IsValid: false })
             Settings = Settings with { Shortcut = CommandBarSettings.DefaultShortcut };
@@ -100,6 +104,8 @@ public sealed class CommandBarModule : IFeatureModule
 
     public Task StopAsync(CancellationToken ct)
     {
+        _capturing = false;
+        _page?.Deactivate();
         _hotkey?.Dispose();
         _hotkey = null;
         _pc?.Dispose();
@@ -124,27 +130,41 @@ public sealed class CommandBarModule : IFeatureModule
 
     // Settings › Command bar.
 
-    public void SetWebSearch(WebEngine engine) => Save(Settings with { WebSearch = engine });
+    public bool SetWebSearch(WebEngine engine) => Save(Settings with { WebSearch = engine });
 
-    public void SetOn(ResultSwitch kind, bool on) =>
+    public bool SetOn(ResultSwitch kind, bool on) =>
         Save(Settings with { Off = [.. Enum.GetValues<ResultSwitch>().Where(k => k == kind ? !on : Settings.Off.Contains(k))] });
 
-    /// <summary>The eye-off button or Shift+Delete: the result never shows again until Settings › Command bar › Hidden brings it back.</summary>
-    public void Hide(Result result)
+    /// <summary>The eye-off button or Shift+Delete: hide until inline Undo or Settings › Command bar › Hidden brings it back.</summary>
+    public bool Hide(Result result)
     {
         if (!result.CanHide || Settings.Hidden.Exists(h => h.Key == result.Key))
-            return;
-        Save(Settings with { Hidden = [.. Settings.Hidden, new HiddenResult(result.Key, result.Name, result.HiddenAs)] });
+            return false;
+        return Save(Settings with { Hidden = [.. Settings.Hidden, new HiddenResult(result.Key, result.Name, result.HiddenAs)] });
     }
 
-    /// <summary>Hidden's Show.</summary>
-    public void Unhide(string key) => Save(Settings with { Hidden = [.. Settings.Hidden.Where(h => h.Key != key)] });
+    /// <summary>Inline Undo or Hidden's Show, with the existing category preference preserved.</summary>
+    public bool Unhide(string key) => Save(Settings with { Hidden = [.. Settings.Hidden.Where(h => h.Key != key)] });
 
-    private void Save(CommandBarSettings settings)
+    private bool Save(CommandBarSettings settings)
     {
-        _context?.Settings.Save(settings);
-        Settings = settings;
+        bool saved = Persist(settings);
+        SettingsError = saved ? null : "Save failed";
         Changed?.Invoke();
+        return saved;
+    }
+
+    private bool Persist(CommandBarSettings settings)
+    {
+        if (_context is null) return false;
+        try { _context.Settings.Save(settings); }
+        catch (Exception ex)
+        {
+            Log.Warn("Command bar: saving settings failed", ex);
+            return false;
+        }
+        Settings = settings;
+        return true;
     }
 
     // The shortcut: Ctrl+Alt+Space by default (Travis's pick), changeable in Settings › Shortcuts.
@@ -171,18 +191,39 @@ public sealed class CommandBarModule : IFeatureModule
             Changed?.Invoke();
             return false;
         }
-        Save(Settings with { Shortcut = shortcut });
-        return true;
+        var previous = Settings.Shortcut;
+        if (Persist(Settings with { Shortcut = shortcut }))
+        {
+            Changed?.Invoke();
+            return true;
+        }
+        // The new chord was registered before saving to detect conflicts. Restore the saved chord on failure.
+        bool restored = previous is not null && TryRegister(previous);
+        if (!restored)
+        {
+            _hotkey?.Dispose();
+            _hotkey = null; // An unsaved chord must never remain active, even if rollback also failed.
+        }
+        ShortcutError = previous is not null && !restored ? "Save failed · Shortcut inactive" : "Save failed";
+        Changed?.Invoke();
+        return false;
     }
 
-    public void RemoveShortcut()
+    public bool RemoveShortcut()
     {
         if (_context is null)
-            return;
+            return false;
+        if (!Persist(Settings with { Shortcut = null }))
+        {
+            ShortcutError = "Save failed";
+            Changed?.Invoke();
+            return false;
+        }
         _hotkey?.Dispose();
         _hotkey = null;
         ShortcutError = null;
-        Save(Settings with { Shortcut = null });
+        Changed?.Invoke();
+        return true;
     }
 
     /// <summary>While Settings records a shortcut, pressing ours doesn't open the Command bar.</summary>
