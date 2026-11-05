@@ -89,6 +89,12 @@ public sealed class QuickActionsShots
                 });
                 pc.Fail = false;
                 Shoot(tiles, Path.Combine(folder, "actions-power-after-eject.png"), panel => Click(panel, "power"));
+                Shoot(tiles, Path.Combine(folder, "actions-power.png"), panel => Click(panel, "power"));
+                Shoot(tiles, Path.Combine(folder, "actions-end-outlook.png"), panel =>
+                {
+                    Click(panel, "quit");
+                    Press(Find<ButtonBase>(panel).First(b => Equals(b.Tag, "end-frozen")));
+                });
                 module.Pick([QuickActionId.Dark, QuickActionId.Hidden, QuickActionId.Icons, QuickActionId.Extend, QuickActionId.Bluetooth, QuickActionId.WiFi,
                     QuickActionId.Plan, QuickActionId.Lock, QuickActionId.Displays, QuickActionId.Recycle, QuickActionId.Eject, QuickActionId.Quit,
                     QuickActionId.Explorer, QuickActionId.Power]);
@@ -163,10 +169,10 @@ public sealed class QuickActionsShots
         [new("e", "Samsung T7 (E:)", 1_000_204_886_016), new("f", "SanDisk (F:)", 62_008_590_336)],
         [
             new(@"C:\Apps\chrome.exe", "Chrome", true), new(@"C:\Apps\steam.exe", "Steam", false), new(@"C:\Apps\Discord.exe", "Discord", false),
-            new(@"C:\Apps\outlook.exe", "Outlook", false), new(@"C:\Apps\Zoom.exe", "Zoom Workplace", false), new(@"C:\Apps\claude.exe", "Claude", false),
+            new(@"C:\Apps\outlook.exe", "Outlook", false, NotResponding: true), new(@"C:\Apps\Zoom.exe", "Zoom Workplace", false), new(@"C:\Apps\claude.exe", "Claude", false),
             new(@"C:\Apps\Spotify.exe", "Spotify", false), new(@"C:\Apps\WindowsTerminal.exe", "Windows Terminal", false), new(@"C:\Apps\game.exe", "007 First Light", false),
         ],
-        0,
+        1,
         12);
 
     private static void Click(IslandPanelWindow panel, string key) =>

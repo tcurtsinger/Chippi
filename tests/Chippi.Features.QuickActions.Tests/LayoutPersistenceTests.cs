@@ -14,21 +14,40 @@ public sealed class LayoutPersistenceTests
     [Fact]
     public void Old_settings_keep_the_packed_gallery_order()
     {
-        var layout = QuickActionsLayout.Normalize(null, ["power", "dark", "lock"]);
-        Assert.Equal(new[] { "dark", "lock", "power" }, layout.Take(3));
+        var layout = QuickActionsLayout.Normalize(null, ["power", "dark", "explorer"]);
+        Assert.Equal(new[] { "dark", "explorer", "power" }, layout.Take(3));
         Assert.Equal(20, layout.Count);
-        Assert.Equal(QuickAction.All.Count, layout.OfType<string>().Distinct().Count());
+        Assert.Equal(QuickAction.All.Count(a => a.InGallery), layout.OfType<string>().Distinct().Count());
+    }
+
+    [Fact]
+    public void The_four_moved_tiles_close_up_their_slots_and_the_rest_keep_their_order_and_own_gaps()
+    {
+        // A layout saved before the regroup: all 19 tiles in a custom order, with one gap of his own at slot 3.
+        string?[] saved =
+        [
+            "power", "quit", "lock", null, "dark", "frozen", "wifi", "displays", "plan", "hidden",
+            "icons", "screensaver", "auto-hide", "extend", "bluetooth", "camera", "recycle", "eject", "explorer", "cleaning",
+        ];
+        var layout = QuickActionsLayout.Normalize(saved, null);
+        string?[] expected = ["power", "quit", null, "dark", "wifi", "plan", "hidden", "icons", "auto-hide", "extend", "bluetooth", "camera", "recycle", "eject", "explorer", "cleaning"];
+        Assert.Equal(expected, layout.Take(expected.Length));
+        Assert.All(layout.Skip(expected.Length), Assert.Null);
+        Assert.DoesNotContain(layout, key => key is "lock" or "displays" or "screensaver" or "frozen");
+        Assert.Equal(20, layout.Count);
+        // Closing up again changes nothing.
+        Assert.Equal(layout, QuickActionsLayout.Normalize(layout, null));
     }
 
     [Fact]
     public void Malformed_layout_is_repaired_without_moving_valid_positions()
     {
-        string?[] saved = [null, "lock", "lock", "retired", null, "dark"];
-        var repaired = QuickActionsLayout.Normalize(saved, ["lock", "dark"]);
-        Assert.Equal("lock", repaired[1]);
+        string?[] saved = [null, "explorer", "explorer", "retired", null, "dark"];
+        var repaired = QuickActionsLayout.Normalize(saved, ["explorer", "dark"]);
+        Assert.Equal("explorer", repaired[1]);
         Assert.Equal("dark", repaired[5]);
-        Assert.Equal(19, repaired.OfType<string>().Distinct().Count());
-        Assert.Single(repaired, key => key is null);
+        Assert.Equal(15, repaired.OfType<string>().Distinct().Count());
+        Assert.Equal(QuickActionsLayout.Slots - 15, repaired.Count(key => key is null));
     }
 
     [Fact]
@@ -45,7 +64,7 @@ public sealed class LayoutPersistenceTests
             Assert.Contains("bluetooth", store.Value.Shown!);
             Assert.Null(store.Value.Layout![0]);
             Assert.Equal("dark", store.Value.Layout[19]);
-            module.SetShown(QuickActionId.Lock, true);
+            module.SetShown(QuickActionId.Explorer, true);
             Assert.Equal(layout, store.Value.Layout);
         }
         finally { await module.StopAsync(default); }

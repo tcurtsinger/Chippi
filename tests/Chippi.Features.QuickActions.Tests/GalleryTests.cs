@@ -29,14 +29,14 @@ public sealed class GalleryTests
         edit.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
         Assert.Equal("Edit actions", page.Title);
         Assert.True(page.IsEditing);
-        var lockPick = Pick(page, QuickActionId.Lock);
+        var lockPick = Pick(page, QuickActionId.Explorer);
         ((IToggleProvider)UIElementAutomationPeer.CreatePeerForElement(lockPick)).Toggle();
-        Assert.DoesNotContain(QuickActionId.Lock, page.EditorSelection);
-        Assert.Contains("lock", f.Module.Settings.Shown!);
+        Assert.DoesNotContain(QuickActionId.Explorer, page.EditorSelection);
+        Assert.Contains("explorer", f.Module.Settings.Shown!);
         Assert.Empty(f.Pc.Calls);
         Assert.True(page.Back());
         Assert.Equal("Actions", page.Title);
-        Assert.Contains("lock", f.Module.Settings.Shown!);
+        Assert.Contains("explorer", f.Module.Settings.Shown!);
     });
 
     [Fact]
@@ -51,7 +51,7 @@ public sealed class GalleryTests
         Assert.Equal(second, page.EditorLayout[0]);
         Assert.Equal(first, page.EditorLayout[1]);
         Arrange(page);
-        int empty = Enumerable.Range(0, 20).Single(i => page.EditorLayout[i] is null);
+        int empty = Enumerable.Range(0, 20).First(i => page.EditorLayout[i] is null);
         Drag(page, 1, empty);
         Assert.Null(page.EditorLayout[1]);
         Assert.Equal(first, page.EditorLayout[empty]);
@@ -143,11 +143,11 @@ public sealed class GalleryTests
         Assert.False(done.IsEnabled);
         page.FinishEdit();
         Assert.Null(f.Module.Settings.Shown);
-        var pick = Pick(page, QuickActionId.Lock);
+        var pick = Pick(page, QuickActionId.Explorer);
         ((IToggleProvider)UIElementAutomationPeer.CreatePeerForElement(pick)).Toggle();
         Assert.True(done.IsEnabled);
         page.FinishEdit();
-        Assert.Equal(["lock"], f.Module.Settings.Shown);
+        Assert.Equal(["explorer"], f.Module.Settings.Shown);
         Assert.Empty(f.Pc.Calls);
     });
 
@@ -204,7 +204,7 @@ public sealed class GalleryTests
     {
         using var f = new Fixture();
         var commands = Find<Button>(f.Page).Where(b => b.Tag is string).ToList();
-        var lockButton = commands.Single(b => Equals(b.Tag, "lock"));
+        var lockButton = commands.Single(b => Equals(b.Tag, "explorer"));
         var lockPeer = UIElementAutomationPeer.CreatePeerForElement(lockButton);
         Assert.NotNull(lockPeer.GetPattern(PatternInterface.Invoke));
         Assert.Null(lockPeer.GetPattern(PatternInterface.Toggle));
@@ -269,7 +269,7 @@ public sealed class GalleryTests
         {
             Module = new QuickActionsModule(() => Pc, () => new Hotkey());
             Module.StartAsync(new ModuleContext(QuickActionsModule.Id, Settings, NullLogger.Instance, new IslandActivityHub().CreatePublisher(QuickActionsModule.Id), new Pages()), default).GetAwaiter().GetResult();
-            if (!firstRun) Module.Pick([QuickActionId.Dark, QuickActionId.Lock]);
+            if (!firstRun) Module.Pick([QuickActionId.Dark, QuickActionId.Explorer]);
             Page = new ActionsPage(Module);
         }
         public void Dispose() => Module.StopAsync(default).GetAwaiter().GetResult();

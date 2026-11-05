@@ -16,7 +16,8 @@ public sealed record RemovableDrive(string Id, string Name, long Size);
 /// <param name="Path">The program file: it keeps an app on the kept list and gives its icon.</param>
 /// <param name="Name">Its name, from the file's description ("Google Chrome"), else the file's name.</param>
 /// <param name="Front">The app that was in front before the island opened.</param>
-public sealed record OpenApp(string Path, string Name, bool Front);
+/// <param name="NotResponding">Its window has stopped responding: Quit apps marks it, and its X ends it.</param>
+public sealed record OpenApp(string Path, string Name, bool Front, bool NotResponding = false);
 
 public enum PowerChoice { Sleep, Restart, ShutDown, SignOut }
 
@@ -60,8 +61,8 @@ public interface IQuickSystem
     /// <summary>Asks every window of the app to close, as its close button does: apps with unsaved work still ask to save.</summary>
     Task QuitAsync(OpenApp app);
 
-    /// <summary>Ends every app that has stopped responding.</summary>
-    Task EndFrozenAppsAsync();
+    /// <summary>Ends one app that has stopped responding, since a hung app can't answer a close.</summary>
+    Task EndAsync(OpenApp app);
 
     /// <summary>Runs an action: Lock, Displays, ScreenSaver, Recycle or Explorer.</summary>
     Task RunAsync(QuickActionId id);
