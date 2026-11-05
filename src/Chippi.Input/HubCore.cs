@@ -277,6 +277,7 @@ internal sealed class HubCore(IHookSource hooks, IInputSender sender, IInputSyst
             {
                 hooks.Install(device);
                 _installed |= device;
+                log?.LogInformation("Input hub: the {Device} hook is in", device == InputDevices.Keyboard ? "keyboard" : "mouse");
                 long now = system.Now;
                 if (device == InputDevices.Keyboard)
                     (_heardKey, _keySuspect) = (now, 0);
@@ -287,6 +288,7 @@ internal sealed class HubCore(IHookSource hooks, IInputSender sender, IInputSyst
             {
                 hooks.Remove(device);
                 _installed &= ~device;
+                log?.LogInformation("Input hub: the {Device} hook came off", device == InputDevices.Keyboard ? "keyboard" : "mouse");
                 if (device == InputDevices.Keyboard)
                     ReleaseHeld(_ => true, "the keyboard hook came off");
             }

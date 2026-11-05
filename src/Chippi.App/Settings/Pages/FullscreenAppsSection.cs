@@ -58,8 +58,14 @@ internal sealed class FullscreenAppsSection : StackPanel
     /// <summary>Tests and shots show the section without installing a Phase 6 feature.</summary>
     internal static bool? ShownOverride { get; set; }
 
-    /// <summary>Shown once a Phase 6 input feature is installed.</summary>
-    internal bool Shown => ShownOverride ?? _shell.Registry.Features.Any(f => f.IsInstalled && f.Descriptor.PausesInFullscreen);
+    /// <summary>Shown once a Phase 6 input feature is installed (in Debug, also while the hub's probe filter is in).</summary>
+    internal bool Shown => ShownOverride ?? (_shell.Registry.Features.Any(f => f.IsInstalled && f.Descriptor.PausesInFullscreen) || ProbeFilterOn);
+
+#if DEBUG
+    private static bool ProbeFilterOn => Environment.GetEnvironmentVariable("CHIPPI_INPUT_PROBE_FILTER") is { Length: > 0 };
+#else
+    private static bool ProbeFilterOn => false;
+#endif
 
     private void OnFeaturesChanged(object? sender, EventArgs e)
     {

@@ -15,7 +15,8 @@ when the build has the hub, hook-timings.csv there.
 .PARAMETER Checks
 Any of: radial (the Radial menu's hold, flick, click, drag and Esc), cost (Chippi's CPU over 60 s of the mouse moving, three
 times), watchdog (Debug builds of the hub only: both hooks are dropped behind the hub's back 45 s after start, and the
-Radial menu must work again after the mouse and keys have moved).
+Radial menu must work again after the mouse and keys have moved), pause (Debug builds only: a borderless window over
+the screen stands in for a game; the pause, Always on, Pause in these apps and the Radial menu's Open over fullscreen apps).
 #>
 param(
     [Parameter(Mandatory)][string]$App,
