@@ -32,7 +32,7 @@ No page of its own, no home tile, no action tile. Rows. Decided (Travis, task 22
 - **Settings › Windows › Keyboard:** "Ignore key chatter", a switch, its window, and "Keys with their own window" (Add key, then the key and its window, Remove). Key capture is the existing recorder.
 - Each switch shows the count it ignored since it was turned on ("12 ignored"), so Travis can see whether the setting is doing anything. Memory only, not saved.
 - Over an admin window, the rows' status reads "Not working in admin windows" (hooks can't see them).
-- Copy is proposed here and settled with the mockup: bare-verb buttons, errors read "… failed", "Chippi cannot watch the mouse right now." / "keyboard" when the hook is down.
+- Copy is proposed here and settled with the mockup: bare-verb buttons, errors read "… failed", "Watching the mouse failed" / "Watching the keyboard failed" when the hook is down.
 
 ## Edge cases
 

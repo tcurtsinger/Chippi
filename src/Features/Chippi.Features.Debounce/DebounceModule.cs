@@ -50,7 +50,7 @@ public sealed class DebounceModule : IFeatureModule
 
     public DebounceSettings Settings { get; private set; } = new();
 
-    /// <summary>"Chippi cannot watch the mouse right now." while the hook is down, else null.</summary>
+    /// <summary>"Watching the mouse failed" while the hook is down, else null.</summary>
     public string? MouseError { get; private set; }
 
     public string? KeyboardError { get; private set; }
@@ -59,7 +59,7 @@ public sealed class DebounceModule : IFeatureModule
 
     public FeatureDescriptor Descriptor { get; } = new(Id, "Click and key debounce",
         "Ignores the double clicks and key chatter of worn switches", FeatureGroup.Windows)
-    { Icon = nameof(LucideIcons.Keyboard) };
+    { Icon = nameof(LucideIcons.Keyboard), Requires = [Capability.InputHooks] };
 
     /// <summary>Presses ignored since the switch was turned on.</summary>
     public int ClickIgnored => (_click?.Ignored ?? 0) - _clickBase;
@@ -182,7 +182,7 @@ public sealed class DebounceModule : IFeatureModule
         catch (Exception ex)
         {
             Log.Warn($"Debounce: the {device} hook failed", ex);
-            return $"Chippi cannot watch the {device} right now.";
+            return $"Watching the {device} failed";
         }
     }
 }

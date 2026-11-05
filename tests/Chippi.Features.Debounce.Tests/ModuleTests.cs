@@ -50,7 +50,7 @@ public sealed class ModuleTests
         await module.StartAsync(Context(hub, new Store { Value = new DebounceSettings { ClickEnabled = true, ClickMs = 900, Keys = [new(0x45, 999), new(0, 5)] } }, new Ui()), default);
         Assert.Equal(100, module.Settings.ClickMs);
         Assert.Equal([new KeyWindow(0x45, 200)], module.Settings.Keys);
-        Assert.Equal("Chippi cannot watch the mouse right now.", module.MouseError);
+        Assert.Equal("Watching the mouse failed", module.MouseError);
         Assert.Null(module.KeyboardError);
     }
 
