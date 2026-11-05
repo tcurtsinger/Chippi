@@ -115,8 +115,7 @@ public sealed partial class AudioRoutingModule : IFeatureModule
             context.Ui.SetSettingsPage(section => section switch
             {
                 "microphone" => new RoutingPage(this, AudioFlow.Capture),
-                OutputShortcutSection => new OutputShortcutView(this, list: false),
-                "shortcut-list" => new OutputShortcutView(this, list: true),
+                OutputShortcutSection => new OutputShortcutView(this),
                 _ => new RoutingPage(this, AudioFlow.Render),
             });
             if (Settings.SwitchShortcut is { IsBindable: false })
@@ -295,6 +294,9 @@ public sealed partial class AudioRoutingModule : IFeatureModule
         Changed?.Invoke();
         return true;
     }
+
+    /// <summary>Settings › Shortcuts with this shortcut's editor open in its row: it's recorded only there.</summary>
+    public void EditShortcut() => _context?.EditShortcut("Switch output");
 
     public void RemoveShortcut()
     {

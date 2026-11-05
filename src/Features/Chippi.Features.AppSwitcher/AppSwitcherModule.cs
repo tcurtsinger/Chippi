@@ -186,6 +186,9 @@ public sealed class AppSwitcherModule : IFeatureModule
         return saved;
     }
 
+    /// <summary>Settings › Shortcuts with this shortcut's editor open in its row: it's recorded only there.</summary>
+    public void EditShortcut() => _context?.EditShortcut(Descriptor.Name);
+
     public void RemoveShortcut()
     {
         if (_context is null)

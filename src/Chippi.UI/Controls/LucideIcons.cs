@@ -52,6 +52,7 @@ public static class LucideIcons
     public static Geometry Down { get; } = G("M6,9 L12,15 L18,9");
     public static Geometry Trash { get; } = G("M3,6 H21 M19,6 V20 a2,2 0 0 1 -2,2 H7 a2,2 0 0 1 -2,-2 V6 M8,6 V4 a2,2 0 0 1 2,-2 h4 a2,2 0 0 1 2,2 v2");
     public static Geometry Plus { get; } = G("M12,5 V19 M5,12 H19");
+    public static Geometry ExternalLink { get; } = G("M15,3 h6 v6 M10,14 L21,3 M18,13 v6 a2,2 0 0 1 -2,2 H5 a2,2 0 0 1 -2,-2 V8 a2,2 0 0 1 2,-2 h6");
     public static Geometry Power { get; } = G("M12,2 v10 M18.4,6.6 a9,9 0 1 1 -12.77,0.04");
     public static Geometry Moon { get; } = G("M12,3 a6,6 0 0 0 9,9 a9,9 0 1 1 -9,-9 Z");
     public static Geometry Sun { get; } = G("M16,12 a4,4 0 1 0 -8,0 a4,4 0 1 0 8,0 Z M12,2 v2 M12,20 v2 M4.93,4.93 l1.41,1.41 M17.66,17.66 l1.41,1.41 M2,12 h2 M20,12 h2 M6.34,17.66 l-1.41,1.41 M19.07,4.93 l-1.41,1.41");

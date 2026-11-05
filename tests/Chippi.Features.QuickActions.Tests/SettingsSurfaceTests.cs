@@ -59,107 +59,15 @@ public sealed class SettingsSurfaceTests
     }
 
     [Fact]
-    public void Shortcut_rows_keep_their_controls_across_PC_polls_and_unrelated_edits()
+    public void A_shortcut_conflict_keeps_the_registered_keys_and_says_why()
     {
-        WpfTestThread.Run(() =>
-        {
-            using var f = new Fixture();
-            var view = new ShortcutList(f.Module);
-            view.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));
-            try
-            {
-                var dark = Named(view, "Set Dark mode shortcut");
-                var wifi = Named(view, "Set Wi-Fi shortcut");
-                var initial = Find<SettingRow>(view).ToArray();
-                var constructed = new HashSet<SettingRow>(initial);
-                var watch = System.Diagnostics.Stopwatch.StartNew();
-                for (int poll = 0; poll < 100; poll++)
-                {
-                    f.Module.RefreshAsync().GetAwaiter().GetResult();
-                    var current = Find<SettingRow>(view).ToArray();
-                    Assert.Equal(initial.Length, current.Length);
-                    for (int i = 0; i < initial.Length; i++) Assert.Same(initial[i], current[i]);
-                    constructed.UnionWith(current);
-                }
-                watch.Stop();
-                Assert.Equal(initial.Length, constructed.Count);
-                if (Environment.GetEnvironmentVariable("CHIPPI_ACTIONS_SHORTCUT_PROOF") is { Length: > 0 } report)
-                {
-                    Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(report))!);
-                    File.WriteAllText(report, $"Unchanged FakePc polls: 100\nRows: {initial.Length}\nBefore: {initial.Length * 100} SettingRow constructions, derived from previous Refresh clearing/rebuilding every row; no before timing claimed.\nAfter: {constructed.Count - initial.Length} new SettingRows, measured by object identity after every poll.\nCurrent 100 polls including identity assertions: {watch.Elapsed.TotalMilliseconds:F3} ms.\nNo windows, actual shortcuts or Windows actions.\n");
-                }
-                f.Module.SetShown(QuickActionId.Dark, true);
-                Assert.Same(dark, Named(view, "Set Dark mode shortcut"));
-                Assert.Same(wifi, Named(view, "Set Wi-Fi shortcut"));
-                f.Module.ChangeShortcut(QuickActionId.WiFi, new KeyShortcut(ShortcutModifiers.Control | ShortcutModifiers.Alt, 0x57));
-                Assert.Same(dark, Named(view, "Set Dark mode shortcut"));
-                Assert.NotSame(wifi, Named(view, "Change Wi-Fi shortcut"));
-            }
-            finally { view.RaiseEvent(new RoutedEventArgs(FrameworkElement.UnloadedEvent)); }
-        });
-    }
-
-    [Theory]
-    [InlineData("tab")]
-    [InlineData("focus")]
-    [InlineData("unavailable")]
-    [InlineData("unload")]
-    public void Leaving_shortcut_capture_restores_commands(string exit)
-    {
-        WpfTestThread.Run(() =>
-        {
-            using var f = new Fixture();
-            var view = new ShortcutList(f.Module);
-            view.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));
-            Named(view, "Set Bluetooth shortcut").RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
-            f.Module.PressedAsync(QuickActionId.Lock).GetAwaiter().GetResult();
-            Assert.Empty(f.Pc.Calls);
-            switch (exit)
-            {
-                case "tab":
-                    var tab = new KeyEventArgs(Keyboard.PrimaryDevice, new NoWindowSource(), 0, Key.Tab) { RoutedEvent = Keyboard.PreviewKeyDownEvent };
-                    view.RaiseEvent(tab);
-                    Assert.True(tab.Handled);
-                    Assert.Empty(f.Module.ShortcutErrors);
-                    break;
-                case "focus":
-                    view.RaiseEvent(new KeyboardFocusChangedEventArgs(Keyboard.PrimaryDevice, 0, view, new Button()) { RoutedEvent = Keyboard.LostKeyboardFocusEvent });
-                    break;
-                case "unavailable":
-                    f.Pc.State = f.Pc.State with { Unsupported = new HashSet<QuickActionId> { QuickActionId.Bluetooth } };
-                    f.Module.RefreshAsync().GetAwaiter().GetResult();
-                    break;
-                default:
-                    view.RaiseEvent(new RoutedEventArgs(FrameworkElement.UnloadedEvent));
-                    break;
-            }
-            f.Module.PressedAsync(QuickActionId.Lock).GetAwaiter().GetResult();
-            Assert.Equal(["run Lock"], f.Pc.Calls);
-            Assert.DoesNotContain(Find<Button>(view), b => AutomationProperties.GetName(b) == "Cancel Bluetooth shortcut");
-            view.RaiseEvent(new RoutedEventArgs(FrameworkElement.UnloadedEvent));
-        });
-    }
-
-    [Fact]
-    public void A_shortcut_conflict_keeps_the_registered_keys_visible_beside_the_error()
-    {
-        WpfTestThread.Run(() =>
-        {
-            using var f = new Fixture();
-            var view = new ShortcutList(f.Module);
-            view.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));
-            try
-            {
-                var registered = new KeyShortcut(ShortcutModifiers.Control | ShortcutModifiers.Alt, 0x57);
-                Assert.True(f.Module.ChangeShortcut(QuickActionId.WiFi, registered));
-                f.Hotkey.Available = false;
-                Assert.False(f.Module.ChangeShortcut(QuickActionId.WiFi, new KeyShortcut(ShortcutModifiers.Control | ShortcutModifiers.Alt, 0x56)));
-                Assert.Equal(registered, f.Module.Settings.ShortcutOf(QuickActionId.WiFi));
-                Assert.Contains(Find<TextBlock>(view), text => text.Text == registered.ToString());
-                Assert.Contains(Find<TextBlock>(view), text => text.Text == "Shortcut in use" && AutomationProperties.GetLiveSetting(text) == AutomationLiveSetting.Polite);
-            }
-            finally { view.RaiseEvent(new RoutedEventArgs(FrameworkElement.UnloadedEvent)); }
-        });
+        using var f = new Fixture();
+        var registered = new KeyShortcut(ShortcutModifiers.Control | ShortcutModifiers.Alt, 0x57);
+        Assert.True(f.Module.ChangeShortcut(QuickActionId.WiFi, registered));
+        f.Hotkey.Available = false;
+        Assert.False(f.Module.ChangeShortcut(QuickActionId.WiFi, new KeyShortcut(ShortcutModifiers.Control | ShortcutModifiers.Alt, 0x56)));
+        Assert.Equal(registered, f.Module.Settings.ShortcutOf(QuickActionId.WiFi));
+        Assert.Equal("Shortcut in use", f.Module.ShortcutErrors[QuickActionId.WiFi]);
     }
 
     [Fact]

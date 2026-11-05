@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Threading;
 using Chippi.App.Shell;
 using Chippi.Core.Actions;
 using Chippi.Core.Input;
@@ -45,13 +46,23 @@ internal sealed class ShortcutsPage : UserControl
         public MouseTrigger? Button;
         public bool Listening;
         public string? Error;
+
+        /// <summary>The row it edits, which it takes the place of; null for a new shortcut, edited under the list.</summary>
+        public string? RowKey => Mode switch
+        {
+            EditMode.Chippi => ChippiKey(EntryId),
+            EditMode.Binding => BindingKey(BindingId),
+            _ => null,
+        };
     }
 
-    private sealed record Row(string Group, string Name, string? Icon, IReadOnlyList<string> Caps, bool Mouse, bool Dim, bool Unset, Action Change, Action? Remove, Action? Another = null);
+    private sealed record Row(string Key, string Group, string Name, string? Icon, IReadOnlyList<string> Caps, bool Mouse, bool Dim, bool Unset, Action Change, Action? Remove, Action? Another = null);
+
+    private static string ChippiKey(long id) => "chippi:" + id;
+    private static string BindingKey(string? id) => "binding:" + id;
 
     private readonly ShellContext _shell;
     private readonly ShortcutsModule? _module;
-    private readonly KeyRecorder _recorder;
     private readonly Chippi.Features.CommandBar.Windows.WindowsPc _pc = new();
     private readonly StackPanel _page = new();
     private readonly Border _listHost = new();
@@ -72,7 +83,7 @@ internal sealed class ShortcutsPage : UserControl
     {
         _shell = shell;
         _module = shell.ShortcutsFeature;
-        _recorder = new KeyRecorder(() => shell.Input);
+        Recorder = new KeyRecorder(() => shell.Input);
         _page.Children.Add(SettingsUi.Header("Shortcuts", ""));
         _page.Children.Add(_listHost);
         _page.Children.Add(_sections);
@@ -97,6 +108,9 @@ internal sealed class ShortcutsPage : UserControl
         RebuildAll();
     }
 
+    /// <summary>Records keys for the editor and the Other… picker; tests stand in for the input hub's.</summary>
+    internal IKeyRecorder Recorder { get; set; }
+
     private bool ModuleRuns => _module is not null && _shell.Registry.Features.Any(f => f.Id == ShortcutsModule.Id && f.IsRunning);
 
     private void RebuildAll()
@@ -112,7 +126,7 @@ internal sealed class ShortcutsPage : UserControl
         foreach (var e in _shell.Shortcuts.List.Where(e => e.Editable))
         {
             var entry = e;
-            yield return new Row("Chippi", entry.Name, entry.Icon, entry.Shortcut is { } k ? CapsOf(k) : [], false, !entry.Held, entry.Shortcut is null,
+            yield return new Row(ChippiKey(entry.Id), "Chippi", entry.Name, entry.Icon, entry.Shortcut is { } k ? Keycaps.CapsOf(k) : [], false, !entry.Held, entry.Shortcut is null,
                 () => StartEdit(new Edit { Mode = EditMode.Chippi, EntryId = entry.Id, EntryName = entry.Name, Door = BindingDoor.Key, Keys = entry.Shortcut }),
                 entry.Shortcut is null ? null : () => _shell.Shortcuts.Remove(entry.Id));
         }
@@ -124,11 +138,11 @@ internal sealed class ShortcutsPage : UserControl
             var status = _module.StatusOf(binding.Id);
             string[] caps = binding.Door switch
             {
-                BindingDoor.Key => [.. CapsOf(binding.Keys!)],
+                BindingDoor.Key => [.. Keycaps.CapsOf(binding.Keys!)],
                 BindingDoor.Caps => [CombosKey(_module.Settings.CapsHeldKey), KeyCombo.NameOf(binding.CapsKey)],
                 _ => [MouseName(binding.Button)],
             };
-            yield return new Row(GroupOf(binding.Action.Kind), binding.Label, ActionCatalog.GlyphOf(binding.Action), caps, binding.Door == BindingDoor.Mouse, !status.Acts, false,
+            yield return new Row(BindingKey(binding.Id), GroupOf(binding.Action.Kind), binding.Label, ActionCatalog.GlyphOf(binding.Action), caps, binding.Door == BindingDoor.Mouse, !status.Acts, false,
                 () => StartEdit(new Edit
                 {
                     Mode = EditMode.Binding, BindingId = binding.Id, Action = binding.Action, Door = binding.Door, Keys = binding.Keys, CapsKey = binding.CapsKey,
@@ -145,16 +159,6 @@ internal sealed class ShortcutsPage : UserControl
         ActionKind.SettingsPage => "Settings",
         _ => kind.ToString(),
     };
-
-    private static IReadOnlyList<string> CapsOf(KeyShortcut k)
-    {
-        var mods = KeyModifiers.None;
-        if (k.Modifiers.HasFlag(ShortcutModifiers.Control)) mods |= KeyModifiers.Ctrl;
-        if (k.Modifiers.HasFlag(ShortcutModifiers.Alt)) mods |= KeyModifiers.Alt;
-        if (k.Modifiers.HasFlag(ShortcutModifiers.Shift)) mods |= KeyModifiers.Shift;
-        if (k.Modifiers.HasFlag(ShortcutModifiers.Windows)) mods |= KeyModifiers.Win;
-        return new KeyCombo(mods, k.Key).Caps;
-    }
 
     private static string CombosKey(uint vk) => vk switch { 0x14 => "Caps Lock", 0xA3 => "Right Ctrl", 0xA1 => "Right Shift", 0x5C => "Right Win", _ => KeyCombo.NameOf(vk) };
 
@@ -179,11 +183,15 @@ internal sealed class ShortcutsPage : UserControl
         {
             var heading = SettingsUi.Styled(new TextBlock { Text = group.Key, VerticalAlignment = VerticalAlignment.Center }, "CaptionTextStyle");
             card.Children.Add(new Border { MinHeight = 36, Padding = new Thickness(16, 8, 16, 0), Child = heading });
+            // Record and Change edit in the row's place; a new shortcut, or one whose row has gone, under the list.
             foreach (var row in group)
-                card.Children.Add(RowView(row));
+                card.Children.Add(_editorView is not null && row.Key == _edit?.RowKey ? _editorView : RowView(row));
         }
         if (_editorView is not null)
-            card.Children.Add(_editorView);
+        {
+            if (_editorView.Parent is null)
+                card.Children.Add(_editorView);
+        }
         else if (ModuleRuns)
         {
             var add = SettingsUi.Button("Add shortcut");
@@ -216,7 +224,7 @@ internal sealed class ShortcutsPage : UserControl
             keys = record;
         }
         else
-            keys = Keycaps(row.Caps, row.Mouse, row.Dim);
+            keys = Keycaps.Of(row.Caps, row.Mouse, row.Dim);
         keys.VerticalAlignment = VerticalAlignment.Center;
         Grid.SetColumn(name, 1);
         Grid.SetColumn(keys, 2);
@@ -250,37 +258,48 @@ internal sealed class ShortcutsPage : UserControl
         return new Border { Padding = SettingsLayout.RowPadding, Child = grid };
     }
 
-    /// <summary>Keys as caps, from the column's left edge; dimmed when they aren't working.</summary>
-    private static FrameworkElement Keycaps(IReadOnlyList<string> caps, bool mouse, bool dim)
-    {
-        var panel = new StackPanel { Orientation = Orientation.Horizontal, Opacity = dim ? 0.45 : 1, HorizontalAlignment = HorizontalAlignment.Left };
-        foreach (string text in caps)
-        {
-            var content = new StackPanel { Orientation = Orientation.Horizontal };
-            if (mouse)
-            {
-                var m = new LucideIcon { Data = LucideIcons.Mouse, Size = 14, Margin = new Thickness(0, 0, 6, 0), VerticalAlignment = VerticalAlignment.Center };
-                m.SetResourceReference(LucideIcon.BrushProperty, "TextPrimaryBrush");
-                content.Children.Add(m);
-            }
-            var label = SettingsUi.Styled(new TextBlock { Text = text, VerticalAlignment = VerticalAlignment.Center }, "CaptionTextStyle");
-            label.SetResourceReference(TextBlock.ForegroundProperty, "TextPrimaryBrush");
-            content.Children.Add(label);
-            var cap = new Border { Child = content, Padding = new Thickness(8, 3, 8, 3), Margin = new Thickness(0, 0, 4, 0), CornerRadius = new CornerRadius(4), BorderThickness = new Thickness(1) };
-            cap.SetResourceReference(Border.BorderBrushProperty, "BorderStrongBrush");
-            panel.Children.Add(cap);
-        }
-        return panel;
-    }
-
     // ---- the editor ----
 
-    private void StartEdit(Edit edit)
+    private void StartEdit(Edit edit, bool listen = true)
     {
         StopListening();
         _edit = edit;
         BuildEditor();
-        Listen();
+        if (listen)
+            Listen();
+        ShowEditor();
+    }
+
+    /// <summary>
+    /// A feature's Edit link (<c>shortcuts/&lt;module id&gt;/&lt;name&gt;</c> past the page): the editor open in that
+    /// shortcut's row, recording as Change does. The list alone when the feature lists no such shortcut.
+    /// </summary>
+    internal void OpenEditor(string ownerAndName, bool listen = true)
+    {
+        int slash = ownerAndName.IndexOf('/');
+        string owner = slash < 0 ? ownerAndName : ownerAndName[..slash];
+        string? name = slash < 0 ? null : ownerAndName[(slash + 1)..];
+        var owned = _shell.Shortcuts.List.Where(e => e.Editable && e.Owner == owner).ToList();
+        if ((owned.FirstOrDefault(e => e.Name == name) ?? (owned.Count == 1 ? owned[0] : null)) is not { } entry)
+        {
+            Chippi.Core.Diagnostics.Log.Warn($"Shortcuts: no shortcut '{name}' from {owner} to edit");
+            return;
+        }
+        StartEdit(new Edit { Mode = EditMode.Chippi, EntryId = entry.Id, EntryName = entry.Name, Door = BindingDoor.Key, Keys = entry.Shortcut }, listen);
+    }
+
+    /// <summary>Once laid out: the editor scrolled into view and, editing a row, the keyboard on its keys.</summary>
+    private void ShowEditor()
+    {
+        var view = _editorView;
+        Dispatcher.BeginInvoke(DispatcherPriority.Background, () =>
+        {
+            if (view is null || !ReferenceEquals(view, _editorView) || !view.IsVisible)
+                return;
+            view.BringIntoView();
+            if (_edit is { Mode: not EditMode.New })
+                _inputRow.Child?.Focus();
+        });
     }
 
     private void CloseEditor()
@@ -457,7 +476,7 @@ internal sealed class ShortcutsPage : UserControl
             Apps = () => [.. _pc.Apps.Select(a => (a.ParsingName, a.Name))],
             Commands = () => [.. _shell.Registry.Commands().Where(c => c.Kind != ChippiCommandKind.Paste)],
             SettingsPages = [.. SettingsPages.All.Select(p => (p.Uri, p.Name))],
-            Recorder = _recorder,
+            Recorder = Recorder,
         });
         picker.Show(edit.Action);
         picker.Changed += (action, _) => { edit.Action = action; RefreshSave(); };
@@ -493,18 +512,18 @@ internal sealed class ShortcutsPage : UserControl
         var content = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
         IReadOnlyList<string> caps = edit.Door switch
         {
-            BindingDoor.Key => edit.Keys is { } k ? CapsOf(k) : [],
+            BindingDoor.Key => edit.Keys is { } k ? Keycaps.CapsOf(k) : [],
             BindingDoor.Caps => edit.CapsKey != 0 ? [CombosKey(_module?.Settings.CapsHeldKey ?? 0x14), KeyCombo.NameOf(edit.CapsKey)] : [],
             _ => edit.Button is { } b ? [MouseName(b)] : [],
         };
         if (caps.Count > 0)
-            content.Children.Add(Keycaps(caps, edit.Door == BindingDoor.Mouse, false));
+            content.Children.Add(Keycaps.Of(caps, edit.Door == BindingDoor.Mouse));
         else
         {
             // Caps Lock: the held key's cap, then the prompt for the key pressed with it.
             if (edit.Door == BindingDoor.Caps)
             {
-                var held = Keycaps([CombosKey(_module?.Settings.CapsHeldKey ?? 0x14)], false, false);
+                var held = Keycaps.Of([CombosKey(_module?.Settings.CapsHeldKey ?? 0x14)]);
                 held.Margin = new Thickness(0, 0, 4, 0);
                 content.Children.Add(held);
                 var plus = SettingsUi.Styled(new TextBlock { Text = "+", Margin = new Thickness(0, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center }, "BodyTextStyle");
@@ -555,7 +574,7 @@ internal sealed class ShortcutsPage : UserControl
         {
             _listening = edit.Door == BindingDoor.Mouse
                 ? new MouseButtonRecorder(_shell.Input, t => Dispatcher.BeginInvoke(() => Recorded(edit, null, t)))
-                : _recorder.Record(combo => Recorded(edit, combo, null));
+                : Recorder.Record(combo => Recorded(edit, combo, null));
         }
         catch (Exception ex)
         {

@@ -2,12 +2,10 @@
 // Copyright (C) Chippi contributors
 
 using Chippi.Core.Shortcuts;
-using Chippi.UI.Shortcuts;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Documents;
-using System.Windows.Input;
 using Chippi.Audio;
 using Chippi.Features.Sound.Routing;
 using Chippi.UI.Controls;
@@ -21,8 +19,6 @@ public enum MicMuteSurface
     Microphone,
     /// <summary>The Mute shortcut section of Settings › Microphone.</summary>
     Shortcut,
-    /// <summary>The app-wide Shortcuts list.</summary>
-    ShortcutList,
 }
 
 public sealed class MicMuteView : UserControl
@@ -40,7 +36,7 @@ public sealed class MicMuteView : UserControl
     private Button? _levelMute;
     private string _microphoneShape = "";
     private Button? _action; // Mute or Unmute as shown now, focused again after a press from the keyboard rebuilds it
-    private bool _recording, _refreshingLevel;
+    private bool _refreshingLevel;
 
     public MicMuteView(MicMuteModule module, MicMuteSurface surface = MicMuteSurface.Shortcut)
     {
@@ -48,33 +44,20 @@ public sealed class MicMuteView : UserControl
         _surface = surface;
         Content = _body;
         Loaded += (_, _) => { _module.Changed += Refresh; Refresh(); };
-        Unloaded += (_, _) =>
-        {
-            _module.Changed -= Refresh;
-            if (_recording) { _recording = false; _module.CaptureShortcut(false); }
-        };
-        PreviewKeyDown += Capture;
+        Unloaded += (_, _) => _module.Changed -= Refresh;
         Refresh();
     }
 
     private void Refresh()
     {
         if (!Dispatcher.CheckAccess()) { Dispatcher.BeginInvoke(Refresh); return; }
-        if (_recording) return;
         if (_surface == MicMuteSurface.Microphone) { RefreshMicrophone(); return; }
         _body.Children.Clear();
-        if (_surface == MicMuteSurface.ShortcutList)
-        {
-            var card = SettingsLayout.Card(SettingsLayout.Row(_module.Descriptor.Name, ShortcutControls()));
-            card.SetResourceReference(StyleProperty, "CardRowsStyle");
-            _body.Children.Add(card);
-            if (_module.ShortcutError is { } error) Error(error);
-            return;
-        }
+        var shortcut = new ShortcutSetting("Mute microphone", _module.EditShortcut);
+        shortcut.Show(_module.Settings.Shortcut, _module.ShortcutError);
         _body.Children.Add(SettingsLayout.Card(
-            SettingsLayout.Row("Shortcut", ShortcutControls()),
+            SettingsLayout.Row("Shortcut", shortcut),
             SettingsLayout.Row("Sound feedback", RoutingUi.Switch("Sound feedback", _module.Settings.PlaySound, _module.SetPlaySound))));
-        if (_module.ShortcutError is { } shortcutError) Error(shortcutError);
     }
 
     /// <summary>
@@ -164,53 +147,6 @@ public sealed class MicMuteView : UserControl
         return row;
     }
 
-    /// <summary>The keys (or "Not set"), Change or Set, and Remove, as Paste as plain text's shortcut.</summary>
-    private StackPanel ShortcutControls()
-    {
-        var shortcut = _module.Settings.Shortcut;
-        var panel = new StackPanel { Orientation = Orientation.Horizontal };
-        var keys = shortcut is null ? RoutingUi.Text("Not set", brush: "TextSecondaryBrush") : RoutingUi.Text(shortcut.ToString());
-        keys.Margin = new Thickness(0, 0, 12, 0);
-        panel.Children.Add(keys);
-        var change = RoutingUi.Button(shortcut is null ? "Set" : "Change", BeginCapture);
-        AutomationProperties.SetName(change, shortcut is null ? "Set shortcut" : "Change shortcut");
-        panel.Children.Add(change);
-        if (shortcut is not null)
-        {
-            var remove = RoutingUi.Button("Remove", _module.RemoveShortcut);
-            remove.Margin = new Thickness(8, 0, 0, 0);
-            AutomationProperties.SetName(remove, "Remove shortcut");
-            panel.Children.Add(remove);
-        }
-        return panel;
-    }
-
-    private void BeginCapture()
-    {
-        _recording = true;
-        _module.CaptureShortcut(true);
-        Focusable = true;
-        _body.Children.Clear();
-        var card = SettingsLayout.Card(SettingsLayout.Row("New shortcut", RoutingUi.Button("Cancel", CancelCapture)));
-        if (_surface == MicMuteSurface.ShortcutList) card.SetResourceReference(StyleProperty, "CardRowsStyle");
-        _body.Children.Add(card);
-        Focus();
-    }
-
-    private void CancelCapture() { _module.CaptureShortcut(false); _recording = false; Refresh(); }
-
-    private void Capture(object sender, KeyEventArgs e)
-    {
-        if (!_recording) return;
-        if (e.Key == Key.Escape) { CancelCapture(); e.Handled = true; return; }
-        if (ShortcutKeys.From(e) is not { } shortcut) return;
-        _module.ChangeShortcut(shortcut);
-        _module.CaptureShortcut(false);
-        _recording = false;
-        e.Handled = true;
-        Refresh();
-    }
-
     private async void Toggle()
     {
         bool focused = IsKeyboardFocusWithin;
@@ -226,13 +162,5 @@ public sealed class MicMuteView : UserControl
                 if (focused) _action?.Focus(); // a second Enter undoes the first
             });
         }
-    }
-
-    private void Error(string message)
-    {
-        var text = RoutingUi.Text(message, "CaptionTextStyle", "WarningTextBrush");
-        text.Margin = new Thickness(0, 8, 0, 0);
-        AutomationProperties.SetLiveSetting(text, AutomationLiveSetting.Polite);
-        _body.Children.Add(text);
     }
 }

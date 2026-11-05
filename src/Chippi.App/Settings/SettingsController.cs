@@ -146,6 +146,8 @@ internal sealed class SettingsController
                                         }
                                     }
                                     shortcutsPage.ShowEditorForShot(null);
+                                    await EditLinkShotsAsync(shortcutsPage, directory, $"{name}-{accent}", width);
+                                    Open(page.Id);
                                 }
                                 _window.Width = width;
                                 _window.Height = height;
@@ -274,6 +276,50 @@ internal sealed class SettingsController
             Core.Diagnostics.Log.Error("Settings snapshot failed", ex);
         }
         _shell.Commands.Quit();
+    }
+
+    /// <summary>
+    /// Each feature's Edit link as a click runs it: the feature's page, then Shortcuts with the editor open in that
+    /// shortcut's row, timed to laid out. The page's recorder is stood in for, so the run never takes the keyboard.
+    /// </summary>
+    private async Task EditLinkShotsAsync(Pages.ShortcutsPage shortcuts, string directory, string suffix, double width)
+    {
+        var recorder = shortcuts.Recorder;
+        shortcuts.Recorder = new SilentRecorder();
+        var lines = new List<string> { suffix };
+        try
+        {
+            _window!.Width = width;
+            _window.Height = 1300;
+            foreach (var entry in _shell.Shortcuts.List.Where(e => e.Editable).ToList())
+            {
+                string feature = "module:" + entry.Owner;
+                if (!_window.NavigationPages.Any(p => p.Id == feature))
+                    continue;
+                Open(feature);
+                await Idle();
+                var clock = System.Diagnostics.Stopwatch.StartNew();
+                Open($"{Core.Modules.ModuleContext.ShortcutsPage}/{entry.Owner}/{entry.Name}");
+                _window.UpdateLayout();
+                clock.Stop();
+                lines.Add($"{entry.Name}: {clock.Elapsed.TotalMilliseconds:F1} ms from Edit to the editor laid out in its row");
+                await Idle();
+                Render(_window, System.IO.Path.Combine(directory, $"r6-edit-{entry.Owner}-{suffix}.png"));
+            }
+        }
+        finally
+        {
+            shortcuts.ShowEditorForShot(null);
+            shortcuts.Recorder = recorder;
+        }
+        System.IO.File.AppendAllLines(System.IO.Path.Combine(directory, "r6-edit-timings.txt"), lines);
+    }
+
+    private sealed class SilentRecorder : Core.Actions.IKeyRecorder, IDisposable
+    {
+        public IDisposable Record(Action<Core.Actions.KeyCombo?> recorded) => this;
+
+        public void Dispose() { }
     }
 
     private static async Task Idle()

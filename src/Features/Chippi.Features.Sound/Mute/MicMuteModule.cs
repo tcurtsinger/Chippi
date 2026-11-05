@@ -140,7 +140,7 @@ public sealed class MicMuteModule : IFeatureModule
                     Status.State == MicrophoneMuteState.Muted ? nameof(LucideIcons.Mic) : nameof(LucideIcons.MicOff), ToggleAsync) { Words = "mic microphone mute unmute" }]
                 : []);
             // Settings › Microphone: "mute" is the Microphone row at the top, the rest the Mute shortcut section.
-            context.Ui.SetSettingsPage(section => new MicMuteView(this, section == "mute" ? MicMuteSurface.Microphone : section == "shortcut-list" ? MicMuteSurface.ShortcutList : MicMuteSurface.Shortcut));
+            context.Ui.SetSettingsPage(section => new MicMuteView(this, section == "mute" ? MicMuteSurface.Microphone : MicMuteSurface.Shortcut));
             _audio.SnapshotChanged += OnSnapshot;
             UpdateState();
         }
@@ -194,6 +194,9 @@ public sealed class MicMuteModule : IFeatureModule
         Changed?.Invoke();
         return true;
     }
+
+    /// <summary>Settings › Shortcuts with this shortcut's editor open in its row: it's recorded only there.</summary>
+    public void EditShortcut() => _context?.EditShortcut("Mute microphone");
 
     public void RemoveShortcut()
     {

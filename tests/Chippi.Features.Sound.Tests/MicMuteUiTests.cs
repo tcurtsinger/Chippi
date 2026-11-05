@@ -64,7 +64,7 @@ public sealed class MicMuteUiTests
             Assert.Contains(Children(card).OfType<TextBlock>(), t => t.Text == "No microphone");
             var settings = Assert.IsType<MicMuteView>(f.Ui.Page!(null));
             Assert.DoesNotContain(Children(settings).OfType<Button>(), b => AutomationProperties.GetName(b) == "Mute all microphones");
-            Assert.Contains(Children(settings).OfType<Button>(), b => AutomationProperties.GetName(b) == "Change shortcut");
+            Assert.Contains(Children(settings).OfType<Button>(), b => AutomationProperties.GetName(b) == "Edit Mute microphone shortcut");
             return Task.CompletedTask;
         });
     }

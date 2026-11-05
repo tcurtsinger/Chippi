@@ -52,7 +52,7 @@ public sealed class PlainPasteModule : IFeatureModule
         _timer = _time.CreateTimer(_ => Expire(), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
         _hotkey = Create(); // listed in Settings › Shortcuts while it runs, set or not
         if (Settings.Shortcut is { } shortcut) Reserve(shortcut);
-        context.Ui.SetSettingsPage(section => new PlainPasteView(this, section == "shortcut-list" ? Descriptor.Name : "Shortcut"));
+        context.Ui.SetSettingsPage(_ => new PlainPasteView(this));
         return Task.CompletedTask;
     }
     /// <summary>The listed shortcut takes these keys; the service holds them before it frees the old ones.</summary>
@@ -97,6 +97,9 @@ public sealed class PlainPasteModule : IFeatureModule
         Changed?.Invoke();
         return saved;
     }
+    /// <summary>Settings › Shortcuts with this shortcut's editor open in its row: it's recorded only there.</summary>
+    public void EditShortcut() => _context?.EditShortcut(Descriptor.Name);
+
     public void RemoveShortcut()
     {
         if (_stopping) return;

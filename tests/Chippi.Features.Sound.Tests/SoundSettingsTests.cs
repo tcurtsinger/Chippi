@@ -202,16 +202,16 @@ public sealed class SoundSettingsTests
         await Sta(async () =>
         {
             var view = Assert.IsType<MicMuteView>(f.Ui.Page!(null));
-            var remove = Descendants(view).OfType<Button>().Single(b => AutomationProperties.GetName(b) == "Remove shortcut");
-            ((IInvokeProvider)new ButtonAutomationPeer(remove)).Invoke();
+            // Settings › Shortcuts removes it through the module; the page has only Edit.
+            Assert.DoesNotContain(Descendants(view).OfType<Button>(), b => AutomationProperties.GetName(b) == "Remove shortcut");
+            f.Module.RemoveShortcut();
             await Until(() => f.Module.Settings.Shortcut is null);
             Assert.Null(f.Module.Settings.Shortcut);
             Assert.Null(f.Settings.Value.Shortcut);
             Assert.Null(f.Hotkey.Current); // still listed, unset
             view = new MicMuteView(f.Module);
             Assert.Contains(Descendants(view).OfType<TextBlock>(), t => t.Text == "Not set");
-            Assert.Contains(Descendants(view).OfType<Button>(), b => AutomationProperties.GetName(b) == "Set shortcut");
-            Assert.DoesNotContain(Descendants(view).OfType<Button>(), b => AutomationProperties.GetName(b) == "Remove shortcut");
+            Assert.Contains(Descendants(view).OfType<Button>(), b => AutomationProperties.GetName(b) == "Edit Mute microphone shortcut");
         });
         var keys = new KeyShortcut(ShortcutModifiers.Control | ShortcutModifiers.Alt, 0x4B);
         Assert.True(f.Module.ChangeShortcut(keys));
