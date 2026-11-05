@@ -59,6 +59,12 @@ public sealed class CloseProtectionFilter(Func<CloseTarget?> target, Func<CloseM
         lock (_gate) { Clear(); _lastTarget = null; }
     }
 
+    public void InputReset(InputDevices devices)
+    {
+        if ((devices & InputDevices.Keyboard) == 0) return;
+        lock (_gate) { Clear(); _lastTarget = null; Array.Clear(_swallowed); }
+    }
+
     public void Advance(long now)
     {
         lock (_gate) Expire(now);

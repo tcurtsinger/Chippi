@@ -231,6 +231,11 @@ internal sealed class HubCore(IHookSource hooks, IInputSender sender, IInputSyst
             Array.Clear(_buttonOwner);
             _ownedButtons = 0;
         }
+        foreach (var entry in _chain)
+        {
+            try { entry.Filter.InputReset(devices); }
+            catch (Exception ex) { log?.LogWarning(ex, "Input hub: a filter failed to reset after ownership was forgotten"); }
+        }
         if (Kept != before)
             RequestUpdate();
     }

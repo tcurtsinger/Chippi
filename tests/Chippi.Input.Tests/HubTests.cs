@@ -8,6 +8,20 @@ namespace Chippi.Input.Tests;
 /// <summary>The hub's rules (architecture §2) on a fake source and a recording sender: nothing here hooks the real input.</summary>
 public class HubTests
 {
+    [Fact]
+    public void Desktop_reset_notifies_filters_after_forgetting_their_owned_keys()
+    {
+        var hub = new TestHub();
+        var filter = new TestFilter("close", InputOrder.CloseProtection) { KeepKey = _ => true };
+        int resets = 0;
+        filter.Reset = devices => { Assert.Equal(InputDevices.Both, devices); Assert.Equal(0, hub.Core.Kept); resets++; };
+        hub.Core.Add(filter);
+        Assert.True(hub.Key(0x73, down: true));
+        Assert.Equal(1, hub.Core.Kept);
+        hub.Core.SessionChanged();
+        Assert.Equal(1, resets);
+    }
+
     private const uint A = 0x41, Esc = 0x1B, Caps = 0x14;
 
     [Fact]

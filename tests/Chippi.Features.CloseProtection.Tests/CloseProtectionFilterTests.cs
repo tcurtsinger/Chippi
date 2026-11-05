@@ -129,6 +129,20 @@ public sealed class CloseProtectionFilterTests
         Assert.True(scene.Key(true, 4));
         Assert.NotNull(scene.Feedback.Last());
     }
+    [Fact]
+    public void OnlyHubKeyboardOwnershipResetForgetsASwallowedKey()
+    {
+        var scene = new Scene();
+        scene.Key(true, 0);
+        scene.Filter.InputReset(InputDevices.Mouse);
+        Assert.True(scene.Key(true, 1, repeat: true));
+        Assert.Equal(1, scene.Masks);
+        scene.Filter.InputReset(InputDevices.Keyboard);
+        Assert.True(scene.Key(true, 2));
+        Assert.Equal(2, scene.Masks);
+        Assert.NotNull(scene.Feedback.Last());
+    }
+
     private sealed class Scene
     {
         public CloseTarget Target = new(1, 1, 1, "app.exe", "App", true);
