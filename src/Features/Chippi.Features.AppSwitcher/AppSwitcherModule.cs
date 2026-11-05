@@ -56,7 +56,7 @@ public sealed class AppSwitcherModule : IFeatureModule
     public AppSwitcherModule(Func<Switcher, ISwitcherView>? view = null, Func<ISwitcherPc>? pc = null, Func<IWindowEvents>? events = null,
         Func<IHotkey>? createHotkey = null)
     {
-        _view = view ?? (switcher => new Views.SwitcherOverlay(switcher));
+        _view = view ?? (switcher => new Views.SwitcherOverlay(switcher, this));
         _createPc = pc ?? (() => new WindowsSwitcherPc());
         _createEvents = events ?? (() => new WindowsWindowEvents());
         _createHotkey = createHotkey;
@@ -101,6 +101,7 @@ public sealed class AppSwitcherModule : IFeatureModule
         if (Settings.Shortcut is { } shortcut && !_paused)
             Reserve(shortcut);
         Microsoft.Win32.SystemEvents.SessionSwitch += OnSessionSwitch;
+        context.Ui.SetSettingsPage(_ => new Views.AppSwitcherPage(this));
         context.Ui.AddCommands(() =>
         [
             new ChippiCommand(OpenKey, "App switcher", "AppWindow", OpenFromCommand) { Words = "switch window alt tab", Tile = Tile },

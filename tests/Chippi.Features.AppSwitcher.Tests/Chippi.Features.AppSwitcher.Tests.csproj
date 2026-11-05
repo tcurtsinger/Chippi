@@ -13,5 +13,7 @@
     <Using Include="Xunit" />
     <ProjectReference Include="../../src/Features/Chippi.Features.AppSwitcher/Chippi.Features.AppSwitcher.csproj" />
     <Compile Include="../Chippi.Island.Tests/WpfTestThread.cs" Link="WpfTestThread.cs" />
+    <!-- Settings' styles, for the page and its shots. -->
+    <ProjectReference Include="../../src/Chippi.App/Chippi.App.csproj" />
   </ItemGroup>
 </Project>
