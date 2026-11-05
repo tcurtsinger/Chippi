@@ -73,7 +73,7 @@ public sealed class CloseProtectionModule(Func<ICloseDesktop> createDesktop, Tim
         _filter.Configure(Settings.Enabled, Settings.ControlWApps);
         _registration = (context.Input ?? throw new InvalidOperationException("Input unavailable")).Add(_filter);
         _timer = _clock.CreateTimer(_ => _filter?.Advance(_clock.GetTimestamp()), null,
-            TimeSpan.FromMilliseconds(50), TimeSpan.FromMilliseconds(50));
+            Settings.Enabled ? TimeSpan.FromMilliseconds(50) : Timeout.InfiniteTimeSpan, TimeSpan.FromMilliseconds(50));
         context.Ui.SetSettingsPage(_ => new CloseProtectionRows(this));
         return Task.CompletedTask;
     }
@@ -98,6 +98,7 @@ public sealed class CloseProtectionModule(Func<ICloseDesktop> createDesktop, Tim
             Settings = next;
             _filter.Configure(next.Enabled, next.ControlWApps);
             _registration?.Refresh();
+            _timer?.Change(next.Enabled ? TimeSpan.FromMilliseconds(50) : Timeout.InfiniteTimeSpan, TimeSpan.FromMilliseconds(50));
             Error = null;
         }
         catch (Exception ex) { Error = "Close protection failed"; Log.Warn("Close protection: changing settings failed", ex); }
