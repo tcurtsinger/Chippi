@@ -46,6 +46,7 @@
     <ProjectReference Include="..\Features\Chippi.Features.CleaningMode\Chippi.Features.CleaningMode.csproj" />
     <ProjectReference Include="..\Features\Chippi.Features.CommandBar\Chippi.Features.CommandBar.csproj" />
     <ProjectReference Include="..\Features\Chippi.Features.RadialMenu\Chippi.Features.RadialMenu.csproj" />
+    <ProjectReference Include="..\Features\Chippi.Features.Debounce\Chippi.Features.Debounce.csproj" />
   </ItemGroup>
 
   <!-- P/Invoke via CsWin32. Each workstream lists its APIs in a NativeMethods.txt inside its own

@@ -96,11 +96,6 @@ public static class FeatureCatalog
             Requires = [Capability.InputHooks],
             Presets = PowerUser,
         },
-        new("debounce", "Click and key debounce", "Ignores the double clicks and key chatter of worn switches", FeatureGroup.Windows)
-        {
-            Icon = "Keyboard",
-            Requires = [Capability.InputHooks],
-        },
         new("super-key", "Super key", "Turns Caps Lock into a modifier for your own shortcuts", FeatureGroup.Windows)
         {
             Icon = "Keyboard",

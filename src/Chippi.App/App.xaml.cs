@@ -207,6 +207,8 @@ public partial class App : Application
         shell.Registry.Register(new Chippi.Features.RadialMenu.RadialMenuModule(() => cleaning.IsOn, () => keepAwake.IsOn, () => commandBar.Settings.WebSearch));
         // [Phase 5.5] AI agent usage: replaces its catalog placeholder.
         shell.Registry.Register(new Chippi.Features.AgentUsage.AgentUsageModule());
+        // [Phase 6] Click and key debounce: replaces its catalog placeholder.
+        shell.Registry.Register(new Chippi.Features.Debounce.DebounceModule(Environment.GetEnvironmentVariable("CHIPPI_DEBOUNCE_INJECTED") == "1"));
 
         // [WS2] "Coming soon" placeholders for the PLAN.md features.
         Settings.Features.FeatureCatalog.RegisterPlaceholders(shell.Registry);
