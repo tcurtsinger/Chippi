@@ -26,8 +26,9 @@ public interface IActionHost
 public sealed class ShortcutsModule : IFeatureModule
 {
     public const string Id = "shortcuts";
-    public const string RadialText = "That button already opens the Radial menu. Pick another one, or free it there first.";
-    public const string ButtonTakenText = "That button or direction is already on the list.";
+    public const string RadialText = "The Radial menu uses this";
+    public const string WindowsText = "Windows uses this";
+    public const string AnotherAppText = "Another app uses this";
     public const string UnavailableText = "Unavailable";
 
     private sealed class Slot(ShortcutBinding binding)
@@ -153,6 +154,10 @@ public sealed class ShortcutsModule : IFeatureModule
             Save(Settings with { MouseIgnoredApps = [.. apps.Where(a => !string.IsNullOrWhiteSpace(a)).Distinct(StringComparer.OrdinalIgnoreCase)] });
     }
 
+    /// <summary>
+    /// Why a binding can't be added or changed to this, in the words the editor shows by Save (Travis, 2026-11-05: a shortcut
+    /// in use is refused there, not saved with a warning); null when it can.
+    /// </summary>
     private string? Check(ShortcutBinding binding, string? except)
     {
         if (binding.Door == BindingDoor.Key)
@@ -163,10 +168,24 @@ public sealed class ShortcutsModule : IFeatureModule
         else if (!Enum.IsDefined(binding.Button))
             return "Pick a button.";
         if (Settings.Bindings.FirstOrDefault(b => b.Id != except && b.SameDoor(binding)) is { } other)
-            return binding.Door == BindingDoor.Key ? $"{other.Label} already uses this." : ButtonTakenText;
-        if (binding.Door == BindingDoor.Mouse && binding.Button <= MouseTrigger.Forward && _radialHolds(binding.Button))
-            return RadialText;
-        return null;
+            return $"{other.Label} already uses this";
+        if (binding.Door == BindingDoor.Mouse)
+            return binding.Button <= MouseTrigger.Forward && _radialHolds(binding.Button) ? RadialText : null;
+        var keys = binding.Keys!;
+        if (WindowsKeys.IsReserved(keys))
+            return WindowsText;
+        // Its own keys, unchanged, are already held by its row.
+        if (except is not null && Settings.Bindings.FirstOrDefault(b => b.Id == except) is { Door: BindingDoor.Key } own && own.Keys == keys)
+            return null;
+        // Windows says only whether the keys were free: ask it, and let go at once.
+        if (_context is null)
+            return null;
+        using var probe = _context.Shortcuts.Add(Id, "Shortcut check");
+        if (probe.Register(keys, () => { }))
+            return null;
+        return probe.Error is { } error && error != ShortcutService.InUse && error.StartsWith("Used by ", StringComparison.Ordinal)
+            ? error["Used by ".Length..] + " already uses this"
+            : AnotherAppText;
     }
 
     private void Save(ShortcutsSettings next)
