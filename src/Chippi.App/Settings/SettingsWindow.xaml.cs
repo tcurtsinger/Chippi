@@ -204,6 +204,12 @@ public partial class SettingsWindow : Window
         if (_closed)
             return;
         RefreshFeatures();
+        // Add features follows its own toggles; rebuilding it would scroll it back to the top.
+        if (_currentPage == AddFeatures && _pageView is not null)
+        {
+            Select(AddFeatures);
+            return;
+        }
         // A page still here keeps its unsaved work; one whose module went has nothing left to save.
         if (_currentPage.Length > 0 && LeaveGuard() is { } guard && !guard.ConfirmLeave(() => Navigate(_currentPage)))
         {

@@ -186,6 +186,27 @@ public sealed class SettingsShellTests
     });
 
     [Fact]
+    public void Turning_a_feature_on_or_off_in_Add_features_keeps_the_page_scrolled() => WpfTestThread.Run(() =>
+    {
+        using var scene = new SettingsScene(Seven);
+        scene.Shell.Registry.Register(new FakeFeature("shelf", "Shelf", FeatureGroup.Files, "Inbox"));
+        var window = scene.Show("features", height: 360);
+        Assert.True(window.Scroller.ScrollableHeight > 0);
+        window.Scroller.ScrollToVerticalOffset(window.Scroller.ScrollableHeight);
+        window.UpdateLayout();
+        double offset = window.Scroller.VerticalOffset;
+        Assert.True(offset > 0);
+
+        foreach (bool on in new[] { true, false })
+        {
+            scene.Shell.Registry.SetInstalledAsync("shelf", on).GetAwaiter().GetResult();
+            System.Windows.Threading.Dispatcher.CurrentDispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.ContextIdle);
+            window.UpdateLayout();
+            Assert.Equal(offset, window.Scroller.VerticalOffset);
+        }
+    });
+
+    [Fact]
     public void Below_1008_the_sidebar_becomes_a_rail_whose_menu_opens_it_over_the_page() => WpfTestThread.Run(() =>
     {
         using var scene = new SettingsScene(Seven);
