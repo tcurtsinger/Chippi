@@ -94,7 +94,7 @@ public sealed class CommandBarModule : IFeatureModule
             TakesKeyboard = true,
             HeaderHeight = 32,
         });
-        context.Ui.SetSettingsPage(section => section == "shortcut-list" ? new ShortcutRow(this, Descriptor.Name) : new CommandBarSettingsPage(this));
+        context.Ui.SetSettingsPage(_ => new CommandBarSettingsPage(this));
         if (Settings.Shortcut is { } shortcut)
             TryRegister(shortcut);
         _pc.RefreshApps(); // read once now, so the first open already has them
@@ -208,6 +208,9 @@ public sealed class CommandBarModule : IFeatureModule
         Changed?.Invoke();
         return false;
     }
+
+    /// <summary>Settings › Shortcuts with this shortcut's editor open in its row: it's recorded only there.</summary>
+    public void EditShortcut() => _context?.EditShortcut(Descriptor.Name);
 
     public bool RemoveShortcut()
     {

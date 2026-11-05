@@ -148,7 +148,7 @@ public sealed class RadialMenuModule : IFeatureModule, IWheelInputSink
         }
         if (Settings.Shortcut is { } shortcut && !ShortcutStandsAside)
             TryRegister(shortcut);
-        context.Ui.SetSettingsPage(section => section == "shortcut-list" ? new ShortcutRow(this, Descriptor.Name) : new RadialMenuSettingsPage(this));
+        context.Ui.SetSettingsPage(_ => new RadialMenuSettingsPage(this));
         _pc.RefreshApps();
         WarmIcons();
         Prepare();
@@ -339,6 +339,9 @@ public sealed class RadialMenuModule : IFeatureModule, IWheelInputSink
         Prepare();
         return true;
     }
+
+    /// <summary>Settings › Shortcuts with this shortcut's editor open in its row: it's recorded only there.</summary>
+    public void EditShortcut() => _context?.EditShortcut(Descriptor.Name);
 
     public void RemoveShortcut()
     {

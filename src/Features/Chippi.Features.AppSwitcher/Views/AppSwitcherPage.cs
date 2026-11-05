@@ -5,16 +5,14 @@ using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
-using System.Windows.Input;
 using Chippi.UI.Controls;
-using Chippi.UI.Shortcuts;
 
 namespace Chippi.Features.AppSwitcher.Views;
 
 /// <summary>
-/// Settings › App switcher (docs/phase-6/design/wave-3.html, board switcher-settings): Opening, its shortcut ("Not set"
-/// and Record until one is set); Windows, which displays it lists and the Previews switch; then Apps without previews,
-/// whose windows show their icon instead.
+/// Settings › App switcher (docs/phase-6/design/wave-3.html, board switcher-settings): Opening, its shortcut read-only
+/// with Edit, which records it in Settings › Shortcuts; Windows, which displays it lists and the Previews switch; then
+/// Apps without previews, whose windows show their icon instead.
 /// </summary>
 internal sealed class AppSwitcherPage : UserControl
 {
@@ -23,13 +21,15 @@ internal sealed class AppSwitcherPage : UserControl
     private readonly ComboBox _from = SettingsLayout.Combo(["All displays", "This display"]);
     private readonly ToggleButton _previews = new();
     private readonly ExcludedAppsCard _noPreview;
-    private bool _recording, _updating, _loaded;
-    private string? _recordError;
+    private readonly ShortcutSetting _shortcutView;
+    private bool _updating, _loaded;
 
     public AppSwitcherPage(AppSwitcherModule module)
     {
         _module = module;
         _shortcut.Icon = LucideIcons.Keyboard;
+        _shortcutView = new ShortcutSetting(module.Descriptor.Name, module.EditShortcut);
+        _shortcut.Content = _shortcutView;
         _from.Width = 200;
         AutomationProperties.SetName(_from, "Windows from");
         _from.SelectionChanged += (_, _) =>
@@ -58,12 +58,6 @@ internal sealed class AppSwitcherPage : UserControl
                 SettingsLayout.Section("Windows"), SettingsLayout.Card(from, previews), _noPreview,
             },
         };
-        PreviewKeyDown += Record;
-        LostKeyboardFocus += (_, e) =>
-        {
-            if (_recording && (e.NewFocus is not DependencyObject next || !IsAncestorOf(next)))
-                StopRecording(focus: false);
-        };
         Loaded += (_, _) =>
         {
             if (_loaded) return;
@@ -75,25 +69,14 @@ internal sealed class AppSwitcherPage : UserControl
         {
             _loaded = false;
             _module.Changed -= OnChanged;
-            StopRecording(focus: false);
         };
         Refresh();
     }
 
-    /// <summary>For tests: the shortcut row's text, and whether it's listening.</summary>
-    internal string ShortcutText => (_shortcut.Content as StackPanel)?.Children.OfType<StackPanel>().FirstOrDefault()?.Children.OfType<TextBlock>().FirstOrDefault()?.Text
-        ?? (_shortcut.Content as StackPanel)?.Children.OfType<TextBlock>().FirstOrDefault()?.Text ?? "";
+    /// <summary>For tests: the shortcut row's keys, or "Not set".</summary>
+    internal string ShortcutText => _shortcutView.KeysText;
 
-    internal bool Recording => _recording;
-
-    internal void StartRecording()
-    {
-        Focus();
-        _recording = true;
-        _module.CaptureShortcut(true);
-        _recordError = null;
-        Refresh();
-    }
+    internal ShortcutSetting ShortcutView => _shortcutView;
 
     private void OnChanged()
     {
@@ -116,91 +99,5 @@ internal sealed class AppSwitcherPage : UserControl
         RefreshShortcut();
     }
 
-    private void RefreshShortcut()
-    {
-        var shortcut = _module.Settings.Shortcut;
-        bool focused = _shortcut.IsKeyboardFocusWithin;
-        var row = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-        AutomationProperties.SetName(row, "Shortcut");
-        if (_recording)
-        {
-            row.Children.Add(Text(_recordError ?? "Press shortcut", _recordError is null ? "TextSecondaryBrush" : "WarningTextBrush"));
-            row.Children.Add(Button("Cancel", "Cancel recording", () => StopRecording()));
-        }
-        else
-        {
-            var status = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
-            status.Children.Add(Text(shortcut?.ToString() ?? "Not set", shortcut is null ? "TextSecondaryBrush" : "TextPrimaryBrush"));
-            if (_module.ShortcutError is { } error) status.Children.Add(Text(error, "WarningTextBrush"));
-            row.Children.Add(status);
-            row.Children.Add(Button(shortcut is null ? "Record" : "Change", shortcut is null ? "Record shortcut" : "Change shortcut", StartRecording));
-            if (shortcut is not null)
-                row.Children.Add(Button("Remove", "Remove shortcut", () => { _module.RemoveShortcut(); Refresh(); FocusPrimary(); }));
-        }
-        _shortcut.Content = row;
-        if (focused && !_recording) FocusPrimary();
-    }
-
-    private void StopRecording(bool focus = true)
-    {
-        if (!_recording) return;
-        _recording = false;
-        _module.CaptureShortcut(false);
-        _recordError = null;
-        RefreshShortcut();
-        if (focus) FocusPrimary();
-    }
-
-    private void Record(object sender, KeyEventArgs e)
-    {
-        if (!_recording) return;
-        if (e.Key == Key.Tab)
-        {
-            StopRecording(focus: false);
-            return;
-        }
-        if (e.OriginalSource is Button && e.Key is Key.Enter or Key.Space) return;
-        e.Handled = true;
-        if (e.Key == Key.Escape)
-        {
-            StopRecording();
-            return;
-        }
-        if (ShortcutKeys.From(e) is not { } shortcut) return; // a modifier alone: keep listening
-        if (!shortcut.IsValid)
-        {
-            _recordError = "Shortcut unavailable";
-            RefreshShortcut();
-            return;
-        }
-        _recording = false;
-        _module.CaptureShortcut(false);
-        _recordError = null;
-        _module.ChangeShortcut(shortcut);
-        Refresh();
-        FocusPrimary();
-    }
-
-    private void FocusPrimary()
-    {
-        if (_loaded) (_shortcut.Content as StackPanel)?.Children.OfType<Button>().FirstOrDefault()?.Focus();
-    }
-
-    private static TextBlock Text(string text, string brush)
-    {
-        var block = new TextBlock { Text = text, VerticalAlignment = VerticalAlignment.Center, MaxWidth = 240, TextTrimming = TextTrimming.CharacterEllipsis };
-        block.SetResourceReference(StyleProperty, "BodyTextStyle");
-        block.SetResourceReference(TextBlock.ForegroundProperty, brush);
-        if (brush == "WarningTextBrush") AutomationProperties.SetLiveSetting(block, AutomationLiveSetting.Polite);
-        return block;
-    }
-
-    private static Button Button(string label, string name, Action click)
-    {
-        var button = new Button { Content = label, Margin = new Thickness(8, 0, 0, 0) };
-        button.SetResourceReference(StyleProperty, "SecondaryButtonStyle");
-        AutomationProperties.SetName(button, name);
-        button.Click += (_, _) => click();
-        return button;
-    }
+    private void RefreshShortcut() => _shortcutView.Show(_module.Settings.Shortcut, _module.ShortcutError);
 }

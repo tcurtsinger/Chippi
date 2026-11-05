@@ -77,7 +77,6 @@ public sealed class ActionsSurfaceProofTests
                 visibility.IsChecked = visibility.IsChecked != true;
                 SaveSettings(settingsPage, "Quick actions", Path.Combine(folder, "settings-save-failed.png"));
                 settings.Fail = false;
-                SaveSettings(new ShortcutList(module), "Shortcuts", Path.Combine(folder, "shortcuts.png"));
                 var menu = settingsPage.AddMenu(new Button());
                 Save((FrameworkElement)menu.Child, Path.Combine(folder, "kept-app-picker.png"));
                 module.SaveLayout([QuickActionId.Bluetooth], module.Layout);

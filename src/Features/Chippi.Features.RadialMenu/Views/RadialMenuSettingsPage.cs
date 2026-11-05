@@ -30,19 +30,20 @@ public sealed class RadialMenuSettingsPage : UserControl
     private readonly RadialMenuModule _module;
     private readonly ToggleButton _middle = Ui.Switch("Hold middle button"), _back = Ui.Switch("Hold Back button"), _forward = Ui.Switch("Hold Forward button");
     private readonly ToggleButton _overFullscreen = Ui.Switch("Open over fullscreen apps");
-    private readonly ContentControl _shortcut = new() { VerticalAlignment = VerticalAlignment.Center, Focusable = false };
+    private readonly ShortcutSetting _shortcut;
     private readonly WheelEditor _editor;
     private readonly Button _up = new() { Width = 32, Height = 32, Focusable = true };
     private readonly TextBlock _where = Ui.Text("Wheel");
     private readonly ContentControl _fields = new() { Focusable = false };
     private readonly List<int> _path = []; // the submenu slices stepped into, from the first wheel
     private int? _selected;
-    private bool _updating, _capturingShortcut;
+    private bool _updating;
     private readonly ActionPicker _picker;
 
     public RadialMenuSettingsPage(RadialMenuModule module)
     {
         _module = module;
+        _shortcut = new ShortcutSetting(module.Descriptor.Name, module.EditShortcut);
         _editor = new WheelEditor(module.ChippiColor) { Margin = new Thickness(0, 12, 0, 8), HorizontalAlignment = HorizontalAlignment.Center };
         _editor.Selected += i => Select(i);
         _editor.Swapped += Swap;
@@ -98,7 +99,6 @@ public sealed class RadialMenuSettingsPage : UserControl
                 SettingsLayout.Section("Wheel"), SettingsLayout.Card(wheel),
             },
         };
-        PreviewKeyDown += CaptureShortcut;
         Loaded += (_, _) =>
         {
             _module.Changed += Refresh;
@@ -108,7 +108,6 @@ public sealed class RadialMenuSettingsPage : UserControl
         {
             _module.Changed -= Refresh;
             _picker.StopRecording();
-            CancelShortcut();
         };
         Refresh();
     }
@@ -154,8 +153,7 @@ public sealed class RadialMenuSettingsPage : UserControl
             _overFullscreen.IsChecked = settings.OpenOverFullscreen;
         }
         finally { _updating = false; }
-        if (!_capturingShortcut)
-            ShowShortcut();
+        _shortcut.Show(_module.Settings.Shortcut, _module.ShortcutError);
         // A path or selection the settings no longer hold (edited elsewhere) falls back.
         while (_path.Count > 0 && ListAt(settings.Slices, ParentOf(_path)) is var parent && (_path[^1] >= parent.Count || parent[_path[^1]].Kind != SliceKind.Submenu))
             _path.RemoveAt(_path.Count - 1);
@@ -214,63 +212,6 @@ public sealed class RadialMenuSettingsPage : UserControl
         int max = parentPath.Count == 0 ? RadialMenuSettings.MaxSlices : RadialMenuSettings.MaxSlices - 1;
         int places = lead + parent.Count + (parent.Count < max ? 1 : 0);
         return WheelGeometry.Normalize((parentBack ?? 0) + (path[^1] + lead) * 360.0 / places + 180);
-    }
-
-    // ---- Opening's shortcut row: "Not set" with Record, or its keys with Remove ----
-
-    private void ShowShortcut()
-    {
-        var row = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-        var shortcut = _module.Settings.Shortcut;
-        if (_module.ShortcutError is { } error)
-            row.Children.Add(Ui.Text(error, "WarningTextBrush"));
-        else if (shortcut is null)
-            row.Children.Add(Ui.Text("Not set", "TextSecondaryBrush"));
-        else
-            row.Children.Add(Ui.Caps(shortcut.ToString().Split('+')));
-        var button = shortcut is null ? Ui.Button("Record", BeginShortcut) : Ui.Button("Remove", _module.RemoveShortcut);
-        button.Margin = new Thickness(12, 0, 0, 0);
-        AutomationProperties.SetName(button, shortcut is null ? "Record shortcut" : "Remove shortcut");
-        row.Children.Add(button);
-        _shortcut.Content = row;
-    }
-
-    private void BeginShortcut()
-    {
-        _capturingShortcut = true;
-        _module.CaptureShortcut(true);
-        var cancel = Ui.Button("Cancel", CancelShortcut);
-        cancel.Margin = new Thickness(12, 0, 0, 0);
-        _shortcut.Content = new StackPanel { Orientation = Orientation.Horizontal, Children = { Ui.Text("Press keys", "TextSecondaryBrush"), cancel } };
-        Focusable = true;
-        Focus();
-    }
-
-    private void CancelShortcut()
-    {
-        if (!_capturingShortcut)
-            return;
-        _capturingShortcut = false;
-        _module.CaptureShortcut(false);
-        ShowShortcut();
-    }
-
-    private void CaptureShortcut(object sender, KeyEventArgs e)
-    {
-        if (!_capturingShortcut)
-            return;
-        e.Handled = true;
-        if (e.Key == Key.Escape)
-        {
-            CancelShortcut();
-            return;
-        }
-        if (ShortcutKeys.From(e) is not { } shortcut)
-            return;
-        _capturingShortcut = false;
-        _module.CaptureShortcut(false);
-        _module.ChangeShortcut(shortcut);
-        ShowShortcut();
     }
 
     // ---- The wheel's edits ----

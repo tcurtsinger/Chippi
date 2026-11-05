@@ -208,14 +208,14 @@ public sealed class SwitcherScreensTests
         public void AddCommands(Func<IReadOnlyList<ChippiCommand>> commands) { }
     }
 
-    private static (AppSwitcherModule Module, AppSwitcherPage Page, SettingsStore Store, Hotkey Hotkey) StartPage(AppSwitcherSettings settings)
+    private static (AppSwitcherModule Module, AppSwitcherPage Page, SettingsStore Store, Hotkey Hotkey) StartPage(AppSwitcherSettings settings, Action<string>? editShortcut = null)
     {
         var pc = new FakePc { Open = Twelve(), Front = 1 };
         var store = new SettingsStore { Value = settings };
         var hotkey = new Hotkey();
         var ui = new PageUi();
         var module = new AppSwitcherModule(_ => new FakeView(pc), () => pc, () => new FakeEvents(), () => hotkey);
-        module.StartAsync(new ModuleContext(AppSwitcherModule.Id, store, NullLogger.Instance, new IslandActivityHub().CreatePublisher(AppSwitcherModule.Id), ui), default).GetAwaiter().GetResult();
+        module.StartAsync(new ModuleContext(AppSwitcherModule.Id, store, NullLogger.Instance, new IslandActivityHub().CreatePublisher(AppSwitcherModule.Id), ui) { EditShortcut = editShortcut ?? (_ => { }) }, default).GetAwaiter().GetResult();
         return (module, (AppSwitcherPage)ui.Page!(null), store, hotkey);
     }
 
@@ -230,7 +230,8 @@ public sealed class SwitcherScreensTests
             var texts = Texts(page);
             foreach (var t in new[] { "Opening", "Shortcut", "Not set", "Windows", "Windows from", "Previews", "Apps without previews", "1 app", "Notepad", "notepad.exe" })
                 Assert.Contains(t, texts);
-            Assert.Contains(Find<Button>(page), b => AutomationProperties.GetName(b) == "Record shortcut" && (string)b.Content == "Record");
+            Assert.Contains(Find<Button>(page), b => AutomationProperties.GetName(b) == "Edit App switcher shortcut");
+            Assert.DoesNotContain(Find<Button>(page), b => AutomationProperties.GetName(b) is "Record shortcut" or "Change shortcut" or "Remove shortcut");
             Shot(page, "switcher-settings", 768);
             Shot(page, "switcher-settings-narrow", 640);
 
@@ -247,35 +248,30 @@ public sealed class SwitcherScreensTests
     }
 
     [Fact]
-    public void Record_listens_for_a_shortcut_and_a_set_one_has_Change_and_Remove()
+    public void The_shortcut_is_read_only_and_Edit_opens_it_in_Settings_Shortcuts()
     {
         WpfTestThread.Run(() =>
         {
             Theme();
-            var (module, page, store, hotkey) = StartPage(new AppSwitcherSettings());
+            var edits = new List<string>();
+            var (module, page, store, hotkey) = StartPage(new AppSwitcherSettings(), edits.Add);
+            page.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent)); // follows the module, as in Settings
             Layout(page, 768);
-            page.StartRecording();
-            Assert.True(page.Recording);
-            Assert.Equal("Press shortcut", page.ShortcutText);
-            Assert.Contains(Find<Button>(page), b => (string)b.Content == "Cancel");
-            Shot(page, "switcher-settings-recording", 768, around: "Opening");
+            Assert.Equal("Not set", page.ShortcutText);
+            page.ShortcutView.EditButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+            Assert.Equal(["App switcher"], edits);
+            // Settings › Shortcuts saves through the module; the page follows.
             var shortcut = new KeyShortcut(ShortcutModifiers.Control | ShortcutModifiers.Alt, 0x4A);
             Assert.True(module.ChangeShortcut(shortcut));
             Assert.Equal(shortcut, store.Value.Shortcut);
             Assert.Equal(shortcut, hotkey.Registered);
-            page.StartRecording();
-            hotkey.Pressed!(); // the current shortcut, pressed while listening: nothing opens
-            Assert.False(module.Switcher!.IsOpen);
-            Find<Button>(page).Single(b => (string)b.Content == "Cancel").RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
-            Assert.False(page.Recording);
-            hotkey.Pressed!();
-            Assert.True(module.Switcher.IsOpen);
-            module.Switcher.Dismiss();
             Assert.Equal(shortcut.ToString(), page.ShortcutText);
-            Assert.Contains(Find<Button>(page), b => (string)b.Content == "Change");
-            Assert.Contains(Find<Button>(page), b => (string)b.Content == "Remove");
+            Assert.DoesNotContain(Find<Button>(page), b => AutomationProperties.GetName(b) is "Record shortcut" or "Change shortcut" or "Remove shortcut");
             Shot(page, "switcher-settings-set", 768, around: "Opening");
-            Find<Button>(page).Single(b => AutomationProperties.GetName(b) == "Remove shortcut").RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+            hotkey.Pressed!();
+            Assert.True(module.Switcher!.IsOpen);
+            module.Switcher.Dismiss();
+            module.RemoveShortcut();
             Assert.Null(store.Value.Shortcut);
             Assert.Equal("Not set", page.ShortcutText);
             module.StopAsync(default).GetAwaiter().GetResult();

@@ -56,10 +56,11 @@ public sealed class PlainPasteTests
         public readonly Hotkey Hotkey = new(); public Hotkey? Replacement;
         public readonly ManualTime Clock = new(); public readonly IslandActivityHub Island = new();
         public PlainPasteModule Module; public int Creates;
+        public readonly List<string> ShortcutEdits = [];
         public static readonly KeyShortcut Shortcut = new(ShortcutModifiers.Control | ShortcutModifiers.Alt, 0x56);
         public Fixture()
         { Module = new PlainPasteModule(() => ++Creates == 1 ? Hotkey : Replacement = new Hotkey { Available = Hotkey.Available }, Clock); }
-        public Task Start() => Module.StartAsync(new ModuleContext(PlainPasteModule.Id, Settings, NullLogger.Instance, Island.CreatePublisher(PlainPasteModule.Id), Ui) { Clipboard = Hub }, default);
+        public Task Start() => Module.StartAsync(new ModuleContext(PlainPasteModule.Id, Settings, NullLogger.Instance, Island.CreatePublisher(PlainPasteModule.Id), Ui) { Clipboard = Hub, EditShortcut = ShortcutEdits.Add }, default);
         public void Configure() => Assert.True(Module.ChangeShortcut(Shortcut));
         public ValueTask DisposeAsync() => new(Module.StopAsync(default));
     }

@@ -75,7 +75,7 @@ public sealed class CleaningModeModule : IFeatureModule
             Settings = new();
         if (Settings.Shortcut is { } shortcut)
             TryRegister(shortcut);
-        context.Ui.SetSettingsPage(section => section == "shortcut-list" ? new Views.ShortcutRow(this, Descriptor.Name) : new Views.CleaningModeSettingsPage(this));
+        context.Ui.SetSettingsPage(_ => new Views.CleaningModeSettingsPage(this));
         context.Ui.AddCommands(() => [new ChippiCommand("cleaning-mode/start", "Cleaning mode", nameof(LucideIcons.Droplet), () =>
         {
             Start();
@@ -143,6 +143,9 @@ public sealed class CleaningModeModule : IFeatureModule
         Changed?.Invoke();
         return true;
     }
+
+    /// <summary>Settings › Shortcuts with this shortcut's editor open in its row: it's recorded only there.</summary>
+    public void EditShortcut() => _context?.EditShortcut(Descriptor.Name);
 
     public void RemoveShortcut()
     {

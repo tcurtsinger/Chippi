@@ -259,6 +259,10 @@ public partial class SettingsWindow : Window
         PageHost.Content = _pageView;
         _currentPage = id;
         Scroller.ScrollToTop();
+        // A feature's Edit link: Shortcuts with that shortcut's editor open in its row, scrolled into view.
+        const string shortcuts = Chippi.Core.Modules.ModuleContext.ShortcutsPage + "/";
+        if (_pageView is ShortcutsPage list && page.StartsWith(shortcuts, StringComparison.OrdinalIgnoreCase))
+            list.OpenEditor(page[shortcuts.Length..]);
     }
 
     /// <summary>Highlights a page in the sidebar (scrolled into view) and clears the search, without navigating.</summary>

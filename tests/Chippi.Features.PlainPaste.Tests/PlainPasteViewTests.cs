@@ -19,24 +19,19 @@ public sealed class PlainPasteViewTests
     }
     private static Button Button(DependencyObject root, string label) => Find(root).OfType<Button>().Single(b => AutomationProperties.GetName(b) == label);
     [Fact]
-    public void Not_set_capture_cancel_and_remove_follow_the_approved_row() => WpfTestThread.Run(() =>
+    public void The_shortcut_is_read_only_with_Edit_to_Settings_Shortcuts() => WpfTestThread.Run(() =>
     {
         var f = new PlainPasteTests.Fixture(); f.Start().GetAwaiter().GetResult();
         try
         {
             var view = Assert.IsType<PlainPasteView>(f.Ui.Page(null));
-            Assert.Contains(Find(view).OfType<TextBlock>(), b => b.Text == "Not set");
-            Button(view, "Set").RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
-            Assert.Contains(Find(view).OfType<Chippi.UI.Controls.SettingRow>(), r => r.Header == "New shortcut");
-            Button(view, "Cancel").RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
-            Assert.Null(f.Module.Settings.Shortcut); Assert.Null(f.Hotkey.Registered);
+            Assert.Equal("Not set", view.Shortcut.KeysText);
+            Assert.DoesNotContain(Find(view).OfType<Button>(), b => AutomationProperties.GetName(b) is "Set" or "Change" or "Remove");
+            Button(view, "Edit Paste as plain text shortcut").RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
+            Assert.Equal(["Paste as plain text"], f.ShortcutEdits);
             f.Configure();
             view = new PlainPasteView(f.Module);
-            Assert.Contains(Find(view).OfType<TextBlock>(), b => b.Text == "Ctrl+Alt+V");
-            Assert.NotNull(Button(view, "Change"));
-            Button(view, "Remove").RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
-            Assert.Null(f.Module.Settings.Shortcut);
-            Assert.Contains(Find(view).OfType<TextBlock>(), b => b.Text == "Not set");
+            Assert.Equal("Ctrl+Alt+V", view.Shortcut.KeysText);
         }
         finally { f.Module.StopAsync(default).GetAwaiter().GetResult(); }
     });
@@ -50,8 +45,7 @@ public sealed class PlainPasteViewTests
             Assert.False(f.Module.ChangeShortcut(new KeyShortcut(ShortcutModifiers.Control, 0x42)));
             var view = new PlainPasteView(f.Module);
             Assert.Contains(Find(view).OfType<TextBlock>(), b => b.Text == "Shortcut in use");
-            Assert.Contains(Find(view).OfType<TextBlock>(), b => b.Text == "Ctrl+Alt+V");
-            Assert.NotNull(Button(view, "Change"));
+            Assert.Equal("Ctrl+Alt+V", view.Shortcut.KeysText);
         }
         finally { f.Module.StopAsync(default).GetAwaiter().GetResult(); }
     });

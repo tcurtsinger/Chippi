@@ -45,6 +45,15 @@ public sealed class ModuleContext(
     /// <summary>The <see cref="OpenSettings"/> section that opens Add features, where the module's requirement installs.</summary>
     public const string RequirementSection = "requirement";
 
+    /// <summary>
+    /// Opens Settings › Shortcuts with the editor open in the row of the shortcut this module added under <c>name</c>
+    /// (its Edit link): shortcuts are recorded only there.
+    /// </summary>
+    public Action<string> EditShortcut { get; init; } = _ => { };
+
+    /// <summary>The Settings page <see cref="EditShortcut"/> opens, as <c>shortcuts/&lt;module id&gt;/&lt;name&gt;</c>.</summary>
+    public const string ShortcutsPage = "shortcuts";
+
     /// <summary>Opens the island on a tile's page (a notice click opening the System page).</summary>
     public Action<string> OpenIslandPage { get; init; } = _ => { };
 

@@ -2,7 +2,6 @@
 // Copyright (C) Chippi contributors
 
 using Chippi.Core.Shortcuts;
-using Chippi.UI.Shortcuts;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Automation.Peers;
@@ -16,7 +15,8 @@ using Chippi.UI.Controls;
 namespace Chippi.Features.CommandBar.Views;
 
 /// <summary>
-/// Settings › Command bar (docs/phase-5.5/command-bar.md): Search engine (Google, Bing or DuckDuckGo); Results, a switch per
+/// Settings › Command bar (docs/phase-5.5/command-bar.md): its shortcut read-only with Edit, which records it in
+/// Settings › Shortcuts; Search engine (Google, Bing or DuckDuckGo); Results, a switch per
 /// kind, all on; Hidden, each hidden result with what it is under it and Show, or "None".
 /// </summary>
 public sealed class CommandBarSettingsPage : UserControl
@@ -38,6 +38,7 @@ public sealed class CommandBarSettingsPage : UserControl
     private static readonly string[] Engines = ["Google", "Bing", "DuckDuckGo"];
 
     private readonly CommandBarModule _module;
+    private readonly ShortcutSetting _shortcut;
     private readonly ComboBox _web = SettingsLayout.Combo(Engines);
     private readonly Dictionary<ResultSwitch, ToggleButton> _switches = [];
     private readonly Card _hidden = SettingsLayout.Card();
@@ -52,6 +53,7 @@ public sealed class CommandBarSettingsPage : UserControl
     public CommandBarSettingsPage(CommandBarModule module)
     {
         _module = module;
+        _shortcut = new ShortcutSetting(module.Descriptor.Name, module.EditShortcut);
         AutomationProperties.SetName(_web, "Search engine");
         _web.SelectionChanged += (_, _) =>
         {
@@ -74,7 +76,7 @@ public sealed class CommandBarSettingsPage : UserControl
         {
             Children =
             {
-                SettingsLayout.Card(SettingsLayout.Row("Search engine", _web)), _webError,
+                SettingsLayout.Card(SettingsLayout.Row("Shortcut", _shortcut), SettingsLayout.Row("Search engine", _web)), _webError,
                 SettingsLayout.Section("Results"), results, _resultsError,
                 SettingsLayout.Section("Hidden"), _hidden, _hiddenError, _restoreStatus,
             },
@@ -112,6 +114,7 @@ public sealed class CommandBarSettingsPage : UserControl
                 toggle.IsChecked = !settings.Off.Contains(kind);
         }
         finally { _updating = false; }
+        _shortcut.Show(settings.Shortcut, _module.ShortcutError);
         foreach (string key in _hiddenRows.Keys.Except(settings.Hidden.Select(h => h.Key)).ToArray())
         {
             _hidden.Children.Remove(_hiddenRows[key].Row);
@@ -215,168 +218,5 @@ public sealed class CommandBarSettingsPage : UserControl
         error.SetResourceReference(TextBlock.ForegroundProperty, "WarningTextBrush");
         AutomationProperties.SetLiveSetting(error, AutomationLiveSetting.Polite);
         return error;
-    }
-}
-
-/// <summary>The shortcut's row on Settings › Shortcuts: Ctrl+Alt+Space by default, with Change and Remove, or Set once removed.</summary>
-public sealed class ShortcutRow : UserControl
-{
-    private readonly CommandBarModule _module;
-    private readonly string _title;
-    private readonly SettingRow _row;
-    private string? _shown;
-    private string? _captureError;
-    private bool _capturing, _loaded, _refreshing;
-
-    public ShortcutRow(CommandBarModule module, string title)
-    {
-        _module = module;
-        _title = title;
-        _row = SettingsLayout.Row(title);
-        var card = SettingsLayout.Card(_row);
-        card.SetResourceReference(StyleProperty, "CardRowsStyle");
-        Content = card;
-        Focusable = true;
-        PreviewKeyDown += Capture;
-        LostKeyboardFocus += (_, e) =>
-        {
-            if (!_refreshing && _capturing && (e.NewFocus is not DependencyObject next || (next != this && !IsAncestorOf(next))))
-                Cancel(restoreFocus: false);
-        };
-        Loaded += (_, _) =>
-        {
-            if (_loaded) return;
-            _loaded = true;
-            _module.Changed += OnChanged;
-            Refresh();
-        };
-        Unloaded += (_, _) =>
-        {
-            _loaded = false;
-            _module.Changed -= OnChanged;
-            Cancel(restoreFocus: false);
-        };
-        Refresh();
-    }
-
-    private void OnChanged()
-    {
-        if (!_loaded) return;
-        if (Dispatcher.CheckAccess()) Refresh();
-        else Dispatcher.BeginInvoke(() => { if (_loaded) Refresh(); });
-    }
-
-    private void Refresh()
-    {
-        var shortcut = _module.Settings.Shortcut;
-        string shown = $"{shortcut}|{_module.ShortcutError}|{_capturing}|{_captureError}";
-        if (shown == _shown) return;
-        _shown = shown;
-        var row = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-        AutomationProperties.SetName(row, _title);
-        if (_capturing)
-        {
-            row.Children.Add(Text(_captureError ?? "Press shortcut", _captureError is null ? "TextSecondaryBrush" : "WarningTextBrush"));
-            row.Children.Add(Button("Cancel", () => Cancel()));
-        }
-        else
-        {
-            var status = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
-            status.Children.Add(Text(shortcut?.ToString() ?? "Not set", shortcut is null ? "TextSecondaryBrush" : "TextPrimaryBrush"));
-            if (_module.ShortcutError is { } error) status.Children.Add(Text(error, "WarningTextBrush"));
-            row.Children.Add(status);
-            row.Children.Add(Button(shortcut is null ? "Set" : "Change", Begin));
-            if (shortcut is not null)
-                row.Children.Add(Button("Remove", () => { _module.RemoveShortcut(); Refresh(); FocusPrimary(); }));
-        }
-        _refreshing = true;
-        try
-        {
-            bool focused = _row.IsKeyboardFocusWithin;
-            _row.Content = row;
-            if (focused && !_capturing) FocusPrimary();
-        }
-        finally { _refreshing = false; }
-    }
-
-    private void Begin()
-    {
-        Focus(); // Preserve capture while replacing the Change/Set control that held focus.
-        _capturing = true;
-        _captureError = null;
-        _module.CaptureShortcut(true);
-        Refresh();
-    }
-
-    private void Cancel(bool restoreFocus = true)
-    {
-        if (!_capturing)
-            return;
-        _capturing = false;
-        _captureError = null;
-        _module.CaptureShortcut(false);
-        Refresh();
-        if (restoreFocus) FocusPrimary();
-    }
-
-    private Button? Primary => (_row.Content as StackPanel)?.Children.OfType<Button>().FirstOrDefault();
-
-    private void FocusPrimary()
-    {
-        if (_loaded) Primary?.Focus();
-    }
-
-    private void Capture(object sender, KeyEventArgs e)
-    {
-        if (!_capturing)
-            return;
-        if (e.Key == Key.Tab)
-        {
-            Cancel();
-            Primary?.MoveFocus(new TraversalRequest(Keyboard.Modifiers.HasFlag(ModifierKeys.Shift)
-                ? FocusNavigationDirection.Previous : FocusNavigationDirection.Next));
-            e.Handled = true;
-            return;
-        }
-        if (e.OriginalSource is Button && e.Key is Key.Enter or Key.Space) return;
-        e.Handled = true;
-        if (e.Key == Key.Escape)
-        {
-            Cancel();
-            return;
-        }
-        if (ShortcutKeys.From(e) is not { } shortcut)
-            return;
-        if (!shortcut.IsValid)
-        {
-            _captureError = "Shortcut unavailable";
-            Refresh();
-            return;
-        }
-        _capturing = false;
-        _captureError = null;
-        _module.CaptureShortcut(false);
-        _module.ChangeShortcut(shortcut);
-        Refresh();
-        FocusPrimary();
-    }
-
-    private static TextBlock Text(string text, string brush)
-    {
-        var block = new TextBlock { Text = text, VerticalAlignment = VerticalAlignment.Center,
-            MaxWidth = 240, TextTrimming = TextTrimming.CharacterEllipsis, ToolTip = text };
-        block.SetResourceReference(StyleProperty, "BodyTextStyle");
-        block.SetResourceReference(TextBlock.ForegroundProperty, brush);
-        if (brush == "WarningTextBrush") AutomationProperties.SetLiveSetting(block, AutomationLiveSetting.Polite);
-        return block;
-    }
-
-    private Button Button(string label, Action action)
-    {
-        var button = new Button { Content = label, Margin = new Thickness(8, 0, 0, 0) };
-        button.SetResourceReference(StyleProperty, "SecondaryButtonStyle");
-        AutomationProperties.SetName(button, $"{label} {_title} shortcut");
-        button.Click += (_, _) => action();
-        return button;
     }
 }

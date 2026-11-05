@@ -63,6 +63,7 @@ set `<UseWPF>true</UseWPF>`. In XAML write `xmlns:c="urn:chippi-ui"`.
 | `ModuleContext.Activation` (`IModuleActivation`) | `Register(verb, handler)`: `Chippi.exe --<verb> values...` from a second launch, the Explorer menu or a notice click reaches the handler on the UI thread. One module per verb; removed on stop. Anything unrouted opens the flyout. |
 | `ModuleServices` | Shell-side: `DataRoot`, `Activation` (`ActivationRouter.TryRoute(args)`), `Toasts`, `IslandNoticeDuration`, `Time`. Passed to `ModuleRegistry`'s new optional parameter. |
 | `IModuleUi.SetSettingsPage(Func<string?, object>)` | A page with sections; `OpenSettings("module:<id>/<section>")` opens it there. The Phase 1 `Func<object>` overload still works. |
+| `ModuleContext.EditShortcut(name)` | A feature page's Edit link: Settings › Shortcuts with the editor open in the row of the shortcut it added as `name`. Shortcuts are recorded only there. |
 | `Capability.ShellIntegration` | "Explorer menu entry", for the Permissions page. |
 | `SingleInstance` | A second launch now sends its arguments over a per-user, per-session named pipe; `ActivationRequested` carries them (`ActivationEventArgs.Arguments`). Requests before the first subscriber are held in order. |
 ## Island (`Chippi.Core.Island`)

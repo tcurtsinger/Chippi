@@ -153,7 +153,7 @@ public sealed class SettingsRecoveryTests
     public void A_failed_shortcut_save_restores_the_registered_chord_and_keeps_the_keys_visible() => WpfTestThread.Run(() =>
     {
         using var f = new Fixture();
-        var view = new ShortcutRow(f.Module, "Command bar");
+        var view = new CommandBarSettingsPage(f.Module);
         Load(view);
         try
         {
@@ -164,7 +164,7 @@ public sealed class SettingsRecoveryTests
             Assert.Equal(previous, f.Hotkey.Shortcut);
             Assert.Equal(previous, f.Store.Value.Shortcut);
             Assert.Equal("Save failed", f.Module.ShortcutError);
-            Assert.Contains(Find<TextBlock>(view), t => t.Text == previous!.ToString());
+            Assert.Equal(previous!.ToString(), Find<ShortcutSetting>(view).Single().KeysText);
             Assert.Contains(Find<TextBlock>(view), t => t.Text == "Save failed" && AutomationProperties.GetLiveSetting(t) == AutomationLiveSetting.Polite);
             f.Store.FailSaving = false;
             Assert.True(f.Module.ChangeShortcut(NewShortcut));
@@ -214,69 +214,48 @@ public sealed class SettingsRecoveryTests
     public void A_registration_conflict_keeps_the_old_keys_and_error_visible() => WpfTestThread.Run(() =>
     {
         using var f = new Fixture();
-        var view = new ShortcutRow(f.Module, "Command bar");
+        var view = new CommandBarSettingsPage(f.Module);
         Load(view);
         try
         {
             f.Hotkey.Outcomes.Enqueue(false);
             Assert.False(f.Module.ChangeShortcut(NewShortcut));
             Assert.Equal(CommandBarSettings.DefaultShortcut, f.Hotkey.Shortcut);
-            Assert.Contains(Find<TextBlock>(view), t => t.Text == "Ctrl+Alt+Space");
+            Assert.Equal("Ctrl+Alt+Space", Find<ShortcutSetting>(view).Single().KeysText);
             Assert.Contains(Find<TextBlock>(view), t => t.Text == "Shortcut in use");
             Assert.Equal(0, f.Store.Writes);
         }
         finally { Unload(view); }
     });
 
-    [Theory]
-    [InlineData("tab")]
-    [InlineData("focus")]
-    [InlineData("unload")]
-    [InlineData("escape")]
-    [InlineData("cancel")]
-    public void Leaving_shortcut_capture_restores_search(string exit) => WpfTestThread.Run(() =>
+    [Fact]
+    public void The_page_shows_the_shortcut_read_only_and_Edit_opens_Settings_Shortcuts() => WpfTestThread.Run(() =>
     {
         using var f = new Fixture();
-        var view = new ShortcutRow(f.Module, "Command bar");
+        var view = new CommandBarSettingsPage(f.Module);
         Load(view);
-        Click(Named(view, "Change Command bar shortcut"));
-        f.Hotkey.Pressed!();
-        Assert.Equal(0, f.Summoned);
-        switch (exit)
+        try
         {
-            case "tab":
-            case "escape":
-                var key = new KeyEventArgs(Keyboard.PrimaryDevice, new NoWindowSource(), 0, exit == "tab" ? Key.Tab : Key.Escape)
-                    { RoutedEvent = Keyboard.PreviewKeyDownEvent };
-                view.RaiseEvent(key);
-                Assert.True(key.Handled);
-                break;
-            case "focus":
-                view.RaiseEvent(new KeyboardFocusChangedEventArgs(Keyboard.PrimaryDevice, 0, view, new Button())
-                    { RoutedEvent = Keyboard.LostKeyboardFocusEvent });
-                break;
-            case "unload": Unload(view); break;
-            default: Click(Named(view, "Cancel Command bar shortcut")); break;
+            Assert.Equal("Ctrl+Alt+Space", Find<ShortcutSetting>(view).Single().KeysText);
+            Assert.DoesNotContain(Find<Button>(view), b => b.Content is "Set" or "Change" or "Remove");
+            Click(Named(view, "Edit Command bar shortcut"));
+            Assert.Equal(["Command bar"], f.ShortcutEdits);
         }
-        f.Hotkey.Pressed!();
-        Assert.Equal(1, f.Summoned);
-        Assert.Null(f.Module.ShortcutError);
-        Assert.DoesNotContain(Find<Button>(view), b => AutomationProperties.GetName(b) == "Cancel Command bar shortcut");
-        Unload(view);
+        finally { Unload(view); }
     });
 
     [Fact]
     public void Unrelated_settings_changes_preserve_shortcut_controls() => WpfTestThread.Run(() =>
     {
         using var f = new Fixture();
-        var view = new ShortcutRow(f.Module, "Command bar");
+        var view = new CommandBarSettingsPage(f.Module);
         Load(view);
         try
         {
-            var change = Named(view, "Change Command bar shortcut");
+            var edit = Named(view, "Edit Command bar shortcut");
             f.Module.SetWebSearch(WebEngine.Bing);
             f.Module.SetOn(ResultSwitch.Emoji, false);
-            Assert.Same(change, Named(view, "Change Command bar shortcut"));
+            Assert.Same(edit, Named(view, "Edit Command bar shortcut"));
         }
         finally { Unload(view); }
     });
@@ -349,6 +328,7 @@ public sealed class SettingsRecoveryTests
         internal FakeHotkey Hotkey { get; } = new();
         internal CommandBarModule Module { get; }
         internal int Summoned;
+        internal List<string> ShortcutEdits { get; } = [];
         internal Fixture(CommandBarSettings? saved = null)
         {
             if (saved is not null) Store.Value = saved;
@@ -358,6 +338,7 @@ public sealed class SettingsRecoveryTests
             {
                 DataDirectory = Path.Combine(Path.GetTempPath(), "chippi-tests", "command-bar-settings-unused"),
                 SummonIslandPage = _ => { Summoned++; return true; },
+                EditShortcut = ShortcutEdits.Add,
             }, default).GetAwaiter().GetResult();
         }
         public void Dispose() => Module.StopAsync(default).GetAwaiter().GetResult();
