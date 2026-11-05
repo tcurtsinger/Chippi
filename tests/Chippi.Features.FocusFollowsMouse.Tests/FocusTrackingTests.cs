@@ -87,6 +87,48 @@ public sealed class FocusTrackingTests
         Assert.Equal(new uint[] { 0, 0, 500 }, settings.Values);
     }
 
+    [Fact]
+    public void FailedRestoreRetainsOwnershipAndStillRestoresOtherFields()
+    {
+        var settings = new Settings(0, 0, 500);
+        var journal = new Journal();
+        var engine = new FocusTrackingEngine(settings, journal);
+        engine.SetEnabled(true);
+        settings.FailOnce = TrackingSetting.Enabled;
+        Assert.Throws<AggregateException>(() => engine.SetEnabled(false));
+        Assert.Equal(new uint[] { 1, 0, 500 }, settings.Values);
+        Assert.Equal(TrackingSetting.Enabled, Assert.Single(journal.Values).Key);
+        engine.SetEnabled(false);
+        Assert.Equal(new uint[] { 0, 0, 500 }, settings.Values);
+        Assert.Empty(journal.Values);
+        Assert.False(engine.Enabled);
+    }
+
+    [Fact]
+    public void ANewEngineRecoversFromTheDurableJournal()
+    {
+        var folder = Path.Combine(Path.GetTempPath(), "chippi-focus-test-" + Guid.NewGuid().ToString("N"));
+        var path = Path.Combine(folder, "tracking.json");
+        try
+        {
+            var settings = new Settings(0, 0, 500);
+            new FocusTrackingEngine(settings, new TrackingJournal(path)).SetEnabled(true);
+            Assert.Equal(3, new TrackingJournal(path).Load().Count);
+            var restarted = new FocusTrackingEngine(settings, new TrackingJournal(path));
+            restarted.Recover();
+            Assert.Equal(new uint[] { 0, 0, 500 }, settings.Values);
+            Assert.Empty(new TrackingJournal(path).Load());
+            Assert.False(restarted.Enabled);
+            // A corrupt journal must fail closed rather than guessing the original settings.
+            File.WriteAllText(path, "{");
+            Assert.Throws<System.Text.Json.JsonException>(() => new FocusTrackingEngine(settings, new TrackingJournal(path)));
+        }
+        finally
+        {
+            if (File.Exists(path)) File.Delete(path);
+            if (Directory.Exists(folder)) Directory.Delete(folder);
+        }
+    }
     private sealed class Settings(uint enabled, uint raise, uint delay) : ITrackingSettings
     {
         public uint[] Values { get; } = [enabled, raise, delay];
