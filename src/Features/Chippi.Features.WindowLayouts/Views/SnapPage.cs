@@ -120,7 +120,6 @@ internal sealed class SnapPage : UserControl
         foreach (var display in Displays)
         {
             var combo = SettingsLayout.Combo(s.Layouts.Select(l => (object)l.Name));
-            combo.Width = 200;
             AutomationProperties.SetName(combo, $"Layout on {display.Name}");
             string current = Store?.ForDisplay(display.Id).Id ?? "halves";
             combo.SelectedIndex = Math.Max(0, s.Layouts.FindIndex(l => l.Id == current));
@@ -132,10 +131,10 @@ internal sealed class SnapPage : UserControl
             };
             string size = $"{display.Bounds.Width} × {display.Bounds.Height}";
             var name = Styled(new TextBlock { Text = display.Name, TextTrimming = TextTrimming.CharacterEllipsis }, "BodyTextStyle");
-            var caption = Styled(new TextBlock { Text = display.IsMain ? $"Main display · {size}" : size }, "CaptionTextStyle");
+            var caption = Styled(new TextBlock { Text = display.IsMain ? $"Main display · {size}" : size, TextTrimming = TextTrimming.CharacterEllipsis }, "CaptionTextStyle");
             caption.SetResourceReference(TextBlock.ForegroundProperty, "TextSecondaryBrush");
-            var label = new StackPanel { Children = { name, caption }, Opacity = s.ShiftDragEnabled ? 1 : Dim };
-            card.Children.Add(Line(label, combo, SettingsLayout.DependentPadding, SettingsLayout.CaptionRowHeight));
+            var label = new StackPanel { Children = { name, caption }, Opacity = s.ShiftDragEnabled ? 1 : Dim, VerticalAlignment = VerticalAlignment.Center };
+            card.Children.Add(DisplayLine(label, combo));
         }
         return card;
     }
@@ -554,6 +553,22 @@ internal sealed class SnapPage : UserControl
         left.VerticalAlignment = VerticalAlignment.Center;
         dock.Children.Add(left);
         return new Border { MinHeight = minHeight, Padding = padding, Child = dock };
+    }
+
+    /// <summary>A display's row: the layout list is 200 wide, and on a narrow page gives up to 40 of that, keeping 200 for the name and size, before the label trims.</summary>
+    private static Border DisplayLine(FrameworkElement label, ComboBox combo)
+    {
+        var grid = new Grid { VerticalAlignment = VerticalAlignment.Center };
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        combo.Width = 200;
+        combo.Margin = new Thickness(16, 0, 0, 0);
+        combo.VerticalAlignment = VerticalAlignment.Center;
+        grid.SizeChanged += (_, e) => combo.Width = Math.Clamp(e.NewSize.Width - 16 - 200, 160, 200);
+        Grid.SetColumn(combo, 1);
+        grid.Children.Add(label);
+        grid.Children.Add(combo);
+        return new Border { MinHeight = SettingsLayout.CaptionRowHeight, Padding = SettingsLayout.DependentPadding, Child = grid };
     }
 
     private static TextBox Field(string text, string placeholder)
