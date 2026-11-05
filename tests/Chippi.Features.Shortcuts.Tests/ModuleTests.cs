@@ -71,15 +71,20 @@ public sealed class ModuleTests
     }
 
     [Fact]
-    public async Task Another_app_holding_the_keys_shows_in_use_by_another_app_and_the_row_stays()
+    public async Task Another_app_holding_the_keys_refuses_a_new_binding_and_dims_a_saved_one()
     {
         var rig = new Rig();
         rig.Registrar.Refused.Add(new KeyShortcut(CtrlAlt, 0x4B));
         await rig.StartAsync();
-        var binding = Key(CtrlAlt, 0x4B);
-        Assert.True(rig.Module.Add(binding).Ok);
-        Assert.Equal(new BindingStatus(BindingState.InUseByApp, "In use by another app"), rig.Module.StatusOf(binding.Id));
-        Assert.Single(rig.Module.Settings.Bindings);
+        Assert.Equal(ShortcutsModule.AnotherAppText, rig.Module.Add(Key(CtrlAlt, 0x4B)).Error);
+        Assert.Empty(rig.Module.Settings.Bindings);
+        Assert.Empty(rig.Service.List); // the check let go of the keys it tried
+
+        // A saved one whose keys another app took since: kept, and its row shows it.
+        var saved = new Rig(new ShortcutsSettings { Bindings = [Key(CtrlAlt, 0x4B)] });
+        saved.Registrar.Refused.Add(new KeyShortcut(CtrlAlt, 0x4B));
+        await saved.StartAsync();
+        Assert.Equal(BindingState.InUseByApp, saved.Module.StatusOf(saved.Module.Settings.Bindings[0].Id).State);
     }
 
     [Fact]
@@ -89,36 +94,38 @@ public sealed class ModuleTests
         await rig.StartAsync();
         Assert.True(rig.Module.Add(Key(CtrlAlt, 0x4B, "Snap left")).Ok);
         var second = rig.Module.Add(Key(CtrlAlt, 0x4B, "Maximize"));
-        Assert.Equal("Snap left already uses this.", second.Error);
+        Assert.Equal("Snap left already uses this", second.Error);
         Assert.Single(rig.Module.Settings.Bindings);
     }
 
     [Fact]
-    public async Task A_key_another_Chippi_feature_holds_shows_the_service_s_words()
+    public async Task A_key_another_Chippi_feature_holds_is_refused_by_its_name()
     {
         var rig = new Rig();
         var mic = rig.Service.Add("mic-mute", "Mute microphone");
         Assert.True(mic.Register(new KeyShortcut(CtrlAlt, 0x4D), () => { }));
         await rig.StartAsync();
-        var binding = Key(CtrlAlt, 0x4D);
-        Assert.True(rig.Module.Add(binding).Ok);
-        Assert.Equal(new BindingStatus(BindingState.UsedTwice, "Used by Mute microphone"), rig.Module.StatusOf(binding.Id));
+        Assert.Equal("Mute microphone already uses this", rig.Module.Add(Key(CtrlAlt, 0x4D)).Error);
+        Assert.Equal(["Mute microphone"], rig.Service.List.Select(e => e.Name)); // the check's own entry is gone
     }
 
     [Theory]
     [InlineData(ShortcutModifiers.Windows, 0x4C)]
     [InlineData(ShortcutModifiers.Alt, 0x09)]
     [InlineData(ShortcutModifiers.Alt, 0x73)]
-    public async Task A_combination_Windows_keeps_saves_shows_in_use_by_Windows_and_is_never_registered(ShortcutModifiers mods, int key)
+    public async Task A_combination_Windows_keeps_is_refused_and_one_saved_shows_in_use_by_Windows_and_is_never_registered(ShortcutModifiers mods, int key)
     {
         var rig = new Rig();
         await rig.StartAsync();
         var binding = Key(mods, (uint)key);
-        Assert.True(rig.Module.Add(binding).Ok);
-        Assert.Equal(new BindingStatus(BindingState.InUseByWindows, "In use by Windows"), rig.Module.StatusOf(binding.Id));
-        Assert.Empty(rig.Registrar.Registered);
-        Assert.Empty(rig.Service.List);
-        Assert.Empty(rig.Hub.Filters);
+        Assert.Equal(ShortcutsModule.WindowsText, rig.Module.Add(binding).Error);
+
+        var saved = new Rig(new ShortcutsSettings { Bindings = [binding] });
+        await saved.StartAsync();
+        Assert.Equal(new BindingStatus(BindingState.InUseByWindows, "In use by Windows"), saved.Module.StatusOf(binding.Id));
+        Assert.Empty(saved.Registrar.Registered);
+        Assert.Empty(saved.Service.List);
+        Assert.Empty(saved.Hub.Filters);
     }
 
     [Fact]
@@ -133,9 +140,37 @@ public sealed class ModuleTests
 
         rig.Registrar.Refused.Add(new KeyShortcut(ShortcutModifiers.Windows, 0x59));
         var held = Key(ShortcutModifiers.Windows, 0x59, "Maximize"); // Win+Y, held by another app
-        Assert.True(rig.Module.Add(held).Ok);
-        Assert.Equal(new BindingStatus(BindingState.InUseByApp, "In use by another app"), rig.Module.StatusOf(held.Id));
+        Assert.Equal(ShortcutsModule.AnotherAppText, rig.Module.Add(held).Error);
         Assert.Empty(rig.Hub.Filters); // no hook: the other app keeps its keys
+    }
+
+    [Fact]
+    public async Task Recording_a_dimmed_shortcuts_own_keys_again_says_who_has_them_and_a_held_one_saves()
+    {
+        var keys = new KeyShortcut(CtrlAlt, 0x4B);
+        var saved = Key(CtrlAlt, 0x4B);
+        var rig = new Rig(new ShortcutsSettings { Bindings = [saved] });
+        rig.Registrar.Refused.Add(keys); // another app took them since it was saved
+        await rig.StartAsync();
+        Assert.Equal(BindingState.InUseByApp, rig.Module.StatusOf(saved.Id).State);
+        Assert.Equal(ShortcutsModule.AnotherAppText, rig.Module.Change(saved with { Keys = keys }).Error);
+
+        var windows = Key(ShortcutModifiers.Windows, 0x4C);
+        var dimmed = new Rig(new ShortcutsSettings { Bindings = [windows] });
+        await dimmed.StartAsync();
+        Assert.Equal(ShortcutsModule.WindowsText, dimmed.Module.Change(windows with { Keys = windows.Keys }).Error);
+
+        var paused = new Rig(new ShortcutsSettings { Bindings = [saved] });
+        paused.Hub.Paused = true; // a game in front: the keys are let go, the row stays
+        await paused.StartAsync();
+        paused.Registrar.Refused.Add(keys); // and another app takes them meanwhile
+        Assert.Equal(ShortcutsModule.AnotherAppText, paused.Module.Change(saved with { Keys = keys }).Error);
+
+        var held = new Rig(new ShortcutsSettings { Bindings = [saved] });
+        await held.StartAsync();
+        Assert.Equal(BindingState.Active, held.Module.StatusOf(saved.Id).State);
+        Assert.True(held.Module.Change(saved with { Action = saved.Action with { Name = "Renamed" } }).Ok); // its own keys, still held
+        Assert.Equal([keys], held.Registrar.Registered);
     }
 
     [Fact]
@@ -145,19 +180,6 @@ public sealed class ModuleTests
         await rig.StartAsync();
         Assert.Equal(BindingState.Unavailable, rig.Module.StatusOf(rig.Module.Settings.Bindings[0].Id).State);
         Assert.Empty(rig.Service.List);
-    }
-
-    [Fact]
-    public async Task A_Win_combination_another_Chippi_feature_holds_is_not_taken_through_the_hub()
-    {
-        var rig = new Rig();
-        var other = rig.Service.Add("other", "Other");
-        Assert.True(other.Register(new KeyShortcut(ShortcutModifiers.Windows, 0x4A), () => { }));
-        await rig.StartAsync();
-        var binding = Key(ShortcutModifiers.Windows, 0x4A);
-        Assert.True(rig.Module.Add(binding).Ok);
-        Assert.Equal(BindingState.UsedTwice, rig.Module.StatusOf(binding.Id).State);
-        Assert.Empty(rig.Hub.Filters);
     }
 
     [Fact]
@@ -229,7 +251,7 @@ public sealed class ModuleTests
         var rig = new Rig();
         await rig.StartAsync();
         Assert.True(rig.Module.Add(Mouse(MouseTrigger.Back)).Ok);
-        Assert.Equal(ShortcutsModule.ButtonTakenText, rig.Module.Add(Mouse(MouseTrigger.Back, "Minimize")).Error);
+        Assert.Equal("Maximize already uses this", rig.Module.Add(Mouse(MouseTrigger.Back, "Minimize")).Error);
     }
 
     [Fact]
@@ -302,7 +324,7 @@ public sealed class ModuleTests
         var b = Key(CtrlAlt, 0x4C, "B");
         rig.Module.Add(a);
         rig.Module.Add(b);
-        Assert.Equal("B already uses this.", rig.Module.Change(a with { Keys = b.Keys }).Error);
+        Assert.Equal("B already uses this", rig.Module.Change(a with { Keys = b.Keys }).Error);
         Assert.True(rig.Module.Change(a with { Keys = new KeyShortcut(CtrlAlt, 0x4D) }).Ok);
         Assert.Equal([a.Id, b.Id], rig.Module.Settings.Bindings.Select(x => x.Id));
         Assert.True(rig.Module.Change(a with { Keys = a.Keys }).Ok); // its own door is not a clash
