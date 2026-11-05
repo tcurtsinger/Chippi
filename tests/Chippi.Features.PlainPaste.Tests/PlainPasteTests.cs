@@ -118,7 +118,8 @@ public sealed class PlainPasteTests
         f.Settings.Reject = true;
         var alternate = new KeyShortcut(ShortcutModifiers.Control, 0x42);
         Assert.False(f.Module.ChangeShortcut(alternate));
-        Assert.True(f.Replacement!.Disposed);
+        Assert.Null(f.Replacement); // one listed shortcut, changed in place
+        Assert.Equal(Fixture.Shortcut, f.Hotkey.Registered); // the saved keys taken back
         Assert.False(f.Hotkey.Disposed);
         Assert.Equal("Save failed", f.Module.ShortcutError);
         f.Module.RemoveShortcut();
@@ -127,7 +128,8 @@ public sealed class PlainPasteTests
         Assert.Equal(f.Module.Settings, f.Settings.Value);
         f.Settings.Reject = false;
         Assert.True(f.Module.ChangeShortcut(alternate));
-        Assert.True(f.Hotkey.Disposed);
+        Assert.False(f.Hotkey.Disposed);
+        Assert.Equal(alternate, f.Hotkey.Registered);
         Assert.Null(f.Module.ShortcutError);
         Assert.Equal(alternate, f.Settings.Value.Shortcut);
     }
@@ -157,7 +159,7 @@ public sealed class PlainPasteTests
         await using var f = new Fixture(); f.Settings.Value = new() { Shortcut = Fixture.Shortcut }; f.Hotkey.Available = false;
         await f.Start(); Assert.Equal("Shortcut in use", f.Module.ShortcutError); Assert.Equal(Fixture.Shortcut, f.Module.Settings.Shortcut);
         await f.Module.StopAsync(default);
-        f.Settings.Value = new() { Shortcut = new KeyShortcut(ShortcutModifiers.Windows, 0x56) };
+        f.Settings.Value = new() { Shortcut = new KeyShortcut(ShortcutModifiers.Shift, 0x56) };
         await f.Start(); Assert.Null(f.Replacement!.Registered); Assert.Null(f.Module.Settings.Shortcut);
     }
     [Fact]

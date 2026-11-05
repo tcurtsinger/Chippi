@@ -324,7 +324,7 @@ public sealed class RadialMenuModule : IFeatureModule, IWheelInputSink
     {
         if (_context is null)
             return false;
-        if (!shortcut.IsValid)
+        if (!shortcut.IsBindable)
         {
             ShortcutError = "Shortcut unavailable";
             Changed?.Invoke();
@@ -353,7 +353,7 @@ public sealed class RadialMenuModule : IFeatureModule, IWheelInputSink
     public void CaptureShortcut(bool capture) => _capturing = capture;
 
     /// <summary>The shortcut in the shell's list, set or not, from start to stop.</summary>
-    private IHotkey CreateHotkey() => _createHotkey?.Invoke() ?? (_context ?? throw new InvalidOperationException("Not started")).Shortcuts.Add(Id, Descriptor.Name);
+    private IHotkey CreateHotkey() => _createHotkey?.Invoke() ?? (_context ?? throw new InvalidOperationException("Not started")).Shortcuts.Add(Id, Descriptor.Name, new(() => Settings.Shortcut, k => ChangeShortcut(k) ? null : ShortcutError, () => RemoveShortcut()) { Icon = Descriptor.Icon });
 
     private bool TryRegister(KeyShortcut shortcut)
     {

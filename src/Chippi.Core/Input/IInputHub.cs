@@ -36,6 +36,9 @@ public interface IInputHub
     /// </summary>
     string? ForegroundApp => null;
 
+    /// <summary>The foreground is elevated above Chippi, or Windows refuses to read its token. Cached outside hook calls.</summary>
+    bool ForegroundElevated => false;
+
     /// <summary>
     /// <see cref="Paused"/> or <see cref="FullscreenInFront"/> changed. Raised on the hub's thread: hand off to the UI
     /// thread before doing anything slow. Features outside the hooks (Focus follows mouse) follow the pause from here.

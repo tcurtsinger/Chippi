@@ -119,7 +119,7 @@ public sealed partial class AudioRoutingModule : IFeatureModule
                 "shortcut-list" => new OutputShortcutView(this, list: true),
                 _ => new RoutingPage(this, AudioFlow.Render),
             });
-            if (Settings.SwitchShortcut is { IsValid: false })
+            if (Settings.SwitchShortcut is { IsBindable: false })
                 Settings = Settings with { SwitchShortcut = null };
             _hotkey = CreateHotkey(context);
             if (Settings.SwitchShortcut is { } shortcut)
@@ -282,11 +282,11 @@ public sealed partial class AudioRoutingModule : IFeatureModule
     public void CaptureShortcut(bool capture) => _capturingShortcut = capture;
 
     /// <summary>The shortcut in the shell's list, set or not, from start to stop.</summary>
-    private IHotkey CreateHotkey(ModuleContext context) => _createHotkey?.Invoke() ?? context.Shortcuts.Add(Descriptor.Id, "Switch output");
+    private IHotkey CreateHotkey(ModuleContext context) => _createHotkey?.Invoke() ?? context.Shortcuts.Add(Descriptor.Id, "Switch output", new(() => Settings.SwitchShortcut, k => ChangeShortcut(k) ? null : ShortcutError, RemoveShortcut) { Icon = Descriptor.Icon });
 
     public bool ChangeShortcut(KeyShortcut shortcut)
     {
-        if (!shortcut.IsValid) { ShortcutError = "Shortcut unavailable"; Changed?.Invoke(); return false; }
+        if (!shortcut.IsBindable) { ShortcutError = "Shortcut unavailable"; Changed?.Invoke(); return false; }
         if (_context is not null && !_stopping) _hotkey ??= CreateHotkey(_context);
         if (_hotkey?.Register(shortcut, OnShortcut) != true) { ShortcutError = _hotkey?.Error ?? ShortcutService.InUse; Changed?.Invoke(); return false; }
         ShortcutError = null;

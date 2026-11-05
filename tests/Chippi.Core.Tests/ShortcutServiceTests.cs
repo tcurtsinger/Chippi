@@ -20,7 +20,7 @@ public sealed class ShortcutServiceTests
         service.Changed += () => changes++;
         var mute = service.Add("mic-mute", "Mute microphone");
         var paste = service.Add("paste-plain-text", "Paste as plain text");
-        Assert.Equal([new("mic-mute", "Mute microphone", null, null), new("paste-plain-text", "Paste as plain text", null, null)], service.List);
+        Assert.Equal([("mic-mute", "Mute microphone", (KeyShortcut?)null, (string?)null), ("paste-plain-text", "Paste as plain text", null, null)], service.List.Select(s => (s.Owner, s.Name, s.Shortcut, s.Error)));
         Assert.Empty(windows.Held);
 
         int muted = 0, pasted = 0;
@@ -117,7 +117,7 @@ public sealed class ShortcutServiceTests
         mute.Register(CtrlShiftM, () => pressed++);
 
         mute.Unregister();
-        Assert.Equal([new("mic-mute", "Mute microphone", null, null)], service.List);
+        Assert.Equal([("mic-mute", "Mute microphone", (KeyShortcut?)null, (string?)null)], service.List.Select(s => (s.Owner, s.Name, s.Shortcut, s.Error)));
         Assert.Empty(windows.Held);
 
         mute.Register(CtrlShiftM, () => pressed++);
@@ -152,18 +152,157 @@ public sealed class ShortcutServiceTests
     public void Shortcuts_read_as_their_keys(uint key, string shown) =>
         Assert.Equal(shown, new KeyShortcut(ShortcutModifiers.Control | ShortcutModifiers.Shift, key).ToString());
 
+    // ---- Settings › Shortcuts changes a feature's shortcut through its edits (task 347) ----
+
+    /// <summary>A feature as the seven use the service: its keys live in its settings, and it registers them at start.</summary>
+    private sealed class Feature
+    {
+        public KeyShortcut? Saved;
+        public IHotkey Hotkey = null!;
+        public int Changes, Removes;
+        public string? SaveError;
+
+        public static Feature Start(ShortcutService service, string owner, string name, KeyShortcut? saved)
+        {
+            var feature = new Feature { Saved = saved };
+            feature.Hotkey = service.Add(owner, name, new ShortcutEdits(() => feature.Saved, feature.Change, feature.Remove) { Icon = "Mic" });
+            if (saved is not null)
+                feature.Hotkey.Register(saved, () => { });
+            return feature;
+        }
+
+        private string? Change(KeyShortcut keys)
+        {
+            Changes++;
+            if (!Hotkey.Register(keys, () => { }))
+                return Hotkey.Error;
+            if (SaveError is not null)
+                return SaveError;
+            Saved = keys;
+            return null;
+        }
+
+        private void Remove()
+        {
+            Removes++;
+            Hotkey.Unregister();
+            Saved = null;
+        }
+    }
+
+    [Fact]
+    public void Settings_changes_and_removes_a_feature_shortcut_through_its_edits_and_lists_the_saved_keys()
+    {
+        var windows = new FakeRegistrar();
+        var service = new ShortcutService(windows);
+        var mute = Feature.Start(service, "mic-mute", "Mute microphone", CtrlShiftM);
+        var probe = service.Add("shortcuts", "Shortcut check");
+        var row = service.List[0];
+        Assert.Equal((CtrlShiftM, true, true, "Mic"), (row.Shortcut, row.Editable, row.Held, row.Icon));
+        Assert.False(service.List[1].Editable);
+
+        // Changed comes once the feature has saved, so a page rebuilding then reads the new keys.
+        var seen = new List<KeyShortcut?>();
+        service.Changed += () => seen.Add(service.List[0].Shortcut);
+        Assert.Null(service.Change(row.Id, CtrlAltV));
+        Assert.Equal(CtrlAltV, mute.Saved);
+        Assert.Equal(CtrlAltV, seen[^1]);
+        Assert.Equal([CtrlAltV], windows.Held.Values);
+        Assert.Equal(row.Id, service.List[0].Id); // the same row, in the same place
+
+        service.Remove(row.Id);
+        Assert.Equal((1, (KeyShortcut?)null), (mute.Removes, mute.Saved));
+        Assert.Empty(windows.Held);
+        Assert.Equal(((KeyShortcut?)null, false), (service.List[0].Shortcut, service.List[0].Held)); // still listed, unset (Record)
+
+        Assert.Equal(ShortcutService.NotFoundText, service.Change(service.List[1].Id, CtrlShiftM)); // not editable
+        probe.Dispose();
+    }
+
+    [Fact]
+    public void Check_refuses_in_the_editors_words_and_asks_Windows_last()
+    {
+        var windows = new FakeRegistrar();
+        var service = new ShortcutService(windows);
+        var mute = Feature.Start(service, "mic-mute", "Mute microphone", CtrlShiftM);
+        Feature.Start(service, "command-bar", "Command bar", CtrlAltV);
+        long muteId = service.List[0].Id;
+        int asked = windows.Asked;
+
+        Assert.Equal(ShortcutService.PickText, service.Check(new KeyShortcut(ShortcutModifiers.Shift, 0x4A)));
+        Assert.Equal("Command bar already uses this", service.Check(CtrlAltV, muteId));
+        Assert.Equal(ShortcutService.WindowsText, service.Check(new KeyShortcut(ShortcutModifiers.Windows, 0x4C))); // Win+L
+        Assert.Null(service.Check(CtrlShiftM, muteId)); // its own keys, held now
+        Assert.Equal(asked, windows.Asked);
+
+        var ctrlAltK = new KeyShortcut(ShortcutModifiers.Control | ShortcutModifiers.Alt, 0x4B);
+        windows.Taken.Add(ctrlAltK);
+        Assert.Equal(ShortcutService.AnotherAppText, service.Check(ctrlAltK));
+        windows.Taken.Clear();
+        var heldBefore = windows.Held.Count;
+        Assert.Null(service.Check(ctrlAltK));
+        Assert.Equal(heldBefore, windows.Held.Count); // the probe let go at once
+        Assert.Equal(["register Ctrl+Alt+K", "unregister Ctrl+Alt+K"], windows.Calls[^2..]);
+
+        // A refused change never reaches the feature.
+        Assert.Equal("Command bar already uses this", service.Change(muteId, CtrlAltV));
+        Assert.Equal((0, CtrlShiftM), (mute.Changes, mute.Saved));
+    }
+
+    [Fact]
+    public void Saved_keys_another_app_holds_list_dimmed_and_recording_them_again_asks_Windows()
+    {
+        var windows = new FakeRegistrar();
+        windows.Taken.Add(CtrlShiftM);
+        var service = new ShortcutService(windows);
+        var mute = Feature.Start(service, "mic-mute", "Mute microphone", CtrlShiftM);
+        var row = service.List[0];
+        Assert.Equal((CtrlShiftM, false), (row.Shortcut, row.Held));
+
+        Assert.Equal(ShortcutService.AnotherAppText, service.Change(row.Id, CtrlShiftM));
+        Assert.Equal(0, mute.Changes);
+
+        windows.Taken.Clear(); // the other app let go
+        Assert.Null(service.Change(row.Id, CtrlShiftM));
+        Assert.Equal((CtrlShiftM, true), (service.List[0].Shortcut, service.List[0].Held));
+    }
+
+    [Fact]
+    public void A_feature_that_fails_to_save_says_so_and_a_failed_check_holds_nothing()
+    {
+        var windows = new FakeRegistrar();
+        var service = new ShortcutService(windows);
+        var mute = Feature.Start(service, "mic-mute", "Mute microphone", null);
+        mute.SaveError = "Save failed";
+        Assert.Equal("Save failed", service.Change(service.List[0].Id, CtrlAltV));
+        Assert.Null(service.List[0].Shortcut);
+
+        // Taken between the check and the feature registering: the check's words, not the feature's.
+        mute.SaveError = ShortcutService.InUse;
+        Assert.Equal(ShortcutService.AnotherAppText, service.Change(service.List[0].Id, CtrlAltV));
+        mute.SaveError = "Used by Snap left";
+        Assert.Equal("Snap left already uses this", service.Change(service.List[0].Id, CtrlAltV));
+
+        windows.Throws = true;
+        Assert.Equal(ShortcutService.AnotherAppText, service.Check(CtrlShiftM));
+        Assert.DoesNotContain(CtrlShiftM, windows.Held.Values);
+    }
+
     private sealed class FakeRegistrar : IHotkeyRegistrar
     {
         public readonly Dictionary<int, KeyShortcut> Held = [];
         public readonly HashSet<KeyShortcut> Taken = []; // by another app
         public readonly List<string> Calls = [];
         public int Asked;
+        public bool Throws;
 
         public event Action<int>? Pressed;
 
         public bool Register(int id, KeyShortcut shortcut)
         {
             Asked++;
+            if (Throws)
+                throw new InvalidOperationException("RegisterHotKey failed");
             if (Taken.Contains(shortcut) || Held.ContainsValue(shortcut))
                 return false;
             Held[id] = shortcut;
