@@ -15,7 +15,7 @@ Window layouts and snapping, app switcher, close protection, focus follows mouse
   - Within Snap, placing windows comes first. Saved app arrangements with relaunch are a separate step after it, later in the phase.
   - Chippi's zones show on Shift+drag, and Windows' own Snap bar keeps the plain drag to the top.
   - The App switcher gets its own shortcut first. Taking over Alt+Tab becomes an option once it has proven itself.
-  - Close protection: press Alt+F4 twice. The first press shows "Press Alt+F4 again to close" on the bar, and Chippi sends no keys. It's on in every app, and Ctrl+W protection is turned on per app. It covers keys only.
+  - Close protection: press Alt+F4 twice. The first press shows a line on the bar, and Chippi sends no keys (wording and timing: tasks 262 to 264 below). It's on in every app, and Ctrl+W protection is turned on per app. It covers keys only.
   - Smooth scrolling has per-app speeds and an excluded-apps list in the first build.
   - No mouse-button drag gestures for now.
   - Caps Lock combos: Right Alt isn't offered, and Win isn't in the default set.

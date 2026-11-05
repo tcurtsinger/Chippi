@@ -32,7 +32,7 @@ Add `?board=<id>&theme=dark|light` to either page to see one board.
 
 ## App icons
 
-Travis (task 264): every app list shows the app's real Windows icon, never the two-letter squares ("Ch", "VS") the mockup draws. That covers Pause in these apps, its Add app menu, Ctrl+W in these apps and Scrolling per app. Read the icon with `WindowsAppIcons` in Chippi.UI: `ReadWindow` for an app that's open, `Read` with the exe's path for one added with Browse… or not running. A letter shows only when Windows has no icon for the app, as in Search and Agents.
+Travis (task 264): every app list shows the app's real Windows icon, never the two-letter squares ("Ch", "VS") the mockup draws. That covers Pause in these apps, its Add app menu, Ctrl+W in these apps and Scrolling per app. Use the public `AppIcon` in Chippi.UI (`WindowsAppIcons` is internal to it): `AppIcon.View(exePath, 20, monogram)` for a row, which loads through the cached `AppIcon.LoadAsync` and keeps the monogram until the icon arrives, so the row never changes size. An open app is listed by its exe's path too. `AppIcon.Read` and `AppIcon.ReadWindow` are only for an STA worker thread, never the UI thread. A letter shows only when Windows has no icon for the app, as in Search and Agents.
 
 The mockup keeps the squares because this repo is public and the apps are other companies' products, so their logos aren't drawn into it. Read each square as that app's icon at the same size (20 in lists and the menu).
 

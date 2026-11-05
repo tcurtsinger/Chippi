@@ -10,7 +10,7 @@ Karl, 2026-11-04. Tasks 199 and 215. Research updated for the settled decisions.
 - Always on defaults off and pauses every Phase 6 input feature on the affected fullscreen display, Debounce included. Radial menu has a separate fullscreen switch, on by default.
 - Snap lives in Actions. Shift+drag shows zones; plain top-edge drag keeps Windows Snap. Saved app arrangements with relaunch are a separate step later in Phase 6. No mouse-button drag gestures.
 - App switcher starts with a separate shortcut. Alt+Tab takeover is a later option after validation.
-- Close protection uses two distinct Alt+F4 presses in every app when enabled. The first shows "Press Alt+F4 again to close" on the bar. No synthetic keys; the second physical press passes through. Ctrl+W is opt-in per app. Keys only.
+- Close protection uses two distinct Alt+F4 presses in every app when enabled. The first shows "Press again to close" over "Alt+F4 · Notepad" on the bar, or plays Windows' default beep when the bar can't show. No synthetic keys; a second physical press while the line shows (6 s) passes through. Ctrl+W is opt-in per app. Keys only.
 - Focus follows mouse uses native Windows tracking, 250 ms and raise enabled, restoring the original settings on disable and pause. The earlier custom wait-for-stop and per-app filtering proposal is not promised by this native implementation.
 - Smooth scrolling includes per-app speeds and exclusions in the first build.
 - Shortcuts combines keys, Caps Lock combos and mouse buttons. These five features use that binding page.
