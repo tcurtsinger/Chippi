@@ -5,14 +5,14 @@ using System.Windows.Threading;
 using Chippi.Core.Actions;
 using Chippi.Core.Input;
 
-namespace Chippi.Features.RadialMenu.Input;
+namespace Chippi.UI.Actions;
 
 /// <summary>
 /// The input hub's last filter while Record shows "Press keys": every key the filters before it passed is kept from the
 /// apps and Windows, so Win+Shift+S is recorded instead of opening the Snipping Tool. It lets go at the first key that
 /// isn't a modifier, or after 10 seconds; the hub keeps the ups of the keys it kept.
 /// </summary>
-internal sealed class KeyRecorder(Func<IInputHub> hub) : IKeyRecorder
+public sealed class KeyRecorder(Func<IInputHub> hub) : IKeyRecorder
 {
     private static readonly TimeSpan Limit = TimeSpan.FromSeconds(10);
 

@@ -54,6 +54,9 @@ public sealed class ModuleServices
 
     /// <summary>Every shortcut Chippi holds (Phase 6). Set by the shell; null in tests.</summary>
     public Chippi.Core.Shortcuts.IShortcutService? Shortcuts { get; set; }
+
+    /// <summary>The PC side of every feature's actions (Phase 6). Set by the shell; null in tests.</summary>
+    public Chippi.Core.Actions.IActionPc? Actions { get; set; }
     public Func<IDisposable> HoldIslandOpen { get; set; } = () => new IslandOpenHold().Hold();
 
     /// <summary>The app in front before the island took the keyboard or opened docked. Set by the shell; null in tests.</summary>

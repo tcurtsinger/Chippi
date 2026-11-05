@@ -5,7 +5,7 @@ using Chippi.Core.Actions;
 using Chippi.Core.Input;
 using Chippi.Features.RadialMenu.Slices;
 using Chippi.Island.Tests;
-using RadialKeyRecorder = Chippi.Features.RadialMenu.Input.KeyRecorder;
+using RadialKeyRecorder = Chippi.UI.Actions.KeyRecorder;
 
 namespace Chippi.Features.RadialMenu.Tests;
 
