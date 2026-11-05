@@ -30,6 +30,7 @@
     <Project Path="src/Features/Chippi.Features.Debounce/Chippi.Features.Debounce.csproj" />
     <Project Path="src/Features/Chippi.Features.SmoothScrolling/Chippi.Features.SmoothScrolling.csproj" />
     <Project Path="src/Features/Chippi.Features.RadialMenu/Chippi.Features.RadialMenu.csproj" />
+    <Project Path="src/Features/Chippi.Features.AppSwitcher/Chippi.Features.AppSwitcher.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Chippi.Audio.Tests/Chippi.Audio.Tests.csproj" />
@@ -52,6 +53,7 @@
     <Project Path="tests/Chippi.Features.AgentUsage.Tests/Chippi.Features.AgentUsage.Tests.csproj" />
     <Project Path="tests/Chippi.Features.CleaningMode.Tests/Chippi.Features.CleaningMode.Tests.csproj" />
     <Project Path="tests/Chippi.Features.CloseProtection.Tests/Chippi.Features.CloseProtection.Tests.csproj" />
+    <Project Path="tests/Chippi.Features.AppSwitcher.Tests/Chippi.Features.AppSwitcher.Tests.csproj" />
     <Project Path="tests/Chippi.Features.CommandBar.Tests/Chippi.Features.CommandBar.Tests.csproj" />
     <Project Path="tests/Chippi.Features.Debounce.Tests/Chippi.Features.Debounce.Tests.csproj" />
     <Project Path="tests/Chippi.Features.SmoothScrolling.Tests/Chippi.Features.SmoothScrolling.Tests.csproj" />

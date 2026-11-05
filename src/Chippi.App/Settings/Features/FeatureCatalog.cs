@@ -62,11 +62,6 @@ public static class FeatureCatalog
             Icon = "LayoutGrid",
             Presets = PowerUser,
         },
-        new("app-switcher", "App switcher", "Switch apps with large live previews", FeatureGroup.Windows)
-        {
-            Icon = "AppWindow",
-            Presets = PowerUser,
-        },
         new("smooth-scrolling", "Smooth scrolling", "Smooth or linear wheel scrolling for mice that step", FeatureGroup.Windows)
         {
             Icon = "Expand",

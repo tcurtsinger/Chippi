@@ -233,6 +233,9 @@ public partial class App : Application
         shell.Registry.Register(new Chippi.Features.CloseProtection.CloseProtectionModule(() =>
             new Chippi.Features.CloseProtection.WindowsCloseDesktop()));
 
+        // [Phase 6] App switcher: replaces its catalog placeholder. Its tile, Search entry and Radial slices fire app-switcher/open.
+        shell.Registry.Register(new Chippi.Features.AppSwitcher.AppSwitcherModule());
+
         // Native tracking: constructed lazily, acquired only when installed and switched on.
         shell.Registry.Register(new Chippi.Features.FocusFollowsMouse.FocusFollowsMouseModule(() =>
         {

@@ -167,6 +167,19 @@ public static class Probe
         return text.ToString();
     }
 
+    /// <summary>Milliseconds until the window titled <paramref name="title"/> is in front, polled each millisecond; -1 if it never is.</summary>
+    public static double WaitForeground(string title, int timeoutMs)
+    {
+        timeBeginPeriod(1);
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        while (clock.ElapsedMilliseconds < timeoutMs)
+        {
+            if (Foreground() == title) return Math.Round(clock.Elapsed.TotalMilliseconds, 1);
+            Thread.Sleep(1);
+        }
+        return -1;
+    }
+
     delegate IntPtr LowLevelProc(int code, IntPtr wParam, IntPtr lParam);
     [StructLayout(LayoutKind.Sequential)] struct MSG { public IntPtr Hwnd; public uint Message; public IntPtr WParam, LParam; public uint Time; public int X, Y; }
     [DllImport("user32.dll")] static extern IntPtr SetWindowsHookEx(int id, LowLevelProc proc, IntPtr module, uint thread);
@@ -254,6 +267,15 @@ public static class Probe
             '{"id":"d","name":"Long","trigger":";lg","text":"' + $long + '","expand":"rightAway"},' +
             '{"id":"e","name":"Clip","trigger":";cp","text":"[{{clipboard}}]","expand":"rightAway"}]}},' +
             '"features":{"preset":"custom","installed":["text-snippets"],"capabilitiesUsed":[]}}'
+    }
+    $switcherOnly = $checks -contains 'switcher' -and -not ($checks -contains 'radial' -or $checks -contains 'watchdog' -or $checks -contains 'cost' -or $debounceOnly)
+    if ($switcherOnly) {
+        # The App switcher on Ctrl+Alt+J, and the Radial menu holding Middle with the switcher on its up slice.
+        $debounceSettings = '{"version":1,"app":{"islandEnabled":false},"modules":{' +
+            '"app-switcher":{"shortcut":{"modifiers":"control, alt","key":74}},' +
+            '"radial-menu":{"holdMiddle":true,"slices":[{"kind":"chippi","value":"app-switcher/open","name":"Switcher"},' +
+            '{"kind":"text","value":"right","name":"Right"},{"kind":"text","value":"down","name":"Down"},{"kind":"text","value":"left","name":"Left"}]}},' +
+            '"features":{"preset":"custom","installed":["app-switcher","radial-menu"],"capabilitiesUsed":[]}}'
     }
     $shortcutsOnly = ($checks -contains 'shortcuts' -or $checks -contains 'caps' -or $checks -contains 'editor') -and -not ($checks -contains 'radial' -or $checks -contains 'watchdog' -or $checks -contains 'cost' -or $debounceOnly)
     function ShortcutSettings([string]$ignored = '') {
@@ -840,6 +862,79 @@ public static class Probe
         $found.snippets = $sn
     }
 
+    if ($checks -contains 'switcher') {
+        # The App switcher between two windows: opened by its shortcut and by a Radial slice (a hub door, which needs the
+        # overlay's one tap and retry for the foreground); Enter, Esc, search and an arrow key. Each step times the overlay
+        # taking the foreground and the chosen window getting it, then types a letter to see where focus really landed.
+        Add-Type -AssemblyName System.Drawing, System.Windows.Forms
+        $sw = [ordered]@{}
+        $other = Start-Process -FilePath powershell.exe -ArgumentList '-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File C:\probe\target.ps1 -Other' -PassThru
+        Start-Sleep -Seconds 5
+        function SwShot([string]$name) {
+            $b = New-Object System.Drawing.Bitmap ([System.Windows.Forms.SystemInformation]::VirtualScreen.Width), ([System.Windows.Forms.SystemInformation]::VirtualScreen.Height)
+            $g = [System.Drawing.Graphics]::FromImage($b); $g.CopyFromScreen(0, 0, 0, 0, $b.Size); $g.Dispose()
+            $b.Save("$results\switcher-$name.png"); $b.Dispose()
+        }
+        function ReadText([string]$file) { if (Test-Path "$results\$file") { Get-Content -LiteralPath "$results\$file" -Raw -Encoding UTF8 } else { '' } }
+        function Tap([uint16]$vk) { [Probe]::Key($vk, $true); [Probe]::Spin(25); [Probe]::Key($vk, $false); [Probe]::Spin(25) }
+        function ClickOther { [Probe]::MoveTo(600, 70); [Probe]::Left($true); [Probe]::Left($false); Start-Sleep -Milliseconds 400 }
+        function ClickTarget { [Probe]::MoveTo($x, $y); [Probe]::Left($true); [Probe]::Left($false); Start-Sleep -Milliseconds 400 }
+        # Ctrl+Alt+J; returns the ms from J down to the overlay in front.
+        function ByShortcut {
+            [Probe]::Key(0xA2, $true); [Probe]::Key(0xA4, $true); [Probe]::Key(0x4A, $true)
+            $ms = [Probe]::WaitForeground('App switcher', 3000)
+            [Probe]::Key(0x4A, $false); [Probe]::Key(0xA4, $false); [Probe]::Key(0xA2, $false)
+            return $ms
+        }
+        # Middle held, flicked up to the Switcher slice and let go; returns the ms from the release to the overlay in front.
+        function ByRadial {
+            [Probe]::Middle($true); Start-Sleep -Milliseconds 400
+            [Probe]::Glide($x, $y, $x, $y - 150, 120); Start-Sleep -Milliseconds 150
+            [Probe]::Middle($false)
+            $ms = [Probe]::WaitForeground('App switcher', 3000)
+            [Probe]::MoveTo($x, $y)
+            return $ms
+        }
+        # One step: $open opens it, $keys runs inside it; $expect is the window that should end up in front, and $letter
+        # (a virtual key) is typed there afterwards.
+        function Step([string]$name, [scriptblock]$open, [scriptblock]$keys, [string]$expect, [uint16]$letter) {
+            Remove-Item -LiteralPath "$results\target.log", "$results\other.log" -ErrorAction SilentlyContinue
+            $before = [Probe]::Foreground()
+            $targetText = ReadText 'target-text.txt'; $otherText = ReadText 'other-text.txt'
+            $openMs = & $open
+            Start-Sleep -Milliseconds 700
+            SwShot $name
+            $clock = [Diagnostics.Stopwatch]::StartNew()
+            & $keys
+            $switchMs = [Probe]::WaitForeground($expect, 3000)
+            $after = [Probe]::Foreground()
+            Start-Sleep -Milliseconds 300
+            Tap $letter
+            Start-Sleep -Milliseconds 800
+            $sw[$name] = [ordered]@{
+                foreground = "$before -> $after"; overlayInFrontMs = $openMs; chosenInFrontMs = $switchMs
+                targetTyped = (ReadText 'target-text.txt').Substring($targetText.Length); otherTyped = (ReadText 'other-text.txt').Substring($otherText.Length)
+                targetHeard = ((TargetLog) -join '; '); otherHeard = ((ReadText 'other.log') -replace "`r?`n", '; ')
+            }
+            Note "switcher $name : $($sw[$name] | ConvertTo-Json -Compress)"
+            Start-Sleep -Milliseconds 500
+        }
+        # The order Chippi has seen: Other, then Target in front. The overlay selects the window before the one in front.
+        ClickOther; ClickTarget
+        Step 'shortcutEnter' { ByShortcut } { Tap 0x0D } 'Probe other' 0x51          # q into Other
+        Step 'shortcutEsc' { ByShortcut } { Tap 0x1B } 'Probe other' 0x57            # Esc: back to Other, w into it
+        Step 'searchTarget' { ByShortcut } { foreach ($k in 0x54, 0x41, 0x52, 0x47) { Tap ([uint16]$k) }; Tap 0x0D } 'Probe target' 0x45   # "targ", e into Target
+        Step 'leftThenEnter' { ByShortcut } { Tap 0x25; Tap 0x0D } 'Probe target' 0x4C   # Left from Other to Target itself, l into it
+        Step 'radialEnter' { ByRadial } { Tap 0x0D } 'Probe other' 0x52              # the hub door: r into Other
+        Step 'radialEsc' { ByRadial } { Tap 0x1B } 'Probe other' 0x59                # y into Other
+        # Opened five times more by the shortcut, for the timing spread.
+        $opens = @()
+        foreach ($i in 1..5) { ClickTarget; $opens += ByShortcut; Start-Sleep -Milliseconds 500; Tap 0x1B; Start-Sleep -Milliseconds 500 }
+        $sw.shortcutOpensMs = $opens -join ', '
+        $found.switcher = $sw
+        Stop-Process -Id $other.Id -Force -ErrorAction SilentlyContinue
+    }
+
     if ($checks -contains 'cost') {
         $cost = @()
         for ($run = 1; $run -le 3; $run++) {
@@ -863,6 +958,10 @@ public static class Probe
         ForEach-Object { Get-Content $_.FullName } | Where-Object { $_ -match 'Input hub' } | ForEach-Object { [string]$_ })
     $found.snippetLog = @(Get-ChildItem "$results\chippi-logs" -Filter *.log -ErrorAction SilentlyContinue |
         ForEach-Object { Get-Content $_.FullName } | Where-Object { $_ -match 'Text snippets' } | ForEach-Object { [string]$_ })
+    if ($checks -contains 'switcher') {
+        $found.switcherLog = @(Get-ChildItem "$results\chippi-logs" -Filter *.log -ErrorAction SilentlyContinue |
+            ForEach-Object { Get-Content $_.FullName } | Where-Object { $_ -match 'app-switcher|App switcher|WRN|ERR' } | ForEach-Object { [string]$_ })
+    }
     Stop-Process -Id $chippi.Id -Force -ErrorAction SilentlyContinue
 }
 catch {
