@@ -28,6 +28,7 @@ public interface IActionPc
 
     ActionWindow? CaptureWindow(nint window) => null;
     bool CanRestore(ActionWindow window) => false;
+    bool CanSnap(ActionWindow window) => !window.Elevated;
     void BeginWindowDrag(ActionWindow window) { }
     void EndWindowDrag(ActionWindow window) { }
     void Window(ActionWindow window, WindowAction action) => Window(window.Handle, action);

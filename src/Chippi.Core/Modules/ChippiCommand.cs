@@ -52,6 +52,9 @@ public sealed record ChippiCommand(string Key, string Name, string Icon, Func<Ta
 
     /// <summary>The Actions tile it shows on (docs/phase-6/architecture.md §3); null for none.</summary>
     public ActionsTile? Tile { get; init; }
+
+    /// <summary>A window command's one shared action. Other doors supply their own captured target.</summary>
+    public Chippi.Core.Actions.ChippiAction? WindowAction { get; init; }
 }
 
 /// <summary>

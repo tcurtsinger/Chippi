@@ -21,6 +21,22 @@ public sealed class SnapGeometryTests
         Assert.All(thirds, r => { Assert.Equal(y, r.Y); Assert.Equal(height, r.Height); });
     }
 
+    [Theory]
+    [InlineData(8, 0)]
+    [InlineData(9, 4)]
+    [InlineData(24, 24)]
+    public void WindowGapIsBetweenZonesAndEdgeGapIsOnlyAtTheScreenEdge(int gap, int edge)
+    {
+        var work = new SnapRect(-1900, 40, 1901, 1040);
+        var left = SnapGeometry.PlaceWithGaps(work, SnapGeometry.BuiltIns[0], gap, edge);
+        var right = SnapGeometry.PlaceWithGaps(work, SnapGeometry.BuiltIns[1], gap, edge);
+        Assert.Equal(gap, right.X - left.X - left.Width);
+        Assert.Equal(work.X + edge, left.X);
+        Assert.Equal(work.X + work.Width - edge, right.X + right.Width);
+        Assert.Equal(work.Y + edge, left.Y);
+        Assert.Equal(work.Height - edge * 2, left.Height);
+    }
+
     [Fact]
     public void OversizedMinimumKeepsTitleBarAtWorkAreaOrigin()
     {

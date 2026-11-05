@@ -327,6 +327,7 @@ public partial class App : Application
         Shell?.Clipboard.Dispose();
         Shell?.Input.Dispose();
         Shell?.Hotkeys.Dispose();
+        (Shell?.Services.Actions as IDisposable)?.Dispose();
         _instance?.Dispose();
         LoggerFactory?.Dispose();
         base.OnExit(e);

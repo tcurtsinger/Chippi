@@ -26,7 +26,7 @@ public sealed class WindowLayoutsModule(Func<IReadOnlyList<SnapDisplay>>? displa
     public event Action? Changed;
 
     public FeatureDescriptor Descriptor { get; } = new(Id, "Snap",
-        "Place windows in halves, thirds and custom zones", FeatureGroup.Windows) { Icon = "LayoutPanelLeft" };
+        "Place windows in halves, thirds and custom zones", FeatureGroup.Windows) { Icon = "LayoutPanelLeft", PausesInFullscreen = true };
 
     public Task StartAsync(ModuleContext context, CancellationToken ct)
     {
@@ -106,6 +106,7 @@ public sealed class WindowLayoutsModule(Func<IReadOnlyList<SnapDisplay>>? displa
         return pc.CaptureWindow(pc.WindowInFront());
     }
 
+    public bool CanMove(ActionWindow target) => _context?.Actions?.CanSnap(target) == true;
     public void BeginDrag(ActionWindow target) => _context?.Actions?.BeginWindowDrag(target);
     public void EndDrag(ActionWindow target) => _context?.Actions?.EndWindowDrag(target);
 
@@ -143,7 +144,8 @@ public sealed class WindowLayoutsModule(Func<IReadOnlyList<SnapDisplay>>? displa
             var key = new SnapZoneKey(layout.Id, zone.Id);
             commands.Add(new($"{Id}/zone/{layout.Id}/{zone.Id}", $"{layout.Name}: {zone.Name}", "LayoutGrid",
                 () => RunAsync(target ?? throw new ActionFailure("Snap failed"), key))
-            { Words = "snap window layout", Detail = target?.App ?? "Snap", Tile = SnapTile });
+            { Words = "snap window layout", Detail = target?.App ?? "Snap", Tile = SnapTile,
+                WindowAction = new() { Kind = ActionKind.Window, Value = nameof(WindowAction.Zone), LayoutId = key.LayoutId, ZoneId = key.ZoneId } });
         }
         foreach (var (verb, name, icon) in new[]
         {
@@ -152,7 +154,8 @@ public sealed class WindowLayoutsModule(Func<IReadOnlyList<SnapDisplay>>? displa
         })
         {
             commands.Add(new($"{Id}/{verb}", name, icon, () => RunAsync(target ?? throw new ActionFailure("Snap failed"), verb))
-            { Words = "snap window", Detail = target?.App ?? "Snap", Tile = SnapTile });
+            { Words = "snap window", Detail = target?.App ?? "Snap", Tile = SnapTile,
+                WindowAction = new() { Kind = ActionKind.Window, Value = verb.ToString() } });
         }
         return commands;
     }

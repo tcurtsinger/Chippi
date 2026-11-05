@@ -47,7 +47,11 @@ public sealed class ShellContext
         Hotkeys = new Chippi.UI.Shortcuts.HotkeyWindow(System.Windows.Threading.Dispatcher.CurrentDispatcher);
         Services.Shortcuts = Shortcuts = new Chippi.Core.Shortcuts.ShortcutService(Hotkeys);
         // What every feature's actions act on: windows, keys, media, programs. It holds nothing.
-        Services.Actions = new Chippi.UI.Actions.WindowsActionPc();
+        Services.Actions = new Chippi.UI.Actions.WindowsActionPc
+        {
+            SnapPaused = target => config.GetSection<AppSettings>(AppSettings.SectionName).PauseRules()
+                .Pauses(Chippi.Core.Input.FullscreenCheck.IsFullscreen(target.Handle), target.Executable),
+        };
         // Always on and Pause in these apps (Settings › General): kept until the hub's thread starts, then applied live.
         void ApplyPauseRules() => Input.Rules = config.GetSection<AppSettings>(AppSettings.SectionName).PauseRules();
         ApplyPauseRules();

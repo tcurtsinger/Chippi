@@ -228,7 +228,7 @@ public sealed class ActionPicker : ContentControl
                 yield return SettingsLayout.Row("Action", Actions(action, [.. ActionCatalog.Media.Select(m => (m.Action.ToString(), m.Name))]));
                 break;
             case ActionKind.Window:
-                yield return SettingsLayout.Row("Action", Actions(action, [.. ActionCatalog.Window.Select(m => (m.Action.ToString(), m.Name))]));
+                yield return SettingsLayout.Row("Action", WindowActions(action));
                 break;
             case ActionKind.Selection:
                 yield return SettingsLayout.Row("Action", Actions(action, [.. ActionCatalog.Selection.Select(m => (m.Action.ToString(), m.Name))]));
@@ -237,6 +237,23 @@ public sealed class ActionPicker : ContentControl
                 yield return SettingsLayout.Row("Page", Actions(action, _source.SettingsPages, "Page"));
                 break;
         }
+    }
+
+    private ComboBox WindowActions(ChippiAction action)
+    {
+        var options = ActionCatalog.Window.Select(w => (Action: new ChippiAction { Kind = ActionKind.Window, Value = w.Action.ToString() }, w.Name))
+            .Concat(_source.Commands().Where(c => c.WindowAction?.Value == nameof(WindowAction.Zone))
+                .Select(c => (Action: c.WindowAction!, Name: c.Name))).ToList();
+        var combo = PickerUi.Combo("Action", options.Select(o => o.Name));
+        combo.SelectedIndex = options.FindIndex(o => o.Action.Value == action.Value
+            && o.Action.LayoutId == action.LayoutId && o.Action.ZoneId == action.ZoneId);
+        combo.SelectionChanged += (_, _) =>
+        {
+            if (combo.SelectedIndex < 0) return;
+            var next = options[combo.SelectedIndex].Action;
+            Retarget(a => a with { Value = next.Value, LayoutId = next.LayoutId, ZoneId = next.ZoneId });
+        };
+        return combo;
     }
 
     private ComboBox Actions(ChippiAction action, IReadOnlyList<(string Value, string Name)> actions, string label = "Action")

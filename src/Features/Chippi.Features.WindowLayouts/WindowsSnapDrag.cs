@@ -83,7 +83,7 @@ public sealed class WindowsSnapDrag : IDisposable
 
     private void Tick(object? sender, EventArgs args)
     {
-        if (!IsWindow(_window)) { SettingsChanged(); return; }
+        if (!IsWindow(_window) || GetForegroundWindow() != _window) { SettingsChanged(); return; }
         if (GetCursorPos(out var p)) _drag.Move(p.X, p.Y, Down(0x10), Down(0x1B), _input?.Paused == true);
         else _drag.Cancel();
         if (!_drag.Active) _timer.Stop();
@@ -113,6 +113,7 @@ public sealed class WindowsSnapDrag : IDisposable
     private delegate void WinEvent(nint hook, uint kind, nint window, int objectId, int childId, uint thread, uint time);
     [DllImport("user32.dll", SetLastError = true)] private static extern nint SetWinEventHook(uint min, uint max, nint module, WinEvent callback, uint process, uint thread, uint flags);
     [DllImport("user32.dll")] private static extern bool UnhookWinEvent(nint hook);
+    [DllImport("user32.dll")] private static extern nint GetForegroundWindow();
     [DllImport("user32.dll")] private static extern bool IsWindow(nint window);
     [DllImport("user32.dll")] private static extern bool GetCursorPos(out Point point);
     [DllImport("user32.dll")] private static extern short GetAsyncKeyState(int vk);

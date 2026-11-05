@@ -10,16 +10,53 @@ using Native = Chippi.UI.Actions.ActionNative;
 
 namespace Chippi.UI.Actions;
 
-public sealed partial class WindowsActionPc
+public sealed partial class WindowsActionPc : IDisposable
 {
+    public Func<ActionWindow, bool>? SnapPaused { get; set; }
     public Func<string, string, WindowZone?>? SnapZones { get; set; }
     private sealed record SnapHistory(ActionWindow Target, Placement Baseline, Native.Rect Expected, bool Maximized);
     private readonly Dictionary<nint, SnapHistory> _snapHistory = [];
     private (ActionWindow Target, Placement Baseline)? _dragBaseline;
+    private readonly Dictionary<nint, long> _lifetimes = [];
+    private long _nextLifetime;
+    private nint _destroyHook;
+    private WindowEvent? _destroyCallback;
+
+    // WinEvent callbacks return to the registering UI thread. A handle reused by the same process/thread/class
+    // receives a new lifetime as well. No state is written into another application's window.
+    private long Lifetime(nint window)
+    {
+        if (_destroyHook == 0)
+        {
+            _destroyCallback = (_, _, hwnd, objectId, childId, _, _) =>
+            {
+                if (objectId != 0 || childId != 0) return;
+                _lifetimes.Remove(hwnd);
+                _snapHistory.Remove(hwnd);
+                if (_dragBaseline?.Target.Handle == hwnd) _dragBaseline = null;
+            };
+            _destroyHook = SetWinEventHook(0x8001, 0x8001, 0, _destroyCallback, 0, 0, 0);
+            if (_destroyHook == 0) throw new Win32Exception(Marshal.GetLastWin32Error());
+        }
+        if (!_lifetimes.TryGetValue(window, out long lifetime))
+            _lifetimes[window] = lifetime = ++_nextLifetime;
+        return lifetime;
+    }
+
+    public void Dispose()
+    {
+        if (_destroyHook != 0) UnhookWinEvent(_destroyHook);
+        _destroyHook = 0;
+        _destroyCallback = null;
+        _lifetimes.Clear();
+        _snapHistory.Clear();
+        _dragBaseline = null;
+    }
 
     public void BeginWindowDrag(ActionWindow target)
     {
         Validate(target);
+        Validate(target, snapping: true);
         _dragBaseline = (target, Baseline(target));
     }
 
@@ -40,39 +77,59 @@ public sealed partial class WindowsActionPc
             return null;
         uint thread = Native.GetWindowThreadProcessId(window, out uint pid);
         if (thread == 0) return null;
+        nint handle = OpenProcess(0x1000, false, pid); // PROCESS_QUERY_LIMITED_INFORMATION, including admin windows
+        if (handle == 0) return null;
         try
         {
             using var process = Process.GetProcessById((int)pid);
-            string exe = process.MainModule?.FileName ?? "";
-            if (exe.Length == 0) return null;
+            var path = new StringBuilder(32768);
+            int length = path.Capacity;
+            if (!QueryFullProcessImageName(handle, 0, path, ref length)) return null;
+            string exe = path.ToString();
             var title = new StringBuilder(1024);
             GetWindowText(window, title, title.Capacity);
-            string app = System.IO.Path.GetFileNameWithoutExtension(exe);
+            string app = FileVersionInfo.GetVersionInfo(exe).FileDescription is { Length: > 0 } description
+                ? description : System.IO.Path.GetFileNameWithoutExtension(exe);
             return new(window, pid, thread, process.StartTime.ToUniversalTime().Ticks, Native.ClassOf(window),
-                exe, app, title.ToString(), IsElevated(process.Handle));
+                exe, app, title.ToString(), IsElevated(handle), Lifetime(window));
         }
-        catch (Exception ex) when (ex is Win32Exception or InvalidOperationException or ArgumentException)
+        catch (Exception ex) when (ex is Win32Exception or InvalidOperationException or ArgumentException or System.IO.IOException)
         { return null; }
+        finally { CloseHandle(handle); }
     }
 
-    private void Validate(ActionWindow target)
+    private void Validate(ActionWindow target, bool snapping = false)
     {
         var current = CaptureWindow(target.Handle);
-        if (current is null || current.ProcessId != target.ProcessId || current.ThreadId != target.ThreadId
+        if (current is null || current.Lifetime != target.Lifetime || current.ProcessId != target.ProcessId || current.ThreadId != target.ThreadId
             || current.ProcessStarted != target.ProcessStarted || current.ClassName != target.ClassName
             || !string.Equals(current.Executable, target.Executable, StringComparison.OrdinalIgnoreCase))
             throw new ActionFailure("Window closed");
         if (current.Elevated || target.Elevated)
             throw new ActionFailure("Access denied");
+        if (snapping && SnapPaused?.Invoke(current) == true)
+            throw new ActionFailure("Paused");
     }
 
+    public bool CanSnap(ActionWindow target)
+    {
+        try { Validate(target, snapping: true); return true; }
+        catch (ActionFailure) { return false; }
+    }
     public void Window(ActionWindow target, WindowAction action)
     {
-        Validate(target);
-        if (IsSnapAction(action)) SnapWindow(target, action);
-        else Window(target.Handle, action);
+        try
+        {
+            Validate(target);
+            if (IsSnapAction(action)) SnapWindow(target, action);
+            else Window(target.Handle, action);
+        }
+        catch (ActionFailure ex)
+        {
+            Chippi.Core.Diagnostics.Log.Warn($"Window {action} failed for {target.App}: {ex.Message}");
+            throw;
+        }
     }
-
     public bool CanRestore(ActionWindow target)
     {
         try
@@ -86,7 +143,7 @@ public sealed partial class WindowsActionPc
     private SnapHistory? History(ActionWindow target)
     {
         if (!_snapHistory.TryGetValue(target.Handle, out var history)) return null;
-        if (history.Target.ProcessId != target.ProcessId || history.Target.ProcessStarted != target.ProcessStarted
+        if (history.Target.Lifetime != target.Lifetime || history.Target.ProcessId != target.ProcessId || history.Target.ProcessStarted != target.ProcessStarted
             || history.Target.ThreadId != target.ThreadId || history.Target.ClassName != target.ClassName
             || !Native.GetWindowRect(target.Handle, out var current) || !Same(current, history.Expected)
             || Native.IsZoomed(target.Handle) != history.Maximized)
@@ -121,6 +178,7 @@ public sealed partial class WindowsActionPc
     private void SnapWindow(ActionWindow target, WindowAction action)
     {
         Validate(target);
+        Validate(target, snapping: true);
         nint hwnd = target.Handle;
         if (action == WindowAction.Restore)
         {
@@ -201,6 +259,7 @@ public sealed partial class WindowsActionPc
     public void WindowZone(ActionWindow target, string layoutId, string zoneId, nint monitor = 0)
     {
         Validate(target);
+        Validate(target, snapping: true);
         var zone = SnapZones?.Invoke(layoutId, zoneId) ?? throw new ActionFailure("Zone removed");
         if (monitor != 0 && !Native.Monitors().Contains(monitor)) throw new ActionFailure("Display removed");
         var baseline = _dragBaseline is { } drag && drag.Target == target ? drag.Baseline : Baseline(target);
@@ -219,23 +278,13 @@ public sealed partial class WindowsActionPc
 
     private static Native.Rect ZoneRect(Native.Rect work, WindowZone zone)
     {
-        if (!double.IsFinite(zone.X) || !double.IsFinite(zone.Y) || !double.IsFinite(zone.Width) || !double.IsFinite(zone.Height)
-            || zone.X < 0 || zone.Y < 0 || zone.Width <= 0 || zone.Height <= 0
-            || zone.X + zone.Width > 1.000000001 || zone.Y + zone.Height > 1.000000001
-            || zone.WindowGap is < 0 or > 24 || zone.ScreenEdgeGap is < 0 or > 24)
-            throw new ActionFailure("Invalid zone");
-        int left = work.Left + (int)Math.Round(zone.X * work.Width);
-        int top = work.Top + (int)Math.Round(zone.Y * work.Height);
-        int right = work.Left + (int)Math.Round((zone.X + zone.Width) * work.Width);
-        int bottom = work.Top + (int)Math.Round((zone.Y + zone.Height) * work.Height);
-        left += zone.X == 0 ? zone.ScreenEdgeGap : zone.WindowGap / 2;
-        top += zone.Y == 0 ? zone.ScreenEdgeGap : zone.WindowGap / 2;
-        right -= zone.X + zone.Width >= 1 - 1e-9 ? zone.ScreenEdgeGap : (zone.WindowGap + 1) / 2;
-        bottom -= zone.Y + zone.Height >= 1 - 1e-9 ? zone.ScreenEdgeGap : (zone.WindowGap + 1) / 2;
-        if (right <= left || bottom <= top) throw new ActionFailure("Zone too small");
-        return new() { Left = left, Top = top, Right = right, Bottom = bottom };
+        try
+        {
+            var (left, top, right, bottom) = zone.Bounds(work.Width, work.Height);
+            return new() { Left = work.Left + left, Top = work.Top + top, Right = work.Left + right, Bottom = work.Top + bottom };
+        }
+        catch (ArgumentException ex) { throw new ActionFailure(ex.Message); }
     }
-
     private static void CheckWork(Native.Rect work)
     {
         if (work.Width <= 0 || work.Height <= 0) throw new ActionFailure("Display removed");
@@ -243,6 +292,7 @@ public sealed partial class WindowsActionPc
 
     private static void KeepReachable(nint hwnd)
     {
+        if (Native.IsZoomed(hwnd)) return;
         var (_, work) = Native.Monitor(Native.MonitorFromWindow(hwnd, 2));
         CheckWork(work);
         if (!Visible(hwnd, out var actual) && actual.Width <= 0) throw new ActionFailure("Snap failed");
@@ -261,6 +311,11 @@ public sealed partial class WindowsActionPc
         finally { CloseHandle(token); }
     }
 
+    private delegate void WindowEvent(nint hook, uint kind, nint window, int objectId, int childId, uint thread, uint time);
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern nint SetWinEventHook(uint min, uint max, nint module, WindowEvent callback, uint process, uint thread, uint flags);
+    [DllImport("user32.dll")] private static extern bool UnhookWinEvent(nint hook);
+
     [StructLayout(LayoutKind.Sequential)]
     private struct Placement
     {
@@ -274,6 +329,9 @@ public sealed partial class WindowsActionPc
     private static extern int GetWindowText(nint hwnd, StringBuilder text, int length);
     [DllImport("advapi32.dll")] private static extern bool OpenProcessToken(nint process, uint access, out nint token);
     [DllImport("advapi32.dll")] private static extern bool GetTokenInformation(nint token, int cls, out int value, int size, out int needed);
+    [DllImport("kernel32.dll")] private static extern nint OpenProcess(uint access, bool inherit, uint process);
+    [DllImport("kernel32.dll", EntryPoint = "QueryFullProcessImageNameW", CharSet = CharSet.Unicode)]
+    private static extern bool QueryFullProcessImageName(nint process, uint flags, StringBuilder path, ref int size);
     [DllImport("kernel32.dll")] private static extern bool CloseHandle(nint handle);
 }
 

@@ -100,6 +100,37 @@ public sealed class ActionRunnerTests
     public void Names_come_from_what_it_does(ActionKind kind, string value, string name) =>
         Assert.Equal(name, ActionCatalog.NameFor(new ChippiAction { Kind = kind, Value = value }, v => v == "ms-settings:bluetooth" ? "Bluetooth & devices" : null));
 
+    [Fact]
+    public async Task Window_commands_keep_the_door_target_instead_of_the_command_lists_target()
+    {
+        var pc = new FakePc { UnderPointer = 11, InFront = 22 };
+        bool wrongRun = false;
+        var command = new ChippiCommand("window-layouts/Center", "Center", "AppWindow",
+            () => { wrongRun = true; return Task.CompletedTask; }) { WindowAction = SnapLeft };
+        var runner = new ActionRunner(pc, () => [command], () => null, text => text, () => 33);
+        var action = new ChippiAction { Kind = ActionKind.Chippi, Value = command.Key };
+        await runner.RunAsync(action, WindowTarget.UnderPointer);
+        await runner.RunAsync(action, WindowTarget.InFront);
+        await runner.RunAsync(action, (nint)44);
+        Assert.Equal([(11, WindowAction.SnapLeft), (22, WindowAction.SnapLeft), (44, WindowAction.SnapLeft)], pc.Windowed);
+        Assert.False(wrongRun);
+    }
+
+    [Fact]
+    public void Removed_zones_are_missing_and_have_a_safe_name_and_glyph()
+    {
+        var zone = new ChippiAction { Kind = ActionKind.Window, Value = nameof(WindowAction.Zone), LayoutId = "coding", ZoneId = "editor" };
+        IReadOnlyList<ChippiCommand> commands =
+        [
+            new("window-layouts/zone/coding/editor", "Coding: Editor", "LayoutGrid", () => Task.CompletedTask) { WindowAction = zone },
+        ];
+        var runner = new ActionRunner(new FakePc(), () => commands, () => null, text => text);
+        Assert.False(runner.IsMissing(zone));
+        Assert.True(runner.IsMissing(zone with { ZoneId = "deleted" }));
+        Assert.Equal("LayoutGrid", ActionCatalog.GlyphOf(zone));
+        Assert.Equal("Coding: Editor", ActionCatalog.NameFor(zone, key => commands.FirstOrDefault(c => c.Key == key)?.Name));
+    }
+
     internal sealed class FakePc : IActionPc
     {
         public nint UnderPointer { get; init; }

@@ -371,7 +371,7 @@ internal sealed class SnapPage : UserControl
             remove.IsEnabled = zones.Count > 1;
             if (display is not null && zones.FirstOrDefault(z => z.Id == draft.Selected) is { } zone)
             {
-                var r = SnapGeometry.Place(display.WorkArea, zone, Settings.WindowGap);
+                var r = SnapGeometry.PlaceWithGaps(display.WorkArea, zone, Settings.WindowGap, Settings.ScreenEdgeGap);
                 size.Text = $"{r.Width} × {r.Height} on {display.Name}";
             }
         }
@@ -431,7 +431,7 @@ internal sealed class SnapPage : UserControl
                 Draw();
             if (display is not null && draft.Root.Flatten().Zones.FirstOrDefault(z => z.Id == draft.Selected) is { } zone)
             {
-                var r = SnapGeometry.Place(display.WorkArea, zone, Settings.WindowGap);
+                var r = SnapGeometry.PlaceWithGaps(display.WorkArea, zone, Settings.WindowGap, Settings.ScreenEdgeGap);
                 size.Text = $"{r.Width} × {r.Height} on {display.Name}";
             }
         };

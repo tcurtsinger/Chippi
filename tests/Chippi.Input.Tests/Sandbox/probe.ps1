@@ -4,9 +4,21 @@
 # Runs inside Windows Sandbox, started by run.ps1. Drives the real hooks with SendInput, without Chippi's marker, so
 # Chippi takes it for a hand's; aims it at target.ps1's window, and writes what happened to C:\results.
 
+param([switch]$SnapMedium)
+
 $ErrorActionPreference = 'Stop'
 $results = 'C:\results'
 $checks = (Get-Content -LiteralPath "$results\checks.txt") -split ','
+if ($checks -contains 'snap' -and -not $SnapMedium) {
+    try { & (Join-Path $PSScriptRoot 'snap-medium.ps1') }
+    catch {
+        @{ checks = $checks; error = $_.ToString(); errorLocation = $_.ScriptStackTrace } | ConvertTo-Json |
+            Set-Content -LiteralPath "$results\results.json" -Encoding UTF8
+        Set-Content -LiteralPath "$results\done.txt" -Value 'failed'
+        shutdown.exe /s /t 5
+    }
+    return
+}
 $found = [ordered]@{ checks = $checks }
 
 function Note([string]$text) { Add-Content -LiteralPath "$results\probe.log" -Value ('{0:HH:mm:ss.fff} {1}' -f (Get-Date), $text) }
@@ -180,6 +192,11 @@ public static class Probe
     }
 }
 '@
+
+    if ($checks -contains 'snap') {
+        $found.snap = & (Join-Path $PSScriptRoot 'snap.ps1')
+        return
+    }
 
     # The app the input is aimed at, and its text box in front.
     Start-Process -FilePath powershell.exe -ArgumentList '-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File C:\probe\target.ps1'
@@ -850,6 +867,7 @@ public static class Probe
 }
 catch {
     $found.error = $_.ToString()
+    $found.errorLocation = $_.ScriptStackTrace
     $failLogs = Join-Path $env:LOCALAPPDATA 'Chippi-dev\sandbox\logs'
     if (Test-Path $failLogs) { Copy-Item -Path $failLogs -Destination "$results\chippi-logs" -Recurse -ErrorAction SilentlyContinue }
     Note "failed: $_"

@@ -24,6 +24,7 @@ internal sealed class SnapMenu : UserControl
     private readonly ActionWindow? _target;
     private readonly TextBlock _failed;
     private bool _running;
+    private Button? _restore;
 
     public SnapMenu(WindowLayoutsModule module) : this(module, module.CaptureTarget())
     {
@@ -79,6 +80,7 @@ internal sealed class SnapMenu : UserControl
             commands.ColumnDefinitions.Add(new ColumnDefinition());
             var (verb, name, icon, enabled) = verbs[i];
             var button = Command(name, icon, enabled);
+            if (verb == WindowAction.Restore) _restore = button;
             button.Margin = new Thickness(i == 0 ? 0 : 4, 0, i == verbs.Length - 1 ? 0 : 4, 0);
             button.Click += (_, _) => Run(name, () => _module.RunAsync(_target!, verb));
             Grid.SetColumn(button, i);
@@ -99,6 +101,7 @@ internal sealed class SnapMenu : UserControl
         {
             await run();
             _failed.Visibility = Visibility.Collapsed;
+            if (_restore is not null) _restore.IsEnabled = _module.CanRestore(_target);
         }
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {

@@ -286,7 +286,7 @@ public sealed class SnapPageTests
 
     private static string Size(SnapDisplay display, double width, double height)
     {
-        var r = SnapGeometry.Place(display.WorkArea, new SnapZone("z", "z", 0, 0, width, height), 8);
+        var r = SnapGeometry.PlaceWithGaps(display.WorkArea, new SnapZone("z", "z", 0, 0, width, height), 8, 0);
         return $"{r.Width} × {r.Height}";
     }
 

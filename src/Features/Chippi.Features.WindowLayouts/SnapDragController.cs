@@ -27,7 +27,7 @@ public sealed class SnapDragController(WindowLayoutsModule module, Func<IReadOnl
     {
         Cancel();
         var settings = module.Layouts?.Settings;
-        if (settings?.ShiftDragEnabled != true || target.Elevated
+        if (settings?.ShiftDragEnabled != true || target.Elevated || !module.CanMove(target)
             || settings.ExcludedApps.Any(a => string.Equals(a, target.Executable, StringComparison.OrdinalIgnoreCase)))
             return;
         module.BeginDrag(target);
@@ -68,6 +68,8 @@ public sealed class SnapDragController(WindowLayoutsModule module, Func<IReadOnl
         try
         {
             if (target is null || display is null || point < 0 || !shift || escape || paused || module.Layouts is not { } store)
+                return;
+            if (!displays().Any(d => d.Id == display.Id && d.Handle == display.Handle && d.WorkArea == display.WorkArea))
                 return;
             var layout = store.ForDisplay(display.Id);
             await module.RunAsync(target, new SnapZoneKey(layout.Id, zones[point].Id), display);

@@ -94,6 +94,14 @@ public sealed partial class WindowsActionPc : IActionPc
     {
         Native.GetWindowRect(window, out var outer);
         bool framed = Visible(window, out var visible);
+        if ((Native.GetWindowLongPtr(window, -16) & 0x00040000) == 0) // no WS_THICKFRAME: preserve fixed-size windows
+        {
+            int width = visible.Width, height = visible.Height;
+            target.Left += (target.Width - width) / 2;
+            target.Top += (target.Height - height) / 2;
+            target.Right = target.Left + width;
+            target.Bottom = target.Top + height;
+        }
         int left = framed ? visible.Left - outer.Left : 0, top = framed ? visible.Top - outer.Top : 0;
         int right = framed ? outer.Right - visible.Right : 0, bottom = framed ? outer.Bottom - visible.Bottom : 0;
         // SWP_NOZORDER | SWP_NOACTIVATE

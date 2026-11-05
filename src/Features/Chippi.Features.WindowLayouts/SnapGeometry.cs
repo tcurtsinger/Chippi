@@ -49,6 +49,14 @@ public static class SnapGeometry
             Math.Max(1, right - left - 2 * gx), Math.Max(1, bottom - top - 2 * gy));
     }
 
+    /// <summary>The exact bounds used by the shared native action service, including separate internal and screen-edge gaps.</summary>
+    public static SnapRect PlaceWithGaps(SnapRect work, SnapZone zone, int windowGap, int screenEdgeGap)
+    {
+        var bounds = new Chippi.Core.Actions.WindowZone(zone.X, zone.Y, zone.Width, zone.Height, windowGap, screenEdgeGap)
+            .Bounds(work.Width, work.Height);
+        return new(work.X + bounds.Left, work.Y + bounds.Top, bounds.Right - bounds.Left, bounds.Bottom - bounds.Top);
+    }
+
     /// <summary>Keep the top edge reachable when an app's minimum size exceeds its destination.</summary>
     public static SnapRect Reachable(SnapRect requested, SnapRect work, int minimumWidth, int minimumHeight)
     {
