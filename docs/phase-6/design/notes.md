@@ -35,11 +35,11 @@ Add `?board=<id>&theme=dark|light` to any page to see one board.
 Travis approved with three caveats (2026-11-05): the keycaps weren't uniform down the column, he didn't want warning text on the rows, and "Off in these apps" was too verbose. The revision:
 
 1. **One keys column.** Every row's keycaps (or its Record button) start at the same point, in a 200-wide column before the row's More button. A row without More keeps the space, so the column doesn't move.
-2. **No state lines on rows.** A saved shortcut that can't work (another app or Windows holds it, its app is gone, the Radial menu holds the button, Caps Lock combos are off) shows only dimmed keycaps. The reason is the keycaps' tooltip and their automation name, so a screen reader hears it.
+2. **No state lines on rows.** A saved shortcut that can't work (another app or Windows holds it, its app is gone, the Radial menu holds the button, Caps Lock combos are off) shows only dimmed keycaps, with no tooltip (Marge on #247: no explaining text). Change shows the reason when it's recorded again (3).
 3. **Clashes are refused in the editor.** Add shortcut, Record and Change all open the same editor. A clash keeps the pressed keys in the field with a red border, leaves Save off, and says why on the Save row: "Snap left already uses this", "The Radial menu uses this", "Windows uses this", "Another app uses this". Pressing again replaces it.
 4. **"Excluded apps"** names both sections' app lists.
 5. **The Caps Lock switch says "Paused"** in place of "On" while an excluded app is open, with no caption.
-6. **The Win warning is a confirm** (Travis's task 211 #10 asked for a warning): turning on Win asks "Add Win to Caps Lock?", "With Ctrl, Alt and Shift, most keys open Office.", with Add and Cancel. That claim is still unconfirmed (`shortcuts.md`).
+6. **The Win warning is a confirm** (Travis's task 211 #10 asked for a warning): turning on Win asks "Add Win to Caps Lock?" with Cancel and Add, in that order like the app's other confirms, and no body line (Marge on #247).
 
 ## Option B's tile order
 

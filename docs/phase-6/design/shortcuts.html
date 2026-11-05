@@ -311,11 +311,11 @@ const cap=x=>x.startsWith('m:')?`<span class="kc">${g('Mouse',14)}${x.slice(2)}<
 const keys=(...k)=>`<span class="caps">${k.map(cap).join('')}</span>`;
 const capsK=k=>keys('Caps Lock',k);
 const btnK=n=>keys('m:'+n);
-const dim=(h,tip)=>h.replace('class="caps"',`class="caps dim" title="${tip}"`);
+const dim=h=>h.replace('class="caps"','class="caps dim"');
 
 /* ---------- the list: one row per binding, grouped like Actions ---------- */
-// state: undefined (Active), or one where the shortcut can't work: its keycaps dim, and the reason is
-// only the keycaps' tooltip and automation name (no state line on the row, Travis task 344).
+// state: undefined (Active), or one where the shortcut can't work: its keycaps only dim. No state line and no
+// tooltip (Travis task 344, Marge on #247); Change shows the reason when it's recorded again.
 const ST={
  other:'In use by another app',
  windows:'In use by Windows',
@@ -324,7 +324,7 @@ const ST={
  inactive:'Caps Lock combos are off'
 };
 const BR=(glyph,name,door,state,o={})=>{const s=ST[state];
- return SR(name,`<span class="kcol">${s?dim(door,s):door}</span>`+(o.unset?'<span class="kspace"></span>':more),{glyph,cls:o.cls});};
+ return SR(name,`<span class="kcol">${s?dim(door):door}</span>`+(o.unset?'<span class="kspace"></span>':more),{glyph,cls:o.cls});};
 const grp=t=>`<div class="grp">${t}</div>`;
 const LIST=[
  ['Chippi',[
@@ -402,8 +402,8 @@ const st={
  windows:card(listRows(head)+editor({glyph:'Snap',action:'Snap left third',door:'Keys',field:filled(keys('Win','←')),warn:'Windows uses this'})),
  recKeys:card(listRows([['Chippi',[LIST[0][1][0]]]])+editor({glyph:'Speaker',action:'Switch output',door:'Keys',field:listening('Press a shortcut')})),
  recOther:card(listRows([['Chippi',[LIST[0][1][0]]]])+editor({glyph:'Speaker',action:'Switch output',door:'Keys',field:filled(keys('Ctrl','Alt','Space')),warn:'Another app uses this'})),
- tip:`<div class="card" style="overflow:visible;position:relative">${listRows([['Chippi',LIST[0][1].slice(0,2)]]).replace(/(<div class="sr)(">(?:(?!<div class="sr).)*Open Command bar)/s,'$1 hov$2')}${addRow('2 shortcuts')}<div class="tip" style="left:512px;top:122px">In use by another app</div></div>`,
- winAsk:`<div style="position:relative">${capsCards()}<div style="position:absolute;inset:0;background:rgba(0,0,0,.35);border-radius:8px"></div><div class="cdlg" style="position:absolute;left:174px;top:40px"><div class="cb1"><div class="ct">Add Win to Caps Lock?</div>With Ctrl, Alt and Shift, most keys open Office.</div><div class="cf">${btn('Add',{acc:1})}${btn('Cancel')}</div></div></div>`,
+ tip:`<div class="card" style="overflow:visible;position:relative">${listRows([['Chippi',LIST[0][1].slice(0,2)]]).replace(/(<div class="sr)(">(?:(?!<div class="sr).)*Open Command bar)/s,'$1 hov$2')}${addRow('2 shortcuts')}</div>`,
+ winAsk:`<div style="position:relative">${capsCards()}<div style="position:absolute;inset:0;background:rgba(0,0,0,.35);border-radius:8px"></div><div class="cdlg" style="position:absolute;left:174px;top:40px"><div class="cb1"><div class="ct" style="margin:0">Add Win to Caps Lock?</div></div><div class="cf">${btn('Cancel')}${btn('Add',{acc:1})}</div></div></div>`,
  menu:`<div class="card" style="overflow:visible;position:relative">${listRows(head)}${BR('OtherScreen','Move to other screen',btnK('Forward button'),null,{cls:'hov'}).replace('aria-label="More options">','aria-label="More options" style="background:var(--shov)">')}
   <div class="pop" style="right:16px;top:206px;width:200px"><div class="pi hov">Change</div><div class="pi">Add another</div><div class="pi">Remove</div></div></div><div style="height:120px"></div>`,
  off:`${card(listRows([['Window',LIST[1][1].slice(0,1)],['Media',LIST[2][1]]],{inactiveCaps:1}))}${sec('Caps Lock')}${capsCards({on:0})}`,
@@ -420,8 +420,8 @@ const B={
   <div class="srow">${stLabel('3 · Caps Lock: hold it and press a key',st.caps)}${stLabel('4 · Mouse button: press it or tilt the wheel',st.mouse)}</div>
   <div class="srow">${stLabel('5 · Recorded, ready to save',st.ready)}${stLabel('Refused: another action uses it',st.twice)}</div>
   <div class="srow">${stLabel('Refused: the Radial menu uses it',st.radial)}${stLabel('Refused: Windows uses it',st.windows)}</div>
-  <div class="srow">${stLabel('Record on a shortcut that isn\'t set',st.recKeys)}${stLabel('Record refused: another app uses it',st.recOther)}</div>
-  <div class="srow">${stLabel('A saved shortcut that can\'t work: dimmed, the reason on hover',st.tip)}${stLabel('Row menu',st.menu)}</div>
+  <div class="srow">${stLabel('Record on a shortcut that isn\'t set',st.recKeys)}${stLabel('Record or Change refused: another app uses it',st.recOther)}</div>
+  <div class="srow">${stLabel('A saved shortcut that can\'t work: dimmed keycaps only',st.tip)}${stLabel('Row menu',st.menu)}</div>
   <div class="srow">${stLabel('Caps Lock combos off: its shortcuts dim',st.off)}<div style="display:flex;flex-direction:column;gap:28px">${stLabel('Paused while an excluded app is open',st.paused)}${stLabel('Turning on Win asks first',st.winAsk)}</div></div>
   <div class="srow">${stLabel('A hook is down: key shortcuts still work',st.hook)}</div>`
 };
