@@ -2,6 +2,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <UseWPF>true</UseWPF>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
   </PropertyGroup>
@@ -10,7 +11,14 @@
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio" />
     <Using Include="Xunit" />
+    <!-- UseWPF drops the implicit System.IO import the layout tests use. -->
+    <Using Include="System.IO" />
     <ProjectReference Include="../../src/Features/Chippi.Features.WindowLayouts/Chippi.Features.WindowLayouts.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The screens' tests: the app's themes and the shared WPF thread. -->
+    <Compile Include="../Chippi.Island.Tests/WpfTestThread.cs" Link="WpfTestThread.cs" />
+    <ProjectReference Include="../../src/Chippi.App/Chippi.App.csproj" />
   </ItemGroup>
 </Project>
 
