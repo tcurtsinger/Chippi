@@ -19,7 +19,7 @@ internal sealed partial class ActionsPage
 {
     private const int SlotCount = 20;
     private const double DragThreshold = 5;
-    private readonly HashSet<QuickActionId> _picking = [];
+    private readonly HashSet<string> _picking = [];
     private readonly List<ToggleButton> _picks = [];
     private readonly List<Border> _slots = [];
     private readonly TextBlock _pickedText = Ui.Muted("", 11);
@@ -35,7 +35,7 @@ internal sealed partial class ActionsPage
     private bool _editing, _choosing, _updatingPicks, _dragging, _saveFailed;
 
     internal IReadOnlyList<string?> EditorLayout => _draft;
-    internal IReadOnlyCollection<QuickActionId> EditorSelection => _picking;
+    internal IReadOnlyCollection<string> EditorSelection => _picking;
     internal bool IsEditing => _editing;
     internal bool IsDragging => _dragging;
 
@@ -44,6 +44,7 @@ internal sealed partial class ActionsPage
     {
         CloseConfirm();
         _list = null;
+        _menu = null;
         StartEdit(first: _module.Settings.Shown is null || _module.Settings.Shown.Count == 0);
         Render();
         _picks.FirstOrDefault()?.Focus();
@@ -57,7 +58,7 @@ internal sealed partial class ActionsPage
         _saveFailed = false;
         _draft = [.. _module.Layout];
         _picking.Clear();
-        foreach (var action in QuickAction.All.Where(a => a.InGallery && _module.Settings.Shows(a.Id))) _picking.Add(action.Id);
+        foreach (var key in QuickAction.All.Where(a => a.InGallery).Select(a => a.Key).Concat(_module.Settings.Added).Where(_module.Settings.Shows)) _picking.Add(key);
         _built = "";
     }
 
@@ -72,7 +73,7 @@ internal sealed partial class ActionsPage
 
     internal void FinishEdit()
     {
-        if (!_editing || !_module.Gallery.Any(a => _picking.Contains(a.Id))) return;
+        if (!_editing || !Tiles.Any(t => _picking.Contains(t.Key))) return;
         var selected = _picking.ToArray();
         var layout = _draft.ToArray();
         try { _module.SaveLayout(selected, layout); }
@@ -91,7 +92,7 @@ internal sealed partial class ActionsPage
 
     private void RenderPicker()
     {
-        var offered = _module.Gallery.ToDictionary(a => a.Key);
+        var offered = Tiles.ToDictionary(t => t.Key);
         string built = "picker:" + string.Join(",", _draft) + ":" + string.Join(",", offered.Keys);
         if (_built != built)
         {
@@ -118,10 +119,10 @@ internal sealed partial class ActionsPage
                 int slotIndex = i;
                 var slot = new Border { CornerRadius = new CornerRadius(6), BorderThickness = new Thickness(1), Background = Brushes.Transparent };
                 slot.SetResourceReference(Border.BorderBrushProperty, "IslandControlBorderBrush");
-                if (_draft[i] is { } key && offered.TryGetValue(key, out var action))
+                if (_draft[i] is { } key && offered.TryGetValue(key, out var tile))
                 {
                     slot.BorderThickness = new Thickness(0);
-                    var pick = PickCell(action, slotIndex);
+                    var pick = PickCell(tile, slotIndex);
                     slot.Child = pick;
                     _picks.Add(pick);
                 }
@@ -173,25 +174,25 @@ internal sealed partial class ActionsPage
         _updatingPicks = true;
         try
         {
-            foreach (var pick in _picks) pick.IsChecked = _picking.Contains((QuickActionId)pick.Tag);
+            foreach (var pick in _picks) pick.IsChecked = _picking.Contains((string)pick.Tag);
         }
         finally { _updatingPicks = false; }
-        int count = _module.Gallery.Count(a => _picking.Contains(a.Id));
+        int count = Tiles.Count(t => _picking.Contains(t.Key));
         _pickedText.Text = $"{count} shown";
         _saveFailure.Visibility = _saveFailed ? Visibility.Visible : Visibility.Collapsed;
         _done.IsEnabled = count > 0;
     }
 
-    private ToggleButton PickCell(QuickAction action, int slot)
+    private ToggleButton PickCell(GalleryTile tile, int slot)
     {
-        var button = new ToggleButton { Tag = action.Id };
+        var button = new ToggleButton { Tag = tile.Key };
         button.SetResourceReference(StyleProperty, "ActionEditorTileStyle");
-        var content = PickContents(action, _picking.Contains(action.Id));
+        var content = PickContents(tile, _picking.Contains(tile.Key));
         button.Content = content.Root;
-        AutomationProperties.SetName(button, action.Name);
+        AutomationProperties.SetName(button, tile.Name);
         AutomationProperties.SetHelpText(button, "Show or hide in Actions. Drag to move, or use Alt and an arrow key.");
         AutomationProperties.SetItemStatus(button, $"Row {slot / Columns + 1}, column {slot % Columns + 1}");
-        button.ToolTip = action.Name;
+        button.ToolTip = tile.Name;
         void Changed()
         {
             bool selected = button.IsChecked == true;
@@ -199,7 +200,7 @@ internal sealed partial class ActionsPage
             content.Ring.Visibility = selected ? Visibility.Collapsed : Visibility.Visible;
             content.Fill.Visibility = content.Check.Visibility = selected ? Visibility.Visible : Visibility.Collapsed;
             if (_updatingPicks) return;
-            if (selected) _picking.Add(action.Id); else _picking.Remove(action.Id);
+            if (selected) _picking.Add(tile.Key); else _picking.Remove(tile.Key);
             RenderPicker();
         }
         button.Checked += (_, _) => Changed();
@@ -214,11 +215,11 @@ internal sealed partial class ActionsPage
         return button;
     }
 
-    private static (Grid Root, Ellipse Ring, Ellipse Fill, LucideIcon Check, TextBlock Label) PickContents(QuickAction action, bool selected)
+    private static (Grid Root, Ellipse Ring, Ellipse Fill, LucideIcon Check, TextBlock Label) PickContents(GalleryTile tile, bool selected)
     {
-        var glyph = Ui.Glyph(action.Icon, 17);
+        var glyph = Ui.Glyph(tile.Icon, 17);
         glyph.HorizontalAlignment = HorizontalAlignment.Center;
-        var name = Ui.Text(action.Label, 11, selected ? "IslandTextBrush" : "IslandTextSecondaryBrush");
+        var name = Ui.Text(tile.Label, 11, selected ? "IslandTextBrush" : "IslandTextSecondaryBrush");
         name.HorizontalAlignment = HorizontalAlignment.Center;
         name.Margin = new Thickness(2, 4, 2, 0);
         var stack = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Children = { glyph, name } };
@@ -239,7 +240,7 @@ internal sealed partial class ActionsPage
     /// <summary>Pointer handlers share this path with the fixture probe; no native input or clipboard is needed.</summary>
     internal bool EditorPointerDown(int slot, Point point)
     {
-        if (!_editing || _gesture is not null || slot < 0 || slot >= _draft.Count || _draft[slot] is not { } key || !_module.Gallery.Any(a => a.Key == key)) return false;
+        if (!_editing || _gesture is not null || slot < 0 || slot >= _draft.Count || _draft[slot] is not { } key || !Tiles.Any(t => t.Key == key)) return false;
         CancelEditorDrag();
         (_slots[slot].Child as ToggleButton)?.Focus();
         _gesture = (slot, point);
@@ -258,17 +259,17 @@ internal sealed partial class ActionsPage
         {
             _dragging = true;
             var source = _slots[gesture.Slot];
-            var action = QuickAction.FromKey(_draft[gesture.Slot]!)!;
+            var tile = Tiles.First(t => t.Key == _draft[gesture.Slot]);
             var visual = new Border
             {
                 Width = source.ActualWidth, Height = source.ActualHeight, CornerRadius = new CornerRadius(6), BorderThickness = new Thickness(1),
-                Child = new Border { CornerRadius = new CornerRadius(5), Child = PickContents(action, _picking.Contains(action.Id)).Root },
+                Child = new Border { CornerRadius = new CornerRadius(5), Child = PickContents(tile, _picking.Contains(tile.Key)).Root },
                 Effect = new DropShadowEffect { Color = Colors.Black, Opacity = 0.24, BlurRadius = 12, ShadowDepth = 4 },
             };
             // The ghost must cover the destination, even though the panel and its tint normally compose with the desktop.
             var surface = (TryFindResource("IslandBrush") as SolidColorBrush)?.Color ?? Colors.Black;
             visual.Background = new SolidColorBrush(Color.FromRgb(surface.R, surface.G, surface.B));
-            ((Border)visual.Child).SetResourceReference(Border.BackgroundProperty, _picking.Contains(action.Id) ? "IslandAccentTintBrush" : "IslandGalleryFaceBrush");
+            ((Border)visual.Child).SetResourceReference(Border.BackgroundProperty, _picking.Contains(tile.Key) ? "IslandAccentTintBrush" : "IslandGalleryFaceBrush");
             visual.SetResourceReference(Border.BorderBrushProperty, "IslandAccentBrush");
             _ghostAt = new TranslateTransform();
             visual.RenderTransform = new TransformGroup { Children = { new ScaleTransform(0.94, 0.94, visual.Width / 2, visual.Height / 2), _ghostAt } };
@@ -362,10 +363,10 @@ internal sealed partial class ActionsPage
         CancelEditorDrag();
         (_draft[from], _draft[to]) = (_draft[to], _draft[from]);
         RenderPicker();
-        if (QuickAction.FromKey(moved) is { } action)
+        if (Tiles.FirstOrDefault(t => t.Key == moved) is { } tile)
         {
-            _picks.FirstOrDefault(b => Equals(b.Tag, action.Id))?.Focus();
-            _pickedText.Text = $"{action.Label} moved to row {to / Columns + 1}, column {to % Columns + 1}";
+            _picks.FirstOrDefault(b => Equals(b.Tag, tile.Key))?.Focus();
+            _pickedText.Text = $"{tile.Label} moved to row {to / Columns + 1}, column {to % Columns + 1}";
             UIElementAutomationPeer.FromElement(_pickedText)?.RaiseAutomationEvent(AutomationEvents.LiveRegionChanged);
         }
     }

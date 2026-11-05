@@ -31,7 +31,7 @@ public sealed class GalleryTests
         Assert.True(page.IsEditing);
         var lockPick = Pick(page, QuickActionId.Explorer);
         ((IToggleProvider)UIElementAutomationPeer.CreatePeerForElement(lockPick)).Toggle();
-        Assert.DoesNotContain(QuickActionId.Explorer, page.EditorSelection);
+        Assert.DoesNotContain("explorer", page.EditorSelection);
         Assert.Contains("explorer", f.Module.Settings.Shown!);
         Assert.Empty(f.Pc.Calls);
         Assert.True(page.Back());
@@ -78,7 +78,7 @@ public sealed class GalleryTests
         Assert.False(page.IsDragging);
         page.EditorPointerUp(start + new Vector(4, 0));
         Assert.Equal(original, page.EditorLayout);
-        Assert.DoesNotContain(QuickActionId.Dark, page.EditorSelection);
+        Assert.DoesNotContain("dark", page.EditorSelection);
         Assert.True(page.Back());
         Assert.True(f.Module.Settings.Shows(QuickActionId.Dark));
         Assert.Equal(original, f.Module.Layout);
@@ -236,7 +236,7 @@ public sealed class GalleryTests
         Assert.Equal(DependencyProperty.UnsetValue, button.ReadLocalValue(Control.BackgroundProperty));
         Assert.Equal(DependencyProperty.UnsetValue, button.ReadLocalValue(Control.ForegroundProperty));
     });
-    private static ToggleButton Pick(ActionsPage page, QuickActionId id) => Find<ToggleButton>(page).Single(b => Equals(b.Tag, id));
+    private static ToggleButton Pick(ActionsPage page, QuickActionId id) => Find<ToggleButton>(page).Single(b => Equals(b.Tag, QuickAction.Of(id).Key));
     private static Point Center(Rect bounds) => new(bounds.Left + bounds.Width / 2, bounds.Top + bounds.Height / 2);
     private static void Arrange(FrameworkElement page)
     {

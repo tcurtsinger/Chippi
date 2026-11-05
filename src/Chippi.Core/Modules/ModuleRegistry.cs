@@ -256,6 +256,22 @@ public sealed class ModuleRegistry(ConfigStore config, IslandActivityHub island,
                 catch (Exception ex) { _logger.LogWarning(ex, "{Id}'s commands failed", entry.Id); }
             }
         }
+        // Settings › General's Always on, the last of the Input menu's switches, while a feature it covers runs.
+        if (_entries.Any(e => e.IsRunning && e.Descriptor.PausesInFullscreen))
+        {
+            all.Add(new ChippiCommand("input/always-on", "Always on in games", "Gamepad", () =>
+            {
+                var app = config.GetSection<AppSettings>(AppSettings.SectionName);
+                app.InputAlwaysOn = !app.InputAlwaysOn;
+                config.SetSection(AppSettings.SectionName, app);
+                return Task.CompletedTask;
+            })
+            {
+                Words = "fullscreen pause input",
+                IsOn = config.GetSection<AppSettings>(AppSettings.SectionName).InputAlwaysOn,
+                Tile = ActionsTile.Input,
+            });
+        }
         foreach (var tile in IslandTileContribution.Group(_entries.Where(e => e.IsRunning).SelectMany(e => e.IslandTiles)))
         {
             if (tile.Parts.Any(p => p.Spec.TakesKeyboard))
@@ -406,6 +422,7 @@ public sealed class ModuleRegistry(ConfigStore config, IslandActivityHub island,
             IslandPasteTarget = () => _services.IslandPasteTarget?.Invoke(),
             SettingsPasteTarget = () => _services.SettingsPasteTarget?.Invoke(),
             CloseIsland = () => _services.CloseIsland?.Invoke(),
+            CanShowIslandFeedback = () => _services.CanShowIslandFeedback?.Invoke() == true,
         };
 
         entry.Ui = ui;

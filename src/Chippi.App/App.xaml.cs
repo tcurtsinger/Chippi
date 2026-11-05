@@ -212,6 +212,21 @@ public partial class App : Application
         // [Phase 6] Smooth and linear scrolling: replaces its catalog placeholder.
         shell.Registry.Register(new Chippi.Features.SmoothScrolling.SmoothScrollingModule(Environment.GetEnvironmentVariable("CHIPPI_SMOOTH_INJECTED") == "1"));
 
+        shell.Registry.Register(new Chippi.Features.CloseProtection.CloseProtectionModule(() =>
+            new Chippi.Features.CloseProtection.WindowsCloseDesktop()));
+
+        // Native tracking: constructed lazily, acquired only when installed and switched on.
+        shell.Registry.Register(new Chippi.Features.FocusFollowsMouse.FocusFollowsMouseModule(() =>
+        {
+            // A dev run must neither change user-wide tracking nor recover the owner's journal.
+            if (!string.Equals(shell.Services.DataRoot, Chippi.Core.Modules.ModuleServices.DefaultDataRoot, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("Native focus tracking unavailable in dev profiles");
+            return new Chippi.Features.FocusFollowsMouse.FocusTrackingEngine(
+                new Chippi.Features.FocusFollowsMouse.WindowsTrackingSettings(),
+                new Chippi.Features.FocusFollowsMouse.TrackingJournal(Path.Combine(Chippi.Core.Modules.ModuleServices.DefaultDataRoot,
+                    Chippi.Features.FocusFollowsMouse.FocusFollowsMouseModule.Id, "ownership.json")));
+        }));
+
         // [WS2] "Coming soon" placeholders for the PLAN.md features.
         Settings.Features.FeatureCatalog.RegisterPlaceholders(shell.Registry);
 

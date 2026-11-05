@@ -80,6 +80,16 @@ public sealed class SmoothScrollingModule : IFeatureModule
             _context = context;
             Settings = Normalize(context.Settings.Get<SmoothScrollingSettings>());
             context.Ui.SetSettingsPage(_ => new SmoothScrollingRows(this));
+            // Both switches, as rows of Actions' Input menu and in Search.
+            context.Ui.AddCommands(() =>
+            [
+                new ChippiCommand("smooth-scrolling/smooth", "Smooth scrolling", nameof(LucideIcons.Mouse),
+                    () => Flip(linear: false))
+                { Words = "scroll wheel glide", IsOn = Settings.SmoothEnabled, Tile = ActionsTile.Input },
+                new ChippiCommand("smooth-scrolling/linear", "Linear scrolling", nameof(LucideIcons.Mouse),
+                    () => Flip(linear: true))
+                { Words = "scroll wheel acceleration steady", IsOn = Settings.LinearEnabled, Tile = ActionsTile.Input },
+            ]);
             if (context.Input is { } hub)
                 hub.PauseChanged += OnPause;
             SystemEvents.SessionSwitch += OnSession;
@@ -113,6 +123,12 @@ public sealed class SmoothScrollingModule : IFeatureModule
             Apply();
         }
         Changed?.Invoke();
+    }
+
+    private Task Flip(bool linear)
+    {
+        Update(s => linear ? s with { LinearEnabled = !s.LinearEnabled } : s with { SmoothEnabled = !s.SmoothEnabled });
+        return Task.CompletedTask;
     }
 
     private void OnPause() => _filter?.Cancel();

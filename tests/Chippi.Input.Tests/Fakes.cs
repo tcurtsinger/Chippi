@@ -86,6 +86,8 @@ internal sealed class TestFilter(string name, InputOrder order, InputDevices dev
     public List<string> Heard { get; } = [];
 
     public List<string>? Shared { get; set; }
+    public Action<InputDevices> Reset { get; set; } = _ => { };
+    public void InputReset(InputDevices devices) => Reset(devices);
 
     public bool Key(in KeyInput key)
     {

@@ -921,14 +921,15 @@ public partial class IslandWindow : Window
     /// <summary>
     /// The widget: the blob sleeps at rest and wakes on hover or while anything is live; hover brightens the
     /// rim, never the size, and the puck lifts while dragged. The widget is the bar while there is something
-    /// to show, in order: a drag from another app (the page it opens), Plain paste's feedback, the song
+    /// to show, in order: a drag from another app (the page it opens), a pending close command, Plain paste's feedback, the song
     /// playing (or paused, for <see cref="PauseHold"/>), or the highest activity. Otherwise it is the puck.
     /// During a drag only the compact puck and its status icons follow the pointer.
     /// </summary>
     private void RefreshPuck()
     {
-        // Plain paste's feedback, or else another short line like it (an agent's "80% used"), which waits while Plain paste's shows.
-        var feedback = _activities.FirstOrDefault(a => a.ModuleId == Chippi.Features.PlainPaste.PlainPasteModule.Id)
+        // A pending close command has a live second-press deadline, so it must stay visible ahead of other feedback.
+        var feedback = _activities.FirstOrDefault(a => a.ModuleId == Chippi.Features.CloseProtection.CloseProtectionModule.Id && a.IsFeedback)
+            ?? _activities.FirstOrDefault(a => a.ModuleId == Chippi.Features.PlainPaste.PlainPasteModule.Id)
             ?? _activities.FirstOrDefault(a => a.IsFeedback);
         var mic = _activities.FirstOrDefault(a => a.ModuleId == "mic-mute" && a.NeedsAttention);
         bool dropping = _dragKey is not null;
@@ -1052,7 +1053,7 @@ public partial class IslandWindow : Window
             else
             {
                 var opens = feedback.OpensTile is { } page ? _tiles.FirstOrDefault(t => t.Key == page) : null;
-                ShowGlyph(opens is null ? LucideIcons.ClipboardType : LucideIcons.Get(opens.Icon), feedback.NeedsAttention);
+                ShowGlyph(feedback.Icon is { } icon ? LucideIcons.Get(icon) : opens is null ? LucideIcons.ClipboardType : LucideIcons.Get(opens.Icon), feedback.NeedsAttention);
             }
             ShowLine(feedback.Key, feedback.Title, feedback.Source);
         }

@@ -102,7 +102,55 @@ public sealed class QuickActionsShots
             }
             finally { module.StopAsync(default).GetAwaiter().GetResult(); }
             Time(Path.Combine(folder, "actions-timings.txt"));
+            InputShots(folder);
         });
+    }
+
+    /// <summary>
+    /// The Input tile after the last tile, its menu, and its menu while a switch failed: Debounce's two switches (Click
+    /// debounce on) and Always on in games, as main has them. The timings gain stepping into the menu.
+    /// </summary>
+    private static void InputShots(string folder)
+    {
+        bool click = true, key = false, alwaysOn = false, fail = false;
+        ChippiCommand Switch(string commandKey, string name, string icon, Func<bool> on, Action flip) =>
+            new(commandKey, name, icon, () =>
+            {
+                if (fail) throw new InvalidOperationException("Fixture hook failure");
+                flip();
+                return Task.CompletedTask;
+            })
+            { IsOn = on(), Tile = ActionsTile.Input };
+        var ui = new Pages();
+        var module = new QuickActionsModule(() => new FakePc { State = MockState() }, () => new NoHotkey());
+        module.StartAsync(new ModuleContext(QuickActionsModule.Id, new Settings(), NullLogger.Instance, new IslandActivityHub().CreatePublisher(QuickActionsModule.Id), ui)
+        {
+            Commands = () =>
+            [
+                Switch("debounce/click", "Click debounce", "Mouse", () => click, () => click = !click),
+                Switch("debounce/key", "Key debounce", "Keyboard", () => key, () => key = !key),
+                Switch("input/always-on", "Always on in games", "Gamepad", () => alwaysOn, () => alwaysOn = !alwaysOn),
+            ],
+        }, default).GetAwaiter().GetResult();
+        try
+        {
+            module.Pick(QuickAction.All.Select(a => a.Id));
+            var tiles = IslandTileContribution.Group([ui.Tile!]);
+            Shoot(tiles, Path.Combine(folder, "actions-input-tile.png"));
+            Shoot(tiles, Path.Combine(folder, "actions-input-menu.png"), panel =>
+            {
+                var watch = System.Diagnostics.Stopwatch.StartNew();
+                Click(panel, "input");
+                File.AppendAllLines(Path.Combine(folder, "actions-timings.txt"), [$"Input stepping in (3 switches): {watch.Elapsed.TotalMilliseconds:0.0} ms"]);
+            });
+            fail = true;
+            Shoot(tiles, Path.Combine(folder, "actions-input-failed.png"), panel =>
+            {
+                Click(panel, "input");
+                Click(panel, "command:debounce/key");
+            });
+        }
+        finally { module.StopAsync(default).GetAwaiter().GetResult(); }
     }
 
     /// <summary>How long the page takes to build and lay out with all 18 picked: the first open (cold), later ones, and Quit apps stepping in.</summary>

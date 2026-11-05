@@ -61,9 +61,12 @@ public partial class SettingsWindow : Window
     internal static IReadOnlyList<SharedPage> SharedPages { get; } =
     [
         new("page:mouse", "Mouse", LucideIcons.Mouse, FeatureGroup.Windows,
-            [new("smooth-scrolling", Chippi.Features.SmoothScrolling.SmoothScrollingModule.MouseSection, "Scrolling"), new("debounce", Chippi.Features.Debounce.DebounceModule.MouseSection, "Clicks")]),
+            [new("focus-follows-mouse", null, null),
+             new("smooth-scrolling", Chippi.Features.SmoothScrolling.SmoothScrollingModule.MouseSection, "Scrolling"),
+             new("debounce", Chippi.Features.Debounce.DebounceModule.MouseSection, "Clicks")]),
         new("page:keyboard", "Keyboard", LucideIcons.Keyboard, FeatureGroup.Windows,
-            [new("debounce", Chippi.Features.Debounce.DebounceModule.KeyboardSection, "Key debounce")]),
+            [new("debounce", Chippi.Features.Debounce.DebounceModule.KeyboardSection, "Key debounce"),
+             new("close-protection", null, "Close protection")]),
         new("page:sound-output", "Output", LucideIcons.Speaker, FeatureGroup.Sound,
             [new("audio-routing", "output", null), new("audio-routing", Chippi.Features.Sound.Routing.AudioRoutingModule.OutputShortcutSection, "Output shortcut")]),
         new("page:sound-microphone", "Microphone", LucideIcons.Mic, FeatureGroup.Sound,
