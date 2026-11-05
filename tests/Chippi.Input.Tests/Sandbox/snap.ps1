@@ -7,6 +7,7 @@ Add-Type @"
 using System;
 using System.Runtime.InteropServices;
 public static class SnapProbe {
+    [DllImport("user32.dll")] public static extern IntPtr SetThreadDpiAwarenessContext(IntPtr context);
     [StructLayout(LayoutKind.Sequential)] public struct Rect { public int X,Y,R,B; public int Width {get{return R-X;}} public int Height {get{return B-Y;}} }
     [StructLayout(LayoutKind.Sequential)] struct Monitor { public int Size; public Rect Bounds,Work; public uint Flags; }
     [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr w,out Rect r);
@@ -31,6 +32,8 @@ public static class SnapProbe {
     public static Rect Work(IntPtr w) { var m=new Monitor{Size=Marshal.SizeOf(typeof(Monitor))}; GetMonitorInfo(MonitorFromWindow(w,2),ref m);return m.Work; }
 }
 "@
+# UI Automation and DWM use physical pixels. Keep SendInput normalization in the same coordinate space.
+[void][SnapProbe]::SetThreadDpiAwarenessContext([IntPtr](-4))
 $uia = [System.Windows.Automation.AutomationElement]
 $answer = [ordered]@{ checks = [ordered]@{}; timingsMs = @(); limits = @('Sandbox has one display and one DPI; physical mixed-DPI and monitor disconnect remain live checks') }
 function Check([string]$name, [bool]$ok) {
@@ -60,6 +63,15 @@ function Press($element) {
         }
     }
     throw "Not pressable: $($element.Current.Name)"
+}
+function ClickNamed([string]$name) {
+    $element = WaitNamed $name
+    $r = $element.Current.BoundingRectangle
+    if ($r.IsEmpty -or -not $element.Current.IsEnabled) { throw "Cannot click $name" }
+    Note "click $name at $r"
+    [Probe]::MoveTo([int]($r.X + $r.Width / 2), [int]($r.Y + $r.Height / 2))
+    [Probe]::Left($true); [Probe]::Left($false)
+    Start-Sleep -Milliseconds 250
 }
 function Shot([string]$name) {
     $screen = [System.Windows.Forms.SystemInformation]::VirtualScreen
@@ -107,7 +119,7 @@ for ($i = 0; $i -lt $verbs.Count; $i++) {
 }
 $bindings += @{ id = 'open-actions'; door = 'key'; keys = @{ modifiers = 'control, alt'; key = 57 };
     action = @{ kind = 'chippi'; value = 'page/quick-actions'; name = 'Actions' } }
-$settings = @{ version = 1; app = @{ islandEnabled = $true }; modules = @{ shortcuts = @{ bindings = $bindings } };
+$settings = @{ version = 1; app = @{ islandEnabled = $true }; modules = @{ shortcuts = @{ bindings = $bindings }; 'quick-actions' = @{ shown = @('snap') } };
     features = @{ preset = 'custom'; installed = @('window-layouts','shortcuts','quick-actions'); capabilitiesUsed = @() } }
 $settings | ConvertTo-Json -Depth 12 | Set-Content (Join-Path $profileDir 'settings.json') -Encoding UTF8
 $chippi = Start-Process 'C:\chippi\Chippi.exe' -ArgumentList '--dev-profile sandbox' -PassThru
@@ -159,7 +171,9 @@ public static class SnapEditors {
     [void][SnapProbe]::SetWindowPos($wb, [IntPtr]::Zero, 450, 200, 640, 460, 0x14)
     Start-Sleep -Seconds 3
     $original = RectText ([SnapProbe]::Visible($wa)); $untouched = RectText ([SnapProbe]::Visible($wb))
-    $answer.probeElevated = [SnapProbe]::Elevated()
+    $answer.probeTokenElevation = [SnapProbe]::Elevated()
+    $answer.probeAdminEnabled = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole('Administrators')
+    $answer.probeIntegrity = (whoami /groups /fo csv | ConvertFrom-Csv | Where-Object { $_.'Group Name' -like 'Mandatory Label*' }).'Group Name'
     Shot 'before'
     $work = [SnapProbe]::Work($wa)
     $left = Place 49 $wa
@@ -189,6 +203,7 @@ public static class SnapEditors {
 
     # Use Settings as the owner does, without changing any settings outside this dev profile.
     $null = Start-Process 'C:\chippi\Chippi.exe' -ArgumentList '--dev-profile sandbox' -PassThru
+    Press (WaitNamed 'Settings')
     $settingsWindow = WaitNamed 'Chippi Settings'
     $nav = $settingsWindow.FindAll([System.Windows.Automation.TreeScope]::Descendants, [System.Windows.Automation.Condition]::TrueCondition) |
         Where-Object { $_.Current.Name -like '*Id = module:window-layouts,*' -or $_.Current.Name -like '*Id = window-layouts,*' } | Select-Object -First 1
@@ -226,9 +241,18 @@ public static class SnapEditors {
     Start-Sleep -Milliseconds 300
 
     Activate $wa
+    # Close an island left open behind Settings, then capture this editor on a fresh opening.
+    [Probe]::Key(0x1B,$true); [Probe]::Key(0x1B,$false)
+    Start-Sleep -Milliseconds 200
     Chord 57
-    Press (WaitNamed 'Snap')
-    Press (WaitNamed 'Halves: Left half')
+    Start-Sleep -Milliseconds 900
+    ClickNamed 'Snap'
+    # Finish Actions' first-run selection before opening the selected Snap tile.
+    if ((Named 'Done').Current.IsEnabled -and -not (Named 'Done').Current.IsOffscreen) { ClickNamed 'Done'; ClickNamed 'Snap' }
+    Shot 'menu-before'
+    $half = WaitNamed 'Halves: Left half'
+    Check 'menu-captured-normal-target' $half.Current.IsEnabled
+    Press $half
     Start-Sleep -Milliseconds 200
     $restore = WaitNamed 'Restore'
     Check 'menu-restore-becomes-available' $restore.Current.IsEnabled

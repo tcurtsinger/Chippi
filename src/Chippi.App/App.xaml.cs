@@ -251,7 +251,10 @@ public partial class App : Application
         var windowLayouts = new Chippi.Features.WindowLayouts.WindowLayoutsModule(SnapDisplaySource.Connected);
         shell.Registry.Register(windowLayouts);
         if (shell.Services.Actions is Chippi.UI.Actions.WindowsActionPc windowPc)
+        {
             windowPc.SnapZones = windowLayouts.ResolveZone;
+            windowPc.SnapFailed = target => windowLayouts.ReportFailure(target.App);
+        }
         windowLayouts.CreateOverlay = () => new Chippi.Features.WindowLayouts.Views.ZoneOverlay();
 
         // [WS2] "Coming soon" placeholders for the PLAN.md features.

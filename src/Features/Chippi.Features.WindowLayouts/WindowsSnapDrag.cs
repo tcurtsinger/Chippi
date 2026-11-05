@@ -21,6 +21,7 @@ public sealed class WindowsSnapDrag : IDisposable
     private nint _hook, _desktopHook;
     private bool _disposed;
     private nint _window;
+    private string _targetApp = "Snap";
     private readonly Dispatcher _ui = Dispatcher.CurrentDispatcher;
     public event Action<string>? Failed;
 
@@ -62,6 +63,7 @@ public sealed class WindowsSnapDrag : IDisposable
                     || !Down(0x10) || !Down(1) || !Caption(window)) return;
                 if (_capture(window) is not { Elevated: false } target) return;
                 _window = window;
+                _targetApp = target.App;
                 _drag.Begin(target);
                 Tick(this, EventArgs.Empty);
                 if (_drag.Active) _timer.Start();
@@ -77,7 +79,7 @@ public sealed class WindowsSnapDrag : IDisposable
         {
             _drag.Cancel();
             _timer.Stop();
-            Failed?.Invoke("Snap failed");
+            Failed?.Invoke(_targetApp);
         }
     }
 

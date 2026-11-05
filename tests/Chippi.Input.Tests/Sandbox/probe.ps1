@@ -10,7 +10,7 @@ $ErrorActionPreference = 'Stop'
 $results = 'C:\results'
 $checks = (Get-Content -LiteralPath "$results\checks.txt") -split ','
 if ($checks -contains 'snap' -and -not $SnapMedium) {
-    try { & (Join-Path $PSScriptRoot 'snap-medium.ps1') }
+    try { & (Join-Path $PSScriptRoot 'snap-medium.ps1'); shutdown.exe /s /t 5 }
     catch {
         @{ checks = $checks; error = $_.ToString(); errorLocation = $_.ScriptStackTrace } | ConvertTo-Json |
             Set-Content -LiteralPath "$results\results.json" -Encoding UTF8

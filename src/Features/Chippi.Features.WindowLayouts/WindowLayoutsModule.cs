@@ -3,6 +3,7 @@
 
 using Chippi.Core.Actions;
 using Chippi.Core.Modules;
+using Chippi.Core.Island;
 using Microsoft.Win32;
 using System.Windows.Threading;
 
@@ -17,6 +18,7 @@ public sealed class WindowLayoutsModule(Func<IReadOnlyList<SnapDisplay>>? displa
     private WindowsSnapDrag? _nativeDrag;
     private IZoneOverlay? _overlay;
     private Dispatcher? _ui;
+    private DispatcherTimer? _failureTimer;
     public Func<IZoneOverlay>? CreateOverlay { get; set; }
     public IReadOnlyList<SnapDisplay> Displays => displays?.Invoke() ?? [];
     public event Action? DisplaysChanged;
@@ -50,6 +52,9 @@ public sealed class WindowLayoutsModule(Func<IReadOnlyList<SnapDisplay>>? displa
         SystemEvents.DisplaySettingsChanged -= DisplaySettingsChanged;
         StopDrag();
         if (Layouts is { } layouts) layouts.Changed -= LayoutsChanged;
+        _failureTimer?.Stop();
+        _failureTimer = null;
+        _context?.Island.Clear("snap-failed");
         Layouts = null;
         _runner = null;
         _context = null;
@@ -78,13 +83,36 @@ public sealed class WindowLayoutsModule(Func<IReadOnlyList<SnapDisplay>>? displa
             _overlay = CreateOverlay();
             var controller = new SnapDragController(this, () => Displays, _overlay);
             _nativeDrag = new WindowsSnapDrag(this, _context.Input, pc.CaptureWindow, controller);
-            _nativeDrag.Failed += error => Failed?.Invoke(error);
+            _nativeDrag.Failed += ReportFailure;
         }
         catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException)
         {
             StopDrag();
-            Failed?.Invoke("Snap failed");
+            ReportFailure("Snap");
         }
+    }
+
+    /// <summary>Uses the shell's transient action-failure bar, including actions fired through other doors.</summary>
+    public void ReportFailure(string app)
+    {
+        if (_ui is null) return;
+        if (!_ui.CheckAccess()) { _ui.BeginInvoke(() => ReportFailure(app)); return; }
+        if (_context is not { } context) return;
+        Failed?.Invoke("Snap failed");
+        if (!context.CanShowIslandFeedback()) return;
+        context.Island.Publish(new IslandActivity("snap-failed", IslandActivityKind.Status, "Snap failed", app)
+        { IsFeedback = true, NeedsAttention = true, Icon = "LayoutGrid" });
+        if (_failureTimer is null)
+        {
+            _failureTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(6) };
+            _failureTimer.Tick += (_, _) =>
+            {
+                _failureTimer.Stop();
+                _context?.Island.Clear("snap-failed");
+            };
+        }
+        _failureTimer.Stop();
+        _failureTimer.Start();
     }
 
     private void StopDrag()

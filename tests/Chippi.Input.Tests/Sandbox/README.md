@@ -54,7 +54,9 @@ features the check needs.
 ## Snap
 
 Pass -Checks snap with a self-contained Release x64 app. This check installs only Snap, Shortcuts and Quick actions
-in the sandbox dev profile. It creates two text files in the results folder and opens them in separate Notepad windows.
+in the sandbox dev profile. It creates two text files in the results folder and opens them in separate Notepad windows
+(standard WinForms editors when Notepad is absent). The guest launcher uses a restricted medium-integrity token
+with the guest console, so native GUI startup works even when the Sandbox image has UAC disabled.
 It exercises placement and Restore through the shared action runner, creates and assigns a layout in Settings through
 UI Automation, then drives native Shift+drag, Escape and Shift release. Its screenshots, assertions and DWM-sampled
 placement timings are written to the output folder. It never accesses the clipboard.

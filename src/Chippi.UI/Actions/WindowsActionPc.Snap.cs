@@ -13,6 +13,7 @@ namespace Chippi.UI.Actions;
 public sealed partial class WindowsActionPc : IDisposable
 {
     public Func<ActionWindow, bool>? SnapPaused { get; set; }
+    public Action<ActionWindow>? SnapFailed { get; set; }
     public Func<string, string, WindowZone?>? SnapZones { get; set; }
     private sealed record SnapHistory(ActionWindow Target, Placement Baseline, Native.Rect Expected, bool Maximized);
     private readonly Dictionary<nint, SnapHistory> _snapHistory = [];
@@ -127,6 +128,7 @@ public sealed partial class WindowsActionPc : IDisposable
         catch (ActionFailure ex)
         {
             Chippi.Core.Diagnostics.Log.Warn($"Window {action} failed for {target.App}: {ex.Message}");
+            if (IsSnapAction(action)) SnapFailed?.Invoke(target);
             throw;
         }
     }
@@ -258,6 +260,12 @@ public sealed partial class WindowsActionPc : IDisposable
 
     public void WindowZone(ActionWindow target, string layoutId, string zoneId, nint monitor = 0)
     {
+        try { PlaceZone(target, layoutId, zoneId, monitor); }
+        catch (ActionFailure) { SnapFailed?.Invoke(target); throw; }
+    }
+
+    private void PlaceZone(ActionWindow target, string layoutId, string zoneId, nint monitor)
+    {
         Validate(target);
         Validate(target, snapping: true);
         var zone = SnapZones?.Invoke(layoutId, zoneId) ?? throw new ActionFailure("Zone removed");
@@ -307,10 +315,26 @@ public sealed partial class WindowsActionPc : IDisposable
     private static bool IsElevated(nint process)
     {
         if (!OpenProcessToken(process, 8, out nint token)) return true;
-        try { return !GetTokenInformation(token, 20, out int elevated, sizeof(int), out _) || elevated != 0; }
-        finally { CloseHandle(token); }
+        nint buffer = 0;
+        try
+        {
+            // UIPI follows integrity, as the input/clipboard guards do. TokenElevation can remain true on
+            // a restricted medium token in a UAC-disabled session (Windows Sandbox).
+            GetTokenInformation(token, 25, 0, 0, out int needed); // TokenIntegrityLevel
+            if (needed <= 0) return true;
+            buffer = Marshal.AllocHGlobal(needed);
+            if (!GetTokenInformation(token, 25, buffer, needed, out _)) return true;
+            nint sid = Marshal.ReadIntPtr(buffer);
+            if (!IsValidSid(sid)) return true;
+            int count = Marshal.ReadByte(GetSidSubAuthorityCount(sid));
+            return count == 0 || Marshal.ReadInt32(GetSidSubAuthority(sid, (uint)(count - 1))) >= 0x3000; // high
+        }
+        finally
+        {
+            if (buffer != 0) Marshal.FreeHGlobal(buffer);
+            CloseHandle(token);
+        }
     }
-
     private delegate void WindowEvent(nint hook, uint kind, nint window, int objectId, int childId, uint thread, uint time);
     [DllImport("user32.dll", SetLastError = true)]
     private static extern nint SetWinEventHook(uint min, uint max, nint module, WindowEvent callback, uint process, uint thread, uint flags);
@@ -328,7 +352,10 @@ public sealed partial class WindowsActionPc : IDisposable
     [DllImport("user32.dll", EntryPoint = "GetWindowTextW", CharSet = CharSet.Unicode)]
     private static extern int GetWindowText(nint hwnd, StringBuilder text, int length);
     [DllImport("advapi32.dll")] private static extern bool OpenProcessToken(nint process, uint access, out nint token);
-    [DllImport("advapi32.dll")] private static extern bool GetTokenInformation(nint token, int cls, out int value, int size, out int needed);
+    [DllImport("advapi32.dll")] private static extern bool GetTokenInformation(nint token, int cls, nint value, int size, out int needed);
+    [DllImport("advapi32.dll")] private static extern bool IsValidSid(nint sid);
+    [DllImport("advapi32.dll")] private static extern nint GetSidSubAuthorityCount(nint sid);
+    [DllImport("advapi32.dll")] private static extern nint GetSidSubAuthority(nint sid, uint index);
     [DllImport("kernel32.dll")] private static extern nint OpenProcess(uint access, bool inherit, uint process);
     [DllImport("kernel32.dll", EntryPoint = "QueryFullProcessImageNameW", CharSet = CharSet.Unicode)]
     private static extern bool QueryFullProcessImageName(nint process, uint flags, StringBuilder path, ref int size);

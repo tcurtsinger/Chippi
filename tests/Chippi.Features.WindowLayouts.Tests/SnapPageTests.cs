@@ -59,12 +59,13 @@ public sealed class SnapPageTests
     {
         public readonly Store Store = new();
         public readonly Ui Ui = new();
+        public readonly IslandActivityHub Island = new();
         public readonly WindowLayoutsModule Module = new(() => [Dell, Laptop]);
 
         public SnapPage Start(WindowLayoutsSettings settings)
         {
             Store.Value = settings;
-            Module.StartAsync(new ModuleContext(WindowLayoutsModule.Id, Store, NullLogger.Instance, new IslandActivityHub().CreatePublisher(WindowLayoutsModule.Id), Ui), default).GetAwaiter().GetResult();
+            Module.StartAsync(new ModuleContext(WindowLayoutsModule.Id, Store, NullLogger.Instance, Island.CreatePublisher(WindowLayoutsModule.Id), Ui) { CanShowIslandFeedback = () => true }, default).GetAwaiter().GetResult();
             return (SnapPage)Ui.Page!(null);
         }
     }
@@ -77,6 +78,23 @@ public sealed class SnapPageTests
         DisplayLayouts = new(StringComparer.OrdinalIgnoreCase) { [Dell.Id] = "coding" },
         ExcludedApps = [Path.Combine(Environment.SystemDirectory, "notepad.exe")],
     };
+
+    [Fact]
+    public void SnapFailureUsesTheTargetAppAndClearsWhenStopped()
+    {
+        WpfTestThread.Run(() =>
+        {
+            var f = new Fixture();
+            f.Start(new());
+            f.Module.ReportFailure("Notepad");
+            var feedback = Assert.Single(f.Island.Activities);
+            Assert.Equal("Snap failed", feedback.Title);
+            Assert.Equal("Notepad", feedback.Source);
+            Assert.True(feedback.IsFeedback);
+            f.Module.StopAsync(default).GetAwaiter().GetResult();
+            Assert.Empty(f.Island.Activities);
+        });
+    }
 
     private static void Theme()
     {
