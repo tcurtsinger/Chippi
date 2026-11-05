@@ -51,6 +51,22 @@ public sealed class ModuleTests
             { Input = Hub, Shortcuts = Service }, default);
     }
 
+    [Theory]
+    [InlineData(CapsTap.Capitals, "Caps Lock")]
+    [InlineData(CapsTap.Escape, "Esc")]
+    [InlineData(CapsTap.InputLanguage, "Win+Space")]
+    public async Task A_quick_tap_uses_a_parseable_shared_key_action(CapsTap tap, string expected)
+    {
+        var rig = new Rig(new ShortcutsSettings { CapsEnabled = true, CapsTap = tap });
+        await rig.StartAsync();
+        var filter = Assert.Single(rig.Hub.Filters);
+        filter.Key(new KeyInput(0x14, 0, true, false, false, false, 0));
+        filter.Key(new KeyInput(0x14, 0, false, false, false, false, 1));
+        await rig.Actions.Ran.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal(expected, Assert.Single(rig.Actions.Values));
+        Assert.NotNull(KeyCombo.Parse(expected));
+        await rig.Module.StopAsync(default);
+    }
     [Fact]
     public async Task Caps_starts_off_then_runs_a_binding_and_drops_its_filter_on_pause_and_stop()
     {
@@ -367,6 +383,7 @@ public sealed class ModuleTests
 
     private sealed class FakeActions : IActionHost
     {
+        public List<string> Values { get; } = [];
         public List<(string Name, WindowTarget Target)> Runs { get; } = [];
         public HashSet<string> Missing { get; } = [];
         public string? Fail { get; set; }
@@ -374,6 +391,7 @@ public sealed class ModuleTests
 
         public Task RunAsync(ChippiAction action, WindowTarget target)
         {
+            Values.Add(action.Value);
             Runs.Add((action.Name, target));
             Ran.TrySetResult();
             return Fail is null ? Task.CompletedTask : Task.FromException(new ActionFailure(Fail));
