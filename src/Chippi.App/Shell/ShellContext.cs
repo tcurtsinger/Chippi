@@ -44,7 +44,8 @@ public sealed class ShellContext
         // Its thread starts on first use; no hook goes in until a feature needs one.
         Services.Input = Input = new InputHub(loggerFactory.CreateLogger("Input"));
         // One message-only window for every feature's shortcut; it opens with the first one set.
-        Services.Shortcuts = Shortcuts = new Chippi.Core.Shortcuts.ShortcutService(new Chippi.UI.Shortcuts.HotkeyWindow(System.Windows.Threading.Dispatcher.CurrentDispatcher));
+        Hotkeys = new Chippi.UI.Shortcuts.HotkeyWindow(System.Windows.Threading.Dispatcher.CurrentDispatcher);
+        Services.Shortcuts = Shortcuts = new Chippi.Core.Shortcuts.ShortcutService(Hotkeys);
         // Always on and Pause in these apps (Settings › General): kept until the hub's thread starts, then applied live.
         void ApplyPauseRules() => Input.Rules = config.GetSection<AppSettings>(AppSettings.SectionName).PauseRules();
         ApplyPauseRules();
@@ -93,6 +94,9 @@ public sealed class ShellContext
 
     /// <summary>Every shortcut Chippi holds, for Settings › Shortcuts.</summary>
     public Chippi.Core.Shortcuts.ShortcutService Shortcuts { get; }
+
+    /// <summary>The shortcuts' window. Disposed at exit, after the modules stop.</summary>
+    public Chippi.UI.Shortcuts.HotkeyWindow Hotkeys { get; }
 
 #if DEBUG
     private readonly Timer? _dropHooks;

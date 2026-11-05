@@ -104,6 +104,11 @@ public sealed class ShortcutServiceTests
         Assert.Empty(service.List);
         Assert.Empty(windows.Held);
         Assert.False(mute.Register(CtrlShiftM, () => pressed++)); // a disposed shortcut holds nothing
+        int changes = 0;
+        service.Changed += () => changes++;
+        mute.Unregister();
+        mute.Dispose();
+        Assert.Equal(0, changes); // a disposed shortcut reports nothing more
         Assert.Empty(windows.Held);
         Assert.Equal(0, pressed);
     }

@@ -123,6 +123,8 @@ public sealed class ShortcutService : IShortcutService
 
     private void Unregister(Entry entry)
     {
+        if (entry.Disposed)
+            return;
         if (entry.Id != 0)
             _registrar.Unregister(entry.Id);
         entry.Id = 0;
