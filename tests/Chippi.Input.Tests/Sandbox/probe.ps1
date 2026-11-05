@@ -559,11 +559,11 @@ public static class Probe
             [Probe]::MoveTo($x, $y)
             Start-Sleep -Milliseconds 300
             $before = [Probe]::Foreground()
-            $capsBefore = if (Test-Path "$results\caps-state.txt") { Get-Content "$results\caps-state.txt" } else { 'unchecked' }
+            $capsBefore = if (Test-Path "$results\caps-state.txt") { [IO.File]::ReadAllText("$results\caps-state.txt").Trim() } else { 'unchecked' }
             $hitsBefore = [Probe]::Hits
             & $act
             Start-Sleep -Milliseconds 1500
-            $sc[$name] = [ordered]@{ actions = ((Actions) -join '; '); targetHeard = ((TargetLog) -join '; '); foreground = "$before -> $([Probe]::Foreground())"; otherAppHotkeyHeard = [Probe]::Hits - $hitsBefore; capsBefore = $capsBefore; capsAfter = $(if (Test-Path "$results\caps-state.txt") { Get-Content "$results\caps-state.txt" } else { "unchecked" }) }
+            $sc[$name] = [ordered]@{ actions = ((Actions) -join '; '); targetHeard = ((TargetLog) -join '; '); foreground = "$before -> $([Probe]::Foreground())"; otherAppHotkeyHeard = [Probe]::Hits - $hitsBefore; capsBefore = $capsBefore; capsAfter = $(if (Test-Path "$results\caps-state.txt") { [IO.File]::ReadAllText("$results\caps-state.txt").Trim() } else { "unchecked" }) }
             Note "shortcuts $name : fired [$((Actions) -join '; ')] target heard [$((TargetLog) -join '; ')] other app heard $([Probe]::Hits - $hitsBefore) foreground $($sc[$name].foreground)"
             Start-Sleep -Milliseconds 300
         }
