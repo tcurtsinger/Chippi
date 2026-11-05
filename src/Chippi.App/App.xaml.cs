@@ -215,10 +215,15 @@ public partial class App : Application
 
         // Native tracking: constructed lazily, acquired only when installed and switched on.
         shell.Registry.Register(new Chippi.Features.FocusFollowsMouse.FocusFollowsMouseModule(() =>
-            new Chippi.Features.FocusFollowsMouse.FocusTrackingEngine(
+        {
+            // A dev run must neither change user-wide tracking nor recover the owner's journal.
+            if (!string.Equals(shell.Services.DataRoot, Chippi.Core.Modules.ModuleServices.DefaultDataRoot, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("Native focus tracking unavailable in dev profiles");
+            return new Chippi.Features.FocusFollowsMouse.FocusTrackingEngine(
                 new Chippi.Features.FocusFollowsMouse.WindowsTrackingSettings(),
-                new Chippi.Features.FocusFollowsMouse.TrackingJournal(Path.Combine(shell.Services.DataRoot,
-                    Chippi.Features.FocusFollowsMouse.FocusFollowsMouseModule.Id, "ownership.json")))));
+                new Chippi.Features.FocusFollowsMouse.TrackingJournal(Path.Combine(Chippi.Core.Modules.ModuleServices.DefaultDataRoot,
+                    Chippi.Features.FocusFollowsMouse.FocusFollowsMouseModule.Id, "ownership.json")));
+        }));
 
         // [WS2] "Coming soon" placeholders for the PLAN.md features.
         Settings.Features.FeatureCatalog.RegisterPlaceholders(shell.Registry);
