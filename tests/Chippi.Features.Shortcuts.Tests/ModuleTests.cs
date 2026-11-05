@@ -51,6 +51,46 @@ public sealed class ModuleTests
             { Input = Hub, Shortcuts = Service }, default);
     }
 
+    [Theory]
+    [InlineData(CapsTap.Capitals, "Caps Lock")]
+    [InlineData(CapsTap.Escape, "Esc")]
+    [InlineData(CapsTap.InputLanguage, "Win+Space")]
+    public async Task A_quick_tap_uses_a_parseable_shared_key_action(CapsTap tap, string expected)
+    {
+        var rig = new Rig(new ShortcutsSettings { CapsEnabled = true, CapsTap = tap });
+        await rig.StartAsync();
+        var filter = Assert.Single(rig.Hub.Filters);
+        filter.Key(new KeyInput(0x14, 0, true, false, false, false, 0));
+        filter.Key(new KeyInput(0x14, 0, false, false, false, false, 1));
+        await rig.Actions.Ran.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal(expected, Assert.Single(rig.Actions.Values));
+        Assert.NotNull(KeyCombo.Parse(expected));
+        await rig.Module.StopAsync(default);
+    }
+    [Fact]
+    public async Task Caps_starts_off_then_runs_a_binding_and_drops_its_filter_on_pause_and_stop()
+    {
+        var binding = new ShortcutBinding { Door = BindingDoor.Caps, CapsKey = 0x4B,
+            Action = new ChippiAction { Kind = ActionKind.Window, Value = "Maximize", Name = "Maximize" } };
+        var rig = new Rig(new ShortcutsSettings { Bindings = [binding] });
+        await rig.StartAsync();
+        Assert.Empty(rig.Hub.Filters);
+        Assert.Equal(BindingState.Inactive, rig.Module.StatusOf(binding.Id).State);
+        rig.Module.ConfigureCaps(true, 0x14, KeyModifiers.Ctrl, CapsTap.Nothing, []);
+        var filter = Assert.Single(rig.Hub.Filters);
+        Assert.True(filter.Key(new KeyInput(0x14, 0, true, false, false, false, 0)));
+        Assert.True(filter.Key(new KeyInput(0x4B, 0, true, false, false, false, 1)));
+        await rig.Actions.Ran.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal(("Maximize", WindowTarget.InFront), Assert.Single(rig.Actions.Runs));
+        rig.Hub.Paused = true;
+        rig.Hub.RaisePause();
+        Assert.Empty(rig.Hub.Filters);
+        rig.Hub.Paused = false;
+        rig.Hub.RaisePause();
+        Assert.Single(rig.Hub.Filters);
+        await rig.Module.StopAsync(default);
+        Assert.Empty(rig.Hub.Filters);
+    }
     [Fact]
     public async Task A_key_binding_is_one_of_the_services_shortcuts_and_pressing_it_runs_its_action_on_the_window_in_front()
     {
@@ -343,6 +383,7 @@ public sealed class ModuleTests
 
     private sealed class FakeActions : IActionHost
     {
+        public List<string> Values { get; } = [];
         public List<(string Name, WindowTarget Target)> Runs { get; } = [];
         public HashSet<string> Missing { get; } = [];
         public string? Fail { get; set; }
@@ -350,6 +391,7 @@ public sealed class ModuleTests
 
         public Task RunAsync(ChippiAction action, WindowTarget target)
         {
+            Values.Add(action.Value);
             Runs.Add((action.Name, target));
             Ran.TrySetResult();
             return Fail is null ? Task.CompletedTask : Task.FromException(new ActionFailure(Fail));

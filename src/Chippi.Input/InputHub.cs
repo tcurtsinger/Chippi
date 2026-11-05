@@ -76,6 +76,10 @@ public sealed class InputHub : IInputHub, IDisposable
 
     public bool FullscreenInFront => _fullscreen;
 
+    private readonly bool _selfElevated = Native.Elevated(0) == true;
+    private volatile bool _foregroundElevated;
+    public bool ForegroundElevated => _foregroundElevated;
+
     public string? ForegroundApp => Volatile.Read(ref _foregroundApp);
 
     public event Action? PauseChanged
@@ -279,6 +283,7 @@ public sealed class InputHub : IInputHub, IDisposable
                 }
             }
         }
+        _foregroundElevated = Native.Elevated(foreground) is not { } elevated || (elevated && !_selfElevated);
         string? app = Native.AppPath(foreground);
         Volatile.Write(ref _foregroundApp, app);
         _core!.Foreground(FullscreenCheck.IsFullscreen(foreground), app);

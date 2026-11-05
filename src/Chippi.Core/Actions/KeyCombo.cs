@@ -84,7 +84,7 @@ public readonly record struct KeyCombo(KeyModifiers Modifiers, uint Key)
     {
         var names = new Dictionary<uint, string>
         {
-            [0x08] = "Backspace", [0x09] = "Tab", [0x0D] = "Enter", [0x13] = "Pause", [0x1B] = "Esc", [0x20] = "Space",
+            [0x08] = "Backspace", [0x09] = "Tab", [0x0D] = "Enter", [0x13] = "Pause", [0x14] = "Caps Lock", [0x1B] = "Esc", [0x20] = "Space",
             [0x21] = "Page Up", [0x22] = "Page Down", [0x23] = "End", [0x24] = "Home",
             [0x25] = "Left", [0x26] = "Up", [0x27] = "Right", [0x28] = "Down",
             [0x2C] = "Print Screen", [0x2D] = "Insert", [0x2E] = "Delete", [0x5D] = "Menu",

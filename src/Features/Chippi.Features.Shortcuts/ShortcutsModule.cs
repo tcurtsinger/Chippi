@@ -47,6 +47,9 @@ public sealed class ShortcutsModule : IFeatureModule
     private readonly List<Slot> _slots = [];
     private ModuleContext? _context;
     private SynchronizationContext? _ui;
+    private CapsTriggerFilter? _caps;
+    private IInputRegistration? _capsRegistration;
+    public string? CapsError { get; private set; }
     private MouseTriggerFilter? _mouse;
     private IInputRegistration? _mouseRegistration;
     private Action? _pauseListener;
@@ -95,6 +98,7 @@ public sealed class ShortcutsModule : IFeatureModule
                 hub.PauseChanged -= _pauseListener;
             _pauseListener = null;
             Clear();
+            StopCaps();
             _mouseRegistration?.Dispose();
             _mouseRegistration = null;
             _mouse = null;
@@ -161,6 +165,14 @@ public sealed class ShortcutsModule : IFeatureModule
     /// Why a binding can't be added or changed to this, in the words the editor shows by Save (Travis, 2026-11-05: a shortcut
     /// in use is refused there, not saved with a warning); null when it can.
     /// </summary>
+    public void ConfigureCaps(bool enabled, uint heldKey, KeyModifiers modifiers, CapsTap tap, IEnumerable<string> ignoredApps)
+    {
+        if (heldKey is not (0x14 or 0xA3 or 0xA1 or 0x5C)) throw new ArgumentOutOfRangeException(nameof(heldKey));
+        if (((uint)modifiers & ~15u) != 0 || !Enum.IsDefined(tap)) throw new ArgumentOutOfRangeException(nameof(modifiers));
+        lock (_gate)
+            Save(Settings with { CapsEnabled = enabled, CapsHeldKey = heldKey, CapsModifiers = modifiers, CapsTap = tap,
+                CapsIgnoredApps = [.. ignoredApps.Where(a => !string.IsNullOrWhiteSpace(a)).Distinct(StringComparer.OrdinalIgnoreCase)] });
+    }
     private string? Check(ShortcutBinding binding, string? except)
     {
         if (binding.Door == BindingDoor.Key)
@@ -168,12 +180,18 @@ public sealed class ShortcutsModule : IFeatureModule
             if (binding.Keys is not { IsBindable: true })
                 return "Pick a shortcut with Ctrl, Alt or the Windows key.";
         }
+        else if (binding.Door == BindingDoor.Caps)
+        {
+            if (binding.CapsKey is < 1 or > 254 || binding.CapsKey == Settings.CapsHeldKey || KeyCombo.ModifierOf(binding.CapsKey) != KeyModifiers.None)
+                return "Pick a key.";
+        }
         else if (!Enum.IsDefined(binding.Button))
             return "Pick a button.";
         if (Settings.Bindings.FirstOrDefault(b => b.Id != except && b.SameDoor(binding)) is { } other)
             return $"{other.Label} already uses this";
         if (binding.Door == BindingDoor.Mouse)
             return binding.Button <= MouseTrigger.Forward && _radialHolds(binding.Button) ? RadialText : null;
+        if (binding.Door == BindingDoor.Caps) return null;
         var keys = binding.Keys!;
         if (WindowsKeys.IsReserved(keys))
             return WindowsText;
@@ -207,8 +225,11 @@ public sealed class ShortcutsModule : IFeatureModule
     private static ShortcutsSettings Normalize(ShortcutsSettings s) => s with
     {
         MouseIgnoredApps = s.MouseIgnoredApps ?? [],
+        CapsIgnoredApps = s.CapsIgnoredApps ?? [],
+        CapsHeldKey = s.CapsHeldKey is 0x14 or 0xA3 or 0xA1 or 0x5C ? s.CapsHeldKey : 0x14,
+        CapsModifiers = s.CapsModifiers & (KeyModifiers)15,
         Bindings = [.. (s.Bindings ?? []).Where(b => b is not null)
-            .Where(b => b.Door == BindingDoor.Key ? b.Keys is not null : Enum.IsDefined(b.Button))
+            .Where(b => b.Door == BindingDoor.Key ? b.Keys is not null : b.Door == BindingDoor.Caps ? b.CapsKey is > 0 and < 255 : b.Door == BindingDoor.Mouse && Enum.IsDefined(b.Button))
             .GroupBy(b => b.Id).Select(g => g.First())],
     };
 
@@ -255,6 +276,11 @@ public sealed class ShortcutsModule : IFeatureModule
                     slot.Status = new BindingStatus(BindingState.HeldByRadial, "This button opens the Radial menu now, so the shortcut waits.");
                 continue;
             }
+            if (binding.Door == BindingDoor.Caps)
+            {
+                if (!Settings.CapsEnabled) slot.Status = new BindingStatus(BindingState.Inactive);
+                continue;
+            }
             var keys = binding.Keys!;
             if (!keys.IsBindable)
             {
@@ -281,8 +307,61 @@ public sealed class ShortcutsModule : IFeatureModule
                 slot.Status = new BindingStatus(BindingState.InUseByApp, "In use by another app");
         }
         ApplyMouse(host);
+        ApplyCaps(host);
     }
 
+    private void StopCaps()
+    {
+        _caps?.Set(0, KeyModifiers.None, [], []);
+        _capsRegistration?.Dispose();
+        _capsRegistration = null;
+        _caps = null;
+    }
+
+    private void ApplyCaps(IActionHost? host)
+    {
+        StopCaps(); // replacing the registration releases every modifier through the hub
+        CapsError = null;
+        var hub = _context?.Input;
+        if (!Settings.CapsEnabled || hub is null || host is null || hub.Paused) return;
+        var filter = new CapsTriggerFilter
+        {
+            ForegroundApp = () => hub.ForegroundApp,
+            Blocked = () => hub.ForegroundElevated,
+            Fired = key => Post(() =>
+            {
+                lock (_gate)
+                    if (_slots.FirstOrDefault(s => s.Binding.Door == BindingDoor.Caps && s.Binding.CapsKey == key && s.Status.Acts) is { } slot)
+                        RunBinding(slot.Binding.Id, _actions(), WindowTarget.InFront);
+            }),
+            Tapped = () => Post(() =>
+            {
+                string? keys = Settings.CapsTap switch { CapsTap.Capitals => "Caps Lock", CapsTap.Escape => "Esc", CapsTap.InputLanguage => "Win+Space", _ => null };
+                if (keys is not null)
+                    _ = RunTapAsync(host, keys);
+            }),
+        };
+        try
+        {
+            var registration = hub.Add(filter);
+            filter.Hold = (key, modifiers) => registration.HoldModifiers(key, modifiers);
+            filter.Set(Settings.CapsHeldKey, Settings.CapsModifiers,
+                _slots.Where(s => s.Binding.Door == BindingDoor.Caps && s.Status.Acts).Select(s => s.Binding.CapsKey), Settings.CapsIgnoredApps);
+            _capsRegistration = registration;
+            _caps = filter;
+        }
+        catch (Exception ex)
+        {
+            CapsError = "Watching the keyboard failed";
+            Log.Warn("Shortcuts: the keyboard hook failed", ex);
+        }
+    }
+
+    private static async Task RunTapAsync(IActionHost host, string keys)
+    {
+        try { await host.RunAsync(new ChippiAction { Kind = ActionKind.Keys, Value = keys }, WindowTarget.InFront); }
+        catch (Exception ex) { Log.Warn("Shortcuts: tap failed", ex); }
+    }
     private void ApplyMouse(IActionHost? host)
     {
         var hub = _context?.Input;

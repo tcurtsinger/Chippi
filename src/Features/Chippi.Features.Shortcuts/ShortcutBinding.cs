@@ -6,8 +6,10 @@ using Chippi.Core.Shortcuts;
 
 namespace Chippi.Features.Shortcuts;
 
-/// <summary>The ways a binding is triggered. The Caps Lock combo joins in the next PR.</summary>
-public enum BindingDoor { Key, Mouse }
+/// <summary>The ways a binding is triggered: a registered key, a mouse button or a Caps combo.</summary>
+public enum BindingDoor { Key, Mouse, Caps }
+
+public enum CapsTap { Nothing, Capitals, Escape, InputLanguage }
 
 /// <summary>The buttons and directions a binding may take (docs/phase-6/shortcuts.md). Left, right and wheel up and down are never offered.</summary>
 public enum MouseTrigger { Middle, Back, Forward, WheelLeft, WheelRight }
@@ -27,12 +29,14 @@ public sealed record ShortcutBinding
     /// <summary>A Mouse door's button or direction.</summary>
     public MouseTrigger Button { get; init; }
 
+    public uint CapsKey { get; init; }
+
     /// <summary>What the action is called in a message: its name, else its kind.</summary>
     public string Label => string.IsNullOrWhiteSpace(Action.Name) ? Action.Kind.ToString() : Action.Name;
 
     /// <summary>The same door, whatever the action: two of these can't both be on the list.</summary>
     public bool SameDoor(ShortcutBinding other) =>
-        Door == other.Door && (Door == BindingDoor.Key ? Keys is not null && Keys == other.Keys : Button == other.Button);
+        Door == other.Door && (Door == BindingDoor.Key ? Keys is not null && Keys == other.Keys : Door == BindingDoor.Caps ? CapsKey == other.CapsKey : Button == other.Button);
 }
 
 /// <summary>What a row shows besides its door (docs/phase-6/shortcuts.md, States and clashes).</summary>
@@ -74,6 +78,12 @@ public sealed record BindingResult(string? Error)
 /// <summary>Settings › Shortcuts. The Mouse buttons section's switch starts off, even once installed (task 226).</summary>
 public sealed record ShortcutsSettings
 {
+    public bool CapsEnabled { get; init; }
+    public uint CapsHeldKey { get; init; } = 0x14;
+    public KeyModifiers CapsModifiers { get; init; } = KeyModifiers.Ctrl | KeyModifiers.Alt | KeyModifiers.Shift;
+    public CapsTap CapsTap { get; init; }
+    public string[] CapsIgnoredApps { get; init; } = [];
+
     public bool MouseEnabled { get; init; }
 
     /// <summary>Exe names or paths whose windows keep their extra buttons: the press reaches the app.</summary>
