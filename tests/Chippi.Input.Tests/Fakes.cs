@@ -65,6 +65,8 @@ internal sealed class FakeSystem : IInputSystem
 
     public bool IsDown(uint vk) => Down.Contains(vk);
 
+    public bool AnyKeyDown() => Down.Count > 0;
+
     public void Advance(TimeSpan by) => Now += (long)(by.TotalSeconds * Stopwatch.Frequency);
 }
 
@@ -123,13 +125,23 @@ internal sealed class TestHub
 
     public int UpdateAsked { get; private set; }
 
-    /// <summary>A key from a hand (or another program with <paramref name="injected"/>), if the keyboard hook hears it. Null when it didn't.</summary>
+    /// <summary>
+    /// A key from a hand (or another program with <paramref name="injected"/>), if the keyboard hook hears it; null when it
+    /// didn't. Windows notes it either way, and its own key state follows unless the hub kept it.
+    /// </summary>
     public bool? Key(uint vk, bool down, bool injected = false, bool ours = false)
     {
-        if (!Hooks.Hears(InputDevices.Keyboard))
-            return null;
         System.LastInput = System.Now;
-        bool keep = Core.Key(vk, 0, injected || ours ? 0x10u : 0, ours ? ChippiInput.Marker : 0, down);
+        bool? keep = Hooks.Hears(InputDevices.Keyboard)
+            ? Core.Key(vk, 0, injected || ours ? 0x10u : 0, ours ? ChippiInput.Marker : 0, down)
+            : null;
+        if (keep != true)
+        {
+            if (down)
+                System.Down.Add(vk);
+            else
+                System.Down.Remove(vk);
+        }
         Settle();
         return keep;
     }
@@ -137,9 +149,9 @@ internal sealed class TestHub
     public bool? Mouse(uint message, int x = 0, int y = 0, uint data = 0, bool ours = false)
     {
         System.Cursor = (x, y);
+        System.LastInput = System.Now;
         if (!Hooks.Hears(InputDevices.Mouse))
             return null;
-        System.LastInput = System.Now;
         bool keep = Core.Mouse(message, x, y, data, ours ? 1u : 0, ours ? ChippiInput.Marker : 0);
         Settle();
         return keep;

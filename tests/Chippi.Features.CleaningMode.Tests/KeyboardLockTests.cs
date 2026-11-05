@@ -39,6 +39,9 @@ public sealed class KeyboardLockTests
     private static KeyInput Key(uint vk, bool down, bool wasDown = false, long ms = 0) =>
         new(vk, 0, down, wasDown, false, false, ms * Stopwatch.Frequency / 1000);
 
+    private static void Drain() =>
+        WpfTestThread.Run(() => System.Windows.Threading.Dispatcher.CurrentDispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle));
+
     [Fact]
     public void It_is_the_hubs_first_filter_needs_only_the_keyboard_and_never_pauses()
     {
@@ -70,7 +73,7 @@ public sealed class KeyboardLockTests
             Assert.False(filter.Key(Key(0xA2, down: false)));
             Assert.False(filter.Mouse(new MouseInput(MouseKind.Down, MouseButton.Left, 0, 0, 0, false, 0)));
         });
-        WpfTestThread.Run(() => { });
+        Drain(); // the posted callbacks, which an Invoke at Send priority would overtake
 
         Assert.Equal([new LockedKey(0x1B, true, 10_000), new LockedKey(0x1B, false, 10_200), new LockedKey(0xA2, true, 0)], heard);
     }

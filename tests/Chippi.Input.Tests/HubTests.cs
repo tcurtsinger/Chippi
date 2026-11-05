@@ -220,6 +220,23 @@ public class HubTests
     }
 
     [Fact]
+    public void Keys_kept_when_the_session_locks_start_fresh_after_it()
+    {
+        var hub = new TestHub();
+        var filter = new TestFilter("f", InputOrder.Triggers, InputDevices.None) { KeepKey = k => k.Down };
+        var entry = hub.Core.Add(filter);
+        filter.Devices = InputDevices.Keyboard;
+        hub.Core.Refresh(entry);
+        Assert.True(hub.Key(A, down: true));
+
+        hub.Core.SessionChanged(); // A went up on the secure desktop
+        filter.KeepKey = _ => false;
+
+        Assert.False(hub.Key(A, down: true));
+        Assert.Equal(0, hub.Core.Kept);
+    }
+
+    [Fact]
     public void Mask_sends_the_unassigned_key_down_and_up_marked_as_chippis()
     {
         var hub = new TestHub();

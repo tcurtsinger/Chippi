@@ -37,6 +37,9 @@ internal interface IInputSystem
 
     /// <summary>Windows' own state has the key down (<c>GetAsyncKeyState</c>).</summary>
     bool IsDown(uint vk);
+
+    /// <summary>Any key, not a mouse button, is down in Windows' own state.</summary>
+    bool AnyKeyDown();
 }
 
 /// <summary>
@@ -156,12 +159,38 @@ internal sealed class HubCore(IHookSource hooks, IInputSender sender, IInputSyst
             downs[i] = new SentKey(modifiers[i], false);
         sender.Send(downs);
         _held.Add(new Held(entry, heldBy, modifiers.ToArray()));
+        _handKey = system.Now; // the 5 s without a key count from the hold, whatever triggered it
     }
 
     public void Mask() => sender.Send([new SentKey(MaskKey, false), new SentKey(MaskKey, true)]);
 
     /// <summary>The session locked or the desktop switched (UAC, Ctrl+Alt+Del): keys going up there never come here.</summary>
-    public void SessionChanged() => ReleaseHeld(_ => true, "the session locked or the desktop switched");
+    public void SessionChanged()
+    {
+        ReleaseHeld(_ => true, "the session locked or the desktop switched");
+        ForgetKept(InputDevices.Both);
+    }
+
+    /// <summary>
+    /// Drops the keepers of keys and buttons whose ups won't come here (they went up on another desktop, or while the hook
+    /// was deaf), so their next press starts fresh instead of going to a stale keeper.
+    /// </summary>
+    private void ForgetKept(InputDevices devices)
+    {
+        int before = Kept;
+        if ((devices & InputDevices.Keyboard) != 0)
+        {
+            Array.Clear(_keyOwner);
+            _ownedKeys = 0;
+        }
+        if ((devices & InputDevices.Mouse) != 0)
+        {
+            Array.Clear(_buttonOwner);
+            _ownedButtons = 0;
+        }
+        if (Kept != before)
+            RequestUpdate();
+    }
 
     /// <summary>Chippi is quitting: every held modifier goes up and every hook comes off.</summary>
     public void Stop()
@@ -355,10 +384,11 @@ internal sealed class HubCore(IHookSource hooks, IInputSender sender, IInputSyst
 
     /// <summary>
     /// Once a second: lets go of held modifiers after 5 s without a key, and puts back a hook that has gone deaf. Windows
-    /// drops a low-level hook it thinks is slow without saying so. A mouse hook is deaf when the pointer moved and it heard
-    /// nothing; a keyboard hook when Windows saw input the hub didn't (the mouse's, when its hook isn't in, only if the
-    /// pointer stayed put). Either way it's put back after 5 s of that, at most once a minute. Over an admin window the
-    /// hooks hear nothing by design, and a reinstall there costs a log line.
+    /// drops a low-level hook it thinks is slow without saying so. A mouse hook is deaf when Windows saw input it didn't
+    /// hear and the pointer moved (a program moving the pointer isn't input). A keyboard hook is deaf when Windows saw
+    /// input the hub didn't; with the mouse hook out, that input could be a click or a wheel, so only while a key is down.
+    /// Either way it's put back after 5 s of that, at most once a minute. Over an admin window the hooks hear nothing by
+    /// design, and a reinstall there costs a log line.
     /// </summary>
     public void Tick()
     {
@@ -371,10 +401,11 @@ internal sealed class HubCore(IHookSource hooks, IInputSender sender, IInputSyst
         bool moved = cursor != _tickCursor;
         _tickCursor = cursor;
         bool mouseIn = (_installed & InputDevices.Mouse) != 0;
-        if (mouseIn && moved && _heardMouse <= _lastTick && _mouseSuspect == 0)
+        long lastInput = system.LastInput;
+        if (mouseIn && moved && _heardMouse <= _lastTick && lastInput > _heardMouse + Slack && _mouseSuspect == 0)
             _mouseSuspect = now;
         if ((_installed & InputDevices.Keyboard) != 0 && _keySuspect == 0
-            && system.LastInput > Math.Max(_heardKey, _heardMouse) + Slack && (mouseIn || !moved))
+            && lastInput > Math.Max(_heardKey, _heardMouse) + Slack && (mouseIn || system.AnyKeyDown()))
             _keySuspect = now;
         _lastTick = now;
 
@@ -396,6 +427,7 @@ internal sealed class HubCore(IHookSource hooks, IInputSender sender, IInputSyst
         string name = device == InputDevices.Keyboard ? "keyboard" : "mouse";
         log?.LogWarning("Input hub: the {Device} hook heard nothing for 5 s while Windows saw input; putting it back", name);
         ReleaseHeld(_ => true, $"the {name} hook was found gone");
+        ForgetKept(device);
         try
         {
             hooks.Install(device);

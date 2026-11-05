@@ -21,7 +21,6 @@ public class WatchdogTests
 
         hub.Hooks.Dropped = InputDevices.Keyboard;
         hub.System.Advance(TimeSpan.FromMilliseconds(300));
-        hub.WindowsSawInput();
         Assert.Null(hub.Key(A, down: true)); // nobody hears it
 
         hub.Tick(5);
@@ -93,11 +92,69 @@ public class WatchdogTests
         {
             // Over an admin window the hook hears nothing by design, however often it's put back.
             hub.Hooks.Dropped = InputDevices.Keyboard;
-            hub.WindowsSawInput();
+            hub.Key(A, down: second % 2 == 0);
             hub.Tick(1);
         }
 
         Assert.Equal(2, hub.Core.Reinstalls); // at about 6 s and 66 s
+    }
+
+    // Herb's review of #227: two ways the watchdog put back a hook that still worked.
+    [Fact]
+    public void A_click_with_the_pointer_still_does_not_reinstall_a_keyboard_only_hook()
+    {
+        var hub = new TestHub();
+        hub.Core.Add(new TestFilter("f", InputOrder.Debounce, InputDevices.Keyboard));
+        hub.Tick(2);
+        hub.System.Advance(TimeSpan.FromMilliseconds(300));
+        hub.WindowsSawInput();
+        hub.Tick(8);
+        Assert.Equal(0, hub.Core.Reinstalls);
+    }
+
+    [Fact]
+    public void A_program_moving_the_pointer_does_not_reinstall_the_mouse_hook()
+    {
+        var hub = new TestHub();
+        hub.Core.Add(new TestFilter("f", InputOrder.Triggers, InputDevices.Mouse));
+        hub.Tick(2);
+        hub.System.Cursor = (500, 500);
+        hub.Tick(8);
+        Assert.Equal(0, hub.Core.Reinstalls);
+    }
+
+    [Fact]
+    public void Clicking_for_minutes_without_typing_never_reinstalls_a_keyboard_only_hook()
+    {
+        var hub = new TestHub();
+        hub.Core.Add(new TestFilter("debounce keys", InputOrder.Debounce, InputDevices.Keyboard));
+        for (int second = 0; second < 180; second++)
+        {
+            hub.WindowsSawInput(); // a click or a wheel notch, the pointer still
+            hub.Tick(1);
+        }
+
+        Assert.Equal(0, hub.Core.Reinstalls);
+    }
+
+    [Fact]
+    public void A_key_kept_before_the_hook_was_put_back_starts_fresh_on_its_next_press()
+    {
+        var hub = new TestHub();
+        var filter = new TestFilter("f", InputOrder.Triggers, InputDevices.Keyboard) { KeepKey = k => k.Down && k.Vk == A };
+        hub.Core.Add(filter);
+        Assert.True(hub.Key(A, down: true));
+        hub.Hooks.Dropped = InputDevices.Keyboard;
+        hub.Key(A, down: false); // its up, unheard
+        hub.System.Advance(TimeSpan.FromMilliseconds(300));
+        hub.System.Down.Add(0x42); // another key, held, that the deaf hook never hears
+        hub.WindowsSawInput();
+        hub.Tick(6);
+        Assert.Equal(1, hub.Core.Reinstalls);
+
+        filter.KeepKey = _ => false;
+        Assert.False(hub.Key(A, down: true)); // not a repeat for a stale keeper
+        Assert.Equal(0, hub.Core.Kept);
     }
 
     [Fact]

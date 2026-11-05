@@ -201,6 +201,9 @@ internal static unsafe class Native
         Windows.TryRemove(window, out _);
     }
 
+    /// <summary>Right Ctrl, Right Alt and the Windows keys are extended keys; sent without the flag they arrive as the left ones.</summary>
+    private static uint Extended(ushort vk) => vk is 0xA3 or 0xA5 or 0x5B or 0x5C ? 0x0001u : 0;
+
     /// <summary>Keys going down or up, marked as Chippi's, in one batch.</summary>
     public static void SendKeys(ReadOnlySpan<SentKey> keys)
     {
@@ -211,7 +214,7 @@ internal static unsafe class Native
                 Type = 1, // INPUT_KEYBOARD
                 Data = new InputUnion
                 {
-                    Keyboard = new KeyboardInput { Vk = keys[i].Vk, Flags = keys[i].Up ? 0x0002u : 0, ExtraInfo = ChippiInput.Marker },
+                    Keyboard = new KeyboardInput { Vk = keys[i].Vk, Flags = (keys[i].Up ? 0x0002u : 0) | Extended(keys[i].Vk), ExtraInfo = ChippiInput.Marker },
                 },
             };
         fixed (Input* first = inputs)

@@ -39,6 +39,9 @@ public sealed class KeyRecorderTests
 
     private static KeyInput Key(uint vk, bool down, bool wasDown = false) => new(vk, 0, down, wasDown, false, false, 0);
 
+    private static void Drain() =>
+        WpfTestThread.Run(() => System.Windows.Threading.Dispatcher.CurrentDispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle));
+
     [Fact]
     public void It_keeps_the_keys_records_the_first_combo_and_leaves_the_hub_at_once()
     {
@@ -57,7 +60,7 @@ public sealed class KeyRecorderTests
             Assert.True(filter.Key(Key(0x53, down: true)));
             Assert.Equal(1, hub.Removed);
         });
-        WpfTestThread.Run(() => { });
+        Drain(); // the posted callbacks, which an Invoke at Send priority would overtake
 
         Assert.Equal([new KeyCombo(KeyModifiers.Ctrl, 0x53)], recorded);
     }
@@ -72,7 +75,7 @@ public sealed class KeyRecorderTests
             new RadialKeyRecorder(() => hub).Record(recorded.Add);
             Assert.True(hub.Filter!.Key(Key(0x1B, down: true)));
         });
-        WpfTestThread.Run(() => { });
+        Drain(); // the posted callbacks, which an Invoke at Send priority would overtake
 
         Assert.Equal([null], recorded);
     }

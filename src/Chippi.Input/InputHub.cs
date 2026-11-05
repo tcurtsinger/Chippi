@@ -123,7 +123,11 @@ public sealed class InputHub : IInputHub, IDisposable
             finally { done.Set(); }
         });
         Native.PostMessage(_window, WmRun, 0, 0);
-        done.Wait();
+        // A call that slips in as the hub stops finds its thread gone: it runs here, on the stopped core.
+        while (!done.Wait(50))
+            if (_thread is { IsAlive: false })
+                while (_work.TryDequeue(out var late))
+                    late();
         if (failed is not null)
             throw failed;
         return result;
@@ -151,6 +155,9 @@ public sealed class InputHub : IInputHub, IDisposable
                 return;
             while (Native.GetMessage(out var message, 0, 0, 0) > 0)
                 Native.DispatchMessage(in message);
+            // Calls that came in as the hub stopped: they run on the stopped core, so none waits forever.
+            while (_work.TryDequeue(out var late))
+                late();
         })
         { IsBackground = true, Name = "Input hub", Priority = ThreadPriority.Highest };
         thread.Start();
@@ -308,5 +315,13 @@ public sealed class InputHub : IInputHub, IDisposable
         public (int X, int Y) Cursor => Native.GetCursorPos(out var at) ? (at.X, at.Y) : default;
 
         public bool IsDown(uint vk) => (Native.GetAsyncKeyState((int)vk) & 0x8000) != 0;
+
+        public bool AnyKeyDown()
+        {
+            for (int vk = 0x08; vk <= 0xFE; vk++) // from Backspace: 1 to 6 are the mouse's buttons
+                if ((Native.GetAsyncKeyState(vk) & 0x8000) != 0)
+                    return true;
+            return false;
+        }
     }
 }

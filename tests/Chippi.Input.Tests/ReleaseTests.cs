@@ -87,7 +87,7 @@ public class ReleaseTests
         var (hub, _) = Holding();
         hub.Hooks.Dropped = InputDevices.Keyboard;
         hub.System.Advance(TimeSpan.FromMilliseconds(500));
-        hub.WindowsSawInput(); // Caps Lock's up, which the dropped hook never heard
+        Assert.Null(hub.Key(A, down: true)); // a key the dropped hook never hears
 
         hub.Tick(6);
 
