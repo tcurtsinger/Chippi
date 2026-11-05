@@ -19,7 +19,7 @@ public sealed record PendingClose(CloseTarget Target, CloseChord Chord, long Exp
 /// never invoke a dispatcher synchronously, query processes, or perform I/O on the hook thread.
 /// The module supplies focus/reset notifications even if no key arrives between focus changes.
 /// </summary>
-public sealed class CloseProtectionFilter(Func<CloseTarget?> target, Func<CloseModifiers> modifiers) : IInputFilter
+public sealed class CloseProtectionFilter(Func<CloseTarget?> target, Func<CloseModifiers> modifiers, Action? maskAlt = null) : IInputFilter
 {
     public static readonly long IntervalTicks = checked(Stopwatch.Frequency * 6);
     private readonly object _gate = new();
@@ -101,6 +101,7 @@ public sealed class CloseProtectionFilter(Func<CloseTarget?> target, Func<CloseM
             _pending[index] = pending;
             _released[index] = false;
             _swallowed[vk] = true;
+            if (chord == CloseChord.AltF4) maskAlt?.Invoke();
             Feedback?.Invoke(pending);
             return true;
         }

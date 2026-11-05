@@ -20,7 +20,7 @@ public sealed class CloseProtectionFilterTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void DistinctReleasedSecondPressPassesWithoutSendingAnything(bool controlW)
+    public void DistinctReleasedSecondPressPassesAndOnlyAltFirstPressMasks(bool controlW)
     {
         var scene = new Scene(controlW);
         Assert.True(scene.Key(true, 0));
@@ -28,6 +28,7 @@ public sealed class CloseProtectionFilterTests
         Assert.True(scene.Key(false, 2));
         Assert.False(scene.Key(true, CloseProtectionFilter.IntervalTicks - 1));
         Assert.False(scene.Key(false, CloseProtectionFilter.IntervalTicks));
+        Assert.Equal(controlW ? 0 : 1, scene.Masks);
         Assert.Null(scene.Feedback.Last());
     }
 
@@ -132,6 +133,7 @@ public sealed class CloseProtectionFilterTests
     {
         public CloseTarget Target = new(1, 1, 1, "app.exe", "App", true);
         public CloseModifiers Modifiers;
+        public int Masks;
         public CloseProtectionFilter Filter { get; }
         public List<PendingClose?> Feedback { get; } = [];
         private readonly uint _vk;
@@ -139,7 +141,7 @@ public sealed class CloseProtectionFilterTests
         {
             Modifiers = controlW ? CloseModifiers.Control : CloseModifiers.Alt;
             _vk = controlW ? 0x57u : 0x73u;
-            Filter = new CloseProtectionFilter(() => Target, () => Modifiers);
+            Filter = new CloseProtectionFilter(() => Target, () => Modifiers, () => Masks++);
             Filter.Feedback += Feedback.Add;
             Filter.Configure(true, ["app.exe"]);
         }

@@ -21,6 +21,7 @@ public sealed class CloseProtectionModuleTests
         Assert.Equal(InputDevices.None, f.Hub.Filter!.Devices);
         f.Module.SetEnabled(true);
         Assert.True(f.Key(true));
+        Assert.Equal(1, f.Hub.Masks);
         Assert.Empty(f.Activities.Activities);
         Assert.Equal(0, f.Desktop.Beeps);
         f.Desktop.Drain();
@@ -153,7 +154,8 @@ public sealed class CloseProtectionModuleTests
         public IInputRegistration Add(IInputFilter filter) { Filter = filter; return this; }
         public void Refresh() { }
         public void HoldModifiers(uint heldBy, ReadOnlySpan<ushort> modifiers) => throw new InvalidOperationException("Close protection sends no keys");
-        public void Mask() => throw new InvalidOperationException("Close protection sends no keys");
+        public int Masks;
+        public void Mask() => Masks++;
         public void Dispose() => Removed = true;
     }
     internal sealed class Store : IModuleSettings

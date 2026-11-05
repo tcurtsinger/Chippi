@@ -60,7 +60,7 @@ public sealed class CloseProtectionModule(Func<ICloseDesktop> createDesktop, Tim
         Settings = context.Settings.Get<CloseProtectionSettings>();
         _announced.Clear();
         _desktop = createDesktop();
-        _filter = new CloseProtectionFilter(() => _desktop.Current, _desktop.Modifiers);
+        _filter = new CloseProtectionFilter(() => _desktop.Current, _desktop.Modifiers, () => _registration!.Mask());
         _filter.Feedback += pending =>
         {
             Volatile.Write(ref _latest, pending);
@@ -70,11 +70,13 @@ public sealed class CloseProtectionModule(Func<ICloseDesktop> createDesktop, Tim
         _desktop.DesktopChanged += DesktopReset;
         try { _desktop.Start(); }
         catch { StopAsync(default).GetAwaiter().GetResult(); throw; }
-        _filter.Configure(Settings.Enabled, Settings.ControlWApps);
+        _filter.Configure(false, Settings.ControlWApps);
         var input = context.Input ?? throw new InvalidOperationException("Input unavailable");
         input.PauseChanged += OnPauseChanged;
         OnPauseChanged();
         _registration = input.Add(_filter);
+        _filter.Configure(Settings.Enabled, Settings.ControlWApps);
+        _registration.Refresh();
         _timer = _clock.CreateTimer(_ => _filter?.Advance(_clock.GetTimestamp()), null,
             Settings.Enabled ? TimeSpan.FromMilliseconds(50) : Timeout.InfiniteTimeSpan, TimeSpan.FromMilliseconds(50));
         context.Ui.SetSettingsPage(_ => new CloseProtectionRows(this));

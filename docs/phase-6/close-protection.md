@@ -8,7 +8,7 @@ Prevent accidental keyboard close. Settings > Windows > Keyboard owns Close prot
 
 ## Behavior
 
-When enabled, protect Alt+F4 in every eligible app. Swallow the first press and show "Press again to close" over "Alt+F4 · Notepad" (the app's name) on the bar without taking focus. Pass the second distinct physical press to the same window. Chippi sends no keys; the app keeps its normal close and save flow.
+When enabled, protect Alt+F4 in every eligible app. Swallow the first press and show "Press again to close" over "Alt+F4 · Notepad" (the app's name) on the bar without taking focus. Pass the second distinct physical press to the same window. Decided (Travis, task 293): while swallowing the first F4, Chippi sends one unassigned key (VK 0xE8, down and up) through the hub, marked as its own input, to prevent a lone Alt tap selecting the menu bar. It sends no close chord; the app keeps its normal close and save flow.
 
 Interval (Travis, task 262): a second press counts for as long as the bar shows the line, 6 seconds, the bar's usual line time. This replaces the reference's 600 ms. Use an injected monotonic clock. A held key's repeat never counts as a second press. Pending state belongs to window identity, process identity and chord. Reset on expiry, focus change, target destruction, lock, disable or shared pause. The line folds whenever the pending press ends: the second press, expiry or any reset, so it never says "Press again" when a press would be swallowed. Handle down/up consistently so a swallowed press cannot leave keys logically held.
 
@@ -26,7 +26,7 @@ Match Vorssaint's distinct-press recognition while preserving Windows' normal sa
 
 ## Acceptance and owner check
 
-Deterministic tests cover interval boundaries (a press at 5.99 s closes, at 6 s it's the first press again), the line folding on every reset, the beep when the bar can't show, repeats, key-up balancing, focus changes, reused handles, exclusions, pause and disabling between presses. Assert zero synthetic input.
+Deterministic tests cover interval boundaries (a press at 5.99 s closes, at 6 s it's the first press again), the line folding on every reset, the beep when the bar can't show, repeats, key-up balancing, focus changes, reused handles, exclusions, pause and disabling between presses. Assert exactly one marked inert-key pair for a first Alt+F4, none for its repeats, its second press or Ctrl+W, and no synthetic close chord.
 
 In Windows Sandbox with clipboard redirection and networking off, use a dev profile without Sound. Open Notepad, type "Unsaved close check", enable protection and press Alt+F4 once: text stays and the bar shows the line. Release F4 and press again within 6 seconds: exactly one save prompt appears. Click Cancel. Repeat after the line folds (6 s): that press is a first press again. Then hold F4 to exercise repeat. Then turn the island off (warn first: this step plays a sound) and press Alt+F4 once: the default beep plays and the text stays; press again within 6 seconds: the save prompt appears. Test opt-in Ctrl+W on a disposable browser tab, title-bar X and fullscreen pause.
 
