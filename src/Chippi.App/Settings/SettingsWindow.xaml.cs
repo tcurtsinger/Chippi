@@ -61,7 +61,7 @@ public partial class SettingsWindow : Window
     internal static IReadOnlyList<SharedPage> SharedPages { get; } =
     [
         new("page:mouse", "Mouse", LucideIcons.Mouse, FeatureGroup.Windows,
-            [new("debounce", Chippi.Features.Debounce.DebounceModule.MouseSection, "Clicks")]),
+            [new("smooth-scrolling", Chippi.Features.SmoothScrolling.SmoothScrollingModule.MouseSection, "Scrolling"), new("debounce", Chippi.Features.Debounce.DebounceModule.MouseSection, "Clicks")]),
         new("page:keyboard", "Keyboard", LucideIcons.Keyboard, FeatureGroup.Windows,
             [new("debounce", Chippi.Features.Debounce.DebounceModule.KeyboardSection, "Key debounce")]),
         new("page:sound-output", "Output", LucideIcons.Speaker, FeatureGroup.Sound,
