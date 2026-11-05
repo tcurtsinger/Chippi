@@ -6,6 +6,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../Chippi.Core/Chippi.Core.csproj" />
+    <ProjectReference Include="../../Chippi.UI/Chippi.UI.csproj" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Chippi.Features.WindowLayouts.Tests" />

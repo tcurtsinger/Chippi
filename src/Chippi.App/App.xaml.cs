@@ -249,6 +249,7 @@ public partial class App : Application
         shell.Registry.Register(windowLayouts);
         if (shell.Services.Actions is Chippi.UI.Actions.WindowsActionPc windowPc)
             windowPc.SnapZones = windowLayouts.ResolveZone;
+        windowLayouts.CreateOverlay = () => new Chippi.Features.WindowLayouts.Views.ZoneOverlay();
 
         // [WS2] "Coming soon" placeholders for the PLAN.md features.
         Settings.Features.FeatureCatalog.RegisterPlaceholders(shell.Registry);

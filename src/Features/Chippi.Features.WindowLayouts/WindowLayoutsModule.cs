@@ -25,8 +25,8 @@ public sealed class WindowLayoutsModule(Func<IReadOnlyList<SnapDisplay>>? displa
     public Action<WindowLayoutsModule, ModuleContext>? ComposeViews { get; set; }
     public event Action? Changed;
 
-    public FeatureDescriptor Descriptor { get; } = new(Id, "Window layouts",
-        "Place windows in halves, thirds and custom zones", FeatureGroup.Windows) { Icon = "LayoutGrid" };
+    public FeatureDescriptor Descriptor { get; } = new(Id, "Snap",
+        "Place windows in halves, thirds and custom zones", FeatureGroup.Windows) { Icon = "LayoutPanelLeft" };
 
     public Task StartAsync(ModuleContext context, CancellationToken ct)
     {
@@ -38,6 +38,7 @@ public sealed class WindowLayoutsModule(Func<IReadOnlyList<SnapDisplay>>? displa
             _runner = new ActionRunner(pc, context.Commands, () => context.Clipboard, text => text,
                 () => context.IslandPasteTarget()?.Window ?? 0);
         context.Ui.AddCommands(Commands);
+        context.Ui.SetSettingsPage(_ => new Views.SnapPage(this));
         ComposeViews?.Invoke(this, context);
         SystemEvents.DisplaySettingsChanged += DisplaySettingsChanged;
         UpdateDrag();
