@@ -9,16 +9,15 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Documents;
 using System.Windows.Input;
-using Chippi.UI.Controls;
 using Microsoft.Win32;
 
-namespace Chippi.App.Settings.Pages;
+namespace Chippi.UI.Controls;
 
 /// <summary>
-/// An "Excluded apps" card (Settings › Shortcuts): its count, Add app, and each app with its own icon and Remove. The caller
+/// An "Excluded apps" card (Settings › Shortcuts, Text snippets): its count, Add app, and each app with its own icon and Remove. The caller
 /// keeps the list; this reads and saves it through <paramref name="get"/> and <paramref name="save"/>.
 /// </summary>
-internal sealed class ExcludedAppsCard : Card
+public sealed class ExcludedAppsCard : Card
 {
     private const double IconSize = 20;
 
@@ -30,7 +29,9 @@ internal sealed class ExcludedAppsCard : Card
     {
         _get = get;
         _save = save;
-        _add = SettingsUi.Button("Add app");
+        // A subclass doesn't pick up Card's implicit style, so ask for it: the Settings card's fill and stroke.
+        SetResourceReference(StyleProperty, typeof(Card));
+        _add = Button("Add app");
         _add.Click += (_, _) => AddMenu(RunningApps()).IsOpen = true;
         Render();
     }
@@ -41,7 +42,7 @@ internal sealed class ExcludedAppsCard : Card
         var apps = _get();
         Children.Clear();
         string caption = apps.Count switch { 0 => "", 1 => "1 app", int n => $"{n} apps" };
-        Children.Add(SettingsUi.Row("Excluded apps", caption, _add));
+        Children.Add(new Border { Child = SettingsLayout.Row("Excluded apps", _add, caption) });
         foreach (var path in apps)
             Children.Add(AppRow(path));
     }
@@ -56,15 +57,15 @@ internal sealed class ExcludedAppsCard : Card
     private Border AppRow(string path)
     {
         string name = AppName(path);
-        var remove = SettingsUi.Button("Remove");
+        var remove = Button("Remove");
         AutomationProperties.SetName(remove, $"Remove {name}");
         remove.Click += (_, _) => Save(_get().Where(p => !string.Equals(p, path, StringComparison.OrdinalIgnoreCase)));
         var title = new StackPanel { Orientation = Orientation.Horizontal };
         title.Children.Add(Icon(path, name));
-        title.Children.Add(SettingsUi.Styled(new TextBlock { Text = name, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 0, 0) }, "BodyTextStyle"));
+        title.Children.Add(Styled(new TextBlock { Text = name, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 0, 0) }, "BodyTextStyle"));
         var label = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
         label.Children.Add(title);
-        label.Children.Add(SettingsUi.Styled(new TextBlock { Text = Path.GetFileName(path) }, "CaptionTextStyle"));
+        label.Children.Add(Styled(new TextBlock { Text = Path.GetFileName(path) }, "CaptionTextStyle"));
         var grid = new Grid { ColumnDefinitions = { new ColumnDefinition(), new ColumnDefinition { Width = GridLength.Auto } } };
         Grid.SetColumn(remove, 1);
         remove.VerticalAlignment = VerticalAlignment.Center;
@@ -76,7 +77,7 @@ internal sealed class ExcludedAppsCard : Card
     /// <summary>The app's own Windows icon; a letter only until it loads, or when Windows has none (Travis, task 264).</summary>
     private static FrameworkElement Icon(string path, string name)
     {
-        var letter = SettingsUi.Styled(new TextBlock
+        var letter = Styled(new TextBlock
         {
             Text = name.Length > 0 ? char.ToUpperInvariant(name[0]).ToString() : "?",
             HorizontalAlignment = HorizontalAlignment.Center,
@@ -88,7 +89,7 @@ internal sealed class ExcludedAppsCard : Card
     }
 
     /// <summary>Add app: the apps open now, with their icons, then Browse… for one that isn't running (notes, wave 1 #8).</summary>
-    internal Popup AddMenu(IReadOnlyList<(string Name, string Path)> running)
+    public Popup AddMenu(IReadOnlyList<(string Name, string Path)> running)
     {
         var listed = _get();
         var stack = new StackPanel();
@@ -101,7 +102,7 @@ internal sealed class ExcludedAppsCard : Card
         var buttons = new List<Button>();
         if (open.Count > 0)
         {
-            stack.Children.Add(SettingsUi.Styled(new TextBlock { Text = "Open apps", Margin = new Thickness(12, 6, 12, 4) }, "CaptionTextStyle"));
+            stack.Children.Add(Styled(new TextBlock { Text = "Open apps", Margin = new Thickness(12, 6, 12, 4) }, "CaptionTextStyle"));
             foreach (var (name, path) in open)
                 buttons.Add(Item(Icon(path, name), name, () => Save([.. _get(), path])));
             var divider = new Border { Height = 1, Margin = new Thickness(4, 4, 4, 4) };
@@ -129,7 +130,7 @@ internal sealed class ExcludedAppsCard : Card
             var content = new StackPanel { Orientation = Orientation.Horizontal };
             content.Children.Add(lead);
             content.Children.Add(new TextBlock { Text = text, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 0, 0) });
-            var button = SettingsUi.Styled(new Button { Content = content, HorizontalContentAlignment = HorizontalAlignment.Left }, "FlyoutRowButtonStyle");
+            var button = Styled(new Button { Content = content, HorizontalContentAlignment = HorizontalAlignment.Left }, "FlyoutRowButtonStyle");
             AutomationProperties.SetName(button, text);
             button.Click += (_, _) =>
             {
@@ -139,6 +140,14 @@ internal sealed class ExcludedAppsCard : Card
             stack.Children.Add(button);
             return button;
         }
+    }
+
+    private static Button Button(string text) => Styled(new Button { Content = text, Margin = new Thickness(8, 0, 0, 0) }, "SecondaryButtonStyle");
+
+    private static T Styled<T>(T element, string style) where T : FrameworkElement
+    {
+        element.SetResourceReference(StyleProperty, style);
+        return element;
     }
 
     private void Browse()
@@ -173,7 +182,7 @@ internal sealed class ExcludedAppsCard : Card
     }
 
     /// <summary>The app's own name for itself, else its file name.</summary>
-    internal static string AppName(string path)
+    public static string AppName(string path)
     {
         try
         {

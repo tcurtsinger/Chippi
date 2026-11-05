@@ -10,7 +10,7 @@ namespace Chippi.Features.TextSnippets.Tests;
 
 public sealed class ModuleTests
 {
-    private sealed class Hub : IInputHub
+    internal sealed class Hub : IInputHub
     {
         public List<IInputFilter> Filters { get; } = [];
 
@@ -22,8 +22,12 @@ public sealed class ModuleTests
 
         public event Action? PauseChanged { add { } remove { } }
 
+        public bool Fails { get; set; }
+
         public IInputRegistration Add(IInputFilter filter)
         {
+            if (Fails)
+                throw new InvalidOperationException("Hook failed");
             Filters.Add(filter);
             return new Registration(() => Filters.Remove(filter));
         }
@@ -40,7 +44,7 @@ public sealed class ModuleTests
         }
     }
 
-    private sealed class Store : IModuleSettings
+    internal sealed class Store : IModuleSettings
     {
         public TextSnippetsSettings Value { get; set; } = new();
 
@@ -49,18 +53,20 @@ public sealed class ModuleTests
         public void Save<T>(T settings) where T : class => Value = (TextSnippetsSettings)(object)settings;
     }
 
-    private sealed class Ui : IModuleUi
+    internal sealed class Ui : IModuleUi
     {
         public Func<IReadOnlyList<ChippiCommand>>? Commands { get; private set; }
 
         public IIslandTile AddIslandTile(IslandTileSpec spec) => throw new InvalidOperationException("Text snippets has no tile");
 
-        public void SetSettingsPage(Func<string?, object> page) { }
+        public Func<string?, object>? Page { get; private set; }
+
+        public void SetSettingsPage(Func<string?, object> page) => Page = page;
 
         public void AddCommands(Func<IReadOnlyList<ChippiCommand>> commands) => Commands = commands;
     }
 
-    private sealed class Sender : ISnippetSender
+    internal sealed class Sender : ISnippetSender
     {
         public List<(int Backspaces, string Text)> Sent { get; } = [];
 
@@ -71,7 +77,7 @@ public sealed class ModuleTests
         }
     }
 
-    private sealed class Reader : IKeyReader
+    internal sealed class Reader : IKeyReader
     {
         public nint Foreground() => 1;
 
@@ -80,7 +86,7 @@ public sealed class ModuleTests
         public char CharOf(uint vk, uint scan) => '\0';
     }
 
-    private static ModuleContext Context(Hub hub, Store store, Ui ui) =>
+    internal static ModuleContext Context(Hub hub, Store store, Ui ui) =>
         new(TextSnippetsModule.Id, store, NullLogger.Instance, new IslandActivityHub().CreatePublisher(TextSnippetsModule.Id), ui) { Input = hub };
 
     private static Snippet S(string name, string trigger, string text, bool enabled = true) =>
@@ -119,7 +125,8 @@ public sealed class ModuleTests
         var command = Assert.Single(ui.Commands!());
         Assert.Equal("Work email", command.Name);
         Assert.Contains(";em", command.Words);
-        Assert.Equal(";em", command.Detail);
+        Assert.Equal("Snippet · ;em", command.Detail);
+        Assert.Equal(ChippiCommandKind.Insert, command.Kind);
     }
 
     [Fact]

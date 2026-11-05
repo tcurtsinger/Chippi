@@ -44,7 +44,7 @@ public sealed class TextSnippetsModule : IFeatureModule
     }
 
     public FeatureDescriptor Descriptor { get; } = new(Id, "Text snippets", "Type a short abbreviation and it expands into saved text", FeatureGroup.ClipboardText)
-    { Icon = nameof(LucideIcons.Keyboard), Requires = [Capability.InputHooks], Presets = PresetMembership.PowerUser, PausesInFullscreen = true };
+    { Icon = nameof(LucideIcons.AlignLeft), Requires = [Capability.InputHooks], Presets = PresetMembership.PowerUser, PausesInFullscreen = true };
 
     public TextSnippetsSettings Settings { get; private set; } = new();
 
@@ -65,6 +65,7 @@ public sealed class TextSnippetsModule : IFeatureModule
             _expander = new SnippetExpander(_sender, () => ReadClipboardAsync(context), _passwordFocused, expanded: PlayExpandedSound);
             _matcher.SetSnippets(Settings.Snippets);
             context.Ui.AddCommands(Commands);
+            context.Ui.SetSettingsPage(_ => new Views.SnippetsPage(this));
             Apply();
         }
         return Task.CompletedTask;
@@ -102,8 +103,8 @@ public sealed class TextSnippetsModule : IFeatureModule
     /// <summary>One command per snippet, found in Search by name and trigger, and listed for Shortcuts' Insert snippet action.</summary>
     private IReadOnlyList<ChippiCommand> Commands() =>
     [.. Settings.Snippets.Where(s => s.Enabled && s.Trigger.Length > 0).Select(s =>
-        new ChippiCommand("text-snippets/" + s.Id, string.IsNullOrWhiteSpace(s.Name) ? s.Trigger : s.Name, nameof(LucideIcons.Keyboard), () => InsertAsync(s.Id))
-        { Words = s.Trigger + " snippet text", Detail = s.Trigger })];
+        new ChippiCommand("text-snippets/" + s.Id, string.IsNullOrWhiteSpace(s.Name) ? s.Trigger : s.Name, nameof(LucideIcons.AlignLeft), () => InsertAsync(s.Id))
+        { Words = s.Trigger + " snippet text", Detail = "Snippet · " + s.Trigger, Kind = ChippiCommandKind.Insert })];
 
     /// <summary>
     /// Types a snippet into the window that was in front before Search opened, or into the one in front when no island took

@@ -17,6 +17,9 @@ public enum ChippiCommandKind
 
     /// <summary>A clipboard copy: Paste, into the app that was in front.</summary>
     Paste,
+
+    /// <summary>A text snippet: Insert, typed into the app that was in front.</summary>
+    Insert,
 }
 
 /// <summary>
