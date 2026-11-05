@@ -226,28 +226,57 @@ public sealed class ProviderLifecycleTests(ITestOutputHelper output)
         Assert.Equal(0, published);
     }
 
+    private sealed class TimeoutClock : TimeProvider
+    {
+        private readonly List<TimeoutTimer> _timers = [];
+        public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
+        {
+            Assert.Equal(TimeSpan.FromMilliseconds(200), dueTime);
+            var timer = new TimeoutTimer(callback, state);
+            _timers.Add(timer);
+            return timer;
+        }
+        public void Expire()
+        {
+            Assert.Contains(_timers, timer => timer.Active);
+            foreach (var timer in _timers.ToArray()) timer.Fire();
+        }
+        private sealed class TimeoutTimer(TimerCallback callback, object? state) : ITimer
+        {
+            public bool Active { get; private set; } = true;
+            public void Fire() { if (Active) { Active = false; callback(state); } }
+            public bool Change(TimeSpan dueTime, TimeSpan period) => throw new NotSupportedException();
+            public void Dispose() => Active = false;
+            public ValueTask DisposeAsync() { Dispose(); return ValueTask.CompletedTask; }
+        }
+    }
     [Fact]
     public async Task Native_timeout_reports_unavailable_without_starting_overlapping_retries()
     {
-        using var started = new ManualResetEventSlim();
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var clock = new TimeoutClock();
         using var release = new ManualResetEventSlim();
         int calls = 0;
         using var pc = new WindowsPc((_, _, _) =>
         {
             if (Interlocked.Increment(ref calls) == 1)
             {
-                started.Set();
+                started.SetResult();
                 if (!release.Wait(TimeSpan.FromSeconds(10))) throw new TimeoutException("Fixture was not released");
             }
             return [];
-        }, fileTimeout: TimeSpan.FromMilliseconds(200));
+        }, fileTimeout: TimeSpan.FromMilliseconds(200), timeProvider: clock);
         try
         {
             var first = pc.FindFilesAsync("first", 8, default);
-            Assert.True(started.Wait(TimeSpan.FromSeconds(10)));
+            await started.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            clock.Expire();
             var failure = await Assert.ThrowsAsync<FileSearchUnavailableException>(() => first);
             Assert.IsType<TimeoutException>(failure.InnerException);
-            await Assert.ThrowsAsync<FileSearchUnavailableException>(() => pc.FindFilesAsync("next", 8, default));
+            var next = pc.FindFilesAsync("next", 8, default);
+            Assert.False(next.IsCompleted); // still waiting for the first native call to leave
+            clock.Expire();
+            await Assert.ThrowsAsync<FileSearchUnavailableException>(() => next);
             Assert.Equal(1, calls);
         }
         finally { release.Set(); }

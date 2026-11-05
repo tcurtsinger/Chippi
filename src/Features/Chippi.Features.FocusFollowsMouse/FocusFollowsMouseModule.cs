@@ -27,7 +27,7 @@ public sealed class FocusFollowsMouseModule(Func<FocusTrackingEngine> createEngi
 
     public FeatureDescriptor Descriptor { get; } = new(Id, "Focus follows mouse",
         "Activates the window under the pointer", FeatureGroup.Windows)
-    { Icon = nameof(LucideIcons.Eye), PausesInFullscreen = true };
+    { Icon = nameof(LucideIcons.Pointer), PausesInFullscreen = true };
 
     public Task StartAsync(ModuleContext context, CancellationToken ct)
     {
@@ -37,7 +37,7 @@ public sealed class FocusFollowsMouseModule(Func<FocusTrackingEngine> createEngi
             _context = context;
             Settings = context.Settings.Get<FocusTrackingSettings>();
             context.Ui.SetSettingsPage(_ => new FocusTrackingRows(this));
-            context.Ui.AddCommands(() => [new ChippiCommand("focus-follows-mouse/toggle", "Focus follows mouse", nameof(LucideIcons.Eye), () =>
+            context.Ui.AddCommands(() => [new ChippiCommand("focus-follows-mouse/toggle", "Focus follows mouse", nameof(LucideIcons.Pointer), () =>
             {
                 SetEnabled(!Settings.Enabled);
                 if (Error is { } error) throw new InvalidOperationException(error);

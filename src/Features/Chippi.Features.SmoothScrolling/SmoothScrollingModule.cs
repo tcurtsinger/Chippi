@@ -64,7 +64,7 @@ public sealed class SmoothScrollingModule : IFeatureModule
 
     public FeatureDescriptor Descriptor { get; } = new(Id, "Smooth scrolling",
         "Smooth or linear wheel scrolling for mice that step", FeatureGroup.Windows)
-    { Icon = nameof(LucideIcons.Mouse), Requires = [Capability.InputHooks], PausesInFullscreen = true };
+    { Icon = nameof(LucideIcons.Scroll), Requires = [Capability.InputHooks], PausesInFullscreen = true };
 
     /// <summary>Lines per notch in Windows' own mouse setting, for the Distance row's caption.</summary>
     public static int WindowsLinesPerNotch()
@@ -83,10 +83,10 @@ public sealed class SmoothScrollingModule : IFeatureModule
             // Both switches, as rows of Actions' Input menu and in Search.
             context.Ui.AddCommands(() =>
             [
-                new ChippiCommand("smooth-scrolling/smooth", "Smooth scrolling", nameof(LucideIcons.Mouse),
+                new ChippiCommand("smooth-scrolling/smooth", "Smooth scrolling", nameof(LucideIcons.Scroll),
                     () => Flip(linear: false))
                 { Words = "scroll wheel glide", IsOn = Settings.SmoothEnabled, Tile = ActionsTile.Input },
-                new ChippiCommand("smooth-scrolling/linear", "Linear scrolling", nameof(LucideIcons.Mouse),
+                new ChippiCommand("smooth-scrolling/linear", "Linear scrolling", nameof(LucideIcons.MoveVertical),
                     () => Flip(linear: true))
                 { Words = "scroll wheel acceleration steady", IsOn = Settings.LinearEnabled, Tile = ActionsTile.Input },
             ]);
