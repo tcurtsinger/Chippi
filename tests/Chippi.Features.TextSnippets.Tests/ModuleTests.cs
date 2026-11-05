@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using System.IO;
 using Chippi.Core.Input;
 using Chippi.Core.Island;
 using Chippi.Core.Modules;
@@ -50,7 +51,11 @@ public sealed class ModuleTests
 
         public T Get<T>() where T : class, new() => (T)(object)Value;
 
-        public void Save<T>(T settings) where T : class => Value = (TextSnippetsSettings)(object)settings;
+        /// <summary>Every save throws, as a full disk or a locked settings file would.</summary>
+        public bool Fails { get; set; }
+
+        public void Save<T>(T settings) where T : class =>
+            Value = Fails ? throw new IOException("Settings locked") : (TextSnippetsSettings)(object)settings;
     }
 
     internal sealed class Ui : IModuleUi

@@ -59,6 +59,7 @@ internal sealed class SnippetsPage : UserControl
     private StackPanel _message = new();
     private bool _refreshing;
     private readonly Border _noResults;
+    private readonly TextBlock _failed = Styled(new TextBlock { Text = SavingFailed, Visibility = Visibility.Collapsed, Margin = new Thickness(0, 8, 0, 0) }, "CaptionTextStyle");
     /// <summary>Each snippet's row, kept while the snippet is unchanged.</summary>
     private readonly Dictionary<string, (Snippet Snippet, FrameworkElement View)> _rows = new(StringComparer.Ordinal);
     /// <summary>What the card holds under the search row, in order: headings (no snippet) and rows, with their folder.</summary>
@@ -79,6 +80,9 @@ internal sealed class SnippetsPage : UserControl
         _page.Children.Add(_excluded);
         _page.Children.Add(SettingsLayout.Section("Snippets"));
         _page.Children.Add(_card);
+        _failed.SetResourceReference(TextBlock.ForegroundProperty, "WarningTextBrush");
+        AutomationProperties.SetLiveSetting(_failed, AutomationLiveSetting.Polite);
+        _page.Children.Add(_failed);
         Content = _page;
         void Changed() => Dispatcher.BeginInvoke(Refresh);
         Loaded += (_, _) => { _module.Changed += Changed; Refresh(); };
@@ -88,10 +92,32 @@ internal sealed class SnippetsPage : UserControl
 
     private IReadOnlyList<Snippet> All => _module.Settings.Snippets;
 
-    private void Save(Func<TextSnippetsSettings, TextSnippetsSettings> change)
+    public const string SavingFailed = "Saving failed";
+
+    /// <summary>
+    /// Saves, or says "Saving failed" under the list and draws the page again from what's saved, so a switch flipped by a
+    /// save that failed goes back. The editor's own Save keeps the draft open instead (<see cref="Commit"/>).
+    /// </summary>
+    private bool Save(Func<TextSnippetsSettings, TextSnippetsSettings> change, bool quiet = false)
     {
-        try { _module.Update(change); }
-        catch (Exception ex) { Log.Warn("Text snippets: saving failed", ex); }
+        try
+        {
+            _module.Update(change);
+            _failed.Visibility = Visibility.Collapsed;
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("Text snippets: saving failed", ex);
+            if (!quiet)
+            {
+                _failed.Visibility = Visibility.Visible;
+                // A kept row may show the change that wasn't saved (a flipped switch), so build them all again.
+                _rows.Clear();
+                Refresh();
+            }
+            return false;
+        }
     }
 
     private void Refresh()
@@ -374,12 +400,13 @@ internal sealed class SnippetsPage : UserControl
 
     private void Delete(string id)
     {
+        if (!Save(s => s with { Snippets = [.. s.Snippets.Where(x => x.Id != id)] }))
+            return;
         if (_draft?.Id == id)
         {
             _draft = null;
             _editor = null;
         }
-        Save(s => s with { Snippets = [.. s.Snippets.Where(x => x.Id != id)] });
         RenderList();
     }
 
@@ -585,9 +612,14 @@ internal sealed class SnippetsPage : UserControl
             Id = d.Id ?? Guid.NewGuid().ToString("N"), Name = d.Name.Trim(), Trigger = d.Trigger, Text = d.Text, Expand = d.Expand,
             IgnoreCase = d.IgnoreCase, Folder = d.Folder.Trim(), Enabled = d.Enabled,
         };
+        // Written first: when it fails, the draft stays open with the reason by Save, so nothing typed is lost.
+        if (!Save(s => s with { Snippets = d.Id is null ? [.. s.Snippets, saved] : [.. s.Snippets.Select(x => x.Id == d.Id ? saved : x)] }, quiet: true))
+        {
+            ShowMessage(SavingFailed, refused: true);
+            return;
+        }
         _draft = null;
         _editor = null;
-        Save(s => s with { Snippets = d.Id is null ? [.. s.Snippets, saved] : [.. s.Snippets.Select(x => x.Id == d.Id ? saved : x)] });
         RenderList();
     }
 

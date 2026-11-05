@@ -163,6 +163,45 @@ public sealed class SnippetsPageTests
     }
 
     [Fact]
+    public void ASaveThatFailsKeepsTheDraftAndSaysSo()
+    {
+        WpfTestThread.Run(() =>
+        {
+            Theme();
+            var f = new Fixture();
+            var page = f.Start(new TextSnippetsSettings { Snippets = Board() });
+            var story = f.Module.Settings.Snippets.Single(s => s.Trigger == ";story");
+            page.StartEdit(SnippetsPage.From(story));
+            Layout(page, 768);
+            Field(page, "Name").Text = "Story note, edited";
+            f.Store.Fails = true;
+            Find<Button>(page).Single(b => Equals(b.Content, "Save")).RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+            // The editor is still open with what was typed, and the reason is by Save.
+            Assert.Equal("Story note, edited", Field(page, "Name").Text);
+            Assert.Contains(SnippetsPage.SavingFailed, Texts(page));
+            Assert.Equal("Story note", f.Module.Settings.Snippets.Single(s => s.Trigger == ";story").Name);
+            Shot(page, "editor-save-failed", 768);
+
+            // Once the file can be written, the same Save goes through.
+            f.Store.Fails = false;
+            Find<Button>(page).Single(b => Equals(b.Content, "Save")).RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+            Assert.Equal("Story note, edited", f.Module.Settings.Snippets.Single(s => s.Trigger == ";story").Name);
+            Assert.DoesNotContain("Edit snippet", Texts(page));
+            Assert.DoesNotContain(SnippetsPage.SavingFailed, Texts(page));
+
+            // A row's switch whose save fails goes back, and the page says so under the list.
+            f.Store.Fails = true;
+            var toggle = Find<ToggleButton>(page).First(t => System.Windows.Automation.AutomationProperties.GetName(t) == "Thanks");
+            toggle.ApplyTemplate();
+            ((IToggleProvider)UIElementAutomationPeer.CreatePeerForElement(toggle)).Toggle();
+            Assert.True(f.Module.Settings.Snippets.Single(s => s.Trigger == ";ty").Enabled);
+            Assert.True(Find<ToggleButton>(page).First(t => System.Windows.Automation.AutomationProperties.GetName(t) == "Thanks").IsChecked);
+            Assert.Contains(SnippetsPage.SavingFailed, Texts(page));
+            f.Module.StopAsync(default).GetAwaiter().GetResult();
+        });
+    }
+
+    [Fact]
     public void FirstInstallAndAHookThatFailedHaveTheirOwnRows()
     {
         WpfTestThread.Run(() =>
