@@ -42,7 +42,7 @@ $box.Add_MouseDown({ Add-Content -LiteralPath $log -Value "mouse down $($_.Butto
 $box.Add_MouseUp({ Add-Content -LiteralPath $log -Value "mouse up $($_.Button)" })
 $box.Add_KeyDown({ Add-Content -LiteralPath $log -Value "key down $($_.KeyCode)" })
 $box.Add_KeyUp({ if ($_.KeyCode -eq 'F24') { Add-Content -LiteralPath $log -Value "key up $($_.KeyCode)" } })
-if (-not $Fullscreen) { $box.Add_TextChanged({ Set-Content -LiteralPath 'C:\results\target-text.txt' -Value $box.Text -NoNewline }) }
+if (-not $Fullscreen) { $box.Add_TextChanged({ Set-Content -LiteralPath 'C:\results\target-text.txt' -Value $box.Text -NoNewline -Encoding UTF8 }) }
 $form.Controls.Add($box)
 $form.Add_Shown({ $form.Activate(); $box.Focus() })
 if ((Get-Content -LiteralPath 'C:\results\checks.txt') -match 'caps') {

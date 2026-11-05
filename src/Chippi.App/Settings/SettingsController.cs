@@ -150,6 +150,18 @@ internal sealed class SettingsController
                                 _window.Width = width;
                                 _window.Height = height;
                             }
+                            if (page.Id == "module:text-snippets")
+                            {
+                                // The narrowest window, where the trigger and Expand columns are tightest (wave 3).
+                                double width = _window.Width, height = _window.Height;
+                                _window.WindowState = WindowState.Normal;
+                                _window.Width = 860;
+                                _window.Height = 1300;
+                                await Idle();
+                                Render(_window, System.IO.Path.Combine(directory, $"r6-snippets-narrow-{name}-{accent}.png"));
+                                _window.Width = width;
+                                _window.Height = height;
+                            }
                             if (page.Id == "module:downloads-organizer")
                             {
                                 // The organizer's other tabs and Preview (R4).
