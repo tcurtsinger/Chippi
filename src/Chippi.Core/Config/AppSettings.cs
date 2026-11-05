@@ -129,6 +129,18 @@ public sealed class AppSettings
 
     /// <summary>Where the Settings window was and the page it showed when it last closed, which the next one reopens at; null until then.</summary>
     public WindowPlacement? SettingsWindow { get; set; }
+
+    /// <summary>
+    /// Settings › General › Fullscreen apps › Always on: Phase 6 input features keep acting while a fullscreen app is in
+    /// front. Off out of the box (Travis, task 198).
+    /// </summary>
+    public bool InputAlwaysOn { get; set; }
+
+    /// <summary>Settings › General › Pause in these apps: exe paths of apps that count as fullscreen in a window.</summary>
+    public List<string> PauseApps { get; set; } = [];
+
+    /// <summary>The input hub's rules from these settings.</summary>
+    public Input.PauseRules PauseRules() => new(InputAlwaysOn, [.. PauseApps]);
 }
 
 /// <summary>A window's restored bounds in DIPs, whether it was maximized, and the page it showed.</summary>

@@ -18,11 +18,23 @@ public interface IInputHub
     IInputRegistration Add(IInputFilter filter);
 
     /// <summary>
-    /// While true, filters that pause (<see cref="IInputFilter.Pauses"/>) hear nothing new: a fullscreen app is in front and
-    /// Always on is off. The ups of keys and buttons they kept before still come to them. A pause beginning lets go of every
-    /// modifier Chippi holds down.
+    /// While true, filters that pause (<see cref="IInputFilter.Pauses"/>) hear nothing new: the window in front counts as
+    /// fullscreen and Always on is off (<see cref="PauseRules"/>). The ups of keys and buttons they kept before still come to
+    /// them. A pause beginning lets go of every modifier Chippi holds down, and a hook no unpaused filter needs comes off.
     /// </summary>
-    bool Paused { get; set; }
+    bool Paused { get; }
+
+    /// <summary>
+    /// The window in front is a fullscreen app or game, or an app on Pause in these apps, whatever Always on says: the Radial
+    /// menu stays closed then while its Open over fullscreen apps is off.
+    /// </summary>
+    bool FullscreenInFront { get; }
+
+    /// <summary>
+    /// <see cref="Paused"/> or <see cref="FullscreenInFront"/> changed. Raised on the hub's thread: hand off to the UI
+    /// thread before doing anything slow. Features outside the hooks (Focus follows mouse) follow the pause from here.
+    /// </summary>
+    event Action? PauseChanged;
 }
 
 /// <summary>A filter in the hub. Dispose to take it out.</summary>

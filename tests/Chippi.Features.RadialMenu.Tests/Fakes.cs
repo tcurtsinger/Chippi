@@ -146,6 +146,8 @@ internal sealed class FakeInput : IWheelInput
 {
     public (bool, bool, bool) Watched { get; private set; }
     public Func<bool> Paused { get; set; } = () => false;
+
+    public bool OpenOverFullscreen { get; set; } = true;
     public int ClosedCount { get; private set; }
     public int ByShortcut { get; private set; }
     public PixelPoint? Virtual { get; private set; }

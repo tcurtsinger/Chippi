@@ -27,6 +27,7 @@ public sealed class RadialMenuSettingsPage : UserControl
 
     private readonly RadialMenuModule _module;
     private readonly ToggleButton _middle = Ui.Switch("Hold middle button"), _back = Ui.Switch("Hold Back button"), _forward = Ui.Switch("Hold Forward button");
+    private readonly ToggleButton _overFullscreen = Ui.Switch("Open over fullscreen apps");
     private readonly ContentControl _shortcut = new() { VerticalAlignment = VerticalAlignment.Center, Focusable = false };
     private readonly WheelEditor _editor;
     private readonly Button _up = new() { Width = 32, Height = 32, Focusable = true };
@@ -48,11 +49,15 @@ public sealed class RadialMenuSettingsPage : UserControl
         Hook(_middle, MouseButton.Middle);
         Hook(_back, MouseButton.Back);
         Hook(_forward, MouseButton.Forward);
+        _overFullscreen.Checked += (_, _) => { if (!_updating) _module.SetOpenOverFullscreen(true); };
+        _overFullscreen.Unchecked += (_, _) => { if (!_updating) _module.SetOpenOverFullscreen(false); };
+        // Last: it applies to every trigger above it (docs/phase-6/design/notes.md, wave 1 #9).
         var opening = SettingsLayout.Card(
             SettingsLayout.Row("Hold middle button", _middle),
             SettingsLayout.Row("Hold Back button", _back),
             SettingsLayout.Row("Hold Forward button", _forward),
-            SettingsLayout.Row("Shortcut", _shortcut));
+            SettingsLayout.Row("Shortcut", _shortcut),
+            SettingsLayout.Row("Open over fullscreen apps", _overFullscreen));
 
         var chevron = new LucideIcon { Data = LucideIcons.ChevronLeft, Size = 16 };
         chevron.SetResourceReference(LucideIcon.BrushProperty, "TextPrimaryBrush");
@@ -131,6 +136,7 @@ public sealed class RadialMenuSettingsPage : UserControl
             _middle.IsChecked = settings.HoldMiddle;
             _back.IsChecked = settings.HoldBack;
             _forward.IsChecked = settings.HoldForward;
+            _overFullscreen.IsChecked = settings.OpenOverFullscreen;
         }
         finally { _updating = false; }
         if (!_capturingShortcut)

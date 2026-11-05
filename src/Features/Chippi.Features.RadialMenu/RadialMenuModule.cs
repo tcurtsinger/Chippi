@@ -126,13 +126,16 @@ public sealed class RadialMenuModule : IFeatureModule, IWheelInputSink
         Runner = new SliceRunner(_pc, context.Commands, () => context.Clipboard, _engine);
         _input = _createInput(this);
         _input.Paused = _cleaning;
+        _input.OpenOverFullscreen = Settings.OpenOverFullscreen;
+        if (context.Input is { } hub)
+            hub.PauseChanged += OnPauseChanged;
         try { _input.Watch(Settings.HoldMiddle, Settings.HoldBack, Settings.HoldForward); }
         catch (Exception ex)
         {
             Log.Warn("Radial menu: hooking the mouse failed", ex);
             throw;
         }
-        if (Settings.Shortcut is { } shortcut)
+        if (Settings.Shortcut is { } shortcut && !ShortcutStandsAside)
             TryRegister(shortcut);
         context.Ui.SetSettingsPage(section => section == "shortcut-list" ? new ShortcutRow(this, Descriptor.Name) : new RadialMenuSettingsPage(this));
         _pc.RefreshApps();
@@ -164,6 +167,8 @@ public sealed class RadialMenuModule : IFeatureModule, IWheelInputSink
                 Finish();
             _window?.Close();
             _window = null;
+            if (_context?.Input is { } hub)
+                hub.PauseChanged -= OnPauseChanged;
             _input?.Dispose();
             _input = null;
             _hotkey?.Dispose();
@@ -209,6 +214,37 @@ public sealed class RadialMenuModule : IFeatureModule, IWheelInputSink
         try { _input?.Watch(settings.HoldMiddle, settings.HoldBack, settings.HoldForward); }
         catch (Exception ex) { Log.Warn("Radial menu: hooking the mouse failed", ex); }
         Prepare();
+    }
+
+    /// <summary>Settings › Radial menu › Open over fullscreen apps.</summary>
+    public void SetOpenOverFullscreen(bool on)
+    {
+        Save(Settings with { OpenOverFullscreen = on });
+        if (_input is not null)
+            _input.OpenOverFullscreen = on;
+        ApplyShortcutGate();
+    }
+
+    /// <summary>Off over fullscreen apps while one is in front: the shortcut is let go, so the game gets its keys.</summary>
+    private bool ShortcutStandsAside => !Settings.OpenOverFullscreen && _context?.Input?.FullscreenInFront == true;
+
+    // The hub raises it on its own thread.
+    private void OnPauseChanged() => Application.Current?.Dispatcher.BeginInvoke(ApplyShortcutGate);
+
+    private void ApplyShortcutGate()
+    {
+        if (_context is null || Settings.Shortcut is not { } shortcut)
+            return;
+        if (ShortcutStandsAside)
+        {
+            _hotkey?.Dispose();
+            _hotkey = null;
+        }
+        else if (_hotkey is null)
+        {
+            TryRegister(shortcut);
+            Changed?.Invoke();
+        }
     }
 
     /// <summary>The wheel's slices, as the editor leaves them.</summary>

@@ -43,6 +43,15 @@ public sealed class ShellContext
         Services.Clipboard = Clipboard = new ClipboardHub(new WindowsClipboardSystem(), new WindowsForeground(), log: loggerFactory.CreateLogger("Clipboard"));
         // Its thread starts on first use; no hook goes in until a feature needs one.
         Services.Input = Input = new InputHub(loggerFactory.CreateLogger("Input"));
+        // Always on and Pause in these apps (Settings › General): kept until the hub's thread starts, then applied live.
+        void ApplyPauseRules() => Input.Rules = config.GetSection<AppSettings>(AppSettings.SectionName).PauseRules();
+        ApplyPauseRules();
+        config.SectionChanged += (_, e) =>
+        {
+            if (e.Name == AppSettings.SectionName)
+                ApplyPauseRules();
+        };
+        config.Imported += (_, _) => ApplyPauseRules();
 #if DEBUG
         // The watchdog's Sandbox check: Windows dropping both hooks unannounced, N seconds after start.
         if (int.TryParse(Environment.GetEnvironmentVariable("CHIPPI_INPUT_DROP_HOOKS"), out int dropAfter))

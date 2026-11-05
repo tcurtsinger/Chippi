@@ -3,6 +3,7 @@
 
 using System.Windows.Threading;
 using Chippi.Core.Config;
+using Chippi.Core.Input;
 using Microsoft.Extensions.Logging;
 using Windows.Win32;
 using Windows.Win32.Foundation;
@@ -22,8 +23,6 @@ namespace Chippi.App.Island;
 /// </summary>
 internal sealed class ForegroundTracker : IDisposable
 {
-    private const int GWL_STYLE = -16;
-    private const int WS_CAPTION = 0x00C00000;
 
     private readonly Dispatcher _dispatcher;
     private readonly ILogger _logger;
@@ -139,31 +138,11 @@ internal sealed class ForegroundTracker : IDisposable
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
-    /// <summary>
-    /// SHQueryUserNotificationState, or 0 when it fails. Only D3D fullscreen and presentation mode
-    /// hide the island: QUNS_BUSY alone is not trusted, because some systems report it while an
-    /// ordinary maximized window is in front. A borderless fullscreen window is caught by
-    /// <see cref="CoversMonitor"/> instead.
-    /// </summary>
-    internal static QUERY_USER_NOTIFICATION_STATE NotificationState() =>
-        PInvoke.SHQueryUserNotificationState(out var state).Succeeded ? state : 0;
+    /// <summary>Core's fullscreen test (<see cref="FullscreenCheck"/>), which the input hub's pause shares.</summary>
+    internal static QUERY_USER_NOTIFICATION_STATE NotificationState() => (QUERY_USER_NOTIFICATION_STATE)FullscreenCheck.NotificationState();
 
-    /// <summary>
-    /// The window covers its whole monitor and is not merely maximized: a maximized captioned window
-    /// leaves the island in place (it covers the monitor only when the taskbar auto-hides).
-    /// </summary>
-    internal static bool CoversMonitor(HWND window, HMONITOR monitor)
-    {
-        if (monitor == default || !PInvoke.IsWindowVisible(window) || PInvoke.IsIconic(window))
-            return false;
-        if (PInvoke.IsZoomed(window) && (PInvoke.GetWindowLong(window, (WINDOW_LONG_PTR_INDEX)GWL_STYLE) & WS_CAPTION) == WS_CAPTION)
-            return false;
-        var info = new MONITORINFO { cbSize = (uint)System.Runtime.InteropServices.Marshal.SizeOf<MONITORINFO>() };
-        if (!PInvoke.GetMonitorInfo(monitor, ref info) || !PInvoke.GetWindowRect(window, out var rect))
-            return false;
-        var m = info.rcMonitor;
-        return rect.left <= m.left && rect.top <= m.top && rect.right >= m.right && rect.bottom >= m.bottom;
-    }
+    /// <inheritdoc cref="FullscreenCheck.CoversMonitor"/>
+    internal static bool CoversMonitor(HWND window, HMONITOR monitor) => FullscreenCheck.CoversMonitor((nint)window, (nint)monitor);
 
     /// <summary>The widget's monitor for the current setting. Follow active window (retired 2026-10-29) reads as Main display.</summary>
     private HMONITOR IslandMonitor()

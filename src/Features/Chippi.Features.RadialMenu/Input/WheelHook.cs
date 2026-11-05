@@ -32,6 +32,9 @@ public interface IWheelInput : IDisposable
     /// <summary>While true (Cleaning mode), no press opens the wheel.</summary>
     Func<bool> Paused { set; }
 
+    /// <summary>Settings › Radial menu › Open over fullscreen apps. Off, no press opens the wheel while a fullscreen app is in front.</summary>
+    bool OpenOverFullscreen { set; }
+
     /// <summary>
     /// The wheel opened from its shortcut: its clicks and Esc go to <see cref="IWheelInputSink"/> until <see cref="Closed"/>.
     /// With <paramref name="virtualPointer"/> (a game hides the pointer), the pointer the wheel hears starts at
@@ -59,6 +62,8 @@ internal sealed class WheelHook : IWheelInput, IInputFilter
     private readonly IWheelInputSink _sink;
     private readonly Dispatcher _ui;
     private readonly IInputRegistration _registration;
+    private readonly IInputHub _hub;
+    private volatile bool _overFullscreen = true;
     private bool _middle, _back, _forward, _shown;
     private Func<bool> _paused = () => false;
     private Timer? _timer;
@@ -71,6 +76,7 @@ internal sealed class WheelHook : IWheelInput, IInputFilter
     {
         _sink = sink;
         _ui = ui;
+        _hub = hub;
         _registration = hub.Add(this);
     }
 
@@ -79,6 +85,8 @@ internal sealed class WheelHook : IWheelInput, IInputFilter
     private Gesture? _gestureWithWatch;
 
     public Func<bool> Paused { set => _paused = value; }
+
+    public bool OpenOverFullscreen { set => _overFullscreen = value; }
 
     public InputOrder Order => InputOrder.Triggers;
 
@@ -95,7 +103,8 @@ internal sealed class WheelHook : IWheelInput, IInputFilter
         }
     }
 
-    private bool Watched(MouseButton button) => !_paused() && button switch
+    // Off over fullscreen apps, a press there is the game's from the start; one already kept still finishes.
+    private bool Watched(MouseButton button) => !_paused() && (_overFullscreen || !_hub.FullscreenInFront) && button switch
     {
         MouseButton.Middle => _middle,
         MouseButton.Back => _back,
