@@ -32,6 +32,14 @@ Window layouts and snapping, app switcher, close protection, focus follows mouse
   1. The shared input layer (`Chippi.Input`: one keyboard hook and one mouse hook with a watchdog), shared actions, the shortcut service and the pause with Always on. The Actions regroup (option B, keeping your tile order). Then Debounce, Focus follows mouse and Close protection.
   2. Shortcuts and Smooth scrolling.
   3. Text snippets, Snap and the App switcher.
+- **Waves so far:**
+
+  | Wave | State |
+  |---|---|
+  | 1 | Passed Travis's live check on 2026-11-05 (task 331), installer built from `bf939a5`. Includes Smooth scrolling. The Radial menu's cold-start flick (issue #230) passed too. The shared action model (#242) came after that build. |
+  | 2 | In progress: Shortcuts, started 2026-11-05 (task 334) |
+  | 3 | Not started |
+
 - **Focus follows mouse** uses Windows' built-in setting (250 ms, the window raised) and puts the original setting back when it's off or paused.
 - **Key debounce** tops out at 200 ms.
 - **Settings:**
