@@ -226,7 +226,7 @@ public static class Probe
             '"features":{"preset":"custom","installed":["smooth-scrolling"],"capabilitiesUsed":[]}}'
         $env:CHIPPI_SMOOTH_INJECTED = '1'
     }
-    $shortcutsOnly = ($checks -contains 'shortcuts' -or $checks -contains 'caps') -and -not ($checks -contains 'radial' -or $checks -contains 'watchdog' -or $checks -contains 'cost' -or $debounceOnly)
+    $shortcutsOnly = ($checks -contains 'shortcuts' -or $checks -contains 'caps' -or $checks -contains 'editor') -and -not ($checks -contains 'radial' -or $checks -contains 'watchdog' -or $checks -contains 'cost' -or $debounceOnly)
     function ShortcutSettings([string]$ignored = '') {
         $action = { param($name) '"action":{"kind":"window","value":"SnapLeft","name":"' + $name + '"}' }
         $bindings = @(
@@ -250,6 +250,12 @@ public static class Probe
         # Shortcuts alone. CHIPPI_SHORTCUTS_PROBE: its fired bindings go to a file (the shared action runner isn't in the shell yet).
         # Another app holds Win+Y, so Chippi's RegisterHotKey for it is refused: the binding fires nothing and the other app hears it.
         $debounceSettings = ShortcutSettings
+        if ($checks -contains 'editor') {
+            # The page's editor: one saved binding (Ctrl+Alt+K), the Radial menu holding Middle, another app holding Win+Y.
+            $debounceSettings = '{"version":1,"app":{"islandEnabled":false},"modules":{"radial-menu":{"holdMiddle":true,"slices":[]},' +
+                '"shortcuts":{"mouseEnabled":true,"bindings":[{"id":"key","door":"key","keys":{"modifiers":"control, alt","key":75},"action":{"kind":"window","value":"SnapLeft","name":"KeyAct"}}]}},' +
+                '"features":{"preset":"custom","installed":["shortcuts","radial-menu"],"capabilitiesUsed":[]}}'
+        }
         $env:CHIPPI_SHORTCUTS_PROBE = "$results\actions.log"
         $holdWinY = [Probe]::HoldHotkey(8, 0x59)
         Note "another app holds Win+Y: $holdWinY"
@@ -606,6 +612,152 @@ public static class Probe
         }
     }
 
+
+    if ($checks -contains 'editor') {
+        # Settings > Shortcuts driven through UI Automation, with real input into the hooks: pick an action from the dropdown,
+        # record keys and a mouse button, read the refusal line, Save, then press the saved keys and see the action run.
+        Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes, System.Drawing, System.Windows.Forms
+        $ed = [ordered]@{}
+        $actionLog = "$results\actions.log"
+        $uia = [System.Windows.Automation.AutomationElement]
+        function Shot([string]$name) {
+            $b = New-Object System.Drawing.Bitmap ([System.Windows.Forms.SystemInformation]::VirtualScreen.Width), ([System.Windows.Forms.SystemInformation]::VirtualScreen.Height)
+            $g = [System.Drawing.Graphics]::FromImage($b); $g.CopyFromScreen(0, 0, 0, 0, $b.Size); $g.Dispose()
+            $b.Save("$results\editor-$name.png"); $b.Dispose()
+        }
+        function Named([string]$name, $root = $uia::RootElement) {
+            $cond = New-Object System.Windows.Automation.PropertyCondition ($uia::NameProperty), $name
+            $root.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $cond)
+        }
+        function WaitNamed([string]$name, [int]$seconds = 10) {
+            $end = (Get-Date).AddSeconds($seconds)
+            while ((Get-Date) -lt $end) { $e = Named $name; if ($e) { return $e }; Start-Sleep -Milliseconds 250 }
+            Shot 'missing'
+            $win = Named 'Chippi Settings'
+            if ($win) { Note ('names: ' + ((@($win.FindAll([System.Windows.Automation.TreeScope]::Descendants, [System.Windows.Automation.Condition]::TrueCondition) | ForEach-Object { $_.Current.Name } | Where-Object { $_ })) -join ' | ')) }
+            throw "No element named '$name'"
+        }
+        function Press($e) {
+            $p = $null
+            if ($e.TryGetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern, [ref]$p)) { $p.Invoke(); return }
+            if ($e.TryGetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern, [ref]$p)) { $p.Select(); return }
+            if ($e.TryGetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern, [ref]$p)) { $p.Toggle(); return }
+            throw "Can't press $($e.Current.Name)"
+        }
+        function SetText($e, [string]$text) { $e.SetFocus(); $e.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern).SetValue($text) }
+        function Texts($window) {
+            $cond = New-Object System.Windows.Automation.PropertyCondition ($uia::ControlTypeProperty), ([System.Windows.Automation.ControlType]::Text)
+            @($window.FindAll([System.Windows.Automation.TreeScope]::Descendants, $cond) | ForEach-Object { $_.Current.Name })
+        }
+        function Chord([uint16[]]$keys) {
+            foreach ($k in $keys) { [Probe]::Key($k, $true); Start-Sleep -Milliseconds 30 }
+            [array]::Reverse($keys)
+            foreach ($k in $keys) { [Probe]::Key($k, $false); Start-Sleep -Milliseconds 30 }
+            Start-Sleep -Milliseconds 700
+        }
+        function Line($window) { (Texts $window | Where-Object { $_ -match 'uses this|Pick a|failed' }) -join '; ' }
+        function Field($window) { [ordered]@{ line = (Line $window); saveEnabled = (Named 'Save' $window).Current.IsEnabled } }
+
+        Start-Process -FilePath 'C:\chippi\Chippi.exe' -ArgumentList '--dev-profile sandbox'
+        $window = WaitNamed 'Chippi Settings' 20
+        Start-Sleep -Seconds 2
+        # The sidebar's items are named by their view model ("NavItem { Id = shortcuts, ..."): find that one and select it.
+        $nav = $null
+        $end = (Get-Date).AddSeconds(15)
+        while (-not $nav -and (Get-Date) -lt $end) {
+            $nav = $window.FindAll([System.Windows.Automation.TreeScope]::Descendants, [System.Windows.Automation.Condition]::TrueCondition) |
+                Where-Object { $_.Current.Name -like 'NavItem { Id = shortcuts,*' } | Select-Object -First 1
+            if (-not $nav) { Start-Sleep -Milliseconds 300 }
+        }
+        Press $nav
+        Start-Sleep -Seconds 1
+        $add = WaitNamed 'Add shortcut' 10
+        Shot 'list'
+        $ed.listTexts = (Texts $window) -join ' | '
+        Press $add
+        Press (WaitNamed 'Choose an action' 10)
+        $search = WaitNamed 'Search actions' 10
+        Start-Sleep -Milliseconds 500
+        Shot 'dropdown-open'
+        SetText $search 'snap'
+        Start-Sleep -Milliseconds 600
+        Shot 'dropdown-search'
+        $ed.searchHasSnapRight = [bool](Named 'Snap right')
+        $ed.searchHidesKeepOnTop = -not (Named 'Keep on top')
+        Press (Named 'Snap right')
+        Start-Sleep -Milliseconds 500
+
+        # 1. A clash with a saved binding is refused with one line, and Save stays off.
+        Chord @(0xA2, 0xA4, 0x4B)
+        $ed.clashSaved = Field $window
+        Shot 'refused-saved'
+        # 2. Another app holds Win+Y.
+        Press (Named 'Shortcut' $window)
+        Start-Sleep -Milliseconds 400
+        Chord @(0x5B, 0x59)
+        $ed.anotherApp = Field $window
+        Shot 'refused-other-app'
+        # 3. A free chord: no line, Save on; Save it.
+        Press (Named 'Shortcut' $window)
+        Start-Sleep -Milliseconds 400
+        Chord @(0xA2, 0xA4, 0x4A)
+        $ed.free = Field $window
+        Shot 'recorded'
+        Press (Named 'Save' $window)
+        Start-Sleep -Milliseconds 800
+        Shot 'saved'
+        $ed.savedTexts = (Texts $window) -join ' | '
+        $ed.settingsJson = (Get-Content -LiteralPath (Join-Path $profileDir 'settings.json') -Raw)
+        # 4. The saved keys run the action through the host (the probe's log stands in for the real runner).
+        Remove-Item -LiteralPath $actionLog -ErrorAction SilentlyContinue
+        Chord @(0xA2, 0xA4, 0x4A)
+        Start-Sleep -Milliseconds 800
+        $ed.savedKeysFired = if (Test-Path -LiteralPath $actionLog) { (Get-Content -LiteralPath $actionLog) -join '; ' } else { '' }
+        # 5. A mouse button: Middle is held by the Radial menu.
+        Press (Named 'Add shortcut' $window)
+        Start-Sleep -Milliseconds 500
+        Press (WaitNamed 'Choose an action' 10)
+        $null = WaitNamed 'Search actions' 10
+        Press (WaitNamed 'Keep on top' 10)
+        Start-Sleep -Milliseconds 400
+        Press (WaitNamed 'Mouse button' 10)
+        Start-Sleep -Milliseconds 600
+        [Probe]::Middle($true); Start-Sleep -Milliseconds 80; [Probe]::Middle($false)
+        Start-Sleep -Milliseconds 700
+        $ed.radialMiddle = Field $window
+        Shot 'refused-radial'
+        Press (Named 'Shortcut' $window)
+        Start-Sleep -Milliseconds 400
+        [Probe]::Back($true); Start-Sleep -Milliseconds 80; [Probe]::Back($false)
+        Start-Sleep -Milliseconds 700
+        $ed.backButton = Field $window
+        Press (Named 'Save' $window)
+        Start-Sleep -Milliseconds 800
+        Shot 'saved-mouse'
+        # 6. Caps Lock combos are off: the held key isn't the combo's key. Caps then M records M, not Caps Lock itself.
+        Press (Named 'Add shortcut' $window)
+        Start-Sleep -Milliseconds 500
+        Press (WaitNamed 'Choose an action' 10)
+        $null = WaitNamed 'Search actions' 10
+        Press (WaitNamed 'Keep on top' 10)
+        Start-Sleep -Milliseconds 400
+        Press (WaitNamed 'Caps Lock' 10)
+        Start-Sleep -Milliseconds 600
+        Chord @(0x14)
+        Chord @(0x4D)
+        $ed.capsRecorded = (Texts $window | Where-Object { $_ -in @('Caps Lock', 'M') }) -join ','
+        Shot 'caps-recorded'
+        Press (Named 'Cancel' $window)
+        Start-Sleep -Milliseconds 500
+        # 7. An Acts as chip toggled through UI Automation (a Toggle, no Click) is saved.
+        $alt = $window.FindAll([System.Windows.Automation.TreeScope]::Descendants, (New-Object System.Windows.Automation.PropertyCondition ($uia::NameProperty), 'Alt')) |
+            Where-Object { $_.Current.ControlType.ProgrammaticName -eq 'ControlType.Button' } | Select-Object -First 1
+        Press $alt
+        Start-Sleep -Milliseconds 800
+        $ed.capsModifiersAfterAltToggle = ([regex]::Match((Get-Content -LiteralPath (Join-Path $profileDir 'settings.json') -Raw), '"capsModifiers":\s*"[^"]*"')).Value
+        $found.editor = $ed
+    }
+
     if ($checks -contains 'cost') {
         $cost = @()
         for ($run = 1; $run -le 3; $run++) {
@@ -631,6 +783,8 @@ public static class Probe
 }
 catch {
     $found.error = $_.ToString()
+    $failLogs = Join-Path $env:LOCALAPPDATA 'Chippi-dev\sandbox\logs'
+    if (Test-Path $failLogs) { Copy-Item -Path $failLogs -Destination "$results\chippi-logs" -Recurse -ErrorAction SilentlyContinue }
     Note "failed: $_"
 }
 finally {

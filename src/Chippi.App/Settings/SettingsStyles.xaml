@@ -7,6 +7,31 @@
     <Style x:Key="RowCaptionStyle" TargetType="TextBlock" BasedOn="{StaticResource CaptionTextStyle}">
         <Setter Property="TextWrapping" Value="Wrap" />
     </Style>
+    <!-- A modifier choice (Settings > Shortcuts > Acts as): filled with the accent while on. -->
+    <Style x:Key="ChipToggleStyle" TargetType="ToggleButton">
+        <Setter Property="MinWidth" Value="52" />
+        <Setter Property="Height" Value="32" />
+        <Setter Property="Margin" Value="8,0,0,0" />
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToggleButton">
+                    <Border x:Name="Chrome" Background="{DynamicResource ChipBrush}" BorderBrush="{DynamicResource BorderStrongBrush}" BorderThickness="1" CornerRadius="6" Padding="14,0">
+                        <ContentPresenter x:Name="Label" HorizontalAlignment="Center" VerticalAlignment="Center" TextElement.Foreground="{TemplateBinding Foreground}" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Chrome" Property="Background" Value="{DynamicResource HoverBrush}" /></Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource AccentBrush}" />
+                            <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                            <Setter TargetName="Label" Property="TextElement.Foreground" Value="{DynamicResource OnAccentBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.45" /></Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
     <Style x:Key="SearchResultButtonStyle" TargetType="Button" BasedOn="{StaticResource SubtleButtonStyle}">
         <Setter Property="Padding" Value="16,10" />
         <Setter Property="HorizontalContentAlignment" Value="Left" />

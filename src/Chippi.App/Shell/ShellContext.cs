@@ -97,6 +97,9 @@ public sealed class ShellContext
     /// <summary>Every shortcut Chippi holds, for Settings › Shortcuts.</summary>
     public Chippi.Core.Shortcuts.ShortcutService Shortcuts { get; }
 
+    /// <summary>The Shortcuts feature, whose bindings Settings › Shortcuts lists; set when the app registers it.</summary>
+    internal Chippi.Features.Shortcuts.ShortcutsModule? ShortcutsFeature { get; set; }
+
     /// <summary>The shortcuts' window. Disposed at exit, after the modules stop.</summary>
     public Chippi.UI.Shortcuts.HotkeyWindow Hotkeys { get; }
 

@@ -111,6 +111,45 @@ internal sealed class SettingsController
                             await Idle();
                             string file = page.Id.Replace(':', '-');
                             Render(_window!, System.IO.Path.Combine(directory, $"r2-{file}-{name}-{accent}.png"));
+                            if (page.Id == "shortcuts")
+                            {
+                                // The whole window, tall enough for the whole page.
+                                double height = _window.Height;
+                                _window.WindowState = WindowState.Normal;
+                                _window.Height = 2100;
+                                await Idle();
+                                Render(_window, System.IO.Path.Combine(directory, $"r6-shortcuts-full-{name}-{accent}.png"));
+                                var scroller = Descendants<System.Windows.Controls.ScrollViewer>(_window).FirstOrDefault(v => v.ScrollableHeight > 0);
+                                if (scroller is not null)
+                                {
+                                    scroller.ScrollToEnd();
+                                    await Idle();
+                                    Render(_window, System.IO.Path.Combine(directory, $"r6-shortcuts-end-{name}-{accent}.png"));
+                                }
+                                double width = _window.Width;
+                                _window.Width = 860;
+                                _window.Height = 1300;
+                                await Idle();
+                                Render(_window, System.IO.Path.Combine(directory, $"r6-shortcuts-narrow-{name}-{accent}.png"));
+                                // The editor's states, at full and narrow width, without recording.
+                                if (Descendants<Pages.ShortcutsPage>(_window).FirstOrDefault() is { } shortcutsPage)
+                                {
+                                    foreach (var (w, size) in new[] { (width, "full"), (860.0, "narrow") })
+                                    {
+                                        _window.Width = w;
+                                        _window.Height = 1300;
+                                        foreach (string state in new[] { "new", "listening", "caps", "ready", "refused" })
+                                        {
+                                            shortcutsPage.ShowEditorForShot(state);
+                                            await Idle();
+                                            Render(_window, System.IO.Path.Combine(directory, $"r6-editor-{state}-{size}-{name}-{accent}.png"));
+                                        }
+                                    }
+                                    shortcutsPage.ShowEditorForShot(null);
+                                }
+                                _window.Width = width;
+                                _window.Height = height;
+                            }
                             if (page.Id == "module:downloads-organizer")
                             {
                                 // The organizer's other tabs and Preview (R4).
@@ -230,6 +269,16 @@ internal sealed class SettingsController
         await Application.Current.Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
         await Task.Delay(400);
         await Application.Current.Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+    }
+
+    private static IEnumerable<T> Descendants<T>(System.Windows.DependencyObject root) where T : System.Windows.DependencyObject
+    {
+        for (int i = 0; i < System.Windows.Media.VisualTreeHelper.GetChildrenCount(root); i++)
+        {
+            var child = System.Windows.Media.VisualTreeHelper.GetChild(root, i);
+            if (child is T match) yield return match;
+            foreach (var d in Descendants<T>(child)) yield return d;
+        }
     }
 
     private static void Render(FrameworkElement element, string path, bool full = false)

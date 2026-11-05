@@ -180,7 +180,7 @@ public sealed class ShortcutsModule : IFeatureModule
             Save(Settings with { CapsEnabled = enabled, CapsHeldKey = heldKey, CapsModifiers = modifiers, CapsTap = tap,
                 CapsIgnoredApps = [.. ignoredApps.Where(a => !string.IsNullOrWhiteSpace(a)).Distinct(StringComparer.OrdinalIgnoreCase)] });
     }
-    private string? Check(ShortcutBinding binding, string? except)
+    public string? Check(ShortcutBinding binding, string? except)
     {
         if (binding.Door == BindingDoor.Key)
         {

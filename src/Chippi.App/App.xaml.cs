@@ -215,7 +215,7 @@ public partial class App : Application
         // [Phase 6] Shortcuts: replaces the Mouse buttons, Super key and Shortcut manager placeholders. Actions run on the shell's
         // runner; the Sandbox probe's host takes its place when CHIPPI_SHORTCUTS_PROBE names a file.
         var shortcutProbe = Environment.GetEnvironmentVariable("CHIPPI_SHORTCUTS_PROBE");
-        shell.Registry.Register(new Chippi.Features.Shortcuts.ShortcutsModule(
+        shell.Registry.Register(shell.ShortcutsFeature = new Chippi.Features.Shortcuts.ShortcutsModule(
             () => string.IsNullOrEmpty(shortcutProbe) ? null : new Chippi.Features.Shortcuts.ProbeActionHost(shortcutProbe),
             radialHolds: button => shell.Registry.Features.Any(f => f.Id == Chippi.Features.RadialMenu.RadialMenuModule.Id && f.IsRunning)
                 && button switch
