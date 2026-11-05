@@ -734,6 +734,27 @@ public static class Probe
         Press (Named 'Save' $window)
         Start-Sleep -Milliseconds 800
         Shot 'saved-mouse'
+        # 6. Caps Lock combos are off: the held key isn't the combo's key. Caps then M records M, not Caps Lock itself.
+        Press (Named 'Add shortcut' $window)
+        Start-Sleep -Milliseconds 500
+        Press (WaitNamed 'Choose an action' 10)
+        $null = WaitNamed 'Search actions' 10
+        Press (WaitNamed 'Keep on top' 10)
+        Start-Sleep -Milliseconds 400
+        Press (WaitNamed 'Caps Lock' 10)
+        Start-Sleep -Milliseconds 600
+        Chord @(0x14)
+        Chord @(0x4D)
+        $ed.capsRecorded = (Texts $window | Where-Object { $_ -in @('Caps Lock', 'M') }) -join ','
+        Shot 'caps-recorded'
+        Press (Named 'Cancel' $window)
+        Start-Sleep -Milliseconds 500
+        # 7. An Acts as chip toggled through UI Automation (a Toggle, no Click) is saved.
+        $alt = $window.FindAll([System.Windows.Automation.TreeScope]::Descendants, (New-Object System.Windows.Automation.PropertyCondition ($uia::NameProperty), 'Alt')) |
+            Where-Object { $_.Current.ControlType.ProgrammaticName -eq 'ControlType.Button' } | Select-Object -First 1
+        Press $alt
+        Start-Sleep -Milliseconds 800
+        $ed.capsModifiersAfterAltToggle = ([regex]::Match((Get-Content -LiteralPath (Join-Path $profileDir 'settings.json') -Raw), '"capsModifiers":\s*"[^"]*"')).Value
         $found.editor = $ed
     }
 

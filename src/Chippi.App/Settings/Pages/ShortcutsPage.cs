@@ -483,7 +483,15 @@ internal sealed class ShortcutsPage : UserControl
         else if (combo is { } c)
         {
             if (edit.Door == BindingDoor.Caps)
+            {
+                // The held key (and a modifier) isn't the combo's key: keep listening for the one pressed with it.
+                if (c.Key == (_module?.Settings.CapsHeldKey ?? 0x14) || KeyCombo.ModifierOf(c.Key) != KeyModifiers.None)
+                {
+                    Listen();
+                    return;
+                }
                 edit.CapsKey = c.Key;
+            }
             else
             {
                 var mods = (c.Modifiers.HasFlag(KeyModifiers.Ctrl) ? ShortcutModifiers.Control : 0) | (c.Modifiers.HasFlag(KeyModifiers.Alt) ? ShortcutModifiers.Alt : 0)
@@ -553,17 +561,24 @@ internal sealed class ShortcutsPage : UserControl
             var box = SettingsUi.Styled(new ToggleButton { Content = label, IsChecked = s.CapsModifiers.HasFlag(flag) }, "ChipToggleStyle");
             AutomationProperties.SetName(box, label);
             var captured = flag;
-            box.Click += (_, _) =>
+            bool reverting = false;
+            // A UIA Toggle raises Checked and Unchecked, not Click.
+            void Changed(object sender, RoutedEventArgs e)
             {
+                if (reverting) return;
                 var next = box.IsChecked == true ? _module.Settings.CapsModifiers | captured : _module.Settings.CapsModifiers & ~captured;
                 if (captured == KeyModifiers.Win && box.IsChecked == true)
                 {
+                    reverting = true;
                     box.IsChecked = false;
+                    reverting = false;
                     ConfirmWin(() => Caps(modifiers: next));
                     return;
                 }
                 Caps(modifiers: next);
-            };
+            }
+            box.Checked += Changed;
+            box.Unchecked += Changed;
             acts.Children.Add(box);
         }
         var tap = SettingsUi.Styled(new ComboBox { MinWidth = 180 }, "HopperComboBoxStyle");
