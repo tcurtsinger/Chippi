@@ -381,16 +381,67 @@ public sealed class ModuleTests
         Assert.Single(rig.Hub.Filters);
     }
 
+    [Fact]
+    public async Task A_binding_runs_its_action_on_the_thread_that_pressed_it()
+    {
+        var rig = new Rig();
+        await rig.StartAsync();
+        var binding = Key(CtrlAlt, 0x4B);
+        Assert.True(rig.Module.Add(binding).Ok);
+        rig.Registrar.Press(binding.Keys!);
+        Assert.Equal(Environment.CurrentManagedThreadId, rig.Actions.ThreadId);
+    }
+
+    [Fact]
+    public async Task With_no_host_given_a_key_binding_runs_on_the_shells_actions()
+    {
+        var registrar = new FakeRegistrar();
+        var service = new ShortcutService(registrar);
+        var pc = new RecordingPc();
+        var module = new ShortcutsModule { InlinePosts = true };
+        await module.StartAsync(
+            new ModuleContext(ShortcutsModule.Id, new Store(), NullLogger.Instance, new IslandActivityHub().CreatePublisher(ShortcutsModule.Id), new Ui())
+            { Input = new FakeHub(), Shortcuts = service, Actions = pc }, default);
+        var binding = Key(CtrlAlt, 0x4B);
+        Assert.True(module.Add(binding).Ok);
+        Assert.Equal(BindingState.Active, module.StatusOf(binding.Id).State);
+
+        registrar.Press(binding.Keys!);
+        await pc.Done.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal((nint)42, pc.Window);
+        Assert.Equal(WindowAction.SnapLeft, pc.Action);
+    }
+
+    private sealed class RecordingPc : IActionPc
+    {
+        public TaskCompletionSource Done { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public nint Window { get; private set; }
+        public WindowAction Action { get; private set; }
+        public bool? HasApp(string parsingName) => true;
+        public bool Exists(string path) => true;
+        public nint WindowUnderPointer() => 7;
+        public nint WindowInFront() => 42;
+        public void Open(string target) { }
+        void IActionPc.Window(nint window, WindowAction action) { Window = window; Action = action; Done.TrySetResult(); }
+        public void Media(MediaAction action) { }
+        public Task PressAsync(KeyCombo keys) => Task.CompletedTask;
+        public Task TypeAsync(string text) => Task.CompletedTask;
+        public void Run(CommandShell shell, string line) { }
+        public Task<(bool Terminal, string? Text)> TerminalSelectionAsync() => Task.FromResult<(bool, string?)>((false, null));
+    }
+
     private sealed class FakeActions : IActionHost
     {
         public List<string> Values { get; } = [];
         public List<(string Name, WindowTarget Target)> Runs { get; } = [];
         public HashSet<string> Missing { get; } = [];
         public string? Fail { get; set; }
+        public int ThreadId { get; private set; }
         public TaskCompletionSource Ran { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public Task RunAsync(ChippiAction action, WindowTarget target)
         {
+            ThreadId = Environment.CurrentManagedThreadId;
             Values.Add(action.Value);
             Runs.Add((action.Name, target));
             Ran.TrySetResult();
