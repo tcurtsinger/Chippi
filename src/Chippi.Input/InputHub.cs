@@ -18,7 +18,8 @@ namespace Chippi.Input;
 /// </summary>
 public sealed class InputHub : IInputHub, IDisposable
 {
-    private const uint WmApp = 0x8000, WmRun = WmApp + 1, WmUpdate = WmApp + 2, WmTimer = 0x0113, WmSessionChange = 0x02B1;
+    private const uint WmApp = 0x8000, WmRun = WmApp + 1, WmUpdate = WmApp + 2, WmForeground = WmApp + 3, WmTimer = 0x0113, WmSessionChange = 0x02B1;
+    private const uint ForegroundEvent = 0x0003, LocationChange = 0x800B;
     private const uint WmKeyDown = 0x0100, WmSysKeyDown = 0x0104;
     private const nint SessionLock = 7;
     private const uint DesktopSwitch = 0x0020;
@@ -30,13 +31,18 @@ public sealed class InputHub : IInputHub, IDisposable
     private HubCore? _core;
     private Thread? _thread;
     private int _threadId;
-    private nint _window, _keyHook, _mouseHook, _desktopHook;
-    private bool _disposed, _faulted;
+    private nint _window, _keyHook, _mouseHook, _desktopHook, _foregroundHook, _locationHook, _foreground;
+    private uint _locationThread;
+    private bool _disposed, _faulted, _foregroundPending;
+    private PauseRules _rules = PauseRules.Default;
+    private volatile bool _paused, _fullscreen;
+    private Action? _pauseChanged;
+    private readonly Lock _listeners = new(); // not _gate: Start holds that while the hub's thread raises its first change
 
     // Kept alive while Windows holds them.
     private readonly Native.HookProc _keyProc, _mouseProc;
     private readonly Native.WndProc _windowProc;
-    private readonly Native.WinEventProc _desktopProc;
+    private readonly Native.WinEventProc _desktopProc, _foregroundProc;
 
     public InputHub(ILogger? log = null)
     {
@@ -45,6 +51,7 @@ public sealed class InputHub : IInputHub, IDisposable
         _mouseProc = OnMouse;
         _windowProc = OnMessage;
         _desktopProc = (_, _, _, _, _, _, _) => _core?.SessionChanged();
+        _foregroundProc = OnForegroundEvent;
         if (Environment.GetEnvironmentVariable("CHIPPI_INPUT_TIMINGS") is { Length: > 0 } report)
             _timings = new HookTimings(report);
     }
@@ -58,8 +65,46 @@ public sealed class InputHub : IInputHub, IDisposable
 
     public bool Paused
     {
-        get => Invoke(core => core.Paused);
-        set => Invoke(core => core.Paused = value);
+        get => _paused;
+        internal set
+        {
+            Invoke(core => core.Paused = value);
+            _paused = value;
+        }
+    }
+
+    public bool FullscreenInFront => _fullscreen;
+
+    public event Action? PauseChanged
+    {
+        add
+        {
+            lock (_listeners)
+                _pauseChanged += value;
+            Invoke(_ => 0); // the hub watches the window in front from its thread
+        }
+        remove
+        {
+            lock (_listeners)
+                _pauseChanged -= value;
+        }
+    }
+
+    /// <summary>Always on and Pause in these apps, from Settings › General. The shell sets them at start and on each change.</summary>
+    public PauseRules Rules
+    {
+        get => _rules;
+        set
+        {
+            bool started;
+            lock (_gate)
+            {
+                _rules = value;
+                started = _thread is not null && !_disposed;
+            }
+            if (started)
+                Invoke(core => core.Rules = value);
+        }
     }
 
     /// <summary>The hooks in now (the Sandbox checks read it).</summary>
@@ -137,17 +182,22 @@ public sealed class InputHub : IInputHub, IDisposable
     {
         var ready = new ManualResetEventSlim();
         Exception? failed = null;
+        var rules = _rules; // the caller holds _gate
         var thread = new Thread(() =>
         {
             try
             {
                 _core = new HubCore(new Hooks(this), new Sender(), new WindowsSystem(), _log);
                 _core.RequestUpdate = () => Native.PostMessage(_window, WmUpdate, 0, 0);
+                _core.PauseChanged = OnPauseChanged;
+                _core.Rules = rules;
                 _window = Native.CreateMessageWindow(_windowProc);
                 Native.SetTimer(_window, 1, 1000, 0);
                 Native.WTSRegisterSessionNotification(_window, 0);
                 _desktopHook = Native.SetWinEventHook(DesktopSwitch, DesktopSwitch, 0, _desktopProc, 0, 0, 0);
+                _foregroundHook = Native.SetWinEventHook(ForegroundEvent, ForegroundEvent, 0, _foregroundProc, 0, 0, 0);
                 _threadId = Environment.CurrentManagedThreadId;
+                EvaluateForeground();
             }
             catch (Exception ex) { failed = ex; }
             ready.Set();
@@ -179,6 +229,10 @@ public sealed class InputHub : IInputHub, IDisposable
             case WmUpdate:
                 Guard(() => _core!.UpdateHooks());
                 return 0;
+            case WmForeground:
+                _foregroundPending = false;
+                Guard(EvaluateForeground);
+                return 0;
             case WmTimer:
                 Guard(() => _core!.Tick());
                 _timings?.Tick();
@@ -188,6 +242,57 @@ public sealed class InputHub : IInputHub, IDisposable
                 return 0;
         }
         return Native.DefWindowProc(window, message, wParam, lParam);
+    }
+
+    // ---- The window in front, for the pause: the foreground event, and its own thread's moves (one going fullscreen in place) ----
+
+    private void OnForegroundEvent(nint hook, uint eventType, nint window, int objectId, int childId, uint thread, uint time)
+    {
+        if (eventType == LocationChange && (window != _foreground || objectId != 0 || childId != 0))
+            return;
+        if (_foregroundPending)
+            return;
+        _foregroundPending = true;
+        Native.PostMessage(_window, WmForeground, 0, 0);
+    }
+
+    private void EvaluateForeground()
+    {
+        nint foreground = Native.GetForegroundWindow();
+        if (foreground != _foreground)
+        {
+            _foreground = foreground;
+            uint thread = foreground == 0 ? 0 : Native.GetWindowThreadProcessId(foreground, out uint process);
+            if (thread != _locationThread)
+            {
+                if (_locationHook != 0)
+                    Native.UnhookWinEvent(_locationHook);
+                _locationHook = 0;
+                _locationThread = thread;
+                if (thread != 0)
+                {
+                    Native.GetWindowThreadProcessId(foreground, out process);
+                    _locationHook = Native.SetWinEventHook(LocationChange, LocationChange, 0, _foregroundProc, process, thread, 0);
+                }
+            }
+        }
+        _core!.Foreground(FullscreenCheck.IsFullscreen(foreground), Native.AppPath(foreground));
+    }
+
+    private void OnPauseChanged()
+    {
+        _paused = _core!.Paused;
+        _fullscreen = _core.FullscreenInFront;
+        Action? listeners;
+        lock (_listeners)
+            listeners = _pauseChanged;
+        if (listeners is null)
+            return;
+        foreach (var listener in listeners.GetInvocationList().Cast<Action>())
+        {
+            try { listener(); }
+            catch (Exception ex) { _log?.LogWarning(ex, "Input hub: a pause listener failed"); }
+        }
     }
 
     private void Guard(Action action)
@@ -252,8 +357,9 @@ public sealed class InputHub : IInputHub, IDisposable
         Invoke(core =>
         {
             core.Stop();
-            if (_desktopHook != 0)
-                Native.UnhookWinEvent(_desktopHook);
+            foreach (nint hook in (ReadOnlySpan<nint>)[_desktopHook, _foregroundHook, _locationHook])
+                if (hook != 0)
+                    Native.UnhookWinEvent(hook);
             Native.WTSUnRegisterSessionNotification(_window);
             Native.KillTimer(_window, 1);
             Native.DestroyMessageWindow(_window);

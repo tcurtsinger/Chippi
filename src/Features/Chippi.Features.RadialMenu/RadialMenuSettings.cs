@@ -62,6 +62,12 @@ public sealed record RadialMenuSettings
     /// <summary>The keyboard shortcut; null until recorded.</summary>
     public MicShortcut? Shortcut { get; init; }
 
+    /// <summary>
+    /// Settings › Radial menu › Open over fullscreen apps: on (the default, as before Phase 6), the wheel opens over a game
+    /// too. Off, while a fullscreen app (or one on Pause in these apps) is in front, its buttons and shortcut reach the app.
+    /// </summary>
+    public bool OpenOverFullscreen { get; init; } = true;
+
     public List<Slice> Slices { get; init; } = [];
 
     /// <summary>A mouse button opens it.</summary>

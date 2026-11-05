@@ -21,6 +21,7 @@ internal sealed class Fixture
     public FakeInput Input { get; } = new();
     public FakeHotkey Hotkey { get; } = new();
     public FakeHub Hub { get; } = new();
+    public FakeInputHub InputHub { get; } = new();
     public FakeSettings Settings { get; } = new();
     public List<string> RanCommands { get; } = [];
     public bool Cleaning { get; init; }
@@ -37,6 +38,7 @@ internal sealed class Fixture
     {
         Commands = Commands,
         Clipboard = Hub,
+        Input = InputHub,
     }, default);
 
     private IReadOnlyList<ChippiCommand> Commands() =>
@@ -146,6 +148,8 @@ internal sealed class FakeInput : IWheelInput
 {
     public (bool, bool, bool) Watched { get; private set; }
     public Func<bool> Paused { get; set; } = () => false;
+
+    public bool OpenOverFullscreen { get; set; } = true;
     public int ClosedCount { get; private set; }
     public int ByShortcut { get; private set; }
     public PixelPoint? Virtual { get; private set; }
@@ -172,6 +176,20 @@ internal sealed class FakeHotkey : IMicHotkey
     }
 
     public void Dispose() => Pressed = null;
+}
+
+/// <summary>The input hub's pause, set by hand: whether a fullscreen app is in front.</summary>
+internal sealed class FakeInputHub : Core.Input.IInputHub
+{
+    public bool Paused { get; set; }
+
+    public bool FullscreenInFront { get; set; }
+
+    public event Action? PauseChanged;
+
+    public void Raise() => PauseChanged?.Invoke();
+
+    public Core.Input.IInputRegistration Add(Core.Input.IInputFilter filter) => throw new NotSupportedException("Tests use FakeInput");
 }
 
 internal sealed class FakeRecorder : IKeyRecorder

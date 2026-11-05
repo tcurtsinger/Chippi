@@ -95,6 +95,12 @@ public sealed record FeatureDescriptor(string Id, string Name, string Descriptio
     public string? Icon { get; init; }
 
     /// <summary>
+    /// A Phase 6 input feature: it stands down while a fullscreen app is in front unless Always on is on. Settings › General
+    /// shows Fullscreen apps once one of these is installed.
+    /// </summary>
+    public bool PausesInFullscreen { get; init; }
+
+    /// <summary>
     /// Something outside Chippi the feature needs before it can be installed (Mic processing's
     /// VB-CABLE driver). Add features creates one while it shows the feature's row and disposes it
     /// after; null for features that need nothing.

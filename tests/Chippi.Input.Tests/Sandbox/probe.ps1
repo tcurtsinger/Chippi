@@ -92,24 +92,28 @@ public static class Probe
     # A dev profile with only the Radial menu: Middle and Back open it, and its four slices type which way was flicked.
     $profileDir = Join-Path $env:APPDATA 'Chippi-dev\sandbox'
     New-Item -ItemType Directory -Force -Path $profileDir | Out-Null
-    @'
-{"version":1,
- "app":{"islandEnabled":false},
- "modules":{"radial-menu":{"holdMiddle":true,"holdBack":true,"slices":[
-   {"kind":"text","value":"up","name":"Up"},{"kind":"text","value":"right","name":"Right"},
-   {"kind":"text","value":"down","name":"Down"},{"kind":"text","value":"left","name":"Left"}]}},
- "features":{"preset":"custom","installed":["radial-menu"],"capabilitiesUsed":[]}}
-'@ | Set-Content -LiteralPath (Join-Path $profileDir 'settings.json') -Encoding ASCII
+    # $app: more "app" settings (the pause's); $radial: more Radial menu settings. Each starts with a comma.
+    function StartChippi([string]$app = '', [string]$radial = '', [string]$installed = '"radial-menu"') {
+        $settings = '{"version":1,"app":{"islandEnabled":false' + $app + '},' +
+            '"modules":{"radial-menu":{"holdMiddle":true,"holdBack":true' + $radial + ',"slices":[' +
+            '{"kind":"text","value":"up","name":"Up"},{"kind":"text","value":"right","name":"Right"},' +
+            '{"kind":"text","value":"down","name":"Down"},{"kind":"text","value":"left","name":"Left"}]}},' +
+            '"features":{"preset":"custom","installed":[' + $installed + '],"capabilitiesUsed":[]}}'
+        Set-Content -LiteralPath (Join-Path $profileDir 'settings.json') -Value $settings -Encoding ASCII
+        $process = Start-Process -FilePath 'C:\chippi\Chippi.exe' -ArgumentList '--dev-profile sandbox' -PassThru
+        Note "Chippi started, pid $($process.Id) (app$app; radial$radial)"
+        Start-Sleep -Seconds 25
+        [Probe]::MoveTo($x, $y); [Probe]::Left($true); [Probe]::Left($false)
+        Start-Sleep -Milliseconds 500
+        $process.Refresh()
+        if ($process.HasExited) { throw "Chippi exited ($($process.ExitCode))" }
+        return $process
+    }
 
     $env:CHIPPI_INPUT_TIMINGS = "$results\hook-timings.csv"
     if ($checks -contains 'watchdog') { $env:CHIPPI_INPUT_DROP_HOOKS = '45' }
-    $chippi = Start-Process -FilePath 'C:\chippi\Chippi.exe' -ArgumentList '--dev-profile sandbox' -PassThru
-    Note "Chippi started, pid $($chippi.Id)"
-    Start-Sleep -Seconds 25
-    [Probe]::MoveTo($x, $y); [Probe]::Left($true); [Probe]::Left($false)
-    Start-Sleep -Milliseconds 500
-    $chippi.Refresh()
-    if ($chippi.HasExited) { throw "Chippi exited ($($chippi.ExitCode))" }
+    if ($checks -contains 'pause') { $env:CHIPPI_INPUT_PROBE_FILTER = '1' }
+    $chippi = if ($checks -contains 'pause') { StartChippi -radial ',"openOverFullscreen":false' } else { StartChippi }
 
     function Flick([string]$button, [int]$dx, [int]$dy) {
         $before = Text
@@ -160,6 +164,84 @@ public static class Probe
             Remove-Item -LiteralPath "$results\target.log" -ErrorAction SilentlyContinue
         }
         $found.radial = $radial
+    }
+
+    if ($checks -contains 'pause') {
+        # A Debug build's probe filter pauses and keeps F24 (CHIPPI_INPUT_PROBE_FILTER). The "game" is a borderless window
+        # covering the screen; target.ps1 logs to fullscreen.log there.
+        function F24 { [Probe]::Key(0x87, $true); Start-Sleep -Milliseconds 80; [Probe]::Key(0x87, $false); Start-Sleep -Milliseconds 500 }
+        function GameLog { if (Test-Path "$results\fullscreen.log") { @(Get-Content -LiteralPath "$results\fullscreen.log") } else { @() } }
+        function StartGame {
+            Remove-Item -LiteralPath "$results\fullscreen.log" -ErrorAction SilentlyContinue
+            $game = Start-Process -FilePath powershell.exe -ArgumentList '-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File C:\probe\target.ps1 -Fullscreen' -PassThru
+            Start-Sleep -Seconds 4
+            [Probe]::MoveTo($x, $y); [Probe]::Left($true); [Probe]::Left($false) # the game in front
+            Start-Sleep -Milliseconds 800
+            Remove-Item -LiteralPath "$results\fullscreen.log" -ErrorAction SilentlyContinue
+            return $game
+        }
+        function EndGame($game) {
+            Stop-Process -Id $game.Id -Force -ErrorAction SilentlyContinue
+            Start-Sleep -Seconds 1
+            [Probe]::MoveTo($x, $y); [Probe]::Left($true); [Probe]::Left($false) # the windowed target in front again
+            Start-Sleep -Milliseconds 800
+            Remove-Item -LiteralPath "$results\target.log" -ErrorAction SilentlyContinue
+        }
+        $pause = [ordered]@{}
+        Remove-Item -LiteralPath "$results\target.log" -ErrorAction SilentlyContinue
+
+        # Always on off (the default), Open over fullscreen apps off.
+        F24
+        $pause.windowedF24 = 'app heard: ' + ((TargetLog) -join '; ')
+        $game = StartGame
+        F24
+        $pause.fullscreenF24 = 'game heard: ' + ((GameLog) -join '; ')
+        Remove-Item -LiteralPath "$results\fullscreen.log" -ErrorAction SilentlyContinue
+        [Probe]::Middle($true); Start-Sleep -Milliseconds 400; [Probe]::Glide($x, $y, $x, $y - 150, 120); [Probe]::Middle($false)
+        Start-Sleep -Milliseconds 1500
+        [Probe]::MoveTo($x, $y)
+        $pause.radialOffOverGame = 'game heard: ' + ((GameLog) -join '; ')
+        EndGame $game
+        $pause.radialOffWindowed = Flick 'middle' 0 -150
+        # F24 held while the game comes to the front: its up is still kept, so the game never sees an up without a down.
+        Remove-Item -LiteralPath "$results\target.log" -ErrorAction SilentlyContinue
+        [Probe]::Key(0x87, $true)
+        Start-Sleep -Milliseconds 300
+        $game = StartGame
+        [Probe]::Key(0x87, $false)
+        Start-Sleep -Milliseconds 500
+        $pause.heldAcrossThePause = 'game heard: ' + ((GameLog) -join '; ') + ' | app heard: ' + ((TargetLog) -join '; ')
+        EndGame $game
+        Stop-Process -Id $chippi.Id -Force
+        Start-Sleep -Seconds 2
+
+        # Always on.
+        $chippi = StartChippi -app ',"inputAlwaysOn":true'
+        $game = StartGame
+        F24
+        $pause.alwaysOnFullscreenF24 = 'game heard: ' + ((GameLog) -join '; ')
+        EndGame $game
+        Stop-Process -Id $chippi.Id -Force
+        Start-Sleep -Seconds 2
+
+        # Pause in these apps: the windowed target (powershell.exe) counts as fullscreen.
+        $chippi = StartChippi -app ',"pauseApps":["C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"]'
+        Remove-Item -LiteralPath "$results\target.log" -ErrorAction SilentlyContinue
+        F24
+        $pause.listedWindowedF24 = 'app heard: ' + ((TargetLog) -join '; ')
+        Stop-Process -Id $chippi.Id -Force
+        Start-Sleep -Seconds 2
+
+        # No Radial menu: only the probe filter needs the keyboard, so its hook comes off for the game and back after it
+        # (the hub's log says so).
+        $chippi = StartChippi -installed ''
+        $game = StartGame
+        F24
+        $pause.noRadialFullscreenF24 = 'game heard: ' + ((GameLog) -join '; ')
+        EndGame $game
+        F24
+        $pause.noRadialWindowedF24 = 'app heard: ' + ((TargetLog) -join '; ')
+        $found.pause = $pause
     }
 
     if ($checks -contains 'watchdog') {

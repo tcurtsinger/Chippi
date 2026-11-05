@@ -18,6 +18,10 @@ public sealed class KeyboardLockTests
 
         public bool Paused { get; set; }
 
+        public bool FullscreenInFront { get; set; }
+
+        public event Action? PauseChanged { add { } remove { } }
+
         public IInputRegistration Add(IInputFilter filter)
         {
             Filter = filter;

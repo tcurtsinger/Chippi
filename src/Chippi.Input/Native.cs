@@ -162,6 +162,41 @@ internal static unsafe class Native
     [DllImport("user32.dll", SetLastError = true)]
     private static extern uint SendInput(uint count, Input* inputs, int size);
 
+    [DllImport("user32.dll")]
+    public static extern nint GetForegroundWindow();
+
+    [DllImport("user32.dll")]
+    public static extern uint GetWindowThreadProcessId(nint window, out uint process);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern nint OpenProcess(uint access, [MarshalAs(UnmanagedType.Bool)] bool inherit, uint process);
+
+    [DllImport("kernel32.dll", EntryPoint = "QueryFullProcessImageNameW", CharSet = CharSet.Unicode, SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool QueryFullProcessImageName(nint process, uint flags, char* name, ref uint size);
+
+    [DllImport("kernel32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool CloseHandle(nint handle);
+
+    /// <summary>The exe behind a window, or null when it can't be read (an elevated or protected process).</summary>
+    public static string? AppPath(nint window)
+    {
+        if (window == 0)
+            return null;
+        GetWindowThreadProcessId(window, out uint id);
+        nint process = id == 0 ? 0 : OpenProcess(0x1000 /* PROCESS_QUERY_LIMITED_INFORMATION */, false, id);
+        if (process == 0)
+            return null;
+        try
+        {
+            char* name = stackalloc char[1024];
+            uint size = 1024;
+            return QueryFullProcessImageName(process, 0, name, ref size) ? new string(name, 0, (int)size) : null;
+        }
+        finally { CloseHandle(process); }
+    }
+
     private static readonly string ClassName = "Chippi.InputHub." + Environment.ProcessId;
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<nint, WndProc> Windows = new();
     private static readonly WndProc Dispatch = (window, message, wParam, lParam) =>

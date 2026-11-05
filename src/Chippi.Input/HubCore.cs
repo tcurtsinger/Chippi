@@ -116,6 +116,49 @@ internal sealed class HubCore(IHookSource hooks, IInputSender sender, IInputSyst
         }
     }
 
+    private PauseRules _rules = PauseRules.Default;
+    private bool _foregroundFullscreen;
+    private string? _foregroundApp;
+
+    /// <summary>The window in front is fullscreen, or its app is on Pause in these apps, whatever Always on says.</summary>
+    public bool FullscreenInFront { get; private set; }
+
+    /// <summary><see cref="Paused"/> or <see cref="FullscreenInFront"/> changed.</summary>
+    public Action PauseChanged { get; set; } = () => { };
+
+    /// <summary>Always on and Pause in these apps, from Settings › General.</summary>
+    public PauseRules Rules
+    {
+        get => _rules;
+        set
+        {
+            _rules = value;
+            Decide();
+        }
+    }
+
+    /// <summary>The window in front changed, or changed size: whether it's fullscreen, and its app's exe (null when unreadable).</summary>
+    public void Foreground(bool fullscreen, string? app)
+    {
+        _foregroundFullscreen = fullscreen;
+        _foregroundApp = app;
+        Decide();
+    }
+
+    private void Decide()
+    {
+        bool counts = _rules.CountsAsFullscreen(_foregroundFullscreen, _foregroundApp);
+        bool paused = _rules.Pauses(_foregroundFullscreen, _foregroundApp);
+        bool changed = counts != FullscreenInFront || paused != _paused;
+        FullscreenInFront = counts;
+        Paused = paused;
+        if (changed)
+        {
+            log?.LogInformation("Input hub: {State}", paused ? "paused for a fullscreen app" : counts ? "a fullscreen app is in front; Always on keeps input features on" : "nothing fullscreen in front");
+            PauseChanged();
+        }
+    }
+
     public Entry Add(IInputFilter filter)
     {
         var entry = new Entry(filter, _added++) { Devices = filter.Devices };
@@ -234,6 +277,7 @@ internal sealed class HubCore(IHookSource hooks, IInputSender sender, IInputSyst
             {
                 hooks.Install(device);
                 _installed |= device;
+                log?.LogInformation("Input hub: the {Device} hook is in", device == InputDevices.Keyboard ? "keyboard" : "mouse");
                 long now = system.Now;
                 if (device == InputDevices.Keyboard)
                     (_heardKey, _keySuspect) = (now, 0);
@@ -244,6 +288,7 @@ internal sealed class HubCore(IHookSource hooks, IInputSender sender, IInputSyst
             {
                 hooks.Remove(device);
                 _installed &= ~device;
+                log?.LogInformation("Input hub: the {Device} hook came off", device == InputDevices.Keyboard ? "keyboard" : "mouse");
                 if (device == InputDevices.Keyboard)
                     ReleaseHeld(_ => true, "the keyboard hook came off");
             }
