@@ -61,7 +61,8 @@ public partial class SettingsWindow : Window
     internal static IReadOnlyList<SharedPage> SharedPages { get; } =
     [
         new("page:mouse", "Mouse", LucideIcons.Mouse, FeatureGroup.Windows,
-            [new("debounce", Chippi.Features.Debounce.DebounceModule.MouseSection, "Clicks")]),
+            [new("focus-follows-mouse", null, null),
+             new("debounce", Chippi.Features.Debounce.DebounceModule.MouseSection, "Clicks")]),
         new("page:keyboard", "Keyboard", LucideIcons.Keyboard, FeatureGroup.Windows,
             [new("debounce", Chippi.Features.Debounce.DebounceModule.KeyboardSection, "Key debounce"),
              new("close-protection", null, "Close protection")]),
