@@ -373,6 +373,8 @@ public static class Probe
         Run 'key60msGap' { [Probe]::TapTwice(0x45, 60) }
         Run 'otherKeysFastStillBoth' { [Probe]::Key(0x41, $true); [Probe]::Key(0x41, $false); [Probe]::Spin(2); [Probe]::Key(0x42, $true); [Probe]::Key(0x42, $false) }
         Run 'keyHeldRepeats' { [Probe]::Key(0x45, $true); [Probe]::Spin(300); [Probe]::Key(0x45, $true); [Probe]::Spin(33); [Probe]::Key(0x45, $true); [Probe]::Key(0x45, $false) }
+        # A held key whose press bounced once (down, up 1 ms later, down 3 ms after that, dropped), then the keyboard's repeats and the up: the hold must still reach the app (#234).
+        Run 'keyBounceThenHold' { [Probe]::Key(0x47, $true); [Probe]::Spin(1); [Probe]::Key(0x47, $false); [Probe]::Spin(3); [Probe]::Key(0x47, $true); [Probe]::Spin(500); for ($i = 0; $i -lt 10; $i++) { [Probe]::Key(0x47, $true); [Probe]::Spin(33) }; [Probe]::Key(0x47, $false) }
         Run 'fastTypingBurst' { for ($i = 0; $i -lt 20; $i++) { [Probe]::TapTwice(0x46, 40) } }
         [Probe]::Circle($x, $y, 150, 8000) | Out-Null
         # Enough key events for a p99 that isn't the first call's JIT: 4,000 (hook-timings.csv, keyboard row).
