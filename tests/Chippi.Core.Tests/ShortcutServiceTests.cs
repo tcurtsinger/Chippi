@@ -33,6 +33,27 @@ public sealed class ShortcutServiceTests
     }
 
     [Fact]
+    public void A_bindable_shortcut_may_hold_the_Windows_key_and_the_service_asks_Windows_for_it_but_a_plain_one_still_may_not()
+    {
+        var windows = new FakeRegistrar();
+        var service = new ShortcutService(windows);
+        var winJ = new KeyShortcut(ShortcutModifiers.Windows, 0x4A);
+        Assert.False(winJ.IsValid);
+        Assert.True(winJ.IsBindable);
+        Assert.Equal("Win+J", winJ.ToString());
+        Assert.True(service.Add("shortcuts", "Snap left").Register(winJ, () => { }));
+        Assert.Equal([winJ], windows.Held.Values);
+
+        Assert.False(new KeyShortcut(ShortcutModifiers.Shift, 0x4A).IsBindable); // no Ctrl, Alt or Win
+        Assert.False(new KeyShortcut(ShortcutModifiers.Control, 0x14).IsBindable); // Caps Lock is a door, not a key
+        Assert.True(new KeyShortcut(ShortcutModifiers.Control | ShortcutModifiers.Alt, 0x25).IsBindable); // Left arrow
+        Assert.True(new KeyShortcut(ShortcutModifiers.Control | ShortcutModifiers.Alt, 0xBC).IsBindable); // comma
+        Assert.Equal("Ctrl+Alt+Left", new KeyShortcut(ShortcutModifiers.Control | ShortcutModifiers.Alt, 0x25).ToString());
+        Assert.Equal("Win+;", new KeyShortcut(ShortcutModifiers.Windows, 0xBA).ToString());
+        Assert.Equal("Win+Ctrl+Alt+Shift+K", new KeyShortcut((ShortcutModifiers)15, 0x4B).ToString());
+    }
+
+    [Fact]
     public void Keys_another_Chippi_shortcut_holds_are_refused_by_name_without_asking_Windows()
     {
         var windows = new FakeRegistrar();
