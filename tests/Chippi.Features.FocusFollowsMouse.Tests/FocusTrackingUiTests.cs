@@ -11,6 +11,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Chippi.Core.Island;
+using Chippi.Core.Input;
 using Chippi.Core.Modules;
 using Chippi.Island.Tests;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -99,6 +100,43 @@ public sealed class FocusTrackingUiTests
             Assert.Null(module.Error);
         }
         finally { File.Delete(path); }
+    }
+    [Fact]
+    public async Task SharedPauseStartsPausedAndDispatchesChangesWithoutReapplyingAfterStop()
+    {
+        var windows = new WindowsSettings();
+        var store = new Store();
+        store.Save(new FocusTrackingSettings { Enabled = true });
+        var input = new Hub { Paused = true };
+        var queue = new Queue<Action>();
+        var module = new FocusFollowsMouseModule(() => new FocusTrackingEngine(windows, new Journal()), queue.Enqueue);
+        await module.StartAsync(new ModuleContext(FocusFollowsMouseModule.Id, store, NullLogger.Instance,
+            new IslandActivityHub().CreatePublisher(FocusFollowsMouseModule.Id), new Ui()) { Input = input }, default);
+        Assert.True(module.Descriptor.PausesInFullscreen);
+        Assert.Equal(0, windows.Writes);
+        input.Pause(false);
+        Assert.Equal(0, windows.Writes);
+        queue.Dequeue()();
+        Assert.Equal(new uint[] { 1, 1, 250 }, windows.Values);
+        input.Pause(true);
+        queue.Dequeue()();
+        Assert.Equal(new uint[] { 0, 0, 500 }, windows.Values);
+        input.Pause(false);
+        await module.StopAsync(default);
+        queue.Dequeue()();
+        Assert.Equal(new uint[] { 0, 0, 500 }, windows.Values);
+        Assert.Equal(0, input.Listeners);
+    }
+
+    private sealed class Hub : IInputHub
+    {
+        public bool Paused { get; set; }
+        public bool FullscreenInFront => Paused;
+        private Action? _changed;
+        public int Listeners { get; private set; }
+        public event Action? PauseChanged { add { _changed += value; Listeners++; } remove { _changed -= value; Listeners--; } }
+        public void Pause(bool paused) { Paused = paused; _changed?.Invoke(); }
+        public IInputRegistration Add(IInputFilter filter) => throw new InvalidOperationException("Focus uses native tracking, not an input filter");
     }
     private static void Shot(FrameworkElement view, string name)
     {

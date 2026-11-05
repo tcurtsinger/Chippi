@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using System.Windows;
 using Chippi.Core.Diagnostics;
 using Chippi.Core.Modules;
 using Chippi.UI.Controls;
@@ -13,10 +14,11 @@ public sealed record FocusTrackingSettings
 }
 
 // Registry lifecycle and UI calls are serialized. Construction never accesses Windows.
-public sealed class FocusFollowsMouseModule(Func<FocusTrackingEngine> createEngine) : IFeatureModule
+public sealed class FocusFollowsMouseModule(Func<FocusTrackingEngine> createEngine, Action<Action>? post = null) : IFeatureModule
 {
     public const string Id = "focus-follows-mouse";
     private readonly object _gate = new();
+    private readonly Action<Action> _post = post ?? (work => Application.Current.Dispatcher.BeginInvoke(work));
     private ModuleContext? _context;
     private FocusTrackingEngine? _engine;
     public FocusTrackingSettings Settings { get; private set; } = new();
@@ -25,7 +27,7 @@ public sealed class FocusFollowsMouseModule(Func<FocusTrackingEngine> createEngi
 
     public FeatureDescriptor Descriptor { get; } = new(Id, "Focus follows mouse",
         "Activates the window under the pointer", FeatureGroup.Windows)
-    { Icon = nameof(LucideIcons.Eye) };
+    { Icon = nameof(LucideIcons.Eye), PausesInFullscreen = true };
 
     public Task StartAsync(ModuleContext context, CancellationToken ct)
     {
@@ -35,10 +37,12 @@ public sealed class FocusFollowsMouseModule(Func<FocusTrackingEngine> createEngi
             _context = context;
             Settings = context.Settings.Get<FocusTrackingSettings>();
             context.Ui.SetSettingsPage(_ => new FocusTrackingRows(this));
+            if (context.Input is { } input) input.PauseChanged += OnPauseChanged;
             try
             {
                 _engine = createEngine();
                 _engine.Recover();
+                _engine.SetPaused(_context.Input?.Paused == true);
                 _engine.SetEnabled(Settings.Enabled);
                 Error = null;
             }
@@ -60,6 +64,7 @@ public sealed class FocusFollowsMouseModule(Func<FocusTrackingEngine> createEngi
                     _engine = createEngine();
                     _engine.Recover();
                 }
+                if (enabled) _engine.SetPaused(_context.Input?.Paused == true);
                 var previous = Settings;
                 _engine.SetEnabled(enabled);
                 try { _context.Settings.Save(Settings with { Enabled = enabled }); }
@@ -76,7 +81,16 @@ public sealed class FocusFollowsMouseModule(Func<FocusTrackingEngine> createEngi
         }
     }
 
-    // The shared fullscreen and lock service plugs into this in Kayla's pause PR.
+    // The hub raises changes on its own thread. Native preferences and UI notifications stay on the UI dispatcher.
+    private void OnPauseChanged()
+    {
+        var context = Volatile.Read(ref _context);
+        if (context is null) return;
+        _post(() =>
+        {
+            if (ReferenceEquals(_context, context)) SetPaused(context.Input?.Paused == true);
+        });
+    }
     public void SetPaused(bool paused)
     {
         lock (_gate)
@@ -92,6 +106,7 @@ public sealed class FocusFollowsMouseModule(Func<FocusTrackingEngine> createEngi
     {
         lock (_gate)
         {
+            if (_context?.Input is { } input) input.PauseChanged -= OnPauseChanged;
             try { _engine?.SetEnabled(false); }
             catch (Exception ex) { Failed(ex); }
             _engine = null;
