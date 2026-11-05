@@ -168,6 +168,19 @@ public class FilterTests
     }
 
     [Fact]
+    public void Letting_go_of_one_Ctrl_keeps_Ctrl_down_while_the_other_is_held()
+    {
+        var fired = new List<string>();
+        var f = Chords(fired, out _, (ShortcutModifiers.Control | ShortcutModifiers.Windows, K, "k"));
+        f.Key(Key(LWin, true));
+        f.Key(Key(LCtrl, true));
+        f.Key(Key(0xA3, true)); // right Ctrl too
+        f.Key(Key(LCtrl, false));
+        Assert.True(f.Key(Key(K, true)));
+        Assert.Equal(["k"], fired);
+    }
+
+    [Fact]
     public void A_reset_forgets_held_modifiers_so_a_stale_Win_cant_trigger_the_chord()
     {
         var fired = new List<string>();

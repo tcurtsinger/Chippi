@@ -149,6 +149,28 @@ public sealed class ModuleTests
     }
 
     [Fact]
+    public async Task A_saved_key_that_is_not_bindable_shows_Unavailable_and_is_not_registered()
+    {
+        var rig = new Rig(new ShortcutsSettings { Bindings = [Key(ShortcutModifiers.Shift, 0x4B)] });
+        await rig.StartAsync();
+        Assert.Equal(BindingState.Unavailable, rig.Module.StatusOf(rig.Module.Settings.Bindings[0].Id).State);
+        Assert.Empty(rig.Service.List);
+    }
+
+    [Fact]
+    public async Task A_Win_combination_another_Chippi_feature_holds_is_not_taken_through_the_hub()
+    {
+        var rig = new Rig();
+        var other = rig.Service.Add("other", "Other");
+        Assert.True(other.Register(new KeyShortcut(ShortcutModifiers.Windows, 0x4A), () => { }));
+        await rig.StartAsync();
+        var binding = Key(ShortcutModifiers.Windows, 0x4A);
+        Assert.True(rig.Module.Add(binding).Ok);
+        Assert.Equal(BindingState.UsedTwice, rig.Module.StatusOf(binding.Id).State);
+        Assert.Empty(rig.Hub.Filters);
+    }
+
+    [Fact]
     public async Task A_shortcut_that_needs_no_Ctrl_Alt_or_Win_is_refused()
     {
         var rig = new Rig();

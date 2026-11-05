@@ -48,7 +48,9 @@ public sealed class ShortcutServiceTests
         Assert.False(new KeyShortcut(ShortcutModifiers.Control, 0x14).IsBindable); // Caps Lock is a door, not a key
         Assert.True(new KeyShortcut(ShortcutModifiers.Control | ShortcutModifiers.Alt, 0x25).IsBindable); // Left arrow
         Assert.True(new KeyShortcut(ShortcutModifiers.Control | ShortcutModifiers.Alt, 0xBC).IsBindable); // comma
-        Assert.Equal("Ctrl+Alt+Shift+Win+K", new KeyShortcut((ShortcutModifiers)15, 0x4B).ToString());
+        Assert.Equal("Ctrl+Alt+Left", new KeyShortcut(ShortcutModifiers.Control | ShortcutModifiers.Alt, 0x25).ToString());
+        Assert.Equal("Win+;", new KeyShortcut(ShortcutModifiers.Windows, 0xBA).ToString());
+        Assert.Equal("Win+Ctrl+Alt+Shift+K", new KeyShortcut((ShortcutModifiers)15, 0x4B).ToString());
     }
 
     [Fact]

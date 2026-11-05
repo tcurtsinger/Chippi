@@ -14,6 +14,7 @@ namespace Chippi.Features.Shortcuts;
 internal sealed class ChordFilter : IInputFilter
 {
     private volatile Dictionary<(ShortcutModifiers, uint), string> _bound = [];
+    private readonly HashSet<uint> _downKeys = [];
     private ShortcutModifiers _down;
     private bool _masking;
 
@@ -36,6 +37,7 @@ internal sealed class ChordFilter : IInputFilter
 
     public void InputReset(InputDevices devices)
     {
+        _downKeys.Clear();
         _down = 0;
         _masking = false;
     }
@@ -45,17 +47,18 @@ internal sealed class ChordFilter : IInputFilter
         var modifier = ModifierOf(key.Vk);
         if (modifier != 0)
         {
+            // Left and right are tracked apart: letting go of one Ctrl while the other is held keeps Ctrl down.
             if (key.Down)
-                _down |= modifier;
+                _downKeys.Add(key.Vk);
             else
+                _downKeys.Remove(key.Vk);
+            _down = 0;
+            foreach (uint vk in _downKeys)
+                _down |= ModifierOf(vk);
+            if (!key.Down && _masking && (modifier & (ShortcutModifiers.Windows | ShortcutModifiers.Alt)) != 0 && (_down & modifier) == 0)
             {
-                _down &= ~modifier;
-                // The Win or Alt that was part of a kept chord comes up: mask it first.
-                if (_masking && (modifier & (ShortcutModifiers.Windows | ShortcutModifiers.Alt)) != 0)
-                {
-                    _masking = false;
-                    Mask();
-                }
+                _masking = false;
+                Mask();
             }
             return false;
         }

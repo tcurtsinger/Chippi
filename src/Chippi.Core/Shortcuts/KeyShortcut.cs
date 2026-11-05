@@ -26,10 +26,10 @@ public sealed record KeyShortcut(ShortcutModifiers Modifiers = ShortcutModifiers
 
     public override string ToString() => string.Join("+", new[]
     {
+        Modifiers.HasFlag(ShortcutModifiers.Windows) ? "Win" : null,
         Modifiers.HasFlag(ShortcutModifiers.Control) ? "Ctrl" : null,
         Modifiers.HasFlag(ShortcutModifiers.Alt) ? "Alt" : null,
         Modifiers.HasFlag(ShortcutModifiers.Shift) ? "Shift" : null,
-        Modifiers.HasFlag(ShortcutModifiers.Windows) ? "Win" : null,
         KeyName(Key),
     }.Where(x => x is not null));
 
@@ -38,6 +38,30 @@ public sealed record KeyShortcut(ShortcutModifiers Modifiers = ShortcutModifiers
     {
         >= 0x30 and <= 0x5A => ((char)key).ToString(),
         0x20 => "Space",
+        0x08 => "Backspace",
+        0x09 => "Tab",
+        0x0D => "Enter",
+        0x21 => "Page up",
+        0x22 => "Page down",
+        0x23 => "End",
+        0x24 => "Home",
+        0x25 => "Left",
+        0x26 => "Up",
+        0x27 => "Right",
+        0x28 => "Down",
+        0x2D => "Insert",
+        0x2E => "Delete",
+        0xBA => ";",
+        0xBB => "=",
+        0xBC => ",",
+        0xBD => "-",
+        0xBE => ".",
+        0xBF => "/",
+        0xC0 => "`",
+        0xDB => "[",
+        0xDC => "\\",
+        0xDD => "]",
+        0xDE => "'",
         >= 0x70 and <= 0x87 => "F" + (key - 0x6F),
         _ => "0x" + key.ToString("X2", System.Globalization.CultureInfo.InvariantCulture),
     };

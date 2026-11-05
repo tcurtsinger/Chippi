@@ -237,6 +237,11 @@ public sealed class ShortcutsModule : IFeatureModule
                 continue;
             }
             var keys = binding.Keys!;
+            if (!keys.IsBindable)
+            {
+                slot.Status = new BindingStatus(BindingState.Unavailable, UnavailableText); // a hand-edited settings file
+                continue;
+            }
             if (WindowsKeys.IsReserved(keys))
             {
                 slot.Status = new BindingStatus(BindingState.InUseByWindows, WindowsKeys.Text);
@@ -248,10 +253,10 @@ public sealed class ShortcutsModule : IFeatureModule
                 continue;
             if (slot.Hotkey.Register(keys, () => RunBinding(binding.Id, host, WindowTarget.InFront)))
                 continue;
-            if (keys.Modifiers.HasFlag(ShortcutModifiers.Windows))
+            if (slot.Hotkey.Error is { } error && error != ShortcutService.InUse)
+                slot.Status = new BindingStatus(BindingState.UsedTwice, error); // another Chippi feature: never taken from it
+            else if (keys.Modifiers.HasFlag(ShortcutModifiers.Windows))
                 chords.Add((keys, binding.Id)); // Windows kept what RegisterHotKey refused; the hub's hook takes it instead
-            else if (slot.Hotkey.Error is { } error && error != ShortcutService.InUse)
-                slot.Status = new BindingStatus(BindingState.UsedTwice, error);
             else
                 slot.Status = new BindingStatus(BindingState.InUseByApp, "In use by another app");
         }
