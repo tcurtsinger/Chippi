@@ -5,9 +5,9 @@ using System.Diagnostics;
 using System.IO;
 using System.Windows.Automation;
 using System.Windows.Media;
+using Chippi.Core.Actions;
 using Chippi.Features.CommandBar.Search;
 using Chippi.Features.CommandBar.Windows;
-using Chippi.Features.RadialMenu.Slices;
 
 namespace Chippi.Features.RadialMenu.Pc;
 
@@ -54,9 +54,13 @@ internal sealed class WindowsRadialPc : IRadialPc
         return new Screen(bounds.Left, bounds.Top, bounds.Width, bounds.Height, scale);
     }
 
-    public nint WindowAt(PixelPoint at)
+    public nint WindowAt(PixelPoint at) => AppWindow(Native.GetAncestor(Native.WindowFromPoint(new Native.Point { X = at.X, Y = at.Y }), 2)); // GA_ROOT
+
+    public nint WindowInFront() => AppWindow(Native.GetForegroundWindow());
+
+    /// <summary>The window, or 0 for the desktop, the taskbar or one of Chippi's.</summary>
+    private static nint AppWindow(nint window)
     {
-        nint window = Native.GetAncestor(Native.WindowFromPoint(new Native.Point { X = at.X, Y = at.Y }), 2); // GA_ROOT
         if (window == 0 || window == Native.GetShellWindow())
             return 0;
         if (Native.ClassOf(window) is "Progman" or "WorkerW" or "Shell_TrayWnd" or "Shell_SecondaryTrayWnd")
@@ -68,15 +72,15 @@ internal sealed class WindowsRadialPc : IRadialPc
     public void Open(string target)
     {
         try { Process.Start(new ProcessStartInfo(target) { UseShellExecute = true })?.Dispose(); }
-        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException) { throw new SliceFailure("Not found"); }
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException) { throw new ActionFailure("Not found"); }
     }
 
     public void Window(nint window, WindowAction action)
     {
         if (window == 0)
-            throw new SliceFailure("No window");
+            throw new ActionFailure("No window");
         if (!Native.IsWindow(window))
-            throw new SliceFailure("Window closed");
+            throw new ActionFailure("Window closed");
         switch (action)
         {
             case WindowAction.Maximize:
@@ -92,7 +96,7 @@ internal sealed class WindowsRadialPc : IRadialPc
                 bool onTop = (Native.GetWindowLongPtr(window, -20) & 0x8) != 0; // GWL_EXSTYLE, WS_EX_TOPMOST
                 // SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE
                 if (!Native.SetWindowPos(window, onTop ? -2 : -1, 0, 0, 0, 0, 0x0002 | 0x0001 | 0x0010))
-                    throw new SliceFailure("Access denied");
+                    throw new ActionFailure("Access denied");
                 break;
             case WindowAction.SnapLeft or WindowAction.SnapRight:
                 Snap(window, action == WindowAction.SnapLeft);
@@ -106,7 +110,7 @@ internal sealed class WindowsRadialPc : IRadialPc
     private static void Command(nint window, nint command)
     {
         if (!Native.PostMessage(window, Native.WmSysCommand, command, 0))
-            throw new SliceFailure("Access denied");
+            throw new ActionFailure("Access denied");
     }
 
     /// <summary>The window fills the left or right half of its screen's work area, its visible edges on the half's.</summary>
@@ -125,7 +129,7 @@ internal sealed class WindowsRadialPc : IRadialPc
     {
         var monitors = Native.Monitors();
         if (monitors.Count < 2)
-            throw new SliceFailure("One screen");
+            throw new ActionFailure("One screen");
         nint here = Native.MonitorFromWindow(window, 2);
         nint next = monitors[(monitors.IndexOf(here) + 1) % monitors.Count];
         var (_, from, _) = Native.Monitor(here);
@@ -156,7 +160,7 @@ internal sealed class WindowsRadialPc : IRadialPc
         int right = framed ? outer.Right - visible.Right : 0, bottom = framed ? outer.Bottom - visible.Bottom : 0;
         // SWP_NOZORDER | SWP_NOACTIVATE
         if (!Native.SetWindowPos(window, 0, target.Left - left, target.Top - top, target.Width + left + right, target.Height + top + bottom, 0x0004 | 0x0010))
-            throw new SliceFailure("Access denied");
+            throw new ActionFailure("Access denied");
     }
 
     private static bool Visible(nint window, out Native.Rect visible)
@@ -180,7 +184,7 @@ internal sealed class WindowsRadialPc : IRadialPc
         };
         Span<Native.Input> inputs = [Native.Key(vk, up: false, Native.KeyExtended), Native.Key(vk, up: true, Native.KeyExtended)];
         if (Native.Send(inputs) != 2)
-            throw new SliceFailure("Input blocked");
+            throw new ActionFailure("Input blocked");
     }
 
     public async Task PressAsync(KeyCombo keys)
@@ -195,7 +199,7 @@ internal sealed class WindowsRadialPc : IRadialPc
         foreach (uint vk in keys.ModifierKeys.Reverse())
             inputs.Add(Native.Key((ushort)vk, up: true, KeyCombo.IsExtended(vk) ? Native.KeyExtended : 0));
         if (Native.Send([.. inputs]) != inputs.Count)
-            throw new SliceFailure("Input blocked");
+            throw new ActionFailure("Input blocked");
     }
 
     public async Task TypeAsync(string text)
@@ -221,7 +225,7 @@ internal sealed class WindowsRadialPc : IRadialPc
         {
             var batch = inputs.GetRange(i, Math.Min(128, inputs.Count - i));
             if (Native.Send([.. batch]) != batch.Count)
-                throw new SliceFailure("Input blocked");
+                throw new ActionFailure("Input blocked");
             if (i + 128 < inputs.Count)
                 await Task.Delay(10);
         }
@@ -246,7 +250,7 @@ internal sealed class WindowsRadialPc : IRadialPc
         start.CreateNoWindow = true;
         start.WorkingDirectory = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         try { Process.Start(start)?.Dispose(); }
-        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException) { throw new SliceFailure("Shell not found"); }
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException) { throw new ActionFailure("Shell not found"); }
     }
 
     public Task<(bool Terminal, string? Text)> TerminalSelectionAsync()

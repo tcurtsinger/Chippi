@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using Chippi.Core.Actions;
 using Chippi.Core.Shortcuts;
 using System.Windows;
 using System.Windows.Media;
@@ -101,7 +102,11 @@ public sealed class RadialMenuModule : IFeatureModule, IWheelInputSink
 
     internal IRadialPc? Pc => _pc;
 
-    internal SliceRunner? Runner { get; private set; }
+    internal ActionRunner? Runner { get; private set; }
+
+    /// <summary>Whether a slice's target is gone (<see cref="ActionRunner.IsMissing"/>); a submenu's never is.</summary>
+    internal bool IsMissing(Slice slice, IReadOnlyList<ChippiCommand> known) =>
+        slice.Kind != SliceKind.Submenu && Runner?.IsMissing(slice.ToAction(), known) == true;
 
     internal IKeyRecorder Recorder { get; }
 
@@ -125,7 +130,7 @@ public sealed class RadialMenuModule : IFeatureModule, IWheelInputSink
         Settings = context.Settings.Get<RadialMenuSettings>().Checked();
         _pc = _createPc();
         _pc.AppsChanged += OnAppsChanged;
-        Runner = new SliceRunner(_pc, context.Commands, () => context.Clipboard, _engine);
+        Runner = new ActionRunner(_pc, context.Commands, () => context.Clipboard, text => _engine().SearchUrl(text), () => context.IslandPasteTarget()?.Window ?? 0);
         _input = _createInput(this);
         _input.Paused = _cleaning;
         _input.OpenOverFullscreen = Settings.OpenOverFullscreen;
@@ -270,7 +275,7 @@ public sealed class RadialMenuModule : IFeatureModule, IWheelInputSink
     // Reads every app's and file's icon ahead, so the wheel opens with them.
     private void WarmIcons()
     {
-        if (Runner is not { } runner)
+        if (_pc is not { } pc)
             return;
         foreach (var slice in All(Settings.Slices).Where(s => s.Glyph is null && s.Kind is SliceKind.App or SliceKind.File && s.Value.Length > 0))
         {
@@ -283,7 +288,7 @@ public sealed class RadialMenuModule : IFeatureModule, IWheelInputSink
             {
                 try
                 {
-                    var icon = await runner.IconAsync(slice, 48); // 24 at 200%
+                    var icon = await pc.IconAsync(value, 48); // 24 at 200%
                     _icons[value] = icon;
                     if (icon is not null)
                         Changed?.Invoke();
@@ -384,9 +389,8 @@ public sealed class RadialMenuModule : IFeatureModule, IWheelInputSink
         _windowUnder = _pc.WindowAt(at);
         _commands = Runner.ChippiCommands();
         var commands = _commands;
-        var runner = Runner;
         _state = new WheelState(new Size(_screen.Width / _screen.Scale, _screen.Height / _screen.Scale), ToWheel(at), Settings.Slices, holding,
-            slice => runner.IsMissing(slice, commands));
+            slice => IsMissing(slice, commands));
         if (holding)
         {
             if (!shown)
@@ -508,8 +512,8 @@ public sealed class RadialMenuModule : IFeatureModule, IWheelInputSink
     {
         if (Runner is not { } runner)
             return;
-        try { await runner.RunAsync(slice, window); }
-        catch (SliceFailure failure) { Report(slice, failure.Message); }
+        try { await runner.RunAsync(slice.ToAction(), window); }
+        catch (ActionFailure failure) { Report(slice, failure.Message); }
         catch (Exception ex)
         {
             Log.Warn($"Radial menu: running {slice.Kind} failed", ex);

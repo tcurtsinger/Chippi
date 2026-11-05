@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using Chippi.Core.Actions;
 using Chippi.Core.Shortcuts;
 using Chippi.UI.Shortcuts;
 using System.IO;
@@ -14,6 +15,7 @@ using Chippi.Features.RadialMenu.Input;
 using Chippi.Features.RadialMenu.Slices;
 using Chippi.Features.RadialMenu.Wheel;
 using Chippi.Features.Sound.Mute;
+using Chippi.UI.Actions;
 using Chippi.UI.Controls;
 using MouseButton = Chippi.Features.RadialMenu.Input.MouseButton;
 
@@ -25,8 +27,6 @@ namespace Chippi.Features.RadialMenu.Views;
 /// </summary>
 public sealed class RadialMenuSettingsPage : UserControl
 {
-    private static readonly string[] Shells = ["PowerShell", "Command Prompt"];
-
     private readonly RadialMenuModule _module;
     private readonly ToggleButton _middle = Ui.Switch("Hold middle button"), _back = Ui.Switch("Hold Back button"), _forward = Ui.Switch("Hold Forward button");
     private readonly ToggleButton _overFullscreen = Ui.Switch("Open over fullscreen apps");
@@ -38,7 +38,7 @@ public sealed class RadialMenuSettingsPage : UserControl
     private readonly List<int> _path = []; // the submenu slices stepped into, from the first wheel
     private int? _selected;
     private bool _updating, _capturingShortcut;
-    private IDisposable? _recording;
+    private readonly ActionPicker _picker;
 
     public RadialMenuSettingsPage(RadialMenuModule module)
     {
@@ -48,6 +48,19 @@ public sealed class RadialMenuSettingsPage : UserControl
         _editor.Swapped += Swap;
         _editor.Added += Add;
         _editor.WentBack += Up;
+        _picker = new ActionPicker(new ActionPickerSource
+        {
+            Apps = () => [.. (module.Pc?.Apps ?? []).Select(a => (a.ParsingName, a.Name))],
+            Commands = () => module.Runner?.ChippiCommands() ?? [],
+            SettingsPages = [.. SettingsPages.All.Select(p => (p.Uri, p.Name))],
+            Recorder = module.Recorder,
+            Icon = action => module.IconOf(Slice.From(action)),
+        })
+        {
+            ExtraRows = _ => SubmenuRows(),
+            Footer = RemoveRow,
+        };
+        _picker.Changed += Picked;
         Hook(_middle, MouseButton.Middle);
         Hook(_back, MouseButton.Back);
         Hook(_forward, MouseButton.Forward);
@@ -94,7 +107,7 @@ public sealed class RadialMenuSettingsPage : UserControl
         Unloaded += (_, _) =>
         {
             _module.Changed -= Refresh;
-            StopRecording();
+            _picker.StopRecording();
             CancelShortcut();
         };
         Refresh();
@@ -166,7 +179,7 @@ public sealed class RadialMenuSettingsPage : UserControl
         {
             Image = _module.IconOf(s),
             IsSubmenu = s.Kind == SliceKind.Submenu,
-            IsMissing = _module.Runner?.IsMissing(s, known) == true,
+            IsMissing = _module.IsMissing(s, known),
         }).ToList();
         string hub = "";
         var tone = HubTone.Name;
@@ -264,7 +277,7 @@ public sealed class RadialMenuSettingsPage : UserControl
 
     private void Select(int index)
     {
-        StopRecording();
+        _picker.StopRecording();
         _selected = index;
         ShowWheel();
         ShowFields();
@@ -293,19 +306,6 @@ public sealed class RadialMenuSettingsPage : UserControl
         });
     }
 
-    /// <summary>A new value, kind or shell, with the name following it unless it was changed by hand.</summary>
-    private void Retarget(Func<Slice, Slice> change) => Change(old =>
-    {
-        var next = change(old);
-        bool named = old.Name.Length > 0 && old.Name != SliceCatalog.NameFor(old, Known);
-        return named ? next : next with { Name = SliceCatalog.NameFor(next, Known) };
-    });
-
-    /// <summary>An app's or a Chippi command's name, by its value.</summary>
-    private string? Known(string value) =>
-        _module.Pc?.Apps.FirstOrDefault(a => string.Equals(a.ParsingName, value, StringComparison.OrdinalIgnoreCase))?.Name
-        ?? _module.Runner?.ChippiCommands().FirstOrDefault(c => c.Key == value)?.Name;
-
     private void Swap(int from, int to)
     {
         _selected = to;
@@ -325,7 +325,7 @@ public sealed class RadialMenuSettingsPage : UserControl
         var explorer = _module.Pc?.Apps.FirstOrDefault(a => a.ParsingName.Equals("Microsoft.Windows.Explorer", StringComparison.OrdinalIgnoreCase));
         var slice = explorer is not null
             ? new Slice { Kind = SliceKind.App, Value = explorer.ParsingName, Name = explorer.Name }
-            : new Slice { Kind = SliceKind.Media, Value = nameof(MediaAction.PlayPause), Name = SliceCatalog.NameOf(MediaAction.PlayPause) };
+            : new Slice { Kind = SliceKind.Media, Value = nameof(MediaAction.PlayPause), Name = ActionCatalog.NameOf(MediaAction.PlayPause) };
         _selected = Here.Count;
         Save(list => [.. list, slice]);
     }
@@ -353,14 +353,14 @@ public sealed class RadialMenuSettingsPage : UserControl
     {
         if (_path.Count == 0)
             return;
-        StopRecording();
+        _picker.StopRecording();
         _selected = _path[^1];
         _path.RemoveAt(_path.Count - 1);
         ShowWheel();
         ShowFields();
     }
 
-    // ---- The selected slice's fields ----
+    // ---- The selected slice's fields: the shared action picker, with Submenu and Remove ----
 
     private void ShowFields()
     {
@@ -372,321 +372,40 @@ public sealed class RadialMenuSettingsPage : UserControl
             _fields.Content = new Grid { Children = { empty } };
             return;
         }
-        var rows = new Card();
-        rows.SetResourceReference(StyleProperty, "CardRowsStyle");
-        var kinds = SliceCatalog.Kinds.Where(k => k.Kind != SliceKind.Submenu || _path.Count < RadialMenuSettings.MaxDepth - 1).ToList();
-        var kind = Ui.Combo("Kind", kinds.Select(k => k.Name));
-        kind.SelectedIndex = kinds.FindIndex(k => k.Kind == slice.Kind);
-        kind.SelectionChanged += (_, _) =>
-        {
-            if (kind.SelectedIndex >= 0 && kinds[kind.SelectedIndex].Kind != slice.Kind)
-                SetKind(kinds[kind.SelectedIndex].Kind);
-        };
-        rows.Children.Add(SettingsLayout.Row("Kind", kind));
-        foreach (var row in ValueRows(slice))
-            rows.Children.Add(row);
+        _picker.ExtraKinds = _path.Count < RadialMenuSettings.MaxDepth - 1 ? [SliceCatalog.SubmenuName] : [];
+        _picker.Show(slice.ToAction(), slice.Kind == SliceKind.Submenu ? 0 : null);
+        _fields.Content = _picker;
+    }
 
-        var name = Ui.Field("Name");
-        name.Text = slice.Name;
-        Commit(name, text => Change(s => s with { Name = text.Trim().Length > 0 ? text.Trim() : SliceCatalog.NameFor(s, Known) }));
-        rows.Children.Add(SettingsLayout.Row("Name", name));
+    /// <summary>A picked action replaces the slice; a submenu kept takes only its name and glyph, and a new one starts empty.</summary>
+    private void Picked(ChippiAction action, int? submenu) => Change(slice => submenu is null
+        ? Slice.From(action)
+        : slice.Kind == SliceKind.Submenu
+            ? slice with { Name = action.Name, Glyph = action.Glyph }
+            : new Slice { Kind = SliceKind.Submenu, Name = action.Name, Shell = slice.Shell });
 
-        var glyph = new StackPanel { Orientation = Orientation.Horizontal };
-        glyph.Children.Add(Ui.Swatch(SliceCatalog.GlyphOf(slice, key => _module.Runner?.ChippiCommands().FirstOrDefault(c => c.Key == key)?.Icon), _module.IconOf(slice)));
-        var change = Ui.Button("Change", () => { });
-        change.Margin = new Thickness(12, 0, 0, 0);
-        change.Click += (_, _) => PickGlyph(change, slice);
-        AutomationProperties.SetName(change, "Change glyph");
-        glyph.Children.Add(change);
-        rows.Children.Add(SettingsLayout.Row("Glyph", glyph));
+    /// <summary>A submenu's Slices row, in place of a value.</summary>
+    private IEnumerable<UIElement> SubmenuRows()
+    {
+        if (Current is not { } slice)
+            yield break;
+        int count = slice.Slices.Count;
+        var open = Ui.Button("Open", Open);
+        open.Margin = new Thickness(12, 0, 0, 0);
+        AutomationProperties.SetName(open, $"Open {WheelState.NameOf(slice)}");
+        var row = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+        row.Children.Add(Ui.Text(count == 1 ? "1 slice" : $"{count} slices", "TextSecondaryBrush"));
+        row.Children.Add(open);
+        yield return SettingsLayout.Row("Slices", row);
+    }
 
+    private IEnumerable<UIElement> RemoveRow()
+    {
+        if (Current is not { } slice)
+            yield break;
         var remove = Ui.Button("Remove", Remove);
         AutomationProperties.SetName(remove, $"Remove {WheelState.NameOf(slice)}");
-        rows.Children.Add(new Border { Padding = SettingsLayout.RowPadding, MinHeight = SettingsLayout.RowHeight, Child = new Grid { Children = { remove } } });
+        yield return new Border { Padding = SettingsLayout.RowPadding, MinHeight = SettingsLayout.RowHeight, Child = new Grid { Children = { remove } } };
         remove.HorizontalAlignment = HorizontalAlignment.Right;
-        _fields.Content = rows;
-    }
-
-    /// <summary>What a kind needs: the app, the path, the address, the keys, the text, the command and its shell, an action, a page.</summary>
-    private IEnumerable<UIElement> ValueRows(Slice slice)
-    {
-        switch (slice.Kind)
-        {
-            case SliceKind.App:
-                var apps = _module.Pc?.Apps ?? [];
-                var names = apps.Select(a => a.Name).ToList();
-                bool program = Path.IsPathFullyQualified(slice.Value);
-                if (program)
-                    names.Insert(0, Path.GetFileNameWithoutExtension(slice.Value));
-                var app = Ui.Combo("App", names, 160);
-                app.SelectedIndex = program ? 0 : apps.ToList().FindIndex(a => string.Equals(a.ParsingName, slice.Value, StringComparison.OrdinalIgnoreCase));
-                app.SelectionChanged += (_, _) =>
-                {
-                    int i = app.SelectedIndex - (program ? 1 : 0);
-                    if (i >= 0 && i < apps.Count)
-                        Retarget(s => s with { Value = apps[i].ParsingName });
-                };
-                yield return SettingsLayout.Row("App", Pair(app, Ui.Button("Browse", BrowseProgram)));
-                break;
-            case SliceKind.File:
-                var path = Ui.Field("Path", 160);
-                path.Text = slice.Value;
-                Commit(path, v => Retarget(s => s with { Value = v.Trim().Trim('"') }));
-                var browse = Ui.Button("Browse", () => { });
-                browse.Click += (_, _) => BrowseFile(browse);
-                yield return SettingsLayout.Row("Path", Pair(path, browse));
-                break;
-            case SliceKind.Link:
-                var address = Ui.Field("Address");
-                address.Text = slice.Value;
-                Commit(address, v => Retarget(s => s with { Value = v.Trim() }));
-                yield return SettingsLayout.Row("Address", address);
-                break;
-            case SliceKind.Keys:
-                yield return SettingsLayout.Row("Keys", KeysField(slice));
-                break;
-            case SliceKind.Text:
-                var text = Ui.Field("Text");
-                text.Text = slice.Value;
-                text.AcceptsReturn = true;
-                text.AcceptsTab = false;
-                text.Height = 64;
-                text.TextWrapping = TextWrapping.Wrap;
-                text.VerticalContentAlignment = VerticalAlignment.Top;
-                text.Padding = new Thickness(0, 4, 0, 4);
-                Commit(text, v => Retarget(s => s with { Value = v }), enter: false);
-                var row = SettingsLayout.Row("Text", text);
-                row.VerticalContentAlignment = VerticalAlignment.Top;
-                yield return row;
-                break;
-            case SliceKind.Command:
-                var shell = Ui.Combo("Shell", Shells);
-                shell.SelectedIndex = (int)slice.Shell;
-                shell.SelectionChanged += (_, _) =>
-                {
-                    if (shell.SelectedIndex >= 0 && (CommandShell)shell.SelectedIndex != slice.Shell)
-                        Change(s => s with { Shell = (CommandShell)shell.SelectedIndex });
-                };
-                yield return SettingsLayout.Row("Shell", shell);
-                var line = Ui.Field("Command", code: true);
-                line.Text = slice.Value;
-                Commit(line, v => Retarget(s => s with { Value = v.Trim() }));
-                yield return SettingsLayout.Row("Command", line);
-                break;
-            case SliceKind.Chippi:
-                var commands = _module.Runner?.ChippiCommands() ?? [];
-                var chippi = Ui.Combo("Action", commands.Select(c => c.Name));
-                chippi.SelectedIndex = commands.ToList().FindIndex(c => c.Key == slice.Value);
-                chippi.SelectionChanged += (_, _) =>
-                {
-                    if (chippi.SelectedIndex >= 0)
-                        Retarget(s => s with { Value = commands[chippi.SelectedIndex].Key });
-                };
-                yield return SettingsLayout.Row("Action", chippi);
-                break;
-            case SliceKind.Media:
-                yield return SettingsLayout.Row("Action", Actions(slice, SliceCatalog.Media.Select(m => (m.Action.ToString(), m.Name)).ToList()));
-                break;
-            case SliceKind.Window:
-                yield return SettingsLayout.Row("Action", Actions(slice, SliceCatalog.Window.Select(m => (m.Action.ToString(), m.Name)).ToList()));
-                break;
-            case SliceKind.Selection:
-                yield return SettingsLayout.Row("Action", Actions(slice, SliceCatalog.Selection.Select(m => (m.Action.ToString(), m.Name)).ToList()));
-                break;
-            case SliceKind.SettingsPage:
-                yield return SettingsLayout.Row("Page", Actions(slice, SettingsPages.All.Select(p => (p.Uri, p.Name)).ToList(), "Page"));
-                break;
-            case SliceKind.Submenu:
-                int count = slice.Slices.Count;
-                var open = Ui.Button("Open", Open);
-                open.Margin = new Thickness(12, 0, 0, 0);
-                AutomationProperties.SetName(open, $"Open {WheelState.NameOf(slice)}");
-                yield return SettingsLayout.Row("Slices", Pair(Ui.Text(count == 1 ? "1 slice" : $"{count} slices", "TextSecondaryBrush"), open));
-                break;
-        }
-    }
-
-    private ComboBox Actions(Slice slice, IReadOnlyList<(string Value, string Name)> actions, string label = "Action")
-    {
-        var combo = Ui.Combo(label, actions.Select(a => a.Name));
-        combo.SelectedIndex = actions.ToList().FindIndex(a => a.Value == slice.Value);
-        combo.SelectionChanged += (_, _) =>
-        {
-            if (combo.SelectedIndex >= 0 && actions[combo.SelectedIndex].Value != slice.Value)
-                Retarget(s => s with { Value = actions[combo.SelectedIndex].Value });
-        };
-        return combo;
-    }
-
-    /// <summary>A new kind starts with its first action, or nothing to fill in; a submenu starts empty.</summary>
-    private void SetKind(SliceKind kind)
-    {
-        StopRecording();
-        string value = kind switch
-        {
-            SliceKind.Media => nameof(MediaAction.PlayPause),
-            SliceKind.Window => nameof(WindowAction.SnapLeft),
-            SliceKind.Selection => nameof(SelectionAction.Search),
-            SliceKind.SettingsPage => SettingsPages.All[0].Uri,
-            SliceKind.Chippi => _module.Runner?.ChippiCommands().FirstOrDefault()?.Key ?? "",
-            SliceKind.App => _module.Pc?.Apps.FirstOrDefault()?.ParsingName ?? "",
-            _ => "",
-        };
-        Change(old =>
-        {
-            var next = new Slice { Kind = kind, Value = value, Shell = old.Shell };
-            return next with { Name = SliceCatalog.NameFor(next, Known) };
-        });
-    }
-
-    private UIElement KeysField(Slice slice)
-    {
-        var row = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-        if (_recording is not null)
-        {
-            row.Children.Add(Ui.Text("Press keys", "TextSecondaryBrush"));
-            var cancel = Ui.Button("Cancel", () =>
-            {
-                StopRecording();
-                ShowFields();
-            });
-            cancel.Margin = new Thickness(12, 0, 0, 0);
-            row.Children.Add(cancel);
-            return row;
-        }
-        if (KeyCombo.Parse(slice.Value) is { } keys)
-            row.Children.Add(Ui.Caps(keys.Caps));
-        else
-            row.Children.Add(Ui.Text("Not set", "TextSecondaryBrush"));
-        var record = Ui.Button("Record", () => { });
-        record.Margin = new Thickness(12, 0, 0, 0);
-        AutomationProperties.SetName(record, "Record keys");
-        record.Click += (_, _) => Record();
-        row.Children.Add(record);
-        return row;
-    }
-
-    private void Record()
-    {
-        try
-        {
-            _recording = _module.Recorder.Record(keys =>
-            {
-                // Recorded, the recorder lets go of the keyboard itself once the keys are up.
-                _recording = null;
-                if (keys is { } recorded)
-                    Retarget(s => s with { Value = recorded.ToString() });
-                else
-                    ShowFields();
-            });
-        }
-        catch (Exception ex)
-        {
-            Core.Diagnostics.Log.Warn("Radial menu: recording keys failed", ex);
-            _recording = null;
-        }
-        ShowFields();
-    }
-
-    private void StopRecording()
-    {
-        _recording?.Dispose();
-        _recording = null;
-    }
-
-    private void BrowseProgram()
-    {
-        var dialog = new Microsoft.Win32.OpenFileDialog { Filter = "Programs (*.exe, *.lnk, *.bat, *.cmd)|*.exe;*.lnk;*.bat;*.cmd|All files|*.*", CheckFileExists = true };
-        if (dialog.ShowDialog(Window.GetWindow(this)) == true)
-            Retarget(s => s with { Value = dialog.FileName });
-    }
-
-    private void BrowseFile(Button anchor)
-    {
-        var menu = new ContextMenu { PlacementTarget = anchor, Placement = PlacementMode.Bottom };
-        var file = new MenuItem { Header = "File…" };
-        file.Click += (_, _) =>
-        {
-            var dialog = new Microsoft.Win32.OpenFileDialog { CheckFileExists = true };
-            if (dialog.ShowDialog(Window.GetWindow(this)) == true)
-                Retarget(s => s with { Value = dialog.FileName });
-        };
-        var folder = new MenuItem { Header = "Folder…" };
-        folder.Click += (_, _) =>
-        {
-            var dialog = new Microsoft.Win32.OpenFolderDialog { Multiselect = false };
-            if (dialog.ShowDialog(Window.GetWindow(this)) == true)
-                Retarget(s => s with { Value = dialog.FolderName });
-        };
-        menu.Items.Add(file);
-        menu.Items.Add(folder);
-        menu.IsOpen = true;
-    }
-
-    private void PickGlyph(Button anchor, Slice slice)
-    {
-        var popup = new Popup { PlacementTarget = anchor, Placement = PlacementMode.Bottom, StaysOpen = false, AllowsTransparency = true };
-        var grid = new UniformGrid { Columns = 8 };
-        foreach (string name in SliceCatalog.Glyphs)
-        {
-            var button = new Button { Content = Ui.Swatch(LucideIcons.Get(name)), Margin = new Thickness(2), Padding = new Thickness(0), Width = 36, Height = 36 };
-            button.SetResourceReference(StyleProperty, "SubtleButtonStyle");
-            AutomationProperties.SetName(button, name);
-            button.Click += (_, _) =>
-            {
-                popup.IsOpen = false;
-                Change(s => s with { Glyph = name });
-            };
-            grid.Children.Add(button);
-        }
-        var reset = Ui.Button(slice.Kind is SliceKind.App or SliceKind.File ? "Use its icon" : "Use the kind's", () =>
-        {
-            popup.IsOpen = false;
-            Change(s => s with { Glyph = null });
-        });
-        reset.HorizontalAlignment = HorizontalAlignment.Left;
-        reset.Margin = new Thickness(2, 8, 2, 2);
-        var panel = new Border
-        {
-            Padding = new Thickness(8),
-            CornerRadius = new CornerRadius(8),
-            BorderThickness = new Thickness(1),
-            Child = new StackPanel { Children = { grid, reset } },
-        };
-        panel.SetResourceReference(Border.BackgroundProperty, "FlyoutBrush");
-        panel.SetResourceReference(Border.BorderBrushProperty, "BorderBrush");
-        popup.Child = panel;
-        popup.IsOpen = true;
-    }
-
-    private static StackPanel Pair(UIElement first, UIElement second)
-    {
-        if (second is FrameworkElement element && element.Margin == default)
-            element.Margin = new Thickness(8, 0, 0, 0);
-        return new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Children = { first, second } };
-    }
-
-    /// <summary>Saves a field's text when it loses the keyboard, or on Enter for a one-line field.</summary>
-    private static void Commit(TextBox box, Action<string> save, bool enter = true)
-    {
-        string was = box.Text;
-        void Done()
-        {
-            if (box.Text == was)
-                return;
-            was = box.Text;
-            save(box.Text);
-        }
-        box.LostKeyboardFocus += (_, _) => Done();
-        // Enter lets go of the field, which saves it, so the fields show what it changed (the name following it).
-        if (enter)
-            box.KeyDown += (_, e) =>
-            {
-                if (e.Key == Key.Enter)
-                {
-                    e.Handled = true;
-                    Keyboard.ClearFocus();
-                }
-            };
     }
 }

@@ -1,35 +1,25 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using Chippi.Core.Actions;
 using Chippi.Core.Shortcuts;
-using Chippi.Features.Sound.Mute;
 
 namespace Chippi.Features.RadialMenu;
 
-/// <summary>What a slice does (docs/phase-5.5/radial-menu.md, What a slice can do).</summary>
-public enum SliceKind { App, File, Link, Keys, Chippi, Media, Window, Text, Command, Selection, SettingsPage, Submenu }
+/// <summary>What a slice does: one of the shared actions' kinds (<see cref="ActionKind"/>), or a submenu, the Radial menu's own.</summary>
+public enum SliceKind
+{
+    App = ActionKind.App, File = ActionKind.File, Link = ActionKind.Link, Keys = ActionKind.Keys, Chippi = ActionKind.Chippi,
+    Media = ActionKind.Media, Window = ActionKind.Window, Text = ActionKind.Text, Command = ActionKind.Command,
+    Selection = ActionKind.Selection, SettingsPage = ActionKind.SettingsPage, Submenu,
+}
 
-/// <summary>Where a Command slice's line runs (Travis, 2026-11-02: a Shell row, PowerShell first).</summary>
-public enum CommandShell { PowerShell, Cmd }
-
-public enum MediaAction { PlayPause, Next, Previous, Mute, VolumeUp, VolumeDown }
-
-/// <summary>What a Window slice does to the window that was under the pointer when the wheel opened.</summary>
-public enum WindowAction { SnapLeft, SnapRight, Maximize, Minimize, Close, KeepOnTop, OtherScreen }
-
-/// <summary>What a Selected text slice does with the text selected in the app in front.</summary>
-public enum SelectionAction { Search, OpenLink, CopyPlain }
-
-/// <summary>One slice of the wheel.</summary>
+/// <summary>One slice of the wheel: a shared action (<see cref="ToAction"/>), or a submenu.</summary>
 public sealed record Slice
 {
     public SliceKind Kind { get; init; }
 
-    /// <summary>
-    /// What it acts on: an app's Start menu parsing name or a program's path, a file's or folder's path, a web address,
-    /// keys ("Ctrl+Shift+T"), a Chippi command's key, a media, window or selected-text action's name, the text, the
-    /// command line, or a Windows Settings page's ms-settings: address. Empty for a submenu.
-    /// </summary>
+    /// <summary>What it acts on (<see cref="ChippiAction.Value"/>). Empty for a submenu.</summary>
     public string Value { get; init; } = "";
 
     /// <summary>What the hub shows while it's pointed at; filled in from what it does, and changeable.</summary>
@@ -43,6 +33,13 @@ public sealed record Slice
 
     /// <summary>A submenu's slices, clockwise after its Back: up to 7.</summary>
     public List<Slice> Slices { get; init; } = [];
+
+    /// <summary>The action it runs; a submenu runs none.</summary>
+    public ChippiAction ToAction() => new() { Kind = (ActionKind)Kind, Value = Value, Name = Name, Glyph = Glyph, Shell = Shell };
+
+    /// <summary>A slice that runs the action.</summary>
+    public static Slice From(ChippiAction action) =>
+        new() { Kind = (SliceKind)action.Kind, Value = action.Value, Name = action.Name, Glyph = action.Glyph, Shell = action.Shell };
 }
 
 /// <summary>Settings › Radial menu: its triggers and its wheel. None of the triggers is on until the owner turns one on.</summary>

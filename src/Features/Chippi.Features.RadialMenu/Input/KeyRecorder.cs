@@ -2,21 +2,10 @@
 // Copyright (C) Chippi contributors
 
 using System.Windows.Threading;
+using Chippi.Core.Actions;
 using Chippi.Core.Input;
-using Chippi.Features.RadialMenu.Slices;
 
 namespace Chippi.Features.RadialMenu.Input;
-
-/// <summary>Records a Key shortcut slice's keys. The real one hooks the keyboard; tests use a fake.</summary>
-public interface IKeyRecorder
-{
-    /// <summary>
-    /// Takes the keyboard until a key is pressed with whatever modifiers are down, then calls <paramref name="recorded"/>
-    /// with them on the calling (UI) thread, or with null for Esc alone, and lets go once those keys are up. Dispose the
-    /// handle to stop early.
-    /// </summary>
-    IDisposable Record(Action<KeyCombo?> recorded);
-}
 
 /// <summary>
 /// The input hub's last filter while Record shows "Press keys": every key the filters before it passed is kept from the

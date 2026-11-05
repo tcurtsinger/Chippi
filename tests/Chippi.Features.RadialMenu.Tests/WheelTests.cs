@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using Chippi.Core.Actions;
 using Chippi.Core.Shortcuts;
 using System.Windows;
 using Chippi.Features.RadialMenu.Input;
@@ -140,9 +141,9 @@ public sealed class WheelTests
     private static readonly Size Screen = new(1920, 1080);
     private static readonly Point Middle = new(960, 540);
 
-    private static Slice Media(MediaAction action) => new() { Kind = SliceKind.Media, Value = action.ToString(), Name = SliceCatalog.NameOf(action) };
+    private static Slice Media(MediaAction action) => new() { Kind = SliceKind.Media, Value = action.ToString(), Name = ActionCatalog.NameOf(action) };
 
-    private static Slice Window(WindowAction action) => new() { Kind = SliceKind.Window, Value = action.ToString(), Name = SliceCatalog.NameOf(action) };
+    private static Slice Window(WindowAction action) => new() { Kind = SliceKind.Window, Value = action.ToString(), Name = ActionCatalog.NameOf(action) };
 
     /// <summary>Eight slices: the right one a Window submenu of three, the bottom one an app that's gone.</summary>
     private static List<Slice> Eight() =>

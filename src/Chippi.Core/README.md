@@ -99,3 +99,17 @@ restarts). Never-used capabilities are not flagged.
 | `Log` | Static `Info/Warn/Error` for startup code before DI exists. |
 | `SingleInstance` | `TryAcquire(name)`: owner or null (after signalling the owner). The second launch calls `AllowSetForegroundWindow` for the owner first, so the owner may take the foreground. Event `ActivationRequested` (background thread; a request before the first subscriber is held). |
 | `StartupRegistration` | HKCU Run, value `Chippi`, command `"<exe>" --startup`. `IsEnabled()`, `SetEnabled(bool, exePath?)`, `GetCommand()`. |
+
+## Actions (`Chippi.Core.Actions`, Phase 6)
+
+One action model, many doors (docs/phase-6/architecture.md section 3). The Radial menu runs its slices through it.
+
+| Type | What it is |
+|---|---|
+| `ChippiAction` | Record: `Kind` (`ActionKind`: App, File, Link, Keys, Chippi, Media, Window, Text, Command, Selection, SettingsPage), `Value`, `Name`, `Glyph` (a `LucideIcons` name, or null), `Shell`. |
+| `ActionCatalog` | Each kind's and action's name and glyph name; `NameFor(action, known)` and `GlyphOf(action)`. `Links` normalizes addresses. |
+| `ActionRunner` | Runs an action on an `IActionPc` and tells whether its target is gone (`IsMissing`). A Window action takes its door's `WindowTarget` (under the pointer, in front, or in front before the island opened), or a window the door read itself. Failures throw `ActionFailure` with the bar's reason. |
+| `IActionPc` | The PC side; tests pass a fake. The Radial menu's `WindowsRadialPc` is the real one. |
+| `KeyCombo`, `IKeyRecorder` | A Key shortcut action's keys, and recording them. |
+
+The picker is `Chippi.UI.Actions.ActionPicker` (Kind, its value rows, Name and Glyph); a host adds kinds of its own after the shared ones, as the Radial menu adds Submenu.
