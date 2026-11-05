@@ -197,6 +197,24 @@ internal static unsafe class Native
         finally { CloseHandle(process); }
     }
 
+    [DllImport("advapi32.dll")] private static extern bool OpenProcessToken(nint process, uint access, out nint token);
+    [DllImport("advapi32.dll")] private static extern bool GetTokenInformation(nint token, int kind, out int value, int size, out int needed);
+
+    public static bool? Elevated(nint window)
+    {
+        uint id;
+        if (window == 0) id = (uint)Environment.ProcessId;
+        else GetWindowThreadProcessId(window, out id);
+        nint process = OpenProcess(0x1000, false, id);
+        if (process == 0) return null;
+        try
+        {
+            if (!OpenProcessToken(process, 8, out nint token)) return null;
+            try { return GetTokenInformation(token, 20, out int value, 4, out _) ? value != 0 : null; }
+            finally { CloseHandle(token); }
+        }
+        finally { CloseHandle(process); }
+    }
     private static readonly string ClassName = "Chippi.InputHub." + Environment.ProcessId;
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<nint, WndProc> Windows = new();
     private static readonly WndProc Dispatch = (window, message, wParam, lParam) =>

@@ -31,4 +31,13 @@ $box.Add_KeyUp({ if ($_.KeyCode -eq 'F24') { Add-Content -LiteralPath $log -Valu
 if (-not $Fullscreen) { $box.Add_TextChanged({ Set-Content -LiteralPath 'C:\results\target-text.txt' -Value $box.Text -NoNewline }) }
 $form.Controls.Add($box)
 $form.Add_Shown({ $form.Activate(); $box.Focus() })
+# Read the toggle on the target's UI thread, whose keyboard queue receives the probe.
+$capsTimer = $null
+if ((Get-Content -LiteralPath 'C:\results\checks.txt') -match 'caps') {
+    $box.Add_KeyUp({ Add-Content -LiteralPath $log -Value "key up $($_.KeyCode)" })
+    $capsTimer = New-Object System.Windows.Forms.Timer
+    $capsTimer.Interval = 100
+    $capsTimer.Add_Tick({ Set-Content -LiteralPath 'C:\results\caps-state.txt' -Value ([System.Windows.Forms.Control]::IsKeyLocked([System.Windows.Forms.Keys]::CapsLock)) })
+    $capsTimer.Start()
+}
 [System.Windows.Forms.Application]::Run($form)

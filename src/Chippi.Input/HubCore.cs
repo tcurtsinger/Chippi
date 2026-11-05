@@ -197,11 +197,11 @@ internal sealed class HubCore(IHookSource hooks, IInputSender sender, IInputSyst
     {
         if (!entry.Alive || modifiers.IsEmpty)
             return;
-        var downs = new SentKey[modifiers.Length];
-        for (int i = 0; i < modifiers.Length; i++)
-            downs[i] = new SentKey(modifiers[i], false);
-        sender.Send(downs);
-        _held.Add(new Held(entry, heldBy, modifiers.ToArray()));
+        // Overlapping keys share our modifiers; never release a physical modifier we did not press.
+        var owned = modifiers.ToArray().Distinct().Where(m => _held.Any(h => h.Modifiers.Contains(m)) || !system.IsDown(m)).ToArray();
+        var downs = owned.Where(m => !_held.Any(h => h.Modifiers.Contains(m))).Select(m => new SentKey(m, false)).ToArray();
+        if (downs.Length > 0) sender.Send(downs);
+        _held.Add(new Held(entry, heldBy, owned));
         _handKey = system.Now; // the 5 s without a key count from the hold, whatever triggered it
     }
 
@@ -505,7 +505,8 @@ internal sealed class HubCore(IHookSource hooks, IInputSender sender, IInputSyst
                 continue;
             var modifiers = _held[i].Modifiers;
             for (int m = modifiers.Length - 1; m >= 0; m--)
-                ups.Add(new SentKey(modifiers[m], true));
+                if (!_held.Where((_, at) => at != i).Any(h => h.Modifiers.Contains(modifiers[m])))
+                    ups.Add(new SentKey(modifiers[m], true));
             _held.RemoveAt(i);
         }
         if (ups.Count == 0)

@@ -52,6 +52,30 @@ public sealed class ModuleTests
     }
 
     [Fact]
+    public async Task Caps_starts_off_then_runs_a_binding_and_drops_its_filter_on_pause_and_stop()
+    {
+        var binding = new ShortcutBinding { Door = BindingDoor.Caps, CapsKey = 0x4B,
+            Action = new ChippiAction { Kind = ActionKind.Window, Value = "Maximize", Name = "Maximize" } };
+        var rig = new Rig(new ShortcutsSettings { Bindings = [binding] });
+        await rig.StartAsync();
+        Assert.Empty(rig.Hub.Filters);
+        Assert.Equal(BindingState.Inactive, rig.Module.StatusOf(binding.Id).State);
+        rig.Module.ConfigureCaps(true, 0x14, KeyModifiers.Ctrl, CapsTap.Nothing, []);
+        var filter = Assert.Single(rig.Hub.Filters);
+        Assert.True(filter.Key(new KeyInput(0x14, 0, true, false, false, false, 0)));
+        Assert.True(filter.Key(new KeyInput(0x4B, 0, true, false, false, false, 1)));
+        await rig.Actions.Ran.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal(("Maximize", WindowTarget.InFront), Assert.Single(rig.Actions.Runs));
+        rig.Hub.Paused = true;
+        rig.Hub.RaisePause();
+        Assert.Empty(rig.Hub.Filters);
+        rig.Hub.Paused = false;
+        rig.Hub.RaisePause();
+        Assert.Single(rig.Hub.Filters);
+        await rig.Module.StopAsync(default);
+        Assert.Empty(rig.Hub.Filters);
+    }
+    [Fact]
     public async Task A_key_binding_is_one_of_the_services_shortcuts_and_pressing_it_runs_its_action_on_the_window_in_front()
     {
         var rig = new Rig();

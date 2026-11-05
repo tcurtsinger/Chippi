@@ -1,4 +1,4 @@
-﻿# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) Chippi contributors
 
 # Runs inside Windows Sandbox, started by run.ps1. Drives the real hooks with SendInput, without Chippi's marker, so
@@ -224,7 +224,7 @@ public static class Probe
             '"features":{"preset":"custom","installed":["smooth-scrolling"],"capabilitiesUsed":[]}}'
         $env:CHIPPI_SMOOTH_INJECTED = '1'
     }
-    $shortcutsOnly = $checks -contains 'shortcuts' -and -not ($checks -contains 'radial' -or $checks -contains 'watchdog' -or $checks -contains 'cost' -or $debounceOnly)
+    $shortcutsOnly = ($checks -contains 'shortcuts' -or $checks -contains 'caps') -and -not ($checks -contains 'radial' -or $checks -contains 'watchdog' -or $checks -contains 'cost' -or $debounceOnly)
     function ShortcutSettings([string]$ignored = '') {
         $action = { param($name) '"action":{"kind":"window","value":"SnapLeft","name":"' + $name + '"}' }
         $bindings = @(
@@ -236,7 +236,12 @@ public static class Probe
             ('{"id":"key","door":"key","keys":{"modifiers":"control, alt","key":75},' + (& $action 'KeyAct') + '}'),
             ('{"id":"winj","door":"key","keys":{"modifiers":"windows","key":74},' + (& $action 'WinJAct') + '}'),
             ('{"id":"winy","door":"key","keys":{"modifiers":"windows","key":89},' + (& $action 'WinYAct') + '}'))
-        '{"version":1,"app":{"islandEnabled":false},"modules":{"shortcuts":{"mouseEnabled":true,"mouseIgnoredApps":[' + $ignored + '],"bindings":[' + ($bindings -join ',') + ']}},' +
+        $caps = ''
+        if ($checks -contains 'caps') {
+            $caps = '"capsEnabled":true,"capsModifiers":"ctrl, alt, shift",'
+            $bindings += '{"id":"caps-k","door":"caps","capsKey":75,"action":{"kind":"window","value":"Maximize","name":"CapsKAct"}}'
+        }
+        '{"version":1,"app":{"islandEnabled":false},"modules":{"shortcuts":{' + $caps + '"mouseEnabled":true,"mouseIgnoredApps":[' + $ignored + '],"bindings":[' + ($bindings -join ',') + ']}},' +
             '"features":{"preset":"custom","installed":["shortcuts"],"capabilitiesUsed":[]}}'
     }
     if ($shortcutsOnly) {
@@ -545,7 +550,7 @@ public static class Probe
         $found.scroll = $s
     }
 
-    if ($checks -contains 'shortcuts') {
+    if ($checks -contains 'shortcuts' -or $checks -contains 'caps') {
         $sc = [ordered]@{}
         $actionLog = "$results\actions.log"
         function Actions { if (Test-Path -LiteralPath $actionLog) { @(Get-Content -LiteralPath $actionLog) } else { @() } }
@@ -554,13 +559,22 @@ public static class Probe
             [Probe]::MoveTo($x, $y)
             Start-Sleep -Milliseconds 300
             $before = [Probe]::Foreground()
+            $capsBefore = if (Test-Path "$results\caps-state.txt") { Get-Content "$results\caps-state.txt" } else { 'unchecked' }
             $hitsBefore = [Probe]::Hits
             & $act
             Start-Sleep -Milliseconds 1500
-            $sc[$name] = [ordered]@{ actions = ((Actions) -join '; '); targetHeard = ((TargetLog) -join '; '); foreground = "$before -> $([Probe]::Foreground())"; otherAppHotkeyHeard = [Probe]::Hits - $hitsBefore }
+            $sc[$name] = [ordered]@{ actions = ((Actions) -join '; '); targetHeard = ((TargetLog) -join '; '); foreground = "$before -> $([Probe]::Foreground())"; otherAppHotkeyHeard = [Probe]::Hits - $hitsBefore; capsBefore = $capsBefore; capsAfter = $(if (Test-Path "$results\caps-state.txt") { Get-Content "$results\caps-state.txt" } else { "unchecked" }) }
             Note "shortcuts $name : fired [$((Actions) -join '; ')] target heard [$((TargetLog) -join '; ')] other app heard $([Probe]::Hits - $hitsBefore) foreground $($sc[$name].foreground)"
             Start-Sleep -Milliseconds 300
         }
+        if ($checks -contains 'caps') {
+            Door 'capsBoundK' { [Probe]::Key(0x14, $true); [Probe]::Key(0x4B, $true); [Probe]::Key(0x4B, $true); [Probe]::Key(0x4B, $false); [Probe]::Key(0x14, $false) }
+            Door 'capsUnboundM' { [Probe]::Key(0x14, $true); [Probe]::Key(0x4D, $true); [Probe]::Key(0x4D, $false); [Probe]::Key(0x14, $false) }
+            Door 'capsSoloTap' { [Probe]::Key(0x14, $true); [Probe]::Key(0x14, $false) }
+            Door 'capsSoloHold' { [Probe]::Key(0x14, $true); Start-Sleep -Milliseconds 600; [Probe]::Key(0x14, $false) }
+        }
+        if ($checks -contains 'caps') { $found.caps = $sc }
+        else {
         Door 'backClick' { [Probe]::Back($true); Start-Sleep -Milliseconds 80; [Probe]::Back($false) }
         Door 'forwardClick' { [Probe]::Forward($true); Start-Sleep -Milliseconds 80; [Probe]::Forward($false) }
         Door 'middleClick' { [Probe]::Middle($true); Start-Sleep -Milliseconds 80; [Probe]::Middle($false) }
@@ -587,6 +601,7 @@ public static class Probe
         Door 'inListedApp_tiltRight' { [Probe]::Tilt(120) }
         Door 'inListedApp_ctrlAltK' { [Probe]::Key(0xA2, $true); [Probe]::Key(0xA4, $true); [Probe]::Key(0x4B, $true); [Probe]::Key(0x4B, $false); [Probe]::Key(0xA4, $false); [Probe]::Key(0xA2, $false) }
         $found.shortcutsInListedApp = $sc
+        }
     }
 
     if ($checks -contains 'cost') {

@@ -36,6 +36,32 @@ public class ReleaseTests
     }
 
     [Fact]
+    public void Overlapping_chords_release_a_shared_modifier_only_after_the_last_key()
+    {
+        var hub = new TestHub();
+        var entry = hub.Core.Add(new TestFilter("caps", InputOrder.Triggers, InputDevices.Keyboard));
+        hub.Core.HoldModifiers(entry, 0x41, Held);
+        hub.Core.HoldModifiers(entry, 0x42, Held);
+        foreach (ushort vk in Held) Assert.Equal(1, hub.Sender.Downs(vk));
+        hub.Key(0x41, down: false);
+        foreach (ushort vk in Held) Assert.Equal(0, hub.Sender.Ups(vk));
+        hub.Key(0x42, down: false);
+        foreach (ushort vk in Held) Assert.Equal(1, hub.Sender.Ups(vk));
+    }
+
+    [Fact]
+    public void Physical_modifiers_are_never_owned_or_released()
+    {
+        var hub = new TestHub();
+        hub.System.Down.Add(Ctrl);
+        var entry = hub.Core.Add(new TestFilter("caps", InputOrder.Triggers, InputDevices.Keyboard));
+        hub.Core.HoldModifiers(entry, 0x41, Held);
+        hub.Core.Remove(entry);
+        Assert.Equal(0, hub.Sender.Downs(Ctrl));
+        Assert.Equal(0, hub.Sender.Ups(Ctrl));
+        Assert.Equal(1, hub.Sender.Ups(Alt));
+    }
+    [Fact]
     public void Its_key_coming_up()
     {
         var (hub, _) = Holding();
