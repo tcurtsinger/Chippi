@@ -227,6 +227,9 @@ public partial class App : Application
                 },
             searchUrl: text => Chippi.Features.CommandBar.WebEngines.SearchUrl(commandBar.Settings.WebSearch, text)));
 
+        // [Phase 6] Text snippets: replaces its catalog placeholder.
+        shell.Registry.Register(new Chippi.Features.TextSnippets.TextSnippetsModule());
+
         shell.Registry.Register(new Chippi.Features.CloseProtection.CloseProtectionModule(() =>
             new Chippi.Features.CloseProtection.WindowsCloseDesktop()));
 

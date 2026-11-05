@@ -370,6 +370,7 @@ internal sealed class CommandBarPage : UserControl
         Win32Exception { NativeErrorCode: 5 } => "Access denied",
         InvalidOperationException { Message: "Window closed" } => "Window closed",
         InvalidOperationException { Message: "Clipboard unavailable" } => "Clipboard unavailable",
+        InvalidOperationException { Message: "Snippet not inserted" or "Not working in admin windows" } => ex.Message,
         _ => $"{result.Verb} failed · Try again",
     };
 
