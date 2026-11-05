@@ -95,7 +95,7 @@ public sealed class ShortcutService : IShortcutService
             return Refuse(entry, $"Used by {holder.Name}");
         int id = ++_nextId;
         bool taken;
-        try { taken = shortcut.IsValid && _registrar.Register(id, shortcut); }
+        try { taken = (shortcut.IsValid || shortcut.IsBindable) && _registrar.Register(id, shortcut); }
         catch (Exception ex)
         {
             Diagnostics.Log.Warn("Shortcuts: registering failed", ex);

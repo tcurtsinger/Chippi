@@ -31,6 +31,12 @@ public interface IInputHub
     bool FullscreenInFront { get; }
 
     /// <summary>
+    /// The exe path of the window in front, as the hub last read it from the foreground event; null when unreadable. For
+    /// a filter's per-app rules: a memory read, safe in a hook call.
+    /// </summary>
+    string? ForegroundApp => null;
+
+    /// <summary>
     /// <see cref="Paused"/> or <see cref="FullscreenInFront"/> changed. Raised on the hub's thread: hand off to the UI
     /// thread before doing anything slow. Features outside the hooks (Focus follows mouse) follow the pause from here.
     /// </summary>

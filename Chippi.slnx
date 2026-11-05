@@ -18,6 +18,7 @@
     <Project Path="src/Features/Chippi.Features.Scratchpad/Chippi.Features.Scratchpad.csproj" />
     <Project Path="src/Features/Chippi.Features.PlainPaste/Chippi.Features.PlainPaste.csproj" />
     <Project Path="src/Features/Chippi.Features.Shelf/Chippi.Features.Shelf.csproj" />
+    <Project Path="src/Features/Chippi.Features.Shortcuts/Chippi.Features.Shortcuts.csproj" />
     <Project Path="src/Features/Chippi.Features.SystemMonitor/Chippi.Features.SystemMonitor.csproj" />
     <Project Path="src/Features/Chippi.Features.QuickActions/Chippi.Features.QuickActions.csproj" />
     <Project Path="src/Features/Chippi.Features.AgentUsage/Chippi.Features.AgentUsage.csproj" />
@@ -41,6 +42,7 @@
     <Project Path="tests/Chippi.Features.Scratchpad.Tests/Chippi.Features.Scratchpad.Tests.csproj" />
     <Project Path="tests/Chippi.Features.PlainPaste.Tests/Chippi.Features.PlainPaste.Tests.csproj" />
     <Project Path="tests/Chippi.Features.Shelf.Tests/Chippi.Features.Shelf.Tests.csproj" />
+    <Project Path="tests/Chippi.Features.Shortcuts.Tests/Chippi.Features.Shortcuts.Tests.csproj" />
     <Project Path="tests/Chippi.Features.SystemMonitor.Tests/Chippi.Features.SystemMonitor.Tests.csproj" />
     <Project Path="tests/Chippi.Features.QuickActions.Tests/Chippi.Features.QuickActions.Tests.csproj" />
     <Project Path="tests/Chippi.Features.AgentUsage.Tests/Chippi.Features.AgentUsage.Tests.csproj" />

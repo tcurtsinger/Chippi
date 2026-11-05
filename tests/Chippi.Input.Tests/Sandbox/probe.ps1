@@ -48,6 +48,9 @@ public static class Probe
     public static void Left(bool down) { Mouse(down ? 0x0002u : 0x0004u); }
     public static void Middle(bool down) { Mouse(down ? 0x0020u : 0x0040u); }
     public static void Back(bool down) { Mouse(down ? 0x0080u : 0x0100u, 0, 0, 1); }
+    public static void Forward(bool down) { Mouse(down ? 0x0080u : 0x0100u, 0, 0, 2); }
+    /// <summary>One tilt of the side wheel: positive is right, 120 a notch.</summary>
+    public static void Tilt(int delta) { Mouse(0x01000, 0, 0, unchecked((uint)delta)); }
 
     public static void Key(ushort vk, bool down)
     {
@@ -112,6 +115,37 @@ public static class Probe
         done.Set();
         thread.Join();
         return rows.ToArray();
+    }
+
+    /// <summary>Holds a RegisterHotKey of this process's own, as another app would: Chippi's attempt on the same keys is refused.</summary>
+    public static bool HoldHotkey(uint modifiers, uint vk)
+    {
+        bool ok = false;
+        var ready = new ManualResetEvent(false);
+        var thread = new Thread(() =>
+        {
+            ok = RegisterHotKey(IntPtr.Zero, 77, modifiers, vk);
+            ready.Set();
+            MSG msg;
+            while (GetMessage(out msg, IntPtr.Zero, 0, 0) > 0) { }
+        });
+        thread.IsBackground = true;
+        thread.Start();
+        ready.WaitOne();
+        return ok;
+    }
+
+    [DllImport("user32.dll")] static extern bool RegisterHotKey(IntPtr hwnd, int id, uint modifiers, uint vk);
+    [DllImport("user32.dll")] static extern int GetMessage(out MSG msg, IntPtr hwnd, uint min, uint max);
+    [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetWindowText(IntPtr hwnd, System.Text.StringBuilder text, int count);
+
+    /// <summary>The title of the window in front: "Probe target" while the target holds the focus, something else once Start or a menu took it.</summary>
+    public static string Foreground()
+    {
+        var text = new System.Text.StringBuilder(256);
+        GetWindowText(GetForegroundWindow(), text, 256);
+        return text.ToString();
     }
 
     delegate IntPtr LowLevelProc(int code, IntPtr wParam, IntPtr lParam);
@@ -184,6 +218,29 @@ public static class Probe
         $debounceSettings = '{"version":1,"app":{"islandEnabled":false},"modules":{"smooth-scrolling":{"smoothEnabled":true}},' +
             '"features":{"preset":"custom","installed":["smooth-scrolling"],"capabilitiesUsed":[]}}'
         $env:CHIPPI_SMOOTH_INJECTED = '1'
+    }
+    $shortcutsOnly = $checks -contains 'shortcuts' -and -not ($checks -contains 'radial' -or $checks -contains 'watchdog' -or $checks -contains 'cost' -or $debounceOnly)
+    function ShortcutSettings([string]$ignored = '') {
+        $action = { param($name) '"action":{"kind":"window","value":"SnapLeft","name":"' + $name + '"}' }
+        $bindings = @(
+            ('{"id":"back","door":"mouse","button":"back",' + (& $action 'BackAct') + '}'),
+            ('{"id":"fwd","door":"mouse","button":"forward",' + (& $action 'ForwardAct') + '}'),
+            ('{"id":"mid","door":"mouse","button":"middle",' + (& $action 'MiddleAct') + '}'),
+            ('{"id":"tr","door":"mouse","button":"wheelRight",' + (& $action 'TiltRightAct') + '}'),
+            ('{"id":"tl","door":"mouse","button":"wheelLeft",' + (& $action 'TiltLeftAct') + '}'),
+            ('{"id":"key","door":"key","keys":{"modifiers":"control, alt","key":75},' + (& $action 'KeyAct') + '}'),
+            ('{"id":"winj","door":"key","keys":{"modifiers":"windows","key":74},' + (& $action 'WinJAct') + '}'),
+            ('{"id":"winy","door":"key","keys":{"modifiers":"windows","key":89},' + (& $action 'WinYAct') + '}'))
+        '{"version":1,"app":{"islandEnabled":false},"modules":{"shortcuts":{"mouseEnabled":true,"mouseIgnoredApps":[' + $ignored + '],"bindings":[' + ($bindings -join ',') + ']}},' +
+            '"features":{"preset":"custom","installed":["shortcuts"],"capabilitiesUsed":[]}}'
+    }
+    if ($shortcutsOnly) {
+        # Shortcuts alone. CHIPPI_SHORTCUTS_PROBE: its fired bindings go to a file (the shared action runner isn't in the shell yet).
+        # Another app holds Win+Y, so Chippi's RegisterHotKey for it is refused and the hub takes it.
+        $debounceSettings = ShortcutSettings
+        $env:CHIPPI_SHORTCUTS_PROBE = "$results\actions.log"
+        $holdWinY = [Probe]::HoldHotkey(8, 0x59)
+        Note "another app holds Win+Y: $holdWinY"
     }
     $env:CHIPPI_INPUT_TIMINGS = "$results\hook-timings.csv"
     if ($checks -contains 'watchdog') { $env:CHIPPI_INPUT_DROP_HOOKS = '45' }
@@ -481,6 +538,49 @@ public static class Probe
 
         Stop-Process -Id $scrollTarget.Id -Force -ErrorAction SilentlyContinue
         $found.scroll = $s
+    }
+
+    if ($checks -contains 'shortcuts') {
+        $sc = [ordered]@{}
+        $actionLog = "$results\actions.log"
+        function Actions { if (Test-Path -LiteralPath $actionLog) { @(Get-Content -LiteralPath $actionLog) } else { @() } }
+        function Door([string]$name, [scriptblock]$act) {
+            Remove-Item -LiteralPath $actionLog, "$results\target.log" -ErrorAction SilentlyContinue
+            [Probe]::MoveTo($x, $y)
+            Start-Sleep -Milliseconds 300
+            $before = [Probe]::Foreground()
+            & $act
+            Start-Sleep -Milliseconds 1500
+            $sc[$name] = [ordered]@{ actions = ((Actions) -join '; '); targetHeard = ((TargetLog) -join '; '); foreground = "$before -> $([Probe]::Foreground())" }
+            Note "shortcuts $name : fired [$((Actions) -join '; ')] target heard [$((TargetLog) -join '; ')] foreground $($sc[$name].foreground)"
+            Start-Sleep -Milliseconds 300
+        }
+        Door 'backClick' { [Probe]::Back($true); Start-Sleep -Milliseconds 80; [Probe]::Back($false) }
+        Door 'forwardClick' { [Probe]::Forward($true); Start-Sleep -Milliseconds 80; [Probe]::Forward($false) }
+        Door 'middleClick' { [Probe]::Middle($true); Start-Sleep -Milliseconds 80; [Probe]::Middle($false) }
+        Door 'backHeldHalfSecond' { [Probe]::Back($true); Start-Sleep -Milliseconds 600; [Probe]::Back($false) }
+        Door 'leftClickIsNeverBound' { [Probe]::Left($true); Start-Sleep -Milliseconds 80; [Probe]::Left($false) }
+        Door 'tiltRightOneNotch' { [Probe]::Tilt(120) }
+        Door 'tiltLeftTwoNotches' { [Probe]::Tilt(-120); Start-Sleep -Milliseconds 60; [Probe]::Tilt(-120) }
+        Door 'tiltRightFineWheel4x30' { 1..4 | ForEach-Object { [Probe]::Tilt(30); Start-Sleep -Milliseconds 20 } }
+        Door 'ctrlAltK' { [Probe]::Key(0xA2, $true); [Probe]::Key(0xA4, $true); [Probe]::Key(0x4B, $true); [Probe]::Key(0x4B, $false); [Probe]::Key(0xA4, $false); [Probe]::Key(0xA2, $false) }
+        Door 'winJ' { [Probe]::Key(0x5B, $true); [Probe]::Key(0x4A, $true); [Probe]::Key(0x4A, $false); [Probe]::Key(0x5B, $false) }
+        Door 'winYHeldByAnotherApp' { [Probe]::Key(0x5B, $true); [Probe]::Key(0x59, $true); Start-Sleep -Milliseconds 700; [Probe]::Key(0x59, $true); [Probe]::Key(0x59, $false); [Probe]::Key(0x5B, $false) }
+        Door 'plainKIsUntouched' { [Probe]::Key(0x4B, $true); [Probe]::Key(0x4B, $false) }
+        # Win alone must still open Start: the masking is only for a chord Chippi kept.
+        Door 'winAloneOpensStart' { [Probe]::Key(0x5B, $true); [Probe]::Key(0x5B, $false) }
+        if ([Probe]::Foreground() -ne 'Probe target') { [Probe]::Key(0x1B, $true); [Probe]::Key(0x1B, $false); Start-Sleep -Milliseconds 500; [Probe]::MoveTo($x, $y); [Probe]::Left($true); [Probe]::Left($false); Start-Sleep -Milliseconds 500 }
+        $found.shortcuts = $sc
+
+        # The same buttons in an app on the list: the press and the tilt reach the app, nothing fires. Keys are unchanged.
+        $sc = [ordered]@{}
+        Stop-Process -Id $chippi.Id -Force -ErrorAction SilentlyContinue
+        Start-Sleep -Seconds 3
+        $chippi = StartChippi -whole (ShortcutSettings '"C:/Windows/System32/WindowsPowerShell/v1.0/powershell.exe"')
+        Door 'inListedApp_backClick' { [Probe]::Back($true); Start-Sleep -Milliseconds 80; [Probe]::Back($false) }
+        Door 'inListedApp_tiltRight' { [Probe]::Tilt(120) }
+        Door 'inListedApp_ctrlAltK' { [Probe]::Key(0xA2, $true); [Probe]::Key(0xA4, $true); [Probe]::Key(0x4B, $true); [Probe]::Key(0x4B, $false); [Probe]::Key(0xA4, $false); [Probe]::Key(0xA2, $false) }
+        $found.shortcutsInListedApp = $sc
     }
 
     if ($checks -contains 'cost') {

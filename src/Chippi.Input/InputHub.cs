@@ -36,6 +36,7 @@ public sealed class InputHub : IInputHub, IDisposable
     private bool _disposed, _faulted, _foregroundPending;
     private PauseRules _rules = PauseRules.Default;
     private volatile bool _paused, _fullscreen;
+    private string? _foregroundApp;
     private Action? _pauseChanged;
     private readonly Lock _listeners = new(); // not _gate: Start holds that while the hub's thread raises its first change
 
@@ -74,6 +75,8 @@ public sealed class InputHub : IInputHub, IDisposable
     }
 
     public bool FullscreenInFront => _fullscreen;
+
+    public string? ForegroundApp => Volatile.Read(ref _foregroundApp);
 
     public event Action? PauseChanged
     {
@@ -276,7 +279,9 @@ public sealed class InputHub : IInputHub, IDisposable
                 }
             }
         }
-        _core!.Foreground(FullscreenCheck.IsFullscreen(foreground), Native.AppPath(foreground));
+        string? app = Native.AppPath(foreground);
+        Volatile.Write(ref _foregroundApp, app);
+        _core!.Foreground(FullscreenCheck.IsFullscreen(foreground), app);
     }
 
     private void OnPauseChanged()
