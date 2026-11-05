@@ -62,7 +62,7 @@ public sealed class TextSnippetsModule : IFeatureModule
         {
             _context = context;
             Settings = Normalize(context.Settings.Get<TextSnippetsSettings>());
-            _expander = new SnippetExpander(_sender, () => ReadClipboardAsync(context), _passwordFocused, expanded: PlayExpandedSound);
+            _expander = new SnippetExpander(_sender, () => ReadClipboardAsync(context), _passwordFocused, expanded: PlayExpandedSound, foreground: _reader.Foreground);
             _matcher.SetSnippets(Settings.Snippets);
             context.Ui.AddCommands(Commands);
             context.Ui.SetSettingsPage(_ => new Views.SnippetsPage(this));
@@ -131,8 +131,10 @@ public sealed class TextSnippetsModule : IFeatureModule
         }
         else if (context.Input?.ForegroundElevated == true)
             throw new InvalidOperationException(AdminWindow);
+        nint window = _reader.Foreground(); // the destination: the clipboard read below can take a second
         string text = await SnippetRenderer.RenderAsync(snippet.Text, DateTimeOffset.Now, () => ReadClipboardAsync(context));
-        await _sender.SendAsync(0, text, null);
+        if (!await _sender.SendAsync(0, text, null, () => _reader.Foreground() == window))
+            throw new InvalidOperationException(NotInserted);
         PlayExpandedSound();
     }
 
@@ -167,7 +169,7 @@ public sealed class TextSnippetsModule : IFeatureModule
             if (_registration is null)
             {
                 var expander = _expander!;
-                _filter = new SnippetFilter(hub, _matcher, expander.Enqueue, _reader);
+                _filter = new SnippetFilter(hub, _matcher, expander.Enqueue, _reader, expander.Cancel);
                 Error = Try(() => _registration = hub.Add(_filter));
                 if (Error is not null)
                     _filter = null;

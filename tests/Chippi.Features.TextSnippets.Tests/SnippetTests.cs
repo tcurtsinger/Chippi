@@ -194,6 +194,7 @@ public sealed class KeystrokeTests
     public void BackspacesThenUnicodeThenTheDelimiter()
     {
         var batches = Keystrokes.Plan(2, "hé", Delimiter.Space);
+        Assert.Single(batches); // the deletions and the text go in one SendInput
         var all = batches.SelectMany(b => b).ToArray();
         Assert.Equal(4 + 4 + 2, all.Length);
         Assert.All(all.Take(4), s => Assert.Equal(Keystrokes.Back, s.Vk));
@@ -260,6 +261,7 @@ public sealed class FilterTests
     private readonly FakeHub _hub = new();
     private readonly FakeReader _reader = new();
     private readonly List<(SnippetMatch Match, Delimiter? After)> _expanded = [];
+    private readonly List<string> _events = [];
     private readonly SnippetFilter _filter;
 
     public FilterTests()
@@ -269,7 +271,7 @@ public sealed class FilterTests
             new Snippet { Trigger = ";em", Text = "a@b.c", Expand = ExpandMode.RightAway },
             new Snippet { Trigger = ";go", Text = "going", Expand = ExpandMode.AfterDelimiter },
         ]);
-        _filter = new SnippetFilter(_hub, matcher, (m, d, _) => _expanded.Add((m, d)), _reader);
+        _filter = new SnippetFilter(_hub, matcher, (m, d, _) => { _expanded.Add((m, d)); _events.Add("expand"); }, _reader, () => _events.Add("cancel"));
     }
 
     private bool Down(uint vk, bool wasDown = false) => _filter.Key(new KeyInput(vk, 0, true, wasDown, false, false, 0));
@@ -284,6 +286,34 @@ public sealed class FilterTests
             Assert.False(Down(vk));
             Up(vk);
         }
+    }
+
+    [Fact]
+    public void EveryKeyCancelsWhatIsPendingBeforeItsOwnExpansionIsQueued()
+    {
+        Type(";em");
+        Assert.Equal("cancel", _events[^2]);
+        Assert.Equal("expand", _events[^1]);
+        Down(0x41);
+        Assert.Equal("cancel", _events[^1]);
+    }
+
+    [Fact]
+    public void AClickCancelsWhatIsPending()
+    {
+        _filter.Mouse(new MouseInput(MouseKind.Down, default, 0, 0, 0, false, 0));
+        Assert.Contains("cancel", _events);
+    }
+
+    [Fact]
+    public void AModifierAloneAndAKeptRepeatCancelNothing()
+    {
+        Type(";go");
+        Assert.True(Down(0x20));
+        _events.Clear();
+        Down(0x11);
+        Assert.True(Down(0x20, wasDown: true));
+        Assert.Empty(_events);
     }
 
     [Fact]
@@ -401,15 +431,17 @@ public sealed class ExpanderTests
 
         public bool FailFirst;
 
-        public Task SendAsync(int backspaces, string text, Delimiter? after, CancellationToken ct = default)
+        public Task<bool> SendAsync(int backspaces, string text, Delimiter? after, Func<bool>? valid = null, CancellationToken ct = default)
         {
+            if (valid is not null && !valid())
+                return Task.FromResult(false);
             if (FailFirst)
             {
                 FailFirst = false;
                 throw new InvalidOperationException("Input blocked");
             }
             Sent.Add((backspaces, text, after));
-            return Task.CompletedTask;
+            return Task.FromResult(true);
         }
     }
 
@@ -423,6 +455,55 @@ public sealed class ExpanderTests
         expander.Enqueue(Match("on {{date:yyyy}} {{clipboard}}"), Delimiter.Tab);
         await expander.IdleAsync();
         Assert.Equal((3, "on 2026 COPY", (Delimiter?)Delimiter.Tab), Assert.Single(sender.Sent));
+    }
+
+    [Fact]
+    public async Task InputWhileTheClipboardIsBeingReadDropsTheExpansion()
+    {
+        var sender = new RecordingSender();
+        var read = new TaskCompletionSource<string?>();
+        SnippetExpander? expander = null;
+        expander = new SnippetExpander(sender, () => read.Task, () => false);
+        expander.Enqueue(Match("{{clipboard}}"), null);
+        expander.Cancel(); // the hand typed "abc"
+        read.SetResult("COPY");
+        await expander.IdleAsync();
+        Assert.Empty(sender.Sent);
+    }
+
+    [Fact]
+    public async Task AnExpansionQueuedAfterTheCancelStillTypes()
+    {
+        var sender = new RecordingSender();
+        var expander = new SnippetExpander(sender, null, () => false);
+        expander.Cancel();
+        expander.Enqueue(Match("ok"), null);
+        await expander.IdleAsync();
+        Assert.Equal("ok", Assert.Single(sender.Sent).Text);
+    }
+
+    [Fact]
+    public async Task AnotherWindowInFrontDropsTheExpansion()
+    {
+        var sender = new RecordingSender();
+        nint window = 1;
+        var read = new TaskCompletionSource<string?>();
+        var expander = new SnippetExpander(sender, () => read.Task, () => false, foreground: () => window);
+        expander.Enqueue(Match("{{clipboard}}"), Delimiter.Enter);
+        window = 2;
+        read.SetResult("COPY");
+        await expander.IdleAsync();
+        Assert.Empty(sender.Sent);
+    }
+
+    [Fact]
+    public async Task TheSameWindowStillTypes()
+    {
+        var sender = new RecordingSender();
+        var expander = new SnippetExpander(sender, null, () => false, foreground: () => 1);
+        expander.Enqueue(Match("ok"), null);
+        await expander.IdleAsync();
+        Assert.Single(sender.Sent);
     }
 
     [Fact]

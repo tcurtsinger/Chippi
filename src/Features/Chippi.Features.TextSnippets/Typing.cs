@@ -15,7 +15,8 @@ internal readonly record struct Stroke(ushort Vk, char Unit, bool Up)
 /// <summary>Sends an expansion: deletes what was typed, then types the text. Every event is tagged as Chippi's, so the hub never sees it.</summary>
 internal interface ISnippetSender
 {
-    Task SendAsync(int backspaces, string text, Delimiter? after, CancellationToken ct = default);
+    /// <summary>Types it; false when <paramref name="valid"/> turned false first, so nothing (more) was typed.</summary>
+    Task<bool> SendAsync(int backspaces, string text, Delimiter? after, Func<bool>? valid = null, CancellationToken ct = default);
 }
 
 /// <summary>The events of an expansion, in batches (docs/phase-6/text-snippets.md, Inserting).</summary>
@@ -29,18 +30,15 @@ internal static class Keystrokes
     public static List<Stroke[]> Plan(int backspaces, string text, Delimiter? after)
     {
         var batches = new List<Stroke[]>();
-        if (backspaces > 0)
+        // The deletions share the first batch with the text's start: one SendInput can't be split by a key the hand types, so
+        // a trigger is never deleted without its text following.
+        var chunk = new List<Stroke>();
+        for (int i = 0; i < backspaces; i++)
         {
-            var back = new List<Stroke>();
-            for (int i = 0; i < backspaces; i++)
-            {
-                back.Add(new Stroke(Back, '\0', false));
-                back.Add(new Stroke(Back, '\0', true));
-            }
-            batches.Add([.. back]);
+            chunk.Add(new Stroke(Back, '\0', false));
+            chunk.Add(new Stroke(Back, '\0', true));
         }
         text = text.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n');
-        var chunk = new List<Stroke>();
         int chars = 0;
         for (int i = 0; i < text.Length; i++)
         {

@@ -70,10 +70,10 @@ public sealed class ModuleTests
     {
         public List<(int Backspaces, string Text)> Sent { get; } = [];
 
-        public Task SendAsync(int backspaces, string text, Delimiter? after, CancellationToken ct = default)
+        public Task<bool> SendAsync(int backspaces, string text, Delimiter? after, Func<bool>? valid = null, CancellationToken ct = default)
         {
             Sent.Add((backspaces, text));
-            return Task.CompletedTask;
+            return Task.FromResult(true);
         }
     }
 
