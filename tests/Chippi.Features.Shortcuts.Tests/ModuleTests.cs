@@ -145,6 +145,29 @@ public sealed class ModuleTests
     }
 
     [Fact]
+    public async Task Recording_a_dimmed_shortcuts_own_keys_again_says_who_has_them_and_a_held_one_saves()
+    {
+        var keys = new KeyShortcut(CtrlAlt, 0x4B);
+        var saved = Key(CtrlAlt, 0x4B);
+        var rig = new Rig(new ShortcutsSettings { Bindings = [saved] });
+        rig.Registrar.Refused.Add(keys); // another app took them since it was saved
+        await rig.StartAsync();
+        Assert.Equal(BindingState.InUseByApp, rig.Module.StatusOf(saved.Id).State);
+        Assert.Equal(ShortcutsModule.AnotherAppText, rig.Module.Change(saved with { Keys = keys }).Error);
+
+        var windows = Key(ShortcutModifiers.Windows, 0x4C);
+        var dimmed = new Rig(new ShortcutsSettings { Bindings = [windows] });
+        await dimmed.StartAsync();
+        Assert.Equal(ShortcutsModule.WindowsText, dimmed.Module.Change(windows with { Keys = windows.Keys }).Error);
+
+        var held = new Rig(new ShortcutsSettings { Bindings = [saved] });
+        await held.StartAsync();
+        Assert.Equal(BindingState.Active, held.Module.StatusOf(saved.Id).State);
+        Assert.True(held.Module.Change(saved with { Action = saved.Action with { Name = "Renamed" } }).Ok); // its own keys, still held
+        Assert.Equal([keys], held.Registrar.Registered);
+    }
+
+    [Fact]
     public async Task A_saved_key_that_is_not_bindable_shows_Unavailable_and_is_not_registered()
     {
         var rig = new Rig(new ShortcutsSettings { Bindings = [Key(ShortcutModifiers.Shift, 0x4B)] });

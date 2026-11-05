@@ -174,8 +174,10 @@ public sealed class ShortcutsModule : IFeatureModule
         var keys = binding.Keys!;
         if (WindowsKeys.IsReserved(keys))
             return WindowsText;
-        // Its own keys, unchanged, are already held by its row.
-        if (except is not null && Settings.Bindings.FirstOrDefault(b => b.Id == except) is { Door: BindingDoor.Key } own && own.Keys == keys)
+        // Its own keys, unchanged, and still held by Chippi: nothing to ask. A row dimmed because another app or
+        // Windows took the keys isn't held, so recording them again runs the check and says who has them.
+        if (except is not null && _slots.FirstOrDefault(s => s.Binding.Id == except) is { Binding: { Door: BindingDoor.Key } own, Status.State: BindingState.Active }
+            && own.Keys == keys)
             return null;
         // Windows says only whether the keys were free: ask it, and let go at once.
         if (_context is null)
