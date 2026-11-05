@@ -330,6 +330,7 @@ internal sealed partial class ActionsPage : UserControl
         if (added.Tile.Menu)
         {
             _menu = added.Key;
+            _built = "";
             ResetListPage();
             Render();
             FirstRowButton()?.Focus();

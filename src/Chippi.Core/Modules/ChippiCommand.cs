@@ -67,6 +67,12 @@ public sealed record ActionsTile(string Key, string Label, string Icon)
     /// <summary>The tile steps into a list of its commands; false for a tile of one command.</summary>
     public bool Menu { get; init; }
 
+    /// <summary>
+    /// A menu's own view (a WPF element), shown under its title in place of its rows, made again each time the menu opens:
+    /// Snap's layout pictures and window commands (docs/phase-6/design/actions-shortcuts.html, sheet-menus). Null for rows.
+    /// </summary>
+    public Func<object>? View { get; init; }
+
     /// <summary>The Phase 6 switches: Debounce's, Close protection, Focus follows mouse, Always on in games.</summary>
     public static ActionsTile Input { get; } = new("input", "Input", "Mouse") { Menu = true };
 }

@@ -128,6 +128,10 @@ public sealed class WindowLayoutsModule(Func<IReadOnlyList<SnapDisplay>>? displa
         _runner?.RunAsync(new ChippiAction { Kind = ActionKind.Window, Value = nameof(WindowAction.Zone),
             LayoutId = zone.LayoutId, ZoneId = zone.ZoneId }, target, display?.Handle ?? 0) ?? throw new ActionFailure("Snap failed");
 
+    /// <summary>The Actions tile: its menu is Snap's own view (pictures and commands), not a row per command.</summary>
+    private ActionsTile SnapTile => _snapTile ??= new("snap", "Snap", "LayoutGrid") { Menu = true, View = () => new Views.SnapMenu(this) };
+    private ActionsTile? _snapTile;
+
     private IReadOnlyList<ChippiCommand> Commands()
     {
         if (Layouts is not { } store) return [];
@@ -139,7 +143,7 @@ public sealed class WindowLayoutsModule(Func<IReadOnlyList<SnapDisplay>>? displa
             var key = new SnapZoneKey(layout.Id, zone.Id);
             commands.Add(new($"{Id}/zone/{layout.Id}/{zone.Id}", $"{layout.Name}: {zone.Name}", "LayoutGrid",
                 () => RunAsync(target ?? throw new ActionFailure("Snap failed"), key))
-            { Words = "snap window layout", Detail = target?.App ?? "Snap", Tile = new("snap", "Snap", "LayoutGrid") { Menu = true } });
+            { Words = "snap window layout", Detail = target?.App ?? "Snap", Tile = SnapTile });
         }
         foreach (var (verb, name, icon) in new[]
         {
@@ -148,7 +152,7 @@ public sealed class WindowLayoutsModule(Func<IReadOnlyList<SnapDisplay>>? displa
         })
         {
             commands.Add(new($"{Id}/{verb}", name, icon, () => RunAsync(target ?? throw new ActionFailure("Snap failed"), verb))
-            { Words = "snap window", Detail = target?.App ?? "Snap", Tile = new("snap", "Snap", "LayoutGrid") { Menu = true } });
+            { Words = "snap window", Detail = target?.App ?? "Snap", Tile = SnapTile });
         }
         return commands;
     }

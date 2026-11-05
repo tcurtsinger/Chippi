@@ -7,6 +7,7 @@ using System.Windows.Automation.Peers;
 using System.Windows.Automation.Provider;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Documents;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Chippi.Core.Island;
@@ -234,6 +235,53 @@ public sealed class SnapPageTests
             Find<Button>(question).Single(b => Equals(b.Content, "Delete")).RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
             Assert.True(deleted);
         });
+    }
+
+    [Fact]
+    public void TheIslandMenuPlacesTheWindowThatWasInFrontOrSaysWhyNot()
+    {
+        WpfTestThread.Run(() =>
+        {
+            Theme();
+            var f = new Fixture();
+            f.Start(Board());
+            var photos = new Chippi.Core.Actions.ActionWindow(10, 20, 30, 0, "ApplicationFrameWindow", @"C:\Fixtures\Photos.exe", "Photos", "IMG_0042.jpg", false);
+            var menu = new SnapMenu(f.Module, photos);
+            Layout(menu, 496);
+            Assert.Contains("Photos", Texts(menu));
+            Assert.Equal(6, Find<Border>(menu).Count(b => b.Child is StackPanel { Children.Count: 2 } p && p.Children[0] is Panel));
+            Assert.True(Find<Button>(menu).Single(b => System.Windows.Automation.AutomationProperties.GetName(b) == "Next monitor").IsEnabled);
+            Assert.False(Find<Button>(menu).Single(b => System.Windows.Automation.AutomationProperties.GetName(b) == "Restore").IsEnabled);
+            IslandShot(menu, "menu");
+
+            // Pressing a zone runs it; with no PC to move windows here it fails, and the line says which.
+            Find<SnapMenu.MenuZone>(menu).First(z => System.Windows.Automation.AutomationProperties.GetName(z) == "Halves: Left half").RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+            Assert.Equal("Left half failed", menu.Failure);
+            IslandShot(menu, "menu-failed");
+
+            var admin = new SnapMenu(f.Module, photos with { App = "Task Manager", Elevated = true });
+            Layout(admin, 496);
+            Assert.Contains("Task Manager runs as admin, so it can't be moved", Texts(admin));
+            Assert.All(Find<Button>(admin), b => Assert.False(b.IsEnabled));
+            IslandShot(admin, "menu-admin");
+
+            var none = new SnapMenu(f.Module, null);
+            Layout(none, 496);
+            Assert.Contains("No window to move", Texts(none));
+            f.Module.StopAsync(default).GetAwaiter().GetResult();
+        });
+    }
+
+    /// <summary>The menu as the island shows it: on the island's own fill, at its page width.</summary>
+    private static void IslandShot(FrameworkElement view, string name)
+    {
+        // The island's page body: 496 by 304 inside its 12 inset.
+        var host = new Border { Padding = new Thickness(12), Child = view, Width = 520 };
+        host.SetResourceReference(Border.BackgroundProperty, "IslandBrush");
+        host.SetResourceReference(TextElement.ForegroundProperty, "TextPrimaryBrush");
+        Shot(host, name, 520);
+        Assert.InRange(view.ActualHeight, 0, 304);
+        host.Child = null;
     }
 
     private static string Size(SnapDisplay display, double width, double height)
