@@ -124,6 +124,21 @@ public class WatchdogTests
     }
 
     [Fact]
+    public void A_program_moving_the_pointer_while_you_type_does_not_reinstall_the_mouse_hook()
+    {
+        var hub = new TestHub();
+        hub.Core.Add(new TestFilter("f", InputOrder.Triggers, InputDevices.Both));
+        for (int second = 0; second < 20; second++)
+        {
+            hub.System.Cursor = (second * 10, 0); // moved by a program: no mouse event
+            hub.Key(0x41, down: second % 2 == 0); // typing, which Windows notes as input
+            hub.Tick(1);
+        }
+
+        Assert.Equal(0, hub.Core.Reinstalls);
+    }
+
+    [Fact]
     public void Clicking_for_minutes_without_typing_never_reinstalls_a_keyboard_only_hook()
     {
         var hub = new TestHub();

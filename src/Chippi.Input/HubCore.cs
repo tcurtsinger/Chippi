@@ -402,7 +402,7 @@ internal sealed class HubCore(IHookSource hooks, IInputSender sender, IInputSyst
         _tickCursor = cursor;
         bool mouseIn = (_installed & InputDevices.Mouse) != 0;
         long lastInput = system.LastInput;
-        if (mouseIn && moved && _heardMouse <= _lastTick && lastInput > _heardMouse + Slack && _mouseSuspect == 0)
+        if (mouseIn && moved && _heardMouse <= _lastTick && lastInput > Math.Max(_heardKey, _heardMouse) + Slack && _mouseSuspect == 0)
             _mouseSuspect = now;
         if ((_installed & InputDevices.Keyboard) != 0 && _keySuspect == 0
             && lastInput > Math.Max(_heardKey, _heardMouse) + Slack && (mouseIn || system.AnyKeyDown()))
