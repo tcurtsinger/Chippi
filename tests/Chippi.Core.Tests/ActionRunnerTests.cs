@@ -40,6 +40,27 @@ public sealed class ActionRunnerTests
     }
 
     [Fact]
+    public async Task Before_island_is_read_as_each_action_runs_and_never_reads_the_pointer_or_front()
+    {
+        var pc = new FakePc { UnderPointer = 11, InFront = 22 };
+        nint before = 33;
+        var runner = new ActionRunner(pc, () => [], () => null, text => text, beforeIsland: () => before);
+
+        Assert.Equal((nint)33, runner.WindowOf(WindowTarget.BeforeIsland));
+
+        before = 55; // the island opened again, over another window
+        await runner.RunAsync(SnapLeft, WindowTarget.BeforeIsland);
+
+        before = 0; // the island opened with nothing in front
+        Assert.Equal((nint)0, runner.WindowOf(WindowTarget.BeforeIsland));
+        var failure = await Assert.ThrowsAsync<ActionFailure>(() => runner.RunAsync(SnapLeft, WindowTarget.BeforeIsland));
+        Assert.Equal("No window", failure.Message);
+
+        Assert.Equal([(55, WindowAction.SnapLeft)], pc.Windowed);
+        Assert.Equal(0, pc.WindowReads);
+    }
+
+    [Fact]
     public void Apps_count_as_missing_only_once_the_Start_menu_is_read()
     {
         var pc = new FakePc();
