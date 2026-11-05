@@ -40,7 +40,7 @@ A Windows 11 tray app for the owner's own PC (C#, .NET 10, WPF): a widget on the
 - **Widget-to-panel motion:** the widget and panel have separate layered windows. To check the handoff, capture both in the same fixed desktop region over an isolated backdrop. Sample DWM presents from before release, including several cold opens. Rendering the panel alone or holding its clock can miss a one-frame flash.
 - **Puck drag direction:** compare the native window's presented pixels and the pointer as it crosses the display midpoint in both directions. Layout alone can miss a frame where the layered window still shows its old pixels. Use an isolated desktop for the drag probe.
 - **The pet's sheets:** `--pet-sheet <dir>` and `--pet-motion <dir>` render offscreen. Seed `"islandEnabled": false` in the dev profile and nothing shows at all. `CHIPPI_PET_SHOTS=<dir>` renders the sheet from the tests.
-- **Measuring the widget's CPU while a fullscreen app holds the main display:** it hides there, so seed the dev profile's widget onto another monitor (`"islandDisplay": "specificMonitor"`, `"islandMonitorId"` the monitor's `\\?\DISPLAY#Ã¢â‚¬Â¦` path), and read the process's CPU time over 45 to 60s, three times: single readings swing by half. The owner's own puck may sit in the same corner; end the run as soon as it's read.
+- **Measuring the widget's CPU while a fullscreen app holds the main display:** it hides there, so seed the dev profile's widget onto another monitor (`"islandDisplay": "specificMonitor"`, `"islandMonitorId"` the monitor's `\\?\DISPLAY#…` path), and read the process's CPU time over 45 to 60s, three times: single readings swing by half. The owner's own puck may sit in the same corner; end the run as soon as it's read.
 
 ## Done means used, with proof
 
@@ -73,7 +73,7 @@ A Windows 11 tray app for the owner's own PC (C#, .NET 10, WPF): a widget on the
 - **Scratch:** shots, probes and review notes go in your session's own temp folder, never the repo, `X:\code` or a folder of their own, and are deleted once the PR merges. Shots the owner should see are sent to them; nothing is archived (the owner, 2026-10-31). At the end of a phase, follow `docs/end-of-phase-checklist.md`.
 - **Installers:** made with `build/pack.ps1` (`build/README.md`) in a worktree. Every file is hashed against `phase-1-release-artifacts.csv`. Refresh them when the owner is about to install or at the end of a phase, not after every merge. During the owner's active test-and-fix loop, deliver refreshed installers with the completed fixes so he can test them (the owner, 2026-11-04). Before removing the pack worktree, copy its set over `X:\code\chippi\build\artifacts\releases\<version>\` (Git ignores it) and check each file against `artifacts.csv`: only the newest set is kept.
 - **Live checks for the owner:** each step says how to make every test file, what to type and where to click.
-- **Copy:** bare-verb buttons. A confirm is a short question with Cancel and a verb. Errors read "Ã¢â‚¬Â¦ failed".
+- **Copy:** bare-verb buttons. A confirm is a short question with Cancel and a verb. Errors read "… failed".
 
 ## Keep this file current
 
