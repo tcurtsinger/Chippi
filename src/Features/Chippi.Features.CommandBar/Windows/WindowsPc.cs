@@ -29,15 +29,17 @@ public sealed class WindowsPc : IPc
     private readonly SemaphoreSlim _fileQuery = new(1, 1);
     private readonly CancellationTokenSource _stopping = new();
     private readonly TimeSpan _fileTimeout;
+    private readonly TimeProvider _timeProvider;
     private int _disposed;
 
     public WindowsPc() : this(Query) { }
 
-    internal WindowsPc(Func<string, int, CancellationToken, IReadOnlyList<FoundFile>> query, StartMenu? startMenu = null, TimeSpan? fileTimeout = null)
+    internal WindowsPc(Func<string, int, CancellationToken, IReadOnlyList<FoundFile>> query, StartMenu? startMenu = null, TimeSpan? fileTimeout = null, TimeProvider? timeProvider = null)
     {
         _query = query;
         _startMenu = startMenu ?? new();
         _fileTimeout = fileTimeout ?? TimeSpan.FromSeconds(5);
+        _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
     public IReadOnlyList<StartApp> Apps => Volatile.Read(ref _apps);
@@ -153,8 +155,8 @@ public sealed class WindowsPc : IPc
     {
         ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
         var caller = ct;
-        using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(ct, _stopping.Token);
-        lifetime.CancelAfter(_fileTimeout);
+        using var timeout = new CancellationTokenSource(_fileTimeout, _timeProvider);
+        using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(ct, _stopping.Token, timeout.Token);
         ct = lifetime.Token;
         ct.ThrowIfCancellationRequested();
         // Each word a prefix of a word in the name: "chr set" finds ChromeSetup.exe's "chromesetup", not "set" inside it.
