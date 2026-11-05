@@ -138,11 +138,7 @@ public sealed class Switcher(ISwitcherPc pc, RecentWindows recent, Func<Switcher
     }
 
     /// <summary>Closes without moving the foreground: the overlay lost it (a click elsewhere), the PC locked, or the shared pause began.</summary>
-    public void Dismiss()
-    {
-        if (Session is not null)
-            Close();
-    }
+    public void Dismiss() => Close();
 
     /// <summary>A window closed while the overlay is open.</summary>
     public void Closed(nint hwnd) => Session?.Remove(hwnd);
@@ -150,8 +146,11 @@ public sealed class Switcher(ISwitcherPc pc, RecentWindows recent, Func<Switcher
     /// <summary>The overlay closed, however it did.</summary>
     public event Action? Closing;
 
+    // Once: handing the foreground on deactivates the overlay, which dismisses it from inside Commit or Cancel.
     private void Close()
     {
+        if (Session is null)
+            return;
         Session = null;
         _view?.Hide();
         Closing?.Invoke();

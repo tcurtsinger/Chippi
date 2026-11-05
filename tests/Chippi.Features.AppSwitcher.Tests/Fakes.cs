@@ -17,6 +17,9 @@ internal sealed class FakePc : ISwitcherPc
     public readonly List<string> Calls = [];
     public readonly HashSet<nint> Closed = [];
 
+    /// <summary>Windows deactivates the overlay inside the call that hands the foreground on.</summary>
+    public Action? Deactivates;
+
     public IReadOnlyList<SwitcherWindow> Windows() => [.. Open.Where(w => !Closed.Contains(w.Handle))];
     public nint Foreground() => Front;
     public nint MonitorOf(nint hwnd) => Open.FirstOrDefault(w => w.Handle == hwnd)?.Monitor ?? 0;
@@ -35,6 +38,7 @@ internal sealed class FakePc : ISwitcherPc
     public bool Activate(SwitcherWindow window)
     {
         Calls.Add($"activate {window.Handle}");
+        Deactivates?.Invoke();
         if (RefuseSwitch)
             return false;
         Front = window.Handle;
@@ -44,6 +48,7 @@ internal sealed class FakePc : ISwitcherPc
     public void GiveBack(nint original)
     {
         Calls.Add($"give back {original}");
+        Deactivates?.Invoke();
         Front = original;
     }
 }

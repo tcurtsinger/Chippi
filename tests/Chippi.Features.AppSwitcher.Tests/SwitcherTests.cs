@@ -127,6 +127,23 @@ public sealed class SwitcherTests
     }
 
     [Fact]
+    public void Deactivated_while_handing_the_foreground_on_it_closes_once()
+    {
+        int closing = 0;
+        _switcher.Closing += () => closing++;
+        _pc.Deactivates = _switcher.Dismiss;
+        _switcher.Open(1, false);
+        _pc.Calls.Clear();
+        Assert.Equal(SwitchOutcome.Switched, _switcher.Commit());
+        Assert.Equal(["activate 2", "hide"], _pc.Calls);
+        _switcher.Open(1, false);
+        _pc.Calls.Clear();
+        _switcher.Cancel();
+        Assert.Equal(["give back 1", "hide"], _pc.Calls);
+        Assert.Equal(2, closing);
+    }
+
+    [Fact]
     public void Closing_is_raised_however_it_closes()
     {
         int closing = 0;

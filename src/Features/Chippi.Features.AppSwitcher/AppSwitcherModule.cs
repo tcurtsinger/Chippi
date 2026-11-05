@@ -52,18 +52,18 @@ public sealed class AppSwitcherModule : IFeatureModule
     private Action? _pauseListener;
     private bool _paused;
 
-    /// <param name="view">The overlay, made once on first open.</param>
-    public AppSwitcherModule(Func<Switcher, ISwitcherView> view, Func<ISwitcherPc>? pc = null, Func<IWindowEvents>? events = null,
+    /// <param name="view">The overlay, made once on first open; the app's by default.</param>
+    public AppSwitcherModule(Func<Switcher, ISwitcherView>? view = null, Func<ISwitcherPc>? pc = null, Func<IWindowEvents>? events = null,
         Func<IHotkey>? createHotkey = null)
     {
-        _view = view;
+        _view = view ?? (switcher => new Views.SwitcherOverlay(switcher));
         _createPc = pc ?? (() => new WindowsSwitcherPc());
         _createEvents = events ?? (() => new WindowsWindowEvents());
         _createHotkey = createHotkey;
     }
 
     public FeatureDescriptor Descriptor { get; } = new(Id, "App switcher", "Switch to an open window, with previews", FeatureGroup.Windows)
-    { Icon = "AppWindow", PausesInFullscreen = true };
+    { Icon = "AppWindow", PausesInFullscreen = true, Presets = PresetMembership.PowerUser };
 
     public AppSwitcherSettings Settings { get; private set; } = new();
 
