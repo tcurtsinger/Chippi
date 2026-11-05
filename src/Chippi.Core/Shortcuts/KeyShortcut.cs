@@ -15,11 +15,21 @@ public sealed record KeyShortcut(ShortcutModifiers Modifiers = ShortcutModifiers
         && (Modifiers & (ShortcutModifiers.Control | ShortcutModifiers.Alt)) != 0 && ((uint)Modifiers & ~7u) == 0
         && (Key is 0x20 or >= 0x30 and <= 0x39 or >= 0x41 and <= 0x5A or >= 0x70 and <= 0x7A);
 
+    /// <summary>
+    /// Valid as a Shortcuts binding (docs/phase-6/shortcuts.md): the Windows key may be held, and the keys include the
+    /// navigation and punctuation keys. Still needs Ctrl, Alt or Windows so a bare Shift never eats typing.
+    /// </summary>
+    public bool IsBindable => ((uint)Modifiers & ~15u) == 0
+        && (Modifiers & (ShortcutModifiers.Control | ShortcutModifiers.Alt | ShortcutModifiers.Windows)) != 0
+        && (Key is 0x08 or 0x09 or 0x0D or 0x20 or (>= 0x21 and <= 0x28) or 0x2D or 0x2E or (>= 0x30 and <= 0x39) or (>= 0x41 and <= 0x5A)
+            or (>= 0x70 and <= 0x87) or (>= 0xBA and <= 0xC0) or (>= 0xDB and <= 0xDE));
+
     public override string ToString() => string.Join("+", new[]
     {
         Modifiers.HasFlag(ShortcutModifiers.Control) ? "Ctrl" : null,
         Modifiers.HasFlag(ShortcutModifiers.Alt) ? "Alt" : null,
         Modifiers.HasFlag(ShortcutModifiers.Shift) ? "Shift" : null,
+        Modifiers.HasFlag(ShortcutModifiers.Windows) ? "Win" : null,
         KeyName(Key),
     }.Where(x => x is not null));
 

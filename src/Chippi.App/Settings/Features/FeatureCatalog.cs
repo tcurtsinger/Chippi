@@ -79,21 +79,10 @@ public static class FeatureCatalog
             Requires = [Capability.InputHooks],
             Presets = PowerUser,
         },
-        new("mouse-buttons", "Mouse button shortcuts", "Maps extra mouse buttons to actions and shortcuts", FeatureGroup.Windows)
-        {
-            Icon = "Sliders",
-            Requires = [Capability.InputHooks],
-            Presets = PowerUser,
-        },
-        new("super-key", "Super key", "Turns Caps Lock into a modifier for your own shortcuts", FeatureGroup.Windows)
+        new("shortcuts", "Shortcuts", "Binds actions to keys and mouse buttons, with clashes flagged", FeatureGroup.Windows)
         {
             Icon = "Keyboard",
             Requires = [Capability.InputHooks],
-            Presets = PowerUser,
-        },
-        new("shortcut-manager", "Shortcut manager", "Every shortcut Chippi and your apps use, with clashes flagged", FeatureGroup.Windows)
-        {
-            Icon = "Keyboard",
             Presets = PowerUser,
         },
 
