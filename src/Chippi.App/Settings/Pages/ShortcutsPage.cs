@@ -52,7 +52,10 @@ internal sealed class ShortcutsPage : UserControl
     private readonly Chippi.Features.CommandBar.Windows.WindowsPc _pc = new();
     private readonly StackPanel _page = new();
     private readonly Border _listHost = new();
-    private readonly Border _editorHost = new();
+    private StackPanel? _editorView;
+    private TextBlock _title = new();
+    private LucideIcon _titleIcon = new() { Size = 18, Margin = new Thickness(0, 0, 14, 0), VerticalAlignment = VerticalAlignment.Center };
+    private StackPanel _messagePanel = new();
     private readonly StackPanel _sections = new();
     private readonly StackPanel _confirmHost = new();
     private Border _inputRow = new();
@@ -69,9 +72,6 @@ internal sealed class ShortcutsPage : UserControl
         _recorder = new KeyRecorder(() => shell.Input);
         _page.Children.Add(SettingsUi.Header("Shortcuts", ""));
         _page.Children.Add(_listHost);
-        _editorHost.Margin = new Thickness(0, 8, 0, 0);
-        _editorHost.Visibility = Visibility.Collapsed;
-        _page.Children.Add(_editorHost);
         _page.Children.Add(_sections);
         Content = _page;
         void Changed() => Dispatcher.BeginInvoke(RebuildLists);
@@ -167,6 +167,8 @@ internal sealed class ShortcutsPage : UserControl
     private void RebuildLists()
     {
         var rows = Rows().ToList();
+        if (_editorView?.Parent is Panel old)
+            old.Children.Remove(_editorView);
         var card = new Card();
         if (rows.Count == 0)
             card.Children.Add(SettingsLayout.Empty("No shortcuts yet. Add the first one."));
@@ -177,7 +179,9 @@ internal sealed class ShortcutsPage : UserControl
             foreach (var row in group)
                 card.Children.Add(RowView(row));
         }
-        if (ModuleRuns)
+        if (_editorView is not null)
+            card.Children.Add(_editorView);
+        else if (ModuleRuns)
         {
             var add = SettingsUi.Button("Add shortcut");
             AutomationProperties.SetName(add, "Add shortcut");
@@ -280,8 +284,8 @@ internal sealed class ShortcutsPage : UserControl
     {
         StopListening();
         _edit = null;
-        _editorHost.Child = null;
-        _editorHost.Visibility = Visibility.Collapsed;
+        _editorView = null;
+        RebuildLists();
     }
 
     private void StopListening()
@@ -291,24 +295,32 @@ internal sealed class ShortcutsPage : UserControl
         if (_edit is not null) _edit.Listening = false;
     }
 
+    private const double FieldWidth = 300;
+
+    /// <summary>The editor's rows, inside the list's card: the action, the input, then the line by Save and the buttons.</summary>
     private void BuildEditor()
     {
         var edit = _edit!;
         _building = true;
-        var card = new Card();
+        var view = new StackPanel();
+        _titleIcon = new LucideIcon { Size = 18, Margin = new Thickness(0, 0, 14, 0), VerticalAlignment = VerticalAlignment.Center, Visibility = Visibility.Collapsed };
+        _titleIcon.SetResourceReference(LucideIcon.BrushProperty, "TextPrimaryBrush");
+        _title = SettingsUi.Styled(new TextBlock { VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis }, "BodyTextStyle");
         if (edit.Mode != EditMode.Chippi)
         {
-            var actionBox = new StackPanel();
+            var actionBox = new StackPanel { Width = FieldWidth };
             var otherHost = new Border { Margin = new Thickness(0, 8, 0, 0), Visibility = Visibility.Collapsed };
             var dropdown = new ActionDropdown(Items, chosen =>
             {
                 edit.Action = chosen;
                 otherHost.Visibility = Visibility.Collapsed;
+                Titled(edit);
                 RefreshSave();
             }, () =>
             {
                 edit.Action = new ChippiAction();
                 ShowOther(otherHost, edit);
+                Titled(edit);
                 RefreshSave();
             });
             if (OtherKind(edit.Action))
@@ -320,7 +332,8 @@ internal sealed class ShortcutsPage : UserControl
                 dropdown.Show(new ActionDropdown.Item("", edit.Action.Name.Length > 0 ? edit.Action.Name : ActionCatalog.NameFor(edit.Action), ActionCatalog.GlyphOf(edit.Action), edit.Action), null);
             actionBox.Children.Add(dropdown);
             actionBox.Children.Add(otherHost);
-            card.Children.Add(SettingsLayout.Row(edit.Mode == EditMode.New ? "New shortcut" : "Action", actionBox));
+            Titled(edit);
+            view.Children.Add(EditorRow(_titleIcon, _title, actionBox));
 
             var segments = SettingsUi.Segments("Input", new[] { ("Keys", BindingDoor.Key), ("Caps Lock", BindingDoor.Caps), ("Mouse button", BindingDoor.Mouse) }, edit.Door);
             segments.SelectionChanged += (_, _) =>
@@ -330,24 +343,28 @@ internal sealed class ShortcutsPage : UserControl
                 edit.Error = null;
                 Listen();
             };
-            _inputRow = new Border();
-            var dock = new DockPanel();
-            DockPanel.SetDock(segments, Dock.Left);
             segments.Margin = new Thickness(0, 0, 12, 0);
-            dock.Children.Add(segments);
-            dock.Children.Add(_inputRow);
-            card.Children.Add(new Border { Padding = SettingsLayout.RowPadding, Child = dock });
+            _inputRow = new Border { Width = FieldWidth };
+            var label = SettingsUi.Styled(new TextBlock { Text = "Input", VerticalAlignment = VerticalAlignment.Center }, "BodyTextStyle");
+            view.Children.Add(EditorRow(null, label, _inputRow, segments));
         }
         else
         {
-            card.Children.Add(SettingsLayout.Row(edit.EntryName));
-            _inputRow = new Border { Margin = new Thickness(16, 8, 16, 8) };
-            card.Children.Add(_inputRow);
+            _title.Text = edit.EntryName;
+            _titleIcon.Data = LucideIcons.Get(_shell.Shortcuts.List.FirstOrDefault(e => e.Id == edit.EntryId)?.Icon);
+            _titleIcon.Visibility = Visibility.Visible;
+            _inputRow = new Border { Width = FieldWidth };
+            view.Children.Add(EditorRow(_titleIcon, _title, _inputRow));
         }
 
+        _messagePanel = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Visibility = Visibility.Collapsed };
+        var glyph = new LucideIcon { Data = LucideIcons.TriangleAlert, Size = 14, Margin = new Thickness(0, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center };
+        glyph.SetResourceReference(LucideIcon.BrushProperty, "WarningTextBrush");
         _message = SettingsUi.Styled(new TextBlock { VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap }, "CaptionTextStyle");
         _message.SetResourceReference(TextBlock.ForegroundProperty, "WarningTextBrush");
         AutomationProperties.SetLiveSetting(_message, AutomationLiveSetting.Polite);
+        _messagePanel.Children.Add(glyph);
+        _messagePanel.Children.Add(_message);
         _save = SettingsUi.Button("Save", primary: true);
         var cancel = SettingsUi.Button("Cancel");
         _save.Click += (_, _) => Save();
@@ -358,13 +375,45 @@ internal sealed class ShortcutsPage : UserControl
         var footer = new DockPanel { Margin = SettingsLayout.RowPadding };
         DockPanel.SetDock(buttons, Dock.Right);
         footer.Children.Add(buttons);
-        footer.Children.Add(_message);
-        card.Children.Add(footer);
+        footer.Children.Add(_messagePanel);
+        view.Children.Add(footer);
 
-        _editorHost.Child = card;
-        _editorHost.Visibility = Visibility.Visible;
+        _editorView = view;
         _building = false;
+        RebuildLists();
         RebuildEditorInput();
+    }
+
+    /// <summary>The row's title: "New shortcut" until an action is chosen, then its icon and name.</summary>
+    private void Titled(Edit edit)
+    {
+        if (edit.Action.Value.Length == 0)
+        {
+            _title.Text = edit.Mode == EditMode.New ? "New shortcut" : "Action";
+            _titleIcon.Visibility = Visibility.Collapsed;
+            return;
+        }
+        _title.Text = edit.Action.Name.Length > 0 ? edit.Action.Name : ActionCatalog.NameFor(edit.Action);
+        _titleIcon.Data = LucideIcons.Get(ActionCatalog.GlyphOf(edit.Action));
+        _titleIcon.Visibility = Visibility.Visible;
+    }
+
+    /// <summary>A row in the editor: an optional icon and a title at the left, an optional switcher, and the control in the keys' column.</summary>
+    private static FrameworkElement EditorRow(FrameworkElement? icon, FrameworkElement title, FrameworkElement control, FrameworkElement? middle = null)
+    {
+        var grid = new Grid { MinHeight = SettingsLayout.RowHeight };
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(icon is null ? 0 : 32) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition());
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        if (icon is not null) { icon.HorizontalAlignment = HorizontalAlignment.Left; grid.Children.Add(icon); }
+        Grid.SetColumn(title, 1);
+        grid.Children.Add(title);
+        if (middle is not null) { Grid.SetColumn(middle, 2); middle.VerticalAlignment = VerticalAlignment.Center; grid.Children.Add(middle); }
+        Grid.SetColumn(control, 3);
+        control.VerticalAlignment = VerticalAlignment.Center;
+        grid.Children.Add(control);
+        return new Border { Padding = SettingsLayout.RowPadding, Child = grid };
     }
 
     private static bool OtherKind(ChippiAction a) => a.Value.Length > 0 && a.Kind is ActionKind.App or ActionKind.File or ActionKind.Link or ActionKind.Keys or ActionKind.Text or ActionKind.Command;
@@ -405,7 +454,7 @@ internal sealed class ShortcutsPage : UserControl
     {
         var edit = _edit;
         if (edit is null) return;
-        var field = new Border { MinHeight = 32, Padding = new Thickness(10, 4, 10, 4), CornerRadius = new CornerRadius(6), BorderThickness = new Thickness(1), HorizontalAlignment = HorizontalAlignment.Stretch };
+        var field = new Border { Width = FieldWidth, MinHeight = 32, Padding = new Thickness(10, 4, 10, 4), CornerRadius = new CornerRadius(6), BorderThickness = new Thickness(1), HorizontalAlignment = HorizontalAlignment.Stretch };
         field.SetResourceReference(Border.BorderBrushProperty, edit.Error is not null ? "WarningTextBrush" : edit.Listening ? "AccentBrush" : "BorderStrongBrush");
         var content = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
         IReadOnlyList<string> caps = edit.Door switch
@@ -430,7 +479,7 @@ internal sealed class ShortcutsPage : UserControl
         }
         field.Child = content;
         // A button, so the keyboard and UI Automation can start recording again too.
-        var press = SettingsUi.Styled(new Button { Content = field, Padding = new Thickness(0), HorizontalContentAlignment = HorizontalAlignment.Stretch }, "SubtleButtonStyle");
+        var press = SettingsUi.Styled(new Button { Content = field, Padding = new Thickness(0), HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Stretch }, "SubtleButtonStyle");
         press.Click += (_, _) => Listen();
         AutomationProperties.SetName(press, "Shortcut");
         _inputRow.Child = press;
@@ -449,6 +498,7 @@ internal sealed class ShortcutsPage : UserControl
         if (_edit is not { } edit) return;
         _save.IsEnabled = Complete(edit) && edit.Error is null;
         _message.Text = edit.Error ?? "";
+        _messagePanel.Visibility = edit.Error is null ? Visibility.Collapsed : Visibility.Visible;
     }
 
     private void Listen()

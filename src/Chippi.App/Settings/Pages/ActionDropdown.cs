@@ -33,13 +33,13 @@ internal sealed class ActionDropdown : Button
         _chosen = chosen;
         _other = other;
         SettingsUi.Styled(this, "SecondaryButtonStyle");
-        MinWidth = 300;
+        Width = 300;
         HorizontalContentAlignment = HorizontalAlignment.Left;
         AutomationProperties.SetName(this, "Choose an action");
         _icon.SetResourceReference(LucideIcon.BrushProperty, "TextPrimaryBrush");
         var chevron = new LucideIcon { Data = LucideIcons.ChevronDown, Size = 14, Margin = new Thickness(12, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
         chevron.SetResourceReference(LucideIcon.BrushProperty, "TextSecondaryBrush");
-        var dock = new DockPanel { LastChildFill = true };
+        var dock = new DockPanel { LastChildFill = true, Width = 268, HorizontalAlignment = HorizontalAlignment.Left };
         DockPanel.SetDock(chevron, Dock.Right);
         dock.Children.Add(chevron);
         DockPanel.SetDock(_icon, Dock.Left);
