@@ -160,6 +160,12 @@ public sealed class ModuleTests
         await dimmed.StartAsync();
         Assert.Equal(ShortcutsModule.WindowsText, dimmed.Module.Change(windows with { Keys = windows.Keys }).Error);
 
+        var paused = new Rig(new ShortcutsSettings { Bindings = [saved] });
+        paused.Hub.Paused = true; // a game in front: the keys are let go, the row stays
+        await paused.StartAsync();
+        paused.Registrar.Refused.Add(keys); // and another app takes them meanwhile
+        Assert.Equal(ShortcutsModule.AnotherAppText, paused.Module.Change(saved with { Keys = keys }).Error);
+
         var held = new Rig(new ShortcutsSettings { Bindings = [saved] });
         await held.StartAsync();
         Assert.Equal(BindingState.Active, held.Module.StatusOf(saved.Id).State);

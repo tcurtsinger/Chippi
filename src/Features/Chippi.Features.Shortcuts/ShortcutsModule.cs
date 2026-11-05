@@ -35,6 +35,9 @@ public sealed class ShortcutsModule : IFeatureModule
     {
         public ShortcutBinding Binding = binding;
         public IHotkey? Hotkey;
+
+        /// <summary>Windows gave Chippi the keys: false while paused, refused or reserved.</summary>
+        public bool Held;
         public BindingStatus Status = new(BindingState.Active);
     }
 
@@ -174,9 +177,9 @@ public sealed class ShortcutsModule : IFeatureModule
         var keys = binding.Keys!;
         if (WindowsKeys.IsReserved(keys))
             return WindowsText;
-        // Its own keys, unchanged, and still held by Chippi: nothing to ask. A row dimmed because another app or
-        // Windows took the keys isn't held, so recording them again runs the check and says who has them.
-        if (except is not null && _slots.FirstOrDefault(s => s.Binding.Id == except) is { Binding: { Door: BindingDoor.Key } own, Status.State: BindingState.Active }
+        // Its own keys, unchanged, and held by Chippi right now: nothing to ask. A row dimmed because another app or
+        // Windows took the keys, or paused in a game, isn't held, so recording them again runs the check and says who has them.
+        if (except is not null && _slots.FirstOrDefault(s => s.Binding.Id == except) is { Binding: { Door: BindingDoor.Key } own, Held: true }
             && own.Keys == keys)
             return null;
         // Windows says only whether the keys were free: ask it, and let go at once.
@@ -268,7 +271,10 @@ public sealed class ShortcutsModule : IFeatureModule
             if (paused)
                 continue;
             if (slot.Hotkey.Register(keys, () => RunBinding(binding.Id, host, WindowTarget.InFront)))
+            {
+                slot.Held = true;
                 continue;
+            }
             if (slot.Hotkey.Error is { } error && error != ShortcutService.InUse)
                 slot.Status = new BindingStatus(BindingState.UsedTwice, error); // another Chippi feature: never taken from it
             else
