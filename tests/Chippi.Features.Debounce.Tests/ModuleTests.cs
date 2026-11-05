@@ -89,7 +89,7 @@ public sealed class ModuleTests
             Assert.Contains(Find<TextBlock>(keyboard), t => t.Text == "Space");
             Shot(keyboard, "keyboard-on");
             var remove = Find<Button>(keyboard).First(b => b.Content as string == "Remove");
-            ((IInvokeProvider)UIElementAutomationPeer.CreatePeerForElement(remove)).Invoke();
+            remove.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
             Assert.Single(store.Value.Keys);
             module.StopAsync(default).GetAwaiter().GetResult();
         });

@@ -128,7 +128,7 @@ public sealed class DebounceRows : UserControl
         foreach (var key in keys)
         {
             var captured = key;
-            var slider = TimeSlider($"Debounce time for {Name(key.Vk)}", DebounceSettings.KeyMinMs, DebounceSettings.KeyMaxMs, out var value);
+            var slider = TimeSlider($"Debounce time for {KeyName(key.Vk)}", DebounceSettings.KeyMinMs, DebounceSettings.KeyMaxMs, out var value);
             slider.Value = key.Ms;
             value.Text = $"{key.Ms} ms";
             slider.ValueChanged += (_, e) =>
@@ -140,10 +140,12 @@ public sealed class DebounceRows : UserControl
             };
             var remove = new Button { Content = "Remove", Margin = new Thickness(12, 0, 0, 0) };
             remove.SetResourceReference(StyleProperty, "SecondaryButtonStyle");
-            AutomationProperties.SetName(remove, $"Remove {Name(key.Vk)}");
+            AutomationProperties.SetName(remove, $"Remove {KeyName(key.Vk)}");
             remove.Click += (_, _) => Save(s => s with { Keys = [.. s.Keys.Where(k => k.Vk != captured.Vk)] });
-            var cap = new Border { Child = new TextBlock { Text = Name(key.Vk) }, Padding = new Thickness(8, 2, 8, 2), CornerRadius = new CornerRadius(4), BorderThickness = new Thickness(1) };
-            cap.SetResourceReference(Border.BorderBrushProperty, "DividerBrush");
+            var capText = new TextBlock { Text = KeyName(key.Vk), VerticalAlignment = VerticalAlignment.Center };
+            capText.SetResourceReference(TextBlock.ForegroundProperty, "TextPrimaryBrush");
+            var cap = new Border { Child = capText, Padding = new Thickness(8, 2, 8, 2), CornerRadius = new CornerRadius(4), BorderThickness = new Thickness(1), VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Left };
+            cap.SetResourceReference(Border.BorderBrushProperty, "BorderStrongBrush");
             _keys.Children.Add(Dependent(null, Pair(slider, value, remove), cap));
         }
     }
@@ -168,7 +170,7 @@ public sealed class DebounceRows : UserControl
         }
     }
 
-    internal static string Name(uint vk) => KeyInterop.KeyFromVirtualKey((int)vk) switch
+    internal static string KeyName(uint vk) => KeyInterop.KeyFromVirtualKey((int)vk) switch
     {
         Key.None => $"Key {vk}",
         var k => k.ToString(),
@@ -207,6 +209,7 @@ public sealed class DebounceRows : UserControl
             label.SetResourceReference(StyleProperty, "BodyTextStyle");
             left = label;
         }
+        if (left is FrameworkElement fe) fe.VerticalAlignment = VerticalAlignment.Center;
         dock.Children.Add(left);
         return new Border { MinHeight = SettingsLayout.RowHeight, Padding = SettingsLayout.DependentPadding, Child = dock };
     }

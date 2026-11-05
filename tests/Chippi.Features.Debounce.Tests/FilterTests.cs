@@ -192,4 +192,44 @@ public class FilterTests
         Assert.Equal(InputDevices.Mouse, new ClickDebounceFilter().Devices);
         Assert.Equal(InputDevices.Keyboard, new KeyDebounceFilter().Devices);
     }
+
+    [Fact]
+    public void Each_event_costs_microseconds()
+    {
+        // The filters answer from memory. Time 200,000 events each, a stopwatch read around every call.
+        var click = new ClickDebounceFilter();
+        var key = new KeyDebounceFilter();
+        key.SetOwn([(E, 30)]);
+        var clickTicks = new long[200_000];
+        var keyTicks = new long[200_000];
+        for (int i = 0; i < 200_000; i++)
+        {
+            var down = i % 2 == 0;
+            var m = Click(down ? MouseKind.Down : MouseKind.Up, i * 40L);
+            long t0 = Stopwatch.GetTimestamp();
+            click.Mouse(m);
+            clickTicks[i] = Stopwatch.GetTimestamp() - t0;
+            var k = Key(down, i * 40L, (uint)(0x41 + i % 26));
+            t0 = Stopwatch.GetTimestamp();
+            key.Key(k);
+            keyTicks[i] = Stopwatch.GetTimestamp() - t0;
+        }
+        double ClickP99() => Percentile(clickTicks, 0.99);
+        double KeyP99() => Percentile(keyTicks, 0.99);
+        if (Environment.GetEnvironmentVariable("CHIPPI_ISLAND_SHOTS") is { Length: > 0 } folder)
+        {
+            System.IO.Directory.CreateDirectory(folder);
+            System.IO.File.WriteAllText(System.IO.Path.Combine(folder, "debounce-filter-cost.txt"),
+                $"Click filter, 200000 events: median {Percentile(clickTicks, 0.5):F3} us, p99 {ClickP99():F3} us, p99.9 {Percentile(clickTicks, 0.999):F3} us.\n" +
+                $"Key filter, 200000 events: median {Percentile(keyTicks, 0.5):F3} us, p99 {KeyP99():F3} us, p99.9 {Percentile(keyTicks, 0.999):F3} us.\n");
+        }
+        Assert.True(ClickP99() < 50 && KeyP99() < 50, $"click p99 {ClickP99():F2} us, key p99 {KeyP99():F2} us");
+    }
+
+    private static double Percentile(long[] ticks, double p)
+    {
+        var sorted = (long[])ticks.Clone();
+        Array.Sort(sorted);
+        return sorted[(int)(p * (sorted.Length - 1))] * 1_000_000.0 / Stopwatch.Frequency;
+    }
 }
