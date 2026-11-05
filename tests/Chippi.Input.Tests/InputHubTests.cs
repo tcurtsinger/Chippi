@@ -40,6 +40,21 @@ public class InputHubTests
     }
 
     [Fact]
+    public void Rules_set_before_the_hub_starts_and_after_reach_it_and_a_listener_can_start_it()
+    {
+        using var hub = new InputHub();
+        hub.Rules = new PauseRules(AlwaysOn: true, []); // the shell sets them before anything starts the thread
+        int changes = 0;
+        hub.PauseChanged += () => changes++; // starts the thread, which reads the window in front
+
+        hub.Rules = new PauseRules(AlwaysOn: true, [@"C:\Games\Game.exe"]);
+
+        Assert.False(hub.Paused); // Always on: never paused, whatever is in front
+        Assert.Equal([@"C:\Games\Game.exe"], hub.Rules.Apps);
+        Assert.InRange(changes, 0, 1); // one, only if the owner's window in front counts as fullscreen
+    }
+
+    [Fact]
     public void Two_hubs_in_one_process_each_get_their_own_window()
     {
         using var first = new InputHub();

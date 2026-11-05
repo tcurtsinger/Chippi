@@ -13,12 +13,15 @@ using Microsoft.Win32;
 
 namespace Chippi.App.Settings.Pages;
 
-/// <summary>General: theme, accent, reduce motion, run at startup, and settings export and import (brief §4.5).</summary>
+/// <summary>General: theme, accent, reduce motion, run at startup, Fullscreen apps (Phase 6), and settings export and import (brief §4.5).</summary>
 internal sealed class GeneralPage : UserControl
 {
     private readonly ShellContext _shell;
     private TextBlock _transferMessage = null!;
     private StackPanel _importConfirm = null!;
+
+    /// <summary>Fullscreen apps: Always on and Pause in these apps, once a Phase 6 input feature is installed.</summary>
+    internal FullscreenAppsSection FullscreenApps { get; private set; } = null!;
 
     public GeneralPage(ShellContext shell)
     {
@@ -45,6 +48,7 @@ internal sealed class GeneralPage : UserControl
             }
         };
         page.Children.Add(SettingsUi.Group(SettingsUi.Row("Theme", "", theme), AccentRow(), MotionRow(), StartupRow()));
+        page.Children.Add(FullscreenApps = new FullscreenAppsSection(_shell));
 
         page.Children.Add(SettingsUi.Section("Settings file"));
         page.Children.Add(SettingsUi.Group(TransferRow()));

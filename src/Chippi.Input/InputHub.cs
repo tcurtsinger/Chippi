@@ -37,6 +37,7 @@ public sealed class InputHub : IInputHub, IDisposable
     private PauseRules _rules = PauseRules.Default;
     private volatile bool _paused, _fullscreen;
     private Action? _pauseChanged;
+    private readonly Lock _listeners = new(); // not _gate: Start holds that while the hub's thread raises its first change
 
     // Kept alive while Windows holds them.
     private readonly Native.HookProc _keyProc, _mouseProc;
@@ -78,13 +79,13 @@ public sealed class InputHub : IInputHub, IDisposable
     {
         add
         {
-            lock (_gate)
+            lock (_listeners)
                 _pauseChanged += value;
             Invoke(_ => 0); // the hub watches the window in front from its thread
         }
         remove
         {
-            lock (_gate)
+            lock (_listeners)
                 _pauseChanged -= value;
         }
     }
@@ -181,6 +182,7 @@ public sealed class InputHub : IInputHub, IDisposable
     {
         var ready = new ManualResetEventSlim();
         Exception? failed = null;
+        var rules = _rules; // the caller holds _gate
         var thread = new Thread(() =>
         {
             try
@@ -188,8 +190,7 @@ public sealed class InputHub : IInputHub, IDisposable
                 _core = new HubCore(new Hooks(this), new Sender(), new WindowsSystem(), _log);
                 _core.RequestUpdate = () => Native.PostMessage(_window, WmUpdate, 0, 0);
                 _core.PauseChanged = OnPauseChanged;
-                lock (_gate)
-                    _core.Rules = _rules;
+                _core.Rules = rules;
                 _window = Native.CreateMessageWindow(_windowProc);
                 Native.SetTimer(_window, 1, 1000, 0);
                 Native.WTSRegisterSessionNotification(_window, 0);
@@ -283,7 +284,7 @@ public sealed class InputHub : IInputHub, IDisposable
         _paused = _core!.Paused;
         _fullscreen = _core.FullscreenInFront;
         Action? listeners;
-        lock (_gate)
+        lock (_listeners)
             listeners = _pauseChanged;
         if (listeners is null)
             return;
