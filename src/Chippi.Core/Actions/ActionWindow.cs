@@ -7,6 +7,28 @@ namespace Chippi.Core.Actions;
 public sealed record ActionWindow(nint Handle, uint ProcessId, uint ThreadId, long ProcessStarted,
     string ClassName, string Executable, string App, string Title, bool Elevated, long Lifetime = 0);
 
+/// <summary>Where a window lands on another display (Snap's Next monitor, the App switcher). Physical pixels.</summary>
+public static class DisplayMove
+{
+    /// <summary>
+    /// Keeps the window's place relative to the work area, scaled to the other one's size, never grown, and fitted inside it.
+    /// <paramref name="window"/> is the visible frame; the work areas are (Left, Top, Width, Height).
+    /// </summary>
+    public static (int Left, int Top, int Width, int Height) Fit((int Left, int Top, int Width, int Height) window,
+        (int Left, int Top, int Width, int Height) from, (int Left, int Top, int Width, int Height) to)
+    {
+        if (from.Width <= 0 || from.Height <= 0 || to.Width <= 0 || to.Height <= 0)
+            throw new ArgumentException("Display removed");
+        double sx = (double)to.Width / from.Width, sy = (double)to.Height / from.Height;
+        double fit = Math.Min(1, Math.Min(sx, sy));
+        int width = Math.Max(1, Math.Min(to.Width, (int)Math.Round(window.Width * fit)));
+        int height = Math.Max(1, Math.Min(to.Height, (int)Math.Round(window.Height * fit)));
+        int x = Math.Clamp(to.Left + (int)Math.Round((window.Left - from.Left) * sx), to.Left, to.Left + to.Width - width);
+        int y = Math.Clamp(to.Top + (int)Math.Round((window.Top - from.Top) * sy), to.Top, to.Top + to.Height - height);
+        return (x, y, width, height);
+    }
+}
+
 /// <summary>A named zone's fractions of a monitor work area. Gaps are physical pixels.</summary>
 public sealed record WindowZone(double X, double Y, double Width, double Height, int WindowGap, int ScreenEdgeGap)
 {

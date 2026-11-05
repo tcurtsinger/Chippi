@@ -57,7 +57,7 @@ public sealed class AppSwitcherModule : IFeatureModule
         Func<IHotkey>? createHotkey = null)
     {
         _view = view ?? (switcher => new Views.SwitcherOverlay(switcher, this));
-        _createPc = pc ?? (() => new WindowsSwitcherPc());
+        _createPc = pc ?? (() => new WindowsSwitcherPc(_context?.Actions));
         _createEvents = events ?? (() => new WindowsWindowEvents());
         _createHotkey = createHotkey;
     }

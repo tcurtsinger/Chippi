@@ -47,15 +47,61 @@ public sealed class SwitcherTests
     }
 
     [Fact]
-    public void Commit_activates_while_the_overlay_holds_the_foreground_then_hides_it()
+    public void Commit_brings_a_window_from_another_display_then_activates_it_while_the_overlay_holds_the_foreground()
     {
         _switcher.Open(1, false);
         _pc.Calls.Clear();
         Assert.Equal(SwitchOutcome.Switched, _switcher.Commit());
-        Assert.Equal(["activate 2", "hide"], _pc.Calls);
+        Assert.Equal(["bring 2 to 1", "activate 2", "hide"], _pc.Calls);
         Assert.Equal(2, _pc.Front);
+        Assert.Equal(1, _pc.MonitorOf(2));
         Assert.False(_switcher.IsOpen);
         Assert.Equal(SwitchOutcome.None, _switcher.Commit());
+    }
+
+    [Fact]
+    public void A_window_already_on_the_switchers_display_is_only_activated()
+    {
+        _pc.Open[1] = _pc.Open[1] with { Monitor = 1 };
+        _switcher.Open(1, false);
+        _pc.Calls.Clear();
+        Assert.Equal(SwitchOutcome.Switched, _switcher.Commit());
+        Assert.Equal(["activate 2", "hide"], _pc.Calls);
+    }
+
+    [Fact]
+    public void A_window_that_stays_put_is_still_activated_with_nothing_said()
+    {
+        _pc.RefuseMove = true; // fullscreen, admin, or it refused
+        _switcher.Open(1, false);
+        _pc.Calls.Clear();
+        Assert.Equal(SwitchOutcome.Switched, _switcher.Commit());
+        Assert.Equal(["bring 2 to 1", "activate 2", "hide"], _pc.Calls);
+        Assert.Null(_view.Failed);
+        Assert.Equal(2, _pc.MonitorOf(2));
+    }
+
+    [Fact]
+    public void A_minimized_window_on_another_display_is_brought_before_it_is_restored()
+    {
+        _pc.Open[2] = W(3, "Code", monitor: 2, minimized: true);
+        _switcher.Open(1, false);
+        _switcher.Session!.Select(2);
+        _pc.Calls.Clear();
+        Assert.Equal(SwitchOutcome.Switched, _switcher.Commit());
+        Assert.Equal(["bring 3 to 1", "activate 3", "hide"], _pc.Calls);
+    }
+
+    [Fact]
+    public void Opened_on_the_pointers_display_it_brings_windows_there()
+    {
+        _pc.Open[1] = _pc.Open[1] with { Monitor = 1 };
+        _pc.Front = 0;
+        _switcher.Open(0, false); // the pointer is on display 2
+        nint picked = _switcher.Session!.Selection!.Handle;
+        _pc.Calls.Clear();
+        _switcher.Commit();
+        Assert.Equal([$"bring {picked} to 2", $"activate {picked}", "hide"], _pc.Calls);
     }
 
     [Fact]
@@ -93,7 +139,7 @@ public sealed class SwitcherTests
         _pc.RefuseSwitch = true;
         _pc.Calls.Clear();
         Assert.Equal(SwitchOutcome.Failed, _switcher.Commit());
-        Assert.Equal(["activate 2"], _pc.Calls);
+        Assert.Equal(["bring 2 to 1", "activate 2"], _pc.Calls);
         Assert.Equal(2, _view.Failed!.Handle);
         Assert.True(_switcher.IsOpen);
     }
@@ -135,7 +181,7 @@ public sealed class SwitcherTests
         _switcher.Open(1, false);
         _pc.Calls.Clear();
         Assert.Equal(SwitchOutcome.Switched, _switcher.Commit());
-        Assert.Equal(["activate 2", "hide"], _pc.Calls);
+        Assert.Equal(["bring 2 to 1", "activate 2", "hide"], _pc.Calls);
         _switcher.Open(1, false);
         _pc.Calls.Clear();
         _switcher.Cancel();
