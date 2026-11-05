@@ -181,17 +181,11 @@ internal sealed class ShortcutsPage : UserControl
         {
             var add = SettingsUi.Button("Add shortcut");
             AutomationProperties.SetName(add, "Add shortcut");
-            add.Click += (_, _) => StartEdit(new Edit { Mode = EditMode.New, Door = BindingDoor.Key, Action = FirstAction() });
+            add.Click += (_, _) => StartEdit(new Edit { Mode = EditMode.New, Door = BindingDoor.Key, Action = new ChippiAction() });
             string count = rows.Count == 1 ? "1 shortcut" : $"{rows.Count} shortcuts";
             card.Children.Add(SettingsLayout.Row(count, add));
         }
         _listHost.Child = card;
-    }
-
-    private static ChippiAction FirstAction()
-    {
-        var first = ActionCatalog.Window[0];
-        return new ChippiAction { Kind = ActionKind.Window, Value = first.Action.ToString(), Name = first.Name };
     }
 
     private FrameworkElement RowView(Row row)
@@ -304,16 +298,29 @@ internal sealed class ShortcutsPage : UserControl
         var card = new Card();
         if (edit.Mode != EditMode.Chippi)
         {
-            var picker = new ActionPicker(new ActionPickerSource
+            var actionBox = new StackPanel();
+            var otherHost = new Border { Margin = new Thickness(0, 8, 0, 0), Visibility = Visibility.Collapsed };
+            var dropdown = new ActionDropdown(Items, chosen =>
             {
-                Apps = () => [.. _pc.Apps.Select(a => (a.ParsingName, a.Name))],
-                Commands = () => [.. _shell.Registry.Commands().Where(c => c.Kind != ChippiCommandKind.Paste)],
-                SettingsPages = [.. SettingsPages.All.Select(p => (p.Uri, p.Name))],
-                Recorder = _recorder,
+                edit.Action = chosen;
+                otherHost.Visibility = Visibility.Collapsed;
+                RefreshSave();
+            }, () =>
+            {
+                edit.Action = new ChippiAction();
+                ShowOther(otherHost, edit);
+                RefreshSave();
             });
-            picker.Show(edit.Action);
-            picker.Changed += (action, _) => { edit.Action = action; RefreshSave(); };
-            card.Children.Add(SettingsLayout.Row(edit.Mode == EditMode.New ? "New shortcut" : "Action", picker));
+            if (OtherKind(edit.Action))
+            {
+                dropdown.Show(null, "Other…");
+                ShowOther(otherHost, edit);
+            }
+            else if (edit.Action.Value.Length > 0)
+                dropdown.Show(new ActionDropdown.Item("", edit.Action.Name.Length > 0 ? edit.Action.Name : ActionCatalog.NameFor(edit.Action), ActionCatalog.GlyphOf(edit.Action), edit.Action), null);
+            actionBox.Children.Add(dropdown);
+            actionBox.Children.Add(otherHost);
+            card.Children.Add(SettingsLayout.Row(edit.Mode == EditMode.New ? "New shortcut" : "Action", actionBox));
 
             var segments = SettingsUi.Segments("Input", new[] { ("Keys", BindingDoor.Key), ("Caps Lock", BindingDoor.Caps), ("Mouse button", BindingDoor.Mouse) }, edit.Door);
             segments.SelectionChanged += (_, _) =>
@@ -360,6 +367,40 @@ internal sealed class ShortcutsPage : UserControl
         RebuildEditorInput();
     }
 
+    private static bool OtherKind(ChippiAction a) => a.Kind is ActionKind.App or ActionKind.File or ActionKind.Link or ActionKind.Keys or ActionKind.Text or ActionKind.Command;
+
+    private void ShowOther(Border host, Edit edit)
+    {
+        var picker = new ActionPicker(new ActionPickerSource
+        {
+            Apps = () => [.. _pc.Apps.Select(a => (a.ParsingName, a.Name))],
+            Commands = () => [.. _shell.Registry.Commands().Where(c => c.Kind != ChippiCommandKind.Paste)],
+            SettingsPages = [.. SettingsPages.All.Select(p => (p.Uri, p.Name))],
+            Recorder = _recorder,
+        });
+        picker.Show(edit.Action);
+        picker.Changed += (action, _) => { edit.Action = action; RefreshSave(); };
+        host.Child = picker;
+        host.Visibility = Visibility.Visible;
+    }
+
+    /// <summary>The dropdown's actions, grouped: Window, Media, Selected text, Chippi and Settings page.</summary>
+    private IReadOnlyList<ActionDropdown.Item> Items()
+    {
+        var items = new List<ActionDropdown.Item>();
+        foreach (var (action, name, glyph) in ActionCatalog.Window)
+            items.Add(new("Window", name, glyph, new ChippiAction { Kind = ActionKind.Window, Value = action.ToString(), Name = name }));
+        foreach (var (action, name, glyph) in ActionCatalog.Media)
+            items.Add(new("Media", name, glyph, new ChippiAction { Kind = ActionKind.Media, Value = action.ToString(), Name = name }));
+        foreach (var (action, name, glyph) in ActionCatalog.Selection)
+            items.Add(new("Selected text", name, glyph, new ChippiAction { Kind = ActionKind.Selection, Value = action.ToString(), Name = name }));
+        foreach (var c in _shell.Registry.Commands().Where(c => c.Kind != ChippiCommandKind.Paste))
+            items.Add(new("Chippi", c.Name, c.Icon, new ChippiAction { Kind = ActionKind.Chippi, Value = c.Key, Name = c.Name }));
+        foreach (var p in SettingsPages.All)
+            items.Add(new("Settings page", p.Name, "Settings", new ChippiAction { Kind = ActionKind.SettingsPage, Value = p.Uri, Name = p.Name }));
+        return items;
+    }
+
     private void RebuildEditorInput()
     {
         var edit = _edit;
@@ -394,7 +435,7 @@ internal sealed class ShortcutsPage : UserControl
         RefreshSave();
     }
 
-    private static bool Complete(Edit e) => e.Door switch
+    private static bool Complete(Edit e) => (e.Mode == EditMode.Chippi || e.Action.Value.Length > 0) && e.Door switch
     {
         BindingDoor.Key => e.Keys is not null,
         BindingDoor.Caps => e.CapsKey != 0,
@@ -531,6 +572,7 @@ internal sealed class ShortcutsPage : UserControl
         tap.SelectionChanged += (_, _) => { if (tap.SelectedItem is ComboBoxItem { Tag: CapsTap t } && t != s.CapsTap) Caps(tapAction: t); };
         var combos = new Card();
         combos.Children.Add(SettingsLayout.Row("Caps Lock combos", capsSwitch, _module.CapsError));
+        ((SettingRow)combos.Children[0]).Icon = LucideIcons.ArrowUp;
         combos.Children.Add(Dependent("Key to hold", held));
         combos.Children.Add(Dependent("Acts as", acts));
         combos.Children.Add(Dependent("Tap on its own", tap));
@@ -543,7 +585,9 @@ internal sealed class ShortcutsPage : UserControl
         var mouse = SettingsUi.Switch(s.MouseEnabled);
         AutomationProperties.SetName(mouse, "Mouse buttons");
         SettingsUi.OnSwitched(mouse, on => _module.SetMouseEnabled(on));
-        _sections.Children.Add(SettingsLayout.Card(SettingsLayout.Row("Mouse buttons", mouse, _module.MouseError)));
+        var mouseRow = SettingsLayout.Row("Mouse buttons", mouse, _module.MouseError);
+        mouseRow.Icon = LucideIcons.Mouse;
+        _sections.Children.Add(SettingsLayout.Card(mouseRow));
         _sections.Children.Add(new ExcludedAppsCard(() => _module.Settings.MouseIgnoredApps, apps => _module.SetMouseIgnoredApps(apps)) { Margin = new Thickness(0, 8, 0, 0) });
     }
 
