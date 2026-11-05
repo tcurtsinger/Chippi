@@ -131,6 +131,22 @@ internal sealed class SettingsController
                                 _window.Height = 1300;
                                 await Idle();
                                 Render(_window, System.IO.Path.Combine(directory, $"r6-shortcuts-narrow-{name}-{accent}.png"));
+                                // The editor's states, at full and narrow width, without recording.
+                                if (Descendants<Pages.ShortcutsPage>(_window).FirstOrDefault() is { } shortcutsPage)
+                                {
+                                    foreach (var (w, size) in new[] { (width, "full"), (860.0, "narrow") })
+                                    {
+                                        _window.Width = w;
+                                        _window.Height = 1300;
+                                        foreach (string state in new[] { "new", "listening", "caps", "ready", "refused" })
+                                        {
+                                            shortcutsPage.ShowEditorForShot(state);
+                                            await Idle();
+                                            Render(_window, System.IO.Path.Combine(directory, $"r6-editor-{state}-{size}-{name}-{accent}.png"));
+                                        }
+                                    }
+                                    shortcutsPage.ShowEditorForShot(null);
+                                }
                                 _window.Width = width;
                                 _window.Height = height;
                             }

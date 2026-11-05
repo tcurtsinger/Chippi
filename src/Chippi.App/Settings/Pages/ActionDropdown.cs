@@ -27,19 +27,19 @@ internal sealed class ActionDropdown : Button
     private readonly LucideIcon _icon = new() { Size = 16, Margin = new Thickness(0, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center };
     private Popup? _popup;
 
-    public ActionDropdown(Func<IReadOnlyList<Item>> items, Action<ChippiAction> chosen, Action other)
+    public ActionDropdown(Func<IReadOnlyList<Item>> items, Action<ChippiAction> chosen, Action other, double width = 300)
     {
         _items = items;
         _chosen = chosen;
         _other = other;
         SettingsUi.Styled(this, "SecondaryButtonStyle");
-        Width = 300;
+        Width = width;
         HorizontalContentAlignment = HorizontalAlignment.Left;
         AutomationProperties.SetName(this, "Choose an action");
         _icon.SetResourceReference(LucideIcon.BrushProperty, "TextPrimaryBrush");
         var chevron = new LucideIcon { Data = LucideIcons.ChevronDown, Size = 14, Margin = new Thickness(12, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
         chevron.SetResourceReference(LucideIcon.BrushProperty, "TextSecondaryBrush");
-        var dock = new DockPanel { LastChildFill = true, Width = 268, HorizontalAlignment = HorizontalAlignment.Left };
+        var dock = new DockPanel { LastChildFill = true, Width = width - 32, HorizontalAlignment = HorizontalAlignment.Left };
         DockPanel.SetDock(chevron, Dock.Right);
         dock.Children.Add(chevron);
         DockPanel.SetDock(_icon, Dock.Left);

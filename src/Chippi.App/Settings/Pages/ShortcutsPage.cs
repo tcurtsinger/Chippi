@@ -26,6 +26,9 @@ internal sealed class ShortcutsPage : UserControl
 {
     private static readonly string[] GroupOrder = ["Chippi", "Window", "Media", "Text", "App", "Keys", "Command", "Selection", "Settings"];
     private const double KeysColumn = 300;
+    private const double OptionsColumn = 44;
+    /// <summary>The editor's fields span the keys' and options' columns, so they start where the keycaps do.</summary>
+    private const double FieldWidth = KeysColumn + OptionsColumn;
 
     private enum EditMode { New, Binding, Chippi }
 
@@ -198,7 +201,7 @@ internal sealed class ShortcutsPage : UserControl
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(32) });
         grid.ColumnDefinitions.Add(new ColumnDefinition());
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(KeysColumn) });
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(44) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(OptionsColumn) });
         var icon = new LucideIcon { Data = LucideIcons.Get(row.Icon), Size = 18, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center };
         icon.SetResourceReference(LucideIcon.BrushProperty, "TextPrimaryBrush");
         var name = SettingsUi.Styled(new TextBlock { Text = row.Name, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis }, "BodyTextStyle");
@@ -295,20 +298,19 @@ internal sealed class ShortcutsPage : UserControl
         if (_edit is not null) _edit.Listening = false;
     }
 
-    private const double FieldWidth = 300;
-
     /// <summary>The editor's rows, inside the list's card: the action, the input, then the line by Save and the buttons.</summary>
     private void BuildEditor()
     {
         var edit = _edit!;
         _building = true;
         var view = new StackPanel();
+        view.SetResourceReference(Panel.BackgroundProperty, "HoverBrush");
         _titleIcon = new LucideIcon { Size = 18, Margin = new Thickness(0, 0, 14, 0), VerticalAlignment = VerticalAlignment.Center, Visibility = Visibility.Collapsed };
         _titleIcon.SetResourceReference(LucideIcon.BrushProperty, "TextPrimaryBrush");
         _title = SettingsUi.Styled(new TextBlock { VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis }, "BodyTextStyle");
         if (edit.Mode != EditMode.Chippi)
         {
-            var actionBox = new StackPanel { Width = FieldWidth };
+            var actionBox = new StackPanel();
             var otherHost = new Border { Margin = new Thickness(0, 8, 0, 0), Visibility = Visibility.Collapsed };
             var dropdown = new ActionDropdown(Items, chosen =>
             {
@@ -322,7 +324,7 @@ internal sealed class ShortcutsPage : UserControl
                 ShowOther(otherHost, edit);
                 Titled(edit);
                 RefreshSave();
-            });
+            }, FieldWidth);
             if (OtherKind(edit.Action))
             {
                 dropdown.Show(null, "Other…");
@@ -344,7 +346,7 @@ internal sealed class ShortcutsPage : UserControl
                 Listen();
             };
             segments.Margin = new Thickness(0, 0, 12, 0);
-            _inputRow = new Border { Width = FieldWidth };
+            _inputRow = new Border();
             var label = SettingsUi.Styled(new TextBlock { Text = "Input", VerticalAlignment = VerticalAlignment.Center }, "BodyTextStyle");
             view.Children.Add(EditorRow(null, label, _inputRow, segments));
         }
@@ -353,14 +355,14 @@ internal sealed class ShortcutsPage : UserControl
             _title.Text = edit.EntryName;
             _titleIcon.Data = LucideIcons.Get(_shell.Shortcuts.List.FirstOrDefault(e => e.Id == edit.EntryId)?.Icon);
             _titleIcon.Visibility = Visibility.Visible;
-            _inputRow = new Border { Width = FieldWidth };
+            _inputRow = new Border();
             view.Children.Add(EditorRow(_titleIcon, _title, _inputRow));
         }
 
         _messagePanel = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Visibility = Visibility.Collapsed };
-        var glyph = new LucideIcon { Data = LucideIcons.TriangleAlert, Size = 14, Margin = new Thickness(0, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center };
+        var glyph = new LucideIcon { Data = LucideIcons.TriangleAlert, Size = 16, Margin = new Thickness(0, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center };
         glyph.SetResourceReference(LucideIcon.BrushProperty, "WarningTextBrush");
-        _message = SettingsUi.Styled(new TextBlock { VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap }, "CaptionTextStyle");
+        _message = SettingsUi.Styled(new TextBlock { VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap }, "BodyTextStyle");
         _message.SetResourceReference(TextBlock.ForegroundProperty, "WarningTextBrush");
         AutomationProperties.SetLiveSetting(_message, AutomationLiveSetting.Polite);
         _messagePanel.Children.Add(glyph);
@@ -390,7 +392,8 @@ internal sealed class ShortcutsPage : UserControl
         if (edit.Action.Value.Length == 0)
         {
             _title.Text = edit.Mode == EditMode.New ? "New shortcut" : "Action";
-            _titleIcon.Visibility = Visibility.Collapsed;
+            _titleIcon.Data = LucideIcons.Plus;
+            _titleIcon.Visibility = edit.Mode == EditMode.New ? Visibility.Visible : Visibility.Collapsed;
             return;
         }
         _title.Text = edit.Action.Name.Length > 0 ? edit.Action.Name : ActionCatalog.NameFor(edit.Action);
@@ -398,23 +401,52 @@ internal sealed class ShortcutsPage : UserControl
         _titleIcon.Visibility = Visibility.Visible;
     }
 
-    /// <summary>A row in the editor: an optional icon and a title at the left, an optional switcher, and the control in the keys' column.</summary>
+    /// <summary>
+    /// A row in the editor, on the list rows' columns: an optional icon, the title (and a switcher at its right), and the
+    /// control from the keys' column's left edge to the options column's right edge.
+    /// </summary>
     private static FrameworkElement EditorRow(FrameworkElement? icon, FrameworkElement title, FrameworkElement control, FrameworkElement? middle = null)
     {
         var grid = new Grid { MinHeight = SettingsLayout.RowHeight };
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(icon is null ? 0 : 32) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(32) });
         grid.ColumnDefinitions.Add(new ColumnDefinition());
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(KeysColumn) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(OptionsColumn) });
         if (icon is not null) { icon.HorizontalAlignment = HorizontalAlignment.Left; grid.Children.Add(icon); }
-        Grid.SetColumn(title, 1);
-        grid.Children.Add(title);
-        if (middle is not null) { Grid.SetColumn(middle, 2); middle.VerticalAlignment = VerticalAlignment.Center; grid.Children.Add(middle); }
-        Grid.SetColumn(control, 3);
+        var left = new DockPanel { VerticalAlignment = VerticalAlignment.Center };
+        if (middle is not null) { DockPanel.SetDock(middle, Dock.Right); middle.VerticalAlignment = VerticalAlignment.Center; left.Children.Add(middle); }
+        left.Children.Add(title);
+        Grid.SetColumn(left, 1);
+        grid.Children.Add(left);
+        Grid.SetColumn(control, 2);
+        Grid.SetColumnSpan(control, 2);
+        control.HorizontalAlignment = HorizontalAlignment.Left;
         control.VerticalAlignment = VerticalAlignment.Center;
         grid.Children.Add(control);
         return new Border { Padding = SettingsLayout.RowPadding, Child = grid };
     }
+
+#if DEBUG
+    /// <summary>
+    /// Debug snapshots: shows the editor in a state without recording, so a shot never takes the keyboard.
+    /// "new", "listening", "caps", "ready", "refused"; null closes it.
+    /// </summary>
+    internal void ShowEditorForShot(string? state)
+    {
+        StopListening();
+        if (state is null) { CloseEditor(); return; }
+        var keepOnTop = new ChippiAction { Kind = ActionKind.Window, Value = nameof(WindowAction.KeepOnTop), Name = "Keep on top" };
+        _edit = state switch
+        {
+            "new" => new Edit { Mode = EditMode.New, Door = BindingDoor.Key },
+            "listening" => new Edit { Mode = EditMode.New, Door = BindingDoor.Key, Action = keepOnTop, Listening = true },
+            "caps" => new Edit { Mode = EditMode.New, Door = BindingDoor.Caps, Action = keepOnTop, Listening = true },
+            "ready" => new Edit { Mode = EditMode.New, Door = BindingDoor.Caps, Action = keepOnTop, CapsKey = 0x31 },
+            _ => new Edit { Mode = EditMode.New, Door = BindingDoor.Key, Action = keepOnTop, Keys = new KeyShortcut(ShortcutModifiers.Windows, 0x59), Error = "Another app uses this" },
+        };
+        BuildEditor();
+    }
+#endif
 
     private static bool OtherKind(ChippiAction a) => a.Value.Length > 0 && a.Kind is ActionKind.App or ActionKind.File or ActionKind.Link or ActionKind.Keys or ActionKind.Text or ActionKind.Command;
 
@@ -454,7 +486,9 @@ internal sealed class ShortcutsPage : UserControl
     {
         var edit = _edit;
         if (edit is null) return;
-        var field = new Border { Width = FieldWidth, MinHeight = 32, Padding = new Thickness(10, 4, 10, 4), CornerRadius = new CornerRadius(6), BorderThickness = new Thickness(1), HorizontalAlignment = HorizontalAlignment.Stretch };
+        // A refusal's border is 2px; the padding takes the extra pixel, so the keys don't move.
+        bool refused = edit.Error is not null;
+        var field = new Border { Width = FieldWidth, MinHeight = 32, Padding = refused ? new Thickness(9, 3, 9, 3) : new Thickness(10, 4, 10, 4), CornerRadius = new CornerRadius(6), BorderThickness = new Thickness(refused ? 2 : 1), HorizontalAlignment = HorizontalAlignment.Stretch };
         field.SetResourceReference(Border.BorderBrushProperty, edit.Error is not null ? "WarningTextBrush" : edit.Listening ? "AccentBrush" : "BorderStrongBrush");
         var content = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
         IReadOnlyList<string> caps = edit.Door switch
@@ -467,13 +501,23 @@ internal sealed class ShortcutsPage : UserControl
             content.Children.Add(Keycaps(caps, edit.Door == BindingDoor.Mouse, false));
         else
         {
+            // Caps Lock: the held key's cap, then the prompt for the key pressed with it.
+            if (edit.Door == BindingDoor.Caps)
+            {
+                var held = Keycaps([CombosKey(_module?.Settings.CapsHeldKey ?? 0x14)], false, false);
+                held.Margin = new Thickness(0, 0, 4, 0);
+                content.Children.Add(held);
+                var plus = SettingsUi.Styled(new TextBlock { Text = "+", Margin = new Thickness(0, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center }, "BodyTextStyle");
+                plus.SetResourceReference(TextBlock.ForegroundProperty, "TextTertiaryBrush");
+                content.Children.Add(plus);
+            }
             string prompt = edit.Door switch
             {
                 BindingDoor.Key => "Press a shortcut",
-                BindingDoor.Caps => "Hold Caps Lock and press a key",
+                BindingDoor.Caps => "Press a key",
                 _ => "Press a mouse button or tilt the wheel",
             };
-            var hint = SettingsUi.Styled(new TextBlock { Text = prompt }, "BodyTextStyle");
+            var hint = SettingsUi.Styled(new TextBlock { Text = prompt, VerticalAlignment = VerticalAlignment.Center }, "BodyTextStyle");
             hint.SetResourceReference(TextBlock.ForegroundProperty, "TextTertiaryBrush");
             content.Children.Add(hint);
         }
