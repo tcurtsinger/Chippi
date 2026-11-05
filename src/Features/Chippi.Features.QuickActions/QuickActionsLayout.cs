@@ -11,12 +11,13 @@ internal static class QuickActionsLayout
     /// <summary>The tiles that moved into Power and Quit apps. An older saved layout may still hold them.</summary>
     private static readonly HashSet<string> Moved = ["lock", "displays", "screensaver", "frozen"];
 
-    internal static List<string?> Normalize(IEnumerable<string?>? saved, IReadOnlyCollection<string>? shown)
+    /// <param name="added">Tiles other features added that already have a position (<see cref="QuickActionsSettings.Added"/>).</param>
+    internal static List<string?> Normalize(IEnumerable<string?>? saved, IReadOnlyCollection<string>? shown, IReadOnlyCollection<string>? added = null)
     {
-        var keys = QuickAction.All.Where(a => a.InGallery).Select(a => a.Key).ToArray();
+        string[] keys = [.. QuickAction.All.Where(a => a.InGallery).Select(a => a.Key), .. (added ?? []).Where(k => QuickAction.FromKey(k) is null).Distinct()];
         // Existing users keep the packed catalog order they already see. Hidden actions follow their selected ones.
         if (saved is null)
-            return [.. keys.Where(k => shown?.Contains(k) == true), .. keys.Where(k => shown?.Contains(k) != true), .. Enumerable.Repeat<string?>(null, Slots - keys.Length)];
+            return [.. keys.Where(k => shown?.Contains(k) == true).Concat(keys.Where(k => shown?.Contains(k) != true)).Take(Slots), .. Enumerable.Repeat<string?>(null, Math.Max(0, Slots - keys.Length))];
 
         var known = keys.ToHashSet(StringComparer.Ordinal);
         var seen = new HashSet<string>(StringComparer.Ordinal);
@@ -32,7 +33,23 @@ internal static class QuickActionsLayout
         }
         // Repair duplicates/obsolete keys without moving any valid saved position.
         foreach (var key in keys.Where(k => !seen.Contains(k)))
-            slots[Array.IndexOf(slots, null)] = key;
+        {
+            int free = Array.IndexOf(slots, null);
+            if (free < 0) break;
+            slots[free] = key;
+        }
         return [.. slots];
+    }
+
+    /// <summary>A newly added tile's position: after the last tile, or the first gap once the last slot is taken.</summary>
+    internal static List<string?> Append(IReadOnlyList<string?> layout, string key)
+    {
+        var slots = layout.ToList();
+        int at = slots.FindLastIndex(k => k is not null) + 1;
+        if (at >= slots.Count)
+            at = slots.IndexOf(null);
+        if (at >= 0)
+            slots[at] = key;
+        return slots;
     }
 }
