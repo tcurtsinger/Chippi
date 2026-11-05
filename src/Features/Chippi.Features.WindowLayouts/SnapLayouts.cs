@@ -5,10 +5,11 @@ namespace Chippi.Features.WindowLayouts;
 
 public enum SplitDirection { SideBySide, Stacked }
 
-/// <summary>A leaf has an id only; a split has two children and a ratio. Records make editor drafts independent of saved layouts.</summary>
+/// <summary>A leaf has a stable id and a name; a split has two children and a ratio. Records make editor drafts independent of saved layouts.</summary>
 public sealed record ZoneNode
 {
     public string Id { get; init; } = Guid.NewGuid().ToString("N");
+    public string Name { get; init; } = "Zone";
     public SplitDirection Direction { get; init; }
     public double Ratio { get; init; } = .5;
     public ZoneNode? First { get; init; }
@@ -26,7 +27,7 @@ public sealed record ZoneNode
 
     private static bool Check(ZoneNode node, int depth, HashSet<string> ids) =>
         depth <= 16 && !string.IsNullOrWhiteSpace(node.Id) && ids.Add(node.Id) &&
-        (node.IsLeaf || node.First is not null && node.Second is not null
+        (node.IsLeaf ? !string.IsNullOrWhiteSpace(node.Name) && node.Name.Length <= 80 : node.First is not null && node.Second is not null
             && Enum.IsDefined(node.Direction) && double.IsFinite(node.Ratio)
             && node.Ratio >= .05 && node.Ratio <= .95
             && Check(node.First, depth + 1, ids) && Check(node.Second, depth + 1, ids));
@@ -37,6 +38,16 @@ public sealed record ZoneNode
             throw new ArgumentOutOfRangeException(nameof(direction));
         return Edit(zoneId, node => node.IsLeaf
             ? Split(node, new ZoneNode(), direction) : throw new ArgumentException("Not a zone"));
+    }
+
+    public ZoneNode Rename(string zoneId, string name)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        name = name.Trim();
+        if (name.Length > 80)
+            throw new ArgumentOutOfRangeException(nameof(name));
+        return Edit(zoneId, node => node.IsLeaf
+            ? node with { Name = name } : throw new ArgumentException("Not a zone"));
     }
 
     public ZoneNode Resize(string dividerId, double ratio)
@@ -89,24 +100,27 @@ public sealed record ZoneNode
     {
         if (node.IsLeaf)
         {
-            zones.Add(new(node.Id, $"Zone {zones.Count + 1}", x, y, width, height));
+            zones.Add(new(node.Id, node.Name, x, y, width, height));
             return;
         }
         bool side = node.Direction == SplitDirection.SideBySide;
         double cut = side ? width * node.Ratio : height * node.Ratio;
-        dividers.Add(new(node.Id, node.Direction, side ? x + cut : x, side ? y : y + cut, side ? height : width));
+        dividers.Add(new(node.Id, node.Direction, side ? x + cut : x, side ? y : y + cut, side ? height : width, node.Ratio, side ? x : y, side ? width : height));
         Walk(node.First!, x, y, side ? cut : width, side ? height : cut, zones, dividers);
         Walk(node.Second!, side ? x + cut : x, side ? y : y + cut,
             side ? width - cut : width, side ? height : height - cut, zones, dividers);
     }
 }
 
-public sealed record ZoneDivider(string Id, SplitDirection Direction, double X, double Y, double Length);
+public sealed record ZoneDivider(string Id, SplitDirection Direction, double X, double Y, double Length,
+    double Ratio, double AxisStart, double AxisLength);
+/// <summary>Zone ids are local to a layout, including duplicated and built-in layouts.</summary>
+public readonly record struct SnapZoneKey(string LayoutId, string ZoneId);
 public sealed record SnapLayout(string Id, string Name, ZoneNode Root, bool BuiltIn = false);
 
 public static class SnapLayouts
 {
-    private static ZoneNode Leaf(string id) => new() { Id = id };
+    private static ZoneNode Leaf(string id) => new() { Id = id, Name = SnapGeometry.BuiltIns.First(z => z.Id == id).Name };
     public static IReadOnlyList<SnapLayout> Defaults() =>
     [
         new("halves", "Halves", ZoneNode.Split(Leaf("left"), Leaf("right"), SplitDirection.SideBySide), true),
