@@ -44,7 +44,7 @@ internal sealed class ShortcutsPage : UserControl
         public string? Error;
     }
 
-    private sealed record Row(string Group, string Name, string? Icon, IReadOnlyList<string> Caps, bool Mouse, bool Dim, bool Unset, Action Change, Action? Remove);
+    private sealed record Row(string Group, string Name, string? Icon, IReadOnlyList<string> Caps, bool Mouse, bool Dim, bool Unset, Action Change, Action? Remove, Action? Another = null);
 
     private readonly ShellContext _shell;
     private readonly ShortcutsModule? _module;
@@ -131,7 +131,8 @@ internal sealed class ShortcutsPage : UserControl
                     Mode = EditMode.Binding, BindingId = binding.Id, Action = binding.Action, Door = binding.Door, Keys = binding.Keys, CapsKey = binding.CapsKey,
                     Button = binding.Door == BindingDoor.Mouse ? binding.Button : null,
                 }),
-                () => _module.Remove(binding.Id));
+                () => _module.Remove(binding.Id),
+                () => StartEdit(new Edit { Mode = EditMode.New, Action = binding.Action, Door = BindingDoor.Key }));
         }
     }
 
@@ -229,6 +230,12 @@ internal sealed class ShortcutsPage : UserControl
             var change = new MenuItem { Header = "Change" };
             change.Click += (_, _) => row.Change();
             menu.Items.Add(change);
+            if (row.Another is { } another)
+            {
+                var item = new MenuItem { Header = "Add another" };
+                item.Click += (_, _) => another();
+                menu.Items.Add(item);
+            }
             if (row.Remove is { } remove)
             {
                 var item = new MenuItem { Header = "Remove" };
@@ -500,7 +507,7 @@ internal sealed class ShortcutsPage : UserControl
         var acts = new StackPanel { Orientation = Orientation.Horizontal };
         foreach (var (label, flag) in new[] { ("Ctrl", KeyModifiers.Ctrl), ("Alt", KeyModifiers.Alt), ("Shift", KeyModifiers.Shift), ("Win", KeyModifiers.Win) })
         {
-            var box = new CheckBox { Content = label, IsChecked = s.CapsModifiers.HasFlag(flag), Margin = new Thickness(16, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+            var box = SettingsUi.Styled(new ToggleButton { Content = label, IsChecked = s.CapsModifiers.HasFlag(flag) }, "ChipToggleStyle");
             AutomationProperties.SetName(box, label);
             var captured = flag;
             box.Click += (_, _) =>

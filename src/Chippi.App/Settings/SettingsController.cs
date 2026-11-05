@@ -111,6 +111,8 @@ internal sealed class SettingsController
                             await Idle();
                             string file = page.Id.Replace(':', '-');
                             Render(_window!, System.IO.Path.Combine(directory, $"r2-{file}-{name}-{accent}.png"));
+                            if (page.Id == "shortcuts")
+                                Render(_window.PageContent, System.IO.Path.Combine(directory, $"r6-shortcuts-full-{name}-{accent}.png"), full: true);
                             if (page.Id == "module:downloads-organizer")
                             {
                                 // The organizer's other tabs and Preview (R4).
