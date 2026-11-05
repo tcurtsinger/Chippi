@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-or-later
+﻿# SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) Chippi contributors
 
 # Runs inside Windows Sandbox, started by run.ps1. Drives the real hooks with SendInput, without Chippi's marker, so
@@ -178,6 +178,12 @@ public static class Probe
             '"modules":{"debounce":{"clickEnabled":true,"clickMs":25,"keyEnabled":true,"keyMs":20}},' +
             '"features":{"preset":"custom","installed":["debounce"],"capabilitiesUsed":[]}}'
         $env:CHIPPI_DEBOUNCE_INJECTED = '1'
+    }
+    if ($checks -contains 'scroll' -and -not ($checks -contains 'radial' -or $checks -contains 'watchdog' -or $checks -contains 'cost' -or $debounceOnly)) {
+        # Smooth scrolling alone; the scroll check restarts Chippi with each of its own settings. CHIPPI_SMOOTH_INJECTED lets it act on SendInput.
+        $debounceSettings = '{"version":1,"app":{"islandEnabled":false},"modules":{"smooth-scrolling":{"smoothEnabled":true}},' +
+            '"features":{"preset":"custom","installed":["smooth-scrolling"],"capabilitiesUsed":[]}}'
+        $env:CHIPPI_SMOOTH_INJECTED = '1'
     }
     $env:CHIPPI_INPUT_TIMINGS = "$results\hook-timings.csv"
     if ($checks -contains 'watchdog') { $env:CHIPPI_INPUT_DROP_HOOKS = '45' }
@@ -383,6 +389,98 @@ public static class Probe
         $d.keyBurst4000Events.target = "$((($d.keyBurst4000Events.typed).Length)) letters in the text box and $logged key downs in the log, of 2000"
         $d.keyBurst4000Events.typed = ''
         $found.debounce = $d
+    }
+
+    if ($checks -contains 'scroll') {
+        . C:\probe\scroll.ps1
+        $s = [ordered]@{}
+        $scrollTarget = Start-Process -FilePath powershell.exe -ArgumentList '-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File C:\probe\scroll-target.ps1' -PassThru
+        Start-Sleep -Seconds 8
+        $psExe = 'C:/Windows/System32/WindowsPowerShell/v1.0/powershell.exe' # forward slashes: a backslash would need escaping in the JSON
+        function ScrollSettings([string]$module) {
+            '{"version":1,"app":{"islandEnabled":false},"modules":{"smooth-scrolling":' + $module + '},' +
+            '"features":{"preset":"custom","installed":["smooth-scrolling"],"capabilitiesUsed":[]}}'
+        }
+        function Restart([string]$module) {
+            Stop-Process -Id $script:chippi.Id -Force -ErrorAction SilentlyContinue
+            Start-Sleep -Seconds 3
+            $script:chippi = StartChippi -whole (ScrollSettings $module)
+            [Probe]::MoveTo($x, $y)
+        }
+        function Pointer { [Probe]::MoveTo($x, $y); Start-Sleep -Milliseconds 300 }
+
+        # Off: the same notches, untouched, for the baseline.
+        Restart '{}'
+        Pointer
+        $s.off = [ordered]@{
+            oneNotch = Measure-Scroll 'off oneNotch' { [Wheel]::Notches(1, 0, 120) }
+            sixFast = Measure-Scroll 'off sixFast' { [Wheel]::Notches(6, 10, 120) }
+        }
+
+        Restart '{"smoothEnabled":true}'
+        Pointer
+        $s.smooth = [ordered]@{
+            oneNotch = Measure-Scroll 'smooth oneNotch' { [Wheel]::Notches(1, 0, 120) }
+            sixFast = Measure-Scroll 'smooth sixFast (10 ms apart)' { [Wheel]::Notches(6, 10, 120) }
+            sixSlow = Measure-Scroll 'smooth sixSlow (300 ms apart)' { [Wheel]::Notches(6, 300, 120) } 2500
+            reversal = Measure-Scroll 'smooth reversal (6 up, then 1 back)' { $t = [Wheel]::Notches(6, 10, 120); [Wheel]::Spin(60); [Wheel]::Send(-120, $false) | Out-Null; $t }
+            ctrlWheel = Measure-Scroll 'smooth ctrl+wheel' { [Wheel]::Key(0x11, $true); $t = [Wheel]::Send(120, $false); [Wheel]::Key(0x11, $false); $t } 600
+            horizontal = Measure-Scroll 'smooth horizontal' { [Wheel]::Send(120, $true) } 800
+            fineDelta = Measure-Scroll 'smooth fine delta 30' { [Wheel]::Send(30, $false) } 600
+        }
+        # Move the pointer off the window 40 ms into a glide: nothing may reach it after the move.
+        $moveAt = 0
+        $s.smooth.switchWindow = Measure-Scroll 'smooth pointer leaves mid-glide' { $t = [Wheel]::Notches(8, 10, 120); [Wheel]::Spin(20); [Wheel]::Move(960, 740); $script:moveAt = [Wheel]::Now(); $t } 1500
+        $csv = @(Get-Content -LiteralPath "$results\scroll.csv")
+        $s.smooth.switchWindow.messagesAfterTheMove = @($csv | Where-Object { [double]($_ -split ',')[0] -gt ($moveAt + 25) }).Count
+        Pointer
+        # Ctrl goes down 40 ms into a glide, with no wheel event: the rest of the glide must not reach the window while Ctrl is held.
+        $ctrlAt = 0
+        $s.smooth.ctrlMidGlide = Measure-Scroll 'smooth ctrl pressed mid-glide' { $t = [Wheel]::Notches(8, 10, 120); [Wheel]::Spin(20); [Wheel]::Key(0x11, $true); $script:ctrlAt = [Wheel]::Now(); Start-Sleep -Milliseconds 800; [Wheel]::Key(0x11, $false); $t } 800
+        $csv = @(Get-Content -LiteralPath "$results\scroll.csv")
+        $s.smooth.ctrlMidGlide.messagesAfterCtrl = @($csv | Where-Object { [double]($_ -split ',')[0] -gt ($ctrlAt + 25) }).Count
+        Pointer
+        # A game in front pauses it: the notch arrives whole and a glide in progress ends. The target is topmost, over the game.
+        # A long glide (about a second), so there is one still going when the switch to the game lands.
+        Restart '{"smoothEnabled":true,"responseMs":400,"coastMs":400}'
+        $game = Start-Process -FilePath powershell.exe -ArgumentList '-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File C:\probe\target.ps1 -Fullscreen' -PassThru
+        Start-Sleep -Seconds 8
+        Pointer
+        [Wheel]::Foreground('Scroll target') | Out-Null; Start-Sleep -Milliseconds 800
+        $glideEnds = 0
+        $s.smooth.pauseMidGlide = Measure-Scroll 'smooth game comes to the front mid-glide' { $t = [Wheel]::Notches(10, 10, 120); [Wheel]::Spin(30); [Wheel]::Key(0x12, $true); [Wheel]::Key(0x09, $true); [Wheel]::Key(0x09, $false); [Wheel]::Key(0x12, $false); $script:glideEnds = [Wheel]::Now(); $t } 2000
+        $csv = @(Get-Content -LiteralPath "$results\scroll.csv")
+        $s.smooth.pauseMidGlide.messagesMoreThan300msAfterTheSwitch = @($csv | Where-Object { [double]($_ -split ',')[0] -gt ($glideEnds + 300) }).Count
+        Start-Sleep -Milliseconds 800
+        $s.smooth.notchOverGame = Measure-Scroll 'smooth one notch with the game in front' { [Wheel]::Notches(1, 0, 120) } 800
+        Stop-Process -Id $game.Id -Force -ErrorAction SilentlyContinue
+        Start-Sleep -Seconds 2
+        [Wheel]::Foreground('Scroll target') | Out-Null
+
+        Restart '{"linearEnabled":true}'
+        Pointer
+        $s.linear = [ordered]@{
+            plainNotch = Measure-Scroll 'linear plain 120' { [Wheel]::Notches(1, 0, 120) } 800
+            driverBig480 = Measure-Scroll 'linear driver message 480' { [Wheel]::Notches(1, 0, 480) } 800
+        }
+
+        Restart '{"smoothEnabled":true,"linearEnabled":true}'
+        Pointer
+        $s.both = [ordered]@{
+            fast480x3 = Measure-Scroll 'both 3 x 480 (a fast spin)' { [Wheel]::Notches(3, 10, 480) }
+            slow120x3 = Measure-Scroll 'both 3 x 120 (a slow spin)' { [Wheel]::Notches(3, 300, 120) } 2500
+        }
+
+        Restart ('{"smoothEnabled":true,"apps":[{"app":"' + $psExe + '","percent":0}]}')
+        Pointer
+        $s.appLeftAlone = [ordered]@{ oneNotch = Measure-Scroll 'app left alone: one notch' { [Wheel]::Notches(1, 0, 120) } 800 }
+
+        Restart ('{"smoothEnabled":true,"apps":[{"app":"' + $psExe + '","percent":200}]}')
+        Pointer
+        $s.app200 = [ordered]@{ oneNotch = Measure-Scroll 'app at 200%: one notch' { [Wheel]::Notches(1, 0, 120) } }
+
+        Stop-Process -Id $scrollTarget.Id -Force -ErrorAction SilentlyContinue
+        $found.scroll = $s
     }
 
     if ($checks -contains 'cost') {

@@ -62,6 +62,7 @@ public partial class SettingsWindow : Window
     [
         new("page:mouse", "Mouse", LucideIcons.Mouse, FeatureGroup.Windows,
             [new("focus-follows-mouse", null, null),
+             new("smooth-scrolling", Chippi.Features.SmoothScrolling.SmoothScrollingModule.MouseSection, "Scrolling"),
              new("debounce", Chippi.Features.Debounce.DebounceModule.MouseSection, "Clicks")]),
         new("page:keyboard", "Keyboard", LucideIcons.Keyboard, FeatureGroup.Windows,
             [new("debounce", Chippi.Features.Debounce.DebounceModule.KeyboardSection, "Key debounce"),

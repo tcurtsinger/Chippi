@@ -209,6 +209,8 @@ public partial class App : Application
         shell.Registry.Register(new Chippi.Features.AgentUsage.AgentUsageModule());
         // [Phase 6] Click and key debounce: replaces its catalog placeholder.
         shell.Registry.Register(new Chippi.Features.Debounce.DebounceModule(Environment.GetEnvironmentVariable("CHIPPI_DEBOUNCE_INJECTED") == "1"));
+        // [Phase 6] Smooth and linear scrolling: replaces its catalog placeholder.
+        shell.Registry.Register(new Chippi.Features.SmoothScrolling.SmoothScrollingModule(Environment.GetEnvironmentVariable("CHIPPI_SMOOTH_INJECTED") == "1"));
 
         shell.Registry.Register(new Chippi.Features.CloseProtection.CloseProtectionModule(() =>
             new Chippi.Features.CloseProtection.WindowsCloseDesktop()));
