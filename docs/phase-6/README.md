@@ -39,7 +39,7 @@ Window layouts and snapping, app switcher, close protection, focus follows mouse
   |---|---|
   | 1 | Passed Travis's live check on 2026-11-05 (task 331), installer built from `bf939a5`. Includes Smooth scrolling. The Radial menu's cold-start flick (issue #230) passed too. The shared action model (#242) came after that build. |
   | 2 | Passed Travis's live check on 2026-11-05 (task 374), installer built from `82aff92`: Shortcuts (keys, Caps Lock combos, mouse buttons, Settings › Shortcuts) on the shared action model (#242, #246). |
-  | 3 | In progress: Text snippets, Snap and the App switcher, started 2026-11-05 |
+  | 3 | Passed Travis's live check on 2026-11-05 (task 422), installer built from `0145b6d` (#258 to #268): Text snippets, Snap and the App switcher, with the fixes from his check (read-only shortcuts with Edit on feature pages, the editor inside its row, Add features keeping its scroll position, the switcher bringing the window to his display). Saved app arrangements is Phase 6's last piece. |
 
 - **Focus follows mouse** uses Windows' built-in setting (250 ms, the window raised) and puts the original setting back when it's off or paused.
 - **Key debounce** tops out at 200 ms.
