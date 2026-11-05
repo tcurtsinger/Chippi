@@ -248,6 +248,15 @@ public partial class App : Application
                     Chippi.Features.FocusFollowsMouse.FocusFollowsMouseModule.Id, "ownership.json")));
         }));
 
+        var windowLayouts = new Chippi.Features.WindowLayouts.WindowLayoutsModule(SnapDisplaySource.Connected);
+        shell.Registry.Register(windowLayouts);
+        if (shell.Services.Actions is Chippi.UI.Actions.WindowsActionPc windowPc)
+        {
+            windowPc.SnapZones = windowLayouts.ResolveZone;
+            windowPc.SnapFailed = target => windowLayouts.ReportFailure(target.App);
+        }
+        windowLayouts.CreateOverlay = () => new Chippi.Features.WindowLayouts.Views.ZoneOverlay();
+
         // [WS2] "Coming soon" placeholders for the PLAN.md features.
         Settings.Features.FeatureCatalog.RegisterPlaceholders(shell.Registry);
 
@@ -324,6 +333,7 @@ public partial class App : Application
         Shell?.Clipboard.Dispose();
         Shell?.Input.Dispose();
         Shell?.Hotkeys.Dispose();
+        (Shell?.Services.Actions as IDisposable)?.Dispose();
         _instance?.Dispose();
         LoggerFactory?.Dispose();
         base.OnExit(e);

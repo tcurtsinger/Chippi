@@ -34,6 +34,9 @@ public sealed class ActionRunner(IActionPc pc, Func<IReadOnlyList<ChippiCommand>
         ActionKind.App when Path.IsPathFullyQualified(action.Value) => !pc.Exists(action.Value),
         ActionKind.App => pc.HasApp(action.Value) == false,
         ActionKind.File => !pc.Exists(action.Value),
+        ActionKind.Window when action.Value == nameof(WindowAction.Zone) =>
+            !(known ?? ChippiCommands()).Any(c => c.WindowAction is { } zone
+                && zone.LayoutId == action.LayoutId && zone.ZoneId == action.ZoneId),
         ActionKind.Chippi => !(known ?? ChippiCommands()).Any(c => c.Key == action.Value),
         _ => false,
     };
@@ -48,7 +51,7 @@ public sealed class ActionRunner(IActionPc pc, Func<IReadOnlyList<ChippiCommand>
 
     /// <summary>Runs the action; a Window action acts on the door's <paramref name="target"/>, read as it runs.</summary>
     public Task RunAsync(ChippiAction action, WindowTarget target) =>
-        RunAsync(action, action.Kind == ActionKind.Window ? WindowOf(target) : 0);
+        RunAsync(action, action.Kind is ActionKind.Window or ActionKind.Chippi ? WindowOf(target) : 0);
 
     /// <param name="window">The window a Window action acts on, as its door read it: the Radial menu's, when the wheel opened.</param>
     public async Task RunAsync(ChippiAction action, nint window)
@@ -85,16 +88,36 @@ public sealed class ActionRunner(IActionPc pc, Func<IReadOnlyList<ChippiCommand>
                 pc.Media(Enum.TryParse<MediaAction>(action.Value, out var media) ? media : throw new ActionFailure("No action"));
                 break;
             case ActionKind.Window:
-                pc.Window(window, Enum.TryParse<WindowAction>(action.Value, out var verb) ? verb : throw new ActionFailure("No action"));
+                if (pc.CaptureWindow(window) is { } captured)
+                    await RunAsync(action, captured);
+                else
+                    pc.Window(window, Enum.TryParse<WindowAction>(action.Value, out var verb) ? verb : throw new ActionFailure("No action"));
                 break;
             case ActionKind.Chippi:
                 var command = ChippiCommands().FirstOrDefault(c => c.Key == action.Value) ?? throw new ActionFailure("Not found");
-                await command.Run();
+                if (command.WindowAction is { } placement)
+                    await RunAsync(placement, window != 0 ? window : WindowOf(WindowTarget.BeforeIsland));
+                else
+                    await command.Run();
                 break;
             case ActionKind.Selection:
                 await SelectionAsync(Enum.TryParse<SelectionAction>(action.Value, out var selection) ? selection : SelectionAction.Search);
                 break;
         }
+    }
+
+    /// <summary>Uses the original target and its process identity throughout menu selection.</summary>
+    public Task RunAsync(ChippiAction action, ActionWindow target, nint monitor = 0)
+    {
+        if (action.Kind != ActionKind.Window)
+            return RunAsync(action, target.Handle);
+        if (!Enum.TryParse<WindowAction>(action.Value, out var verb))
+            throw new ActionFailure("No action");
+        if (verb == WindowAction.Zone)
+            pc.WindowZone(target, action.LayoutId ?? "", action.ZoneId ?? "", monitor);
+        else
+            pc.Window(target, verb);
+        return Task.CompletedTask;
     }
 
     private async Task SelectionAsync(SelectionAction action)

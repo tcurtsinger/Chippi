@@ -363,6 +363,7 @@ internal sealed class CommandBarPage : UserControl
 
     private static string Failure(Result result, Exception ex) => ex switch
     {
+        Chippi.Core.Actions.ActionFailure when result.Key.StartsWith("chippi:window-layouts/", StringComparison.Ordinal) => "Snap failed",
         FileNotFoundException => "File not found",
         DirectoryNotFoundException => "Folder not found",
         UnauthorizedAccessException => "Access denied",

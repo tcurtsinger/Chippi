@@ -44,6 +44,17 @@ public static class ActionCatalog
         (WindowAction.Close, "Close", "Close"),
         (WindowAction.KeepOnTop, "Keep on top", "Pin"),
         (WindowAction.OtherScreen, "Move to other screen", "OtherScreen"),
+        (WindowAction.Center, "Center", "AppWindow"),
+        (WindowAction.Restore, "Restore", "AppWindow"),
+        (WindowAction.LeftThird, "Left third", "SnapLeft"),
+        (WindowAction.MiddleThird, "Middle third", "AppWindow"),
+        (WindowAction.RightThird, "Right third", "SnapRight"),
+        (WindowAction.LeftTwoThirds, "Left two-thirds", "SnapLeft"),
+        (WindowAction.RightTwoThirds, "Right two-thirds", "SnapRight"),
+        (WindowAction.TopLeft, "Top left", "LayoutGrid"),
+        (WindowAction.TopRight, "Top right", "LayoutGrid"),
+        (WindowAction.BottomLeft, "Bottom left", "LayoutGrid"),
+        (WindowAction.BottomRight, "Bottom right", "LayoutGrid"),
     ];
 
     public static IReadOnlyList<(SelectionAction Action, string Name, string Glyph)> Selection { get; } =
@@ -87,6 +98,7 @@ public static class ActionCatalog
             ActionKind.Keys => "Keyboard",
             ActionKind.Chippi => commandIcon?.Invoke(action.Value) ?? "Zap",
             ActionKind.Media => Enum.TryParse<MediaAction>(action.Value, out var media) ? Media.First(m => m.Action == media).Glyph : "PlayPause",
+            ActionKind.Window when action.Value == nameof(WindowAction.Zone) => "LayoutGrid",
             ActionKind.Window => Enum.TryParse<WindowAction>(action.Value, out var window) ? Window.First(m => m.Action == window).Glyph : "AppWindow",
             ActionKind.Selection => Enum.TryParse<SelectionAction>(action.Value, out var selection) ? Selection.First(m => m.Action == selection).Glyph : "Globe",
             ActionKind.Text => "Type",
@@ -114,6 +126,7 @@ public static class ActionCatalog
             ActionKind.Keys => KeyCombo.Parse(value)?.ToString() ?? value,
             ActionKind.Chippi => known?.Invoke(value) ?? "Chippi",
             ActionKind.Media => Enum.TryParse<MediaAction>(value, out var media) ? NameOf(media) : "Media",
+            ActionKind.Window when value == nameof(WindowAction.Zone) => known?.Invoke($"window-layouts/zone/{action.LayoutId}/{action.ZoneId}") ?? "Zone",
             ActionKind.Window => Enum.TryParse<WindowAction>(value, out var window) ? window == WindowAction.OtherScreen ? "Other screen" : NameOf(window) : "Window",
             ActionKind.Selection => Enum.TryParse<SelectionAction>(value, out var selection) ? NameOf(selection) : "Selected text",
             ActionKind.Text => FirstLine(value, "Text"),

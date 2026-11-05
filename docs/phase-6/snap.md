@@ -1,6 +1,6 @@
 # Snap: brief
 
-Draft for Travis's confirmation. Wave 3. Actions mockup is Lumen's task 212; zone/editor mockups follow. [Decisions](README.md); [reference evidence](behavior-spec-a.md#1-window-layouts-and-snapping).
+Wave 3. The screens were approved by Travis in task 384 and built by Lumen. [Decisions](README.md); [reference evidence](behavior-spec-a.md#1-window-layouts-and-snapping).
 
 Decided (Travis, task 226): Shift+drag zones are off until switched on, even once installed. The Snap menu works as soon as Snap is installed.
 
@@ -34,7 +34,18 @@ Geometry fixtures cover mixed DPI, negative origins, portrait, taskbar edges, fi
 
 In Windows Sandbox with clipboard redirection and networking off, use a dev profile without Sound. Open two Notepad windows with distinct text. Use Actions > Snap > Left, Right, Next monitor and Restore on one: the other never moves. In Settings create a zone named "Reading". Shift+drag into it and release; repeat cancelling with Escape and releasing Shift away from a zone. Plain top-edge drag still offers Windows Snap.
 
-Record environments where Sandbox cannot supply mixed DPI or multiple monitors; require suitable isolated-desktop coverage before acceptance. Capture dark/light menu and zone screenshots at real panel size, cold/warm opening and DWM placement timings. No runtime checks have run for this draft.
+Record environments where Sandbox cannot supply mixed DPI or multiple monitors; require suitable isolated-desktop coverage before acceptance. Capture dark/light menu and zone screenshots at real panel size, cold/warm opening and DWM placement timings. The integrated Release x64 Sandbox check passed 19 assertions on 2026-11-05: halves, thirds, repeated-snap Restore,
+maximized and manual-move baselines, Settings layout creation and assignment, the actual Actions menu, native Shift+drag
+overlay and drop, Escape and Shift-release cancellation, and the second window staying untouched. The image had no
+Notepad, so two standard WinForms editors were used. Placement first changed in 10 to 42 ms, sampled with DWM.
+The probe ran at medium integrity with its Administrators membership disabled; clipboard redirection and networking
+were off. Release builds for x64 and ARM64 were clean. Local checks passed 33 Snap, 145 Core, 101 Quick actions and
+two action-picker tests.
+
+Physical multiple-monitor/mixed-DPI placement, monitor removal, admin-window refusal, plain top-edge Windows Snap,
+and app-specific fixed/minimum sizes still require native live checks. The pure geometry and drag fixtures cover
+negative origins, portrait/taskbar work areas, oversized minimums, removed displays and cancelled drags. Page opening
+and overlay pointer latency have not been timed; the recorded native timings measure placement only.
 
 ## Approval and dependencies
 
