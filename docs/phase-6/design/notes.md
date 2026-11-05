@@ -7,6 +7,7 @@ Every app, count and setting in these mockups is invented. Nothing read or chang
 - `actions-shortcuts.html`: task 212, the Actions menus and Settings › Shortcuts. Travis approved it on 2026-11-04 (task 240) with option B (task 224).
 - `wave-1.html`: wave 1's Settings screens and Close protection's bar line. Travis approved it on 2026-11-04 (task 264), with real app icons in every app list ([App icons](#app-icons)).
 - `shortcuts.html`: wave 2's Settings › Shortcuts, revised for Travis's caveats when he approved it on 2026-11-05 (tasks 341 and 344, [Wave 2](#wave-2-shortcuts-task-344)). It replaces the Settings › Shortcuts boards in `actions-shortcuts.html`.
+- `wave-3.html`: wave 3's screens (task 375): Settings › Text snippets, Settings › Snap with its zone editor, Shift+drag zones, the App switcher overlay and Settings › App switcher ([Wave 3](#wave-3-text-snippets-snap-and-the-app-switcher-task-375)). Waiting on Travis's approval.
 - `before\`: real renders from `main` at `b9b6d05`: the Actions gallery, Settings › General and Radial menu (`--settings-snapshot`, a dev profile with only Radial menu and every hold off), and the agent's 6-second bar line (`AgentBarTests.Render`).
 - `shots\<board>-<theme>.png`: 2x renders of every board, dark and light.
 - `render.ps1`: renders the PNGs again with headless Edge. Use `-Only <board>,<board>` to render only some boards.
@@ -28,6 +29,15 @@ Add `?board=<id>&theme=dark|light` to any page to see one board.
 | wave-1 | `sheet-bar` | "Press again to close" on the bar, Ctrl+W, the widget on the left, the line that doesn't fit, the two presses |
 | shortcuts | `shortcuts`, `shortcuts-narrow` | Settings › Shortcuts at 1120 and 860: a dozen shortcuts, Caps Lock, Mouse buttons |
 | shortcuts | `shortcuts-empty` | First install: no shortcuts, both switches off |
+| wave-3 | `snippets`, `snippets-narrow` | Settings › Text snippets at 1120 and 860: twelve snippets in four folders, one turned off |
+| wave-3 | `snippets-empty` | First install: no snippets, Snippet expansion off |
+| wave-3 | `sheet-snippets-states` | Add and Edit, the two refusals, a trigger that starts another, Insert date or time, Delete, search, a missing sound, the hook down, a snippet in the island's Search |
+| wave-3 | `snap`, `snap-narrow` | Settings › Snap at 1120 and 860: Shift+drag per display, Layouts, Gaps |
+| wave-3 | `sheet-snap-editor` | The zone editor: a zone selected, a divider dragged, a new layout, a name refused; a layout's menu; Shift+drag off |
+| wave-3 | `sheet-snap-zones` | Shift+drag over the main display and the laptop's, the pointer in a gap, "Snap failed" on the bar |
+| wave-3 | `switcher` | The App switcher over the desktop: twelve windows, a minimized one |
+| wave-3 | `switcher-settings` | Settings › App switcher |
+| wave-3 | `sheet-switcher-states` | Search, This display, no preview, 50 windows, no results, "Switch failed" on the bar |
 | shortcuts | `sheet-shortcuts-states` | Add shortcut's steps, the three refusals, Record, a shortcut that can't work, the row menu, Caps Lock off, paused, the Win confirm, a hook down |
 
 ## Wave 2: Shortcuts (task 344)
@@ -40,6 +50,40 @@ Travis approved with three caveats (2026-11-05): the keycaps weren't uniform dow
 4. **"Excluded apps"** names both sections' app lists.
 5. **The Caps Lock switch says "Paused"** in place of "On" while an excluded app is open, with no caption.
 6. **The Win warning is a confirm** (Travis's task 211 #10 asked for a warning): turning on Win asks "Add Win to Caps Lock?" with Cancel and Add, in that order like the app's other confirms, and no body line (Marge on #247).
+
+## Wave 3: Text snippets, Snap and the App switcher (task 375)
+
+Drawn from `text-snippets.md`, `snap.md` and `app-switcher.md`. The Snap menu itself is the approved `sheet-menus` board and isn't redrawn. Choices for Travis to check:
+
+**Text snippets**
+1. **"Snippet expansion"**, not the brief's "Expand snippets while typing": setting labels are noun phrases (DESIGN.md §3), as "Click debounce" was in wave 1. Off on first install. Its sound is the dependent row "Expansion sound" (None by default); a missing one says "Sound unavailable" in Caution.
+2. **The switch and its excluded apps come first, the list after.** With fifty snippets the list is long, and the switch decides whether any of them works.
+3. **The list's first row is the search, the count and Add snippet**, so Add is in reach with fifty snippets. Folders are group headers, as in Shortcuts. Each row: the name over its text (variables as typed), the trigger in the code font, how it expands, its switch and More. A turned-off snippet dims everything but its switch.
+4. **Row switches have no On/Off beside them:** in a list of fifty that word repeats on every row, and the dimmed row already says it.
+5. **The editor opens in place**, like the Shortcuts editor: in the row's place for Edit, under the search row for Add. Delete is on its title row and asks "Delete this snippet?" with Cancel and Delete.
+6. **Refusals sit on the Save row** in Caution, with the field's amber border and Save off, as in Shortcuts: "The trigger needs at least 2 characters", "Another snippet already uses this trigger". "This trigger starts another one" doesn't block, so it's a neutral status with Save still on.
+7. **Insert date or time** is a flyout from its button under Text, with the brief's rows and a live Preview; Insert writes the tag where the cursor was. **Insert clipboard** writes `{{clipboard}}`.
+8. **Empty is "No snippets" with Add snippet**, the same as Shortcuts' "No shortcuts", not the brief's "No snippets yet. Add the first one."
+9. **In the island's Search**, a snippet is a result with the Snippet glyph, "Snippet · ;sig" as its detail and **Insert** as its verb. "Snippet not inserted" and "Not working in admin windows" use Search's line under the results.
+10. **Not drawn:** "Not working in admin windows" on the Settings page, for the reason wave 1 gives: Settings is the window in front while you read it.
+
+**Snap**
+11. **The page is "Snap"**, as the approved Shortcuts sidebar names it, not the brief's "Window layouts".
+12. **Shift+drag picks a layout per display**, each named as Windows names it with its role and resolution as the caption. FancyZones works the same way, and a laptop screen rarely wants the desk monitor's layout.
+13. **Layouts are one list with grips.** The five built-in ones can be duplicated but not edited or deleted. The Snap menu shows six pictures, so it shows the first six; a layout past them is captioned "not in the Snap menu" and stays in the action picker.
+14. **The zone editor opens in place of the list**, like the Radial menu's wheel: the layout's name, then the canvas at the main display's shape beside the selected zone's rows (Zone name, Split: Side by side or Stacked, its size in pixels on that display, Remove). Dividers drag; while one moves it shows the split ("60% · 40%"). A new layout starts as one zone to split. A name another layout has is refused like a trigger.
+15. **Gaps** are two sliders: Window gap (8 px) and Screen edge gap (0 px).
+16. **The zones on Shift+drag** fill the display's work area at the gaps, on the island's fill, each named; the one under the pointer takes the accent tint and border. In a gap nothing is lit and release leaves the window where it is. A placement that fails says "Snap failed" over the app on the bar.
+
+**App switcher**
+17. **The overlay** is the island's fill and shadow, centered on the display it opened on: the search field ("Search windows") with All displays and This display beside it, then cards five across (a preview, the app's icon and the title). Typing goes to the search at once.
+18. **Selection starts on the second card,** the window you were in before the one in front, as Alt+Tab does, so opening then Enter goes back.
+19. **Without a preview** (a minimized window, an app in "Apps without previews", or one Windows can't capture) the card shows the app's icon in the preview's place, with "Minimized" under it for a minimized one. The card's size doesn't change.
+20. **More than three rows scroll inside the grid,** with the selection kept in view. The island's no-scroll rule is for its pages; this is an overlay, like the Radial menu.
+21. **"Switch failed"** shows on the bar over the window's title, since the overlay has closed by then.
+22. **Settings › App switcher:** Shortcut (Not set, Record), as the Radial menu has; Windows from (All displays or This display, which the overlay's switch also changes); Previews; and Apps without previews.
+
+**Not drawn:** reduced motion (the overlay and zones only fade in), several virtual desktops, and the switcher on a portrait display. Every app, title, monitor and snippet here is invented, and the squares stand for each app's real icon ([App icons](#app-icons)).
 
 ## Option B's tile order
 
