@@ -5,6 +5,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
+using Chippi.Core.Actions;
 using Chippi.Core.Input;
 
 namespace Chippi.Features.AppSwitcher.Windows;
@@ -19,14 +20,20 @@ namespace Chippi.Features.AppSwitcher.Windows;
 public sealed partial class WindowsSwitcherPc : ISwitcherPc
 {
     private readonly uint _self;
+    private readonly IActionPc? _actions;
     private readonly ConcurrentDictionary<string, string> _names = new(StringComparer.OrdinalIgnoreCase);
 
-    public WindowsSwitcherPc() : this((uint)Environment.ProcessId)
+    /// <param name="actions">The shell's window moves, which bring a window to the switcher's display; without them, nothing moves.</param>
+    public WindowsSwitcherPc(IActionPc? actions = null) : this((uint)Environment.ProcessId, actions)
     {
     }
 
     /// <param name="self">The process whose windows are left out: Chippi's own, or 0 in tests that list their own windows.</param>
-    internal WindowsSwitcherPc(uint self) => _self = self;
+    internal WindowsSwitcherPc(uint self, IActionPc? actions = null)
+    {
+        _self = self;
+        _actions = actions;
+    }
 
     public IReadOnlyList<SwitcherWindow> Windows()
     {
@@ -78,6 +85,22 @@ public sealed partial class WindowsSwitcherPc : ISwitcherPc
             return true;
         Tap(Unassigned);
         return SetForegroundWindow(overlay) && GetForegroundWindow() == overlay;
+    }
+
+    /// <summary>Snap's Next monitor move (<see cref="IActionPc.MoveToDisplay"/>). An admin window isn't tried: Chippi can't move it.</summary>
+    public bool BringTo(SwitcherWindow window, nint monitor)
+    {
+        if (_actions?.CaptureWindow(window.Handle) is not { Elevated: false } target)
+            return false;
+        try
+        {
+            _actions.MoveToDisplay(target, monitor);
+            return true;
+        }
+        catch (ActionFailure)
+        {
+            return false;
+        }
     }
 
     public bool Activate(SwitcherWindow window)

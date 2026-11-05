@@ -35,6 +35,19 @@ internal sealed class FakePc : ISwitcherPc
         return true;
     }
 
+    /// <summary>The window stays where it is (fullscreen, admin, or it refused).</summary>
+    public bool RefuseMove;
+
+    public bool BringTo(SwitcherWindow window, nint monitor)
+    {
+        Calls.Add($"bring {window.Handle} to {monitor}");
+        if (RefuseMove)
+            return false;
+        int i = Open.FindIndex(w => w.Handle == window.Handle);
+        Open[i] = Open[i] with { Monitor = monitor };
+        return true;
+    }
+
     public bool Activate(SwitcherWindow window)
     {
         Calls.Add($"activate {window.Handle}");
@@ -154,6 +167,22 @@ internal sealed class Hub : IInputHub
 internal sealed class ActionPc : IActionPc
 {
     public nint InFront;
+
+    /// <summary>Windows that run as admin, and what <see cref="MoveToDisplay"/> throws ("Fullscreen" and the like).</summary>
+    public readonly HashSet<nint> Admin = [];
+    public string? MoveFails;
+    public readonly List<(nint Window, nint Monitor)> Moves = [];
+
+    public ActionWindow? CaptureWindow(nint window) =>
+        new(window, 1, 1, 0, "Window", @"C:\Apps\App.exe", "App", "Title", Admin.Contains(window));
+
+    public void MoveToDisplay(ActionWindow window, nint monitor)
+    {
+        if (MoveFails is { } reason)
+            throw new ActionFailure(reason);
+        Moves.Add((window.Handle, monitor));
+    }
+
     public bool? HasApp(string parsingName) => null;
     public bool Exists(string path) => false;
     public nint WindowUnderPointer() => 0;

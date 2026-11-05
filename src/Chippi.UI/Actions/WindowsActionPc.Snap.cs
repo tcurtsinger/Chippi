@@ -6,6 +6,7 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
 using Chippi.Core.Actions;
+using Chippi.Core.Input;
 using Native = Chippi.UI.Actions.ActionNative;
 
 namespace Chippi.UI.Actions;
@@ -199,34 +200,20 @@ public sealed partial class WindowsActionPc : IDisposable
             Remember(target, baseline);
             return;
         }
-        if (action == WindowAction.OtherScreen && Native.Monitors().Count < 2)
-            throw new ActionFailure("One screen");
-        bool maximized = Native.IsZoomed(hwnd);
-        if (maximized || Native.IsIconic(hwnd)) Native.ShowWindow(hwnd, 9);
-        var monitors = Native.Monitors();
-        nint here = Native.MonitorFromWindow(hwnd, 2);
-        var (_, work) = Native.Monitor(here);
+        if (action == WindowAction.OtherScreen)
+        {
+            var monitors = Native.Monitors();
+            if (monitors.Count < 2) throw new ActionFailure("One screen");
+            Carry(target, monitors[(monitors.IndexOf(Native.MonitorFromWindow(hwnd, 2)) + 1) % monitors.Count]);
+            Remember(target, baseline);
+            return;
+        }
+        if (Native.IsZoomed(hwnd) || Native.IsIconic(hwnd)) Native.ShowWindow(hwnd, 9);
+        var (_, work) = Native.Monitor(Native.MonitorFromWindow(hwnd, 2));
         CheckWork(work);
         if (!Visible(hwnd, out var visible) && visible.Width <= 0) throw new ActionFailure("Snap failed");
         Native.Rect destination;
-        if (action == WindowAction.OtherScreen)
-        {
-            if (monitors.Count < 2) throw new ActionFailure("One screen");
-            nint next = monitors[(monitors.IndexOf(here) + 1) % monitors.Count];
-            var (_, to) = Native.Monitor(next);
-            CheckWork(to);
-            double sx = (double)to.Width / work.Width, sy = (double)to.Height / work.Height;
-            double fit = Math.Min(1, Math.Min(sx, sy));
-            int width = Math.Max(1, Math.Min(to.Width, (int)Math.Round(visible.Width * fit)));
-            int height = Math.Max(1, Math.Min(to.Height, (int)Math.Round(visible.Height * fit)));
-            int x = Math.Clamp(to.Left + (int)Math.Round((visible.Left - work.Left) * sx), to.Left, to.Right - width);
-            int y = Math.Clamp(to.Top + (int)Math.Round((visible.Top - work.Top) * sy), to.Top, to.Bottom - height);
-            destination = new() { Left = x, Top = y, Right = x + width, Bottom = y + height };
-            // Cross the DPI boundary before sizing. The app can process WM_DPICHANGED between calls.
-            if (!Native.SetWindowPos(hwnd, 0, x, y, 0, 0, 0x0001 | 0x0004 | 0x0010))
-                throw new ActionFailure("Snap failed");
-        }
-        else if (action == WindowAction.Center)
+        if (action == WindowAction.Center)
         {
             int width = Math.Min(work.Width, visible.Width), height = Math.Min(work.Height, visible.Height);
             int x = work.Left + (work.Width - width) / 2, y = work.Top + (work.Height - height) / 2;
@@ -254,8 +241,50 @@ public sealed partial class WindowsActionPc : IDisposable
         Validate(target);
         Place(hwnd, destination);
         KeepReachable(hwnd);
-        if (action == WindowAction.OtherScreen && maximized) Native.ShowWindow(hwnd, 3);
         Remember(target, baseline);
+    }
+
+    /// <summary>The App switcher's move. Snap's pause list doesn't apply, and Snap's Restore doesn't remember it.</summary>
+    public void MoveToDisplay(ActionWindow target, nint monitor)
+    {
+        try
+        {
+            Validate(target);
+            if (!Native.Monitors().Contains(monitor)) throw new ActionFailure("Display removed");
+            nint from = Native.MonitorFromWindow(target.Handle, 2);
+            if (from == monitor) return;
+            if (FullscreenCheck.CoversMonitor(target.Handle, from)) throw new ActionFailure("Fullscreen");
+            Carry(target, monitor);
+        }
+        catch (ActionFailure ex)
+        {
+            Chippi.Core.Diagnostics.Log.Info($"Move to display skipped for {target.App}: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>Snap's Next monitor and the App switcher: restored, moved across, fitted, then maximized again when it was.</summary>
+    private void Carry(ActionWindow target, nint to)
+    {
+        nint hwnd = target.Handle;
+        if (Native.IsIconic(hwnd)) Native.ShowWindow(hwnd, 9);
+        // Read once it's restored: a window minimized from maximized comes back maximized.
+        bool maximized = Native.IsZoomed(hwnd);
+        if (maximized) Native.ShowWindow(hwnd, 9);
+        var (_, work) = Native.Monitor(Native.MonitorFromWindow(hwnd, 2));
+        CheckWork(work);
+        var (_, area) = Native.Monitor(to);
+        CheckWork(area);
+        if (!Visible(hwnd, out var visible) && visible.Width <= 0) throw new ActionFailure("Snap failed");
+        var (x, y, width, height) = DisplayMove.Fit((visible.Left, visible.Top, visible.Width, visible.Height),
+            (work.Left, work.Top, work.Width, work.Height), (area.Left, area.Top, area.Width, area.Height));
+        // Cross the DPI boundary before sizing. The app can process WM_DPICHANGED between calls.
+        if (!Native.SetWindowPos(hwnd, 0, x, y, 0, 0, 0x0001 | 0x0004 | 0x0010))
+            throw new ActionFailure("Snap failed");
+        Validate(target);
+        Place(hwnd, new() { Left = x, Top = y, Right = x + width, Bottom = y + height });
+        KeepReachable(hwnd);
+        if (maximized) Native.ShowWindow(hwnd, 3);
     }
 
     public void WindowZone(ActionWindow target, string layoutId, string zoneId, nint monitor = 0)

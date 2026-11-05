@@ -4,6 +4,8 @@ Draft for Travis's confirmation. Wave 3. Overlay mockups follow. [Decisions](REA
 
 Decided (Travis, task 226): the App switcher's tile and Search entry work as soon as it is installed. Its shortcut is unassigned until you set one.
 
+Decided (Travis, task 430, 2026-11-05): a window picked from another display moves to the switcher's display before it comes to the front, through the shell's window moves (`IActionPc.MoveToDisplay`, the same placement as Snap's Next monitor, `DisplayMove.Fit`). The switcher's display is the one it opened on: the original window's, else the pointer's. Fullscreen and admin windows, and any that refuse the move, are activated where they are, with no error line. No setting.
+
 ## Job and invocation
 
 Find and activate an open window quickly. One App switcher tile in Actions opens its overlay. Settings > Windows > App switcher owns presentation and filters. No home tile.

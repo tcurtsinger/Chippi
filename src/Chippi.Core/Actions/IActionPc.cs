@@ -34,6 +34,12 @@ public interface IActionPc
     void Window(ActionWindow window, WindowAction action) => Window(window.Handle, action);
     void WindowZone(ActionWindow window, string layoutId, string zoneId, nint monitor = 0) => throw new ActionFailure("Unavailable");
 
+    /// <summary>
+    /// Moves the window onto the display (an HMONITOR) as Snap's Next monitor does: maximized stays maximized, minimized is
+    /// restored there. Nothing happens when it's already there. Throws for a fullscreen or admin window, which stays put.
+    /// </summary>
+    void MoveToDisplay(ActionWindow window, nint monitor) => throw new ActionFailure("Unavailable");
+
     void Media(MediaAction action);
 
     /// <summary>Presses the keys in the app in front, once the keys still held are let go.</summary>

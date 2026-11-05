@@ -22,6 +22,12 @@ public interface ISwitcherPc
     /// <summary>Gives the overlay the foreground, so keys reach it; false when Windows refused.</summary>
     bool TakeForeground(nint overlay);
 
+    /// <summary>
+    /// Moves the window onto the switcher's display before it's activated (Travis, task 430). False when it stays where it
+    /// is: fullscreen, an admin window, or it refused the move.
+    /// </summary>
+    bool BringTo(SwitcherWindow window, nint monitor);
+
     /// <summary>Restores the window when it's minimized and brings it to the front; false when Windows refused.</summary>
     bool Activate(SwitcherWindow window);
 
@@ -108,7 +114,10 @@ public sealed class Switcher(ISwitcherPc pc, RecentWindows recent, Func<Switcher
         return true;
     }
 
-    /// <summary>Activates the selected window and closes, or says why not.</summary>
+    /// <summary>
+    /// Brings the selected window to the switcher's display, activates it and closes, or says why not. A window that
+    /// can't move is still activated where it is, with nothing said.
+    /// </summary>
     public SwitchOutcome Commit()
     {
         if (Session?.Selection is not { } window)
@@ -118,6 +127,8 @@ public sealed class Switcher(ISwitcherPc pc, RecentWindows recent, Func<Switcher
             Session.Remove(window.Handle);
             return SwitchOutcome.Gone;
         }
+        if (Session.Monitor != 0 && pc.MonitorOf(window.Handle) != Session.Monitor)
+            pc.BringTo(window, Session.Monitor);
         // The overlay still holds the foreground here, which is what lets Windows hand it on.
         if (!pc.Activate(window))
         {
