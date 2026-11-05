@@ -58,4 +58,22 @@ public sealed class PlainPasteGlyphTests
         }
         finally { window.Close(); }
     });
+    [Fact]
+    public void Pending_close_stays_visible_over_plain_paste_until_its_second_press_deadline() => WpfTestThread.Run(() =>
+    {
+        var window = new IslandWindow();
+        try
+        {
+            var paste = new IslandActivity(PlainPasteModule.FeedbackKey, IslandActivityKind.Status, "Plain text copied", "")
+            { ModuleId = PlainPasteModule.Id };
+            var close = new IslandActivity("close-protection/pending", IslandActivityKind.Status, "Press again to close", "Alt+F4 · Notepad")
+            { ModuleId = "close-protection", IsFeedback = true, Icon = nameof(LucideIcons.ShieldX) };
+            window.SetActivities([paste, close], PetMood.Idle);
+            Assert.Equal("Press again to close · Alt+F4 · Notepad", window.ChipText);
+            Assert.Same(LucideIcons.ShieldX, window.GlyphIcon.Data);
+            window.SetActivities([paste], PetMood.Idle);
+            Assert.Equal("Plain text copied", window.ChipText);
+        }
+        finally { window.Close(); }
+    });
 }
