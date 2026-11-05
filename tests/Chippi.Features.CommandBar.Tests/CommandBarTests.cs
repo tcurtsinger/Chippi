@@ -222,6 +222,7 @@ public sealed class CommandBarTests
             Assert.Equal(["app:Chrome"], again.MostUsed());
             again.Forget("app:Chrome");
             Assert.Equal(0, again.For("chr", "app:Chrome"));
+            await again.Saved; // Forget saves in the background: let it finish before the folder is deleted
         }
         finally { if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true); }
     }
