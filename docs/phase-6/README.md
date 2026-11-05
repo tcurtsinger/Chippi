@@ -15,7 +15,7 @@ Window layouts and snapping, app switcher, close protection, focus follows mouse
   - Within Snap, placing windows comes first. Saved app arrangements with relaunch are a separate step after it, later in the phase.
   - Chippi's zones show on Shift+drag, and Windows' own Snap bar keeps the plain drag to the top.
   - The App switcher gets its own shortcut first. Taking over Alt+Tab becomes an option once it has proven itself.
-  - Close protection: press Alt+F4 twice. The first press shows "Press Alt+F4 again to close" on the bar, and Chippi sends no keys. It's on in every app, and Ctrl+W protection is turned on per app. It covers keys only.
+  - Close protection: press Alt+F4 twice. The first press shows a line on the bar, and Chippi sends no keys (wording and timing: tasks 262 to 264 below). It's on in every app, and Ctrl+W protection is turned on per app. It covers keys only.
   - Smooth scrolling has per-app speeds and an excluded-apps list in the first build.
   - No mouse-button drag gestures for now.
   - Caps Lock combos: Right Alt isn't offered, and Win isn't in the default set.
@@ -24,6 +24,7 @@ Window layouts and snapping, app switcher, close protection, focus follows mouse
 - **Actions regroup (tasks 224 and 225):** option B. Lock, Turn off displays and Screen saver move into the Power menu, and End frozen apps moves into Quit apps, where a frozen app shows "Not responding" with End. Lock doesn't stay as a tile of its own. Phase 6 adds Snap, Input and Switcher as each feature is installed, which makes 18 tiles. Mockup: Lumen's Actions option B and menus (task 212).
 - **Start state (task 226):** what acts on your input in the background is off until you switch it on, even once it's installed: Close protection, Focus follows mouse, Smooth scrolling and Debounce (the four Travis was asked about), and by the same rule Snap's Shift+drag zones, Caps Lock combos and snippet expansion while typing. What you trigger yourself works once installed: the Snap menu, the App switcher's tile and Search, snippets picked in Search, and shortcuts you bind. The App switcher's shortcut is unassigned until you set one.
 - **Wave 1 calls (task 227):** Always on lives in Settings › General under Fullscreen apps. A "Pause in these apps" list covers games that run in a window. Shortcuts from before Phase 6 (mic mute and the rest) never pause.
+- **Wave 1 screens (tasks 262 to 264):** Travis approved Lumen's wave 1 mockup (`design/wave-1.html`), with each app's real Windows icon in every app list instead of letter squares. Close protection's bar line reads "Press again to close" over "Alt+F4 · Notepad". A second press counts for as long as that line shows (6 seconds), replacing 600 ms. When the bar can't show, the first press plays Windows' default beep.
 
 ## Lead calls (Marge)
 

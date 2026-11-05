@@ -1,4 +1,5 @@
 <!doctype html>
+<!-- Approved by Travis, 2026-11-04 (task 264). App lists show each app's real Windows icon, not these letter squares: see notes.md, App icons. -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -374,9 +375,9 @@ const B={
   ${L('Ctrl+W in an app on the list',desk(bar('Press again to close','Ctrl+W · Chrome')))}
   ${L('Widget on the left',desk(bar('Press again to close','Alt+F4 · Notepad',{left:1}),'left'))}</div>
   <div class="srow">
-  ${L('Not this: the line as the brief words it',desk(bar('Press Alt+F4 again to close','Notepad',{cut:1})),'159 DIPs at 13 / 600 in a 148 line, so it would scroll after its 2-second hold and be half read when the line folds.')}
+  ${L('Not this: the brief\'s first wording',desk(bar('Press Alt+F4 again to close','Notepad',{cut:1})),'159 DIPs at 13 / 600 in a 148 line, so it would scroll after its 2-second hold and be half read when the line folds.')}
   ${L('1 · First Alt+F4: swallowed, the line unfolds',desk(notepad()+bar('Press again to close','Alt+F4 · Notepad')))}
-  ${L('2 · Second Alt+F4: passed to Notepad, the line folds',desk(notepad(1)+puck))}</div>`
+  ${L('2 · Second Alt+F4 within 6 s: passed to Notepad, the line folds',desk(notepad(1)+puck))}</div>`
 };
 document.body.className=theme;
 const html=B[board]();

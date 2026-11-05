@@ -5,7 +5,7 @@ Every app, count and setting in these mockups is invented. Nothing read or chang
 ## Files
 
 - `actions-shortcuts.html`: task 212, the Actions menus and Settings › Shortcuts. Travis approved it on 2026-11-04 (task 240) with option B (task 224).
-- `wave-1.html`: wave 1's Settings screens and Close protection's bar line. **Not approved yet.**
+- `wave-1.html`: wave 1's Settings screens and Close protection's bar line. Travis approved it on 2026-11-04 (task 264), with real app icons in every app list ([App icons](#app-icons)).
 - `before\`: real renders from `main` at `b9b6d05`: the Actions gallery, Settings › General and Radial menu (`--settings-snapshot`, a dev profile with only Radial menu and every hold off), and the agent's 6-second bar line (`AgentBarTests.Render`).
 - `shots\<board>-<theme>.png`: 2x renders of every board, dark and light.
 - `render.ps1`: renders the PNGs again with headless Edge. Use `-Only <board>,<board>` to render only some boards.
@@ -30,11 +30,17 @@ Add `?board=<id>&theme=dark|light` to either page to see one board.
 
 `sheet-actions` B shows Input, Snap and Switcher partway through the gallery. The rule in `input-layer.md` replaces that order: remaining tiles keep their order, and a new tile goes after the last tile once its feature is installed (Kayla, Lumen and Marge, #223). The tiles themselves are as approved.
 
-## Wave 1: choices to approve
+## App icons
+
+Travis (task 264): every app list shows the app's real Windows icon, never the two-letter squares ("Ch", "VS") the mockup draws. That covers Pause in these apps, its Add app menu, Ctrl+W in these apps and Scrolling per app. Use the public `AppIcon` in Chippi.UI (`WindowsAppIcons` is internal to it): `AppIcon.View(exePath, 20, monogram)` for a row, which loads through the cached `AppIcon.LoadAsync` and keeps the monogram until the icon arrives, so the row never changes size. An open app is listed by its exe's path too. `AppIcon.Read` and `AppIcon.ReadWindow` are only for an STA worker thread, never the UI thread. A letter shows only when Windows has no icon for the app, as in Search and Agents.
+
+The mockup keeps the squares because this repo is public and the apps are other companies' products, so their logos aren't drawn into it. Read each square as that app's icon at the same size (20 in lists and the menu).
+
+## Wave 1: choices Travis approved (task 264)
 
 1. **The bar line is "Press again to close" over "Alt+F4 · Notepad".** The brief's "Press Alt+F4 again to close" measures 159 DIPs at the bar's 13 / 600, and the title line has 148. It would scroll after its 2-second hold, so half of it would still be unread when the line folds. The keys and the app fit in the second line (91 DIPs). Ctrl+W uses the same line with "Ctrl+W · Chrome".
 2. **The lead is Close protection's ShieldX glyph** in the 34 accent-tint circle, the same as other activities, not the app's icon. The second line names the app.
-3. **The line folds when the second press closes the window.** The app's own save prompt takes over from there.
+3. **The line folds when the second press closes the window,** and whenever the pending press ends otherwise (6 s, focus moving, a pause). The app's own save prompt takes over from there.
 4. **Setting labels are noun phrases** (DESIGN.md §3): "Click debounce" and "Key debounce" replace the brief's "Ignore accidental double clicks" and "Ignore key chatter". "Debounce time" replaces "window", since "window" on the Windows pages would read as an app window.
 5. **The ignored count is the switch's caption** ("12 ignored"). It shows only while the switch is on, and it's kept in memory only.
 6. **Lists inside a section start with a header row** (the list's name, its count as caption and Add app or Add key), with items indented 50 below it, as dependent rows are. Pause in these apps, Ctrl+W in these apps, Keys with their own time and Scrolling per app all work this way.
@@ -43,12 +49,12 @@ Add `?board=<id>&theme=dark|light` to either page to see one board.
 9. **Open over fullscreen apps is the last row of Opening**, since it applies to every trigger above it. It's on by default.
 10. **A hook that stays down is an infobar naming the features that failed** ("Click debounce and Smooth scrolling failed", Retry), the same as the Shortcuts page's. It shows only after the watchdog's 5-second reinstall has failed.
 11. **Scroll speed and leaving an app alone share one list,** "Scrolling per app", with a combo per app: a speed, or Leave alone. A second list of the same apps would be redundant. Smooth scrolling is wave 2; it's drawn here so the Mouse page is designed once.
-12. **No row for fixed values:** Focus follows mouse's 250 ms delay and Close protection's 600 ms interval aren't settings (DESIGN.md §3, Setting labels).
+12. **No row for fixed values:** Focus follows mouse's 250 ms delay and Close protection's 6-second interval aren't settings (DESIGN.md §3, Setting labels).
 
-## Questions for Travis
+## Travis's answers
 
-1. **How long a second press counts.** The decided interval is 600 ms, and the bar's lines last 6 seconds. With both, the line still says "Press again" for 5.4 s after a second press would only be swallowed again. At 600 ms the bar has barely finished its 240 ms unfold, so the line can't be shorter. **Recommendation:** a second press counts for as long as the line shows (6 s), and the line folds when that time runs out. Focus moving to another window still resets the count, so a quick close of one window and then the next isn't affected.
-2. **When the bar can't show** (the island is off, or Always on is on while a fullscreen app fills the widget's display), the first Alt+F4 does nothing visible. **Recommendation:** play Windows' default beep in those cases, the same as Plain paste's failures.
+1. **How long a second press counts (task 262): while the line shows.** A second Alt+F4 or Ctrl+W closes the app for as long as the bar shows "Press again to close", 6 seconds, and the line folds when that runs out. This replaces the 600 ms interval, which would have left the line saying "Press again" for 5.4 s while a press was only swallowed again. Focus moving to another window still resets the count, so closing one window and then the next isn't affected.
+2. **When the bar can't show (task 263): the first press beeps.** With the island off, or Always on on while a fullscreen app fills the widget's display, the first press plays Windows' default beep, the same as Plain paste's failures. The second press still counts for 6 seconds.
 
 ## Not drawn, and why
 
