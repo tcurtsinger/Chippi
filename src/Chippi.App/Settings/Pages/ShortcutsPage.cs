@@ -367,7 +367,7 @@ internal sealed class ShortcutsPage : UserControl
         RebuildEditorInput();
     }
 
-    private static bool OtherKind(ChippiAction a) => a.Kind is ActionKind.App or ActionKind.File or ActionKind.Link or ActionKind.Keys or ActionKind.Text or ActionKind.Command;
+    private static bool OtherKind(ChippiAction a) => a.Value.Length > 0 && a.Kind is ActionKind.App or ActionKind.File or ActionKind.Link or ActionKind.Keys or ActionKind.Text or ActionKind.Command;
 
     private void ShowOther(Border host, Edit edit)
     {
@@ -429,9 +429,11 @@ internal sealed class ShortcutsPage : UserControl
             content.Children.Add(hint);
         }
         field.Child = content;
-        field.MouseLeftButtonUp += (_, _) => Listen();
-        AutomationProperties.SetName(field, "Shortcut");
-        _inputRow.Child = field;
+        // A button, so the keyboard and UI Automation can start recording again too.
+        var press = SettingsUi.Styled(new Button { Content = field, Padding = new Thickness(0), HorizontalContentAlignment = HorizontalAlignment.Stretch }, "SubtleButtonStyle");
+        press.Click += (_, _) => Listen();
+        AutomationProperties.SetName(press, "Shortcut");
+        _inputRow.Child = press;
         RefreshSave();
     }
 

@@ -33,7 +33,7 @@ internal sealed class ActionDropdown : Button
         _chosen = chosen;
         _other = other;
         SettingsUi.Styled(this, "SecondaryButtonStyle");
-        MinWidth = 240;
+        MinWidth = 300;
         HorizontalContentAlignment = HorizontalAlignment.Left;
         AutomationProperties.SetName(this, "Choose an action");
         _icon.SetResourceReference(LucideIcon.BrushProperty, "TextPrimaryBrush");
