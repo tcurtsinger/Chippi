@@ -11,45 +11,6 @@ using Chippi.UI.Controls;
 
 namespace Chippi.App.Settings.Pages;
 
-/// <summary>
-/// Settings › Shortcuts: each feature that holds a shortcut in the shell's list shows its own rows, in the order the
-/// features are listed, so a new feature's shortcuts appear here with no change to this page.
-/// </summary>
-internal sealed class ShortcutsPage : UserControl
-{
-    public ShortcutsPage(Chippi.App.Shell.ShellContext shell)
-    {
-        var page = new StackPanel();
-        page.Children.Add(SettingsUi.Header("Shortcuts", ""));
-        void Build()
-        {
-            while (page.Children.Count > 1) page.Children.RemoveAt(1);
-            var card = new Card();
-            var owners = shell.Shortcuts.List.Select(s => s.Owner).ToHashSet(StringComparer.Ordinal);
-            foreach (var entry in shell.Registry.Features.Where(f => f.IsRunning && owners.Contains(f.Id)))
-                if (entry.SettingsPage?.CreateView("shortcut-list") is FrameworkElement view)
-                    card.Children.Add(view);
-            if (card.Children.Count == 0) card.Children.Add(SettingsLayout.Empty("No shortcuts"));
-            page.Children.Add(card);
-        }
-        // The list changes on every shortcut set or refused too; only a feature arriving or leaving rebuilds the page.
-        string shown = "";
-        void Rebuild()
-        {
-            string owners = string.Join(",", shell.Shortcuts.List.Select(s => s.Owner).Distinct());
-            if (owners == shown) return;
-            shown = owners;
-            Build();
-        }
-        void Changed(object? sender, EventArgs e) => Dispatcher.BeginInvoke(Build);
-        void ListChanged() => Dispatcher.BeginInvoke(Rebuild);
-        Loaded += (_, _) => { shell.Registry.Changed += Changed; shell.Shortcuts.Changed += ListChanged; Build(); };
-        Unloaded += (_, _) => { shell.Registry.Changed -= Changed; shell.Shortcuts.Changed -= ListChanged; };
-        Build();
-        Content = page;
-    }
-}
-
 internal sealed class AboutPage : UserControl
 {
     private readonly StackPanel _page = new();
