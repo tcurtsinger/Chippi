@@ -1,6 +1,7 @@
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <UseWPF>true</UseWPF>
     <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
   </PropertyGroup>
   <PropertyGroup>
@@ -10,5 +11,8 @@
     <PackageReference Include="Microsoft.Windows.CsWin32" PrivateAssets="all" />
     <AdditionalFiles Include="**\NativeMethods.txt" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../Chippi.Core/Chippi.Core.csproj" />
+    <ProjectReference Include="../../Chippi.UI/Chippi.UI.csproj" />
+  </ItemGroup>
 </Project>
-

@@ -213,6 +213,13 @@ public partial class App : Application
         shell.Registry.Register(new Chippi.Features.CloseProtection.CloseProtectionModule(() =>
             new Chippi.Features.CloseProtection.WindowsCloseDesktop()));
 
+        // Native tracking: constructed lazily, acquired only when installed and switched on.
+        shell.Registry.Register(new Chippi.Features.FocusFollowsMouse.FocusFollowsMouseModule(() =>
+            new Chippi.Features.FocusFollowsMouse.FocusTrackingEngine(
+                new Chippi.Features.FocusFollowsMouse.WindowsTrackingSettings(),
+                new Chippi.Features.FocusFollowsMouse.TrackingJournal(Path.Combine(shell.Services.DataRoot,
+                    Chippi.Features.FocusFollowsMouse.FocusFollowsMouseModule.Id, "ownership.json")))));
+
         // [WS2] "Coming soon" placeholders for the PLAN.md features.
         Settings.Features.FeatureCatalog.RegisterPlaceholders(shell.Registry);
 

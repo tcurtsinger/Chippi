@@ -3,6 +3,8 @@
 
 using Chippi.Features.FocusFollowsMouse;
 
+using System.IO;
+
 namespace Chippi.Features.FocusFollowsMouse.Tests;
 
 public sealed class FocusTrackingTests
@@ -23,7 +25,7 @@ public sealed class FocusTrackingTests
         for (var i = 0; i < 3; i++)
         {
             engine.SetPaused(true);
-            Assert.Equal(new[] { enabled, raise, delay }, settings.Values);
+            Assert.Equal(new[] { 0u, raise, delay }, settings.Values);
             engine.SetPaused(false);
             Assert.Equal(new uint[] { 1, 1, 250 }, settings.Values);
         }

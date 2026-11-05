@@ -3,6 +3,8 @@
 
 using System.Text.Json;
 
+using System.IO;
+
 namespace Chippi.Features.FocusFollowsMouse;
 
 public sealed class TrackingJournal(string path) : ITrackingJournal

@@ -45,6 +45,7 @@
     <ProjectReference Include="..\Features\Chippi.Features.AgentUsage\Chippi.Features.AgentUsage.csproj" />
     <ProjectReference Include="..\Features\Chippi.Features.CleaningMode\Chippi.Features.CleaningMode.csproj" />
     <ProjectReference Include="..\Features\Chippi.Features.CloseProtection\Chippi.Features.CloseProtection.csproj" />
+    <ProjectReference Include="..\Features\Chippi.Features.FocusFollowsMouse\Chippi.Features.FocusFollowsMouse.csproj" />
     <ProjectReference Include="..\Features\Chippi.Features.CommandBar\Chippi.Features.CommandBar.csproj" />
     <ProjectReference Include="..\Features\Chippi.Features.RadialMenu\Chippi.Features.RadialMenu.csproj" />
     <ProjectReference Include="..\Features\Chippi.Features.Debounce\Chippi.Features.Debounce.csproj" />
@@ -82,4 +83,3 @@
     </ItemGroup>
   </Target>
 </Project>
-

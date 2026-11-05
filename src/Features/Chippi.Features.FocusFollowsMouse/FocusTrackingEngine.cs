@@ -45,7 +45,8 @@ public sealed class FocusTrackingEngine(ITrackingSettings settings, ITrackingJou
         if (Enabled) return;
         Recover();
         _original = Enum.GetValues<TrackingSetting>().ToDictionary(key => key, settings.Read);
-        if (!Paused) Apply();
+        if (Paused) PauseTracking();
+        else Apply();
         Enabled = true;
     }
 
@@ -55,10 +56,18 @@ public sealed class FocusTrackingEngine(ITrackingSettings settings, ITrackingJou
         if (Paused == paused) return;
         if (Enabled)
         {
-            if (paused) Restore();
+            if (paused) PauseTracking();
             else Apply();
         }
         Paused = paused;
+    }
+
+    private void PauseTracking()
+    {
+        Restore();
+        // Fullscreen pause must turn native tracking off even when it was on before Chippi.
+        // Own that temporary override too, so disable or crash recovery restores the original.
+        if (settings.Read(TrackingSetting.Enabled) != 0) Write(TrackingSetting.Enabled, 0);
     }
 
     private void Apply()

@@ -2,6 +2,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <UseWPF>true</UseWPF>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
   </PropertyGroup>
@@ -11,5 +12,11 @@
     <PackageReference Include="xunit.runner.visualstudio" />
     <Using Include="Xunit" />
     <ProjectReference Include="../../src/Features/Chippi.Features.FocusFollowsMouse/Chippi.Features.FocusFollowsMouse.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="../Chippi.Island.Tests/WpfTestThread.cs" Link="WpfTestThread.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/Chippi.App/Chippi.App.csproj" />
   </ItemGroup>
 </Project>
