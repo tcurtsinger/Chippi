@@ -43,6 +43,15 @@ public sealed class ShellContext
         Services.Clipboard = Clipboard = new ClipboardHub(new WindowsClipboardSystem(), new WindowsForeground(), log: loggerFactory.CreateLogger("Clipboard"));
         // Its thread starts on first use; no hook goes in until a feature needs one.
         Services.Input = Input = new InputHub(loggerFactory.CreateLogger("Input"));
+#if DEBUG
+        // The watchdog's Sandbox check: Windows dropping both hooks unannounced, N seconds after start.
+        if (int.TryParse(Environment.GetEnvironmentVariable("CHIPPI_INPUT_DROP_HOOKS"), out int dropAfter))
+            _dropHooks = new Timer(_ =>
+            {
+                Input.DropHook(Chippi.Core.Input.InputDevices.Keyboard);
+                Input.DropHook(Chippi.Core.Input.InputDevices.Mouse);
+            }, null, TimeSpan.FromSeconds(dropAfter), Timeout.InfiniteTimeSpan);
+#endif
         Registry = new ModuleRegistry(config, Island, loggerFactory, Services);
         Startup = string.IsNullOrWhiteSpace(devProfile)
             ? new StartupRegistration()
@@ -67,6 +76,10 @@ public sealed class ShellContext
 
     /// <summary>The shared keyboard and mouse hooks. Disposed at exit, after the modules stop.</summary>
     public InputHub Input { get; }
+
+#if DEBUG
+    private readonly Timer? _dropHooks;
+#endif
 
     /// <summary>Windows' media sessions, set by the island at start; Settings › Now Playing shares them.</summary>
     public Island.Media.IMediaSessions? Media { get; internal set; }

@@ -174,6 +174,7 @@ public sealed class InputHub : IInputHub, IDisposable
                 return 0;
             case WmTimer:
                 Guard(() => _core!.Tick());
+                _timings?.Tick();
                 return 0;
             case WmSessionChange when wParam == SessionLock:
                 Guard(() => _core!.SessionChanged());

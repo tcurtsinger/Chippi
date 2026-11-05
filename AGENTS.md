@@ -54,7 +54,9 @@ A Windows 11 tray app for the owner's own PC (C#, .NET 10, WPF): a widget on the
 ## The owner's PC
 
 - **Real input:** never click or type on the desktop while a fullscreen app or Zoom is in front; `build/fullscreen-check.ps1` exits 1 then. Never send keys blind: confirm what's in front first.
-- **Clipboard:** never read, write or log the owner's real clipboard. Clipboard and input checks run only in Windows Sandbox (a `.wsb` with clipboard redirection and networking off). A probe there drives the real hooks with `SendInput`: the Radial menu's hooks pass on only input Chippi sends itself (marked in its extra info), so a probe's input counts as a hand's.
+- **Clipboard:** never read, write or log the owner's real clipboard. Clipboard and input checks run only in Windows Sandbox (a `.wsb` with clipboard redirection and networking off). A probe there drives the real hooks with `SendInput`: the input hub passes on untouched only input Chippi sends itself (`ChippiInput.Marker` in its extra info), so a probe's input counts as a hand's.
+- **Input checks in the Sandbox:** `tests/Chippi.Input.Tests/Sandbox/run.ps1` (its README) runs a self-contained build there against a target window and writes what arrived; it refuses while a fullscreen app is in front or another Sandbox runs. `dotnet publish` needs `pwsh` for the soundboard tools, so build the app self-contained instead.
+- **Hooks:** no feature hooks the keyboard or mouse itself. It adds a filter to `ModuleContext.Input`, the shell's one input hub (`Chippi.Input`, docs/phase-6/architecture.md section 2), and its tests feed the filter by hand or use the hub's fakes in `Chippi.Input.Tests`. `CHIPPI_INPUT_TIMINGS` names a report of the hooks' time per event.
 - **Ask first** before installing anything or changing the audio setup.
 - **No sound** without warning.
 - **No CPU stress tests:** one froze the PC.
