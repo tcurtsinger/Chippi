@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using Chippi.Core.Shortcuts;
+using Chippi.UI.Shortcuts;
 using System.IO;
 using System.Windows;
 using System.Windows.Automation;
@@ -250,7 +252,7 @@ public sealed class RadialMenuSettingsPage : UserControl
             CancelShortcut();
             return;
         }
-        if (MicShortcut.From(e) is not { } shortcut)
+        if (ShortcutKeys.From(e) is not { } shortcut)
             return;
         _capturingShortcut = false;
         _module.CaptureShortcut(false);

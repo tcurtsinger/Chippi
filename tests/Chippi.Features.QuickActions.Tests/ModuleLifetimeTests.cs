@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using Chippi.Core.Shortcuts;
 using System.IO;
 using Chippi.Core.Island;
 using Chippi.Core.Modules;
@@ -164,7 +165,7 @@ public sealed class ModuleLifetimeTests
     {
         using var f = new Fixture();
         await f.Start();
-        var original = new MicShortcut(ShortcutModifiers.Control | ShortcutModifiers.Alt, 0x44);
+        var original = new KeyShortcut(ShortcutModifiers.Control | ShortcutModifiers.Alt, 0x44);
         var replacement = original with { Key = 0x45 };
         Assert.True(f.Module.ChangeShortcut(QuickActionId.Dark, original));
         f.Settings.Fail = true;
@@ -187,7 +188,7 @@ public sealed class ModuleLifetimeTests
     {
         using var f = new Fixture();
         await f.Start();
-        var original = new MicShortcut(ShortcutModifiers.Control | ShortcutModifiers.Alt, 0x44);
+        var original = new KeyShortcut(ShortcutModifiers.Control | ShortcutModifiers.Alt, 0x44);
         var replacement = original with { Key = 0x45 };
         Assert.True(f.Module.ChangeShortcut(QuickActionId.Dark, original));
         f.Settings.Fail = true;
@@ -226,16 +227,17 @@ public sealed class ModuleLifetimeTests
         public IIslandTile AddIslandTile(IslandTileSpec spec) => new IslandTileContribution(QuickActionsModule.Id, spec);
         public void SetSettingsPage(Func<string?, object> factory) { }
     }
-    private sealed class Hotkey : IMicHotkey
+    private sealed class Hotkey : IHotkey
     {
-        public MicShortcut? Current;
-        public Func<MicShortcut, bool>? CanRegister;
-        public bool Register(MicShortcut shortcut, Action pressed)
+        public KeyShortcut? Current;
+        public Func<KeyShortcut, bool>? CanRegister;
+        public bool Register(KeyShortcut shortcut, Action pressed)
         {
             if (CanRegister?.Invoke(shortcut) == false) return false;
             Current = shortcut;
             return true;
         }
+        public void Unregister() => Current = null;
         public void Dispose() => Current = null;
     }
     private sealed class ControlledPc : IQuickSystem

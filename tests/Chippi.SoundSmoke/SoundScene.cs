@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
+using Chippi.Core.Shortcuts;
 using System.IO;
 using System.Windows;
 using System.Windows.Threading;
@@ -170,10 +171,10 @@ internal sealed class SoundScene : IAsyncDisposable
     }
 }
 
-internal sealed class FakeHotkey : IMicHotkey
+internal sealed class FakeHotkey : IHotkey
 {
     public bool Disposed { get; private set; }
-    public bool Register(MicShortcut shortcut, Action pressed) => true;
+    public bool Register(KeyShortcut shortcut, Action pressed) => true;
     public void Dispose() => Disposed = true;
 }
 

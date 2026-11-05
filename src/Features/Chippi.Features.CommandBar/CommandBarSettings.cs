@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using Chippi.Core.Shortcuts;
 using Chippi.Features.CommandBar.Search;
 using Chippi.Features.Sound.Mute;
 using System.Text.Json.Serialization;
@@ -42,7 +43,7 @@ public sealed record HiddenResult(string Key, string Name, string Kind)
 public sealed record CommandBarSettings
 {
     /// <summary>Ctrl+Alt+Space (Travis's pick, docs/phase-5.5/command-bar.md).</summary>
-    public static MicShortcut DefaultShortcut { get; } = new(ShortcutModifiers.Control | ShortcutModifiers.Alt, 0x20);
+    public static KeyShortcut DefaultShortcut { get; } = new(ShortcutModifiers.Control | ShortcutModifiers.Alt, 0x20);
 
     public WebEngine WebSearch { get; init; } = WebEngine.Google;
 
@@ -53,7 +54,7 @@ public sealed record CommandBarSettings
     public List<HiddenResult> Hidden { get; init; } = [];
 
     /// <summary>The shortcut; null once removed.</summary>
-    public MicShortcut? Shortcut { get; init; } = DefaultShortcut;
+    public KeyShortcut? Shortcut { get; init; } = DefaultShortcut;
 
     /// <summary>Recover structurally valid but incomplete settings without rewriting the saved file on load.</summary>
     internal CommandBarSettings Normalize() => this with

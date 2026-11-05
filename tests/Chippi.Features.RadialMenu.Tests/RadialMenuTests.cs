@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using Chippi.Core.Shortcuts;
 using System.Windows.Media;
 using Chippi.Core.Clipboard;
 using Chippi.Core.Island;
@@ -184,7 +185,7 @@ public sealed class RadialMenuTests
     {
         var f = new Fixture { Slices = [Slice(MediaAction.PlayPause), Slice(MediaAction.Next)] };
         f.StartAsync().GetAwaiter().GetResult();
-        Assert.True(f.Module.ChangeShortcut(new MicShortcut(ShortcutModifiers.Control | ShortcutModifiers.Alt, 0x52)));
+        Assert.True(f.Module.ChangeShortcut(new KeyShortcut(ShortcutModifiers.Control | ShortcutModifiers.Alt, 0x52)));
         f.Hotkey.Pressed!();
         Assert.False(f.Module.Open!.Holding);
         Assert.Equal(1, f.Input.ByShortcut);

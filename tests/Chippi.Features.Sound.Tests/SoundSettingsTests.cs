@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using Chippi.Core.Shortcuts;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Automation.Peers;
@@ -206,13 +207,13 @@ public sealed class SoundSettingsTests
             await Until(() => f.Module.Settings.Shortcut is null);
             Assert.Null(f.Module.Settings.Shortcut);
             Assert.Null(f.Settings.Value.Shortcut);
-            Assert.True(f.Hotkey.Disposed);
+            Assert.Null(f.Hotkey.Current); // still listed, unset
             view = new MicMuteView(f.Module);
             Assert.Contains(Descendants(view).OfType<TextBlock>(), t => t.Text == "Not set");
             Assert.Contains(Descendants(view).OfType<Button>(), b => AutomationProperties.GetName(b) == "Set shortcut");
             Assert.DoesNotContain(Descendants(view).OfType<Button>(), b => AutomationProperties.GetName(b) == "Remove shortcut");
         });
-        var keys = new MicShortcut(ShortcutModifiers.Control | ShortcutModifiers.Alt, 0x4B);
+        var keys = new KeyShortcut(ShortcutModifiers.Control | ShortcutModifiers.Alt, 0x4B);
         Assert.True(f.Module.ChangeShortcut(keys));
         Assert.Equal(keys, f.Hotkey.Current);
         Assert.Equal(keys, f.Settings.Value.Shortcut);

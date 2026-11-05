@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using Chippi.Core.Shortcuts;
 using System.Windows.Media;
 using Chippi.Core.Clipboard;
 using Chippi.Core.Island;
@@ -165,16 +166,17 @@ internal sealed class FakeInput : IWheelInput
     public void Dispose() { }
 }
 
-internal sealed class FakeHotkey : IMicHotkey
+internal sealed class FakeHotkey : IHotkey
 {
     public Action? Pressed;
 
-    public bool Register(MicShortcut shortcut, Action pressed)
+    public bool Register(KeyShortcut shortcut, Action pressed)
     {
         Pressed = pressed;
         return true;
     }
 
+    public void Unregister() => Pressed = null;
     public void Dispose() => Pressed = null;
 }
 

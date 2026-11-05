@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using Chippi.Core.Shortcuts;
 using Chippi.Audio;
 using Chippi.Features.Sound.Mute;
 
@@ -44,7 +45,7 @@ public sealed record RoutingSettings
     public RoutingList Microphone { get; init; } = new();
 
     /// <summary>Switches to the next connected output; not set until the user records one.</summary>
-    public MicShortcut? SwitchShortcut { get; init; }
+    public KeyShortcut? SwitchShortcut { get; init; }
 
     public RoutingList For(AudioFlow flow) => flow == AudioFlow.Render ? Output : Microphone;
     public RoutingSettings With(AudioFlow flow, RoutingList list) =>

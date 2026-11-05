@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using Chippi.Core.Shortcuts;
 using System.IO;
 using System.Text.Json;
 using System.Windows;
@@ -185,7 +186,7 @@ public sealed class SettingsRecoveryTests
         Assert.Equal(previous, f.Module.Settings.Shortcut);
         Assert.Equal(previous, f.Store.Value.Shortcut);
         Assert.Null(f.Hotkey.Pressed);
-        Assert.Equal(1, f.Hotkey.Disposals);
+        Assert.Equal(1, f.Hotkey.Unregisters); // the unsaved chord is let go; the shortcut stays listed
         Assert.Equal("Save failed · Shortcut inactive", f.Module.ShortcutError);
     }
 
@@ -291,7 +292,7 @@ public sealed class SettingsRecoveryTests
     public void Previously_hidden_entries_recover_their_category(string kind, ResultSwitch expected) =>
         Assert.Equal(expected, new HiddenResult("legacy-key", "Name", kind).Switch);
 
-    private static MicShortcut NewShortcut => new(ShortcutModifiers.Control | ShortcutModifiers.Alt, 0x4B);
+    private static KeyShortcut NewShortcut => new(ShortcutModifiers.Control | ShortcutModifiers.Alt, 0x4B);
     private static Result App(string name) => new("app:" + name, ResultKind.App, name, "App", () => Task.CompletedTask);
     private static bool IsSaveError(TextBlock text) => text.Text == "Save failed" && text.Visibility == Visibility.Visible;
     private static void Load(FrameworkElement view) => view.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));
@@ -303,6 +304,43 @@ public sealed class SettingsRecoveryTests
         if (root is T value) yield return value;
         foreach (var child in LogicalTreeHelper.GetChildren(root).OfType<DependencyObject>())
             foreach (var found in Find<T>(child)) yield return found;
+    }
+
+    [Fact]
+    public async Task Through_the_shell_list_it_is_listed_and_keys_another_Chippi_shortcut_holds_say_which()
+    {
+        var shortcuts = new ShortcutService(new Windows());
+        var mute = shortcuts.Add("mic-mute", "Mute microphone");
+        Assert.True(mute.Register(CommandBarSettings.DefaultShortcut, () => { }));
+        var module = new CommandBarModule(() => new NoPc(), null);
+        await module.StartAsync(new ModuleContext(CommandBarModule.Id, new Store(), NullLogger.Instance,
+            new IslandActivityHub().CreatePublisher(CommandBarModule.Id), new NoUi())
+        {
+            DataDirectory = Path.Combine(Path.GetTempPath(), "chippi-tests", "command-bar-settings-unused"),
+            Shortcuts = shortcuts,
+        }, default);
+        try
+        {
+            Assert.Equal("Used by Mute microphone", module.ShortcutError);
+            var bar = Assert.Single(shortcuts.List, s => s.Owner == CommandBarModule.Id);
+            Assert.Equal(("Command bar", null), (bar.Name, bar.Shortcut));
+
+            mute.Unregister();
+            Assert.True(module.ChangeShortcut(CommandBarSettings.DefaultShortcut));
+            Assert.Equal(CommandBarSettings.DefaultShortcut, shortcuts.List.Single(s => s.Owner == CommandBarModule.Id).Shortcut);
+            Assert.True(module.RemoveShortcut());
+            Assert.Null(shortcuts.List.Single(s => s.Owner == CommandBarModule.Id).Shortcut); // still listed, unset
+        }
+        finally { await module.StopAsync(default); }
+        Assert.DoesNotContain(shortcuts.List, s => s.Owner == CommandBarModule.Id);
+    }
+
+    private sealed class Windows : IHotkeyRegistrar
+    {
+        private readonly Dictionary<int, KeyShortcut> _held = [];
+        public bool Register(int id, KeyShortcut shortcut) { if (_held.ContainsValue(shortcut)) return false; _held[id] = shortcut; return true; }
+        public void Unregister(int id) => _held.Remove(id);
+        public event Action<int>? Pressed { add { } remove { } }
     }
 
     private sealed class Fixture : IDisposable
@@ -339,19 +377,20 @@ public sealed class SettingsRecoveryTests
         }
     }
 
-    private sealed class FakeHotkey : IMicHotkey
+    private sealed class FakeHotkey : IHotkey
     {
         internal Queue<bool> Outcomes { get; } = [];
-        internal MicShortcut? Shortcut;
+        internal KeyShortcut? Shortcut;
         internal Action? Pressed;
-        internal int Disposals;
-        public bool Register(MicShortcut shortcut, Action pressed)
+        internal int Disposals, Unregisters;
+        public bool Register(KeyShortcut shortcut, Action pressed)
         {
             if (Outcomes.TryDequeue(out bool available) && !available) return false;
             Shortcut = shortcut;
             Pressed = pressed;
             return true;
         }
+        public void Unregister() { Unregisters++; Pressed = null; Shortcut = null; }
         public void Dispose() { Disposals++; Pressed = null; Shortcut = null; }
     }
 

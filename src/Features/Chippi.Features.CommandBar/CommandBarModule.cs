@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using Chippi.Core.Shortcuts;
 using System.IO;
 using Chippi.Core.Clipboard;
 using Chippi.Core.Diagnostics;
@@ -29,16 +30,17 @@ public sealed class CommandBarModule : IFeatureModule
     public const string OpenCommand = "command-bar/open";
 
     private readonly Func<IPc> _createPc;
-    private readonly Func<IMicHotkey> _createHotkey;
-    private IMicHotkey? _hotkey;
+    private readonly Func<IHotkey>? _createHotkey;
+    private IHotkey? _hotkey;
     private IPc? _pc;
     private ModuleContext? _context;
     private CommandBarPage? _page;
     private bool _capturing;
 
-    public CommandBarModule() : this(() => new WindowsPc(), GlobalMicHotkey.Create) { }
+    public CommandBarModule() : this(() => new WindowsPc(), null) { }
 
-    public CommandBarModule(Func<IPc> pc, Func<IMicHotkey> hotkey)
+    /// <param name="hotkey">Its shortcut's registration (tests); null for the shell's shortcut list.</param>
+    public CommandBarModule(Func<IPc> pc, Func<IHotkey>? hotkey)
     {
         _createPc = pc;
         _createHotkey = hotkey;
@@ -70,6 +72,7 @@ public sealed class CommandBarModule : IFeatureModule
     {
         ct.ThrowIfCancellationRequested();
         _context = context;
+        _hotkey ??= CreateHotkey(); // listed in Settings › Shortcuts while it runs, set or not
         _capturing = false;
         ShortcutError = null;
         SettingsError = null;
@@ -174,7 +177,7 @@ public sealed class CommandBarModule : IFeatureModule
         _context?.SummonIslandPage(TileKey);
     }
 
-    public bool ChangeShortcut(MicShortcut shortcut)
+    public bool ChangeShortcut(KeyShortcut shortcut)
     {
         if (_context is null)
             return false;
@@ -199,8 +202,7 @@ public sealed class CommandBarModule : IFeatureModule
         bool restored = previous is not null && TryRegister(previous);
         if (!restored)
         {
-            _hotkey?.Dispose();
-            _hotkey = null; // An unsaved chord must never remain active, even if rollback also failed.
+            _hotkey?.Unregister(); // An unsaved chord must never remain active, even if rollback also failed.
         }
         ShortcutError = previous is not null && !restored ? "Save failed · Shortcut inactive" : "Save failed";
         Changed?.Invoke();
@@ -217,8 +219,7 @@ public sealed class CommandBarModule : IFeatureModule
             Changed?.Invoke();
             return false;
         }
-        _hotkey?.Dispose();
-        _hotkey = null;
+        _hotkey?.Unregister(); // still listed in Settings › Shortcuts, unset
         ShortcutError = null;
         Changed?.Invoke();
         return true;
@@ -227,12 +228,15 @@ public sealed class CommandBarModule : IFeatureModule
     /// <summary>While Settings records a shortcut, pressing ours doesn't open the Command bar.</summary>
     public void CaptureShortcut(bool capture) => _capturing = capture;
 
-    private bool TryRegister(MicShortcut shortcut)
+    /// <summary>The shortcut in the shell's list, set or not, from start to stop.</summary>
+    private IHotkey CreateHotkey() => _createHotkey?.Invoke() ?? (_context ?? throw new InvalidOperationException("Not started")).Shortcuts.Add(Id, Descriptor.Name);
+
+    private bool TryRegister(KeyShortcut shortcut)
     {
         try
         {
-            _hotkey ??= _createHotkey();
-            ShortcutError = _hotkey.Register(shortcut, Summon) ? null : "Shortcut in use";
+            _hotkey ??= CreateHotkey();
+            ShortcutError = _hotkey.Register(shortcut, Summon) ? null : _hotkey.Error ?? ShortcutService.InUse;
         }
         catch (Exception ex)
         {

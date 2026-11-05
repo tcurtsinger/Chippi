@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using Chippi.Core.Shortcuts;
+using Chippi.UI.Shortcuts;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
@@ -96,7 +98,7 @@ public sealed class OutputShortcutView : UserControl
     {
         if (!_recording) return;
         if (e.Key == Key.Escape) { CancelCapture(); e.Handled = true; return; }
-        if (MicShortcut.From(e) is not { } shortcut) return;
+        if (ShortcutKeys.From(e) is not { } shortcut) return;
         _module.ChangeShortcut(shortcut);
         _module.CaptureShortcut(false);
         _recording = false;

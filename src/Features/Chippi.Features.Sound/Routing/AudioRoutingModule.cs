@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using Chippi.Core.Shortcuts;
 using System.Globalization;
 using System.Text.RegularExpressions;
 using Chippi.Audio;
@@ -19,24 +20,24 @@ public sealed partial class AudioRoutingModule : IFeatureModule
     private static readonly AudioRole[] WithoutCalls = [AudioRole.Console, AudioRole.Multimedia];
     private readonly SemaphoreSlim _gate = new(1);
     private readonly Func<AudioEndpoint, bool> _excluded;
-    private readonly Func<IMicHotkey> _createHotkey;
+    private readonly Func<IHotkey>? _createHotkey;
     private AudioService? _audio;
     private IAsyncDisposable? _lease;
     private ModuleContext? _context;
     private IIslandTile? _tile;
-    private IMicHotkey? _hotkey;
+    private IHotkey? _hotkey;
     private volatile bool _stopping;
     private volatile bool _capturingShortcut;
 
     public AudioRoutingModule() : this(null) { }
 
     /// <param name="excluded">Verified transport endpoints supplied by the processing integration; never a name heuristic.</param>
-    /// <param name="hotkey">The output shortcut's registration; a message window, made only once a shortcut is set.</param>
-    public AudioRoutingModule(AudioService? audio, Func<AudioEndpoint, bool>? excluded = null, Func<IMicHotkey>? hotkey = null)
+    /// <param name="hotkey">The output shortcut's registration (tests); null for the shell's shortcut list.</param>
+    public AudioRoutingModule(AudioService? audio, Func<AudioEndpoint, bool>? excluded = null, Func<IHotkey>? hotkey = null)
     {
         _audio = audio;
         _excluded = excluded ?? (_ => false);
-        _createHotkey = hotkey ?? GlobalMicHotkey.Create;
+        _createHotkey = hotkey;
     }
 
     public FeatureDescriptor Descriptor { get; } = new("audio-routing", "Audio routing",
@@ -120,11 +121,9 @@ public sealed partial class AudioRoutingModule : IFeatureModule
             });
             if (Settings.SwitchShortcut is { IsValid: false })
                 Settings = Settings with { SwitchShortcut = null };
+            _hotkey = CreateHotkey(context);
             if (Settings.SwitchShortcut is { } shortcut)
-            {
-                _hotkey = _createHotkey();
-                ShortcutError = _hotkey.Register(shortcut, OnShortcut) ? null : "Shortcut in use";
-            }
+                ShortcutError = _hotkey.Register(shortcut, OnShortcut) ? null : _hotkey.Error ?? ShortcutService.InUse;
             _audio.SnapshotChanged += OnSnapshot;
             _audio.RolesChanged += OnRoles;
             Error = null;
@@ -282,11 +281,14 @@ public sealed partial class AudioRoutingModule : IFeatureModule
 
     public void CaptureShortcut(bool capture) => _capturingShortcut = capture;
 
-    public bool ChangeShortcut(MicShortcut shortcut)
+    /// <summary>The shortcut in the shell's list, set or not, from start to stop.</summary>
+    private IHotkey CreateHotkey(ModuleContext context) => _createHotkey?.Invoke() ?? context.Shortcuts.Add(Descriptor.Id, "Switch output");
+
+    public bool ChangeShortcut(KeyShortcut shortcut)
     {
         if (!shortcut.IsValid) { ShortcutError = "Shortcut unavailable"; Changed?.Invoke(); return false; }
-        if (_context is not null && !_stopping) _hotkey ??= _createHotkey();
-        if (_hotkey?.Register(shortcut, OnShortcut) != true) { ShortcutError = "Shortcut in use"; Changed?.Invoke(); return false; }
+        if (_context is not null && !_stopping) _hotkey ??= CreateHotkey(_context);
+        if (_hotkey?.Register(shortcut, OnShortcut) != true) { ShortcutError = _hotkey?.Error ?? ShortcutService.InUse; Changed?.Invoke(); return false; }
         ShortcutError = null;
         Settings = Settings with { SwitchShortcut = shortcut };
         _context?.Settings.Save(Settings);
@@ -296,8 +298,7 @@ public sealed partial class AudioRoutingModule : IFeatureModule
 
     public void RemoveShortcut()
     {
-        _hotkey?.Dispose();
-        _hotkey = null;
+        _hotkey?.Unregister(); // still listed in Settings › Shortcuts, unset
         ShortcutError = null;
         Settings = Settings with { SwitchShortcut = null };
         _context?.Settings.Save(Settings);

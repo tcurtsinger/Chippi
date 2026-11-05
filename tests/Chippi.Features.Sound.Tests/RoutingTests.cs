@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using Chippi.Core.Shortcuts;
 using System.Text.Json;
 using Chippi.Audio;
 using Chippi.Features.Sound.Routing;
@@ -388,7 +389,7 @@ public sealed class RoutingTests
         f.System.Disconnect("Gone");
         await Until(() => f.Module.Snapshot.Find("Gone")?.IsActive == false);
         Assert.Null(f.Hotkey.Current); // nothing registered by default
-        var keys = new Mute.MicShortcut(Mute.ShortcutModifiers.Control | Mute.ShortcutModifiers.Alt, 0x4F);
+        var keys = new KeyShortcut(ShortcutModifiers.Control | ShortcutModifiers.Alt, 0x4F);
         Assert.True(f.Module.ChangeShortcut(keys));
         Assert.Equal(keys, f.Settings.Value.SwitchShortcut);
 
@@ -404,7 +405,7 @@ public sealed class RoutingTests
         Assert.Equal(["A", "B", "C", "Gone"], f.Module.Settings.Output.Devices.Select(d => d.Id));
 
         f.Module.RemoveShortcut();
-        Assert.True(f.Hotkey.Disposed);
+        Assert.Null(f.Hotkey.Current); // still listed, unset
         Assert.Null(f.Settings.Value.SwitchShortcut);
     }
 
@@ -413,12 +414,12 @@ public sealed class RoutingTests
     {
         await using var f = new RoutingFixture();
         f.System.With(Speaker("A"), Speaker("B")).WithDefault("A");
-        f.Settings.Value = new() { SwitchShortcut = new(Mute.ShortcutModifiers.Control | Mute.ShortcutModifiers.Alt, 0x4F) };
+        f.Settings.Value = new() { SwitchShortcut = new(ShortcutModifiers.Control | ShortcutModifiers.Alt, 0x4F) };
         f.Hotkey.Available = false;
         await f.Start();
         Assert.Equal("Shortcut in use", f.Module.ShortcutError);
         f.Hotkey.Available = true;
-        Assert.True(f.Module.ChangeShortcut(new(Mute.ShortcutModifiers.Control | Mute.ShortcutModifiers.Alt, 0x50)));
+        Assert.True(f.Module.ChangeShortcut(new(ShortcutModifiers.Control | ShortcutModifiers.Alt, 0x50)));
         Assert.Null(f.Module.ShortcutError);
     }
 

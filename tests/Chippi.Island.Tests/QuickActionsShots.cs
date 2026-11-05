@@ -2,6 +2,7 @@
 // Copyright (C) Chippi contributors
 
 #if DEBUG
+using Chippi.Core.Shortcuts;
 using System.IO;
 using System.Windows;
 using System.Windows.Automation;
@@ -311,9 +312,9 @@ public sealed class QuickActionsShots
         public void SetSettingsPage(Func<string?, object> factory) => Page = factory;
     }
 
-    private sealed class NoHotkey : IMicHotkey
+    private sealed class NoHotkey : IHotkey
     {
-        public bool Register(MicShortcut shortcut, Action pressed) => true;
+        public bool Register(KeyShortcut shortcut, Action pressed) => true;
         public void Dispose() { }
     }
 }

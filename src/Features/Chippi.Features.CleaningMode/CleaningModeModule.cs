@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using Chippi.Core.Shortcuts;
 using Chippi.Core.Diagnostics;
 using Chippi.Core.Modules;
 using Chippi.Features.CleaningMode.Screens;
@@ -12,7 +13,7 @@ namespace Chippi.Features.CleaningMode;
 /// <summary>Cleaning mode's settings: its shortcut, none by default.</summary>
 public sealed record CleaningModeSettings
 {
-    public MicShortcut? Shortcut { get; init; }
+    public KeyShortcut? Shortcut { get; init; }
 }
 
 /// <summary>
@@ -25,16 +26,16 @@ public sealed class CleaningModeModule : IFeatureModule
     public const string Id = "cleaning-mode";
 
     private readonly CleaningSession _session;
-    private readonly Func<IMicHotkey> _createHotkey;
-    private IMicHotkey? _hotkey;
+    private readonly Func<IHotkey>? _createHotkey;
+    private IHotkey? _hotkey;
     private ModuleContext? _context;
     private bool _capturing;
 
-    public CleaningModeModule() : this(null, null, GlobalMicHotkey.Create) { }
+    public CleaningModeModule() : this(null, null, null) { }
 
     /// <param name="keyboard">The lock; null for the real one, a filter in the shell's input hub.</param>
     /// <param name="screens">The black screens; null for the real ones, whose Chippi wears the colour picked for him.</param>
-    public CleaningModeModule(IKeyboardLock? keyboard, Func<ICleaningScreens>? screens, Func<IMicHotkey> hotkey)
+    public CleaningModeModule(IKeyboardLock? keyboard, Func<ICleaningScreens>? screens, Func<IHotkey>? hotkey)
     {
         keyboard ??= new KeyboardLock(() => _context?.Input ?? throw new InvalidOperationException("Cleaning mode needs the input hub"));
         _session = new CleaningSession(keyboard, screens ?? (() => new CleaningScreens(_context?.ChippiColor() ?? Core.Config.PetColor.Synth)));
@@ -66,6 +67,7 @@ public sealed class CleaningModeModule : IFeatureModule
     {
         ct.ThrowIfCancellationRequested();
         _context = context;
+        _hotkey ??= CreateHotkey(); // listed in Settings › Shortcuts while it runs, set or not
         _capturing = false;
         ShortcutError = null;
         Settings = context.Settings.Get<CleaningModeSettings>();
@@ -121,7 +123,7 @@ public sealed class CleaningModeModule : IFeatureModule
 
     // Its shortcut: none by default, as Paste as plain text's.
 
-    public bool ChangeShortcut(MicShortcut shortcut)
+    public bool ChangeShortcut(KeyShortcut shortcut)
     {
         if (_context is null)
             return false;
@@ -146,8 +148,7 @@ public sealed class CleaningModeModule : IFeatureModule
     {
         if (_context is null)
             return;
-        _hotkey?.Dispose();
-        _hotkey = null;
+        _hotkey?.Unregister(); // still listed in Settings › Shortcuts, unset
         ShortcutError = null;
         Settings = Settings with { Shortcut = null };
         _context.Settings.Save(Settings);
@@ -157,12 +158,15 @@ public sealed class CleaningModeModule : IFeatureModule
     /// <summary>While Settings records a shortcut, pressing ours doesn't start Cleaning mode.</summary>
     public void CaptureShortcut(bool capture) => _capturing = capture;
 
-    private bool TryRegister(MicShortcut shortcut)
+    /// <summary>The shortcut in the shell's list, set or not, from start to stop.</summary>
+    private IHotkey CreateHotkey() => _createHotkey?.Invoke() ?? (_context ?? throw new InvalidOperationException("Not started")).Shortcuts.Add(Id, Descriptor.Name);
+
+    private bool TryRegister(KeyShortcut shortcut)
     {
         try
         {
-            _hotkey ??= _createHotkey();
-            ShortcutError = _hotkey.Register(shortcut, StartFromShortcut) ? null : "Shortcut in use";
+            _hotkey ??= CreateHotkey();
+            ShortcutError = _hotkey.Register(shortcut, StartFromShortcut) ? null : _hotkey.Error ?? ShortcutService.InUse;
         }
         catch (Exception ex)
         {

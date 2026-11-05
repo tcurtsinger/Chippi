@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using Chippi.Core.Shortcuts;
 using Chippi.Features.Sound.Mute;
 
 namespace Chippi.Features.RadialMenu;
@@ -60,7 +61,7 @@ public sealed record RadialMenuSettings
     public bool HoldForward { get; init; }
 
     /// <summary>The keyboard shortcut; null until recorded.</summary>
-    public MicShortcut? Shortcut { get; init; }
+    public KeyShortcut? Shortcut { get; init; }
 
     /// <summary>
     /// Settings › Radial menu › Open over fullscreen apps: on (the default, as before Phase 6), the wheel opens over a game

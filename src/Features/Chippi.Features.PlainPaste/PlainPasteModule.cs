@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
+using Chippi.Core.Shortcuts;
 using System.IO;
 using Chippi.Core.Clipboard;
 using Chippi.Core.Island;
@@ -11,7 +12,7 @@ namespace Chippi.Features.PlainPaste;
 public sealed record PlainPasteSettings
 {
     // Reuse Mic mute's shortcut value/registrar, without its default combination or audio service.
-    public MicShortcut? Shortcut { get; init; }
+    public KeyShortcut? Shortcut { get; init; }
 }
 
 /// <summary>Shortcut only. No clipboard listener, tile, page, notification or successful-paste status.</summary>
@@ -20,18 +21,18 @@ public sealed class PlainPasteModule : IFeatureModule
     public const string Id = "paste-plain-text";
     public const string FeedbackKey = "plain-paste";
     public static readonly TimeSpan FeedbackDuration = TimeSpan.FromSeconds(6);
-    private readonly Func<IMicHotkey> _create;
+    private readonly Func<IHotkey>? _create;
     private readonly TimeProvider _time;
     private readonly SemaphoreSlim _running = new(1, 1);
     private readonly Lock _feedbackGate = new();
     private ModuleContext? _context;
-    private IMicHotkey? _hotkey;
+    private IHotkey? _hotkey;
     private ITimer? _timer;
     private DateTimeOffset _expires;
     private volatile bool _stopping = true, _capturing;
 
-    public PlainPasteModule(Func<IMicHotkey>? createHotkey = null, TimeProvider? time = null)
-    { _create = createHotkey ?? GlobalMicHotkey.Create; _time = time ?? TimeProvider.System; }
+    public PlainPasteModule(Func<IHotkey>? createHotkey = null, TimeProvider? time = null)
+    { _create = createHotkey; _time = time ?? TimeProvider.System; }
     public FeatureDescriptor Descriptor { get; } = new(Id, "Paste as plain text", "Pastes without the source formatting", FeatureGroup.ClipboardText)
     {
         Icon = "ClipboardType", Requires = [Capability.InputHooks],
@@ -50,28 +51,31 @@ public sealed class PlainPasteModule : IFeatureModule
         if (Settings.Shortcut is { IsValid: false }) Settings = new();
         _timer = _time.CreateTimer(_ => Expire(), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
         if (Settings.Shortcut is { } shortcut) _hotkey = Reserve(shortcut);
+        _hotkey ??= Create(); // listed in Settings › Shortcuts while it runs, set or not
         context.Ui.SetSettingsPage(section => new PlainPasteView(this, section == "shortcut-list" ? Descriptor.Name : "Shortcut"));
         return Task.CompletedTask;
     }
-    private IMicHotkey? Reserve(MicShortcut shortcut)
+    private IHotkey? Reserve(KeyShortcut shortcut)
     {
-        IMicHotkey? candidate = null;
+        IHotkey? candidate = null;
+        // With no keys held, the listed shortcut takes them itself; a change holds the new keys apart until it's saved.
+        bool fresh = _hotkey is null || Settings.Shortcut is not null;
         try
         {
-            candidate = _create();
+            candidate = fresh ? Create() : _hotkey!;
             if (candidate.Register(shortcut, () => { if (ReferenceEquals(candidate, _hotkey)) OnShortcut(); }))
             {
                 ShortcutError = null;
                 return candidate;
             }
-            ShortcutError = "Shortcut in use";
+            ShortcutError = candidate.Error ?? ShortcutService.InUse;
         }
         catch { ShortcutError = "Shortcut unavailable"; }
-        candidate?.Dispose();
+        if (fresh) candidate?.Dispose();
         return null;
     }
 
-    private bool Save(MicShortcut? shortcut)
+    private bool Save(KeyShortcut? shortcut)
     {
         var candidate = Settings with { Shortcut = shortcut };
         try { _context!.Settings.Save(candidate); }
@@ -85,7 +89,7 @@ public sealed class PlainPasteModule : IFeatureModule
         return true;
     }
 
-    public bool ChangeShortcut(MicShortcut shortcut)
+    public bool ChangeShortcut(KeyShortcut shortcut)
     {
         if (_stopping) return false;
         if (!shortcut.IsValid) { ShortcutError = "Shortcut unavailable"; Changed?.Invoke(); return false; }
@@ -100,9 +104,10 @@ public sealed class PlainPasteModule : IFeatureModule
         bool saved = replacement is not null && Save(shortcut);
         if (saved)
         {
-            _hotkey?.Dispose();
+            if (!ReferenceEquals(_hotkey, replacement)) _hotkey?.Dispose();
             _hotkey = replacement;
         }
+        else if (ReferenceEquals(replacement, _hotkey)) replacement?.Unregister(); // the unsaved keys never stay held
         else replacement?.Dispose();
         Changed?.Invoke();
         return saved;
@@ -111,13 +116,13 @@ public sealed class PlainPasteModule : IFeatureModule
     {
         if (_stopping) return;
         if (Save(null))
-        {
-            _hotkey?.Dispose();
-            _hotkey = null;
-        }
+            _hotkey?.Unregister(); // still listed, unset
         Changed?.Invoke();
     }
     public void CaptureShortcut(bool capture) => _capturing = capture;
+
+    /// <summary>A shortcut in the shell's list. A change reserves a new one before the old one goes.</summary>
+    private IHotkey Create() => _create?.Invoke() ?? (_context ?? throw new InvalidOperationException("Not started")).Shortcuts.Add(Id, Descriptor.Name);
     private async void OnShortcut() { try { await InvokeAsync(); } catch { /* The shortcut never logs clipboard contents or exception messages. */ } }
 
     public async Task InvokeAsync()

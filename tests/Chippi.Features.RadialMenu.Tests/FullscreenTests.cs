@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using Chippi.Core.Shortcuts;
 using System.Windows.Threading;
 using Chippi.Core.Input;
 using Chippi.Features.RadialMenu.Input;
@@ -26,7 +27,7 @@ public sealed class FullscreenTests
     public void Off_the_shortcut_steps_aside_while_a_fullscreen_app_is_in_front_and_comes_back_after() => WpfTestThread.Run(() =>
     {
         var f = new Fixture();
-        f.Settings.Value = f.Settings.Value with { Shortcut = new MicShortcut(ShortcutModifiers.Control | ShortcutModifiers.Alt, 0x52) };
+        f.Settings.Value = f.Settings.Value with { Shortcut = new KeyShortcut(ShortcutModifiers.Control | ShortcutModifiers.Alt, 0x52) };
         f.StartAsync().GetAwaiter().GetResult();
         Assert.True(f.Input.OpenOverFullscreen);
         Assert.NotNull(f.Hotkey.Pressed);

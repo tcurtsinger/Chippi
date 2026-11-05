@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using Chippi.Core.Shortcuts;
+using Chippi.UI.Shortcuts;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
@@ -126,7 +128,7 @@ public sealed class PlainPasteView : UserControl
         if (e.Key == Key.Escape) { CancelCapture(); e.Handled = true; return; }
         if (e.Key == Key.Tab || (e.Key is Key.Enter or Key.Space && Keyboard.Modifiers == ModifierKeys.None))
             return; // Normal focus traversal and keyboard activation of Cancel.
-        if (MicShortcut.From(e) is not { } shortcut)
+        if (ShortcutKeys.From(e) is not { } shortcut)
         {
             ShowModifiers(Keyboard.Modifiers);
             e.Handled = true;

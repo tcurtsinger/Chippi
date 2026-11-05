@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using Chippi.Core.Shortcuts;
 using System.IO;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -236,7 +237,7 @@ public sealed class CommandBarTests
         f.Module.RemoveShortcut();
         Assert.Null(f.Settings.Shortcut);
         Assert.Null(f.Hotkey.Pressed);
-        Assert.False(f.Module.ChangeShortcut(new MicShortcut(ShortcutModifiers.Shift, 0x20))); // Shift alone would eat typing
+        Assert.False(f.Module.ChangeShortcut(new KeyShortcut(ShortcutModifiers.Shift, 0x20))); // Shift alone would eat typing
         Assert.Equal("Shortcut unavailable", f.Module.ShortcutError);
     }
 
@@ -411,17 +412,18 @@ public sealed class CommandBarTests
         public void SetSettingsPage(Func<string?, object> page) { }
     }
 
-    private sealed class FakeHotkey : IMicHotkey
+    private sealed class FakeHotkey : IHotkey
     {
         public Action? Pressed;
-        public MicShortcut? Shortcut;
-        public bool Register(MicShortcut shortcut, Action pressed)
+        public KeyShortcut? Shortcut;
+        public bool Register(KeyShortcut shortcut, Action pressed)
         {
             Shortcut = shortcut;
             Pressed = pressed;
             return true;
         }
 
+        public void Unregister() => Pressed = null;
         public void Dispose() => Pressed = null;
     }
 }

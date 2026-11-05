@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
+using Chippi.Core.Shortcuts;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
@@ -35,9 +36,9 @@ public sealed class PlainPasteSmokeTests
         try
         {
             module.StartAsync(new ModuleContext(PlainPasteModule.Id, new Settings(), NullLogger.Instance, activities.CreatePublisher(PlainPasteModule.Id), ui) { Clipboard = hub }, default).GetAwaiter().GetResult();
-            Assert.Equal(0, registrations); Assert.NotNull(ui.SettingsFactory);
+            Assert.Equal(1, registrations); Assert.Null(key.Pressed); Assert.NotNull(ui.SettingsFactory); // listed, unset
             module.InvokeAsync().GetAwaiter().GetResult(); Assert.Equal(0, hub.Calls);
-            Assert.True(module.ChangeShortcut(new MicShortcut(ShortcutModifiers.Control | ShortcutModifiers.Alt, 0x56)));
+            Assert.True(module.ChangeShortcut(new KeyShortcut(ShortcutModifiers.Control | ShortcutModifiers.Alt, 0x56)));
             activities.CreatePublisher("fake-player").Publish(new IslandActivity("track", IslandActivityKind.Media, "Invented track", "Fake player"));
             key.Pressed!();
             Assert.Equal(1, hub.Calls); Assert.Equal(name is null ? 0 : 1, hub.Beeps);
@@ -67,7 +68,7 @@ public sealed class PlainPasteSmokeTests
     });
     private sealed class Settings : IModuleSettings { private PlainPasteSettings _value = new(); public T Get<T>() where T : class, new() => (T)(object)_value; public void Save<T>(T value) where T : class => _value = (PlainPasteSettings)(object)value; }
     private sealed class Ui : IModuleUi { public Func<string?, object>? SettingsFactory; public void SetSettingsPage(Func<string?, object> factory) => SettingsFactory = factory; public IIslandTile AddIslandTile(IslandTileSpec spec) => throw new InvalidOperationException("Shortcut-only feature must not create a tile."); }
-    private sealed class Hotkey : IMicHotkey { public Action? Pressed; public bool Disposed; public bool Register(MicShortcut shortcut, Action pressed) { Assert.True(shortcut.IsValid); Pressed = pressed; return true; } public void Dispose() { Disposed = true; Pressed = null; } }
+    private sealed class Hotkey : IHotkey { public Action? Pressed; public bool Disposed; public bool Register(KeyShortcut shortcut, Action pressed) { Assert.True(shortcut.IsValid); Pressed = pressed; return true; } public void Dispose() { Disposed = true; Pressed = null; } }
     private sealed class Hub(PasteOutcome outcome) : IClipboardHub
     {
         public int Calls, Beeps;

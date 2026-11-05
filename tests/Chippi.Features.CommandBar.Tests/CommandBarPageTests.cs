@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using Chippi.Core.Shortcuts;
 using System.IO;
 using System.Reflection;
 using System.Windows;
@@ -601,9 +602,9 @@ public sealed class CommandBarPageTests
         public void SetSettingsPage(Func<string?, object> page) { }
     }
 
-    private sealed class FakeHotkey : IMicHotkey
+    private sealed class FakeHotkey : IHotkey
     {
-        public bool Register(MicShortcut shortcut, Action pressed) => true;
+        public bool Register(KeyShortcut shortcut, Action pressed) => true;
         public void Dispose() { }
     }
 }

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using Chippi.Core.Shortcuts;
 using System.Windows;
 using Chippi.Features.RadialMenu.Input;
 using Chippi.Features.RadialMenu.Pc;
@@ -317,7 +318,7 @@ public sealed class WheelTests
         var middle = new Slice { Kind = SliceKind.Submenu, Name = "B", Slices = [.. Enumerable.Repeat(Media(MediaAction.Mute), 9), deep] };
         var settings = new RadialMenuSettings
         {
-            Shortcut = new MicShortcut(ShortcutModifiers.Windows, 0x52),
+            Shortcut = new KeyShortcut(ShortcutModifiers.Windows, 0x52),
             Slices = [.. Enumerable.Repeat(new Slice { Kind = SliceKind.Submenu, Name = "A", Slices = [middle] }, 10)],
         }.Checked();
         Assert.Null(settings.Shortcut);

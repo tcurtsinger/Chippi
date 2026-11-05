@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using Chippi.Core.Shortcuts;
 using System.Text.Json;
 using System.Windows.Controls;
 using Chippi.Core.Clipboard;
@@ -31,16 +32,17 @@ public sealed class QuickActionsTests
         public void SetSettingsPage(Func<string?, object> page) => Page = page;
     }
 
-    private sealed class Hotkey : IMicHotkey
+    private sealed class Hotkey : IHotkey
     {
         public bool Available = true;
         public Action? Pressed;
-        public bool Register(MicShortcut shortcut, Action pressed)
+        public bool Register(KeyShortcut shortcut, Action pressed)
         {
             if (!Available) return false;
             Pressed = pressed;
             return true;
         }
+        public void Unregister() => Pressed = null;
         public void Dispose() => Pressed = null;
     }
 
@@ -77,7 +79,7 @@ public sealed class QuickActionsTests
         }, default);
     }
 
-    private static readonly MicShortcut Keys = new(ShortcutModifiers.Control | ShortcutModifiers.Alt, 0x44);
+    private static readonly KeyShortcut Keys = new(ShortcutModifiers.Control | ShortcutModifiers.Alt, 0x44);
 
     [Fact]
     public async Task The_home_button_is_Actions_with_no_status()
@@ -183,8 +185,8 @@ public sealed class QuickActionsTests
         await f.Start();
         Assert.True(f.Module.ChangeShortcut(QuickActionId.Dark, Keys));
         Assert.True(f.Module.ChangeShortcut(QuickActionId.Lock, Keys with { Key = 0x4C }));
-        f.Hotkeys[0].Pressed!();
-        f.Hotkeys[1].Pressed!();
+        f.Hotkeys[(int)QuickActionId.Dark].Pressed!();
+        f.Hotkeys[(int)QuickActionId.Lock].Pressed!();
         Assert.Equal(["set Dark True", "run Lock"], f.Pc.Calls);
         Assert.Empty(f.Opened);
         Assert.Equal("Ctrl+Alt+D", f.Settings.Value.Shortcuts["dark"].ToString());
@@ -199,7 +201,7 @@ public sealed class QuickActionsTests
         var f = new Fixture();
         await f.Start();
         Assert.True(f.Module.ChangeShortcut(id, Keys));
-        f.Hotkeys[0].Pressed!();
+        f.Hotkeys[(int)id].Pressed!();
         Assert.Empty(f.Pc.Calls);
         Assert.Equal(["quick-actions"], f.Opened);
         Assert.Equal(id, f.Module.Pending);
@@ -211,7 +213,7 @@ public sealed class QuickActionsTests
         var f = new Fixture { IslandShows = false }; // off, or a fullscreen app in front
         await f.Start();
         Assert.True(f.Module.ChangeShortcut(QuickActionId.Frozen, Keys));
-        f.Hotkeys[0].Pressed!();
+        f.Hotkeys[(int)QuickActionId.Frozen].Pressed!();
         Assert.Empty(f.Opened);
         Assert.Null(f.Module.Pending); // nothing pops up the next time Actions opens
         Assert.Empty(f.Pc.Calls);
@@ -248,7 +250,7 @@ public sealed class QuickActionsTests
         f.Pc.State = QuickState.Empty with { Drives = [new("e", "SanDisk (F:)", 62_000_000_000)] };
         await f.Start();
         Assert.True(f.Module.ChangeShortcut(QuickActionId.Eject, Keys));
-        f.Hotkeys[0].Pressed!();
+        f.Hotkeys[(int)QuickActionId.Eject].Pressed!();
         Assert.Equal(["eject SanDisk (F:)"], f.Pc.Calls);
     }
 
@@ -259,7 +261,7 @@ public sealed class QuickActionsTests
         await f.Start();
         Assert.True(f.Module.ChangeShortcut(QuickActionId.Dark, Keys));
         f.Module.CaptureShortcut(true);
-        f.Hotkeys[0].Pressed!();
+        f.Hotkeys[(int)QuickActionId.Dark].Pressed!();
         Assert.Empty(f.Pc.Calls);
     }
 
@@ -281,7 +283,7 @@ public sealed class QuickActionsTests
         Assert.True(f.Module.ChangeShortcut(QuickActionId.Dark, Keys));
         f.Module.RemoveShortcut(QuickActionId.Dark);
         Assert.Empty(f.Settings.Value.Shortcuts);
-        Assert.Null(f.Hotkeys[0].Pressed);
+        Assert.Null(f.Hotkeys[(int)QuickActionId.Dark].Pressed);
     }
 
     [Fact]

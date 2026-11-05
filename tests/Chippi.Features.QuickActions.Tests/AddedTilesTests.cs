@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using Chippi.Core.Shortcuts;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Automation.Peers;
@@ -221,9 +222,9 @@ public sealed class AddedTilesTests
         public void SetSettingsPage(Func<string?, object> factory) { }
     }
 
-    private sealed class Hotkey : IMicHotkey
+    private sealed class Hotkey : IHotkey
     {
-        public bool Register(MicShortcut shortcut, Action pressed) => true;
+        public bool Register(KeyShortcut shortcut, Action pressed) => true;
         public void Dispose() { }
     }
 }

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
+using Chippi.Core.Shortcuts;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
@@ -28,7 +29,7 @@ public sealed class PlainPasteViewTests
             Button(view, "Set").RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
             Assert.Contains(Find(view).OfType<Chippi.UI.Controls.SettingRow>(), r => r.Header == "New shortcut");
             Button(view, "Cancel").RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
-            Assert.Null(f.Module.Settings.Shortcut); Assert.Equal(0, f.Creates);
+            Assert.Null(f.Module.Settings.Shortcut); Assert.Null(f.Hotkey.Registered);
             f.Configure();
             view = new PlainPasteView(f.Module);
             Assert.Contains(Find(view).OfType<TextBlock>(), b => b.Text == "Ctrl+Alt+V");
@@ -46,7 +47,7 @@ public sealed class PlainPasteViewTests
         try
         {
             f.Configure(); f.Hotkey.Available = false;
-            Assert.False(f.Module.ChangeShortcut(new MicShortcut(ShortcutModifiers.Control, 0x42)));
+            Assert.False(f.Module.ChangeShortcut(new KeyShortcut(ShortcutModifiers.Control, 0x42)));
             var view = new PlainPasteView(f.Module);
             Assert.Contains(Find(view).OfType<TextBlock>(), b => b.Text == "Shortcut in use");
             Assert.Contains(Find(view).OfType<TextBlock>(), b => b.Text == "Ctrl+Alt+V");
