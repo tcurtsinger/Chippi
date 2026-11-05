@@ -367,6 +367,11 @@ public static class Probe
         Run 'otherKeysFastStillBoth' { [Probe]::Key(0x41, $true); [Probe]::Key(0x41, $false); [Probe]::Spin(2); [Probe]::Key(0x42, $true); [Probe]::Key(0x42, $false) }
         Run 'keyHeldRepeats' { [Probe]::Key(0x45, $true); [Probe]::Spin(300); [Probe]::Key(0x45, $true); [Probe]::Spin(33); [Probe]::Key(0x45, $true); [Probe]::Key(0x45, $false) }
         Run 'fastTypingBurst' { for ($i = 0; $i -lt 20; $i++) { [Probe]::TapTwice(0x46, 40) } }
+        [Probe]::Circle($x, $y, 150, 8000) | Out-Null
+        # Enough key events for a p99 that isn't the first call's JIT: 4,000 (hook-timings.csv, keyboard row).
+        Run 'keyBurst4000Events' { for ($i = 0; $i -lt 2000; $i++) { [Probe]::Key([uint16](0x41 + $i % 26), $true); [Probe]::Key([uint16](0x41 + $i % 26), $false); [Probe]::Spin(6) } }
+        $d.keyBurst4000Events.target = "$((($d.keyBurst4000Events.typed).Length)) letters typed of 2000"
+        $d.keyBurst4000Events.typed = ''
         $found.debounce = $d
     }
 
