@@ -24,11 +24,14 @@ public sealed class ExcludedAppsCard : Card
     private readonly Func<IReadOnlyList<string>> _get;
     private readonly Action<IEnumerable<string>> _save;
     private readonly Button _add;
+    private readonly string _title;
 
-    public ExcludedAppsCard(Func<IReadOnlyList<string>> get, Action<IEnumerable<string>> save)
+    /// <param name="title">The card's first row: "Excluded apps", or the list's own name.</param>
+    public ExcludedAppsCard(Func<IReadOnlyList<string>> get, Action<IEnumerable<string>> save, string title = "Excluded apps")
     {
         _get = get;
         _save = save;
+        _title = title;
         // A subclass doesn't pick up Card's implicit style, so ask for it: the Settings card's fill and stroke.
         SetResourceReference(StyleProperty, typeof(Card));
         _add = Button("Add app");
@@ -42,7 +45,7 @@ public sealed class ExcludedAppsCard : Card
         var apps = _get();
         Children.Clear();
         string caption = apps.Count switch { 0 => "", 1 => "1 app", int n => $"{n} apps" };
-        Children.Add(new Border { Child = SettingsLayout.Row("Excluded apps", _add, caption) });
+        Children.Add(new Border { Child = SettingsLayout.Row(_title, _add, caption) });
         foreach (var path in apps)
             Children.Add(AppRow(path));
     }
