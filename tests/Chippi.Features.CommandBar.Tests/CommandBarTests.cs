@@ -177,6 +177,14 @@ public sealed class CommandBarTests
     }
 
     [Fact]
+    public void A_snippet_says_Insert_and_where_it_came_from()
+    {
+        var f = new Fixture();
+        var snippet = Assert.Single(f.Search.Find("signature", f.Pc.OpenWindows, []), r => r.Name == "Signature");
+        Assert.Equal(("Insert", "Snippet · ;sig", "AlignLeft"), (snippet.Verb, snippet.Detail, snippet.Icon));
+    }
+
+    [Fact]
     public async Task Rows_run_what_they_say()
     {
         var f = new Fixture();
@@ -356,6 +364,7 @@ public sealed class CommandBarTests
         {
             "keep awake 2 hr" => [new("keep-awake/value", "Keep awake for 2 hr", "Coffee", () => Task.CompletedTask) { Kind = ChippiCommandKind.Value }],
             "pull" => [new("clipboard/7", "https://github.com/tcurtsinger/Chippi/pull/178", "Clipboard", () => Task.CompletedTask) { Kind = ChippiCommandKind.Paste, Detail = "Copied today, 4:12 PM" }],
+            "signature" => [new("text-snippets/1", "Signature", "AlignLeft", () => Task.CompletedTask) { Kind = ChippiCommandKind.Insert, Detail = "Snippet · ;sig" }],
             _ => [],
         };
     }

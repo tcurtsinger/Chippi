@@ -215,6 +215,7 @@ internal sealed class CommandSearch(
         Icon = command.Kind == ChippiCommandKind.Paste ? "Clipboard" : command.Icon,
         Level = command.Level,
         Opens = command.Kind == ChippiCommandKind.Page,
+        Inserts = command.Kind == ChippiCommandKind.Insert,
     };
 
     private Result Window(OpenWindow window) =>
