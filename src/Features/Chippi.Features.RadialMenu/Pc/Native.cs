@@ -98,7 +98,7 @@ internal static unsafe class Native
     public const uint MouseMiddleDown = 0x0020, MouseMiddleUp = 0x0040, MouseXDown = 0x0080, MouseXUp = 0x0100;
 
     /// <summary>Marks the input Chippi sends, so its own hook passes it on.</summary>
-    public static readonly nint Ours = 0x43_48_49_50; // "CHIP"
+    public const nint Ours = Core.Input.ChippiInput.Marker;
 
     public const int HookKeyboard = 13, HookMouse = 14;
     public const uint WmKeyDown = 0x0100, WmKeyUp = 0x0101, WmSysKeyDown = 0x0104, WmSysKeyUp = 0x0105, WmQuit = 0x0012;

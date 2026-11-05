@@ -30,11 +30,13 @@ public sealed class CleaningModeModule : IFeatureModule
     private ModuleContext? _context;
     private bool _capturing;
 
-    public CleaningModeModule() : this(new KeyboardLock(), null, GlobalMicHotkey.Create) { }
+    public CleaningModeModule() : this(null, null, GlobalMicHotkey.Create) { }
 
+    /// <param name="keyboard">The lock; null for the real one, a filter in the shell's input hub.</param>
     /// <param name="screens">The black screens; null for the real ones, whose Chippi wears the colour picked for him.</param>
-    public CleaningModeModule(IKeyboardLock keyboard, Func<ICleaningScreens>? screens, Func<IMicHotkey> hotkey)
+    public CleaningModeModule(IKeyboardLock? keyboard, Func<ICleaningScreens>? screens, Func<IMicHotkey> hotkey)
     {
+        keyboard ??= new KeyboardLock(() => _context?.Input ?? throw new InvalidOperationException("Cleaning mode needs the input hub"));
         _session = new CleaningSession(keyboard, screens ?? (() => new CleaningScreens(_context?.ChippiColor() ?? Core.Config.PetColor.Synth)));
         _session.Changed += () => Changed?.Invoke();
         _createHotkey = hotkey;
