@@ -33,18 +33,25 @@ internal static class SmokeLog
     internal static void AssertOnlyHere(string marker)
     {
         Check();
-        Assert.Contains(marker, File.ReadAllText(Log.Default.CurrentFile));
+        Assert.Contains(marker, ReadShared(Log.Default.CurrentFile));
         if (Directory.Exists(RollingFileLog.DefaultDirectory))
             foreach (string file in Directory.EnumerateFiles(RollingFileLog.DefaultDirectory, "*.log"))
             {
                 try
                 {
-                    using var stream = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
-                    using var reader = new StreamReader(stream);
-                    Assert.DoesNotContain(marker, reader.ReadToEnd());
+                    Assert.DoesNotContain(marker, ReadShared(file));
                 }
                 catch (FileNotFoundException) { } // Installed Chippi may rotate between enumeration and open.
             }
+    }
+
+    // Another test in the process may be appending to the log right now: share it like the writer does.
+    // File.ReadAllText shares Read only and fails against an open writer (main CI, 2026-11-05).
+    static string ReadShared(string file)
+    {
+        using var stream = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+        using var reader = new StreamReader(stream);
+        return reader.ReadToEnd();
     }
 
     internal static void Check()
