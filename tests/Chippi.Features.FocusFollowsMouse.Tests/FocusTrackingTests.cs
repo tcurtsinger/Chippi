@@ -131,12 +131,48 @@ public sealed class FocusTrackingTests
             if (Directory.Exists(folder)) Directory.Delete(folder);
         }
     }
+    [Fact]
+    public void FailedPauseAfterRestoreStillAllowsResumeToReapplyTracking()
+    {
+        var settings = new Settings(0, 0, 500);
+        var engine = new FocusTrackingEngine(settings, new Journal());
+        engine.SetEnabled(true);
+        settings.FailReadAfterRestore = true;
+        Assert.Throws<IOException>(() => engine.SetPaused(true));
+        Assert.True(engine.Paused);
+        Assert.Equal(new uint[] { 0, 0, 500 }, settings.Values);
+        settings.FailReadAfterRestore = false;
+        engine.SetPaused(false);
+        Assert.Equal(new uint[] { 1, 1, 250 }, settings.Values);
+    }
+
+    [Fact]
+    public void FailedResumeCanRetryTheSamePolicy()
+    {
+        var settings = new Settings(0, 0, 500);
+        var engine = new FocusTrackingEngine(settings, new Journal());
+        engine.SetEnabled(true);
+        engine.SetPaused(true);
+        settings.FailOnce = TrackingSetting.Raise;
+        Assert.Throws<IOException>(() => engine.SetPaused(false));
+        Assert.False(engine.Paused);
+        Assert.Equal(new uint[] { 0, 0, 500 }, settings.Values);
+        engine.SetPaused(false);
+        Assert.Equal(new uint[] { 1, 1, 250 }, settings.Values);
+    }
+
     private sealed class Settings(uint enabled, uint raise, uint delay) : ITrackingSettings
     {
         public uint[] Values { get; } = [enabled, raise, delay];
         public int Writes { get; private set; }
         public TrackingSetting? FailOnce { get; set; }
-        public uint Read(TrackingSetting setting) => Values[(int)setting];
+        public bool FailReadAfterRestore;
+        private bool _readFailure;
+        public uint Read(TrackingSetting setting)
+        {
+            if (_readFailure && setting == TrackingSetting.Enabled) { _readFailure = false; throw new IOException("Injected post-restore read failure"); }
+            return Values[(int)setting];
+        }
         public void Write(TrackingSetting setting, uint value)
         {
             if (FailOnce == setting)
@@ -146,6 +182,7 @@ public sealed class FocusTrackingTests
             }
             Writes++;
             Values[(int)setting] = value;
+            if (FailReadAfterRestore && setting == TrackingSetting.Delay && value == 500) _readFailure = true;
         }
     }
 

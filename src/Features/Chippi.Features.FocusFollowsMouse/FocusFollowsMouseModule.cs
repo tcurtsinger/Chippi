@@ -91,6 +91,7 @@ public sealed class FocusFollowsMouseModule(Func<FocusTrackingEngine> createEngi
             if (ReferenceEquals(_context, context)) SetPaused(context.Input?.Paused == true);
         });
     }
+
     public void SetPaused(bool paused)
     {
         lock (_gate)

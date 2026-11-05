@@ -31,6 +31,7 @@ public sealed class FocusTrackingEngine(ITrackingSettings settings, ITrackingJou
     private Dictionary<TrackingSetting, uint>? _original;
     public bool Enabled { get; private set; }
     public bool Paused { get; private set; }
+    private bool _pausePending;
 
     // Call before accepting enable requests, including when the feature is installed but off.
     public void Recover() => Restore();
@@ -55,13 +56,15 @@ public sealed class FocusTrackingEngine(ITrackingSettings settings, ITrackingJou
     // Seam for the shared fullscreen/lock policy. Pausing retains the original snapshot.
     public void SetPaused(bool paused)
     {
-        if (Paused == paused) return;
+        if (Paused == paused && !_pausePending) return;
+        Paused = paused;
+        _pausePending = true;
         if (Enabled)
         {
             if (paused) PauseTracking();
             else Apply();
         }
-        Paused = paused;
+        _pausePending = false;
     }
 
     private void PauseTracking()
