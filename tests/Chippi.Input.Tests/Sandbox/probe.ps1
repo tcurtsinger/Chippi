@@ -353,6 +353,14 @@ public static class Probe
             $before = (Text).Length
             & $act
             Start-Sleep -Milliseconds 700
+            # The target's handlers are slow PowerShell: wait until its text file stops changing, or a read lands mid-burst
+            # (and collides with the target's own append to target.log).
+            $stable = 0; $last = -1
+            for ($wait = 0; $wait -lt 120 -and $stable -lt 3; $wait++) {
+                Start-Sleep -Milliseconds 500
+                $now = (Get-Item -LiteralPath "$results\target-text.txt" -ErrorAction SilentlyContinue).Length
+                if ($now -eq $last) { $stable++ } else { $stable = 0; $last = $now }
+            }
             $typed = (Text).Substring($before)
             $d[$name] = [ordered]@{ target = ((TargetLog) -join '; '); typed = $typed }
             Note "debounce $name : $($d[$name].target) typed '$typed'"
@@ -370,7 +378,8 @@ public static class Probe
         [Probe]::Circle($x, $y, 150, 8000) | Out-Null
         # Enough key events for a p99 that isn't the first call's JIT: 4,000 (hook-timings.csv, keyboard row).
         Run 'keyBurst4000Events' { for ($i = 0; $i -lt 2000; $i++) { [Probe]::Key([uint16](0x41 + $i % 26), $true); [Probe]::Key([uint16](0x41 + $i % 26), $false); [Probe]::Spin(6) } }
-        $d.keyBurst4000Events.target = "$((($d.keyBurst4000Events.typed).Length)) letters typed of 2000"
+        $logged = @($d.keyBurst4000Events.target -split '; ' | Where-Object { $_ -like 'key down*' }).Count
+        $d.keyBurst4000Events.target = "$((($d.keyBurst4000Events.typed).Length)) letters in the text box and $logged key downs in the log, of 2000"
         $d.keyBurst4000Events.typed = ''
         $found.debounce = $d
     }
