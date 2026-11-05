@@ -64,9 +64,6 @@ public interface IQuickSystem
     /// <summary>Ends one app that has stopped responding, since a hung app can't answer a close.</summary>
     Task EndAsync(OpenApp app);
 
-    /// <summary>Ends every app that has stopped responding.</summary>
-    Task EndFrozenAppsAsync();
-
     /// <summary>Runs an action: Lock, Displays, ScreenSaver, Recycle or Explorer.</summary>
     Task RunAsync(QuickActionId id);
 

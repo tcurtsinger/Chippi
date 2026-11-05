@@ -299,7 +299,23 @@ public sealed class QuickActionsModule : IFeatureModule
 
     public Task EndAsync(OpenApp app) => ThenRefresh(pc => pc.EndAsync(app));
 
-    public Task EndFrozenAppsAsync() => ThenRefresh(pc => pc.EndFrozenAppsAsync());
+    /// <summary>Ends exactly the apps the confirm named, each only if it is still not responding; an app that hung since isn't touched.</summary>
+    public async Task EndAsync(IReadOnlyList<OpenApp> apps)
+    {
+        var reviewed = apps.ToArray();
+        var run = Active;
+        await ThenRefresh(async pc =>
+        {
+            var failed = new List<Exception>();
+            foreach (var app in reviewed)
+            {
+                if (!Current(run)) break;
+                try { await pc.EndAsync(app); }
+                catch (Exception ex) { failed.Add(ex); }
+            }
+            if (failed.Count > 0) throw new AggregateException("End failed", failed);
+        }, run);
+    }
 
     public Task RunAsync(QuickActionId id)
     {

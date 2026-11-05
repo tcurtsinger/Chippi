@@ -335,7 +335,7 @@ internal sealed partial class ActionsPage : UserControl
             Run(id);
     }
 
-    private async void Run(QuickActionId id) => await Act(id, id == QuickActionId.Frozen ? _module.EndFrozenAppsAsync : () => _module.RunAsync(id));
+    private async void Run(QuickActionId id) => await Act(id, () => _module.RunAsync(id));
 
     /// <summary>The complete tile is one semantic button or toggle, including its label and state.</summary>
     private sealed class Cell

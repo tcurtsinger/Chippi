@@ -345,7 +345,28 @@ public sealed class ActionListsTests
             Click(Find<Button>(page).Single(b => Equals(b.Tag, "end-frozen")));
             Assert.Equal("End 2 apps?", page.ConfirmationQuestion);
             Click(Find<Button>(page.Confirmation!.Child).Single(b => Equals(b.Content, "End")));
-            Assert.Equal(["end frozen"], f.Pc.Calls);
+            Assert.Equal(["end Outlook", "end Word"], f.Pc.Calls);
+        });
+    }
+
+    [Fact]
+    public void The_footer_ends_only_the_apps_its_question_named_even_if_another_hangs_meanwhile()
+    {
+        WpfTestThread.Run(() =>
+        {
+            using var f = new Fixture();
+            var outlook = new OpenApp(@"C:\Office\Outlook.exe", "Outlook", false, NotResponding: true);
+            f.Start(QuickState.Empty with { Apps = [FakePc.Chrome, outlook], Frozen = 1 }, new() { Shown = ["quit"] });
+            var page = new ActionsPage(f.Module);
+            page.OpenConfirmation = _ => { };
+            page.Press(QuickActionId.Quit);
+            Click(Find<Button>(page).Single(b => Equals(b.Tag, "end-frozen")));
+            Assert.Equal("End Outlook?", page.ConfirmationQuestion);
+            var popup = page.Confirmation!;
+            // Word hangs while the question is open.
+            f.Pc.State = f.Pc.State with { Apps = [FakePc.Chrome, outlook, new OpenApp(@"C:\Office\Word.exe", "Word", false, NotResponding: true)], Frozen = 2 };
+            Click(Find<Button>(popup.Child).Single(b => Equals(b.Content, "End")));
+            Assert.Equal(["end Outlook"], f.Pc.Calls);
         });
     }
 
@@ -429,7 +450,6 @@ public sealed class ActionListsTests
             await pc.QuitAsync(app);
         }
         public Task EndAsync(OpenApp app) => pc.EndAsync(app);
-        public Task EndFrozenAppsAsync() => pc.EndFrozenAppsAsync();
         public Task RunAsync(QuickActionId id) => pc.RunAsync(id);
         public Task PowerAsync(PowerChoice choice) => pc.PowerAsync(choice);
     }

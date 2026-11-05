@@ -65,12 +65,6 @@ internal sealed class FakePc : IQuickSystem
         return Task.CompletedTask;
     }
 
-    public Task EndFrozenAppsAsync()
-    {
-        Record("end frozen");
-        return Task.CompletedTask;
-    }
-
     public Task RunAsync(QuickActionId id)
     {
         Record($"run {id}");

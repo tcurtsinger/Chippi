@@ -121,20 +121,6 @@ internal sealed partial class AltTabApps
             throw new InvalidOperationException("End failed: the app couldn't be ended");
     }
 
-    /// <summary>Ends every app that has stopped responding; when one couldn't be ended (an elevated app), throws after the rest.</summary>
-    public static void EndFrozen()
-    {
-        int failed = 0;
-        foreach (uint pid in Frozen(List()))
-        {
-            using var process = PInvoke.OpenProcess_SafeHandle(PROCESS_ACCESS_RIGHTS.PROCESS_TERMINATE, false, pid);
-            if (process.IsInvalid || !PInvoke.TerminateProcess(process, 1))
-                failed++;
-        }
-        if (failed > 0)
-            throw new InvalidOperationException($"End frozen apps failed: {failed} couldn't be ended");
-    }
-
     /// <summary>Visible, its own app (unowned, or marked as an app window), not a tool window, not cloaked, with a title.</summary>
     private static unsafe bool IsAltTab(HWND hwnd, bool ghosted)
     {

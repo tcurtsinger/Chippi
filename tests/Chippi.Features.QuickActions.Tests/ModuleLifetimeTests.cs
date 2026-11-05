@@ -257,7 +257,6 @@ public sealed class ModuleLifetimeTests
         public Task EjectAsync(RemovableDrive drive) => Inner.EjectAsync(drive);
         public Task QuitAsync(OpenApp app) => Interlocked.Exchange(ref NextQuit, null)?.Invoke(app) ?? Inner.QuitAsync(app);
         public Task EndAsync(OpenApp app) => Inner.EndAsync(app);
-        public Task EndFrozenAppsAsync() => Inner.EndFrozenAppsAsync();
         public Task RunAsync(QuickActionId id) => Inner.RunAsync(id);
         public Task PowerAsync(PowerChoice choice) => Inner.PowerAsync(choice);
     }

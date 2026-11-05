@@ -208,12 +208,13 @@ internal sealed partial class ActionsPage
         if (frozen.Length > 0)
         {
             // Beside Quit all, in place of the old Frozen tile: ends the apps that stopped responding, after asking.
+            var targets = frozen; // the apps the question names, not whatever hangs by the time it is answered
             string what = frozen.Length == 1 ? frozen[0].Name : $"{frozen.Length} apps";
             var end = Ui.Button($"End {what}");
             end.Tag = "end-frozen";
             end.MaxWidth = 300;
             end.IsEnabled = !_running.Any(r => r.Action == QuickActionId.Quit);
-            end.Click += (_, _) => AskFirst(end, $"End {what}?", "End", async () => await Act(QuickActionId.Quit, _module.EndFrozenAppsAsync, "End failed", "bulk"));
+            end.Click += (_, _) => AskFirst(end, $"End {what}?", "End", async () => await Act(QuickActionId.Quit, () => _module.EndAsync(targets), "End failed", "bulk"));
             DockPanel.SetDock(end, Dock.Left);
             footer.Children.Add(end);
         }

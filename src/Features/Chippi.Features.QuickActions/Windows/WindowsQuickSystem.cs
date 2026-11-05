@@ -110,8 +110,6 @@ public sealed class WindowsQuickSystem : IQuickSystem
 
     public Task EndAsync(OpenApp app) => Task.Run(() => AltTabApps.End(app.Path));
 
-    public Task EndFrozenAppsAsync() => Task.Run(AltTabApps.EndFrozen);
-
     public Task RunAsync(QuickActionId id) => id switch
     {
         QuickActionId.Lock => Task.Run(SystemActions.Lock),
