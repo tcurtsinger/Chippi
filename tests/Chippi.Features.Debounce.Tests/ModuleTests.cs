@@ -125,6 +125,8 @@ public sealed class ModuleTests
         public List<IInputFilter> Filters { get; } = [];
         public bool Refuse { get; init; }
         public bool Paused { get; set; }
+        public bool FullscreenInFront => false;
+        public event Action? PauseChanged { add { } remove { } }
 
         public IInputRegistration Add(IInputFilter filter)
         {

@@ -59,7 +59,7 @@ public sealed class DebounceModule : IFeatureModule
 
     public FeatureDescriptor Descriptor { get; } = new(Id, "Click and key debounce",
         "Ignores the double clicks and key chatter of worn switches", FeatureGroup.Windows)
-    { Icon = nameof(LucideIcons.Keyboard), Requires = [Capability.InputHooks] };
+    { Icon = nameof(LucideIcons.Keyboard), Requires = [Capability.InputHooks], PausesInFullscreen = true };
 
     /// <summary>Presses ignored since the switch was turned on.</summary>
     public int ClickIgnored => (_click?.Ignored ?? 0) - _clickBase;

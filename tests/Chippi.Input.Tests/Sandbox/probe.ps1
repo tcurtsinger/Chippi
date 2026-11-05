@@ -152,12 +152,13 @@ public static class Probe
     $profileDir = Join-Path $env:APPDATA 'Chippi-dev\sandbox'
     New-Item -ItemType Directory -Force -Path $profileDir | Out-Null
     # $app: more "app" settings (the pause's); $radial: more Radial menu settings. Each starts with a comma.
-    function StartChippi([string]$app = '', [string]$radial = '', [string]$installed = '"radial-menu"') {
+    function StartChippi([string]$app = '', [string]$radial = '', [string]$installed = '"radial-menu"', [string]$whole = '') {
         $settings = '{"version":1,"app":{"islandEnabled":false' + $app + '},' +
             '"modules":{"radial-menu":{"holdMiddle":true,"holdBack":true' + $radial + ',"slices":[' +
             '{"kind":"text","value":"up","name":"Up"},{"kind":"text","value":"right","name":"Right"},' +
             '{"kind":"text","value":"down","name":"Down"},{"kind":"text","value":"left","name":"Left"}]}},' +
             '"features":{"preset":"custom","installed":[' + $installed + '],"capabilitiesUsed":[]}}'
+        if ($whole) { $settings = $whole }
         Set-Content -LiteralPath (Join-Path $profileDir 'settings.json') -Value $settings -Encoding ASCII
         $process = Start-Process -FilePath 'C:\chippi\Chippi.exe' -ArgumentList '--dev-profile sandbox' -PassThru
         Note "Chippi started, pid $($process.Id) (app$app; radial$radial)"
@@ -170,20 +171,18 @@ public static class Probe
     }
 
     $debounceOnly = ($checks -contains 'debounce' -or $checks -contains 'timestamps') -and -not ($checks -contains 'radial' -or $checks -contains 'watchdog' -or $checks -contains 'cost')
+    $debounceSettings = ''
     if ($debounceOnly) {
         # Debounce alone, both switches on (clicks 25 ms, keys 20 ms). CHIPPI_DEBOUNCE_INJECTED lets it act on SendInput.
-        @'
-{"version":1,
- "app":{"islandEnabled":false},
- "modules":{"debounce":{"clickEnabled":true,"clickMs":25,"keyEnabled":true,"keyMs":20}},
- "features":{"preset":"custom","installed":["debounce"],"capabilitiesUsed":[]}}
-'@ | Set-Content -LiteralPath (Join-Path $profileDir 'settings.json') -Encoding ASCII
+        $debounceSettings = '{"version":1,"app":{"islandEnabled":false},' +
+            '"modules":{"debounce":{"clickEnabled":true,"clickMs":25,"keyEnabled":true,"keyMs":20}},' +
+            '"features":{"preset":"custom","installed":["debounce"],"capabilitiesUsed":[]}}'
         $env:CHIPPI_DEBOUNCE_INJECTED = '1'
     }
     $env:CHIPPI_INPUT_TIMINGS = "$results\hook-timings.csv"
     if ($checks -contains 'watchdog') { $env:CHIPPI_INPUT_DROP_HOOKS = '45' }
     if ($checks -contains 'pause') { $env:CHIPPI_INPUT_PROBE_FILTER = '1' }
-    $chippi = if ($checks -contains 'pause') { StartChippi -radial ',"openOverFullscreen":false' } else { StartChippi }
+    $chippi = if ($checks -contains 'pause') { StartChippi -radial ',"openOverFullscreen":false' } else { StartChippi -whole $debounceSettings }
 
     function Flick([string]$button, [int]$dx, [int]$dy) {
         $before = Text
