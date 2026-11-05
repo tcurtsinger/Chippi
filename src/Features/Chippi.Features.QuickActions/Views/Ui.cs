@@ -49,9 +49,9 @@ internal static class Ui
     }
 
     /// <summary>"Front" or "Kept" beside an app: 18 tall, the control fill with its edge, 11 semibold secondary.</summary>
-    public static Border Badge(string text)
+    public static Border Badge(string text, bool warning = false)
     {
-        var label = Text(text, 11, "IslandTextSecondaryBrush");
+        var label = Text(text, 11, warning ? "IslandCautionBrush" : "IslandTextSecondaryBrush");
         label.FontWeight = FontWeights.SemiBold;
         var badge = new Border { Height = 18, Padding = new Thickness(6, 0, 6, 0), CornerRadius = new CornerRadius(4), BorderThickness = new Thickness(1), Child = label, Margin = new Thickness(8, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
         badge.SetResourceReference(Border.BackgroundProperty, "IslandButtonBrush");

@@ -57,7 +57,7 @@ internal sealed partial class ActionsPage
         _saveFailed = false;
         _draft = [.. _module.Layout];
         _picking.Clear();
-        foreach (var action in QuickAction.All.Where(a => _module.Settings.Shows(a.Id))) _picking.Add(action.Id);
+        foreach (var action in QuickAction.All.Where(a => a.InGallery && _module.Settings.Shows(a.Id))) _picking.Add(action.Id);
         _built = "";
     }
 
@@ -72,7 +72,7 @@ internal sealed partial class ActionsPage
 
     internal void FinishEdit()
     {
-        if (!_editing || !_module.Offered.Any(a => _picking.Contains(a.Id))) return;
+        if (!_editing || !_module.Gallery.Any(a => _picking.Contains(a.Id))) return;
         var selected = _picking.ToArray();
         var layout = _draft.ToArray();
         try { _module.SaveLayout(selected, layout); }
@@ -91,7 +91,7 @@ internal sealed partial class ActionsPage
 
     private void RenderPicker()
     {
-        var offered = _module.Offered.ToDictionary(a => a.Key);
+        var offered = _module.Gallery.ToDictionary(a => a.Key);
         string built = "picker:" + string.Join(",", _draft) + ":" + string.Join(",", offered.Keys);
         if (_built != built)
         {
@@ -176,7 +176,7 @@ internal sealed partial class ActionsPage
             foreach (var pick in _picks) pick.IsChecked = _picking.Contains((QuickActionId)pick.Tag);
         }
         finally { _updatingPicks = false; }
-        int count = _module.Offered.Count(a => _picking.Contains(a.Id));
+        int count = _module.Gallery.Count(a => _picking.Contains(a.Id));
         _pickedText.Text = $"{count} shown";
         _saveFailure.Visibility = _saveFailed ? Visibility.Visible : Visibility.Collapsed;
         _done.IsEnabled = count > 0;
@@ -239,7 +239,7 @@ internal sealed partial class ActionsPage
     /// <summary>Pointer handlers share this path with the fixture probe; no native input or clipboard is needed.</summary>
     internal bool EditorPointerDown(int slot, Point point)
     {
-        if (!_editing || _gesture is not null || slot < 0 || slot >= _draft.Count || _draft[slot] is not { } key || !_module.Offered.Any(a => a.Key == key)) return false;
+        if (!_editing || _gesture is not null || slot < 0 || slot >= _draft.Count || _draft[slot] is not { } key || !_module.Gallery.Any(a => a.Key == key)) return false;
         CancelEditorDrag();
         (_slots[slot].Child as ToggleButton)?.Focus();
         _gesture = (slot, point);

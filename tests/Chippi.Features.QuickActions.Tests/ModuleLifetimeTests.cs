@@ -149,14 +149,14 @@ public sealed class ModuleLifetimeTests
         var layout = f.Module.Layout.ToArray();
         (layout[0], layout[19]) = (layout[19], layout[0]);
         f.Settings.Fail = true;
-        Assert.Throws<IOException>(() => f.Module.SaveLayout([QuickActionId.Dark, QuickActionId.Lock], layout));
+        Assert.Throws<IOException>(() => f.Module.SaveLayout([QuickActionId.Dark, QuickActionId.Explorer], layout));
         Assert.Same(saved, f.Module.Settings);
         Assert.Same(saved, f.Settings.Value);
         f.Settings.Fail = false;
-        f.Module.SaveLayout([QuickActionId.Dark, QuickActionId.Lock], layout);
+        f.Module.SaveLayout([QuickActionId.Dark, QuickActionId.Explorer], layout);
         Assert.Null(f.Module.Layout[0]);
         Assert.Equal("dark", f.Module.Layout[19]);
-        Assert.True(f.Module.Settings.Shows(QuickActionId.Lock));
+        Assert.True(f.Module.Settings.Shows(QuickActionId.Explorer));
     }
 
     [Fact]
@@ -256,7 +256,7 @@ public sealed class ModuleLifetimeTests
         public Task SetPowerPlanAsync(Guid plan) => Inner.SetPowerPlanAsync(plan);
         public Task EjectAsync(RemovableDrive drive) => Inner.EjectAsync(drive);
         public Task QuitAsync(OpenApp app) => Interlocked.Exchange(ref NextQuit, null)?.Invoke(app) ?? Inner.QuitAsync(app);
-        public Task EndFrozenAppsAsync() => Inner.EndFrozenAppsAsync();
+        public Task EndAsync(OpenApp app) => Inner.EndAsync(app);
         public Task RunAsync(QuickActionId id) => Inner.RunAsync(id);
         public Task PowerAsync(PowerChoice choice) => Inner.PowerAsync(choice);
     }

@@ -36,16 +36,16 @@ public sealed class SettingsSurfaceTests
             view.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));
             try
             {
-                var toggle = Find<ToggleButton>(view).Single(t => AutomationProperties.GetName(t) == "Show Lock in Actions");
+                var toggle = Find<ToggleButton>(view).Single(t => AutomationProperties.GetName(t) == "Show Restart Explorer in Actions");
                 toggle.ApplyTemplate();
                 Assert.Equal("Hidden", toggle.Content);
                 var peer = (IToggleProvider)UIElementAutomationPeer.CreatePeerForElement(toggle);
                 peer.Toggle();
-                Assert.True(module.Settings.Shows(QuickActionId.Lock));
+                Assert.True(module.Settings.Shows(QuickActionId.Explorer));
                 Assert.Equal("Shown", toggle.Content);
                 Assert.Equal("Shown", AutomationProperties.GetItemStatus(toggle));
                 peer.Toggle();
-                Assert.False(module.Settings.Shows(QuickActionId.Lock));
+                Assert.False(module.Settings.Shows(QuickActionId.Explorer));
                 Assert.Equal("Hidden", toggle.Content);
                 Assert.Empty(pc.Calls);
             }
@@ -200,17 +200,17 @@ public sealed class SettingsSurfaceTests
             view.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));
             try
             {
-                var toggle = Find<ToggleButton>(view).Single(t => AutomationProperties.GetName(t) == "Show Lock in Actions");
+                var toggle = Find<ToggleButton>(view).Single(t => AutomationProperties.GetName(t) == "Show Restart Explorer in Actions");
                 var peer = (IToggleProvider)UIElementAutomationPeer.CreatePeerForElement(toggle);
                 f.Settings.FailSaving = true;
                 peer.Toggle();
-                Assert.False(f.Module.Settings.Shows(QuickActionId.Lock));
+                Assert.False(f.Module.Settings.Shows(QuickActionId.Explorer));
                 Assert.False(toggle.IsChecked);
                 Assert.Equal("Hidden", toggle.Content);
                 Assert.Contains(Find<TextBlock>(view), IsSaveError);
                 f.Settings.FailSaving = false;
                 peer.Toggle();
-                Assert.True(f.Module.Settings.Shows(QuickActionId.Lock));
+                Assert.True(f.Module.Settings.Shows(QuickActionId.Explorer));
                 Assert.True(toggle.IsChecked);
                 Assert.DoesNotContain(Find<TextBlock>(view), IsSaveError);
                 Assert.Empty(f.Pc.Calls);

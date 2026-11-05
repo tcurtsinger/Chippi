@@ -22,6 +22,12 @@ public sealed record QuickAction(QuickActionId Id, string Key, string Label, str
     /// <summary>The list it steps into (Plan, Eject, Quit, Power); Eject's only with two or more drives.</summary>
     public bool OpensList { get; init; }
 
+    /// <summary>
+    /// Whether it has a tile in the Actions gallery. Lock, Displays, Screensaver and Frozen live in Power and Quit apps now
+    /// (Travis, tasks 224 and 225); they stay actions, so Search, Radial slices and shortcuts still run them by key.
+    /// </summary>
+    public bool InGallery { get; init; } = true;
+
     public static IReadOnlyList<QuickAction> All { get; } =
     [
         new(QuickActionId.Dark, "dark", "Dark", "Dark mode", true, LucideIcons.Moon),
@@ -33,13 +39,13 @@ public sealed record QuickAction(QuickActionId Id, string Key, string Label, str
         new(QuickActionId.WiFi, "wifi", "Wi-Fi", "Wi-Fi", true, LucideIcons.Wifi),
         new(QuickActionId.Camera, "camera", "Camera", "Camera", true, LucideIcons.Camera),
         new(QuickActionId.Plan, "plan", "Plan", "Power plan", true, LucideIcons.Gauge) { OpensList = true },
-        new(QuickActionId.Lock, "lock", "Lock", "Lock", false, LucideIcons.Lock),
-        new(QuickActionId.Displays, "displays", "Displays", "Turn off displays", false, LucideIcons.MonitorOff),
-        new(QuickActionId.ScreenSaver, "screensaver", "Screensaver", "Screen saver", false, LucideIcons.ScreenSaver),
+        new(QuickActionId.Lock, "lock", "Lock", "Lock", false, LucideIcons.Lock) { InGallery = false },
+        new(QuickActionId.Displays, "displays", "Displays", "Turn off displays", false, LucideIcons.MonitorOff) { InGallery = false },
+        new(QuickActionId.ScreenSaver, "screensaver", "Screensaver", "Screen saver", false, LucideIcons.ScreenSaver) { InGallery = false },
         new(QuickActionId.Recycle, "recycle", "Recycle", "Empty Recycle Bin", false, LucideIcons.Trash) { Confirm = ("Empty Recycle Bin?", "Empty") },
         new(QuickActionId.Eject, "eject", "Eject", "Eject", false, LucideIcons.Eject) { OpensList = true },
         new(QuickActionId.Quit, "quit", "Quit", "Quit apps", false, LucideIcons.SquareX) { OpensList = true },
-        new(QuickActionId.Frozen, "frozen", "Frozen", "End frozen apps", false, LucideIcons.Snowflake) { Confirm = ("End frozen apps?", "End") },
+        new(QuickActionId.Frozen, "frozen", "Frozen", "End frozen apps", false, LucideIcons.Snowflake) { Confirm = ("End frozen apps?", "End"), InGallery = false },
         new(QuickActionId.Explorer, "explorer", "Explorer", "Restart Explorer", false, LucideIcons.RefreshCw) { Confirm = ("Restart Explorer?", "Restart") },
         new(QuickActionId.Power, "power", "Power", "Power", false, LucideIcons.Power) { OpensList = true },
         new(QuickActionId.Cleaning, "cleaning", "Cleaning", "Cleaning mode", false, LucideIcons.Droplet),
