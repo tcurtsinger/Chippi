@@ -43,6 +43,13 @@ public sealed class FocusTrackingUiTests
             var peer = (IToggleProvider)UIElementAutomationPeer.CreatePeerForElement(toggle);
             Assert.False(store.Value.Enabled);
             Assert.Equal(0, settings.Writes);
+            var command = Assert.Single(ui.Commands());
+            Assert.Equal(ActionsTile.Input, command.Tile);
+            Assert.False(command.IsOn);
+            command.Run().GetAwaiter().GetResult();
+            Assert.True(Assert.Single(ui.Commands()).IsOn);
+            command.Run().GetAwaiter().GetResult();
+            Assert.False(store.Value.Enabled);
             Shot(view, "off");
             peer.Toggle();
             Assert.True(store.Value.Enabled);
@@ -87,6 +94,7 @@ public sealed class FocusTrackingUiTests
             await module.StartAsync(new ModuleContext(FocusFollowsMouseModule.Id, store, NullLogger.Instance,
                 new IslandActivityHub().CreatePublisher(FocusFollowsMouseModule.Id), new Ui()), default);
             Assert.Equal(0, settings.Writes);
+
             Assert.Null(module.Error);
             module.SetEnabled(true);
             Assert.True(store.Value.Enabled);
@@ -186,6 +194,8 @@ public sealed class FocusTrackingUiTests
     }
     private sealed class Ui : IModuleUi
     {
+        public Func<IReadOnlyList<ChippiCommand>> Commands = null!;
+        public void AddCommands(Func<IReadOnlyList<ChippiCommand>> commands) => Commands = commands;
         public Func<string?, object>? Page { get; private set; }
         public IIslandTile AddIslandTile(IslandTileSpec spec) => throw new InvalidOperationException("Focus has no tile");
         public void SetSettingsPage(Func<string?, object> page) => Page = page;

@@ -37,6 +37,12 @@ public sealed class FocusFollowsMouseModule(Func<FocusTrackingEngine> createEngi
             _context = context;
             Settings = context.Settings.Get<FocusTrackingSettings>();
             context.Ui.SetSettingsPage(_ => new FocusTrackingRows(this));
+            context.Ui.AddCommands(() => [new ChippiCommand("focus-follows-mouse/toggle", "Focus follows mouse", nameof(LucideIcons.Eye), () =>
+            {
+                SetEnabled(!Settings.Enabled);
+                if (Error is { } error) throw new InvalidOperationException(error);
+                return Task.CompletedTask;
+            }) { IsOn = Settings.Enabled, Tile = ActionsTile.Input }]);
             if (context.Input is { } input) input.PauseChanged += OnPauseChanged;
             try
             {

@@ -19,6 +19,14 @@ public sealed class CloseProtectionModuleTests
         var f = new Fixture(visible);
         await f.Start();
         Assert.Equal(InputDevices.None, f.Hub.Filter!.Devices);
+        var command = Assert.Single(f.Ui.Commands());
+        Assert.Equal(ActionsTile.Input, command.Tile);
+        Assert.False(command.IsOn);
+        await command.Run();
+        Assert.True(f.Store.Get<CloseProtectionSettings>().Enabled);
+        Assert.True(Assert.Single(f.Ui.Commands()).IsOn);
+        await command.Run();
+        Assert.False(f.Store.Get<CloseProtectionSettings>().Enabled);
         f.Module.SetEnabled(true);
         Assert.True(f.Key(true));
         Assert.Equal(1, f.Hub.Masks);
@@ -73,6 +81,10 @@ public sealed class CloseProtectionModuleTests
         f.Module.SetEnabled(true);
         Assert.False(f.Module.Settings.Enabled);
         Assert.Equal(InputDevices.None, f.Hub.Filter!.Devices);
+        var command = Assert.Single(f.Ui.Commands());
+        Assert.Equal(ActionsTile.Input, command.Tile);
+        Assert.False(command.IsOn);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => command.Run());
         Assert.Equal("Close protection failed", f.Module.Error);
         await f.Module.StopAsync(default);
     }
@@ -188,6 +200,8 @@ public sealed class CloseProtectionModuleTests
     internal sealed class Ui : IModuleUi
     {
         public IIslandTile AddIslandTile(IslandTileSpec spec) => throw new InvalidOperationException("No Close protection tile");
+        public Func<IReadOnlyList<ChippiCommand>> Commands = null!;
+        public void AddCommands(Func<IReadOnlyList<ChippiCommand>> commands) => Commands = commands;
         public Func<string?, object>? Page;
         public void SetSettingsPage(Func<string?, object> page) => Page = page;
     }
