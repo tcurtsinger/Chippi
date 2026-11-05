@@ -50,7 +50,7 @@ public sealed class AppSwitcherModule : IFeatureModule
     private Switcher? _switcher;
     private SynchronizationContext? _ui;
     private Action? _pauseListener;
-    private bool _paused;
+    private bool _paused, _capturing;
 
     /// <param name="view">The overlay, made once on first open; the app's by default.</param>
     public AppSwitcherModule(Func<Switcher, ISwitcherView>? view = null, Func<ISwitcherPc>? pc = null, Func<IWindowEvents>? events = null,
@@ -118,6 +118,7 @@ public sealed class AppSwitcherModule : IFeatureModule
         _pauseListener = null;
         _hotkey?.Dispose();
         _hotkey = null;
+        _capturing = false;
         if (_events is not null)
         {
             _events.Foreground -= _recent.Activated;
@@ -214,9 +215,12 @@ public sealed class AppSwitcherModule : IFeatureModule
         return opened;
     }
 
+    /// <summary>Settings is recording a new shortcut: the current one doesn't open the overlay meanwhile.</summary>
+    public void CaptureShortcut(bool capture) => _capturing = capture;
+
     private void OnShortcut()
     {
-        if (_paused || _pc is null)
+        if (_paused || _capturing || _pc is null)
             return;
         // A shortcut leaves the window it was pressed in at the front, Chippi's Settings included: Esc goes back to it.
         Open(_pc.Foreground());

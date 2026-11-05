@@ -247,6 +247,18 @@ public sealed class AppSwitcherModuleTests : IAsyncLifetime
     }
 
     [Fact]
+    public void While_Settings_records_a_new_shortcut_the_current_one_doesnt_open_it()
+    {
+        _module.ChangeShortcut(Shortcut);
+        _module.CaptureShortcut(true);
+        _hotkey.Pressed!();
+        Assert.False(_module.Switcher!.IsOpen);
+        _module.CaptureShortcut(false);
+        _hotkey.Pressed!();
+        Assert.True(_module.Switcher.IsOpen);
+    }
+
+    [Fact]
     public void A_shortcut_in_use_is_refused_and_not_saved()
     {
         _hotkey.Available = false;

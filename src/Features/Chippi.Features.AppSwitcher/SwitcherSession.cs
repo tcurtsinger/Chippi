@@ -76,6 +76,20 @@ public sealed class SwitcherSession
         Changed?.Invoke();
     }
 
+    /// <summary>
+    /// Steps a row in a grid <paramref name="columns"/> wide, keeping the column. Down from the row above a short last
+    /// row goes to its last window; at the top or bottom row it stays.
+    /// </summary>
+    public void MoveRow(int columns, bool down)
+    {
+        if (_shown.Count == 0 || columns < 1)
+            return;
+        int from = Math.Max(0, Selected), to = from + (down ? columns : -columns);
+        if (to >= _shown.Count)
+            to = from / columns < (_shown.Count - 1) / columns ? _shown.Count - 1 : from;
+        Select(to < 0 ? from : to);
+    }
+
     public void Select(int index)
     {
         if (index < 0 || index >= _shown.Count || index == Selected)

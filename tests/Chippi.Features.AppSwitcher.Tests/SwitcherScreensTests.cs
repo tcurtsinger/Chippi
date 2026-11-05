@@ -264,8 +264,13 @@ public sealed class SwitcherScreensTests
             Assert.Equal(shortcut, store.Value.Shortcut);
             Assert.Equal(shortcut, hotkey.Registered);
             page.StartRecording();
+            hotkey.Pressed!(); // the current shortcut, pressed while listening: nothing opens
+            Assert.False(module.Switcher!.IsOpen);
             Find<Button>(page).Single(b => (string)b.Content == "Cancel").RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
             Assert.False(page.Recording);
+            hotkey.Pressed!();
+            Assert.True(module.Switcher.IsOpen);
+            module.Switcher.Dismiss();
             Assert.Equal(shortcut.ToString(), page.ShortcutText);
             Assert.Contains(Find<Button>(page), b => (string)b.Content == "Change");
             Assert.Contains(Find<Button>(page), b => (string)b.Content == "Remove");
@@ -341,7 +346,8 @@ public sealed class SwitcherScreensTests
                     for (int i = 0; i < 10; i++)
                     {
                         clock.Restart();
-                        session.Move(i % 2 == 0 ? overlay.Board.Columns : 1);
+                        if (i % 2 == 0) session.MoveRow(overlay.Board.Columns, down: true);
+                        else session.Move(1);
                         Pump();
                         moves.Add(clock.Elapsed.TotalMilliseconds);
                     }

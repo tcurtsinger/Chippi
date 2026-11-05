@@ -46,6 +46,27 @@ public sealed class SwitcherSessionTests
     }
 
     [Fact]
+    public void Up_and_Down_keep_the_column_and_stop_at_the_top_and_bottom_rows()
+    {
+        // 12 windows, 5 across: rows 0-4, 5-9, 10-11.
+        var s = new SwitcherSession([.. Enumerable.Range(1, 12).Select(h => W(h, $"w{h}"))], 99, 1, false);
+        s.Select(1);
+        s.MoveRow(5, down: false);
+        Assert.Equal(1, s.Selected); // top row: stays
+        s.MoveRow(5, down: true);
+        Assert.Equal(6, s.Selected);
+        s.MoveRow(5, down: true);
+        Assert.Equal(11, s.Selected); // column 1 of the short last row
+        s.Select(8);
+        s.MoveRow(5, down: true);
+        Assert.Equal(11, s.Selected); // no window below column 3: the last one
+        s.MoveRow(5, down: true);
+        Assert.Equal(11, s.Selected); // bottom row: stays
+        s.MoveRow(5, down: false);
+        Assert.Equal(6, s.Selected);
+    }
+
+    [Fact]
     public void Arrows_wrap_at_either_end()
     {
         var s = new SwitcherSession([W(1, "a"), W(2, "b"), W(3, "c")], 9, 1, false);

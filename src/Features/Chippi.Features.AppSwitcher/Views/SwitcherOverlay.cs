@@ -114,10 +114,10 @@ public sealed partial class SwitcherOverlay : Window, ISwitcherView
                 break;
             // The cards are a grid: Up and Down step a row, Left, Right and Tab one card.
             case Key.Down:
-                _session.Move(_board.Columns);
+                _session.MoveRow(_board.Columns, down: true);
                 break;
             case Key.Up:
-                _session.Move(-_board.Columns);
+                _session.MoveRow(_board.Columns, down: false);
                 break;
             case Key.Right:
                 _session.Move(1);

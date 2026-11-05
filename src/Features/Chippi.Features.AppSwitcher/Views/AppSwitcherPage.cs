@@ -90,6 +90,7 @@ internal sealed class AppSwitcherPage : UserControl
     {
         Focus();
         _recording = true;
+        _module.CaptureShortcut(true);
         _recordError = null;
         Refresh();
     }
@@ -144,6 +145,7 @@ internal sealed class AppSwitcherPage : UserControl
     {
         if (!_recording) return;
         _recording = false;
+        _module.CaptureShortcut(false);
         _recordError = null;
         RefreshShortcut();
         if (focus) FocusPrimary();
@@ -172,6 +174,7 @@ internal sealed class AppSwitcherPage : UserControl
             return;
         }
         _recording = false;
+        _module.CaptureShortcut(false);
         _recordError = null;
         _module.ChangeShortcut(shortcut);
         Refresh();
