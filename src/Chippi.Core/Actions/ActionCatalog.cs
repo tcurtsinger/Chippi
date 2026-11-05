@@ -44,6 +44,17 @@ public static class ActionCatalog
         (WindowAction.Close, "Close", "Close"),
         (WindowAction.KeepOnTop, "Keep on top", "Pin"),
         (WindowAction.OtherScreen, "Move to other screen", "OtherScreen"),
+        (WindowAction.Center, "Center", "AppWindow"),
+        (WindowAction.Restore, "Restore", "AppWindow"),
+        (WindowAction.LeftThird, "Left third", "SnapLeft"),
+        (WindowAction.MiddleThird, "Middle third", "AppWindow"),
+        (WindowAction.RightThird, "Right third", "SnapRight"),
+        (WindowAction.LeftTwoThirds, "Left two-thirds", "SnapLeft"),
+        (WindowAction.RightTwoThirds, "Right two-thirds", "SnapRight"),
+        (WindowAction.TopLeft, "Top left", "LayoutGrid"),
+        (WindowAction.TopRight, "Top right", "LayoutGrid"),
+        (WindowAction.BottomLeft, "Bottom left", "LayoutGrid"),
+        (WindowAction.BottomRight, "Bottom right", "LayoutGrid"),
     ];
 
     public static IReadOnlyList<(SelectionAction Action, string Name, string Glyph)> Selection { get; } =

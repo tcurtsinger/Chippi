@@ -15,7 +15,7 @@ public enum CommandShell { PowerShell, Cmd }
 public enum MediaAction { PlayPause, Next, Previous, Mute, VolumeUp, VolumeDown }
 
 /// <summary>What a Window action does to its target window (<see cref="WindowTarget"/>).</summary>
-public enum WindowAction { SnapLeft, SnapRight, Maximize, Minimize, Close, KeepOnTop, OtherScreen }
+public enum WindowAction { SnapLeft, SnapRight, Maximize, Minimize, Close, KeepOnTop, OtherScreen, Center, Restore, LeftThird, MiddleThird, RightThird, LeftTwoThirds, RightTwoThirds, TopLeft, TopRight, BottomLeft, BottomRight, Zone }
 
 /// <summary>What a Selected text action does with the text selected in the app in front.</summary>
 public enum SelectionAction { Search, OpenLink, CopyPlain }
@@ -46,6 +46,9 @@ public sealed record ChippiAction
     public string? Glyph { get; init; }
 
     /// <summary>A Command action's shell.</summary>
+    public string? LayoutId { get; init; }
+    public string? ZoneId { get; init; }
+
     public CommandShell Shell { get; init; }
 }
 

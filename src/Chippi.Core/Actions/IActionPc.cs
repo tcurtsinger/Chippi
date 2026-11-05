@@ -26,6 +26,13 @@ public interface IActionPc
 
     void Window(nint window, WindowAction action);
 
+    ActionWindow? CaptureWindow(nint window) => null;
+    bool CanRestore(ActionWindow window) => false;
+    void BeginWindowDrag(ActionWindow window) { }
+    void EndWindowDrag(ActionWindow window) { }
+    void Window(ActionWindow window, WindowAction action) => Window(window.Handle, action);
+    void WindowZone(ActionWindow window, string layoutId, string zoneId, nint monitor = 0) => throw new ActionFailure("Unavailable");
+
     void Media(MediaAction action);
 
     /// <summary>Presses the keys in the app in front, once the keys still held are let go.</summary>

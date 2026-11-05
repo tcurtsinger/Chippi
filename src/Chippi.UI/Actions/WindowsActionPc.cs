@@ -13,7 +13,7 @@ namespace Chippi.UI.Actions;
 /// The real PC side of every feature's actions, which the shell hands out as <see cref="Core.Modules.ModuleContext.Actions"/>.
 /// Nothing in it runs in tests or dev runs (docs/phase-5.5-handoff.md §3): tests pass a fake.
 /// </summary>
-public sealed class WindowsActionPc : IActionPc
+public sealed partial class WindowsActionPc : IActionPc
 {
     // The terminals where Ctrl+C stops what runs: Windows Terminal, the console host, ConEmu, mintty and PuTTY.
     private static readonly HashSet<string> Terminals = new(StringComparer.Ordinal)
@@ -56,6 +56,12 @@ public sealed class WindowsActionPc : IActionPc
             throw new ActionFailure("No window");
         if (!Native.IsWindow(window))
             throw new ActionFailure("Window closed");
+        if (IsSnapAction(action))
+        {
+            var target = CaptureWindow(window) ?? throw new ActionFailure("Window closed");
+            SnapWindow(target, action);
+            return;
+        }
         switch (action)
         {
             case WindowAction.Maximize:
@@ -73,12 +79,7 @@ public sealed class WindowsActionPc : IActionPc
                 if (!Native.SetWindowPos(window, onTop ? -2 : -1, 0, 0, 0, 0, 0x0002 | 0x0001 | 0x0010))
                     throw new ActionFailure("Access denied");
                 break;
-            case WindowAction.SnapLeft or WindowAction.SnapRight:
-                Snap(window, action == WindowAction.SnapLeft);
-                break;
-            case WindowAction.OtherScreen:
-                MoveToNextScreen(window);
-                break;
+
         }
     }
 
@@ -86,44 +87,6 @@ public sealed class WindowsActionPc : IActionPc
     {
         if (!Native.PostMessage(window, Native.WmSysCommand, command, 0))
             throw new ActionFailure("Access denied");
-    }
-
-    /// <summary>The window fills the left or right half of its screen's work area, its visible edges on the half's.</summary>
-    private static void Snap(nint window, bool left)
-    {
-        if (Native.IsZoomed(window) || Native.IsIconic(window))
-            Native.ShowWindow(window, 9); // SW_RESTORE
-        var (_, work) = Native.Monitor(Native.MonitorFromWindow(window, 2));
-        int half = work.Width / 2;
-        var target = new Native.Rect { Left = left ? work.Left : work.Left + half, Top = work.Top, Right = left ? work.Left + half : work.Right, Bottom = work.Bottom };
-        Place(window, target);
-    }
-
-    /// <summary>The window goes to the next screen to the right (the first after the last), where it sat on its own, scaled to fit.</summary>
-    private static void MoveToNextScreen(nint window)
-    {
-        var monitors = Native.Monitors();
-        if (monitors.Count < 2)
-            throw new ActionFailure("One screen");
-        nint here = Native.MonitorFromWindow(window, 2);
-        nint next = monitors[(monitors.IndexOf(here) + 1) % monitors.Count];
-        var (_, from) = Native.Monitor(here);
-        var (_, to) = Native.Monitor(next);
-        bool maximized = Native.IsZoomed(window);
-        if (maximized || Native.IsIconic(window))
-            Native.ShowWindow(window, 9); // SW_RESTORE
-        Visible(window, out var visible);
-        double sx = (double)to.Width / Math.Max(1, from.Width), sy = (double)to.Height / Math.Max(1, from.Height);
-        double fit = Math.Min(1, Math.Min(sx, sy)); // smaller on a smaller screen, never larger
-        int width = Math.Min(to.Width, (int)Math.Round(visible.Width * fit));
-        int height = Math.Min(to.Height, (int)Math.Round(visible.Height * fit));
-        int x = to.Left + (int)Math.Round((visible.Left - from.Left) * sx);
-        int y = to.Top + (int)Math.Round((visible.Top - from.Top) * sy);
-        x = Math.Clamp(x, to.Left, to.Right - width);
-        y = Math.Clamp(y, to.Top, to.Bottom - height);
-        Place(window, new Native.Rect { Left = x, Top = y, Right = x + width, Bottom = y + height });
-        if (maximized)
-            Native.ShowWindow(window, 3); // SW_MAXIMIZE, on its new screen
     }
 
     /// <summary>Puts the window's visible edges on <paramref name="target"/>: Windows 11 frames carry invisible resize borders outside them.</summary>

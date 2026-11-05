@@ -85,7 +85,10 @@ public sealed class ActionRunner(IActionPc pc, Func<IReadOnlyList<ChippiCommand>
                 pc.Media(Enum.TryParse<MediaAction>(action.Value, out var media) ? media : throw new ActionFailure("No action"));
                 break;
             case ActionKind.Window:
-                pc.Window(window, Enum.TryParse<WindowAction>(action.Value, out var verb) ? verb : throw new ActionFailure("No action"));
+                if (pc.CaptureWindow(window) is { } captured)
+                    await RunAsync(action, captured);
+                else
+                    pc.Window(window, Enum.TryParse<WindowAction>(action.Value, out var verb) ? verb : throw new ActionFailure("No action"));
                 break;
             case ActionKind.Chippi:
                 var command = ChippiCommands().FirstOrDefault(c => c.Key == action.Value) ?? throw new ActionFailure("Not found");
@@ -95,6 +98,20 @@ public sealed class ActionRunner(IActionPc pc, Func<IReadOnlyList<ChippiCommand>
                 await SelectionAsync(Enum.TryParse<SelectionAction>(action.Value, out var selection) ? selection : SelectionAction.Search);
                 break;
         }
+    }
+
+    /// <summary>Uses the original target and its process identity throughout menu selection.</summary>
+    public Task RunAsync(ChippiAction action, ActionWindow target, nint monitor = 0)
+    {
+        if (action.Kind != ActionKind.Window)
+            return RunAsync(action, target.Handle);
+        if (!Enum.TryParse<WindowAction>(action.Value, out var verb))
+            throw new ActionFailure("No action");
+        if (verb == WindowAction.Zone)
+            pc.WindowZone(target, action.LayoutId ?? "", action.ZoneId ?? "", monitor);
+        else
+            pc.Window(target, verb);
+        return Task.CompletedTask;
     }
 
     private async Task SelectionAsync(SelectionAction action)

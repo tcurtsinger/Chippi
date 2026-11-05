@@ -242,6 +242,11 @@ public partial class App : Application
                     Chippi.Features.FocusFollowsMouse.FocusFollowsMouseModule.Id, "ownership.json")));
         }));
 
+        var windowLayouts = new Chippi.Features.WindowLayouts.WindowLayoutsModule(SnapDisplaySource.Connected);
+        shell.Registry.Register(windowLayouts);
+        if (shell.Services.Actions is Chippi.UI.Actions.WindowsActionPc windowPc)
+            windowPc.SnapZones = windowLayouts.ResolveZone;
+
         // [WS2] "Coming soon" placeholders for the PLAN.md features.
         Settings.Features.FeatureCatalog.RegisterPlaceholders(shell.Registry);
 
