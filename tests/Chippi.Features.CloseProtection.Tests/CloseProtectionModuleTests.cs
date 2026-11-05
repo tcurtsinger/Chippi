@@ -86,6 +86,26 @@ public sealed class CloseProtectionModuleTests
         Assert.Null(f.Hub.Filter);
     }
 
+    [Fact]
+    public async Task SharedPauseClearsPendingAndResumeNeedsANewFirstPress()
+    {
+        var f = new Fixture(true);
+        await f.Start();
+        Assert.True(f.Module.Descriptor.PausesInFullscreen);
+        f.Module.SetEnabled(true);
+        Assert.True(f.Key(true));
+        f.Key(false);
+        f.Desktop.Drain();
+        Assert.NotEmpty(f.Activities.Activities);
+        f.Hub.Pause(true);
+        f.Desktop.Drain();
+        Assert.Empty(f.Activities.Activities);
+        Assert.False(f.Key(true));
+        f.Hub.Pause(false);
+        Assert.True(f.Key(true));
+        await f.Module.StopAsync(default);
+    }
+
     internal sealed class Fixture(bool visible)
     {
         public Desktop Desktop { get; } = new();
@@ -127,6 +147,9 @@ public sealed class CloseProtectionModuleTests
         public IInputFilter? Filter;
         public bool Removed;
         public bool Paused { get; set; }
+        public bool FullscreenInFront => Paused;
+        public event Action? PauseChanged;
+        public void Pause(bool paused) { Paused = paused; PauseChanged?.Invoke(); }
         public IInputRegistration Add(IInputFilter filter) { Filter = filter; return this; }
         public void Refresh() { }
         public void HoldModifiers(uint heldBy, ReadOnlySpan<ushort> modifiers) => throw new InvalidOperationException("Close protection sends no keys");

@@ -117,12 +117,15 @@ public sealed class CloseProtectionFilterTests
     }
 
     [Fact]
-    public void DesktopResetForgetsUpsThatWillNeverArrive()
+    public void DesktopResetKeepsSwallowedRepeatsAndUpUntilReleased()
     {
         var scene = new Scene();
         scene.Key(true, 0);
-        scene.Filter.Reset(forgetKeys: true);
-        Assert.True(scene.Key(true, 2));
+        scene.Filter.Reset();
+        Assert.True(scene.Key(true, 2, repeat: true));
+        Assert.Null(scene.Feedback.Last());
+        Assert.True(scene.Key(false, 3));
+        Assert.True(scene.Key(true, 4));
         Assert.NotNull(scene.Feedback.Last());
     }
     private sealed class Scene

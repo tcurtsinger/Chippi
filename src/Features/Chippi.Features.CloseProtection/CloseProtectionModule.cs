@@ -50,7 +50,7 @@ public sealed class CloseProtectionModule(Func<ICloseDesktop> createDesktop, Tim
 
     public FeatureDescriptor Descriptor { get; } = new(Id, "Close protection",
         "Protects keyboard close commands from accidental presses", FeatureGroup.Windows)
-    { Icon = nameof(LucideIcons.ShieldX), Requires = [Capability.InputHooks], Presets = PresetMembership.PowerUser };
+    { Icon = nameof(LucideIcons.ShieldX), Requires = [Capability.InputHooks], PausesInFullscreen = true, Presets = PresetMembership.PowerUser };
 
     public Task StartAsync(ModuleContext context, CancellationToken ct)
     {
@@ -71,7 +71,10 @@ public sealed class CloseProtectionModule(Func<ICloseDesktop> createDesktop, Tim
         try { _desktop.Start(); }
         catch { StopAsync(default).GetAwaiter().GetResult(); throw; }
         _filter.Configure(Settings.Enabled, Settings.ControlWApps);
-        _registration = (context.Input ?? throw new InvalidOperationException("Input unavailable")).Add(_filter);
+        var input = context.Input ?? throw new InvalidOperationException("Input unavailable");
+        input.PauseChanged += OnPauseChanged;
+        OnPauseChanged();
+        _registration = input.Add(_filter);
         _timer = _clock.CreateTimer(_ => _filter?.Advance(_clock.GetTimestamp()), null,
             Settings.Enabled ? TimeSpan.FromMilliseconds(50) : Timeout.InfiniteTimeSpan, TimeSpan.FromMilliseconds(50));
         context.Ui.SetSettingsPage(_ => new CloseProtectionRows(this));
@@ -108,7 +111,8 @@ public sealed class CloseProtectionModule(Func<ICloseDesktop> createDesktop, Tim
     // Kayla's shared pause supplies every fullscreen, lock and disabled-policy reset.
     public void SetPaused(bool paused) => _filter?.SetPaused(paused);
     private void Reset() => _filter?.Reset();
-    private void DesktopReset() => _filter?.Reset(forgetKeys: true);
+    private void DesktopReset() => _filter?.Reset();
+    private void OnPauseChanged() => _filter?.SetPaused(_context?.Input?.Paused == true);
 
     // All island and beep work happens after the hook returns, on the UI dispatcher.
     private void Feedback(long run, PendingClose? pending)
@@ -137,8 +141,9 @@ public sealed class CloseProtectionModule(Func<ICloseDesktop> createDesktop, Tim
     {
         Interlocked.Increment(ref _run);
         _timer?.Dispose(); _timer = null;
+        if (_context?.Input is { } input) input.PauseChanged -= OnPauseChanged;
         _registration?.Dispose(); _registration = null;
-        _filter?.Reset(forgetKeys: true); _filter = null;
+        _filter?.Reset(); _filter = null;
         if (_desktop is { } desktop)
         {
             desktop.ForegroundChanged -= Reset;

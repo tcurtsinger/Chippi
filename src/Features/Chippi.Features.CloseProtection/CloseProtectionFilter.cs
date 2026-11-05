@@ -54,9 +54,9 @@ public sealed class CloseProtectionFilter(Func<CloseTarget?> target, Func<CloseM
 
     // Focus loss, target destruction, session lock, disable and removal all clear pending presses.
     // The hub still owns a swallowed down's repeats and up; never release those into the app.
-    public void Reset(bool forgetKeys = false)
+    public void Reset()
     {
-        lock (_gate) { Clear(); _lastTarget = null; if (forgetKeys) Array.Clear(_swallowed); }
+        lock (_gate) { Clear(); _lastTarget = null; }
     }
 
     public void Advance(long now)
