@@ -108,11 +108,11 @@ public sealed class QuickActionsShots
 
     /// <summary>
     /// The Input tile after the last tile, its menu, and its menu while a switch failed: Debounce's two switches (Click
-    /// debounce on) and Always on in games, as main has them. The timings gain stepping into the menu.
+    /// debounce on), Focus follows mouse, Close protection and Always on in games. The timings gain stepping into the menu.
     /// </summary>
     private static void InputShots(string folder)
     {
-        bool click = true, key = false, alwaysOn = false, fail = false;
+        bool click = true, key = false, focus = false, close = false, alwaysOn = false, fail = false;
         ChippiCommand Switch(string commandKey, string name, string icon, Func<bool> on, Action flip) =>
             new(commandKey, name, icon, () =>
             {
@@ -129,6 +129,8 @@ public sealed class QuickActionsShots
             [
                 Switch("debounce/click", "Click debounce", "Mouse", () => click, () => click = !click),
                 Switch("debounce/key", "Key debounce", "Keyboard", () => key, () => key = !key),
+                Switch("focus-follows-mouse/toggle", "Focus follows mouse", "Eye", () => focus, () => focus = !focus),
+                Switch("close-protection/toggle", "Close protection", "ShieldX", () => close, () => close = !close),
                 Switch("input/always-on", "Always on in games", "Gamepad", () => alwaysOn, () => alwaysOn = !alwaysOn),
             ],
         }, default).GetAwaiter().GetResult();
@@ -141,7 +143,7 @@ public sealed class QuickActionsShots
             {
                 var watch = System.Diagnostics.Stopwatch.StartNew();
                 Click(panel, "input");
-                File.AppendAllLines(Path.Combine(folder, "actions-timings.txt"), [$"Input stepping in (3 switches): {watch.Elapsed.TotalMilliseconds:0.0} ms"]);
+                File.AppendAllLines(Path.Combine(folder, "actions-timings.txt"), [$"Input stepping in (5 switches): {watch.Elapsed.TotalMilliseconds:0.0} ms"]);
             });
             fail = true;
             Shoot(tiles, Path.Combine(folder, "actions-input-failed.png"), panel =>

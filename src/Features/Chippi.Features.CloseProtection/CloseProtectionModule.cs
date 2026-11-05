@@ -80,6 +80,12 @@ public sealed class CloseProtectionModule(Func<ICloseDesktop> createDesktop, Tim
         _timer = _clock.CreateTimer(_ => _filter?.Advance(_clock.GetTimestamp()), null,
             Settings.Enabled ? TimeSpan.FromMilliseconds(50) : Timeout.InfiniteTimeSpan, TimeSpan.FromMilliseconds(50));
         context.Ui.SetSettingsPage(_ => new CloseProtectionRows(this));
+        context.Ui.AddCommands(() => [new ChippiCommand("close-protection/toggle", "Close protection", nameof(LucideIcons.ShieldX), () =>
+        {
+            SetEnabled(!Settings.Enabled);
+            if (Error is { } error) throw new InvalidOperationException(error);
+            return Task.CompletedTask;
+        }) { IsOn = Settings.Enabled, Tile = ActionsTile.Input }]);
         return Task.CompletedTask;
     }
 
