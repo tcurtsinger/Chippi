@@ -73,12 +73,6 @@ public static class FeatureCatalog
             Icon = "AppWindow",
             Presets = PowerUser,
         },
-        new("close-protection", "Close protection", "Hold Alt+F4 to close, so a slip never loses your work", FeatureGroup.Windows)
-        {
-            Icon = "Shield",
-            Requires = [Capability.InputHooks],
-            Presets = PowerUser,
-        },
         new("focus-follows-mouse", "Focus follows mouse", "Activates the window under the pointer", FeatureGroup.Windows)
         {
             Icon = "Eye",

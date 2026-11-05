@@ -108,6 +108,9 @@ public interface IInputFilter
 
     /// <summary>A mouse move, button or wheel. True keeps it; a kept button down keeps its up, as for keys.</summary>
     bool Mouse(in MouseInput mouse);
+
+    /// <summary>On the hub thread, after ownership is forgotten for a desktop switch or lost hook. Clear matching local ownership.</summary>
+    void InputReset(InputDevices devices) { }
 }
 
 /// <param name="Vk">The virtual-key code.</param>

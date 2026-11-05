@@ -25,6 +25,7 @@ public static class LucideIcons
     public static Geometry ArrowUp { get; } = G("M12,19 V5 M5,12 L12,5 L19,12");
 
     public static Geometry Mouse { get; } = G("M12,2 a7,7 0 0 1 7,7 v6 a7,7 0 0 1 -14,0 V9 a7,7 0 0 1 7,-7 Z M12,6 v4");
+    public static Geometry ShieldX { get; } = G("M20,13 c0,5 -3.5,7.5 -7.66,8.95 a1,1 0 0 1 -.67,-.01 C7.5,20.5 4,18 4,13 V6 a1,1 0 0 1 1,-1 c2,0 4.5,-1.2 6.24,-2.72 a1.17,1.17 0 0 1 1.52,0 C14.51,3.81 17,5 19,5 a1,1 0 0 1 1,1 Z M14.5,9.5 l-5,5 M9.5,9.5 l5,5");
 
     // Devices (from Hopper).
     public static Geometry Monitor { get; } = G("M4,3 H20 A2,2 0 0 1 22,5 V15 A2,2 0 0 1 20,17 H4 A2,2 0 0 1 2,15 V5 A2,2 0 0 1 4,3 Z M8,21 H16 M12,17 V21");

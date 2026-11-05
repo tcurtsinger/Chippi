@@ -61,4 +61,7 @@ public sealed class ModuleServices
 
     /// <summary>Closes the island (after a paste was sent). Set by the shell; null in tests.</summary>
     public Action? CloseIsland { get; set; }
+
+    /// <summary>Widget feedback visibility, queried on the UI dispatcher.</summary>
+    public Func<bool>? CanShowIslandFeedback { get; set; }
 }

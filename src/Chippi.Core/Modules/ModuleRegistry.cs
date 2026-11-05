@@ -406,6 +406,7 @@ public sealed class ModuleRegistry(ConfigStore config, IslandActivityHub island,
             IslandPasteTarget = () => _services.IslandPasteTarget?.Invoke(),
             SettingsPasteTarget = () => _services.SettingsPasteTarget?.Invoke(),
             CloseIsland = () => _services.CloseIsland?.Invoke(),
+            CanShowIslandFeedback = () => _services.CanShowIslandFeedback?.Invoke() == true,
         };
 
         entry.Ui = ui;

@@ -210,6 +210,9 @@ public partial class App : Application
         // [Phase 6] Click and key debounce: replaces its catalog placeholder.
         shell.Registry.Register(new Chippi.Features.Debounce.DebounceModule(Environment.GetEnvironmentVariable("CHIPPI_DEBOUNCE_INJECTED") == "1"));
 
+        shell.Registry.Register(new Chippi.Features.CloseProtection.CloseProtectionModule(() =>
+            new Chippi.Features.CloseProtection.WindowsCloseDesktop()));
+
         // [WS2] "Coming soon" placeholders for the PLAN.md features.
         Settings.Features.FeatureCatalog.RegisterPlaceholders(shell.Registry);
 
