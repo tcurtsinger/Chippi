@@ -121,9 +121,9 @@ public sealed class FocusTrackingTests
             Assert.Equal(new uint[] { 0, 0, 500 }, settings.Values);
             Assert.Empty(new TrackingJournal(path).Load());
             Assert.False(restarted.Enabled);
-            // A corrupt journal must fail closed rather than guessing the original settings.
+            // Damaged ownership is treated as empty; no original preferences are guessed.
             File.WriteAllText(path, "{");
-            Assert.Throws<System.Text.Json.JsonException>(() => new FocusTrackingEngine(settings, new TrackingJournal(path)));
+            Assert.Empty(new TrackingJournal(path).Load());
         }
         finally
         {

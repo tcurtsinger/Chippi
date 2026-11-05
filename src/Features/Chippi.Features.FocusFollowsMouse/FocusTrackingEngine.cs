@@ -12,7 +12,9 @@ public interface ITrackingSettings
     void Write(TrackingSetting setting, uint value);
 }
 
-public sealed record TrackingOwnership(uint Original, uint Applied);
+public sealed record TrackingOwnership(
+    [property: System.Text.Json.Serialization.JsonRequired] uint Original,
+    [property: System.Text.Json.Serialization.JsonRequired] uint Applied);
 
 public interface ITrackingJournal
 {

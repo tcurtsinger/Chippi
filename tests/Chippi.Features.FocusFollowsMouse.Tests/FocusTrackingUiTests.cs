@@ -68,6 +68,38 @@ public sealed class FocusTrackingUiTests
         });
     }
 
+    [Theory]
+    [InlineData("{")]
+    [InlineData("null")]
+    [InlineData("{\"Enabled\":null}")]
+    [InlineData("{\"Enabled\":{\"Original\":0}}")]
+    [InlineData("{\"999\":{\"Original\":0,\"Applied\":1}}")]
+    public async Task DamagedJournalDoesNotBlockEnableOrUninstall(string json)
+    {
+        var path = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllText(path, json);
+            var settings = new WindowsSettings();
+            var store = new Store();
+            var module = new FocusFollowsMouseModule(() => new FocusTrackingEngine(settings, new TrackingJournal(path)));
+            await module.StartAsync(new ModuleContext(FocusFollowsMouseModule.Id, store, NullLogger.Instance,
+                new IslandActivityHub().CreatePublisher(FocusFollowsMouseModule.Id), new Ui()), default);
+            Assert.Equal(0, settings.Writes);
+            Assert.Null(module.Error);
+            module.SetEnabled(true);
+            Assert.True(store.Value.Enabled);
+            Assert.Null(module.Error);
+            await module.StopAsync(default);
+            Assert.Equal(new uint[] { 0, 0, 500 }, settings.Values);
+            File.WriteAllText(path, json);
+            int before = settings.Writes;
+            await module.UninstallAsync(default);
+            Assert.Equal(before, settings.Writes);
+            Assert.Null(module.Error);
+        }
+        finally { File.Delete(path); }
+    }
     private static void Shot(FrameworkElement view, string name)
     {
         if (Environment.GetEnvironmentVariable("CHIPPI_ISLAND_SHOTS") is not { Length: > 0 } folder) return;
