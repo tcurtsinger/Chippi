@@ -100,7 +100,7 @@ public sealed class ActionRunnerTests
     public void Names_come_from_what_it_does(ActionKind kind, string value, string name) =>
         Assert.Equal(name, ActionCatalog.NameFor(new ChippiAction { Kind = kind, Value = value }, v => v == "ms-settings:bluetooth" ? "Bluetooth & devices" : null));
 
-    private sealed class FakePc : IActionPc
+    internal sealed class FakePc : IActionPc
     {
         public nint UnderPointer { get; init; }
         public nint InFront { get; init; }

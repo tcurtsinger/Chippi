@@ -102,14 +102,14 @@ restarts). Never-used capabilities are not flagged.
 
 ## Actions (`Chippi.Core.Actions`, Phase 6)
 
-One action model, many doors (docs/phase-6/architecture.md section 3). The Radial menu runs its slices through it.
+One action model, many doors (docs/phase-6/architecture.md section 3). The Radial menu runs its slices through it, on the shell's `ModuleContext.Actions`.
 
 | Type | What it is |
 |---|---|
 | `ChippiAction` | Record: `Kind` (`ActionKind`: App, File, Link, Keys, Chippi, Media, Window, Text, Command, Selection, SettingsPage), `Value`, `Name`, `Glyph` (a `LucideIcons` name, or null), `Shell`. |
 | `ActionCatalog` | Each kind's and action's name and glyph name; `NameFor(action, known)` and `GlyphOf(action)`. `Links` normalizes addresses. |
 | `ActionRunner` | Runs an action on an `IActionPc` and tells whether its target is gone (`IsMissing`). A Window action takes its door's `WindowTarget` (under the pointer, in front, or in front before the island opened), or a window the door read itself. Failures throw `ActionFailure` with the bar's reason. |
-| `IActionPc` | The PC side; tests pass a fake. The Radial menu's `WindowsRadialPc` is the real one. |
-| `KeyCombo`, `IKeyRecorder` | A Key shortcut action's keys, and recording them. |
+| `IActionPc` | The PC side; tests pass a fake. The shell gives every feature the real one as `ModuleContext.Actions` (`Chippi.UI.Actions.WindowsActionPc`); a feature builds its own `ActionRunner` over it. |
+| `KeyCombo`, `IKeyRecorder` | A Key shortcut action's keys, and recording them. `Chippi.UI.Actions.KeyRecorder` is the real recorder, a filter in the input hub. |
 
 The picker is `Chippi.UI.Actions.ActionPicker` (Kind, its value rows, Name and Glyph); a host adds kinds of its own after the shared ones, as the Radial menu adds Submenu.
