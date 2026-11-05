@@ -100,7 +100,9 @@ public interface IInputFilter
 
     /// <summary>
     /// A key went down or up. True keeps it from the apps and Windows. Keeping a down keeps its up: that up comes only to
-    /// this filter, whatever it answers. An up whose down nobody kept always passes on.
+    /// this filter, whatever it answers. Its repeats come here too; answering false to one gives the key back, and that
+    /// repeat goes on to the other filters and the app as a new press, as does the key's up. An up whose down nobody kept
+    /// always passes on.
     /// </summary>
     bool Key(in KeyInput key);
 

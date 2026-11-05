@@ -321,24 +321,25 @@ internal sealed class HubCore(IHookSource hooks, IInputSender sender, IInputSyst
         uint index = vk & 0xFF;
         var input = new KeyInput(vk, scan, down, down && system.IsDown(vk), injected, (flags & KeyExtended) != 0, now);
         bool keep = false;
-        if (_keyOwner[index] is { } owner)
+        Entry? owner = _keyOwner[index];
+        if (owner is not null)
         {
-            // A kept key's repeats and up are its keeper's, whatever it answers: the app never saw it go down.
-            if (owner.Alive)
-                owner.Filter.Key(in input);
-            keep = true;
-            if (!down)
+            // A kept key's up is its keeper's, whatever it answers: the app never saw it go down. So are its repeats,
+            // unless the keeper answers false to one: that gives the key back, and the repeat goes down the chain as a
+            // new press (Debounce drops a bounce's press, and the key still held must reach the app).
+            keep = !owner.Alive || owner.Filter.Key(in input) || !down;
+            if (!down || !keep)
             {
                 _keyOwner[index] = null;
                 if (--_ownedKeys == 0)
                     RequestUpdate();
             }
         }
-        else if (down)
+        if (down && !keep)
         {
             foreach (var entry in _chain)
             {
-                if (!entry.Hears(InputDevices.Keyboard, _paused) || !entry.Filter.Key(in input))
+                if (entry == owner || !entry.Hears(InputDevices.Keyboard, _paused) || !entry.Filter.Key(in input))
                     continue;
                 keep = true;
                 // A key Windows already had down went to the app: its up must reach the app too.
@@ -350,7 +351,7 @@ internal sealed class HubCore(IHookSource hooks, IInputSender sender, IInputSyst
                 break;
             }
         }
-        else
+        else if (!down && owner is null)
         {
             // An up whose down nobody kept: filters may note it, and it always passes on.
             foreach (var entry in _chain)

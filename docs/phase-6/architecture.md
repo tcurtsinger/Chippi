@@ -27,7 +27,7 @@ Why one hub and not one hook per feature:
 - **Order.** Windows calls low-level hooks newest first, so separate hooks in one process run in whatever order they were installed. In the hub the order is fixed (below).
 - **Cost.** Each hook is a cross-thread round trip on every mouse move, up to 1000 a second on Travis's mouse. Five features with their own hooks pay that five times.
 - **Silent removal.** Windows drops a low-level hook that answers too slowly and doesn't say so. One hook gets one watchdog; none of today's four would notice.
-- **One place for the shared rules:** Chippi's own input passes untouched, input other programs send counts as a hand's, a swallowed down always swallows its up, modifier masking, and the pause.
+- **One place for the shared rules:** Chippi's own input passes untouched, input other programs send counts as a hand's, a swallowed down always swallows its up (and its repeats, unless the filter that swallowed it lets one pass: then the key is the app's again, repeat and up), modifier masking, and the pause.
 
 Filter order:
 

@@ -44,6 +44,72 @@ public class HubTests
     }
 
     [Fact]
+    public void A_held_key_whose_press_bounced_still_repeats_and_comes_up_in_the_app()
+    {
+        // Backspace held, its switch bouncing once at the press: down, up 1 ms later, down 2 ms after that. A filter
+        // like Debounce keeps the bounce's press and answers false to the repeats that follow while the key is held.
+        const uint Back = 0x08;
+        var hub = new TestHub();
+        var debounce = new TestFilter("debounce", InputOrder.Debounce);
+        var later = new TestFilter("later", InputOrder.Recorder);
+        bool bounced = false;
+        debounce.KeepKey = k => k.Down && !bounced && (bounced = debounce.Heard.Count == 3);
+        hub.Core.Add(debounce);
+        hub.Core.Add(later);
+
+        var reached = new List<string>();
+        void Key(bool down, double ms)
+        {
+            hub.System.Advance(TimeSpan.FromMilliseconds(ms));
+            if (hub.Key(Back, down) == false)
+                reached.Add(down ? "down" : "up");
+        }
+        Key(true, 0);
+        Key(false, 1);
+        Key(true, 2); // kept: the bounce
+        for (int i = 0; i < 3; i++)
+            Key(true, i == 0 ? 500 : 33); // the keyboard's repeats while the key is held
+        Key(false, 300);
+
+        Assert.Equal(["down", "up", "down", "down", "down", "up"], reached);
+        // The repeat given back went on down the chain, and the key's up reached every filter as a key nobody kept.
+        Assert.Equal(["later key 08 down", "later key 08 up", "later key 08 down", "later key 08 down", "later key 08 down", "later key 08 up"], later.Heard);
+        Assert.Equal(0, hub.Core.Kept);
+    }
+
+    [Fact]
+    public void A_repeat_given_back_can_be_kept_by_a_later_filter_and_then_its_up_is_that_filters()
+    {
+        var hub = new TestHub();
+        bool first = true;
+        var giver = new TestFilter("giver", InputOrder.Debounce) { KeepKey = k => k.Down && (first ? !(first = false) : false) };
+        var taker = new TestFilter("taker", InputOrder.Triggers) { KeepKey = k => k.Down && !first };
+        hub.Core.Add(giver);
+        hub.Core.Add(taker);
+
+        Assert.True(hub.Key(A, down: true)); // the giver keeps it
+        Assert.True(hub.Key(A, down: true)); // given back on the repeat, and the taker keeps that
+        Assert.True(hub.Key(A, down: false)); // the taker's now
+
+        Assert.Equal(["giver key 41 down", "giver key 41 down"], giver.Heard);
+        Assert.Equal(["taker key 41 down", "taker key 41 up"], taker.Heard);
+        Assert.Equal(0, hub.Core.Kept);
+    }
+
+    [Fact]
+    public void A_keeper_whose_registration_ended_still_keeps_its_keys_repeats_and_up()
+    {
+        var hub = new TestHub();
+        var keeper = new TestFilter("keeper", InputOrder.CleaningLock) { KeepKey = k => k.Down };
+        var entry = hub.Core.Add(keeper);
+
+        Assert.True(hub.Key(A, down: true));
+        hub.Core.Remove(entry);
+        Assert.True(hub.Key(A, down: true));
+        Assert.True(hub.Key(A, down: false));
+    }
+
+    [Fact]
     public void An_up_whose_down_nobody_kept_always_passes_on()
     {
         var hub = new TestHub();
