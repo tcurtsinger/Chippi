@@ -48,6 +48,9 @@ public sealed class ModuleServices
 
     /// <summary>The shared clipboard service (Phase 5). Set by the shell; null in tests. Idle until a feature uses it.</summary>
     public Clipboard.IClipboardHub? Clipboard { get; set; }
+
+    /// <summary>The input hub (Phase 6). Set by the shell; null in tests. No hook goes in until a feature needs one.</summary>
+    public Input.IInputHub? Input { get; set; }
     public Func<IDisposable> HoldIslandOpen { get; set; } = () => new IslandOpenHold().Hold();
 
     /// <summary>The app in front before the island took the keyboard or opened docked. Set by the shell; null in tests.</summary>

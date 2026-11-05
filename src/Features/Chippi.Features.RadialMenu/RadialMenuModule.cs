@@ -62,17 +62,19 @@ public sealed class RadialMenuModule : IFeatureModule, IWheelInputSink
     /// <param name="keepAwake">Whether Keep awake runs: the hub's Chippi is wide awake then.</param>
     /// <param name="engine">The Command bar's web search, for Selected text's Search the web.</param>
     public RadialMenuModule(Func<bool> cleaning, Func<bool> keepAwake, Func<WebEngine> engine)
-        : this(() => new WindowsRadialPc(), sink => new WheelHook(sink, Application.Current?.Dispatcher ?? Dispatcher.CurrentDispatcher), GlobalMicHotkey.Create, new KeyRecorder(), cleaning, keepAwake, engine)
+        : this(() => new WindowsRadialPc(), null, GlobalMicHotkey.Create, null, cleaning, keepAwake, engine)
     {
     }
 
-    public RadialMenuModule(Func<IRadialPc> pc, Func<IWheelInputSink, IWheelInput> input, Func<IMicHotkey> hotkey, IKeyRecorder recorder,
+    /// <param name="input">The mouse and Esc; null for the real ones, a filter in the shell's input hub.</param>
+    /// <param name="recorder">Records a Key shortcut slice; null for the real one, a filter in the input hub.</param>
+    public RadialMenuModule(Func<IRadialPc> pc, Func<IWheelInputSink, IWheelInput>? input, Func<IMicHotkey> hotkey, IKeyRecorder? recorder,
         Func<bool>? cleaning = null, Func<bool>? keepAwake = null, Func<WebEngine>? engine = null)
     {
         _createPc = pc;
-        _createInput = input;
+        _createInput = input ?? (sink => new WheelHook(sink, Hub(), Application.Current?.Dispatcher ?? Dispatcher.CurrentDispatcher));
         _createHotkey = hotkey;
-        Recorder = recorder;
+        Recorder = recorder ?? new KeyRecorder(Hub);
         _cleaning = cleaning ?? (() => false);
         _keepAwake = keepAwake ?? (() => false);
         _engine = engine ?? (() => WebEngine.Google);
@@ -101,6 +103,8 @@ public sealed class RadialMenuModule : IFeatureModule, IWheelInputSink
     internal SliceRunner? Runner { get; private set; }
 
     internal IKeyRecorder Recorder { get; }
+
+    private Core.Input.IInputHub Hub() => _context?.Input ?? throw new InvalidOperationException("The Radial menu needs the input hub");
 
     /// <summary>Chippi's colour, as Settings › Island &amp; pet picked it.</summary>
     internal Core.Config.PetColor ChippiColor => _context?.ChippiColor() ?? Core.Config.PetColor.Synth;

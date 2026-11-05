@@ -31,6 +31,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Chippi.Clipboard\Chippi.Clipboard.csproj" />
     <ProjectReference Include="..\Chippi.Core\Chippi.Core.csproj" />
+    <ProjectReference Include="..\Chippi.Input\Chippi.Input.csproj" />
     <ProjectReference Include="..\Chippi.UI\Chippi.UI.csproj" />
     <ProjectReference Include="..\Features\Chippi.Features.KeepAwake\Chippi.Features.KeepAwake.csproj" />
     <ProjectReference Include="..\Features\Chippi.Features.Downloads\Chippi.Features.Downloads.csproj" />

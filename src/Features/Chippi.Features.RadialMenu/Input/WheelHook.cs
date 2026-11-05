@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
-using System.ComponentModel;
 using System.Windows.Threading;
+using Chippi.Core.Input;
 using Chippi.Features.RadialMenu.Pc;
+using HubButton = Chippi.Core.Input.MouseButton;
 
 namespace Chippi.Features.RadialMenu.Input;
 
@@ -46,33 +47,53 @@ public interface IWheelInput : IDisposable
 }
 
 /// <summary>
-/// Low-level mouse and keyboard hooks on a thread of their own that does nothing else, so they always answer in time
-/// (Windows passes input on, and may drop a hook unannounced, when the thread that owns it is busy). Input Chippi sends is
-/// passed on untouched, as is everything else unless <see cref="Gesture"/> keeps it.
+/// The Radial menu's filter in the input hub, among the triggers (architecture §2): the hub's hooks, on their own thread,
+/// bring it every mouse event and key while a button opens the wheel or it shows. Everything passes on unless
+/// <see cref="Gesture"/> keeps it; the hub keeps a kept press's up for it.
 /// </summary>
-internal sealed class WheelHook(IWheelInputSink sink, Dispatcher ui) : IWheelInput
+internal sealed class WheelHook : IWheelInput, IInputFilter
 {
     public static readonly TimeSpan Hold = TimeSpan.FromMilliseconds(250);
 
     private readonly Lock _gate = new();
-    private readonly Dispatcher _ui = ui;
+    private readonly IWheelInputSink _sink;
+    private readonly Dispatcher _ui;
+    private readonly IInputRegistration _registration;
     private bool _middle, _back, _forward, _shown;
     private Func<bool> _paused = () => false;
-    private Thread? _thread;
-    private uint _threadId;
-    private Native.HookProc? _mouseProc, _keyProc;
-    private nint _mouseHook, _keyHook;
     private Timer? _timer;
     private bool _virtual;
     private PixelPoint _pointer;
     private bool _movePosted;
     private Task _replays = Task.CompletedTask;
 
+    public WheelHook(IWheelInputSink sink, IInputHub hub, Dispatcher ui)
+    {
+        _sink = sink;
+        _ui = ui;
+        _registration = hub.Add(this);
+    }
+
     // The gesture asks which buttons open the wheel through this, under the lock.
     private Gesture Gesture => _gestureWithWatch ??= new Gesture(Watched, Slop());
     private Gesture? _gestureWithWatch;
 
     public Func<bool> Paused { set => _paused = value; }
+
+    public InputOrder Order => InputOrder.Triggers;
+
+    // The Radial menu has its own switch for fullscreen apps (wave 1, PR 3); the hub's pause never stops it.
+    public bool Pauses => false;
+
+    // The hooks run while a button opens the wheel and while it shows; the hub keeps them until a kept press's up.
+    public InputDevices Devices
+    {
+        get
+        {
+            lock (_gate)
+                return _middle || _back || _forward || _shown ? InputDevices.Both : InputDevices.None;
+        }
+    }
 
     private bool Watched(MouseButton button) => !_paused() && button switch
     {
@@ -93,7 +114,7 @@ internal sealed class WheelHook(IWheelInputSink sink, Dispatcher ui) : IWheelInp
             _back = back;
             _forward = forward;
         }
-        Update();
+        _registration.Refresh();
     }
 
     public void OpenedByShortcut(bool virtualPointer, PixelPoint at)
@@ -105,7 +126,7 @@ internal sealed class WheelHook(IWheelInputSink sink, Dispatcher ui) : IWheelInp
             _virtual = virtualPointer;
             _pointer = at;
         }
-        Update();
+        _registration.Refresh();
     }
 
     public void UseVirtualPointer(PixelPoint at)
@@ -125,86 +146,15 @@ internal sealed class WheelHook(IWheelInputSink sink, Dispatcher ui) : IWheelInp
             _virtual = false;
             Gesture.Closed();
         }
-        Update();
+        _registration.Refresh();
     }
 
-    // The hooks run while a button opens the wheel, while it shows, and until the last kept key or button is up.
-    private bool Wanted => _middle || _back || _forward || _shown || !Gesture.IsIdle;
-
-    private void Update()
+    public bool Mouse(in MouseInput mouse)
     {
-        bool wanted;
-        lock (_gate)
-            wanted = Wanted;
-        if (wanted && _thread is null)
-            Start();
-        else if (!wanted && _thread is not null)
-            Stop();
-    }
-
-    private void Start()
-    {
-        var ready = new ManualResetEventSlim();
-        Exception? failed = null;
-        _mouseProc = OnMouse;
-        _keyProc = OnKey;
-        _thread = new Thread(() =>
-        {
-            _threadId = Native.GetCurrentThreadId();
-            nint module = Native.GetModuleHandle(null);
-            _mouseHook = Native.SetWindowsHookEx(Native.HookMouse, _mouseProc, module, 0);
-            _keyHook = _mouseHook == 0 ? 0 : Native.SetWindowsHookEx(Native.HookKeyboard, _keyProc, module, 0);
-            if (_mouseHook == 0 || _keyHook == 0)
-            {
-                failed = new Win32Exception();
-                if (_mouseHook != 0)
-                    Native.UnhookWindowsHookEx(_mouseHook);
-                ready.Set();
-                return;
-            }
-            ready.Set();
-            // Windows calls the hooks from inside GetMessage; the loop ends on WM_QUIT.
-            while (Native.GetMessage(out _, 0, 0, 0) > 0)
-            {
-            }
-            Native.UnhookWindowsHookEx(_keyHook);
-            Native.UnhookWindowsHookEx(_mouseHook);
-        })
-        { IsBackground = true, Name = "Radial menu input", Priority = ThreadPriority.Highest };
-        _thread.Start();
-        ready.Wait();
-        ready.Dispose();
-        if (failed is not null)
-        {
-            _thread = null;
-            throw failed;
-        }
-    }
-
-    private void Stop()
-    {
-        if (_threadId != 0)
-            Native.PostThreadMessage(_threadId, Native.WmQuit, 0, 0);
-        _thread?.Join(TimeSpan.FromSeconds(2));
-        _thread = null;
-        _threadId = 0;
-        _timer?.Dispose();
-        _timer = null;
-    }
-
-    private unsafe nint OnMouse(int code, nint wParam, nint lParam)
-    {
-        if (code < 0)
-            return Native.CallNextHookEx(0, code, wParam, lParam);
-        var info = (Native.MouseHookInfo*)lParam;
-        // Chippi's own replays go straight on. Input other programs send (a remapped key, Remote Desktop) counts as a hand's.
-        if ((info->Flags & Native.InjectedMouse) != 0 && info->ExtraInfo == Native.Ours)
-            return Native.CallNextHookEx(0, code, wParam, lParam);
-        uint message = (uint)wParam;
         GestureStep step;
         lock (_gate)
         {
-            var at = new PixelPoint(info->At.X, info->At.Y);
+            var at = new PixelPoint(mouse.X, mouse.Y);
             if (_virtual)
             {
                 // A game that hides the pointer may hold it in place: follow the mouse's own movement instead.
@@ -212,17 +162,11 @@ internal sealed class WheelHook(IWheelInputSink sink, Dispatcher ui) : IWheelInp
                 _pointer = new PixelPoint(_pointer.X + at.X - was.X, _pointer.Y + at.Y - was.Y);
                 at = _pointer;
             }
-            step = message switch
+            step = (mouse.Kind, Button(mouse.Button)) switch
             {
-                Native.WmMouseMove => Gesture.Move(at),
-                Native.WmLButtonDown => Gesture.Down(MouseButton.Left, at),
-                Native.WmLButtonUp => Gesture.Up(MouseButton.Left, at),
-                Native.WmRButtonDown => Gesture.Down(MouseButton.Right, at),
-                Native.WmRButtonUp => Gesture.Up(MouseButton.Right, at),
-                Native.WmMButtonDown => Gesture.Down(MouseButton.Middle, at),
-                Native.WmMButtonUp => Gesture.Up(MouseButton.Middle, at),
-                Native.WmXButtonDown => Gesture.Down(XButton(info->MouseData), at),
-                Native.WmXButtonUp => Gesture.Up(XButton(info->MouseData), at),
+                (MouseKind.Move, _) => Gesture.Move(at),
+                (MouseKind.Down, { } button) => Gesture.Down(button, at),
+                (MouseKind.Up, { } button) => Gesture.Up(button, at),
                 _ => new GestureStep(false),
             };
             if (step.Effect == GestureEffect.Move)
@@ -234,32 +178,28 @@ internal sealed class WheelHook(IWheelInputSink sink, Dispatcher ui) : IWheelInp
                 else
                     _movePosted = true;
             }
-            else if (step.Keep && !Wanted)
-                _ui.BeginInvoke(Update); // the last kept up after the wheel opened from its shortcut: the hooks can go
         }
         Act(step);
-        return step.Keep ? 1 : Native.CallNextHookEx(0, code, wParam, lParam);
+        return step.Keep;
     }
 
-    private static MouseButton XButton(uint data) => (data >> 16) == 1 ? MouseButton.Back : MouseButton.Forward;
-
-    private unsafe nint OnKey(int code, nint wParam, nint lParam)
+    private static MouseButton? Button(HubButton button) => button switch
     {
-        if (code < 0)
-            return Native.CallNextHookEx(0, code, wParam, lParam);
-        var info = (Native.KeyHookInfo*)lParam;
-        if ((info->Flags & Native.InjectedKey) != 0 && info->ExtraInfo == Native.Ours)
-            return Native.CallNextHookEx(0, code, wParam, lParam);
-        uint message = (uint)wParam;
+        HubButton.Left => MouseButton.Left,
+        HubButton.Right => MouseButton.Right,
+        HubButton.Middle => MouseButton.Middle,
+        HubButton.Back => MouseButton.Back,
+        HubButton.Forward => MouseButton.Forward,
+        _ => null,
+    };
+
+    public bool Key(in KeyInput key)
+    {
         GestureStep step;
         lock (_gate)
-        {
-            step = Gesture.Key(info->Vk, message is Native.WmKeyDown or Native.WmSysKeyDown);
-            if (step.Keep && step.Effect == GestureEffect.None && !Wanted)
-                _ui.BeginInvoke(Update);
-        }
+            step = Gesture.Key(key.Vk, key.Down);
         Act(step);
-        return step.Keep ? 1 : Native.CallNextHookEx(0, code, wParam, lParam);
+        return step.Keep;
     }
 
     private void Act(GestureStep step)
@@ -281,7 +221,7 @@ internal sealed class WheelHook(IWheelInputSink sink, Dispatcher ui) : IWheelInp
                     _replays = _replays.ContinueWith(_ => Replay(replay.Button, replay.Effect), TaskScheduler.Default);
                 break;
             case GestureEffect.Open:
-                _ui.BeginInvoke(() => sink.Opened(step.At, step.Button));
+                _ui.BeginInvoke(() => _sink.Opened(step.At, step.Button));
                 break;
             case GestureEffect.Move:
                 _ui.BeginInvoke(() =>
@@ -292,17 +232,17 @@ internal sealed class WheelHook(IWheelInputSink sink, Dispatcher ui) : IWheelInp
                         latest = _pointer;
                         _movePosted = false;
                     }
-                    sink.Moved(latest);
+                    _sink.Moved(latest);
                 });
                 break;
             case GestureEffect.Release:
-                _ui.BeginInvoke(() => sink.Released(step.At));
+                _ui.BeginInvoke(() => _sink.Released(step.At));
                 break;
             case GestureEffect.Click:
-                _ui.BeginInvoke(() => sink.Clicked(step.At));
+                _ui.BeginInvoke(() => _sink.Clicked(step.At));
                 break;
             case GestureEffect.Dismiss:
-                _ui.BeginInvoke(sink.Dismissed);
+                _ui.BeginInvoke(_sink.Dismissed);
                 break;
         }
     }
@@ -336,9 +276,9 @@ internal sealed class WheelHook(IWheelInputSink sink, Dispatcher ui) : IWheelInp
     public void Dispose()
     {
         lock (_gate)
-        {
             _middle = _back = _forward = _shown = false;
-        }
-        Stop();
+        _registration.Dispose();
+        _timer?.Dispose();
+        _timer = null;
     }
 }

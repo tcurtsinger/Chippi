@@ -1,0 +1,22 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- The input hub (Phase 6, docs/phase-6/architecture.md §2): one low-level keyboard hook and one mouse hook on a
+     thread of their own, the filters every input feature plugs in, the held-modifier release path and the watchdog. No
+     WPF and no module code; behavior is tested with a fake hook source and a recording sender, never the real input. -->
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <RootNamespace>Chippi.Input</RootNamespace>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Chippi.Core\Chippi.Core.csproj" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Chippi.Input.Tests" />
+  </ItemGroup>
+
+</Project>
