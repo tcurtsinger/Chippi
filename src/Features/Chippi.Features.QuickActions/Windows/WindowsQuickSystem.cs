@@ -70,8 +70,9 @@ public sealed class WindowsQuickSystem : IQuickSystem
         ReadPart("open apps", () =>
         {
             var windows = AltTabApps.List();
-            apps = _apps.Apps(windows, frontProcessId);
-            frozen = AltTabApps.Frozen(windows).Count;
+            var hung = AltTabApps.Frozen(windows);
+            apps = _apps.Apps(windows, frontProcessId, hung);
+            frozen = hung.Count;
         });
         await ReadPartAsync("the Recycle Bin", async () => recycled = await _recycled.GetAsync().WaitAsync(SlowWait, ct), ct);
         return new QuickState(on, unsupported, plans, drives, apps, frozen, recycled);
@@ -106,6 +107,8 @@ public sealed class WindowsQuickSystem : IQuickSystem
     public Task EjectAsync(RemovableDrive drive) => Task.Run(() => RemovableDrives.Eject(drive));
 
     public Task QuitAsync(OpenApp app) => Task.Run(() => AltTabApps.Quit(app.Path));
+
+    public Task EndAsync(OpenApp app) => Task.Run(() => AltTabApps.End(app.Path));
 
     public Task EndFrozenAppsAsync() => Task.Run(AltTabApps.EndFrozen);
 

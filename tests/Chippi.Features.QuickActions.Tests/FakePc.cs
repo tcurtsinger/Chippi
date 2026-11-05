@@ -58,6 +58,13 @@ internal sealed class FakePc : IQuickSystem
         return Task.CompletedTask;
     }
 
+    public Task EndAsync(OpenApp app)
+    {
+        Record($"end {app.Name}");
+        State = State with { Apps = [.. State.Apps.Where(a => a != app)] };
+        return Task.CompletedTask;
+    }
+
     public Task EndFrozenAppsAsync()
     {
         Record("end frozen");

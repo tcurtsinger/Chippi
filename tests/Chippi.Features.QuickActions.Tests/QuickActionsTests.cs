@@ -94,9 +94,9 @@ public sealed class QuickActionsTests
     {
         var f = new Fixture();
         await f.Start();
-        f.Module.Pick([QuickActionId.Power, QuickActionId.Dark, QuickActionId.Lock]);
-        Assert.Equal(["dark", "lock", "power"], f.Settings.Value.Shown);
-        Assert.Equal([QuickActionId.Dark, QuickActionId.Lock, QuickActionId.Power], f.Module.Shown.Select(a => a.Id));
+        f.Module.Pick([QuickActionId.Power, QuickActionId.Dark, QuickActionId.Explorer]);
+        Assert.Equal(["dark", "explorer", "power"], f.Settings.Value.Shown);
+        Assert.Equal([QuickActionId.Dark, QuickActionId.Explorer, QuickActionId.Power], f.Module.Shown.Select(a => a.Id));
     }
 
     [Fact]

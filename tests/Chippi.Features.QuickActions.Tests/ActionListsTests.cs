@@ -291,6 +291,79 @@ public sealed class ActionListsTests
         });
     }
 
+    [Fact]
+    public void Power_holds_Lock_Turn_off_displays_and_Screen_saver_beside_the_power_choices()
+    {
+        WpfTestThread.Run(() =>
+        {
+            using var f = new Fixture();
+            f.Start(QuickState.Empty, new() { Shown = ["power"] });
+            var page = new ActionsPage(f.Module);
+            page.OpenConfirmation = _ => { };
+            page.Press(QuickActionId.Power);
+            Assert.Equal(["Lock", "Sleep", "Turn off displays", "Restart", "Screen saver", "Shut down", "Sign out"],
+                Find<Button>(page).Select(AutomationProperties.GetName).Where(n => n.Length > 0 && n != "Edit actions" && n != "Done").ToArray());
+            Click(Named(page, "Lock"));
+            Click(Named(page, "Turn off displays"));
+            Click(Named(page, "Screen saver"));
+            Assert.Equal(["run Lock", "run Displays", "run ScreenSaver"], f.Pc.Calls);
+            Assert.Null(page.ConfirmationQuestion);
+            Click(Named(page, "Sleep"));
+            Assert.Equal("Sleep?", page.ConfirmationQuestion);
+        });
+    }
+
+    [Fact]
+    public void A_frozen_app_shows_Not_responding_and_its_X_and_the_footer_End_ask_before_ending_it()
+    {
+        WpfTestThread.Run(() =>
+        {
+            using var f = new Fixture();
+            var outlook = new OpenApp(@"C:\Office\Outlook.exe", "Outlook", false, NotResponding: true);
+            f.Start(QuickState.Empty with { Apps = [FakePc.Chrome, outlook], Frozen = 1 }, new() { Shown = ["quit"] });
+            var page = new ActionsPage(f.Module);
+            page.OpenConfirmation = _ => { };
+            page.Press(QuickActionId.Quit);
+            Assert.Contains(Find<TextBlock>(page), t => t.Text == "Not responding");
+            Assert.Contains(Find<Button>(page), b => Equals(b.Tag, "quit-all"));
+            var end = Find<Button>(page).Single(b => Equals(b.Tag, "end-frozen"));
+            Assert.Equal("End Outlook", end.Content);
+
+            Click(Named(page, "End Outlook (not responding)"));
+            Assert.Equal("End Outlook?", page.ConfirmationQuestion);
+            Assert.Empty(f.Pc.Calls);
+            Click(Find<Button>(page.Confirmation!.Child).Single(b => Equals(b.Content, "End")));
+            Assert.Equal(["end Outlook"], f.Pc.Calls);
+
+            // The footer ends every frozen app, after asking.
+            var second = new OpenApp(@"C:\Office\Word.exe", "Word", false, NotResponding: true);
+            f.Pc.Calls.Clear();
+            f.Pc.State = f.Pc.State with { Apps = [FakePc.Chrome, outlook, second], Frozen = 2 };
+            f.Module.PollAsync().GetAwaiter().GetResult();
+            Drain();
+            page.Render();
+            Click(Find<Button>(page).Single(b => Equals(b.Tag, "end-frozen")));
+            Assert.Equal("End 2 apps?", page.ConfirmationQuestion);
+            Click(Find<Button>(page.Confirmation!.Child).Single(b => Equals(b.Content, "End")));
+            Assert.Equal(["end frozen"], f.Pc.Calls);
+        });
+    }
+
+    [Fact]
+    public void A_responding_apps_X_still_quits_it_without_the_End_footer()
+    {
+        WpfTestThread.Run(() =>
+        {
+            using var f = new Fixture();
+            f.Start(QuickState.Empty with { Apps = [FakePc.Chrome] }, new() { Shown = ["quit"] });
+            var page = new ActionsPage(f.Module);
+            page.Press(QuickActionId.Quit);
+            Assert.DoesNotContain(Find<Button>(page), b => Equals(b.Tag, "end-frozen"));
+            Click(Named(page, "Quit Google Chrome"));
+            Assert.Equal(["quit Google Chrome"], f.Pc.Calls);
+        });
+    }
+
     private static void Drain() => Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.Background);
     private static Button Named(DependencyObject root, string name) => Find<Button>(root).Single(b => AutomationProperties.GetName(b) == name);
     private static void Click(ButtonBase button) => button.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
@@ -355,6 +428,7 @@ public sealed class ActionListsTests
             if (QuitHold is { } hold) await hold.Task;
             await pc.QuitAsync(app);
         }
+        public Task EndAsync(OpenApp app) => pc.EndAsync(app);
         public Task EndFrozenAppsAsync() => pc.EndFrozenAppsAsync();
         public Task RunAsync(QuickActionId id) => pc.RunAsync(id);
         public Task PowerAsync(PowerChoice choice) => pc.PowerAsync(choice);

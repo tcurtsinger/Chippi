@@ -97,6 +97,9 @@ public sealed class QuickActionsModule : IFeatureModule
     public IReadOnlyList<QuickAction> Offered =>
         [.. QuickAction.All.Where(a => !State.Unsupported.Contains(a.Id) && (a.Id != QuickActionId.Cleaning || _cleaning() is not null))];
 
+    /// <summary>The actions that have a gallery tile and can be offered on this PC.</summary>
+    public IReadOnlyList<QuickAction> Gallery => [.. Offered.Where(a => a.InGallery)];
+
     /// <summary>All gallery positions, including hidden actions so hiding one never moves its neighbors.</summary>
     public IReadOnlyList<string?> Layout => QuickActionsLayout.Normalize(Settings.Layout, Settings.Shown);
 
@@ -105,7 +108,7 @@ public sealed class QuickActionsModule : IFeatureModule
     {
         get
         {
-            var offered = Offered.ToDictionary(a => a.Key);
+            var offered = Gallery.ToDictionary(a => a.Key);
             return [.. Layout.OfType<string>().Where(offered.ContainsKey).Select(key => offered[key]).Where(a => Settings.Shows(a.Id))];
         }
     }
@@ -229,23 +232,23 @@ public sealed class QuickActionsModule : IFeatureModule
     /// <summary>The picker's Done: the page shows these from now on.</summary>
     public void Pick(IEnumerable<QuickActionId> ids)
     {
-        var shown = ids.Distinct().Order().Select(id => QuickAction.Of(id).Key).ToList();
+        var shown = ids.Distinct().Order().Where(id => QuickAction.Of(id).InGallery).Select(id => QuickAction.Of(id).Key).ToList();
         Save(Settings with { Shown = shown, Layout = QuickActionsLayout.Normalize(null, shown) });
     }
 
     /// <summary>Commit the editor's selection and exact positions together; unavailable actions keep their saved choice.</summary>
     public void SaveLayout(IEnumerable<QuickActionId> selected, IEnumerable<string?> slots)
     {
-        var offered = Offered.Select(a => a.Id).ToHashSet();
+        var offered = Gallery.Select(a => a.Id).ToHashSet();
         var chosen = selected.ToHashSet();
-        var shown = QuickAction.All.Where(a => offered.Contains(a.Id) ? chosen.Contains(a.Id) : Settings.Shows(a.Id)).Select(a => a.Key).ToList();
+        var shown = QuickAction.All.Where(a => a.InGallery).Where(a => offered.Contains(a.Id) ? chosen.Contains(a.Id) : Settings.Shows(a.Id)).Select(a => a.Key).ToList();
         Save(Settings with { Shown = shown, Layout = QuickActionsLayout.Normalize(slots, shown) });
     }
 
     /// <summary>Settings' switch for one action: shown on the page or not.</summary>
     public void SetShown(QuickActionId id, bool shown)
     {
-        var keys = QuickAction.All.Where(a => a.Id == id ? shown : Settings.Shows(a.Id)).Select(a => a.Key);
+        var keys = QuickAction.All.Where(a => a.InGallery).Where(a => a.Id == id ? shown : Settings.Shows(a.Id)).Select(a => a.Key);
         Save(Settings with { Shown = [.. keys], Layout = [.. Layout] });
     }
 
@@ -293,6 +296,8 @@ public sealed class QuickActionsModule : IFeatureModule
             if (failed.Count > 0) throw new QuitAppsException(refused, failed);
         }, run);
     }
+
+    public Task EndAsync(OpenApp app) => ThenRefresh(pc => pc.EndAsync(app));
 
     public Task EndFrozenAppsAsync() => ThenRefresh(pc => pc.EndFrozenAppsAsync());
 

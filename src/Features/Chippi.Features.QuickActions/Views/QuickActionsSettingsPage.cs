@@ -74,7 +74,7 @@ public sealed class QuickActionsSettingsPage : UserControl
 
     private void Refresh()
     {
-        var offered = _module.Offered;
+        var offered = _module.Gallery;
         string key = string.Join(",", offered.Select(a => a.Key));
         if (key != _offered)
         {

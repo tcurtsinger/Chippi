@@ -159,6 +159,17 @@ internal sealed partial class ActionsPage : UserControl
         _module.Pending = null;
         DiscardEdit();
         var action = QuickAction.Of(id);
+        if (id == QuickActionId.Frozen)
+        {
+            // Its tile moved into Quit apps: a shortcut or Search opens that list and asks there.
+            if (!Describe(action, _module.State).Enabled)
+                return;
+            CloseConfirm();
+            _list = QuickActionId.Quit;
+            Render();
+            Buttons(_body).FirstOrDefault(b => Equals(b.Tag, "end-frozen"))?.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+            return;
+        }
         if (action.OpensList)
         {
             CloseConfirm();
@@ -216,7 +227,7 @@ internal sealed partial class ActionsPage : UserControl
             var n => ($"{n} drives", true, true),
         },
         QuickActionId.Quit => state.Apps.Count == 0 ? ("None", false, false) : ($"{state.Apps.Count} open", true, true),
-        QuickActionId.Frozen => state.Frozen == 0 ? ("None", false, false) : (state.Frozen == 1 ? "1 app" : $"{state.Frozen} apps", true, false),
+        QuickActionId.Frozen => state.Frozen == 0 ? ("None", false, false) : (state.Frozen == 1 ? "1 app" : $"{state.Frozen} apps", true, false), // no tile now; the shortcut asks first
         QuickActionId.Recycle => state.RecycleBinItems == 0 ? ("Empty", false, false) : ("", true, false),
         QuickActionId.Power => ("", true, true),
         _ => ("", true, false),
@@ -235,7 +246,7 @@ internal sealed partial class ActionsPage : UserControl
 
     private void RenderGrid()
     {
-        var offered = _module.Offered.ToDictionary(a => a.Key);
+        var offered = _module.Gallery.ToDictionary(a => a.Key);
         var slots = _module.Layout.Select(key => key is not null && offered.TryGetValue(key, out var action) && _module.Settings.Shows(action.Id) ? action : null).ToArray();
         string built = "grid:" + string.Join(",", slots.Select(a => a?.Key));
         if (_built != built)

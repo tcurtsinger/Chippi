@@ -61,7 +61,7 @@ internal sealed partial class AltTabApps
     }
 
     /// <summary>One app per program file, in Alt+Tab's order; <paramref name="frontProcessId"/> marks the front one.</summary>
-    public IReadOnlyList<OpenApp> Apps(IReadOnlyList<AltTabWindow> windows, uint frontProcessId)
+    public IReadOnlyList<OpenApp> Apps(IReadOnlyList<AltTabWindow> windows, uint frontProcessId, IReadOnlySet<uint>? frozen = null)
     {
         var paths = new List<string>();
         foreach (var window in windows)
@@ -73,7 +73,8 @@ internal sealed partial class AltTabApps
         string? front = frontProcessId == 0 ? null
             : windows.FirstOrDefault(w => w.ProcessId == frontProcessId).Path
               ?? windows.FirstOrDefault(w => w.WindowProcessId == frontProcessId).Path;
-        return [.. paths.Select(p => new OpenApp(p, Name(p), string.Equals(p, front, StringComparison.OrdinalIgnoreCase)))];
+        return [.. paths.Select(p => new OpenApp(p, Name(p), string.Equals(p, front, StringComparison.OrdinalIgnoreCase),
+            frozen is not null && windows.Any(w => frozen.Contains(w.ProcessId) && string.Equals(w.Path, p, StringComparison.OrdinalIgnoreCase))))];
     }
 
     /// <summary>
@@ -102,6 +103,22 @@ internal sealed partial class AltTabApps
         int asked = windows.Count(w => PInvoke.PostMessage(w.Handle, PInvoke.WM_CLOSE, 0, 0));
         if (windows.Count > 0 && asked == 0)
             throw new Win32Exception(Marshal.GetLastPInvokeError(), "Quit failed");
+    }
+
+    /// <summary>Ends the app at <paramref name="path"/> if it has stopped responding; throws when it couldn't be ended (an elevated app).</summary>
+    public static void End(string path)
+    {
+        var windows = List();
+        var mine = Frozen(windows).Where(pid => windows.Exists(w => w.ProcessId == pid && string.Equals(w.Path, path, StringComparison.OrdinalIgnoreCase)));
+        int failed = 0;
+        foreach (uint pid in mine)
+        {
+            using var process = PInvoke.OpenProcess_SafeHandle(PROCESS_ACCESS_RIGHTS.PROCESS_TERMINATE, false, pid);
+            if (process.IsInvalid || !PInvoke.TerminateProcess(process, 1))
+                failed++;
+        }
+        if (failed > 0)
+            throw new InvalidOperationException("End failed: the app couldn't be ended");
     }
 
     /// <summary>Ends every app that has stopped responding; when one couldn't be ended (an elevated app), throws after the rest.</summary>

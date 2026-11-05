@@ -54,13 +54,13 @@ internal sealed partial class ActionsPage
             QuickActionId.Quit => state.Apps.Count,
             QuickActionId.Eject => state.Drives.Count,
             QuickActionId.Plan => state.Plans.Count,
-            _ => 4,
+            _ => PowerRows,
         };
         ListPageCount = Math.Max(1, (count + ListRows * MaxListColumns - 1) / (ListRows * MaxListColumns));
         _listPage = Math.Clamp(_listPage, 0, ListPageCount - 1);
         string content = id switch
         {
-            QuickActionId.Quit => "quit:" + string.Join(",", state.Apps.Select(a => $"{a.Path}|{a.Name}|{a.Front}|{_module.Settings.Keeps(a.Path)}")),
+            QuickActionId.Quit => "quit:" + string.Join(",", state.Apps.Select(a => $"{a.Path}|{a.Name}|{a.Front}|{a.NotResponding}|{_module.Settings.Keeps(a.Path)}")),
             QuickActionId.Eject => "eject:" + string.Join(",", state.Drives.Select(d => $"{d.Id}|{d.Name}|{d.Size}")),
             QuickActionId.Plan => "plan:" + string.Join(",", state.Plans.Select(p => $"{p.Id}|{p.Name}|{p.Active}")),
             _ => "power:",
@@ -91,13 +91,17 @@ internal sealed partial class ActionsPage
                 Rows(state.Plans, PlanRow, "No power plans", "plans");
                 break;
             default:
-                Rows(new[]
+                // Two columns read down: Lock, Turn off displays, Screen saver, Sign out, then Sleep, Restart, Shut down.
+                Rows(new (PowerChoice? Choice, QuickActionId? Run, string Name, Geometry Icon, string Question)[]
                 {
-                    (PowerChoice.Sleep, "Sleep", LucideIcons.Moon, "Sleep?"),
-                    (PowerChoice.Restart, "Restart", LucideIcons.RefreshCw, "Restart?"),
-                    (PowerChoice.ShutDown, "Shut down", LucideIcons.Power, "Shut down?"),
-                    (PowerChoice.SignOut, "Sign out", LucideIcons.LogOut, "Sign out?"),
-                }, choice => PowerRow(choice.Item1, choice.Item2, choice.Item3, choice.Item4), "", "actions");
+                    (null, QuickActionId.Lock, "Lock", LucideIcons.Lock, ""),
+                    (PowerChoice.Sleep, null, "Sleep", LucideIcons.Moon, "Sleep?"),
+                    (null, QuickActionId.Displays, "Turn off displays", LucideIcons.MonitorOff, ""),
+                    (PowerChoice.Restart, null, "Restart", LucideIcons.RefreshCw, "Restart?"),
+                    (null, QuickActionId.ScreenSaver, "Screen saver", LucideIcons.ScreenSaver, ""),
+                    (PowerChoice.ShutDown, null, "Shut down", LucideIcons.Power, "Shut down?"),
+                    (PowerChoice.SignOut, null, "Sign out", LucideIcons.LogOut, "Sign out?"),
+                }, row => PowerRow(row.Choice, row.Run, row.Name, row.Icon, row.Question), "", "actions");
                 break;
         }
         if (focusKey is not null)
@@ -163,7 +167,16 @@ internal sealed partial class ActionsPage
             top.Children.Add(pager);
         }
         if (_list == QuickActionId.Quit)
-            top.Children.Add(Ui.Muted($"{count} {(count == 1 ? "app" : "apps")} open", 11));
+        {
+            var summary = Ui.Muted($"{count} {(count == 1 ? "app" : "apps")} open", 11);
+            if (_module.State.Apps.Count(a => a.NotResponding) is > 0 and var hung)
+            {
+                var note = new System.Windows.Documents.Run($" · {hung} not responding");
+                note.SetResourceReference(System.Windows.Documents.TextElement.ForegroundProperty, "IslandCautionBrush");
+                summary.Inlines.Add(note);
+            }
+            top.Children.Add(summary);
+        }
         _body.Children.Add(top);
         var grid = new UniformGrid
         {
@@ -185,13 +198,30 @@ internal sealed partial class ActionsPage
     private void QuitList(QuickState state)
     {
         Rows(state.Apps, AppRow, "No apps open", "apps");
-        if (_module.Quitting(keepFront: false).Count == 0)
+        var frozen = state.Apps.Where(a => a.NotResponding).ToArray();
+        if (_module.Quitting(keepFront: false).Count == 0 && frozen.Length == 0)
             return;
-        var buttons = new StackPanel
+        var footer = new DockPanel { VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 0, 4), LastChildFill = false };
+        var buttons = new StackPanel { Orientation = Orientation.Horizontal };
+        DockPanel.SetDock(buttons, Dock.Right);
+        footer.Children.Add(buttons);
+        if (frozen.Length > 0)
         {
-            Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right,
-            VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 0, 4),
-        };
+            // Beside Quit all, in place of the old Frozen tile: ends the apps that stopped responding, after asking.
+            string what = frozen.Length == 1 ? frozen[0].Name : $"{frozen.Length} apps";
+            var end = Ui.Button($"End {what}");
+            end.Tag = "end-frozen";
+            end.MaxWidth = 300;
+            end.IsEnabled = !_running.Any(r => r.Action == QuickActionId.Quit);
+            end.Click += (_, _) => AskFirst(end, $"End {what}?", "End", async () => await Act(QuickActionId.Quit, _module.EndFrozenAppsAsync, "End failed", "bulk"));
+            DockPanel.SetDock(end, Dock.Left);
+            footer.Children.Add(end);
+        }
+        if (_module.Quitting(keepFront: false).Count == 0)
+        {
+            _body.Children.Add(footer);
+            return;
+        }
         if (state.Apps.FirstOrDefault(a => a.Front) is { } front && !_module.Settings.Keeps(front.Path) && _module.Quitting(keepFront: true).Count > 0)
         {
             var allBut = Ui.Button($"Quit all but {front.Name}");
@@ -209,7 +239,7 @@ internal sealed partial class ActionsPage
         buttons.Children.Add(all);
         foreach (Button button in buttons.Children)
             button.IsEnabled = !_running.Any(r => r.Action == QuickActionId.Quit);
-        _body.Children.Add(buttons);
+        _body.Children.Add(footer);
     }
 
     private void ConfirmQuit(UIElement anchor, bool keepFront)
@@ -248,19 +278,24 @@ internal sealed partial class ActionsPage
     {
         UIElement mark = AppIcon.View(app.Path, 16, Ui.Monogram(app.Name));
         bool failing = _rowFailures.ContainsKey((QuickActionId.Quit, app.Path));
-        var quit = Ui.Icon(failing ? LucideIcons.RefreshCw : LucideIcons.Close, failing ? $"Retry quitting {app.Name}" : $"Quit {app.Name}");
+        // A hung app can't answer a close, so its X ends it, after asking first.
+        string verb = app.NotResponding ? "End" : "Quit";
+        var quit = Ui.Icon(failing ? LucideIcons.RefreshCw : LucideIcons.Close, failing ? $"Retry {(app.NotResponding ? "ending" : "quitting")} {app.Name}" : app.NotResponding ? $"End {app.Name} (not responding)" : $"Quit {app.Name}");
         quit.Tag = "quit:" + app.Path.ToUpperInvariant();
         quit.IsEnabled = !Running(QuickActionId.Quit, app.Path) && !Running(QuickActionId.Quit, "bulk");
-        quit.Click += async (_, _) => await Act(QuickActionId.Quit, () => _module.QuitAsync(app), "Quit failed", app.Path);
+        if (app.NotResponding)
+            quit.Click += (_, _) => AskFirst(quit, $"End {app.Name}?", "End", async () => await Act(QuickActionId.Quit, () => _module.EndAsync(app), "End failed", app.Path));
+        else
+            quit.Click += async (_, _) => await Act(QuickActionId.Quit, () => _module.QuitAsync(app), "Quit failed", app.Path);
         var parts = new List<UIElement> { quit };
-        string badge = string.Join(" \u00b7 ", new[] { app.Front ? "Front" : null, _module.Settings.Keeps(app.Path) ? "Kept" : null }.Where(x => x is not null));
+        string badge = string.Join(" \u00b7 ", new[] { app.NotResponding ? "Not responding" : null, app.Front ? "Front" : null, _module.Settings.Keeps(app.Path) ? "Kept" : null }.Where(x => x is not null));
         if (badge.Length > 0)
         {
-            var tag = Ui.Badge(badge);
+            var tag = Ui.Badge(badge, warning: app.NotResponding);
             tag.Margin = new Thickness(4, 0, 0, 0);
             parts.Add(tag);
         }
-        return Row(mark, app.Name, parts, failing ? "Quit failed" : "", failing, badge.Length > 0 ? $"{app.Name} \u00b7 {badge}" : app.Name);
+        return Row(mark, app.Name, parts, failing ? $"{verb} failed" : "", failing, badge.Length > 0 ? $"{app.Name} \u00b7 {badge}" : app.Name);
     }
 
     private Border DriveRow(RemovableDrive drive)
@@ -328,15 +363,22 @@ internal sealed partial class ActionsPage
         return row;
     }
 
-    private Button PowerRow(PowerChoice choice, string name, Geometry icon, string question)
+    private const int PowerRows = 7;
+
+    /// <summary>A row of Power: a power choice asks first; Lock, Turn off displays and Screen saver run at once, as their tiles did.</summary>
+    private Button PowerRow(PowerChoice? choice, QuickActionId? run, string name, Geometry icon, string question)
     {
-        bool failed = _rowFailures.ContainsKey((QuickActionId.Power, choice.ToString()));
+        string key = choice?.ToString() ?? run.ToString()!;
+        bool failed = _rowFailures.ContainsKey((QuickActionId.Power, key));
         var labels = Labels(name, failed ? $"{name} failed" : "", failed);
         labels.Margin = new Thickness(8, 0, 0, 0);
         var row = ListButton(new DockPanel { Children = { Ui.Glyph(icon), labels } }, name);
-        row.Tag = "power:" + choice;
+        row.Tag = "power:" + key;
         row.IsEnabled = !_running.Any(r => r.Action == QuickActionId.Power);
-        row.Click += (_, _) => AskFirst(row, question, name, async () => await Act(QuickActionId.Power, () => _module.PowerAsync(choice), $"{name} failed", choice.ToString()));
+        if (choice is { } picked)
+            row.Click += (_, _) => AskFirst(row, question, name, async () => await Act(QuickActionId.Power, () => _module.PowerAsync(picked), $"{name} failed", key));
+        else
+            row.Click += async (_, _) => await Act(QuickActionId.Power, () => _module.RunAsync(run!.Value), $"{name} failed", key);
         return row;
     }
 
