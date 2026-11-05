@@ -63,6 +63,65 @@ public static class Probe
         for (int t = 1; t <= ms; t++) { MoveTo(x0 + (x1 - x0) * t / ms, y0 + (y1 - y0) * t / ms); Thread.Sleep(1); }
     }
 
+    /// <summary>Waits <paramref name="ms"/> milliseconds on the high-resolution clock, without sleeping (a sleep ticks at 1 ms at best).</summary>
+    public static void Spin(double ms)
+    {
+        long end = System.Diagnostics.Stopwatch.GetTimestamp() + (long)(ms * System.Diagnostics.Stopwatch.Frequency / 1000);
+        while (System.Diagnostics.Stopwatch.GetTimestamp() < end) { }
+    }
+
+    public static void Click(double gapMs)
+    {
+        Left(true); Left(false); Spin(gapMs); Left(true); Left(false);
+    }
+
+    public static void TapTwice(ushort vk, double gapMs)
+    {
+        Key(vk, true); Key(vk, false); Spin(gapMs); Key(vk, true); Key(vk, false);
+    }
+
+    /// <summary>Installs a mouse hook of its own and logs each event's own timestamp beside a Stopwatch reading taken in the hook.</summary>
+    public static string[] HookClock(int events, double gapMs)
+    {
+        var rows = new System.Collections.Generic.List<string>();
+        var ready = new ManualResetEvent(false);
+        var done = new ManualResetEvent(false);
+        var thread = new Thread(() =>
+        {
+            LowLevelProc proc = (code, wParam, lParam) =>
+            {
+                if (code >= 0 && (int)wParam == 0x0200)
+                {
+                    long now = System.Diagnostics.Stopwatch.GetTimestamp();
+                    uint time = (uint)Marshal.ReadInt32(lParam, 8 + 4 + 4);
+                    rows.Add(time + "," + (now * 1000.0 / System.Diagnostics.Stopwatch.Frequency).ToString("F3", System.Globalization.CultureInfo.InvariantCulture));
+                }
+                return CallNextHookEx(IntPtr.Zero, code, wParam, lParam);
+            };
+            IntPtr hook = SetWindowsHookEx(14, proc, IntPtr.Zero, 0);
+            ready.Set();
+            MSG msg;
+            while (!done.WaitOne(0)) { if (PeekMessage(out msg, IntPtr.Zero, 0, 0, 1)) { DispatchMessage(ref msg); } else { Thread.Sleep(1); } }
+            UnhookWindowsHookEx(hook);
+        });
+        thread.IsBackground = true;
+        thread.Start();
+        ready.WaitOne();
+        for (int i = 0; i < events; i++) { MoveTo(300 + (i % 2) * 4, 300); Spin(gapMs); }
+        Thread.Sleep(300);
+        done.Set();
+        thread.Join();
+        return rows.ToArray();
+    }
+
+    delegate IntPtr LowLevelProc(int code, IntPtr wParam, IntPtr lParam);
+    [StructLayout(LayoutKind.Sequential)] struct MSG { public IntPtr Hwnd; public uint Message; public IntPtr WParam, LParam; public uint Time; public int X, Y; }
+    [DllImport("user32.dll")] static extern IntPtr SetWindowsHookEx(int id, LowLevelProc proc, IntPtr module, uint thread);
+    [DllImport("user32.dll")] static extern bool UnhookWindowsHookEx(IntPtr hook);
+    [DllImport("user32.dll")] static extern IntPtr CallNextHookEx(IntPtr hook, int code, IntPtr wParam, IntPtr lParam);
+    [DllImport("user32.dll")] static extern bool PeekMessage(out MSG msg, IntPtr hwnd, uint min, uint max, uint remove);
+    [DllImport("user32.dll")] static extern IntPtr DispatchMessage(ref MSG msg);
+
     /// <summary>Circles for <paramref name="ms"/> milliseconds at up to a thousand moves a second; returns the moves sent.</summary>
     public static int Circle(int x, int y, int radius, int ms)
     {
@@ -93,12 +152,13 @@ public static class Probe
     $profileDir = Join-Path $env:APPDATA 'Chippi-dev\sandbox'
     New-Item -ItemType Directory -Force -Path $profileDir | Out-Null
     # $app: more "app" settings (the pause's); $radial: more Radial menu settings. Each starts with a comma.
-    function StartChippi([string]$app = '', [string]$radial = '', [string]$installed = '"radial-menu"') {
+    function StartChippi([string]$app = '', [string]$radial = '', [string]$installed = '"radial-menu"', [string]$whole = '') {
         $settings = '{"version":1,"app":{"islandEnabled":false' + $app + '},' +
             '"modules":{"radial-menu":{"holdMiddle":true,"holdBack":true' + $radial + ',"slices":[' +
             '{"kind":"text","value":"up","name":"Up"},{"kind":"text","value":"right","name":"Right"},' +
             '{"kind":"text","value":"down","name":"Down"},{"kind":"text","value":"left","name":"Left"}]}},' +
             '"features":{"preset":"custom","installed":[' + $installed + '],"capabilitiesUsed":[]}}'
+        if ($whole) { $settings = $whole }
         Set-Content -LiteralPath (Join-Path $profileDir 'settings.json') -Value $settings -Encoding ASCII
         $process = Start-Process -FilePath 'C:\chippi\Chippi.exe' -ArgumentList '--dev-profile sandbox' -PassThru
         Note "Chippi started, pid $($process.Id) (app$app; radial$radial)"
@@ -110,10 +170,19 @@ public static class Probe
         return $process
     }
 
+    $debounceOnly = ($checks -contains 'debounce' -or $checks -contains 'timestamps') -and -not ($checks -contains 'radial' -or $checks -contains 'watchdog' -or $checks -contains 'cost')
+    $debounceSettings = ''
+    if ($debounceOnly) {
+        # Debounce alone, both switches on (clicks 25 ms, keys 20 ms). CHIPPI_DEBOUNCE_INJECTED lets it act on SendInput.
+        $debounceSettings = '{"version":1,"app":{"islandEnabled":false},' +
+            '"modules":{"debounce":{"clickEnabled":true,"clickMs":25,"keyEnabled":true,"keyMs":20}},' +
+            '"features":{"preset":"custom","installed":["debounce"],"capabilitiesUsed":[]}}'
+        $env:CHIPPI_DEBOUNCE_INJECTED = '1'
+    }
     $env:CHIPPI_INPUT_TIMINGS = "$results\hook-timings.csv"
     if ($checks -contains 'watchdog') { $env:CHIPPI_INPUT_DROP_HOOKS = '45' }
     if ($checks -contains 'pause') { $env:CHIPPI_INPUT_PROBE_FILTER = '1' }
-    $chippi = if ($checks -contains 'pause') { StartChippi -radial ',"openOverFullscreen":false' } else { StartChippi }
+    $chippi = if ($checks -contains 'pause') { StartChippi -radial ',"openOverFullscreen":false' } else { StartChippi -whole $debounceSettings }
 
     function Flick([string]$button, [int]$dx, [int]$dy) {
         $before = Text
@@ -256,6 +325,64 @@ public static class Probe
         [Probe]::MoveTo($x, $y)
         Start-Sleep -Milliseconds 300
         $found.watchdog = [ordered]@{ afterDropFlickUp = (Flick 'middle' 0 -150) }
+    }
+
+    if ($checks -contains 'timestamps') {
+        # The hook's own timestamp beside the Stopwatch, for 400 moves 2 ms apart: how often each ticks.
+        $rows = [Probe]::HookClock(400, 2.0)
+        Set-Content -LiteralPath "$results\hook-clock.csv" -Value (@('hookMs,stopwatchMs') + $rows) -Encoding ASCII
+        $hook = $rows | ForEach-Object { [double]($_ -split ',')[0] }
+        $watch = $rows | ForEach-Object { [double]($_ -split ',')[1] }
+        $hookSteps = for ($i = 1; $i -lt $hook.Count; $i++) { $hook[$i] - $hook[$i - 1] }
+        $watchSteps = for ($i = 1; $i -lt $watch.Count; $i++) { $watch[$i] - $watch[$i - 1] }
+        $distinct = ($hookSteps | Where-Object { $_ -gt 0 } | Sort-Object -Unique | Select-Object -First 6) -join ' '
+        $found.timestamps = [ordered]@{
+            events = $rows.Count
+            hookStepsZeroOrNot = "$(@($hookSteps | Where-Object { $_ -eq 0 }).Count) of $($hookSteps.Count) steps are 0 ms"
+            hookSmallestNonZeroStepsMs = $distinct
+            hookMaxStepMs = ($hookSteps | Measure-Object -Maximum).Maximum
+            stopwatchMedianStepMs = [math]::Round((($watchSteps | Sort-Object)[[int]($watchSteps.Count / 2)]), 3)
+        }
+    }
+
+    if ($checks -contains 'debounce') {
+        $d = [ordered]@{}
+        function Run([string]$name, [scriptblock]$act) {
+            Remove-Item -LiteralPath "$results\target.log" -ErrorAction SilentlyContinue
+            $before = (Text).Length
+            & $act
+            Start-Sleep -Milliseconds 700
+            # The target's handlers are slow PowerShell: wait until its text file stops changing, or a read lands mid-burst
+            # (and collides with the target's own append to target.log).
+            $stable = 0; $last = -1
+            for ($wait = 0; $wait -lt 120 -and $stable -lt 3; $wait++) {
+                Start-Sleep -Milliseconds 500
+                $now = (Get-Item -LiteralPath "$results\target-text.txt" -ErrorAction SilentlyContinue).Length
+                if ($now -eq $last) { $stable++ } else { $stable = 0; $last = $now }
+            }
+            $typed = (Text).Substring($before)
+            $d[$name] = [ordered]@{ target = ((TargetLog) -join '; '); typed = $typed }
+            Note "debounce $name : $($d[$name].target) typed '$typed'"
+            Start-Sleep -Milliseconds 300
+        }
+        [Probe]::MoveTo($x, $y)
+        Run 'click2msGap' { [Probe]::Click(2) }
+        Run 'click60msGap' { [Probe]::Click(60) }
+        Run 'clickHeldThenSecond' { [Probe]::Left($true); [Probe]::Spin(300); [Probe]::Left($false); [Probe]::Spin(100); [Probe]::Left($true); [Probe]::Left($false) }
+        Run 'key2msGap' { [Probe]::TapTwice(0x45, 2) }
+        Run 'key60msGap' { [Probe]::TapTwice(0x45, 60) }
+        Run 'otherKeysFastStillBoth' { [Probe]::Key(0x41, $true); [Probe]::Key(0x41, $false); [Probe]::Spin(2); [Probe]::Key(0x42, $true); [Probe]::Key(0x42, $false) }
+        Run 'keyHeldRepeats' { [Probe]::Key(0x45, $true); [Probe]::Spin(300); [Probe]::Key(0x45, $true); [Probe]::Spin(33); [Probe]::Key(0x45, $true); [Probe]::Key(0x45, $false) }
+        # A held key whose press bounced once (down, up 1 ms later, down 3 ms after that, dropped), then the keyboard's repeats and the up: the hold must still reach the app (#234).
+        Run 'keyBounceThenHold' { [Probe]::Key(0x47, $true); [Probe]::Spin(1); [Probe]::Key(0x47, $false); [Probe]::Spin(3); [Probe]::Key(0x47, $true); [Probe]::Spin(500); for ($i = 0; $i -lt 10; $i++) { [Probe]::Key(0x47, $true); [Probe]::Spin(33) }; [Probe]::Key(0x47, $false) }
+        Run 'fastTypingBurst' { for ($i = 0; $i -lt 20; $i++) { [Probe]::TapTwice(0x46, 40) } }
+        [Probe]::Circle($x, $y, 150, 8000) | Out-Null
+        # Enough key events for a p99 that isn't the first call's JIT: 4,000 (hook-timings.csv, keyboard row).
+        Run 'keyBurst4000Events' { for ($i = 0; $i -lt 2000; $i++) { [Probe]::Key([uint16](0x41 + $i % 26), $true); [Probe]::Key([uint16](0x41 + $i % 26), $false); [Probe]::Spin(6) } }
+        $logged = @($d.keyBurst4000Events.target -split '; ' | Where-Object { $_ -like 'key down*' }).Count
+        $d.keyBurst4000Events.target = "$((($d.keyBurst4000Events.typed).Length)) letters in the text box and $logged key downs in the log, of 2000"
+        $d.keyBurst4000Events.typed = ''
+        $found.debounce = $d
     }
 
     if ($checks -contains 'cost') {
