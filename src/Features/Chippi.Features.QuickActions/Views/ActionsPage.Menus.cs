@@ -22,6 +22,25 @@ internal sealed partial class ActionsPage
     /// <summary>An added menu: a row per command, a switch for each that turns something on and off.</summary>
     private void RenderMenu(AddedTile tile)
     {
+        if (tile.Tile.View is { } view)
+        {
+            // Made once per opening (PressedAdded clears _built), so it reads the window in front as the menu opens.
+            ListPageCount = 1;
+            _listPage = 0;
+            _listFailed.Visibility = Visibility.Collapsed;
+            if (_built == "menu:" + tile.Key)
+                return;
+            _built = "menu:" + tile.Key;
+            _body.Children.Clear();
+            _firstRow = null;
+            if (view() is UIElement element)
+            {
+                _body.Children.Add(element);
+                // Opening it puts the keyboard on its first control, as a menu of rows does.
+                _firstRow = Buttons(element).FirstOrDefault(b => b.IsEnabled);
+            }
+            return;
+        }
         int count = tile.Commands.Count;
         ListPageCount = Math.Max(1, (count + ListRows * MaxListColumns - 1) / (ListRows * MaxListColumns));
         _listPage = Math.Clamp(_listPage, 0, ListPageCount - 1);
