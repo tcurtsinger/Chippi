@@ -226,6 +226,18 @@ public static class Probe
             '"features":{"preset":"custom","installed":["smooth-scrolling"],"capabilitiesUsed":[]}}'
         $env:CHIPPI_SMOOTH_INJECTED = '1'
     }
+    $snippetsOnly = $checks -contains 'snippets' -and -not ($checks -contains 'radial' -or $checks -contains 'watchdog' -or $checks -contains 'cost' -or $debounceOnly)
+    if ($snippetsOnly) {
+        # Text snippets alone, expansion on. Escapes keep the file ASCII: an accent and an emoji (a surrogate pair) in one snippet.
+        $long = '0123456789' * 20
+        $debounceSettings = '{"version":1,"app":{"islandEnabled":false},"modules":{"text-snippets":{"expandWhileTyping":true,"snippets":[' +
+            '{"id":"a","name":"Email","trigger":";em","text":"a@b.c","expand":"rightAway"},' +
+            '{"id":"b","name":"Going","trigger":";go","text":"going","expand":"afterDelimiter"},' +
+            '{"id":"c","name":"Lines","trigger":";ln","text":"caf\u00e9 \ud83d\ude00\nsecond","expand":"rightAway"},' +
+            '{"id":"d","name":"Long","trigger":";lg","text":"' + $long + '","expand":"rightAway"},' +
+            '{"id":"e","name":"Clip","trigger":";cp","text":"[{{clipboard}}]","expand":"rightAway"}]}},' +
+            '"features":{"preset":"custom","installed":["text-snippets"],"capabilitiesUsed":[]}}'
+    }
     $shortcutsOnly = ($checks -contains 'shortcuts' -or $checks -contains 'caps' -or $checks -contains 'editor') -and -not ($checks -contains 'radial' -or $checks -contains 'watchdog' -or $checks -contains 'cost' -or $debounceOnly)
     function ShortcutSettings([string]$ignored = '') {
         $action = { param($name) '"action":{"kind":"window","value":"SnapLeft","name":"' + $name + '"}' }
@@ -758,6 +770,54 @@ public static class Probe
         $found.editor = $ed
     }
 
+    if ($checks -contains 'snippets') {
+        $sn = [ordered]@{}
+        $vks = @{ ';' = 0xBA; ' ' = 0x20 }
+        function TypeKeys([string]$keys) {
+            foreach ($c in $keys.ToCharArray()) {
+                $vk = if ($vks.ContainsKey([string]$c)) { $vks[[string]$c] } else { [int][char]::ToUpperInvariant($c) }
+                [Probe]::Key([uint16]$vk, $true); [Probe]::Spin(25); [Probe]::Key([uint16]$vk, $false); [Probe]::Spin(25)
+            }
+        }
+        # Types, then waits until the target's text stops changing (its handlers are slow PowerShell); returns what was added.
+        function Typed([string]$name, [scriptblock]$act, [string]$file = 'target-text.txt') {
+            $before = if (Test-Path "$results\$file") { (Get-Content -LiteralPath "$results\$file" -Raw -Encoding UTF8).Length } else { 0 }
+            & $act
+            Start-Sleep -Milliseconds 600
+            $stable = 0; $last = -1
+            for ($wait = 0; $wait -lt 80 -and $stable -lt 3; $wait++) {
+                Start-Sleep -Milliseconds 300
+                $now = (Get-Item -LiteralPath "$results\$file" -ErrorAction SilentlyContinue).Length
+                if ($now -eq $last) { $stable++ } else { $stable = 0; $last = $now }
+            }
+            $all = if (Test-Path "$results\$file") { Get-Content -LiteralPath "$results\$file" -Raw -Encoding UTF8 } else { '' }
+            $typed = $all.Substring([math]::Min($before, $all.Length))
+            $sn[$name] = ($typed -replace "`r", '\r' -replace "`n", '\n')
+            Note "snippets $name : '$($sn[$name])'"
+        }
+        Set-Clipboard -Value 'SENTINEL'
+        [Probe]::MoveTo($x, $y)
+        Typed 'rightAway;em' { TypeKeys ';em' }
+        Typed 'afterSpace;go' { TypeKeys ';go'; TypeKeys ' ' }
+        Typed 'afterEnter;go' { TypeKeys ';go'; [Probe]::Key(0x0D, $true); [Probe]::Spin(25); [Probe]::Key(0x0D, $false) }
+        Typed 'accentEmojiNewline;ln' { TypeKeys ';ln' }
+        Typed 'long200;lg' { TypeKeys ';lg' }
+        Typed 'clipboardVariable;cp' { TypeKeys ';cp' }
+        $sn.clipboardAfter = [string](Get-Clipboard)
+        Typed 'noMatchTypedAsIs' { TypeKeys 'hello;ex' }
+        Typed 'backspaceThenTrigger' { TypeKeys ';ex'; [Probe]::Key(0x08, $true); [Probe]::Spin(25); [Probe]::Key(0x08, $false); [Probe]::Spin(25); TypeKeys 'm' }
+        Typed 'clickBreaksATrigger' { TypeKeys ';e'; [Probe]::Left($true); [Probe]::Left($false); [Probe]::Spin(100); TypeKeys 'm' }
+        # A password box: where the app tells UI Automation so, nothing expands.
+        $password = Start-Process -FilePath powershell.exe -ArgumentList '-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File C:\probe\password-target.ps1' -PassThru
+        Start-Sleep -Seconds 5
+        [Probe]::MoveTo($x, 120); [Probe]::Left($true); [Probe]::Left($false)
+        Start-Sleep -Milliseconds 500
+        $sn.foregroundWhileInPassword = [Probe]::Foreground()
+        Typed 'passwordBoxGetsNothing;em' { TypeKeys ';em' } 'password-text.txt'
+        Stop-Process -Id $password.Id -Force -ErrorAction SilentlyContinue
+        $found.snippets = $sn
+    }
+
     if ($checks -contains 'cost') {
         $cost = @()
         for ($run = 1; $run -le 3; $run++) {
@@ -779,6 +839,8 @@ public static class Probe
     if (Test-Path $logs) { Copy-Item -Path $logs -Destination "$results\chippi-logs" -Recurse }
     $found.hubLog = @(Get-ChildItem "$results\chippi-logs" -Filter *.log -ErrorAction SilentlyContinue |
         ForEach-Object { Get-Content $_.FullName } | Where-Object { $_ -match 'Input hub' } | ForEach-Object { [string]$_ })
+    $found.snippetLog = @(Get-ChildItem "$results\chippi-logs" -Filter *.log -ErrorAction SilentlyContinue |
+        ForEach-Object { Get-Content $_.FullName } | Where-Object { $_ -match 'Text snippets' } | ForEach-Object { [string]$_ })
     Stop-Process -Id $chippi.Id -Force -ErrorAction SilentlyContinue
 }
 catch {

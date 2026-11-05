@@ -54,12 +54,6 @@ public static class FeatureCatalog
         },
 
         // Clipboard and text (Phase 5's five features are real modules: Chippi.Features.Clipboard, PlainPaste, Scratchpad, Shelf)
-        new("text-snippets", "Text snippets", "Type a short abbreviation and it expands into saved text", FeatureGroup.ClipboardText)
-        {
-            Icon = "Keyboard",
-            Requires = [Capability.InputHooks],
-            Presets = PowerUser,
-        },
 
         // Phase 5.5 and 6: Windows and input (the Command bar and the Radial menu are real modules: Chippi.Features.CommandBar
         // and Chippi.Features.RadialMenu)
