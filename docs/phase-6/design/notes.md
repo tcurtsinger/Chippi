@@ -7,7 +7,7 @@ Every app, count and setting in these mockups is invented. Nothing read or chang
 - `actions-shortcuts.html`: task 212, the Actions menus and Settings › Shortcuts. Travis approved it on 2026-11-04 (task 240) with option B (task 224).
 - `wave-1.html`: wave 1's Settings screens and Close protection's bar line. Travis approved it on 2026-11-04 (task 264), with real app icons in every app list ([App icons](#app-icons)).
 - `shortcuts.html`: wave 2's Settings › Shortcuts, revised for Travis's caveats when he approved it on 2026-11-05 (tasks 341 and 344, [Wave 2](#wave-2-shortcuts-task-344)). It replaces the Settings › Shortcuts boards in `actions-shortcuts.html`.
-- `wave-3.html`: wave 3's screens (task 375): Settings › Text snippets, Settings › Snap with its zone editor, Shift+drag zones, the App switcher overlay and Settings › App switcher ([Wave 3](#wave-3-text-snippets-snap-and-the-app-switcher-task-375)). Waiting on Travis's approval.
+- `wave-3.html`: wave 3's screens (task 375): Settings › Text snippets, Settings › Snap with its zone editor, Shift+drag zones, the App switcher overlay and Settings › App switcher ([Wave 3](#wave-3-text-snippets-snap-and-the-app-switcher-task-375)). Travis approved it on 2026-11-05 as drawn (task 384).
 - `before\`: real renders from `main` at `b9b6d05`: the Actions gallery, Settings › General and Radial menu (`--settings-snapshot`, a dev profile with only Radial menu and every hold off), and the agent's 6-second bar line (`AgentBarTests.Render`).
 - `shots\<board>-<theme>.png`: 2x renders of every board, dark and light.
 - `render.ps1`: renders the PNGs again with headless Edge. Use `-Only <board>,<board>` to render only some boards.
