@@ -37,6 +37,18 @@ public sealed class SnapGeometryTests
         Assert.Equal(work.Height - edge * 2, left.Height);
     }
 
+    [Theory]
+    [InlineData(.01)]
+    [InlineData(.00001)]
+    public void DeeplySplitZonesRemainDrawableWithMaximumGaps(double fraction)
+    {
+        var r = SnapGeometry.PlaceWithGaps(new(-900, 40, 900, 1500),
+            new("tiny", "Tiny", 0, 0, fraction, fraction), 24, 24);
+        Assert.InRange(r.Width, 1, 9);
+        Assert.InRange(r.Height, 1, 15);
+        Assert.InRange(r.X, -900, -1);
+        Assert.InRange(r.Y, 40, 1539);
+    }
     [Fact]
     public void OversizedMinimumKeepsTitleBarAtWorkAreaOrigin()
     {

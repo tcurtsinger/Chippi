@@ -13,17 +13,24 @@ public sealed record WindowZone(double X, double Y, double Width, double Height,
     public (int Left, int Top, int Right, int Bottom) Bounds(int width, int height)
     {
         if (width <= 0 || height <= 0 || !double.IsFinite(X) || !double.IsFinite(Y)
-            || !double.IsFinite(Width) || !double.IsFinite(Height) || X < 0 || Y < 0 || Width <= 0 || Height <= 0
+            || !double.IsFinite(Width) || !double.IsFinite(Height) || X < 0 || Y < 0 || X >= 1 || Y >= 1 || Width <= 0 || Height <= 0
             || X + Width > 1.000000001 || Y + Height > 1.000000001
             || WindowGap is < 0 or > 24 || ScreenEdgeGap is < 0 or > 24)
             throw new ArgumentException("Invalid zone");
-        int left = (int)Math.Round(X * width), top = (int)Math.Round(Y * height);
-        int right = (int)Math.Round((X + Width) * width), bottom = (int)Math.Round((Y + Height) * height);
-        left += X == 0 ? ScreenEdgeGap : WindowGap / 2;
-        top += Y == 0 ? ScreenEdgeGap : WindowGap / 2;
-        right -= X + Width >= 1 - 1e-9 ? ScreenEdgeGap : (WindowGap + 1) / 2;
-        bottom -= Y + Height >= 1 - 1e-9 ? ScreenEdgeGap : (WindowGap + 1) / 2;
-        if (right <= left || bottom <= top) throw new ArgumentException("Zone too small");
+        int left = Math.Min(width - 1, (int)Math.Round(X * width));
+        int top = Math.Min(height - 1, (int)Math.Round(Y * height));
+        int right = Math.Max(left + 1, Math.Min(width, (int)Math.Round((X + Width) * width)));
+        int bottom = Math.Max(top + 1, Math.Min(height, (int)Math.Round((Y + Height) * height)));
+        int l = X == 0 ? ScreenEdgeGap : WindowGap / 2;
+        int t = Y == 0 ? ScreenEdgeGap : WindowGap / 2;
+        int r = X + Width >= 1 - 1e-9 ? ScreenEdgeGap : (WindowGap + 1) / 2;
+        int b = Y + Height >= 1 - 1e-9 ? ScreenEdgeGap : (WindowGap + 1) / 2;
+        // A deeply split zone can be smaller than the gaps. Reduce its insets before it becomes empty.
+        int available = right - left - 1;
+        if (l + r > available) { l = Math.Min(l, available / 2); r = Math.Min(r, available - l); }
+        available = bottom - top - 1;
+        if (t + b > available) { t = Math.Min(t, available / 2); b = Math.Min(b, available - t); }
+        left += l; top += t; right -= r; bottom -= b;
         return (left, top, right, bottom);
     }
 }
