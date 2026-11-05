@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Chippi Phase 6 wave 2: Settings › Shortcuts (revision 2)</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font-family:'Segoe UI Variable Text','Segoe UI',system-ui,sans-serif;-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
+button{font:inherit;color:inherit;margin:0}
+svg.g{fill:none;stroke:currentColor;stroke-linecap:round;stroke-linejoin:round;flex:none;display:block}
+
+/* ---------- island tokens (Chippi.UI/Themes Dark.xaml / Light.xaml) ---------- */
+.dark{--fill:rgba(40,40,44,.961);--bord:rgba(255,255,255,.09);--hair:rgba(255,255,255,.078);--face:rgba(255,255,255,.024);--faceh:rgba(255,255,255,.10);--cardb:rgba(255,255,255,.059);
+ --btn:rgba(255,255,255,.071);--btnh:rgba(255,255,255,.09);--ctlb:rgba(255,255,255,.09);--hov:rgba(255,255,255,.059);--muted:rgba(255,255,255,.28);
+ --tx:#FFFFFF;--tx2:#C9C9C9;--tx3:#9A9A9A;--acc:#B79CFF;--accf:linear-gradient(135deg,#B78FFF,#82AEFF);--tint:rgba(183,156,255,.14);--onacc:#170F2E;--cau:#FF99A4;--warn:#FCE100;
+ --shadow:0 16px 40px rgba(0,0,0,.5);--desk:#1F1F1F;--zone:rgba(255,255,255,.085);--mono:rgba(183,156,255,.16);
+ /* Settings */
+ --win:#202020;--surf:#2B2B2B;--sbord:rgba(255,255,255,.031);--div:rgba(255,255,255,.059);--st1:#FFFFFF;--st2:#C5C5C5;--st3:#ABABAB;--st4:#9D9D9D;
+ --shov:rgba(255,255,255,.039);--ssel:rgba(255,255,255,.059);--sbtn:rgba(255,255,255,.059);--sbtnh:rgba(255,255,255,.09);--sbtnb:rgba(255,255,255,.09);--sacc:#B79CFF;--sonacc:#000;--swarn:#FCE100;--pop:#2C2C2C;--field:rgba(255,255,255,.059);--fieldb:rgba(255,255,255,.55)}
+.light{--fill:rgba(245,245,246,.961);--bord:rgba(0,0,0,.078);--hair:rgba(0,0,0,.078);--face:rgba(255,255,255,.45);--faceh:#FFFFFF;--cardb:rgba(0,0,0,.059);
+ --btn:rgba(255,255,255,.86);--btnh:#F6F6F6;--ctlb:rgba(0,0,0,.09);--hov:rgba(0,0,0,.043);--muted:rgba(0,0,0,.18);
+ --tx:#1A1A1A;--tx2:#5C5C5C;--tx3:#707070;--acc:#7444F0;--accf:linear-gradient(135deg,#8F5CFF,#5B86FF);--tint:rgba(116,68,240,.10);--onacc:#FFFFFF;--cau:#C42B1C;--warn:#9D5D00;
+ --shadow:0 16px 40px rgba(0,0,0,.2);--desk:#1F1F1F;--zone:rgba(0,0,0,.07);--mono:rgba(116,68,240,.12);
+ --win:#F3F3F3;--surf:#FBFBFB;--sbord:rgba(0,0,0,.059);--div:rgba(0,0,0,.071);--st1:#1A1A1A;--st2:#404040;--st3:#5D5D5D;--st4:#616161;
+ --shov:rgba(0,0,0,.039);--ssel:rgba(0,0,0,.055);--sbtn:#FFFFFF;--sbtnh:#F6F6F6;--sbtnb:rgba(0,0,0,.10);--sacc:#6B4FBB;--sonacc:#FFF;--swarn:#9D5D00;--pop:#F9F9F9;--field:#FFFFFF;--fieldb:rgba(0,0,0,.45)}
+
+/* ---------- sheet ---------- */
+.sheet{display:inline-flex;flex-direction:column;gap:28px;padding:32px;background:#161616;color:#E6E6E6}
+.sheet.lt{background:#D9D9D9;color:#1A1A1A}
+.srow{display:flex;gap:28px;align-items:flex-start}
+.cap{font-size:13px;line-height:18px;font-weight:600;margin:0 0 8px}
+.cap span{font-weight:400;opacity:.7}
+.stage{background:var(--desk);padding:24px 32px 40px;border-radius:2px}
+
+/* ---------- island panel 520x360 ---------- */
+.panel{position:relative;width:520px;height:360px;padding:12px;background:var(--fill);border:1px solid var(--bord);border-radius:8px;box-shadow:var(--shadow);color:var(--tx);font-size:12px;line-height:16px;overflow:hidden}
+.hdr{display:flex;align-items:center;height:24px;margin-bottom:8px}
+.ib{width:28px;height:24px;display:inline-flex;align-items:center;justify-content:center;border:0;padding:0;border-radius:4px;background:transparent;color:var(--tx2)}
+.ib.back{margin:0 4px 0 -4px}
+.ttl{flex:1;font-size:14px;font-weight:600;line-height:20px;white-space:nowrap}
+.body{position:relative;width:494px;height:302px}
+.grid{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);display:grid;grid-template-columns:repeat(5,1fr);gap:7px}
+.tile{position:relative;height:76px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0;border:1px solid var(--cardb);border-radius:6px;background:var(--face);color:var(--tx)}
+.grid.r4 .tile{height:61px}
+.tile .lb{font-size:12px;font-weight:600;line-height:16px;margin:3px 2px 0}
+.tile .st{font-size:11px;line-height:14px;margin:1px 3px 0;color:var(--tx2);white-space:nowrap}
+.tile .chev{position:absolute;top:7px;right:6px}
+.tile.on{background:var(--accf);border-color:transparent;color:var(--onacc)}
+.tile.on .st{color:var(--onacc)}
+.tile.hov{background:var(--faceh)}
+.tile.dis{opacity:.5}
+.tile.new::after{content:"";position:absolute;left:6px;top:6px;width:6px;height:6px;border-radius:3px;background:var(--acc)}
+.foc{outline:2px solid var(--tx);outline-offset:1px}
+
+/* list pages */
+.topbar{display:flex;align-items:center;height:28px;gap:8px;font-size:11px;color:var(--tx3);white-space:nowrap}
+.topbar .cau{color:var(--cau)}
+.rows{position:absolute;left:0;right:0;top:34px;display:grid;column-gap:8px}
+.row{height:42px;display:flex;align-items:center;gap:8px;padding:0 10px;border-radius:4px;color:var(--tx);border:0;background:transparent;text-align:left;width:100%}
+.row.hov{background:var(--hov)}
+.row .nm{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.app{height:42px;display:flex;align-items:center;gap:8px;padding:0 3px 0 5px;border-radius:4px}
+.mono{width:16px;height:16px;border-radius:3px;background:var(--mono);color:var(--acc);font-size:8px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;flex:none;margin-right:2px}
+.badge{height:18px;padding:0 6px;border-radius:4px;background:var(--btn);font-size:11px;font-weight:600;color:var(--tx2);display:inline-flex;align-items:center;white-space:nowrap}
+.badge.cau{color:var(--cau)}
+.x{width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;color:var(--tx2);flex:none}
+.ibtn{height:28px;padding:0 11px;border-radius:4px;border:1px solid var(--ctlb);background:var(--btn);font-size:12px;color:var(--tx);white-space:nowrap}
+.foot{position:absolute;right:0;bottom:0;left:0;display:flex;gap:8px;justify-content:flex-end}
+.foot .l{margin-right:auto}
+/* island switch 34x18 */
+.isw{width:34px;height:18px;border-radius:9px;border:1px solid var(--tx3);position:relative;flex:none}
+.isw::after{content:"";position:absolute;left:2px;top:2px;width:12px;height:12px;border-radius:6px;background:var(--tx2)}
+.isw.on{background:var(--accf);border-color:transparent}
+.isw.on::after{left:auto;right:2px;background:var(--onacc)}
+.rowst{font-size:11px;color:var(--tx3);margin-right:6px}
+
+/* snap pictures */
+.pics{position:absolute;left:0;right:0;top:34px;display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.pic{height:98px;padding:6px 6px 0;border:1px solid var(--cardb);border-radius:6px;background:var(--face);display:flex;flex-direction:column}
+.zs{flex:1;display:grid;gap:3px}
+.z{border-radius:3px;background:var(--zone);border:1px solid transparent}
+.z.hov{background:var(--tint);border-color:var(--acc)}
+.pic .pn{height:20px;font-size:11px;line-height:20px;color:var(--tx3);white-space:nowrap}
+.pics.off{opacity:.5}
+.cmds{position:absolute;left:0;right:0;bottom:0;display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.cmd{height:42px;display:flex;align-items:center;justify-content:center;gap:8px;border:1px solid var(--cardb);border-radius:6px;background:var(--face);font-size:12px;color:var(--tx)}
+.cmds.off{opacity:.5}
+
+/* ---------- Settings ---------- */
+.sw{width:1120px;background:var(--win);color:var(--st1);font-size:14px;line-height:20px;border:1px solid rgba(128,128,128,.35);border-radius:8px;overflow:hidden;display:flex;flex-direction:column}
+.sw.narrow{width:860px}
+.tbar{height:40px;display:flex;align-items:center;flex:none}
+.tbar .logo{width:16px;height:16px;border-radius:8px;background:linear-gradient(135deg,#B78FFF,#82AEFF);margin:0 12px 0 16px}
+.tbar .tt{flex:1;font-size:12px}
+.tbar .cb{width:46px;height:40px;display:flex;align-items:center;justify-content:center}
+.shell{display:flex;flex:1}
+.side{width:272px;flex:none;padding:12px 4px 0 4px}
+.side.rail{width:48px;padding:4px 4px 0}
+.find{height:32px;margin:0 12px 8px;padding:0 10px;border-radius:4px;background:var(--field);border:1px solid var(--sbtnb);border-bottom-color:var(--fieldb);display:flex;align-items:center;justify-content:space-between;font-size:14px;color:var(--st4)}
+.gl{font-size:12px;font-weight:600;color:var(--st3);padding:12px 16px 4px;line-height:16px}
+.gl:first-of-type{padding-top:0}
+.nav{position:relative;height:32px;margin:2px 4px;padding:0 12px;border-radius:4px;display:flex;align-items:center;gap:12px;white-space:nowrap}
+.nav.sel{background:var(--ssel);font-weight:600}
+.nav.sel::before{content:"";position:absolute;left:0;top:8px;width:3px;height:16px;border-radius:2px;background:var(--sacc)}
+.rail .nav{padding:0;justify-content:center;margin:2px 0}
+.rail .hl{height:1px;background:var(--div);margin:6px 8px}
+.page{flex:1;padding:4px 40px 28px;min-width:0}
+.ptitle{font-family:'Segoe UI Variable Display','Segoe UI',sans-serif;font-size:20px;font-weight:600;line-height:28px;margin:0 0 14px}
+.sh{font-size:14px;font-weight:600;line-height:20px;margin:24px 0 8px}
+.sh:first-of-type{margin-top:0}
+.card{background:var(--surf);border:1px solid var(--sbord);border-radius:8px;position:relative}
+.sr{min-height:48px;display:flex;align-items:center;padding:8px 16px;gap:12px;border-top:1px solid var(--div)}
+.sr:first-child{border-top:0}
+.sr .lead{width:20px;height:20px;color:var(--st1);flex:none}
+.sr .tl{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sr .tl small{display:block;font-size:12px;line-height:16px;color:var(--st3)}
+.sr .ctl{display:flex;align-items:center;gap:8px;flex:none}
+.sr.hov{background:var(--shov)}
+.sr.edit{background:var(--shov)}
+.sr .mut{color:var(--st3)}
+.sr .warn{color:var(--swarn);font-size:14px;display:flex;align-items:center;gap:6px}
+.sbt{height:32px;padding:0 12px;border-radius:4px;border:1px solid var(--sbtnb);background:var(--sbtn);font-size:14px;color:var(--st1);display:inline-flex;align-items:center;gap:8px;white-space:nowrap}
+.sbt.acc{background:var(--sacc);border-color:var(--sacc);color:var(--sonacc)}
+.sbt.icon{width:32px;padding:0;justify-content:center;background:transparent;border-color:transparent;color:var(--st2)}
+.sbt.tog.on{background:var(--sacc);border-color:var(--sacc);color:var(--sonacc)}
+.combo{height:32px;min-width:200px;padding:0 10px 0 11px;border-radius:4px;border:1px solid var(--sbtnb);background:var(--sbtn);display:inline-flex;align-items:center;justify-content:space-between;gap:12px;font-size:14px;white-space:nowrap}
+.combo.open{border-color:var(--sacc)}
+.combo .ph{color:var(--st3)}
+.caps{display:flex;align-items:center;gap:4px}
+.kc{height:24px;min-width:24px;padding:0 7px;border-radius:4px;border:1px solid var(--sbtnb);border-bottom-width:2px;background:var(--sbtn);font-size:12px;line-height:20px;color:var(--st1);display:inline-flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap}
+.kc.dim{color:var(--st3)}
+.plus{font-size:12px;color:var(--st3)}
+.ssw{width:40px;height:20px;border-radius:10px;border:1px solid var(--st2);position:relative;flex:none}
+.ssw::after{content:"";position:absolute;left:3px;top:3px;width:12px;height:12px;border-radius:6px;background:var(--st2)}
+.ssw.on{background:var(--sacc);border-color:var(--sacc)}
+.ssw.on::after{left:auto;right:3px;top:2px;width:14px;height:14px;border-radius:7px;background:var(--sonacc)}
+.listen{height:32px;min-width:290px;padding:0 11px;border-radius:4px;border:1px solid var(--sacc);box-shadow:inset 0 0 0 1px var(--sacc);background:var(--field);display:inline-flex;align-items:center;gap:8px;font-size:14px;color:var(--st2)}
+.pop{position:absolute;z-index:3;background:var(--pop);border:1px solid var(--sbtnb);border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,.3);padding:4px;font-size:14px}
+.pop .pf{height:32px;margin:4px 4px 6px;padding:0 10px;border-radius:4px;border:1px solid var(--sbtnb);border-bottom:2px solid var(--sacc);background:var(--field);display:flex;align-items:center;gap:8px}
+.pop .pg{font-size:12px;font-weight:600;color:var(--st3);padding:8px 12px 2px}
+.pop .pi{height:32px;padding:0 12px;border-radius:4px;display:flex;align-items:center;gap:12px;white-space:nowrap}
+.pop .pi.hov{background:var(--shov)}
+.pop .pi .k{margin-left:auto;font-size:12px;color:var(--st3)}
+.infobar{display:flex;align-items:center;gap:12px;min-height:48px;padding:8px 8px 8px 16px;margin-bottom:8px;border-radius:8px;background:var(--surf);border:1px solid var(--sbord);color:var(--st1)}
+.infobar .ic{color:var(--swarn)}
+.infobar .t{flex:1}
+.stcard{width:768px}
+/* ---------- wave 1 additions ---------- */
+.sw.tall{height:auto}
+.sw.fixed{height:720px}
+.sw.fixed .page{overflow:hidden}
+.sr .on{font-size:14px;color:var(--st1)}
+.sr.dep{padding-left:50px}
+.sr .tl small.cau{color:var(--cau)}
+.light .sr .tl small.cau{color:#C42B1C}
+.dark .sr .tl small.cau{color:#FF99A4}
+.card+.card{margin-top:8px}
+.card.dim>.sr{opacity:.45}
+.card.dim>.sr:first-child{opacity:1}
+.card.dim.all>.sr{opacity:.45}
+.appn{display:flex;align-items:center;gap:12px}
+.appn .mono{width:20px;height:20px;font-size:10px;margin:0}
+/* WinUI slider: 4 track, 20 thumb with an accent dot */
+.sld{position:relative;width:200px;height:20px;flex:none}
+.sld::before{content:"";position:absolute;left:0;right:0;top:8px;height:4px;border-radius:2px;background:var(--st4);opacity:.55}
+.sld i{position:absolute;left:0;top:8px;height:4px;border-radius:2px;background:var(--sacc)}
+.sld b{position:absolute;top:0;width:20px;height:20px;margin-left:-10px;border-radius:10px;background:var(--pop);border:1px solid var(--sbtnb);box-shadow:0 1px 2px rgba(0,0,0,.25)}
+.sld b::after{content:"";position:absolute;left:4px;top:4px;width:10px;height:10px;border-radius:5px;background:var(--sacc)}
+.val{min-width:52px;text-align:right;font-size:14px}
+.preview{width:300px;height:88px;border:1px solid var(--sbtnb);border-radius:4px;background:var(--field);overflow:hidden;position:relative;font-size:12px;line-height:18px;color:var(--st2);padding:4px 10px}
+.preview .thumb{position:absolute;right:2px;top:22px;width:2px;height:28px;border-radius:1px;background:var(--st3)}
+.pop .sep{height:1px;background:var(--div);margin:4px 0}
+.pop .pi .mono{width:20px;height:20px;font-size:10px;margin:0}
+.listen.sm{min-width:200px}
+.dimtxt{opacity:.45}
+/* the bar (DESIGN.md §5 Island: 256x50, round ends, Chippi 46 at the puck end) */
+.bar{position:relative;width:256px;height:50px;border-radius:25px;background:var(--fill);border:1px solid var(--wrim);box-shadow:0 4px 12px rgba(0,0,0,.28);display:flex;align-items:center;color:var(--tx);white-space:nowrap;flex:none}
+.dark{--wrim:rgba(255,255,255,.17)}
+.light{--wrim:rgba(0,0,0,.12)}
+.bar .lead{width:34px;height:34px;border-radius:17px;background:var(--tint);color:var(--acc);display:flex;align-items:center;justify-content:center;flex:none}
+.bar .lines{width:148px;display:flex;flex-direction:column;min-width:0;flex:none}
+.bar .bt{font-size:13px;font-weight:600;line-height:17px;overflow:hidden}
+.bar .ba{font-size:12px;line-height:16px;color:var(--tx2);overflow:hidden;text-overflow:ellipsis}
+.bar .pet{width:46px;display:flex;justify-content:center;flex:none}
+.bar .cut{-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 8px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 8px),transparent)}
+.puckonly{width:50px;height:50px;border-radius:25px;background:var(--fill);border:1px solid var(--wrim);box-shadow:0 4px 12px rgba(0,0,0,.28);display:flex;align-items:center;justify-content:center}
+.desk2{background:var(--desk);padding:20px 24px;border-radius:2px;display:flex;flex-direction:column;gap:6px;align-items:flex-end;min-width:330px}
+.desk2.left{align-items:flex-start}
+.note{font-size:12px;line-height:16px;opacity:.75;max-width:330px;margin-top:6px}
+.win{width:300px;height:120px;border-radius:8px;background:var(--surf);border:1px solid var(--sbord);color:var(--st1);font-size:12px;padding:8px 10px;box-shadow:0 8px 24px rgba(0,0,0,.35)}
+.win .wt{font-size:12px;color:var(--st3);margin-bottom:6px}
+.dlg{position:absolute;left:40px;top:34px;width:220px;padding:10px;border-radius:8px;background:var(--pop);border:1px solid var(--sbtnb);font-size:12px;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.dlg .bs{display:flex;gap:6px;justify-content:flex-end;margin-top:10px}
+.dlg .bs span{height:24px;padding:0 10px;border-radius:4px;border:1px solid var(--sbtnb);background:var(--sbtn);display:inline-flex;align-items:center}
+.dlg .bs span.acc{background:var(--sacc);color:var(--sonacc);border-color:var(--sacc)}
+/* ---------- wave 2: Shortcuts ---------- */
+.grp{padding:12px 16px 4px;font-size:12px;font-weight:600;line-height:16px;color:var(--st3);border-top:1px solid var(--div)}
+.grp:first-child{border-top:0}
+.sr .tl small .si{display:inline-flex;align-items:center;gap:4px}
+.light .sr .tl small.cau{color:#C42B1C}
+.kc .g{margin-left:-1px}
+/* revision 2 (Travis, task 344): one keys column, no state lines, clashes refused in the editor */
+.kcol{width:200px;flex:none;display:flex;justify-content:flex-start}
+.kspace{width:32px;flex:none}
+.caps.dim{opacity:.45}
+.dark{--scau:#FF99A4}.light{--scau:#C42B1C}
+.field.bad{border-color:var(--scau);box-shadow:inset 0 0 0 1px var(--scau)}
+.sr .tl .msg{display:inline-flex;align-items:center;gap:8px;color:var(--scau)}
+.tip{position:absolute;z-index:3;padding:6px 8px;border-radius:4px;background:var(--pop);border:1px solid var(--sbtnb);box-shadow:0 4px 12px rgba(0,0,0,.25);font-size:12px;line-height:16px;color:var(--st1);white-space:nowrap}
+.cdlg{width:420px;border-radius:8px;background:var(--surf);border:1px solid var(--sbtnb);box-shadow:0 16px 40px rgba(0,0,0,.35);overflow:hidden}
+.cdlg .cb1{padding:24px}
+.cdlg .ct{font-family:'Segoe UI Variable Display','Segoe UI',sans-serif;font-size:20px;font-weight:600;line-height:28px;margin-bottom:12px}
+.cdlg .cf{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:24px;background:var(--win);border-top:1px solid var(--div)}
+.cdlg .cf .sbt{justify-content:center}
+.seg{display:inline-flex;padding:2px;border:1px solid var(--sbtnb);border-radius:6px;gap:0}
+.seg span{height:28px;padding:0 12px;border-radius:4px;display:inline-flex;align-items:center;gap:6px;font-size:14px;white-space:nowrap}
+.seg span.sel{background:var(--ssel);font-weight:600}
+.field{height:32px;min-width:240px;padding:0 11px;border-radius:4px;border:1px solid var(--sbtnb);border-bottom-color:var(--fieldb);background:var(--field);display:inline-flex;align-items:center;gap:8px;font-size:14px;color:var(--st1)}
+.listen{min-width:240px}
+.listen .kc{height:22px}
+.sbt.off{opacity:.45}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+// Glyphs: path data copied from src/Chippi.UI/Controls/LucideIcons.cs; the ones marked new are Lucide glyphs the app doesn't have yet.
+const P={
+Moon:"M12,3 a6,6 0 0 0 9,9 a9,9 0 1 1 -9,-9 Z",
+Eye:"M2,12 s3,-7 10,-7 s10,7 10,7 s-3,7 -10,7 s-10,-7 -10,-7 Z M12,9 a3,3 0 1 0 0,6 a3,3 0 1 0 0,-6 Z",
+LayoutGrid:"M4,3 H9 a1,1 0 0 1 1,1 V9 a1,1 0 0 1 -1,1 H4 a1,1 0 0 1 -1,-1 V4 a1,1 0 0 1 1,-1 Z M15,3 H20 a1,1 0 0 1 1,1 V9 a1,1 0 0 1 -1,1 H15 a1,1 0 0 1 -1,-1 V4 a1,1 0 0 1 1,-1 Z M15,14 H20 a1,1 0 0 1 1,1 V20 a1,1 0 0 1 -1,1 H15 a1,1 0 0 1 -1,-1 V15 a1,1 0 0 1 1,-1 Z M4,14 H9 a1,1 0 0 1 1,1 V20 a1,1 0 0 1 -1,1 H4 a1,1 0 0 1 -1,-1 V15 a1,1 0 0 1 1,-1 Z",
+PanelBottom:"M5,3 h14 a2,2 0 0 1 2,2 v14 a2,2 0 0 1 -2,2 H5 a2,2 0 0 1 -2,-2 V5 a2,2 0 0 1 2,-2 Z M3,15 h18",
+Screens:"M8,3 h12 a2,2 0 0 1 2,2 v8 a2,2 0 0 1 -2,2 h-2 M4,7 h10 a2,2 0 0 1 2,2 v7 a2,2 0 0 1 -2,2 H4 a2,2 0 0 1 -2,-2 V9 a2,2 0 0 1 2,-2 Z M6,22 h6 M9,18 v4",
+Bluetooth:"M7,7 L17,17 L12,22 V2 L17,7 L7,17",
+Wifi:"M12,20 h0.01 M2,8.82 a15,15 0 0 1 20,0 M5,12.86 a10,10 0 0 1 14,0 M8.5,16.43 a5,5 0 0 1 7,0",
+Camera:"M14.5,4 h-5 L7,7 H4 a2,2 0 0 0 -2,2 v9 a2,2 0 0 0 2,2 h16 a2,2 0 0 0 2,-2 V9 a2,2 0 0 0 -2,-2 h-3 Z M12,10 a3,3 0 1 0 0,6 a3,3 0 1 0 0,-6 Z",
+Gauge:"M12,14 l4,-4 M3.34,19 a10,10 0 1 1 17.32,0",
+Lock:"M5,11 h14 a2,2 0 0 1 2,2 v7 a2,2 0 0 1 -2,2 H5 a2,2 0 0 1 -2,-2 v-7 a2,2 0 0 1 2,-2 Z M7,11 V7 a5,5 0 0 1 10,0 v4",
+MonitorOff:"M17,17 H4 a2,2 0 0 1 -2,-2 V5 c0,-1.5 1,-2 1,-2 M22,15 V5 a2,2 0 0 0 -2,-2 H9 M8,21 h8 M12,17 v4 M2,2 l20,20",
+ScreenSaver:"M4,3 h16 a2,2 0 0 1 2,2 v10 a2,2 0 0 1 -2,2 H4 a2,2 0 0 1 -2,-2 V5 a2,2 0 0 1 2,-2 Z M12,17 v4 M8,21 h8 M10,7.5 v5 l4,-2.5 Z",
+Trash:"M3,6 H21 M19,6 V20 a2,2 0 0 1 -2,2 H7 a2,2 0 0 1 -2,-2 V6 M8,6 V4 a2,2 0 0 1 2,-2 h4 a2,2 0 0 1 2,2 v2",
+Eject:"M5,19 h14 M12,5 l7,9 H5 Z",
+SquareX:"M5,3 h14 a2,2 0 0 1 2,2 v14 a2,2 0 0 1 -2,2 H5 a2,2 0 0 1 -2,-2 V5 a2,2 0 0 1 2,-2 Z M9,9 l6,6 M15,9 l-6,6",
+Snowflake:"M2,12 h20 M12,2 v20 M20,16 l-4,-4 l4,-4 M4,8 l4,4 l-4,4 M16,4 l-4,4 l-4,-4 M8,20 l4,-4 l4,4",
+RefreshCw:"M3,12 a9,9 0 0 1 9,-9 a9.75,9.75 0 0 1 6.74,2.74 L21,8 M21,3 v5 h-5 M21,12 a9,9 0 0 1 -9,9 a9.75,9.75 0 0 1 -6.74,-2.74 L3,16 M8,16 H3 v5",
+Power:"M12,2 v10 M18.4,6.6 a9,9 0 1 1 -12.77,0.04",
+Droplet:"M12,22 a7,7 0 0 0 7,-7 c0,-2 -1,-3.9 -3,-5.5 s-3.5,-4 -4,-6.5 c-.5,2.5 -2,4.9 -4,6.5 C6,11.1 5,13 5,15 a7,7 0 0 0 7,7 Z",
+LogOut:"M9,21 H5 a2,2 0 0 1 -2,-2 V5 a2,2 0 0 1 2,-2 h4 M16,17 l5,-5 l-5,-5 M21,12 H9",
+ChevronLeft:"M15,18 L9,12 L15,6",ChevronRight:"M9,18 L15,12 L9,6",ChevronDown:"M6,9 l6,6 l6,-6",
+Pencil:"M21.174,6.812 a1,1 0 0 0 -3.986,-3.987 L3.842,16.174 a2,2 0 0 0 -.5,.83 l-1.321,4.352 a.5,.5 0 0 0 .623,.622 l4.353,-1.32 a2,2 0 0 0 .83,-.497 Z M15,5 l4,4",
+Close:"M18,6 L6,18 M6,6 L18,18",Plus:"M12,5 V19 M5,12 H19",Search:"M11,3 a8,8 0 1 0 0,16 a8,8 0 1 0 0,-16 Z M21,21 L16.65,16.65",
+Ellipsis:"M5,11 a1,1 0 1 0 0,2 a1,1 0 1 0 0,-2 Z M12,11 a1,1 0 1 0 0,2 a1,1 0 1 0 0,-2 Z M19,11 a1,1 0 1 0 0,2 a1,1 0 1 0 0,-2 Z",
+Maximize:"M8,3 H5 a2,2 0 0 0 -2,2 v3 M21,8 V5 a2,2 0 0 0 -2,-2 h-3 M3,16 v3 a2,2 0 0 0 2,2 h3 M16,21 h3 a2,2 0 0 0 2,-2 v-3",
+OtherScreen:"M4,4 h16 a2,2 0 0 1 2,2 v8 a2,2 0 0 1 -2,2 H4 a2,2 0 0 1 -2,-2 V6 a2,2 0 0 1 2,-2 Z M8,20 h8 M12,16 v4 M8,10 h7 M12.5,7.5 L15,10 l-2.5,2.5",
+SnapLeft:"M4,4 h16 a1,1 0 0 1 1,1 v14 a1,1 0 0 1 -1,1 H4 a1,1 0 0 1 -1,-1 V5 a1,1 0 0 1 1,-1 Z M12,4 v16 M8.5,9.5 L6,12 l2.5,2.5",
+Undo:"M9,14 L4,9 L9,4 M4,9 H14.5 a5.5,5.5 0 0 1 5.5,5.5 a5.5,5.5 0 0 1 -5.5,5.5 H11",
+Keyboard:"M4,4 H20 a2,2 0 0 1 2,2 V18 a2,2 0 0 1 -2,2 H4 a2,2 0 0 1 -2,-2 V6 a2,2 0 0 1 2,-2 Z M6,8 h.01 M10,8 h.01 M14,8 h.01 M18,8 h.01 M8,12 h.01 M12,12 h.01 M16,12 h.01 M7,16 h10",
+Gamepad:"M6,12 h4 M8,10 v4 M15,13 h.01 M18,11 h.01 M17.32,5 H6.68 a4,4 0 0 0 -3.98,3.59 c-.01,.05 -.02,.1 -.02,.15 C2.6,9.42 2,14.46 2,16 a3,3 0 0 0 3,3 c1,0 1.5,-.5 2,-1 l1.41,-1.41 A2,2 0 0 1 9.83,16 h4.34 a2,2 0 0 1 1.41,.59 L17,18 c.5,.5 1,1 2,1 a3,3 0 0 0 3,-3 c0,-1.55 -.6,-6.58 -.68,-7.26 c-.01,-.05 -.02,-.1 -.02,-.15 A4,4 0 0 0 17.32,5 Z",
+Mic:"M12,2 a3,3 0 0 0 -3,3 v7 a3,3 0 0 0 6,0 V5 a3,3 0 0 0 -3,-3 Z M19,10 v2 a7,7 0 0 1 -14,0 v-2 M12,19 v3 M8,22 h8",
+Type:"M4,7 V4 h16 v3 M9,20 h6 M12,4 v16",
+TriangleAlert:"M21.73,18 L13.73,4 a2,2 0 0 0 -3.48,0 L2.27,18 A2,2 0 0 0 4,21 H20 a2,2 0 0 0 1.73,-3 Z M12,9 V13 M12,17 h0.01",
+Settings:"M12,9 a3,3 0 1 0 0,6 a3,3 0 1 0 0,-6 Z M12,2 v2 M12,20 v2 M4.9,4.9 l1.4,1.4 M17.7,17.7 l1.4,1.4 M2,12 h2 M20,12 h2 M4.9,19.1 l1.4,-1.4 M17.7,6.3 l1.4,-1.4",
+Home:"M3,10 L12,3 L21,10 V20 a1,1 0 0 1 -1,1 H15 V14 H9 V21 H4 a1,1 0 0 1 -1,-1 Z",
+Info:"M12,2 a10,10 0 1 0 0,20 a10,10 0 1 0 0,-20 Z M12,16 V12 M12,8 h0.01",
+Menu:"M4,6 h16 M4,12 h16 M4,18 h16",Minus:"M5,12 h14",Square:"M5,5 h14 v14 H5 Z",
+Folder:"M20,20 a2,2 0 0 0 2,-2 V8 a2,2 0 0 0 -2,-2 h-7.9 a2,2 0 0 1 -1.69,-.9 L9.6,3.9 A2,2 0 0 0 7.93,3 H4 a2,2 0 0 0 -2,2 v13 a2,2 0 0 0 2,2 Z",
+Clipboard:"M9,2 H15 a1,1 0 0 1 1,1 V5 a1,1 0 0 1 -1,1 H9 a1,1 0 0 1 -1,-1 V3 a1,1 0 0 1 1,-1 Z M16,4 h2 a2,2 0 0 1 2,2 v14 a2,2 0 0 1 -2,2 H6 a2,2 0 0 1 -2,-2 V6 a2,2 0 0 1 2,-2 h2",
+Bell:"M10.27,21 a2,2 0 0 0 3.46,0 M3.26,15.33 A1,1 0 0 0 4,17 h16 a1,1 0 0 0 .74,-1.67 C19.41,13.96 18,12.5 18,8 A6,6 0 0 0 6,8 c0,4.5 -1.41,5.96 -2.74,7.33",
+Download:"M12,15 V3 M21,15 v4 a2,2 0 0 1 -2,2 H5 a2,2 0 0 1 -2,-2 v-4 M7,10 l5,5 l5,-5",
+Coffee:"M10,2 v2 M14,2 v2 M16,8 a1,1 0 0 1 1,1 v8 a4,4 0 0 1 -4,4 H7 a4,4 0 0 1 -4,-4 V9 a1,1 0 0 1 1,-1 h14 a4,4 0 1 1 0,8 h-1 M6,2 v2",
+// new
+Snap:"M4,3 h5 a1,1 0 0 1 1,1 v16 a1,1 0 0 1 -1,1 H4 a1,1 0 0 1 -1,-1 V4 a1,1 0 0 1 1,-1 Z M15,3 h5 a1,1 0 0 1 1,1 v5 a1,1 0 0 1 -1,1 h-5 a1,1 0 0 1 -1,-1 V4 a1,1 0 0 1 1,-1 Z M15,14 h5 a1,1 0 0 1 1,1 v5 a1,1 0 0 1 -1,1 h-5 a1,1 0 0 1 -1,-1 v-5 a1,1 0 0 1 1,-1 Z",
+Switcher:"M4,10 c-1.1,0 -2,-.9 -2,-2 V4 c0,-1.1 .9,-2 2,-2 h4 c1.1,0 2,.9 2,2 M10,16 c-1.1,0 -2,-.9 -2,-2 v-4 c0,-1.1 .9,-2 2,-2 h4 c1.1,0 2,.9 2,2 M16,14 h4 a2,2 0 0 1 2,2 v4 a2,2 0 0 1 -2,2 h-4 a2,2 0 0 1 -2,-2 v-4 a2,2 0 0 1 2,-2 Z",
+Mouse:"M12,2 a7,7 0 0 1 7,7 v6 a7,7 0 0 1 -14,0 V9 a7,7 0 0 1 7,-7 Z M12,6 v4",
+Pointer:"M4.037,4.688 a.495,.495 0 0 1 .651,-.651 l16,6.5 a.5,.5 0 0 1 -.063,.947 l-6.124,1.58 a2,2 0 0 0 -1.438,1.435 l-1.579,6.126 a.5,.5 0 0 1 -.947,.063 Z",
+Scroll:"M7,15 l5,5 l5,-5 M7,9 l5,-5 l5,5",
+CapsLock:"M9,19 h6 M9,15 v-3 H5 l7,-7 l7,7 h-4 v3 H9 Z",
+ShieldX:"M20,13 c0,5 -3.5,7.5 -7.66,8.95 a1,1 0 0 1 -.67,-.01 C7.5,20.5 4,18 4,13 V6 a1,1 0 0 1 1,-1 c2,0 4.5,-1.2 6.24,-2.72 a1.17,1.17 0 0 1 1.52,0 C14.51,3.81 17,5 19,5 a1,1 0 0 1 1,1 Z M14.5,9.5 l-5,5 M9.5,9.5 l5,5",
+Radial:"M12,2 a10,10 0 1 0 0,20 a10,10 0 1 0 0,-20 Z M12,9 a3,3 0 1 0 0,6 a3,3 0 1 0 0,-6 Z M12,2 v7 M12,15 v7 M2,12 h7 M15,12 h7",
+Snippet:"M17,6.1 H3 M21,12.1 H3 M15.1,18 H3"
+,Zap:"M4,14 a1,1 0 0 1 -.78,-1.63 l9.9,-10.2 a.5,.5 0 0 1 .86,.46 l-1.92,6.02 A1,1 0 0 0 13,10 h7 a1,1 0 0 1 .78,1.63 l-9.9,10.2 a.5,.5 0 0 1 -.86,-.46 l1.92,-6.02 A1,1 0 0 0 11,14 Z",
+Music:"M9,18 V5 l12,-2 v13 M6,15 a3,3 0 1 0 0,6 a3,3 0 1 0 0,-6 Z M18,13 a3,3 0 1 0 0,6 a3,3 0 1 0 0,-6 Z",
+Shield:"M20,13 c0,5 -3.5,7.5 -7.66,8.95 a1,1 0 0 1 -.67,-.01 C7.5,20.5 4,18 4,13 V6 a1,1 0 0 1 1,-1 c2,0 4.5,-1.2 6.24,-2.72 a1.17,1.17 0 0 1 1.52,0 C14.51,3.81 17,5 19,5 a1,1 0 0 1 1,1 Z",
+FolderOpen:"M6,14 l1.5,-2.9 A2,2 0 0 1 9.24,10 H20 a2,2 0 0 1 1.94,2.5 l-1.54,6 a2,2 0 0 1 -1.95,1.5 H4 a2,2 0 0 1 -2,-2 V5 a2,2 0 0 1 2,-2 h3.9 a2,2 0 0 1 1.69,.9 l.81,1.2 a2,2 0 0 0 1.67,.9 H18 a2,2 0 0 1 2,2 v2"
+};
+Object.assign(P,{
+SnapRight:"M4,4 h16 a1,1 0 0 1 1,1 v14 a1,1 0 0 1 -1,1 H4 a1,1 0 0 1 -1,-1 V5 a1,1 0 0 1 1,-1 Z M12,4 v16 M15.5,9.5 L18,12 l-2.5,2.5",
+PlayPause:"M3,5 l9,7 l-9,7 V5 Z M16,5 v14 M21,5 v14",
+SkipForward:"M5,4 L15,12 L5,20 Z M19,5 V19",
+AppWindow:"M4,4 H20 a2,2 0 0 1 2,2 V18 a2,2 0 0 1 -2,2 H4 a2,2 0 0 1 -2,-2 V6 a2,2 0 0 1 2,-2 Z M2,8 H22 M6,4 V8 M10,4 V8",
+Speaker:"M11,5 L6,9 L2,9 L2,15 L6,15 L11,19 Z M15.5,8.5 a5,5 0 0 1 0,7 M19,5 a10,10 0 0 1 0,14"
+});
+const g=(n,s=16)=>`<svg class="g" width="${s}" height="${s}" viewBox="0 0 24 24" stroke-width="${(30/s).toFixed(3)}"><path d="${P[n]}"/></svg>`;
+const q=new URLSearchParams(location.search);
+const board=q.get('board')||'shortcuts', theme=q.get('theme')||'dark';
+
+/* ---------- Settings pieces (real sizes: rows 48, or 60 with a caption; cards 768) ---------- */
+const SR=(title,right,o={})=>`<div class="sr${o.cls?' '+o.cls:''}">${o.glyph?`<span class="lead">${g(o.glyph,20)}</span>`:''}<span class="tl">${title}${o.small?`<small${o.cau?' class="cau"':''}>${o.small}</small>`:''}</span><span class="ctl">${right}</span></div>`;
+const swc=on=>`<span class="on">${on?'On':'Off'}</span><span class="ssw${on?' on':''}"></span>`;
+const btn=(t,o={})=>`<button class="sbt${o.acc?' acc':''}${o.off?' off':''}">${o.plus?g('Plus',14):''}${t}</button>`;
+const app=(m,name)=>`<span class="appn"><span class="mono">${m}</span>${name}</span>`;
+const combo=(t,w=120,o={})=>`<span class="combo${o.open?' open':''}" style="min-width:${w}px">${o.ph?`<span class="ph">${t}</span>`:t}${g('ChevronDown',12)}</span>`;
+const sec=(t,first)=>`<div class="sh"${first?' style="margin-top:0"':''}>${t}</div>`;
+const card=(rows,cls='',style='')=>`<div class="card${cls?' '+cls:''}"${style?` style="${style}"`:''}>${rows}</div>`;
+const infobar=t=>`<div class="infobar"><span class="ic">${g('TriangleAlert',20)}</span><span class="t">${t}</span>${btn('Retry')}</div>`;
+const more=`<button class="sbt icon" aria-label="More options">${g('Ellipsis')}</button>`;
+
+/* ---------- doors ---------- */
+const cap=x=>x.startsWith('m:')?`<span class="kc">${g('Mouse',14)}${x.slice(2)}</span>`:`<span class="kc">${x}</span>`;
+const keys=(...k)=>`<span class="caps">${k.map(cap).join('')}</span>`;
+const capsK=k=>keys('Caps Lock',k);
+const btnK=n=>keys('m:'+n);
+const dim=h=>h.replace('class="caps"','class="caps dim"');
+
+/* ---------- the list: one row per binding, grouped like Actions ---------- */
+// state: undefined (Active), or one where the shortcut can't work: its keycaps only dim. No state line and no
+// tooltip (Travis task 344, Marge on #247); Change shows the reason when it's recorded again.
+const ST={
+ other:'In use by another app',
+ windows:'In use by Windows',
+ gone:'App not found',
+ radial:'Held by the Radial menu',
+ inactive:'Caps Lock combos are off'
+};
+const BR=(glyph,name,door,state,o={})=>{const s=ST[state];
+ return SR(name,`<span class="kcol">${s?dim(door):door}</span>`+(o.unset?'<span class="kspace"></span>':more),{glyph,cls:o.cls});};
+const grp=t=>`<div class="grp">${t}</div>`;
+const LIST=[
+ ['Chippi',[
+  ['Mic','Mute microphone',keys('Ctrl','Shift','M')],
+  ['Search','Open Command bar',keys('Ctrl','Alt','Space'),'other'],
+  ['Type','Paste as plain text',keys('Ctrl','Shift','V')],
+  ['Speaker','Switch output',btn('Record'),null,{unset:1}]]],
+ ['Window',[
+  ['SnapLeft','Snap left',capsK('←')],
+  ['SnapRight','Snap right',keys('Win','→'),'windows'],
+  ['OtherScreen','Move to other screen',btnK('Forward button')],
+  ['Switcher','Open App switcher',btnK('Back button'),'radial']]],
+ ['Media',[
+  ['PlayPause','Play/pause',capsK('Space')],
+  ['SkipForward','Next',btnK('Wheel right')]]],
+ ['Text',[['Snippet','Insert Signature',capsK('S')]]],
+ ['App',[['AppWindow','Open OBS Studio',capsK('O'),'gone']]]
+];
+const listRows=(groups,o={})=>groups.map(([t,rows])=>grp(t)+rows.map(r=>BR(r[0],r[1],r[2],o.inactiveCaps&&r[2].includes('>Caps Lock<')?'inactive':r[3],r[4])).join('')).join('');
+const addRow=n=>SR(`<span class="mut">${n}</span>`,btn('Add shortcut',{plus:1}));
+const listCard=(o={})=>card(listRows(o.groups||LIST,o)+(o.foot===false?'':addRow(o.count||'11 shortcuts')),'',o.style||'');
+
+/* ---------- Caps Lock and Mouse buttons sections ---------- */
+const tog=(t,on)=>`<button class="sbt tog${on?' on':''}">${t}</button>`;
+const capsCards=(o={})=>{const on=o.on??1, d='dep'+(on?'':' dimtxt');
+ return card(
+  SR('Caps Lock combos',o.paused?`<span class="on">Paused</span><span class="ssw on"></span>`:swc(on),{glyph:'CapsLock'})+
+  SR('Key to hold',combo('Caps Lock',160),{cls:d})+
+  SR('Acts as',tog('Ctrl',1)+tog('Alt',1)+tog('Shift',1)+tog('Win',o.win),{cls:d})+
+  SR('Tap on its own',combo('Nothing',200),{cls:d}))+
+ card(SR('Excluded apps',btn('Add app'),{small:'1 app'})+SR(app('RD','Remote Desktop'),btn('Remove'),{cls:'dep',small:'mstsc.exe'}),on?'':'dim all');};
+const mouseCards=(o={})=>{const on=o.on??1;
+ return card(SR('Mouse buttons',swc(on),{glyph:'Mouse'}))+
+ card(SR('Excluded apps',btn('Add app'),{small:'2 apps'})+SR(app('Ch','Chrome'),btn('Remove'),{cls:'dep',small:'chrome.exe'})+SR(app('FE','File Explorer'),btn('Remove'),{cls:'dep',small:'explorer.exe'}),on?'':'dim all');};
+
+const page=`<div class="ptitle">Shortcuts</div>${listCard()}${sec('Caps Lock')}${capsCards()}${sec('Mouse buttons')}${mouseCards()}`;
+const emptyCapsCards=()=>card(SR('Caps Lock combos',swc(0),{glyph:'CapsLock'})+SR('Key to hold',combo('Caps Lock',160),{cls:'dep dimtxt'})+SR('Acts as',tog('Ctrl',1)+tog('Alt',1)+tog('Shift',1)+tog('Win',0),{cls:'dep dimtxt'})+SR('Tap on its own',combo('Nothing',200),{cls:'dep dimtxt'}))+card(SR('Excluded apps',btn('Add app')),'dim all');
+const emptyMouseCards=()=>card(SR('Mouse buttons',swc(0),{glyph:'Mouse'}))+card(SR('Excluded apps',btn('Add app')),'dim all');
+const emptyPage=`<div class="ptitle">Shortcuts</div>${card(SR('<span class="mut">No shortcuts</span>',btn('Add shortcut',{plus:1})))}${sec('Caps Lock')}${emptyCapsCards()}${sec('Mouse buttons')}${emptyMouseCards()}`;
+
+/* ---------- frame (today's sidebar; Shortcuts is in the Chippi group) ---------- */
+const N=(glyph,label,sel)=>`<div class="nav${sel?' sel':''}">${g(glyph)}${label}</div>`;
+const sidebar=`<div class="side"><div class="find">Find a setting${g('Search',14)}</div>
+ <div class="gl">Sound</div>${N('Music','Now Playing')}${N('Speaker','Output')}${N('Mic','Microphone')}
+ <div class="gl">Clipboard &amp; text</div>${N('Type','Paste as plain text')}${N('Snippet','Text snippets')}
+ <div class="gl">Windows</div>${N('Mouse','Mouse')}${N('Keyboard','Keyboard')}${N('Zap','Radial menu')}${N('Snap','Snap')}${N('Switcher','App switcher')}
+ <div class="gl">Chippi</div>${N('Settings','General')}${N('Droplet','Island &amp; pet')}${N('Keyboard','Shortcuts',1)}${N('Bell','Notifications')}${N('Shield','Permissions')}${N('Plus','Add features')}${N('Info','About')}</div>`;
+const rail=`<div class="side rail">${N('Menu','')}${N('Search','')}<div class="hl"></div>${N('Music','')}${N('Speaker','')}${N('Mic','')}<div class="hl"></div>${N('Type','')}${N('Snippet','')}<div class="hl"></div>${N('Mouse','')}${N('Keyboard','')}${N('Zap','')}${N('Snap','')}${N('Switcher','')}<div class="hl"></div>${N('Settings','')}${N('Droplet','')}${N('Keyboard','',1)}${N('Bell','')}${N('Shield','')}${N('Plus','')}${N('Info','')}</div>`;
+const frame=(content,o={})=>`<div class="sw${o.narrow?' narrow':''}"><div class="tbar"><span class="logo"></span><span class="tt">Chippi Settings</span><span class="cb">${g('Minus',14)}</span><span class="cb">${g('Square',12)}</span><span class="cb">${g('Close',14)}</span></div><div class="shell">${o.narrow?rail:sidebar}<div class="page">${content}</div></div></div>`;
+
+/* ---------- Add shortcut: action, then the input (three doors), then Save ---------- */
+const head=[['Window',LIST[1][1].slice(0,2)]];
+const seg=sel=>`<span class="seg">${['Keys','Caps Lock','Mouse button'].map(t=>`<span${t===sel?' class="sel"':''}>${t}</span>`).join('')}</span>`;
+const editor=(o)=>
+ SR(o.action?o.action:'New shortcut',o.action?'':combo('Choose an action',300,{ph:1,open:o.picking}),{glyph:o.glyph||'Plus',cls:'edit'})+
+ (o.picking?'':SR('Input',seg(o.door)+(o.warn?o.field.replace('class="field"','class="field bad"'):o.field),{cls:'edit dep'}))+
+ // a clash is refused here: the pressed keys stay in the field, Save stays off, the message sits on the Save row
+ SR(o.warn?`<span class="msg" role="alert">${g('TriangleAlert',16)}${o.warn}</span>`:'',btn('Save',{acc:1,off:!o.ready})+btn('Cancel'),{cls:'edit'});
+const listening=t=>`<span class="listen">${t}</span>`;
+const filled=h=>`<span class="field">${h}</span>`;
+const picker=`<div class="pop" style="right:16px;top:44px;width:300px">
+ <div class="pf">${g('Search',14)}<span style="color:var(--st1)">snap</span></div>
+ <div class="pg">Window</div>
+ <div class="pi">${g('SnapLeft')}Snap left<span class="k">Caps Lock + ←</span></div><div class="pi">${g('SnapRight')}Snap right<span class="k">Win + →</span></div>
+ <div class="pg">Snap</div>
+ <div class="pi hov">${g('Snap')}Left third</div><div class="pi">${g('Snap')}Center third</div><div class="pi">${g('Snap')}Right third</div></div>`;
+const st={
+ pick:`${listCard({groups:head,foot:false,style:'overflow:visible'})}<div class="card" style="margin-top:-1px;border-top-left-radius:0;border-top-right-radius:0;overflow:visible;position:relative">${editor({picking:1})}${picker}</div><div style="height:190px"></div>`,
+ keys:card(listRows(head)+editor({glyph:'Snap',action:'Snap left third',door:'Keys',field:listening('Press a shortcut')})),
+ caps:card(listRows(head)+editor({glyph:'Snap',action:'Snap left third',door:'Caps Lock',field:listening(`${keys('Caps Lock')}<span class="plus">+</span>Press a key`)})),
+ mouse:card(listRows(head)+editor({glyph:'Snap',action:'Snap left third',door:'Mouse button',field:listening('Press a mouse button or tilt the wheel')})),
+ ready:card(listRows(head)+editor({glyph:'Snap',action:'Snap left third',door:'Caps Lock',field:filled(capsK('1')),ready:1})),
+ twice:card(listRows(head)+editor({glyph:'Snap',action:'Snap left third',door:'Caps Lock',field:filled(capsK('←')),warn:'Snap left already uses this'})),
+ radial:card(listRows(head)+editor({glyph:'Snap',action:'Snap left third',door:'Mouse button',field:filled(btnK('Middle button')),warn:'The Radial menu uses this'})),
+ windows:card(listRows(head)+editor({glyph:'Snap',action:'Snap left third',door:'Keys',field:filled(keys('Win','←')),warn:'Windows uses this'})),
+ recKeys:card(listRows([['Chippi',[LIST[0][1][0]]]])+editor({glyph:'Speaker',action:'Switch output',door:'Keys',field:listening('Press a shortcut')})),
+ recOther:card(listRows([['Chippi',[LIST[0][1][0]]]])+editor({glyph:'Speaker',action:'Switch output',door:'Keys',field:filled(keys('Ctrl','Alt','Space')),warn:'Another app uses this'})),
+ tip:`<div class="card" style="overflow:visible;position:relative">${listRows([['Chippi',LIST[0][1].slice(0,2)]]).replace(/(<div class="sr)(">(?:(?!<div class="sr).)*Open Command bar)/s,'$1 hov$2')}${addRow('2 shortcuts')}</div>`,
+ winAsk:`<div style="position:relative">${capsCards()}<div style="position:absolute;inset:0;background:rgba(0,0,0,.35);border-radius:8px"></div><div class="cdlg" style="position:absolute;left:174px;top:40px"><div class="cb1"><div class="ct" style="margin:0">Add Win to Caps Lock?</div></div><div class="cf">${btn('Cancel')}${btn('Add',{acc:1})}</div></div></div>`,
+ menu:`<div class="card" style="overflow:visible;position:relative">${listRows(head)}${BR('OtherScreen','Move to other screen',btnK('Forward button'),null,{cls:'hov'}).replace('aria-label="More options">','aria-label="More options" style="background:var(--shov)">')}
+  <div class="pop" style="right:16px;top:206px;width:200px"><div class="pi hov">Change</div><div class="pi">Add another</div><div class="pi">Remove</div></div></div><div style="height:120px"></div>`,
+ off:`${card(listRows([['Window',LIST[1][1].slice(0,1)],['Media',LIST[2][1]]],{inactiveCaps:1}))}${sec('Caps Lock')}${capsCards({on:0})}`,
+ paused:capsCards({paused:1}),
+ hook:`${infobar('Caps Lock combos and Mouse buttons failed')}${card(listRows([['Chippi',LIST[0][1].slice(0,1)],['Window',LIST[1][1].slice(0,1)]]))}`
+};
+const stLabel=(t,c)=>`<div><div class="cap">${t}</div><div class="${theme} stage" style="padding:16px;background:var(--win)"><div class="stcard" style="color:var(--st1);font-size:14px;line-height:20px;position:relative">${c}</div></div></div>`;
+
+const B={
+ 'shortcuts':()=>frame(page),
+ 'shortcuts-narrow':()=>frame(page,{narrow:1}),
+ 'shortcuts-empty':()=>frame(emptyPage),
+ 'sheet-shortcuts-states':()=>`<div class="srow">${stLabel('1 · Add shortcut: choose an action',st.pick)}${stLabel('2 · Keys: listening',st.keys)}</div>
+  <div class="srow">${stLabel('3 · Caps Lock: hold it and press a key',st.caps)}${stLabel('4 · Mouse button: press it or tilt the wheel',st.mouse)}</div>
+  <div class="srow">${stLabel('5 · Recorded, ready to save',st.ready)}${stLabel('Refused: another action uses it',st.twice)}</div>
+  <div class="srow">${stLabel('Refused: the Radial menu uses it',st.radial)}${stLabel('Refused: Windows uses it',st.windows)}</div>
+  <div class="srow">${stLabel('Record on a shortcut that isn\'t set',st.recKeys)}${stLabel('Record or Change refused: another app uses it',st.recOther)}</div>
+  <div class="srow">${stLabel('A saved shortcut that can\'t work: dimmed keycaps only',st.tip)}${stLabel('Row menu',st.menu)}</div>
+  <div class="srow">${stLabel('Caps Lock combos off: its shortcuts dim',st.off)}<div style="display:flex;flex-direction:column;gap:28px">${stLabel('Paused while an excluded app is open',st.paused)}${stLabel('Turning on Win asks first',st.winAsk)}</div></div>
+  <div class="srow">${stLabel('A hook is down: key shortcuts still work',st.hook)}</div>`
+};
+document.body.className=theme;
+const html=B[board]();
+const wrap=board.startsWith('sheet')?`<div class="sheet ${theme==='light'?'lt':''}"><div class="${theme}" style="display:contents">${html}</div></div>`:`<div style="display:inline-block;padding:24px;background:${theme==='light'?'#D9D9D9':'#161616'}"><div class="${theme}">${html}</div></div>`;
+document.getElementById('root').innerHTML=wrap;
+const el=document.getElementById('root').firstElementChild;
+document.body.dataset.size=Math.ceil(el.getBoundingClientRect().width)+','+Math.ceil(el.getBoundingClientRect().height);
+</script>
+</body>
+</html>
