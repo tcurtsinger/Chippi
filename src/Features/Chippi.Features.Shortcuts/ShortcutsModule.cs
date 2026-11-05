@@ -42,7 +42,9 @@ public sealed class ShortcutsModule : IFeatureModule
     }
 
     private readonly object _gate = new();
-    private readonly Func<IActionHost?> _actions;
+    private readonly Func<IActionHost?> _actionsOverride;
+    private readonly Func<string, string> _searchUrl;
+    private IActionHost? _shellHost;
     private readonly Func<MouseTrigger, bool> _radialHolds;
     private readonly List<Slot> _slots = [];
     private ModuleContext? _context;
@@ -53,9 +55,11 @@ public sealed class ShortcutsModule : IFeatureModule
 
     /// <param name="actions">The shared action runner; null while there is none (every binding then shows Unavailable).</param>
     /// <param name="radialHolds">Whether the Radial menu opens from a mouse button now, read from its settings. A memory read: the hub calls it.</param>
-    public ShortcutsModule(Func<IActionHost?>? actions = null, Func<MouseTrigger, bool>? radialHolds = null)
+    /// <param name="searchUrl">The web search's address for a text (the Command bar's engine), for a Text action that searches.</param>
+    public ShortcutsModule(Func<IActionHost?>? actions = null, Func<MouseTrigger, bool>? radialHolds = null, Func<string, string>? searchUrl = null)
     {
-        _actions = actions ?? (() => null);
+        _actionsOverride = actions ?? (() => null);
+        _searchUrl = searchUrl ?? (text => "https://www.google.com/search?q=" + Uri.EscapeDataString(text));
         _radialHolds = radialHolds ?? (_ => false);
     }
 
@@ -78,6 +82,9 @@ public sealed class ShortcutsModule : IFeatureModule
         {
             _context = context;
             _ui = SynchronizationContext.Current;
+            _shellHost = context.Actions is { } pc
+                ? new RunnerHost(new ActionRunner(pc, context.Commands, () => context.Clipboard, _searchUrl, () => context.IslandPasteTarget()?.Window ?? 0))
+                : null;
             Settings = Normalize(context.Settings.Get<ShortcutsSettings>());
             _pauseListener = () => Post(() => { lock (_gate) Rebuild(); });
             if (context.Input is { } hub)
@@ -193,6 +200,16 @@ public sealed class ShortcutsModule : IFeatureModule
             : AnotherAppText;
     }
 
+    /// <summary>A test's or the probe's host, else the shell's runner; null while there is none.</summary>
+    private IActionHost? Host() => _actionsOverride() ?? _shellHost;
+
+    private sealed class RunnerHost(ActionRunner runner) : IActionHost
+    {
+        public Task RunAsync(ChippiAction action, WindowTarget target) => runner.RunAsync(action, target);
+
+        public bool IsMissing(ChippiAction action) => runner.IsMissing(action);
+    }
+
     private void Save(ShortcutsSettings next)
     {
         if (_context is null)
@@ -237,7 +254,7 @@ public sealed class ShortcutsModule : IFeatureModule
             return;
         Clear();
         bool paused = _context.Input?.Paused == true;
-        var host = _actions();
+        var host = Host();
         foreach (var binding in Settings.Bindings)
         {
             var slot = new Slot(binding);
@@ -305,7 +322,7 @@ public sealed class ShortcutsModule : IFeatureModule
                 {
                     lock (_gate)
                         if (_slots.FirstOrDefault(s => s.Binding.Door == BindingDoor.Mouse && s.Binding.Button == trigger && s.Status.Acts) is { } slot)
-                            RunBinding(slot.Binding.Id, _actions(), WindowTarget.UnderPointer);
+                            RunBinding(slot.Binding.Id, Host(), WindowTarget.UnderPointer);
                 }),
             };
             try

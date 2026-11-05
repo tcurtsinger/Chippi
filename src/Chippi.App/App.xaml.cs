@@ -211,11 +211,12 @@ public partial class App : Application
         shell.Registry.Register(new Chippi.Features.Debounce.DebounceModule(Environment.GetEnvironmentVariable("CHIPPI_DEBOUNCE_INJECTED") == "1"));
         // [Phase 6] Smooth and linear scrolling: replaces its catalog placeholder.
         shell.Registry.Register(new Chippi.Features.SmoothScrolling.SmoothScrollingModule(Environment.GetEnvironmentVariable("CHIPPI_SMOOTH_INJECTED") == "1"));
-        // [Phase 6] Shortcuts: replaces the Mouse buttons, Super key and Shortcut manager placeholders. The shared action runner
-        // comes with the shell's actions (PR D); until then only the Sandbox probe's host runs anything.
+        // [Phase 6] Shortcuts: replaces the Mouse buttons, Super key and Shortcut manager placeholders. Actions run on the shell's
+        // runner; the Sandbox probe's host takes its place when CHIPPI_SHORTCUTS_PROBE names a file.
         var shortcutProbe = Environment.GetEnvironmentVariable("CHIPPI_SHORTCUTS_PROBE");
         shell.Registry.Register(new Chippi.Features.Shortcuts.ShortcutsModule(
-            () => string.IsNullOrEmpty(shortcutProbe) ? null : new Chippi.Features.Shortcuts.ProbeActionHost(shortcutProbe)));
+            () => string.IsNullOrEmpty(shortcutProbe) ? null : new Chippi.Features.Shortcuts.ProbeActionHost(shortcutProbe),
+            searchUrl: text => Chippi.Features.CommandBar.WebEngines.SearchUrl(commandBar.Settings.WebSearch, text)));
 
         shell.Registry.Register(new Chippi.Features.CloseProtection.CloseProtectionModule(() =>
             new Chippi.Features.CloseProtection.WindowsCloseDesktop()));
