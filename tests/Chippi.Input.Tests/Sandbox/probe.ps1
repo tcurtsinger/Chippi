@@ -30,6 +30,8 @@ public static class Probe
     [DllImport("user32.dll")] static extern int GetSystemMetrics(int index);
     [DllImport("winmm.dll")] static extern uint timeBeginPeriod(uint ms);
 
+    [DllImport("user32.dll")] static extern IntPtr SendMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
+    public static bool CapsOn() { return SendMessage(GetForegroundWindow(), 0x8042, IntPtr.Zero, IntPtr.Zero) != IntPtr.Zero; }
     static void Send(Input input) { SendInput(1, new[] { input }, Marshal.SizeOf(typeof(Input))); }
 
     static void Mouse(uint flags, int dx = 0, int dy = 0, uint data = 0)
@@ -559,11 +561,11 @@ public static class Probe
             [Probe]::MoveTo($x, $y)
             Start-Sleep -Milliseconds 300
             $before = [Probe]::Foreground()
-            $capsBefore = if (Test-Path "$results\caps-state.txt") { [IO.File]::ReadAllText("$results\caps-state.txt").Trim() } else { 'unchecked' }
+            $capsBefore = [Probe]::CapsOn()
             $hitsBefore = [Probe]::Hits
             & $act
             Start-Sleep -Milliseconds 1500
-            $sc[$name] = [ordered]@{ actions = ((Actions) -join '; '); targetHeard = ((TargetLog) -join '; '); foreground = "$before -> $([Probe]::Foreground())"; otherAppHotkeyHeard = [Probe]::Hits - $hitsBefore; capsBefore = $capsBefore; capsAfter = $(if (Test-Path "$results\caps-state.txt") { [IO.File]::ReadAllText("$results\caps-state.txt").Trim() } else { "unchecked" }) }
+            $sc[$name] = [ordered]@{ actions = ((Actions) -join '; '); targetHeard = ((TargetLog) -join '; '); foreground = "$before -> $([Probe]::Foreground())"; otherAppHotkeyHeard = [Probe]::Hits - $hitsBefore; capsBefore = $capsBefore; capsAfter = [Probe]::CapsOn() }
             Note "shortcuts $name : fired [$((Actions) -join '; ')] target heard [$((TargetLog) -join '; ')] other app heard $([Probe]::Hits - $hitsBefore) foreground $($sc[$name].foreground)"
             Start-Sleep -Milliseconds 300
         }
