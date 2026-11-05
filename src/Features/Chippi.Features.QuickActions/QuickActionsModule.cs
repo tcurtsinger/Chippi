@@ -100,8 +100,59 @@ public sealed class QuickActionsModule : IFeatureModule
     /// <summary>The actions that have a gallery tile and can be offered on this PC.</summary>
     public IReadOnlyList<QuickAction> Gallery => [.. Offered.Where(a => a.InGallery)];
 
+    /// <summary>The tiles other features add (Input), while one of their commands runs. Read afresh each time.</summary>
+    public IReadOnlyList<AddedTile> AddedTiles
+    {
+        get
+        {
+            if (Context is not { } context)
+                return [];
+            try { return AddedTile.From(context.Commands()); }
+            catch (Exception ex)
+            {
+                Log.Warn("Quick actions: reading the added tiles failed", ex);
+                return [];
+            }
+        }
+    }
+
+    /// <summary>The gallery's offered tiles: Quick actions, then the tiles other features added.</summary>
+    internal IReadOnlyList<GalleryTile> GalleryTiles => TilesWith(AddedTiles);
+
+    /// <summary>The offered tiles with <paramref name="added"/> as the added ones, read once by the caller.</summary>
+    internal IReadOnlyList<GalleryTile> TilesWith(IReadOnlyList<AddedTile> added) => [.. Gallery.Select(a => new GalleryTile(a)), .. added.Select(t => new GalleryTile(t))];
+
     /// <summary>All gallery positions, including hidden actions so hiding one never moves its neighbors.</summary>
-    public IReadOnlyList<string?> Layout => QuickActionsLayout.Normalize(Settings.Layout, Settings.Shown);
+    public IReadOnlyList<string?> Layout => QuickActionsLayout.Normalize(Settings.Layout, Settings.Shown, Settings.Added);
+
+    /// <summary>
+    /// Gives each tile another feature added for the first time a position after the last tile, shown. A tile that already
+    /// has one keeps it, so a feature that's out leaves its gap, and one never installed leaves none. True when it saved.
+    /// </summary>
+    internal bool AdoptAdded(IReadOnlyList<AddedTile> added)
+    {
+        var fresh = added.Select(t => t.Key).Where(k => !Settings.Added.Contains(k)).ToArray();
+        if (fresh.Length == 0 || Context is null)
+            return false;
+        var layout = Layout.ToList();
+        foreach (var key in fresh)
+            layout = QuickActionsLayout.Append(layout, key);
+        try
+        {
+            Save(Settings with
+            {
+                Added = [.. Settings.Added, .. fresh],
+                Layout = layout,
+                Shown = Settings.Shown is null ? null : [.. Settings.Shown, .. fresh],
+            });
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("Quick actions: saving a new tile failed", ex);
+            return false;
+        }
+    }
 
     /// <summary>What the page shows, in the saved order: picked, and possible on this PC.</summary>
     public IReadOnlyList<QuickAction> Shown
@@ -233,22 +284,28 @@ public sealed class QuickActionsModule : IFeatureModule
     public void Pick(IEnumerable<QuickActionId> ids)
     {
         var shown = ids.Distinct().Order().Where(id => QuickAction.Of(id).InGallery).Select(id => QuickAction.Of(id).Key).ToList();
-        Save(Settings with { Shown = shown, Layout = QuickActionsLayout.Normalize(null, shown) });
+        Save(Settings with { Shown = [.. shown, .. Settings.Added], Layout = QuickActionsLayout.Normalize(null, shown, Settings.Added) });
     }
 
-    /// <summary>Commit the editor's selection and exact positions together; unavailable actions keep their saved choice.</summary>
-    public void SaveLayout(IEnumerable<QuickActionId> selected, IEnumerable<string?> slots)
+    /// <summary>Commit the editor's selection and exact positions together, by key; unavailable tiles keep their saved choice.</summary>
+    public void SaveLayout(IEnumerable<string> selected, IEnumerable<string?> slots)
     {
-        var offered = Gallery.Select(a => a.Id).ToHashSet();
-        var chosen = selected.ToHashSet();
-        var shown = QuickAction.All.Where(a => a.InGallery).Where(a => offered.Contains(a.Id) ? chosen.Contains(a.Id) : Settings.Shows(a.Id)).Select(a => a.Key).ToList();
-        Save(Settings with { Shown = shown, Layout = QuickActionsLayout.Normalize(slots, shown) });
+        var offered = GalleryTiles.Select(t => t.Key).ToHashSet(StringComparer.Ordinal);
+        var chosen = selected.ToHashSet(StringComparer.Ordinal);
+        var shown = QuickAction.All.Where(a => a.InGallery).Select(a => a.Key).Concat(Settings.Added)
+            .Where(key => offered.Contains(key) ? chosen.Contains(key) : Settings.Shows(key)).ToList();
+        Save(Settings with { Shown = shown, Layout = QuickActionsLayout.Normalize(slots, shown, Settings.Added) });
     }
 
-    /// <summary>Settings' switch for one action: shown on the page or not.</summary>
+    /// <summary>The same with Quick actions only: added tiles keep their saved choice.</summary>
+    public void SaveLayout(IEnumerable<QuickActionId> selected, IEnumerable<string?> slots) =>
+        SaveLayout(selected.Select(id => QuickAction.Of(id).Key).Concat(Settings.Added.Where(Settings.Shows)), slots);
+
+    /// <summary>Settings' switch for one action: shown on the page or not. Added tiles keep theirs.</summary>
     public void SetShown(QuickActionId id, bool shown)
     {
-        var keys = QuickAction.All.Where(a => a.InGallery).Where(a => a.Id == id ? shown : Settings.Shows(a.Id)).Select(a => a.Key);
+        var keys = QuickAction.All.Where(a => a.InGallery).Where(a => a.Id == id ? shown : Settings.Shows(a.Id)).Select(a => a.Key)
+            .Concat(Settings.Added.Where(Settings.Shows));
         Save(Settings with { Shown = [.. keys], Layout = [.. Layout] });
     }
 

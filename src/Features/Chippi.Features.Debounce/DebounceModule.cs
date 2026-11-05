@@ -76,6 +76,14 @@ public sealed class DebounceModule : IFeatureModule
             _context = context;
             Settings = Normalize(context.Settings.Get<DebounceSettings>());
             context.Ui.SetSettingsPage(section => new DebounceRows(this, section == KeyboardSection ? KeyboardSection : MouseSection));
+            // Both switches, as rows of Actions' Input menu and in Search.
+            context.Ui.AddCommands(() =>
+            [
+                new ChippiCommand("debounce/click", "Click debounce", nameof(LucideIcons.Mouse), () => Toggle(click: true))
+                { Words = "double click chatter mouse", IsOn = Settings.ClickEnabled, Tile = ActionsTile.Input },
+                new ChippiCommand("debounce/key", "Key debounce", nameof(LucideIcons.Keyboard), () => Toggle(click: false))
+                { Words = "key chatter keyboard", IsOn = Settings.KeyEnabled, Tile = ActionsTile.Input },
+            ]);
             Apply();
         }
         return Task.CompletedTask;
@@ -107,6 +115,15 @@ public sealed class DebounceModule : IFeatureModule
             Apply();
         }
         Changed?.Invoke();
+    }
+
+    /// <summary>A command's switch: flips one, and throws the hook's error so the row says it failed.</summary>
+    private Task Toggle(bool click)
+    {
+        Update(s => click ? s with { ClickEnabled = !s.ClickEnabled } : s with { KeyEnabled = !s.KeyEnabled });
+        if ((click ? MouseError : KeyboardError) is { } error)
+            throw new InvalidOperationException(error);
+        return Task.CompletedTask;
     }
 
     private static DebounceSettings Normalize(DebounceSettings s) => s with

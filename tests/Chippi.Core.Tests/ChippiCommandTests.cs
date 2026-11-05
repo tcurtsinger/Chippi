@@ -62,4 +62,42 @@ public sealed class ChippiCommandTests
         }
         finally { await registry.StopAllAsync(); }
     }
+
+    [Fact]
+    public async Task Always_on_is_the_Input_menus_last_switch_while_a_feature_that_pauses_runs()
+    {
+        using var dir = new TempDir();
+        var config = new Config.ConfigStore(dir.File("settings.json"));
+        config.Load();
+        var registry = new ModuleRegistry(config, new Island.IslandActivityHub(), NullLoggerFactory.Instance, new ModuleServices { DataRoot = dir.File("data") });
+        var plain = FakeModule.Create("plain");
+        var pausing = new FakeModule(new FeatureDescriptor("pausing", "Pausing", "Test feature", FeatureGroup.Windows) { PausesInFullscreen = true })
+        {
+            OnStart = ctx => ctx.Ui.AddCommands(() => [new ChippiCommand("pausing/switch", "Pausing", "Mouse", () => Task.CompletedTask) { IsOn = false, Tile = ActionsTile.Input }]),
+        };
+        registry.Register(plain);
+        registry.Register(pausing);
+        try
+        {
+            await registry.StartAsync();
+            await registry.SetInstalledAsync("plain", true);
+            Assert.DoesNotContain(plain.Context!.Commands(), c => c.Key == "input/always-on");
+
+            await registry.SetInstalledAsync("pausing", true);
+            var input = plain.Context.Commands().Where(c => c.Tile == ActionsTile.Input).ToArray();
+            Assert.Equal(["pausing/switch", "input/always-on"], input.Select(c => c.Key));
+            Assert.Equal(("Always on in games", false), (input[1].Name, input[1].IsOn));
+
+            await input[1].Run();
+            Assert.True(config.GetSection<Config.AppSettings>(Config.AppSettings.SectionName).InputAlwaysOn);
+            var again = plain.Context.Commands().Single(c => c.Key == "input/always-on");
+            Assert.True(again.IsOn);
+            await again.Run();
+            Assert.False(config.GetSection<Config.AppSettings>(Config.AppSettings.SectionName).InputAlwaysOn);
+
+            await registry.SetInstalledAsync("pausing", false);
+            Assert.DoesNotContain(plain.Context.Commands(), c => c.Key == "input/always-on");
+        }
+        finally { await registry.StopAllAsync(); }
+    }
 }

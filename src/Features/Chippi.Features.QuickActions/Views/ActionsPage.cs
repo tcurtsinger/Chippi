@@ -40,6 +40,11 @@ internal sealed partial class ActionsPage : UserControl
     private readonly List<Cell> _cells = [];
     private string _built = ""; // what _body holds now: "picker", the grid's keys, or a list and its rows
     private QuickActionId? _list;
+    private string? _menu; // an added menu's tile key (Input) while its list shows
+    private IReadOnlyList<AddedTile> _added = []; // the tiles other features added, read once per render
+
+    /// <summary>The offered tiles, Quick actions and added, as this render read them.</summary>
+    private IReadOnlyList<GalleryTile> Tiles => _module.TilesWith(_added);
 
     public ActionsPage(QuickActionsModule module)
     {
@@ -82,6 +87,7 @@ internal sealed partial class ActionsPage : UserControl
                 _refresh.Stop();
                 CloseConfirm();
                 _list = null;
+                _menu = null;
                 ResetListPage();
                 DiscardEdit();
                 Render();
@@ -97,9 +103,9 @@ internal sealed partial class ActionsPage : UserControl
 
     /// <summary>The first button of what shows.</summary>
     public object? InitialFocus =>
-        _editing ? _picks.FirstOrDefault() : _list is null ? (object?)_cells.FirstOrDefault(c => c.Button.IsEnabled)?.Button ?? _edit : FirstRowButton();
+        _editing ? _picks.FirstOrDefault() : _list is null && _menu is null ? (object?)_cells.FirstOrDefault(c => c.Button.IsEnabled)?.Button ?? _edit : FirstRowButton();
 
-    /// <summary>What shows: "picker", "grid", or the open list ("quit", "eject", "plan", "power").</summary>
+    /// <summary>What shows: "picker", "grid", the open list ("quit", "eject", "plan", "power") or an added "menu".</summary>
     internal string Showing => _built.Split(':')[0];
 
     /// <summary>The failure at a list's foot while it shows, else empty.</summary>
@@ -108,7 +114,13 @@ internal sealed partial class ActionsPage : UserControl
     /// <summary>Presses an action's button, as a click does.</summary>
     internal void Press(QuickActionId id)
     {
-        if (!_editing) Pressed(_cells.First(c => c.Action.Id == id));
+        if (!_editing) Pressed(_cells.First(c => c.Tile.Action?.Id == id));
+    }
+
+    /// <summary>Presses an added tile's button by its key, as a click does.</summary>
+    internal void Press(string key)
+    {
+        if (!_editing) Pressed(_cells.First(c => c.Tile.Key == key));
     }
 
     /// <summary>Back: a list returns to the buttons; true when it did.</summary>
@@ -125,13 +137,21 @@ internal sealed partial class ActionsPage : UserControl
             }
             return !first;
         }
+        if (_menu is { } menu)
+        {
+            _menu = null;
+            ResetListPage();
+            Render();
+            _cells.FirstOrDefault(c => c.Tile.Key == menu)?.Button.Focus();
+            return true;
+        }
         if (_list is not { } prior)
             return false;
         CloseConfirm();
         _list = null;
         ResetListPage();
         Render();
-        _cells.FirstOrDefault(c => c.Action.Id == prior)?.Button.Focus();
+        _cells.FirstOrDefault(c => c.Tile.Action?.Id == prior)?.Button.Focus();
         return true;
     }
 
@@ -158,6 +178,7 @@ internal sealed partial class ActionsPage : UserControl
             return;
         _module.Pending = null;
         DiscardEdit();
+        _menu = null;
         var action = QuickAction.Of(id);
         if (id == QuickActionId.Frozen)
         {
@@ -181,7 +202,7 @@ internal sealed partial class ActionsPage : UserControl
         Render();
         if (action.Confirm is { } confirm && Describe(action, _module.State).Enabled)
         {
-            UIElement anchor = (UIElement?)_cells.FirstOrDefault(c => c.Action.Id == id)?.Button ?? _title;
+            UIElement anchor = (UIElement?)_cells.FirstOrDefault(c => c.Tile.Action?.Id == id)?.Button ?? _title;
             AskFirst(anchor, confirm.Question, confirm.Verb, () => Run(id));
         }
     }
@@ -195,10 +216,18 @@ internal sealed partial class ActionsPage : UserControl
     internal void Render()
     {
         PruneFailures();
+        _added = _module.AddedTiles;
+        if (!_editing)
+            _module.AdoptAdded(_added); // a feature's first tile goes after the last one
         bool first = _module.Settings.Shown is null || _module.Settings.Shown.Count == 0;
         if (_editing && _choosing && !first)
             DiscardEdit(); // another view completed the first pick
-        if (_list is { } list)
+        // A menu whose feature stopped while it showed returns to the buttons.
+        var menu = _menu is { } key && !_editing ? _added.FirstOrDefault(t => t.Key == key) : null;
+        _menu = menu?.Key;
+        if (menu is not null)
+            RenderMenu(menu);
+        else if (_list is { } list)
             RenderList(list);
         else if (_editing || first)
         {
@@ -207,8 +236,8 @@ internal sealed partial class ActionsPage : UserControl
         }
         else
             RenderGrid();
-        _title.Text = _list is { } open ? QuickAction.Of(open).Name : _editing ? _choosing ? "Choose actions" : "Edit actions" : "Actions";
-        _edit.Visibility = !_editing && _list is null ? Visibility.Visible : Visibility.Collapsed;
+        _title.Text = menu is not null ? menu.Tile.Label : _list is { } open ? QuickAction.Of(open).Name : _editing ? _choosing ? "Choose actions" : "Edit actions" : "Actions";
+        _edit.Visibility = !_editing && _list is null && menu is null ? Visibility.Visible : Visibility.Collapsed;
         _done.Visibility = _editing ? Visibility.Visible : Visibility.Collapsed;
     }
 
@@ -246,9 +275,9 @@ internal sealed partial class ActionsPage : UserControl
 
     private void RenderGrid()
     {
-        var offered = _module.Gallery.ToDictionary(a => a.Key);
-        var slots = _module.Layout.Select(key => key is not null && offered.TryGetValue(key, out var action) && _module.Settings.Shows(action.Id) ? action : null).ToArray();
-        string built = "grid:" + string.Join(",", slots.Select(a => a?.Key));
+        var offered = Tiles.ToDictionary(t => t.Key);
+        var slots = _module.Layout.Select(key => key is not null && offered.TryGetValue(key, out var tile) && _module.Settings.Shows(key) ? tile : null).ToArray();
+        string built = "grid:" + string.Join(",", slots.Select(t => t?.Key));
         if (_built != built)
         {
             _built = built;
@@ -261,8 +290,8 @@ internal sealed partial class ActionsPage : UserControl
             grid.VerticalAlignment = VerticalAlignment.Center;
             for (int i = 0; i < slots.Length; i++)
             {
-                if (slots[i] is not { } action) continue;
-                var cell = new Cell(action, height, this);
+                if (slots[i] is not { } tile) continue;
+                var cell = new Cell(tile, height, this);
                 _cells.Add(cell);
                 Put(grid, cell.Button, i, 7);
             }
@@ -278,10 +307,35 @@ internal sealed partial class ActionsPage : UserControl
         var state = _module.State;
         foreach (var cell in _cells)
         {
-            var id = cell.Action.Id;
+            if (cell.Tile.Action is not { } action)
+            {
+                var added = offered[cell.Tile.Key].Added!;
+                var command = added.Commands[0];
+                bool single = !added.Tile.Menu;
+                cell.Show((added.Status, !(single && _commandsRunning.Contains(command.Key)), added.Tile.Menu),
+                    single && command.IsOn == true, single && _commandsFailed.Contains(command.Key));
+                continue;
+            }
+            var id = action.Id;
             bool on = _setting.TryGetValue(id, out var setting) ? setting : state.On.GetValueOrDefault(id);
-            cell.Show(Describe(cell.Action, state), on, _failed.TryGetValue(id, out var until) && until > DateTime.UtcNow);
+            cell.Show(Describe(action, state), on, _failed.TryGetValue(id, out var until) && until > DateTime.UtcNow);
         }
+    }
+
+    /// <summary>An added tile: a menu steps into its list; a single command runs, or switches.</summary>
+    private void PressedAdded(Cell cell)
+    {
+        if (_added.FirstOrDefault(t => t.Key == cell.Tile.Key) is not { } added)
+            return;
+        if (added.Tile.Menu)
+        {
+            _menu = added.Key;
+            ResetListPage();
+            Render();
+            FirstRowButton()?.Focus();
+        }
+        else
+            RunCommand(added.Commands[0]);
     }
 
     private static Grid SlotGrid(int rows, double gap)
@@ -303,7 +357,11 @@ internal sealed partial class ActionsPage : UserControl
     private async void Pressed(Cell cell)
     {
         if (_editing || !cell.Button.IsEnabled) return;
-        var action = cell.Action;
+        if (cell.Tile.Action is not { } action)
+        {
+            PressedAdded(cell);
+            return;
+        }
         var id = action.Id;
         var state = _module.State;
         if (action.Toggle && !action.OpensList)
@@ -345,16 +403,17 @@ internal sealed partial class ActionsPage : UserControl
         private readonly TextBlock _status = Ui.Muted("", 11);
         private bool _on, _showing;
 
-        public Cell(QuickAction action, double height, ActionsPage page)
+        public Cell(GalleryTile tile, double height, ActionsPage page)
         {
-            Action = action;
-            Button = action.Toggle && !action.OpensList ? new ToggleButton() : new Button();
+            Tile = tile;
+            bool switches = tile.Action is { } action ? action.Toggle && !action.OpensList : tile.Added is { Tile.Menu: false } added && added.Commands[0].IsOn is not null;
+            Button = switches ? new ToggleButton() : new Button();
             Button.Height = height;
-            Button.Tag = action.Key;
+            Button.Tag = tile.Key;
             Button.SetResourceReference(FrameworkElement.StyleProperty, Button is ToggleButton ? "ActionGalleryToggleStyle" : "ActionGalleryButtonStyle");
             BindInk(_glyph, LucideIcon.BrushProperty);
             BindInk(_chevron, LucideIcon.BrushProperty);
-            var name = Ui.Text(action.Label, 12);
+            var name = Ui.Text(tile.Label, 12);
             name.FontWeight = FontWeights.SemiBold;
             name.HorizontalAlignment = HorizontalAlignment.Center;
             name.Margin = new Thickness(2, 3, 2, 0);
@@ -372,7 +431,7 @@ internal sealed partial class ActionsPage : UserControl
             else Button.Click += (_, _) => page.Pressed(this);
         }
 
-        public QuickAction Action { get; }
+        public GalleryTile Tile { get; }
         public ButtonBase Button { get; }
 
         private void BindInk(DependencyObject element, DependencyProperty property) =>
@@ -395,7 +454,7 @@ internal sealed partial class ActionsPage : UserControl
 
         public void Show((string Status, bool Enabled, bool List) look, bool on, bool failed)
         {
-            _on = Action.Toggle && !Action.OpensList && on;
+            _on = Button is ToggleButton && on;
             Check(_on);
             Button.IsEnabled = look.Enabled;
             // Keep the real toggle state, but give failure ink a neutral surface even when the toggle remains on.
@@ -409,16 +468,16 @@ internal sealed partial class ActionsPage : UserControl
                 Button.ClearValue(Control.BackgroundProperty);
                 Button.ClearValue(Control.ForegroundProperty);
             }
-            _glyph.Data = Action.Id == QuickActionId.Camera && !on ? LucideIcons.CameraOff : Action.Icon;
+            _glyph.Data = Tile.Action?.Id == QuickActionId.Camera && !on ? LucideIcons.CameraOff : Tile.Icon;
             _chevron.Visibility = look.List ? Visibility.Visible : Visibility.Collapsed;
-            string status = failed ? $"{Action.Label} failed" : look.Status.Length > 0 ? look.Status : Button is ToggleButton ? on ? "On" : "Off" : "";
+            string status = failed ? $"{Tile.Label} failed" : look.Status.Length > 0 ? look.Status : Button is ToggleButton ? on ? "On" : "Off" : "";
             _status.Text = status;
             _status.Visibility = status.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
             _status.SetResourceReference(TextBlock.ForegroundProperty, failed ? "WarningTextBrush" : _on ? "IslandOnAccentBrush" : "IslandTextSecondaryBrush");
-            AutomationProperties.SetName(Button, Action.Name);
+            AutomationProperties.SetName(Button, Tile.Name);
             AutomationProperties.SetItemStatus(Button, status);
-            AutomationProperties.SetHelpText(Button, failed ? $"{Action.Name} failed. Activate to retry." : Action.Name);
-            Button.ToolTip = status.Length > 0 ? $"{Action.Name} \u00b7 {status}" : Action.Name;
+            AutomationProperties.SetHelpText(Button, failed ? $"{Tile.Name} failed. Activate to retry." : Tile.Name);
+            Button.ToolTip = status.Length > 0 ? $"{Tile.Name} \u00b7 {status}" : Tile.Name;
         }
     }
 }

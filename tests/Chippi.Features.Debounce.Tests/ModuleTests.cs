@@ -43,6 +43,33 @@ public sealed class ModuleTests
     }
 
     [Fact]
+    public async Task Both_switches_are_rows_of_the_Input_menu_that_flip_them_and_a_refused_hook_fails_its_row()
+    {
+        var hub = new FakeHub();
+        var store = new Store();
+        var ui = new Ui();
+        var module = new DebounceModule();
+        await module.StartAsync(Context(hub, store, ui), default);
+        var rows = ui.Commands!();
+        Assert.Equal(["Click debounce", "Key debounce"], rows.Select(c => c.Name));
+        Assert.All(rows, c => Assert.Same(ActionsTile.Input, c.Tile));
+        Assert.All(rows, c => Assert.False(c.IsOn));
+
+        await rows[1].Run();
+        Assert.True(store.Value.KeyEnabled);
+        Assert.Single(hub.Filters);
+        Assert.Equal([false, true], ui.Commands!().Select(c => c.IsOn == true));
+        await ui.Commands!()[1].Run();
+        Assert.False(store.Value.KeyEnabled);
+        Assert.Empty(hub.Filters);
+
+        var refusing = new DebounceModule();
+        var refusingUi = new Ui();
+        await refusing.StartAsync(Context(new FakeHub { Refuse = true }, new Store(), refusingUi), default);
+        var failed = await Assert.ThrowsAsync<InvalidOperationException>(() => refusingUi.Commands!()[0].Run());
+        Assert.Equal("Watching the mouse failed", failed.Message);
+    }
+    [Fact]
     public async Task Settings_are_clamped_and_a_refused_hook_says_so_without_throwing()
     {
         var hub = new FakeHub { Refuse = true };
@@ -156,5 +183,7 @@ public sealed class ModuleTests
         public Func<string?, object>? Page { get; private set; }
         public IIslandTile AddIslandTile(IslandTileSpec spec) => throw new InvalidOperationException("Debounce has no tile");
         public void SetSettingsPage(Func<string?, object> page) => Page = page;
+        public Func<IReadOnlyList<ChippiCommand>>? Commands { get; private set; }
+        public void AddCommands(Func<IReadOnlyList<ChippiCommand>> commands) => Commands = commands;
     }
 }

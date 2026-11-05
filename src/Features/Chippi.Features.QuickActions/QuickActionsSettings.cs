@@ -21,7 +21,15 @@ public sealed record QuickActionsSettings
     /// <summary>Each action's shortcut, by key; none by default.</summary>
     public Dictionary<string, MicShortcut> Shortcuts { get; init; } = [];
 
-    public bool Shows(QuickActionId id) => Shown?.Contains(QuickAction.Of(id).Key) == true;
+    /// <summary>
+    /// Tiles other features added (Input), by key, once they had a position: the first time its feature runs, a tile goes
+    /// after the last tile, and from then on keeps its position while its feature is out, as Cleaning does.
+    /// </summary>
+    public List<string> Added { get; init; } = [];
+
+    public bool Shows(QuickActionId id) => Shows(QuickAction.Of(id).Key);
+
+    public bool Shows(string key) => Shown?.Contains(key) == true;
 
     public bool Keeps(string path) =>
         Kept.Any(kept => string.Equals(Path.GetFileName(kept), Path.GetFileName(path), StringComparison.OrdinalIgnoreCase));
