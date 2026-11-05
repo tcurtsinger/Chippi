@@ -107,6 +107,21 @@ public sealed class CloseProtectionModuleTests
         await f.Module.StopAsync(default);
     }
 
+    [Fact]
+    public async Task FailedMaskStillShowsThePendingLineAndPassesTheSecondPress()
+    {
+        var f = new Fixture(true);
+        await f.Start();
+        f.Module.SetEnabled(true);
+        f.Hub.FailMask = true;
+        Assert.True(f.Key(true));
+        f.Desktop.Drain();
+        Assert.Equal("Press again to close", Assert.Single(f.Activities.Activities).Title);
+        Assert.True(f.Key(false));
+        Assert.False(f.Key(true));
+        await f.Module.StopAsync(default);
+    }
+
     internal sealed class Fixture(bool visible)
     {
         public Desktop Desktop { get; } = new();
@@ -155,7 +170,8 @@ public sealed class CloseProtectionModuleTests
         public void Refresh() { }
         public void HoldModifiers(uint heldBy, ReadOnlySpan<ushort> modifiers) => throw new InvalidOperationException("Close protection sends no keys");
         public int Masks;
-        public void Mask() => Masks++;
+        public bool FailMask;
+        public void Mask() { Masks++; if (FailMask) throw new InvalidOperationException("Injected mask failure"); }
         public void Dispose() => Removed = true;
     }
     internal sealed class Store : IModuleSettings

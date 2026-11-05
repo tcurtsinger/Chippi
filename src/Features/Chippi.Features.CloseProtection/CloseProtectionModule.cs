@@ -60,7 +60,7 @@ public sealed class CloseProtectionModule(Func<ICloseDesktop> createDesktop, Tim
         Settings = context.Settings.Get<CloseProtectionSettings>();
         _announced.Clear();
         _desktop = createDesktop();
-        _filter = new CloseProtectionFilter(() => _desktop.Current, _desktop.Modifiers, () => _registration!.Mask());
+        _filter = new CloseProtectionFilter(() => _desktop.Current, _desktop.Modifiers, MaskAlt);
         _filter.Feedback += pending =>
         {
             Volatile.Write(ref _latest, pending);
@@ -81,6 +81,12 @@ public sealed class CloseProtectionModule(Func<ICloseDesktop> createDesktop, Tim
             Settings.Enabled ? TimeSpan.FromMilliseconds(50) : Timeout.InfiniteTimeSpan, TimeSpan.FromMilliseconds(50));
         context.Ui.SetSettingsPage(_ => new CloseProtectionRows(this));
         return Task.CompletedTask;
+    }
+
+    private void MaskAlt()
+    {
+        try { _registration!.Mask(); }
+        catch (Exception ex) { Log.Warn("Close protection: masking Alt failed", ex); }
     }
 
     public Task<IReadOnlyList<CloseApp>> OpenAppsAsync() => _desktop?.OpenAppsAsync() ?? Task.FromResult<IReadOnlyList<CloseApp>>([]);
