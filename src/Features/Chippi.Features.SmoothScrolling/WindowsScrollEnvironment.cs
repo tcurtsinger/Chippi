@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
+﻿// SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
 using System.Collections.Concurrent;
@@ -15,6 +15,8 @@ namespace Chippi.Features.SmoothScrolling;
 internal sealed unsafe class WindowsScrollEnvironment : IScrollEnvironment, IDisposable
 {
     private readonly ConcurrentDictionary<uint, string?> _paths = new();
+    private readonly ConcurrentDictionary<uint, bool> _reachable = new();
+    private readonly bool _elevated = Elevated(GetCurrentProcess()) == true;
     private readonly SemaphoreSlim _wake = new(0);
     private readonly Thread _thread;
     private readonly nint _timer;
@@ -103,6 +105,39 @@ internal sealed unsafe class WindowsScrollEnvironment : IScrollEnvironment, IDis
         finally { CloseHandle(process); }
     }
 
+    /// <summary>Cached by process. A process whose token can't be read counts as out of reach too (a system one).</summary>
+    public bool CanSend(nint window)
+    {
+        GetWindowThreadProcessId(window, out uint id);
+        if (id == 0)
+            return false;
+        if (_reachable.TryGetValue(id, out bool known))
+            return known;
+        if (_reachable.Count > 256)
+            _reachable.Clear();
+        nint process = OpenProcess(0x1000 /* PROCESS_QUERY_LIMITED_INFORMATION */, false, id);
+        bool reachable = process != 0;
+        if (reachable)
+        {
+            try { reachable = _elevated || Elevated(process) is false; }
+            finally { CloseHandle(process); }
+        }
+        return _reachable[id] = reachable;
+    }
+
+    /// <summary>True or false from the token; null when it can't be read.</summary>
+    private static bool? Elevated(nint process)
+    {
+        if (!OpenProcessToken(process, 0x0008 /* TOKEN_QUERY */, out nint token))
+            return null;
+        try
+        {
+            int elevated = 0;
+            return GetTokenInformation(token, 20 /* TokenElevation */, &elevated, 4, out _) ? elevated != 0 : null;
+        }
+        finally { CloseHandle(token); }
+    }
+
     public bool ModifierDown() =>
         (GetAsyncKeyState(0x11) & 0x8000) != 0 || (GetAsyncKeyState(0x10) & 0x8000) != 0 ||
         (GetAsyncKeyState(0x12) & 0x8000) != 0 || (GetAsyncKeyState(0x5B) & 0x8000) != 0 || (GetAsyncKeyState(0x5C) & 0x8000) != 0;
@@ -154,6 +189,9 @@ internal sealed unsafe class WindowsScrollEnvironment : IScrollEnvironment, IDis
     [DllImport("gdi32.dll")] private static extern int GetDeviceCaps(nint dc, int index);
     [DllImport("kernel32.dll")] private static extern nint OpenProcess(uint access, bool inherit, uint process);
     [DllImport("kernel32.dll")] private static extern bool CloseHandle(nint handle);
+    [DllImport("kernel32.dll")] private static extern nint GetCurrentProcess();
+    [DllImport("advapi32.dll")] private static extern bool OpenProcessToken(nint process, uint access, out nint token);
+    [DllImport("advapi32.dll")] private static extern bool GetTokenInformation(nint token, int kind, int* data, int size, out int needed);
     [DllImport("kernel32.dll", EntryPoint = "QueryFullProcessImageNameW", CharSet = CharSet.Unicode)]
     private static extern bool QueryFullProcessImageName(nint process, uint flags, char* name, ref uint size);
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode)] private static extern nint CreateWaitableTimerExW(nint attributes, string? name, uint flags, uint access);

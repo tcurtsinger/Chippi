@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
+﻿// SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
 using System.Diagnostics;
@@ -22,6 +22,9 @@ internal interface IScrollEnvironment
 
     /// <summary>Ctrl, Shift, Alt or Windows is down: the wheel means something else (zoom, sideways) and passes.</summary>
     bool ModifierDown();
+
+    /// <summary>Whether wheel messages sent from here reach the window: false for a window of a higher integrity (an elevated app), whose input Windows blocks from us.</summary>
+    bool CanSend(nint window);
 
     /// <summary>One wheel message, marked as Chippi's. Never called from the hook's thread or under the filter's lock.</summary>
     void Send(bool horizontal, int delta);
@@ -70,11 +73,21 @@ internal sealed class ScrollFilter(IScrollEnvironment env, Func<bool> paused) : 
             return false;
         var tuning = _tuning;
         int delta = mouse.Delta;
-        if (delta == 0 || delta % Notch != 0 || env.ModifierDown() || (!tuning.Smooth && !tuning.Linear))
+        if (delta == 0 || delta % Notch != 0 || (!tuning.Smooth && !tuning.Linear))
             return false;
+        if (env.ModifierDown())
+        {
+            Cancel(); // the wheel means something else now: no tail of ours into it
+            return false;
+        }
         nint window = env.WindowAt(mouse.X, mouse.Y);
         if (window == 0)
             return false;
+        if (!env.CanSend(window))
+        {
+            Cancel(); // elevated: Windows would drop what we send, so its wheel stays native
+            return false;
+        }
         int speed = tuning.DistancePercent;
         if (FindApp(tuning, env.AppPath(window)) is { } app)
         {
@@ -115,7 +128,7 @@ internal sealed class ScrollFilter(IScrollEnvironment env, Func<bool> paused) : 
         }
     }
 
-    /// <summary>One frame: sends what the glide owes, unless the pointer moved to another window, the window went, or a pause began. False once nothing is left.</summary>
+    /// <summary>One frame: sends what the glide owes, unless the pointer moved to another window, the window went, or a pause began, or a modifier went down. False once nothing is left.</summary>
     public bool Tick(long now)
     {
         (int v, int h) = (0, 0);
@@ -124,7 +137,7 @@ internal sealed class ScrollFilter(IScrollEnvironment env, Func<bool> paused) : 
         {
             if (_disposed || _engine.Idle)
                 return false;
-            if (paused() || env.WindowUnderCursor() != _engine.Target || !env.IsWindow(_engine.Target))
+            if (paused() || env.ModifierDown() || env.WindowUnderCursor() != _engine.Target || !env.IsWindow(_engine.Target))
             {
                 _engine.Cancel();
                 return false;

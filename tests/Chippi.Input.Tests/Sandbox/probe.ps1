@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-or-later
+﻿# SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) Chippi contributors
 
 # Runs inside Windows Sandbox, started by run.ps1. Drives the real hooks with SendInput, without Chippi's marker, so
@@ -434,7 +434,12 @@ public static class Probe
         $csv = @(Get-Content -LiteralPath "$results\scroll.csv")
         $s.smooth.switchWindow.messagesAfterTheMove = @($csv | Where-Object { [double]($_ -split ',')[0] -gt ($moveAt + 25) }).Count
         Pointer
-
+        # Ctrl goes down 40 ms into a glide, with no wheel event: the rest of the glide must not reach the window while Ctrl is held.
+        $ctrlAt = 0
+        $s.smooth.ctrlMidGlide = Measure-Scroll 'smooth ctrl pressed mid-glide' { $t = [Wheel]::Notches(8, 10, 120); [Wheel]::Spin(20); [Wheel]::Key(0x11, $true); $script:ctrlAt = [Wheel]::Now(); Start-Sleep -Milliseconds 800; [Wheel]::Key(0x11, $false); $t } 800
+        $csv = @(Get-Content -LiteralPath "$results\scroll.csv")
+        $s.smooth.ctrlMidGlide.messagesAfterCtrl = @($csv | Where-Object { [double]($_ -split ',')[0] -gt ($ctrlAt + 25) }).Count
+        Pointer
         # A game in front pauses it: the notch arrives whole and a glide in progress ends. The target is topmost, over the game.
         # A long glide (about a second), so there is one still going when the switch to the game lands.
         Restart '{"smoothEnabled":true,"responseMs":400,"coastMs":400}'

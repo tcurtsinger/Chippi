@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
+﻿// SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
 using System.Diagnostics;
@@ -202,6 +202,51 @@ public sealed class FilterTests
         Assert.Equal(120, env.Sends.Sum(s => s.Delta));
     }
 
+    [Fact]
+    public void A_modifier_pressed_mid_glide_ends_the_glide()
+    {
+        var (filter, env) = Make(new ScrollTuning(true, false, 100, 400, 0, []));
+        Assert.True(filter.Mouse(Wheel(600)));
+        long now = 0;
+        Assert.True(filter.Tick(now += 8 * Ms));
+        int before = env.Vertical;
+        Assert.NotEqual(0, before);
+        env.Modifier = true; // Ctrl goes down, no wheel event yet
+        Assert.False(filter.Tick(now += 8 * Ms));
+        Assert.Equal(before, env.Vertical);
+        env.Modifier = false;
+        Assert.False(filter.Tick(now += 8 * Ms));
+        Assert.Equal(before, env.Vertical);
+    }
+
+    [Fact]
+    public void A_modified_wheel_passes_and_drops_the_old_glide()
+    {
+        var (filter, env) = Make(new ScrollTuning(true, false, 100, 400, 0, []));
+        Assert.True(filter.Mouse(Wheel(600)));
+        long now = 0;
+        filter.Tick(now += 8 * Ms);
+        int before = env.Vertical;
+        env.Modifier = true;
+        Assert.False(filter.Mouse(Wheel(120)));
+        env.Modifier = false;
+        Assert.False(filter.Tick(now += 8 * Ms));
+        Assert.Equal(before, env.Vertical);
+    }
+
+    [Fact]
+    public void A_window_we_cannot_send_to_keeps_native_wheel_and_ends_a_glide()
+    {
+        var (filter, env) = Make(new ScrollTuning(true, false, 100, 400, 0, []));
+        Assert.True(filter.Mouse(Wheel(600)));
+        env.Reachable = false; // pointer moved onto an elevated window
+        env.Window = 8;
+        Assert.False(filter.Mouse(Wheel(120)));
+        long now = 0;
+        Assert.False(filter.Tick(now += 8 * Ms));
+        Assert.Equal(0, env.Vertical);
+    }
+
     private static MouseInput Wheel(int delta, bool injected = false) => new(MouseKind.Wheel, MouseButton.None, 10, 10, delta, injected, 0);
 
     private static (ScrollFilter, FakeEnv) Make(ScrollTuning tuning, Func<bool>? paused = null)
@@ -217,6 +262,7 @@ public sealed class FilterTests
         public bool Alive { get; set; } = true;
         public string? Path { get; set; }
         public bool Modifier { get; set; }
+        public bool Reachable { get; set; } = true;
         public int Wakes { get; private set; }
         public List<(bool Horizontal, int Delta)> Sends { get; } = [];
         public int Vertical => Sends.Where(s => !s.Horizontal).Sum(s => s.Delta);
@@ -226,6 +272,7 @@ public sealed class FilterTests
         public bool IsWindow(nint window) => Alive;
         public string? AppPath(nint window) => Path;
         public bool ModifierDown() => Modifier;
+        public bool CanSend(nint window) => Reachable;
         public void Send(bool horizontal, int delta) => Sends.Add((horizontal, delta));
         public void Wake() => Wakes++;
     }
