@@ -108,7 +108,7 @@ public sealed class CloseProtectionFilter(Func<CloseTarget?> target, Func<CloseM
 
     private void Expire(long now)
     {
-        if (now < _lastTime) Clear();
+        now = Math.Max(now, _lastTime);
         _lastTime = now;
         bool expired = false;
         for (int i = 0; i < _pending.Length; i++)

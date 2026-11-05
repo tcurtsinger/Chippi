@@ -68,7 +68,8 @@ public sealed class CloseProtectionModule(Func<ICloseDesktop> createDesktop, Tim
         };
         _desktop.ForegroundChanged += Reset;
         _desktop.DesktopChanged += DesktopReset;
-        _desktop.Start();
+        try { _desktop.Start(); }
+        catch { StopAsync(default).GetAwaiter().GetResult(); throw; }
         _filter.Configure(Settings.Enabled, Settings.ControlWApps);
         _registration = (context.Input ?? throw new InvalidOperationException("Input unavailable")).Add(_filter);
         _timer = _clock.CreateTimer(_ => _filter?.Advance(_clock.GetTimestamp()), null,

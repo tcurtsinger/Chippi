@@ -7,6 +7,16 @@ namespace Chippi.Features.CloseProtection.Tests;
 
 public sealed class CloseProtectionFilterTests
 {
+    [Fact]
+    public void TimerReadingAheadOfQueuedKeyDoesNotClearPendingPress()
+    {
+        var scene = new Scene();
+        Assert.True(scene.Key(true, 0));
+        Assert.True(scene.Key(false, 1));
+        scene.Filter.Advance(100);
+        Assert.False(scene.Key(true, 99));
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

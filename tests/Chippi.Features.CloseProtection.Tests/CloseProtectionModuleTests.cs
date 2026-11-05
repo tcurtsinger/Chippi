@@ -76,6 +76,16 @@ public sealed class CloseProtectionModuleTests
         await f.Module.StopAsync(default);
     }
 
+    [Fact]
+    public async Task FailedDesktopStartDisposesObservation()
+    {
+        var f = new Fixture(true);
+        f.Desktop.FailStart = true;
+        await Assert.ThrowsAsync<InvalidOperationException>(() => f.Start());
+        Assert.True(f.Desktop.Disposed);
+        Assert.Null(f.Hub.Filter);
+    }
+
     internal sealed class Fixture(bool visible)
     {
         public Desktop Desktop { get; } = new();
@@ -103,7 +113,8 @@ public sealed class CloseProtectionModuleTests
         public CloseModifiers Modifiers() => CloseModifiers.Alt;
         public event Action? ForegroundChanged;
         public event Action? DesktopChanged { add { } remove { } }
-        public void Start() { }
+        public bool FailStart;
+        public void Start() { if (FailStart) throw new InvalidOperationException("Injected start failure"); }
         public void Post(Action work) => _work.Enqueue(work);
         public void Beep() => Beeps++;
         public Task<IReadOnlyList<CloseApp>> OpenAppsAsync() => Task.FromResult<IReadOnlyList<CloseApp>>([]);
