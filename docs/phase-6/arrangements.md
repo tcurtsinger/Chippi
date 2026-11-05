@@ -10,7 +10,7 @@ The reference is [PowerToys Workspaces](https://learn.microsoft.com/en-us/window
 
 ## Doors
 
-- Settings > Windows > Window layouts gains an Arrangements section alongside zones. Arrangements belong to Snap, with no separate installed feature or home tile.
+- Settings › Snap gains an Arrangements section below Layouts. Arrangements belong to Snap, with no separate installed feature or home tile.
 - Actions > Snap gains an Arrangements submenu containing saved names and Manage. Each saved arrangement is one shared action, also available in Search, the Radial menu and the action picker.
 - Bind Launch {name} only in Settings > Shortcuts. The arrangement editor shows its binding read-only with Edit, using the existing shortcut service. No default binding.
 - Launch works when Snap is installed. It obeys the shared Phase 6 fullscreen pause and Pause in these apps policy. A refused launch starts no apps and says why. Always on does not permit moving a fullscreen or elevated window.
