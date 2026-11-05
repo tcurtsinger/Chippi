@@ -38,6 +38,8 @@ Empty state: "No shortcuts yet. Add the first one."
 
 ### States and clashes
 
+**How the page shows them (Travis, 2026-11-05, task 344; `design/shortcuts.html`):** no row has a state or warning line. Add shortcut, Record and Change refuse a press that clashes at the moment it's recorded (used twice, the Radial menu, Windows, another app): the keys stay in the field, Save stays off, and one short line on the Save row says who uses it ("Snap left already uses this", "The Radial menu uses this", "Windows uses this", "Another app uses this"). A saved shortcut that stops working later shows dimmed keycaps, and its state below is only their tooltip and automation name. The wording in the list below is replaced by those lines.
+
 - **Active**, **Inactive** (its feature is off).
 - **Used twice:** two Chippi bindings on one door. The second doesn't save: "{action} already uses this." For a mouse button: "That button or direction is already on the list."
 - **In use by another app:** `RegisterHotKey` failed. This is the only way to learn another app holds a combination.

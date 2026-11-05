@@ -6,11 +6,12 @@ Every app, count and setting in these mockups is invented. Nothing read or chang
 
 - `actions-shortcuts.html`: task 212, the Actions menus and Settings › Shortcuts. Travis approved it on 2026-11-04 (task 240) with option B (task 224).
 - `wave-1.html`: wave 1's Settings screens and Close protection's bar line. Travis approved it on 2026-11-04 (task 264), with real app icons in every app list ([App icons](#app-icons)).
+- `shortcuts.html`: wave 2's Settings › Shortcuts, revised for Travis's caveats when he approved it on 2026-11-05 (tasks 341 and 344, [Wave 2](#wave-2-shortcuts-task-344)). It replaces the Settings › Shortcuts boards in `actions-shortcuts.html`.
 - `before\`: real renders from `main` at `b9b6d05`: the Actions gallery, Settings › General and Radial menu (`--settings-snapshot`, a dev profile with only Radial menu and every hold off), and the agent's 6-second bar line (`AgentBarTests.Render`).
 - `shots\<board>-<theme>.png`: 2x renders of every board, dark and light.
 - `render.ps1`: renders the PNGs again with headless Edge. Use `-Only <board>,<board>` to render only some boards.
 
-Add `?board=<id>&theme=dark|light` to either page to see one board.
+Add `?board=<id>&theme=dark|light` to any page to see one board.
 
 | Page | Board | What it shows |
 |---|---|---|
@@ -25,6 +26,20 @@ Add `?board=<id>&theme=dark|light` to either page to see one board.
 | wave-1 | `settings-keyboard`, `settings-keyboard-narrow` | Windows › Keyboard: Close protection and its Ctrl+W list, Key debounce, at 1120 and 860 |
 | wave-1 | `sheet-settings-states` | Always on (list dims), Add app, empty list, first install, Focus change failed, a hook down, Add key, Close protection off |
 | wave-1 | `sheet-bar` | "Press again to close" on the bar, Ctrl+W, the widget on the left, the line that doesn't fit, the two presses |
+| shortcuts | `shortcuts`, `shortcuts-narrow` | Settings › Shortcuts at 1120 and 860: a dozen shortcuts, Caps Lock, Mouse buttons |
+| shortcuts | `shortcuts-empty` | First install: no shortcuts, both switches off |
+| shortcuts | `sheet-shortcuts-states` | Add shortcut's steps, the three refusals, Record, a shortcut that can't work, the row menu, Caps Lock off, paused, the Win confirm, a hook down |
+
+## Wave 2: Shortcuts (task 344)
+
+Travis approved with three caveats (2026-11-05): the keycaps weren't uniform down the column, he didn't want warning text on the rows, and "Off in these apps" was too verbose. The revision:
+
+1. **One keys column.** Every row's keycaps (or its Record button) start at the same point, in a 200-wide column before the row's More button. A row without More keeps the space, so the column doesn't move.
+2. **No state lines on rows.** A saved shortcut that can't work (another app or Windows holds it, its app is gone, the Radial menu holds the button, Caps Lock combos are off) shows only dimmed keycaps. The reason is the keycaps' tooltip and their automation name, so a screen reader hears it.
+3. **Clashes are refused in the editor.** Add shortcut, Record and Change all open the same editor. A clash keeps the pressed keys in the field with a red border, leaves Save off, and says why on the Save row: "Snap left already uses this", "The Radial menu uses this", "Windows uses this", "Another app uses this". Pressing again replaces it.
+4. **"Excluded apps"** names both sections' app lists.
+5. **The Caps Lock switch says "Paused"** in place of "On" while an excluded app is open, with no caption.
+6. **The Win warning is a confirm** (Travis's task 211 #10 asked for a warning): turning on Win asks "Add Win to Caps Lock?", "With Ctrl, Alt and Shift, most keys open Office.", with Add and Cancel. That claim is still unconfirmed (`shortcuts.md`).
 
 ## Option B's tile order
 
