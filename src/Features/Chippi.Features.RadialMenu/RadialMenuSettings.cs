@@ -77,7 +77,7 @@ public sealed record RadialMenuSettings
     /// </summary>
     public RadialMenuSettings Checked()
     {
-        if (Shortcut is { IsValid: false })
+        if (Shortcut is { IsBindable: false })
             return (this with { Shortcut = null }).Checked();
         return this with { Slices = Trim(Slices, depth: 1) };
 

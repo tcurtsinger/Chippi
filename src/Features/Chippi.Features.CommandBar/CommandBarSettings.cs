@@ -60,7 +60,7 @@ public sealed record CommandBarSettings
     internal CommandBarSettings Normalize() => this with
     {
         WebSearch = Enum.IsDefined(WebSearch) ? WebSearch : WebEngine.Google,
-        Shortcut = Shortcut is { IsValid: false } ? DefaultShortcut : Shortcut,
+        Shortcut = Shortcut is { IsBindable: false } ? DefaultShortcut : Shortcut,
         Off = [.. (Off ?? []).Where(kind => Enum.IsDefined(kind)).Distinct()],
         Hidden = [.. (Hidden ?? []).Where(result => result is not null
             && !string.IsNullOrWhiteSpace(result.Key) && !string.IsNullOrWhiteSpace(result.Name)

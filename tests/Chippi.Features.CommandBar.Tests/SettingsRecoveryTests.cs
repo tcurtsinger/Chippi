@@ -323,11 +323,11 @@ public sealed class SettingsRecoveryTests
         {
             Assert.Equal("Used by Mute microphone", module.ShortcutError);
             var bar = Assert.Single(shortcuts.List, s => s.Owner == CommandBarModule.Id);
-            Assert.Equal(("Command bar", null), (bar.Name, bar.Shortcut));
+            Assert.Equal(("Command bar", CommandBarSettings.DefaultShortcut, false), (bar.Name, bar.Shortcut, bar.Held)); // saved, not held: dimmed
 
             mute.Unregister();
             Assert.True(module.ChangeShortcut(CommandBarSettings.DefaultShortcut));
-            Assert.Equal(CommandBarSettings.DefaultShortcut, shortcuts.List.Single(s => s.Owner == CommandBarModule.Id).Shortcut);
+            Assert.Equal((CommandBarSettings.DefaultShortcut, true), shortcuts.List.Where(s => s.Owner == CommandBarModule.Id).Select(s => (s.Shortcut, s.Held)).Single());
             Assert.True(module.RemoveShortcut());
             Assert.Null(shortcuts.List.Single(s => s.Owner == CommandBarModule.Id).Shortcut); // still listed, unset
         }

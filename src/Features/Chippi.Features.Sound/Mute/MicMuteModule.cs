@@ -123,7 +123,7 @@ public sealed class MicMuteModule : IFeatureModule
         _context = context;
         _stopping = false;
         Settings = context.Settings.Get<MicMuteSettings>();
-        if (Settings.Shortcut is { IsValid: false }) Settings = Settings with { Shortcut = new() };
+        if (Settings.Shortcut is { IsBindable: false }) Settings = Settings with { Shortcut = new() };
         _audio ??= SoundAudio.Get(context.Logger);
         _lease = _audio.Acquire();
         try
@@ -181,11 +181,11 @@ public sealed class MicMuteModule : IFeatureModule
     public void CaptureShortcut(bool capture) => _capturingShortcut = capture;
 
     /// <summary>The shortcut in the shell's list, set or not, from start to stop.</summary>
-    private IHotkey CreateHotkey(ModuleContext context) => _createHotkey?.Invoke() ?? context.Shortcuts.Add(Id, "Mute microphone");
+    private IHotkey CreateHotkey(ModuleContext context) => _createHotkey?.Invoke() ?? context.Shortcuts.Add(Id, "Mute microphone", new(() => Settings.Shortcut, k => ChangeShortcut(k) ? null : ShortcutError, RemoveShortcut) { Icon = Descriptor.Icon });
 
     public bool ChangeShortcut(KeyShortcut shortcut)
     {
-        if (!shortcut.IsValid) { ShortcutError = "Shortcut unavailable"; Changed?.Invoke(); return false; }
+        if (!shortcut.IsBindable) { ShortcutError = "Shortcut unavailable"; Changed?.Invoke(); return false; }
         if (_context is not null && !_stopping) _hotkey ??= CreateHotkey(_context);
         if (_hotkey?.Register(shortcut, OnHotkey) != true) { ShortcutError = _hotkey?.Error ?? ShortcutService.InUse; Changed?.Invoke(); return false; }
         ShortcutError = null;
