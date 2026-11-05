@@ -108,6 +108,7 @@ public class HubTests
         Assert.True(hub.Key(A, down: true));
         Assert.True(hub.Key(A, down: false));
     }
+
     [Fact]
     public void An_up_whose_down_nobody_kept_always_passes_on()
     {
