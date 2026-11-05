@@ -78,6 +78,12 @@ public sealed class ModuleContext(
     /// <summary>The shell's one list of shortcuts; no module registers a hotkey itself. Without a shell, every shortcut is refused.</summary>
     public Chippi.Core.Shortcuts.IShortcutService Shortcuts { get; init; } = new Chippi.Core.Shortcuts.ShortcutService(Chippi.Core.Shortcuts.RefusingRegistrar.Instance);
 
+    /// <summary>
+    /// The PC side of actions (Chippi.Core.Actions): no module sends keys, moves windows or opens programs for an action itself.
+    /// It runs them with an <see cref="Chippi.Core.Actions.ActionRunner"/> over this. Null when the shell has none (tests pass a fake).
+    /// </summary>
+    public Chippi.Core.Actions.IActionPc? Actions { get; init; }
+
     /// <summary>Keep the island open during a dialog or drag. Dispose the scope when it ends.</summary>
     public Func<IDisposable> HoldIslandOpen { get; init; } = () => new IslandOpenHold().Hold();
 

@@ -61,6 +61,31 @@ public sealed class ModuleServicesTests : IDisposable
         }
     }
 
+    // ---- Actions
+
+    [Fact]
+    public async Task Each_module_runs_its_actions_on_the_shells_one_pc()
+    {
+        var pc = new ActionRunnerTests.FakePc();
+        _services.Actions = pc;
+        var first = FakeModule.Create("shortcuts");
+        var second = FakeModule.Create("radial-menu");
+        _registry.Register(first);
+        _registry.Register(second);
+        await _registry.StartAsync();
+        await _registry.SetInstalledAsync("shortcuts", true);
+        await _registry.SetInstalledAsync("radial-menu", true);
+        Assert.Same(pc, first.Context!.Actions);
+        Assert.Same(pc, second.Context!.Actions);
+    }
+
+    [Fact]
+    public async Task Without_a_shell_pc_a_module_gets_none()
+    {
+        var module = await StartAsync("shortcuts");
+        Assert.Null(module.Context!.Actions);
+    }
+
     // ---- Data folder
 
     [Fact]
