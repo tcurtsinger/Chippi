@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using Chippi.Core.Actions;
 using Chippi.Core.Shortcuts;
 using System.Windows.Media;
 using Chippi.Core.Clipboard;
@@ -60,13 +61,13 @@ public sealed class RadialMenuTests
         Assert.Equal("https://duckduckgo.com/?q=Ashen%20Gate", f.Pc.Opened[^1]);
         await runner.RunAsync(new Slice { Kind = SliceKind.Selection, Value = "CopyPlain" }, 0);
         Assert.Equal(["Ashen Gate"], f.Hub.Written);
-        var notALink = await Assert.ThrowsAsync<SliceFailure>(() => runner.RunAsync(new Slice { Kind = SliceKind.Selection, Value = "OpenLink" }, 0));
+        var notALink = await Assert.ThrowsAsync<ActionFailure>(() => runner.RunAsync(new Slice { Kind = SliceKind.Selection, Value = "OpenLink" }, 0));
         Assert.Equal("Not a link", notALink.Message);
         f.Hub.Selection = "github.com/tcurtsinger/Chippi/pull/183";
         await runner.RunAsync(new Slice { Kind = SliceKind.Selection, Value = "OpenLink" }, 0);
         Assert.Equal("https://github.com/tcurtsinger/Chippi/pull/183", f.Pc.Opened[^1]);
         f.Hub.Selection = null;
-        var nothing = await Assert.ThrowsAsync<SliceFailure>(() => runner.RunAsync(new Slice { Kind = SliceKind.Selection, Value = "Search" }, 0));
+        var nothing = await Assert.ThrowsAsync<ActionFailure>(() => runner.RunAsync(new Slice { Kind = SliceKind.Selection, Value = "Search" }, 0));
         Assert.Equal("Nothing selected", nothing.Message);
     }
 
@@ -234,7 +235,7 @@ public sealed class RadialMenuTests
         Stop(f);
     });
 
-    private static Slice Slice(MediaAction action) => new() { Kind = SliceKind.Media, Value = action.ToString(), Name = SliceCatalog.NameOf(action) };
+    private static Slice Slice(MediaAction action) => new() { Kind = SliceKind.Media, Value = action.ToString(), Name = ActionCatalog.NameOf(action) };
 
     private static PixelPoint Offset(PixelPoint at, int x, int y) => new(at.X + x, at.Y + y);
 

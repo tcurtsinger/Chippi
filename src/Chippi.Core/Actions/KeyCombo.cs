@@ -3,13 +3,13 @@
 
 using System.Globalization;
 
-namespace Chippi.Features.RadialMenu.Slices;
+namespace Chippi.Core.Actions;
 
 [Flags]
 public enum KeyModifiers { None = 0, Ctrl = 1, Alt = 2, Shift = 4, Win = 8 }
 
 /// <summary>
-/// A Key shortcut slice's keys: modifiers and one key, written "Ctrl+Shift+T" or "Win+Shift+S" in settings.json and on the
+/// A Key shortcut action's keys: modifiers and one key, written "Ctrl+Shift+T" or "Win+Shift+S" in settings.json and on the
 /// key caps Settings shows. Unlike a Chippi shortcut, any key and the Windows key are allowed: they're pressed, not taken.
 /// </summary>
 public readonly record struct KeyCombo(KeyModifiers Modifiers, uint Key)

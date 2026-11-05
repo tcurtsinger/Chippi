@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using Chippi.Core.Actions;
 using Chippi.Core.Shortcuts;
 using System.Windows.Media;
 using Chippi.Core.Clipboard;
@@ -33,7 +34,7 @@ internal sealed class Fixture
 
     public RadialMenuModule Module => _module ??= new RadialMenuModule(() => Pc, sink => Input, () => Hotkey, new FakeRecorder(), () => Cleaning, () => KeepAwake, () => WebEngine.DuckDuckGo);
 
-    public SliceRunner Runner() => new(Pc, Commands, () => Hub, () => WebEngine.DuckDuckGo);
+    public ActionRunner Runner() => new(Pc, Commands, () => Hub, text => WebEngine.DuckDuckGo.SearchUrl(text));
 
     public Task StartAsync() => Module.StartAsync(new ModuleContext(RadialMenuModule.Id, Settings, NullLogger.Instance, Hub, new FakeUi())
     {
@@ -115,12 +116,16 @@ internal sealed class FakePc : IRadialPc
 
     public nint WindowAt(PixelPoint at) => Under;
 
+    public nint InFront { get; set; } = 43;
+
+    public nint WindowInFront() => InFront;
+
     public void Open(string target) => Opened.Add(target);
 
     public void Window(nint window, WindowAction action)
     {
         if (window == 0)
-            throw new SliceFailure("No window");
+            throw new ActionFailure("No window");
         Windowed.Add((window, action));
     }
 
@@ -254,4 +259,12 @@ internal sealed class FakeUi : IModuleUi
     public IIslandTile AddIslandTile(IslandTileSpec spec) => new IslandTileContribution(RadialMenuModule.Id, spec);
 
     public void SetSettingsPage(Func<string?, object> page) { }
+}
+
+/// <summary>The runner's calls with a slice, as the module makes them (<see cref="Slice.ToAction"/>).</summary>
+internal static class SliceRuns
+{
+    public static Task RunAsync(this ActionRunner runner, Slice slice, nint window) => runner.RunAsync(slice.ToAction(), window);
+
+    public static bool IsMissing(this ActionRunner runner, Slice slice) => runner.IsMissing(slice.ToAction());
 }
