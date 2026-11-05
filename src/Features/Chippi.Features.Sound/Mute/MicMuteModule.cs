@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using Chippi.Core.Shortcuts;
 using System.Media;
 using Chippi.Audio;
 using Chippi.Core.Island;
@@ -13,7 +14,7 @@ namespace Chippi.Features.Sound.Mute;
 public sealed record MicMuteSettings
 {
     /// <summary>Null once removed in Settings: no global shortcut until one is set again.</summary>
-    public MicShortcut? Shortcut { get; init; } = new();
+    public KeyShortcut? Shortcut { get; init; } = new();
     public bool PlaySound { get; init; }
 }
 
@@ -21,11 +22,11 @@ public sealed class MicMuteModule : IFeatureModule
 {
     public const string Id = "mic-mute";
     private readonly SemaphoreSlim _gate = new(1);
-    private readonly Func<IMicHotkey> _createHotkey;
+    private readonly Func<IHotkey>? _createHotkey;
     private readonly Action<bool> _tone;
     private readonly Func<string?>? _microphone;
     private AudioService? _audio;
-    private IMicHotkey? _hotkey;
+    private IHotkey? _hotkey;
     private IAsyncDisposable? _lease;
     private ModuleContext? _context;
     private IIslandTile? _tile;
@@ -34,10 +35,10 @@ public sealed class MicMuteModule : IFeatureModule
     private bool _levelFailed; // Error is a level's failure, which a level that works clears; a mute's failure stays
 
     /// <param name="microphone">The mic in use as Audio routing picks it, never VB-CABLE (the app passes routing's); null while routing is off.</param>
-    public MicMuteModule(AudioService? audio = null, Func<IMicHotkey>? hotkey = null, Action<bool>? tone = null, Func<string?>? microphone = null)
+    public MicMuteModule(AudioService? audio = null, Func<IHotkey>? hotkey = null, Action<bool>? tone = null, Func<string?>? microphone = null)
     {
         _audio = audio;
-        _createHotkey = hotkey ?? GlobalMicHotkey.Create;
+        _createHotkey = hotkey;
         _tone = tone ?? (muted => { if (muted) SystemSounds.Hand.Play(); else SystemSounds.Asterisk.Play(); });
         _microphone = microphone;
     }
@@ -129,8 +130,8 @@ public sealed class MicMuteModule : IFeatureModule
         {
             await _audio.RefreshAsync();
             ct.ThrowIfCancellationRequested();
-            _hotkey = _createHotkey();
-            ShortcutError = Settings.Shortcut is null || _hotkey.Register(Settings.Shortcut, OnHotkey) ? null : "Shortcut in use";
+            _hotkey = CreateHotkey(context);
+            ShortcutError = Settings.Shortcut is null || _hotkey.Register(Settings.Shortcut, OnHotkey) ? null : _hotkey.Error ?? ShortcutService.InUse;
             _tile = context.Ui.AddIslandTile(SoundTile.Section(10, SoundTile.Microphone, () => new MicQuickView(this))
                 with { StatusPriority = 100, Toggle = new IslandTileToggle(() => Status.State == MicrophoneMuteState.Muted, ToggleAsync, "Microphone", "Mic", GalleryStatus) });
             // The Command bar: mute or unmute every microphone, as the shortcut does.
@@ -179,11 +180,14 @@ public sealed class MicMuteModule : IFeatureModule
 
     public void CaptureShortcut(bool capture) => _capturingShortcut = capture;
 
-    public bool ChangeShortcut(MicShortcut shortcut)
+    /// <summary>The shortcut in the shell's list, set or not, from start to stop.</summary>
+    private IHotkey CreateHotkey(ModuleContext context) => _createHotkey?.Invoke() ?? context.Shortcuts.Add(Id, "Mute microphone");
+
+    public bool ChangeShortcut(KeyShortcut shortcut)
     {
         if (!shortcut.IsValid) { ShortcutError = "Shortcut unavailable"; Changed?.Invoke(); return false; }
-        if (_context is not null && !_stopping) _hotkey ??= _createHotkey(); // set again after Remove
-        if (_hotkey?.Register(shortcut, OnHotkey) != true) { ShortcutError = "Shortcut in use"; Changed?.Invoke(); return false; }
+        if (_context is not null && !_stopping) _hotkey ??= CreateHotkey(_context);
+        if (_hotkey?.Register(shortcut, OnHotkey) != true) { ShortcutError = _hotkey?.Error ?? ShortcutService.InUse; Changed?.Invoke(); return false; }
         ShortcutError = null;
         Settings = Settings with { Shortcut = shortcut };
         _context?.Settings.Save(Settings);
@@ -193,8 +197,7 @@ public sealed class MicMuteModule : IFeatureModule
 
     public void RemoveShortcut()
     {
-        _hotkey?.Dispose();
-        _hotkey = null;
+        _hotkey?.Unregister(); // still listed in Settings › Shortcuts, unset
         ShortcutError = null;
         Settings = Settings with { Shortcut = null };
         _context?.Settings.Save(Settings);

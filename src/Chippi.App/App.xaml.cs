@@ -302,6 +302,7 @@ public partial class App : Application
         _toasts?.Dispose();
         Shell?.Clipboard.Dispose();
         Shell?.Input.Dispose();
+        Shell?.Hotkeys.Dispose();
         _instance?.Dispose();
         LoggerFactory?.Dispose();
         base.OnExit(e);

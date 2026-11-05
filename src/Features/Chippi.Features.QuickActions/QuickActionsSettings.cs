@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using Chippi.Core.Shortcuts;
 using System.IO;
 using Chippi.Features.Sound.Mute;
 
@@ -19,7 +20,7 @@ public sealed record QuickActionsSettings
     public List<string> Kept { get; init; } = [];
 
     /// <summary>Each action's shortcut, by key; none by default.</summary>
-    public Dictionary<string, MicShortcut> Shortcuts { get; init; } = [];
+    public Dictionary<string, KeyShortcut> Shortcuts { get; init; } = [];
 
     /// <summary>
     /// Tiles other features added (Input), by key, once they had a position: the first time its feature runs, a tile goes
@@ -34,5 +35,5 @@ public sealed record QuickActionsSettings
     public bool Keeps(string path) =>
         Kept.Any(kept => string.Equals(Path.GetFileName(kept), Path.GetFileName(path), StringComparison.OrdinalIgnoreCase));
 
-    public MicShortcut? ShortcutOf(QuickActionId id) => Shortcuts.GetValueOrDefault(QuickAction.Of(id).Key);
+    public KeyShortcut? ShortcutOf(QuickActionId id) => Shortcuts.GetValueOrDefault(QuickAction.Of(id).Key);
 }

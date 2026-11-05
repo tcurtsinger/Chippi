@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using Chippi.Core.Shortcuts;
+using Chippi.UI.Shortcuts;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
@@ -93,7 +95,7 @@ public sealed class ShortcutRow : UserControl
             Cancel();
             return;
         }
-        if (MicShortcut.From(e) is not { } shortcut)
+        if (ShortcutKeys.From(e) is not { } shortcut)
             return;
         _capturing = false;
         _module.CaptureShortcut(false);

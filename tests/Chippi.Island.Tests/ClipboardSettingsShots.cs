@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using Chippi.Core.Shortcuts;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
@@ -142,9 +143,9 @@ public sealed class ClipboardSettingsShots
         public void SetSettingsPage(Func<string?, object> factory) => Page = factory;
     }
 
-    private sealed class NoHotkey : Chippi.Features.Sound.Mute.IMicHotkey
+    private sealed class NoHotkey : Chippi.Core.Shortcuts.IHotkey
     {
-        public bool Register(Chippi.Features.Sound.Mute.MicShortcut shortcut, Action pressed) => true;
+        public bool Register(Chippi.Core.Shortcuts.KeyShortcut shortcut, Action pressed) => true;
         public void Dispose() { }
     }
 

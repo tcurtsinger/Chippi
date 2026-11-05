@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
+using Chippi.Core.Shortcuts;
 using Chippi.Clipboard.Tests;
 using Chippi.Core.Clipboard;
 using Chippi.Core.Island;
@@ -27,14 +28,15 @@ public sealed class PlainPasteTests
         public IIslandTile AddIslandTile(IslandTileSpec spec) => throw new InvalidOperationException("Plain paste must not add a tile");
         public void SetSettingsPage(Func<string?, object> page) => Page = page;
     }
-    public sealed class Hotkey : IMicHotkey
+    public sealed class Hotkey : IHotkey
     {
-        public bool Available = true, Disposed; public MicShortcut? Registered; public Action? Pressed;
-        public bool Register(MicShortcut shortcut, Action pressed)
+        public bool Available = true, Disposed; public KeyShortcut? Registered; public Action? Pressed;
+        public bool Register(KeyShortcut shortcut, Action pressed)
         {
             if (!Available) return false;
             Registered = shortcut; Pressed = pressed; return true;
         }
+        public void Unregister() { Registered = null; Pressed = null; }
         public void Dispose() { Disposed = true; Pressed = null; }
     }
     public sealed class Hub : IClipboardHub
@@ -54,7 +56,7 @@ public sealed class PlainPasteTests
         public readonly Hotkey Hotkey = new(); public Hotkey? Replacement;
         public readonly ManualTime Clock = new(); public readonly IslandActivityHub Island = new();
         public PlainPasteModule Module; public int Creates;
-        public static readonly MicShortcut Shortcut = new(ShortcutModifiers.Control | ShortcutModifiers.Alt, 0x56);
+        public static readonly KeyShortcut Shortcut = new(ShortcutModifiers.Control | ShortcutModifiers.Alt, 0x56);
         public Fixture()
         { Module = new PlainPasteModule(() => ++Creates == 1 ? Hotkey : Replacement = new Hotkey { Available = Hotkey.Available }, Clock); }
         public Task Start() => Module.StartAsync(new ModuleContext(PlainPasteModule.Id, Settings, NullLogger.Instance, Island.CreatePublisher(PlainPasteModule.Id), Ui) { Clipboard = Hub }, default);
@@ -65,7 +67,8 @@ public sealed class PlainPasteTests
     public async Task Default_reserves_nothing_and_does_not_read_or_listen()
     {
         await using var f = new Fixture(); await f.Start();
-        Assert.Null(f.Module.Settings.Shortcut); Assert.Equal(0, f.Creates);
+        // Listed in Settings › Shortcuts, unset: no keys held.
+        Assert.Null(f.Module.Settings.Shortcut); Assert.Equal(1, f.Creates); Assert.Null(f.Hotkey.Registered);
         await f.Module.InvokeAsync(); Assert.Equal(0, f.Hub.Calls); Assert.Empty(f.Island.Activities); Assert.Equal(0, f.Settings.Saves);
     }
     [Theory]
@@ -101,9 +104,9 @@ public sealed class PlainPasteTests
     {
         await using var f = new Fixture(); await f.Start(); f.Configure();
         f.Hotkey.Available = false;
-        Assert.False(f.Module.ChangeShortcut(new MicShortcut(ShortcutModifiers.Control, 0x42)));
+        Assert.False(f.Module.ChangeShortcut(new KeyShortcut(ShortcutModifiers.Control, 0x42)));
         Assert.Equal(Fixture.Shortcut, f.Module.Settings.Shortcut); Assert.Equal(Fixture.Shortcut, f.Hotkey.Registered); Assert.Equal("Shortcut in use", f.Module.ShortcutError);
-        f.Module.RemoveShortcut(); Assert.True(f.Hotkey.Disposed); Assert.Null(f.Module.Settings.Shortcut); Assert.Null(f.Module.ShortcutError);
+        f.Module.RemoveShortcut(); Assert.Null(f.Hotkey.Registered); Assert.False(f.Hotkey.Disposed); Assert.Null(f.Module.Settings.Shortcut); Assert.Null(f.Module.ShortcutError);
         await f.Module.InvokeAsync(); Assert.Equal(0, f.Hub.Calls);
     }
     [Fact]
@@ -113,7 +116,7 @@ public sealed class PlainPasteTests
         await f.Start();
         f.Configure();
         f.Settings.Reject = true;
-        var alternate = new MicShortcut(ShortcutModifiers.Control, 0x42);
+        var alternate = new KeyShortcut(ShortcutModifiers.Control, 0x42);
         Assert.False(f.Module.ChangeShortcut(alternate));
         Assert.True(f.Replacement!.Disposed);
         Assert.False(f.Hotkey.Disposed);
@@ -135,7 +138,7 @@ public sealed class PlainPasteTests
         await using var f = new Fixture(); await f.Start(); f.Configure();
         foreach (uint key in new uint[] { 0x56, 0x31 })
         {
-            Assert.False(f.Module.ChangeShortcut(new MicShortcut(ShortcutModifiers.Shift, key)));
+            Assert.False(f.Module.ChangeShortcut(new KeyShortcut(ShortcutModifiers.Shift, key)));
             Assert.Equal("Shortcut unavailable", f.Module.ShortcutError);
             Assert.Equal(Fixture.Shortcut, f.Module.Settings.Shortcut);
             Assert.Equal(Fixture.Shortcut, f.Hotkey.Registered);
@@ -154,8 +157,8 @@ public sealed class PlainPasteTests
         await using var f = new Fixture(); f.Settings.Value = new() { Shortcut = Fixture.Shortcut }; f.Hotkey.Available = false;
         await f.Start(); Assert.Equal("Shortcut in use", f.Module.ShortcutError); Assert.Equal(Fixture.Shortcut, f.Module.Settings.Shortcut);
         await f.Module.StopAsync(default);
-        f.Settings.Value = new() { Shortcut = new MicShortcut(ShortcutModifiers.Windows, 0x56) };
-        int before = f.Creates; await f.Start(); Assert.Equal(before, f.Creates); Assert.Null(f.Module.Settings.Shortcut);
+        f.Settings.Value = new() { Shortcut = new KeyShortcut(ShortcutModifiers.Windows, 0x56) };
+        await f.Start(); Assert.Null(f.Replacement!.Registered); Assert.Null(f.Module.Settings.Shortcut);
     }
     [Fact]
     public async Task Stop_waits_for_the_inflight_paste_and_blocks_late_feedback_and_new_presses()

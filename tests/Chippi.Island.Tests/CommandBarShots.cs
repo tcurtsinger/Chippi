@@ -2,6 +2,7 @@
 // Copyright (C) Chippi contributors
 
 #if DEBUG
+using Chippi.Core.Shortcuts;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
@@ -165,9 +166,9 @@ public sealed class CommandBarShots
         public void SetSettingsPage(Func<string?, object> page) { }
     }
 
-    private sealed class Hotkey : IMicHotkey
+    private sealed class Hotkey : IHotkey
     {
-        public bool Register(MicShortcut shortcut, Action pressed) => true;
+        public bool Register(KeyShortcut shortcut, Action pressed) => true;
         public void Dispose() { }
     }
 }

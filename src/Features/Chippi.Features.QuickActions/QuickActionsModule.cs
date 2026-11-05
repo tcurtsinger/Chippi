@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using Chippi.Core.Shortcuts;
 using System.Collections.Concurrent;
 using Chippi.Core.Diagnostics;
 using Chippi.Core.Modules;
@@ -32,9 +33,9 @@ public sealed class QuickActionsModule : IFeatureModule
     internal static readonly TimeSpan PendingFor = TimeSpan.FromSeconds(3);
 
     private readonly Func<IQuickSystem> _createSystem;
-    private readonly Func<IMicHotkey> _createHotkey;
+    private readonly Func<IHotkey>? _createHotkey;
     private readonly Func<Action?> _cleaning;
-    private readonly Dictionary<QuickActionId, IMicHotkey> _hotkeys = [];
+    private readonly Dictionary<QuickActionId, IHotkey> _hotkeys = [];
     private readonly Dictionary<QuickActionId, string> _shortcutErrors = [];
     private sealed class Running(ModuleContext context, IQuickSystem system)
     {
@@ -56,9 +57,10 @@ public sealed class QuickActionsModule : IFeatureModule
     private bool _capturing;
 
     /// <param name="cleaning">Starts Cleaning mode while it's installed, else null: the page offers Cleaning only then.</param>
-    public QuickActionsModule(Func<Action?>? cleaning = null) : this(() => new WindowsQuickSystem(), GlobalMicHotkey.Create, cleaning) { }
+    public QuickActionsModule(Func<Action?>? cleaning = null) : this(() => new WindowsQuickSystem(), null, cleaning) { }
 
-    public QuickActionsModule(Func<IQuickSystem> system, Func<IMicHotkey> hotkey, Func<Action?>? cleaning = null)
+    /// <param name="hotkey">Each action's shortcut registration (tests); null for the shell's shortcut list.</param>
+    public QuickActionsModule(Func<IQuickSystem> system, Func<IHotkey>? hotkey, Func<Action?>? cleaning = null)
     {
         _cleaning = cleaning ?? (() => null);
         _createSystem = system;
@@ -182,9 +184,13 @@ public sealed class QuickActionsModule : IFeatureModule
         // The Command bar runs each as its shortcut does: one that needs a choice or asks first opens its list or its confirm.
         context.Ui.AddCommands(() => [.. Offered.Where(a => a.Id != QuickActionId.Cleaning).Select(a =>
             new ChippiCommand($"quick-actions/{a.Key}", a.Name, LucideIcons.KeyOf(a.Icon), () => PressedAsync(a.Id)) { Words = a.Label })]);
+        // Each action is listed in Settings › Shortcuts while Quick actions runs, set or not.
         foreach (var action in QuickAction.All)
+        {
+            _hotkeys[action.Id] = CreateHotkey(context, action);
             if (Settings.ShortcutOf(action.Id) is { IsValid: true } shortcut)
                 TryRegister(action.Id, shortcut);
+        }
         // Read once now, so the page opens already filled.
         _ = PollAsync();
         return Task.CompletedTask;
@@ -407,7 +413,7 @@ public sealed class QuickActionsModule : IFeatureModule
 
     // Shortcuts: none by default, one per action at most.
 
-    public bool ChangeShortcut(QuickActionId id, MicShortcut shortcut)
+    public bool ChangeShortcut(QuickActionId id, KeyShortcut shortcut)
     {
         if (Context is null)
             return false;
@@ -433,8 +439,8 @@ public sealed class QuickActionsModule : IFeatureModule
             // Registration happened first so a clash never reaches settings. A failed save must restore that registration too.
             bool restored = previous is not null && TryRegister(id, previous);
             // The old chord might have been claimed after we released it. Never leave the unsaved new chord active.
-            if (!restored && _hotkeys.Remove(id, out var added))
-                added.Dispose();
+            if (!restored && _hotkeys.TryGetValue(id, out var added))
+                added.Unregister();
             Log.Warn("Quick actions: saving shortcut failed", ex);
             _shortcutErrors[id] = "Save failed";
             Changed?.Invoke();
@@ -446,7 +452,7 @@ public sealed class QuickActionsModule : IFeatureModule
     {
         if (Context is null)
             return;
-        var shortcuts = new Dictionary<string, MicShortcut>(Settings.Shortcuts);
+        var shortcuts = new Dictionary<string, KeyShortcut>(Settings.Shortcuts);
         shortcuts.Remove(QuickAction.Of(id).Key);
         try { Save(Settings with { Shortcuts = shortcuts }); }
         catch (Exception ex)
@@ -456,23 +462,25 @@ public sealed class QuickActionsModule : IFeatureModule
             Changed?.Invoke();
             return;
         }
-        if (_hotkeys.Remove(id, out var hotkey)) hotkey.Dispose();
+        if (_hotkeys.TryGetValue(id, out var hotkey)) hotkey.Unregister();
         if (_shortcutErrors.Remove(id)) Changed?.Invoke();
     }
 
     /// <summary>While Settings records a shortcut, pressing one of ours doesn't run it.</summary>
     public void CaptureShortcut(bool capture) => _capturing = capture;
 
-    private bool TryRegister(QuickActionId id, MicShortcut shortcut)
+    private IHotkey CreateHotkey(ModuleContext context, QuickAction action) => _createHotkey?.Invoke() ?? context.Shortcuts.Add(Id, action.Name);
+
+    private bool TryRegister(QuickActionId id, KeyShortcut shortcut)
     {
         try
         {
             if (!_hotkeys.TryGetValue(id, out var hotkey))
-                _hotkeys[id] = hotkey = _createHotkey();
+                _hotkeys[id] = hotkey = CreateHotkey(Active.Context, QuickAction.Of(id));
             if (hotkey.Register(shortcut, () => _ = PressedAsync(id)))
                 _shortcutErrors.Remove(id);
             else
-                _shortcutErrors[id] = "Shortcut in use";
+                _shortcutErrors[id] = hotkey.Error ?? ShortcutService.InUse;
         }
         catch (Exception ex)
         {

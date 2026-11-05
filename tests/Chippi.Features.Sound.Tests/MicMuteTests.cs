@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using Chippi.Core.Shortcuts;
 using Chippi.Audio;
 using Chippi.Audio.Tests;
 using Chippi.Core.Island;
@@ -30,19 +31,20 @@ public sealed class MuteFixture : IAsyncDisposable
     public ValueTask DisposeAsync() => new(Module.StopAsync(CancellationToken.None));
 }
 
-public sealed class FakeHotkey : IMicHotkey
+public sealed class FakeHotkey : IHotkey
 {
     public bool Available { get; set; } = true;
     public bool Disposed { get; private set; }
-    public MicShortcut? Current { get; private set; }
+    public KeyShortcut? Current { get; private set; }
     public Action? Pressed { get; private set; }
-    public bool Register(MicShortcut shortcut, Action pressed)
+    public bool Register(KeyShortcut shortcut, Action pressed)
     {
         if (!Available) return false;
         Current = shortcut;
         Pressed = pressed;
         return true;
     }
+    public void Unregister() { Current = null; Pressed = null; }
     public void Dispose() { Disposed = true; Pressed = null; }
 }
 
@@ -120,7 +122,7 @@ public sealed class MicMuteTests
         Assert.Equal(original, f.Module.Settings.Shortcut);
         Assert.False(f.Module.ChangeShortcut(new(ShortcutModifiers.Windows | ShortcutModifiers.Alt, 0x4B)));
         f.Hotkey.Available = true;
-        var replacement = new MicShortcut(ShortcutModifiers.Alt | ShortcutModifiers.Shift, 0x4E);
+        var replacement = new KeyShortcut(ShortcutModifiers.Alt | ShortcutModifiers.Shift, 0x4E);
         Assert.True(f.Module.ChangeShortcut(replacement));
         Assert.Equal(replacement, f.Settings.Value.Shortcut);
         Assert.Null(f.Module.ShortcutError);

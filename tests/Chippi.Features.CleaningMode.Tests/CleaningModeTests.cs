@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using Chippi.Core.Shortcuts;
 using Chippi.Core.Island;
 using Chippi.Core.Modules;
 using Chippi.Features.CleaningMode.Screens;
@@ -284,10 +285,11 @@ public sealed class CleaningModeTests
         public void SetSettingsPage(Func<string?, object> page) { }
     }
 
-    private sealed class Hotkey : IMicHotkey
+    private sealed class Hotkey : IHotkey
     {
         public Action? Pressed;
-        public bool Register(MicShortcut shortcut, Action pressed) { Pressed = pressed; return true; }
+        public bool Register(KeyShortcut shortcut, Action pressed) { Pressed = pressed; return true; }
+        public void Unregister() => Pressed = null;
         public void Dispose() => Pressed = null;
     }
 
@@ -305,7 +307,7 @@ public sealed class CleaningModeTests
         await module.StartAsync(new ModuleContext(CleaningModeModule.Id, settings, NullLogger.Instance, new IslandActivityHub().CreatePublisher(CleaningModeModule.Id), new Ui()), default);
         Assert.True(module.Installed);
         Assert.Null(settings.Value.Shortcut); // none by default
-        Assert.True(module.ChangeShortcut(new MicShortcut(ShortcutModifiers.Control | ShortcutModifiers.Alt, 0x43)));
+        Assert.True(module.ChangeShortcut(new KeyShortcut(ShortcutModifiers.Control | ShortcutModifiers.Alt, 0x43)));
         module.CaptureShortcut(true);
         hotkey.Pressed!();
         Assert.Equal(0, keyboard.Locks);
@@ -325,7 +327,7 @@ public sealed class CleaningModeTests
         var module = new CleaningModeModule(new FakeLock(order), () => new FakeScreens(order) { FailShow = true }, () => hotkey);
         await module.StartAsync(new ModuleContext(CleaningModeModule.Id, new Settings(), NullLogger.Instance, new IslandActivityHub().CreatePublisher(CleaningModeModule.Id), new Ui()), default);
         Assert.Throws<InvalidOperationException>(module.Start); // Settings and the Actions page say "… failed"
-        Assert.True(module.ChangeShortcut(new MicShortcut(ShortcutModifiers.Control | ShortcutModifiers.Alt, 0x43)));
+        Assert.True(module.ChangeShortcut(new KeyShortcut(ShortcutModifiers.Control | ShortcutModifiers.Alt, 0x43)));
         hotkey.Pressed!(); // logged, nothing thrown into the hotkey's window
         Assert.False(module.IsOn);
     }

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using Chippi.Core.Shortcuts;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -38,14 +39,14 @@ public sealed class RadialMenuModule : IFeatureModule, IWheelInputSink
 
     private readonly Func<IRadialPc> _createPc;
     private readonly Func<IWheelInputSink, IWheelInput> _createInput;
-    private readonly Func<IMicHotkey> _createHotkey;
+    private readonly Func<IHotkey>? _createHotkey;
     private readonly Func<bool> _cleaning;
     private readonly Func<bool> _keepAwake;
     private readonly Func<WebEngine> _engine;
     private readonly Dictionary<string, ImageSource?> _icons = new(StringComparer.OrdinalIgnoreCase);
     private IRadialPc? _pc;
     private IWheelInput? _input;
-    private IMicHotkey? _hotkey;
+    private IHotkey? _hotkey;
     private ModuleContext? _context;
     private DispatcherTimer? _errorTimer;
     private bool _capturing;
@@ -62,13 +63,13 @@ public sealed class RadialMenuModule : IFeatureModule, IWheelInputSink
     /// <param name="keepAwake">Whether Keep awake runs: the hub's Chippi is wide awake then.</param>
     /// <param name="engine">The Command bar's web search, for Selected text's Search the web.</param>
     public RadialMenuModule(Func<bool> cleaning, Func<bool> keepAwake, Func<WebEngine> engine)
-        : this(() => new WindowsRadialPc(), null, GlobalMicHotkey.Create, null, cleaning, keepAwake, engine)
+        : this(() => new WindowsRadialPc(), null, null, null, cleaning, keepAwake, engine)
     {
     }
 
     /// <param name="input">The mouse and Esc; null for the real ones, a filter in the shell's input hub.</param>
     /// <param name="recorder">Records a Key shortcut slice; null for the real one, a filter in the input hub.</param>
-    public RadialMenuModule(Func<IRadialPc> pc, Func<IWheelInputSink, IWheelInput>? input, Func<IMicHotkey> hotkey, IKeyRecorder? recorder,
+    public RadialMenuModule(Func<IRadialPc> pc, Func<IWheelInputSink, IWheelInput>? input, Func<IHotkey>? hotkey, IKeyRecorder? recorder,
         Func<bool>? cleaning = null, Func<bool>? keepAwake = null, Func<WebEngine>? engine = null)
     {
         _createPc = pc;
@@ -118,6 +119,7 @@ public sealed class RadialMenuModule : IFeatureModule, IWheelInputSink
     {
         ct.ThrowIfCancellationRequested();
         _context = context;
+        _hotkey ??= CreateHotkey(); // listed in Settings › Shortcuts while it runs, set or not
         _capturing = false;
         ShortcutError = null;
         Settings = context.Settings.Get<RadialMenuSettings>().Checked();
@@ -309,7 +311,7 @@ public sealed class RadialMenuModule : IFeatureModule, IWheelInputSink
         OpenAt(at, shown, holding: false);
     }
 
-    public bool ChangeShortcut(MicShortcut shortcut)
+    public bool ChangeShortcut(KeyShortcut shortcut)
     {
         if (_context is null)
             return false;
@@ -333,8 +335,7 @@ public sealed class RadialMenuModule : IFeatureModule, IWheelInputSink
     {
         if (_context is null)
             return;
-        _hotkey?.Dispose();
-        _hotkey = null;
+        _hotkey?.Unregister(); // still listed in Settings › Shortcuts, unset
         ShortcutError = null;
         Save(Settings with { Shortcut = null });
     }
@@ -342,12 +343,15 @@ public sealed class RadialMenuModule : IFeatureModule, IWheelInputSink
     /// <summary>While Settings records a shortcut, pressing ours doesn't open the wheel.</summary>
     public void CaptureShortcut(bool capture) => _capturing = capture;
 
-    private bool TryRegister(MicShortcut shortcut)
+    /// <summary>The shortcut in the shell's list, set or not, from start to stop.</summary>
+    private IHotkey CreateHotkey() => _createHotkey?.Invoke() ?? (_context ?? throw new InvalidOperationException("Not started")).Shortcuts.Add(Id, Descriptor.Name);
+
+    private bool TryRegister(KeyShortcut shortcut)
     {
         try
         {
-            _hotkey ??= _createHotkey();
-            ShortcutError = _hotkey.Register(shortcut, OnShortcut) ? null : "Shortcut in use";
+            _hotkey ??= CreateHotkey();
+            ShortcutError = _hotkey.Register(shortcut, OnShortcut) ? null : _hotkey.Error ?? ShortcutService.InUse;
         }
         catch (Exception ex)
         {

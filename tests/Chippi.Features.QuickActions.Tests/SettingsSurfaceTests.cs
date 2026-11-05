@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using Chippi.Core.Shortcuts;
 using System.IO;
 using System.Windows;
 using System.Windows.Automation;
@@ -90,7 +91,7 @@ public sealed class SettingsSurfaceTests
                 f.Module.SetShown(QuickActionId.Dark, true);
                 Assert.Same(dark, Named(view, "Set Dark mode shortcut"));
                 Assert.Same(wifi, Named(view, "Set Wi-Fi shortcut"));
-                f.Module.ChangeShortcut(QuickActionId.WiFi, new MicShortcut(ShortcutModifiers.Control | ShortcutModifiers.Alt, 0x57));
+                f.Module.ChangeShortcut(QuickActionId.WiFi, new KeyShortcut(ShortcutModifiers.Control | ShortcutModifiers.Alt, 0x57));
                 Assert.Same(dark, Named(view, "Set Dark mode shortcut"));
                 Assert.NotSame(wifi, Named(view, "Change Wi-Fi shortcut"));
             }
@@ -149,10 +150,10 @@ public sealed class SettingsSurfaceTests
             view.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));
             try
             {
-                var registered = new MicShortcut(ShortcutModifiers.Control | ShortcutModifiers.Alt, 0x57);
+                var registered = new KeyShortcut(ShortcutModifiers.Control | ShortcutModifiers.Alt, 0x57);
                 Assert.True(f.Module.ChangeShortcut(QuickActionId.WiFi, registered));
                 f.Hotkey.Available = false;
-                Assert.False(f.Module.ChangeShortcut(QuickActionId.WiFi, new MicShortcut(ShortcutModifiers.Control | ShortcutModifiers.Alt, 0x56)));
+                Assert.False(f.Module.ChangeShortcut(QuickActionId.WiFi, new KeyShortcut(ShortcutModifiers.Control | ShortcutModifiers.Alt, 0x56)));
                 Assert.Equal(registered, f.Module.Settings.ShortcutOf(QuickActionId.WiFi));
                 Assert.Contains(Find<TextBlock>(view), text => text.Text == registered.ToString());
                 Assert.Contains(Find<TextBlock>(view), text => text.Text == "Shortcut in use" && AutomationProperties.GetLiveSetting(text) == AutomationLiveSetting.Polite);
@@ -283,10 +284,10 @@ public sealed class SettingsSurfaceTests
         public void Dispose() => Module.StopAsync(default).GetAwaiter().GetResult();
     }
 
-    private sealed class TestHotkey : IMicHotkey
+    private sealed class TestHotkey : IHotkey
     {
         internal bool Available = true;
-        public bool Register(MicShortcut shortcut, Action pressed) => Available;
+        public bool Register(KeyShortcut shortcut, Action pressed) => Available;
         public void Dispose() { }
     }
 
@@ -322,9 +323,9 @@ public sealed class SettingsSurfaceTests
         public void SetSettingsPage(Func<string?, object> factory) { }
     }
 
-    private sealed class NoHotkey : IMicHotkey
+    private sealed class NoHotkey : IHotkey
     {
-        public bool Register(MicShortcut shortcut, Action pressed) => true;
+        public bool Register(KeyShortcut shortcut, Action pressed) => true;
         public void Dispose() { }
     }
 }

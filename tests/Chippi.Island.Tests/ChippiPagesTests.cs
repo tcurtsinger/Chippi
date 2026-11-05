@@ -74,13 +74,20 @@ public sealed class ChippiPagesTests
     private sealed class ShortcutFeature : IFeatureModule
     {
         public string? Section;
+        private Chippi.Core.Shortcuts.IHotkey? _shortcut;
         public FeatureDescriptor Descriptor { get; } = new("paste-plain-text", "Paste as plain text", "Shortcut", FeatureGroup.ClipboardText);
         public Task StartAsync(ModuleContext context, CancellationToken ct)
         {
+            // A feature is on Settings › Shortcuts because its shortcut is in the shell's list, set or not.
+            _shortcut = context.Shortcuts.Add(Descriptor.Id, Descriptor.Name);
             context.Ui.SetSettingsPage(section => { Section = section; return new TextBlock { Text = "Existing shortcut editor" }; });
             return Task.CompletedTask;
         }
-        public Task StopAsync(CancellationToken ct) => Task.CompletedTask;
+        public Task StopAsync(CancellationToken ct)
+        {
+            _shortcut?.Dispose();
+            return Task.CompletedTask;
+        }
     }
     private sealed class FailedFeature(string id = "failed-test", bool unknown = false) : IFeatureModule
     {
