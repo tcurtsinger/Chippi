@@ -46,6 +46,8 @@ public sealed class ShellContext
         // One message-only window for every feature's shortcut; it opens with the first one set.
         Hotkeys = new Chippi.UI.Shortcuts.HotkeyWindow(System.Windows.Threading.Dispatcher.CurrentDispatcher);
         Services.Shortcuts = Shortcuts = new Chippi.Core.Shortcuts.ShortcutService(Hotkeys);
+        // What every feature's actions act on: windows, keys, media, programs. It holds nothing.
+        Services.Actions = new Chippi.UI.Actions.WindowsActionPc();
         // Always on and Pause in these apps (Settings › General): kept until the hub's thread starts, then applied live.
         void ApplyPauseRules() => Input.Rules = config.GetSection<AppSettings>(AppSettings.SectionName).PauseRules();
         ApplyPauseRules();
