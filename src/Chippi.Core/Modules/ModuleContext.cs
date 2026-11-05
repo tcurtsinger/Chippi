@@ -86,6 +86,9 @@ public sealed class ModuleContext(
 
     /// <summary>Closes the island, after a page's paste was sent.</summary>
     public Action CloseIsland { get; init; } = () => { };
+
+    /// <summary>Whether the widget can show feedback now. Call on the UI dispatcher.</summary>
+    public Func<bool> CanShowIslandFeedback { get; init; } = () => false;
 }
 
 /// <summary>Typed access to a module's config section (<c>modules.&lt;id&gt;</c> in settings.json).</summary>

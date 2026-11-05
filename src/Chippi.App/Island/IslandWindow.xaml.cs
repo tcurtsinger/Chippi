@@ -1052,7 +1052,7 @@ public partial class IslandWindow : Window
             else
             {
                 var opens = feedback.OpensTile is { } page ? _tiles.FirstOrDefault(t => t.Key == page) : null;
-                ShowGlyph(opens is null ? LucideIcons.ClipboardType : LucideIcons.Get(opens.Icon), feedback.NeedsAttention);
+                ShowGlyph(feedback.Icon is { } icon ? LucideIcons.Get(icon) : opens is null ? LucideIcons.ClipboardType : LucideIcons.Get(opens.Icon), feedback.NeedsAttention);
             }
             ShowLine(feedback.Key, feedback.Title, feedback.Source);
         }
