@@ -196,7 +196,7 @@ public static class Probe
     $logs = Join-Path $env:LOCALAPPDATA 'Chippi-dev\sandbox\logs'
     if (Test-Path $logs) { Copy-Item -Path $logs -Destination "$results\chippi-logs" -Recurse }
     $found.hubLog = @(Get-ChildItem "$results\chippi-logs" -Filter *.log -ErrorAction SilentlyContinue |
-        ForEach-Object { Get-Content $_.FullName } | Where-Object { $_ -match 'Input hub' })
+        ForEach-Object { Get-Content $_.FullName } | Where-Object { $_ -match 'Input hub' } | ForEach-Object { [string]$_ })
     Stop-Process -Id $chippi.Id -Force -ErrorAction SilentlyContinue
 }
 catch {
