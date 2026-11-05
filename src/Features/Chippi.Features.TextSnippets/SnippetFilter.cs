@@ -33,7 +33,7 @@ internal sealed class WindowsKeyReader : IKeyReader
 /// completes an After-delimiter trigger: that key's text goes in after the snippet, and Tab or Enter would otherwise move
 /// focus or send the message with the trigger in it. Memory only; nothing typed is logged.
 /// </summary>
-internal sealed class SnippetFilter(IInputHub hub, SnippetMatcher matcher, Action<SnippetMatch, Delimiter?, long> expand, IKeyReader reader) : IInputFilter
+internal sealed class SnippetFilter(IInputHub hub, SnippetMatcher matcher, Action<SnippetMatch, Delimiter?, long> expand, IKeyReader reader, Action? cancel = null) : IInputFilter
 {
     private nint _foreground;
     private uint _swallowed;
@@ -51,12 +51,16 @@ internal sealed class SnippetFilter(IInputHub hub, SnippetMatcher matcher, Actio
     public bool Mouse(in MouseInput mouse)
     {
         if (mouse.Kind == MouseKind.Down)
+        {
+            cancel?.Invoke();
             matcher.Reset();
+        }
         return false;
     }
 
     public void InputReset(InputDevices devices)
     {
+        cancel?.Invoke();
         matcher.Reset();
         _swallowed = 0;
     }
@@ -77,9 +81,11 @@ internal sealed class SnippetFilter(IInputHub hub, SnippetMatcher matcher, Actio
             case 0x10 or 0xA0 or 0xA1 or 0x11 or 0xA2 or 0xA3 or 0x12 or 0xA4 or 0xA5 or 0x14 or 0x90 or 0x91:
                 return false; // a modifier alone: the key after it decides
             case 0x5B or 0x5C or 0xE5: // Win, or an IME composing
+                cancel?.Invoke();
                 matcher.Reset();
                 return false;
         }
+        cancel?.Invoke(); // any key but a modifier moves the caret or the text: an expansion still pending would delete the wrong characters
         nint front = reader.Foreground();
         if (front != _foreground)
         {

@@ -806,6 +806,11 @@ public static class Probe
         $sn.clipboardAfter = [string](Get-Clipboard)
         Typed 'noMatchTypedAsIs' { TypeKeys 'hello;ex' }
         Typed 'backspaceThenTrigger' { TypeKeys ';ex'; [Probe]::Key(0x08, $true); [Probe]::Spin(25); [Probe]::Key(0x08, $false); [Probe]::Spin(25); TypeKeys 'm' }
+        # Keys typed the moment a trigger completes: the expansion is dropped or lands whole, and the typed keys are never deleted.
+        # Either ";cpabc" (dropped) or "[SENTINEL]abc" (typed first) is right; "abc" alone or a cut-up text is not.
+        Typed 'typedRightAfterTrigger;cp' { TypeKeys ';c'; [Probe]::Key(0x50, $true); [Probe]::Key(0x50, $false); foreach ($k in 0x41, 0x42, 0x43) { [Probe]::Key([uint16]$k, $true); [Probe]::Key([uint16]$k, $false) } }
+        # Ctrl still down when the trigger completes, held past the one-second wait: nothing is typed and nothing is deleted.
+        Typed 'ctrlHeldPastTheWait;em' { TypeKeys ';e'; [Probe]::Key(0x4D, $true); [Probe]::Key(0x4D, $false); [Probe]::Key(0x11, $true); Start-Sleep -Milliseconds 2500; [Probe]::Key(0x11, $false) }
         Typed 'clickBreaksATrigger' { TypeKeys ';e'; [Probe]::Left($true); [Probe]::Left($false); [Probe]::Spin(100); TypeKeys 'm' }
         # A password box: where the app tells UI Automation so, nothing expands.
         $password = Start-Process -FilePath powershell.exe -ArgumentList '-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File C:\probe\password-target.ps1' -PassThru
