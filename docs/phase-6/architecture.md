@@ -34,7 +34,7 @@ Filter order:
 1. Cleaning mode lock (not Phase 6; never paused).
 2. Debounce: drops chatter, sends nothing.
 3. Close protection: swallows the first Alt+F4, passes the second.
-4. Shortcuts' hook triggers (Caps Lock combos, mouse buttons, chords `RegisterHotKey` can't take) and the Radial gesture. They share buttons: a click goes to the shortcut, a 250 ms hold opens the wheel.
+4. Shortcuts' hook triggers (Caps Lock combos, mouse buttons) and the Radial gesture. They share buttons: a click goes to the shortcut, a 250 ms hold opens the wheel.
 5. Smooth scrolling: swallows a wheel notch, sends a stream of small deltas.
 6. The snippet watcher: reads typed characters, never swallows.
 7. Later, only if Travis turns on the App switcher's Alt+Tab option: Alt+Tab.
@@ -68,7 +68,7 @@ Travis (task 208): every verb is one shared action, and any door can fire it: an
 - It knows every shortcut Chippi owns, with its owner and name, so Settings › Shortcuts lists them from the service and flags clashes between Chippi's own, instead of seven hard-coded ids.
 - A failed `RegisterHotKey` means another app holds it, and the row says so.
 - `RegisterHotKey` works over admin windows and needs no hook.
-- **Win combos can be bound** (Marge's call). The service keeps a list of the combos Windows itself uses (Win+L, Ctrl+Alt+Del, Alt+Tab, Alt+F4 and Windows' own Win combos, Herb's `shortcuts.md`): one saves, shows "In use by Windows" and doesn't act. A free Win combo goes through `RegisterHotKey`, or through the hub when `RegisterHotKey` refuses it, with Win masked (section 2).
+- **Win combos can be bound** (Marge's call). The service keeps a list of the combos Windows itself uses (Win+L, Ctrl+Alt+Del, Alt+Tab, Alt+F4 and Windows' own Win combos, Herb's `shortcuts.md`): one saves, shows "In use by Windows" and doesn't act. A free Win combo goes through `RegisterHotKey` like any key. When `RegisterHotKey` refuses it, another app holds it: the row shows "In use by another app" and Chippi never takes it over with a hook (Marge, 2026-11-05).
 - Clashes are found only with apps that also use `RegisterHotKey`; a game's own key binding isn't visible to Windows.
 - Shortcuts (Herb's brief) adds custom bindings, Caps Lock combos and mouse buttons on top. The App switcher's own shortcut is one of its rows.
 

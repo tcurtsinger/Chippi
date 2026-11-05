@@ -122,7 +122,7 @@ public sealed class ModuleTests
     }
 
     [Fact]
-    public async Task A_free_Win_combination_binds_through_RegisterHotKey_and_one_it_refuses_goes_through_the_hub()
+    public async Task A_free_Win_combination_binds_through_RegisterHotKey_and_one_another_app_holds_is_never_taken()
     {
         var rig = new Rig();
         await rig.StartAsync();
@@ -130,22 +130,12 @@ public sealed class ModuleTests
         Assert.True(rig.Module.Add(free).Ok);
         Assert.Equal(BindingState.Active, rig.Module.StatusOf(free.Id).State);
         Assert.Contains(free.Keys!, rig.Registrar.Registered);
-        Assert.Empty(rig.Hub.Filters);
 
         rig.Registrar.Refused.Add(new KeyShortcut(ShortcutModifiers.Windows, 0x59));
-        var refused = Key(ShortcutModifiers.Windows, 0x59, "Maximize"); // Win+Y
-        Assert.True(rig.Module.Add(refused).Ok);
-        Assert.Equal(BindingState.Active, rig.Module.StatusOf(refused.Id).State);
-        var filter = Assert.Single(rig.Hub.Filters);
-        Assert.Equal(InputDevices.Keyboard, filter.Devices);
-
-        // Win+Y in the hub runs the action on the window in front, and masks Win when it comes up.
-        filter.Key(new KeyInput(0x5B, 0, true, false, false, false, 0));
-        Assert.True(filter.Key(new KeyInput(0x59, 0, true, false, false, false, 0)));
-        await rig.Actions.Ran.Task.WaitAsync(TimeSpan.FromSeconds(5));
-        Assert.Equal(("Maximize", WindowTarget.InFront), rig.Actions.Runs.Single());
-        filter.Key(new KeyInput(0x5B, 0, false, false, false, false, 0));
-        Assert.Equal(1, rig.Hub.Masks);
+        var held = Key(ShortcutModifiers.Windows, 0x59, "Maximize"); // Win+Y, held by another app
+        Assert.True(rig.Module.Add(held).Ok);
+        Assert.Equal(new BindingStatus(BindingState.InUseByApp, "In use by another app"), rig.Module.StatusOf(held.Id));
+        Assert.Empty(rig.Hub.Filters); // no hook: the other app keeps its keys
     }
 
     [Fact]
@@ -370,7 +360,6 @@ public sealed class ModuleTests
     private sealed class FakeHub : IInputHub
     {
         public List<IInputFilter> Filters { get; } = [];
-        public int Masks { get; private set; }
         public bool Paused { get; set; }
         public bool FullscreenInFront => false;
         public event Action? PauseChanged;
@@ -387,7 +376,7 @@ public sealed class ModuleTests
             public void Dispose() => hub.Filters.Remove(filter);
             public void Refresh() { }
             public void HoldModifiers(uint heldBy, ReadOnlySpan<ushort> modifiers) { }
-            public void Mask() => hub.Masks++;
+            public void Mask() { }
         }
     }
 

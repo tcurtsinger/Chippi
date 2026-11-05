@@ -20,8 +20,7 @@ public interface IActionHost
 
 /// <summary>
 /// Shortcuts: any action on a key, or a mouse button (the Caps Lock combo comes next). A key shortcut is one of the
-/// shortcut service's, so Settings lists it with Chippi's own and Windows is asked for the keys; one with the Windows key
-/// that Windows refuses goes through the input hub. A mouse button is a filter in the hub, in only while the section's
+/// shortcut service's, so Settings lists it with Chippi's own and Windows is asked for the keys. A mouse button is a filter in the hub, in only while the section's
 /// switch is on and a binding uses a button. Both pause in a fullscreen app (keys are freed, so the game gets them).
 /// </summary>
 public sealed class ShortcutsModule : IFeatureModule
@@ -45,8 +44,7 @@ public sealed class ShortcutsModule : IFeatureModule
     private ModuleContext? _context;
     private SynchronizationContext? _ui;
     private MouseTriggerFilter? _mouse;
-    private ChordFilter? _chords;
-    private IInputRegistration? _mouseRegistration, _chordRegistration;
+    private IInputRegistration? _mouseRegistration;
     private Action? _pauseListener;
 
     /// <param name="actions">The shared action runner; null while there is none (every binding then shows Unavailable).</param>
@@ -94,10 +92,8 @@ public sealed class ShortcutsModule : IFeatureModule
             _pauseListener = null;
             Clear();
             _mouseRegistration?.Dispose();
-            _chordRegistration?.Dispose();
-            _mouseRegistration = _chordRegistration = null;
+            _mouseRegistration = null;
             _mouse = null;
-            _chords = null;
             _context = null;
         }
         return Task.CompletedTask;
@@ -218,7 +214,6 @@ public sealed class ShortcutsModule : IFeatureModule
         Clear();
         bool paused = _context.Input?.Paused == true;
         var host = _actions();
-        var chords = new List<(KeyShortcut, string)>();
         foreach (var binding in Settings.Bindings)
         {
             var slot = new Slot(binding);
@@ -255,44 +250,10 @@ public sealed class ShortcutsModule : IFeatureModule
                 continue;
             if (slot.Hotkey.Error is { } error && error != ShortcutService.InUse)
                 slot.Status = new BindingStatus(BindingState.UsedTwice, error); // another Chippi feature: never taken from it
-            else if (keys.Modifiers.HasFlag(ShortcutModifiers.Windows))
-                chords.Add((keys, binding.Id)); // Windows kept what RegisterHotKey refused; the hub's hook takes it instead
             else
                 slot.Status = new BindingStatus(BindingState.InUseByApp, "In use by another app");
         }
-        ApplyChords(chords, host);
         ApplyMouse(host);
-    }
-
-    private void ApplyChords(List<(KeyShortcut, string)> chords, IActionHost? host)
-    {
-        var hub = _context?.Input;
-        if (chords.Count == 0 || hub is null || host is null)
-        {
-            _chordRegistration?.Dispose();
-            _chordRegistration = null;
-            _chords = null;
-            return;
-        }
-        if (_chordRegistration is null)
-        {
-            var filter = new ChordFilter { Fired = id => Post(() => { lock (_gate) RunBinding(id, _actions(), WindowTarget.InFront); }) };
-            try
-            {
-                _chordRegistration = hub.Add(filter);
-                filter.Mask = _chordRegistration.Mask;
-                _chords = filter;
-            }
-            catch (Exception ex)
-            {
-                Log.Warn("Shortcuts: the keyboard hook failed", ex);
-                foreach (var (_, id) in chords)
-                    if (_slots.FirstOrDefault(s => s.Binding.Id == id) is { } slot)
-                        slot.Status = new BindingStatus(BindingState.InUseByApp, "In use by another app");
-                return;
-            }
-        }
-        _chords!.Set(chords);
     }
 
     private void ApplyMouse(IActionHost? host)

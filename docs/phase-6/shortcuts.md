@@ -42,7 +42,7 @@ Empty state: "No shortcuts yet. Add the first one."
 - **Used twice:** two Chippi bindings on one door. The second doesn't save: "{action} already uses this." For a mouse button: "That button or direction is already on the list."
 - **In use by another app:** `RegisterHotKey` failed. This is the only way to learn another app holds a combination.
 - **Held by the Radial menu:** "That button already opens the Radial menu. Pick another one, or free it there first." A button the Radial menu holds shows "This button opens the Radial menu now, so the shortcut waits." Radial wins until it's freed; both live in the hub (click for the binding, hold for the wheel).
-- **In use by Windows:** a reserved combination, listed above. The row shows it and the binding doesn't act. Win combinations Windows doesn't use work, through the hub where `RegisterHotKey` can't take them.
+- **In use by Windows:** a reserved combination, listed above. The row shows it and the binding doesn't act. Win combinations Windows doesn't use work through `RegisterHotKey`; one that another app holds shows "In use by another app" and Chippi doesn't take it over.
 - Honest scope: Windows has no call that lists other apps' global shortcuts, so the page says "Shortcuts Chippi uses, with clashes flagged". The catalog blurb is reworded from "Every shortcut Chippi and your apps use".
 
 ## Edge cases

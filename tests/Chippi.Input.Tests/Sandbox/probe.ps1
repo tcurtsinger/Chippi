@@ -118,6 +118,11 @@ public static class Probe
     }
 
     /// <summary>Holds a RegisterHotKey of this process's own, as another app would: Chippi's attempt on the same keys is refused.</summary>
+    static int hits;
+
+    /// <summary>Presses the process's own held hotkey has heard.</summary>
+    public static int Hits { get { return hits; } }
+
     public static bool HoldHotkey(uint modifiers, uint vk)
     {
         bool ok = false;
@@ -127,7 +132,7 @@ public static class Probe
             ok = RegisterHotKey(IntPtr.Zero, 77, modifiers, vk);
             ready.Set();
             MSG msg;
-            while (GetMessage(out msg, IntPtr.Zero, 0, 0) > 0) { }
+            while (GetMessage(out msg, IntPtr.Zero, 0, 0) > 0) { if (msg.Message == 0x312) System.Threading.Interlocked.Increment(ref hits); }
         });
         thread.IsBackground = true;
         thread.Start();
@@ -236,7 +241,7 @@ public static class Probe
     }
     if ($shortcutsOnly) {
         # Shortcuts alone. CHIPPI_SHORTCUTS_PROBE: its fired bindings go to a file (the shared action runner isn't in the shell yet).
-        # Another app holds Win+Y, so Chippi's RegisterHotKey for it is refused and the hub takes it.
+        # Another app holds Win+Y, so Chippi's RegisterHotKey for it is refused: the binding fires nothing and the other app hears it.
         $debounceSettings = ShortcutSettings
         $env:CHIPPI_SHORTCUTS_PROBE = "$results\actions.log"
         $holdWinY = [Probe]::HoldHotkey(8, 0x59)
@@ -549,10 +554,11 @@ public static class Probe
             [Probe]::MoveTo($x, $y)
             Start-Sleep -Milliseconds 300
             $before = [Probe]::Foreground()
+            $hitsBefore = [Probe]::Hits
             & $act
             Start-Sleep -Milliseconds 1500
-            $sc[$name] = [ordered]@{ actions = ((Actions) -join '; '); targetHeard = ((TargetLog) -join '; '); foreground = "$before -> $([Probe]::Foreground())" }
-            Note "shortcuts $name : fired [$((Actions) -join '; ')] target heard [$((TargetLog) -join '; ')] foreground $($sc[$name].foreground)"
+            $sc[$name] = [ordered]@{ actions = ((Actions) -join '; '); targetHeard = ((TargetLog) -join '; '); foreground = "$before -> $([Probe]::Foreground())"; otherAppHotkeyHeard = [Probe]::Hits - $hitsBefore }
+            Note "shortcuts $name : fired [$((Actions) -join '; ')] target heard [$((TargetLog) -join '; ')] other app heard $([Probe]::Hits - $hitsBefore) foreground $($sc[$name].foreground)"
             Start-Sleep -Milliseconds 300
         }
         Door 'backClick' { [Probe]::Back($true); Start-Sleep -Milliseconds 80; [Probe]::Back($false) }
