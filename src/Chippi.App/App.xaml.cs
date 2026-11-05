@@ -204,7 +204,8 @@ public partial class App : Application
         var commandBar = new Chippi.Features.CommandBar.CommandBarModule();
         shell.Registry.Register(commandBar);
         // [Phase 5.5] The Radial menu: closed during Cleaning mode, wide awake with Keep awake, searching where the Command bar does.
-        shell.Registry.Register(new Chippi.Features.RadialMenu.RadialMenuModule(() => cleaning.IsOn, () => keepAwake.IsOn, () => commandBar.Settings.WebSearch));
+        var radial = new Chippi.Features.RadialMenu.RadialMenuModule(() => cleaning.IsOn, () => keepAwake.IsOn, () => commandBar.Settings.WebSearch);
+        shell.Registry.Register(radial);
         // [Phase 5.5] AI agent usage: replaces its catalog placeholder.
         shell.Registry.Register(new Chippi.Features.AgentUsage.AgentUsageModule());
         // [Phase 6] Click and key debounce: replaces its catalog placeholder.
@@ -216,6 +217,14 @@ public partial class App : Application
         var shortcutProbe = Environment.GetEnvironmentVariable("CHIPPI_SHORTCUTS_PROBE");
         shell.Registry.Register(new Chippi.Features.Shortcuts.ShortcutsModule(
             () => string.IsNullOrEmpty(shortcutProbe) ? null : new Chippi.Features.Shortcuts.ProbeActionHost(shortcutProbe),
+            radialHolds: button => shell.Registry.Features.Any(f => f.Id == Chippi.Features.RadialMenu.RadialMenuModule.Id && f.IsRunning)
+                && button switch
+                {
+                    Chippi.Features.Shortcuts.MouseTrigger.Middle => radial.Settings.HoldMiddle,
+                    Chippi.Features.Shortcuts.MouseTrigger.Back => radial.Settings.HoldBack,
+                    Chippi.Features.Shortcuts.MouseTrigger.Forward => radial.Settings.HoldForward,
+                    _ => false,
+                },
             searchUrl: text => Chippi.Features.CommandBar.WebEngines.SearchUrl(commandBar.Settings.WebSearch, text)));
 
         shell.Registry.Register(new Chippi.Features.CloseProtection.CloseProtectionModule(() =>

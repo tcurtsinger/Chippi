@@ -347,9 +347,12 @@ public sealed class ShortcutsModule : IFeatureModule
         if (slot is null || host is null)
             return;
         var binding = slot.Binding;
-        _ = Task.Run(async () =>
+        _ = RunAsync();
+
+        // Started where the press landed, the UI thread: Chippi's commands and the PC's window calls are UI-thread APIs.
+        async Task RunAsync()
         {
-            try { await host.RunAsync(binding.Action, target).ConfigureAwait(false); }
+            try { await host.RunAsync(binding.Action, target); }
             catch (Exception ex)
             {
                 string reason = ex is ActionFailure ? ex.Message : "Failed";
@@ -357,6 +360,6 @@ public sealed class ShortcutsModule : IFeatureModule
                     Log.Warn($"Shortcuts: {binding.Label} failed", ex);
                 Post(() => ActionFailed?.Invoke(binding, reason));
             }
-        });
+        }
     }
 }

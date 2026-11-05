@@ -342,6 +342,17 @@ public sealed class ModuleTests
     }
 
     [Fact]
+    public async Task A_binding_runs_its_action_on_the_thread_that_pressed_it()
+    {
+        var rig = new Rig();
+        await rig.StartAsync();
+        var binding = Key(CtrlAlt, 0x4B);
+        Assert.True(rig.Module.Add(binding).Ok);
+        rig.Registrar.Press(binding.Keys!);
+        Assert.Equal(Environment.CurrentManagedThreadId, rig.Actions.ThreadId);
+    }
+
+    [Fact]
     public async Task With_no_host_given_a_key_binding_runs_on_the_shells_actions()
     {
         var registrar = new FakeRegistrar();
@@ -384,10 +395,12 @@ public sealed class ModuleTests
         public List<(string Name, WindowTarget Target)> Runs { get; } = [];
         public HashSet<string> Missing { get; } = [];
         public string? Fail { get; set; }
+        public int ThreadId { get; private set; }
         public TaskCompletionSource Ran { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public Task RunAsync(ChippiAction action, WindowTarget target)
         {
+            ThreadId = Environment.CurrentManagedThreadId;
             Runs.Add((action.Name, target));
             Ran.TrySetResult();
             return Fail is null ? Task.CompletedTask : Task.FromException(new ActionFailure(Fail));
