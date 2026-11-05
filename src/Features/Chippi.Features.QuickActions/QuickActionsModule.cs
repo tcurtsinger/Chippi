@@ -188,7 +188,7 @@ public sealed class QuickActionsModule : IFeatureModule
         foreach (var action in QuickAction.All)
         {
             _hotkeys[action.Id] = CreateHotkey(context, action);
-            if (Settings.ShortcutOf(action.Id) is { IsValid: true } shortcut)
+            if (Settings.ShortcutOf(action.Id) is { IsBindable: true } shortcut)
                 TryRegister(action.Id, shortcut);
         }
         // Read once now, so the page opens already filled.
@@ -417,7 +417,7 @@ public sealed class QuickActionsModule : IFeatureModule
     {
         if (Context is null)
             return false;
-        if (!shortcut.IsValid)
+        if (!shortcut.IsBindable)
         {
             _shortcutErrors[id] = "Shortcut unavailable";
             Changed?.Invoke();
@@ -469,7 +469,8 @@ public sealed class QuickActionsModule : IFeatureModule
     /// <summary>While Settings records a shortcut, pressing one of ours doesn't run it.</summary>
     public void CaptureShortcut(bool capture) => _capturing = capture;
 
-    private IHotkey CreateHotkey(ModuleContext context, QuickAction action) => _createHotkey?.Invoke() ?? context.Shortcuts.Add(Id, action.Name);
+    private IHotkey CreateHotkey(ModuleContext context, QuickAction action) => _createHotkey?.Invoke() ?? context.Shortcuts.Add(Id, action.Name,
+        new(() => Settings.ShortcutOf(action.Id), k => ChangeShortcut(action.Id, k) ? null : ShortcutErrors.GetValueOrDefault(action.Id), () => RemoveShortcut(action.Id)) { Icon = LucideIcons.KeyOf(action.Icon) });
 
     private bool TryRegister(QuickActionId id, KeyShortcut shortcut)
     {

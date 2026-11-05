@@ -48,31 +48,27 @@ public sealed class PlainPasteModule : IFeatureModule
         _context = context; _stopping = false; _capturing = false;
         ShortcutError = null;
         Settings = context.Settings.Get<PlainPasteSettings>();
-        if (Settings.Shortcut is { IsValid: false }) Settings = new();
+        if (Settings.Shortcut is { IsBindable: false }) Settings = new();
         _timer = _time.CreateTimer(_ => Expire(), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
-        if (Settings.Shortcut is { } shortcut) _hotkey = Reserve(shortcut);
-        _hotkey ??= Create(); // listed in Settings › Shortcuts while it runs, set or not
+        _hotkey = Create(); // listed in Settings › Shortcuts while it runs, set or not
+        if (Settings.Shortcut is { } shortcut) Reserve(shortcut);
         context.Ui.SetSettingsPage(section => new PlainPasteView(this, section == "shortcut-list" ? Descriptor.Name : "Shortcut"));
         return Task.CompletedTask;
     }
-    private IHotkey? Reserve(KeyShortcut shortcut)
+    /// <summary>The listed shortcut takes these keys; the service holds them before it frees the old ones.</summary>
+    private bool Reserve(KeyShortcut shortcut)
     {
-        IHotkey? candidate = null;
-        // With no keys held, the listed shortcut takes them itself; a change holds the new keys apart until it's saved.
-        bool fresh = _hotkey is null || Settings.Shortcut is not null;
         try
         {
-            candidate = fresh ? Create() : _hotkey!;
-            if (candidate.Register(shortcut, () => { if (ReferenceEquals(candidate, _hotkey)) OnShortcut(); }))
+            if (_hotkey!.Register(shortcut, OnShortcut))
             {
                 ShortcutError = null;
-                return candidate;
+                return true;
             }
-            ShortcutError = candidate.Error ?? ShortcutService.InUse;
+            ShortcutError = _hotkey.Error ?? ShortcutService.InUse;
         }
         catch { ShortcutError = "Shortcut unavailable"; }
-        if (fresh) candidate?.Dispose();
-        return null;
+        return false;
     }
 
     private bool Save(KeyShortcut? shortcut)
@@ -92,23 +88,12 @@ public sealed class PlainPasteModule : IFeatureModule
     public bool ChangeShortcut(KeyShortcut shortcut)
     {
         if (_stopping) return false;
-        if (!shortcut.IsValid) { ShortcutError = "Shortcut unavailable"; Changed?.Invoke(); return false; }
-        if (Settings.Shortcut == shortcut && _hotkey is not null)
-        {
-            ShortcutError = null;
-            Changed?.Invoke();
-            return true;
-        }
-        // Keep the previous combination registered until its replacement is both available and saved.
-        var replacement = Reserve(shortcut);
-        bool saved = replacement is not null && Save(shortcut);
-        if (saved)
-        {
-            if (!ReferenceEquals(_hotkey, replacement)) _hotkey?.Dispose();
-            _hotkey = replacement;
-        }
-        else if (ReferenceEquals(replacement, _hotkey)) replacement?.Unregister(); // the unsaved keys never stay held
-        else replacement?.Dispose();
+        if (!shortcut.IsBindable) { ShortcutError = "Shortcut unavailable"; Changed?.Invoke(); return false; }
+        // A refused change keeps the previous keys held. A failed save takes them back, or holds nothing unsaved.
+        var previous = Settings.Shortcut;
+        bool saved = Reserve(shortcut) && Save(shortcut);
+        if (!saved && ShortcutError == "Save failed" && (previous is null || _hotkey?.Register(previous, OnShortcut) != true))
+            _hotkey?.Unregister();
         Changed?.Invoke();
         return saved;
     }
@@ -121,8 +106,9 @@ public sealed class PlainPasteModule : IFeatureModule
     }
     public void CaptureShortcut(bool capture) => _capturing = capture;
 
-    /// <summary>A shortcut in the shell's list. A change reserves a new one before the old one goes.</summary>
-    private IHotkey Create() => _create?.Invoke() ?? (_context ?? throw new InvalidOperationException("Not started")).Shortcuts.Add(Id, Descriptor.Name);
+    /// <summary>The shortcut in the shell's list, set or not, from start to stop; Settings › Shortcuts changes it here.</summary>
+    private IHotkey Create() => _create?.Invoke() ?? (_context ?? throw new InvalidOperationException("Not started")).Shortcuts.Add(Id, Descriptor.Name,
+        new(() => Settings.Shortcut, k => ChangeShortcut(k) ? null : ShortcutError, RemoveShortcut) { Icon = Descriptor.Icon });
     private async void OnShortcut() { try { await InvokeAsync(); } catch { /* The shortcut never logs clipboard contents or exception messages. */ } }
 
     public async Task InvokeAsync()

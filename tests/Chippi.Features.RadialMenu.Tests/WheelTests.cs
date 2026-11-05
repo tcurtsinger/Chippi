@@ -319,7 +319,7 @@ public sealed class WheelTests
         var middle = new Slice { Kind = SliceKind.Submenu, Name = "B", Slices = [.. Enumerable.Repeat(Media(MediaAction.Mute), 9), deep] };
         var settings = new RadialMenuSettings
         {
-            Shortcut = new KeyShortcut(ShortcutModifiers.Windows, 0x52),
+            Shortcut = new KeyShortcut(ShortcutModifiers.Shift, 0x52), // no Ctrl, Alt or Win
             Slices = [.. Enumerable.Repeat(new Slice { Kind = SliceKind.Submenu, Name = "A", Slices = [middle] }, 10)],
         }.Checked();
         Assert.Null(settings.Shortcut);

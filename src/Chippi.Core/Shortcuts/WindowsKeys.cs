@@ -1,15 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
-using Chippi.Core.Shortcuts;
-
-namespace Chippi.Features.Shortcuts;
+namespace Chippi.Core.Shortcuts;
 
 /// <summary>
 /// Combinations Windows keeps for itself. A binding on one saves and shows "In use by Windows", and doesn't act. From the
 /// shortcuts Windows 11 documents; Windows has no call that lists them, so a new one it adds isn't known here.
 /// </summary>
-internal static class WindowsKeys
+public static class WindowsKeys
 {
     public const string Text = "In use by Windows";
 
