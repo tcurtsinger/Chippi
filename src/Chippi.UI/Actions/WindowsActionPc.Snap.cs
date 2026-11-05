@@ -253,7 +253,10 @@ public sealed partial class WindowsActionPc : IDisposable
             if (!Native.Monitors().Contains(monitor)) throw new ActionFailure("Display removed");
             nint from = Native.MonitorFromWindow(target.Handle, 2);
             if (from == monitor) return;
-            if (FullscreenCheck.CoversMonitor(target.Handle, from)) throw new ActionFailure("Fullscreen");
+            // A minimized window never covers its monitor: restore it first (activating does anyway), then ask.
+            if (Native.IsIconic(target.Handle)) Native.ShowWindow(target.Handle, 9);
+            if (FullscreenCheck.CoversMonitor(target.Handle, Native.MonitorFromWindow(target.Handle, 2)))
+                throw new ActionFailure("Fullscreen");
             Carry(target, monitor);
         }
         catch (ActionFailure ex)
