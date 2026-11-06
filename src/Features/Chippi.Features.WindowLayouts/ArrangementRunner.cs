@@ -91,10 +91,13 @@ public sealed class ArrangementRunner(IArrangementDesktop desktop, TimeProvider?
                         CheckStop(ct);
                         if (_time.GetElapsedTime(started) >= TimeSpan.FromSeconds(60))
                         {
-                            Update(i, Results[i] with { State = ArrangementRowState.Failed, Reason = "Launching failed: Timed out" });
+                            bool reused = desktop.Windows().Any(w => _matcher.IsReserved(w.Candidate.Window)
+                                && string.Equals(w.Candidate.AppIdentity, Results[i].Row.AppIdentity, StringComparison.OrdinalIgnoreCase));
+                            Update(i, Results[i] with { State = reused ? ArrangementRowState.Skipped : ArrangementRowState.Failed,
+                                Reason = reused ? "Window already used" : "Launching failed: Timed out" });
                             break;
                         }
-                        if (AttemptPlace(i, desktop.Windows(), ct, afterLaunch: true)) break;
+                        if (AttemptPlace(i, desktop.Windows(), ct)) break;
                         await (delay?.Invoke(TimeSpan.FromMilliseconds(100), ct)
                             ?? Task.Delay(TimeSpan.FromMilliseconds(100), _time, ct));
                     }
@@ -111,13 +114,13 @@ public sealed class ArrangementRunner(IArrangementDesktop desktop, TimeProvider?
         finally { Changed?.Invoke(); }
     }
 
-    private bool AttemptPlace(int index, IReadOnlyList<ArrangementLiveWindow> windows, CancellationToken ct, bool afterLaunch = false)
+    private bool AttemptPlace(int index, IReadOnlyList<ArrangementLiveWindow> windows, CancellationToken ct)
     {
-        try { return TryPlace(index, windows, ct, afterLaunch); }
+        try { return TryPlace(index, windows, ct); }
         catch (ActionFailure ex) { Failure(index, "Placement failed", ex); return true; }
     }
 
-    private bool TryPlace(int index, IReadOnlyList<ArrangementLiveWindow> windows, CancellationToken ct, bool afterLaunch)
+    private bool TryPlace(int index, IReadOnlyList<ArrangementLiveWindow> windows, CancellationToken ct)
     {
         var result = Results[index];
         var row = result.Row;
@@ -137,7 +140,7 @@ public sealed class ArrangementRunner(IArrangementDesktop desktop, TimeProvider?
             var sameApp = windows.Where(w => string.Equals(w.Candidate.AppIdentity, row.AppIdentity, StringComparison.OrdinalIgnoreCase)).ToArray();
             string? refusal = sameApp.Any(w => !w.Candidate.CurrentDesktop) ? "Another desktop"
                 : sameApp.Any(w => w.Candidate.Window.Elevated) ? "Needs admin"
-                : afterLaunch && sameApp.Any(w => _matcher.IsReserved(w.Candidate.Window)) ? "Window already used" : null;
+                : null;
             if (refusal is null) return false;
             Update(index, result with { State = ArrangementRowState.Skipped, Reason = refusal });
             return true;

@@ -64,3 +64,14 @@ placement timings are written to the output folder. It never accesses the clipbo
 The Sandbox supplies only one display and DPI. Physical mixed-DPI, multiple-monitor placement and disconnect still
 need a suitable isolated desktop or the owner's live check. Plain top-edge Windows Snap and app-specific fixed/minimum
 sizes also remain live checks unless explicitly recorded in the probe result.
+## Arrangements
+
+`-Checks arrangements` uses the same self-contained app and medium-integrity guest launcher as Snap. It creates twelve
+standard editor windows across three disposable fixture executables, closes six, and launches three seeded arrangements
+through their shared shortcuts. It checks reuse without duplicates, restored bounds on the same display, missing-display
+fallback, normal/maximized/minimized state, minimized-from-maximized restoration, and foreground retention when all
+windows already exist. It writes before/after screenshots and completion timings that include app startup.
+
+Run this once with the completed feature. Capture UI, Cancel, timeout, summaries, registered-app elevation refusal and
+fullscreen ownership still need the final screen-driven cases. The script records these as limits rather than claiming
+full acceptance. No fixture touches the clipboard, network, Sound modules or host windows.

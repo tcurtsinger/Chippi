@@ -96,11 +96,29 @@ public sealed class ArrangementEngineTests
     {
         var desktop = new Desktop();
         desktop.Live.Add(Live(1));
-        var runner = new ArrangementRunner(desktop);
+        var clock = new Clock();
+        var runner = new ArrangementRunner(desktop, clock, (_, _) => { clock.Now += 10000; return Task.CompletedTask; });
         await runner.LaunchAsync(Arrangement(Row(), Row()), "saved");
         Assert.Equal(ArrangementRowState.Skipped, runner.Results[1].State);
         Assert.Equal("Window already used", runner.Results[1].Reason);
         Assert.Equal(new[] { "place:1", "launch:editor" }, desktop.Calls);
+    }
+
+    [Fact]
+    public async Task A_second_window_can_arrive_after_the_app_reuses_its_process()
+    {
+        var desktop = new Desktop();
+        desktop.Live.Add(Live(1));
+        var clock = new Clock();
+        var runner = new ArrangementRunner(desktop, clock, (_, _) =>
+        {
+            clock.Now += 100;
+            if (clock.Now == 500) desktop.Live.Add(Live(2));
+            return Task.CompletedTask;
+        });
+        await runner.LaunchAsync(Arrangement(Row(), Row()), "saved");
+        Assert.All(runner.Results, r => Assert.Equal(ArrangementRowState.Ready, r.State));
+        Assert.Equal(new[] { "place:1", "launch:editor", "place:2" }, desktop.Calls);
     }
 
     [Fact]
