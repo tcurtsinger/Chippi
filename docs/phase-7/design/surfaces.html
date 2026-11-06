@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Chippi Phase 7: surfaces (rough boards)</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font-family:'Segoe UI Variable Text','Segoe UI',system-ui,sans-serif;-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
+button{font:inherit;color:inherit;margin:0}
+svg.g{fill:none;stroke:currentColor;stroke-linecap:round;stroke-linejoin:round;flex:none;display:block}
+
+/* island tokens, copied from docs/phase-6/design (Chippi.UI/Themes Dark.xaml / Light.xaml) */
+.dark{--fill:rgba(40,40,44,.961);--bord:rgba(255,255,255,.09);--hair:rgba(255,255,255,.078);--face:rgba(255,255,255,.024);--faceh:rgba(255,255,255,.10);--cardb:rgba(255,255,255,.059);
+ --btn:rgba(255,255,255,.071);--ctlb:rgba(255,255,255,.09);--hov:rgba(255,255,255,.059);--muted:rgba(255,255,255,.28);--track:rgba(255,255,255,.16);
+ --tx:#FFFFFF;--tx2:#C9C9C9;--tx3:#9A9A9A;--acc:#B79CFF;--accf:linear-gradient(135deg,#B78FFF,#82AEFF);--tint:rgba(183,156,255,.14);--onacc:#170F2E;--cau:#FF99A4;--crit:#FF99A4;
+ --shadow:0 16px 40px rgba(0,0,0,.5);--rim:rgba(255,255,255,.17);
+ --win:#202020;--surf:#2B2B2B;--sbord:rgba(255,255,255,.031);--div:rgba(255,255,255,.059);--st1:#FFFFFF;--st2:#C5C5C5;--st3:#ABABAB;--st4:#9D9D9D;
+ --ssel:rgba(255,255,255,.059);--sbtn:rgba(255,255,255,.059);--sbtnb:rgba(255,255,255,.09);--sacc:#B79CFF;--sonacc:#000;--field:rgba(255,255,255,.059);--fieldb:rgba(255,255,255,.55);--cap:rgba(255,255,255,.09)}
+.light{--fill:rgba(245,245,246,.961);--bord:rgba(0,0,0,.078);--hair:rgba(0,0,0,.078);--face:rgba(255,255,255,.45);--faceh:#FFFFFF;--cardb:rgba(0,0,0,.059);
+ --btn:rgba(255,255,255,.86);--ctlb:rgba(0,0,0,.09);--hov:rgba(0,0,0,.043);--muted:rgba(0,0,0,.18);--track:rgba(0,0,0,.14);
+ --tx:#1A1A1A;--tx2:#5C5C5C;--tx3:#707070;--acc:#7444F0;--accf:linear-gradient(135deg,#8F5CFF,#5B86FF);--tint:rgba(116,68,240,.10);--onacc:#FFFFFF;--cau:#C42B1C;--crit:#C42B1C;
+ --shadow:0 16px 40px rgba(0,0,0,.2);--rim:rgba(0,0,0,.12);
+ --win:#F3F3F3;--surf:#FBFBFB;--sbord:rgba(0,0,0,.059);--div:rgba(0,0,0,.071);--st1:#1A1A1A;--st2:#404040;--st3:#5D5D5D;--st4:#616161;
+ --ssel:rgba(0,0,0,.055);--sbtn:#FFFFFF;--sbtnb:rgba(0,0,0,.10);--sacc:#6B4FBB;--sonacc:#FFF;--field:#FFFFFF;--fieldb:rgba(0,0,0,.45);--cap:rgba(0,0,0,.06)}
+
+.sheet{display:inline-flex;flex-direction:column;gap:28px;padding:32px;background:#161616;color:#E6E6E6}
+.sheet.lt{background:#D9D9D9;color:#1A1A1A}
+.srow{display:flex;gap:28px;align-items:flex-start}
+.cap{font-size:13px;line-height:18px;font-weight:600;margin:0 0 8px;max-width:620px}
+.stage{background:#1F1F1F;padding:24px 32px 32px;border-radius:2px}
+
+/* island panel 520x360 */
+.panel{position:relative;width:520px;height:360px;padding:12px;background:var(--fill);border:1px solid var(--bord);border-radius:8px;box-shadow:var(--shadow);color:var(--tx);font-size:12px;line-height:16px;overflow:hidden}
+.hdr{display:flex;align-items:center;height:24px;margin-bottom:8px;gap:6px}
+.ib{width:28px;height:24px;display:inline-flex;align-items:center;justify-content:center;border:0;padding:0;border-radius:4px;background:transparent;color:var(--tx2)}
+.ib.back{margin:0 0 0 -4px}
+.ttl{flex:1;font-size:13px;font-weight:600;line-height:20px;white-space:nowrap}
+.body{position:relative;width:494px;height:302px}
+.ibtn{height:28px;padding:0 10px;border-radius:4px;border:1px solid var(--ctlb);background:var(--btn);font-size:12px;color:var(--tx);white-space:nowrap;display:inline-flex;align-items:center;gap:6px;min-width:64px;justify-content:center}
+.ibtn.acc{background:var(--accf);border-color:transparent;color:var(--onacc);font-weight:600}
+.ibtn.crit{background:var(--crit);border-color:transparent;color:#000}
+.light .ibtn.crit{color:#fff}
+.ibtn.sm{height:24px;min-width:0;padding:0 8px;font-size:11px}
+.seg{display:inline-flex;height:24px;border-radius:4px;background:var(--hov);padding:2px;gap:2px;font-size:11px}
+.seg span{padding:0 8px;border-radius:3px;display:flex;align-items:center;color:var(--tx2)}
+.seg span.on{background:var(--btn);color:var(--tx);font-weight:600;box-shadow:0 0 0 1px var(--ctlb)}
+.combo{height:24px;padding:0 6px 0 8px;border-radius:4px;border:1px solid var(--ctlb);background:var(--btn);display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--tx);white-space:nowrap}
+.grid6{display:grid;grid-template-columns:repeat(6,76px);gap:8px}
+.cc{height:64px;border:1px solid var(--cardb);border-radius:6px;background:var(--face);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;color:var(--tx2);font-size:12px;position:relative}
+.cc span{color:var(--tx)}
+.cc.pri{background:var(--accf);border-color:transparent;color:var(--onacc)}
+.cc.pri span{color:var(--onacc);font-weight:600}
+.cc.on{background:var(--tint);border-color:var(--acc);color:var(--acc)}
+.cc.dis{opacity:.45}
+.cc.hov{background:var(--faceh)}
+.sub{display:flex;align-items:center;height:28px;margin-top:12px}
+.sub b{flex:1;font-size:12px;font-weight:600}
+.thumbs{display:grid;grid-template-columns:repeat(4,118px);gap:8px;margin-top:4px}
+.th .img{height:66px;border-radius:6px;border:1px solid var(--hair);position:relative;overflow:hidden}
+.th .n{font-size:11px;line-height:14px;color:var(--tx2);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.th .m{font-size:11px;line-height:14px;color:var(--tx3)}
+.dur{position:absolute;right:4px;bottom:4px;height:16px;padding:0 4px;border-radius:3px;background:rgba(0,0,0,.6);color:#fff;font-size:10px;line-height:16px}
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:var(--tx3);font-size:12px}
+.card{border:1px solid var(--cardb);border-radius:6px;background:var(--face)}
+.foot{position:absolute;left:0;right:0;bottom:0;display:flex;gap:8px;justify-content:flex-end;align-items:center}
+.foot .l{margin-right:auto}
+.rec{height:64px;display:flex;align-items:center;gap:8px;padding:0 10px}
+.dot{width:10px;height:10px;border-radius:5px;background:#E5484D;flex:none}
+.big{font-size:20px;font-weight:600;line-height:26px}
+.t3{color:var(--tx3);font-size:11px}
+.t2{color:var(--tx2)}
+.slider{flex:1;height:18px;position:relative}
+.slider::before{content:"";position:absolute;left:0;right:0;top:7px;height:4px;border-radius:2px;background:var(--track)}
+.slider i{position:absolute;left:0;top:7px;height:4px;border-radius:2px;background:var(--accf)}
+.slider b{position:absolute;top:0;width:18px;height:18px;margin-left:-9px;border-radius:9px;background:var(--fill);box-shadow:0 0 0 1px var(--ctlb),0 1px 3px rgba(0,0,0,.3)}
+.slider b::after{content:"";position:absolute;left:4px;top:4px;width:10px;height:10px;border-radius:5px;background:var(--acc)}
+.drow{height:44px;display:flex;align-items:center;gap:10px;padding:0 10px;margin-bottom:8px}
+.drow .nm{width:150px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.drow .pc{width:34px;text-align:right;color:var(--tx2)}
+.lrow{height:42px;display:flex;align-items:center;gap:8px;padding:0 10px;border-radius:4px}
+.lrow.hov{background:var(--hov)}
+.lrow .nm{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ico{width:16px;height:16px;border-radius:4px;flex:none}
+.badge{height:18px;padding:0 6px;border-radius:4px;background:var(--btn);font-size:11px;font-weight:600;color:var(--tx2);display:inline-flex;align-items:center;white-space:nowrap}
+.chk{width:16px;height:16px;border-radius:3px;border:1px solid var(--tx3);flex:none;display:inline-flex;align-items:center;justify-content:center}
+.chk.on{background:var(--accf);border-color:transparent;color:var(--onacc)}
+.q{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;background:var(--fill)}
+.q .qt{font-size:14px;font-weight:600}
+.isr{height:34px;display:flex;align-items:center;gap:10px;padding:0 10px;border-radius:4px}
+.isr.sel{background:var(--tint)}
+.isr .ld{width:20px;display:flex;justify-content:center;color:var(--tx2)}
+.isr .nm{font-size:12px;line-height:15px}
+.isr .dt{font-size:11px;line-height:14px;color:var(--tx2)}
+.isr .vb{margin-left:auto;font-size:11px;font-weight:600}
+.sfield{flex:1;height:32px;border-radius:4px;border:1px solid var(--ctlb);border-bottom:2px solid var(--acc);background:var(--btn);display:flex;align-items:center;padding:0 10px;font-size:13px}
+.lvl{width:48px;height:4px;border-radius:2px;background:var(--track);position:relative;margin-left:8px}
+.lvl i{position:absolute;left:0;top:0;bottom:0;border-radius:2px;background:var(--acc)}
+
+/* Actions tiles */
+.tile{position:relative;height:76px;display:flex;flex-direction:column;align-items:center;justify-content:center;border:1px solid var(--cardb);border-radius:6px;background:var(--face);color:var(--tx)}
+.agrid{display:grid;grid-template-columns:repeat(5,1fr);gap:7px}
+.agrid .tile{height:61px}
+.tile .lb{font-size:12px;font-weight:600;line-height:16px;margin-top:3px}
+.tile .st{font-size:11px;line-height:14px;color:var(--tx2)}
+.tile .chev{position:absolute;top:7px;right:6px;color:var(--tx3)}
+.tile.on{background:var(--accf);border-color:transparent;color:var(--onacc)}
+.tile.on .st{color:var(--onacc)}
+.tile.new::after{content:"";position:absolute;left:6px;top:6px;width:6px;height:6px;border-radius:3px;background:var(--acc)}
+
+/* bar 256x50 */
+.desk{background:#3A3F4B;padding:16px 20px;border-radius:2px}
+.bar{width:256px;height:50px;border-radius:25px;background:var(--fill);box-shadow:0 0 0 1px var(--rim),0 6px 16px rgba(0,0,0,.35);display:flex;align-items:center;color:var(--tx)}
+.bar .lead{width:34px;height:34px;border-radius:17px;background:var(--tint);color:var(--acc);display:flex;align-items:center;justify-content:center;flex:none;overflow:hidden}
+.bar .lead.cau{background:rgba(255,153,164,.16);color:var(--cau)}
+.bar .lines{flex:1;min-width:0;display:flex;flex-direction:column}
+.bar .bt{font-size:13px;font-weight:600;line-height:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar .bt.cau{color:var(--cau)}
+.bar .ba{font-size:12px;line-height:15px;color:var(--tx2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pet{width:46px;height:50px;display:flex;align-items:center;justify-content:center;flex:none}
+.pet span{width:34px;height:30px;border-radius:15px 15px 13px 13px;background:linear-gradient(160deg,#C9B6FF,#8E7BE8)}
+
+/* the frozen screen, at real size (DIPs) */
+.scr{position:relative;width:1100px;height:640px;overflow:hidden;border-radius:2px;background:linear-gradient(160deg,#2C3E57,#1B2838);font-size:12px}
+.w{position:absolute;border-radius:8px;background:#F3F3F3;box-shadow:0 8px 24px rgba(0,0,0,.4);overflow:hidden}
+.w .tb{height:32px;background:#E8E8E8;display:flex;align-items:center;padding:0 12px;font-size:12px;color:#333}
+.w .ln{height:10px;margin:12px 16px 0;border-radius:3px;background:#D5D5D5}
+.w.dk{background:#1E1E1E}.w.dk .tb{background:#2B2B2B;color:#ddd}.w.dk .ln{background:#3A3A3A}
+.dim{position:absolute;background:rgba(0,0,0,.45)}
+.selx{position:absolute;border:1px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.4)}
+.hdl{position:absolute;width:8px;height:8px;background:#fff;border:1px solid #7444F0;margin:-4px 0 0 -4px}
+.whl{position:absolute;border:2px solid #B79CFF;background:rgba(183,156,255,.10);border-radius:8px}
+.size{position:absolute;height:22px;padding:0 8px;border-radius:4px;background:rgba(32,32,36,.92);color:#fff;font-size:11px;line-height:22px;white-space:nowrap}
+.mag{position:absolute;width:112px;height:112px;border-radius:56px;border:2px solid #fff;box-shadow:0 4px 12px rgba(0,0,0,.5);overflow:hidden;background:
+ repeating-linear-gradient(0deg,rgba(0,0,0,.25) 0 1px,transparent 1px 8px),repeating-linear-gradient(90deg,rgba(0,0,0,.25) 0 1px,transparent 1px 8px),linear-gradient(90deg,#2B2B2B 0 50%,#2C3E57 50%)}
+.mag::after{content:"";position:absolute;left:52px;top:52px;width:8px;height:8px;border:1px solid #B79CFF}
+.magl{position:absolute;height:20px;padding:0 6px;border-radius:4px;background:rgba(32,32,36,.92);color:#fff;font-size:11px;line-height:20px;white-space:nowrap}
+.tools{position:absolute;width:40px;padding:4px;border-radius:8px;background:var(--fill);box-shadow:0 0 0 1px var(--bord),var(--shadow);display:flex;flex-direction:column;color:var(--tx2)}
+.tools .t{width:32px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:4px}
+.tools .t.on{background:var(--tint);color:var(--acc)}
+.tools .sep{height:1px;background:var(--hair);margin:4px 2px}
+.sw{width:14px;height:14px;border-radius:7px;background:#E5484D;box-shadow:0 0 0 2px var(--fill),0 0 0 3px var(--ctlb)}
+.acts{position:absolute;height:40px;padding:6px;border-radius:8px;background:var(--fill);box-shadow:0 0 0 1px var(--bord),var(--shadow);display:flex;gap:6px;align-items:center;color:var(--tx)}
+.acts .vsep{width:1px;height:20px;background:var(--hair)}
+.pill{position:absolute;height:32px;padding:0 4px 0 12px;border-radius:16px;background:var(--fill);box-shadow:0 0 0 1px var(--bord),var(--shadow);display:flex;gap:8px;align-items:center;color:var(--tx);font-size:12px;font-weight:600}
+.frame{position:absolute;border:2px solid #E5484D;border-radius:2px}
+.mk{position:absolute}
+
+/* Settings (rough) */
+.sw1{width:1120px;background:var(--win);color:var(--st1);font-size:14px;line-height:20px;border:1px solid rgba(128,128,128,.35);border-radius:8px;overflow:hidden;display:flex;flex-direction:column}
+.tbar{height:40px;display:flex;align-items:center;flex:none;font-size:12px}
+.tbar .logo{width:16px;height:16px;border-radius:8px;background:linear-gradient(135deg,#B78FFF,#82AEFF);margin:0 12px 0 16px}
+.shell{display:flex;flex:1}
+.side{width:272px;flex:none;padding:0 4px 12px}
+.gl{font-size:12px;font-weight:600;color:var(--st3);padding:12px 16px 4px;line-height:16px}
+.nav{position:relative;height:32px;margin:2px 4px;padding:0 12px;border-radius:4px;display:flex;align-items:center;gap:12px;white-space:nowrap}
+.nav.sel{background:var(--ssel);font-weight:600}
+.nav.sel::before{content:"";position:absolute;left:0;top:8px;width:3px;height:16px;border-radius:2px;background:var(--sacc)}
+.nav.new::after{content:"";margin-left:auto;width:6px;height:6px;border-radius:3px;background:var(--sacc)}
+.page{flex:1;padding:4px 40px 28px;min-width:0}
+.ptitle{font-family:'Segoe UI Variable Display','Segoe UI',sans-serif;font-size:20px;font-weight:600;line-height:28px;margin:0 0 14px}
+.sh{font-size:14px;font-weight:600;line-height:20px;margin:22px 0 8px}
+.scard{background:var(--surf);border:1px solid var(--sbord);border-radius:8px}
+.sr{min-height:48px;display:flex;align-items:center;padding:8px 16px;gap:12px;border-top:1px solid var(--div)}
+.sr:first-child{border-top:0}
+.sr .tl{flex:1;min-width:0}
+.sr .tl small{display:block;font-size:12px;line-height:16px;color:var(--st3)}
+.sbt{height:32px;padding:0 12px;border-radius:4px;border:1px solid var(--sbtnb);background:var(--sbtn);font-size:14px;color:var(--st1);display:inline-flex;align-items:center;gap:8px;white-space:nowrap}
+.scombo{height:32px;min-width:160px;padding:0 10px 0 11px;border-radius:4px;border:1px solid var(--sbtnb);background:var(--sbtn);display:inline-flex;align-items:center;justify-content:space-between;gap:12px;font-size:14px}
+.ssw{width:40px;height:20px;border-radius:10px;border:1px solid var(--st3);position:relative}
+.ssw::after{content:"";position:absolute;left:4px;top:4px;width:10px;height:10px;border-radius:5px;background:var(--st2)}
+.ssw.on{background:var(--sacc);border-color:var(--sacc)}.ssw.on::after{left:auto;right:4px;background:var(--sonacc)}
+.kc{height:24px;min-width:24px;padding:0 7px;border-radius:4px;background:var(--cap);border:1px solid var(--sbtnb);border-bottom-width:2px;font-size:12px;display:inline-flex;align-items:center;justify-content:center}
+.keys{width:200px;display:flex;gap:4px;align-items:center;color:var(--st3);font-size:14px}
+.link{color:var(--sacc);font-size:14px;display:inline-flex;align-items:center;gap:4px}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+// Rough boards: sizes are real (DIPs), glyphs are Lucide, every app, file and number is invented.
+const P={
+ChevronLeft:"M15,18 L9,12 L15,6",ChevronRight:"M9,18 L15,12 L9,6",ChevronDown:"M6,9 l6,6 l6,-6",
+Close:"M18,6 L6,18 M6,6 L18,18",Plus:"M12,5 V19 M5,12 H19",
+Region:"M5 3a2 2 0 0 0-2 2 M19 3a2 2 0 0 1 2 2 M21 19a2 2 0 0 1-2 2 M5 21a2 2 0 0 1-2-2 M9 3h1 M9 21h1 M14 3h1 M14 21h1 M3 9v1 M21 9v1 M3 14v1 M21 14v1",
+AppWindow:"M4,4 H20 a2,2 0 0 1 2,2 V18 a2,2 0 0 1 -2,2 H4 a2,2 0 0 1 -2,-2 V6 a2,2 0 0 1 2,-2 Z M2,8 H22 M6,4 V8 M10,4 V8",
+Monitor:"M4,3 H20 a2,2 0 0 1 2,2 V15 a2,2 0 0 1 -2,2 H4 a2,2 0 0 1 -2,-2 V5 a2,2 0 0 1 2,-2 Z M8,21 h8 M12,17 v4",
+Screens:"M8,3 h12 a2,2 0 0 1 2,2 v8 a2,2 0 0 1 -2,2 h-2 M4,7 h10 a2,2 0 0 1 2,2 v7 a2,2 0 0 1 -2,2 H4 a2,2 0 0 1 -2,-2 V9 a2,2 0 0 1 2,-2 Z M6,22 h6 M9,18 v4",
+Lasso:"M7 22a5 5 0 0 1-2-4 M3.3 14A6.8 6.8 0 0 1 2 10c0-4.4 4.5-8 10-8s10 3.6 10 8-4.5 8-10 8a12 12 0 0 1-5-1 M5 18a2 2 0 1 0 0-4 2 2 0 0 0 0 4z",
+History:"M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8 M3 3v5h5 M12 7v5l4 2",
+Video:"M16 13l5.2 3.1a.5.5 0 0 0 .8-.4V8.3a.5.5 0 0 0-.8-.4L16 11 M4 6h10a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z",
+Film:"M3 3h18v18H3z M7 3v18 M3 7.5h4 M3 12h18 M3 16.5h4 M17 3v18 M17 7.5h4 M17 16.5h4",
+ScanText:"M3 7V5a2 2 0 0 1 2-2h2 M17 3h2a2 2 0 0 1 2 2v2 M21 17v2a2 2 0 0 1-2 2h-2 M7 21H5a2 2 0 0 1-2-2v-2 M7 8h8 M7 12h10 M7 16h6",
+Qr:"M3 3h5v5H3z M16 3h5v5h-5z M3 16h5v5H3z M21 16h-3a2 2 0 0 0-2 2v3 M21 21v.01 M12 7v3a2 2 0 0 1-2 2H7 M3 12h.01 M12 3h.01 M12 16v.01 M16 12h1 M21 12v.01 M12 21v-1",
+Pipette:"M2 22l1-1h3l9-9 M3 21v-3l9-9 M15 6l3.4-3.4a2.1 2.1 0 1 1 3 3L18 9l.4.4a2.1 2.1 0 1 1-3 3l-3.8-3.8a2.1 2.1 0 1 1 3-3l.4.4z",
+Images:"M18 22H4a2 2 0 0 1-2-2V6 M8 2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z M22 13l-3.4-3.4a2 2 0 0 0-2.8 0L6 19",
+Image:"M5,3 H19 a2,2 0 0 1 2,2 V19 a2,2 0 0 1 -2,2 H5 a2,2 0 0 1 -2,-2 V5 a2,2 0 0 1 2,-2 Z M9,8 a1,1 0 1 0 0,2 a1,1 0 1 0 0,-2 Z M21,15 l-5,-5 L5,21",
+Sun:"M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z M12 2v2 M12 20v2 M4.93 4.93l1.41 1.41 M17.66 17.66l1.41 1.41 M2 12h2 M20 12h2 M6.34 17.66l-1.41 1.41 M19.07 4.93l-1.41 1.41",
+Package:"M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z M12 22V12 M3.3 7l8.7 5 8.7-5",
+Pointer:"M4.037,4.688 a.495,.495 0 0 1 .651,-.651 l16,6.5 a.5,.5 0 0 1 -.063,.947 l-6.124,1.58 a2,2 0 0 0 -1.438,1.435 l-1.579,6.126 a.5,.5 0 0 1 -.947,.063 Z",
+Pencil:"M21.174,6.812 a1,1 0 0 0 -3.986,-3.987 L3.842,16.174 a2,2 0 0 0 -.5,.83 l-1.321,4.352 a.5,.5 0 0 0 .623,.622 l4.353,-1.32 a2,2 0 0 0 .83,-.497 Z",
+Highlighter:"M9 11l-6 6v3h9l3-3 M22 12l-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4",
+Line:"M5 19L19 5",Arrow:"M7 7h10v10 M7 17L17 7",Square:"M5,5 h14 v14 H5 Z",Circle:"M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z",
+Type:"M4,7 V4 h16 v3 M9,20 h6 M12,4 v16",Redact:"M3 7h18v10H3z M7 11h10 M7 13h6",
+Eraser:"M7 21l-4.3-4.3a1 1 0 0 1 0-1.4l10-10a1 1 0 0 1 1.4 0l5.6 5.6a1 1 0 0 1 0 1.4L11 21 M22 21H7 M5 11l9 9",
+Crop:"M6 2v14a2 2 0 0 0 2 2h14 M18 22V8a2 2 0 0 0-2-2H2",
+Undo:"M9,14 L4,9 L9,4 M4,9 H14.5 a5.5,5.5 0 0 1 5.5,5.5 a5.5,5.5 0 0 1 -5.5,5.5 H11",
+Redo:"M15,14 L20,9 L15,4 M20,9 H9.5 a5.5,5.5 0 0 0 -5.5,5.5 a5.5,5.5 0 0 0 5.5,5.5 H13",
+Pause:"M6 4h4v16H6z M14 4h4v16h-4z",Stop:"M6 6h12v12H6z",Play:"M7 4l13 8-13 8z",
+Open:"M15 3h6v6 M10 14L21 3 M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6",
+Check:"M20 6L9 17l-5-5",TriangleAlert:"M21.73,18 L13.73,4 a2,2 0 0 0 -3.48,0 L2.27,18 A2,2 0 0 0 4,21 H20 a2,2 0 0 0 1.73,-3 Z M12,9 V13 M12,17 h0.01",
+Trash:"M3,6 H21 M19,6 V20 a2,2 0 0 1 -2,2 H7 a2,2 0 0 1 -2,-2 V6 M8,6 V4 a2,2 0 0 1 2,-2 h4 a2,2 0 0 1 2,2 v2",
+Network:"M16 16h6v6h-6z M2 16h6v6H2z M9 2h6v6H9z M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3 M12 12V8",
+Moon:"M12,3 a6,6 0 0 0 9,9 a9,9 0 1 1 -9,-9 Z",Eye:"M2,12 s3,-7 10,-7 s10,7 10,7 s-3,7 -10,7 s-10,-7 -10,-7 Z M12,9 a3,3 0 1 0 0,6 a3,3 0 1 0 0,-6 Z",
+Grid:"M4,3 H9 V10 H4 Z M15,3 H20 V10 H15 Z M15,14 H20 V21 H15 Z M4,14 H9 V21 H4 Z",Panel:"M5,3 h14 a2,2 0 0 1 2,2 v14 a2,2 0 0 1 -2,2 H5 a2,2 0 0 1 -2,-2 V5 a2,2 0 0 1 2,-2 Z M3,15 h18",
+Bluetooth:"M7,7 L17,17 L12,22 V2 L17,7 L7,17",Wifi:"M12,20 h0.01 M2,8.82 a15,15 0 0 1 20,0 M5,12.86 a10,10 0 0 1 14,0 M8.5,16.43 a5,5 0 0 1 7,0",
+Camera:"M14.5,4 h-5 L7,7 H4 a2,2 0 0 0 -2,2 v9 a2,2 0 0 0 2,2 h16 a2,2 0 0 0 2,-2 V9 a2,2 0 0 0 -2,-2 h-3 Z M12,10 a3,3 0 1 0 0,6 a3,3 0 1 0 0,-6 Z",
+Gauge:"M12,14 l4,-4 M3.34,19 a10,10 0 1 1 17.32,0",Eject:"M5,19 h14 M12,5 l7,9 H5 Z",SquareX:"M5,3 h14 a2,2 0 0 1 2,2 v14 a2,2 0 0 1 -2,2 H5 a2,2 0 0 1 -2,-2 V5 a2,2 0 0 1 2,-2 Z M9,9 l6,6 M15,9 l-6,6",
+RefreshCw:"M3,12 a9,9 0 0 1 9,-9 a9.75,9.75 0 0 1 6.74,2.74 L21,8 M21,3 v5 h-5 M21,12 a9,9 0 0 1 -9,9 a9.75,9.75 0 0 1 -6.74,-2.74 L3,16 M8,16 H3 v5",
+Power:"M12,2 v10 M18.4,6.6 a9,9 0 1 1 -12.77,0.04",Droplet:"M12,22 a7,7 0 0 0 7,-7 c0,-2 -1,-3.9 -3,-5.5 s-3.5,-4 -4,-6.5 c-.5,2.5 -2,4.9 -4,6.5 C6,11.1 5,13 5,15 a7,7 0 0 0 7,7 Z",
+Snap:"M4,3 h5 v18 H4 Z M15,3 h5 v7 h-5 Z M15,14 h5 v7 h-5 Z",Mouse:"M12,2 a7,7 0 0 1 7,7 v6 a7,7 0 0 1 -14,0 V9 a7,7 0 0 1 7,-7 Z M12,6 v4",
+Switcher:"M4,10 c-1.1,0 -2,-.9 -2,-2 V4 c0,-1.1 .9,-2 2,-2 h4 c1.1,0 2,.9 2,2 M10,16 c-1.1,0 -2,-.9 -2,-2 v-4 c0,-1.1 .9,-2 2,-2 h4 c1.1,0 2,.9 2,2 M16,14 h4 a2,2 0 0 1 2,2 v4 a2,2 0 0 1 -2,2 h-4 a2,2 0 0 1 -2,-2 v-4 a2,2 0 0 1 2,-2 Z",
+Settings:"M12,9 a3,3 0 1 0 0,6 a3,3 0 1 0 0,-6 Z M12,2 v2 M12,20 v2 M4.9,4.9 l1.4,1.4 M17.7,17.7 l1.4,1.4 M2,12 h2 M20,12 h2 M4.9,19.1 l1.4,-1.4 M17.7,6.3 l1.4,-1.4",
+Speaker:"M11,5 L6,9 L2,9 L2,15 L6,15 L11,19 Z M15.5,8.5 a5,5 0 0 1 0,7 M19,5 a10,10 0 0 1 0,14",
+Shield:"M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"
+};
+const g=(n,s=16)=>`<svg class="g" width="${s}" height="${s}" viewBox="0 0 24 24" stroke-width="${(30/s).toFixed(3)}"><path d="${P[n]}"/></svg>`;
+const q=new URLSearchParams(location.search);
+const board=q.get('board')||'sheet-capture', theme=q.get('theme')||'dark';
+const L=(t,html)=>`<div><p class="cap">${t}</p>${html}</div>`;
+const stage=h=>`<div class="stage">${h}</div>`;
+const panel=(title,body,o={})=>`<div class="panel"><div class="hdr"><button class="ib back" aria-label="Back">${g('ChevronLeft',16)}</button><span class="ttl">${title}</span>${o.aside||''}</div><div class="body">${body}</div></div>`;
+const ib=(t,o={})=>`<button class="ibtn${o.acc?' acc':''}${o.crit?' crit':''}${o.sm?' sm':''}">${o.g?g(o.g,14):''}${t}</button>`;
+const cc=(glyph,label,o={})=>`<div class="cc${o.pri?' pri':''}${o.on?' on':''}${o.dis?' dis':''}${o.hov?' hov':''}">${g(glyph,20)}<span>${label}</span></div>`;
+const thumb=(name,meta,bg,o={})=>`<div class="th"><div class="img" style="background:${bg}">${o.dur?`<span class="dur">${o.dur}</span>`:''}</div><div class="n">${name}</div><div class="m">${meta}</div></div>`;
+const T1='linear-gradient(180deg,#E8E8E8 0 18%,#F7F7F7 18% 100%)', T2='linear-gradient(135deg,#2C3E57,#1B2838)', T3='linear-gradient(90deg,#1E1E1E 0 30%,#2B2B2B 30%)', T4='linear-gradient(180deg,#7444F0 0 40%,#F3F3F3 40%)';
+
+/* ---------- Capture panel ---------- */
+const delay=`<span class="combo">No delay ${g('ChevronDown',12)}</span>`;
+const modes=(o={})=>`<div class="grid6">${cc('Region','Region',{pri:1})}${cc('AppWindow','Window',o)}${cc('Monitor','Screen',o)}${cc('Screens','All displays',o)}${cc('Lasso','Freeform',o)}${cc('History','Last region',o)}</div>`;
+const tools=(o={})=>`<div class="grid6" style="margin-top:8px">${cc('Video','Record',{on:o.rec,dis:o.dis&&!o.rec})}${cc('Film','GIF',{dis:o.dis})}${cc('ScanText','Text',{dis:o.dis})}${cc('Qr','QR code',{dis:o.dis})}${cc('Pipette','Color',{dis:o.dis})}${cc('Images','Convert',{})}</div>`;
+const recentHead=`<div class="sub"><b>Recent</b>${ib('Open folder',{sm:1})}</div>`;
+const recents=`<div class="thumbs">${thumb('Region · 1280 × 720','2 min ago',T1)}${thumb('Recording · Window','9 min ago',T3,{dur:'0:42'})}${thumb('Screen · 3440 × 1440','Yesterday',T2)}${thumb('Freeform · 612 × 488','Yesterday',T4)}</div>`;
+const capRest=panel('Capture',modes()+tools()+recentHead+recents,{aside:delay});
+const capEmpty=panel('Capture',modes()+tools()+`<div class="sub"><b>Recent</b></div><div class="card empty" style="height:104px;margin-top:4px">${g('Image',24)}No captures yet</div>`,{aside:delay});
+const recCard=`<div class="card rec"><span class="dot"></span><span style="margin-left:4px"><div class="big">0:42</div><div class="t3">Region · 1280 × 720 · System sound</div></span><span style="flex:1"></span>${ib('Discard')}${ib('Pause',{g:'Pause'})}${ib('Stop',{acc:1,g:'Stop'})}</div>`;
+const capRec=panel('Capture',recCard+tools({rec:1,dis:1})+recentHead+recents);
+const capHover=panel('Capture',`<div class="grid6">${cc('Region','Region',{pri:1})}${cc('AppWindow','Window',{hov:1})}${cc('Monitor','Screen')}${cc('Screens','All displays')}${cc('Lasso','Freeform')}${cc('History','Last region')}</div><div style="position:absolute;left:52px;top:70px;z-index:2;padding:6px 8px;border-radius:4px;background:var(--fill);box-shadow:0 0 0 1px var(--bord),0 4px 12px rgba(0,0,0,.3);font-size:12px;white-space:nowrap">Capture window · <span class="t2">Ctrl+Shift+W</span></div>`+tools()+recentHead+recents,{aside:`<span class="combo">3 seconds ${g('ChevronDown',12)}</span>`});
+
+/* results, inside the Capture panel */
+const resText=panel('Text',`<div class="card" style="height:258px;padding:10px;font-size:12px;line-height:18px;color:var(--tx)">Quarterly review<br>Revenue grew 12% over the last quarter, led by the new subscription plans.<br><br>Next steps<br>· Ship the onboarding update by Friday<br>· Review pricing with the team<span style="display:inline-block;width:1px;height:14px;background:var(--tx);vertical-align:-2px;margin-left:1px"></span></div><div class="foot">${ib('Reselect')}${ib('Copy all',{acc:1})}</div>`,{aside:`<span class="t3">English (US) · 31 words</span>`});
+const resQr=panel('QR code',`<div class="card" style="padding:12px 10px"><div class="t3">Link</div><div style="font-size:13px;line-height:18px;margin-top:4px;word-break:break-all">https://menu.example.com/table/12?lang=en</div><div class="t3" style="margin-top:8px">Opens menu.example.com</div></div><div class="foot">${ib('Copy')}${ib('Open link',{acc:1,g:'Open'})}</div>`,{aside:`<span class="seg"><span class="on">Code 1</span><span>Code 2</span></span>`});
+const sw=(c,s=24)=>`<span style="width:${s}px;height:${s}px;border-radius:${s/2}px;background:${c};box-shadow:0 0 0 1px var(--hair);display:inline-block;flex:none"></span>`;
+const crow=(k,v)=>`<div class="lrow" style="height:36px"><span class="t3" style="width:36px">${k}</span><span class="nm" style="font-size:13px">${v}</span>${ib('Copy',{sm:1})}</div>`;
+const resColor=panel('Color',`<div style="display:flex;gap:16px;align-items:center;height:72px">${sw('#7C5CFF',72)}<span><div class="big">#7C5CFF</div><div class="t3">Copied as HEX</div></span></div><div class="card" style="margin-top:12px">${crow('HEX','#7C5CFF')}${crow('RGB','rgb(124 92 255)')}${crow('HSL','hsl(252 100% 68%)')}</div><div class="foot"><span class="l" style="display:flex;gap:6px">${['#7C5CFF','#1B2838','#E5484D','#F3F3F3','#2C3E57','#FFC53D','#30A46C','#0090FF'].map(c=>sw(c,20)).join('')}</span>${ib('Pick again',{g:'Pipette'})}</div>`);
+const resRec=panel('Recording',`<div style="height:189px;width:336px;margin:0 auto;border-radius:6px;background:${T3};position:relative;display:flex;align-items:center;justify-content:center"><span style="width:44px;height:44px;border-radius:22px;background:rgba(0,0,0,.55);color:#fff;display:flex;align-items:center;justify-content:center">${g('Play',18)}</span></div>
+ <div style="position:relative;height:28px;margin-top:10px"><div style="position:absolute;left:0;right:0;top:10px;height:8px;border-radius:4px;background:var(--track)"></div><div style="position:absolute;left:60px;right:90px;top:10px;height:8px;background:var(--tint);border-top:2px solid var(--acc);border-bottom:2px solid var(--acc)"></div><div style="position:absolute;left:56px;top:4px;width:8px;height:20px;border-radius:3px;background:var(--acc)"></div><div style="position:absolute;right:86px;top:4px;width:8px;height:20px;border-radius:3px;background:var(--acc)"></div></div>
+ <div style="display:flex;justify-content:space-between" class="t3"><span>0:04</span><span>0:31 kept</span><span>0:35</span></div>
+ <div class="foot"><span class="l">${ib('Discard')}</span>${ib('Export GIF')}${ib('Save as')}${ib('Save',{acc:1})}</div>`,{aside:`<span class="t3">0:42 · 1280 × 720 · MP4</span>`});
+const frow=(c,n,a,b)=>`<div class="lrow" style="height:34px"><span class="ico" style="background:${c}"></span><span class="nm">${n}</span><span class="t3">${a}</span><span class="t2" style="width:70px;text-align:right">${b}</span></div>`;
+const convSeg=`<span class="seg"><span class="on">Convert</span><span>Resize</span><span>Compress</span></span>`;
+const resConvert=panel('Convert',`<div style="display:flex;justify-content:space-between;align-items:center;height:28px"><span class="t3">4 images · 18.6 MB</span><span style="display:flex;gap:6px"><span class="combo">PNG to JPEG ${g('ChevronDown',12)}</span><span class="combo">Quality 85 ${g('ChevronDown',12)}</span></span></div>
+ <div class="card" style="margin-top:6px">${frow('#7C5CFF','Screenshot 2026-11-06 101500.png','4.8 MB','≈ 0.9 MB')}${frow('#0090FF','Screenshot 2026-11-06 094210.png','5.1 MB','≈ 1.0 MB')}${frow('#30A46C','diagram-final.png','3.9 MB','≈ 0.6 MB')}${frow('#FFC53D','photo-wall.png','4.8 MB','≈ 1.2 MB')}</div>
+ <div class="t3" style="margin-top:8px">Saves beside the originals · Keeps the originals</div>
+ <div class="foot"><span class="l">${ib('Add files',{g:'Plus'})}</span>${ib('Run',{acc:1})}</div>`,{aside:convSeg});
+const resConvertEmpty=panel('Convert',`<div class="card empty" style="height:258px;border-style:dashed">${g('Images',24)}Drop images or videos</div><div class="foot">${ib('Add files',{acc:1,g:'Plus'})}</div>`,{aside:convSeg});
+
+/* ---------- the frozen screen ---------- */
+const win=(x,y,w,h,t,dk)=>`<div class="w${dk?' dk':''}" style="left:${x}px;top:${y}px;width:${w}px;height:${h}px"><div class="tb">${t}</div>${'<div class="ln"></div>'.repeat(Math.floor((h-40)/22))}</div>`;
+const desk=win(60,50,560,420,'Report.docx · Word')+win(520,140,520,400,'Terminal',1)+win(160,380,380,220,'Notes');
+const dimAround=(x,y,w,h)=>`<div class="dim" style="left:0;top:0;right:0;height:${y}px"></div><div class="dim" style="left:0;top:${y+h}px;right:0;bottom:0"></div><div class="dim" style="left:0;top:${y}px;width:${x}px;height:${h}px"></div><div class="dim" style="left:${x+w}px;top:${y}px;right:0;height:${h}px"></div>`;
+const handles=(x,y,w,h)=>[[0,0],[.5,0],[1,0],[0,.5],[1,.5],[0,1],[.5,1],[1,1]].map(([a,b])=>`<div class="hdl" style="left:${x+a*w}px;top:${y+b*h}px"></div>`).join('');
+const ovSelect=`<div class="scr">${desk}${dimAround(520,140,520,400)}<div class="whl" style="left:520px;top:140px;width:520px;height:400px"></div>
+ <div class="mag" style="left:690px;top:170px"></div><div class="magl" style="left:690px;top:288px">1184, 412 · #2B2B2B</div>
+ <div class="size" style="left:520px;top:112px">Terminal · 1040 × 800</div></div>`;
+const SX=240,SY=120,SW=520,SH=330;
+const toolCol=`<div class="tools" style="left:${SX+SW+8}px;top:${SY}px"><div class="t">${g('Pointer')}</div><div class="t on">${g('Pencil')}</div><div class="t">${g('Highlighter')}</div><div class="t">${g('Line')}</div><div class="t">${g('Arrow')}</div><div class="t">${g('Square')}</div><div class="t">${g('Circle')}</div><div class="t">${g('Type')}</div><div class="t">${g('Redact')}</div><div class="t">${g('Eraser')}</div><div class="t">${g('Crop')}</div><div class="sep"></div><div class="t"><span class="sw"></span></div><div class="sep"></div><div class="t">${g('Undo')}</div><div class="t">${g('Redo')}</div></div>`;
+const actBar=`<div class="acts" style="left:${SX+SW-330}px;top:${SY+SH+8}px"><button class="ib" style="width:32px;height:28px" aria-label="Copy text">${g('ScanText')}</button><button class="ib" style="width:32px;height:28px" aria-label="Scan QR code">${g('Qr')}</button><span class="vsep"></span>${ib('Save as')}${ib('Save')}${ib('Copy',{acc:1})}<span class="vsep"></span><button class="ib" style="width:28px;height:28px" aria-label="Cancel">${g('Close')}</button></div>`;
+const marks=`<svg class="mk" style="left:${SX}px;top:${SY}px" width="${SW}" height="${SH}"><path d="M120 250 L296 124" stroke="#E5484D" stroke-width="4" fill="none" stroke-linecap="round"/><path d="M304 118 l-24 4 l12 18 z" fill="#E5484D"/><rect x="330" y="60" width="160" height="90" rx="2" fill="none" stroke="#E5484D" stroke-width="3"/><rect x="40" y="40" width="190" height="22" fill="#000"/></svg>`;
+const ovEdit=`<div class="scr">${desk}${dimAround(SX,SY,SW,SH)}<div class="selx" style="left:${SX}px;top:${SY}px;width:${SW}px;height:${SH}px"></div>${handles(SX,SY,SW,SH)}${marks}
+ <div class="size" style="left:${SX}px;top:${SY-28}px">1040 × 660</div>${toolCol}${actBar}</div>`;
+const ovFull=`<div class="scr">${desk}<div class="selx" style="left:0;top:0;width:1100px;height:640px"></div>${handles(0,0,1100,640)}
+ <div class="size" style="left:12px;top:12px">3440 × 1440</div>${toolCol.replace(`left:${SX+SW+8}px;top:${SY}px`,'left:1048px;top:12px')}${actBar.replace(`left:${SX+SW-330}px;top:${SY+SH+8}px`,'left:708px;top:588px')}</div>`;
+const RX=200,RY=110,RW=600,RH=380;
+const ovRec=`<div class="scr">${desk}<div class="frame" style="left:${RX-2}px;top:${RY-2}px;width:${RW+4}px;height:${RH+4}px"></div>
+ <div class="pill" style="left:${RX+RW-190}px;top:${RY-44}px"><span class="dot"></span>0:42<span style="flex:1"></span>${ib('Pause',{sm:1,g:'Pause'})}${ib('Stop',{sm:1,acc:1,g:'Stop'})}</div></div>`;
+const ovRecStart=`<div class="scr">${desk}${dimAround(RX,RY,RW,RH)}<div class="selx" style="left:${RX}px;top:${RY}px;width:${RW}px;height:${RH}px"></div>${handles(RX,RY,RW,RH)}
+ <div class="size" style="left:${RX}px;top:${RY-28}px">1200 × 760</div>
+ <div class="acts" style="left:${RX+RW-420}px;top:${RY+RH+8}px"><span class="combo">MP4 ${g('ChevronDown',12)}</span><span class="combo">System sound: Off ${g('ChevronDown',12)}</span><span class="combo">Mic: Off ${g('ChevronDown',12)}</span><span class="vsep"></span>${ib('Start',{acc:1,g:'Video'})}<button class="ib" style="width:28px;height:28px" aria-label="Cancel">${g('Close')}</button></div></div>`;
+
+/* ---------- the bar ---------- */
+const bar=(lead,t,a,o={})=>`<div class="desk"><div class="bar"><span style="width:8px"></span><span class="lead${o.cau?' cau':''}"${o.leadStyle?` style="${o.leadStyle}"`:''}>${lead}</span><span style="width:10px"></span><span class="lines"><span class="bt${o.cau?' cau':''}">${t}</span><span class="ba">${a}</span></span><span style="width:10px"></span><span class="pet"><span></span></span></div></div>`;
+const ring=f=>`<svg width="22" height="22" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="var(--hair)" stroke-width="2.5"/><circle cx="12" cy="12" r="9" fill="none" stroke="var(--acc)" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="${(56.5*f).toFixed(1)} 56.5" transform="rotate(-90 12 12)"/></svg>`;
+
+/* ---------- Displays ---------- */
+const slider=v=>`<span class="slider"><i style="width:${v}%"></i><b style="left:${v}%"></b></span>`;
+const drow=(name,v,o={})=>`<div class="card drow">${g(o.all?'Screens':'Monitor',16)}<span class="nm">${name}${o.main?' <span class="t3">· Main</span>':''}</span>${o.na?`<span style="flex:1"></span><span class="t3">Brightness control failed</span>`:slider(v)+`<span class="pc">${v}%</span>`}</div>`;
+const dispSeg=c=>`<span class="seg"><span${c?'':' class="on"'}>Brightness</span><span${c?' class="on"':''}>Contrast</span></span>`;
+const dispMain=panel('Displays',drow('All displays',57,{all:1})+drow('OMEN 34c',54,{main:1})+drow('Samsung S24',60),{aside:dispSeg()});
+const dispContrast=panel('Displays',drow('All displays',88,{all:1})+drow('OMEN 34c',100,{main:1})+drow('Samsung S24',75),{aside:dispSeg(1)});
+const dispNa=panel('Displays',drow('OMEN 34c',54,{main:1})+drow('Dell P2419H',0,{na:1}),{aside:dispSeg()});
+const dispOne=panel('Displays',drow('OMEN 34c',54,{main:1}),{aside:dispSeg()});
+
+/* ---------- Actions ---------- */
+const at=(glyph,lb,st,o={})=>`<div class="tile${o.on?' on':''}${o.new?' new':''}">${o.chev?`<span class="chev">${g('ChevronRight',12)}</span>`:''}${g(glyph,20)}<span class="lb">${lb}</span>${st?`<span class="st">${st}</span>`:''}</div>`;
+const actionsGallery=panel('Actions',`<div class="agrid">${[
+ at('Moon','Dark','On',{on:1}),at('Eye','Hidden','Off'),at('Grid','Icons','On',{on:1}),at('Panel','Auto-hide','Off'),at('Screens','Extend','On',{on:1}),
+ at('Bluetooth','Bluetooth','On',{on:1}),at('Wifi','Wi-Fi','On',{on:1}),at('Camera','Camera','On',{on:1}),at('Gauge','Plan','Balanced',{chev:1}),at('Trash','Recycle','2.1 GB'),
+ at('Eject','Eject','1 drive',{chev:1}),at('SquareX','Quit','9 apps',{chev:1}),at('RefreshCw','Explorer',''),at('Power','Power','',{chev:1}),at('Droplet','Cleaning',''),
+ at('Snap','Snap','',{chev:1}),at('Mouse','Input','',{chev:1}),at('Switcher','Switcher',''),at('Package','Apps','5 updates',{chev:1,new:1})].join('')}</div>`,{aside:`<button class="ib" aria-label="Edit actions">${g('Pencil',14)}</button>`});
+const mrow=(glyph,n,right,o={})=>`<div class="lrow${o.hov?' hov':''}">${g(glyph,16)}<span class="nm">${n}</span>${right}${g(o.open?'Open':'ChevronRight',12)}</div>`;
+const appsMenu=panel('Apps',`<div style="display:grid;grid-template-columns:1fr 1fr;column-gap:8px;grid-auto-flow:column;grid-template-rows:repeat(5,42px)">${mrow('RefreshCw','Update apps','<span class="badge">5</span>',{hov:1})+mrow('Trash','Clean junk files','<span class="t3">1.0 GB</span>')+mrow('Package','Uninstall','',{open:1})}</div>`);
+const icos=['#0B84FF','#E66000','#5865F2','#2EA043','#F7DF1E'];
+const urow=(i,n,a,b,o={})=>`<div class="lrow${o.hov?' hov':''}"><span class="ico" style="background:${icos[i]}"></span><span class="nm">${n}</span><span class="t3">${a} → ${b}</span>${o.state?`<span class="t3" style="width:64px;text-align:right">${o.state}</span>`:ib('Update',{sm:1})}</div>`;
+const updList=panel('Update apps',`<div style="display:flex;align-items:center;height:28px" class="t3">5 updates · checked 2 min ago</div>${urow(0,'Visual Studio Code','1.95.1','1.95.3',{hov:1})+urow(1,'Firefox','132.0','132.0.1')+urow(2,'Discord','1.0.9171','1.0.9172',{state:'Updating…'})+urow(3,'Git','2.47.0','2.47.1')+urow(4,'Node.js LTS','22.11.0','22.12.0')}`,{aside:ib('Update all',{acc:1})});
+const updEmpty=panel('Update apps',`<div class="empty" style="height:280px">${g('Check',24)}Everything is up to date<span class="t3">Checked 2 min ago</span></div>`,{aside:ib('Check again')});
+const crow2=(on,n,size,tag)=>`<div class="lrow"><span class="chk${on?' on':''}">${on?g('Check',12):''}</span><span class="nm">${n}</span>${tag?`<span class="badge">${tag}</span>`:''}<span class="t2" style="width:64px;text-align:right">${size}</span></div>`;
+const cleanList=panel('Clean junk files',`<div style="display:flex;align-items:center;height:28px" class="t3">1.0 GB selected of 3.2 GB</div>${crow2(1,'Temp files','820 MB')+crow2(1,'Thumbnail and icon caches','210 MB')+crow2(0,'App caches','380 MB','Check first')+crow2(0,'Windows Update cache','1.6 GB','Needs admin')+crow2(0,'Crash dumps and logs','190 MB')}`,{aside:ib('Clean',{acc:1})});
+const cleanConfirm=panel('Clean junk files',`<div class="q"><span class="qt">Clean 1.0 GB for good?</span><span style="display:flex;gap:8px">${ib('Cancel')}${ib('Clean',{crit:1})}</span></div>`);
+
+/* ---------- Search ---------- */
+const isr=(lead,nm,dt,o={})=>`<div class="isr${o.sel?' sel':''}"><span class="ld">${lead}</span><span><div class="nm">${nm}</div><div class="dt">${dt}</div></span>${o.lvl!=null?`<span class="lvl"><i style="width:${o.lvl}%"></i></span>`:''}${o.sel&&o.verb?`<span class="vb" style="display:flex;align-items:center;gap:4px">${o.sh?g('Shield',12):''}${o.verb}</span>`:''}</div>`;
+const search=(qtext,rows)=>`<div class="panel"><div class="hdr" style="height:32px"><button class="ib back" aria-label="Back">${g('ChevronLeft',16)}</button><span class="sfield">${qtext}</span></div><div style="margin-top:8px">${rows}</div></div>`;
+const sCapture=search('capt',isr(g('Region'),'Capture region','Capture · PrtSc',{sel:1,verb:'Run'})+isr(g('AppWindow'),'Capture window','Capture')+isr(g('Monitor'),'Capture full screen','Capture')+isr(g('Screens'),'Capture all displays','Capture')+isr(g('History'),'Capture last region','Capture')+isr(g('Image'),'Capture','Island page')+isr(g('Settings'),'Screen capture','Settings'));
+const sPort=search('port 3000',isr(g('Network'),'Port 3000 · node.exe','PID 4120 · Listening on 127.0.0.1',{sel:1,verb:'Free'})+isr(g('Network'),'Ports','Settings'));
+const confirm=(t,verb,o={})=>`<div class="panel"><div class="q"><span class="qt">${t}</span><span style="display:flex;gap:8px">${ib('Cancel')}${ib(verb,{crit:1,g:o.sh?'Shield':''})}</span></div></div>`;
+const sPortConfirm=confirm('End node.exe to free port 3000?','End');
+const sPortService=search('port 9100',isr(g('Network'),'Port 9100 · Print Spooler','Service · PID 2880 · Listening on 0.0.0.0',{sel:1,verb:'Stop',sh:1})+isr(g('Network'),'Ports','Settings'));
+const sServiceConfirm=confirm('Stop service Print Spooler to free port 9100?','Stop',{sh:1});
+const sPortSystem=search('port 445',isr(g('Network'),'Port 445 · System','PID 4 · Listening on 0.0.0.0',{sel:1})+isr(g('Network'),'Port 445 · Closing','PID 0 · TIME_WAIT to 192.168.1.20')+isr(g('Network'),'Ports','Settings'));
+const sBright=search('bright 40',isr(g('Sun'),'Brightness to 40%','All displays',{sel:1,verb:'Run',lvl:40})+isr(g('Sun'),'Brightness up','Displays')+isr(g('Sun'),'Brightness down','Displays')+isr(g('Sun'),'Displays','Island page'));
+
+/* ---------- Settings ---------- */
+const nav=(n,o={})=>`<div class="nav${o.sel?' sel':''}${o.new?' new':''}">${n}</div>`;
+const sideNav=`<div class="side"><div class="gl">Files</div>${nav('File organizer')+nav('Shelf')}<div class="gl">Sound</div>${nav('Now Playing')+nav('Output')}<div class="gl">System</div>${nav('Keep awake')+nav('System monitor')+nav('Actions')+nav('Displays',{new:1})+nav('Ports',{new:1})}<div class="gl">Clipboard &amp; text</div>${nav('Clipboard history')+nav('Scratchpad')}<div class="gl">Windows</div>${nav('Snap')+nav('Shortcuts')}<div class="gl">Capture</div>${nav('Screen capture',{sel:1,new:1})+nav('Recording',{new:1})+nav('Text and QR',{new:1})+nav('Color picker',{new:1})+nav('Media tools',{new:1})}<div class="gl">Apps</div>${nav('App updates',{new:1})+nav('Uninstaller',{new:1})+nav('Cleaner',{new:1})}<div class="gl">Chippi</div>${nav('General')}</div>`;
+const sr=(t,right,small)=>`<div class="sr"><span class="tl">${t}${small?`<small>${small}</small>`:''}</span>${right}</div>`;
+const kc=k=>k.split('+').map(x=>`<span class="kc">${x}</span>`).join('');
+const krow=(n,k)=>`<div class="sr"><span class="tl">${n}</span><span class="keys">${k?kc(k):'Not set'}</span><span class="link">Edit ${g('Open',12)}</span></div>`;
+const capSettings=`<div class="sw1"><div class="tbar"><span class="logo"></span>Chippi Settings</div><div class="shell">${sideNav}<div class="page"><div class="ptitle">Screen capture</div>
+ <div class="sh">After capture</div><div class="scard">${sr('Copy and Save',`<span class="scombo">Copy or save ${g('ChevronDown',12)}</span>`)}${sr('Save to',`<span style="color:var(--st3)">Pictures\\Screenshots</span><span class="sbt">Change</span>`)}${sr('File type',`<span class="scombo">PNG ${g('ChevronDown',12)}</span>`)}${sr('Ctrl+drag copies on release','<span class="ssw on"></span>')}${sr('Magnifier','<span class="ssw on"></span>')}</div>
+ <div class="sh">Recent captures</div><div class="scard">${sr('Keep recent captures','<span class="ssw on"></span>')}${sr('Keep',`<span class="scombo">50 captures ${g('ChevronDown',12)}</span>`)}</div>
+ <div class="sh">Shortcuts</div><div class="scard">${krow('Capture region','PrtSc')}${krow('Capture window','Ctrl+Shift+W')}${krow('Capture full screen','')}${krow('Capture all displays','')}${krow('Capture freeform','')}${krow('Capture last region','')}${krow('Capture after delay','')}</div>
+ </div></div></div>`;
+
+const B={
+ 'sheet-capture':()=>`<div class="srow">${L('Capture at rest: Region is the primary; Recent shows the last four',stage(capRest))}${L('First use: no captures yet',stage(capEmpty))}</div>
+  <div class="srow">${L('Recording: the card takes the modes row; other captures wait until Stop',stage(capRec))}${L('Delay set, a mode pointed at: its name and shortcut in the tooltip',stage(capHover))}</div>`,
+ 'sheet-results':()=>`<div class="srow">${L('Extract text: editable, Copy all (Ctrl+C copies a selection)',stage(resText))}${L('Scan QR code: the payload in full; Open link only for web links',stage(resQr))}</div>
+  <div class="srow">${L('Pick and review color: each format copies on its own',stage(resColor))}${L('Recording stopped: trim, then Save, Save as or Export GIF',stage(resRec))}</div>
+  <div class="srow">${L('Convert, with four images: Convert, Resize or Compress, then Run',stage(resConvert))}${L('Convert, empty: drop files or Add files',stage(resConvertEmpty))}</div>`,
+ 'sheet-overlay':()=>`<div class="srow">${L('1. Capture region: the screen freezes and dims. Hovering lights the window under the pointer (a click takes it); a drag draws a region. The magnifier shows the pixel under the pointer.',ovSelect)}</div>
+  <div class="srow">${L('2. Released: the selection stays adjustable (handles, arrow keys). Tools run down its side, Copy and Save sit under it. Ctrl+C, Ctrl+S and Esc work without the bars.',ovEdit)}</div>
+  <div class="srow">${L('2b. A selection that fills the display (Ctrl+A, or edge to edge): no room outside, so both bars sit inside it',ovFull)}</div>
+  <div class="srow">${L('3. Record region: the same selector, kept to the display where the drag started, then the sound choices and Start under the region',ovRecStart)}</div>
+  <div class="srow">${L('4. Recording: a red frame around the region and a pill outside it, both left out of the video',ovRec)}</div>`,
+ 'sheet-bar':()=>`<div class="srow">${L('Copied (Copy, or Ctrl+drag)',bar(`<span style="width:34px;height:34px;background:${T1}"></span>`,'Copied','Region · 1280 × 720'))}${L('Saved',bar(`<span style="width:34px;height:34px;background:${T2}"></span>`,'Saved','Capture 2026-11-06 101500.png'))}${L('Copy failed: the draft stays open',bar(g('TriangleAlert'),'Copy failed','Capture',{cau:1}))}</div>
+  <div class="srow">${L('Copy text from screen',bar(g('ScanText'),'Copied text','31 words'))}${L('Nothing read: the clipboard is left alone',bar(g('ScanText'),'No text found','Text and QR',{cau:1}))}${L('Pick color',bar('','#7C5CFF','Copied as HEX',{leadStyle:'background:#7C5CFF'}))}</div>
+  <div class="srow">${L('Capture after delay',bar(ring(1/3),'Capturing in 2','Region'))}${L('Recording: the highest activity; a click opens Capture',bar('<span class="dot"></span>','0:42','Recording · Region'))}${L('App updates running',bar(ring(2/5),'2 of 5 updated','App updates'))}</div>
+  <div class="srow">${L('Stopped over a fullscreen app, once the widget is back',bar(`<span style="width:34px;height:34px;background:${T3}"></span>`,'Recording saved','0:42 · Region'))}</div>`,
+ 'sheet-displays':()=>`<div class="srow">${L('Displays: All displays moves every slider together',stage(dispMain))}${L('Contrast (external monitors only)',stage(dispContrast))}</div>
+  <div class="srow">${L('A display that doesn\'t answer: Settings › Displays lists the likely causes',stage(dispNa))}${L('One display: no All displays row',stage(dispOne))}</div>`,
+ 'sheet-actions':()=>`<div class="srow">${L('Actions with Apps added: 19 of 20 places',stage(actionsGallery))}${L('Actions › Apps',stage(appsMenu))}</div>
+  <div class="srow">${L('Update apps: real app icons in the build (AppIcon.View)',stage(updList))}${L('Nothing to update',stage(updEmpty))}</div>
+  <div class="srow">${L('Clean junk files: measured on open, ticks remembered',stage(cleanList))}${L('Clean asks first',stage(cleanConfirm))}</div>`,
+ 'sheet-search':()=>`<div class="srow">${L('Every verb is a Search row',stage(sCapture))}${L('A port number finds who holds it',stage(sPort))}</div>
+  <div class="srow">${L('Free asks first, naming the process',stage(sPortConfirm))}${L('A service is stopped, never its host process; the shield means a UAC prompt',stage(sPortService))}</div>
+  <div class="srow">${L('Stopping a service asks first; so does ending an admin, system or other user\'s process, with the shield on End',stage(sServiceConfirm))}${L('System (PID 4) and closing (PID 0) rows have no verb; Enter opens Settings › Ports',stage(sPortSystem))}</div>
+  <div class="srow">${L('A brightness value, like "volume 40"',stage(sBright))}</div>`,
+ 'settings':()=>capSettings
+};
+document.body.className=theme;
+const html=B[board]();
+const wrap=board.startsWith('sheet')?`<div class="sheet ${theme==='light'?'lt':''}"><div class="${theme}" style="display:contents">${html}</div></div>`:`<div style="display:inline-block;padding:24px;background:${theme==='light'?'#D9D9D9':'#161616'}"><div class="${theme}">${html}</div></div>`;
+document.getElementById('root').innerHTML=wrap;
+const el=document.getElementById('root').firstElementChild;
+document.body.dataset.size=Math.ceil(el.getBoundingClientRect().width)+','+Math.ceil(el.getBoundingClientRect().height);
+</script>
+</body>
+</html>
