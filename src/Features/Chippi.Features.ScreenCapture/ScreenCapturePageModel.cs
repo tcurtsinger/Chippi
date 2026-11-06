@@ -17,6 +17,8 @@ public enum EnterAction
 /// <summary>Screen capture's settings, kept in the module's settings.</summary>
 public sealed record ScreenCaptureSettings
 {
+    public Dictionary<string, KeyShortcut?>? Shortcuts { get; init; }
+
     public EnterAction Enter { get; init; } = EnterAction.Copy;
 
     /// <summary>The quick-save folder Travis chose; null is the default, Pictures\Screenshots (<see cref="CaptureFiles.DefaultFolder"/>).</summary>

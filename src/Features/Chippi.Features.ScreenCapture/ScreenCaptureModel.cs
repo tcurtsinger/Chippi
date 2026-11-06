@@ -69,7 +69,7 @@ public sealed class ScreenCaptureModel : IScreenCapturePageModel, IDisposable
         return (slot?.Shortcut, slot?.Error);
     }
 
-    private bool Save(ScreenCaptureSettings settings)
+    internal bool Save(ScreenCaptureSettings settings)
     {
         try
         {

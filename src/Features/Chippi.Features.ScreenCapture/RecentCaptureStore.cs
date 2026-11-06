@@ -9,7 +9,7 @@ using Chippi.Clipboard.Storage;
 
 namespace Chippi.Features.ScreenCapture;
 
-public sealed record RecentCapture(Guid Id, string Image, DateTimeOffset Time, int Width, int Height, string? SavedFile);
+public sealed record RecentCapture(Guid Id, string Image, DateTimeOffset Time, int Width, int Height, string? SavedFile, CaptureFileIdentity? SavedIdentity = null);
 
 /// <summary>Single-worker store. Index and thumbnails are sealed; retained PNGs are ordinary local files.</summary>
 public sealed class RecentCaptureStore : IDisposable
@@ -89,7 +89,8 @@ public sealed class RecentCaptureStore : IDisposable
         string name = Guid.NewGuid().ToString("N") + ".png";
         // SaveAs publishes a fully encoded file before its index row can become visible.
         CaptureFiles.SaveAs(flattened, Path.Combine(_folder, name), CaptureFileType.Png, true);
-        var entry = new RecentCapture(draftId, name, time, flattened.PixelWidth, flattened.PixelHeight, savedFile ?? previous.FirstOrDefault(x => x.Id == draftId)?.SavedFile);
+        var entry = new RecentCapture(draftId, name, time, flattened.PixelWidth, flattened.PixelHeight, savedFile ?? previous.FirstOrDefault(x => x.Id == draftId)?.SavedFile,
+            savedFile != null ? CaptureSavedFile.Identity(savedFile) : previous.FirstOrDefault(x => x.Id == draftId)?.SavedIdentity);
         double scale = Math.Min(1, 240d / flattened.PixelWidth);
         var thumbnail = new TransformedBitmap(flattened, new ScaleTransform(scale, scale));
         var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(thumbnail));
