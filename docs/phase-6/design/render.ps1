@@ -1,4 +1,4 @@
-# Renders each board of actions-shortcuts.html, wave-1.html, shortcuts.html and wave-3.html to shots\<board>-<theme>.png at 2x with headless Edge,
+# Renders each board of actions-shortcuts.html, wave-1.html, shortcuts.html, wave-3.html and arrangements.html to shots\<board>-<theme>.png at 2x with headless Edge,
 # dark and light. Each board reports its own size (body data-size), so edits never leave stale sizes here.
 # Uses its own throwaway Edge profile, so it doesn't touch the everyday one.
 param([string[]]$Only)
@@ -15,6 +15,8 @@ $pages = [ordered]@{
     'shortcuts.html'         = 'shortcuts', 'shortcuts-narrow', 'shortcuts-empty', 'sheet-shortcuts-states'
     'wave-3.html'            = 'snippets', 'snippets-narrow', 'snippets-empty', 'sheet-snippets-states', 'snap', 'snap-narrow',
                                'sheet-snap-editor', 'sheet-snap-zones', 'switcher', 'switcher-settings', 'sheet-switcher-states'
+    'arrangements.html'      = 'arrangements', 'arrangements-narrow', 'arrangements-review', 'arrangements-review-narrow',
+                               'sheet-arrangements-states', 'sheet-arrangements-island'
 }
 foreach ($file in $pages.Keys) {
     $page = ([Uri](Join-Path $PSScriptRoot $file)).AbsoluteUri

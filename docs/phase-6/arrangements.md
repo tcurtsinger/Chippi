@@ -17,7 +17,7 @@ The reference is [PowerToys Workspaces](https://learn.microsoft.com/en-us/window
 
 ## Capture and edit
 
-1. Choose New arrangement. Arrange the apps normally, using Snap if useful, then choose Capture. Chippi remains usable while preparing the desktop.
+1. Choose New arrangement. It captures what's open right away and opens the review; there is no separate Capture step. If the desktop wasn't ready, arrange the apps normally, using Snap if useful, then choose Recapture on the review (Travis, 2026-11-05, task 441).
 2. Capture eligible top-level windows on the current virtual desktop, across connected displays, reusing the App switcher's window list through shared code rather than adding another enumerator. Exclude Chippi, desktop/taskbar, tool windows, dialogs, fullscreen and elevated windows. Show a count of skipped windows and their reasons.
 3. Review before saving: name, a preview grouped by readable display names, and one row per window with the app's real icon, title, display and position. Remove excludes that row from the saved arrangement; it never closes the app. Cancel discards the draft.
 4. Each row stores the same target value as the shared App action. Resolve it through that existing model, including registered packaged-app targets. Arguments and Working folder are offered only for executable path targets; Start menu app-list targets cannot accept them. Prefer a stable target over a versioned executable path. If no supported launch target can be resolved, the row cannot be saved until removed or given a valid desktop app target.
@@ -50,7 +50,7 @@ A missing display falls back to the invocation display: the Chippi surface's dis
 
 Normal windows arrive normal, maximized windows arrive maximized, and minimized windows are placed using their restored bounds then minimized again. A minimized-from-maximized row retains its maximized restore state. Recheck for fullscreen after any restoration, before moving, as the App switcher does. Fullscreen, elevated, denied and identity-changed windows are skipped with a reason. No elevation prompt or administrator launch option in this build.
 
-Progress shows each app as Waiting, Opening, Placing, Ready, Skipped or Failed. Errors use "Launching failed" or "Placement failed" with a short reason and Retry where useful. A run summary retains guessed matches and display substitutions. Successful completion with no guesses or substitutions dismisses progress; partial completion remains available until dismissed. Dismiss hides progress; Cancel stops work. Launch may visibly open a window before moving it. No promise of atomic placement, exact stacking order or automatic rollback. Chippi does not repeatedly activate each app during placement.
+Progress shows each app as Waiting, Opening, Placing, Ready, Skipped or Failed. Errors use "Launching failed" or "Placement failed" with a short reason and Retry where useful. A run summary retains guessed matches and display substitutions. Successful completion with no guesses or substitutions dismisses progress. A run that is partly done, guessed a window or moved one to another display stays on the bar until dismissed (Travis, 2026-11-05, task 442). Dismiss hides progress; Cancel stops work. Launch may visibly open a window before moving it. No promise of atomic placement, exact stacking order or automatic rollback. Chippi does not repeatedly activate each app during placement.
 
 ## The page
 

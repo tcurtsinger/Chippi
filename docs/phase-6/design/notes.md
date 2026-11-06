@@ -8,6 +8,7 @@ Every app, count and setting in these mockups is invented. Nothing read or chang
 - `wave-1.html`: wave 1's Settings screens and Close protection's bar line. Travis approved it on 2026-11-04 (task 264), with real app icons in every app list ([App icons](#app-icons)).
 - `shortcuts.html`: wave 2's Settings › Shortcuts, revised for Travis's caveats when he approved it on 2026-11-05 (tasks 341 and 344, [Wave 2](#wave-2-shortcuts-task-344)). It replaces the Settings › Shortcuts boards in `actions-shortcuts.html`.
 - `wave-3.html`: wave 3's screens (task 375): Settings › Text snippets, Settings › Snap with its zone editor, Shift+drag zones, the App switcher overlay and Settings › App switcher ([Wave 3](#wave-3-text-snippets-snap-and-the-app-switcher-task-375)). Travis approved it on 2026-11-05 as drawn (task 384).
+- `arrangements.html`: saved app arrangements (task 439): Settings › Snap › Arrangements with its review and editor, and the island's Arrangements list, run page and bar lines ([Saved app arrangements](#saved-app-arrangements-task-439)). Not approved yet.
 - `before\`: real renders from `main` at `b9b6d05`: the Actions gallery, Settings › General and Radial menu (`--settings-snapshot`, a dev profile with only Radial menu and every hold off), and the agent's 6-second bar line (`AgentBarTests.Render`).
 - `shots\<board>-<theme>.png`: 2x renders of every board, dark and light.
 - `render.ps1`: renders the PNGs again with headless Edge. Use `-Only <board>,<board>` to render only some boards.
@@ -38,6 +39,10 @@ Add `?board=<id>&theme=dark|light` to any page to see one board.
 | wave-3 | `switcher` | The App switcher over the desktop: twelve windows, a minimized one |
 | wave-3 | `switcher-settings` | Settings › App switcher |
 | wave-3 | `sheet-switcher-states` | Search, This display, no preview, 50 windows, no results, "Switch failed" on the bar |
+| arrangements | `arrangements`, `arrangements-narrow` | Settings › Snap at 1120 and 860 with three arrangements |
+| arrangements | `arrangements-review`, `arrangements-review-narrow` | New arrangement's review: twelve windows on two displays, a row pointed at |
+| arrangements | `sheet-arrangements-states` | Empty, a row's menu, launched from Settings, Delete, launch details, the three refusals, Edit, Recapture |
+| arrangements | `sheet-arrangements-island` | Actions › Snap and its Arrangements list (and empty), Search, a run: launching, partly done (pages 1 and 2), guessed, a missing display, cancelled, stopped; four bar lines |
 | shortcuts | `sheet-shortcuts-states` | Add shortcut's steps, the three refusals, Record, a shortcut that can't work, the row menu, Caps Lock off, paused, the Win confirm, a hook down |
 
 ## Wave 2: Shortcuts (task 344)
@@ -84,6 +89,25 @@ Drawn from `text-snippets.md`, `snap.md` and `app-switcher.md`. The Snap menu it
 22. **Settings › App switcher:** Shortcut (Not set, Record), as the Radial menu has; Windows from (All displays or This display, which the overlay's switch also changes); Previews; and Apps without previews.
 
 **Not drawn:** reduced motion (the overlay and zones only fade in), several virtual desktops, and the switcher on a portrait display. Every app, title, monitor and snippet here is invented, and the squares stand for each app's real icon ([App icons](#app-icons)).
+
+## Saved app arrangements (task 439)
+
+Drawn from `arrangements.md` as Travis confirmed it (task 438). Every window, app and display is invented. Travis approved these boards (task 443) and said yes to 3 (task 441) and 10 (task 442); `arrangements.md` records both. The choices:
+
+1. **Arrangements is the last section of Settings › Snap,** after Gaps. The brief puts it below Layouts; Gaps stays next to the layouts it spaces.
+2. **A saved row:** up to four of its apps' icons, the name over "12 windows · 2 displays", its shortcut as caps when one is set, Launch, and More (Edit, Delete), like a layout's menu. Rows are sorted by name: the Snap menu lists them in that order.
+3. **New arrangement captures what's open right away** and opens the review in place, under the list. The brief had a separate Capture step after New. Most of the time the desktop is already arranged when you think "save this", and Recapture on the review's title row covers the times it isn't.
+4. **The review:** Name, then a preview with each display where it sits and the windows that show on it (minimized ones are only in the list), then one row per window, grouped by display. Each row has the app's icon, its title over its size and place on that display ("1536 × 2088 at 0, 0", "Maximized", "Minimized · …"), Remove, and a chevron that opens its launch details. Pointing at a row lights its window in the preview. Windows that weren't captured are one row at the end: "3 windows not captured" over each one and why.
+5. **Launch details:** a program shows its path with Browse…, Arguments and Working folder. A Start menu app shows its name over "Start menu" and nothing else, since it can't take either.
+6. **Refusals sit on the Save row** in Caution with Save off, as in Snippets: "Fan Control needs an app to launch", "Another arrangement already uses this name", "No windows to save".
+7. **Edit** is the same editor with Delete beside Recapture and the shortcut read-only with Edit ↗ (Settings › Shortcuts). Recapture replaces the rows, marks new windows "New" and says "Recaptured · 2 new · 1 gone" on the Save row. Cancel keeps what was saved. Delete asks "Delete Coding?" with Cancel and Delete.
+8. **On the island, Actions › Snap has Arrangements in its header.** Its four commands already fill their row. The page lists the arrangements two across, as Actions lists do. Pointing at one shows Launch, and Manage opens Settings › Snap. Search finds an arrangement as "Arrangement · 12 windows", with Launch as its verb.
+9. **A run is an island page named after the arrangement,** with Actions' two columns of five rows and paging. Each row shows the window's title over its state: Waiting, Opening, Placing, Ready, Skipped or Failed, with the reason. A problem gets a Caution glyph as well as the word, so it isn't carried by color alone. Once the run ends, problems and guesses sort first, so they're on page 1.
+10. **The run is also an activity on the bar:** a progress ring with "5 of 12 ready" over the name. A clean run folds once it's done. A run that's only partly done, or that guessed a window or moved one to another display, stays on the bar until Dismiss, and clicking it opens the page. Partly done is Caution and offers Retry for the failed rows. Cancelled and Stopped (a fullscreen app came in front) offer Launch.
+11. **A refused launch** (a fullscreen app or Pause in these apps) shows "Not launched" over "Coding · Fullscreen app" on the bar. If the widget is hidden because of that fullscreen app, the launch beeps once, as Close protection does (task 263).
+12. **Launched from Settings,** the row's caption shows the run ("Opening · 5 of 12 ready") and Cancel takes Launch's place. The other Launch buttons are off until it ends, since only one run happens at a time.
+
+**Not drawn:** the action picker and the Radial menu (an arrangement is an ordinary action there), reduced motion, a third display, and the widget on the left.
 
 ## Option B's tile order
 
