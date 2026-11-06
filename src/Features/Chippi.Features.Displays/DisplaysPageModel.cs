@@ -19,6 +19,13 @@ public sealed record DisplaysSettings
 
     /// <summary>Percent a press moves: 5, 10 or 20.</summary>
     public int Step { get; init; } = 10;
+
+    /// <summary>The three global slots' keys; null while a slot is unset (all three start unset).</summary>
+    public KeyShortcut? BrightnessUp { get; init; }
+
+    public KeyShortcut? BrightnessDown { get; init; }
+
+    public KeyShortcut? OpenDisplays { get; init; }
 }
 
 /// <summary>A display as Settings › Displays lists it.</summary>

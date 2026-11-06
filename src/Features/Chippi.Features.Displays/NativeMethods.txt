@@ -1,0 +1,8 @@
+GetPhysicalMonitorsFromHMONITOR
+GetNumberOfPhysicalMonitorsFromHMONITOR
+DestroyPhysicalMonitors
+GetVCPFeatureAndVCPFeatureReply
+SetVCPFeature
+PHYSICAL_MONITOR
+GetCursorPos
+MonitorFromPoint
