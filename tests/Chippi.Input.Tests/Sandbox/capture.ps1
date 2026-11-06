@@ -44,7 +44,7 @@ function Shot([string]$name) {
 }
 # One scenario: $start opens the overlay, $act runs on it; returns the events it logged and where the keyboard ended up.
 function Scenario([string]$name, [scriptblock]$start, [scriptblock]$act, [string]$shot = '') {
-    $from = (Events).Count
+    $from = @(Events).Count
     Click 700 520   # the fixture in front first, so the hand-back has somewhere to go
     Start-Sleep -Milliseconds 300
     & $start
@@ -114,7 +114,7 @@ $s.clipperAfterPrintScreen = @(Get-Process -Name ScreenClippingHost, SnippingToo
 # Timings: 10 more opens by shortcut (Esc each), then 30 releases.
 $opens = @()
 foreach ($i in 1..10) { $o = Scenario "open$i" { Starter 1 } { Start-Sleep -Milliseconds 200; Tap 0x1B }; $opens += $o.frozen }
-$s.timedOpensFrozen = ($opens | Where-Object { $_ }).Count
+$s.timedOpensFrozen = @($opens | Where-Object { $_ }).Count
 $releases = Scenario 'releases' { Starter 1 } {
     Drag 300 300 500 400
     foreach ($i in 1..30) { Start-Sleep -Milliseconds 150; Drag 500 400 (520 + $i) (420 + $i) }   # each a handle drag and release
@@ -126,7 +126,7 @@ Set-ItemProperty -Path 'HKCU:\Control Panel\Keyboard' -Name PrintScreenKeyForSni
 Start-Sleep -Seconds 2
 $found.usedByWindows = @(Events | Where-Object { $_.event -eq 'shortcuts' } | Select-Object -Last 1 | ForEach-Object { $_.entries })
 $found.settingAfterTurnedOn = Setting
-$from = (Events).Count
+$from = @(Events).Count
 Click 700 520; Start-Sleep -Milliseconds 300
 Tap 0x2C
 Start-Sleep -Seconds 2

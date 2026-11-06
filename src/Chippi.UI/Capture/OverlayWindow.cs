@@ -41,6 +41,9 @@ internal sealed partial class OverlayWindow : Window
             Handle = new WindowInteropHelper(this).Handle;
             SetWindowLongPtr(Handle, GwlExStyle, GetWindowLongPtr(Handle, GwlExStyle) | WsExToolWindow | WsExLayered);
             SetAlpha(0);
+            // Out of every screen read, the freeze's own included: at alpha 0 the overlay still read as black with
+            // CAPTUREBLT (the Sandbox check, 2026-11-06), the brief's fallback.
+            SetWindowDisplayAffinity(Handle, WdaExcludeFromCapture);
         };
     }
 
@@ -155,11 +158,12 @@ internal sealed partial class OverlayWindow : Window
 
     private const int GwlExStyle = -20;
     private const nint WsExToolWindow = 0x80, WsExLayered = 0x80000;
-    private const uint LwaAlpha = 0x2, SwpNoActivate = 0x0010;
+    private const uint LwaAlpha = 0x2, SwpNoActivate = 0x0010, WdaExcludeFromCapture = 0x11;
     private static readonly nint HwndTopmost = -1;
 
     [LibraryImport("user32.dll", EntryPoint = "GetWindowLongPtrW")] private static partial nint GetWindowLongPtr(nint hwnd, int index);
     [LibraryImport("user32.dll", EntryPoint = "SetWindowLongPtrW")] private static partial nint SetWindowLongPtr(nint hwnd, int index, nint value);
     [LibraryImport("user32.dll")][return: MarshalAs(UnmanagedType.Bool)] private static partial bool SetLayeredWindowAttributes(nint hwnd, uint key, byte alpha, uint flags);
+    [LibraryImport("user32.dll")][return: MarshalAs(UnmanagedType.Bool)] private static partial bool SetWindowDisplayAffinity(nint hwnd, uint affinity);
     [LibraryImport("user32.dll")][return: MarshalAs(UnmanagedType.Bool)] private static partial bool SetWindowPos(nint hwnd, nint after, int x, int y, int cx, int cy, uint flags);
 }
