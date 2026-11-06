@@ -168,6 +168,15 @@ public static class LucideIcons
     public static Geometry Pipette { get; } = G("M12,9 L3.586,17.414 A2,2 0 0 0 3,18.828 v1.344 a2,2 0 0 1 -0.586,1.414 A2,2 0 0 1 3.828,21 h1.344 a2,2 0 0 0 1.414,-0.586 L15,12 M18,9 l0.4,0.4 a1,1 0 1 1 -3,3 l-3.8,-3.8 a1,1 0 1 1 3,-3 l0.4,0.4 l3.4,-3.4 a1,1 0 1 1 3,3 Z M2,22 l0.414,-0.414");
     public static Geometry Gamepad { get; } = G("M6,12 h4 M8,10 v4 M15,13 h.01 M18,11 h.01 M17.32,5 H6.68 a4,4 0 0 0 -3.98,3.59 c-.01,.05 -.02,.1 -.02,.15 C2.6,9.42 2,14.46 2,16 a3,3 0 0 0 3,3 c1,0 1.5,-.5 2,-1 l1.41,-1.41 A2,2 0 0 1 9.83,16 h4.34 a2,2 0 0 1 1.41,.59 L17,18 c.5,.5 1,1 2,1 a3,3 0 0 0 3,-3 c0,-1.55 -.6,-6.58 -.68,-7.26 c-.01,-.05 -.02,-.1 -.02,-.15 A4,4 0 0 0 17.32,5 Z");
 
+    // The frozen screen's markup tools (Frozen screen v1).
+    public static Geometry Copy { get; } = G("M10,8 H20 a2,2 0 0 1 2,2 V20 a2,2 0 0 1 -2,2 H10 a2,2 0 0 1 -2,-2 V10 a2,2 0 0 1 2,-2 Z M4,16 c-1.1,0 -2,-0.9 -2,-2 V4 c0,-1.1 0.9,-2 2,-2 h10 c1.1,0 2,0.9 2,2");
+    public static Geometry Circle { get; } = G("M12,2 a10,10 0 1 0 0,20 a10,10 0 1 0 0,-20 Z");
+    public static Geometry Crop { get; } = G("M6,2 v14 a2,2 0 0 0 2,2 h14 M18,22 V8 a2,2 0 0 0 -2,-2 H2");
+    public static Geometry Eraser { get; } = G("M21,21 H8 a2,2 0 0 1 -1.42,-0.587 l-3.994,-3.999 a2,2 0 0 1 0,-2.828 l10,-10 a2,2 0 0 1 2.829,0 l5.999,6 a2,2 0 0 1 0,2.828 L12.834,21 M5.082,11.09 l8.828,8.828");
+    public static Geometry Highlighter { get; } = G("M9,11 l-6,6 v3 h9 l3,-3 M22,12 l-4.6,4.6 a2,2 0 0 1 -2.8,0 l-5.2,-5.2 a2,2 0 0 1 0,-2.8 L14,4");
+    public static Geometry MoveUpRight { get; } = G("M13,5 H19 V11 M19,5 L5,19");
+    public static Geometry Redo { get; } = G("M15,14 l5,-5 l-5,-5 M20,9 H9.5 A5.5,5.5 0 0 0 4,14.5 A5.5,5.5 0 0 0 9.5,20 H13");
+
     private static readonly FrozenDictionary<string, Geometry> ByKey = typeof(LucideIcons)
         .GetProperties(BindingFlags.Public | BindingFlags.Static)
         .Where(p => p.PropertyType == typeof(Geometry))

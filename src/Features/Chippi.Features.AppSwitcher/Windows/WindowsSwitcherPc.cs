@@ -3,7 +3,6 @@
 
 using System.Runtime.InteropServices;
 using Chippi.Core.Actions;
-using Chippi.Core.Input;
 
 namespace Chippi.Features.AppSwitcher.Windows;
 
@@ -43,19 +42,8 @@ public sealed partial class WindowsSwitcherPc : ISwitcherPc
     public bool IsSame(nint hwnd, uint processId) =>
         IsWindow(hwnd) && GetWindowThreadProcessId(hwnd, out uint pid) != 0 && pid == processId;
 
-    /// <summary>
-    /// Gives the overlay the keyboard. A shortcut, an island click or Search leaves Chippi the right to the foreground;
-    /// the input hub's doors (the Radial menu, mouse buttons, Caps Lock combos) don't, as the hub swallowed the press.
-    /// Then one tap of an unassigned key, marked as Chippi's so the hub passes it, earns the right, and it tries once
-    /// more. Never a loop, and never Alt, which can open an app's menu bar.
-    /// </summary>
-    public bool TakeForeground(nint overlay)
-    {
-        if (SetForegroundWindow(overlay) && GetForegroundWindow() == overlay)
-            return true;
-        Tap(Unassigned);
-        return SetForegroundWindow(overlay) && GetForegroundWindow() == overlay;
-    }
+    /// <summary>Gives the overlay the keyboard, with the 0x07 tap when the door left no right to it (<see cref="Chippi.UI.Actions.ForegroundRight"/>).</summary>
+    public bool TakeForeground(nint overlay) => Chippi.UI.Actions.ForegroundRight.Take(overlay);
 
     /// <summary>Snap's Next monitor move (<see cref="IActionPc.MoveToDisplay"/>). An admin window isn't tried: Chippi can't move it.</summary>
     public bool BringTo(SwitcherWindow window, nint monitor)
@@ -87,19 +75,6 @@ public sealed partial class WindowsSwitcherPc : ISwitcherPc
             SetForegroundWindow(original);
     }
 
-    /// <summary>VK 0x07 is unassigned: no app acts on it.</summary>
-    private const ushort Unassigned = 0x07;
-
-    private static void Tap(ushort vk)
-    {
-        Input[] inputs =
-        [
-            new() { Type = 1, Keyboard = new KeyboardInput { Vk = vk, ExtraInfo = ChippiInput.Marker } },
-            new() { Type = 1, Keyboard = new KeyboardInput { Vk = vk, Flags = 0x0002, ExtraInfo = ChippiInput.Marker } },
-        ];
-        SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<Input>());
-    }
-
 
     private const uint MonitorDefaultToNull = 0, MonitorDefaultToNearest = 2;
 
@@ -108,12 +83,6 @@ public sealed partial class WindowsSwitcherPc : ISwitcherPc
     [StructLayout(LayoutKind.Sequential)]
     private struct Point { public int X, Y; }
 
-    [StructLayout(LayoutKind.Sequential)]
-    private struct KeyboardInput { public ushort Vk, Scan; public uint Flags, Time; public nint ExtraInfo; }
-
-    // INPUT with the keyboard member; the union's size is the mouse member's, hence the padding.
-    [StructLayout(LayoutKind.Explicit, Size = 40)]
-    private struct Input { [FieldOffset(0)] public uint Type; [FieldOffset(8)] public KeyboardInput Keyboard; }
 
     [LibraryImport("user32.dll")] private static partial nint GetForegroundWindow();
     [LibraryImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] private static partial bool SetForegroundWindow(nint hwnd);
@@ -124,5 +93,4 @@ public sealed partial class WindowsSwitcherPc : ISwitcherPc
     [LibraryImport("user32.dll")] private static partial nint MonitorFromWindow(nint hwnd, uint flags);
     [LibraryImport("user32.dll")] private static partial nint MonitorFromPoint(Point point, uint flags);
     [LibraryImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] private static partial bool GetCursorPos(out Point point);
-    [LibraryImport("user32.dll")] private static partial uint SendInput(uint count, [In] Input[] inputs, int size);
 }

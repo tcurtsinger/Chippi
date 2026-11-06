@@ -1,6 +1,6 @@
 # Capture layer and selector: brief
 
-Wave 1. Owner: Kayla (engine, overlay wiring, shortcut service). Overlay look: Lumen (`design/wave-1.html`, board 3). Reviewer: Karl. Task 490. Status: for Travis's confirmation with the wave 1 mockups. Nothing is built yet.
+Wave 1. Owner: Kayla (engine, overlay wiring, shortcut service). Overlay look: Lumen (`design/wave-1.html`, board 3). Reviewer: Karl. Task 490. Status: confirmed by Travis (task 509); built in task 531 (`feat/capture-layer`).
 
 [Decisions](README.md) override the research. References: [behavior spec A](behavior-spec-a.md#proposed-selector-contract), [architecture §2](architecture.md#2-one-capture-layer), [surfaces §4](surfaces.md#4-capture). The features on top have their own briefs: [screen-capture.md](screen-capture.md) (Karl: markup, Copy and Save, Recent, the Capture panel), `color-picker.md` and `text-and-qr.md` (Herb). Recording (wave 2) uses this layer too.
 
@@ -23,11 +23,11 @@ The overlay windows (one per display: topmost, at that display's DPI, covering t
 
 1. **A starter fires** (a shortcut, a Capture panel card, Search, a Radial slice). The layer notes **the return window**, the one that gets the keyboard back when the overlay closes:
    - after a shortcut or a Radial slice, the foreground window at that moment
-   - from the island (a panel card, or Search, which is the island's own page), the last window in front that wasn't the island's. `ForegroundTracker` already keeps it, since it ignores the island's windows.
+   - from the island (a panel card, or Search, which is the island's own page), the last window in front that wasn't the island's. The island already keeps it for a page's Paste (`IslandPasteTarget`).
 2. **The overlays take the keyboard before anything is read.** They show with nothing drawn (every pixel fully transparent), and the one on the display under the pointer activates, using the right its door gives it (Foreground, below). From the island, this happens while the island is still on screen, so Chippi holds the foreground throughout the handoff (Phase 6 rule: activate the next window, then hide yours). With a delay, this step waits for the count to end instead.
 3. **The island closes, if it's open,** and the freeze waits for its close to finish and one `DwmFlush`, so the presented frame no longer has the panel. An overlay already holds the foreground, so the island hiding doesn't let Windows activate another window. The Radial menu and the App switcher are already gone, since firing a verb closes them.
 4. **A delay, if one was picked** (3, 5 or 10 seconds): the bar shows "Capturing in 3", counting down, and nothing else happens. Nothing of Chippi's holds the keyboard during the count, so menus can be opened. A click on the bar line cancels it; so does pressing the same starter again. Esc doesn't, because Esc would also close the menu being opened. At the end, step 2 runs.
-5. **Read every display once** into memory with GDI `BitBlt` (`SRCCOPY | CAPTUREBLT`) from the screen DC, one call per display (the spike's answer, below). The pointer isn't included. The empty overlays are on screen, but a fully transparent pixel adds nothing to the read. **Inference:** the Sandbox check compares the frozen image with the fixture's known pixels. If an empty overlay shows up in the read, the overlays get `WDA_EXCLUDEFROMCAPTURE` instead, which keeps them out of every capture, Travis's screen shares included.
+5. **Read every display once** into memory with GDI `BitBlt` (`SRCCOPY | CAPTUREBLT`) from the screen DC, one call per display (the spike's answer, below). The pointer isn't included. The empty overlays are on screen, but a fully transparent pixel adds nothing to the read. **Found in the Sandbox check (task 531):** an empty overlay at alpha 0 still read as black with `CAPTUREBLT`, so the overlays carry `WDA_EXCLUDEFROMCAPTURE`, which keeps them out of every capture, Travis's screen shares included.
 6. **Read the window list** at the same moment: top-level windows in z-order from `WindowsWindowList`, visible and not cloaked, with frame bounds from `DWMWA_EXTENDED_FRAME_BOUNDS`. Chippi's own puck, the recording pill and the overlays are left out. This list is a snapshot, so it matches the frozen image.
 7. **Draw the frozen image,** dimmed, into the overlays already on screen.
 
@@ -51,9 +51,11 @@ Recording (wave 2) asks for Region or Window with the selection kept on the disp
 
 **After release** the selection keeps its eight handles: drag them to resize, drag inside to move. Arrow keys move it a pixel and Shift+arrows resize from the right and bottom edges (Flameshot). Ctrl+A selects the whole display under the pointer (Lightshot). Each change redraws the bars' place and the size pill.
 
-**The magnifier** follows the pointer while selecting: 8× over the frozen pixels around the pointer, with the pixel grid, the pointer's physical coordinates and the pixel's HEX. It flips to stay on the display. Settings › Screen capture can hide it, except for Pick a point. **The size pill** shows "1040 × 800" in physical pixels at the selection's corner, outside it when there's room.
+**The magnifier** follows the pointer from hover on, while choosing (fine aim starts before the press; Lumen, Frozen screen v1): 8× over the frozen pixels around the pointer, with the pixel grid, the pointer's physical coordinates and the pixel's HEX. It flips to stay on the display. Settings › Screen capture can hide it, except for Pick a point. **The size pill** shows "1040 × 800" in physical pixels at the selection's corner, outside it when there's room; over a window, its title first ("Terminal · 1040 × 800").
 
 The look of the dimming, handles, magnifier and pill is Lumen's board; they stay neutral so they read over any screen.
+
+**Reopening a capture** (`ICaptureLayer.Reopen`, Annotate on a Recent capture): the screen freezes as for a capture, and the finished capture's flattened pixels show centred on the display under the pointer, already selected. It keeps its own size when it fits on that display; otherwise it shrinks to fit 32 DIPs inside the display's edges (an All displays capture on one display). The selection is fixed: no handles, no move, no arrows, no Ctrl+A. The bars, keys, Tooling and Close work as after a release, and the size pill reads the image's own size. `Selection.Image()` returns the reopened pixels unchanged, never the screen under them; `Selection.Scale` is screen pixels per image pixel, so markup drawn on the surface maps back to image pixels. Last region doesn't change.
 
 ## Keys on the overlay
 
@@ -87,9 +89,12 @@ The feature supplies its bars' content (Screen capture: the 40-wide tool column 
 
 **Windows' setting**, "Use the Print screen key to open screen capture" (`HKCU\Control Panel\Keyboard`, `PrintScreenKeyForSnippingEnabled`; unset means on):
 
-- **When Print Screen becomes a Chippi shortcut** (installing Screen capture with the default, or Travis recording it), Chippi reads the value, saves what it found (unset, 0 or 1) in its own settings, and writes 0. That takes effect at the next press: no sign-out, Explorer restart or broadcast needed (spike). It also broadcasts `WM_SETTINGCHANGE`, which costs nothing and is what putting it back uses.
+- **When Print Screen becomes a Chippi shortcut** (installing Screen capture with the default, or Travis recording it), Chippi reads the value, saves what it found (unset, 0 or 1) beside its own registry values (`HKCU\Software\Chippi`, `PrintScreenFound`, where the uninstaller can read it), and writes 0. That takes effect at the next press: no sign-out, Explorer restart or broadcast needed (spike). It also broadcasts `WM_SETTINGCHANGE`, which costs nothing and is what putting it back uses.
 - **When Print Screen stops being a Chippi shortcut** (changed, removed, the feature uninstalled), Chippi puts back what it found, by writing the value back (or deleting it, if it was unset) and broadcasting `WM_SETTINGCHANGE`, which took effect at once in the spike. Chippi's uninstaller does the same, beside removing the Explorer entry (`Program.cs`, `OnBeforeUninstallFastCallback`).
-- **When Travis turns the setting back on himself** while Chippi holds Print Screen: Chippi's shortcut then fires only while a Chippi window is in front, and Windows' screen clipping opens everywhere else (spike). Chippi watches the value (`RegNotifyChangeKeyValue`) and doesn't turn it off again: the Capture region row in Settings › Shortcuts shows "Used by Windows", like any clash, until Travis records Print Screen again, which turns it off again. `RegisterHotKey` itself succeeds either way, so the value, not the registration, tells Chippi.
+- **The order matters (the build's Sandbox check):** a Print Screen hotkey registered while Windows' setting is on fires only while a Chippi window is in front, even after the setting goes off. So the service writes 0 first and registers after.
+- **When Travis turns the setting back on himself** while Chippi holds Print Screen: a hotkey registered while the setting was off keeps the key from Windows, so Chippi lets go of the key (`UnregisterHotKey`) and keeps the shortcut set. Chippi watches the value (`RegNotifyChangeKeyValue`) and doesn't turn it off again: the Capture region row in Settings › Shortcuts shows "Used by Windows", dimmed like any clash, until Travis records Print Screen again (off, then registered) or turns Windows' switch off again (registered again). `RegisterHotKey` itself succeeds either way, so the value, not the registration, tells Chippi.
+- **Not proven:** in the Sandbox, after Chippi had turned the setting off, a flip back on from outside (the value and the `WM_SETTINGCHANGE` broadcast) didn't bring Windows' own screen clipping back for that session, with Chippi holding nothing. Whether Windows Settings' own switch does is Travis's live check.
+- **Quitting isn't removing:** the setting stays off for the next start. After the features start, a hold that no shortcut uses any more (the feature went while Chippi wasn't running) puts it back.
 - **Only Chippi.exe in the real profile changes the setting.** Dev profiles and tests get a fake setting store, the way `ExplorerRegistration.CanChange` keeps tests off the real Explorer menu.
 
 ## Foreground
@@ -142,7 +147,7 @@ The layer adds one slot; each feature brief lists its own starters.
 Every string the layer shows. Marge runs them through Decide before the installer.
 
 - **Bar:** Capturing in <seconds>; Capture failed (the read failed, for example on the secure desktop).
-- **Overlay:** "<width> × <height>" (size pill); "<x>, <y>" and "#RRGGBB" (magnifier).
+- **Overlay:** "<width> × <height>", or "<title> · <width> × <height>" over a window (size pill); "<x>, <y>" and "#RRGGBB" (magnifier).
 - **Settings › Shortcuts:** Print Screen (key name); Open Capture (row); Used by Windows (Capture region's row, while Windows' setting is back on).
 - **Settings › Screen capture:** Magnifier (its switch is Karl's row; the layer reads it).
 
@@ -152,7 +157,8 @@ Every string the layer shows. Marge runs them through Decide before the installe
 - **Chippi.UI:** the selector overlay (`Chippi.UI.Capture`: overlay windows, selection, magnifier, size pill, the bars' placement and keys). Lumen builds its look; I build the window, input and placement.
 - **Core, shortcut service:** `KeyShortcut.IsBindable` and `KeyName` for Print Screen; the Print Screen setting store (an interface in Core, the registry version in App).
 - **Chippi.UI, displays:** `DisplayCatalog.Changed` (shared with [displays.md](displays.md)).
-- **App:** the Capture host (tile, panel host, `capture/open` and its slot) and the uninstall hook's restore of Windows' Print Screen setting.
+- **App:** the Capture host (tile, panel host, `capture/open` and its slot) and the uninstall hook's restore of Windows' Print Screen setting. As built (task 531): `CaptureShell` (the return window, the island's close, the bar line) and one `CaptureLayer` in `ShellContext`, passed to each capture feature as it's registered. The Capture host's tile, panel and slot come with Screen capture, its first feature.
+- **Also shared, as built:** `ForegroundRight` (the 0x07 tap) moves to `Chippi.UI.Actions` for the App switcher and the overlay; `IslandActivity.Clicked` lets a click on "Capturing in 3" cancel; the island gets `ClosePagesAsync`.
 - **Island:** nothing beyond the Capture tile's catalog order (75, after Clipboard).
 
 ## Spike results (Windows Sandbox, 2026-11-06)
