@@ -152,6 +152,56 @@ public sealed class AddedTilesTests
         Assert.Equal((true, "On"), (tile.IsChecked, AutomationProperties.GetItemStatus(tile)));
     });
 
+    /// <summary>A menu view with a page of its own, as Snap's Arrangements is.</summary>
+    private sealed class PagedView : StackPanel, IActionsMenuView
+    {
+        public readonly Button Side = new() { Content = "Arrangements" };
+        public bool Inner;
+        public string? Title => Inner ? "Arrangements" : null;
+        public object? Aside => Inner ? null : Side;
+        public event Action? HeaderChanged;
+        public PagedView() => Children.Add(new Button { Content = "First" });
+        public void Step(bool inner) { Inner = inner; HeaderChanged?.Invoke(); }
+        public bool Back()
+        {
+            if (!Inner) return false;
+            Step(false);
+            return true;
+        }
+    }
+
+    [Fact]
+    public void A_menu_view_with_pages_sets_the_header_takes_Back_first_and_can_ask_to_open() => WpfTestThread.Run(() =>
+    {
+        using var f = new Fixture(installed: true);
+        PagedView? view = null;
+        bool ask = false;
+        var tile = new ActionsTile("snap", "Snap", "LayoutGrid") { Menu = true, View = () => view = new PagedView(), OpensNow = () => { bool a = ask; ask = false; return a; } };
+        f.Extra = new FakeSwitch("snap/x", "Snap") { Tile = tile };
+        f.Page.Render();
+        f.Page.Press("snap");
+        Assert.Equal(("menu", "Snap"), (f.Page.Showing, f.Page.Title));
+        Assert.Contains(view!.Side, Find<Button>(f.Page.Header));
+
+        // Its own page: its title, nothing at the right; Back returns to its first page, then leaves the menu.
+        view.Step(true);
+        Assert.Equal("Arrangements", f.Page.Title);
+        Assert.DoesNotContain(view.Side, Find<Button>(f.Page.Header));
+        Assert.True(f.Page.Back());
+        Assert.Equal(("menu", "Snap"), (f.Page.Showing, f.Page.Title));
+        Assert.True(f.Page.Back());
+        Assert.Equal(("grid", "Actions"), (f.Page.Showing, f.Page.Title));
+        Assert.DoesNotContain(view.Side, Find<Button>(f.Page.Header));
+
+        // Asked once, Actions opens on the menu; the next opening is the usual one.
+        ask = true;
+        f.Page.OpenAsked();
+        Assert.Equal(("menu", "snap"), (f.Page.Showing, f.Page.Menu));
+        f.Page.Back();
+        f.Page.OpenAsked();
+        Assert.Equal("grid", f.Page.Showing);
+    });
+
     private static string Status(ActionsPage page, string key) => AutomationProperties.GetItemStatus(Tiles(page).Single(b => Equals(b.Tag, key)));
 
     private static IEnumerable<ButtonBase> Tiles(ActionsPage page) => Find<ButtonBase>(page).Where(b => b.Tag is string key && !key.Contains(':'));

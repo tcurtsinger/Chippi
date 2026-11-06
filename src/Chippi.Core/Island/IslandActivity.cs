@@ -76,7 +76,7 @@ public sealed record IslandActivity(string Key, IslandActivityKind Kind, string 
     /// </summary>
     public bool IsFeedback { get; init; }
 
-    /// <summary>Optional Lucide glyph for feedback without an island tile.</summary>
+    /// <summary>Optional Lucide glyph for feedback without an island tile, or for a <see cref="IslandActivityKind.Status"/> in place of its dot.</summary>
     public string? Icon { get; init; }
 
     /// <summary>Set by the hub to the publishing module's id.</summary>

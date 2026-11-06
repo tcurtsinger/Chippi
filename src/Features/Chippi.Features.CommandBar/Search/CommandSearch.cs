@@ -216,6 +216,7 @@ internal sealed class CommandSearch(
         Level = command.Level,
         Opens = command.Kind == ChippiCommandKind.Page,
         Inserts = command.Kind == ChippiCommandKind.Insert,
+        Launches = command.Kind == ChippiCommandKind.Launch,
     };
 
     private Result Window(OpenWindow window) =>

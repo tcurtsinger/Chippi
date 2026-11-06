@@ -34,6 +34,8 @@ internal sealed partial class ActionsPage : UserControl
     private readonly DockPanel _header = new();
     private readonly Button _edit = Ui.Icon(LucideIcons.Pencil, "Edit actions");
     private readonly Button _done = Ui.Button("Done", "IslandAccentButtonStyle");
+    private readonly ContentControl _aside = new() { Focusable = false, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 0, 0) };
+    private IActionsMenuView? _menuView; // the open menu's view, when it has pages of its own (Snap's Arrangements)
     private readonly Grid _body = new() { Width = IslandPage.BodyWidth, Height = IslandPage.BodyHeight };
     private readonly System.Windows.Threading.DispatcherTimer _refresh = new() { Interval = QuickActionsModule.RefreshEvery };
     private readonly Dictionary<QuickActionId, bool> _setting = []; // a toggle's new state while Windows switches it
@@ -58,8 +60,10 @@ internal sealed partial class ActionsPage : UserControl
         _done.Click += (_, _) => FinishEdit();
         DockPanel.SetDock(_edit, Dock.Right);
         DockPanel.SetDock(_done, Dock.Right);
+        DockPanel.SetDock(_aside, Dock.Right);
         _header.Children.Add(_edit);
         _header.Children.Add(_done);
+        _header.Children.Add(_aside);
         _header.Children.Add(_title);
         _listFailed.VerticalAlignment = VerticalAlignment.Bottom;
         _listFailed.HorizontalAlignment = HorizontalAlignment.Left;
@@ -81,6 +85,7 @@ internal sealed partial class ActionsPage : UserControl
                 _refresh.Start();
                 _ = _module.PollAsync();
                 ShowPending();
+                OpenAsked();
             }
             else
             {
@@ -139,6 +144,8 @@ internal sealed partial class ActionsPage : UserControl
         }
         if (_menu is { } menu)
         {
+            if (_menuView?.Back() == true)
+                return true;
             _menu = null;
             ResetListPage();
             Render();
@@ -236,7 +243,9 @@ internal sealed partial class ActionsPage : UserControl
         }
         else
             RenderGrid();
-        _title.Text = menu is not null ? menu.Tile.Label : _list is { } open ? QuickAction.Of(open).Name : _editing ? _choosing ? "Choose actions" : "Edit actions" : "Actions";
+        if (menu is null) MenuView(null);
+        _aside.Content = menu is not null ? _menuView?.Aside : null;
+        _title.Text = menu is not null ? _menuView?.Title ?? menu.Tile.Label : _list is { } open ? QuickAction.Of(open).Name : _editing ? _choosing ? "Choose actions" : "Edit actions" : "Actions";
         _edit.Visibility = !_editing && _list is null && menu is null ? Visibility.Visible : Visibility.Collapsed;
         _done.Visibility = _editing ? Visibility.Visible : Visibility.Collapsed;
     }
@@ -320,6 +329,35 @@ internal sealed partial class ActionsPage : UserControl
             bool on = _setting.TryGetValue(id, out var setting) ? setting : state.On.GetValueOrDefault(id);
             cell.Show(Describe(action, state), on, _failed.TryGetValue(id, out var until) && until > DateTime.UtcNow);
         }
+    }
+
+    /// <summary>A menu that asked to open as Actions opens (a run Snap was asked to show) opens now.</summary>
+    internal void OpenAsked()
+    {
+        if (_editing || _list is not null) return;
+        Render();
+        if (_added.FirstOrDefault(t => t.Tile.OpensNow?.Invoke() == true) is not { } asked) return;
+        _menu = asked.Key;
+        _built = "";
+        ResetListPage();
+        Render();
+        FirstRowButton()?.Focus();
+    }
+
+    /// <summary>Follows the open menu's view, when it has pages of its own, for the header's title and its right.</summary>
+    private void MenuView(IActionsMenuView? view)
+    {
+        if (ReferenceEquals(view, _menuView)) return;
+        if (_menuView is not null) _menuView.HeaderChanged -= HeaderChanged;
+        _menuView = view;
+        if (view is not null) view.HeaderChanged += HeaderChanged;
+    }
+
+    private void HeaderChanged()
+    {
+        if (_menu is null) return;
+        _aside.Content = _menuView?.Aside;
+        _title.Text = _menuView?.Title ?? _added.FirstOrDefault(t => t.Key == _menu)?.Tile.Label ?? _title.Text;
     }
 
     /// <summary>An added tile: a menu steps into its list; a single command runs, or switches.</summary>

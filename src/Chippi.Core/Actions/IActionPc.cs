@@ -24,6 +24,18 @@ public interface IActionPc
     /// <summary>Opens a file, folder, app, Settings page or web address as Explorer would.</summary>
     void Open(string target);
 
+    /// <summary>Starts an executable directly, refusing elevation rather than showing a UAC prompt.</summary>
+    LaunchedApp? LaunchExecutable(ExecutableLaunch launch) => throw new ActionFailure("Unavailable");
+
+    /// <summary>Activates a registered app without user arguments or an elevation prompt.</summary>
+    LaunchedApp? LaunchRegisteredApp(string parsingName) => throw new ActionFailure("Unavailable");
+
+    /// <summary>Reads normal outer bounds without restoring or activating the window.</summary>
+    SavedWindowPlacement? ReadPlacement(ActionWindow window) => null;
+
+    /// <summary>Fits saved outer bounds on the destination, including when already there. Never activates it.</summary>
+    void PlaceSaved(ActionWindow window, SavedWindowPlacement placement, nint monitor) => throw new ActionFailure("Unavailable");
+
     void Window(nint window, WindowAction action);
 
     ActionWindow? CaptureWindow(nint window) => null;

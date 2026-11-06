@@ -96,7 +96,7 @@ public sealed class SnapPageTests
         });
     }
 
-    private static void Theme()
+    internal static void Theme()
     {
         if (Application.Current.Resources.MergedDictionaries.Any(d => d.Source?.OriginalString.EndsWith("SettingsStyles.xaml", StringComparison.Ordinal) == true))
             return;
@@ -291,7 +291,7 @@ public sealed class SnapPageTests
     }
 
     /// <summary>The menu as the island shows it: on the island's own fill, at its page width.</summary>
-    private static void IslandShot(FrameworkElement view, string name)
+    internal static void IslandShot(FrameworkElement view, string name)
     {
         // The island's page body: 496 by 304 inside its 12 inset.
         var host = new Border { Padding = new Thickness(12), Child = view, Width = 520 };
@@ -308,12 +308,12 @@ public sealed class SnapPageTests
         return $"{r.Width} × {r.Height}";
     }
 
-    private static TextBox Field(DependencyObject root, string name) =>
+    internal static TextBox Field(DependencyObject root, string name) =>
         Find<TextBox>(root).First(t => System.Windows.Automation.AutomationProperties.GetName(t) == name);
 
-    private static List<string> Texts(DependencyObject root) => [.. Find<TextBlock>(root).Select(t => t.Text)];
+    internal static List<string> Texts(DependencyObject root) => [.. Find<TextBlock>(root).Select(t => t.Text)];
 
-    private static IEnumerable<T> Find<T>(DependencyObject root) where T : DependencyObject
+    internal static IEnumerable<T> Find<T>(DependencyObject root) where T : DependencyObject
     {
         if (root is UIElement { Visibility: not Visibility.Visible }) yield break;
         if (root is T item) yield return item;
@@ -321,7 +321,7 @@ public sealed class SnapPageTests
             foreach (var found in Find<T>(child)) yield return found;
     }
 
-    private static void Layout(FrameworkElement view, double width)
+    internal static void Layout(FrameworkElement view, double width)
     {
         view.Measure(new Size(width, double.PositiveInfinity));
         double w = double.IsInfinity(width) ? view.DesiredSize.Width : width;
@@ -330,7 +330,7 @@ public sealed class SnapPageTests
     }
 
     /// <summary>The view at 2x on the window's background when CHIPPI_ISLAND_SHOTS names a folder; around a heading, just its card's part.</summary>
-    private static void Shot(FrameworkElement view, string name, double width, string? around = null)
+    internal static void Shot(FrameworkElement view, string name, double width, string? around = null, double tall = 720)
     {
         if (Environment.GetEnvironmentVariable("CHIPPI_ISLAND_SHOTS") is not { Length: > 0 } folder) return;
         Directory.CreateDirectory(folder);
@@ -339,7 +339,7 @@ public sealed class SnapPageTests
         if (around is not null && Find<TextBlock>(view).FirstOrDefault(t => t.Text == around) is { } heading)
         {
             top = Math.Max(0, heading.TranslatePoint(new Point(), view).Y - 40);
-            h = Math.Min(h - top, 720);
+            h = Math.Min(h - top, tall);
         }
         var visual = new DrawingVisual();
         using (var dc = visual.RenderOpen())

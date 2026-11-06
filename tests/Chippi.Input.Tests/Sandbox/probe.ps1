@@ -9,7 +9,7 @@ param([switch]$SnapMedium)
 $ErrorActionPreference = 'Stop'
 $results = 'C:\results'
 $checks = (Get-Content -LiteralPath "$results\checks.txt") -split ','
-if ($checks -contains 'snap' -and -not $SnapMedium) {
+if (($checks -contains 'snap' -or $checks -contains 'arrangements') -and -not $SnapMedium) {
     try { & (Join-Path $PSScriptRoot 'snap-medium.ps1'); shutdown.exe /s /t 5 }
     catch {
         @{ checks = $checks; error = $_.ToString(); errorLocation = $_.ScriptStackTrace } | ConvertTo-Json |
@@ -205,6 +205,11 @@ public static class Probe
     }
 }
 '@
+
+    if ($checks -contains 'arrangements') {
+        $found.arrangements = & (Join-Path $PSScriptRoot 'arrangements.ps1')
+        return
+    }
 
     if ($checks -contains 'snap') {
         $found.snap = & (Join-Path $PSScriptRoot 'snap.ps1')

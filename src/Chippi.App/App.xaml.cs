@@ -249,6 +249,9 @@ public partial class App : Application
         }));
 
         var windowLayouts = new Chippi.Features.WindowLayouts.WindowLayoutsModule(SnapDisplaySource.Connected);
+        windowLayouts.PointerDisplayId = SnapDisplaySource.PointerId;
+        windowLayouts.CreateArrangementDesktop = context => new ArrangementDesktop(context.Actions!,
+            () => shell.Config.GetSection<AppSettings>(AppSettings.SectionName).PauseRules(), () => windowLayouts.ArrangementsLocked);
         shell.Registry.Register(windowLayouts);
         if (shell.Services.Actions is Chippi.UI.Actions.WindowsActionPc windowPc)
         {

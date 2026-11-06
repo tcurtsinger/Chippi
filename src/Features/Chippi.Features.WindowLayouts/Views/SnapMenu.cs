@@ -7,6 +7,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using Chippi.Core.Actions;
 using Chippi.Core.Diagnostics;
+using Chippi.Core.Modules;
 using Chippi.UI.Controls;
 
 namespace Chippi.Features.WindowLayouts.Views;
@@ -17,7 +18,7 @@ namespace Chippi.Features.WindowLayouts.Views;
 /// Maximize, Center, Next monitor and Restore. A move that fails says so at the line's right ("Left half failed") and the
 /// menu stays open to try another. An admin window, or none, dims everything with the reason.
 /// </summary>
-internal sealed class SnapMenu : UserControl
+internal sealed class SnapMenu : UserControl, IActionsMenuView
 {
     private const double Dim = 0.45;
     private readonly WindowLayoutsModule _module;
@@ -87,7 +88,77 @@ internal sealed class SnapMenu : UserControl
             commands.Children.Add(button);
         }
         stack.Children.Add(commands);
+        _layouts = stack;
+        _aside = AsideButton();
         Content = stack;
+        if (module.TakeOpenRunPage() && module.ArrangementRun is not null)
+            Show(Page.Run);
+    }
+
+    // ---- its pages: the layouts, Arrangements, and a run (arrangements.html, sheet-arrangements-island) ----
+
+    internal enum Page { Layouts, List, Run }
+
+    private readonly FrameworkElement _layouts;
+    private readonly Button _aside;
+
+    internal Page Showing { get; private set; }
+
+    public string? Title => Showing switch
+    {
+        Page.List => "Arrangements",
+        Page.Run => _module.ArrangementRun?.Name ?? "Arrangements",
+        _ => null,
+    };
+
+    /// <summary>"Arrangements ›" in the header while the layouts show: its four commands already fill their row.</summary>
+    public object? Aside => Showing == Page.Layouts ? _aside : null;
+
+    public event Action? HeaderChanged;
+
+    public bool Back()
+    {
+        if (Showing == Page.Layouts) return false;
+        Show(Showing == Page.Run ? Page.List : Page.Layouts);
+        return true;
+    }
+
+    internal void Show(Page page)
+    {
+        Showing = page;
+        Content = page switch
+        {
+            Page.List => new ArrangementList(_module, () => Show(Page.Run)),
+            Page.Run => new ArrangementRunPage(_module, () => Show(Page.List)),
+            _ => _layouts,
+        };
+        if (page == Page.Run) _module.TakeRunAsk();
+        HeaderChanged?.Invoke();
+        // The keyboard follows onto the new page's first control.
+        Dispatcher.BeginInvoke(() =>
+        {
+            if (Content is DependencyObject root && Buttons(root).FirstOrDefault(b => b.IsEnabled) is { } first && IsKeyboardFocusWithin)
+                first.Focus();
+        });
+    }
+
+    private Button AsideButton()
+    {
+        var label = new TextBlock { Text = "Arrangements", FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
+        var chevron = new LucideIcon { Data = LucideIcons.ChevronRight, Size = 12, Margin = new Thickness(6, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+        chevron.SetResourceReference(LucideIcon.BrushProperty, "TextPrimaryBrush");
+        var button = new Button { Content = new StackPanel { Orientation = Orientation.Horizontal, Children = { label, chevron } }, Height = 24, Padding = new Thickness(10, 0, 8, 0) };
+        button.SetResourceReference(StyleProperty, "IslandButtonStyle");
+        AutomationProperties.SetName(button, "Arrangements");
+        button.Click += (_, _) => Show(Page.List);
+        return button;
+    }
+
+    private static IEnumerable<Button> Buttons(DependencyObject root)
+    {
+        if (root is Button button) yield return button;
+        foreach (var child in LogicalTreeHelper.GetChildren(root).OfType<DependencyObject>())
+            foreach (var found in Buttons(child)) yield return found;
     }
 
     /// <summary>The failure line's text, for tests.</summary>

@@ -42,6 +42,7 @@ internal sealed class SnapPage : UserControl
     private readonly Card _layouts = new();
     private readonly Border _gapsHost = new();
     private readonly TextBlock _failed;
+    private readonly ArrangementsSection _arrangements;
     private Draft? _draft;
     private FrameworkElement? _editor;
     private ZoneCanvas? _canvas;
@@ -63,6 +64,9 @@ internal sealed class SnapPage : UserControl
         _page.Children.Add(_layouts);
         _page.Children.Add(SettingsLayout.Section("Gaps"));
         _page.Children.Add(_gapsHost);
+        _arrangements = new ArrangementsSection(module);
+        _page.Children.Add(SettingsLayout.Section("Arrangements"));
+        _page.Children.Add(_arrangements.View);
         _page.Children.Add(_failed);
         Content = _page;
         void Changed() => Dispatcher.BeginInvoke(Refresh);
@@ -70,6 +74,9 @@ internal sealed class SnapPage : UserControl
         Unloaded += (_, _) => { _module.Changed -= Changed; _module.DisplaysChanged -= Changed; };
         Refresh();
     }
+
+    /// <summary>The Arrangements section, for tests and shots.</summary>
+    internal ArrangementsSection Arrangements => _arrangements;
 
     private SnapLayoutStore? Store => _module.Layouts;
 
@@ -106,6 +113,7 @@ internal sealed class SnapPage : UserControl
         _excluded.Render();
         _refreshing = false;
         RenderLayouts();
+        _arrangements.Render();
     }
 
     // ---- Shift+drag ----
@@ -461,7 +469,7 @@ internal sealed class SnapPage : UserControl
                 return $"Zone {n}";
     }
 
-    private static void Show(StackPanel message, string? text)
+    internal static void Show(StackPanel message, string? text)
     {
         message.Children.Clear();
         message.Visibility = text is null ? Visibility.Collapsed : Visibility.Visible;
@@ -503,23 +511,23 @@ internal sealed class SnapPage : UserControl
     // ---- shared pieces ----
 
     /// <summary>"Delete this layout?" under the button, with Cancel and Delete (Critical).</summary>
-    private static void Confirm(FrameworkElement anchor, Action confirmed)
+    internal static void Confirm(FrameworkElement anchor, Action confirmed, string question = "Delete this layout?")
     {
         var popup = new Popup { PlacementTarget = anchor, Placement = PlacementMode.Bottom, StaysOpen = false, AllowsTransparency = true, PopupAnimation = PopupAnimation.None };
-        popup.Child = ConfirmPanel(() => { popup.IsOpen = false; anchor.Focus(); }, () => { popup.IsOpen = false; confirmed(); }, out var first);
+        popup.Child = ConfirmPanel(() => { popup.IsOpen = false; anchor.Focus(); }, () => { popup.IsOpen = false; confirmed(); }, out var first, question);
         popup.Opened += (_, _) => first.Focus();
         popup.IsOpen = true;
     }
 
-    internal static Border ConfirmPanel(Action cancelled, Action confirmed, out Button first)
+    internal static Border ConfirmPanel(Action cancelled, Action confirmed, out Button first, string question = "Delete this layout?")
     {
         var cancel = Button("Cancel");
         cancel.Margin = new Thickness(0);
         cancel.Click += (_, _) => cancelled();
         var act = Styled(new Button { Content = "Delete", Margin = new Thickness(8, 0, 0, 0) }, "CriticalButtonStyle");
         act.Click += (_, _) => confirmed();
-        var question = Styled(new TextBlock { Text = "Delete this layout?", FontWeight = FontWeights.SemiBold }, "BodyTextStyle");
-        var body = new StackPanel { Margin = new Thickness(16), Children = { question, new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 16, 0, 0), Children = { cancel, act } } } };
+        var asked = Styled(new TextBlock { Text = question, FontWeight = FontWeights.SemiBold }, "BodyTextStyle");
+        var body = new StackPanel { Margin = new Thickness(16), Children = { asked, new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 16, 0, 0), Children = { cancel, act } } } };
         KeyboardNavigation.SetTabNavigation(body, KeyboardNavigationMode.Cycle);
         body.PreviewKeyDown += (_, e) =>
         {
@@ -541,7 +549,7 @@ internal sealed class SnapPage : UserControl
         return label;
     }
 
-    private static Border Line(FrameworkElement left, FrameworkElement? right, Thickness padding, double minHeight = SettingsLayout.RowHeight)
+    internal static Border Line(FrameworkElement left, FrameworkElement? right, Thickness padding, double minHeight = SettingsLayout.RowHeight)
     {
         var dock = new DockPanel { VerticalAlignment = VerticalAlignment.Center };
         if (right is not null)
@@ -571,7 +579,7 @@ internal sealed class SnapPage : UserControl
         return new Border { MinHeight = SettingsLayout.CaptionRowHeight, Padding = SettingsLayout.DependentPadding, Child = grid };
     }
 
-    private static TextBox Field(string text, string placeholder)
+    internal static TextBox Field(string text, string placeholder)
     {
         var box = Styled(new TextBox { Text = text, Tag = placeholder, VerticalContentAlignment = VerticalAlignment.Center }, "TextFieldStyle");
         AutomationProperties.SetName(box, placeholder);
@@ -593,7 +601,7 @@ internal sealed class SnapPage : UserControl
         toggle.Unchecked += Handler;
     }
 
-    private static Button Button(string text, bool primary = false, Geometry? icon = null)
+    internal static Button Button(string text, bool primary = false, Geometry? icon = null)
     {
         object content = text;
         if (icon is not null)
@@ -607,21 +615,21 @@ internal sealed class SnapPage : UserControl
         return button;
     }
 
-    private static LucideIcon Glyph(Geometry data, string brush)
+    internal static LucideIcon Glyph(Geometry data, string brush)
     {
         var icon = new LucideIcon { Data = data, Size = 16, VerticalAlignment = VerticalAlignment.Center };
         icon.SetResourceReference(LucideIcon.BrushProperty, brush);
         return icon;
     }
 
-    private static bool Inside<T>(DependencyObject source) where T : DependencyObject
+    internal static bool Inside<T>(DependencyObject source) where T : DependencyObject
     {
         for (var node = source; node is not null; node = VisualTreeHelper.GetParent(node) ?? LogicalTreeHelper.GetParent(node))
             if (node is T) return true;
         return false;
     }
 
-    private static IEnumerable<T> Descendants<T>(DependencyObject root) where T : DependencyObject
+    internal static IEnumerable<T> Descendants<T>(DependencyObject root) where T : DependencyObject
     {
         foreach (var child in LogicalTreeHelper.GetChildren(root).OfType<DependencyObject>())
         {
