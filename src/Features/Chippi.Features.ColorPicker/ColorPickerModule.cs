@@ -46,7 +46,15 @@ public sealed class ColorPickerModule : IFeatureModule, IColorPageModel
     private IDisposable? _use;
     private IHotkey? _pickKey, _reviewKey;
 
-    public ColorPickerModule(ICaptureLayer? capture = null) => _capture = capture;
+    public ColorPickerModule(ICaptureLayer? capture = null)
+    {
+        _capture = capture;
+        Settings = new SettingsModel(this);
+        Changed += Settings.RaiseChanged;
+    }
+
+    /// <summary>What Settings › Color picker shows and changes.</summary>
+    public SettingsModel Settings { get; }
 
     public FeatureDescriptor Descriptor { get; } = new(Id, "Color picker", "Picks a color from anywhere on screen and copies it", FeatureGroup.Capture)
     {
@@ -81,6 +89,8 @@ public sealed class ColorPickerModule : IFeatureModule, IColorPageModel
             _recent = [.. Validated(_settings.Recent)];
             if (!Array.Exists(FormatNames, n => n == _settings.CopyFormat)) _settings = _settings with { CopyFormat = "HEX" };
         }
+        context.Ui.SetSettingsPage(_ => new Views.ColorPickerSettingsPage(Settings));
+        context.Shortcuts.Changed += Settings.RaiseChanged;
         if (_capture is not null)
         {
             _use = _capture.Use();
@@ -105,6 +115,7 @@ public sealed class ColorPickerModule : IFeatureModule, IColorPageModel
 
     public Task StopAsync(CancellationToken ct)
     {
+        lock (_gate) if (_context is { } stopping) stopping.Shortcuts.Changed -= Settings.RaiseChanged;
         _pickKey?.Dispose(); _reviewKey?.Dispose(); _pickKey = _reviewKey = null;
         _use?.Dispose(); _use = null;
         PickRequested = null;
@@ -210,6 +221,67 @@ public sealed class ColorPickerModule : IFeatureModule, IColorPageModel
             Feedback(context, copied ? new IslandActivity(FeedbackKey, IslandActivityKind.Status, value, $"Copied as {format}") { IsFeedback = true, Swatch = hex }
                 : new IslandActivity(FeedbackKey, IslandActivityKind.Status, "Copy failed", "Color") { IsFeedback = true, NeedsAttention = true, Icon = nameof(LucideIcons.TriangleAlert) });
         };
+    }
+
+    /// <summary>Settings › Color picker's model: the palette, the format and the shortcut rows.</summary>
+    public sealed class SettingsModel(ColorPickerModule owner) : IColorPickerSettingsModel
+    {
+        public IReadOnlyList<string> Recent => owner.Recent;
+
+        public IReadOnlyList<ColorFormat> Formats
+        {
+            get
+            {
+                string hex = owner.Recent is [var newest, ..] ? newest : "#7C5CFF";
+                var color = ColorFormats.Describe(hex);
+                return [new ColorFormat("HEX", color.Hex), .. color.Formats];
+            }
+        }
+
+        public string CopyAs => owner.CopyFormat;
+
+        public string? SettingsError => null;
+
+        public event Action? Changed;
+
+        internal void RaiseChanged() => Changed?.Invoke();
+
+        public (KeyShortcut? Keys, string? Error) Shortcut(string name)
+        {
+            ModuleContext? context;
+            lock (owner._gate) context = owner._context;
+            if (context is null) return (null, null);
+            bool host = name == ColorPickerShortcuts.OpenCapture;
+            foreach (var entry in context.Shortcuts.List)
+                if (host ? entry.Name == name && entry.Owner != Id : entry.Owner == Id && entry.Name == name)
+                    return (entry.Shortcut, entry.Error);
+            return (null, null);
+        }
+
+        public bool SetCopyAs(string format)
+        {
+            if (!Array.Exists(FormatNames, n => n == format)) return false;
+            var before = owner._settings;
+            try { owner.SetCopyFormat(format); return true; }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                owner._settings = before;
+                RaiseChanged();
+                return false;
+            }
+        }
+
+        public void ClearRecent()
+        {
+            owner.ClearRecent();
+        }
+
+        public void EditShortcut(string name)
+        {
+            ModuleContext? context;
+            lock (owner._gate) context = owner._context;
+            if (name != ColorPickerShortcuts.OpenCapture) context?.EditShortcut(name);
+        }
     }
 
     private const string FeedbackKey = "color-picker.pick";

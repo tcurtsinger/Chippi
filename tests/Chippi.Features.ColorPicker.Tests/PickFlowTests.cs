@@ -225,4 +225,22 @@ public sealed class PickFlowTests
         ((IColorPageModel)t.Module).PickAgain();
         Assert.NotNull(t.Layer.Last);
     }
+
+    [Fact]
+    public void The_settings_model_lists_the_formats_of_the_newest_color_and_saves_the_format()
+    {
+        var t = Start(new ColorPickerSettings { Recent = ["#FF0000", "#00FF00"] });
+        var model = t.Module.Settings;
+        Assert.Equal(["HEX", "RGB", "HSL", "HSV", "CMYK"], model.Formats.Select(f => f.Name));
+        Assert.Equal("#FF0000", model.Formats[0].Value);
+        Assert.Equal("#7C5CFF", Start().Module.Settings.Formats[0].Value);
+        int raised = 0;
+        model.Changed += () => raised++;
+        Assert.True(model.SetCopyAs("RGB"));
+        Assert.Equal("RGB", t.Settings.Value.CopyFormat);
+        Assert.False(model.SetCopyAs("nope"));
+        model.ClearRecent();
+        Assert.Empty(model.Recent);
+        Assert.Equal(2, raised);
+    }
 }
