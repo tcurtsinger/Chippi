@@ -19,11 +19,17 @@ The layer has no doors of its own: each feature's starters reach it (their brief
 
 ## The freeze
 
-1. **A starter fires** (a shortcut, a panel card, Search, a Radial slice). If the island is open, it closes first, and the freeze waits for its close to finish so the panel is never captured. Chippi's other transient windows (the Radial menu, the App switcher) are gone by then, since firing a verb closes them.
-2. **A delay, if one was picked** (3, 5 or 10 seconds): the bar shows "Capturing in 3", counting down, and nothing else happens, so menus can be opened. A click on the bar line cancels it; so does pressing the same starter again. Esc doesn't, because Esc would also close the menu being opened.
-3. **Read every display once** into memory with GDI `BitBlt` (`SRCCOPY | CAPTUREBLT`) from the screen DC, one call per display (the spike's answer, below). The pointer isn't included.
-4. **Read the window list** at the same moment: top-level windows in z-order from `WindowsWindowList`, visible and not cloaked, with frame bounds from `DWMWA_EXTENDED_FRAME_BOUNDS`. Chippi's own puck and the recording pill are left out. This list is a snapshot, so it matches the frozen image.
-5. **Show one overlay per display:** topmost, at that display's DPI, covering the whole display (taskbar included), drawing the frozen image dimmed. The overlay windows are made when the first capture feature starts, and again after a display change, then kept hidden: a capture only swaps their image and shows them (a new window cost 45 ms in the spike). The overlay takes the keyboard (Foreground, below).
+The overlay windows (one per display: topmost, at that display's DPI, covering the whole display, taskbar included) are made when the first capture feature starts, and again after a display change, then kept hidden: a capture only shows them and swaps their image (a new window cost 45 ms in the spike). Every starter, whatever its door, runs the same steps:
+
+1. **A starter fires** (a shortcut, a Capture panel card, Search, a Radial slice). The layer notes **the return window**, the one that gets the keyboard back when the overlay closes:
+   - after a shortcut or a Radial slice, the foreground window at that moment
+   - from the island (a panel card, or Search, which is the island's own page), the last window in front that wasn't the island's. `ForegroundTracker` already keeps it, since it ignores the island's windows.
+2. **The overlays take the keyboard before anything is read.** They show with nothing drawn (every pixel fully transparent), and the one on the display under the pointer activates, using the right its door gives it (Foreground, below). From the island, this happens while the island is still on screen, so Chippi holds the foreground throughout the handoff (Phase 6 rule: activate the next window, then hide yours). With a delay, this step waits for the count to end instead.
+3. **The island closes, if it's open,** and the freeze waits for its close to finish and one `DwmFlush`, so the presented frame no longer has the panel. An overlay already holds the foreground, so the island hiding doesn't let Windows activate another window. The Radial menu and the App switcher are already gone, since firing a verb closes them.
+4. **A delay, if one was picked** (3, 5 or 10 seconds): the bar shows "Capturing in 3", counting down, and nothing else happens. Nothing of Chippi's holds the keyboard during the count, so menus can be opened. A click on the bar line cancels it; so does pressing the same starter again. Esc doesn't, because Esc would also close the menu being opened. At the end, step 2 runs.
+5. **Read every display once** into memory with GDI `BitBlt` (`SRCCOPY | CAPTUREBLT`) from the screen DC, one call per display (the spike's answer, below). The pointer isn't included. The empty overlays are on screen, but a fully transparent pixel adds nothing to the read. **Inference:** the Sandbox check compares the frozen image with the fixture's known pixels. If an empty overlay shows up in the read, the overlays get `WDA_EXCLUDEFROMCAPTURE` instead, which keeps them out of every capture, Travis's screen shares included.
+6. **Read the window list** at the same moment: top-level windows in z-order from `WindowsWindowList`, visible and not cloaked, with frame bounds from `DWMWA_EXTENDED_FRAME_BOUNDS`. Chippi's own puck, the recording pill and the overlays are left out. This list is a snapshot, so it matches the frozen image.
+7. **Draw the frozen image,** dimmed, into the overlays already on screen.
 
 Everything after that reads the frozen image and the snapshot list, never the live screen. Pixels stay in Chippi's memory until a feature saves; the layer releases them when the overlay closes. Travis's two displays are about 28 MB of pixels.
 
@@ -88,12 +94,14 @@ The feature supplies its bars' content (Screen capture: the 40-wide tool column 
 
 ## Foreground
 
-The overlay needs the keyboard (Esc, Enter, arrows, the feature's keys).
+The overlay needs the keyboard (Esc, Enter, arrows, the feature's keys). It takes it in the freeze's step 2, before the read and before the island closes. What earns the right depends on the door:
 
-- After a `RegisterHotKey` shortcut (Print Screen included), it takes the foreground directly (Phase 6 rule).
-- After a press the input hub swallowed (a Caps Lock combo, a mouse button, a Radial slice), it uses the marked 0x07 tap and one retry (`WindowsSwitcherPc.TakeForeground`).
-- After an island click or Search, the island already has the foreground; the overlay activates while it still does, then the island hides.
-- When the overlay closes, it hands the foreground back to the window that had it before the freeze (activate that window, then hide the overlays), so Ctrl+V lands where Travis was.
+- **A `RegisterHotKey` shortcut** (Print Screen included): `SetForegroundWindow` directly (Phase 6 rule).
+- **A press the input hub swallowed** (a Caps Lock combo, a mouse button, a Radial slice), **or the end of a delay** (no input reached Chippi during the count): the marked 0x07 tap and one retry (`WindowsSwitcherPc.TakeForeground`).
+- **A Capture panel card or Search:** the click or key went to the island, so Chippi's process may set the foreground, whether or not the island itself had activated (it's `WS_EX_NOACTIVATE` until a press asks). The overlay activates while the island is still on screen, then the island closes (step 3). If Windows refuses, the 0x07 tap and one retry.
+- **If every try is refused** (a game took the foreground back), the capture goes on without the keyboard: the mouse still selects, and a click on the overlay earns the keyboard.
+
+**When the overlay closes** (Esc, Copy, Save, a discard, a lock), it hands the keyboard to the return window from step 1: activate that window while the overlay still holds the foreground, then hide the overlays, so Ctrl+V lands where Travis was. From the island, that's the app he was in before he opened the panel, not the island. If the return window is gone or minimized, the overlays just hide and Windows picks.
 
 ## Edge cases
 
@@ -160,9 +168,14 @@ A throwaway WPF program ran in Windows Sandbox (two runs, 09:13 and 09:20). Clip
 | Desktop Duplication (a duplication per capture) | 320 ms | 47 ms | 7 ms | **Black.** The first frame of a new duplication held no desktop image (`LastPresentTime` 0). Waiting for one with a desktop image failed with `DXGI_ERROR_ACCESS_LOST` |
 
 - **Answer: `BitBlt`.** It's simplest and fastest cold, and its warm times are as good as WGC's median with a far better tail. WGC's cold start (WinRT activation and a Direct3D device) costs over half a second. Desktop Duplication only has a desktop image once something on the screen changes, so a still on demand needs a duplication running all the time. It also gives one duplication per GPU, and Travis's displays may sit on two.
-- **Most of the time is showing, not reading:** 45 ms median for a new WPF window with a 12 MB image. So the overlay windows are made once, when the first capture feature starts, and kept hidden; a capture only swaps their image and shows them (step 5, the freeze). **Inference:** that saves most of those 45 ms; the final build's Sandbox run measures it.
+- **Most of the time is showing, not reading:** 45 ms median for a new WPF window with a 12 MB image. So the overlay windows are made once, when the first capture feature starts, and kept hidden; a capture only shows them and swaps their image (the freeze, above). **Inference:** that saves most of those 45 ms; the final build's Sandbox run measures it.
 - **Travis's displays** have 2.3 times the Sandbox's pixels (7.0 million). **Inference:** a `BitBlt` read of both takes about 70 ms, since the read grew with pixels here. His live check judges it against Snipping Tool.
-- **WGC is kept for recording** (wave 2) and for an HDR display if `BitBlt` washes it out. Turning off Windows' yellow capture border (`IsBorderRequired = false`, set through `IGraphicsCaptureSession3`) returned S_OK in all 33 sessions, from an unpackaged program, without calling `RequestAccessAsync`. A `BitBlt` taken mid-session showed no border. It's unverified whether `BitBlt` would show a border Windows draws.
+- **WGC is kept for recording** (wave 2) and for an HDR display if `BitBlt` washes it out.
+- **WGC's yellow border: not verified off.**
+  - **What the spike saw:** setting `IsBorderRequired = false` (through `IGraphicsCaptureSession3`) returned S_OK in all 33 sessions, from an unpackaged program, without calling `RequestAccessAsync`. A `BitBlt` taken mid-session showed no border.
+  - **Why that proves nothing:** it's unknown whether `BitBlt` captures the border at all, so that shot looks the same either way. [Microsoft documents](https://learn.microsoft.com/en-us/uwp/api/windows.graphics.capture.graphicscapturesession.isborderrequired) that the setter can succeed and still be ignored without the user's consent to borderless capture.
+  - **Before anything relies on it** (the HDR fallback here, the recorder in wave 2): the wave 2 recording spike asks first with `GraphicsCaptureAccess.RequestAccessAsync(GraphicsCaptureAccessKind.Borderless)`, records what an unpackaged Chippi gets (allowed, a prompt or refused), then runs a 10-second session with the border off. Whether a border shows is judged on the displayed output: a shot of the Sandbox window taken on the host (what the guest displays), and Travis's eyes in his live check. A capture taken inside the session doesn't count.
+  - **If the border still shows,** Chippi leaves it: Windows draws it around the recorded display or window, and an HDR read shows it for the one frame the session lasts. No workaround hides it. The recording frame and pill are drawn just inside it.
 
 **2. Print Screen.** Two windows: "Capture spike" (Chippi's stand-in) and "Other app" (a second process). Windows' key went through each state below; in each, five cases ran:
 - (A) nothing registered, Other in front
@@ -201,7 +214,9 @@ The spike's program and its raw results (`timings.jsonl`, `prtsc.json`, a screen
   - Print Screen: bindable alone and with modifiers, nothing else bare; the default only when no Chippi shortcut uses it; the setting store saves what it found, turns it off, puts it back on change, removal and uninstall, never touches the real registry from a dev profile
   - the delay: countdown, cancel by bar click and by the starter again, with an injected clock
 - **Offscreen shots** (`CHIPPI_ISLAND_SHOTS`, both themes) over a synthetic frozen screen, beside Lumen's board 3: hovering a window, dragging with the magnifier and size pill, released with both bars, bars flipped at each edge, a selection filling a display, Ctrl-drag, the countdown on the bar.
-- **Sandbox, once, with the finished wave 1 features** (`tests/Chippi.Input.Tests/Sandbox`, a new `capture` check; clipboard redirection and networking off): Print Screen with Windows' setting on, then after Chippi turns it off, with Chippi in front and another app in front; every mode; Esc; the delay and its cancel; the foreground handed back; key to frozen screen and release to bars timed on the final build. The clipboard checks are Screen capture's, in the same run.
+- **Sandbox, once, with the finished wave 1 features** (`tests/Chippi.Input.Tests/Sandbox`, a new `capture` check; clipboard redirection and networking off): Print Screen with Windows' setting on, then after Chippi turns it off, with Chippi in front and another app in front; every mode; Esc; the delay and its cancel; the foreground handed back; key to frozen screen and release to bars timed on the final build.
+  - **From the island,** with Notepad in front before the panel opens: a Capture panel card, and Search with the starter typed and Enter. Each time, the frozen image has no island or overlay pixels (checked against the fixture's known pixels), the overlay holds the foreground before the read, and both Esc and Copy hand the foreground back to Notepad, not the island or another Chippi window. Once more with a 3-second delay.
+  - **From a swallowed press** (a Caps Lock combo): the overlay gets the keyboard through the 0x07 tap, and Esc hands it back. The clipboard checks are Screen capture's, in the same run.
 
 ## Done means
 
@@ -209,7 +224,7 @@ The layer ships inside the first wave 1 feature PR that needs it (Screen capture
 
 | What | Target | How |
 |---|---|---|
-| Key press to frozen screen shown | Warm p95 under 100 ms; the first capture after Chippi starts under 150 ms (the spike: 105 ms and 126 ms with a new window each time, on one 2736 × 1111 display) | Sandbox: `SendInput` time to every overlay's first frame presented (`DwmFlush`), 10 cold, 30 warm. Travis's two displays: his live check, against Snipping Tool |
+| Key press to frozen screen shown | Warm p95 under 100 ms; the first capture after Chippi starts under 150 ms (the spike: 105 ms and 126 ms with a new window each time, on one 2736 × 1111 display) | Sandbox: `SendInput` time to every overlay's first frame presented (`DwmFlush`), 10 cold, 30 warm. From the island, the panel's close comes first: reported separately, not counted against the target. Travis's two displays: his live check, against Snipping Tool |
 | Release to bars shown | One frame: 16.7 ms at 60 Hz, p95 | Sandbox: mouse up to the frame with the bars presented, 30 releases |
 | Selecting at 165 Hz on the 3440 display | No skipped frames while dragging; UI-thread work per move under 2 ms p95 | Sandbox at 60 Hz with moves posted once a frame; Travis judges 165 Hz by feel against Snipping Tool |
 
@@ -223,4 +238,6 @@ Screenshots of each mode next to Lumen's board, and the timings report, go to th
 - Mixed DPI, a region across two displays and negative origins on real hardware: the Sandbox has one display. Travis's live check.
 - 165 Hz behavior: the Sandbox runs at 60 Hz.
 - HDR reads: no HDR display in the Sandbox.
+- That an empty overlay on screen adds nothing to the `BitBlt` read, and that it can be activated while empty (the freeze's steps 2 and 5). The Sandbox check proves both; `WDA_EXCLUDEFROMCAPTURE` is the fallback for the first.
+- That WGC's yellow border actually turns off: the setter succeeded, but nobody looked at the screen (spike results, item 1).
 - Exclusive-fullscreen games under the overlay.
