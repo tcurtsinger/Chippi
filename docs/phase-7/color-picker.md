@@ -108,7 +108,7 @@ Every on-screen string, for Marge's Decide pass.
 
 - **CI, Core and feature unit tests.** Conversions with known values, including #7C5CFF as above, black, white, pure red, a gray (saturation 0, hue 0) and the 0 and 255 edges; round trips HEX ↔ RGB for all 256 values of one channel; formatting (upper case HEX, rounding of 50.5%); palette add (newest first, a repeat moves to the front, capped at 10), clear, and a corrupt saved list read as empty. The sampler against a fixture BGRA buffer (BGRA order, not RGB). Pick and Pick-and-review against a fake capture layer: Esc and right click copy nothing, Enter copies once, the clipboard hub fake gets one text write; a refused write shows "Copy failed".
 - **Offscreen shots** (`CHIPPI_ISLAND_SHOTS`): the Color page filled, empty, and in light theme; the Settings page; the bar line with a swatch. Compared with Lumen's boards.
-- **Sandbox, once at the end of the wave** (Windows Sandbox, clipboard redirection on only for this check, networking off): a window of known solid colors; fire Pick color; move to each; click; read the Sandbox clipboard and compare with the known HEX. Also a second display size if the Sandbox gives one, otherwise stated as not run. Never the real clipboard.
+- **Sandbox, once at the end of the wave** (Windows Sandbox, clipboard redirection off, networking off; the clipboard is read and written only inside the Sandbox): a window of known solid colors; fire Pick color; move to each; click; read the Sandbox's own clipboard from inside it and compare with the known HEX. Also a second display size if the Sandbox gives one, otherwise stated as not run. Never the real clipboard.
 
 ## Done means, and timings to set
 
