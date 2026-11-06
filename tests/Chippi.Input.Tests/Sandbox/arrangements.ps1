@@ -237,6 +237,20 @@ try {
         $fixtureHandles = @($arrangements | ForEach-Object { $_.rows } | ForEach-Object { [ArrangementProbe]::Find($_.titleHint) })
         Check "group-$group-does-not-activate-fixtures" ($fixtureHandles -notcontains $front)
     }
+    $maxWindow = [ArrangementProbe]::Find('Fixture-A-1')
+    $arrangedRect = New-Object ArrangementProbe+Rect
+    [void][ArrangementProbe]::GetWindowRect($maxWindow,[ref]$arrangedRect)
+    [void][ArrangementProbe]::SetForegroundWindow($maxWindow)
+    Start-Sleep -Milliseconds 200
+    Shot 'saved-maximize'
+    [void][ArrangementProbe]::ShowWindow($maxWindow,9)
+    [void][ArrangementProbe]::ShowWindow($maxWindow,3)
+    Start-Sleep -Milliseconds 300
+    $realRect = New-Object ArrangementProbe+Rect
+    [void][ArrangementProbe]::GetWindowRect($maxWindow,[ref]$realRect)
+    Shot 'windows-maximize'
+    $answer.maximizedBounds = @{ saved=$arrangedRect; windows=$realRect }
+    Check 'maximized-outer-bounds-match-windows' ($arrangedRect.Left -eq $realRect.Left -and $arrangedRect.Top -eq $realRect.Top -and $arrangedRect.Right -eq $realRect.Right -and $arrangedRect.Bottom -eq $realRect.Bottom)
     Check 'twelve-windows-no-duplicates' (@(Get-Process -Name ArrangementA,ArrangementB,ArrangementC -ErrorAction SilentlyContinue).Count -eq 12)
     foreach ($arrangement in $fixtureGroups) {
         $last = [ArrangementProbe]::Find($arrangement.rows[3].titleHint)

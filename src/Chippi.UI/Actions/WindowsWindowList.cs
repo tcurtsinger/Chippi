@@ -16,19 +16,6 @@ public sealed partial class WindowsWindowList(uint self)
     private readonly uint _self = self;
     private readonly ConcurrentDictionary<string, string> _names = new(StringComparer.OrdinalIgnoreCase);
 
-    private static bool IsOnDesktop(nint hwnd)
-    {
-        IVirtualDesktopManager? manager = null;
-        try
-        {
-            manager = (IVirtualDesktopManager)Activator.CreateInstance(Type.GetTypeFromCLSID(
-                new Guid("AA509086-5CA9-4C25-8F95-589D3C07B48A"), throwOnError: true)!)!;
-            return manager.IsWindowOnCurrentVirtualDesktop(hwnd, out bool current) == 0 && current;
-        }
-        catch (COMException) { return false; }
-        finally { if (manager is not null) Marshal.ReleaseComObject(manager); }
-    }
-
     [ComImport, Guid("A5CD92FF-29BE-454C-8D04-D82879FB3F1B"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
     private interface IVirtualDesktopManager
     {
@@ -41,29 +28,50 @@ public sealed partial class WindowsWindowList(uint self)
         nint shell = GetShellWindow();
         var paths = new Dictionary<uint, string?>();
         var found = new List<ListedWindow>();
-        foreach (nint top in TopLevel())
+        IVirtualDesktopManager? manager = null;
+        try
         {
-            if (top == shell || !IsAltTab(top, includeOtherDesktops))
-                continue;
-            GetWindowThreadProcessId(top, out uint pid);
-            uint appPid = pid;
-            if (ClassIs(top, "ApplicationFrameWindow"))
+            if (includeOtherDesktops)
             {
-                // A UWP app's frame: its own window inside names the app. Minimized, it leaves the frame; then the frame's title still does.
-                nint content = FindWindowEx(top, 0, "Windows.UI.Core.CoreWindow", null);
-                if (content != 0)
-                    GetWindowThreadProcessId(content, out appPid);
+                try { manager = (IVirtualDesktopManager)Activator.CreateInstance(Type.GetTypeFromCLSID(
+                    new Guid("AA509086-5CA9-4C25-8F95-589D3C07B48A"), throwOnError: true)!)!; }
+                catch (COMException) { }
             }
-            if (pid == _self || appPid == _self)
-                continue;
-            if (!paths.TryGetValue(appPid, out var path))
-                paths[appPid] = path = ImagePath(appPid);
-            string title = Title(top);
-            found.Add(new ListedWindow(top, pid, path is null ? title : Name(path), title, path ?? "", IsIconic(top),
-                MonitorFromWindow(top, MonitorDefaultToNearest), !includeOtherDesktops || IsOnDesktop(top), appPid));
+            foreach (nint top in TopLevel())
+            {
+                if (top == shell || !IsAltTab(top, includeOtherDesktops))
+                    continue;
+                GetWindowThreadProcessId(top, out uint pid);
+                uint appPid = pid;
+                if (ClassIs(top, "ApplicationFrameWindow"))
+                {
+                    // A UWP app's frame: its own window inside names the app. Minimized, it leaves the frame; then the frame's title still does.
+                    nint content = FindWindowEx(top, 0, "Windows.UI.Core.CoreWindow", null);
+                    if (content != 0)
+                        GetWindowThreadProcessId(content, out appPid);
+                }
+                if (pid == _self || appPid == _self)
+                    continue;
+                if (!paths.TryGetValue(appPid, out var path))
+                    paths[appPid] = path = ImagePath(appPid);
+                string title = Title(top);
+                found.Add(new ListedWindow(top, pid, path is null ? title : Name(path), title, path ?? "", IsIconic(top),
+                    MonitorFromWindow(top, MonitorDefaultToNearest), !includeOtherDesktops || IsOnDesktop(manager, top), appPid));
+            }
+            return found;
         }
-        return found;
+        finally { if (manager is not null) Marshal.ReleaseComObject(manager); }
     }
+
+    private static bool IsOnDesktop(IVirtualDesktopManager? manager, nint window)
+    {
+        try { return manager is not null && manager.IsWindowOnCurrentVirtualDesktop(window, out bool current) == 0 && current; }
+        catch (COMException) { return false; }
+    }
+
+    // Only shell-cloaked windows may belong to another desktop. App and inherited cloaks stay hidden.
+    internal static bool CloakingExcludes(uint cloaked, bool includeOtherDesktops) =>
+        (cloaked & ~2u) != 0 || (cloaked != 0 && !includeOtherDesktops);
 
     private static unsafe bool IsAltTab(nint hwnd, bool includeOtherDesktops)
     {
@@ -75,7 +83,7 @@ public sealed partial class WindowsWindowList(uint self)
         if ((style & WsExAppWindow) == 0 && (GetWindow(hwnd, GwOwner) != 0 || (style & WsExNoActivate) != 0))
             return false;
         uint cloaked = 0;
-        if (DwmGetWindowAttribute(hwnd, DwmwaCloaked, &cloaked, sizeof(uint)) == 0 && cloaked != 0 && !includeOtherDesktops)
+        if (DwmGetWindowAttribute(hwnd, DwmwaCloaked, &cloaked, sizeof(uint)) == 0 && CloakingExcludes(cloaked, includeOtherDesktops))
             return false;
         if (ClassIs(hwnd, "Windows.UI.Core.CoreWindow"))
             return false; // Start, Search and the like

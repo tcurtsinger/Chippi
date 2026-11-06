@@ -50,9 +50,7 @@ internal sealed class ArrangementDesktop(IActionPc pc, Func<PauseRules> rules, F
                 var placement = !window.Elevated && eligible ? pc.ReadPlacement(window) : null;
                 var bounds = placement is { } p ? new ArrangementBounds(p.Left, p.Top, p.Width, p.Height) : new(0, 0, 1, 1);
                 string? identity = RegisteredAppTargets.ProcessIdentity(listed.AppProcessId == 0 ? listed.ProcessId : listed.AppProcessId);
-                var target = identity is null ? _targets.FirstOrDefault(t => t.PackageFullName.Length == 0
-                    && string.Equals(t.Executable, listed.Executable, StringComparison.OrdinalIgnoreCase))
-                    : _targets.FirstOrDefault(t => string.Equals(t.Identity, identity, StringComparison.OrdinalIgnoreCase));
+                var target = RegisteredTarget(identity, _targets);
                 string appIdentity = target?.Identity ?? identity ?? listed.Executable;
                 string launch = target?.Identity ?? (identity is not null ? "" : listed.Executable);
                 bool minimizedFullscreen = listed.Minimized && placement is { Maximized: false }
@@ -68,6 +66,10 @@ internal sealed class ArrangementDesktop(IActionPc pc, Func<PauseRules> rules, F
         }
         return found;
     }
+
+    internal static RegisteredAppTargets.Target? RegisteredTarget(string? identity, IReadOnlyList<RegisteredAppTargets.Target> targets) =>
+        string.IsNullOrEmpty(identity) ? null : targets.FirstOrDefault(t =>
+            string.Equals(t.Identity, identity, StringComparison.OrdinalIgnoreCase));
 
     public string? StopReason(IReadOnlySet<ArrangementProcess> launched)
     {

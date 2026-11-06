@@ -119,6 +119,7 @@ public static class RegisteredAppTargets
                 foreach (string path in Directory.EnumerateFiles(directory, "*.lnk", new EnumerationOptions
                     { RecurseSubdirectories = true, IgnoreInaccessible = true, AttributesToSkip = FileAttributes.ReparsePoint }))
                 {
+                    if (!ShortcutNeedsAdmin(path)) continue;
                     object? folder = null, item = null;
                     try
                     {

@@ -27,6 +27,11 @@ public sealed class ArrangementDiscoveryTests
                 if (RegisteredAppTargets.Resolve(target.Identity) is { } actual)
                 { Assert.Equal(target.Identity, actual.Identity); resolved++; }
             Assert.Equal(targets.Count, resolved);
+            timer.Restart();
+            foreach (var target in targets.Where(t => t.PackageFullName.Length == 0).Take(6))
+                RegisteredAppTargets.NeedsAdminShortcut(target);
+            long adminChecks = timer.ElapsedMilliseconds;
+            File.WriteAllText(report + ".admin.txt", $"Six Start menu safety checks: {adminChecks} ms\n");
             var windows = new WindowsWindowList();
             timer.Restart();
             var cold = windows.Read(includeOtherDesktops: true);
