@@ -22,7 +22,6 @@ public sealed class QrResultView : UserControl
 {
     internal const string NotFound = "No QR code found";
     internal const string Unreadable = "That code can't be read";
-    internal const string UnreadableFix = "Select closer to the code.";
     internal const string CheckAddress = "Check the address";
     internal const string Hidden = "••••••••";
 
@@ -149,7 +148,7 @@ public sealed class QrResultView : UserControl
         _split.Visibility = code is null ? Visibility.Collapsed : Visibility.Visible;
         _message.Visibility = code is null ? Visibility.Visible : Visibility.Collapsed;
         _message.Content = code is not null ? null
-            : state == QrScanState.Unreadable ? Bits.Message(LucideIcons.TriangleAlert, Unreadable, UnreadableFix, caution: true)
+            : state == QrScanState.Unreadable ? Bits.Message(LucideIcons.TriangleAlert, Unreadable, caution: true)
             : Bits.Message(LucideIcons.QrCode, NotFound);
         _reselect.Visibility = code is null ? Visibility.Visible : Visibility.Collapsed;
         _copy.Visibility = code is null ? Visibility.Collapsed : Visibility.Visible;

@@ -16,7 +16,7 @@ public static class ScreenTextShortcuts
     public const string ScanQrCode = "Scan QR code";
     public const string OpenCapture = "Open Capture";
 
-    public static IReadOnlyList<string> All { get; } = [CopyText, ExtractText, ScanQrCode, OpenCapture];
+    public static IReadOnlyList<string> All { get; } = [CopyText, ExtractText, ScanQrCode]; // Open Capture joins when the Capture host exists
 }
 
 /// <summary>

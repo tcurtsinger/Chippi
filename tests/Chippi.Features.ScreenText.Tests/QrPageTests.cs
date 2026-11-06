@@ -114,7 +114,7 @@ public sealed class QrPageTests
 
             model.State = QrScanState.Unreadable;
             model.Set([]);
-            Assert.Equal([QrResultView.Unreadable, QrResultView.UnreadableFix], Texts(view.Message));
+            Assert.Equal([QrResultView.Unreadable], Texts(view.Message));
         });
     }
 
