@@ -31,7 +31,7 @@ public sealed class ExplorerRegistration
     public bool CanChange => !string.Equals(_classesRoot.TrimEnd('\\'), DefaultClassesRoot, StringComparison.OrdinalIgnoreCase) || IsApp(Environment.ProcessPath);
 
     /// <summary>Chippi.exe, installed or a dev build.</summary>
-    internal static bool IsApp(string? processPath) => string.Equals(Path.GetFileName(processPath), "Chippi.exe", StringComparison.OrdinalIgnoreCase);
+    public static bool IsApp(string? processPath) => string.Equals(Path.GetFileName(processPath), "Chippi.exe", StringComparison.OrdinalIgnoreCase);
 
     public void SetEnabled(bool enabled)
     {
