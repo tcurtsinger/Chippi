@@ -45,7 +45,12 @@ public sealed class ShellContext
         Services.Input = Input = new InputHub(loggerFactory.CreateLogger("Input"));
         // One message-only window for every feature's shortcut; it opens with the first one set.
         Hotkeys = new Chippi.UI.Shortcuts.HotkeyWindow(System.Windows.Threading.Dispatcher.CurrentDispatcher);
-        Services.Shortcuts = Shortcuts = new Chippi.Core.Shortcuts.ShortcutService(Hotkeys);
+        // Windows' own Print Screen setting, turned off while a Chippi shortcut is Print Screen: only the real profile's
+        // Chippi.exe changes the real one (capture-layer.md, Print Screen).
+        PrintScreen = string.IsNullOrWhiteSpace(devProfile) && ExplorerRegistration.IsApp(Environment.ProcessPath)
+            ? new WindowsPrintScreenSetting(SynchronizationContext.Current)
+            : new Chippi.Core.Shortcuts.MemoryPrintScreenSetting();
+        Services.Shortcuts = Shortcuts = new Chippi.Core.Shortcuts.ShortcutService(Hotkeys, PrintScreen);
         // What every feature's actions act on: windows, keys, media, programs. It holds nothing.
         Services.Actions = new Chippi.UI.Actions.WindowsActionPc
         {
@@ -73,6 +78,10 @@ public sealed class ShellContext
                 Input.DropHook(Chippi.Core.Input.InputDevices.Mouse);
             }, null, TimeSpan.FromSeconds(dropAfter), Timeout.InfiniteTimeSpan);
 #endif
+        // The capture layer every capture feature shares: no window until the first one starts using it.
+        CaptureShell = new CaptureShell(this);
+        // Its overlays take the island's styles, for the features' bars.
+        Capture = new Chippi.UI.Capture.CaptureLayer(CaptureShell) { BarStyles = new Uri("pack://application:,,,/Chippi;component/Island/IslandStyles.xaml") };
         Registry = new ModuleRegistry(config, Island, loggerFactory, Services);
         Startup = string.IsNullOrWhiteSpace(devProfile)
             ? new StartupRegistration()
@@ -100,6 +109,15 @@ public sealed class ShellContext
 
     /// <summary>Every shortcut Chippi holds, for Settings › Shortcuts.</summary>
     public Chippi.Core.Shortcuts.ShortcutService Shortcuts { get; }
+
+    /// <summary>The shared capture layer (docs/phase-7/capture-layer.md), passed to each capture feature as it's registered.</summary>
+    public Chippi.UI.Capture.ICaptureLayer Capture { get; }
+
+    /// <summary>The capture layer's island side; the island host sets its close.</summary>
+    internal CaptureShell CaptureShell { get; }
+
+    /// <summary>Windows' Print Screen setting as the shortcut service sees it: the real one only for the real profile's Chippi.exe.</summary>
+    public Chippi.Core.Shortcuts.IPrintScreenSetting PrintScreen { get; }
 
     /// <summary>The Shortcuts feature, whose bindings Settings › Shortcuts lists; set when the app registers it.</summary>
     internal Chippi.Features.Shortcuts.ShortcutsModule? ShortcutsFeature { get; set; }

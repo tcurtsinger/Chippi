@@ -288,7 +288,7 @@ public sealed class ShortcutServiceTests
         Assert.DoesNotContain(CtrlShiftM, windows.Held.Values);
     }
 
-    private sealed class FakeRegistrar : IHotkeyRegistrar
+    internal sealed class FakeRegistrar : IHotkeyRegistrar
     {
         public readonly Dictionary<int, KeyShortcut> Held = [];
         public readonly HashSet<KeyShortcut> Taken = []; // by another app

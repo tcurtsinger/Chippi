@@ -80,6 +80,12 @@ public sealed record IslandActivity(string Key, IslandActivityKind Kind, string 
     public string? Icon { get; init; }
 
     /// <summary>
+    /// What a click on the bar does in place of opening a page, while this activity holds the bar ("Capturing in 3" cancels
+    /// the capture). Runs on the UI thread.
+    /// </summary>
+    public Action? Clicked { get; init; }
+
+    /// <summary>
     /// Feedback only: an encoded image (PNG or JPEG) that fills the bar's circle in place of <see cref="Icon"/>, as a
     /// song's art does: a capture's thumbnail on "Copied" and "Saved". Keep it small; the bar decodes it at 34.
     /// </summary>

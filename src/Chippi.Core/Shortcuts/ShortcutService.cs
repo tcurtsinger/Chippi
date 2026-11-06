@@ -109,16 +109,41 @@ public sealed class ShortcutService : IShortcutService
     public const string AnotherAppText = "Another app uses this";
     public const string NotFoundText = "Not found";
 
+    /// <summary>A Print Screen shortcut's error while Windows' own Print Screen setting is back on (capture-layer.md).</summary>
+    public const string UsedByWindowsText = "Used by Windows";
+
     private readonly IHotkeyRegistrar _registrar;
+    private readonly IPrintScreenSetting? _printScreen;
     private readonly List<Entry> _entries = [];
     private int _nextId;
     private long _nextKey;
+    private bool _changing;
+    private bool _closing;
 
-    public ShortcutService(IHotkeyRegistrar registrar)
+    /// <param name="printScreen">
+    /// Windows' Print Screen setting, which the service turns off while one of Chippi's shortcuts is Print Screen and puts
+    /// back after; null leaves it alone.
+    /// </param>
+    public ShortcutService(IHotkeyRegistrar registrar, IPrintScreenSetting? printScreen = null)
     {
         _registrar = registrar;
         _registrar.Pressed += id => _entries.FirstOrDefault(e => e.Id == id && id != 0)?.Pressed?.Invoke();
+        _printScreen = printScreen;
+        if (_printScreen is not null)
+            _printScreen.Changed += OnPrintScreenChanged;
     }
+
+    /// <summary>
+    /// The shell is closing: the features' shortcuts go as they stop, but Windows' Print Screen setting stays as it is,
+    /// so the key is Chippi's again at the next start. Removing a shortcut or a feature otherwise puts it back.
+    /// </summary>
+    public void Closing() => _closing = true;
+
+    /// <summary>
+    /// After the features started: a hold on Print Screen that no shortcut uses any more (the feature went while Chippi
+    /// wasn't running) puts Windows' setting back.
+    /// </summary>
+    public void Started() => ReleasePrintScreen();
 
     public event Action? Changed;
 
@@ -180,12 +205,14 @@ public sealed class ShortcutService : IShortcutService
         if (Check(keys, id) is { } refused)
             return refused;
         string? failed;
+        _changing = true;
         try { failed = edits.Change(keys); }
         catch (Exception ex)
         {
             Diagnostics.Log.Warn("Shortcuts: changing a shortcut failed", ex);
             failed = "Change failed";
         }
+        finally { _changing = false; }
         Changed?.Invoke(); // after the feature saved, so the list reads its new keys
         // Taken between the check and the feature's registering: the same words the check would have said.
         const string usedBy = "Used by ";
@@ -211,6 +238,7 @@ public sealed class ShortcutService : IShortcutService
         {
             entry.Pressed = pressed;
             entry.Error = null;
+            ClaimPrintScreen(entry);
             return true;
         }
         if (_entries.FirstOrDefault(e => !ReferenceEquals(e, entry) && e.Id != 0 && e.Shortcut == shortcut) is { } holder)
@@ -232,8 +260,80 @@ public sealed class ShortcutService : IShortcutService
         entry.Shortcut = shortcut;
         entry.Pressed = pressed;
         entry.Error = null;
+        ClaimPrintScreen(entry);
+        ReleasePrintScreen(); // the old keys may have been Print Screen
         Changed?.Invoke();
         return true;
+    }
+
+    private static bool IsPrintScreen(KeyShortcut? keys) => keys?.Key == KeyShortcut.PrintScreen;
+
+    /// <summary>Windows' value says its own Print Screen is on: unset counts as on.</summary>
+    private static bool WindowsHasIt(int? value) => value != 0;
+
+    /// <summary>
+    /// An entry now holds Print Screen. The first hold saves what Windows' setting was and turns it off. While held, the
+    /// setting found on again (Travis turned it back on, maybe while Chippi wasn't running) is left on, and the entry
+    /// reads "Used by Windows", until he records Print Screen again, which turns it off again.
+    /// </summary>
+    private void ClaimPrintScreen(Entry entry)
+    {
+        if (_printScreen is null || !IsPrintScreen(entry.Shortcut))
+            return;
+        try
+        {
+            int? value = _printScreen.Read();
+            if (_printScreen.Claim is null)
+            {
+                _printScreen.Claim = new PrintScreenClaim(value);
+                if (value != 0)
+                    _printScreen.Write(0);
+            }
+            else if (WindowsHasIt(value))
+            {
+                if (_changing)
+                    _printScreen.Write(0);
+                else
+                    entry.Error = UsedByWindowsText;
+            }
+        }
+        catch (Exception ex) { Diagnostics.Log.Warn("Shortcuts: turning off Windows' Print Screen setting failed", ex); }
+    }
+
+    /// <summary>No entry holds Print Screen any more: Windows' setting goes back to what Chippi found.</summary>
+    private void ReleasePrintScreen()
+    {
+        if (_printScreen?.Claim is not { } claim || _closing || _entries.Any(e => e.Id != 0 && IsPrintScreen(e.Shortcut)))
+            return;
+        try
+        {
+            _printScreen.Write(claim.Found);
+            _printScreen.Claim = null;
+        }
+        catch (Exception ex) { Diagnostics.Log.Warn("Shortcuts: putting back Windows' Print Screen setting failed", ex); }
+    }
+
+    /// <summary>Travis flipped Windows' switch: the Print Screen entries say so, or stop saying so.</summary>
+    private void OnPrintScreenChanged()
+    {
+        if (_printScreen?.Claim is null)
+            return;
+        int? value;
+        try { value = _printScreen.Read(); }
+        catch (Exception ex)
+        {
+            Diagnostics.Log.Warn("Shortcuts: reading Windows' Print Screen setting failed", ex);
+            return;
+        }
+        bool changed = false;
+        foreach (var e in _entries.Where(e => e.Id != 0 && IsPrintScreen(e.Shortcut)))
+        {
+            string? error = WindowsHasIt(value) ? UsedByWindowsText : e.Error == UsedByWindowsText ? null : e.Error;
+            changed |= error != e.Error;
+            e.Error = error;
+        }
+        if (changed)
+            Changed?.Invoke();
     }
 
     private bool Refuse(Entry entry, string error)
@@ -253,6 +353,7 @@ public sealed class ShortcutService : IShortcutService
         entry.Shortcut = null;
         entry.Pressed = null;
         entry.Error = null;
+        ReleasePrintScreen();
         Changed?.Invoke();
     }
 
@@ -266,6 +367,7 @@ public sealed class ShortcutService : IShortcutService
         entry.Pressed = null;
         entry.Disposed = true;
         _entries.Remove(entry);
+        ReleasePrintScreen();
         Changed?.Invoke();
     }
 
