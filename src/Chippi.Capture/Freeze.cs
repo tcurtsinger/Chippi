@@ -163,6 +163,15 @@ public sealed record Selection(PixelRect Rect, Freeze Freeze, CaptureMode Mode, 
 
     public DateTimeOffset Time => Freeze.Time;
 
-    /// <summary>The selected pixels, cut from each display's own frozen image.</summary>
-    public CapturedImage Image() => Freeze.Cut(Rect, Mask);
+    /// <summary>
+    /// A finished capture reopened (<c>ICaptureLayer.Reopen</c>): its own pixels, which <see cref="Image"/> returns whole.
+    /// <see cref="Rect"/> is then where it shows, <see cref="Scale"/> times its size.
+    /// </summary>
+    public CapturedImage? Source { get; init; }
+
+    /// <summary>Screen pixels per source pixel: 1 for a capture, less for a reopened image too big for its display.</summary>
+    public double Scale { get; init; } = 1;
+
+    /// <summary>The selected pixels, cut from each display's own frozen image; a reopened capture's own pixels.</summary>
+    public CapturedImage Image() => Source ?? Freeze.Cut(Rect, Mask);
 }

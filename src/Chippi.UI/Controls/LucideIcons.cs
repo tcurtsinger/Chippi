@@ -126,6 +126,7 @@ public static class LucideIcons
     public static Geometry ToggleRight { get; } = G("M7,5 h10 a7,7 0 0 1 0,14 H7 A7,7 0 0 1 7,5 Z M14,12 a3,3 0 1 0 6,0 a3,3 0 1 0 -6,0");
     public static Geometry PanelBottom { get; } = G("M5,3 h14 a2,2 0 0 1 2,2 v14 a2,2 0 0 1 -2,2 H5 a2,2 0 0 1 -2,-2 V5 a2,2 0 0 1 2,-2 Z M3,15 h18");
     public static Geometry Screens { get; } = G("M8,3 h12 a2,2 0 0 1 2,2 v8 a2,2 0 0 1 -2,2 h-2 M4,7 h10 a2,2 0 0 1 2,2 v7 a2,2 0 0 1 -2,2 H4 a2,2 0 0 1 -2,-2 V9 a2,2 0 0 1 2,-2 Z M6,22 h6 M9,18 v4");
+    public static Geometry Contrast { get; } = G("M22,12 a10,10 0 1 0 -20,0 a10,10 0 1 0 20,0 Z M12,18 a6,6 0 0 0 0,-12 v12 Z");
     public static Geometry Bluetooth { get; } = G("M7,7 L17,17 L12,22 V2 L17,7 L7,17");
     public static Geometry Wifi { get; } = G("M12,20 h0.01 M2,8.82 a15,15 0 0 1 20,0 M5,12.86 a10,10 0 0 1 14,0 M8.5,16.43 a5,5 0 0 1 7,0");
     public static Geometry CameraOff { get; } = G("M14.56,14.56 a3,3 0 1 1 -4.12,-4.12 M2,2 l20,20 M20,20 H4 a2,2 0 0 1 -2,-2 V9 a2,2 0 0 1 2,-2 h2 M9.7,4.02 A2,2 0 0 1 10,4 h4 a2,2 0 0 1 1.76,1.05 l0.49,0.9 A2,2 0 0 0 18,7 h2 a2,2 0 0 1 2,2 v7.34");

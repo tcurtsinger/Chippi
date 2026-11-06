@@ -32,6 +32,7 @@
     <Project Path="src/Features/Chippi.Features.Debounce/Chippi.Features.Debounce.csproj" />
     <Project Path="src/Features/Chippi.Features.SmoothScrolling/Chippi.Features.SmoothScrolling.csproj" />
     <Project Path="src/Features/Chippi.Features.RadialMenu/Chippi.Features.RadialMenu.csproj" />
+    <Project Path="src/Features/Chippi.Features.Displays/Chippi.Features.Displays.csproj" />
     <Project Path="src/Features/Chippi.Features.AppSwitcher/Chippi.Features.AppSwitcher.csproj" />
   </Folder>
   <Folder Name="/tests/">
@@ -62,6 +63,7 @@
     <Project Path="tests/Chippi.Features.Debounce.Tests/Chippi.Features.Debounce.Tests.csproj" />
     <Project Path="tests/Chippi.Features.SmoothScrolling.Tests/Chippi.Features.SmoothScrolling.Tests.csproj" />
     <Project Path="tests/Chippi.Features.RadialMenu.Tests/Chippi.Features.RadialMenu.Tests.csproj" />
+    <Project Path="tests/Chippi.Features.Displays.Tests/Chippi.Features.Displays.Tests.csproj" />
     <Project Path="tests/Chippi.Island.Tests/Chippi.Island.Tests.csproj" />
     <Project Path="tests/Chippi.Notifications.Tests/Chippi.Notifications.Tests.csproj" />
     <Project Path="tests/Chippi.Rules.Tests/Chippi.Rules.Tests.csproj" />

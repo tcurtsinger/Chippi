@@ -95,6 +95,20 @@ public sealed partial class CaptureLayer : ICaptureLayer
         return session;
     }
 
+    public ICaptureSession? Reopen(CapturedImage image, CaptureDoor door)
+    {
+        ArgumentNullException.ThrowIfNull(image);
+        if (image.Width <= 0 || image.Height <= 0)
+            throw new ArgumentException("The image is empty.", nameof(image));
+        if (_current is not null)
+            return null;
+        var request = new CaptureRequest(CaptureMode.Region) { Door = door, Magnifier = false };
+        nint back = door == CaptureDoor.Island ? _shell.IslandReturnWindow() : GetForegroundWindow();
+        var session = _current = new Session(this, request, back, Stopwatch.GetTimestamp()) { Reopened = image };
+        session.Begin();
+        return session;
+    }
+
     /// <summary>The displays changed: a capture on screen closes with nothing kept, and the overlays are made again.</summary>
     private void OnDisplaysChanged()
     {
@@ -159,6 +173,10 @@ public sealed partial class CaptureLayer : ICaptureLayer
         private long _released;
 
         public CaptureRequest Request { get; } = request;
+
+        /// <summary>A finished capture to show instead of choosing (<see cref="Reopen"/>).</summary>
+        public CapturedImage? Reopened { get; init; }
+
         public Freeze? Freeze { get; private set; }
         public Selection? Selection => _selector?.Selection;
         public IReadOnlyList<CaptureSurface> Surfaces { get; private set; } = [];
@@ -207,16 +225,32 @@ public sealed partial class CaptureLayer : ICaptureLayer
                                 return;
                             layer._shell.Bar(null);
                             started = Stopwatch.GetTimestamp();
-                            await FreezeAsync(CaptureDoor.Swallowed); // no input reached Chippi during the count
+                            await GuardedFreezeAsync(CaptureDoor.Swallowed); // no input reached Chippi during the count
                         }));
                     return;
                 }
-                await FreezeAsync(Request.Door);
+            }
+            catch (Exception ex)
+            {
+                Core.Diagnostics.Log.Warn("Capture: the delay failed", ex);
+                Fail();
+                return;
+            }
+            await GuardedFreezeAsync(Request.Door);
+        }
+
+        /// <summary>The freeze, with any failure closing the capture as "Capture failed", after a delay too.</summary>
+        private async Task GuardedFreezeAsync(CaptureDoor door)
+        {
+            try
+            {
+                await FreezeAsync(door);
             }
             catch (Exception ex)
             {
                 Core.Diagnostics.Log.Warn("Capture: the freeze failed", ex);
-                Fail();
+                if (!_closed)
+                    Fail();
             }
         }
 
@@ -258,7 +292,16 @@ public sealed partial class CaptureLayer : ICaptureLayer
             var ids = DisplayCatalog.Connected().ToDictionary(d => d.Handle, d => d.Id);
             var freezer = new Freezer(layer._reader, () => FrozenWindows.Read(exclude), m => ids.GetValueOrDefault(m, ""), layer._time);
             long reading = Stopwatch.GetTimestamp();
-            var freeze = await Task.Run(() => freezer.Take(monitors));
+            var at = Cursor();
+            var image = Reopened;
+            var (freeze, shown) = await Task.Run(() =>
+            {
+                var live = freezer.Take(monitors);
+                // A reopened capture is drawn into its display's pixels off the UI thread, shrunk when it has to be.
+                return live is not null && image is not null
+                    ? (live, Reopening.Place(live, image, at, (int)Math.Round(32 * live.NearestScreen(at).Dpi / 96.0)))
+                    : (live, default);
+            });
             double readMs = Ms(reading);
             if (_closed)
                 return;
@@ -267,8 +310,16 @@ public sealed partial class CaptureLayer : ICaptureLayer
                 Fail();
                 return;
             }
-            Freeze = freeze;
-            _selector = new Selector(freeze, Request.Mode, layer.LastRegion, Cursor(), DragSize(), (int)Math.Round(6 * target.Dpi / 96.0));
+            if (image is not null)
+            {
+                Freeze = shown.Freeze;
+                _selector = new Selector(shown.Freeze, shown.Rect, shown.Display, image, shown.Scale, at);
+            }
+            else
+            {
+                Freeze = freeze;
+                _selector = new Selector(freeze, Request.Mode, layer.LastRegion, Cursor(), DragSize(), (int)Math.Round(6 * target.Dpi / 96.0));
+            }
             // 7. The frozen image, drawn into the overlays already on screen, then shown.
             Surfaces = [.. overlays.Select(o => new CaptureSurface(ScreenOf(o)?.DisplayId ?? "", o.Bounds, o.Dpi, o.View.Layer))];
             foreach (var o in overlays)
@@ -282,7 +333,7 @@ public sealed partial class CaptureLayer : ICaptureLayer
                 o.Reveal();
             await Task.Run(DwmFlush);
             layer.Report(string.Create(CultureInfo.InvariantCulture,
-                $"freeze door={door} mode={Request.Mode} displays={monitors.Count} key-to-shown={Ms(started):F1} read={readMs:F1} island-close={islandClosed} keyboard={keyboard}"));
+                $"freeze door={door} mode={(image is null ? Request.Mode.ToString() : "Reopen")} displays={monitors.Count} key-to-shown={Ms(started):F1} read={readMs:F1} island-close={islandClosed} keyboard={keyboard}"));
             Frozen?.Invoke();
             if (_selector.Selection is { } selection)
                 Released(selection);
@@ -399,7 +450,7 @@ public sealed partial class CaptureLayer : ICaptureLayer
         /// <summary>The first release: the feature puts up its bars from <see cref="Selected"/>.</summary>
         private void Released(Selection s)
         {
-            if (s.Mask is null)
+            if (s.Mask is null && s.Source is null)
                 layer.LastRegion = s.Rect;
             // The bars move to the display the selection was released on.
             SetBars(_tools, _output);
