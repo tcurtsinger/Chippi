@@ -32,7 +32,7 @@ Screen capture with markup, screen recording, text and QR from screen, a color p
 - **Waves (task 488):** as below.
 - **Wave 1 briefs (task 505):** Screen capture, Color picker, Text and QR and Displays confirmed as written.
 - **All displays (task 504):** the slider moves every display by the same amount and keeps their difference ([displays.md](displays.md)).
-- **Mockups:** wave 1 mockups are SerenityOS designs in `designs/` (Home, Capture panel, Frozen screen, Capture results, Displays, Settings › Capture, Settings › Shortcuts). Travis picks a version of each and presses Build; Kayla's design notes go into the build, not new versions. Settings › Capture: v3 built, with v4's shorter labels.
+- **Mockups:** wave 1 mockups are SerenityOS designs in `designs/` (Home, Capture panel, Frozen screen, Capture results, Displays, Settings › Capture, Settings › Shortcuts). Travis picks a version of each and presses Build; Kayla's design notes go into the build, not new versions. Picked so far: Settings › Capture v3 (with the shorter labels from Travis's notes on it, drawn as v4), Settings › Shortcuts v2, Home v1.
 
 ## Lead calls (Marge)
 
