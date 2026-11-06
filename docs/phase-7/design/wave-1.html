@@ -199,7 +199,7 @@ const tools=list=>`<div class="grid6" style="margin-top:8px">${list.map(([gl,l])
 const recentHead=`<div class="sub"><b>Recent</b>${ib('Open folder',{sm:1})}</div>`;
 const capPanel=(o={})=>panel('Capture',modes(o)+tools(o.full?[...W1TOOLS,...W2TOOLS]:W1TOOLS)+(o.empty?`<div class="sub"><b>Recent</b></div><div class="card empty" style="height:104px;margin-top:4px">${g('image',24)}No captures yet</div>`:recentHead+RECENT)+(o.extra||''),{aside:delayC(o.delay||'No delay',o.open)});
 const delayMenu=`<div class="menu" style="right:0;top:-6px">${['No delay','3 seconds','5 seconds','10 seconds'].map((t,i)=>`<div class="${i===1?'on':''}"><span class="ck">${i===1?g('check',14):''}</span>${t}</div>`).join('')}</div>`;
-const tipWin=`<div class="tip" style="left:52px;top:70px">Capture window · Ctrl+Shift+W</div>`;
+const tipWin=`<div class="tip" style="left:52px;top:70px">Capture window</div>`;
 
 /* ---------- 3. the frozen screen ---------- */
 const win=(x,y,w,h,t,dk)=>`<div class="w${dk?' dk':''}" style="left:${x}px;top:${y}px;width:${w}px;height:${h}px"><div class="tb">${t}</div>${Array.from({length:Math.floor((h-40)/22)},(_,i)=>`<div class="ln${i%4===3?' s':''}"></div>`).join('')}</div>`;
@@ -287,30 +287,35 @@ const sec=t=>`<div class="sh">${t}</div>`;
 const card=r=>`<div class="scard">${r}</div>`;
 const folderRow=(o={})=>SR('Save folder',`${o.reset?btn('Reset'):''}${btn('Change')}`,{gl:'folder-open',small:o.small||'Pictures\\Screenshots',cau:o.cau});
 const capturePage=(o={})=>`<div class="ptitle">Screen capture</div>
- ${sec('Shortcuts')}${card(krow('Capture region','PrtSc','square-dashed')+krow('Capture window','Ctrl+Shift+W','app-window')+krow('Capture full screen','','monitor')+krow('Capture all displays','','screens')+krow('Capture freeform','','lasso')+krow('Capture last region','','rotate-ccw-clock')+krow('Capture after delay','','timer')+krow('Open Capture','','scan'))}
+ ${sec('Shortcuts')}${card(krow('Capture region','PrtSc','square-dashed')+krow('Capture window','','app-window')+krow('Capture full screen','','monitor')+krow('Capture all displays','','screens')+krow('Capture freeform','','lasso')+krow('Capture last region','','rotate-ccw-clock')+krow('Capture after delay','','timer')+krow('Open Capture','','scan'))}
  ${sec('Saving')}${card(folderRow(o.folder)+SR('File type',combo('PNG'),{gl:'image'})+SR('When a capture finishes',combo('Do what I press'),{gl:'check'}))}
  ${sec('Selecting')}${card(SR('Ctrl+drag copies on release',swc(1),{gl:'copy'})+SR('Magnifier',swc(1),{gl:'search'}))}
  ${sec('Recent captures')}${card(SR('Keep recent captures',swc(1),{gl:'rotate-ccw-clock',small:'The last 50 you copied or saved'})+SR('<span style="color:var(--st3)">50 captures</span>',btn('Clear'),{cls:'dep'})+`<div class="sthumbs">${[T.doc,T.term,T.desk,T.site,T.doc,T.term,T.site,T.desk,T.doc,T.term,T.desk,T.site].map(b=>`<div style="background:${b}"></div>`).join('')}</div>`)}`;
 const colorPage=`<div class="ptitle">Color picker</div>
- ${sec('Shortcuts')}${card(krow('Pick color','Ctrl+Shift+C','pipette')+krow('Pick and review color','','pipette'))}
+ ${sec('Shortcuts')}${card(krow('Pick color','','pipette')+krow('Pick and review color','','pipette'))}
  ${sec('Copying')}${card(SR('Copy as',combo('HEX · #7C5CFF',240),{gl:'copy'}))}
  ${sec('Recent colors')}${card(SR(`<span class="palette">${['#7C5CFF','#1B2838','#E5484D','#F3F3F3','#2C3E57','#FFC53D','#30A46C','#0090FF','#8B8D98','#FFFFFF'].map(c=>`<span style="background:${c}"></span>`).join('')}</span>`,btn('Clear'),{gl:'palette'}))}`;
 const textPage=`<div class="ptitle">Text and QR</div>
- ${sec('Shortcuts')}${card(krow('Copy text from screen','Ctrl+Shift+T','scan-text')+krow('Extract text','','scan-text')+krow('Scan QR code','','qr-code'))}
+ ${sec('Shortcuts')}${card(krow('Copy text from screen','','scan-text')+krow('Extract text','','scan-text')+krow('Scan QR code','','qr-code'))}
  ${sec('Text')}${card(SR('Language',combo('English (United States)',260),{gl:'type',small:'Languages installed in Windows'})+SR('Keep line breaks',swc(1),{gl:'minus'}))}`;
 const displaysPage=`<div class="ptitle">Displays</div>
- ${sec('Shortcuts')}${card(krow('Brightness up','Ctrl+Alt+Up','sun')+krow('Brightness down','Ctrl+Alt+Down','sun')+krow('Open Displays','','sun'))}
+ ${sec('Shortcuts')}${card(krow('Brightness up','','sun')+krow('Brightness down','','sun')+krow('Open Displays','','sun'))}
  ${sec('Brightness keys')}${card(SR('Act on',combo('Display under the pointer',260),{gl:'monitor'})+SR('Step',combo('10%',120),{gl:'sun'}))}
  ${sec('Displays')}${card(SR(D1,`<span class="path">54%</span>`,{gl:'monitor',small:'Main display · Brightness and contrast'})+SR(D2,`<span class="path">60%</span>`,{gl:'monitor',small:'Brightness and contrast'})+SR('Dell P2419H',btn('Try again'),{gl:'monitor',small:'Brightness control failed · Turn on DDC/CI in the monitor\'s menu, or connect it without a dock',cau:1}))}`;
 const srow=(n,k,gl,o={})=>`<div class="sr">${gl?`<span class="lead">${g(gl,20)}</span>`:''}<span class="tl">${n}</span><span class="keys">${k?`<span style="display:flex;gap:4px">${kc(k)}</span>`:btn('Record')}</span><span style="width:32px;display:flex;justify-content:center;color:var(--st2)">${k?g('ellipsis',16):''}</span></div>`;
 const grp=t=>`<div class="sr grp">${t}</div>`;
+/* One rule: each feature's rows under its own name, A to Z; the owner's own bindings last, under Your shortcuts.
+   Keys as shipped: only Print Screen (Phase 7) and Command bar's Ctrl+Alt+Space are set by default. */
 const shortcutsPage=`<div class="ptitle">Shortcuts</div>${card(
- grp('Chippi')+srow('App switcher','Ctrl+Alt+Tab','app-window')+
- grp('Screen capture')+srow('Capture region','PrtSc','square-dashed')+srow('Capture window','Ctrl+Shift+W','app-window')+srow('Capture full screen','','monitor')+srow('Capture all displays','','screens')+srow('Capture freeform','','lasso')+srow('Capture last region','','rotate-ccw-clock')+srow('Capture after delay','','timer')+srow('Open Capture','','scan')+
- grp('Text and QR')+srow('Copy text from screen','Ctrl+Shift+T','scan-text')+srow('Extract text','','scan-text')+srow('Scan QR code','','qr-code')+
- grp('Color picker')+srow('Pick color','Ctrl+Shift+C','pipette')+srow('Pick and review color','','pipette')+
- grp('Displays')+srow('Brightness up','Ctrl+Alt+Up','sun')+srow('Brightness down','Ctrl+Alt+Down','sun')+srow('Open Displays','','sun')+
- SR('7 shortcuts',btn('Add shortcut')))}`;
+ grp('App switcher')+srow('App switcher','','app-window')+
+ grp('Color picker')+srow('Pick color','','pipette')+srow('Pick and review color','','pipette')+
+ grp('Command bar')+srow('Command bar','Ctrl+Alt+Space','search')+
+ grp('Displays')+srow('Brightness up','','sun')+srow('Brightness down','','sun')+srow('Open Displays','','sun')+
+ grp('Radial menu')+srow('Radial menu','','zap')+
+ grp('Screen capture')+srow('Capture region','PrtSc','square-dashed')+srow('Capture window','','app-window')+srow('Capture full screen','','monitor')+srow('Capture all displays','','screens')+srow('Capture freeform','','lasso')+srow('Capture last region','','rotate-ccw-clock')+srow('Capture after delay','','timer')+srow('Open Capture','','scan')+
+ grp('Text and QR')+srow('Copy text from screen','','scan-text')+srow('Extract text','','scan-text')+srow('Scan QR code','','qr-code')+
+ grp('Your shortcuts')+srow('Open Notes','Ctrl+Alt+N','notebook-pen')+srow('Play or pause','Caps Lock+P','music')+
+ SR('21 shortcuts',btn('Add shortcut')))}`;
 
 const B={
  'home':()=>`<div class="srow">${L('Home at 12: Displays after System, Capture after Clipboard. The real island (IslandGrid), rendered with the final glyphs.',`<img src="wave-1/home-12-${theme}.png" width="520" height="360" alt="">`)}</div>`,

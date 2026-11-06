@@ -19,7 +19,7 @@
 | `sheet-displays` | Brightness with All displays, Contrast, a display that doesn't answer |
 | `settings-capture`, `sheet-settings-capture-states` | Settings › Screen capture, and the save folder: default, changed (Reset), gone |
 | `settings-text`, `settings-color`, `settings-displays` | Settings › Text and QR, Color picker, Displays |
-| `settings-shortcuts` | Settings › Shortcuts with the new rows; Print Screen on Capture region |
+| `settings-shortcuts` | Settings › Shortcuts, every feature under its own name; only Print Screen (and Command bar's existing Ctrl+Alt+Space) set |
 
 ### Calls made in the mockups
 
@@ -32,7 +32,8 @@
 7. **Text has its size beside it while typing; Crop asks with Cancel and Crop.**
 8. **Pick and review shows "Copied"** under the color: HEX is copied on the pick, like Pick color.
 9. **A display that doesn't answer** reads "Brightness control failed" on the island; its reason and Try again are in Settings › Displays.
-10. **Settings › Shortcuts groups rows by feature** (Screen capture, Text and QR, Color picker, Displays). Today it groups by action kind, so every Phase 7 verb would land under "Chippi". This is a change to `ShortcutsPage` in App.
+10. **Settings › Shortcuts groups rows by feature, one rule for the page** (Marge approved). Every feature's rows sit under its own name, A to Z, existing ones too (App switcher, Command bar, Radial menu). The bindings you make with Add shortcut come last, under "Your shortcuts", next to Add shortcut. Today feature rows all sit under "Chippi" and bindings under their action kind, so this is a change to `ShortcutsPage` in App.
+11. **No default keys except Print Screen** (Travis, decision 5): every other Phase 7 row shows Record on Settings › Shortcuts and "Not set" with Edit on its feature page. Existing defaults stay as shipped (Command bar's Ctrl+Alt+Space).
 
 ### For Marge (against the README's starter rule)
 
@@ -41,7 +42,7 @@
 
 ### Copy
 
-- **Capture panel:** Capture · No delay · 3 seconds · 5 seconds · 10 seconds · Region · Window · Screen · All displays · Freeform · Last region · Text · QR code · Color · Record · GIF · Convert · Recent · Open folder · No captures yet · Tooltips: "Capture window · Ctrl+Shift+W" (verb · keys)
+- **Capture panel:** Capture · No delay · 3 seconds · 5 seconds · 10 seconds · Region · Window · Screen · All displays · Freeform · Last region · Text · QR code · Color · Record · GIF · Convert · Recent · Open folder · No captures yet · Tooltips: the verb, then its keys once set ("Capture region · PrtSc", "Capture window")
 - **Frozen screen:** "Terminal · 1040 × 800" · "1320, 760 · #F3F3F3" · Save as · Save · Copy · Cancel (tooltip) · Copy text and Scan QR code (tooltips) · Cancel · Crop · Thin · Medium · Thick · Pick from screen
 - **Bar:** Copied · Saved · Copy failed · Save failed · Folder not found · Copied text · 31 words · No text found · No QR code found · Text and QR · Copied as HEX · Capturing in 3
 - **Results:** Text · 31 words · Reselect · Copy all · QR code · Link · Text · Copy · Open link · "1 2 of 2" · Color · Copied · HEX · RGB · HSL · Pick again
