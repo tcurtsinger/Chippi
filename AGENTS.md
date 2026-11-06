@@ -90,14 +90,16 @@ A Windows 11 tray app for the owner's own PC (C#, .NET 10, WPF): a widget on the
 - **Live checks for the owner:** each step says how to make every test file, what to type and where to click.
 - **Copy:** bare-verb buttons. A confirm is a short question with Cancel and a verb. Errors read "… failed".
 
-## Keep this file current
 
-When a step here changes, or you learn one, change this file in the same pull request.
 
 ## Phase 7 safety
 
 - Competitors are researched from public documentation; do not install tools on the owner's PC for research.
 - Capture, OCR, QR and color-picker checks that copy run only in Windows Sandbox. Never touch the owner's real clipboard.
-- Uninstall, cleanup and process-ending checks use Sandbox or throwaway fixtures, never the owner's real apps, files or processes.
+- Uninstall, cleanup and process-ending checks use Sandbox or throwaway fixtures, never the owner's real apps, files or processes, except in the owner's own live check with throwaway installs.
 - Warn before dev runs change monitor brightness, restore it afterwards, and limit DDC/CI writes to brightness and contrast.
 - Tests and dev runs never show UAC prompts. New admin-helper operations require the approved narrow contract.
+
+## Keep this file current
+
+When a step here changes, or you learn one, change this file in the same pull request.
