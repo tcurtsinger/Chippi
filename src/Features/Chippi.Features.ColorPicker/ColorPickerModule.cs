@@ -211,7 +211,7 @@ public sealed class ColorPickerModule : IFeatureModule, IColorPageModel
             if (review)
             {
                 Present(hex);
-                context.OpenIslandPage(Id);
+                ShowPage(context, Id);
                 return;
             }
             string format = _settings.CopyFormat;
@@ -221,6 +221,14 @@ public sealed class ColorPickerModule : IFeatureModule, IColorPageModel
             Feedback(context, copied ? new IslandActivity(FeedbackKey, IslandActivityKind.Status, value, $"Copied as {format}") { IsFeedback = true, Swatch = hex }
                 : new IslandActivity(FeedbackKey, IslandActivityKind.Status, "Copy failed", "Color") { IsFeedback = true, NeedsAttention = true, Icon = nameof(LucideIcons.TriangleAlert) });
         };
+    }
+
+    // The capture's overlay still covers the screen when a result asks for its page, so the island may be hidden as for a
+    // fullscreen app and refuse; then it's shown over it (Settings opens only when the island is off).
+    private static void ShowPage(ModuleContext context, string key)
+    {
+        if (!context.TryOpenIslandPage(key) && !context.SummonIslandPage(key))
+            context.OpenIslandPage(key);
     }
 
     /// <summary>Settings › Color picker's model: the palette, the format and the shortcut rows.</summary>
