@@ -149,22 +149,44 @@ internal sealed class MonitorWorker : IDisposable
         }
     }
 
-    public void Dispose()
+    /// <summary>Asks the worker to end and returns at once; it closes its own handle when the read or write in flight is done.</summary>
+    public void Stop()
     {
         lock (_gate)
         {
             _stop = true;
             Monitor.Pulse(_gate);
         }
-        // At most one read or write is in flight; wait for it (displays.md, Stopping the feature).
-        _thread.Join(TimeSpan.FromSeconds(5));
-        _monitor?.Dispose();
-        _monitor = null;
+    }
+
+    /// <summary>Waits for the worker to end, at most 5 seconds. A call still running then ends it and closes the handle later.</summary>
+    public void Join() => _thread.Join(TimeSpan.FromSeconds(5));
+
+    public void Dispose()
+    {
+        Stop();
+        Join();
+    }
+
+    private bool Stopping
+    {
+        get { lock (_gate) return _stop; }
     }
 
     private Axis Of(Vcp code) => code == Vcp.Brightness ? _brightness : _contrast;
 
     private void Run()
+    {
+        try { Loop(); }
+        finally
+        {
+            // Only this thread uses the handle, so closing it here never cuts a call short.
+            _monitor?.Dispose();
+            _monitor = null;
+        }
+    }
+
+    private void Loop()
     {
         while (true)
         {
@@ -234,7 +256,7 @@ internal sealed class MonitorWorker : IDisposable
     private void ReadAll()
     {
         bool answered = Read(_brightness, out int level);
-        if (!answered)
+        if (!answered && !Stopping)
         {
             _sleep(RetryAfter);
             answered = Read(_brightness, out level);

@@ -101,7 +101,7 @@ internal sealed partial class DisplayBrightness : IDisposable
         foreach (var worker in removed)
         {
             worker.Changed -= OnChanged;
-            worker.Dispose();
+            worker.Stop(); // never waits: this runs on the UI thread, and the worker closes its own handle
         }
         Changed?.Invoke();
     }
@@ -246,7 +246,8 @@ internal sealed partial class DisplayBrightness : IDisposable
         foreach (var worker in workers)
         {
             worker.Changed -= OnChanged;
-            worker.Dispose();
+            worker.Stop();
         }
+        foreach (var worker in workers) worker.Join();
     }
 }

@@ -19,6 +19,13 @@ public sealed class DisplayBrightnessTests
         public bool NoContrast;
         public ManualResetEventSlim? Hold;
 
+        /// <summary>A read waits here, as a DDC call that takes its time does.</summary>
+        public ManualResetEventSlim? ReadHold;
+        public readonly ManualResetEventSlim ReadStarted = new(false);
+        public volatile bool InCall;
+        public volatile bool Closed;
+        public volatile bool ClosedDuringCall;
+
         /// <summary>A driver both monitors share: its calls are taken in turn, each taking <see cref="WriteMs"/>.</summary>
         public object? Driver;
         public int WriteMs;
@@ -29,6 +36,13 @@ public sealed class DisplayBrightnessTests
 
         public bool TryRead(Vcp code, out int current, out int max)
         {
+            ReadStarted.Set();
+            if (ReadHold is not null)
+            {
+                InCall = true;
+                ReadHold.Wait(TimeSpan.FromSeconds(10));
+                InCall = false;
+            }
             lock (Gate)
             {
                 Reads.Add(code);
@@ -57,7 +71,11 @@ public sealed class DisplayBrightnessTests
             }
         }
 
-        public void Dispose() { }
+        public void Dispose()
+        {
+            ClosedDuringCall = InCall;
+            Closed = true;
+        }
     }
 
     internal sealed class FakeBus : IMonitorBus
@@ -374,6 +392,41 @@ public sealed class DisplayBrightnessTests
         Until(() => rig["A"].Writes.Count >= 2 && rig["B"].Writes.Count >= 1);
         Assert.All(rig["A"].Writes.Concat(rig["B"].Writes), w => Assert.True(w.Code is Vcp.Brightness or Vcp.Contrast));
         Assert.Equal([0x10, 0x12], Enum.GetValues<Vcp>().Select(c => (int)c));
+    }
+}
+
+public sealed class DisplayRemovalTests
+{
+    // A removed display is dropped on the UI thread (WM_DISPLAYCHANGE): that must not wait for its monitor, and its handle
+    // must outlive the call in flight.
+    [Fact]
+    public void Removing_a_display_never_waits_and_the_handle_closes_after_the_call_in_flight()
+    {
+        var a = DisplayBrightnessTests.Info("A", "OMEN", 1, true);
+        var b = DisplayBrightnessTests.Info("B", "Samsung", 2);
+        var bus = new DisplayBrightnessTests.FakeBus();
+        bus.Monitors["A"] = new DisplayBrightnessTests.FakeMonitor("A");
+        var slow = new DisplayBrightnessTests.FakeMonitor("B") { ReadHold = new ManualResetEventSlim(false), FailReads = 99 };
+        bus.Monitors["B"] = slow;
+        var sleeps = new List<TimeSpan>();
+        IReadOnlyList<DisplayInfo> list = [a, b];
+        using var engine = new DisplayBrightness(bus, () => list, () => 1, null, s => sleeps.Add(s));
+        engine.Refresh();
+        Assert.True(slow.ReadStarted.Wait(TimeSpan.FromSeconds(5)), "the read started");
+
+        list = [a];
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        engine.Refresh();
+        Assert.True(clock.ElapsedMilliseconds < 100, $"Refresh waited {clock.ElapsedMilliseconds} ms");
+        Thread.Sleep(50);
+        Assert.False(slow.Closed, "the handle stays open while a call uses it");
+
+        slow.ReadHold.Set();
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (!slow.Closed && DateTime.UtcNow < deadline) Thread.Sleep(2);
+        Assert.True(slow.Closed, "the worker closed its own handle");
+        Assert.False(slow.ClosedDuringCall);
+        Assert.Empty(sleeps); // stopping skips the 500 ms retry
     }
 }
 
