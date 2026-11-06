@@ -61,6 +61,7 @@ public static class Probe
 
     public static void Left(bool down) { Mouse(down ? 0x0002u : 0x0004u); }
     public static void Middle(bool down) { Mouse(down ? 0x0020u : 0x0040u); }
+    public static void Right(bool down) { Mouse(down ? 0x0008u : 0x0010u); }
     public static void Back(bool down) { Mouse(down ? 0x0080u : 0x0100u, 0, 0, 1); }
     public static void Forward(bool down) { Mouse(down ? 0x0080u : 0x0100u, 0, 0, 2); }
     /// <summary>One tilt of the side wheel: positive is right, 120 a notch.</summary>
@@ -213,6 +214,11 @@ public static class Probe
 
     if ($checks -contains 'snap') {
         $found.snap = & (Join-Path $PSScriptRoot 'snap.ps1')
+        return
+    }
+
+    if ($checks -contains 'capture') {
+        $found.capture = & (Join-Path $PSScriptRoot 'capture.ps1')
         return
     }
 
