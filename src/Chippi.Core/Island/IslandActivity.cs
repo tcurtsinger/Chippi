@@ -46,7 +46,7 @@ public static class IslandActivityKindExtensions
 /// <param name="Source">Tertiary line, e.g. "Spotify".</param>
 public sealed record IslandActivity(string Key, IslandActivityKind Kind, string Title, string Source)
 {
-    /// <summary>0..1 for the gradient progress bar, or null for none.</summary>
+    /// <summary>0..1 for the gradient progress bar, or null for none. On feedback, the ring that counts down ("Capturing in 3").</summary>
     public double? Progress { get; init; }
 
     /// <summary>Held or failed: the shell shows the source in amber with an amber dot (DESIGN.md §5).</summary>
@@ -78,6 +78,15 @@ public sealed record IslandActivity(string Key, IslandActivityKind Kind, string 
 
     /// <summary>Optional Lucide glyph for feedback without an island tile, or for a <see cref="IslandActivityKind.Status"/> in place of its dot.</summary>
     public string? Icon { get; init; }
+
+    /// <summary>
+    /// Feedback only: an encoded image (PNG or JPEG) that fills the bar's circle in place of <see cref="Icon"/>, as a
+    /// song's art does: a capture's thumbnail on "Copied" and "Saved". Keep it small; the bar decodes it at 34.
+    /// </summary>
+    public byte[]? Picture { get; init; }
+
+    /// <summary>Feedback only: a color, <c>#RRGGBB</c>, that fills the bar's circle in place of <see cref="Icon"/> ("#7C5CFF · Copied as HEX").</summary>
+    public string? Swatch { get; init; }
 
     /// <summary>Set by the hub to the publishing module's id.</summary>
     public string ModuleId { get; init; } = "";
