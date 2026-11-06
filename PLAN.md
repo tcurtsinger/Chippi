@@ -130,10 +130,13 @@ Shaped 2026-11-04: [docs/phase-6/](docs/phase-6/README.md). Built in three waves
 - Deferred: taking over Alt+Tab as an option, mouse-button drag gestures, a snippet paste mode and import or export.
 
 ### Phase 7: Capture and app management
-Not started. Screen capture selector, screenshot and annotate, screen recording, OCR and QR,
+Shaped 2026-11-06: [docs/phase-7/](docs/phase-7/README.md). Screen capture selector, screenshot and annotate, screen recording, OCR and QR,
 color picker, media tools, winget update manager, uninstaller with leftovers,
 cleaner, port manager, displays and brightness. Displays and brightness is in the
-Essentials preset, the only one of its features not built yet.
+Essentials preset, the only one of its features not built yet. Capture gets its own home tile and panel, Displays the 12th tile; the Apps trio goes in an Actions menu.
+- **Wave 1:** the capture layer and selector, Screen capture with markup, Color picker, Text and QR, Displays and brightness.
+- **Wave 2:** Screen recording, Media tools, and a scrolling capture trial.
+- **Wave 3:** the admin helper, App updates, Uninstaller, Cleaner, Port manager.
 
 ## Open items
 - **Updates:** Velopack builds the installers, but no update feed is set and the app never checks for updates (the update check in Architecture, auto-update in Decisions).
