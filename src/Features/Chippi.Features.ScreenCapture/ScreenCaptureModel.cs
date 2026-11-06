@@ -114,7 +114,11 @@ public sealed class ScreenCaptureModel : IScreenCapturePageModel, IDisposable
         Changed?.Invoke();
         return deleted;
     }
-    public void EditShortcut(string name) => _context.EditShortcut(name);
+    public void EditShortcut(string name)
+    {
+        if (name == ScreenCaptureShortcuts.OpenCapture) _context.EditShortcutFor("capture", name);
+        else _context.EditShortcut(name);
+    }
     private void ShortcutsChanged() => Changed?.Invoke();
     public void Dispose() => _context.Shortcuts.Changed -= ShortcutsChanged;
 }
