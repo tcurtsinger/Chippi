@@ -688,8 +688,11 @@ public partial class IslandWindow : Window
             OpenIsland();
     }
 
-    /// <summary>The bar's page: a song's opens Now Playing, an activity's its feature's page; without one it acts as the puck.</summary>
-    private void OpenChip()
+    /// <summary>
+    /// The bar's page: a song's opens Now Playing, an activity's its feature's page, or its own click (IslandActivity.Clicked);
+    /// without one it acts as the puck.
+    /// </summary>
+    internal void OpenChip()
     {
         if (_chipClick is { } click && !_panel.IsOpen)
             click();
@@ -1039,11 +1042,13 @@ public partial class IslandWindow : Window
         }
         ShowBar(bar);
         if (_dragging) SetDragOrigin();
+        // A capture's thumbnail fills the cover's circle, as a song's art does.
+        var picture = bar && dropTile is null && feedback is not null ? PictureOf(feedback) : null;
         if (bar)
         {
             // Folding, the bar keeps what it showed while it fades.
-            Cover.Visibility = Shown(_singing);
-            Glyph.Visibility = Shown(!_singing);
+            Cover.Visibility = Shown(_singing || picture is not null);
+            Glyph.Visibility = Shown(!_singing && picture is null);
             bool bars = _singing && !paused;
             // Playing to paused and back on a bar that's out: the mark that takes over scales in.
             if (settled && !arriving && bars && Equalizer.Visibility != Visibility.Visible)
@@ -1067,6 +1072,12 @@ public partial class IslandWindow : Window
         {
             if (AgentNames.FromId(feedback.ProviderId) is { } provider)
                 ShowProvider(provider, feedback.NeedsAttention);
+            else if (picture is not null)
+                ShowCover(picture);
+            else if (SwatchOf(feedback) is { } swatch)
+                ShowSwatch(swatch);
+            else if (feedback.Progress is not null) // a count down, "Capturing in 3"
+                ShowKindGlyph(feedback with { Kind = IslandActivityKind.Timer });
             else
             {
                 var opens = feedback.OpensTile is { } page ? _tiles.FirstOrDefault(t => t.Key == page) : null;
@@ -1432,6 +1443,52 @@ public partial class IslandWindow : Window
         if (CoverArt.Fill is not ImageBrush { ImageSource: var shown } || shown != art)
             CoverArt.Fill = new ImageBrush(art) { Stretch = Stretch.UniformToFill };
         CoverGlyph.Visibility = Visibility.Collapsed;
+    }
+
+    /// <summary>A picked color fills the 34 circle with no glyph: "#7C5CFF · Copied as HEX".</summary>
+    private void ShowSwatch(Color color)
+    {
+        if (GlyphPlate.Fill is not SolidColorBrush { Color: var shown } || shown != color)
+            GlyphPlate.Fill = new SolidColorBrush(color);
+        GlyphIcon.Visibility = Ring.Visibility = Dot.Visibility = ProviderMark.Visibility = Visibility.Collapsed;
+    }
+
+    private static Color? SwatchOf(IslandActivity activity)
+    {
+        if (activity.Swatch is not { Length: 7 } hex || hex[0] != '#' || !uint.TryParse(hex.AsSpan(1), System.Globalization.NumberStyles.HexNumber, null, out uint rgb))
+            return null;
+        return Color.FromRgb((byte)(rgb >> 16), (byte)(rgb >> 8), (byte)rgb);
+    }
+
+    // The last picture decoded, by the array it came from, so a refresh doesn't decode it again.
+    private byte[]? _pictureBytes;
+    private ImageSource? _picture;
+
+    /// <summary>The feedback's picture decoded at the circle's size, or null for none or one that doesn't decode (its glyph shows).</summary>
+    private ImageSource? PictureOf(IslandActivity activity)
+    {
+        if (activity.Picture is not { Length: > 0 } bytes)
+            return null;
+        if (ReferenceEquals(bytes, _pictureBytes))
+            return _picture;
+        _pictureBytes = bytes;
+        _picture = null;
+        try
+        {
+            var image = new System.Windows.Media.Imaging.BitmapImage();
+            image.BeginInit();
+            image.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+            image.DecodePixelHeight = (int)Math.Ceiling(34 * VisualTreeHelper.GetDpi(this).DpiScaleY);
+            image.StreamSource = new System.IO.MemoryStream(bytes, writable: false);
+            image.EndInit();
+            image.Freeze();
+            _picture = image;
+        }
+        catch (Exception ex) when (ex is NotSupportedException or System.IO.IOException or ArgumentException or InvalidOperationException or FormatException)
+        {
+            // The line still reads; its glyph shows in place of the picture.
+        }
+        return _picture;
     }
 
     /// <summary>

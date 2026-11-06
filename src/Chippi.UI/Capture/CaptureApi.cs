@@ -142,6 +142,35 @@ public interface ICaptureShell
     /// <summary>Closes the island if it's open; completes once its close has finished.</summary>
     Task CloseIslandAsync();
 
-    /// <summary>Shows a line on the bar ("Capturing in 3", "Capture failed"), or clears the layer's line for null. A click on it runs <paramref name="click"/>.</summary>
-    void Bar(string? line, Action? click = null);
+    /// <summary>Shows the layer's line on the bar ("Capturing in 3", "Capture failed"), or clears it for null.</summary>
+    void Bar(CaptureBarLine? line);
+}
+
+/// <summary>
+/// The layer's line on the bar, as Capture results v3 draws it (DESIGN.md §5): the title over the mode ("Capturing in 3"
+/// over "Region").
+/// </summary>
+/// <param name="Source">The mode, as <see cref="ModeName"/> names it.</param>
+public sealed record CaptureBarLine(string Title, string Source)
+{
+    /// <summary>The countdown's ring: 1 at the start of the delay, down towards 0.</summary>
+    public double? Progress { get; init; }
+
+    /// <summary>"Capture failed": Caution, with the triangle; it goes after 6 seconds.</summary>
+    public bool Failed { get; init; }
+
+    /// <summary>What a click on the line does (the countdown's cancel).</summary>
+    public Action? Clicked { get; init; }
+
+    public static string ModeName(CaptureMode mode) => mode switch
+    {
+        CaptureMode.Region => "Region",
+        CaptureMode.Window => "Window",
+        CaptureMode.Screen => "Screen",
+        CaptureMode.AllDisplays => "All displays",
+        CaptureMode.Freeform => "Freeform",
+        CaptureMode.LastRegion => "Last region",
+        CaptureMode.PickPoint => "Pick a point",
+        _ => "",
+    };
 }

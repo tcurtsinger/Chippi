@@ -188,7 +188,12 @@ public sealed partial class CaptureLayer : ICaptureLayer
                     // Nothing of Chippi's holds the keyboard while counting, so menus can be opened; a click on the
                     // line or the same starter again cancels it.
                     _countdown = new Countdown(Request.Delay, layer._time,
-                        n => ui.BeginInvoke(() => { if (!_closed) layer._shell.Bar($"Capturing in {n}", CancelCountdown); }),
+                        n => ui.BeginInvoke(() =>
+                        {
+                            if (!_closed)
+                                layer._shell.Bar(new CaptureBarLine($"Capturing in {n}", CaptureBarLine.ModeName(Request.Mode))
+                                    { Progress = n / (double)Request.Delay, Clicked = CancelCountdown });
+                        }),
                         () => ui.BeginInvoke(async () =>
                         {
                             if (_closed)
@@ -281,7 +286,7 @@ public sealed partial class CaptureLayer : ICaptureLayer
         private void Fail()
         {
             Close(CaptureEnd.Failed, handBack: true);
-            layer._shell.Bar("Capture failed");
+            layer._shell.Bar(new CaptureBarLine("Capture failed", CaptureBarLine.ModeName(Request.Mode)) { Failed = true });
         }
 
         public void SetBars(FrameworkElement? tools, FrameworkElement? output)

@@ -26,7 +26,7 @@ internal sealed class CaptureShell(ShellContext shell) : ICaptureShell
 
     public Task CloseIslandAsync() => CloseIsland?.Invoke() ?? Task.CompletedTask;
 
-    public void Bar(string? line, Action? click = null)
+    public void Bar(CaptureBarLine? line)
     {
         _clear?.Stop();
         if (line is null)
@@ -34,15 +34,17 @@ internal sealed class CaptureShell(ShellContext shell) : ICaptureShell
             _bar.Clear(Key);
             return;
         }
-        // A line with a click (the countdown) stays until the layer clears it; a failure goes after 6 seconds.
-        _bar.Publish(new IslandActivity(Key, IslandActivityKind.Status, line, "")
+        // As Capture results v3 draws them (DESIGN.md §5): the countdown's ring, or "Capture failed" with the triangle.
+        _bar.Publish(new IslandActivity(Key, IslandActivityKind.Status, line.Title, line.Source)
         {
             IsFeedback = true,
-            Icon = "Camera",
-            NeedsAttention = click is null,
-            Clicked = click,
+            Progress = line.Progress,
+            Icon = line.Failed ? "TriangleAlert" : null,
+            NeedsAttention = line.Failed,
+            Clicked = line.Clicked,
         });
-        if (click is not null)
+        // The countdown stays until the layer clears it; a failure goes after 6 seconds.
+        if (!line.Failed)
             return;
         _clear = new DispatcherTimer { Interval = shell.Services.IslandNoticeDuration };
         _clear.Tick += (_, _) =>
