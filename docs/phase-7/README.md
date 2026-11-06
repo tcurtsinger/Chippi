@@ -30,6 +30,9 @@ Screen capture with markup, screen recording, text and QR from screen, a color p
   5. **While recording,** a small pill (time, Pause, Stop) sits beside the recorded region as well as the line on the bar, and both are kept out of the video.
 - **Defaults (task 487):** recordings are MP4, no system sound and no mic unless switched on for that recording, the cursor shown, one display per recording in the first build. Brightness keys act on the monitor under the pointer, 10% a press, changeable in Settings.
 - **Waves (task 488):** as below.
+- **Wave 1 briefs (task 505):** Screen capture, Color picker, Text and QR and Displays confirmed as written.
+- **All displays (task 504):** the slider moves every display by the same amount and keeps their difference ([displays.md](displays.md)).
+- **Mockups:** wave 1 mockups are SerenityOS designs in `designs/` (Home, Capture panel, Frozen screen, Capture results, Displays, Settings › Capture, Settings › Shortcuts). Travis picks a version of each and presses Build; Kayla's design notes go into the build, not new versions. Settings › Capture: v3 built, with v4's shorter labels.
 
 ## Lead calls (Marge)
 
