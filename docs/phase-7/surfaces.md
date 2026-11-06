@@ -76,7 +76,7 @@ Every feature has at least three doors, and each verb has exactly one home.
 This is Lightshot's flow on Snipping Tool's feature list.
 
 1. **Select:** one key, and every display freezes and dims. Hovering lights the frontmost window, and a click takes it. A drag draws a region (ShareX and Snipaste work this way, so Region mode covers Window too). A magnifier shows the pixel, its coordinates and color, and can be hidden in Settings. A size pill shows "1040 × 800" at the selection's corner.
-2. **Mark up in place:** on release the selection keeps its handles, and arrow keys move it by a pixel (Shift resizes, as Flameshot does). The tools run down the selection's side in one 40-wide column: Select, Pen, Highlighter, Line, Arrow, Rectangle, Ellipse, Text, Redact, Eraser, Crop, then color, then Undo and Redo. Copy and Save sit in a bar under it: Copy text, Scan QR, Save as, Save, Copy (the accent) and Cancel. This is Lightshot's two-bar layout, so a small selection still gets every tool. Each bar flips to the other side when the selection reaches a screen edge, and stays on a visible display.
+2. **Mark up in place:** on release the selection keeps its handles, and arrow keys move it by a pixel (Shift resizes, as Flameshot does). The tools run down the selection's side in one 40-wide column: Select, Pen, Highlighter, Line, Arrow, Rectangle, Ellipse, Text, Redact, Eraser, Crop, then color, then Undo and Redo. Copy and Save sit in a bar under it: Copy text, Scan QR, Save as, Save, Copy (the accent) and Cancel. This is Lightshot's two-bar layout, so a small selection still gets every tool. Each bar flips to the other side when the selection reaches a screen edge. The bars live on the display where the drag was released, clamped to it, so they never span two displays. A selection that fills the whole display (Ctrl+A, or edge to edge) has no outside, so both bars sit inside it, as in Lightshot (board `sheet-overlay` 2b).
 3. **Fast path:** hold Ctrl as the drag starts, and release copies and closes with no bars (Lightshot). Ctrl+C, Ctrl+S, Esc and Enter work with no click.
 4. **Text and QR from a capture:** the same selection's Copy text and Scan QR buttons, so a region you already drew doesn't need drawing again.
 
@@ -84,9 +84,11 @@ The bars use island surfaces (fill, rim, shadow, 4-radius controls), so they rea
 
 ### Recording (boards `sheet-overlay` 3 and 4, `sheet-bar`)
 
+- **One display per recording:** the first build records one display per session (architecture §3). The selector keeps a recording region to the display where the drag started, so the selection stops at that display's edge. Record window and Record screen record the display the window or screen is on. Screenshots can still span displays (§2). A region over two displays is a later build, listed in Step 2 as a cost.
 - **Before Start:** the same selector, then a bar under the region with MP4 or GIF, System sound (Off by default), Mic (Off by default), Start and Cancel. Nothing records until Start.
-- **While recording:** a 2px red frame around the region and a pill just outside it (elapsed time, Pause, Stop). The pill is needed because the widget can sit on another display, and it hides while a fullscreen app is in front of its display (DESIGN.md §5). The bar shows "0:42 · Recording · Region" as the highest activity, and a click opens the Capture panel's recording card. Stop recording has its own shortcut.
-- **Stopped:** the Capture panel opens on the recording page with the poster, play, a trim bar, Discard, Export GIF, Save as and Save. Nothing plays on its own.
+- **While recording:** a 2px red frame around the region and a pill just outside it (elapsed time, Pause, Stop). The pill is its own top-level window, not part of the frame, and both are left out of the video. The puck is left out only while a recording runs, so it still shows in screen shares and stills. The pill is needed because the widget can sit on another display, and it hides while a fullscreen app is in front of its display (DESIGN.md §5). The bar shows "0:42 · Recording · Region" as the highest activity, and a click opens the Capture panel's recording card. Stop recording has its own shortcut.
+- **Stopped:** the Capture panel opens on the recording page with the poster, play, a trim bar, Discard, Export GIF, Save as and Save. Nothing plays on its own. Trim re-encodes, so the page has a progress state while it runs.
+- **Stopped over a fullscreen app:** the panel can't open while a fullscreen app holds the widget's display, and summoning it over a game that's still running would be the worse surprise. So Stop saves the recording to Settings › Recording's Save to folder and adds it to Recent. The bar shows "Recording saved" with its length and source ("0:42 · Region") once the widget is back, and a click opens the recording page, where Trim, Export GIF and Discard still work. The page never opens by itself later (board `sheet-bar`).
 
 ### Results (board `sheet-results`)
 
@@ -107,7 +109,7 @@ The rule: a result that copies says so on the bar for 6 seconds. A result you ne
 - **Essentials:** Displays is in the Essentials preset, the last one not built. A fresh Essentials install gets it on the home next to Audio and System.
 - **Fit:** it's the 12th tile and fills row 3 (section 2).
 
-The panel's header switches between Brightness and Contrast (Contrast only for external monitors), the way Audio switches views. There's an All displays row (left out with one display), then a 44-tall card per display: its name, "· Main", a slider and the percentage. Up to five rows fit, so four displays plus All displays. A display that doesn't answer shows "Not available", and Settings › Displays gives the reason ("Turn on DDC/CI in the monitor's menu"). Extend and Turn off displays stay in Actions, since they're Windows display modes and power, not brightness.
+The panel's header switches between Brightness and Contrast (Contrast only for external monitors), the way Audio switches views. There's an All displays row (left out with one display), then a 44-tall card per display: its name, "· Main", a slider and the percentage. Up to five rows fit, so four displays plus All displays. A display that doesn't answer shows "Brightness control failed" (architecture's copy). Chippi can't tell DDC/CI being off in the monitor's menu from a dock or adapter that doesn't pass it on, so Settings › Displays lists the likely causes rather than one reason. Extend and Turn off displays stay in Actions, since they're Windows display modes and power, not brightness.
 
 The alternative, if Travis would rather keep the 12th place free: an Actions menu "Displays" whose view holds the same sliders, like Snap's custom view. That puts it two clicks away.
 
@@ -125,7 +127,16 @@ The alternative, if Travis would rather keep the 12th place free: an Actions men
 - **Clean junk files:** the categories, measured on open, with sizes and the last ticks remembered. "Check first" and "Needs admin" tags. Clean in the header asks "Clean 1.0 GB for good?" with Cancel and Clean.
 - **Uninstall:** opens Settings › Apps › Uninstaller with its search focused (the open glyph, like Arrangements' Manage).
 
-**Port manager lives in Search and Settings** (board `sheet-search`). The task is "who holds port 3000?", a lookup by number, so typing "port 3000" in Search gives the row "Port 3000 · node.exe" with its PID and state, and its verb is Free. Free asks "End node.exe to free port 3000?" with Cancel and End. "Ports" opens Settings › System › Ports, the live list.
+**Port manager lives in Search and Settings** (board `sheet-search`). The task is "who holds port 3000?", a lookup by number, so typing "port 3000" in Search gives the row "Port 3000 · node.exe" with its PID and state. "Ports" opens Settings › System › Ports, the live list. The row's verb depends on what holds the port (architecture §9):
+
+| Holder | Row's verb | Confirm |
+|---|---|---|
+| Your own process | Free | "End node.exe to free port 3000?" with Cancel and End |
+| A service (its row says "Service") | Stop, with the UAC shield | "Stop service Print Spooler to free port 9100?" with Cancel and Stop. Only the service stops, never its `svchost` host, which may run others. |
+| An admin, SYSTEM or other user's process | Free, with the UAC shield | "End postgres.exe to free port 5432?" with Cancel and End, the shield on End. It goes through the admin helper (wave 3), one UAC prompt. |
+| System (PID 4) or a closing connection (PID 0, TIME_WAIT) | none | Enter opens Settings › Ports at that row. |
+
+Before Free or Stop runs, the row is read again (PID and start time). If the process has changed or gone, nothing is ended, and the row updates. The shield is Windows' own stock shield icon. Settings › Ports uses the same verbs and confirms.
 
 The Search value rows "brightness 40" and "port 3000" follow the existing "volume 40" pattern.
 
@@ -143,7 +154,7 @@ Each feature gets one page in its catalog group's section of the sidebar (board 
 | Apps | App updates | The full list, Skipped with Restore, history, "Show apps with an unknown version", Shortcuts |
 | Apps | Uninstaller | Search, sort and filter over every app, the leftover review, Shortcuts |
 | Apps | Cleaner | Categories with descriptions, what each never touches, Shortcuts |
-| System | Displays | Each display's reason when it doesn't answer, step size, which display the keys act on, Reset, Shortcuts |
+| System | Displays | The likely causes when a display doesn't answer, step size, which display the keys act on, Reset, Shortcuts |
 | System | Ports | The live list (protocol, ports, state, process with icon and path), all connections, Shortcuts |
 
 ## 8. What we took from each competitor's screens
@@ -156,7 +167,7 @@ Each feature gets one page in its catalog group's section of the sidebar (board 
 | Flameshot | Arrow keys nudge and Shift resizes; tool letters | |
 | CleanShot X | One Capture home with the recent results beside the tools | The floating thumbnail after every capture (the bar line does that job) |
 | PowerToys Color Picker, Text Extractor | Copy straight away, or review with formats | |
-| Twinkle Tray, Monitorian | One click to the sliders, All displays together, plain reasons for a display that doesn't answer | Time-of-day schedules |
+| Twinkle Tray, Monitorian | One click to the sliders, All displays together, plain likely causes for a display that doesn't answer | Time-of-day schedules |
 | UniGetUI, Patch My PC | List, Update, Update all; close the app first | Several package managers, schedules |
 | BleachBit | Measure first, then a confirm with the size | Shredding |
 | TCPView, CurrPorts | Process name, icon and path on every port | Closing single connections in the first build |
@@ -168,14 +179,16 @@ Each feature gets one page in its catalog group's section of the sidebar (board 
 3. **Port manager without a tile or menu:** Search's "port 3000" and Settings › Ports (recommended).
 4. **Media tools inside Capture:** the Convert page on the Capture panel rather than a tile (recommended).
 5. **The recording pill:** a small pill beside the recorded region as well as the bar (recommended, because the widget hides over fullscreen apps).
+6. **A recording region over two displays:** one display per recording in the first build (recommended). Recording across two needs two sessions composed into one picture, an M of work on its own.
 
-## 10. For Kayla to check (feasibility)
+## 10. Feasibility (Kayla's review of #280)
 
-- The recording frame and pill are left out of the video. **Inference:** `SetWindowDisplayAffinity(WDA_EXCLUDEFROMCAPTURE)` on Chippi's own windows; also the puck, if it's inside the region.
-- Region mode takes a window on click and a region on drag, using architecture §2's snapshot window list.
-- The overlay's two bars flip at screen edges and never span two displays at different scales.
-- The Capture panel reads its recent thumbnails from the history index without slowing the panel's open (pre-sized thumbnails).
-- Search value rows for "port N" read the IP Helper table on each keystroke (about 2 ms measured in architecture.md).
+- **Frame and pill out of the video:** feasible with `WDA_EXCLUDEFROMCAPTURE`, which works on Chippi's transparent windows. The pill must be its own top-level window. The puck is excluded only while a recording runs.
+- **Click takes a window, drag draws a region:** feasible from architecture §2's snapshot list, with Windows' drag threshold telling them apart. Chippi's own puck and pill are left out of the list.
+- **Bars never span two displays:** each display has its own overlay, so a bar is clamped to the display where the drag was released.
+- **Recent thumbnails:** small thumbnails are saved into the history index when a capture is kept (a poster frame for a recording), so the panel's open decodes nothing. Kayla adds this to the capture brief.
+- **"port N" per keystroke:** the port table reads in about 2 ms; process names and services are read once per query, and the row is read again before Free.
+- **Verbs the capture brief adds:** Pause and Resume, Trim, playback on the recording page, and Record window's frame following the window as it moves. All feasible.
 
 ## Not verified
 

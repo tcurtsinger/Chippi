@@ -221,7 +221,8 @@ Power:"M12,2 v10 M18.4,6.6 a9,9 0 1 1 -12.77,0.04",Droplet:"M12,22 a7,7 0 0 0 7,
 Snap:"M4,3 h5 v18 H4 Z M15,3 h5 v7 h-5 Z M15,14 h5 v7 h-5 Z",Mouse:"M12,2 a7,7 0 0 1 7,7 v6 a7,7 0 0 1 -14,0 V9 a7,7 0 0 1 7,-7 Z M12,6 v4",
 Switcher:"M4,10 c-1.1,0 -2,-.9 -2,-2 V4 c0,-1.1 .9,-2 2,-2 h4 c1.1,0 2,.9 2,2 M10,16 c-1.1,0 -2,-.9 -2,-2 v-4 c0,-1.1 .9,-2 2,-2 h4 c1.1,0 2,.9 2,2 M16,14 h4 a2,2 0 0 1 2,2 v4 a2,2 0 0 1 -2,2 h-4 a2,2 0 0 1 -2,-2 v-4 a2,2 0 0 1 2,-2 Z",
 Settings:"M12,9 a3,3 0 1 0 0,6 a3,3 0 1 0 0,-6 Z M12,2 v2 M12,20 v2 M4.9,4.9 l1.4,1.4 M17.7,17.7 l1.4,1.4 M2,12 h2 M20,12 h2 M4.9,19.1 l1.4,-1.4 M17.7,6.3 l1.4,-1.4",
-Speaker:"M11,5 L6,9 L2,9 L2,15 L6,15 L11,19 Z M15.5,8.5 a5,5 0 0 1 0,7 M19,5 a10,10 0 0 1 0,14"
+Speaker:"M11,5 L6,9 L2,9 L2,15 L6,15 L11,19 Z M15.5,8.5 a5,5 0 0 1 0,7 M19,5 a10,10 0 0 1 0,14",
+Shield:"M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"
 };
 const g=(n,s=16)=>`<svg class="g" width="${s}" height="${s}" viewBox="0 0 24 24" stroke-width="${(30/s).toFixed(3)}"><path d="${P[n]}"/></svg>`;
 const q=new URLSearchParams(location.search);
@@ -278,6 +279,8 @@ const actBar=`<div class="acts" style="left:${SX+SW-330}px;top:${SY+SH+8}px"><bu
 const marks=`<svg class="mk" style="left:${SX}px;top:${SY}px" width="${SW}" height="${SH}"><path d="M120 250 L296 124" stroke="#E5484D" stroke-width="4" fill="none" stroke-linecap="round"/><path d="M304 118 l-24 4 l12 18 z" fill="#E5484D"/><rect x="330" y="60" width="160" height="90" rx="2" fill="none" stroke="#E5484D" stroke-width="3"/><rect x="40" y="40" width="190" height="22" fill="#000"/></svg>`;
 const ovEdit=`<div class="scr">${desk}${dimAround(SX,SY,SW,SH)}<div class="selx" style="left:${SX}px;top:${SY}px;width:${SW}px;height:${SH}px"></div>${handles(SX,SY,SW,SH)}${marks}
  <div class="size" style="left:${SX}px;top:${SY-28}px">1040 × 660</div>${toolCol}${actBar}</div>`;
+const ovFull=`<div class="scr">${desk}<div class="selx" style="left:0;top:0;width:1100px;height:640px"></div>${handles(0,0,1100,640)}
+ <div class="size" style="left:12px;top:12px">3440 × 1440</div>${toolCol.replace(`left:${SX+SW+8}px;top:${SY}px`,'left:1048px;top:12px')}${actBar.replace(`left:${SX+SW-330}px;top:${SY+SH+8}px`,'left:708px;top:588px')}</div>`;
 const RX=200,RY=110,RW=600,RH=380;
 const ovRec=`<div class="scr">${desk}<div class="frame" style="left:${RX-2}px;top:${RY-2}px;width:${RW+4}px;height:${RH+4}px"></div>
  <div class="pill" style="left:${RX+RW-190}px;top:${RY-44}px"><span class="dot"></span>0:42<span style="flex:1"></span>${ib('Pause',{sm:1,g:'Pause'})}${ib('Stop',{sm:1,acc:1,g:'Stop'})}</div></div>`;
@@ -291,7 +294,7 @@ const ring=f=>`<svg width="22" height="22" viewBox="0 0 24 24"><circle cx="12" c
 
 /* ---------- Displays ---------- */
 const slider=v=>`<span class="slider"><i style="width:${v}%"></i><b style="left:${v}%"></b></span>`;
-const drow=(name,v,o={})=>`<div class="card drow">${g(o.all?'Screens':'Monitor',16)}<span class="nm">${name}${o.main?' <span class="t3">· Main</span>':''}</span>${o.na?`<span style="flex:1"></span><span class="t3">Not available</span>`:slider(v)+`<span class="pc">${v}%</span>`}</div>`;
+const drow=(name,v,o={})=>`<div class="card drow">${g(o.all?'Screens':'Monitor',16)}<span class="nm">${name}${o.main?' <span class="t3">· Main</span>':''}</span>${o.na?`<span style="flex:1"></span><span class="t3">Brightness control failed</span>`:slider(v)+`<span class="pc">${v}%</span>`}</div>`;
 const dispSeg=c=>`<span class="seg"><span${c?'':' class="on"'}>Brightness</span><span${c?' class="on"':''}>Contrast</span></span>`;
 const dispMain=panel('Displays',drow('All displays',57,{all:1})+drow('OMEN 34c',54,{main:1})+drow('Samsung S24',60),{aside:dispSeg()});
 const dispContrast=panel('Displays',drow('All displays',88,{all:1})+drow('OMEN 34c',100,{main:1})+drow('Samsung S24',75),{aside:dispSeg(1)});
@@ -316,11 +319,15 @@ const cleanList=panel('Clean junk files',`<div style="display:flex;align-items:c
 const cleanConfirm=panel('Clean junk files',`<div class="q"><span class="qt">Clean 1.0 GB for good?</span><span style="display:flex;gap:8px">${ib('Cancel')}${ib('Clean',{crit:1})}</span></div>`);
 
 /* ---------- Search ---------- */
-const isr=(lead,nm,dt,o={})=>`<div class="isr${o.sel?' sel':''}"><span class="ld">${lead}</span><span><div class="nm">${nm}</div><div class="dt">${dt}</div></span>${o.lvl!=null?`<span class="lvl"><i style="width:${o.lvl}%"></i></span>`:''}${o.sel?`<span class="vb">${o.verb}</span>`:''}</div>`;
+const isr=(lead,nm,dt,o={})=>`<div class="isr${o.sel?' sel':''}"><span class="ld">${lead}</span><span><div class="nm">${nm}</div><div class="dt">${dt}</div></span>${o.lvl!=null?`<span class="lvl"><i style="width:${o.lvl}%"></i></span>`:''}${o.sel&&o.verb?`<span class="vb" style="display:flex;align-items:center;gap:4px">${o.sh?g('Shield',12):''}${o.verb}</span>`:''}</div>`;
 const search=(qtext,rows)=>`<div class="panel"><div class="hdr" style="height:32px"><button class="ib back" aria-label="Back">${g('ChevronLeft',16)}</button><span class="sfield">${qtext}</span></div><div style="margin-top:8px">${rows}</div></div>`;
 const sCapture=search('capt',isr(g('Region'),'Capture region','Capture · PrtSc',{sel:1,verb:'Run'})+isr(g('AppWindow'),'Capture window','Capture')+isr(g('Monitor'),'Capture full screen','Capture')+isr(g('Screens'),'Capture all displays','Capture')+isr(g('History'),'Capture last region','Capture')+isr(g('Image'),'Capture','Island page')+isr(g('Settings'),'Screen capture','Settings'));
 const sPort=search('port 3000',isr(g('Network'),'Port 3000 · node.exe','PID 4120 · Listening on 127.0.0.1',{sel:1,verb:'Free'})+isr(g('Network'),'Ports','Settings'));
-const sPortConfirm=`<div class="panel"><div class="q"><span class="qt">End node.exe to free port 3000?</span><span style="display:flex;gap:8px">${ib('Cancel')}${ib('End',{crit:1})}</span></div></div>`;
+const confirm=(t,verb,o={})=>`<div class="panel"><div class="q"><span class="qt">${t}</span><span style="display:flex;gap:8px">${ib('Cancel')}${ib(verb,{crit:1,g:o.sh?'Shield':''})}</span></div></div>`;
+const sPortConfirm=confirm('End node.exe to free port 3000?','End');
+const sPortService=search('port 9100',isr(g('Network'),'Port 9100 · Print Spooler','Service · PID 2880 · Listening on 0.0.0.0',{sel:1,verb:'Stop',sh:1})+isr(g('Network'),'Ports','Settings'));
+const sServiceConfirm=confirm('Stop service Print Spooler to free port 9100?','Stop',{sh:1});
+const sPortSystem=search('port 445',isr(g('Network'),'Port 445 · System','PID 4 · Listening on 0.0.0.0',{sel:1})+isr(g('Network'),'Port 445 · Closing','PID 0 · TIME_WAIT to 192.168.1.20')+isr(g('Network'),'Ports','Settings'));
 const sBright=search('bright 40',isr(g('Sun'),'Brightness to 40%','All displays',{sel:1,verb:'Run',lvl:40})+isr(g('Sun'),'Brightness up','Displays')+isr(g('Sun'),'Brightness down','Displays')+isr(g('Sun'),'Displays','Island page'));
 
 /* ---------- Settings ---------- */
@@ -343,18 +350,22 @@ const B={
   <div class="srow">${L('Convert, with four images: Convert, Resize or Compress, then Run',stage(resConvert))}${L('Convert, empty: drop files or Add files',stage(resConvertEmpty))}</div>`,
  'sheet-overlay':()=>`<div class="srow">${L('1. Capture region: the screen freezes and dims. Hovering lights the window under the pointer (a click takes it); a drag draws a region. The magnifier shows the pixel under the pointer.',ovSelect)}</div>
   <div class="srow">${L('2. Released: the selection stays adjustable (handles, arrow keys). Tools run down its side, Copy and Save sit under it. Ctrl+C, Ctrl+S and Esc work without the bars.',ovEdit)}</div>
-  <div class="srow">${L('3. Record region: the same selector, then the sound choices and Start under the region',ovRecStart)}</div>
+  <div class="srow">${L('2b. A selection that fills the display (Ctrl+A, or edge to edge): no room outside, so both bars sit inside it',ovFull)}</div>
+  <div class="srow">${L('3. Record region: the same selector, kept to the display where the drag started, then the sound choices and Start under the region',ovRecStart)}</div>
   <div class="srow">${L('4. Recording: a red frame around the region and a pill outside it, both left out of the video',ovRec)}</div>`,
  'sheet-bar':()=>`<div class="srow">${L('Copied (Copy, or Ctrl+drag)',bar(`<span style="width:34px;height:34px;background:${T1}"></span>`,'Copied','Region · 1280 × 720'))}${L('Saved',bar(`<span style="width:34px;height:34px;background:${T2}"></span>`,'Saved','Capture 2026-11-06 101500.png'))}${L('Copy failed: the draft stays open',bar(g('TriangleAlert'),'Copy failed','Capture',{cau:1}))}</div>
   <div class="srow">${L('Copy text from screen',bar(g('ScanText'),'Copied text','31 words'))}${L('Nothing read: the clipboard is left alone',bar(g('ScanText'),'No text found','Text and QR',{cau:1}))}${L('Pick color',bar('','#7C5CFF','Copied as HEX',{leadStyle:'background:#7C5CFF'}))}</div>
-  <div class="srow">${L('Capture after delay',bar(ring(1/3),'Capturing in 2','Region'))}${L('Recording: the highest activity; a click opens Capture',bar('<span class="dot"></span>','0:42','Recording · Region'))}${L('App updates running',bar(ring(2/5),'2 of 5 updated','App updates'))}</div>`,
+  <div class="srow">${L('Capture after delay',bar(ring(1/3),'Capturing in 2','Region'))}${L('Recording: the highest activity; a click opens Capture',bar('<span class="dot"></span>','0:42','Recording · Region'))}${L('App updates running',bar(ring(2/5),'2 of 5 updated','App updates'))}</div>
+  <div class="srow">${L('Stopped over a fullscreen app, once the widget is back',bar(`<span style="width:34px;height:34px;background:${T3}"></span>`,'Recording saved','0:42 · Region'))}</div>`,
  'sheet-displays':()=>`<div class="srow">${L('Displays: All displays moves every slider together',stage(dispMain))}${L('Contrast (external monitors only)',stage(dispContrast))}</div>
-  <div class="srow">${L('A display that doesn\'t answer: its reason is in Settings › Displays',stage(dispNa))}${L('One display: no All displays row',stage(dispOne))}</div>`,
+  <div class="srow">${L('A display that doesn\'t answer: Settings › Displays lists the likely causes',stage(dispNa))}${L('One display: no All displays row',stage(dispOne))}</div>`,
  'sheet-actions':()=>`<div class="srow">${L('Actions with Apps added: 19 of 20 places',stage(actionsGallery))}${L('Actions › Apps',stage(appsMenu))}</div>
   <div class="srow">${L('Update apps: real app icons in the build (AppIcon.View)',stage(updList))}${L('Nothing to update',stage(updEmpty))}</div>
   <div class="srow">${L('Clean junk files: measured on open, ticks remembered',stage(cleanList))}${L('Clean asks first',stage(cleanConfirm))}</div>`,
  'sheet-search':()=>`<div class="srow">${L('Every verb is a Search row',stage(sCapture))}${L('A port number finds who holds it',stage(sPort))}</div>
-  <div class="srow">${L('Free asks first, naming the process',stage(sPortConfirm))}${L('A brightness value, like "volume 40"',stage(sBright))}</div>`,
+  <div class="srow">${L('Free asks first, naming the process',stage(sPortConfirm))}${L('A service is stopped, never its host process; the shield means a UAC prompt',stage(sPortService))}</div>
+  <div class="srow">${L('Stopping a service asks first; so does ending an admin, system or other user\'s process, with the shield on End',stage(sServiceConfirm))}${L('System (PID 4) and closing (PID 0) rows have no verb; Enter opens Settings › Ports',stage(sPortSystem))}</div>
+  <div class="srow">${L('A brightness value, like "volume 40"',stage(sBright))}</div>`,
  'settings':()=>capSettings
 };
 document.body.className=theme;
