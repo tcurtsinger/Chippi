@@ -66,7 +66,25 @@ public sealed class Selector
             Hover = Snaps ? Freeze.WindowAt(Pointer) : null;
     }
 
+    /// <summary>
+    /// A finished capture reopened at <paramref name="rect"/> (<see cref="Reopening.Place"/>): released at once and fixed,
+    /// with no handles, moves or Ctrl+A; with <see cref="Tooling"/> on, presses inside it are the feature's.
+    /// </summary>
+    public Selector(Freeze freeze, PixelRect rect, CapturedScreen display, CapturedImage source, double scale, PixelPoint pointer)
+    {
+        Freeze = freeze;
+        Mode = CaptureMode.Region;
+        _dragWidth = _dragHeight = _reach = 1;
+        Pointer = SelectionMath.OnDisplays(freeze.Displays, pointer);
+        Fixed = true;
+        Rect = rect;
+        Selection = new Selection(rect, freeze, Mode, null, null, false, display) { Source = source, Scale = scale };
+    }
+
     public Freeze Freeze { get; }
+
+    /// <summary>A reopened capture: the selection can't be moved, resized or replaced.</summary>
+    public bool Fixed { get; }
 
     /// <summary>The mode; <see cref="CaptureMode.LastRegion"/> with none becomes <see cref="CaptureMode.Region"/>.</summary>
     public CaptureMode Mode { get; private set; }
@@ -109,8 +127,8 @@ public sealed class Selector
     {
         get
         {
-            // A freeform outline keeps its shape: no handles.
-            if (Selection is not { Mask: null } s)
+            // A freeform outline keeps its shape, and a reopened capture its place: no handles.
+            if (Fixed || Selection is not { Mask: null } s)
                 return SelectionHandle.None;
             var handle = SelectionMath.HandleAt(s.Rect, Pointer, _reach);
             return handle == SelectionHandle.Inside && Tooling ? SelectionHandle.None : handle;
@@ -237,6 +255,9 @@ public sealed class Selector
     /// </summary>
     public SelectorOutcome Key(SelectorKey key, bool shift, bool ctrl)
     {
+        if (Fixed)
+            return key is SelectorKey.Left or SelectorKey.Right or SelectorKey.Up or SelectorKey.Down && !ctrl || key == SelectorKey.A && ctrl
+                ? SelectorOutcome.None : SelectorOutcome.PassToFeature;
         if (key == SelectorKey.A && ctrl)
         {
             if (Mode == CaptureMode.PickPoint)

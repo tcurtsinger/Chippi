@@ -12,7 +12,14 @@ namespace Chippi.UI.Displays;
 /// <summary>A connected monitor, as the island setting sees it.</summary>
 /// <param name="Id">Stable device path (<c>\\?\DISPLAY#…</c>); survives renumbering and rearranging.</param>
 /// <param name="Name">What Settings shows: the monitor's own name, with its resolution and "main" where it applies.</param>
-public sealed record DisplayInfo(string Id, string Name, nint Handle, bool IsMain);
+public sealed record DisplayInfo(string Id, string Name, nint Handle, bool IsMain)
+{
+    /// <summary>The monitor's own name, without its size or "main" ("OMEN 34c"); "Built-in display" or "Display 2" when it has none.</summary>
+    public string Friendly { get; init; } = "";
+
+    /// <summary>A laptop's own panel, which brightness reaches through WMI rather than DDC/CI.</summary>
+    public bool IsInternal { get; init; }
+}
 
 /// <summary>
 /// Connected monitors and their stable ids. Windows display configuration gives each active
@@ -42,7 +49,11 @@ public static unsafe class DisplayCatalog
                 .Select((f, i) =>
                 {
                     string name = f.Friendly.Length > 0 ? f.Friendly : f.Internal ? "Built-in display" : $"Display {i + 1}";
-                    return new DisplayInfo(f.Id, $"{name} ({f.Size}{(f.IsMain ? ", main" : "")})", (nint)f.Handle.Value, f.IsMain);
+                    return new DisplayInfo(f.Id, $"{name} ({f.Size}{(f.IsMain ? ", main" : "")})", (nint)f.Handle.Value, f.IsMain)
+                    {
+                        Friendly = name,
+                        IsInternal = f.Internal,
+                    };
                 }),
         ];
     }

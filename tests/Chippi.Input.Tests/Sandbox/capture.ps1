@@ -122,24 +122,43 @@ $releases = Scenario 'releases' { Starter 1 } {
     Start-Sleep -Milliseconds 300; Tap 0x1B }
 $found.scenarios = $s
 
+# Windows' switch flipped from outside, as Windows Settings does: the value, then the settings-change broadcast.
+function FlipWindows([int]$value) {
+    Set-ItemProperty -Path 'HKCU:\Control Panel\Keyboard' -Name PrintScreenKeyForSnippingEnabled -Value $value -Type DWord
+    [ChippiCheck.Flip]::Broadcast()
+}
+Add-Type -Namespace ChippiCheck -Name Flip -MemberDefinition @'
+[DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern IntPtr SendMessageTimeoutW(IntPtr h, uint m, IntPtr w, string l, uint f, uint t, out IntPtr r);
+public static void Broadcast() { IntPtr r; SendMessageTimeoutW((IntPtr)0xFFFF, 0x1A, IntPtr.Zero, null, 2, 3000, out r); SendMessageTimeoutW((IntPtr)0xFFFF, 0x1A, IntPtr.Zero, @"Control Panel\Keyboard", 2, 3000, out r); }
+'@
 # Windows' switch turned back on from outside: Chippi says "Used by Windows" and leaves it; Print Screen goes to Windows.
-Set-ItemProperty -Path 'HKCU:\Control Panel\Keyboard' -Name PrintScreenKeyForSnippingEnabled -Value 1 -Type DWord
+FlipWindows 1
 Start-Sleep -Seconds 2
 $found.usedByWindows = @(Events | Where-Object { $_.event -eq 'shortcuts' } | Select-Object -Last 1 | ForEach-Object { $_.entries })
 $found.settingAfterTurnedOn = Setting
 $from = @(Events).Count
-Click 700 520; Start-Sleep -Milliseconds 300
+Click 700 520; Start-Sleep -Seconds 3
 PrintScreen
-Start-Sleep -Seconds 2
+Start-Sleep -Seconds 3
 $found.printScreenWithWindowsOn = [ordered]@{
     chippiFroze = [bool](WaitEvent 'frozen' $from 500)
     windowsClipper = @(Get-Process -Name ScreenClippingHost, SnippingTool -ErrorAction SilentlyContinue | ForEach-Object { $_.Name })
+    foreground = [Probe]::Foreground()
 }
 Shot 'windows-clip'
 Tap 0x1B; Start-Sleep -Milliseconds 500
 Get-Process -Name ScreenClippingHost, SnippingTool -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 
-if (Test-Path "$results\capture-timings.txt") { $found.timings = @(Get-Content -LiteralPath "$results\capture-timings.txt") }
+# And off again from outside: the line clears and Print Screen reaches Chippi with the fixture in front.
+FlipWindows 0
+Start-Sleep -Seconds 2
+$found.afterTurnedOff = @(Events | Where-Object { $_.event -eq 'shortcuts' } | Select-Object -Last 1 | ForEach-Object { $_.entries })
+$s2 = [ordered]@{}
+$s2.printScreenAfterTurnedOff = Scenario 'printScreenAfterTurnedOff' { PrintScreen } { Start-Sleep -Milliseconds 300; Tap 0x1B }
+$s2.clipper = @(Get-Process -Name ScreenClippingHost, SnippingTool -ErrorAction SilentlyContinue).Count
+$found.turnedOffAgain = $s2
+
+if (Test-Path "$results\capture-timings.txt") { $found.timings = @(Get-Content -LiteralPath "$results\capture-timings.txt" | ForEach-Object { [string]$_ }) }
 $logs = Join-Path $env:LOCALAPPDATA 'Chippi\logs'
 if (Test-Path $logs) { Copy-Item -Path $logs -Destination "$results\chippi-logs" -Recurse -ErrorAction SilentlyContinue }
 Stop-Process -Id $chippi.Id -Force -ErrorAction SilentlyContinue
