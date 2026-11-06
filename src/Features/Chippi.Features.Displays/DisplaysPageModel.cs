@@ -19,6 +19,13 @@ public sealed record DisplaysSettings
 
     /// <summary>Percent a press moves: 5, 10 or 20.</summary>
     public int Step { get; init; } = 10;
+
+    /// <summary>The three global slots' keys; null while a slot is unset (all three start unset).</summary>
+    public KeyShortcut? BrightnessUp { get; init; }
+
+    public KeyShortcut? BrightnessDown { get; init; }
+
+    public KeyShortcut? OpenDisplays { get; init; }
 }
 
 /// <summary>A display as Settings › Displays lists it.</summary>
@@ -28,7 +35,14 @@ public sealed record DisplaysSettings
 /// <param name="Contrast">The display answered VCP 0x12.</param>
 /// <param name="Failed">The display doesn't answer: "Brightness control failed", the likely causes and Try again.</param>
 /// <param name="Retrying">Try again is reading it.</param>
-public sealed record DisplayStatus(string Id, string Name, bool IsMain, int? Brightness, bool Contrast, bool Failed = false, bool Retrying = false);
+public sealed record DisplayStatus(string Id, string Name, bool IsMain, int? Brightness, bool Contrast, bool Failed = false, bool Retrying = false)
+{
+    /// <summary>The last contrast level read, 0 to 100; null when the display has no contrast or it hasn't been read.</summary>
+    public int? ContrastLevel { get; init; }
+
+    /// <summary>The last write didn't go through; <see cref="Brightness"/> is the last level that did.</summary>
+    public bool WriteFailed { get; init; }
+}
 
 /// <summary>The feature's three global slots, in the page's order.</summary>
 public static class DisplaysShortcuts
