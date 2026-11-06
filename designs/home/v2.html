@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Home, v2: five columns with room for three more</title>
+<link rel="stylesheet" href="../tokens.css">
+<style>
+:root{--radius-tile:var(--radius-island-card);--tile-gap:8px}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font-family:var(--font-text);font-variant-numeric:tabular-nums;background:var(--window);color:var(--text);-webkit-font-smoothing:antialiased}
+button,input{font:inherit;color:inherit;margin:0}
+svg.g{width:var(--s,16px);height:var(--s,16px);fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;flex:none;display:block}
+
+.page{padding:32px 28px 40px}
+.intro h1{font-family:var(--font-display);font-size:20px;line-height:28px;font-weight:600;margin:0}
+.intro p{font-size:14px;line-height:20px;color:var(--text-secondary);margin:4px 0 0;max-width:64ch;text-wrap:pretty}
+.stages{display:flex;flex-wrap:wrap;gap:24px;margin-top:24px}
+.stage{background:var(--window);color:var(--island-text);padding:18px;border-radius:var(--radius-card);border:1px solid var(--divider)}
+.stage h2{font-size:12px;line-height:16px;font-weight:600;color:var(--text-secondary);margin:0 0 12px}
+
+/* The island panel at its real size, 520 x 360 DIPs (IslandGrid). */
+.panel{position:relative;width:520px;height:360px;padding:0 12px;background:var(--island);border:1px solid var(--island-border);border-radius:var(--radius-island);box-shadow:0 16px 40px rgba(0,0,0,.32);overflow:hidden;display:flex;flex-direction:column}
+.hdr{height:44px;display:flex;align-items:center;flex:none}
+.hdr h3{flex:1;margin:0;font-family:var(--font-display);font-size:18px;line-height:24px;font-weight:600}
+.btn{height:28px;padding:0 9px;display:inline-flex;align-items:center;gap:6px;font-size:13px;border-radius:var(--radius-control);border:1px solid var(--island-control-border);background:var(--island-button);cursor:pointer}
+.btn .g{color:var(--island-text-secondary)}
+.btn:hover{background:var(--island-button-hover)}
+:focus-visible{outline:2px solid var(--island-text);outline-offset:1px}
+
+.gallery{height:229px;flex:none;padding-bottom:8px}
+.tiles{height:100%;display:grid;grid-template-columns:repeat(5,1fr);grid-template-rows:repeat(3,1fr);gap:var(--tile-gap)}
+.tile{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;border:1px solid var(--island-card-border);border-radius:var(--radius-tile);background:var(--island-gallery-face);cursor:pointer;padding:0 4px;min-width:0}
+.tile:hover{background:var(--island-gallery-hover)}
+.tile .g{--s:22px;color:var(--island-text-secondary);stroke-width:1.5}
+.tile.on .g{color:var(--island-accent)}
+.tile span{font-size:13px;line-height:18px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.dot{position:absolute;width:8px;height:8px;border-radius:4px;background:var(--island-waiting-ink);box-shadow:0 0 0 1.5px var(--island)}
+.tile .dot{top:12px;left:calc(50% + 7px)}
+
+
+.quick{height:42px;flex:none;display:flex;align-items:center;gap:24px;padding:0 5px;font-size:13px;color:var(--island-text-secondary)}
+.sw{display:flex;align-items:center;gap:10px}
+.toggle{width:40px;height:20px;border-radius:10px;border:1px solid var(--switch-off-stroke);background:transparent;position:relative;padding:0;cursor:pointer}
+.toggle::after{content:"";position:absolute;left:4px;top:4px;width:10px;height:10px;border-radius:5px;background:var(--switch-off-knob)}
+.toggle[aria-checked="true"]{background:var(--island-accent-fill);border-color:transparent}
+.toggle[aria-checked="true"]::after{left:auto;right:4px;width:12px;height:12px;top:3px;border-radius:6px;background:var(--island-on-accent)}
+.vol{margin-left:auto;display:flex;align-items:center;gap:8px;color:var(--island-text)}
+.vol .g{--s:15px}
+.vol output{font-size:11px;width:32px;text-align:right;color:var(--island-text-secondary)}
+input[type=range]{appearance:none;width:96px;height:18px;background:transparent;cursor:pointer}
+input[type=range]::-webkit-slider-runnable-track{height:4px;border-radius:2px;background:var(--island-accent-fill) 0 0/var(--v) 100% no-repeat,var(--island-slider-track)}
+input[type=range]::-webkit-slider-thumb{appearance:none;width:18px;height:18px;margin-top:-7px;border-radius:9px;background:radial-gradient(circle,var(--island-accent) 0 5px,var(--island-thumb) 5.5px);box-shadow:0 0 0 1px var(--island-control-border),0 1px 3px rgba(0,0,0,.3)}
+
+.foot{height:45px;flex:none;margin:0 -12px;padding:0 6px 0 16px;display:flex;align-items:center;gap:10px;background:var(--island-footer);border-top:1px solid var(--island-hair);font-size:13px}
+.foot .np{display:flex;align-items:center;gap:12px;flex:1;min-width:0;height:100%;background:none;border:0;padding:0;text-align:left;cursor:pointer}
+.foot .np .g{--s:18px;color:var(--island-text-secondary)}
+.foot .np b{font-weight:600}
+.foot .np em{font-style:normal;color:var(--island-text-secondary);flex:1}
+.foot .np .chev{--s:16px;color:var(--island-text-tertiary)}
+.ib{width:32px;height:32px;display:inline-flex;align-items:center;justify-content:center;border:0;border-radius:var(--radius-control);background:transparent;color:var(--island-text-secondary);cursor:pointer;padding:0}
+.ib:hover{background:var(--island-hover)}
+.pet{width:32px;height:32px;border:0;padding:0;background:none;cursor:pointer}
+.pet img{width:32px;height:32px;display:block}
+
+@media (max-width:640px){.page{padding:20px 12px}.stage{padding:12px}.panel{zoom:.62}}
+</style>
+</head>
+<body>
+<!--icons-->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<!-- Lucide glyphs (ISC): app-* are Chippi's own (src/Chippi.UI/Controls/LucideIcons.cs), the rest lucide-react 1.35.0 -->
+<symbol id="i-app-activity" viewBox="0 0 24 24"><path d="M22,12 H18 L15,21 L9,3 L6,12 H2"/></symbol>
+<symbol id="i-app-chevron-right" viewBox="0 0 24 24"><path d="M9,18 L15,12 L9,6"/></symbol>
+<symbol id="i-app-clipboard-list" viewBox="0 0 24 24"><path d="M9,2 H15 a1,1 0 0 1 1,1 V5 a1,1 0 0 1 -1,1 H9 a1,1 0 0 1 -1,-1 V3 a1,1 0 0 1 1,-1 Z M16,4 h2 a2,2 0 0 1 2,2 v14 a2,2 0 0 1 -2,2 H6 a2,2 0 0 1 -2,-2 V6 a2,2 0 0 1 2,-2 h2 M12,11 h4 M12,16 h4 M8,11 h.01 M8,16 h.01"/></symbol>
+<symbol id="i-app-coffee" viewBox="0 0 24 24"><path d="M10,2 v2 M14,2 v2 M6,2 v2 M16,8 a1,1 0 0 1 1,1 v8 a4,4 0 0 1 -4,4 H7 a4,4 0 0 1 -4,-4 V9 a1,1 0 0 1 1,-1 h14 a4,4 0 1 1 0,8 h-1"/></symbol>
+<symbol id="i-app-folder" viewBox="0 0 24 24"><path d="M20,20 a2,2 0 0 0 2,-2 V8 a2,2 0 0 0 -2,-2 H12.1 a2,2 0 0 1 -1.69,-0.9 L9.6,3.9 A2,2 0 0 0 7.93,3 H4 a2,2 0 0 0 -2,2 V18 a2,2 0 0 0 2,2 Z"/></symbol>
+<symbol id="i-app-gauge" viewBox="0 0 24 24"><path d="M12,14 l4,-4 M3.34,19 a10,10 0 1 1 17.32,0"/></symbol>
+<symbol id="i-app-inbox" viewBox="0 0 24 24"><path d="M22,12 H16 L14,15 H10 L8,12 H2 M5.45,5.11 L2,12 v6 a2,2 0 0 0 2,2 h16 a2,2 0 0 0 2,-2 v-6 l-3.45,-6.89 A2,2 0 0 0 16.76,4 H7.24 a2,2 0 0 0 -1.79,1.11 Z"/></symbol>
+<symbol id="i-app-music" viewBox="0 0 24 24"><path d="M9,18 V5 L21,3 V16 M3,18 a3,3 0 1 0 6,0 a3,3 0 1 0 -6,0 Z M15,16 a3,3 0 1 0 6,0 a3,3 0 1 0 -6,0 Z"/></symbol>
+<symbol id="i-app-notebook-pen" viewBox="0 0 24 24"><path d="M13.4,2 H6 a2,2 0 0 0 -2,2 v16 a2,2 0 0 0 2,2 h12 a2,2 0 0 0 2,-2 v-7.4 M2,6 h4 M2,10 h4 M2,14 h4 M2,18 h4 M21.378,5.626 a1,1 0 1 0 -3.004,-3.004 l-5.01,5.012 a2,2 0 0 0 -0.506,0.854 l-0.837,2.87 a0.5,0.5 0 0 0 0.62,0.62 l2.87,-0.837 a2,2 0 0 0 0.854,-0.506 Z"/></symbol>
+<symbol id="i-app-search" viewBox="0 0 24 24"><path d="M11,3 a8,8 0 1 0 0,16 a8,8 0 1 0 0,-16 Z M21,21 L16.65,16.65"/></symbol>
+<symbol id="i-app-settings" viewBox="0 0 24 24"><path d="M12.22,2 h-.44 a2,2 0 0 0 -2,2 v.18 a2,2 0 0 1 -1,1.73 l-.43.25 a2,2 0 0 1 -2,0 l-.15-.08 a2,2 0 0 0 -2.73.73 l-.22.38 a2,2 0 0 0 .73,2.73 l.15.1 a2,2 0 0 1 1,1.72 v.51 a2,2 0 0 1 -1,1.74 l-.15.09 a2,2 0 0 0 -.73,2.73 l.22.38 a2,2 0 0 0 2.73.73 l.15-.08 a2,2 0 0 1 2,0 l.43.25 a2,2 0 0 1 1,1.73 V20 a2,2 0 0 0 2,2 h.44 a2,2 0 0 0 2,-2 v-.18 a2,2 0 0 1 1,-1.73 l.43-.25 a2,2 0 0 1 2,0 l.15.08 a2,2 0 0 0 2.73-.73 l.22-.39 a2,2 0 0 0 -.73,-2.73 l-.15-.08 a2,2 0 0 1 -1,-1.74 v-.5 a2,2 0 0 1 1,-1.74 l.15-.09 a2,2 0 0 0 .73,-2.73 l-.22-.38 a2,2 0 0 0 -2.73,-.73 l-.15.08 a2,2 0 0 1 -2,0 l-.43-.25 a2,2 0 0 1 -1,-1.73 V4 a2,2 0 0 0 -2,-2 Z M12,9 a3,3 0 1 0 0,6 a3,3 0 1 0 0,-6 Z"/></symbol>
+<symbol id="i-app-sun" viewBox="0 0 24 24"><path d="M16,12 a4,4 0 1 0 -8,0 a4,4 0 1 0 8,0 Z M12,2 v2 M12,20 v2 M4.93,4.93 l1.41,1.41 M17.66,17.66 l1.41,1.41 M2,12 h2 M20,12 h2 M6.34,17.66 l-1.41,1.41 M19.07,4.93 l-1.41,1.41"/></symbol>
+<symbol id="i-app-toggle-right" viewBox="0 0 24 24"><path d="M7,5 h10 a7,7 0 0 1 0,14 H7 A7,7 0 0 1 7,5 Z M14,12 a3,3 0 1 0 6,0 a3,3 0 1 0 -6,0"/></symbol>
+<symbol id="i-app-volume" viewBox="0 0 24 24"><path d="M11,5 L6,9 H2 V15 H6 L11,19 Z M15.54,8.46 a5,5 0 0 1 0,7.07 M19.07,4.93 a10,10 0 0 1 0,14.14"/></symbol>
+<symbol id="i-scan" viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/></symbol>
+</svg>
+<!--/icons-->
+<main class="page">
+  <header class="intro" data-id="intro">
+    <h1 data-id="title">Home, v2: five columns with room for three more</h1>
+    <p>The same twelve tools in the same order, five to a row. The tiles get narrower, not shorter, so the panel stays 520 × 360 and three places stay free: a thirteenth tool (the Apps trio, or a wave 2 tile) lands without squeezing every tile.</p>
+  </header>
+
+  <div class="stages">
+    <section class="stage dark" data-id="dark-theme" aria-label="Dark theme">
+      <h2>Dark</h2>
+      <div class="panel" data-id="panel" role="dialog" aria-label="Chippi">
+        <div class="hdr" data-id="header">
+          <h3 data-id="heading">Tools</h3>
+          <button class="btn" data-id="find-a-tool" title="Find a tool (Ctrl+F)"><svg class="g" style="--s:14px"><use href="#i-app-search"/></svg>Find a tool</button>
+        </div>
+        <div class="gallery" data-id="gallery">
+          <div class="tiles">
+            <button class="tile" data-id="tile-audio"><svg class="g"><use href="#i-app-volume"/></svg><span>Audio</span></button>
+            <button class="tile on" data-id="tile-awake"><svg class="g"><use href="#i-app-coffee"/></svg><span>Awake</span></button>
+            <button class="tile" data-id="tile-organizer"><svg class="g"><use href="#i-app-folder"/></svg><span>Organizer</span></button>
+            <button class="tile" data-id="tile-system"><svg class="g"><use href="#i-app-activity"/></svg><span>System</span></button>
+            <button class="tile" data-id="tile-displays"><svg class="g"><use href="#i-app-sun"/></svg><span>Displays</span></button>
+            <button class="tile" data-id="tile-clipboard"><svg class="g"><use href="#i-app-clipboard-list"/></svg><span>Clipboard</span></button>
+            <button class="tile" data-id="tile-capture"><svg class="g"><use href="#i-scan"/></svg><span>Capture</span></button>
+            <button class="tile" data-id="tile-scratchpad"><svg class="g"><use href="#i-app-notebook-pen"/></svg><span>Scratchpad</span></button>
+            <button class="tile" data-id="tile-agents" aria-label="Agents, waiting on you"><svg class="g"><use href="#i-app-gauge"/></svg><i class="dot"></i><span>Agents</span></button>
+            <button class="tile" data-id="tile-shelf"><svg class="g"><use href="#i-app-inbox"/></svg><span>Shelf</span></button>
+            <button class="tile" data-id="tile-actions"><svg class="g"><use href="#i-app-toggle-right"/></svg><span>Actions</span></button>
+            <button class="tile" data-id="tile-search"><svg class="g"><use href="#i-app-search"/></svg><span>Search</span></button>
+          </div>
+        </div>
+        <div class="quick" data-id="quick-controls">
+          <div class="sw"><span id="d-mic">Mute mic</span><button class="toggle" role="switch" aria-checked="false" aria-labelledby="d-mic" data-id="switch-mute-mic"></button></div>
+          <div class="sw"><span id="d-awake">Keep awake</span><button class="toggle" role="switch" aria-checked="true" aria-labelledby="d-awake" data-id="switch-keep-awake"></button></div>
+          <div class="vol" data-id="volume"><svg class="g"><use href="#i-app-volume"/></svg><input type="range" min="0" max="100" value="62" style="--v:62%" aria-label="Volume"><output>62%</output></div>
+        </div>
+        <div class="foot" data-id="footer">
+          <button class="np" data-id="now-playing"><svg class="g"><use href="#i-app-music"/></svg><b>Now Playing</b><em>Nothing playing</em><svg class="g chev"><use href="#i-app-chevron-right"/></svg></button>
+          <button class="ib" data-id="settings" title="Settings" aria-label="Settings"><svg class="g"><use href="#i-app-settings"/></svg></button>
+          <button class="pet" data-id="pet" aria-label="Chippi"><img src="pet-dark.png" alt=""></button>
+        </div>
+      </div>
+    </section>
+
+    <section class="stage light" data-id="light-theme" aria-label="Light theme">
+      <h2>Light</h2>
+      <div class="panel" role="dialog" aria-label="Chippi">
+        <div class="hdr">
+          <h3>Tools</h3>
+          <button class="btn" title="Find a tool (Ctrl+F)"><svg class="g" style="--s:14px"><use href="#i-app-search"/></svg>Find a tool</button>
+        </div>
+        <div class="gallery">
+          <div class="tiles">
+            <button class="tile"><svg class="g"><use href="#i-app-volume"/></svg><span>Audio</span></button>
+            <button class="tile on"><svg class="g"><use href="#i-app-coffee"/></svg><span>Awake</span></button>
+            <button class="tile"><svg class="g"><use href="#i-app-folder"/></svg><span>Organizer</span></button>
+            <button class="tile"><svg class="g"><use href="#i-app-activity"/></svg><span>System</span></button>
+            <button class="tile"><svg class="g"><use href="#i-app-sun"/></svg><span>Displays</span></button>
+            <button class="tile"><svg class="g"><use href="#i-app-clipboard-list"/></svg><span>Clipboard</span></button>
+            <button class="tile"><svg class="g"><use href="#i-scan"/></svg><span>Capture</span></button>
+            <button class="tile"><svg class="g"><use href="#i-app-notebook-pen"/></svg><span>Scratchpad</span></button>
+            <button class="tile" aria-label="Agents, waiting on you"><svg class="g"><use href="#i-app-gauge"/></svg><i class="dot"></i><span>Agents</span></button>
+            <button class="tile"><svg class="g"><use href="#i-app-inbox"/></svg><span>Shelf</span></button>
+            <button class="tile"><svg class="g"><use href="#i-app-toggle-right"/></svg><span>Actions</span></button>
+            <button class="tile"><svg class="g"><use href="#i-app-search"/></svg><span>Search</span></button>
+          </div>
+        </div>
+        <div class="quick">
+          <div class="sw"><span id="l-mic">Mute mic</span><button class="toggle" role="switch" aria-checked="false" aria-labelledby="l-mic"></button></div>
+          <div class="sw"><span id="l-awake">Keep awake</span><button class="toggle" role="switch" aria-checked="true" aria-labelledby="l-awake"></button></div>
+          <div class="vol"><svg class="g"><use href="#i-app-volume"/></svg><input type="range" min="0" max="100" value="62" style="--v:62%" aria-label="Volume"><output>62%</output></div>
+        </div>
+        <div class="foot">
+          <button class="np"><svg class="g"><use href="#i-app-music"/></svg><b>Now Playing</b><em>Nothing playing</em><svg class="g chev"><use href="#i-app-chevron-right"/></svg></button>
+          <button class="ib" title="Settings" aria-label="Settings"><svg class="g"><use href="#i-app-settings"/></svg></button>
+          <button class="pet" aria-label="Chippi"><img src="pet-light.png" alt=""></button>
+        </div>
+      </div>
+    </section>
+  </div>
+</main>
+</body>
+</html>

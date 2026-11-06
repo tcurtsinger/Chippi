@@ -1,0 +1,5 @@
+{
+  "title": "Home",
+  "for": "The island's home: the tools Travis opens most days, the quick switches and Now Playing, at 520 × 360.",
+  "knobs": ["--radius-tile", "--tile-gap"]
+}
