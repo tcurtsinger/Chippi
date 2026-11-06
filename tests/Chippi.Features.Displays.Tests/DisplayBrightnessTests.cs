@@ -84,7 +84,7 @@ public sealed class DisplayBrightnessTests
         public int Opens;
         public IMonitor? Open(DisplayInfo display)
         {
-            Opens++;
+            Interlocked.Increment(ref Opens);
             return Monitors.TryGetValue(display.Id, out var m) ? m : null;
         }
     }
