@@ -8,7 +8,7 @@ namespace Chippi.Features.Displays.Tests;
 /// <summary>The brightness engine over a fake monitor bus (docs/phase-7/displays.md, Tests).</summary>
 public sealed class DisplayBrightnessTests
 {
-    private sealed class FakeMonitor(string id) : IMonitor
+    internal sealed class FakeMonitor(string id) : IMonitor
     {
         public readonly object Gate = new();
         public readonly Dictionary<Vcp, int> Levels = new() { [Vcp.Brightness] = 50, [Vcp.Contrast] = 70 };
@@ -18,6 +18,11 @@ public sealed class DisplayBrightnessTests
         public bool FailWrites;
         public bool NoContrast;
         public ManualResetEventSlim? Hold;
+
+        /// <summary>A driver both monitors share: its calls are taken in turn, each taking <see cref="WriteMs"/>.</summary>
+        public object? Driver;
+        public int WriteMs;
+        public long LastEnd;
         public ManualResetEventSlim WriteStarted = new(false);
         public string Id { get; } = id;
         public int Max => 100;
@@ -40,11 +45,14 @@ public sealed class DisplayBrightnessTests
         {
             WriteStarted.Set();
             Hold?.Wait(TimeSpan.FromSeconds(10));
+            if (Driver is not null)
+                lock (Driver) Thread.Sleep(WriteMs);
             lock (Gate)
             {
                 Writes.Add((code, raw));
                 if (FailWrites) return false;
                 Levels[code] = raw;
+                LastEnd = System.Diagnostics.Stopwatch.GetTimestamp();
                 return true;
             }
         }
@@ -52,7 +60,7 @@ public sealed class DisplayBrightnessTests
         public void Dispose() { }
     }
 
-    private sealed class FakeBus : IMonitorBus
+    internal sealed class FakeBus : IMonitorBus
     {
         public readonly Dictionary<string, FakeMonitor> Monitors = [];
         public int Opens;
@@ -63,7 +71,7 @@ public sealed class DisplayBrightnessTests
         }
     }
 
-    private static DisplayInfo Info(string id, string name, nint handle, bool main = false) =>
+    internal static DisplayInfo Info(string id, string name, nint handle, bool main = false) =>
         new(id, name + " (1920×1080)", handle, main) { Friendly = name };
 
     private sealed class Rig : IDisposable
@@ -367,4 +375,42 @@ public sealed class DisplayBrightnessTests
         Assert.All(rig["A"].Writes.Concat(rig["B"].Writes), w => Assert.True(w.Code is Vcp.Brightness or Vcp.Contrast));
         Assert.Equal([0x10, 0x12], Enum.GetValues<Vcp>().Select(c => (int)c));
     }
+}
+
+public sealed class DisplayDragLagTests
+{
+    // The real monitors' DDC/CI calls are taken in turn by the driver (two plain threads reading take twice as long as one);
+    // this keeps that in the test and checks the last write of an All displays drag lands soon after the hand stops.
+    [Fact]
+    public void The_last_write_of_an_All_displays_drag_lands_within_a_write_or_two_of_the_release()
+    {
+        var driver = new object();
+        var a = DisplayBrightnessTests.Info("A", "OMEN", 1, true);
+        var b = DisplayBrightnessTests.Info("B", "Samsung", 2);
+        var bus = new DisplayBrightnessTests.FakeBus();
+        bus.Monitors["A"] = new DisplayBrightnessTests.FakeMonitor("A") { Driver = driver, WriteMs = 30 };
+        bus.Monitors["B"] = new DisplayBrightnessTests.FakeMonitor("B") { Driver = driver, WriteMs = 30 };
+        bus.Monitors["B"].Levels[Vcp.Brightness] = 60;
+        using var engine = new DisplayBrightness(bus, () => [a, b], () => 1);
+        engine.Refresh();
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (engine.Statuses.Any(s => s.Brightness is null) && DateTime.UtcNow < deadline) Thread.Sleep(2);
+        engine.BeginAll();
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        for (int i = 1; i <= 50; i++)
+        {
+            engine.MoveAll(50 - i / 4);
+            long until = clock.ElapsedTicks + 16 * System.Diagnostics.Stopwatch.Frequency / 1000;
+            while (clock.ElapsedTicks < until) Thread.SpinWait(50);
+        }
+        engine.EndAll();
+        long release = System.Diagnostics.Stopwatch.GetTimestamp();
+        deadline = DateTime.UtcNow.AddSeconds(5);
+        while (engine.Statuses.Any(s => s.Brightness != (s.Id == "A" ? 38 : 48)) && DateTime.UtcNow < deadline) Thread.Sleep(2);
+        long last = Math.Max(bus.Monitors["A"].LastEnd, bus.Monitors["B"].LastEnd);
+        double lagMs = (last - release) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+        Assert.Equal([38, 48], engine.Statuses.Select(s => s.Brightness!.Value));
+        Assert.True(lagMs < 300, $"the last write landed {lagMs:F0} ms after the release");
+    }
+
 }

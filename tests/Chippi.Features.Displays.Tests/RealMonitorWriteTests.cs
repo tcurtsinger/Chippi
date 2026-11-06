@@ -72,7 +72,7 @@ public sealed class RealMonitorWriteTests
                 Report(lines, log, t0, "fresh key");
 
                 // 2. Stale key press: wait out the 10 s staleness; the press reads first, then writes from the real level.
-                Thread.Sleep((int)MonitorWorker.StaleMs + 1_000);
+                if (Environment.GetEnvironmentVariable("CHIPPI_DISPLAYS_SKIP_STALE") != "1") Thread.Sleep((int)MonitorWorker.StaleMs + 1_000);
                 long t1 = Mark(log, clock, "stale key -5, all displays");
                 handoff.Restart();
                 engine.Step(-5, BrightnessTarget.AllDisplays);
@@ -82,7 +82,12 @@ public sealed class RealMonitorWriteTests
 
                 // 3. A press while a write is in flight: three presses 20 ms apart add up.
                 long t2 = Mark(log, clock, "three quick presses -5, all displays");
-                for (int i = 0; i < 3; i++) { engine.Step(-5, BrightnessTarget.AllDisplays); Thread.Sleep(20); }
+                for (int i = 0; i < 3; i++)
+                {
+                    log.Enqueue(new Op(clock.ElapsedMilliseconds, "hand", $"press {i + 1}"));
+                    engine.Step(-5, BrightnessTarget.AllDisplays);
+                    Pause(clock, 20); // Thread.Sleep(20) waits about 31 ms: the 15.6 ms timer tick
+                }
                 Settle(log);
                 Report(lines, log, t2, "in-flight presses");
                 foreach (var s in engine.Statuses) lines.Add($"after presses {s.Name}: brightness={s.Brightness}");
@@ -91,9 +96,10 @@ public sealed class RealMonitorWriteTests
                 int start = engine.AllLevel() ?? 50;
                 long t3 = Mark(log, clock, $"All displays drag from {start} down 15 and back 10, release");
                 engine.BeginAll();
-                for (int i = 1; i <= 30; i++) { engine.MoveAll(start - i * 15 / 30); Thread.Sleep(16); }
-                for (int i = 1; i <= 20; i++) { engine.MoveAll(start - 15 + i * 10 / 20); Thread.Sleep(16); }
+                for (int i = 1; i <= 30; i++) { engine.MoveAll(start - i * 15 / 30); Pause(clock, 16); }
+                for (int i = 1; i <= 20; i++) { engine.MoveAll(start - 15 + i * 10 / 20); Pause(clock, 16); }
                 engine.EndAll();
+                log.Enqueue(new Op(clock.ElapsedMilliseconds, "hand", "released"));
                 Settle(log);
                 Report(lines, log, t3, "All displays drag");
                 foreach (var s in engine.Statuses) lines.Add($"after drag {s.Name}: brightness={s.Brightness} (target {start - 5} + each display's own offset)");
@@ -138,6 +144,12 @@ public sealed class RealMonitorWriteTests
         long now = clock.ElapsedMilliseconds;
         log.Enqueue(new Op(now, "-", what));
         return now;
+    }
+
+    private static void Pause(Stopwatch clock, int ms)
+    {
+        long until = clock.ElapsedTicks + ms * Stopwatch.Frequency / 1000;
+        while (clock.ElapsedTicks < until) Thread.SpinWait(50);
     }
 
     // No new operation for 600 ms: the queue is quiet.
