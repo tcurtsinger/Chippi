@@ -85,3 +85,7 @@ if (($Checks | ForEach-Object { $_ -split ',' }) -contains 'arrangements') {
     $report = Get-Content -LiteralPath $reportPath -Raw | ConvertFrom-Json
     if ($report.error -or $report.arrangements.passed -ne $true) { throw 'Arrangements Sandbox check failed; see results.json' }
 }
+if (($Checks | ForEach-Object { $_ -split ',' }) -contains 'screen-capture') {
+    $report = Get-Content -LiteralPath $reportPath -Raw | ConvertFrom-Json
+    if ($report.error -or $report.screenCapture.passed -ne $true) { throw 'Screen capture Sandbox check failed; see results.json' }
+}

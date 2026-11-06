@@ -23,6 +23,8 @@ public sealed class ScreenCaptureModule(ICaptureLayer capture) : IFeatureModule
     private readonly List<IHotkey> _keys = [];
     private CaptureEditor? _editor;
     private DispatcherTimer? _clear;
+    public Func<bool> TextAvailable { get; init; } = () => false;
+    public Func<CapturedImage, bool, Task> ReadText { get; init; } = (_, _) => Task.CompletedTask;
     public ScreenCaptureModel? Model { get; private set; }
     public FeatureDescriptor Descriptor { get; } = new(Id, "Screen capture", "Capture and mark up anything on screen", FeatureGroup.Capture)
     { Icon = "Scan", Presets = PresetMembership.PowerUser };
@@ -90,25 +92,36 @@ public sealed class ScreenCaptureModule(ICaptureLayer capture) : IFeatureModule
     public void Start(CaptureMode mode, CaptureDoor door, int delay = 0)
     {
         if (Model == null || _context == null) return;
-        if (_editor != null) { _editor.AskDiscard(() => Start(mode, door, delay)); return; }
-        Attach(capture.Start(new CaptureRequest(mode) { Door = door, Delay = delay, Magnifier = Model.Settings.Magnifier }));
+        var request = new CaptureRequest(mode) { Door = door, Delay = delay, Magnifier = Model.Settings.Magnifier };
+        if (_editor != null)
+        {
+            if (capture.Current?.Selection == null) { capture.Start(request); return; }
+            _editor.AskDiscard(() => Start(mode, door, delay)); return;
+        }
+        Attach(capture.Start(request));
     }
 
     private void Annotate(BitmapSource image)
     {
-        if (_editor != null) { _editor.AskDiscard(() => Annotate(image)); return; }
+        if (_editor != null)
+        {
+            if (capture.Current?.Selection == null) { capture.Start(new CaptureRequest(CaptureMode.Region)); return; }
+            _editor.AskDiscard(() => Annotate(image)); return;
+        }
         var converted = new FormatConvertedBitmap(image, PixelFormats.Bgra32, null, 0);
         byte[] pixels = new byte[checked(converted.PixelWidth * converted.PixelHeight * 4)];
         converted.CopyPixels(pixels, converted.PixelWidth * 4, 0);
-        Attach(capture.Reopen(new CapturedImage(image.PixelWidth, image.PixelHeight, pixels), CaptureDoor.Island));
+        Attach(capture.Reopen(new CapturedImage(image.PixelWidth, image.PixelHeight, pixels), CaptureDoor.Shortcut));
     }
 
     private void Attach(ICaptureSession? session)
     {
-        if (session == null || Model == null || _context == null || _store == null) return;
-        _editor = new CaptureEditor(session, _context, Model, _store, Feedback);
+        if (session == null || !ReferenceEquals(capture.Current, session) || Model == null || _context == null || _store == null) return;
+        _editor = new CaptureEditor(session, _context, Model, _store, Feedback, TextAvailable, ReadText);
         session.Closed += _ => { _editor?.Dispose(); _editor = null; };
     }
+
+    public void RefreshProviders() => _editor?.RefreshProviders();
 
     private void OpenCapture()
     {
@@ -120,8 +133,8 @@ public sealed class ScreenCaptureModule(ICaptureLayer capture) : IFeatureModule
     {
         if (_context is not { } context) return;
         _clear?.Stop();
-        context.Island.Publish(new IslandActivity(Id + "/result", IslandActivityKind.Status, title, "Screen capture")
-        { IsFeedback = true, NeedsAttention = failed, Icon = failed ? "TriangleAlert" : null, Clicked = ShowRecent });
+        context.Island.Publish(new IslandActivity(Id + "/result", IslandActivityKind.Status, title, _editor?.FeedbackSource ?? "Screen capture")
+        { IsFeedback = true, Picture = _editor?.FeedbackPicture, NeedsAttention = failed, Icon = failed ? "TriangleAlert" : null, Clicked = ShowRecent });
         _clear = new DispatcherTimer { Interval = TimeSpan.FromSeconds(6) };
         _clear.Tick += (_, _) => { _clear?.Stop(); context.Island.Clear(Id + "/result"); };
         _clear.Start();

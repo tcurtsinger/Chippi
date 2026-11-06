@@ -9,6 +9,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using Chippi.Capture;
 using Chippi.Core.Modules;
+using Chippi.Core.Clipboard;
 using Chippi.Island.Tests;
 using Chippi.UI.Capture;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -62,14 +63,56 @@ public sealed class CaptureEditorTests
             Tool("Crop"); Drag(new(10, 10), new(110, 90));
             Click(Find(session.Output!, "Crop"));
             Assert.Equal(new Int32Rect(10, 10, 100, 80), editor.Draft.Crop);
+            Assert.Equal(new PixelRect(10, 10, 100, 80), session.Preview!.Bounds);
             Click(Find(session.Tools!, "Undo"));
             Assert.Equal(new Int32Rect(0, 0, 400, 300), editor.Draft.Crop);
+            Assert.Null(session.Preview);
             Click(Find(session.Tools!, "Redo"));
             Assert.Equal(100, editor.Draft.Flatten().PixelWidth);
         }
         finally { Directory.Delete(folder, true); }
     });
 
+    [Fact]
+    public void Failed_copy_exposes_retry_and_each_explicit_output_is_a_new_attempt() => WpfTestThread.Run(() =>
+    {
+        string folder = Path.Combine(Path.GetTempPath(), "chippi-retry-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(folder);
+        try
+        {
+            using var store = new RecentCaptureStore(folder);
+            var clipboard = new BusyClipboard();
+            var context = new ModuleContext("screen-capture", new SettingsStore(), NullLogger.Instance, null!, null!) { Clipboard = clipboard };
+            using var model = new ScreenCaptureModel(context, store, _ => { }, _ => false);
+            var session = new Session();
+            using var editor = new CaptureEditor(session, context, model, store, (_, _) => { });
+            session.Release();
+            var finish = Assert.IsType<FinishBar>(session.Output);
+            Click(finish.Copy);
+            Assert.Equal("Copy failed", finish.Failure);
+            Assert.Same(finish.Retry, finish.Main);
+            Assert.Equal(1, clipboard.Writes);
+            Click(finish.Retry);
+            Assert.Equal(2, clipboard.Writes);
+            Click(finish.Copy);
+            Assert.Equal(3, clipboard.Writes);
+            Assert.Empty(model.Recent);
+        }
+        finally { Directory.Delete(folder, true); }
+    });
+
+    private sealed class BusyClipboard : IClipboardHub
+    {
+        public int Writes;
+        public Task<ClipStatus> WriteAsync(ClipContent content, CancellationToken cancel = default)
+        { Writes++; return Task.FromResult(ClipStatus.Busy); }
+        public IDisposable Listen(Action<ClipCopy> copied, Func<string, bool>? skip = null) => throw new NotSupportedException();
+        public Task<ClipRead> ReadAsync(CancellationToken cancel = default) => throw new NotSupportedException();
+        public PasteTarget? CaptureTarget() => null;
+        public Task<PasteOutcome> PasteAsync(ClipContent content, PasteTarget target, CancellationToken cancel = default) => throw new NotSupportedException();
+        public Task<PasteOutcome> PastePlainTextAsync(CancellationToken cancel = default) => throw new NotSupportedException();
+        public void Beep() { }
+    }
     private static void Click(Button button) => button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
     private static Button Find(DependencyObject root, string name)
     {
@@ -98,6 +141,8 @@ public sealed class CaptureEditorTests
         public CaptureRequest Request { get; } = new(Chippi.Capture.CaptureMode.Region);
         public Canvas Canvas { get; } = new() { Width = 400, Height = 300 };
         public FrameworkElement? Tools, Output;
+        public CapturePreview? Preview;
+        public void SetPreview(CapturePreview? preview) => Preview = preview;
         public Freeze? Freeze { get; private set; }
         public Selection? Selection { get; private set; }
         public IReadOnlyList<CaptureSurface> Surfaces => [new("fixture", new(0, 0, 400, 300), 96, Canvas)];

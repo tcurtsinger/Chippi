@@ -3,6 +3,7 @@
 
 # Runs only inside Windows Sandbox, with clipboard redirection and networking disabled by run.ps1.
 $ErrorActionPreference = 'Stop'
+if ($env:USERNAME -ne 'WDAGUtilityAccount') { throw 'Run this check only inside Windows Sandbox through run.ps1.' }
 Add-Type -AssemblyName System.Drawing, System.Windows.Forms, UIAutomationClient, UIAutomationTypes
 Add-Type -Namespace CaptureCheck -Name Clipboard -MemberDefinition '[DllImport("user32.dll")] public static extern uint GetClipboardSequenceNumber();'
 $results = 'C:\results'
@@ -11,7 +12,7 @@ function Note([string]$text) { Add-Content -LiteralPath "$results\probe.log" -Va
 function Require([bool]$value, [string]$name) { if (-not $value) { throw "Screen capture check failed: $name" }; Note "PASS $name" }
 function Aim {
     $front = [Probe]::Foreground()
-    if ($front -notmatch 'Capture fixture|Chippi|Save [Aa]s') { throw "Unexpected foreground before input: $front" }
+    if ($front -notmatch 'Capture fixture|Results fixture|Chippi|Save [Aa]s') { throw "Unexpected foreground before input: $front" }
 }
 function Tap([uint16]$vk) { Aim; [Probe]::Key($vk, $true); [Probe]::Spin(25); [Probe]::Key($vk, $false); [Probe]::Spin(25) }
 function Chord([uint16[]]$keys) {
@@ -76,7 +77,7 @@ try {
     New-Item -ItemType Directory -Path $profile -Force | Out-Null
     New-Item -ItemType Directory -Path "$results\saved" -Force | Out-Null
     $settings = [ordered]@{ version = 1; app = @{ islandEnabled = $false }; modules = @{
-        'screen-capture' = @{ saveFolder = "$results\saved"; shortcuts = @{
+        'screen-capture' = @{ enter = 2; saveFolder = "$results\saved"; shortcuts = @{
             'Capture region' = @{ modifiers = 3; key = 49 }; 'Capture window' = @{ modifiers = 3; key = 50 };
             'Capture full screen' = @{ modifiers = 3; key = 51 }; 'Capture all displays' = @{ modifiers = 3; key = 52 };
             'Capture freeform' = @{ modifiers = 3; key = 53 }; 'Capture last region' = @{ modifiers = 3; key = 54 };
@@ -95,10 +96,15 @@ try {
     Invoke 'Redact'; Drag 320 270 380 330; Shot 'redacted'
     $before = [CaptureCheck.Clipboard]::GetClipboardSequenceNumber(); Invoke 'Copy'
     $image = Copied $before
-    Require ($image.Width -eq 400 -and $image.Height -eq 250) 'source resolution'
+    Require ($image.Width -eq 401 -and $image.Height -eq 251) 'source resolution'
     Require ($image.GetPixel(40, 40).ToArgb() -eq [System.Drawing.Color]::Black.ToArgb()) 'redaction copied as opaque black'
     $image.Save("$results\screen-capture-redacted-output.png"); $image.Dispose()
 
+    Region; Invoke 'Rectangle'; Invoke 'Color and width'; Invoke 'Fill'; Drag 325 275 420 350
+    $before = [CaptureCheck.Clipboard]::GetClipboardSequenceNumber(); Invoke 'Copy'
+    $image = Copied $before
+    Require ($image.GetPixel(60, 50).R -eq 0xE5 -and $image.GetPixel(60, 50).G -eq 0x48) 'filled shape pixels'
+    $image.Dispose()
     Region; Invoke 'Rectangle'; Drag 325 275 420 350
     Chord @(0xA2, 0x5A); Chord @(0xA2, 0x59); Invoke 'Select'; Drag 325 275 345 295; Shot 'object-selected'
     Tap 0x2E; Invoke 'Pen'; Drag 330 280 450 350; Invoke 'Eraser'; Click 390 315; Shot 'erased'; Tap 0x1B
@@ -121,8 +127,21 @@ try {
     Invoke 'Save'
     WaitFor { @(Get-ChildItem "$results\saved" -Filter '*.png').Count -eq 1 } 'saved PNG'
     $saved = Get-ChildItem "$results\saved" -Filter '*.png' | Select-Object -First 1
-    $image = [System.Drawing.Image]::FromFile($saved.FullName); Require ($image.Width -eq 400 -and $image.Height -eq 250) 'saved dimensions'; $image.Dispose()
+    $image = [System.Drawing.Image]::FromFile($saved.FullName); Require ($image.Width -eq 401 -and $image.Height -eq 251) 'saved dimensions'; $image.Dispose()
 
+    # A partial success must retry the failed save without copying again.
+    Move-Item -LiteralPath 'C:\results\saved' -Destination 'C:\results\saved-original'
+    Set-Content -LiteralPath 'C:\results\saved' -Value 'blocked destination'
+    Region; Tap 0x0D
+    WaitFor { $null -ne (Find 'Retry') } 'partial output Retry'
+    $copiedSequence = [CaptureCheck.Clipboard]::GetClipboardSequenceNumber()
+    Shot 'partial-failure'
+    Remove-Item -LiteralPath 'C:\results\saved'
+    Move-Item -LiteralPath 'C:\results\saved-original' -Destination 'C:\results\saved'
+    Invoke 'Retry'
+    WaitFor { [Probe]::Foreground() -eq 'Capture fixture' } 'Retry completes'
+    Require ([CaptureCheck.Clipboard]::GetClipboardSequenceNumber() -eq $copiedSequence) 'Retry does not repeat successful copy'
+    Require (@(Get-ChildItem "$results\saved" -Filter '*.png').Count -eq 2) 'Retry saves once'
     # Real-size Recent history: actual successful captures, with retention never touching saved files.
     foreach ($i in 1..50) {
         Fixture; Starter 1; WaitFor { [Probe]::Foreground() -eq 'Chippi capture' } 'history freeze'
@@ -135,7 +154,7 @@ try {
     Require (@(Get-ChildItem $cache -Filter '*.png').Count -eq 50) 'retention keeps 50 owned images'
     Require (Test-Path -LiteralPath $saved.FullName) 'retention preserves external saved file'
     Region; Invoke 'Save'
-    WaitFor { @(Get-ChildItem "$results\saved" -Filter '*.png').Count -eq 2 } 'second saved file'
+    WaitFor { @(Get-ChildItem "$results\saved" -Filter '*.png').Count -eq 3 } 'second saved file'
     $latestSaved = Get-ChildItem "$results\saved" -Filter '*.png' | Sort-Object LastWriteTime -Descending | Select-Object -First 1
     Fixture; Starter 9; WaitFor { $null -ne (Find 'Capture, ' -Prefix) } 'Recent in real Settings'; Shot 'settings-recent'
     Invoke 'Capture, ' -Prefix; Invoke 'Annotate'
@@ -153,6 +172,24 @@ try {
     Require (@(Get-ChildItem $cache -Filter '*.png').Count -eq 0) 'Clear removes owned cache'
     Require (Test-Path -LiteralPath $saved.FullName) 'Clear preserves saved file'
     Shot 'settings-cleared'
+    # Provider integration consumes this selection, and the QR page gets the decoded fixture without a second freeze.
+    Stop-Process -Id $chippi.Id -Force
+    Stop-Process -Id $fixture.Id -Force
+    $fixture = Start-Process -FilePath powershell.exe -ArgumentList '-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File C:\probe\results-fixture.ps1' -PassThru
+    $currentSettings = Get-Content -LiteralPath "$profile\settings.json" -Raw | ConvertFrom-Json
+    $currentSettings.features.installed = @('screen-capture', 'screen-text')
+    $currentSettings | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath "$profile\settings.json" -Encoding UTF8
+    $chippi = Start-Process -FilePath 'C:\chippi\Chippi.exe' -PassThru
+    Start-Sleep -Seconds 12
+    Click 1000 650; Starter 1
+    WaitFor { [Probe]::Foreground() -eq 'Chippi capture' } 'provider capture'
+    Start-Sleep -Milliseconds 250; Drag 360 290 710 640
+    WaitFor { $null -ne (Find 'Scan QR code') } 'installed provider button'
+    $freezeCount = @(Get-Content "$results\screen-capture-timings.txt" | Where-Object { $_ -like 'freeze *' }).Count
+    Invoke 'Scan QR code'
+    WaitFor { $null -ne (Find 'https://example.com/chippi-check') } 'QR result from composed selection'
+    Shot 'qr-provider-result'
+    Require (@(Get-Content "$results\screen-capture-timings.txt" | Where-Object { $_ -like 'freeze *' }).Count -eq $freezeCount) 'provider does not recapture'
     $found.passed = $true
     $found.savedCount = @(Get-ChildItem "$results\saved" -Filter '*.png').Count
     $found.timings = @(Get-Content "$results\screen-capture-timings.txt")

@@ -29,6 +29,7 @@ public sealed class CaptureOutputTests
         fail = false;
         var retried = await output.RetryAsync();
         Assert.Equal("Copied and saved", retried.Title);
+        Assert.Equal("fixture.png", retried.SavedFile);
         Assert.Equal(copyFails ? 2 : 1, copies);
         Assert.Equal(copyFails ? 1 : 2, saves);
         Assert.Equal("fixture.png", retainedFile);

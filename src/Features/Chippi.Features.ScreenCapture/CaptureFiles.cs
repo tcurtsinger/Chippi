@@ -27,6 +27,14 @@ public static class CaptureFiles
         return done.Task;
     }
 
+    internal static byte[] Thumbnail(BitmapSource pixels)
+    {
+        double scale = Math.Min(1, 240d / pixels.PixelWidth);
+        var image = new TransformedBitmap(pixels, new ScaleTransform(scale, scale));
+        var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(image));
+        using var stream = new MemoryStream(); encoder.Save(stream);
+        return stream.ToArray();
+    }
     public static string DefaultFolder => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "Screenshots");
 
     public static string Save(BitmapSource flattened, string folder, CaptureFileType type, DateTimeOffset time)

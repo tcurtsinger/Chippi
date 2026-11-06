@@ -258,14 +258,22 @@ public partial class App : Application
         // [Phase 7] Displays and brightness: replaces its catalog placeholder.
         shell.Registry.Register(new Chippi.Features.Displays.DisplaysModule());
 
-        shell.Registry.Register(new Chippi.Features.ScreenCapture.ScreenCaptureModule(shell.Capture));
+
         var windowLayouts = new Chippi.Features.WindowLayouts.WindowLayoutsModule(SnapDisplaySource.Connected);
         windowLayouts.PointerDisplayId = SnapDisplaySource.PointerId;
         windowLayouts.CreateArrangementDesktop = context => new ArrangementDesktop(context.Actions!,
             () => shell.Config.GetSection<AppSettings>(AppSettings.SectionName).PauseRules(), () => windowLayouts.ArrangementsLocked);
         shell.Registry.Register(windowLayouts);
         // [Phase 7] Text and QR: on the capture layer.
-        shell.Registry.Register(new Chippi.Features.ScreenText.ScreenTextModule(shell.Capture));
+        var screenText = new Chippi.Features.ScreenText.ScreenTextModule(shell.Capture);
+        shell.Registry.Register(screenText);
+        var screenCapture = new Chippi.Features.ScreenCapture.ScreenCaptureModule(shell.Capture)
+        {
+            TextAvailable = () => shell.Registry.Find("screen-text")?.IsRunning == true,
+            ReadText = (image, qr) => screenText.ReadSelectionAsync(image, qr ? Chippi.Features.ScreenText.ScreenTextVerb.ScanQr : Chippi.Features.ScreenText.ScreenTextVerb.CopyText),
+        };
+        shell.Registry.Register(screenCapture);
+        shell.Registry.Changed += (_, _) => Dispatcher.BeginInvoke(screenCapture.RefreshProviders);
         // [Phase 7] Color picker: on the capture layer.
         shell.Registry.Register(new Chippi.Features.ColorPicker.ColorPickerModule(shell.Capture));
         if (shell.Services.Actions is Chippi.UI.Actions.WindowsActionPc windowPc)

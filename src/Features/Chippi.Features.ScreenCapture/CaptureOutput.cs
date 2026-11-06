@@ -7,6 +7,7 @@ namespace Chippi.Features.ScreenCapture;
 
 public sealed record CaptureOutputResult(bool Copied, bool Saved, bool CopyFailed, bool SaveFailed, bool RecentFailed)
 {
+    public string? SavedFile { get; init; }
     public string Title => (Copied, Saved, CopyFailed, SaveFailed) switch
     {
         (true, _, _, true) => "Copied. Save failed",
@@ -74,7 +75,7 @@ public sealed class CaptureOutput(
                 catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException or Microsoft.Data.Sqlite.SqliteException)
                 { recentFailed = true; }
             }
-            return new(_copied, _saved, wantsCopy && !_copied, wantsSave && !_saved, recentFailed);
+            return new(_copied, _saved, wantsCopy && !_copied, wantsSave && !_saved, recentFailed) { SavedFile = _savedFile };
         }
         finally { _busy = false; }
     }

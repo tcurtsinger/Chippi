@@ -99,10 +99,7 @@ public sealed class RecentCaptureStore : IDisposable
         CaptureFiles.SaveAs(flattened, Path.Combine(_folder, name), CaptureFileType.Png, true);
         var entry = new RecentCapture(draftId, name, time, flattened.PixelWidth, flattened.PixelHeight, savedFile ?? previous.FirstOrDefault(x => x.Id == draftId)?.SavedFile,
             savedFile != null ? CaptureSavedFile.Identity(savedFile) : previous.FirstOrDefault(x => x.Id == draftId)?.SavedIdentity);
-        double scale = Math.Min(1, 240d / flattened.PixelWidth);
-        var thumbnail = new TransformedBitmap(flattened, new ScaleTransform(scale, scale));
-        var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(thumbnail));
-        using var stream = new MemoryStream(); encoder.Save(stream);
+        var thumbnail = CaptureFiles.Thumbnail(flattened);
         using var transaction = _database.Connection.BeginTransaction();
         foreach (var old in previous.Where(x => x.Id == draftId)) DeleteRow(old.Id, transaction);
         using var insert = _database.Connection.CreateCommand(); insert.Transaction = transaction;
@@ -110,7 +107,7 @@ public sealed class RecentCaptureStore : IDisposable
         long row = (long)insert.ExecuteScalar()!;
         using var update = _database.Connection.CreateCommand(); update.Transaction = transaction;
         update.CommandText = "UPDATE captures SET entry=$entry,thumbnail=$thumbnail WHERE id=$id";
-        update.Parameters.AddWithValue("$id", row); update.Parameters.AddWithValue("$entry", _database.Seal(JsonSerializer.SerializeToUtf8Bytes(entry), "captures", row)); update.Parameters.AddWithValue("$thumbnail", _database.Seal(stream.ToArray(), "thumbnails", row)); update.ExecuteNonQuery();
+        update.Parameters.AddWithValue("$id", row); update.Parameters.AddWithValue("$entry", _database.Seal(JsonSerializer.SerializeToUtf8Bytes(entry), "captures", row)); update.Parameters.AddWithValue("$thumbnail", _database.Seal(thumbnail, "thumbnails", row)); update.ExecuteNonQuery();
         var evicted = previous.Where(x => x.Id != draftId).Skip(49).ToArray();
         foreach (var old in evicted) DeleteRow(old.Id, transaction);
         transaction.Commit();

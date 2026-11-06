@@ -328,6 +328,12 @@ public sealed class ScreenTextModule : IFeatureModule
         };
     }
 
+    /// <summary>Consumes Screen capture's composed selection without starting another capture.</summary>
+    public Task ReadSelectionAsync(CapturedImage image, ScreenTextVerb verb)
+    {
+        if (_context == null) return Task.CompletedTask;
+        return Work = verb == ScreenTextVerb.ScanQr ? ScanAsync(image) : ReadAsync(image, copy: verb == ScreenTextVerb.CopyText);
+    }
     private void Retry()
     {
         if (_lastImage is { } image) Work = ReadAsync(image, copy: false);

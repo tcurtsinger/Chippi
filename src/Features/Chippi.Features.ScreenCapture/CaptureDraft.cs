@@ -99,6 +99,7 @@ public sealed class CaptureDraft
     private readonly Stack<State> _undo = new(), _redo = new();
     private State _state;
     public Int32Rect Crop => _state.Crop;
+    internal bool IsCropped => Crop != new Int32Rect(0, 0, _source.PixelWidth, _source.PixelHeight);
     public bool CanUndo => _undo.Count > 0;
     public bool CanRedo => _redo.Count > 0;
     public IReadOnlyList<MarkupObject> Objects => Array.AsReadOnly(_state.Objects);
