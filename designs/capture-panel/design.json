@@ -1,0 +1,8 @@
+{
+  "title": "Capture panel",
+  "for": "The Capture tile's page on the island: start a capture mode, open a tool, reopen a recent capture.",
+  "knobs": [
+    "--radius-island-card",
+    "--island-accent"
+  ]
+}

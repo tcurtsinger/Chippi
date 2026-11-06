@@ -1,0 +1,8 @@
+{
+  "title": "Settings › Shortcuts",
+  "for": "The one place every shortcut is set: each feature's keys, Record, and the ones Travis adds.",
+  "knobs": [
+    "--radius-card",
+    "--accent"
+  ]
+}

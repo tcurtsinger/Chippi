@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Capture panel, v2: Region leads</title>
+<link rel="stylesheet" href="../tokens.css">
+<style>
+:root{--wall-1:#2C3E57;--wall-2:#1B2838;--ink-red:#E5484D;--ink-yellow:#FFC53D;--ink-green:#30A46C;--ink-blue:#0090FF;--ink-violet:#7444F0;--ink-black:#1A1A1A;--ink-white:#FFFFFF;--ink-gray:#8B8D98;--sample:#7C5CFF}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font-family:var(--font-text);font-variant-numeric:tabular-nums;background:var(--window);color:var(--text);-webkit-font-smoothing:antialiased}
+button,input{font:inherit;color:inherit;margin:0}
+svg.g{width:var(--s,16px);height:var(--s,16px);fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;flex:none;display:block}
+:focus-visible{outline:2px solid var(--focus-ring);outline-offset:1px}
+.page{padding:28px 16px 40px}
+.pic-doc{background:linear-gradient(180deg,var(--window) 0 18%,var(--card) 18%)}
+.pic-term{background:linear-gradient(90deg,var(--window) 0 30%,var(--card) 30%)}
+.pic-desk{background:linear-gradient(135deg,var(--wall-1),var(--wall-2))}
+.pic-site{background:linear-gradient(180deg,var(--ink-violet) 0 40%,var(--card) 40%)}
+.intro{max-width:900px;padding:0 4px}
+.intro h1{font-family:var(--font-display);font-size:20px;line-height:28px;font-weight:600;margin:0}
+.intro p{font-size:14px;line-height:20px;color:var(--text-secondary);margin:6px 0 0;max-width:80ch;text-wrap:pretty}
+.stages{display:flex;flex-wrap:wrap;gap:24px;margin-top:24px;align-items:flex-start}
+.stage{background:var(--window);color:var(--island-text);padding:16px;border-radius:var(--radius-card);border:1px solid var(--divider);min-width:0}
+.stage>h2{font-size:12px;line-height:16px;font-weight:600;color:var(--text-secondary);margin:0 0 12px;max-width:560px;text-wrap:pretty}
+.stage.wide>h2{max-width:900px}
+.row{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start}
+.cap{font-size:12px;line-height:16px;color:var(--text-secondary);margin:0 0 6px;max-width:440px}
+@media (max-width:1199px){.stage.wide .zoom{zoom:.78}}
+@media (max-width:900px){.stage.wide .zoom{zoom:.6}}
+@media (max-width:640px){.page{padding:20px 8px}.stage{padding:10px}.stage .izoom{zoom:.62}.stage.wide .zoom{zoom:.29}}
+
+.panel{position:relative;width:520px;height:360px;padding:12px;background:var(--island);border:1px solid var(--island-border);border-radius:var(--radius-island);box-shadow:0 16px 40px rgba(0,0,0,.32);color:var(--island-text);font-size:12px;line-height:16px;overflow:hidden}
+.phdr{display:flex;align-items:center;height:24px;margin-bottom:8px;gap:6px}
+.phdr h3{flex:1;margin:0;font-size:13px;font-weight:600;line-height:20px;white-space:nowrap}
+.ib{width:28px;height:24px;display:inline-flex;align-items:center;justify-content:center;border:0;padding:0;border-radius:var(--radius-control);background:transparent;color:var(--island-text-secondary);flex:none;cursor:pointer}
+.ib:hover{background:var(--island-hover)}
+.ib.back{margin:0 0 0 -4px}
+.pbody{position:relative;width:494px;height:302px}
+.ibtn{height:28px;padding:0 10px;border-radius:var(--radius-control);border:1px solid var(--island-control-border);background:var(--island-button);font-size:12px;color:var(--island-text);white-space:nowrap;display:inline-flex;align-items:center;gap:6px;min-width:64px;justify-content:center;flex:none;cursor:pointer}
+.ibtn:hover{background:var(--island-button-hover)}
+.ibtn .g{color:var(--island-text-secondary)}
+.ibtn.acc{background:var(--island-accent-fill);border-color:transparent;color:var(--island-on-accent);font-weight:600}
+.ibtn.acc .g{color:var(--island-on-accent)}
+.ibtn.sm{height:24px;min-width:0;padding:0 8px;font-size:11px}
+.seg{display:inline-flex;height:24px;border-radius:var(--radius-control);background:var(--island-hover);padding:2px;gap:2px;font-size:11px}
+.seg button{border:0;background:transparent;padding:0 8px;border-radius:3px;display:flex;align-items:center;color:var(--island-text-secondary);cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--island-button);color:var(--island-text);font-weight:600;box-shadow:0 0 0 1px var(--island-control-border)}
+.combo{height:24px;padding:0 6px 0 8px;border-radius:var(--radius-control);border:1px solid var(--island-control-border);background:var(--island-button);display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--island-text);white-space:nowrap;cursor:pointer}
+.combo[aria-expanded="true"]{border-color:var(--island-accent)}
+.menu{position:absolute;z-index:3;padding:4px;border-radius:var(--radius-card);background:var(--flyout);box-shadow:0 0 0 1px var(--island-border),0 8px 24px rgba(0,0,0,.35);font-size:12px;min-width:132px;color:var(--island-text)}
+.menu div{height:30px;display:flex;align-items:center;gap:8px;padding:0 10px;border-radius:var(--radius-control);white-space:nowrap}
+.menu div[aria-selected="true"]{background:var(--island-accent-tint)}
+.menu .ck{width:14px;color:var(--island-accent)}
+.tip{position:absolute;z-index:3;padding:6px 8px;border-radius:var(--radius-control);background:var(--flyout);box-shadow:0 0 0 1px var(--island-border),0 4px 12px rgba(0,0,0,.3);font-size:12px;white-space:nowrap;color:var(--island-text)}
+.card{border:1px solid var(--island-card-border);border-radius:var(--radius-island-card);background:var(--island-gallery-face)}
+.sub{display:flex;align-items:center;height:28px;margin-top:12px}
+.sub h4{flex:1;margin:0;font-size:12px;font-weight:600}
+.foot{position:absolute;left:0;right:0;bottom:0;display:flex;gap:8px;justify-content:flex-end;align-items:center}
+.foot .l{margin-right:auto;display:flex;gap:6px;align-items:center}
+.t2{color:var(--island-text-secondary)}
+.t3{color:var(--island-text-tertiary);font-size:11px}
+.cau{color:var(--island-caution)}
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:var(--island-text-tertiary);font-size:12px}
+.kc{height:20px;min-width:20px;padding:0 6px;border-radius:var(--radius-control);border:1px solid var(--island-control-border);font-size:11px;display:inline-flex;align-items:center;justify-content:center;color:var(--island-text-secondary);white-space:nowrap}
+.th{min-width:0}
+.th .img{height:66px;border-radius:var(--radius-island-card);border:1px solid var(--island-hair);overflow:hidden}
+.th .n{font-size:11px;line-height:14px;color:var(--island-text-secondary);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.th .m{font-size:11px;line-height:14px;color:var(--island-text-tertiary)}
+
+.slider{flex:1;height:18px;position:relative}
+.slider::before{content:"";position:absolute;left:0;right:0;top:7px;height:4px;border-radius:2px;background:var(--island-track)}
+.slider i{position:absolute;left:0;top:7px;height:4px;border-radius:2px;background:var(--island-accent-fill)}
+.slider b,.vslider b{position:absolute;width:18px;height:18px;border-radius:9px;background:radial-gradient(circle,var(--island-accent) 0 5px,var(--island-thumb) 5.5px);box-shadow:0 0 0 1px var(--island-control-border),0 1px 3px rgba(0,0,0,.3)}
+.slider b{top:0;margin-left:-9px}
+.vslider{position:relative;width:18px}
+.vslider::before{content:"";position:absolute;left:7px;top:0;bottom:0;width:4px;border-radius:2px;background:var(--island-track)}
+.vslider i{position:absolute;left:7px;bottom:0;width:4px;border-radius:2px;background:var(--island-accent-fill)}
+.vslider b{left:0;margin-bottom:-9px}
+/* the bar, 256 x 50 */
+.desk{background:linear-gradient(135deg,var(--wall-1),var(--wall-2));padding:16px 20px;border-radius:2px}
+.bar{width:256px;height:50px;border-radius:25px;background:var(--island);box-shadow:0 0 0 1px var(--island-widget-border),0 6px 16px rgba(0,0,0,.35);display:flex;align-items:center;color:var(--island-text);padding:0 0 0 8px;gap:10px}
+.bar .lead{width:34px;height:34px;border-radius:17px;background:var(--island-accent-tint);color:var(--island-accent);display:flex;align-items:center;justify-content:center;flex:none;overflow:hidden}
+.bar .lead.cau{background:color-mix(in srgb,var(--island-caution) 16%,transparent);color:var(--island-caution)}
+.bar .lines{flex:1;min-width:0;display:flex;flex-direction:column}
+.bar .bt{font-size:13px;font-weight:600;line-height:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar .bt.cau{color:var(--island-caution)}
+.bar .ba{font-size:12px;line-height:15px;color:var(--island-text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar img{width:34px;height:34px;margin-right:8px;flex:none}
+
+
+.grid6{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}
+.cc{height:64px;border:1px solid var(--island-card-border);border-radius:var(--radius-island-card);background:var(--island-gallery-face);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;color:var(--island-text-secondary);font-size:12px;position:relative;cursor:pointer;padding:0 2px;min-width:0}
+.cc span{color:var(--island-text);white-space:nowrap}
+.cc:hover,.cc.hov{background:var(--island-gallery-hover)}
+.cc.foc{outline:2px solid var(--focus-ring);outline-offset:1px}
+.cc .g{--s:20px}
+.thumbs{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:4px}
+/* v2 */
+.lead-region{width:100%;height:76px;border:0;border-radius:var(--radius-island-card);background:var(--island-accent-tint);color:var(--island-text);display:flex;align-items:center;gap:14px;padding:0 18px;cursor:pointer;text-align:left}
+.lead-region .g{--s:28px;color:var(--island-accent)}
+.lead-region:hover{background:color-mix(in srgb,var(--island-accent) 22%,transparent)}
+.lead-region b{display:block;font-size:16px;line-height:22px}
+.lead-region small{font-size:12px;opacity:.85}
+.lead-region .kc{margin-left:auto;height:24px;font-size:12px;padding:0 8px}
+.mrow{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:8px}
+.mb{height:34px;border:1px solid var(--island-card-border);border-radius:var(--radius-control);background:var(--island-gallery-face);display:flex;align-items:center;justify-content:center;gap:6px;font-size:12px;color:var(--island-text);cursor:pointer;white-space:nowrap;padding:0 4px;min-width:0}
+.mb .g{color:var(--island-text-secondary);--s:14px}
+.mb:hover{background:var(--island-gallery-hover)}
+.trow{display:flex;gap:6px;margin-top:8px;align-items:center}
+.trow .mb{flex:1}
+.thumbs.big{grid-template-columns:repeat(4,1fr)}
+.thumbs.big .img{height:74px}
+/* v3 */
+.cols{display:grid;grid-template-columns:236px 1fr;gap:14px;height:100%}
+.lh{font-size:11px;line-height:16px;font-weight:600;color:var(--island-text-tertiary);margin:0 0 4px;padding:0 8px}
+.list{display:flex;flex-direction:column;gap:2px}
+.li{height:34px;display:flex;align-items:center;gap:10px;padding:0 8px;border-radius:var(--radius-control);border:0;background:transparent;color:var(--island-text);font-size:13px;cursor:pointer;text-align:left;width:100%}
+.li .g{color:var(--island-text-secondary)}
+.li:hover,.li.hov{background:var(--island-hover)}
+.li.first{background:var(--island-accent-tint)}
+.li.first .g{color:var(--island-accent)}
+.li .nm{flex:1}
+.tg{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.tg .cc{height:52px;font-size:11px;gap:4px}
+.tg .cc .g{--s:18px}
+.tg.full .cc{height:48px}
+.rl{display:flex;flex-direction:column;gap:2px}
+.rli{height:34px;display:flex;align-items:center;gap:10px;padding:0 6px;border-radius:var(--radius-control)}
+.rli .img{width:44px;height:28px;border-radius:3px;border:1px solid var(--island-hair);flex:none}
+.rli .n{flex:1;min-width:0;font-size:12px;line-height:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rli .m{font-size:11px;color:var(--island-text-tertiary);white-space:nowrap}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<!-- Lucide glyphs (ISC), from lucide-react 1.35.0 and Chippi's LucideIcons.cs -->
+<symbol id="i-app-window" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M10 4v4"/><path d="M2 8h20"/><path d="M6 4v4"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+<symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+<symbol id="i-chevron-left" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+<symbol id="i-film" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M7 3v18"/><path d="M3 7.5h4"/><path d="M3 12h18"/><path d="M3 16.5h4"/><path d="M17 3v18"/><path d="M17 7.5h4"/><path d="M17 16.5h4"/></symbol>
+<symbol id="i-image" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></symbol>
+<symbol id="i-images" viewBox="0 0 24 24"><path d="m22 11-1.296-1.296a2.4 2.4 0 0 0-3.408 0L11 16"/><path d="M4 8a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2"/><circle cx="13" cy="7" r="1" fill="currentColor"/><rect x="8" y="2" width="14" height="14" rx="2"/></symbol>
+<symbol id="i-lasso" viewBox="0 0 24 24"><path d="M3.704 14.467a10 8 0 1 1 3.115 2.375"/><path d="M7 22a5 5 0 0 1-2-3.994"/><circle cx="5" cy="16" r="2"/></symbol>
+<symbol id="i-monitor" viewBox="0 0 24 24"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></symbol>
+<symbol id="i-pipette" viewBox="0 0 24 24"><path d="m12 9-8.414 8.414A2 2 0 0 0 3 18.828v1.344a2 2 0 0 1-.586 1.414A2 2 0 0 1 3.828 21h1.344a2 2 0 0 0 1.414-.586L15 12"/><path d="m18 9 .4.4a1 1 0 1 1-3 3l-3.8-3.8a1 1 0 1 1 3-3l.4.4 3.4-3.4a1 1 0 1 1 3 3z"/><path d="m2 22 .414-.414"/></symbol>
+<symbol id="i-qr-code" viewBox="0 0 24 24"><rect width="5" height="5" x="3" y="3" rx="1"/><rect width="5" height="5" x="16" y="3" rx="1"/><rect width="5" height="5" x="3" y="16" rx="1"/><path d="M21 16h-3a2 2 0 0 0-2 2v3"/><path d="M21 21v.01"/><path d="M12 7v3a2 2 0 0 1-2 2H7"/><path d="M3 12h.01"/><path d="M12 3h.01"/><path d="M12 16v.01"/><path d="M16 12h1"/><path d="M21 12v.01"/><path d="M12 21v-1"/></symbol>
+<symbol id="i-rotate-ccw-clock" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></symbol>
+<symbol id="i-scan-text" viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 8h8"/><path d="M7 12h10"/><path d="M7 16h6"/></symbol>
+<symbol id="i-screens" viewBox="0 0 24 24"><path d="M8,3 h12 a2,2 0 0 1 2,2 v8 a2,2 0 0 1 -2,2 h-2 M4,7 h10 a2,2 0 0 1 2,2 v7 a2,2 0 0 1 -2,2 H4 a2,2 0 0 1 -2,-2 V9 a2,2 0 0 1 2,-2 Z M6,22 h6 M9,18 v4"/></symbol>
+<symbol id="i-square-dashed" viewBox="0 0 24 24"><path d="M5 3a2 2 0 0 0-2 2"/><path d="M19 3a2 2 0 0 1 2 2"/><path d="M21 19a2 2 0 0 1-2 2"/><path d="M5 21a2 2 0 0 1-2-2"/><path d="M9 3h1"/><path d="M9 21h1"/><path d="M14 3h1"/><path d="M14 21h1"/><path d="M3 9v1"/><path d="M21 9v1"/><path d="M3 14v1"/><path d="M21 14v1"/></symbol>
+<symbol id="i-timer" viewBox="0 0 24 24"><line x1="10" x2="14" y1="2" y2="2"/><line x1="12" x2="15" y1="14" y2="11"/><circle cx="12" cy="14" r="8"/></symbol>
+<symbol id="i-video" viewBox="0 0 24 24"><path d="m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5"/><rect x="2" y="6" width="14" height="12" rx="2"/></symbol>
+</svg>
+<main class="page">
+<header class="intro" data-id="intro"><h1 data-id="title">Capture panel, v2: Region leads</h1><p>Lightshot-lean. Region is the one most people want, so it's a single wide button with its key, and the other five modes sit in a row of small buttons under it. Tools follow, then Recent.</p><p>The island panel at its real size, 520 × 360. Only installed tools show (wave 1: Text, QR code, Color). Recent shows the last four finished captures; Settings shows all 50. Nothing on the panel scrolls.</p><p>Pick this one if most captures start from the panel rather than from Print Screen.</p></header>
+<div class="stages">
+<section class="stage dark" data-id="panel"><h2 data-id="panel-heading">Wave 1 installed: Text, QR code and Color; Recent shows the last four</h2>
+<div class="izoom"><div class="panel" role="dialog" aria-label="Capture" data-id="panel-panel"><div class="phdr" data-id="panel-header"><button class="ib back" aria-label="Back" title="Back" data-id="panel-back"><svg class="g" style="--s:16px" aria-hidden="true"><use href="#i-chevron-left"/></svg></button><h3 data-id="panel-page-title">Capture</h3><button class="combo" aria-haspopup="listbox" aria-expanded="false" aria-label="Delay" data-id="panel-delay"><svg class="g" style="--s:12px" aria-hidden="true"><use href="#i-timer"/></svg>No delay <svg class="g" style="--s:12px" aria-hidden="true"><use href="#i-chevron-down"/></svg></button></div><div class="pbody"><button class="lead-region" data-id="panel-region"><svg class="g" style="--s:28px" aria-hidden="true"><use href="#i-square-dashed"/></svg><b>Region</b><span class="kc">PrtSc</span></button><div class="mrow" data-id="panel-modes"><button class="mb" data-id="panel-mode-window"><svg class="g" style="--s:14px" aria-hidden="true"><use href="#i-app-window"/></svg>Window</button><button class="mb" data-id="panel-mode-screen"><svg class="g" style="--s:14px" aria-hidden="true"><use href="#i-monitor"/></svg>Screen</button><button class="mb" data-id="panel-mode-all-displays"><svg class="g" style="--s:14px" aria-hidden="true"><use href="#i-screens"/></svg>All displays</button><button class="mb" data-id="panel-mode-freeform"><svg class="g" style="--s:14px" aria-hidden="true"><use href="#i-lasso"/></svg>Freeform</button><button class="mb" data-id="panel-mode-last-region"><svg class="g" style="--s:14px" aria-hidden="true"><use href="#i-rotate-ccw-clock"/></svg>Last region</button></div><div class="trow" data-id="panel-tools"><button class="mb" data-id="panel-tool-text"><svg class="g" style="--s:14px" aria-hidden="true"><use href="#i-scan-text"/></svg>Text</button><button class="mb" data-id="panel-tool-qr-code"><svg class="g" style="--s:14px" aria-hidden="true"><use href="#i-qr-code"/></svg>QR code</button><button class="mb" data-id="panel-tool-color"><svg class="g" style="--s:14px" aria-hidden="true"><use href="#i-pipette"/></svg>Color</button></div><div class="sub" style="margin-top:10px" data-id="panel-recent-heading"><h4>Recent</h4><button class="ibtn sm" data-id="panel-open-folder">Open folder</button></div><div class="thumbs" data-id="panel-recent"><div class="th" data-id="panel-recent-region-1280-720"><div class="img pic-doc light"></div><div class="n">Region · 1280 × 720</div><div class="m">2 min ago</div></div><div class="th" data-id="panel-recent-window-terminal"><div class="img pic-term dark"></div><div class="n">Window · Terminal</div><div class="m">9 min ago</div></div><div class="th" data-id="panel-recent-screen-3440-1440"><div class="img pic-desk light"></div><div class="n">Screen · 3440 × 1440</div><div class="m">Yesterday</div></div><div class="th" data-id="panel-recent-freeform-612-488"><div class="img pic-site light"></div><div class="n">Freeform · 612 × 488</div><div class="m">Yesterday</div></div></div></div></div></div></section>
+
+<section class="stage light" data-id="panel-light"><h2>Wave 1 installed: Text, QR code and Color; Recent shows the last four · Light</h2>
+<div class="izoom"><div class="panel" role="dialog" aria-label="Capture"><div class="phdr"><button class="ib back" aria-label="Back" title="Back"><svg class="g" style="--s:16px" aria-hidden="true"><use href="#i-chevron-left"/></svg></button><h3>Capture</h3><button class="combo" aria-haspopup="listbox" aria-expanded="false" aria-label="Delay"><svg class="g" style="--s:12px" aria-hidden="true"><use href="#i-timer"/></svg>No delay <svg class="g" style="--s:12px" aria-hidden="true"><use href="#i-chevron-down"/></svg></button></div><div class="pbody"><button class="lead-region"><svg class="g" style="--s:28px" aria-hidden="true"><use href="#i-square-dashed"/></svg><b>Region</b><span class="kc">PrtSc</span></button><div class="mrow"><button class="mb"><svg class="g" style="--s:14px" aria-hidden="true"><use href="#i-app-window"/></svg>Window</button><button class="mb"><svg class="g" style="--s:14px" aria-hidden="true"><use href="#i-monitor"/></svg>Screen</button><button class="mb"><svg class="g" style="--s:14px" aria-hidden="true"><use href="#i-screens"/></svg>All displays</button><button class="mb"><svg class="g" style="--s:14px" aria-hidden="true"><use href="#i-lasso"/></svg>Freeform</button><button class="mb"><svg class="g" style="--s:14px" aria-hidden="true"><use href="#i-rotate-ccw-clock"/></svg>Last region</button></div><div class="trow"><button class="mb"><svg class="g" style="--s:14px" aria-hidden="true"><use href="#i-scan-text"/></svg>Text</button><button class="mb"><svg class="g" style="--s:14px" aria-hidden="true"><use href="#i-qr-code"/></svg>QR code</button><button class="mb"><svg class="g" style="--s:14px" aria-hidden="true"><use href="#i-pipette"/></svg>Color</button></div><div class="sub" style="margin-top:10px"><h4>Recent</h4><button class="ibtn sm">Open folder</button></div><div class="thumbs"><div class="th"><div class="img pic-doc light"></div><div class="n">Region · 1280 × 720</div><div class="m">2 min ago</div></div><div class="th"><div class="img pic-term dark"></div><div class="n">Window · Terminal</div><div class="m">9 min ago</div></div><div class="th"><div class="img pic-desk light"></div><div class="n">Screen · 3440 × 1440</div><div class="m">Yesterday</div></div><div class="th"><div class="img pic-site light"></div><div class="n">Freeform · 612 × 488</div><div class="m">Yesterday</div></div></div></div></div></div></section>
+
+<section class="stage dark" data-id="first-use"><h2 data-id="first-use-heading">First use: no captures yet</h2>
+<div class="izoom"><div class="panel" role="dialog" aria-label="Capture" data-id="first-use-panel"><div class="phdr" data-id="first-use-header"><button class="ib back" aria-label="Back" title="Back" data-id="first-use-back"><svg class="g" style="--s:16px" aria-hidden="true"><use href="#i-chevron-left"/></svg></button><h3 data-id="first-use-page-title">Capture</h3><button class="combo" aria-haspopup="listbox" aria-expanded="false" aria-label="Delay" data-id="first-use-delay"><svg class="g" style="--s:12px" aria-hidden="true"><use href="#i-timer"/></svg>No delay <svg class="g" style="--s:12px" aria-hidden="true"><use href="#i-chevron-down"/></svg></button></div><div class="pbody"><button class="lead-region" data-id="first-use-region"><svg class="g" style="--s:28px" aria-hidden="true"><use href="#i-square-dashed"/></svg><b>Region</b><span class="kc">PrtSc</span></button><div class="mrow" data-id="first-use-modes"><button class="mb" data-id="first-use-mode-window"><svg class="g" style="--s:14px" aria-hidden="true"><use href="#i-app-window"/></svg>Window</button><button class="mb" data-id="first-use-mode-screen"><svg class="g" style="--s:14px" aria-hidden="true"><use href="#i-monitor"/></svg>Screen</button><button class="mb" data-id="first-use-mode-all-displays"><svg class="g" style="--s:14px" aria-hidden="true"><use href="#i-screens"/></svg>All displays</button><button class="mb" data-id="first-use-mode-freeform"><svg class="g" style="--s:14px" aria-hidden="true"><use href="#i-lasso"/></svg>Freeform</button><button class="mb" data-id="first-use-mode-last-region"><svg class="g" style="--s:14px" aria-hidden="true"><use href="#i-rotate-ccw-clock"/></svg>Last region</button></div><div class="trow" data-id="first-use-tools"><button class="mb" data-id="first-use-tool-text"><svg class="g" style="--s:14px" aria-hidden="true"><use href="#i-scan-text"/></svg>Text</button><button class="mb" data-id="first-use-tool-qr-code"><svg class="g" style="--s:14px" aria-hidden="true"><use href="#i-qr-code"/></svg>QR code</button><button class="mb" data-id="first-use-tool-color"><svg class="g" style="--s:14px" aria-hidden="true"><use href="#i-pipette"/></svg>Color</button></div><div class="sub" data-id="first-use-recent-heading"><h4>Recent</h4></div><div class="card empty" style="height:92px;margin-top:4px" data-id="first-use-no-captures"><svg class="g" style="--s:24px" aria-hidden="true"><use href="#i-image"/></svg>No captures yet</div></div></div></div></section>
+
+<section class="stage dark" data-id="delay"><h2 data-id="delay-heading">Delay open: the next mode waits 3 seconds, and the choice is kept</h2>
+<div class="izoom"><div class="panel" role="dialog" aria-label="Capture" data-id="delay-panel"><div class="phdr" data-id="delay-header"><button class="ib back" aria-label="Back" title="Back" data-id="delay-back"><svg class="g" style="--s:16px" aria-hidden="true"><use href="#i-chevron-left"/></svg></button><h3 data-id="delay-page-title">Capture</h3><button class="combo" aria-haspopup="listbox" aria-expanded="true" aria-label="Delay" data-id="delay-delay"><svg class="g" style="--s:12px" aria-hidden="true"><use href="#i-timer"/></svg>3 seconds <svg class="g" style="--s:12px" aria-hidden="true"><use href="#i-chevron-down"/></svg></button></div><div class="pbody"><div class="menu" role="listbox" style="right:0;top:-6px" data-id="delay-delay-menu"><div role="option" aria-selected="false" data-id="delay-delay-no-delay"><span class="ck"></span>No delay</div><div role="option" aria-selected="true" data-id="delay-delay-3-seconds"><span class="ck"><svg class="g" style="--s:14px" aria-hidden="true"><use href="#i-check"/></svg></span>3 seconds</div><div role="option" aria-selected="false" data-id="delay-delay-5-seconds"><span class="ck"></span>5 seconds</div><div role="option" aria-selected="false" data-id="delay-delay-10-seconds"><span class="ck"></span>10 seconds</div></div><button class="lead-region" data-id="delay-region"><svg class="g" style="--s:28px" aria-hidden="true"><use href="#i-square-dashed"/></svg><b>Region</b><span class="kc">PrtSc</span></button><div class="mrow" data-id="delay-modes"><button class="mb" data-id="delay-mode-window"><svg class="g" style="--s:14px" aria-hidden="true"><use href="#i-app-window"/></svg>Window</button><button class="mb" data-id="delay-mode-screen"><svg class="g" style="--s:14px" aria-hidden="true"><use href="#i-monitor"/></svg>Screen</button><button class="mb" data-id="delay-mode-all-displays"><svg class="g" style="--s:14px" aria-hidden="true"><use href="#i-screens"/></svg>All displays</button><button class="mb" data-id="delay-mode-freeform"><svg class="g" style="--s:14px" aria-hidden="true"><use href="#i-lasso"/></svg>Freeform</button><button class="mb" data-id="delay-mode-last-region"><svg class="g" style="--s:14px" aria-hidden="true"><use href="#i-rotate-ccw-clock"/></svg>Last region</button></div><div class="trow" data-id="delay-tools"><button class="mb" data-id="delay-tool-text"><svg class="g" style="--s:14px" aria-hidden="true"><use href="#i-scan-text"/></svg>Text</button><button class="mb" data-id="delay-tool-qr-code"><svg class="g" style="--s:14px" aria-hidden="true"><use href="#i-qr-code"/></svg>QR code</button><button class="mb" data-id="delay-tool-color"><svg class="g" style="--s:14px" aria-hidden="true"><use href="#i-pipette"/></svg>Color</button></div><div class="sub" style="margin-top:10px" data-id="delay-recent-heading"><h4>Recent</h4><button class="ibtn sm" data-id="delay-open-folder">Open folder</button></div><div class="thumbs" data-id="delay-recent"><div class="th" data-id="delay-recent-region-1280-720"><div class="img pic-doc light"></div><div class="n">Region · 1280 × 720</div><div class="m">2 min ago</div></div><div class="th" data-id="delay-recent-window-terminal"><div class="img pic-term dark"></div><div class="n">Window · Terminal</div><div class="m">9 min ago</div></div><div class="th" data-id="delay-recent-screen-3440-1440"><div class="img pic-desk light"></div><div class="n">Screen · 3440 × 1440</div><div class="m">Yesterday</div></div><div class="th" data-id="delay-recent-freeform-612-488"><div class="img pic-site light"></div><div class="n">Freeform · 612 × 488</div><div class="m">Yesterday</div></div></div></div></div></div></section>
+
+<section class="stage dark" data-id="pointed"><h2 data-id="pointed-heading">A mode pointed at: Window lights; its tooltip names the verb</h2>
+<div class="izoom"><div class="panel" role="dialog" aria-label="Capture" data-id="pointed-panel"><div class="phdr" data-id="pointed-header"><button class="ib back" aria-label="Back" title="Back" data-id="pointed-back"><svg class="g" style="--s:16px" aria-hidden="true"><use href="#i-chevron-left"/></svg></button><h3 data-id="pointed-page-title">Capture</h3><button class="combo" aria-haspopup="listbox" aria-expanded="false" aria-label="Delay" data-id="pointed-delay"><svg class="g" style="--s:12px" aria-hidden="true"><use href="#i-timer"/></svg>3 seconds <svg class="g" style="--s:12px" aria-hidden="true"><use href="#i-chevron-down"/></svg></button></div><div class="pbody"><button class="lead-region" data-id="pointed-region"><svg class="g" style="--s:28px" aria-hidden="true"><use href="#i-square-dashed"/></svg><b>Region</b><span class="kc">PrtSc</span></button><div class="mrow" data-id="pointed-modes"><button class="mb" data-id="pointed-mode-window"><svg class="g" style="--s:14px" aria-hidden="true"><use href="#i-app-window"/></svg>Window</button><button class="mb" data-id="pointed-mode-screen"><svg class="g" style="--s:14px" aria-hidden="true"><use href="#i-monitor"/></svg>Screen</button><button class="mb" data-id="pointed-mode-all-displays"><svg class="g" style="--s:14px" aria-hidden="true"><use href="#i-screens"/></svg>All displays</button><button class="mb" data-id="pointed-mode-freeform"><svg class="g" style="--s:14px" aria-hidden="true"><use href="#i-lasso"/></svg>Freeform</button><button class="mb" data-id="pointed-mode-last-region"><svg class="g" style="--s:14px" aria-hidden="true"><use href="#i-rotate-ccw-clock"/></svg>Last region</button></div><div class="trow" data-id="pointed-tools"><button class="mb" data-id="pointed-tool-text"><svg class="g" style="--s:14px" aria-hidden="true"><use href="#i-scan-text"/></svg>Text</button><button class="mb" data-id="pointed-tool-qr-code"><svg class="g" style="--s:14px" aria-hidden="true"><use href="#i-qr-code"/></svg>QR code</button><button class="mb" data-id="pointed-tool-color"><svg class="g" style="--s:14px" aria-hidden="true"><use href="#i-pipette"/></svg>Color</button></div><div class="sub" style="margin-top:10px" data-id="pointed-recent-heading"><h4>Recent</h4><button class="ibtn sm" data-id="pointed-open-folder">Open folder</button></div><div class="thumbs" data-id="pointed-recent"><div class="th" data-id="pointed-recent-region-1280-720"><div class="img pic-doc light"></div><div class="n">Region · 1280 × 720</div><div class="m">2 min ago</div></div><div class="th" data-id="pointed-recent-window-terminal"><div class="img pic-term dark"></div><div class="n">Window · Terminal</div><div class="m">9 min ago</div></div><div class="th" data-id="pointed-recent-screen-3440-1440"><div class="img pic-desk light"></div><div class="n">Screen · 3440 × 1440</div><div class="m">Yesterday</div></div><div class="th" data-id="pointed-recent-freeform-612-488"><div class="img pic-site light"></div><div class="n">Freeform · 612 × 488</div><div class="m">Yesterday</div></div></div><div class="tip" style="left:96px;top:126px">Capture window</div></div></div></div></section>
+
+<section class="stage dark" data-id="wave-2"><h2 data-id="wave-2-heading">With wave 2 installed: Record, GIF and Convert join after Color, so nothing moves</h2>
+<div class="izoom"><div class="panel" role="dialog" aria-label="Capture" data-id="wave-2-panel"><div class="phdr" data-id="wave-2-header"><button class="ib back" aria-label="Back" title="Back" data-id="wave-2-back"><svg class="g" style="--s:16px" aria-hidden="true"><use href="#i-chevron-left"/></svg></button><h3 data-id="wave-2-page-title">Capture</h3><button class="combo" aria-haspopup="listbox" aria-expanded="false" aria-label="Delay" data-id="wave-2-delay"><svg class="g" style="--s:12px" aria-hidden="true"><use href="#i-timer"/></svg>No delay <svg class="g" style="--s:12px" aria-hidden="true"><use href="#i-chevron-down"/></svg></button></div><div class="pbody"><button class="lead-region" data-id="wave-2-region"><svg class="g" style="--s:28px" aria-hidden="true"><use href="#i-square-dashed"/></svg><b>Region</b><span class="kc">PrtSc</span></button><div class="mrow" data-id="wave-2-modes"><button class="mb" data-id="wave-2-mode-window"><svg class="g" style="--s:14px" aria-hidden="true"><use href="#i-app-window"/></svg>Window</button><button class="mb" data-id="wave-2-mode-screen"><svg class="g" style="--s:14px" aria-hidden="true"><use href="#i-monitor"/></svg>Screen</button><button class="mb" data-id="wave-2-mode-all-displays"><svg class="g" style="--s:14px" aria-hidden="true"><use href="#i-screens"/></svg>All displays</button><button class="mb" data-id="wave-2-mode-freeform"><svg class="g" style="--s:14px" aria-hidden="true"><use href="#i-lasso"/></svg>Freeform</button><button class="mb" data-id="wave-2-mode-last-region"><svg class="g" style="--s:14px" aria-hidden="true"><use href="#i-rotate-ccw-clock"/></svg>Last region</button></div><div class="trow" data-id="wave-2-tools"><button class="mb" data-id="wave-2-tool-text"><svg class="g" style="--s:14px" aria-hidden="true"><use href="#i-scan-text"/></svg>Text</button><button class="mb" data-id="wave-2-tool-qr-code"><svg class="g" style="--s:14px" aria-hidden="true"><use href="#i-qr-code"/></svg>QR code</button><button class="mb" data-id="wave-2-tool-color"><svg class="g" style="--s:14px" aria-hidden="true"><use href="#i-pipette"/></svg>Color</button><button class="mb" data-id="wave-2-tool-record"><svg class="g" style="--s:14px" aria-hidden="true"><use href="#i-video"/></svg>Record</button><button class="mb" data-id="wave-2-tool-gif"><svg class="g" style="--s:14px" aria-hidden="true"><use href="#i-film"/></svg>GIF</button><button class="mb" data-id="wave-2-tool-convert"><svg class="g" style="--s:14px" aria-hidden="true"><use href="#i-images"/></svg>Convert</button></div><div class="sub" style="margin-top:10px" data-id="wave-2-recent-heading"><h4>Recent</h4><button class="ibtn sm" data-id="wave-2-open-folder">Open folder</button></div><div class="thumbs" data-id="wave-2-recent"><div class="th" data-id="wave-2-recent-region-1280-720"><div class="img pic-doc light"></div><div class="n">Region · 1280 × 720</div><div class="m">2 min ago</div></div><div class="th" data-id="wave-2-recent-window-terminal"><div class="img pic-term dark"></div><div class="n">Window · Terminal</div><div class="m">9 min ago</div></div><div class="th" data-id="wave-2-recent-screen-3440-1440"><div class="img pic-desk light"></div><div class="n">Screen · 3440 × 1440</div><div class="m">Yesterday</div></div><div class="th" data-id="wave-2-recent-freeform-612-488"><div class="img pic-site light"></div><div class="n">Freeform · 612 × 488</div><div class="m">Yesterday</div></div></div></div></div></div></section>
+</div>
+</main>
+</body>
+</html>

@@ -2,26 +2,23 @@
 
 ## Wave 1 (task 493, 2026-11-06)
 
-`wave-1.html` draws wave 1's screens against the approved map ([surfaces.md](../surfaces.md)) and Travis's decisions ([README.md](../README.md)). Sizes are real DIPs. Glyphs are Lucide's own, copied into `wave-1/lucide.js` (ISC); Screens is Chippi's. Every window, file and number is invented, except Travis's two monitors' names, which Settings › Snap already shows.
+The wave 1 mockups are SerenityOS designs in [`designs/`](../../../designs/) at the repo root (task 511, 2026-11-06): each has `now.html` for a screen that exists today, then `v1.html` (the board first drawn here in `wave-1.html`, now removed) and two versions that really differ. Each page links `designs/tokens.css` (the XAML themes' colors) and names its parts with `data-id`s for review notes. `designs/system.html` shows the tokens, type and real parts. They're drawn against the approved map ([surfaces.md](../surfaces.md)) and Travis's decisions ([README.md](../README.md)). Sizes are real DIPs, glyphs are Lucide's own or Chippi's `LucideIcons`, and every window, file and number is invented, except Travis's two monitors' names, which Settings › Snap already shows.
 
-- **Real renders:** `wave-1/home-12-{dark,light}.png` are the real island (`IslandGrid` in `Chippi.Island.Tests`), with stand-in Capture and Displays tiles carrying the final glyphs: Lucide `scan` for Capture (not in `LucideIcons` yet) and the app's `Sun` for Displays. The Settings boards follow a real `--settings-snapshot` of main `9a978b7`: the row heights, the Edit link and the Record column match it.
+- **Real renders:** `designs/home/now.html` follows the real island (`IslandPanelShots.RenderToolGallery`); the Settings designs follow a real `--settings-snapshot` of main `f633523`, and `designs/settings-shortcuts/now.html` is that snapshot's Shortcuts page.
 - **App icons:** wave 1 lists no apps. Windows on the frozen screen are named in text, and recent captures are thumbnails. The pet on the bar lines stands in for Chippi.
-- **Renders:** `render.ps1` writes `shots/w1-<board>-<theme>.png`; `-Only w1-<board>` renders one.
+- **Content colors:** the frozen screen's dimming, white selection and ink colors, the invented wallpaper and the sampled color are content, not Chippi's theme, so each page names them once as variables (`--ink-*`, `--wall-*`, `--sample`).
 
-| Board | What it shows |
+| Design | Versions |
 |---|---|
-| `home` | The home at 12: Displays after System, Capture after Clipboard |
-| `sheet-capture` | The Capture panel: wave 1 (Text, QR code, Color), first use, Delay picked, a mode pointed at, and with wave 2's Record, GIF and Convert |
-| `sheet-overlay` | The frozen screen: hover a window, dragging with the magnifier, released with both bars, at a screen edge, filling a display, Ctrl+drag |
-| `sheet-markup` | Each tool in use (Select, Pen, Highlighter, Line, Arrow, Rectangle, Ellipse, Text, Redact, Eraser, Crop) and the color choice |
-| `sheet-bar` | Copied, Saved, Copy failed, Save failed, Copied text, No text found, No QR code found, the color line, Capturing in 3 |
-| `sheet-results` | Text, QR code (a link, and two codes), Color |
-| `sheet-displays` | Brightness with All displays, Contrast, a display that doesn't answer |
-| `settings-capture`, `sheet-settings-capture-states` | Settings › Screen capture, and the save folder: default, changed (Reset), gone |
-| `settings-text`, `settings-color`, `settings-displays` | Settings › Text and QR, Color picker, Displays |
-| `settings-shortcuts` | Settings › Shortcuts, every feature under its own name; only Print Screen (and Command bar's existing Ctrl+Alt+Space) set |
+| `home` | now (10 tiles); v1 the 12 tiles; v2 five columns; v3 Capture and Displays lead as wide tiles |
+| `capture-panel` | v1 modes and tools as tiles; v2 Region leads; v3 a list of modes with their keys |
+| `capture-overlay` | v1 two bars beside the selection (Lightshot); v2 one floating toolbar; v3 a dock at the bottom of the display. Each with hover, drag, released, edge, full display, Ctrl+drag and every markup tool |
+| `capture-results` | v1 an island page for each; v2 results on the frozen screen; v3 the capture beside its result. Each with the bar's lines |
+| `displays` | v1 a slider row per display; v2 a mixer; v3 the displays as Windows arranges them |
+| `settings-capture` | v1 four pages, shortcuts first; v2 one Screen capture page; v3 four pages, shortcuts last. Each with the save folder's states |
+| `settings-shortcuts` | now; v1 grouped by feature; v2 grouped as the sidebar is; v3 set shortcuts first |
 
-### Calls made in the mockups
+### Calls made in the mockups (v1)
 
 1. **Tools keep their places.** Wave 1's tools are Text, QR code and Color; Record, GIF and Convert join after them in wave 2, so nothing moves when they're installed (Marge's call: only installed features show).
 2. **Delay is a picker in the panel's header** ("No delay", 3, 5 or 10 seconds) and applies to the next mode; it's kept.
@@ -45,6 +42,6 @@
 - **Capture panel:** Capture · No delay · 3 seconds · 5 seconds · 10 seconds · Region · Window · Screen · All displays · Freeform · Last region · Text · QR code · Color · Record · GIF · Convert · Recent · Open folder · No captures yet · Tooltips: the verb, then its keys once set ("Capture region · PrtSc", "Capture window")
 - **Frozen screen:** "Terminal · 1040 × 800" · "1320, 760 · #F3F3F3" · Save as · Save · Copy · Cancel (tooltip) · Copy text and Scan QR code (tooltips) · Cancel · Crop · Thin · Medium · Thick · Pick from screen
 - **Bar:** Copied · Saved · Copy failed · Save failed · Folder not found · Copied text · 31 words · No text found · No QR code found · Text and QR · Copied as HEX · Capturing in 3
-- **Results:** Text · 31 words · Reselect · Copy all · QR code · Link · Text · Copy · Open link · "1 2 of 2" · Color · Copied · HEX · RGB · HSL · Pick again
+- **Results:** Text · 31 words · Reselect · Copy all · QR code · Link · Text · Copy · Open link · "1 2 of 2" · Color · Copied · HEX · RGB · HSL · HSV · CMYK · Clear · Pick again (all five formats and Clear, as color-picker.md says; the first board had three)
 - **Displays:** Displays · Brightness · Contrast · All displays · Main · Brightness control failed
 - **Settings:** Shortcuts · Saving · Save folder · Change · Reset · Folder not found · File type · When a capture finishes · Do what I press · Selecting · Ctrl+drag copies on release · Magnifier · Recent captures · Keep recent captures · The last 50 you copied or saved · Clear · Copying · Copy as · Recent colors · Text · Language · Languages installed in Windows · Keep line breaks · Brightness keys · Act on · Display under the pointer · Step · Try again · "Turn on DDC/CI in the monitor's menu, or connect it without a dock" · Not set · Edit · Record · Add shortcut

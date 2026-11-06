@@ -1,6 +1,6 @@
 # Text and QR: brief
 
-Wave 1. For Travis to confirm. Decisions: [README](README.md) (ZXing.Net approved, task 484). Research: [behavior-spec-a.md](behavior-spec-a.md) (Text and QR), [architecture.md](architecture.md) section 4, [surfaces.md](surfaces.md) sections 3, 4 and 7. Shared selector and freeze: `capture-layer.md` (Kayla). Mockup: Lumen's `wave-1.html` (Text page, QR code page, bar lines, Settings). DESIGN.md wins where it speaks.
+Wave 1. For Travis to confirm. Decisions: [README](README.md) (ZXing.Net approved, task 484). Research: [behavior-spec-a.md](behavior-spec-a.md) (Text and QR), [architecture.md](architecture.md) section 4, [surfaces.md](surfaces.md) sections 3, 4 and 7. Shared selector and freeze: `capture-layer.md` (Kayla). Mockup: Lumen's `designs/capture-results/` (Text page, QR code page, bar lines) and `designs/settings-capture/` (Settings). DESIGN.md wins where it speaks.
 
 ## Job
 

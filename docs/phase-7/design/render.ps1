@@ -1,5 +1,6 @@
-# Renders each board of surfaces.html and wave-1.html to shots\<board>-<theme>.png at 2x with headless Edge, dark and light.
-# wave-1.html's boards are prefixed w1-. Each board reports its own size (body data-size). Uses its own throwaway Edge profile.
+# Renders each board of surfaces.html to shots\<board>-<theme>.png at 2x with headless Edge, dark and light.
+# Each board reports its own size (body data-size). Uses its own throwaway Edge profile.
+# Phase 7's mockups are SerenityOS designs in designs/ at the repo root; `serenity design shot` renders those.
 param([string[]]$Only)
 $ErrorActionPreference = 'Continue' # Edge reports each write on stderr
 $edge = "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe"
@@ -9,12 +10,10 @@ New-Item -ItemType Directory -Force $out | Out-Null
 
 $pages = [ordered]@{
     'surfaces.html' = 'sheet-capture', 'sheet-results', 'sheet-overlay', 'sheet-bar', 'sheet-displays', 'sheet-actions', 'sheet-search', 'settings'
-    'wave-1.html'   = 'home', 'sheet-capture', 'sheet-overlay', 'sheet-markup', 'sheet-bar', 'sheet-results', 'sheet-displays',
-                      'settings-capture', 'sheet-settings-capture-states', 'settings-text', 'settings-color', 'settings-displays', 'settings-shortcuts'
 }
 foreach ($file in $pages.Keys) {
     $page = ([Uri](Join-Path $PSScriptRoot $file)).AbsoluteUri
-    $prefix = if ($file -eq 'wave-1.html') { 'w1-' } else { '' }
+    $prefix = ''
     foreach ($b in $pages[$file]) {
         if ($Only -and "$prefix$b" -notin $Only) { continue }
         foreach ($theme in 'dark', 'light') {
