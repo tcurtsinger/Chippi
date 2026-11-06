@@ -48,8 +48,11 @@ public sealed class CaptureBarsTests
                 string hint = (string)button.ToolTip;
                 Assert.Equal(CaptureBars.Letter(tool) is { } letter ? $"{MarkupTools.ToolName(tool)} · {letter}" : MarkupTools.ToolName(tool), hint);
             }
-            Assert.Null(CaptureBars.Letter(CaptureTool.Select));
-            Assert.Equal(10, Enum.GetValues<CaptureTool>().Select(CaptureBars.Letter).OfType<char>().Distinct().Count());
+            // screen-capture.md's Markup table, which Karl's keys follow.
+            Assert.Equal("VPHLAROTBEC", string.Concat(Enum.GetValues<CaptureTool>().Select(t => CaptureBars.Letter(t)!.Value)));
+            Assert.Equal("Ellipse · O", (string)column.ButtonFor(CaptureTool.Ellipse).ToolTip);
+            Assert.Equal("Redact · B", (string)column.ButtonFor(CaptureTool.Redact).ToolTip);
+            Assert.Equal("Eraser · E", (string)column.ButtonFor(CaptureTool.Eraser).ToolTip);
         });
     }
 
