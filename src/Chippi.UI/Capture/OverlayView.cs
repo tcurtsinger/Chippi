@@ -267,7 +267,7 @@ public sealed class OverlayView : Grid
 
     private void RenderHandles(Selector selector, PixelRect cut)
     {
-        bool show = selector.Selection is { Mask: null } && !cut.IsEmpty && !selector.IsDragging;
+        bool show = selector.Selection is { Mask: null } && !selector.Fixed && !cut.IsEmpty && !selector.IsDragging;
         var rect = selector.Rect?.Offset(-Bounds.X, -Bounds.Y) ?? default;
         double[] xs = [rect.X, rect.X + rect.Width / 2.0, rect.Right];
         double[] ys = [rect.Y, rect.Y + rect.Height / 2.0, rect.Bottom];
@@ -300,7 +300,9 @@ public sealed class OverlayView : Grid
             _pill.Visibility = Visibility.Collapsed;
             return;
         }
-        string pixels = string.Create(CultureInfo.InvariantCulture, $"{rect.Width} × {rect.Height}");
+        // A reopened capture shown smaller still reads its own size.
+        var of = selector.Selection?.Source is { } source ? new PixelSize(source.Width, source.Height) : rect.Size;
+        string pixels = string.Create(CultureInfo.InvariantCulture, $"{of.Width} × {of.Height}");
         _pillText.Text = window is { Title.Length: > 0 } ? $"{window.Title} · {pixels}" : pixels;
         _pillCopy.Visibility = selector.CopyDrag ? Visibility.Visible : Visibility.Collapsed;
         _pill.Visibility = Visibility.Visible;

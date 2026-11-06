@@ -255,6 +255,9 @@ public partial class App : Application
                     Chippi.Features.FocusFollowsMouse.FocusFollowsMouseModule.Id, "ownership.json")));
         }));
 
+        // [Phase 7] Displays and brightness: replaces its catalog placeholder.
+        shell.Registry.Register(new Chippi.Features.Displays.DisplaysModule());
+
         var windowLayouts = new Chippi.Features.WindowLayouts.WindowLayoutsModule(SnapDisplaySource.Connected);
         windowLayouts.PointerDisplayId = SnapDisplaySource.PointerId;
         windowLayouts.CreateArrangementDesktop = context => new ArrangementDesktop(context.Actions!,

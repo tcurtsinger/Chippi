@@ -126,7 +126,7 @@ public sealed class PrintScreenShortcutTests
 
         setting.SetOutside(1);
         Assert.Equal(ShortcutService.UsedByWindowsText, service.List[0].Error);
-        Assert.True(service.List[0].Held); // RegisterHotKey succeeded either way: the value tells
+        Assert.False(service.List[0].Held); // let go, so Windows gets the key
         Assert.Equal(1, changes);
         Assert.Equal(writes, setting.Writes); // left on: Travis chose it
 
@@ -147,6 +147,130 @@ public sealed class PrintScreenShortcutTests
         setting.SetOutside(1);
         setting.SetOutside(0);
         Assert.Null(service.List[0].Error);
+    }
+
+    [Fact]
+    public void Windows_setting_goes_off_before_Print_Screen_is_registered_and_turning_it_off_later_registers_it_again()
+    {
+        // Registered while Windows' own is on, Print Screen reaches Chippi only with its own window in front.
+        var windows = new ShortcutServiceTests.FakeRegistrar();
+        var setting = new LoggedSetting(windows.Calls);
+        var service = new ShortcutService(windows, setting);
+        KeyShortcut? saved = null;
+        IHotkey region = null!;
+        region = service.Add("screen-capture", "Capture region", new ShortcutEdits(() => saved, keys =>
+        {
+            if (!region.Register(keys, () => { })) return region.Error;
+            saved = keys;
+            return null;
+        }, () => { region.Unregister(); saved = null; }));
+        Assert.Null(service.Change(service.List[0].Id, PrintScreen));
+        // The check asks Windows and lets go first; the hold comes after the setting.
+        Assert.Equal(["register Print Screen", "unregister Print Screen", "setting 0", "register Print Screen"], windows.Calls);
+
+        // Travis turns Windows' back on: Chippi lets go, so Windows gets the key; the shortcut stays set.
+        windows.Calls.Clear();
+        setting.SetOutside(1);
+        Assert.Equal(["unregister Print Screen"], windows.Calls);
+        Assert.Equal(ShortcutService.UsedByWindowsText, service.List[0].Error);
+        Assert.Equal(PrintScreen, service.List[0].Shortcut);
+        Assert.NotNull(setting.Claim);
+
+        // He records Print Screen again: off first, then held.
+        windows.Calls.Clear();
+        Assert.Null(service.Change(service.List[0].Id, PrintScreen));
+        Assert.Equal(["register Print Screen", "unregister Print Screen", "setting 0", "register Print Screen"], windows.Calls);
+        Assert.True(service.List[0].Held);
+
+        // Turned on and off again in Windows' Settings: held again once it's off.
+        setting.SetOutside(1);
+        windows.Calls.Clear();
+        setting.SetOutside(0);
+        Assert.Equal(["register Print Screen"], windows.Calls);
+        Assert.True(service.List[0].Held);
+        Assert.Null(service.List[0].Error);
+        bool pressed = false;
+        region.Register(PrintScreen, () => pressed = true);
+        windows.Press(PrintScreen);
+        Assert.True(pressed);
+    }
+
+    [Fact]
+    public void A_failed_write_to_Windows_setting_refuses_Print_Screen_keeps_the_old_keys_and_forgets_the_claim()
+    {
+        var windows = new ShortcutServiceTests.FakeRegistrar();
+        var setting = new LoggedSetting(windows.Calls) { Fails = true };
+        setting.SetOutside(1);
+        var service = new ShortcutService(windows, setting);
+        bool pressed = false;
+        var region = service.Add("screen-capture", "Capture region");
+        Assert.True(region.Register(CtrlAltR, () => pressed = true));
+
+        windows.Calls.Clear();
+        Assert.False(region.Register(PrintScreen, () => { }));
+        Assert.Equal(ShortcutService.PrintScreenFailedText, region.Error);
+        Assert.Empty(windows.Calls); // Print Screen never registered
+        Assert.Null(setting.Claim);
+        Assert.Equal(1, setting.Read());
+        windows.Press(CtrlAltR);
+        Assert.True(pressed);
+        Assert.Equal(CtrlAltR, service.List[0].Shortcut);
+
+        // Once the write works, Print Screen holds.
+        setting.Fails = false;
+        Assert.True(region.Register(PrintScreen, () => { }));
+        Assert.Null(region.Error);
+        Assert.Equal(0, setting.Read());
+        Assert.Equal(new PrintScreenClaim(1), setting.Claim);
+    }
+
+    [Fact]
+    public void Another_feature_can_not_take_Print_Screen_while_Windows_has_it_and_removing_the_shortcut_still_puts_the_setting_back()
+    {
+        var setting = new MemoryPrintScreenSetting();
+        var windows = new ShortcutServiceTests.FakeRegistrar();
+        var service = new ShortcutService(windows, setting);
+        var region = service.Add("screen-capture", "Capture region");
+        Assert.True(region.Register(PrintScreen, () => { }));
+        setting.SetOutside(1);
+        Assert.Empty(windows.Held);
+
+        var other = service.Add("text-and-qr", "Copy text");
+        Assert.False(other.Register(PrintScreen, () => { }));
+        Assert.Equal("Used by Capture region", other.Error);
+
+        region.Unregister();
+        Assert.Null(setting.Value); // what was found: unset
+        Assert.Null(setting.Claim);
+    }
+
+    /// <summary>A setting that writes into the fake registrar's call list, so the order can be read.</summary>
+    private sealed class LoggedSetting(List<string> calls) : IPrintScreenSetting
+    {
+        private int? _value;
+
+        public PrintScreenClaim? Claim { get; set; }
+
+        public event Action? Changed;
+
+        /// <summary>Writes throw, as the registry refusing access would.</summary>
+        public bool Fails { get; set; }
+
+        public int? Read() => _value;
+
+        public void Write(int? value)
+        {
+            if (Fails)
+                throw new UnauthorizedAccessException();
+            _value = value;
+            calls.Add("setting " + value);
+        }
+
+        public void SetOutside(int? value)
+        {
+            _value = value;
+            Changed?.Invoke();
+        }
     }
 
     [Fact]

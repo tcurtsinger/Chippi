@@ -86,6 +86,19 @@ public sealed class CaptureOverlayShots
 
                 var pick = new Selector(freeze, CaptureMode.PickPoint, null, new PixelPoint(300, 175), drag, 6);
                 Shoot(pick, new CaptureRequest(CaptureMode.PickPoint) { Dim = false }, $"capture-pick{at}.png");
+
+                // A Recent capture reopened for Annotate: 900 × 600 at its own size, then 2600 × 1400 shrunk to fit.
+                foreach (var (w, h) in new[] { (900, 600), (2600, 1400) })
+                {
+                    var crop = freeze.Cut(new PixelRect(200, 120, Math.Min(w, 1700), Math.Min(h, 960)));
+                    var image = new CapturedImage(w, h, new byte[w * h * 4]);
+                    for (int y = 0; y < h; y++)
+                        for (int x = 0; x < w; x += crop.Width)
+                            Buffer.BlockCopy(crop.Pixels, y % crop.Height * crop.Stride, image.Pixels, (y * w + x) * 4, Math.Min(crop.Width, w - x) * 4);
+                    var shown = Reopening.Place(freeze, image, new PixelPoint(900, 500), 32 * dpi / 96);
+                    var reopened = new Selector(shown.Freeze, shown.Rect, shown.Display, image, shown.Scale, new PixelPoint(900, 500));
+                    Shoot(reopened, request with { Magnifier = false }, $"capture-reopen-{w}{at}.png", bars: true);
+                }
             }
 
             void Shoot(Selector selector, CaptureRequest request, string name, bool bars = false)
