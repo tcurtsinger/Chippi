@@ -103,3 +103,9 @@ A Windows 11 tray app for the owner's own PC (C#, .NET 10, WPF): a widget on the
 ## Keep this file current
 
 When a step here changes, or you learn one, change this file in the same pull request.
+
+## Screen capture engine (in progress)
+
+- Offscreen engine checks: `dotnet test tests/Chippi.Features.ScreenCapture.Tests/Chippi.Features.ScreenCapture.Tests.csproj -c Release`. Uses synthetic pixels and isolated temporary files, never the clipboard.
+- `Chippi.Storage` holds the unchanged Clipboard sealing primitive, retaining its namespace for source compatibility. Clipboard and Screen capture reference it independently; each opens its own database/key.
+- Screen capture is not yet composed into the app. The feature is not done until Settings, the capture layer and output adapters are wired and the brief's Sandbox flow is used.

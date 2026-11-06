@@ -7,6 +7,7 @@
     <Project Path="src/Chippi.Input/Chippi.Input.csproj" />
     <Project Path="src/Chippi.Rules/Chippi.Rules.csproj" />
     <Project Path="src/Chippi.UrlCleaning/Chippi.UrlCleaning.csproj" />
+    <Project Path="src/Chippi.Storage/Chippi.Storage.csproj" />
     <Project Path="src/Chippi.UI/Chippi.UI.csproj" />
   </Folder>
   <Folder Name="/src/Features/">
@@ -17,6 +18,7 @@
     <Project Path="src/Features/Chippi.Features.Sound/Chippi.Features.Sound.csproj" />
     <Project Path="src/Features/Chippi.Features.Scratchpad/Chippi.Features.Scratchpad.csproj" />
     <Project Path="src/Features/Chippi.Features.PlainPaste/Chippi.Features.PlainPaste.csproj" />
+    <Project Path="src/Features/Chippi.Features.ScreenCapture/Chippi.Features.ScreenCapture.csproj" />
     <Project Path="src/Features/Chippi.Features.Shelf/Chippi.Features.Shelf.csproj" />
     <Project Path="src/Features/Chippi.Features.Shortcuts/Chippi.Features.Shortcuts.csproj" />
     <Project Path="src/Features/Chippi.Features.WindowLayouts/Chippi.Features.WindowLayouts.csproj" />
@@ -44,6 +46,7 @@
     <Project Path="tests/Chippi.Features.Sound.Tests/Chippi.Features.Sound.Tests.csproj" />
     <Project Path="tests/Chippi.Features.Scratchpad.Tests/Chippi.Features.Scratchpad.Tests.csproj" />
     <Project Path="tests/Chippi.Features.PlainPaste.Tests/Chippi.Features.PlainPaste.Tests.csproj" />
+    <Project Path="tests/Chippi.Features.ScreenCapture.Tests/Chippi.Features.ScreenCapture.Tests.csproj" />
     <Project Path="tests/Chippi.Features.Shelf.Tests/Chippi.Features.Shelf.Tests.csproj" />
     <Project Path="tests/Chippi.Features.Shortcuts.Tests/Chippi.Features.Shortcuts.Tests.csproj" />
     <Project Path="tests/Chippi.Features.WindowLayouts.Tests/Chippi.Features.WindowLayouts.Tests.csproj" />
