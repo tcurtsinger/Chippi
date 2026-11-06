@@ -12,12 +12,14 @@ using System;
 using System.Drawing;
 using System.Windows.Forms;
 public static class ArrangementTarget {
+    [System.Runtime.InteropServices.DllImport("dwmapi.dll")] static extern int DwmSetWindowAttribute(IntPtr window,int attribute,ref int value,int size);
     [STAThread] public static void Main(string[] args) {
         if(args.Length>0 && args[0]=="no-window") { System.Threading.Thread.Sleep(120000); return; }
         Application.EnableVisualStyles();
         var form=new Form {Text=args.Length>0?args[0]:"Arrangement target",Size=new Size(360,220),StartPosition=FormStartPosition.Manual,Location=new Point(100,100)};
         if(args.Length>1 && args[1]=="fullscreen") { form.FormBorderStyle=FormBorderStyle.None;form.Bounds=Screen.PrimaryScreen.Bounds; }
         form.Controls.Add(new TextBox {Multiline=true,Dock=DockStyle.Fill,Text="Disposable arrangement fixture. No files or clipboard."});
+        if(args.Length>1 && args[1]=="hidden") form.Shown += (sender,e) => {int cloak=1;if(DwmSetWindowAttribute(form.Handle,13,ref cloak,4)!=0)throw new Exception("Cloaking failed");};
         Application.Run(form);
     }
 }
@@ -28,7 +30,7 @@ $targetSource | Set-Content C:\results\fixture.cs -Encoding UTF8
 $csc=Join-Path ([Runtime.InteropServices.RuntimeEnvironment]::GetRuntimeDirectory()) 'csc.exe'
 & $csc /nologo /target:winexe /out:C:\results\RequiresAdmin.exe /win32manifest:C:\results\admin.manifest /reference:System.Windows.Forms.dll /reference:System.Drawing.dll C:\results\fixture.cs
 if ($LASTEXITCODE -ne 0) { throw 'Admin fixture compilation failed' }
-foreach ($name in @('AfterAdmin','ShortcutAdmin','NoWindow','AfterCancel','OwnedFullscreen','AfterFullscreen')) { Copy-Item C:\results\ArrangementA.exe "C:\results\$name.exe" }
+foreach ($name in @('HiddenFixture','AfterAdmin','ShortcutAdmin','NoWindow','AfterCancel','OwnedFullscreen','AfterFullscreen')) { Copy-Item C:\results\ArrangementA.exe "C:\results\$name.exe" }
 Copy-Item C:\results\ArrangementA.exe C:\results\ArrangementB.exe
 Copy-Item C:\results\ArrangementA.exe C:\results\ArrangementC.exe
 Copy-Item C:\results\ArrangementA.exe C:\results\ArrangementObserver.exe
@@ -159,6 +161,9 @@ try {
         }
         $arrangements += @{ id="fixture-$letter";name="Fixture $letter";rows=$rows;shortcut=@{modifiers='control, alt';key=74+$group} }
     }
+    $targets += Start-Process C:\results\HiddenFixture.exe -ArgumentList 'Hidden-fixture hidden' -PassThru
+    $hiddenWindow = Window 'Hidden-fixture'
+    Start-Sleep -Milliseconds 300
     Shot 'before'
     # Missing rows relaunch; all other rows must keep their existing handles.
     $reused = @{}
@@ -178,6 +183,11 @@ try {
     }
     $startMenu=Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs'
     New-Item -ItemType Directory -Force $startMenu | Out-Null
+    $wsh=New-Object -ComObject WScript.Shell
+    foreach($mode in @('skin','reset-config')) {
+        $alias=$wsh.CreateShortcut((Join-Path $startMenu ("Fixture $mode.lnk")))
+        $alias.TargetPath='C:\results\ArrangementA.exe';$alias.Arguments="--$mode";$alias.Save()
+    }
     $linkPath=Join-Path $startMenu 'Arrangement admin shortcut.lnk'
     $wsh=New-Object -ComObject WScript.Shell
     $link=$wsh.CreateShortcut($linkPath);$link.TargetPath='C:\results\ShortcutAdmin.exe';$link.Arguments='Shortcut-admin';$link.Save()
@@ -193,6 +203,8 @@ try {
         if(!$registered){Start-Sleep -Milliseconds 250}
     } while(!$registered -and (Get-Date) -lt $until)
     if(!$registered){throw 'Admin shortcut not registered in guest Start menu'}
+    $aliases=@($shell.Namespace('shell:AppsFolder').Items() | Where-Object {$_.ExtendedProperty('System.Link.TargetParsingPath') -eq 'C:\results\ArrangementA.exe'})
+    Check 'multiple-shortcut-fixture-registered' ($aliases.Count -ge 2)
     $shortcutRow=ExtraRow 'C:\results\ShortcutAdmin.exe' '' 'Shortcut-admin'
     $shortcutRow.appIdentity=$registered;$shortcutRow.target=$registered;$shortcutRow.workingFolder=''
     $safety=@{id='safety';name='Safety';shortcut=@{modifiers='control, alt';key=77};rows=@(
@@ -294,6 +306,9 @@ try {
     $saved=Get-Content (Join-Path $profile 'settings.json') -Raw | ConvertFrom-Json
     $captured=@($saved.modules.'window-layouts'.arrangements | Where-Object {$_.name -eq 'Captured fixture'})
     Check 'capture-saved-real-window-draft' ($captured.Count -eq 1 -and $captured[0].rows.Count -ge 12)
+    Check 'capture-excludes-app-cloaked-window' (@($captured[0].rows | Where-Object {$_.titleHint -eq 'Hidden-fixture'}).Count -eq 0)
+    $aliasRows=@($captured[0].rows | Where-Object {$_.titleHint -like 'Fixture-A-*'})
+    Check 'capture-does-not-guess-shortcut-arguments' ($aliasRows.Count -eq 4 -and @($aliasRows | Where-Object {$_.target -ne 'C:\results\ArrangementA.exe' -or $_.arguments}).Count -eq 0)
     Press (WaitNamed 'Launch Cancel fixture')
     $until=(Get-Date).AddSeconds(8)
     while(@(Get-Process -Name NoWindow -ErrorAction SilentlyContinue).Count -eq 0 -and (Get-Date) -lt $until){Start-Sleep -Milliseconds 100}
@@ -314,6 +329,6 @@ finally {
     $answer | ConvertTo-Json -Depth 8 | Set-Content C:\results\arrangements-partial.json -Encoding UTF8
     if ($chippi -and -not $chippi.HasExited) { Stop-Process -Id $chippi.Id -ErrorAction SilentlyContinue }
     # These executable names are generated by this Sandbox check only.
-    Get-Process -Name ArrangementA,ArrangementB,ArrangementC,ArrangementObserver,AfterAdmin,ShortcutAdmin,RequiresAdmin,NoWindow,AfterCancel,OwnedFullscreen,AfterFullscreen -ErrorAction SilentlyContinue | Stop-Process
+    Get-Process -Name HiddenFixture,ArrangementA,ArrangementB,ArrangementC,ArrangementObserver,AfterAdmin,ShortcutAdmin,RequiresAdmin,NoWindow,AfterCancel,OwnedFullscreen,AfterFullscreen -ErrorAction SilentlyContinue | Stop-Process
 }
 $answer
