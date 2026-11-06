@@ -2,6 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/Chippi.App/Chippi.App.csproj" />
     <Project Path="src/Chippi.Audio/Chippi.Audio.csproj" />
+    <Project Path="src/Chippi.Capture/Chippi.Capture.csproj" />
     <Project Path="src/Chippi.Clipboard/Chippi.Clipboard.csproj" />
     <Project Path="src/Chippi.Core/Chippi.Core.csproj" />
     <Project Path="src/Chippi.Input/Chippi.Input.csproj" />
@@ -34,6 +35,7 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Chippi.Audio.Tests/Chippi.Audio.Tests.csproj" />
+    <Project Path="tests/Chippi.Capture.Tests/Chippi.Capture.Tests.csproj" />
     <Project Path="tests/Chippi.Clipboard.Tests/Chippi.Clipboard.Tests.csproj" />
     <Project Path="tests/Chippi.Core.Tests/Chippi.Core.Tests.csproj" />
     <Project Path="tests/Chippi.Input.Tests/Chippi.Input.Tests.csproj" />

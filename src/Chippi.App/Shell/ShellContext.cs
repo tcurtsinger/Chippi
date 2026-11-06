@@ -45,7 +45,12 @@ public sealed class ShellContext
         Services.Input = Input = new InputHub(loggerFactory.CreateLogger("Input"));
         // One message-only window for every feature's shortcut; it opens with the first one set.
         Hotkeys = new Chippi.UI.Shortcuts.HotkeyWindow(System.Windows.Threading.Dispatcher.CurrentDispatcher);
-        Services.Shortcuts = Shortcuts = new Chippi.Core.Shortcuts.ShortcutService(Hotkeys);
+        // Windows' own Print Screen setting, turned off while a Chippi shortcut is Print Screen: only the real profile's
+        // Chippi.exe changes the real one (capture-layer.md, Print Screen).
+        PrintScreen = string.IsNullOrWhiteSpace(devProfile) && ExplorerRegistration.IsApp(Environment.ProcessPath)
+            ? new WindowsPrintScreenSetting(SynchronizationContext.Current)
+            : new Chippi.Core.Shortcuts.MemoryPrintScreenSetting();
+        Services.Shortcuts = Shortcuts = new Chippi.Core.Shortcuts.ShortcutService(Hotkeys, PrintScreen);
         // What every feature's actions act on: windows, keys, media, programs. It holds nothing.
         Services.Actions = new Chippi.UI.Actions.WindowsActionPc
         {
@@ -100,6 +105,9 @@ public sealed class ShellContext
 
     /// <summary>Every shortcut Chippi holds, for Settings › Shortcuts.</summary>
     public Chippi.Core.Shortcuts.ShortcutService Shortcuts { get; }
+
+    /// <summary>Windows' Print Screen setting as the shortcut service sees it: the real one only for the real profile's Chippi.exe.</summary>
+    public Chippi.Core.Shortcuts.IPrintScreenSetting PrintScreen { get; }
 
     /// <summary>The Shortcuts feature, whose bindings Settings › Shortcuts lists; set when the app registers it.</summary>
     internal Chippi.Features.Shortcuts.ShortcutsModule? ShortcutsFeature { get; set; }
