@@ -57,6 +57,7 @@ public sealed class ModuleFlowTests
         public PixelRect? LastRegion { get; set; }
         public IDisposable Use() => new Disposer(() => Disposed++);
         public ICaptureSession? Start(CaptureRequest request) => Current is not null ? null : Last = new Session(request);
+        public ICaptureSession? Reopen(CapturedImage image, CaptureDoor door) => null;
     }
 
     private sealed class Disposer(Action a) : IDisposable { public void Dispose() => a(); }
