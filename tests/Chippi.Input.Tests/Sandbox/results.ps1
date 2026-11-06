@@ -104,7 +104,7 @@ foreach ($i in 1..5) {
     Fixture
     Set-Clipboard -Value 'untouched'; $before = [ChippiCheck.Clip]::GetClipboardSequenceNumber()
     Starter 3; Start-Sleep -Milliseconds 700
-    Drag 360 95 900 175 -Ctrl
+    Drag 330 95 900 175 -Ctrl
     $ms = CopyTime $before
     Start-Sleep -Milliseconds 300
     if ($i -eq 1) { Shot 'text-bar' }
@@ -114,7 +114,7 @@ foreach ($i in 1..5) {
 $found.copyText = $text
 Fixture; Set-Clipboard -Value 'untouched'; $before = [ChippiCheck.Clip]::GetClipboardSequenceNumber()
 Starter 3; Start-Sleep -Milliseconds 700
-Drag 360 95 900 175
+Drag 330 95 900 175
 Start-Sleep -Milliseconds 300; Shot 'text-selected'
 $script:release = [Diagnostics.Stopwatch]::StartNew(); Tap 0x0D
 $found.copyTextEnter = [ordered]@{ copyMs = (CopyTime $before); clipboard = (ClipText).Trim() }
@@ -146,7 +146,7 @@ $found.tinyDrag.nextCaptureCopied = (ClipText).Trim()
 # --- Extract text: opens the Text page without copying.
 Fixture; Set-Clipboard -Value 'untouched'
 Starter 4; Start-Sleep -Milliseconds 700
-Drag 360 95 900 175 -Ctrl
+Drag 330 95 900 175 -Ctrl
 Start-Sleep -Milliseconds 1500; Shot 'text-page'
 $found.extract = [ordered]@{ clipboard = (ClipText).Trim() }
 # Reselect, then Esc: the Text page must not stay on "Reading text". The Reselect button is found by its place in the shot.
