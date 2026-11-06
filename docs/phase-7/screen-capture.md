@@ -1,4 +1,4 @@
-# Screen capture: brief
+﻿# Screen capture: brief
 
 Wave 1. Owner: Karl. Reviewer: Kayla. Task: 491. Status: proposed implementation contract, awaiting review and Travis's confirmation with Lumen's mockups. No feature code is authorized by this document alone.
 
@@ -16,6 +16,18 @@ Press Print Screen, select, mark up beside the selection, then Copy or Save. No 
 - Settings > Capture > Screen capture: output preference, Save to, file type, Ctrl-drag, magnifier, Recent, and read-only shortcut rows with Edit. Edit opens Settings > Shortcuts in that row. Full history lives here; Open recent captures lands on it.
 
 Capture panel registration is shared by the installed providers, with one stable page identity and one panel command. Opening Text, QR code or Color delegates to that provider. Copy text and Scan QR in the screenshot toolbar pass the current selection to Herb's implementation without capturing again. Their result pages and strings belong to his briefs. Removing a provider cancels its pending work and removes its controls.
+
+## What we took
+
+These choices come from the research tables in behavior-spec-a.md and surfaces.md, not a new competitor trial.
+
+- Lightshot: one key, drag, tools beside the selection, Copy/Save underneath, Ctrl-drag and Ctrl+A.
+- Snipping Tool: the capture modes, delay, markup and text actions within the captured selection.
+- ShareX: magnifier and repeat-last-region access; scrolling remains the separately approved wave 2 trial.
+- Snipaste: hover a window or drag a region within one selector, as recorded in the doors map.
+- Flameshot: arrow-key precision, Shift to resize and fixed tool letters.
+- CleanShot X: one Capture home with recent results alongside its tools.
+- Greenshot: configurable destinations and naming, annotation and opaque redaction.
 
 ## Selection and draft lifecycle
 
@@ -61,7 +73,7 @@ Copy uses the shell's clipboard adapter with a composed bitmap and PNG represent
 
 Keep the last 50 successfully copied or saved captures, newest first. Four appear in the panel; Settings shows all 50 with thumbnail, dimensions, time and saved-file status. Cancelled drafts and failed outputs add nothing. Repeated Copy/Save of one draft updates its entry rather than duplicating it.
 
-Store a flattened retained PNG and precomputed thumbnail in the feature data folder, including for copy-only captures. Seal the index and thumbnail payloads with the established per-user sealing mechanism used by Clipboard history. Retained PNGs and user-saved files are ordinary local image files, not encrypted archives. State that privacy boundary in Settings. Do not introduce a runtime dependency on the Clipboard feature: extract/reuse the sealing primitive after review, with a distinct capture key/store. Logs contain counts, durations and error codes, never pixels, OCR text, window titles or full saved paths.
+Store a flattened retained PNG and precomputed thumbnail in the feature data folder, including for copy-only captures. Seal the index and thumbnail payloads with the established per-user sealing mechanism used by Clipboard history. Retained PNGs and user-saved files are ordinary local image files, not encrypted archives. Record that privacy boundary in the implementation report; it adds no Settings explanation row. Do not introduce a runtime dependency on the Clipboard feature: extract/reuse the sealing primitive after review, with a distinct capture key/store. Logs contain counts, durations and error codes, never pixels, OCR text, window titles or full saved paths.
 
 Commit the retained image before its index entry. Recovery removes only orphan files inside the capture-owned store. A retention failure after successful Copy/Save reports "Recent capture failed" and does not falsely report the output failed. Index corruption is isolated and reported; never reset silently or delete user files. Panel open uses the already prepared thumbnails, with no full-image decode on the UI thread.
 
@@ -75,7 +87,7 @@ Each starter is a shared command and a global slot, registered while its provide
 
 | Starter | Proposed command id | Default |
 |---|---|---|
-| Open Capture | `screen-capture/open` | Unassigned |
+| Open Capture | `capture/open` | Unassigned |
 | Capture region | `screen-capture/region` | Print Screen |
 | Capture window | `screen-capture/window` | Unassigned |
 | Capture full screen | `screen-capture/screen` | Unassigned |
@@ -85,7 +97,7 @@ Each starter is a shared command and a global slot, registered while its provide
 | Capture after delay | `screen-capture/delay` | Unassigned |
 | Open recent captures | `screen-capture/recent` | Unassigned |
 
-Open Capture remains available through the shared host if Screen capture is removed but another provider remains; it must have one shortcut owner, never duplicate registrations. Final owner/id coordination is part of the shared-layer integration review.
+The shell Capture host owns `capture/open` and its shortcut slot. Providers register only their own starters. Open Capture remains available if Screen capture is removed but another provider remains.
 
 In context only: all markup verbs in the table; Copy, Save, Save as, Finish (Enter), Cancel (Esc), Retry (focused button), Delay (focused picker), Choose (folder picker), Open folder, Annotate, Remove recent capture, Clear recent captures and Delete capture file (focused controls/context menu). Selection move is arrows; resize is Shift+arrows; Ctrl+A expands to the current display outside text. Tab and Shift+Tab reach every bar control, with accessible names matching the labels. Copy text and Scan QR use Herb's context actions. No row/result verb gets a global slot.
 
@@ -95,7 +107,7 @@ These are the feature's visible strings and accessible names. Tool names and sta
 
 - Panel: Capture; Region; Window; Screen; All displays; Freeform; Last region; Delay; No delay; 3 seconds; 5 seconds; 10 seconds; Recent; No captures yet; Open folder; Text; QR code; Color. Future installed-provider labels: Record; GIF; Convert.
 - Editor: Select; Pen; Highlighter; Line; Arrow; Rectangle; Ellipse; Text; Redact; Eraser; Crop; Color; Width; Size; Outline; Fill; Undo; Redo; Copy text; Scan QR; Copy; Save; Save as; Cancel; Retry. Size pill: `<width> x <height>`.
-- Settings: Screen capture; After capture; Copy; Save; Copy and save; Save to; Choose; File type; PNG; JPEG; Ctrl-drag to copy; Magnifier; Recent captures; Keep last 50; Shortcuts; Edit. Privacy text: "Recent captures keeps local image copies. Saved images are not encrypted."
+- Settings: Screen capture; After capture; Copy; Save; Copy and save; Save to; Choose; File type; PNG; JPEG; Ctrl-drag to copy; Magnifier; Recent captures; Shortcuts; Edit.
 - Recent: Annotate; Remove recent capture; Clear recent captures; Delete capture file; File missing; `<width> x <height>`; `<time>`.
 - Confirms: Discard capture? (Cancel, Discard); Clear recent captures? (Cancel, Clear); Delete <filename>? (Cancel, Delete).
 - Bar/status: Copied; Saved; Copied and saved; Copy failed; Save failed; Copied. Save failed; Saved. Copy failed; Recent capture failed; Open folder failed; Delete failed; Capture failed; Capturing in <seconds>. A saved result includes the filename as secondary content, never a tooltip-style instruction.
@@ -124,9 +136,11 @@ Targets below are proposals to measure in the implementation, not observed perfo
 
 | Interaction | Acceptance target and measurement |
 |---|---|
-| Key to frozen screen | Shared-layer target: warm p95 <=100 ms, cold <=250 ms; align with Kayla's spike before implementation approval |
+| Key to frozen screen | Target and measurement belong to `capture-layer.md`, set from Kayla's Sandbox spike before implementation approval |
 | Release to both bars | p95 <= one 60 Hz frame (16.7 ms), with draft already filled |
-| Markup on 3440-wide, 165 Hz display | p95 pointer sample to presented stroke <=12.2 ms; report DWM frame samples and skipped frames only during active drawing |
+| Markup handler | UI-thread time per pointer move: p95 <2 ms with a 3440 x 1440 frozen image and 50 objects already drawn; time handler entry to exit |
+| Active stroke in Sandbox | No skipped frames during a 2-second stroke at 60 Hz; sample DWM frames and post moves once per frame; count only the active stroke |
+| Physical 165 Hz display | Travis compares drawing feel with Snipping Tool in his live check; report his assessment, with no inferred pointer-to-photon measurement |
 | Ctrl+C to clipboard ready | p95 <=150 ms for 3440 x 1440 composed pixels in Sandbox, including flattening |
 | Capture panel open | Warm p95 <=100 ms, cold <=200 ms with 50 entries; four thumbnails already filled, no UI-thread full decode |
 
