@@ -95,7 +95,7 @@ All from the PRs named, measured by their authors.
 | The hub's mouse hook per event | median 0.9 µs, p99 12.1 µs over 91,285 events (target under 50 µs) | #227, `CHIPPI_INPUT_TIMINGS`, Release |
 | Debounce's filters per event | median under 0.1 µs, 200,000 events each | #231 |
 | A snippet typed out, last trigger key to finished text | 13 to 16 ms for 5 characters (the first 105 ms), 160 ms for 200 | #258, Sandbox |
-| The App switcher's overlay taking the foreground | 3 to 36 ms after a shortcut, an island click or Search | #259, Sandbox |
+| The App switcher's overlay taking the foreground | 90.5 ms on the first open, then 7 to 13 ms from a shortcut or the Radial menu | #259, end-of-feature Sandbox run |
 | Snap's first placement change | 10 to 42 ms, sampled on DWM frames | #261, Sandbox |
 | Settings › Shortcuts with 15 shortcuts, build and layout | p50 12 ms, p99 24 ms | #253 |
 | A four-window arrangement, run to done, with app startup | 1.8 to 1.9 s, three runs | #272, Sandbox |
