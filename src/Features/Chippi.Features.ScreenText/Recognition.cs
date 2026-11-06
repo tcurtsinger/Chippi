@@ -24,6 +24,9 @@ public interface IOcr
     /// <summary>The languages with OCR installed in Windows: tag and name.</summary>
     IReadOnlyList<(string Tag, string Name)> Languages();
 
+    /// <summary>The tag reading uses when none is saved or the saved one is gone: the profile's, else the first installed; null when none is installed.</summary>
+    string? DefaultLanguage() => Languages() is [var first, ..] ? first.Tag : null;
+
     /// <summary>Reads the region. <paramref name="language"/> is a saved tag; one no longer installed falls back to the profile's.</summary>
     Task<OcrOutcome> RecognizeAsync(CapturedImage image, string? language, CancellationToken ct);
 }
@@ -43,6 +46,8 @@ public sealed class WindowsOcr : IOcr
 {
     public IReadOnlyList<(string Tag, string Name)> Languages() =>
         [.. OcrEngine.AvailableRecognizerLanguages.Select(l => (l.LanguageTag, l.DisplayName))];
+
+    public string? DefaultLanguage() => OcrEngine.TryCreateFromUserProfileLanguages()?.RecognizerLanguage.LanguageTag ?? Languages().FirstOrDefault().Tag;
 
     public async Task<OcrOutcome> RecognizeAsync(CapturedImage image, string? language, CancellationToken ct)
     {

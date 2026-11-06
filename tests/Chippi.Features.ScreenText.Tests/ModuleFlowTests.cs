@@ -303,4 +303,21 @@ public sealed class ModuleFlowTests
         Assert.All(t.Keys.Added.Values, h => Assert.True(h.Disposed));
         Assert.Null(t.Module.Text.Result);
     }
+
+    [Fact]
+    public async Task The_settings_model_shows_the_language_and_line_breaks_and_saves_changes()
+    {
+        var t = await Start(new ScreenTextSettings { Language = "fr-FR" });
+        var model = t.Module.Settings;
+        Assert.Equal("en-US", model.Language);
+        Assert.True(model.KeepLineBreaks);
+        int raised = 0;
+        model.Changed += () => raised++;
+        Assert.True(model.SetKeepLineBreaks(false));
+        Assert.True(t.Settings.Value.JoinLines);
+        Assert.False(model.KeepLineBreaks);
+        Assert.True(model.SetLanguage("en-US"));
+        Assert.Equal("en-US", t.Settings.Value.Language);
+        Assert.Equal(2, raised);
+    }
 }

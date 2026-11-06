@@ -18,11 +18,11 @@ namespace Chippi.Features.ScreenText.Views;
 /// </summary>
 public sealed class ScreenTextSettingsPage : UserControl
 {
-    internal const string NoLanguage = "No OCR language installed. Add one in Windows Settings.";
+    internal const string NoLanguage = "No OCR language installed";
 
     private readonly IScreenTextSettingsModel _model;
     private readonly ComboBox _language = SettingsLayout.Combo([]);
-    private readonly Button _openSettings = new() { Content = "Open Windows Settings", VerticalAlignment = VerticalAlignment.Center };
+    private readonly Button _openSettings = new() { Content = "Add language", VerticalAlignment = VerticalAlignment.Center };
     private readonly SettingRow _languageRow;
     private readonly ToggleButton _keepLines = new();
     private readonly Dictionary<string, ShortcutSetting> _shortcuts = [];

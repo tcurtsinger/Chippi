@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -72,6 +73,7 @@ public sealed class ScreenTextModule : IFeatureModule
         _decoder = decoder ?? new ZXingQrDecoder();
         Text = new TextPage(this);
         Qr = new QrPage(this);
+        Settings = new SettingsModel(this);
     }
 
     public FeatureDescriptor Descriptor { get; } = new(Id, "Text and QR from screen", "Copies text or reads a QR code from anything on screen", FeatureGroup.Capture)
@@ -84,6 +86,9 @@ public sealed class ScreenTextModule : IFeatureModule
 
     public QrPage Qr { get; }
 
+    /// <summary>What Settings › Text and QR shows and changes.</summary>
+    public SettingsModel Settings { get; }
+
     public Task StartAsync(ModuleContext context, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
@@ -92,6 +97,8 @@ public sealed class ScreenTextModule : IFeatureModule
             _context = context;
             _settings = context.Settings.Get<ScreenTextSettings>();
         }
+        context.Ui.SetSettingsPage(_ => new Views.ScreenTextSettingsPage(Settings));
+        context.Shortcuts.Changed += Settings.RaiseChanged;
         if (_capture is not null)
         {
             _use = _capture.Use();
@@ -125,6 +132,7 @@ public sealed class ScreenTextModule : IFeatureModule
 
     public Task StopAsync(CancellationToken ct)
     {
+        lock (_gate) if (_context is { } stopping) stopping.Shortcuts.Changed -= Settings.RaiseChanged;
         foreach (var key in _keys) key.Dispose();
         _keys.Clear();
         _use?.Dispose();
@@ -175,6 +183,78 @@ public sealed class ScreenTextModule : IFeatureModule
     {
         _settings = settings;
         _context?.Settings.Save(settings);
+        Settings.RaiseChanged();
+    }
+
+    /// <summary>Settings › Text and QR's model: the languages Windows has, the saved language and line breaks, and the shortcut rows.</summary>
+    public sealed class SettingsModel(ScreenTextModule owner) : IScreenTextSettingsModel
+    {
+        public IReadOnlyList<OcrLanguage> Languages => [.. owner._ocr.Languages().Select(l => new OcrLanguage(l.Tag, l.Name))];
+
+        public string? Language
+        {
+            get
+            {
+                var all = owner._ocr.Languages();
+                string? saved = owner._settings.Language;
+                return saved is not null && all.Any(l => l.Tag == saved) ? saved : all.Count == 0 ? null : owner._ocr.DefaultLanguage();
+            }
+        }
+
+        public bool KeepLineBreaks => !owner._settings.JoinLines;
+
+        public string? SettingsError => null;
+
+        public event Action? Changed;
+
+        internal void RaiseChanged() => Changed?.Invoke();
+
+        public (KeyShortcut? Keys, string? Error) Shortcut(string name)
+        {
+            ModuleContext? context;
+            lock (owner._gate) context = owner._context;
+            if (context is null) return (null, null);
+            bool host = name == ScreenTextShortcuts.OpenCapture;
+            foreach (var entry in context.Shortcuts.List)
+                if (host ? entry.Name == name && entry.Owner != Id : entry.Owner == Id && entry.Name == Map(name))
+                    return (entry.Shortcut, entry.Error);
+            return (null, null);
+        }
+
+        private static string Map(string slot) => slot switch
+        {
+            ScreenTextShortcuts.ScanQrCode => ScanName,
+            _ => slot,
+        };
+
+        public bool SetLanguage(string tag) => Write(owner._settings with { Language = tag });
+
+        public bool SetKeepLineBreaks(bool on) => Write(owner._settings with { JoinLines = !on });
+
+        private bool Write(ScreenTextSettings settings)
+        {
+            var before = owner._settings;
+            try { owner.Update(settings); return true; }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                owner._settings = before;
+                RaiseChanged();
+                return false;
+            }
+        }
+
+        public void OpenLanguageSettings()
+        {
+            try { Process.Start(new ProcessStartInfo("ms-settings:regionlanguage") { UseShellExecute = true }); }
+            catch (Exception ex) when (ex is Win32Exception or InvalidOperationException) { }
+        }
+
+        public void EditShortcut(string name)
+        {
+            ModuleContext? context;
+            lock (owner._gate) context = owner._context;
+            if (name != ScreenTextShortcuts.OpenCapture) context?.EditShortcut(Map(name));
+        }
     }
 
     private IHotkey AddShortcut(ModuleContext context, string name, Func<KeyShortcut?> saved, Action<KeyShortcut?> set, ScreenTextVerb verb)
