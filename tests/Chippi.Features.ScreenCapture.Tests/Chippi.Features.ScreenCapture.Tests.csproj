@@ -10,6 +10,9 @@
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio" />
     <Using Include="Xunit" />
+    <!-- The Settings page's tests: the app's themes and the shared WPF thread. -->
+    <Compile Include="../Chippi.Island.Tests/WpfTestThread.cs" Link="WpfTestThread.cs" />
     <ProjectReference Include="../../src/Features/Chippi.Features.ScreenCapture/Chippi.Features.ScreenCapture.csproj" />
+    <ProjectReference Include="../../src/Chippi.App/Chippi.App.csproj" />
   </ItemGroup>
 </Project>
