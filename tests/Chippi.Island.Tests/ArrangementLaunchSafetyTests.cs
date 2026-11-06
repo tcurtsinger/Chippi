@@ -10,15 +10,18 @@ namespace Chippi.Island.Tests;
 public sealed class ArrangementLaunchSafetyTests
 {
     [Theory]
-    [InlineData(0u, false, false)]
-    [InlineData(1u, true, true)]
-    [InlineData(2u, true, false)]
-    [InlineData(3u, true, true)]
-    [InlineData(4u, true, true)]
-    public void App_hidden_windows_stay_excluded_while_other_desktops_remain_reportable(uint flags, bool switcherExcludes, bool captureExcludes)
+    [InlineData(0u, true, true, false)]
+    [InlineData(0u, true, null, false)]
+    [InlineData(1u, true, false, true)]
+    [InlineData(2u, false, false, true)]
+    [InlineData(2u, true, true, true)]
+    [InlineData(2u, true, false, false)]
+    [InlineData(2u, true, null, true)]
+    [InlineData(3u, true, false, true)]
+    [InlineData(4u, true, false, true)]
+    public void Shell_hidden_windows_require_confirmation_of_another_desktop(uint flags, bool includeOtherDesktops, bool? onCurrentDesktop, bool excluded)
     {
-        Assert.Equal(switcherExcludes, WindowsWindowList.CloakingExcludes(flags, false));
-        Assert.Equal(captureExcludes, WindowsWindowList.CloakingExcludes(flags, true));
+        Assert.Equal(excluded, WindowsWindowList.CloakingExcludes(flags, includeOtherDesktops, onCurrentDesktop));
     }
     [Fact]
     public void Capture_without_process_identity_never_selects_a_shortcuts_arguments()

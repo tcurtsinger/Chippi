@@ -39,7 +39,7 @@ public sealed partial class WindowsWindowList(uint self)
             }
             foreach (nint top in TopLevel())
             {
-                if (top == shell || !IsAltTab(top, includeOtherDesktops))
+                if (top == shell || !IsAltTab(top, includeOtherDesktops, manager, out bool currentDesktop))
                     continue;
                 GetWindowThreadProcessId(top, out uint pid);
                 uint appPid = pid;
@@ -56,25 +56,26 @@ public sealed partial class WindowsWindowList(uint self)
                     paths[appPid] = path = ImagePath(appPid);
                 string title = Title(top);
                 found.Add(new ListedWindow(top, pid, path is null ? title : Name(path), title, path ?? "", IsIconic(top),
-                    MonitorFromWindow(top, MonitorDefaultToNearest), !includeOtherDesktops || IsOnDesktop(manager, top), appPid));
+                    MonitorFromWindow(top, MonitorDefaultToNearest), currentDesktop, appPid));
             }
             return found;
         }
         finally { if (manager is not null) Marshal.ReleaseComObject(manager); }
     }
 
-    private static bool IsOnDesktop(IVirtualDesktopManager? manager, nint window)
+    private static bool? IsOnDesktop(IVirtualDesktopManager? manager, nint window)
     {
-        try { return manager is not null && manager.IsWindowOnCurrentVirtualDesktop(window, out bool current) == 0 && current; }
-        catch (COMException) { return false; }
+        try { return manager is not null && manager.IsWindowOnCurrentVirtualDesktop(window, out bool current) == 0 ? current : null; }
+        catch (COMException) { return null; }
     }
 
-    // Only shell-cloaked windows may belong to another desktop. App and inherited cloaks stay hidden.
-    internal static bool CloakingExcludes(uint cloaked, bool includeOtherDesktops) =>
-        (cloaked & ~2u) != 0 || (cloaked != 0 && !includeOtherDesktops);
+    // A shell cloak is retained only when Windows confirms another desktop. Unknown/current stays hidden.
+    internal static bool CloakingExcludes(uint cloaked, bool includeOtherDesktops, bool? onCurrentDesktop) =>
+        (cloaked & ~2u) != 0 || (cloaked != 0 && (!includeOtherDesktops || onCurrentDesktop != false));
 
-    private static unsafe bool IsAltTab(nint hwnd, bool includeOtherDesktops)
+    private static unsafe bool IsAltTab(nint hwnd, bool includeOtherDesktops, IVirtualDesktopManager? manager, out bool currentDesktop)
     {
+        currentDesktop = true;
         if (!IsWindowVisible(hwnd))
             return false;
         int style = GetWindowLong(hwnd, GwlExStyle);
@@ -83,7 +84,10 @@ public sealed partial class WindowsWindowList(uint self)
         if ((style & WsExAppWindow) == 0 && (GetWindow(hwnd, GwOwner) != 0 || (style & WsExNoActivate) != 0))
             return false;
         uint cloaked = 0;
-        if (DwmGetWindowAttribute(hwnd, DwmwaCloaked, &cloaked, sizeof(uint)) == 0 && CloakingExcludes(cloaked, includeOtherDesktops))
+        bool readCloak = DwmGetWindowAttribute(hwnd, DwmwaCloaked, &cloaked, sizeof(uint)) == 0;
+        bool? onCurrentDesktop = includeOtherDesktops ? IsOnDesktop(manager, hwnd) : true;
+        currentDesktop = onCurrentDesktop ?? false;
+        if (readCloak && CloakingExcludes(cloaked, includeOtherDesktops, onCurrentDesktop))
             return false;
         if (ClassIs(hwnd, "Windows.UI.Core.CoreWindow"))
             return false; // Start, Search and the like
