@@ -21,9 +21,9 @@ The layer has no doors of its own: each feature's starters reach it (their brief
 
 1. **A starter fires** (a shortcut, a panel card, Search, a Radial slice). If the island is open, it closes first, and the freeze waits for its close to finish so the panel is never captured. Chippi's other transient windows (the Radial menu, the App switcher) are gone by then, since firing a verb closes them.
 2. **A delay, if one was picked** (3, 5 or 10 seconds): the bar shows "Capturing in 3", counting down, and nothing else happens, so menus can be opened. A click on the bar line cancels it; so does pressing the same starter again. Esc doesn't, because Esc would also close the menu being opened.
-3. **Read every display once** into memory. **The method is the spike's answer below.** The pointer isn't included.
+3. **Read every display once** into memory with GDI `BitBlt` (`SRCCOPY | CAPTUREBLT`) from the screen DC, one call per display (the spike's answer, below). The pointer isn't included.
 4. **Read the window list** at the same moment: top-level windows in z-order from `WindowsWindowList`, visible and not cloaked, with frame bounds from `DWMWA_EXTENDED_FRAME_BOUNDS`. Chippi's own puck and the recording pill are left out. This list is a snapshot, so it matches the frozen image.
-5. **Show one overlay per display:** topmost, at that display's DPI, covering the whole display (taskbar included), drawing the frozen image dimmed. The overlay takes the keyboard (Foreground, below).
+5. **Show one overlay per display:** topmost, at that display's DPI, covering the whole display (taskbar included), drawing the frozen image dimmed. The overlay windows are made when the first capture feature starts, and again after a display change, then kept hidden: a capture only swaps their image and shows them (a new window cost 45 ms in the spike). The overlay takes the keyboard (Foreground, below).
 
 Everything after that reads the frozen image and the snapshot list, never the live screen. Pixels stay in Chippi's memory until a feature saves; the layer releases them when the overlay closes. Travis's two displays are about 28 MB of pixels.
 
@@ -75,15 +75,15 @@ The feature supplies its bars' content (Screen capture: the 40-wide tool column 
 
 ## Print Screen
 
-**The shortcut service.** `KeyShortcut.IsBindable` today needs Ctrl, Alt or Win. It changes to: Print Screen (`0x2C`) alone or with any modifiers is bindable; nothing else bare. `KeyName` reads "Print Screen". The Settings › Shortcuts recorder already reads keys through the input hub, which sees Print Screen go down (Windows sends windows only its key up).
+**The shortcut service.** `KeyShortcut.IsBindable` today needs Ctrl, Alt or Win. It changes to: Print Screen (`0x2C`) alone or with any modifiers is bindable; nothing else bare. `KeyName` reads "Print Screen". The Settings › Shortcuts recorder already reads keys through the input hub, whose hook sees Print Screen go down and up whatever is in front (spike).
 
 **Default.** When Screen capture is installed, Capture region gets Print Screen, unless another Chippi shortcut already uses it. It's the only Phase 7 slot with a default. Travis changes or removes it in Settings › Shortcuts like any other.
 
 **Windows' setting**, "Use the Print screen key to open screen capture" (`HKCU\Control Panel\Keyboard`, `PrintScreenKeyForSnippingEnabled`; unset means on):
 
-- **When Print Screen becomes a Chippi shortcut** (installing Screen capture with the default, or Travis recording it), Chippi reads the value, saves what it found (unset, 0 or 1) in its own settings, and turns the setting off. **How it turns it off so it takes effect at once is the spike's answer below.**
-- **When Print Screen stops being a Chippi shortcut** (changed, removed, the feature uninstalled), Chippi puts back what it found, the same way. Chippi's uninstaller does the same, beside removing the Explorer entry (`Program.cs`, `OnBeforeUninstallFastCallback`).
-- **When Travis turns the setting back on himself** while Chippi holds Print Screen: **the spike's answer decides** whether Chippi's shortcut still works. If it doesn't, the row in Settings › Shortcuts shows "Used by Snipping Tool" like any clash.
+- **When Print Screen becomes a Chippi shortcut** (installing Screen capture with the default, or Travis recording it), Chippi reads the value, saves what it found (unset, 0 or 1) in its own settings, and writes 0. That takes effect at the next press: no sign-out, Explorer restart or broadcast needed (spike). It also broadcasts `WM_SETTINGCHANGE`, which costs nothing and is what putting it back uses.
+- **When Print Screen stops being a Chippi shortcut** (changed, removed, the feature uninstalled), Chippi puts back what it found, by writing the value back (or deleting it, if it was unset) and broadcasting `WM_SETTINGCHANGE`, which took effect at once in the spike. Chippi's uninstaller does the same, beside removing the Explorer entry (`Program.cs`, `OnBeforeUninstallFastCallback`).
+- **When Travis turns the setting back on himself** while Chippi holds Print Screen: Chippi's shortcut then fires only while a Chippi window is in front, and Windows' screen clipping opens everywhere else (spike). Chippi watches the value (`RegNotifyChangeKeyValue`) and doesn't turn it off again: the Capture region row in Settings › Shortcuts shows "Used by Windows", like any clash, until Travis records Print Screen again, which turns it off again. `RegisterHotKey` itself succeeds either way, so the value, not the registration, tells Chippi.
 - **Only Chippi.exe in the real profile changes the setting.** Dev profiles and tests get a fake setting store, the way `ExplorerRegistration.CanChange` keeps tests off the real Explorer menu.
 
 ## Foreground
@@ -104,7 +104,7 @@ The overlay needs the keyboard (Esc, Enter, arrows, the feature's keys).
 - **Admin windows:** a capture of the screen includes them (the freeze reads the screen, not the window).
 - **Mixed DPI:** each overlay runs at its display's DPI; selection math is in physical pixels throughout, so a region across the 3440 and 1920 displays cuts each display's own pixels.
 - **Displays with gaps and negative origins** (a display left of or above the main one): the virtual-screen rectangle handles both.
-- **HDR:** **the spike's method decides** how an HDR display is read. Whether Travis's OMEN runs HDR is unknown.
+- **HDR:** what `BitBlt` returns on an HDR display isn't documented. If the live check shows washed-out captures on an HDR display, that display is read with WGC instead (kept warm, below). Whether Travis's OMEN runs HDR is unknown.
 - **The clipboard's pixel limit** (16,588,800 pixels) is the feature's to refuse; the layer selects any size.
 
 ## Shortcuts
@@ -135,7 +135,7 @@ Every string the layer shows. Marge runs them through Decide before the installe
 
 - **Bar:** Capturing in <seconds>; Capture failed (the read failed, for example on the secure desktop).
 - **Overlay:** "<width> × <height>" (size pill); "<x>, <y>" and "#RRGGBB" (magnifier).
-- **Settings › Shortcuts:** Print Screen (key name); Open Capture (row); Used by Snipping Tool (clash, only if the spike shows it's needed).
+- **Settings › Shortcuts:** Print Screen (key name); Open Capture (row); Used by Windows (Capture region's row, while Windows' setting is back on).
 - **Settings › Screen capture:** Magnifier (its switch is Karl's row; the layer reads it).
 
 ## Shared code
@@ -149,7 +149,47 @@ Every string the layer shows. Marge runs them through Decide before the installe
 
 ## Spike results (Windows Sandbox, 2026-11-06)
 
-PENDING: the spike runs once Travis's fullscreen game is closed.
+A throwaway WPF program ran in Windows Sandbox (two runs, 09:13 and 09:20). Clipboard redirection and networking were off, and it never read Travis's screen. The Sandbox ran Windows 26100.9711 on one 2736 × 1111 display at 100%, with the host's RTX 4080 shared in (vGPU) behind the Remote Display Adapter. The program ran elevated, as the Sandbox's logon command does. Every key was a `SendInput` press, not a physical one.
+
+**1. Reading the screen.** Ctrl+Alt+F10 was registered with `RegisterHotKey` and pressed with `SendInput`. On `WM_HOTKEY` the program read the display, then showed it dimmed in a new topmost window. The clock stopped when that window's first frame was rendered and `DwmFlush` returned. Each method ran in three fresh processes of 11 captures. A process's first capture is cold (device and interop set-up included); the other ten are warm.
+
+| Method | Cold, key to shown (3) | Warm, key to shown (30) | Warm read alone | Image |
+|---|---|---|---|---|
+| `BitBlt` | median 70 ms, worst 126 ms | median 76 ms, p95 105 ms | median 30 ms, p95 35 ms | Right in every run |
+| WGC (`CreateForMonitor`, a session per capture) | 663 to 726 ms | median 78 to 80 ms, p95 140 to 267 ms | median 53 to 56 ms, p95 89 to 233 ms | Right in every run |
+| Desktop Duplication (a duplication per capture) | 320 ms | 47 ms | 7 ms | **Black.** The first frame of a new duplication held no desktop image (`LastPresentTime` 0). Waiting for one with a desktop image failed with `DXGI_ERROR_ACCESS_LOST` |
+
+- **Answer: `BitBlt`.** It's simplest and fastest cold, and its warm times are as good as WGC's median with a far better tail. WGC's cold start (WinRT activation and a Direct3D device) costs over half a second. Desktop Duplication only has a desktop image once something on the screen changes, so a still on demand needs a duplication running all the time. It also gives one duplication per GPU, and Travis's displays may sit on two.
+- **Most of the time is showing, not reading:** 45 ms median for a new WPF window with a 12 MB image. So the overlay windows are made once, when the first capture feature starts, and kept hidden; a capture only swaps their image and shows them (step 5, the freeze). **Inference:** that saves most of those 45 ms; the final build's Sandbox run measures it.
+- **Travis's displays** have 2.3 times the Sandbox's pixels (7.0 million). **Inference:** a `BitBlt` read of both takes about 70 ms, since the read grew with pixels here. His live check judges it against Snipping Tool.
+- **WGC is kept for recording** (wave 2) and for an HDR display if `BitBlt` washes it out. Turning off Windows' yellow capture border (`IsBorderRequired = false`, set through `IGraphicsCaptureSession3`) returned S_OK in all 33 sessions, from an unpackaged program, without calling `RequestAccessAsync`. A `BitBlt` taken mid-session showed no border. It's unverified whether `BitBlt` would show a border Windows draws.
+
+**2. Print Screen.** Two windows: "Capture spike" (Chippi's stand-in) and "Other app" (a second process). Windows' key went through each state below; in each, five cases ran:
+- (A) nothing registered, Other in front
+- (B) `RegisterHotKey(VK_SNAPSHOT)` with Chippi's window in front
+- (C1) registered with Chippi's window in front, pressed with Other in front
+- (C2) registered and pressed with Other in front
+- (D) nothing registered, a low-level keyboard hook (the input hub's kind) swallowing the key, Other in front
+
+| Windows' setting | `RegisterHotKey` | `WM_HOTKEY` arrives | Windows' screen clipping opens | Hook sees it |
+|---|---|---|---|---|
+| Unset (on by default) | Succeeds in every case | Only with Chippi's window in front (B) | With Other in front (A, C1, C2) | Down and up, every case |
+| 0, registry only (no broadcast, no restart) | Succeeds | Every case: B, C1, C2 | Never | Down and up |
+| 0 plus `WM_SETTINGCHANGE` | Succeeds | B, C1, C2 | Never | Down and up |
+| 0 plus Explorer restarted | Succeeds | B, C1, C2 | Never | Down and up |
+| 1 plus `WM_SETTINGCHANGE` | Succeeds | Only B | A, C1, C2 | Down and up |
+| 1 plus Explorer restarted | Succeeds | Only B | A, C1, C2 | Down and up |
+
+- **Answers:**
+  - With the setting on, the registration "succeeds" but works only while a Chippi window is in front, as Microsoft's page warns.
+  - Writing 0 works at the next press, with no sign-out.
+  - Writing 1 back (with the broadcast) gives the key back to Windows at once.
+  - The hook always sees the key, and a hook that swallows it stops screen clipping even with the setting on (D, in every state).
+- **What Chippi does:** writes the setting as above and binds Print Screen with `RegisterHotKey`, like every shortcut. The hub swallowing Print Screen also works, but the input hub pauses over fullscreen apps unless Always on is set, and a capture over a game is a main use. So it stays a fallback, not the plan.
+- **Snipping Tool isn't in the Sandbox image.** The key opened Windows' own `ScreenClippingHost` ("Draw a shape to create a screen snip"). Travis's PC has Snipping Tool, and Microsoft names the same setting for both. **Inference:** it behaves the same there; his live check presses the real key with the setting off.
+- **Not answered:** turning the setting off from the Settings app. The program couldn't find the switch through UI Automation, so how the Settings app writes it is unknown. The registry value is what Chippi changes either way.
+
+The spike's program and its raw results (`timings.jsonl`, `prtsc.json`, a screenshot per Print Screen case) are in my session's temp folder and are deleted when this PR merges.
 
 ## Tests
 
@@ -169,7 +209,7 @@ The layer ships inside the first wave 1 feature PR that needs it (Screen capture
 
 | What | Target | How |
 |---|---|---|
-| Key press to frozen screen shown | PENDING from the spike (warm and cold, two displays) | Sandbox: `SendInput` time to every overlay's first frame presented (`DwmFlush`), 10 cold, 30 warm |
+| Key press to frozen screen shown | Warm p95 under 100 ms; the first capture after Chippi starts under 150 ms (the spike: 105 ms and 126 ms with a new window each time, on one 2736 × 1111 display) | Sandbox: `SendInput` time to every overlay's first frame presented (`DwmFlush`), 10 cold, 30 warm. Travis's two displays: his live check, against Snipping Tool |
 | Release to bars shown | One frame: 16.7 ms at 60 Hz, p95 | Sandbox: mouse up to the frame with the bars presented, 30 releases |
 | Selecting at 165 Hz on the 3440 display | No skipped frames while dragging; UI-thread work per move under 2 ms p95 | Sandbox at 60 Hz with moves posted once a frame; Travis judges 165 Hz by feel against Snipping Tool |
 
@@ -177,7 +217,9 @@ Screenshots of each mode next to Lumen's board, and the timings report, go to th
 
 ## Not verified
 
-- Everything under the spike's PENDING section until it runs.
+- The spike's numbers on Travis's own displays: it ran in the Sandbox, on one display, through the Remote Display Adapter, elevated, with `SendInput` keys.
+- Print Screen from a physical key, with Snipping Tool installed, and the Settings app's own switch.
+- That reused overlay windows bring key to frozen screen under 100 ms (the spike made a new window each time).
 - Mixed DPI, a region across two displays and negative origins on real hardware: the Sandbox has one display. Travis's live check.
 - 165 Hz behavior: the Sandbox runs at 60 Hz.
 - HDR reads: no HDR display in the Sandbox.
