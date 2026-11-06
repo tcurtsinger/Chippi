@@ -28,7 +28,7 @@ public static class FeatureCatalog
         },
 
         // System (the System feature is a real module since Phase 4: Chippi.Features.SystemMonitor, and AI agent usage
-        // since Phase 5.5: Chippi.Features.AgentUsage)
+        // since Phase 5.5: Chippi.Features.AgentUsage; Displays and brightness since Phase 7: Chippi.Features.Displays)
         new("temperatures", "Temperatures", "CPU and GPU temperatures with alerts when they run hot", FeatureGroup.System)
         {
             Icon = "Cpu",
@@ -41,11 +41,6 @@ public static class FeatureCatalog
             Icon = "Wrench",
             Requires = [Capability.Admin],
             Badges = [FeatureBadge.Needs("Admin for fans")],
-        },
-        new("displays", "Displays and brightness", "Brightness for every monitor, external ones included", FeatureGroup.System)
-        {
-            Icon = "Sun",
-            Presets = Essentials | PowerUser,
         },
         new("port-manager", "Port manager", "Shows which app holds a network port and frees it", FeatureGroup.System)
         {

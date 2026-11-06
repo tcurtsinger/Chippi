@@ -415,6 +415,16 @@ Screen and copy specification: the [System page mockup](docs/system/design/index
 - **Alerts:** five off-by-default kinds: CPU load, Memory in use, Low disk space, Low battery and GPU temperature. Threshold sub-rows contain sliders and values and dim while off. GPU limit fields remain editable while off, one per reporting GPU, 40 to 110 Celsius with "Not set" and no default. The GPU switch requires at least one limit. Repeat interval choices: 2/5/15/30/60 minutes, default 15. Exact threshold and sustain behavior is in the brief.
 - **Notices:** Windows and Island destinations default on for each opt-in alert. One short reading (for example "Memory in use 93%"), no buttons; clicking opens the System page in the island, or Settings while the island can't show. The widget's chip shows the alert's reading with its glyph in Caution, after media/timer/stash/agent priority, until the alert clears. Chippi stays idle.
 
+### Displays (approved 2026-11-06)
+
+Screen specification: [designs/displays/v3.html](designs/displays/v3.html), which Travis picked; behavior is in [displays.md](docs/phase-7/displays.md).
+
+- **Arrangement:** a 132 tall island card across the body draws each display where Windows puts it, scaled to fit 16 in and centered, 3 apart. Each display is a pick tile (`IslandPickTileStyle`: picked, the accent tint with a 1px accent edge) with its name in 12 and a line in 11 secondary under it ("Main · 54%", "60%"); a display that doesn't answer reads "Brightness control failed" in Caution, up to two lines. Names trim; the tooltip has the full name. Tab follows display order.
+- **Picked line:** a 16 Monitor glyph, the name in 13 / 600 and "· Main" in 11 tertiary, 10 under the map; "Brightness control failed" in 11 Caution at the right after a write that didn't go through.
+- **Sliders:** island control cards, 6 apart: a 16 glyph (Sun, Contrast), the name, the island slider and the level at the right. Contrast shows only for a display that answers it. A display that doesn't answer shows a card with the Caution triangle, "Brightness control failed" and Try again (24 tall) instead.
+- **All displays:** a pick tile in the header (Screens glyph, 11 text, 24 tall), shown with two or more displays that answer. On, every answering tile is picked, the line reads "All displays" with the Screens glyph, and the sliders show the main display's levels and move every display, keeping their difference.
+- The page opens on the display under the pointer, filled with the last levels read. No displays: the MonitorOff glyph and "No displays found", centered.
+
 ### Clipboard and text (approved 2026-10-28)
 
 Screen and copy specification: [approved notes](docs/phase-5/design/notes.md), [boards](docs/phase-5/design/index.html), and [renders](docs/phase-5/design/shots/). The notes decide the approved exceptions to this section. [Scope](docs/phase-5/scope.md) and the [design input](docs/phase-5/design-input.md) decide behavior, except the screens the notes replaced: there is no Clean URL page, and no Plain paste tile or page. The tile set follows Vorssaint's island, which gives these five features three tiles.
