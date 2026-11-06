@@ -27,6 +27,7 @@
     <Project Path="src/Features/Chippi.Features.CleaningMode/Chippi.Features.CleaningMode.csproj" />
     <Project Path="src/Features/Chippi.Features.CloseProtection/Chippi.Features.CloseProtection.csproj" />
     <Project Path="src/Features/Chippi.Features.CommandBar/Chippi.Features.CommandBar.csproj" />
+    <Project Path="src/Features/Chippi.Features.ScreenText/Chippi.Features.ScreenText.csproj" />
     <Project Path="src/Features/Chippi.Features.Debounce/Chippi.Features.Debounce.csproj" />
     <Project Path="src/Features/Chippi.Features.SmoothScrolling/Chippi.Features.SmoothScrolling.csproj" />
     <Project Path="src/Features/Chippi.Features.RadialMenu/Chippi.Features.RadialMenu.csproj" />
@@ -55,6 +56,7 @@
     <Project Path="tests/Chippi.Features.CloseProtection.Tests/Chippi.Features.CloseProtection.Tests.csproj" />
     <Project Path="tests/Chippi.Features.AppSwitcher.Tests/Chippi.Features.AppSwitcher.Tests.csproj" />
     <Project Path="tests/Chippi.Features.CommandBar.Tests/Chippi.Features.CommandBar.Tests.csproj" />
+    <Project Path="tests/Chippi.Features.ScreenText.Tests/Chippi.Features.ScreenText.Tests.csproj" />
     <Project Path="tests/Chippi.Features.Debounce.Tests/Chippi.Features.Debounce.Tests.csproj" />
     <Project Path="tests/Chippi.Features.SmoothScrolling.Tests/Chippi.Features.SmoothScrolling.Tests.csproj" />
     <Project Path="tests/Chippi.Features.RadialMenu.Tests/Chippi.Features.RadialMenu.Tests.csproj" />
