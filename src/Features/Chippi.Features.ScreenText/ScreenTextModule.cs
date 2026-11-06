@@ -351,7 +351,7 @@ public sealed class ScreenTextModule : IFeatureModule
         if (!copy)
         {
             ShowText(result);
-            context.OpenIslandPage(Id);
+            ShowPage(context, Id);
             return;
         }
         switch (outcome.State)
@@ -388,7 +388,15 @@ public sealed class ScreenTextModule : IFeatureModule
         var codes = hits.Select(h => QrPayload.Parse(h.Text)).ToList();
         ShowCodes(codes, failed || damaged ? QrScanState.Unreadable : codes.Count == 0 ? QrScanState.NotFound : QrScanState.Read);
         if (failed) Feedback(context, "QR scan failed", "QR code", true);
-        context.OpenIslandPage(QrTileKey);
+        ShowPage(context, QrTileKey);
+    }
+
+    // The capture's overlay still covers the screen when a result asks for its page, so the island may be hidden as for a
+    // fullscreen app and refuse; then it's shown over it (Settings opens only when the island is off).
+    private static void ShowPage(ModuleContext context, string key)
+    {
+        if (!context.TryOpenIslandPage(key) && !context.SummonIslandPage(key))
+            context.OpenIslandPage(key);
     }
 
     private static BitmapSource Bitmap(CapturedImage image)
