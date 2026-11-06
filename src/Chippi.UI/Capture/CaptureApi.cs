@@ -129,6 +129,16 @@ public interface ICaptureLayer
     /// </summary>
     ICaptureSession? Start(CaptureRequest request);
 
+    /// <summary>
+    /// Reopens a finished capture for Annotate (capture-layer.md, Reopening a capture): the screen freezes as for a
+    /// capture, and the image shows centred on the display under the pointer, already selected and fixed in place, at its
+    /// own size or shrunk to fit. <see cref="ICaptureSession.Selected"/> fires at once; the bars, keys, Tooling and Close
+    /// work as for a capture. <see cref="Selection.Image"/> returns <paramref name="image"/> unchanged,
+    /// <see cref="Selection.Scale"/> maps it to <see cref="Selection.Rect"/>. Null when a capture is already running.
+    /// </summary>
+    /// <param name="image">The flattened pixels, BGRA with straight alpha, as <see cref="Selection.Image"/> returns them.</param>
+    ICaptureSession? Reopen(CapturedImage image, CaptureDoor door);
+
     /// <summary>The previous released rectangle, for Last region; the feature saves it in its settings and sets it at start.</summary>
     PixelRect? LastRegion { get; set; }
 }

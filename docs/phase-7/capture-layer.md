@@ -55,6 +55,8 @@ Recording (wave 2) asks for Region or Window with the selection kept on the disp
 
 The look of the dimming, handles, magnifier and pill is Lumen's board; they stay neutral so they read over any screen.
 
+**Reopening a capture** (`ICaptureLayer.Reopen`, Annotate on a Recent capture): the screen freezes as for a capture, and the finished capture's flattened pixels show centred on the display under the pointer, already selected. It keeps its own size when it fits on that display; otherwise it shrinks to fit 32 DIPs inside the display's edges (an All displays capture on one display). The selection is fixed: no handles, no move, no arrows, no Ctrl+A. The bars, keys, Tooling and Close work as after a release, and the size pill reads the image's own size. `Selection.Image()` returns the reopened pixels unchanged, never the screen under them; `Selection.Scale` is screen pixels per image pixel, so markup drawn on the surface maps back to image pixels. Last region doesn't change.
+
 ## Keys on the overlay
 
 Fixed, in context only, never registered with `RegisterHotKey` (README, task 482):

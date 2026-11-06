@@ -112,6 +112,9 @@ public sealed class ShortcutService : IShortcutService
     /// <summary>A Print Screen shortcut's error while Windows' own Print Screen setting is back on (capture-layer.md).</summary>
     public const string UsedByWindowsText = "Used by Windows";
 
+    /// <summary>Windows' own Print Screen setting couldn't be read or turned off, so Chippi's Print Screen wouldn't work.</summary>
+    public const string PrintScreenFailedText = "Turning off Windows' Print Screen failed";
+
     private readonly IHotkeyRegistrar _registrar;
     private readonly IPrintScreenSetting? _printScreen;
     private readonly List<Entry> _entries = [];
@@ -240,7 +243,9 @@ public sealed class ShortcutService : IShortcutService
             ClaimPrintScreen(shortcut, out string? windows);
             if (windows is not null)
             {
+                // Windows' own is on (and couldn't be turned off): let go, and say why.
                 Yield(entry);
+                entry.Error = windows;
                 Changed?.Invoke();
             }
             return true;
@@ -251,6 +256,8 @@ public sealed class ShortcutService : IShortcutService
         // fires only with Chippi's own window in front, and while it's on, Windows keeps the key only if Chippi lets go
         // (the capture layer's Sandbox check, 2026-11-06).
         ClaimPrintScreen(shortcut, out string? usedByWindows);
+        if (usedByWindows == PrintScreenFailedText)
+            return Refuse(entry, PrintScreenFailedText); // the old keys keep working
         if (usedByWindows is not null)
         {
             if (entry.Id != 0)
@@ -328,18 +335,23 @@ public sealed class ShortcutService : IShortcutService
     /// the setting found on again (Travis turned it back on, maybe while Chippi wasn't running) is left on, and the entry
     /// lets go of the key and reads "Used by Windows", until he records Print Screen again, which turns it off again.
     /// </summary>
-    /// <param name="error">"Used by Windows" when Windows keeps the key.</param>
+    /// <param name="error">
+    /// "Used by Windows" when Windows keeps the key; <see cref="PrintScreenFailedText"/> when its setting couldn't be read or
+    /// turned off, with a claim made here taken back.
+    /// </param>
     private void ClaimPrintScreen(KeyShortcut keys, out string? error)
     {
         error = null;
         if (_printScreen is null || !IsPrintScreen(keys))
             return;
+        bool claimed = false;
         try
         {
             int? value = _printScreen.Read();
             if (_printScreen.Claim is null)
             {
                 _printScreen.Claim = new PrintScreenClaim(value);
+                claimed = true;
                 if (value != 0)
                     _printScreen.Write(0);
             }
@@ -351,7 +363,17 @@ public sealed class ShortcutService : IShortcutService
                     error = UsedByWindowsText;
             }
         }
-        catch (Exception ex) { Diagnostics.Log.Warn("Shortcuts: turning off Windows' Print Screen setting failed", ex); }
+        catch (Exception ex)
+        {
+            Diagnostics.Log.Warn("Shortcuts: turning off Windows' Print Screen setting failed", ex);
+            error = PrintScreenFailedText;
+            // The write failed, so Windows' value is still what was found: forget the claim made here.
+            if (claimed)
+            {
+                try { _printScreen.Claim = null; }
+                catch (Exception clear) { Diagnostics.Log.Warn("Shortcuts: clearing the Print Screen claim failed", clear); }
+            }
+        }
     }
 
     /// <summary>No entry holds Print Screen any more: Windows' setting goes back to what Chippi found.</summary>

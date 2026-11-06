@@ -196,6 +196,35 @@ public sealed class PrintScreenShortcutTests
     }
 
     [Fact]
+    public void A_failed_write_to_Windows_setting_refuses_Print_Screen_keeps_the_old_keys_and_forgets_the_claim()
+    {
+        var windows = new ShortcutServiceTests.FakeRegistrar();
+        var setting = new LoggedSetting(windows.Calls) { Fails = true };
+        setting.SetOutside(1);
+        var service = new ShortcutService(windows, setting);
+        bool pressed = false;
+        var region = service.Add("screen-capture", "Capture region");
+        Assert.True(region.Register(CtrlAltR, () => pressed = true));
+
+        windows.Calls.Clear();
+        Assert.False(region.Register(PrintScreen, () => { }));
+        Assert.Equal(ShortcutService.PrintScreenFailedText, region.Error);
+        Assert.Empty(windows.Calls); // Print Screen never registered
+        Assert.Null(setting.Claim);
+        Assert.Equal(1, setting.Read());
+        windows.Press(CtrlAltR);
+        Assert.True(pressed);
+        Assert.Equal(CtrlAltR, service.List[0].Shortcut);
+
+        // Once the write works, Print Screen holds.
+        setting.Fails = false;
+        Assert.True(region.Register(PrintScreen, () => { }));
+        Assert.Null(region.Error);
+        Assert.Equal(0, setting.Read());
+        Assert.Equal(new PrintScreenClaim(1), setting.Claim);
+    }
+
+    [Fact]
     public void Another_feature_can_not_take_Print_Screen_while_Windows_has_it_and_removing_the_shortcut_still_puts_the_setting_back()
     {
         var setting = new MemoryPrintScreenSetting();
@@ -224,10 +253,15 @@ public sealed class PrintScreenShortcutTests
 
         public event Action? Changed;
 
+        /// <summary>Writes throw, as the registry refusing access would.</summary>
+        public bool Fails { get; set; }
+
         public int? Read() => _value;
 
         public void Write(int? value)
         {
+            if (Fails)
+                throw new UnauthorizedAccessException();
             _value = value;
             calls.Add("setting " + value);
         }
