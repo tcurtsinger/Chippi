@@ -77,10 +77,15 @@ internal sealed class ArrangementDesktop(IActionPc pc, Func<PauseRules> rules, F
         if (foreground is null) return null;
         bool own = launched.Contains(new(foreground.ProcessId, foreground.ProcessStarted));
         var policy = rules();
-        if (!policy.Pauses(FullscreenCheck.IsFullscreen(foreground.Handle), foreground.Executable)) return null;
+        bool fullscreen = FullscreenCheck.IsFullscreen(foreground.Handle);
+        if (!policy.Pauses(fullscreen, foreground.Executable)) return null;
+        // Said as the run page and the bar say it: a fullscreen app in front, or one of Pause in these apps.
         return own && FullscreenCheck.CoversMonitor(foreground.Handle, MonitorFromWindow(foreground.Handle, 2))
-            ? null : "Paused";
+            ? null : fullscreen ? "Fullscreen app" : "Paused app";
     }
+
+    public void Beep() => MessageBeep(0);
+    [DllImport("user32.dll")] private static extern bool MessageBeep(uint type);
 
     public ArrangementProcess? Launch(ArrangementRow row)
     {

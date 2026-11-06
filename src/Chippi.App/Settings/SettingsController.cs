@@ -211,6 +211,24 @@ internal sealed class SettingsController
                                     }
                                 }
                             }
+                            if (page.Id == "module:window-layouts")
+                            {
+                                // Snap's Arrangements at the end of its page, at full width and at the narrowest, 860.
+                                double height = _window.Height, width = _window.Width;
+                                _window.WindowState = WindowState.Normal;
+                                foreach (var (w, size) in new[] { (width, "full"), (860.0, "narrow") })
+                                {
+                                    _window.Width = w;
+                                    _window.Height = 1300;
+                                    await Idle();
+                                    Descendants<System.Windows.Controls.ScrollViewer>(_window).FirstOrDefault(v => v.ScrollableHeight > 0)?.ScrollToEnd();
+                                    await Idle();
+                                    Render(_window, System.IO.Path.Combine(directory, $"r6-snap-arrangements-{size}-{name}-{accent}.png"));
+                                }
+                                _window.Width = width;
+                                _window.Height = height;
+                                await Idle();
+                            }
                             if (page.Id == "features")
                             {
                                 _window.VerifyFeatureSearchSnapshot();

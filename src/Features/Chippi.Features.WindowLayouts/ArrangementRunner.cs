@@ -20,6 +20,9 @@ public interface IArrangementDesktop
     string? StopReason(IReadOnlySet<ArrangementProcess> launched);
     ArrangementProcess? Launch(ArrangementRow row);
     void Place(ActionWindow target, SavedWindowPlacement placement, nint monitor);
+
+    /// <summary>Windows' default beep, for a refused launch while the widget can't show it (Close protection's, task 263).</summary>
+    void Beep() { }
 }
 
 /// <summary>One bounded run at a time. Cancellation leaves opened apps and completed placements alone.</summary>
@@ -54,6 +57,7 @@ public sealed class ArrangementRunner(IArrangementDesktop desktop, TimeProvider?
     {
         _cancel?.Dispose();
         _cancel = new();
+        Stopped = null;
         // Yield before running so a reentrant Changed handler always sees this task as active.
         _running = RunAsync(retry, _cancel.Token);
         return _running;
@@ -187,8 +191,15 @@ public sealed class ArrangementRunner(IArrangementDesktop desktop, TimeProvider?
     private void CheckStop(CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        if (desktop.StopReason(_launched) is not null) throw new OperationCanceledException(ct);
+        if (desktop.StopReason(_launched) is { } reason)
+        {
+            Stopped = reason;
+            throw new OperationCanceledException(ct);
+        }
     }
+
+    /// <summary>Why the last run stopped by itself ("Fullscreen app", "Session locked"); null when it wasn't stopped.</summary>
+    public string? Stopped { get; private set; }
 
     private void Update(int index, ArrangementRowResult result)
     {

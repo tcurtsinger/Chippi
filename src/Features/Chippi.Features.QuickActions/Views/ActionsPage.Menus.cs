@@ -33,8 +33,10 @@ internal sealed partial class ActionsPage
             _built = "menu:" + tile.Key;
             _body.Children.Clear();
             _firstRow = null;
+            MenuView(null);
             if (view() is UIElement element)
             {
+                MenuView(element as IActionsMenuView);
                 _body.Children.Add(element);
                 // Opening it puts the keyboard on its first control, as a menu of rows does.
                 _firstRow = Buttons(element).FirstOrDefault(b => b.IsEnabled);

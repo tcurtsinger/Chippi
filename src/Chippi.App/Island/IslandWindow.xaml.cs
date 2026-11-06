@@ -1391,6 +1391,9 @@ public partial class IslandWindow : Window
             case IslandActivityKind.Media: // music Now Playing can't read: its title, without the bars
                 ShowGlyph(LucideIcons.Music, activity.NeedsAttention);
                 break;
+            case IslandActivityKind.Status when activity.Icon is { } icon: // a finished run of an arrangement: its mark or Caution
+                ShowGlyph(LucideIcons.Get(icon), activity.NeedsAttention);
+                break;
             default:
                 GlyphPlate.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, "IslandAccentTintBrush");
                 Dot.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, activity.NeedsAttention ? "IslandCautionBrush" : "IslandAccentBrush");

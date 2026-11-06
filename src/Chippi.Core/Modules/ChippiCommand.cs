@@ -20,6 +20,9 @@ public enum ChippiCommandKind
 
     /// <summary>A text snippet: Insert, typed into the app that was in front.</summary>
     Insert,
+
+    /// <summary>A saved app arrangement: Launch, which opens its apps and puts each window back.</summary>
+    Launch,
 }
 
 /// <summary>
@@ -76,6 +79,31 @@ public sealed record ActionsTile(string Key, string Label, string Icon)
     /// </summary>
     public Func<object>? View { get; init; }
 
+    /// <summary>
+    /// Asked as Actions opens: true opens this menu straight away (a run of Snap's arrangements a click on the bar wants to
+    /// show). The tile consumes its ask, so the next opening is the usual one.
+    /// </summary>
+    public Func<bool>? OpensNow { get; init; }
+
     /// <summary>The Phase 6 switches: Debounce's, Close protection, Focus follows mouse, Always on in games.</summary>
     public static ActionsTile Input { get; } = new("input", "Input", "Mouse") { Menu = true };
+}
+
+/// <summary>
+/// A menu's view (<see cref="ActionsTile.View"/>) with pages of its own: Snap's Arrangements and a run of one. Actions
+/// shows its title and the element beside it in the header, and asks it first when Back is pressed.
+/// </summary>
+public interface IActionsMenuView
+{
+    /// <summary>The header's title while the view shows; null for the tile's label.</summary>
+    string? Title { get; }
+
+    /// <summary>A WPF element at the header's right ("Arrangements"), or null.</summary>
+    object? Aside { get; }
+
+    /// <summary>Steps back within the view: true when it did, and the menu stays open.</summary>
+    bool Back();
+
+    /// <summary>Raised on the UI thread when <see cref="Title"/> or <see cref="Aside"/> changed.</summary>
+    event Action? HeaderChanged;
 }

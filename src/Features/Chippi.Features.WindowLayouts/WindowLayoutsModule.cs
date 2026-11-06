@@ -161,7 +161,7 @@ public sealed partial class WindowLayoutsModule(Func<IReadOnlyList<SnapDisplay>>
             LayoutId = zone.LayoutId, ZoneId = zone.ZoneId }, target, display?.Handle ?? 0) ?? throw new ActionFailure("Snap failed");
 
     /// <summary>The Actions tile: its menu is Snap's own view (pictures and commands), not a row per command.</summary>
-    private ActionsTile SnapTile => _snapTile ??= new("snap", "Snap", "LayoutGrid") { Menu = true, View = () => new Views.SnapMenu(this) };
+    private ActionsTile SnapTile => _snapTile ??= new("snap", "Snap", "LayoutGrid") { Menu = true, View = () => new Views.SnapMenu(this), OpensNow = TakeRunAsk };
     private ActionsTile? _snapTile;
 
     private IReadOnlyList<ChippiCommand> Commands()

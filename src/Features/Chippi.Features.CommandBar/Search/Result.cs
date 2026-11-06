@@ -43,11 +43,14 @@ public sealed record Result(string Key, ResultKind Kind, string Name, string Det
     /// <summary>A text snippet, typed into the app that was in front: Insert, not Run.</summary>
     public bool Inserts { get; init; }
 
+    /// <summary>A saved app arrangement: Launch, not Run.</summary>
+    public bool Launches { get; init; }
+
     /// <summary>What the selected row says at its right.</summary>
     public string Verb => Kind switch
     {
         ResultKind.Value => "Run",
-        ResultKind.Chippi => Opens ? "Open" : Inserts ? "Insert" : "Run",
+        ResultKind.Chippi => Opens ? "Open" : Inserts ? "Insert" : Launches ? "Launch" : "Run",
         ResultKind.Window => "Switch",
         ResultKind.Clipboard => "Paste",
         ResultKind.Answer or ResultKind.Emoji => "Copy",
