@@ -66,7 +66,7 @@ Window layouts and snapping, app switcher, close protection, focus follows mouse
 | Smooth scrolling (`smooth-scrolling.md`) | Karl | Settings rows only |
 | Text snippets (`text-snippets.md`) | Herb | Settings page |
 | Snap (`snap.md`) | Karl | Lumen, task 212 (Actions menu); zones to follow |
-| Saved app arrangements (`arrangements.md`, [live check](arrangements-live-check.md)) | Karl | [Approved boards](design/arrangements.html) |
+| Saved app arrangements (`arrangements.md`) | Karl | [Approved boards](design/arrangements.html) |
 | App switcher (pp-switcher.md) | Karl | To follow |
 
 Each brief is confirmed by Travis, and each new surface's mockup is approved, before it's built.
