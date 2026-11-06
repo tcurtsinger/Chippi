@@ -45,18 +45,19 @@ public static class CaptureBars
     /// <summary>The text sizes a Text mark offers.</summary>
     public static IReadOnlyList<int> TextSizes { get; } = [12, 14, 18, 24, 32, 48];
 
-    /// <summary>The letter that picks a tool on the frozen screen; Select has none.</summary>
+    /// <summary>The letter that picks a tool on the frozen screen (screen-capture.md, Markup).</summary>
     public static char? Letter(CaptureTool tool) => tool switch
     {
+        CaptureTool.Select => 'V',
         CaptureTool.Pen => 'P',
         CaptureTool.Highlighter => 'H',
         CaptureTool.Line => 'L',
         CaptureTool.Arrow => 'A',
         CaptureTool.Rectangle => 'R',
-        CaptureTool.Ellipse => 'E',
+        CaptureTool.Ellipse => 'O',
         CaptureTool.Text => 'T',
-        CaptureTool.Redact => 'D',
-        CaptureTool.Eraser => 'X',
+        CaptureTool.Redact => 'B',
+        CaptureTool.Eraser => 'E',
         CaptureTool.Crop => 'C',
         _ => null,
     };
