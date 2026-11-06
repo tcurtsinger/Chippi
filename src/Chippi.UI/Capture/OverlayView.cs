@@ -8,6 +8,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
 using Chippi.Capture;
+using Chippi.UI.Controls;
 using CaptureMode = Chippi.Capture.CaptureMode;
 
 namespace Chippi.UI.Capture;
@@ -24,19 +25,33 @@ public sealed class OverlayView : Grid
     /// <summary>The magnifier: this many frozen pixels across, each drawn this many DIPs wide.</summary>
     internal const int MagnifierPixels = 15, MagnifierZoom = 8;
 
+    // The frozen screen's own colours (Frozen screen v1): content, the same in both themes, so they read over any
+    // screen. The feature's bars are the only part that follows the app theme.
+    private static readonly Brush DimBrush = Frozen(Color.FromArgb(0x73, 0, 0, 0));
+    private static readonly Brush EdgeShadowBrush = Frozen(Color.FromArgb(0x66, 0, 0, 0));
+    private static readonly Brush MarkBrush = Frozen(Color.FromRgb(0x74, 0x44, 0xF0));
+    private static readonly Brush PillBrush = Frozen(Color.FromArgb(0xE6, 0x14, 0x14, 0x18));
+    private static readonly Brush GridBrush = Frozen(Color.FromArgb(0x38, 0, 0, 0));
+
+    /// <summary>The size pill and the pointer's pill: 22 high, 8 in, 6 from what they label.</summary>
+    private const double PillHeight = 22, PillGap = 6, PillInset = 8;
+
     private readonly Canvas _pixels = new();
     private readonly Image _image = new() { Stretch = Stretch.Fill };
-    private readonly Path _dim = new() { Fill = new SolidColorBrush(Color.FromArgb(0x80, 0, 0, 0)) };
+    private readonly Path _dim = new() { Fill = DimBrush };
     private readonly Rectangle _frame = new() { Stroke = Brushes.White, Visibility = Visibility.Collapsed, SnapsToDevicePixels = true };
+    private readonly Rectangle _frameShadow = new() { Stroke = EdgeShadowBrush, Visibility = Visibility.Collapsed, SnapsToDevicePixels = true };
+    private readonly Rectangle _window = new() { Stroke = MarkBrush, Visibility = Visibility.Collapsed };
+    private readonly Rectangle _windowRing = new() { Stroke = Brushes.White, Visibility = Visibility.Collapsed };
     private readonly Polyline _outline = new() { Stroke = Brushes.White, Visibility = Visibility.Collapsed };
-    private readonly Rectangle[] _handles = [.. Enumerable.Range(0, 8).Select(_ => new Rectangle { Fill = Brushes.White, Stroke = Brushes.Black, Visibility = Visibility.Collapsed })];
+    private readonly Rectangle[] _handles = [.. Enumerable.Range(0, 8).Select(_ => new Rectangle { Fill = Brushes.White, Stroke = MarkBrush, Visibility = Visibility.Collapsed })];
     private readonly Canvas _chrome = new() { IsHitTestVisible = true };
     private readonly Border _pill;
-    private readonly TextBlock _pillText = new() { Foreground = Brushes.White, FontSize = 12, MaxWidth = 360, TextTrimming = TextTrimming.CharacterEllipsis };
-    private readonly Border _magnifier;
+    private readonly LucideIcon _pillCopy = new() { Data = LucideIcons.Copy, Size = 12, Brush = Brushes.White, Margin = new Thickness(0, 0, 6, 0), VerticalAlignment = VerticalAlignment.Center, Visibility = Visibility.Collapsed };
+    private readonly TextBlock _pillText = Pill();
+    private readonly StackPanel _magnifier;
     private readonly Image _zoom = new() { Width = MagnifierPixels * MagnifierZoom, Height = MagnifierPixels * MagnifierZoom, Stretch = Stretch.Fill };
-    private readonly TextBlock _where = new() { Foreground = Brushes.White, FontSize = 11 };
-    private readonly TextBlock _hex = new() { Foreground = Brushes.White, FontSize = 11 };
+    private readonly TextBlock _where = Pill();
     private readonly WriteableBitmap _zoomBits = new(MagnifierPixels, MagnifierPixels, 96, 96, PixelFormats.Bgra32, null);
     private readonly byte[] _zoomPixels = new byte[MagnifierPixels * MagnifierPixels * 4];
     private WriteableBitmap? _bitmap;
@@ -49,32 +64,70 @@ public sealed class OverlayView : Grid
         _pixels.Children.Add(_image);
         _pixels.Children.Add(_dim);
         _pixels.Children.Add(Layer);
+        _pixels.Children.Add(_windowRing);
+        _pixels.Children.Add(_window);
+        _pixels.Children.Add(_frameShadow);
         _pixels.Children.Add(_frame);
         _pixels.Children.Add(_outline);
         foreach (var h in _handles)
             _pixels.Children.Add(h);
         Children.Add(new Viewbox { Stretch = Stretch.Fill, Child = _pixels });
 
-        _pill = new Border { Background = new SolidColorBrush(Color.FromArgb(0xD9, 0x20, 0x20, 0x20)), CornerRadius = new CornerRadius(4), Padding = new Thickness(6, 2, 6, 2), Child = _pillText, Visibility = Visibility.Collapsed, IsHitTestVisible = false };
-        var grid = new Grid();
+        _pill = PillBox(new StackPanel { Orientation = Orientation.Horizontal, Children = { _pillCopy, _pillText } });
+        _pill.Visibility = Visibility.Collapsed;
+
+        // A round lens over the frozen pixels, its grid and the centre pixel ringed black then white; the pointer's
+        // position and colour in a pill under it.
+        double lens = MagnifierPixels * MagnifierZoom;
+        var grid = new Grid { Width = lens, Height = lens, Clip = new EllipseGeometry(new Rect(0, 0, lens, lens)) };
         grid.Children.Add(_zoom);
         grid.Children.Add(MagnifierGrid());
-        _magnifier = new Border
+        var ring = new Border
         {
-            Background = new SolidColorBrush(Color.FromArgb(0xE6, 0x20, 0x20, 0x20)),
-            BorderBrush = new SolidColorBrush(Color.FromArgb(0x66, 0xFF, 0xFF, 0xFF)),
-            BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(4),
-            Padding = new Thickness(4),
-            IsHitTestVisible = false,
-            Visibility = Visibility.Collapsed,
-            Child = new StackPanel { Children = { grid, _where, _hex } },
+            Width = lens + 4,
+            Height = lens + 4,
+            CornerRadius = new CornerRadius(lens / 2 + 2),
+            BorderBrush = Brushes.White,
+            BorderThickness = new Thickness(2),
+            Background = Brushes.Black,
+            Child = grid,
+            Effect = new System.Windows.Media.Effects.DropShadowEffect { BlurRadius = 12, ShadowDepth = 4, Direction = 270, Opacity = 0.5, Color = Colors.Black },
         };
+        var where = PillBox(_where);
+        where.HorizontalAlignment = HorizontalAlignment.Left;
+        where.Margin = new Thickness(0, PillGap, 0, 0);
+        _magnifier = new StackPanel { IsHitTestVisible = false, Visibility = Visibility.Collapsed, Children = { ring, where } };
         _zoom.Source = _zoomBits;
         _chrome.Children.Add(_pill);
         _chrome.Children.Add(_magnifier);
         Children.Add(_chrome);
     }
+
+    private static SolidColorBrush Frozen(Color color)
+    {
+        var brush = new SolidColorBrush(color);
+        brush.Freeze();
+        return brush;
+    }
+
+    private static TextBlock Pill() => new()
+    {
+        Foreground = Brushes.White,
+        FontSize = 11,
+        MaxWidth = 360,
+        TextTrimming = TextTrimming.CharacterEllipsis,
+        VerticalAlignment = VerticalAlignment.Center,
+    };
+
+    private static Border PillBox(UIElement child) => new()
+    {
+        Background = PillBrush,
+        CornerRadius = new CornerRadius(4),
+        Height = PillHeight,
+        Padding = new Thickness(PillInset, 0, PillInset, 0),
+        Child = child,
+        IsHitTestVisible = false,
+    };
 
     /// <summary>The feature's drawing layer, in the display's physical pixels.</summary>
     public Canvas Layer { get; } = new() { IsHitTestVisible = false };
@@ -94,14 +147,20 @@ public sealed class OverlayView : Grid
         _pixels.Height = Layer.Height = bounds.Height;
         Width = bounds.Width / Scale;
         Height = bounds.Height / Scale;
-        double line = Math.Max(1, Math.Round(Scale));
-        _frame.StrokeThickness = _outline.StrokeThickness = line;
+        Line = Math.Max(1, Math.Round(Scale));
+        _frame.StrokeThickness = _frameShadow.StrokeThickness = _outline.StrokeThickness = _windowRing.StrokeThickness = Line;
+        _window.StrokeThickness = 2 * Line;
+        _window.RadiusX = _window.RadiusY = Math.Round(8 * Scale);
+        _windowRing.RadiusX = _windowRing.RadiusY = _window.RadiusX + Line;
         foreach (var h in _handles)
         {
             h.Width = h.Height = Math.Round(8 * Scale);
-            h.StrokeThickness = line;
+            h.StrokeThickness = Line;
         }
     }
+
+    /// <summary>One DIP of line on this display, in whole physical pixels.</summary>
+    private double Line { get; set; } = 1;
 
     /// <summary>Shows a display's frozen pixels, reusing the bitmap when the size is the same.</summary>
     public void SetImage(CapturedScreen? screen)
@@ -162,18 +221,24 @@ public sealed class OverlayView : Grid
         else
             _dim.Visibility = Visibility.Collapsed;
 
-        // The frame around the selection or hovered window; a freeform outline instead of a frame.
+        // The hovered window lights with a rounded mark; a selection gets a white frame with a dark edge outside it (2
+        // wide when it fills the display, where the edge has no room); a freeform outline instead of a frame.
         bool freeform = selector.Outline.Count > 0;
-        if (!cut.IsEmpty && !freeform && !picking)
+        bool hovering = selector.Rect is null && !cut.IsEmpty && !picking;
+        bool framed = !cut.IsEmpty && !freeform && !picking && !hovering;
+        if (framed)
         {
-            Canvas.SetLeft(_frame, cut.X);
-            Canvas.SetTop(_frame, cut.Y);
-            _frame.Width = cut.Width;
-            _frame.Height = cut.Height;
-            _frame.Visibility = Visibility.Visible;
+            _frame.StrokeThickness = cut == local ? 2 * Line : Line;
+            Put(_frame, cut, 0);
+            Put(_frameShadow, cut, Line);
         }
-        else
-            _frame.Visibility = Visibility.Collapsed;
+        _frame.Visibility = _frameShadow.Visibility = framed ? Visibility.Visible : Visibility.Collapsed;
+        if (hovering)
+        {
+            Put(_window, cut, 0);
+            Put(_windowRing, cut, Line);
+        }
+        _window.Visibility = _windowRing.Visibility = hovering ? Visibility.Visible : Visibility.Collapsed;
         if (freeform)
         {
             _outline.Points = new PointCollection(selector.Outline.Select(p => new Point(p.X - Bounds.X + 0.5, p.Y - Bounds.Y + 0.5)));
@@ -189,6 +254,15 @@ public sealed class OverlayView : Grid
         RenderMagnifier(selector, request, screen);
         RenderBars(selector);
         Layer.IsHitTestVisible = selector.IsReleased && selector.Tooling;
+    }
+
+    /// <summary>Lays a stroked rectangle over <paramref name="r"/>, grown by <paramref name="outward"/> on each side.</summary>
+    private static void Put(Rectangle shape, PixelRect r, double outward)
+    {
+        Canvas.SetLeft(shape, r.X - outward);
+        Canvas.SetTop(shape, r.Y - outward);
+        shape.Width = r.Width + 2 * outward;
+        shape.Height = r.Height + 2 * outward;
     }
 
     private void RenderHandles(Selector selector, PixelRect cut)
@@ -228,14 +302,20 @@ public sealed class OverlayView : Grid
         }
         string pixels = string.Create(CultureInfo.InvariantCulture, $"{rect.Width} × {rect.Height}");
         _pillText.Text = window is { Title.Length: > 0 } ? $"{window.Title} · {pixels}" : pixels;
+        _pillCopy.Visibility = selector.CopyDrag ? Visibility.Visible : Visibility.Collapsed;
         _pill.Visibility = Visibility.Visible;
         _pill.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
         var size = _pill.DesiredSize;
-        double x = Math.Max(rect.X - Bounds.X, 0) / Scale, y = (rect.Y - Bounds.Y) / Scale - size.Height - 4;
-        if (y < 4)
-            y = Math.Max(rect.Y - Bounds.Y, 0) / Scale + 4; // no room above: inside
-        Canvas.SetLeft(_pill, Math.Clamp(x, 4, Math.Max(4, Width - size.Width - 4)));
-        Canvas.SetTop(_pill, Math.Clamp(y, 4, Math.Max(4, Height - size.Height - 4)));
+        double left = (rect.X - Bounds.X) / Scale, top = (rect.Y - Bounds.Y) / Scale;
+        double x = left, y = top - size.Height - PillGap;
+        if (y < 0)
+        {
+            // No room above: inside the corner, clear of the frame.
+            x = Math.Max(left, 0) + PillInset;
+            y = Math.Max(top, 0) + PillInset;
+        }
+        Canvas.SetLeft(_pill, Math.Clamp(x, 0, Math.Max(0, Width - size.Width)));
+        Canvas.SetTop(_pill, Math.Clamp(y, 0, Math.Max(0, Height - size.Height)));
     }
 
     /// <summary>8× over the frozen pixels around the pointer, with the grid, its physical coordinates and the HEX, flipped to stay on the display.</summary>
@@ -263,13 +343,12 @@ public sealed class OverlayView : Grid
             }
         _zoomBits.WritePixels(new Int32Rect(0, 0, MagnifierPixels, MagnifierPixels), _zoomPixels, MagnifierPixels * 4, 0);
         uint center = screen.PixelAt(p) ?? 0;
-        _where.Text = string.Create(CultureInfo.InvariantCulture, $"{p.X}, {p.Y}");
-        _hex.Text = string.Create(CultureInfo.InvariantCulture, $"#{(center >> 16) & 0xFF:X2}{(center >> 8) & 0xFF:X2}{center & 0xFF:X2}");
+        _where.Text = string.Create(CultureInfo.InvariantCulture, $"{p.X}, {p.Y} · #{(center >> 16) & 0xFF:X2}{(center >> 8) & 0xFF:X2}{center & 0xFF:X2}");
         _magnifier.Visibility = Visibility.Visible;
         _magnifier.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
         var size = _magnifier.DesiredSize;
         double px = (p.X - Bounds.X) / Scale, py = (p.Y - Bounds.Y) / Scale;
-        const double offset = 20;
+        const double offset = 16;
         double mx = px + offset + size.Width > Width ? px - offset - size.Width : px + offset;
         double my = py + offset + size.Height > Height ? py - offset - size.Height : py + offset;
         Canvas.SetLeft(_magnifier, Math.Max(0, mx));
@@ -317,19 +396,26 @@ public sealed class OverlayView : Grid
         return g;
     }
 
-    /// <summary>The magnifier's pixel grid and its centre pixel's frame.</summary>
-    private static Path MagnifierGrid()
+    /// <summary>The magnifier's pixel grid, and its centre pixel ringed black, then white, so it reads on any colour.</summary>
+    private static Canvas MagnifierGrid()
     {
         var g = new GeometryGroup();
         double size = MagnifierPixels * MagnifierZoom;
         for (int i = 1; i < MagnifierPixels; i++)
         {
-            g.Children.Add(new LineGeometry(new Point(i * MagnifierZoom, 0), new Point(i * MagnifierZoom, size)));
-            g.Children.Add(new LineGeometry(new Point(0, i * MagnifierZoom), new Point(size, i * MagnifierZoom)));
+            g.Children.Add(new LineGeometry(new Point(i * MagnifierZoom + 0.5, 0), new Point(i * MagnifierZoom + 0.5, size)));
+            g.Children.Add(new LineGeometry(new Point(0, i * MagnifierZoom + 0.5), new Point(size, i * MagnifierZoom + 0.5)));
         }
-        int c = MagnifierPixels / 2 * MagnifierZoom;
-        g.Children.Add(new RectangleGeometry(new Rect(c, c, MagnifierZoom, MagnifierZoom)));
         g.Freeze();
-        return new Path { Data = g, Stroke = new SolidColorBrush(Color.FromArgb(0x40, 0xFF, 0xFF, 0xFF)), StrokeThickness = 1, IsHitTestVisible = false };
+        int c = MagnifierPixels / 2 * MagnifierZoom;
+        var canvas = new Canvas { IsHitTestVisible = false, Children = { new Path { Data = g, Stroke = GridBrush, StrokeThickness = 1 } } };
+        foreach (var (inset, brush) in new[] { (-1.0, Brushes.Black), (-2.0, Brushes.White) })
+        {
+            var ring = new Rectangle { Width = MagnifierZoom - 2 * inset, Height = MagnifierZoom - 2 * inset, Stroke = brush, StrokeThickness = 1 };
+            Canvas.SetLeft(ring, c + inset);
+            Canvas.SetTop(ring, c + inset);
+            canvas.Children.Add(ring);
+        }
+        return canvas;
     }
 }

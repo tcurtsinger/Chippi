@@ -161,6 +161,9 @@ public sealed class Selector
 
     private bool _fastPath;
 
+    /// <summary>A drag that started with Ctrl is under way: its release copies and closes (the size pill shows the copy glyph).</summary>
+    public bool CopyDrag => _pressed && _fastPath;
+
     /// <summary>The left button went down.</summary>
     public SelectorOutcome Down(PixelPoint p, bool ctrl)
     {

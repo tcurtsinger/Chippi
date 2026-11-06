@@ -42,6 +42,11 @@ public sealed partial class CaptureLayer : ICaptureLayer
 
     public PixelRect? LastRegion { get; set; }
 
+    /// <summary>The styles the features' bars ask for (the island's), merged into each overlay when it's made.</summary>
+    public Uri? BarStyles { get; init; }
+
+    private ResourceDictionary? _barStyles;
+
     public IDisposable Use()
     {
         if (_uses++ == 0)
@@ -109,6 +114,8 @@ public sealed partial class CaptureLayer : ICaptureLayer
         foreach (var m in monitors)
         {
             var overlay = new OverlayWindow();
+            if (BarStyles is not null)
+                overlay.Resources.MergedDictionaries.Add(_barStyles ??= new ResourceDictionary { Source = BarStyles });
             overlay.Place(m.Bounds, m.Dpi);
             overlay.ButtonDown += (o, e) => _current?.OnButtonDown(o, e);
             overlay.ButtonUp += (o, e) => _current?.OnButtonUp(o, e);
