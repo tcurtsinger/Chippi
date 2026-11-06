@@ -178,7 +178,7 @@ public sealed class ShortcutService : IShortcutService
         if (!keys.IsBindable)
             return PickText;
         var own = except is { } key ? _entries.FirstOrDefault(e => e.Key == key) : null;
-        if (_entries.FirstOrDefault(e => !ReferenceEquals(e, own) && e.Id != 0 && e.Shortcut == keys) is { } holder)
+        if (_entries.FirstOrDefault(e => !ReferenceEquals(e, own) && Holds(e) && e.Shortcut == keys) is { } holder)
             return $"{holder.Name} already uses this";
         if (WindowsKeys.IsReserved(keys))
             return WindowsText;
@@ -237,12 +237,32 @@ public sealed class ShortcutService : IShortcutService
         if (entry.Id != 0 && entry.Shortcut == shortcut)
         {
             entry.Pressed = pressed;
-            entry.Error = null;
-            ClaimPrintScreen(entry);
+            ClaimPrintScreen(shortcut, out string? windows);
+            if (windows is not null)
+            {
+                Yield(entry);
+                Changed?.Invoke();
+            }
             return true;
         }
-        if (_entries.FirstOrDefault(e => !ReferenceEquals(e, entry) && e.Id != 0 && e.Shortcut == shortcut) is { } holder)
+        if (_entries.FirstOrDefault(e => !ReferenceEquals(e, entry) && Holds(e) && e.Shortcut == shortcut) is { } holder)
             return Refuse(entry, $"Used by {holder.Name}");
+        // Windows' own Print Screen goes off before the key is registered: a Print Screen hotkey registered while it's on
+        // fires only with Chippi's own window in front, and while it's on, Windows keeps the key only if Chippi lets go
+        // (the capture layer's Sandbox check, 2026-11-06).
+        ClaimPrintScreen(shortcut, out string? usedByWindows);
+        if (usedByWindows is not null)
+        {
+            if (entry.Id != 0)
+                _registrar.Unregister(entry.Id);
+            entry.Id = 0;
+            entry.Shortcut = shortcut;
+            entry.Pressed = pressed;
+            entry.Yielded = true;
+            entry.Error = usedByWindows;
+            Changed?.Invoke();
+            return true;
+        }
         int id = ++_nextId;
         bool taken;
         try { taken = (shortcut.IsValid || shortcut.IsBindable) && _registrar.Register(id, shortcut); }
@@ -252,18 +272,50 @@ public sealed class ShortcutService : IShortcutService
             taken = false;
         }
         if (!taken)
+        {
+            ReleasePrintScreen();
             return Refuse(entry, InUse);
+        }
         // The new keys are held before the old ones go, so a refused change keeps the shortcut working.
         if (entry.Id != 0)
             _registrar.Unregister(entry.Id);
         entry.Id = id;
         entry.Shortcut = shortcut;
         entry.Pressed = pressed;
+        entry.Yielded = false;
         entry.Error = null;
-        ClaimPrintScreen(entry);
         ReleasePrintScreen(); // the old keys may have been Print Screen
         Changed?.Invoke();
         return true;
+    }
+
+    /// <summary>Set to keys Chippi holds, or to Print Screen while Windows' own has it.</summary>
+    private static bool Holds(Entry e) => e.Id != 0 || e.Yielded;
+
+    /// <summary>Windows' own Print Screen is on: the entry lets go of the key and keeps it set, to take it back once it's off.</summary>
+    private void Yield(Entry entry)
+    {
+        if (entry.Id != 0)
+            _registrar.Unregister(entry.Id);
+        entry.Id = 0;
+        entry.Yielded = true;
+        entry.Error = UsedByWindowsText;
+    }
+
+    /// <summary>Windows' own Print Screen is off again: the entry registers the key again, or reads in use when another app took it.</summary>
+    private void TakeBack(Entry entry)
+    {
+        int id = ++_nextId;
+        bool taken;
+        try { taken = _registrar.Register(id, entry.Shortcut!); }
+        catch (Exception ex)
+        {
+            Diagnostics.Log.Warn("Shortcuts: registering failed", ex);
+            taken = false;
+        }
+        entry.Yielded = false;
+        entry.Id = taken ? id : 0;
+        entry.Error = taken ? null : InUse;
     }
 
     private static bool IsPrintScreen(KeyShortcut? keys) => keys?.Key == KeyShortcut.PrintScreen;
@@ -272,13 +324,15 @@ public sealed class ShortcutService : IShortcutService
     private static bool WindowsHasIt(int? value) => value != 0;
 
     /// <summary>
-    /// An entry now holds Print Screen. The first hold saves what Windows' setting was and turns it off. While held, the
-    /// setting found on again (Travis turned it back on, maybe while Chippi wasn't running) is left on, and the entry
-    /// reads "Used by Windows", until he records Print Screen again, which turns it off again.
+    /// An entry is about to hold Print Screen. The first hold saves what Windows' setting was and turns it off. While held,
+    /// the setting found on again (Travis turned it back on, maybe while Chippi wasn't running) is left on, and the entry
+    /// lets go of the key and reads "Used by Windows", until he records Print Screen again, which turns it off again.
     /// </summary>
-    private void ClaimPrintScreen(Entry entry)
+    /// <param name="error">"Used by Windows" when Windows keeps the key.</param>
+    private void ClaimPrintScreen(KeyShortcut keys, out string? error)
     {
-        if (_printScreen is null || !IsPrintScreen(entry.Shortcut))
+        error = null;
+        if (_printScreen is null || !IsPrintScreen(keys))
             return;
         try
         {
@@ -294,7 +348,7 @@ public sealed class ShortcutService : IShortcutService
                 if (_changing)
                     _printScreen.Write(0);
                 else
-                    entry.Error = UsedByWindowsText;
+                    error = UsedByWindowsText;
             }
         }
         catch (Exception ex) { Diagnostics.Log.Warn("Shortcuts: turning off Windows' Print Screen setting failed", ex); }
@@ -303,7 +357,7 @@ public sealed class ShortcutService : IShortcutService
     /// <summary>No entry holds Print Screen any more: Windows' setting goes back to what Chippi found.</summary>
     private void ReleasePrintScreen()
     {
-        if (_printScreen?.Claim is not { } claim || _closing || _entries.Any(e => e.Id != 0 && IsPrintScreen(e.Shortcut)))
+        if (_printScreen?.Claim is not { } claim || _closing || _entries.Any(e => Holds(e) && IsPrintScreen(e.Shortcut)))
             return;
         try
         {
@@ -326,11 +380,15 @@ public sealed class ShortcutService : IShortcutService
             return;
         }
         bool changed = false;
-        foreach (var e in _entries.Where(e => e.Id != 0 && IsPrintScreen(e.Shortcut)))
+        foreach (var e in _entries.Where(e => Holds(e) && IsPrintScreen(e.Shortcut)))
         {
-            string? error = WindowsHasIt(value) ? UsedByWindowsText : e.Error == UsedByWindowsText ? null : e.Error;
-            changed |= error != e.Error;
-            e.Error = error;
+            if (WindowsHasIt(value) && !e.Yielded)
+                Yield(e);
+            else if (!WindowsHasIt(value) && e.Yielded)
+                TakeBack(e);
+            else
+                continue;
+            changed = true;
         }
         if (changed)
             Changed?.Invoke();
@@ -352,6 +410,7 @@ public sealed class ShortcutService : IShortcutService
         entry.Id = 0;
         entry.Shortcut = null;
         entry.Pressed = null;
+        entry.Yielded = false;
         entry.Error = null;
         ReleasePrintScreen();
         Changed?.Invoke();
@@ -365,6 +424,7 @@ public sealed class ShortcutService : IShortcutService
             _registrar.Unregister(entry.Id);
         entry.Id = 0;
         entry.Pressed = null;
+        entry.Yielded = false;
         entry.Disposed = true;
         _entries.Remove(entry);
         ReleasePrintScreen();
@@ -381,6 +441,7 @@ public sealed class ShortcutService : IShortcutService
         public KeyShortcut? Shortcut;
         public Action? Pressed;
         public bool Disposed;
+        public bool Yielded; // Print Screen, set but let go while Windows' own has it
 
         public string? Error { get; set; }
 
