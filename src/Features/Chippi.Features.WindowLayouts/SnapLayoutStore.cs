@@ -7,6 +7,7 @@ namespace Chippi.Features.WindowLayouts;
 
 public sealed record WindowLayoutsSettings
 {
+    public List<SavedArrangement> Arrangements { get; init; } = [];
     public bool ShiftDragEnabled { get; init; }
     public int WindowGap { get; init; } = 8;
     public int ScreenEdgeGap { get; init; }
@@ -23,6 +24,24 @@ public sealed class SnapLayoutStore(IModuleSettings settings)
 
     public bool NameTaken(string name, string? exceptId = null) =>
         Settings.Layouts.Any(l => l.Id != exceptId && string.Equals(l.Name, name.Trim(), StringComparison.OrdinalIgnoreCase));
+
+    public bool ArrangementNameTaken(string name, string? exceptId = null) => Settings.Arrangements.Any(a =>
+        a.Id != exceptId && string.Equals(a.Name, name.Trim(), StringComparison.OrdinalIgnoreCase));
+
+    public void SaveArrangement(SavedArrangement arrangement)
+    {
+        if (!arrangement.IsValid || ArrangementNameTaken(arrangement.Name, arrangement.Id))
+            throw new ArgumentException("Invalid arrangement", nameof(arrangement));
+        var arrangements = Settings.Arrangements.ToList();
+        int index = arrangements.FindIndex(a => a.Id == arrangement.Id);
+        var saved = arrangement with { Name = arrangement.Name.Trim(), Rows = arrangement.Rows.ToList() };
+        if (index < 0) arrangements.Add(saved);
+        else arrangements[index] = saved;
+        Commit(Settings with { Arrangements = arrangements });
+    }
+
+    public void DeleteArrangement(string id) =>
+        Commit(Settings with { Arrangements = Settings.Arrangements.Where(a => a.Id != id).ToList() });
 
     public void Save(SnapLayout layout)
     {
@@ -125,7 +144,12 @@ public sealed class SnapLayoutStore(IModuleSettings settings)
         }
         foreach (var layout in defaults)
             if (!layouts.Any(l => l.Id == layout.Id)) layouts.Add(layout);
-        return saved with { Layouts = layouts, WindowGap = Math.Clamp(saved.WindowGap, 0, 24),
+        var arrangementIds = new HashSet<string>(StringComparer.Ordinal);
+        var arrangementNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var arrangements = (saved.Arrangements ?? []).Where(a => a is not null && a.IsValid
+            && arrangementIds.Add(a.Id) && arrangementNames.Add(a.Name.Trim()))
+            .Select(a => a with { Name = a.Name.Trim(), Rows = a.Rows.ToList() }).ToList();
+        return saved with { Arrangements = arrangements, Layouts = layouts, WindowGap = Math.Clamp(saved.WindowGap, 0, 24),
             ScreenEdgeGap = Math.Clamp(saved.ScreenEdgeGap, 0, 24),
             DisplayLayouts = new(saved.DisplayLayouts ?? [], StringComparer.OrdinalIgnoreCase),
             ExcludedApps = (saved.ExcludedApps ?? []).Where(s => !string.IsNullOrWhiteSpace(s)).Distinct(StringComparer.OrdinalIgnoreCase).ToList() };

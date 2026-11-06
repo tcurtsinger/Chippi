@@ -27,6 +27,9 @@ public sealed class ArrangementMatcher
 {
     private readonly HashSet<(nint Handle, uint Process, long Started, long Lifetime)> _reserved = [];
 
+    internal bool IsReserved(ActionWindow window) => _reserved.Contains(Key(window));
+    internal void Release(ActionWindow window) => _reserved.Remove(Key(window));
+
     public ArrangementMatch? Match(string appIdentity, string className, string titleHint,
         ArrangementBounds destination, IReadOnlyList<ArrangementCandidate> windows)
     {

@@ -14,7 +14,8 @@ public sealed record SavedWindowPlacement(int Left, int Top, int Width, int Heig
 /// <summary>An executable launch, never a shell command. Arguments are entered deliberately.</summary>
 public sealed record ExecutableLaunch(string Path, string Arguments = "", string WorkingFolder = "")
 {
-    public bool IsValid => System.IO.Path.IsPathFullyQualified(Path)
+    public bool IsValid => !string.IsNullOrWhiteSpace(Path) && Arguments is not null && WorkingFolder is not null
+        && System.IO.Path.IsPathFullyQualified(Path)
         && string.Equals(System.IO.Path.GetExtension(Path), ".exe", StringComparison.OrdinalIgnoreCase)
         && (WorkingFolder.Length == 0 || System.IO.Path.IsPathFullyQualified(WorkingFolder))
         && !Path.Contains('\0') && !Arguments.Contains('\0') && !WorkingFolder.Contains('\0');
