@@ -80,7 +80,8 @@ public sealed class ShellContext
 #endif
         // The capture layer every capture feature shares: no window until the first one starts using it.
         CaptureShell = new CaptureShell(this);
-        Capture = new Chippi.UI.Capture.CaptureLayer(CaptureShell);
+        // Its overlays take the island's styles, for the features' bars.
+        Capture = new Chippi.UI.Capture.CaptureLayer(CaptureShell) { BarStyles = new Uri("pack://application:,,,/Chippi;component/Island/IslandStyles.xaml") };
         Registry = new ModuleRegistry(config, Island, loggerFactory, Services);
         Startup = string.IsNullOrWhiteSpace(devProfile)
             ? new StartupRegistration()

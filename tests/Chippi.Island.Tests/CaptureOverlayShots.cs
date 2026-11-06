@@ -30,11 +30,15 @@ public sealed class CaptureOverlayShots
         Directory.CreateDirectory(folder);
         WpfTestThread.Run(() =>
         {
+            // The overlays take the island's styles for the bars, as the shell's capture layer does.
+            var styles = new ResourceDictionary { Source = new Uri("pack://application:,,,/Chippi;component/Island/IslandStyles.xaml") };
+            string theme = WpfTestThread.ShotsTheme == "Light" ? "-light" : "";
+            Gallery(styles, Path.Combine(folder, $"capture-markup{theme}.png"));
             foreach (int dpi in new[] { 96, 144 })
             {
                 var display = new PixelRect(0, 0, 1920, 1080);
                 var freeze = new Freeze([Screen(display, dpi)], [Terminal, Editor], DateTimeOffset.UnixEpoch);
-                string at = dpi == 96 ? "" : "-150";
+                string at = (dpi == 96 ? "" : "-150") + theme;
                 var drag = new PixelSize(4, 4);
                 var request = new CaptureRequest(CaptureMode.Region);
 
@@ -45,6 +49,11 @@ public sealed class CaptureOverlayShots
                 dragging.Down(new PixelPoint(400, 300), ctrl: false);
                 dragging.Move(new PixelPoint(1100, 700));
                 Shoot(dragging, request, $"capture-drag{at}.png");
+
+                var copying = new Selector(freeze, CaptureMode.Region, null, new PixelPoint(400, 300), drag, 6);
+                copying.Down(new PixelPoint(400, 300), ctrl: true);
+                copying.Move(new PixelPoint(1100, 700));
+                Shoot(copying, request, $"capture-ctrl-drag{at}.png");
 
                 var released = new Selector(freeze, CaptureMode.Region, null, new PixelPoint(400, 300), drag, 6);
                 released.Down(new PixelPoint(400, 300), false);
@@ -83,10 +92,11 @@ public sealed class CaptureOverlayShots
             {
                 var screen = selector.Freeze.Screens[0];
                 var view = new OverlayView();
+                view.Resources.MergedDictionaries.Add(styles);
                 view.Place(screen.Bounds, screen.Dpi);
                 view.SetImage(screen);
                 if (bars)
-                    view.SetBars(Bar(40, 280, vertical: true), Bar(220, 40, vertical: false));
+                    view.SetBars(new MarkupTools { Tool = CaptureTool.Pen }, new FinishBar { ShowCopyText = true, ShowScanQrCode = true });
                 view.Measure(new Size(view.Width, view.Height));
                 view.Arrange(new Rect(0, 0, view.Width, view.Height));
                 view.Render(selector, request, screen);
@@ -101,14 +111,37 @@ public sealed class CaptureOverlayShots
         });
     }
 
-    /// <summary>A stand-in for a feature's bar: a dark rounded strip with a few square buttons.</summary>
-    private static Border Bar(double width, double height, bool vertical)
+    /// <summary>
+    /// The bars on their own over a wallpaper, at 2×: the column with Rectangle lit and Undo on, the colour choice (blue,
+    /// Thick), a Text mark's bar with its size menu open and Bold on, Crop's bar, and the finish bar without Copy text and
+    /// Scan QR code (Text and QR off).
+    /// </summary>
+    private static void Gallery(ResourceDictionary styles, string path)
     {
-        var buttons = new StackPanel { Orientation = vertical ? Orientation.Vertical : Orientation.Horizontal, Margin = new Thickness(4) };
-        int count = (int)((vertical ? height : width) / 36);
-        for (int i = 0; i < count; i++)
-            buttons.Children.Add(new Border { Width = 28, Height = 28, Margin = new Thickness(2), CornerRadius = new CornerRadius(4), Background = new SolidColorBrush(Color.FromArgb(0x33, 0xFF, 0xFF, 0xFF)) });
-        return new Border { Width = width, Height = height, CornerRadius = new CornerRadius(8), Background = new SolidColorBrush(Color.FromRgb(0x2B, 0x2B, 0x2E)), Child = buttons };
+        var canvas = new Canvas { Width = 760, Height = 560 };
+        canvas.Resources.MergedDictionaries.Add(styles);
+        canvas.Background = new LinearGradientBrush(Color.FromRgb(0x2C, 0x3E, 0x57), Color.FromRgb(0x1B, 0x28, 0x38), 45);
+        var tools = new MarkupTools { Tool = CaptureTool.Rectangle, Ink = CaptureBars.Inks[3].Color, CanUndo = true };
+        var ink = new InkChoice { Ink = CaptureBars.Inks[3].Color, Stroke = InkWidth.Thick };
+        var text = new TextMarkBar { TextSize = 24, Bold = true };
+        var crop = new CropBar();
+        var finish = new FinishBar { ShowCopyText = false, ShowScanQrCode = false };
+        var full = new FinishBar { ShowCopyText = true, ShowScanQrCode = true };
+        foreach (var (bar, x, y) in new (FrameworkElement, double, double)[] { (tools, 24, 24), (ink, 96, 24), (text, 96, 300), (crop, 300, 300), (finish, 96, 400), (full, 96, 470) })
+        {
+            Canvas.SetLeft(bar, x);
+            Canvas.SetTop(bar, y);
+            canvas.Children.Add(bar);
+        }
+        canvas.Measure(new Size(canvas.Width, canvas.Height));
+        canvas.Arrange(new Rect(0, 0, canvas.Width, canvas.Height));
+        canvas.UpdateLayout();
+        var bitmap = new RenderTargetBitmap(760 * 2, 560 * 2, 192, 192, PixelFormats.Pbgra32);
+        bitmap.Render(canvas);
+        var png = new PngBitmapEncoder();
+        png.Frames.Add(BitmapFrame.Create(bitmap));
+        using var file = File.Create(path);
+        png.Save(file);
     }
 
     /// <summary>A desktop with a gradient wallpaper and two app windows, drawn into BGRA like a screen read.</summary>
