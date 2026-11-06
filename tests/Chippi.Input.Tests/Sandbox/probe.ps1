@@ -74,6 +74,15 @@ public static class Probe
         Send(input);
     }
 
+    /// <summary>A key as a keyboard sends it, with its scan code and the extended flag (Print Screen: 0x2C, 0x37).
+    /// Windows doesn't match a bare-VK Print Screen to a registered hotkey (the capture check, 2026-11-06).</summary>
+    public static void ExtendedKey(ushort vk, ushort scan, bool down)
+    {
+        var input = new Input { Type = 1 };
+        input.Data.Key = new KeyInput { Vk = vk, Scan = scan, Flags = 1u | (down ? 0u : 2u) };
+        Send(input);
+    }
+
     /// <summary>From one point to another over about <paramref name="ms"/> milliseconds, a move a millisecond, as a hand would.</summary>
     public static void Glide(int x0, int y0, int x1, int y1, int ms)
     {

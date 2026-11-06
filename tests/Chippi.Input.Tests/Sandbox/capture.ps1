@@ -24,6 +24,7 @@ function WaitEvent([string]$name, [int]$from, [int]$ms = 4000) {
     return $null
 }
 function Tap([uint16]$vk) { [Probe]::Key($vk, $true); [Probe]::Spin(25); [Probe]::Key($vk, $false); [Probe]::Spin(25) }
+function PrintScreen { [Probe]::ExtendedKey(0x2C, 0x37, $true); [Probe]::Spin(25); [Probe]::ExtendedKey(0x2C, 0x37, $false); [Probe]::Spin(25) }
 function Chord([uint16[]]$keys) { foreach ($k in $keys) { [Probe]::Key($k, $true); [Probe]::Spin(15) }; [array]::Reverse($keys); foreach ($k in $keys) { [Probe]::Key($k, $false); [Probe]::Spin(15) } }
 function Starter([int]$digit) { Chord @(0xA2, 0xA4, [uint16](0x30 + $digit)) }   # Ctrl+Alt+digit
 function Drag([int]$x1, [int]$y1, [int]$x2, [int]$y2, [switch]$Ctrl) {
@@ -108,7 +109,7 @@ $s.swallowed = Scenario 'swallowed' { Starter 9 } { Start-Sleep -Milliseconds 30
 $s.delay = Scenario 'delay' { Starter 8; Start-Sleep -Milliseconds 1200; $s.delayForegroundDuringCount = [Probe]::Foreground() } { Start-Sleep -Milliseconds 300; Tap 0x1B }
 $s.delayCancel = Scenario 'delayCancel' { Starter 8; Start-Sleep -Milliseconds 1000; Starter 8; Start-Sleep -Milliseconds 3500 } { }
 # Print Screen with another app in front, Windows' setting off by Chippi.
-$s.printScreen = Scenario 'printScreen' { Tap 0x2C } { Start-Sleep -Milliseconds 300; Tap 0x1B }
+$s.printScreen = Scenario 'printScreen' { PrintScreen } { Start-Sleep -Milliseconds 300; Tap 0x1B }
 $s.clipperAfterPrintScreen = @(Get-Process -Name ScreenClippingHost, SnippingTool -ErrorAction SilentlyContinue).Count
 
 # Timings: 10 more opens by shortcut (Esc each), then 30 releases.
@@ -128,7 +129,7 @@ $found.usedByWindows = @(Events | Where-Object { $_.event -eq 'shortcuts' } | Se
 $found.settingAfterTurnedOn = Setting
 $from = @(Events).Count
 Click 700 520; Start-Sleep -Milliseconds 300
-Tap 0x2C
+PrintScreen
 Start-Sleep -Seconds 2
 $found.printScreenWithWindowsOn = [ordered]@{
     chippiFroze = [bool](WaitEvent 'frozen' $from 500)
