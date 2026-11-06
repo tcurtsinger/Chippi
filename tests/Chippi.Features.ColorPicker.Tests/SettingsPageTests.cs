@@ -62,10 +62,10 @@ public sealed class SettingsPageTests
             var model = new FakeModel();
             var page = new ColorPickerSettingsPage(model);
             Assert.Equal("Not set", page.ShortcutOf(ColorPickerShortcuts.PickColor).KeysText);
-            var edit = page.ShortcutOf(ColorPickerShortcuts.OpenCapture).EditButton;
-            Assert.Equal("Edit Open Capture shortcut", AutomationProperties.GetName(edit));
+            var edit = page.ShortcutOf(ColorPickerShortcuts.PickAndReview).EditButton;
+            Assert.Equal("Edit Pick and review color shortcut", AutomationProperties.GetName(edit));
             edit.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
-            Assert.Equal([ColorPickerShortcuts.OpenCapture], model.Edited);
+            Assert.Equal([ColorPickerShortcuts.PickAndReview], model.Edited);
         });
     }
 

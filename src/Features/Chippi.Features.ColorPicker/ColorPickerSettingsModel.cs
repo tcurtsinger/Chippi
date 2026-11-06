@@ -12,7 +12,7 @@ public static class ColorPickerShortcuts
     public const string PickAndReview = "Pick and review color";
     public const string OpenCapture = "Open Capture";
 
-    public static IReadOnlyList<string> All { get; } = [PickColor, PickAndReview, OpenCapture];
+    public static IReadOnlyList<string> All { get; } = [PickColor, PickAndReview]; // Open Capture joins when the Capture host exists
 }
 
 /// <summary>
