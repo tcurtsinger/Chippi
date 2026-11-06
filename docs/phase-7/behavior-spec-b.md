@@ -14,6 +14,7 @@ Where a "Best of the field" row says "not stated", the tool may well do it; the 
 
 - **Verbs are shared actions.** Each verb below is one `ChippiAction`, so any door can fire it: an Actions tile, Search, a Radial slice, or a shortcut. Names are bare verbs ("Update all", "Free port"), which is the Copy rule.
 - **Shortcut slots are all unassigned by default.** Each feature registers its slots with `ModuleContext.Shortcuts` when it starts, set or not. They show in Settings › Shortcuts, and on the feature's page read-only with Edit. The exception is Brightness up and down, which are the only verbs here you'd press often. They still ship unassigned, because no default key is safe from other apps (an app held Ctrl+Alt+Space on 2026-11-05).
+- **Every verb has a slot, including per-row verbs.** A slot for a verb that needs a target (Update app, Uninstall app, Free port) opens a target picker when no row is chosen, then the same confirm as the button. A picker never acts on its own: it only chooses what the confirm names. In a list with a selected row, the slot acts on that row.
 - **Every destructive verb asks first**, as a question with Cancel and the verb ("Uninstall Notepad++?"). A verb fired from a shortcut or the Radial menu opens the same confirm; none runs destructive work silently. Which verbs may skip the confirm is Travis's call (Step 2, decision 7).
 - **Prefer the Recycle Bin.** Wherever Chippi deletes files itself, it sends them to the Recycle Bin when the file can go there, and says in the confirm when it can't.
 - **Nothing here is installed to study.** No competitor was run.
@@ -39,10 +40,10 @@ A list of installed apps winget knows an update for: the app's real icon (`AppIc
 | Verb | Behavior | Needs admin | Can't be undone | Shortcut slot |
 |---|---|---|---|---|
 | Check for updates | Runs the equivalent of `winget upgrade` and fills the list. Read-only. | No | n/a | Check app updates |
-| Update | Updates one app silently (`--silent`, agreements accepted). Per-row. | Some apps (the installer asks for it) | The old version is replaced. Rolling back is a reinstall of the old version, which winget can do only if the source still has it. Inference. | none: a per-row action |
+| Update | Updates one app silently (`--silent`, agreements accepted). Per-row. | Some apps (the installer asks for it) | The old version is replaced. Rolling back is a reinstall of the old version, which winget can do only if the source still has it. Inference. | Update app |
 | Update all | Updates every non-ignored app in the list, one after another, with progress per row. | Some | As Update | Update all apps |
-| Skip | Hides one app's available version, or the app for good ("Always skip"). | No | Reversible: shown in a "Skipped" list with Restore | none: a per-row action |
-| Close and update | If the app is running, closes it with a normal close request first, then updates. Asks if the app has unsaved work? Chippi can't know. The confirm says "Close Firefox and update?" | Some | The app is closed | none: a per-row action |
+| Skip | Hides one app's available version, or the app for good ("Always skip"). | No | Reversible: shown in a "Skipped" list with Restore | Skip app update |
+| Close and update | If the app is running, closes it with a normal close request first, then updates. Asks if the app has unsaved work? Chippi can't know. The confirm says "Close Firefox and update?" | Some | The app is closed | Close and update app |
 
 - **Scope.** The first build covers the update list, Update, Update all, Skip, and a history of what ran. Pinning, backup and restore (`winget export` and `import` exist [W2]), scheduled checks, and notifications are listed so Travis can trim or add: UniGetUI has the schedule and backup [U1]; Patch My PC has the schedule [P1]. **Recommend:** no schedule and no backup in Wave 3; a "Check" on open plus the verb above.
 - **Unknown version.** Apps whose version winget can't read stay out of the list unless the switch "Show apps with an unknown version" is on; Update on one of those says plainly that its version couldn't be checked. Fact for the flag [W1]; the wording is mine.
@@ -53,7 +54,7 @@ A list of installed apps winget knows an update for: the app's real icon (`AppIc
 
 ### Verb summary
 
-Check for updates, Update, Update all, Skip, Close and update. Shortcut slots: Check app updates, Update all apps.
+Check for updates, Update, Update all, Skip, Close and update. Shortcut slots: Check app updates, Update app, Update all apps, Skip app update, Close and update app.
 
 ---
 
@@ -76,21 +77,25 @@ A list of installed apps: real icon, name, publisher, size, install date, with s
 
 | Verb | Behavior | Needs admin | Can't be undone | Shortcut slot |
 |---|---|---|---|---|
-| Uninstall | Runs the app's own uninstaller (quiet when it has one, else its normal wizard, which Chippi does not click through). Afterwards, offers Scan for leftovers. | Often (machine-wide installs) | The app is removed. Reinstall is the recovery [R1]. | none: a per-row action |
-| Scan for leftovers | Looks in the app's former install folder, its folders in the user's AppData and ProgramData, and its registry keys, and lists what it found with a confidence mark. Read-only. | No | n/a | none |
-| Remove leftovers | Removes what's ticked. Files go to the Recycle Bin where they can; registry entries are exported to a backup file first. A preview of exactly what goes comes first (Simulate). | Some paths | Recycle Bin files: restorable. Registry entries: restorable from the backup file Chippi writes. Files that can't go to the Recycle Bin (over its size limit, network) are permanent; the confirm says so. | none |
+| Uninstall | Runs the app's own uninstaller (quiet when it has one, else its normal wizard, which Chippi does not click through). Afterwards, offers Scan for leftovers. | Often (machine-wide installs) | The app is removed. Reinstall is the recovery [R1]. | Uninstall app |
+| Scan for leftovers | Looks in the app's former install folder, its folders in the user's AppData and ProgramData, and its registry keys, and lists what it found with a confidence mark. Read-only. | No | n/a | Scan for leftovers |
+| Remove leftovers | Removes what's ticked. Files go to the Recycle Bin where they can; registry entries are exported to a backup file first. A preview of exactly what goes comes first (Simulate). | Some paths | Recycle Bin files: restorable. Registry entries: restorable from the backup file Chippi writes. Files that can't go to the Recycle Bin (over its size limit, network) are permanent; the confirm says so. | Remove leftovers |
 | Uninstall several | A queue of ticked apps: one confirm listing them all, one after another with progress. | Often | As Uninstall | Uninstall selected apps |
-| Open install folder | Reveals the app's folder in File Explorer. | No | n/a | none |
-| Remove broken entry | For an app with no working uninstaller: removes only its entry from the list (Revo's "forced uninstall" and BCU's "manually" take over here, with the "not recommended" warning [B1]). Off in the first build. | Often | The entry is gone; files stay. | none |
+| Open install folder | Reveals the app's folder in File Explorer. | No | n/a | Open app install folder |
+| Remove broken entry | For an app with no working uninstaller: removes only its entry from the list (Revo's "forced uninstall" and BCU's "manually" take over here, with the "not recommended" warning [B1]). Off in the first build. | Often | The entry is gone; files stay. | Remove broken app entry |
 
-- **Leftover confidence.** Only the leftover scan's rules matter here, and no tool's rules were readable: BCU's scan modes and confidence levels, and Revo's mode names, are unconfirmed. **Recommend** Chippi lists only items whose path or key contains the app's exact install folder name or its publisher folder name and is empty or only holds files belonging to the app, marks each "Safe" or "Check first" (Check first means unticked), and never lists anything under `Windows`, `System32`, a shared Microsoft key, or another app's folder. This is Chippi's own rule, inference, to be tested with fixtures.
+- **Leftover ownership.** No tool's scan rules were readable (BCU's scan modes and confidence levels, Revo's mode names: unconfirmed), so this is Chippi's own rule, inference, to be tested with fixtures. A name match is never proof: a publisher folder can be shared (Mozilla's holds both Firefox and Thunderbird, and a vendor folder can hold several of that vendor's apps). A candidate is ticked ("Safe") only with **verified ownership**:
+  - it is inside the app's own recorded install location (the Uninstall entry's `InstallLocation`), or
+  - its registry key or folder is named by the app's own uninstall data (product code or the app's own key), or
+  - it holds files whose path the app's installer or package manifest lists (inference; where that data exists).
+  Everything else that only matches by name (a publisher folder, an AppData folder named like the app) is a **review-only candidate**: listed, unticked, labelled "Check first", with the reason ("Shared with Thunderbird"). Chippi checks whether another installed app points at the same folder or key and, if so, marks it "Shared" and never offers it for removal. It never lists anything under `Windows`, `System32`, a shared Microsoft key, or another app's folder.
 - **Restore point.** Revo makes one at the start of an uninstall [R1]. Creating one needs admin and System Protection on, and Windows limits how often it creates them (inference, not read). **Open for Travis:** Chippi offers a restore point only if one is cheap, or leaves it out and relies on the Recycle Bin and registry backup. **Recommend** leaving it out of the first build.
 - **Protected and system entries** are hidden unless asked, and never offered for bulk removal: Windows components, Chippi itself, and the winget "framework" packages.
 - **Testing.** Never against Travis's real apps. Fixtures: a fake Uninstall key set and a stand-in installer in the Sandbox.
 
 ### Verb summary
 
-Uninstall, Scan for leftovers, Remove leftovers, Uninstall several, Open install folder, (later) Remove broken entry. Shortcut slot: Uninstall selected apps.
+Uninstall, Scan for leftovers, Remove leftovers, Uninstall several, Open install folder, (later) Remove broken entry. Shortcut slots: Uninstall app, Uninstall selected apps, Scan for leftovers, Remove leftovers, Open app install folder, Remove broken app entry.
 
 ---
 
@@ -155,10 +160,10 @@ A list: protocol, local address and port, remote address and port, state, and th
 | Verb | Behavior | Admin | Can't be undone | Shortcut slot |
 |---|---|---|---|---|
 | Find port | Types a port number, shows who holds it. Opens the page with that filter. | No | n/a | Find port |
-| Free port | Ends the process that holds the port, after a confirm that names the process and the port: "End node.exe (PID 4120) to free port 3000?". It asks the process to close first; "Force end" is a second, separate step if it doesn't. | Not for the user's own processes; yes for others' and for services | The process's unsaved work and state are lost. No undo. | none: per-row action |
-| Close connection | Closes one TCP connection (as TCPView and CurrPorts do [T1] [N1]). Listed as a candidate for later: closing a connection needs admin (inference) and is rarely what you want. | Yes (inference) | The connection ends; the app may reconnect | none |
-| Copy | Copies a row's port, address or PID text. Writes the clipboard, so tests are Sandbox only. | No | n/a | none |
-| Refresh | Reads the table again. Auto-refresh every few seconds while the page is open, a pause switch. | No | n/a | none |
+| Free port | Ends the process that holds the port, after a confirm that names the process and the port: "End node.exe (PID 4120) to free port 3000?". It asks the process to close first; "Force end" is a second, separate step if it doesn't. | Not for the user's own processes; yes for others' and for services | The process's unsaved work and state are lost. No undo. | Free port |
+| Close connection | Closes one TCP connection (as TCPView and CurrPorts do [T1] [N1]). Listed as a candidate for later: closing a connection needs admin (inference) and is rarely what you want. | Yes (inference) | The connection ends; the app may reconnect | Close port connection |
+| Copy | Copies a row's port, address or PID text. Writes the clipboard, so tests are Sandbox only. | No | n/a | Copy port details |
+| Refresh | Reads the table again. Auto-refresh every few seconds while the page is open, a pause switch. | No | n/a | Refresh ports |
 
 - **Protected processes.** System, services and Chippi itself are shown but not endable: the row says why ("Windows service") instead of a verb. Ending a process Chippi doesn't own says "Needs admin" and does nothing without the helper.
 - **Why the confirm names the process.** The one thing Travis can't recover is the process's state, so the question has to name it.
@@ -187,9 +192,9 @@ A panel with a slider per display: the display's name, its brightness, and (for 
 |---|---|---|---|---|
 | Brightness up | Raises the display under the pointer (or all, per a setting) by a step (default 10 %). | No | Reversible by Brightness down | Brightness up |
 | Brightness down | The same, lowering. A floor: never below 5 % in one step from a key, so a held key can't leave a black screen (inference; Twinkle Tray's Offset is the same idea [K1]). | No | Reversible | Brightness down |
-| Set brightness | Sets one display or all to a value, from the slider. | No | Reversible | none |
-| Set contrast | Same, for external monitors only. | No | Reversible | none |
-| Match displays | Aligns the displays to the same perceived level (Twinkle Tray's normalize [K1]). Candidate for later. | No | Reversible | none |
+| Set brightness | Sets one display or all to a value, from the slider. | No | Reversible | Set brightness |
+| Set contrast | Same, for external monitors only. | No | Reversible | Set contrast |
+| Match displays | Aligns the displays to the same perceived level (Twinkle Tray's normalize [K1]). Candidate for later. | No | Reversible | Match displays |
 
 - **Which display does the shortcut act on.** The display under the pointer, because that is the one Travis is looking at; a setting offers "All displays" instead. (Proposed; Travis may differ.)
 - **What can't be undone.** Nothing here is permanent in the sense of Travis's data. The risk is a monitor stuck at a level he can't see to change. So a key can't push below the floor, and Settings shows a Reset that sets each display to 50 % (proposed).
