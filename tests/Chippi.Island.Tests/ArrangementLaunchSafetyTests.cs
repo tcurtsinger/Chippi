@@ -27,6 +27,17 @@ public sealed class ArrangementLaunchSafetyTests
         finally { File.Delete(path); }
     }
 
+    [Theory]
+    [InlineData("asInvoker", false)]
+    [InlineData("requireAdministrator", true)]
+    [InlineData("highestAvailable", true)]
+    public void Manifest_elevation_is_refused_before_process_creation(string level, bool expected)
+    {
+        using var stream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(
+            $"<assembly><trustInfo><requestedExecutionLevel level='{level}' /></trustInfo></assembly>"));
+        Assert.Equal(expected, ExecutableLaunchPolicy.ManifestNeedsAdmin(stream));
+    }
+
     [Fact]
     public void Relative_executable_is_refused_without_shell_fallback()
     {

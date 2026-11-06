@@ -72,6 +72,7 @@ through their shared shortcuts. It checks reuse without duplicates, restored bou
 fallback, normal/maximized/minimized state, minimized-from-maximized restoration, and foreground retention when all
 windows already exist. It writes before/after screenshots and completion timings that include app startup.
 
-Run this once with the completed feature. Capture UI, Cancel, timeout, summaries, registered-app elevation refusal and
-fullscreen ownership still need the final screen-driven cases. The script records these as limits rather than claiming
-full acceptance. No fixture touches the clipboard, network, Sound modules or host windows.
+The completed script also uses real Settings capture and Save, checks Cancel and the fixed 60-second deadline, and
+checks executable manifests and Run as administrator shortcuts without a UAC prompt. A launched fullscreen fixture is
+skipped without stopping the following row. No fixture touches the clipboard, network, Sound modules or host windows.
+Physical display changes, packaged activation and app-specific fixed/minimum sizes remain owner checks.

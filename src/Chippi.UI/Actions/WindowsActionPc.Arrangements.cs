@@ -21,6 +21,7 @@ public sealed partial class WindowsActionPc
             throw new ActionFailure("Working folder not found");
         try
         {
+            if (ExecutableLaunchPolicy.NeedsAdmin(launch.Path)) throw new ActionFailure("Needs admin");
             // CreateProcess, never ShellExecute: ERROR_ELEVATION_REQUIRED is returned without asking for consent.
             using var process = Process.Start(new ProcessStartInfo(launch.Path)
             {
@@ -35,7 +36,7 @@ public sealed partial class WindowsActionPc
         {
             throw new ActionFailure("Needs admin");
         }
-        catch (Exception ex) when (ex is Win32Exception or InvalidOperationException)
+        catch (Exception ex) when (ex is Win32Exception or InvalidOperationException or IOException or UnauthorizedAccessException or System.Xml.XmlException or System.Security.SecurityException)
         {
             throw new ActionFailure("Launching failed");
         }

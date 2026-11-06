@@ -79,4 +79,9 @@ while (Get-Process -Name WindowsSandbox, WindowsSandboxClient, WindowsSandboxRem
     Start-Sleep -Seconds 2
 }
 Remove-Item -LiteralPath $wsb -Force
-Get-Content -LiteralPath (Join-Path $Out 'results.json')
+$reportPath = Join-Path $Out 'results.json'
+Get-Content -LiteralPath $reportPath
+if (($Checks | ForEach-Object { $_ -split ',' }) -contains 'arrangements') {
+    $report = Get-Content -LiteralPath $reportPath -Raw | ConvertFrom-Json
+    if ($report.error -or $report.arrangements.passed -ne $true) { throw 'Arrangements Sandbox check failed; see results.json' }
+}

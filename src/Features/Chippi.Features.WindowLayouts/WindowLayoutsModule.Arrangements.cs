@@ -74,11 +74,24 @@ public sealed partial class WindowLayoutsModule
     {
         if (_context is null) return;
         if (e.Reason is SessionSwitchReason.SessionLock or SessionSwitchReason.ConsoleDisconnect)
-        { ArrangementsLocked = true; CancelArrangement(); }
+        { LockArrangements(); }
         else if (e.Reason is SessionSwitchReason.SessionUnlock or SessionSwitchReason.ConsoleConnect)
             ArrangementsLocked = false;
         SyncArrangementShortcuts();
     });
+
+    internal void LockArrangements()
+    {
+        ArrangementsLocked = true;
+        if (ArrangementsPreparing || Arrangements?.IsRunning == true)
+        {
+            _arrangementEpoch++;
+            ArrangementsPreparing = false;
+            _ownerCancelled = false;
+            Arrangements?.Stop("Session locked");
+            OnArrangementsChanged();
+        }
+    }
 
     private void OnArrangementsChanged()
     {
@@ -176,9 +189,11 @@ public sealed partial class WindowLayoutsModule
     /// <summary>Surfaces pass their display and original window. Search and shortcuts use the display under the pointer.</summary>
     public Task LaunchArrangementAsync(string id, string? invocationDisplay = null, nint originalWindow = 0)
     {
-        ArrangementProgressRequested?.Invoke();
-        if (_arrangementTask is { IsCompleted: false }) return _arrangementTask;
-        if (ArrangementsPreparing) return Task.CompletedTask;
+        if (_arrangementTask is { IsCompleted: false } || ArrangementsPreparing || Arrangements?.IsRunning == true)
+        {
+            ArrangementProgressRequested?.Invoke();
+            return _arrangementTask ?? Task.CompletedTask;
+        }
         var saved = Layouts?.Settings.Arrangements.FirstOrDefault(a => a.Id == id) ?? throw new ActionFailure("Arrangement deleted");
         var desktop = _arrangementDesktop ?? throw new ActionFailure("Unavailable");
         var runner = Arrangements ?? throw new ActionFailure("Unavailable");
@@ -199,6 +214,7 @@ public sealed partial class WindowLayoutsModule
         int epoch = ++_arrangementEpoch;
         ArrangementsPreparing = true;
         ArrangementError = null;
+        runner.Prepare(saved, display);
         _arrangementTask = PrepareAndLaunchAsync();
         ArrangementProgressRequested?.Invoke();
         OnArrangementsChanged();

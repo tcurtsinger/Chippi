@@ -43,15 +43,37 @@ public sealed class ArrangementRunner(IArrangementDesktop desktop, TimeProvider?
     {
         if (IsRunning) { Changed?.Invoke(); return _running!; }
         if (!arrangement.IsValid) throw new ArgumentException("Invalid arrangement", nameof(arrangement));
+        Prepare(arrangement, invocationDisplay);
+        return StartAsync(false);
+    }
+
+    internal void Prepare(SavedArrangement arrangement, string invocationDisplay)
+    {
+        Stopped = null;
         _invocationDisplay = invocationDisplay;
         _matcher = new();
         _launched.Clear();
         Results = arrangement.Rows.Select(r => new ArrangementRowResult(r)).ToArray();
-        return StartAsync(false);
+        Changed?.Invoke();
     }
 
     public Task RetryAsync() => IsRunning ? _running! : StartAsync(true);
-    public void Cancel() => _cancel?.Cancel();
+    public void Cancel()
+    {
+        _cancel?.Cancel();
+        if (!IsRunning && Results.Any(r => r.State is ArrangementRowState.Waiting or ArrangementRowState.Opening or ArrangementRowState.Placing))
+        {
+            Results = Results.Select(r => r.State is ArrangementRowState.Waiting or ArrangementRowState.Opening or ArrangementRowState.Placing
+                ? r with { State = ArrangementRowState.Cancelled, Reason = "Cancelled" } : r).ToArray();
+            Changed?.Invoke();
+        }
+    }
+
+    internal void Stop(string reason)
+    {
+        Stopped = reason;
+        Cancel();
+    }
 
     private Task StartAsync(bool retry)
     {

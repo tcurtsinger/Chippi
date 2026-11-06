@@ -26,7 +26,12 @@ public sealed class ArrangementModuleTests
             fixture.Desktop.Prepared.SetResult();
         });
         await first!;
-        WpfTestThread.Run(() => { Assert.Equal(0, fixture!.Desktop.Launched); fixture.Stop(); });
+        WpfTestThread.Run(() => {
+            Assert.Equal(0, fixture!.Desktop.Launched);
+            Assert.Single(fixture.Module.Arrangements!.Results);
+            Assert.Equal(ArrangementRowState.Cancelled, fixture.Module.Arrangements.Results[0].State);
+            fixture.Stop();
+        });
     }
 
     [Fact]
@@ -74,6 +79,28 @@ public sealed class ArrangementModuleTests
             Assert.Equal("Save failed", fixture.Shortcuts.Change(id, next));
             Assert.Equal(previous, fixture.Store.Value.Arrangements.Single().Shortcut);
             Assert.Equal(previous, fixture.Registrar.Held.Values.Single());
+            fixture.Stop();
+        });
+    }
+
+    [Fact]
+    public async Task Lock_during_discovery_reports_a_stop_and_starts_no_apps()
+    {
+        Fixture? fixture = null;
+        Task? pending = null;
+        WpfTestThread.Run(() =>
+        {
+            fixture = new();
+            pending = fixture.Module.LaunchArrangementAsync("work");
+            fixture.Module.LockArrangements();
+            fixture.Desktop.Prepared.SetResult();
+        });
+        await pending!;
+        WpfTestThread.Run(() =>
+        {
+            Assert.Equal(0, fixture!.Desktop.Launched);
+            Assert.Equal("Session locked", ArrangementSummary.Of(fixture.Module).Stopped);
+            Assert.Equal(1, ArrangementSummary.Of(fixture.Module).Cancelled);
             fixture.Stop();
         });
     }

@@ -106,7 +106,7 @@ public static class RegisteredAppTargets
         return (BitConverter.ToUInt32(header[20..24]) & 0x2000) != 0;
     }
 
-    public static bool NeedsAdminShortcut(string identity)
+    public static bool NeedsAdminShortcut(Target target)
     {
         object? shell = null;
         try
@@ -127,7 +127,15 @@ public static class RegisteredAppTargets
                         item = ((dynamic)folder).ParseName(Path.GetFileName(path));
                         if (item is null) continue;
                         string? appId = ((dynamic)item).ExtendedProperty("System.AppUserModel.ID") as string;
-                        if (!string.Equals(appId, identity, StringComparison.OrdinalIgnoreCase)) continue;
+                        if (!string.Equals(appId, target.Identity, StringComparison.OrdinalIgnoreCase))
+                        {
+                            // The shell generates IDs for links without an explicit AppUserModelID; the source link
+                            // need not expose that generated ID. Match its actual launch metadata as well.
+                            string? executable = ((dynamic)item).ExtendedProperty("System.Link.TargetParsingPath") as string;
+                            string arguments = ((dynamic)item).ExtendedProperty("System.Link.Arguments") as string ?? "";
+                            if (!string.Equals(executable, target.Executable, StringComparison.OrdinalIgnoreCase)
+                                || !string.Equals(arguments, target.Arguments, StringComparison.Ordinal)) continue;
+                        }
                         if (ShortcutNeedsAdmin(path)) return true;
                     }
                     finally
@@ -150,7 +158,7 @@ public sealed partial class WindowsActionPc
     public LaunchedApp? LaunchRegisteredApp(string parsingName)
     {
         var target = RegisteredAppTargets.Resolve(parsingName) ?? throw new ActionFailure("Not found");
-        if (RegisteredAppTargets.NeedsAdminShortcut(parsingName)) throw new ActionFailure("Needs admin");
+        if (RegisteredAppTargets.NeedsAdminShortcut(target)) throw new ActionFailure("Needs admin");
         if (target.PackageFullName.Length == 0)
             return LaunchExecutable(new(target.Executable, target.Arguments));
         var path = new StringBuilder(32768);
