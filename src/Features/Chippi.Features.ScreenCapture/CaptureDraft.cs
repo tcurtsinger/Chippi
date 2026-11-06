@@ -18,15 +18,31 @@ public sealed class MarkupObject
     public double Width { get; }
     public bool Fill { get; }
     public string Text { get; }
+    public bool Bold { get; }
 
-    public MarkupObject(MarkupTool tool, IEnumerable<Point> points, Color color, double width = 3, bool fill = false, string text = "")
+    public MarkupObject(MarkupTool tool, IEnumerable<Point> points, Color color, double width = 3, bool fill = false, string text = "", bool bold = false)
     {
         if (!Enum.IsDefined(tool)) throw new ArgumentOutOfRangeException(nameof(tool));
         if (!double.IsFinite(width) || width <= 0) throw new ArgumentOutOfRangeException(nameof(width));
         var copy = points.ToArray();
         if (copy.Length < 2 || copy.Any(p => !double.IsFinite(p.X) || !double.IsFinite(p.Y))) throw new ArgumentException("Two finite points are required.", nameof(points));
-        Tool = tool; Points = Array.AsReadOnly(copy); Color = color; Width = width; Fill = fill; Text = text;
+        Tool = tool; Points = Array.AsReadOnly(copy); Color = color; Width = width; Fill = fill; Text = text; Bold = bold;
     }
+
+    internal Rect Bounds
+    {
+        get { var visual = new DrawingVisual(); using (var dc = visual.RenderOpen()) Draw(dc); return visual.Drawing.Bounds; }
+    }
+    internal bool Hit(Point point)
+    {
+        var visual = new DrawingVisual();
+        using (var dc = visual.RenderOpen()) Draw(dc);
+        return VisualTreeHelper.HitTest(visual, point) != null;
+    }
+    internal MarkupObject Move(Vector by) => new(Tool, Points.Select(p => p + by), Color, Width, Fill, Text, Bold);
+    internal MarkupObject Resize(Rect from, Rect to) => new(Tool,
+        Points.Select(p => new Point(to.Left + (p.X - from.Left) * to.Width / Math.Max(1, from.Width),
+            to.Top + (p.Y - from.Top) * to.Height / Math.Max(1, from.Height))), Color, Width, Fill, Text, Bold);
 
     internal void Draw(DrawingContext dc)
     {
@@ -45,7 +61,7 @@ public sealed class MarkupObject
             case MarkupTool.Rectangle: dc.DrawRectangle(Fill ? brush : null, pen, bounds); break;
             case MarkupTool.Ellipse: dc.DrawEllipse(Fill ? brush : null, pen, new Point(bounds.X + bounds.Width / 2, bounds.Y + bounds.Height / 2), bounds.Width / 2, bounds.Height / 2); break;
             case MarkupTool.Text:
-                dc.DrawText(new FormattedText(Text, System.Globalization.CultureInfo.CurrentCulture, FlowDirection.LeftToRight, new Typeface("Segoe UI"), Width, brush, 1), Points[0]);
+                dc.DrawText(new FormattedText(Text, System.Globalization.CultureInfo.CurrentCulture, FlowDirection.LeftToRight, new Typeface(new FontFamily("Segoe UI"), FontStyles.Normal, Bold ? FontWeights.Bold : FontWeights.Normal, FontStretches.Normal), Width, brush, 1), Points[0]);
                 break;
             case MarkupTool.Line:
             case MarkupTool.Arrow:
@@ -83,6 +99,8 @@ public sealed class CaptureDraft
     private readonly Stack<State> _undo = new(), _redo = new();
     private State _state;
     public Int32Rect Crop => _state.Crop;
+    public bool CanUndo => _undo.Count > 0;
+    public bool CanRedo => _redo.Count > 0;
     public IReadOnlyList<MarkupObject> Objects => Array.AsReadOnly(_state.Objects);
 
     public CaptureDraft(BitmapSource source)
@@ -106,6 +124,14 @@ public sealed class CaptureDraft
     }
     public bool Undo() { if (!_undo.TryPop(out var state)) return false; _redo.Push(_state); _state = state; return true; }
     public bool Redo() { if (!_redo.TryPop(out var state)) return false; _undo.Push(_state); _state = state; return true; }
+
+    internal void Paint(DrawingContext dc, int skip = -1)
+    {
+        dc.PushClip(new RectangleGeometry(new Rect(Crop.X, Crop.Y, Crop.Width, Crop.Height)));
+        dc.DrawImage(_source, new Rect(0, 0, _source.PixelWidth, _source.PixelHeight));
+        for (int i = 0; i < _state.Objects.Length; i++) if (i != skip) _state.Objects[i].Draw(dc);
+        dc.Pop();
+    }
 
     public BitmapSource Flatten()
     {

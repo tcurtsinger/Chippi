@@ -22,7 +22,7 @@ public sealed class CaptureOutputTests
         var output = new CaptureOutput(pixels,
             _ => { copies++; return Task.FromResult(!(copyFails && fail)); },
             _ => { saves++; if (!copyFails && fail) throw new IOException(); return Task.FromResult("fixture.png"); },
-            (_, file) => { entries = 1; retainedFile = file; });
+            (_, file) => { entries = 1; retainedFile = file; return Task.CompletedTask; });
         var first = await output.FinishAsync(EnterAction.CopyAndSave);
         Assert.Equal(copyFails ? "Saved. Copy failed" : "Copied. Save failed", first.Title);
         Assert.Equal(1, entries);

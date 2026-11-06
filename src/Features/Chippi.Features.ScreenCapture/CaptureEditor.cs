@@ -23,8 +23,10 @@ internal sealed class CaptureEditor : IDisposable
     private readonly RecentCaptureStore _store;
     private readonly Action<string, bool> _feedback;
     private readonly MarkupTools _tools = new();
-    private readonly FinishBar _finish = new();
+    private readonly FinishBar _finish = new() { ShowCopyText = false, ShowScanQrCode = false };
     private readonly List<Canvas> _canvases = [];
+    private readonly Dictionary<Canvas, Preview> _previews = [];
+    private readonly HashSet<Window> _windows = [];
     private readonly CancellationTokenSource _cancel = new();
     private EnterAction? _lastAction;
     private readonly Guid _id = Guid.NewGuid();
@@ -32,30 +34,45 @@ internal sealed class CaptureEditor : IDisposable
     private Selection? _selection;
     private CaptureTool _tool = CaptureTool.Select;
     private readonly List<Point> _points = [];
-    private bool _drawing, _busy, _disposed;
+    private bool _drawing, _busy, _disposed, _resize, _pickingInk;
+    private int _selected = -1;
+    private MarkupObject? _original, _preview;
+    private Point _down;
     private double _width = 3;
+    private TextBox? _text;
+    private TextMarkBar? _textBar;
+    private Canvas? _textCanvas;
+    private Point _textPoint;
+    private int _textIndex = -1;
+    private Int32Rect? _crop;
     private CaptureOutput? _output;
+
+    internal CaptureDraft? Draft => _draft;
+    internal Func<Canvas, MouseEventArgs, Point>? PointerAt { get; set; }
 
     public CaptureEditor(ICaptureSession session, ModuleContext context, ScreenCaptureModel model, RecentCaptureStore store, Action<string, bool> feedback)
     {
         _session = session; _context = context; _model = model; _store = store; _feedback = feedback;
+        _tools.Tool = CaptureTool.Select;
         session.Selected += Selected;
         session.KeyDown += Key;
-        _tools.ToolPicked += tool => { _tool = tool; _tools.Tool = tool; session.Tooling = tool != CaptureTool.Select; };
-        _tools.UndoAsked += () => { _draft?.Undo(); Redraw(); };
-        _tools.RedoAsked += () => { _draft?.Redo(); Redraw(); };
+        _tools.ToolPicked += PickTool;
+        _tools.UndoAsked += () => History(redo: false);
+        _tools.RedoAsked += () => History(redo: true);
         _tools.InkAsked += button =>
         {
             var choice = new InkChoice();
             var popup = new Popup { Child = choice, PlacementTarget = button, Placement = PlacementMode.Right, StaysOpen = false, AllowsTransparency = true };
+            if (Window.GetWindow(button) is { } window) popup.Resources = window.Resources;
             choice.InkPicked += color => { _tools.Ink = color; popup.IsOpen = false; };
             choice.WidthPicked += width => { _width = width switch { InkWidth.Thin => 2, InkWidth.Thick => 8, _ => 4 }; };
+            choice.PickAsked += () => { popup.IsOpen = false; _pickingInk = true; _session.Tooling = true; };
             popup.IsOpen = true;
         };
         _finish.Picked += async action =>
         {
             if (action == FinishAction.Cancel) Cancel();
-            else if (action == FinishAction.SaveAs) SaveAs();
+            else if (action == FinishAction.SaveAs) await SaveAs();
             else if (action == FinishAction.Copy) await Finish(EnterAction.Copy);
             else if (action == FinishAction.Save) await Finish(EnterAction.Save);
         };
@@ -69,6 +86,7 @@ internal sealed class CaptureEditor : IDisposable
     private void Selected(Selection selection)
     {
         if (_busy) return;
+        CommitText();
         var old = _selection;
         var objects = _draft?.Objects.ToArray() ?? [];
         _selection = selection;
@@ -77,80 +95,251 @@ internal sealed class CaptureEditor : IDisposable
             foreach (var item in objects)
                 _draft.Add(new MarkupObject(item.Tool, item.Points.Select(p => new Point(
                     (p.X * old.Scale + old.Rect.X - selection.Rect.X) / selection.Scale,
-                    (p.Y * old.Scale + old.Rect.Y - selection.Rect.Y) / selection.Scale)), item.Color, item.Width, item.Fill, item.Text));
-        _output = null;
+                    (p.Y * old.Scale + old.Rect.Y - selection.Rect.Y) / selection.Scale)), item.Color, item.Width, item.Fill, item.Text, item.Bold));
+        _output = null; _selected = -1;
         foreach (var surface in _session.Surfaces)
         {
-            if (!_canvases.Contains(surface.Layer)) _canvases.Add(surface.Layer);
-            surface.Layer.Background = Brushes.Transparent;
-            surface.Layer.MouseLeftButtonDown -= Down; surface.Layer.MouseLeftButtonDown += Down;
-            surface.Layer.MouseMove -= Move; surface.Layer.MouseMove += Move;
-            surface.Layer.MouseLeftButtonUp -= Up; surface.Layer.MouseLeftButtonUp += Up;
+            if (!_canvases.Contains(surface.Layer))
+            {
+                _canvases.Add(surface.Layer);
+                surface.Layer.Background = Brushes.Transparent;
+                surface.Layer.MouseLeftButtonDown += Down;
+                surface.Layer.MouseMove += Move;
+                surface.Layer.MouseLeftButtonUp += Up;
+                var preview = new Preview(this, surface) { IsHitTestVisible = false, Width = surface.Bounds.Width, Height = surface.Bounds.Height };
+                _previews.Add(surface.Layer, preview);
+                surface.Layer.Children.Add(preview);
+                if (Window.GetWindow(surface.Layer) is { } window && _windows.Add(window)) window.PreviewKeyDown += PreviewKey;
+            }
         }
-        _session.SetBars(_tools, _finish);
+        _session.SetBars(selection.FastPath && _model.Settings.CtrlDragCopies ? null : _tools, selection.FastPath && _model.Settings.CtrlDragCopies ? null : _finish);
         Redraw();
         if (selection.FastPath && _model.Settings.CtrlDragCopies) _ = Finish(EnterAction.Copy);
     }
+    private void PickTool(CaptureTool tool)
+    {
+        CommitText(); _crop = null; _selected = -1;
+        _tool = tool; _tools.Tool = tool;
+        Redraw();
+    }
     private Point SourcePoint(Canvas canvas, MouseEventArgs e)
     {
+        if (PointerAt != null) return PointerAt(canvas, e);
         var surface = _session.Surfaces.First(s => ReferenceEquals(s.Layer, canvas));
         var point = e.GetPosition(canvas); var selection = _selection!;
         return new((point.X + surface.Bounds.X - selection.Rect.X) / selection.Scale,
             (point.Y + surface.Bounds.Y - selection.Rect.Y) / selection.Scale);
     }
+    private int Hit(Point point)
+    {
+        if (_draft == null) return -1;
+        for (int i = _draft.Objects.Count - 1; i >= 0; i--)
+            if (_draft.Objects[i].Hit(point)) return i;
+        return -1;
+    }
     private void Down(object sender, MouseButtonEventArgs e)
     {
-        if (_busy || _draft == null || _tool == CaptureTool.Select) return;
+        if (_busy || _draft == null || _selection == null) return;
         var canvas = (Canvas)sender;
         var point = SourcePoint(canvas, e);
-        if (point.X < 0 || point.Y < 0 || point.X >= _draft.Crop.Width || point.Y >= _draft.Crop.Height) return;
-        e.Handled = true;
-        _points.Clear(); _points.Add(point); _drawing = true; canvas.CaptureMouse();
+        if (_pickingInk)
+        {
+            var virtualPoint = new PixelPoint((int)Math.Round(_selection.Rect.X + point.X * _selection.Scale),
+                (int)Math.Round(_selection.Rect.Y + point.Y * _selection.Scale));
+            if (_session.Freeze?.PixelAt(virtualPoint) is { } color)
+                _tools.Ink = Color.FromArgb((byte)(color >> 24), (byte)(color >> 16), (byte)(color >> 8), (byte)color);
+            _pickingInk = false; e.Handled = true; Redraw(); return;
+        }
+        if (!new Rect(_draft.Crop.X, _draft.Crop.Y, _draft.Crop.Width, _draft.Crop.Height).Contains(point)) return;
+        CommitText(); e.Handled = true;
+        if (_tool == CaptureTool.Text) { BeginText(canvas, point, -1); return; }
+        if (_tool == CaptureTool.Eraser)
+        {
+            int hit = Hit(point);
+            if (hit >= 0) { _draft.Remove(hit); _output = null; _selected = -1; Redraw(); }
+            return;
+        }
+        _resize = _selected >= 0 && _selected < _draft.Objects.Count &&
+            (point - _draft.Objects[_selected].Bounds.BottomRight).Length <= 8 / _selection.Scale;
+        if (_tool == CaptureTool.Select)
+        {
+            if (!_resize) _selected = Hit(point);
+            if (_selected < 0) { Redraw(); return; }
+            if (e.ClickCount == 2 && _draft.Objects[_selected].Tool == MarkupTool.Text)
+            { BeginText(canvas, _draft.Objects[_selected].Points[0], _selected); return; }
+            _original = _draft.Objects[_selected];
+        }
+        _points.Clear(); _points.Add(point); _down = point; _drawing = true;
+        canvas.CaptureMouse(); Redraw();
     }
     private void Move(object sender, MouseEventArgs e)
     {
-        if (!_drawing) return;
+        if (!_drawing || _draft == null) return;
         var point = SourcePoint((Canvas)sender, e);
-        if (_tool is CaptureTool.Pen or CaptureTool.Highlighter) _points.Add(point);
-        else { if (_points.Count > 1) _points.RemoveAt(1); _points.Add(point); }
         e.Handled = true;
+        if (_tool == CaptureTool.Select && _original != null)
+        {
+            var from = _original.Bounds;
+            var to = new Rect(from.TopLeft, new Point(Math.Max(from.Left + 1, point.X), Math.Max(from.Top + 1, point.Y)));
+            _preview = _resize ? _original.Resize(from, to) : _original.Move(point - _down);
+        }
+        else
+        {
+            if (_tool is CaptureTool.Pen or CaptureTool.Highlighter) _points.Add(point);
+            else { if (_points.Count > 1) _points.RemoveAt(1); _points.Add(point); }
+            if (Enum.TryParse<MarkupTool>(_tool.ToString(), out var tool)) _preview = new(tool, _points, _tools.Ink, _width);
+            if (_tool == CaptureTool.Crop) _crop = ClampCrop(new Rect(_down, point));
+        }
+        Redraw();
+    }
+    private Int32Rect? ClampCrop(Rect bounds)
+    {
+        var crop = _draft!.Crop;
+        bounds.Intersect(new Rect(crop.X, crop.Y, crop.Width, crop.Height));
+        if (bounds.IsEmpty) return null;
+        int left = (int)Math.Ceiling(bounds.Left), top = (int)Math.Ceiling(bounds.Top);
+        int right = (int)Math.Floor(bounds.Right), bottom = (int)Math.Floor(bounds.Bottom);
+        return right > left && bottom > top ? new Int32Rect(left, top, right - left, bottom - top) : null;
     }
     private void Up(object sender, MouseButtonEventArgs e)
     {
         if (!_drawing || _draft == null) return;
+        Move(sender, e);
         _drawing = false; ((Canvas)sender).ReleaseMouseCapture(); e.Handled = true;
-        if (_points.Count == 1) _points.Add(SourcePoint((Canvas)sender, e));
-        if (Enum.TryParse<MarkupTool>(_tool.ToString(), out var tool))
-            _draft.Add(new(tool, _points, _tools.Ink, _width));
-        _output = null; Redraw();
+        if (_preview != null)
+        {
+            if (_tool == CaptureTool.Select && _selected >= 0) _draft.Replace(_selected, _preview);
+            else { _draft.Add(_preview); _selected = _draft.Objects.Count - 1; }
+        }
+        _preview = null; _original = null; _output = null;
+        if (_tool == CaptureTool.Crop && _crop != null)
+        {
+            var bar = new CropBar();
+            bar.Cancelled += () => { _crop = null; _session.SetBars(_tools, _finish); Redraw(); };
+            bar.Cropped += () => { if (_crop is { } crop) _draft.SetCrop(crop); _crop = null; _session.SetBars(_tools, _finish); Redraw(); };
+            _session.SetBars(_tools, bar);
+        }
+        Redraw();
+    }
+    private void BeginText(Canvas canvas, Point point, int index)
+    {
+        var old = index >= 0 ? _draft!.Objects[index] : null;
+        _textCanvas = canvas; _textPoint = point; _textIndex = index;
+        _text = new TextBox { Text = old?.Text ?? "", AcceptsReturn = false, MinWidth = 100, FontFamily = new FontFamily("Segoe UI"),
+            FontSize = old?.Width ?? 18, FontWeight = old?.Bold == true ? FontWeights.Bold : FontWeights.Normal,
+            Foreground = new SolidColorBrush(old?.Color ?? _tools.Ink), Background = Brushes.Transparent, BorderBrush = Brushes.White,
+            BorderThickness = new Thickness(1), Padding = new Thickness(0), LayoutTransform = new ScaleTransform(_selection!.Scale, _selection.Scale) };
+        _textBar = new TextMarkBar { TextSize = (int)_text.FontSize, Bold = old?.Bold ?? false };
+        _textBar.SizePicked += size => { if (_text != null) _text.FontSize = size; };
+        _textBar.BoldChanged += bold => { if (_text != null) _text.FontWeight = bold ? FontWeights.Bold : FontWeights.Normal; };
+        var surface = _session.Surfaces.First(s => ReferenceEquals(s.Layer, canvas));
+        double x = _selection.Rect.X - surface.Bounds.X + point.X * _selection.Scale;
+        double y = _selection.Rect.Y - surface.Bounds.Y + point.Y * _selection.Scale;
+        Canvas.SetLeft(_text, x); Canvas.SetTop(_text, y);
+        _textBar.LayoutTransform = new ScaleTransform(surface.Dpi / 96d, surface.Dpi / 96d);
+        Canvas.SetLeft(_textBar, x); Canvas.SetTop(_textBar, y + _text.FontSize * _selection.Scale + 8);
+        canvas.Children.Add(_text); canvas.Children.Add(_textBar);
+        _text.Focus(); _text.SelectAll();
+    }
+    private void CommitText()
+    {
+        if (_text == null || _draft == null) return;
+        var text = _text; _text = null;
+        if (text.Text.Length > 0)
+        {
+            var item = new MarkupObject(MarkupTool.Text, [_textPoint, _textPoint + new Vector(1, 1)],
+                ((SolidColorBrush)text.Foreground).Color, text.FontSize, text: text.Text, bold: text.FontWeight == FontWeights.Bold);
+            if (_textIndex >= 0) _draft.Replace(_textIndex, item); else _draft.Add(item);
+        }
+        else if (_textIndex >= 0) _draft.Remove(_textIndex);
+        _textCanvas?.Children.Remove(text);
+        if (_textBar != null) _textCanvas?.Children.Remove(_textBar);
+        _textBar = null; _textCanvas = null; _selected = -1; _output = null;
+        Redraw();
+    }
+    private void PreviewKey(object sender, KeyEventArgs e)
+    {
+        if (_text != null)
+        {
+            if (e.Key == System.Windows.Input.Key.B && Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
+            {
+                bool bold = _text.FontWeight != FontWeights.Bold;
+                _text.FontWeight = bold ? FontWeights.Bold : FontWeights.Normal;
+                if (_textBar != null) _textBar.Bold = bold;
+                e.Handled = true; return;
+            }
+            if (e.Key is System.Windows.Input.Key.Escape or System.Windows.Input.Key.Enter) { CommitText(); e.Handled = true; }
+            return; // TextBox owns its typing, arrows, Ctrl+A/C and undo.
+        }
+        if (_selected < 0 || _draft == null || _selected >= _draft.Objects.Count) return;
+        Vector delta = e.Key switch
+        {
+            System.Windows.Input.Key.Left => new(-1, 0), System.Windows.Input.Key.Right => new(1, 0),
+            System.Windows.Input.Key.Up => new(0, -1), System.Windows.Input.Key.Down => new(0, 1), _ => default,
+        };
+        if (delta.LengthSquared > 0)
+        { _draft.Replace(_selected, _draft.Objects[_selected].Move(delta)); _output = null; Redraw(); e.Handled = true; }
+        else if (e.Key == System.Windows.Input.Key.Delete)
+        { _draft.Remove(_selected); _selected = -1; _output = null; Redraw(); e.Handled = true; }
     }
     private void Redraw()
     {
         if (_draft == null || _selection == null || _disposed) return;
-        var pixels = _draft.Flatten();
-        foreach (var surface in _session.Surfaces)
+        _tools.CanUndo = _draft.CanUndo; _tools.CanRedo = _draft.CanRedo;
+        _session.Tooling = _tool != CaptureTool.Select || _draft.Objects.Count > 0;
+        foreach (var preview in _previews.Values) preview.InvalidateVisual();
+    }
+    private void History(bool redo)
+    {
+        CommitText();
+        if (redo) _draft?.Redo(); else _draft?.Undo();
+        _selected = -1; _output = null; Redraw();
+    }
+    private sealed class Preview(CaptureEditor owner, CaptureSurface surface) : FrameworkElement
+    {
+        protected override void OnRender(DrawingContext dc)
         {
-            surface.Layer.Children.Clear();
-            var image = new Image { Source = pixels, Width = pixels.PixelWidth * _selection.Scale, Height = pixels.PixelHeight * _selection.Scale, IsHitTestVisible = false };
-            Canvas.SetLeft(image, _selection.Rect.X - surface.Bounds.X + _draft.Crop.X * _selection.Scale);
-            Canvas.SetTop(image, _selection.Rect.Y - surface.Bounds.Y + _draft.Crop.Y * _selection.Scale);
-            surface.Layer.Children.Add(image);
+            if (owner._selection is not { } selection || owner._draft is not { } draft) return;
+            dc.PushTransform(new TranslateTransform(selection.Rect.X - surface.Bounds.X, selection.Rect.Y - surface.Bounds.Y));
+            dc.PushTransform(new ScaleTransform(selection.Scale, selection.Scale));
+            draft.Paint(dc, owner._text != null ? owner._textIndex : owner._original != null ? owner._selected : -1);
+            dc.PushClip(new RectangleGeometry(new Rect(draft.Crop.X, draft.Crop.Y, draft.Crop.Width, draft.Crop.Height)));
+            owner._preview?.Draw(dc);
+            dc.Pop();
+            Rect? frame = owner._crop is { } crop ? new Rect(crop.X, crop.Y, crop.Width, crop.Height)
+                : owner._selected >= 0 && owner._selected < draft.Objects.Count ? (owner._preview ?? draft.Objects[owner._selected]).Bounds : null;
+            if (frame is { IsEmpty: false } bounds)
+            {
+                var pen = new Pen(Brushes.White, 1 / selection.Scale) { DashStyle = DashStyles.Dash };
+                dc.DrawRectangle(null, pen, bounds);
+                double size = 6 / selection.Scale;
+                dc.DrawRectangle(Brushes.White, null, new Rect(bounds.Right - size / 2, bounds.Bottom - size / 2, size, size));
+            }
+            dc.Pop(); dc.Pop();
         }
     }
     private async void Key(KeyEventArgs e)
     {
+        if (_text != null) return;
         bool ctrl = Keyboard.Modifiers.HasFlag(ModifierKeys.Control);
+        bool shift = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift);
         if (e.Key == System.Windows.Input.Key.Escape) { e.Handled = true; Cancel(); }
         else if (e.Key == System.Windows.Input.Key.Enter) { e.Handled = true; await Finish(_model.Settings.Enter); }
         else if (ctrl && e.Key == System.Windows.Input.Key.C) { e.Handled = true; await Finish(EnterAction.Copy); }
-        else if (ctrl && e.Key == System.Windows.Input.Key.S)
-        { e.Handled = true; if (Keyboard.Modifiers.HasFlag(ModifierKeys.Shift)) SaveAs(); else await Finish(EnterAction.Save); }
-        else if (ctrl && e.Key == System.Windows.Input.Key.Z) { e.Handled = true; _draft?.Undo(); _output = null; Redraw(); }
-        else if (ctrl && e.Key == System.Windows.Input.Key.Y) { e.Handled = true; _draft?.Redo(); _output = null; Redraw(); }
+        else if (ctrl && e.Key == System.Windows.Input.Key.S) { e.Handled = true; if (shift) await SaveAs(); else await Finish(EnterAction.Save); }
+        else if (ctrl && e.Key == System.Windows.Input.Key.Z) { e.Handled = true; History(redo: shift); }
+        else if (ctrl && e.Key == System.Windows.Input.Key.Y) { e.Handled = true; History(redo: true); }
+        else if (!ctrl && Keyboard.Modifiers == ModifierKeys.None)
+        {
+            var key = e.Key.ToString();
+            var tool = Enum.GetValues<CaptureTool>().FirstOrDefault(t => CaptureBars.Letter(t)?.ToString() == key);
+            if (e.Key == System.Windows.Input.Key.V || tool != CaptureTool.Select) { e.Handled = true; PickTool(tool); }
+        }
     }
     private async Task Finish(EnterAction action)
     {
         if (_busy || _draft == null || _disposed) return;
+        CommitText();
         _busy = true;
         try
         {
@@ -160,30 +349,57 @@ internal sealed class CaptureEditor : IDisposable
             _lastAction = action;
             _output ??= new CaptureOutput(pixels,
                 image => _context.Clipboard == null ? Task.FromResult(false) : CaptureClipboard.CopyAsync(_context.Clipboard, image, _cancel.Token),
-                image => Task.FromResult(CaptureFiles.Save(image, _model.SaveFolder, _model.Settings.FileType, DateTimeOffset.Now)),
-                (image, file) => { _cancel.Token.ThrowIfCancellationRequested(); if (_model.Settings.History) { _store.Put(_id, image, DateTimeOffset.Now, file); _model.RefreshRecent(); } });
+                image => CaptureFiles.OnWorkerAsync(() => CaptureFiles.Save(image, _model.SaveFolder, _model.Settings.FileType, DateTimeOffset.Now)),
+                                async (image, file) =>
+                {
+                    _cancel.Token.ThrowIfCancellationRequested();
+                    if (_model.Settings.History)
+                    {
+                        await CaptureFiles.OnWorkerAsync(() => { _cancel.Token.ThrowIfCancellationRequested(); _store.Put(_id, image, DateTimeOffset.Now, file); return true; });
+                        _cancel.Token.ThrowIfCancellationRequested();
+                        _model.RefreshRecent();
+                    }
+                });
             var result = retry ? await _output.RetryAsync() : await _output.FinishAsync(action);
             if (_disposed) return;
             _feedback(result.RecentFailed ? "Recent capture failed" : result.Title, result.CopyFailed || result.SaveFailed || result.RecentFailed);
             if (!result.CopyFailed && !result.SaveFailed) _session.Close();
+            else _session.SetBars(_tools, _finish);
         }
         catch (OperationCanceledException) { }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { _feedback("Capture failed", true); }
         finally { _busy = false; }
     }
-    private void SaveAs()
+    private async Task SaveAs()
     {
         if (_busy || _draft == null) return;
+        CommitText();
         var dialog = new SaveFileDialog { Filter = "PNG image|*.png|JPEG image|*.jpg", FileName = "Screenshot.png", OverwritePrompt = true, AddExtension = true };
-        if (dialog.ShowDialog() != true) return;
+        var owner = Window.GetWindow(_finish);
+        if ((owner == null ? dialog.ShowDialog() : dialog.ShowDialog(owner)) != true) return;
+        _busy = true;
         try
         {
             var pixels = _draft.Flatten();
-            CaptureFiles.SaveAs(pixels, dialog.FileName, dialog.FilterIndex == 2 ? CaptureFileType.Jpeg : CaptureFileType.Png, true);
-            if (_model.Settings.History) { _store.Put(_id, pixels, DateTimeOffset.Now, dialog.FileName); _model.RefreshRecent(); }
-            _feedback("Saved", false); _session.Close();
+            var type = dialog.FilterIndex == 2 ? CaptureFileType.Jpeg : CaptureFileType.Png;
+            await CaptureFiles.OnWorkerAsync(() => { CaptureFiles.SaveAs(pixels, dialog.FileName, type, true); return true; });
+            if (_disposed) return;
+            try
+            {
+                if (_model.Settings.History)
+                {
+                    await CaptureFiles.OnWorkerAsync(() => { _cancel.Token.ThrowIfCancellationRequested(); _store.Put(_id, pixels, DateTimeOffset.Now, dialog.FileName); return true; });
+                    if (!_disposed) _model.RefreshRecent();
+                }
+                if (!_disposed) _feedback("Saved", false);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or Microsoft.Data.Sqlite.SqliteException)
+            { if (!_disposed) _feedback("Recent capture failed", true); }
+            if (!_disposed) _session.Close();
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { _feedback("Save failed", true); }
+        catch (OperationCanceledException) { }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { if (!_disposed) _feedback("Save failed", true); }
+        finally { _busy = false; }
     }
     public void AskDiscard(Action next)
     {
@@ -198,13 +414,15 @@ internal sealed class CaptureEditor : IDisposable
     public void Cancel() => _session.Close(CaptureEnd.Cancelled);
     public void Dispose()
     {
-        _disposed = true;
-        _cancel.Cancel();
+        _disposed = true; _cancel.Cancel();
+        foreach (var window in _windows) window.PreviewKeyDown -= PreviewKey;
         _session.Selected -= Selected; _session.KeyDown -= Key;
-        foreach (var surface in _session.Surfaces)
+        foreach (var canvas in _canvases)
         {
-            surface.Layer.MouseLeftButtonDown -= Down; surface.Layer.MouseMove -= Move; surface.Layer.MouseLeftButtonUp -= Up;
+            canvas.MouseLeftButtonDown -= Down; canvas.MouseMove -= Move; canvas.MouseLeftButtonUp -= Up;
         }
+        _canvases.Clear(); _windows.Clear(); _previews.Clear();
+        _text = null; _textBar = null; _textCanvas = null;
         _draft = null; _output = null;
     }
 }

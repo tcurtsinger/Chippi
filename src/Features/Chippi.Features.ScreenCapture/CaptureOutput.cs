@@ -24,7 +24,7 @@ public sealed class CaptureOutput(
     BitmapSource flattened,
     Func<BitmapSource, Task<bool>> copy,
     Func<BitmapSource, Task<string>> save,
-    Action<BitmapSource, string?> retain)
+    Func<BitmapSource, string?, Task> retain)
 {
     private bool _busy, _copied, _saved, _retained;
     private string? _savedFile;
@@ -70,7 +70,7 @@ public sealed class CaptureOutput(
             // Re-run retention after a successful save retry to update the existing draft's saved-file status.
             if ((_copied || _saved) && !_retained)
             {
-                try { retain(flattened, _savedFile); _retained = !wantsSave || _saved; }
+                try { await retain(flattened, _savedFile); _retained = !wantsSave || _saved; }
                 catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException or Microsoft.Data.Sqlite.SqliteException)
                 { recentFailed = true; }
             }

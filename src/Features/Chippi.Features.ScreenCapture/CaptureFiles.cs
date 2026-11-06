@@ -14,6 +14,19 @@ public enum CaptureFileType { Png, Jpeg }
 /// <summary>Publishes encoded pixels only after the sibling temporary file is closed.</summary>
 public static class CaptureFiles
 {
+    internal static Task<T> OnWorkerAsync<T>(Func<T> work)
+    {
+        var done = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var worker = new Thread(() =>
+        {
+            try { done.SetResult(work()); }
+            catch (Exception ex) { done.SetException(ex); }
+        }) { IsBackground = true, Name = "Chippi capture output" };
+        worker.SetApartmentState(ApartmentState.STA);
+        worker.Start();
+        return done.Task;
+    }
+
     public static string DefaultFolder => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "Screenshots");
 
     public static string Save(BitmapSource flattened, string folder, CaptureFileType type, DateTimeOffset time)

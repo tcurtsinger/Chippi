@@ -14,6 +14,7 @@ public sealed record RecentCapture(Guid Id, string Image, DateTimeOffset Time, i
 /// <summary>Single-worker store. Index and thumbnails are sealed; retained PNGs are ordinary local files.</summary>
 public sealed class RecentCaptureStore : IDisposable
 {
+    private readonly object _gate = new();
     private readonly string _folder;
     private readonly SealedDatabase _database;
     public RecentCaptureStore(string folder)
@@ -30,7 +31,8 @@ public sealed class RecentCaptureStore : IDisposable
             if (Guid.TryParseExact(Path.GetFileNameWithoutExtension(file), "N", out _) && !live.Contains(Path.GetFileName(file))) File.Delete(file);
     }
 
-    public IReadOnlyList<RecentCapture> Read()
+    public IReadOnlyList<RecentCapture> Read() { lock (_gate) return ReadCore(); }
+    private IReadOnlyList<RecentCapture> ReadCore()
     {
         using var cmd = _database.Connection.CreateCommand(); cmd.CommandText = "SELECT id,entry FROM captures ORDER BY id DESC";
         using var reader = cmd.ExecuteReader();
@@ -44,7 +46,8 @@ public sealed class RecentCaptureStore : IDisposable
         return entries;
     }
 
-    public BitmapSource Load(Guid id)
+    public BitmapSource Load(Guid id) { lock (_gate) return LoadCore(id); }
+    private BitmapSource LoadCore(Guid id)
     {
         var entry = Read().FirstOrDefault(x => x.Id == id) ?? throw new FileNotFoundException("Recent capture missing.");
         var image = new BitmapImage();
@@ -55,7 +58,8 @@ public sealed class RecentCaptureStore : IDisposable
         image.Freeze();
         return image;
     }
-    public byte[] Thumbnail(Guid id)
+    public byte[] Thumbnail(Guid id) { lock (_gate) return ThumbnailCore(id); }
+    private byte[] ThumbnailCore(Guid id)
     {
         using var cmd = _database.Connection.CreateCommand(); cmd.CommandText = "SELECT id,entry,thumbnail FROM captures";
         using var reader = cmd.ExecuteReader();
@@ -68,7 +72,8 @@ public sealed class RecentCaptureStore : IDisposable
         throw new FileNotFoundException();
     }
 
-    public void Remove(Guid id)
+    public void Remove(Guid id) { lock (_gate) RemoveCore(id); }
+    private void RemoveCore(Guid id)
     {
         var entry = Read().FirstOrDefault(x => x.Id == id);
         if (entry == null) return;
@@ -77,13 +82,16 @@ public sealed class RecentCaptureStore : IDisposable
         File.Delete(Path.Combine(_folder, entry.Image));
     }
 
-    public void Clear()
+    public void Clear() { lock (_gate) ClearCore(); }
+    private void ClearCore()
     {
         var entries = Read();
         using var cmd = _database.Connection.CreateCommand(); cmd.CommandText = "DELETE FROM captures"; cmd.ExecuteNonQuery();
         foreach (var entry in entries) File.Delete(Path.Combine(_folder, entry.Image));
     }
     public void Put(Guid draftId, BitmapSource flattened, DateTimeOffset time, string? savedFile)
+    { lock (_gate) PutCore(draftId, flattened, time, savedFile); }
+    private void PutCore(Guid draftId, BitmapSource flattened, DateTimeOffset time, string? savedFile)
     {
         var previous = Read();
         string name = Guid.NewGuid().ToString("N") + ".png";
@@ -122,7 +130,7 @@ public sealed class RecentCaptureStore : IDisposable
             using var delete = _database.Connection.CreateCommand(); delete.Transaction = transaction; delete.CommandText = "DELETE FROM captures WHERE id=$id"; delete.Parameters.AddWithValue("$id", row); delete.ExecuteNonQuery();
         }
     }
-    public void Dispose() => _database.Dispose();
+    public void Dispose() { lock (_gate) _database.Dispose(); }
 }
 
 
