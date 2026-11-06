@@ -11,6 +11,13 @@ namespace Chippi.App.Shell;
 /// <summary>Reuses the island's stable monitor paths and friendly names.</summary>
 internal static class SnapDisplaySource
 {
+    public static string? PointerId()
+    {
+        if (!PInvoke.GetCursorPos(out var pointer)) return null;
+        var monitor = PInvoke.MonitorFromPoint(pointer, MONITOR_FROM_FLAGS.MONITOR_DEFAULTTONEAREST);
+        return Displays.Connected().FirstOrDefault(d => d.Handle == monitor)?.Id;
+    }
+
     public static unsafe IReadOnlyList<SnapDisplay> Connected()
     {
         var displays = new List<SnapDisplay>();

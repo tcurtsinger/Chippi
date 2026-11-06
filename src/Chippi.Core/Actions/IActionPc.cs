@@ -25,7 +25,10 @@ public interface IActionPc
     void Open(string target);
 
     /// <summary>Starts an executable directly, refusing elevation rather than showing a UAC prompt.</summary>
-    void LaunchExecutable(ExecutableLaunch launch) => throw new ActionFailure("Unavailable");
+    LaunchedApp? LaunchExecutable(ExecutableLaunch launch) => throw new ActionFailure("Unavailable");
+
+    /// <summary>Activates a registered app without user arguments or an elevation prompt.</summary>
+    LaunchedApp? LaunchRegisteredApp(string parsingName) => throw new ActionFailure("Unavailable");
 
     /// <summary>Reads normal outer bounds without restoring or activating the window.</summary>
     SavedWindowPlacement? ReadPlacement(ActionWindow window) => null;

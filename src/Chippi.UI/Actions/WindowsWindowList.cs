@@ -60,7 +60,7 @@ public sealed partial class WindowsWindowList(uint self)
                 paths[appPid] = path = ImagePath(appPid);
             string title = Title(top);
             found.Add(new ListedWindow(top, pid, path is null ? title : Name(path), title, path ?? "", IsIconic(top),
-                MonitorFromWindow(top, MonitorDefaultToNearest), !includeOtherDesktops || IsOnDesktop(top)));
+                MonitorFromWindow(top, MonitorDefaultToNearest), !includeOtherDesktops || IsOnDesktop(top), appPid));
         }
         return found;
     }

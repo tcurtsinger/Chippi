@@ -13,7 +13,7 @@ namespace Chippi.UI.Actions;
 
 public sealed partial class WindowsActionPc
 {
-    public void LaunchExecutable(ExecutableLaunch launch)
+    public LaunchedApp? LaunchExecutable(ExecutableLaunch launch)
     {
         if (!launch.IsValid) throw new ActionFailure("Invalid launch details");
         if (!File.Exists(launch.Path)) throw new ActionFailure("Not found");
@@ -22,13 +22,14 @@ public sealed partial class WindowsActionPc
         try
         {
             // CreateProcess, never ShellExecute: ERROR_ELEVATION_REQUIRED is returned without asking for consent.
-            Process.Start(new ProcessStartInfo(launch.Path)
+            using var process = Process.Start(new ProcessStartInfo(launch.Path)
             {
                 UseShellExecute = false,
                 Arguments = launch.Arguments,
                 WorkingDirectory = launch.WorkingFolder.Length == 0
                     ? Path.GetDirectoryName(launch.Path)! : launch.WorkingFolder
-            })?.Dispose();
+            });
+            return process is null ? null : ReadLaunchedApp(process);
         }
         catch (Win32Exception ex) when (ex.NativeErrorCode is 740 or 1223)
         {
@@ -39,6 +40,15 @@ public sealed partial class WindowsActionPc
             throw new ActionFailure("Launching failed");
         }
     }
+
+    internal static LaunchedApp? ReadLaunchedApp(Process process)
+    {
+        try { return new((uint)process.Id, process.StartTime.ToUniversalTime().Ticks); }
+        catch (Exception ex) when (ex is Win32Exception or InvalidOperationException or ArgumentException) { return null; }
+    }
+
+    [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW", SetLastError = true)]
+    private static extern nint SetArrangementStyle(nint window, int index, nint value);
 
     public SavedWindowPlacement? ReadPlacement(ActionWindow target)
     {
@@ -72,6 +82,13 @@ public sealed partial class WindowsActionPc
         var (x, y, width, height) = DisplayMove.Fit((saved.Left, saved.Top, saved.Width, saved.Height),
             (saved.WorkLeft, saved.WorkTop, saved.WorkWidth, saved.WorkHeight),
             (area.Left, area.Top, area.Width, area.Height));
+        if ((Native.GetWindowLongPtr(hwnd, -16) & 0x00040000) == 0 && Native.GetWindowRect(hwnd, out var fixedBounds))
+        {
+            x += (width - fixedBounds.Width) / 2;
+            y += (height - fixedBounds.Height) / 2;
+            width = fixedBounds.Width;
+            height = fixedBounds.Height;
+        }
         if (!Native.SetWindowPos(hwnd, 0, x, y, width, height, 0x0004 | 0x0010))
             throw new ActionFailure("Placement failed");
         KeepReachable(hwnd);
@@ -79,9 +96,19 @@ public sealed partial class WindowsActionPc
         if (!Native.Monitors().Contains(monitor)) throw new ActionFailure("Display removed");
         var placement = new Placement { Length = Marshal.SizeOf<Placement>() };
         if (!GetWindowPlacement(hwnd, ref placement)) throw new ActionFailure("Placement failed");
-        placement.Flags = saved.Maximized && saved.Minimized ? placement.Flags | 2 : placement.Flags & ~2;
-        // SetWindowPlacement restores the state and preserves the new normal bounds.
-        placement.ShowCommand = saved.Minimized ? 7 : saved.Maximized ? 3 : 4;
+        placement.Flags &= ~2;
+        placement.ShowCommand = 4; // SW_SHOWNOACTIVATE, preserving the new normal bounds.
         if (!SetWindowPlacement(hwnd, ref placement)) throw new ActionFailure("Placement failed");
+        if (saved.Maximized)
+        {
+            // SW_SHOWMAXIMIZED activates the target. Apply its state and work-area geometry with SWP_NOACTIVATE instead.
+            nint style = Native.GetWindowLongPtr(hwnd, -16);
+            if (SetArrangementStyle(hwnd, -16, style | 0x01000000) == 0 && Marshal.GetLastWin32Error() != 0)
+                throw new ActionFailure("Placement failed");
+            if (!Native.SetWindowPos(hwnd, 0, area.Left, area.Top, area.Width, area.Height, 0x0004 | 0x0010 | 0x0020))
+                throw new ActionFailure("Placement failed");
+        }
+        // Minimize after maximizing so Windows retains its maximized restore state, without activating it.
+        if (saved.Minimized) Native.ShowWindow(hwnd, 7);
     }
 }

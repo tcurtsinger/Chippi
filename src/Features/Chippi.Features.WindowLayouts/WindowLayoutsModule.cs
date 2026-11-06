@@ -10,7 +10,7 @@ using System.Windows.Threading;
 namespace Chippi.Features.WindowLayouts;
 
 /// <summary>Snap's settings and commands. The shell supplies the PC; views use the same captured target and runner.</summary>
-public sealed class WindowLayoutsModule(Func<IReadOnlyList<SnapDisplay>>? displays = null) : IFeatureModule
+public sealed partial class WindowLayoutsModule(Func<IReadOnlyList<SnapDisplay>>? displays = null) : IFeatureModule
 {
     public const string Id = "window-layouts";
     private ModuleContext? _context;
@@ -39,6 +39,7 @@ public sealed class WindowLayoutsModule(Func<IReadOnlyList<SnapDisplay>>? displa
         if (context.Actions is { } pc)
             _runner = new ActionRunner(pc, context.Commands, () => context.Clipboard, text => text,
                 () => context.IslandPasteTarget()?.Window ?? 0);
+        StartArrangements(context);
         context.Ui.AddCommands(Commands);
         context.Ui.SetSettingsPage(_ => new Views.SnapPage(this));
         ComposeViews?.Invoke(this, context);
@@ -51,6 +52,7 @@ public sealed class WindowLayoutsModule(Func<IReadOnlyList<SnapDisplay>>? displa
     {
         SystemEvents.DisplaySettingsChanged -= DisplaySettingsChanged;
         StopDrag();
+        StopArrangements();
         if (Layouts is { } layouts) layouts.Changed -= LayoutsChanged;
         _failureTimer?.Stop();
         _failureTimer = null;
@@ -64,6 +66,7 @@ public sealed class WindowLayoutsModule(Func<IReadOnlyList<SnapDisplay>>? displa
 
     private void LayoutsChanged()
     {
+        SyncArrangementShortcuts();
         UpdateDrag();
         Changed?.Invoke();
     }
@@ -185,6 +188,7 @@ public sealed class WindowLayoutsModule(Func<IReadOnlyList<SnapDisplay>>? displa
             { Words = "snap window", Detail = target?.App ?? "Snap", Tile = SnapTile,
                 WindowAction = new() { Kind = ActionKind.Window, Value = verb.ToString() } });
         }
+        AddArrangementCommands(commands);
         return commands;
     }
 }

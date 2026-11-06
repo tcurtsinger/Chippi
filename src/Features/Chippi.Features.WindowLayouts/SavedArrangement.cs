@@ -32,10 +32,11 @@ public sealed record SavedArrangement
 {
     public string Id { get; init; } = Guid.NewGuid().ToString("N");
     public string Name { get; init; } = "";
+    public Chippi.Core.Shortcuts.KeyShortcut? Shortcut { get; init; }
     public List<ArrangementRow> Rows { get; init; } = [];
 
     public bool IsValid => !string.IsNullOrWhiteSpace(Id) && !string.IsNullOrWhiteSpace(Name)
-        && Name.Trim().Length <= 80 && Rows is { Count: > 0 }
+        && Name.Trim().Length <= 80 && (Shortcut is null || Shortcut.IsBindable) && Rows is { Count: > 0 }
         && Rows.All(r => r is not null && r.IsValid)
         && Rows.Select(r => r.Id).Distinct(StringComparer.Ordinal).Count() == Rows.Count;
 

@@ -6,7 +6,7 @@ using Chippi.Core.Actions;
 namespace Chippi.Features.WindowLayouts;
 
 public sealed record ArrangementLiveWindow(ArrangementCandidate Candidate, string Target, string DisplayId,
-    string DisplayName, int Dpi, SavedWindowPlacement Placement, bool Fullscreen = false);
+    string DisplayName, int Dpi, SavedWindowPlacement? Placement, bool Fullscreen = false);
 
 public sealed record ArrangementCapture(IReadOnlyList<ArrangementRow> Rows, IReadOnlyList<string> Skipped);
 

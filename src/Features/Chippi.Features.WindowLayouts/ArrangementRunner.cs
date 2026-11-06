@@ -13,6 +13,8 @@ public readonly record struct ArrangementProcess(uint Id, long Started);
 /// <summary>The shared window list, display discovery, pause policy and action PC, adapted by the shell. UI thread only.</summary>
 public interface IArrangementDesktop
 {
+    Task PrepareAsync() => Task.CompletedTask;
+    void BeginInvocation(nint original) { }
     IReadOnlyList<ArrangementLiveWindow> Windows();
     IReadOnlyList<SnapDisplay> Displays();
     string? StopReason(IReadOnlySet<ArrangementProcess> launched);
