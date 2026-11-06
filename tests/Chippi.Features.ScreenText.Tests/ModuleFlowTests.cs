@@ -38,6 +38,9 @@ public sealed class ModuleFlowTests
         public void Release(int width, int height) => Selected?.Invoke(Selection_(width, height));
         public void Cancel() => Close(CaptureEnd.Cancelled);
 
+        /// <summary>A key the layer passes to the feature once a region is released.</summary>
+        public void Press(Key key) => KeyDown?.Invoke(new KeyEventArgs(Keyboard.PrimaryDevice, new UnshownSource(), 0, key) { RoutedEvent = Keyboard.KeyDownEvent });
+
         // The module reads the pixels from selection.Image(); a frozen screen of one flat colour stands in.
         private static Selection Selection_(int width, int height)
         {
@@ -47,6 +50,13 @@ public sealed class ModuleFlowTests
             var freeze = new Freeze([screen], [], DateTimeOffset.Now);
             return new Selection(new PixelRect(0, 0, width, height), freeze, Chippi.Capture.CaptureMode.Region, null, null, false, screen);
         }
+    }
+
+    private sealed class UnshownSource : PresentationSource
+    {
+        public override System.Windows.Media.Visual RootVisual { get; set; } = null!;
+        public override bool IsDisposed => false;
+        protected override System.Windows.Media.CompositionTarget GetCompositionTargetCore() => null!;
     }
 
     private sealed class Layer : ICaptureLayer
@@ -75,8 +85,9 @@ public sealed class ModuleFlowTests
     private sealed class Qr : IQrDecoder
     {
         public IReadOnlyList<QrHit> Hits = [new QrHit("https://example.com/", new Point(10, 10))];
-        public bool Throw;
+        public bool Throw, Damaged;
         public IReadOnlyList<QrHit> Decode(CapturedImage image) => Throw ? throw new InvalidOperationException() : Hits;
+        public bool LooksLikeCode(CapturedImage image) => Damaged;
     }
 
     private sealed class Clipboard : IClipboardHub
@@ -235,11 +246,48 @@ public sealed class ModuleFlowTests
         var t = await Start();
         t.Module.Start(ScreenTextVerb.CopyText);
         t.Layer.Last!.Release(4, 4);
-        t.Layer.Last.Cancel();
+        // The layer sends no key to a feature that closed; a tiny drag ends the capture itself.
+        Assert.Equal(CaptureEnd.Cancelled, t.Layer.Last.Ended);
         await t.Module.Work;
         Assert.Equal(0, t.Ocr.Calls);
         Assert.Empty(t.Clip.Written);
         Assert.Empty(t.Hub.Activities);
+    }
+
+    [Fact]
+    public async Task Esc_after_a_region_is_released_closes_the_capture()
+    {
+        var t = await Start();
+        t.Module.Start(ScreenTextVerb.CopyText);
+        Chippi.Island.Tests.WpfTestThread.Run(() => t.Layer.Last!.Press(Key.Escape));
+        Assert.Equal(CaptureEnd.Cancelled, t.Layer.Last!.Ended);
+        Assert.Equal(0, t.Ocr.Calls);
+    }
+
+    [Fact]
+    public async Task Cancelling_Reselect_leaves_the_Text_page_as_it_was()
+    {
+        var t = await Start();
+        await Select(t, ScreenTextVerb.ExtractText);
+        Assert.False(t.Module.Text.Reading);
+        t.Module.Text.Reselect();
+        Assert.False(t.Module.Text.Reading);
+        t.Layer.Last!.Cancel();
+        Assert.False(t.Module.Text.Reading);
+        Assert.NotNull(t.Module.Text.Result);
+    }
+
+    [Fact]
+    public async Task A_code_the_decoder_finds_but_cannot_read_is_Unreadable_and_a_blank_region_is_NotFound()
+    {
+        var t = await Start();
+        t.Qr.Hits = [];
+        t.Qr.Damaged = true;
+        await Select(t, ScreenTextVerb.ScanQr);
+        Assert.Equal(QrScanState.Unreadable, t.Module.Qr.State);
+        t.Qr.Damaged = false;
+        await Select(t, ScreenTextVerb.ScanQr);
+        Assert.Equal(QrScanState.NotFound, t.Module.Qr.State);
     }
 
     [Fact]

@@ -149,9 +149,26 @@ public sealed class ScreenTextModule : IFeatureModule
 
     public Task UninstallAsync(CancellationToken ct) => Task.CompletedTask;
 
-    private TextResultView TextView() => _textView ??= new TextResultView(Text);
+    // What was read doesn't outlive its page: closing the page clears it, and the region's pixels with it.
+    private TextResultView TextView()
+    {
+        if (_textView is null)
+        {
+            _textView = new TextResultView(Text);
+            _textView.Unloaded += (_, _) => { Text.Clear(); _lastImage = null; };
+        }
+        return _textView;
+    }
 
-    private QrResultView QrView() => _qrView ??= new QrResultView(Qr);
+    private QrResultView QrView()
+    {
+        if (_qrView is null)
+        {
+            _qrView = new QrResultView(Qr);
+            _qrView.Unloaded += (_, _) => Qr.Clear();
+        }
+        return _qrView;
+    }
 
     /// <summary>Puts what Extract text read on the Text page.</summary>
     public void ShowText(TextResult result) => Text.Set(result);
@@ -287,10 +304,23 @@ public sealed class ScreenTextModule : IFeatureModule
         var session = _capture.Start(new CaptureRequest(Chippi.Capture.CaptureMode.Region) { Door = door });
         if (session is null) return;
         bool taken = false;
+        // Once a region is released the layer hands every key to the feature, Esc included.
+        session.KeyDown += e =>
+        {
+            if (e.Key != System.Windows.Input.Key.Escape || taken) return;
+            e.Handled = true;
+            session.Close(CaptureEnd.Cancelled);
+        };
         session.Selected += selection =>
         {
-            // A sub-8-pixel drag is no selection; the first real one is the region.
-            if (taken || selection.Rect.Width < 8 || selection.Rect.Height < 8) return;
+            if (taken) return;
+            // A sub-8-pixel drag is no selection: the capture ends instead of leaving the frozen screen with nothing to do.
+            if (selection.Rect.Width < 8 || selection.Rect.Height < 8)
+            {
+                taken = true;
+                session.Close(CaptureEnd.Cancelled);
+                return;
+            }
             taken = true;
             var image = selection.Image();
             session.Close(CaptureEnd.Finished, handBack: verb == ScreenTextVerb.CopyText);
@@ -307,6 +337,7 @@ public sealed class ScreenTextModule : IFeatureModule
     {
         long generation = Interlocked.Increment(ref _generation);
         _lastImage = image;
+        if (!copy) Text.SetReading(true);
         string? language = _settings.Language;
         bool join = _settings.JoinLines;
         OcrOutcome outcome;
@@ -342,13 +373,20 @@ public sealed class ScreenTextModule : IFeatureModule
     {
         long generation = Interlocked.Increment(ref _generation);
         IReadOnlyList<QrHit> hits = [];
-        bool failed = false;
-        try { hits = await Task.Run(() => _decoder.Decode(image)); }
+        bool failed = false, damaged = false;
+        try
+        {
+            (hits, damaged) = await Task.Run(() =>
+            {
+                var found = _decoder.Decode(image);
+                return (found, found.Count == 0 && _decoder.LooksLikeCode(image));
+            });
+        }
         catch (Exception ex) when (ex is not OperationCanceledException) { failed = true; }
         if (generation != Interlocked.Read(ref _generation) || _context is not { } context) return;
 
         var codes = hits.Select(h => QrPayload.Parse(h.Text)).ToList();
-        ShowCodes(codes, failed ? QrScanState.Unreadable : codes.Count == 0 ? QrScanState.NotFound : QrScanState.Read);
+        ShowCodes(codes, failed || damaged ? QrScanState.Unreadable : codes.Count == 0 ? QrScanState.NotFound : QrScanState.Read);
         if (failed) Feedback(context, "QR scan failed", "QR code", true);
         context.OpenIslandPage(QrTileKey);
     }
@@ -389,9 +427,10 @@ public sealed class ScreenTextModule : IFeatureModule
 
         public bool Copy(string text) => owner.Write(text);
 
-        public void Reselect() { SetReading(owner.TextReselect is not null); owner.TextReselect?.Invoke(); }
+        // Reading starts when a region is taken, so Esc on the selector leaves the page as it was.
+        public void Reselect() => owner.TextReselect?.Invoke();
 
-        public void Retry() { SetReading(owner.TextRetry is not null); owner.TextRetry?.Invoke(); }
+        public void Retry() => owner.TextRetry?.Invoke();
 
         internal void Set(TextResult result)
         {
@@ -405,7 +444,7 @@ public sealed class ScreenTextModule : IFeatureModule
             Changed?.Invoke();
         }
 
-        private void SetReading(bool reading)
+        internal void SetReading(bool reading)
         {
             lock (_gate) _reading = reading;
             Changed?.Invoke();

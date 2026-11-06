@@ -73,7 +73,7 @@ public sealed class TextPageTests
             Assert.Equal(Visibility.Visible, view.RetryButton.Visibility);
 
             model.Set(Document() with { State = TextReadState.NoLanguage, Text = "", Lines = [] });
-            Assert.Equal([TextResultView.NoLanguage, TextResultView.NoLanguageFix], Texts(view.Message));
+            Assert.Equal([TextResultView.NoLanguage], Texts(view.Message));
             model.Set(Document() with { State = TextReadState.Failed, Text = "", Lines = [] });
             Assert.Equal([TextResultView.Failed], Texts(view.Message));
 

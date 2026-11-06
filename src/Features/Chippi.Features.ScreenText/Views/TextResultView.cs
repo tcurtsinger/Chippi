@@ -22,7 +22,6 @@ public sealed class TextResultView : UserControl
 {
     internal const string NoText = "No text found";
     internal const string NoLanguage = "No OCR language installed";
-    internal const string NoLanguageFix = "Add one in Windows Settings.";
     internal const string Failed = "Text recognition failed";
     internal const string CopyFailed = "Copy failed";
     internal const string Reading = "Reading text";
@@ -153,7 +152,7 @@ public sealed class TextResultView : UserControl
         _message.Content = state switch
         {
             TextReadState.NoText => Bits.Message(LucideIcons.ScanText, NoText),
-            TextReadState.NoLanguage => Bits.Message(LucideIcons.TriangleAlert, NoLanguage, NoLanguageFix, caution: true),
+            TextReadState.NoLanguage => Bits.Message(LucideIcons.TriangleAlert, NoLanguage, caution: true),
             TextReadState.Failed => Bits.Message(LucideIcons.TriangleAlert, Failed, caution: true),
             _ => _model.Reading ? Bits.Message(LucideIcons.ScanText, Reading) : null,
         };

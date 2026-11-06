@@ -39,6 +39,9 @@ public interface IQrDecoder
 {
     /// <summary>Every code in the region, top to bottom then left to right; empty when there is none.</summary>
     IReadOnlyList<QrHit> Decode(CapturedImage image);
+
+    /// <summary>True when the image shows a code's finder patterns that <see cref="Decode"/> couldn't read (a damaged or too small code).</summary>
+    bool LooksLikeCode(CapturedImage image) => false;
 }
 
 /// <summary><c>Windows.Media.Ocr</c>: built in, local, standard user.</summary>
@@ -118,6 +121,19 @@ public sealed class ZXingQrDecoder : IQrDecoder
             .Where(r => !string.IsNullOrEmpty(r.Text))
             .Select(r => new QrHit(r.Text, At(r)))
             .OrderBy(h => Math.Round(h.At.Y / 20)).ThenBy(h => h.At.X)];
+    }
+
+    public bool LooksLikeCode(CapturedImage image)
+    {
+        if (image.Width <= 0 || image.Height <= 0)
+            return false;
+        try
+        {
+            var source = new RGBLuminanceSource(image.Pixels, image.Width, image.Height, RGBLuminanceSource.BitmapFormat.BGRA32);
+            var matrix = new BinaryBitmap(new HybridBinarizer(source)).BlackMatrix;
+            return matrix is not null && new ZXing.QrCode.Internal.Detector(matrix).detect() is not null;
+        }
+        catch (ReaderException) { return false; }
     }
 
     private static Point At(Result result)

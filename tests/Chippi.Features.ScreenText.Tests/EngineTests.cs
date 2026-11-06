@@ -165,6 +165,23 @@ public sealed class EngineTests(Xunit.Abstractions.ITestOutputHelper output)
         Assert.Empty(decoder.Decode(new CapturedImage(0, 0, [])));
     }
 
+    [Fact]
+    public void A_damaged_code_is_found_but_not_read()
+    {
+        var decoder = new ZXingQrDecoder();
+        var code = Draw("https://example.com/hello", 6);
+        var image = Canvas(code.Size + 40, code.Size + 40, (code, 20, 20));
+        Assert.NotEmpty(decoder.Decode(image));
+        // Whiten the middle of the code: the three finder corners stay, a square of data goes, past what the code's error correction repairs.
+        int from = 20 + (int)(code.Size * 0.36), to = 20 + (int)(code.Size * 0.64);
+        for (int y = from; y < to; y++)
+            for (int x = from; x < to; x++)
+                image.Pixels[(y * image.Width + x) * 4] = image.Pixels[(y * image.Width + x) * 4 + 1] = image.Pixels[(y * image.Width + x) * 4 + 2] = 255;
+        Assert.Empty(decoder.Decode(image));
+        Assert.True(decoder.LooksLikeCode(image));
+        Assert.False(decoder.LooksLikeCode(Canvas(300, 300)));
+    }
+
     // ---- Windows OCR over text the test draws; the CI runner may have no language, which the engine says
 
     [Fact]
