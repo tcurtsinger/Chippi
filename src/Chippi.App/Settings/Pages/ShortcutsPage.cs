@@ -19,13 +19,16 @@ using Chippi.UI.Controls;
 namespace Chippi.App.Settings.Pages;
 
 /// <summary>
-/// Settings › Shortcuts (docs/phase-6/design/shortcuts.html): every shortcut in one list, Chippi's own from the shell's list
-/// and the owner's bindings from the Shortcuts feature, with their keys in one column; then Add shortcut, the Caps Lock
-/// combos and Mouse buttons. A shortcut that clashes is refused where it's recorded, with one line by Save.
+/// Settings › Shortcuts (designs/settings-shortcuts/v2.html): every shortcut in one list, the features' own under the
+/// sidebar's groups (System, Windows, Capture…) and the owner's bindings from the Shortcuts feature under Your shortcuts,
+/// with their keys in one column; then Add shortcut, the Caps Lock combos and Mouse buttons. A shortcut that clashes is
+/// refused where it's recorded, with one line by Save.
 /// </summary>
 internal sealed class ShortcutsPage : UserControl
 {
-    private static readonly string[] GroupOrder = ["Chippi", "Window", "Media", "Text", "App", "Keys", "Command", "Selection", "Settings"];
+    /// <summary>Shortcuts from no installed feature, after the feature groups.</summary>
+    private const string ChippiGroup = "Chippi";
+    private const string YourGroup = "Your shortcuts";
     private const double KeysColumn = 300;
     private const double OptionsColumn = 44;
     /// <summary>The editor's fields span the keys' and options' columns, so they start where the keycaps do.</summary>
@@ -56,7 +59,8 @@ internal sealed class ShortcutsPage : UserControl
         };
     }
 
-    private sealed record Row(string Key, string Group, string Name, string? Icon, IReadOnlyList<string> Caps, bool Mouse, bool Dim, bool Unset, Action Change, Action? Remove, Action? Another = null);
+    /// <param name="Feature">The second line: its feature's name, when that feature offers more than one shortcut.</param>
+    private sealed record Row(string Key, string Group, string Name, string? Feature, string? Icon, IReadOnlyList<string> Caps, bool Mouse, bool Dim, bool Unset, Action Change, Action? Remove, Action? Another = null);
 
     private static string ChippiKey(long id) => "chippi:" + id;
     private static string BindingKey(string? id) => "binding:" + id;
@@ -121,12 +125,21 @@ internal sealed class ShortcutsPage : UserControl
 
     // ---- the list ----
 
+    /// <summary>
+    /// The rows in the list's order: the features' groups in the sidebar's order, features by name within a group and
+    /// each feature's shortcuts in the order it added them; then any from no installed feature, then Your shortcuts.
+    /// </summary>
     private IEnumerable<Row> Rows()
     {
-        foreach (var e in _shell.Shortcuts.List.Where(e => e.Editable))
+        var ordered = _shell.Shortcuts.List.Where(e => e.Editable)
+            .Select(e => (Entry: e, Feature: FeatureOf(e)))
+            .OrderBy(x => x.Feature is { } f ? (int)f.Group : int.MaxValue)
+            .ThenBy(x => x.Feature?.Name ?? "", StringComparer.CurrentCultureIgnoreCase);
+        foreach (var (e, feature) in ordered)
         {
             var entry = e;
-            yield return new Row(ChippiKey(entry.Id), "Chippi", entry.Name, entry.Icon, entry.Shortcut is { } k ? Keycaps.CapsOf(k) : [], false, !entry.Held, entry.Shortcut is null,
+            string group = feature?.Group.DisplayName() ?? ChippiGroup;
+            yield return new Row(ChippiKey(entry.Id), group, entry.Name, FeatureLine(entry), entry.Icon, entry.Shortcut is { } k ? Keycaps.CapsOf(k) : [], false, !entry.Held, entry.Shortcut is null,
                 () => StartEdit(new Edit { Mode = EditMode.Chippi, EntryId = entry.Id, EntryName = entry.Name, Door = BindingDoor.Key, Keys = entry.Shortcut }),
                 entry.Shortcut is null ? null : () => _shell.Shortcuts.Remove(entry.Id));
         }
@@ -142,7 +155,7 @@ internal sealed class ShortcutsPage : UserControl
                 BindingDoor.Caps => [CombosKey(_module.Settings.CapsHeldKey), KeyCombo.NameOf(binding.CapsKey)],
                 _ => [MouseName(binding.Button)],
             };
-            yield return new Row(BindingKey(binding.Id), GroupOf(binding.Action.Kind), binding.Label, ActionCatalog.GlyphOf(binding.Action), caps, binding.Door == BindingDoor.Mouse, !status.Acts, false,
+            yield return new Row(BindingKey(binding.Id), YourGroup, binding.Label, null, ActionCatalog.GlyphOf(binding.Action), caps, binding.Door == BindingDoor.Mouse, !status.Acts, false,
                 () => StartEdit(new Edit
                 {
                     Mode = EditMode.Binding, BindingId = binding.Id, Action = binding.Action, Door = binding.Door, Keys = binding.Keys, CapsKey = binding.CapsKey,
@@ -153,12 +166,20 @@ internal sealed class ShortcutsPage : UserControl
         }
     }
 
-    private static string GroupOf(ActionKind kind) => kind switch
+    private FeatureDescriptor? FeatureOf(ShortcutEntry entry) => _shell.Registry.Features.FirstOrDefault(f => f.Id == entry.Owner)?.Descriptor;
+
+    /// <summary>The row's second line: its feature's name, when that feature offers more than one shortcut.</summary>
+    private string? FeatureLine(ShortcutEntry entry) =>
+        FeatureOf(entry) is { } feature && feature.Name != entry.Name && _shell.Shortcuts.List.Count(e => e.Editable && e.Owner == entry.Owner) > 1 ? feature.Name : null;
+
+    /// <summary>A row's name over its feature's, in the caption style; the name alone without one.</summary>
+    private static FrameworkElement Named(TextBlock name, string? feature)
     {
-        ActionKind.App or ActionKind.File or ActionKind.Link => "App",
-        ActionKind.SettingsPage => "Settings",
-        _ => kind.ToString(),
-    };
+        if (feature is null)
+            return name;
+        var caption = SettingsUi.Styled(new TextBlock { Text = feature, TextTrimming = TextTrimming.CharacterEllipsis }, "CaptionTextStyle");
+        return new StackPanel { VerticalAlignment = VerticalAlignment.Center, Children = { name, caption } };
+    }
 
     private static string CombosKey(uint vk) => vk switch { 0x14 => "Caps Lock", 0xA3 => "Right Ctrl", 0xA1 => "Right Shift", 0x5C => "Right Win", _ => KeyCombo.NameOf(vk) };
 
@@ -179,7 +200,7 @@ internal sealed class ShortcutsPage : UserControl
         var card = new Card();
         if (rows.Count == 0)
             card.Children.Add(SettingsLayout.Empty("No shortcuts yet. Add the first one."));
-        foreach (var group in rows.GroupBy(r => r.Group).OrderBy(g => Math.Max(0, Array.IndexOf(GroupOrder, g.Key))))
+        foreach (var group in rows.GroupBy(r => r.Group))
         {
             var heading = SettingsUi.Styled(new TextBlock { Text = group.Key, VerticalAlignment = VerticalAlignment.Center }, "CaptionTextStyle");
             card.Children.Add(new Border { MinHeight = 36, Padding = new Thickness(16, 8, 16, 0), Child = heading });
@@ -212,7 +233,7 @@ internal sealed class ShortcutsPage : UserControl
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(OptionsColumn) });
         var icon = new LucideIcon { Data = LucideIcons.Get(row.Icon), Size = 18, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center };
         icon.SetResourceReference(LucideIcon.BrushProperty, "TextPrimaryBrush");
-        var name = SettingsUi.Styled(new TextBlock { Text = row.Name, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis }, "BodyTextStyle");
+        var name = Named(SettingsUi.Styled(new TextBlock { Text = row.Name, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis }, "BodyTextStyle"), row.Feature);
         FrameworkElement keys;
         if (row.Unset)
         {
@@ -371,11 +392,12 @@ internal sealed class ShortcutsPage : UserControl
         }
         else
         {
+            var entry = _shell.Shortcuts.List.FirstOrDefault(e => e.Id == edit.EntryId);
             _title.Text = edit.EntryName;
-            _titleIcon.Data = LucideIcons.Get(_shell.Shortcuts.List.FirstOrDefault(e => e.Id == edit.EntryId)?.Icon);
+            _titleIcon.Data = LucideIcons.Get(entry?.Icon);
             _titleIcon.Visibility = Visibility.Visible;
             _inputRow = new Border();
-            view.Children.Add(EditorRow(_titleIcon, _title, _inputRow));
+            view.Children.Add(EditorRow(_titleIcon, Named(_title, entry is null ? null : FeatureLine(entry)), _inputRow));
         }
 
         _messagePanel = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Visibility = Visibility.Collapsed };

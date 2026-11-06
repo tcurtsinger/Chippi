@@ -46,6 +46,51 @@ public sealed class ChippiPagesTests
     });
 
     [Fact]
+    public void Shortcuts_sit_under_the_sidebars_groups_and_name_a_feature_with_several() => WpfTestThread.Run(() =>
+    {
+        string profile = "chippi-shortcut-groups-" + Guid.NewGuid().ToString("N");
+        string root = Path.Combine(Path.GetTempPath(), profile);
+        Directory.CreateDirectory(root);
+        var shell = new ShellContext(new ConfigStore(Path.Combine(root, "settings.json")), NullLoggerFactory.Instance, false, profile);
+        try
+        {
+            shell.Registry.Register(new StubFeature("test-capture", "Screen capture", FeatureGroup.Capture));
+            shell.Registry.Register(new StubFeature("test-command", "Command bar", FeatureGroup.Windows));
+            shell.Registry.Register(new StubFeature("test-displays", "Displays", FeatureGroup.System));
+            shell.Registry.Register(new StubFeature("test-switcher", "App switcher", FeatureGroup.Windows));
+            ShortcutEdits Unset() => new(() => null, _ => null, () => { });
+            // Added in the order features start, which isn't the list's.
+            using var loose = shell.Shortcuts.Add("test-gone", "Loose", Unset());
+            using var region = shell.Shortcuts.Add("test-capture", "Capture region", Unset());
+            using var command = shell.Shortcuts.Add("test-command", "Command bar", Unset());
+            using var up = shell.Shortcuts.Add("test-displays", "Brightness up", Unset());
+            using var down = shell.Shortcuts.Add("test-displays", "Brightness down", Unset());
+            using var switcher = shell.Shortcuts.Add("test-switcher", "App switcher", Unset());
+
+            var page = new ShortcutsPage(shell);
+            string[] lines = [.. Find<TextBlock>(Find<Card>(page).First()).Select(t => t.Text)];
+            Assert.Equal(
+                ["System", "Brightness up", "Displays", "Brightness down", "Displays",
+                 "Windows", "App switcher", "Command bar",
+                 "Capture", "Capture region",
+                 "Chippi", "Loose"],
+                lines);
+
+            // Edit lands on the row with its editor, which keeps the feature's line.
+            page.OpenEditor("test-displays/Brightness down", listen: false);
+            var editor = Find<Card>(page).First().Children.OfType<StackPanel>().Single();
+            Assert.Equal(["Brightness down", "Displays"], Find<TextBlock>(editor).Select(t => t.Text).Where(t => t.Length > 0).Take(2));
+        }
+        finally
+        {
+            shell.Registry.StopAllAsync().GetAwaiter().GetResult();
+            shell.Clipboard.Dispose();
+            foreach (string folder in new[] { root, Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Chippi-dev", profile) })
+                if (Directory.Exists(folder)) Directory.Delete(folder, true);
+        }
+    });
+
+    [Fact]
     public void A_failed_shortcut_feature_has_no_sidebar_entry_and_unknown_errors_have_no_invented_reason() => WpfTestThread.Run(() =>
     {
         string profile = "chippi-failed-shortcut-" + Guid.NewGuid().ToString("N");
@@ -160,6 +205,14 @@ public sealed class ChippiPagesTests
         public Task StartAsync(ModuleContext context, CancellationToken ct) => Task.FromException(unknown ? new InvalidOperationException("Not about a device") : new UnauthorizedAccessException("Raw sensitive path"));
         public Task StopAsync(CancellationToken ct) => Task.CompletedTask;
     }
+
+    private sealed class StubFeature(string id, string name, FeatureGroup group) : IFeatureModule
+    {
+        public FeatureDescriptor Descriptor { get; } = new(id, name, "Description", group);
+        public Task StartAsync(ModuleContext context, CancellationToken ct) => Task.CompletedTask;
+        public Task StopAsync(CancellationToken ct) => Task.CompletedTask;
+    }
+
     private static IEnumerable<T> Find<T>(DependencyObject root) where T : DependencyObject
     {
         if (root is T match) yield return match;
