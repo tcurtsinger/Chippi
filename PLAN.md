@@ -121,10 +121,13 @@ Shaped from 2026-11-01: [docs/phase-5.5/](docs/phase-5.5/README.md). All five we
 - **Agents:** discovery, session attention and tray Quit fixed (#204); a matching puck badge (#205, #206), showing the installed apps' own icons (#216), its artwork cropped to fill the round badge (#218).
 - **Organizer, Clipboard, Scratchpad:** inspect a held file in the widget (#199); polish passes (#200 to #203).
 
-### Phase 6: Windows and input
-Not started. Window layouts and snapping, app switcher with previews, quit and close protection,
-focus follows mouse, smooth and linear scrolling, mouse button shortcuts, click and
-key debounce, super key, text snippets, shortcut manager.
+### Phase 6: Windows and input (done)
+Shaped 2026-11-04: [docs/phase-6/](docs/phase-6/README.md). Built in three waves and a last step, PRs #220 to #274, on one input hub (`Chippi.Input`), one action model and one shortcut service. Live checks passed 2026-11-05 (tasks 331, 374, 422, 458); report: [docs/phase-6-report.md](docs/phase-6-report.md).
+- **Wave 1:** the input layer, Always on and Pause in these apps, Debounce, Focus follows mouse, Close protection, Smooth scrolling, the Actions regroup.
+- **Wave 2:** Shortcuts (keys, Caps Lock combos, mouse buttons), which covers the planned mouse button shortcuts, super key and shortcut manager.
+- **Wave 3:** Text snippets, Snap (window layouts and Shift+drag zones) and the App switcher with live previews.
+- **Last step:** saved app arrangements in Snap.
+- Deferred: taking over Alt+Tab as an option, mouse-button drag gestures, a snippet paste mode and import or export.
 
 ### Phase 7: Capture and app management
 Not started. Screen capture selector, screenshot and annotate, screen recording, OCR and QR,

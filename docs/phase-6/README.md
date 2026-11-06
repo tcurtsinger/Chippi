@@ -39,7 +39,8 @@ Window layouts and snapping, app switcher, close protection, focus follows mouse
   |---|---|
   | 1 | Passed Travis's live check on 2026-11-05 (task 331), installer built from `bf939a5`. Includes Smooth scrolling. The Radial menu's cold-start flick (issue #230) passed too. The shared action model (#242) came after that build. |
   | 2 | Passed Travis's live check on 2026-11-05 (task 374), installer built from `82aff92`: Shortcuts (keys, Caps Lock combos, mouse buttons, Settings › Shortcuts) on the shared action model (#242, #246). |
-  | 3 | Passed Travis's live check on 2026-11-05 (task 422), installer built from `0145b6d` (#258 to #268): Text snippets, Snap and the App switcher, with the fixes from his check (read-only shortcuts with Edit on feature pages, the editor inside its row, Add features keeping its scroll position, the switcher bringing the window to his display). Saved app arrangements is Phase 6's last piece. |
+  | 3 | Passed Travis's live check on 2026-11-05 (task 422), installer built from `0145b6d` (#258 to #268): Text snippets, Snap and the App switcher, with the fixes from his check (read-only shortcuts with Edit on feature pages, the editor inside its row, Add features keeping its scroll position, the switcher bringing the window to his display). |
+  | Arrangements | Passed Travis's live check on 2026-11-05 (task 458), installer built from `b830c09` (#270 to #274): saved app arrangements in Snap, Phase 6's last piece. Phase 6 is done: [report](../phase-6-report.md). |
 
 - **Focus follows mouse** uses Windows' built-in setting (250 ms, the window raised) and puts the original setting back when it's off or paused.
 - **Key debounce** tops out at 200 ms.
@@ -65,8 +66,8 @@ Window layouts and snapping, app switcher, close protection, focus follows mouse
 | Shortcuts (`shortcuts.md`) | Herb | Lumen, task 212 |
 | Smooth scrolling (`smooth-scrolling.md`) | Karl | Settings rows only |
 | Text snippets (`text-snippets.md`) | Herb | Settings page |
-| Snap (`snap.md`) | Karl | Lumen, task 212 (Actions menu); zones to follow |
+| Snap (`snap.md`) | Karl | Lumen, task 212 (Actions menu); zones and editor in the [wave 3 boards](design/wave-3.html) |
 | Saved app arrangements (`arrangements.md`) | Karl | [Approved boards](design/arrangements.html) |
-| App switcher (pp-switcher.md) | Karl | To follow |
+| App switcher (`app-switcher.md`) | Karl | [Wave 3 boards](design/wave-3.html) |
 
 Each brief is confirmed by Travis, and each new surface's mockup is approved, before it's built.
