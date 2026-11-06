@@ -20,14 +20,16 @@ public sealed record ArrangementSummary(bool Running, int Ready, int Total, int 
 
     /// <summary>The bar's second line after the name: "3 need attention", "2 guessed", "Fullscreen app".</summary>
     public string Note => Cancelled > 0 ? Stopped ?? $"{Ready} ready"
-        : Problems > 0 ? $"{Problems} need attention"
+        : Problems > 0 ? $"{Problems} {NeedsAttention}"
         : Guessed > 0 ? $"{Guessed} guessed"
         : Moved == 1 ? "1 on another display" : $"{Moved} on another display";
+
+    private string NeedsAttention => Problems == 1 ? "needs attention" : "need attention";
 
     /// <summary>The run page's line over its rows.</summary>
     public string Status => Running ? $"{Ready} of {Total} ready"
         : Cancelled > 0 ? Stopped is not null ? $"Stopped · {Stopped}" : $"{Ready} ready · {Cancelled} cancelled"
-        : Problems > 0 ? $"{Ready} of {Total} ready · {Problems} need attention"
+        : Problems > 0 ? $"{Ready} of {Total} ready · {Problems} {NeedsAttention}"
         : Guessed > 0 ? $"{Ready} of {Total} ready · {Guessed} guessed"
         : $"{Ready} of {Total} ready";
 
