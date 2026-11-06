@@ -1,6 +1,6 @@
 # Color picker: brief
 
-Wave 1. For Travis to confirm. Decisions: [README](README.md). Research: [behavior-spec-a.md](behavior-spec-a.md) (Color picker), [architecture.md](architecture.md) section 5, [surfaces.md](surfaces.md) sections 3, 4 and 7. Shared selector and freeze: `capture-layer.md` (Kayla). Mockup: Lumen's `wave-1.html` (Color page, bar line, Settings). DESIGN.md wins where it speaks.
+Wave 1. For Travis to confirm. Decisions: [README](README.md). Research: [behavior-spec-a.md](behavior-spec-a.md) (Color picker), [architecture.md](architecture.md) section 5, [surfaces.md](surfaces.md) sections 3, 4 and 7. Shared selector and freeze: `capture-layer.md` (Kayla). Mockup: Lumen's `designs/capture-results/` (Color page, bar line) and `designs/settings-capture/` (Settings). DESIGN.md wins where it speaks.
 
 ## Job
 

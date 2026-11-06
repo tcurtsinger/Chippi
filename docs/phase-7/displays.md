@@ -1,6 +1,6 @@
 # Displays and brightness: brief
 
-Wave 1. Owner: Kayla (engine and wiring). Screens: Lumen (`design/wave-1.html` in #284, boards `sheet-displays` and `settings-displays`). Reviewer: Karl. Task 490. Status: for Travis's confirmation with the wave 1 mockups. Nothing is built yet.
+Wave 1. Owner: Kayla (engine and wiring). Screens: Lumen (`designs/displays/` and `designs/settings-capture/`). Reviewer: Karl. Task 490. Status: for Travis's confirmation with the wave 1 mockups. Nothing is built yet.
 
 [Decisions](README.md) override the research. References: [behavior spec B §5](behavior-spec-b.md#5-displays-and-brightness), [architecture §8](architecture.md#8-displays-and-brightness), [surfaces §5](surfaces.md#5-displays-gets-a-tile).
 

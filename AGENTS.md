@@ -2,7 +2,7 @@
 
 A Windows 11 tray app for the owner's own PC (C#, .NET 10, WPF): a widget on the desktop (a puck with the pet) that opens a panel with a page per feature (Audio, Clipboard, Scratchpad, Shelf, System, Keep awake, File organizer and more), and a Settings window. GitHub: `tcurtsinger/Chippi`.
 
-- **Design:** `DESIGN.md` wins over taste. Mockups are under `docs/**/design/`.
+- **Design:** `DESIGN.md` wins over taste. From Phase 7 on, mockups are SerenityOS designs in `designs/<name>/` (`now.html`, then `v1.html` and on, each linking `designs/tokens.css`, the XAML themes' colours as CSS variables); `serenity guide design` says how. Never change a version that's been shown: copy it to the next number. Older phases' mockups stay under `docs/**/design/`.
 - **Plans:** `PLAN.md` has the phases. Each phase's brief is `docs/phase-N-handoff.md`, with its `behavior-spec.md`, `architecture.md` and report beside it.
 - **Hopper** (`X:\code\hopper`) is reference only. Never change it.
 

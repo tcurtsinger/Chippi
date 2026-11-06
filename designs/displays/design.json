@@ -1,0 +1,8 @@
+{
+  "title": "Displays",
+  "for": "The Displays tile's page: set each monitor's brightness and contrast, or all of them at once.",
+  "knobs": [
+    "--radius-island-card",
+    "--island-accent"
+  ]
+}

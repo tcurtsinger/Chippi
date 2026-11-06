@@ -1,0 +1,8 @@
+{
+  "title": "Settings › Capture",
+  "for": "The Settings pages for Screen capture, Text and QR, Color picker and Displays: where captures go and how each tool behaves.",
+  "knobs": [
+    "--radius-card",
+    "--accent"
+  ]
+}

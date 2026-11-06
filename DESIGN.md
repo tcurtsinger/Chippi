@@ -1,6 +1,7 @@
 ---
 name: Chippi
 description: A Windows tray suite that looks like it shipped with Windows 11 — neutral layers, Segoe, the user's accent — with one small blob that lives in a widget on the desktop.
+tokens: designs/tokens.css
 colors:
   window: "#202020"
   card: "#2B2B2B"

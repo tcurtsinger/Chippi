@@ -2,7 +2,7 @@
 
 Wave 1. Owner: Karl. Reviewer: Kayla. Task: 491. Status: proposed implementation contract, awaiting review and Travis's confirmation with Lumen's mockups. No feature code is authorized by this document alone.
 
-[Phase decisions](README.md) (PR #281 while pending) override the research. References: [Capture research](behavior-spec-a.md), [architecture](architecture.md), [doors map](surfaces.md). The shared freeze, selector, magnifier, selection geometry and Print Screen ownership belong to Kayla's `capture-layer.md`. Lumen owns screens and glyphs in `design/wave-1.html`; developers own engines and wiring.
+[Phase decisions](README.md) (PR #281 while pending) override the research. References: [Capture research](behavior-spec-a.md), [architecture](architecture.md), [doors map](surfaces.md). The shared freeze, selector, magnifier, selection geometry and Print Screen ownership belong to Kayla's `capture-layer.md`. Lumen owns screens and glyphs in `designs/` (from the repo root); developers own engines and wiring.
 
 ## Job and doors
 

@@ -1,6 +1,6 @@
 # Capture layer and selector: brief
 
-Wave 1. Owner: Kayla (engine, overlay wiring, shortcut service). Overlay look: Lumen (`design/wave-1.html`, board 3). Reviewer: Karl. Task 490. Status: for Travis's confirmation with the wave 1 mockups. Nothing is built yet.
+Wave 1. Owner: Kayla (engine, overlay wiring, shortcut service). Overlay look: Lumen (`designs/capture-overlay/`). Reviewer: Karl. Task 490. Status: for Travis's confirmation with the wave 1 mockups. Nothing is built yet.
 
 [Decisions](README.md) override the research. References: [behavior spec A](behavior-spec-a.md#proposed-selector-contract), [architecture §2](architecture.md#2-one-capture-layer), [surfaces §4](surfaces.md#4-capture). The features on top have their own briefs: [screen-capture.md](screen-capture.md) (Karl: markup, Copy and Save, Recent, the Capture panel), `color-picker.md` and `text-and-qr.md` (Herb). Recording (wave 2) uses this layer too.
 
