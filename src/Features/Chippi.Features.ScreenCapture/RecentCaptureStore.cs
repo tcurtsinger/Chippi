@@ -44,6 +44,17 @@ public sealed class RecentCaptureStore : IDisposable
         return entries;
     }
 
+    public BitmapSource Load(Guid id)
+    {
+        var entry = Read().FirstOrDefault(x => x.Id == id) ?? throw new FileNotFoundException("Recent capture missing.");
+        var image = new BitmapImage();
+        image.BeginInit();
+        image.CacheOption = BitmapCacheOption.OnLoad;
+        image.UriSource = new Uri(Path.Combine(_folder, entry.Image));
+        image.EndInit();
+        image.Freeze();
+        return image;
+    }
     public byte[] Thumbnail(Guid id)
     {
         using var cmd = _database.Connection.CreateCommand(); cmd.CommandText = "SELECT id,entry,thumbnail FROM captures";

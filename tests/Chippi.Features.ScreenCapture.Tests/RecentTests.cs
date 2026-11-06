@@ -39,7 +39,15 @@ public sealed class RecentTests
                 {
                     Assert.Equal(50, store.Read().Count);
                     Assert.NotEmpty(store.Thumbnail(last));
+                    var reopened = store.Load(last);
+                    Assert.Equal(400, reopened.PixelWidth);
+                    Assert.Equal(300, reopened.PixelHeight);
+                    Assert.True(reopened.IsFrozen);
+                    Assert.False(new CaptureDraft(reopened).Undo());
                     store.Remove(last); Assert.Equal(49, store.Read().Count);
+                    Assert.Throws<FileNotFoundException>(() => store.Load(last));
+                    // Loading releases the file, so removal succeeds while its pixels remain usable.
+                    Assert.Equal(400, reopened.PixelWidth);
                     store.Clear(); Assert.Empty(store.Read());
                 }
                 Assert.Equal("owner file", File.ReadAllText(external));
