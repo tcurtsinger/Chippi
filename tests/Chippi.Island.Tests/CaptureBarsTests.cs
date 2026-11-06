@@ -66,11 +66,91 @@ public sealed class CaptureBarsTests
             Assert.Equal(["Save as", "Save", "Copy", "Cancel"], shown);
 
             bar.ShowCopyText = bar.ShowScanQrCode = true;
-            foreach (var button in buttons)
+            foreach (var button in buttons.Where(b => b.Visibility == Visibility.Visible))
                 button.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
 
             Assert.Equal([FinishAction.CopyText, FinishAction.ScanQrCode, FinishAction.SaveAs, FinishAction.Save, FinishAction.Copy, FinishAction.Cancel], heard);
         });
+    }
+
+    [Fact]
+    public void A_failure_shows_its_line_and_Retry_in_place_of_Text_and_QR_until_cleared()
+    {
+        WpfTestThread.Run(() =>
+        {
+            var bar = new FinishBar { ShowCopyText = true, ShowScanQrCode = true };
+            var heard = new List<FinishAction>();
+            bar.Picked += heard.Add;
+            var buttons = Buttons(bar);
+            Assert.Null(bar.Failure);
+            Assert.Same(bar.Copy, bar.Main);
+
+            bar.Failure = "Copied. Save failed";
+
+            Assert.Equal("Copied. Save failed", bar.Failure);
+            var shown = buttons.Where(b => b.Visibility == Visibility.Visible).Select(AutomationProperties.GetName).ToArray();
+            Assert.Equal(["Retry", "Save as", "Save", "Copy", "Cancel"], shown);
+            Assert.Same(bar.Retry, bar.Main);
+            Assert.True(bar.ShowCopyText);
+            var line = Texts(bar).Single(t => t.Text == "Copied. Save failed");
+            Assert.Equal(Visibility.Visible, ((FrameworkElement)line.Parent).Visibility);
+            Assert.Equal(AutomationLiveSetting.Assertive, AutomationProperties.GetLiveSetting(line));
+
+            bar.Retry.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+            Assert.Equal([FinishAction.Retry], heard);
+
+            bar.Failure = null;
+
+            Assert.Null(bar.Failure);
+            Assert.Same(bar.Copy, bar.Main);
+            shown = buttons.Where(b => b.Visibility == Visibility.Visible).Select(AutomationProperties.GetName).ToArray();
+            Assert.Equal(["Copy text", "Scan QR code", "Save as", "Save", "Copy", "Cancel"], shown);
+        });
+    }
+
+    [Fact]
+    public void Outline_and_Fill_show_only_when_asked_and_tell_the_feature()
+    {
+        WpfTestThread.Run(() =>
+        {
+            var choice = new InkChoice();
+            bool? heard = null;
+            choice.FillPicked += f => heard = f;
+            var buttons = Buttons(choice);
+            var outline = buttons.Single(b => AutomationProperties.GetName(b) == "Outline");
+            var fill = buttons.Single(b => AutomationProperties.GetName(b) == "Fill");
+            Assert.False(choice.ShowFill);
+            Assert.False(choice.Filled);
+
+            choice.ShowFill = true;
+            fill.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+
+            Assert.True(heard);
+            Assert.True(choice.Filled);
+            Assert.Equal(ToggleState.On, State(fill));
+            Assert.Equal(ToggleState.Off, State(outline));
+
+            outline.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+            Assert.False(heard);
+            Assert.False(choice.Filled);
+        });
+
+        static ToggleState State(Button b) => ((IToggleProvider)UIElementAutomationPeer.CreatePeerForElement(b).GetPattern(PatternInterface.Toggle)).ToggleState;
+    }
+
+    private static List<TextBlock> Texts(DependencyObject root)
+    {
+        var found = new List<TextBlock>();
+        void Walk(object node)
+        {
+            if (node is TextBlock t)
+                found.Add(t);
+            if (node is DependencyObject d)
+                foreach (var child in LogicalTreeHelper.GetChildren(d))
+                    Walk(child);
+        }
+        Walk(root);
+        return found;
     }
 
     [Fact]

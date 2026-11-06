@@ -302,20 +302,41 @@ public sealed class MarkupTools : Border
 }
 
 /// <summary>What the finish bar's buttons do.</summary>
-public enum FinishAction { CopyText, ScanQrCode, SaveAs, Save, Copy, Cancel }
+public enum FinishAction { CopyText, ScanQrCode, SaveAs, Save, Copy, Cancel, Retry }
 
 /// <summary>
 /// The finish bar under the selection (Frozen screen v1, released-action-bar): Copy text and Scan QR code (each only when
-/// its feature is on), Save as, Save, Copy (the main verb), and Cancel. 40 high.
+/// its feature is on), Save as, Save, Copy (the main verb), and Cancel. 40 high. After a failed output the feature sets
+/// <see cref="Failure"/>: the line ("Copy failed", "Copied. Save failed") and Retry take the place of Copy text and Scan
+/// QR code, and Retry becomes the main verb.
 /// </summary>
 public sealed class FinishBar : Border
 {
-    private readonly Button _copyText, _scan;
+    private readonly Button _copyText, _scan, _copy, _retry;
     private readonly Border _lead;
+    private readonly StackPanel _failure;
+    private readonly TextBlock _failureText = new() { FontSize = 12, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 0, 0) };
+    private bool _showCopyText = true, _showScan = true;
 
     public FinishBar()
     {
         var row = new StackPanel { Orientation = Orientation.Horizontal };
+        // The failure line: the island's caution glyph and words, read out when it changes; not a button, so Tab skips it.
+        _failureText.SetResourceReference(TextBlock.ForegroundProperty, "IslandCautionBrush");
+        AutomationProperties.SetLiveSetting(_failureText, AutomationLiveSetting.Assertive);
+        _failure = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Margin = new Thickness(6, 0, 0, 0),
+            Visibility = Visibility.Collapsed,
+            Children = { CaptureBars.Glyph(LucideIcons.TriangleAlert, "IslandCautionBrush"), _failureText },
+        };
+        _retry = CaptureBars.TextButton("Retry", accent: true);
+        _retry.Margin = new Thickness(10, 0, 0, 0);
+        _retry.Visibility = Visibility.Collapsed;
+        _retry.Click += (_, _) => Picked?.Invoke(FinishAction.Retry);
+        row.Children.Add(_failure);
+        row.Children.Add(_retry);
         _copyText = CaptureBars.IconButton(LucideIcons.ScanText, "Copy text", 32, 28);
         _scan = CaptureBars.IconButton(LucideIcons.QrCode, "Scan QR code", 32, 28);
         _scan.Margin = new Thickness(6, 0, 0, 0);
@@ -343,17 +364,48 @@ public sealed class FinishBar : Border
         }
         Child = CaptureBars.Surface(row, new Thickness(5));
         AutomationProperties.SetName(this, "Finish");
-        Copy = copy;
+        _copy = copy;
     }
 
-    /// <summary>Copy text shows while Text and QR is on.</summary>
-    public bool ShowCopyText { get => _copyText.Visibility == Visibility.Visible; set { _copyText.Visibility = Show(value); Lead(); } }
+    /// <summary>Copy text shows while Text and QR is on (and no failure is shown).</summary>
+    public bool ShowCopyText { get => _showCopyText; set { _showCopyText = value; Lead(); } }
 
-    /// <summary>Scan QR code shows while Text and QR is on.</summary>
-    public bool ShowScanQrCode { get => _scan.Visibility == Visibility.Visible; set { _scan.Visibility = Show(value); Lead(); } }
+    /// <summary>Scan QR code shows while Text and QR is on (and no failure is shown).</summary>
+    public bool ShowScanQrCode { get => _showScan; set { _showScan = value; Lead(); } }
 
-    /// <summary>The main verb, for Enter's default.</summary>
-    public Button Copy { get; }
+    /// <summary>Copy, the main verb while nothing has failed.</summary>
+    public Button Copy => _copy;
+
+    /// <summary>Retry, shown with <see cref="Failure"/>.</summary>
+    public Button Retry => _retry;
+
+    /// <summary>The main verb, for Enter's default: Retry while a failure shows, otherwise Copy.</summary>
+    public Button Main => Failure is null ? _copy : _retry;
+
+    /// <summary>
+    /// The failed output's line ("Copy failed", "Save failed", "Copied. Save failed"), or null. Setting it shows the line
+    /// and Retry (accented, focused when the bar is on screen); null puts Copy text, Scan QR code and Copy's accent back.
+    /// The feature clears it once Retry, or any other output, succeeds.
+    /// </summary>
+    public string? Failure
+    {
+        get => _failure.Visibility == Visibility.Visible ? _failureText.Text : null;
+        set
+        {
+            bool failed = !string.IsNullOrEmpty(value);
+            string? was = Failure;
+            _failureText.Text = failed ? value : "";
+            _failure.Visibility = _retry.Visibility = Show(failed);
+            _copy.SetResourceReference(StyleProperty, failed ? "IslandButtonStyle" : "IslandAccentButtonStyle");
+            Lead();
+            if (failed && was != value)
+            {
+                UIElementAutomationPeer.FromElement(_failureText)?.RaiseAutomationEvent(AutomationEvents.LiveRegionChanged);
+                if (IsVisible)
+                    Dispatcher.BeginInvoke(() => _retry.Focus(), System.Windows.Threading.DispatcherPriority.Input);
+            }
+        }
+    }
 
     public event Action<FinishAction>? Picked;
 
@@ -361,22 +413,29 @@ public sealed class FinishBar : Border
 
     private void Lead()
     {
-        _scan.Margin = new Thickness(ShowCopyText ? 6 : 0, 0, 0, 0);
-        _lead.Visibility = Show(ShowCopyText || ShowScanQrCode);
+        bool failed = _failure.Visibility == Visibility.Visible;
+        _copyText.Visibility = Show(_showCopyText && !failed);
+        _scan.Visibility = Show(_showScan && !failed);
+        _scan.Margin = new Thickness(_copyText.Visibility == Visibility.Visible ? 6 : 0, 0, 0, 0);
+        _lead.Visibility = Show(failed || _copyText.Visibility == Visibility.Visible || _scan.Visibility == Visibility.Visible);
         ((FrameworkElement)Child).InvalidateMeasure();
     }
 }
 
 /// <summary>
-/// The colour choice (Frozen screen v1, markup-color-choice): eight inks, Thin, Medium and Thick, and Pick from screen.
-/// The feature shows it beside the column's ink button and closes it on a pick, Esc or a press elsewhere.
+/// The colour choice (Frozen screen v1, markup-color-choice): eight inks, Outline and Fill (for Rectangle and Ellipse,
+/// <see cref="ShowFill"/>), Thin, Medium and Thick, and Pick from screen. The feature shows it beside the column's ink
+/// button and closes it on a pick, Esc or a press elsewhere.
 /// </summary>
 public sealed class InkChoice : Border
 {
     private readonly List<(Color Color, ToggleIconButton Button, Border Ring)> _inks = [];
     private readonly ToggleIconButton[] _widths;
+    private readonly ToggleIconButton _outline, _fill;
+    private readonly Border _shape;
     private Color _ink;
     private InkWidth _stroke;
+    private bool _filled;
 
     public InkChoice()
     {
@@ -398,23 +457,19 @@ public sealed class InkChoice : Border
             grid.Children.Add(button);
         }
 
-        var widths = new UniformGrid { Rows = 1, Margin = new Thickness(0) };
-        _widths = [.. Enum.GetValues<InkWidth>().Select(width =>
+        // Outline or Fill, for Rectangle and Ellipse only: the same trough as the widths, above them.
+        _outline = Segment("Outline", () => Pick(filled: false));
+        _fill = Segment("Fill", () => Pick(filled: true));
+        _shape = Trough("Shape", [_outline, _fill]);
+        _shape.Margin = new Thickness(0, 0, 0, 6);
+        _shape.Visibility = Visibility.Collapsed;
+
+        _widths = [.. Enum.GetValues<InkWidth>().Select(width => Segment(width.ToString(), () =>
         {
-            var label = new TextBlock { Text = width.ToString(), FontSize = 11, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center };
-            label.SetResourceReference(TextBlock.ForegroundProperty, "IslandTextSecondaryBrush");
-            var button = new ToggleIconButton(null, label) { Width = double.NaN, Height = 20, Margin = new Thickness(1) };
-            AutomationProperties.SetName(button, width.ToString());
-            button.Click += (_, _) =>
-            {
-                Stroke = width;
-                WidthPicked?.Invoke(width);
-            };
-            widths.Children.Add(button);
-            return button;
-        })];
-        var trough = new Border { CornerRadius = new CornerRadius(4), Padding = new Thickness(1), Child = widths, Height = 24 };
-        trough.SetResourceReference(Border.BackgroundProperty, "IslandHoverBrush");
+            Stroke = width;
+            WidthPicked?.Invoke(width);
+        }))];
+        var trough = Trough("Width", _widths);
 
         var pickLabel = new TextBlock { Text = "Pick from screen", FontSize = 12, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 0, 0) };
         pickLabel.SetResourceReference(TextBlock.ForegroundProperty, "IslandTextSecondaryBrush");
@@ -435,10 +490,61 @@ public sealed class InkChoice : Border
 
         var hair = new Border { Height = 1, Margin = new Thickness(0, 8, 0, 10) };
         hair.SetResourceReference(Border.BackgroundProperty, "IslandHairBrush");
-        Child = CaptureBars.Surface(new StackPanel { Width = 196, Children = { grid, hair, trough, pick } }, new Thickness(7));
+        Child = CaptureBars.Surface(new StackPanel { Width = 196, Children = { grid, hair, _shape, trough, pick } }, new Thickness(7));
         AutomationProperties.SetName(this, "Color and width");
         Ink = CaptureBars.Inks[0].Color;
         Stroke = InkWidth.Medium;
+        Filled = false;
+    }
+
+    /// <summary>Outline and Fill show: the feature sets this while Rectangle or Ellipse is the tool.</summary>
+    public bool ShowFill
+    {
+        get => _shape.Visibility == Visibility.Visible;
+        set => _shape.Visibility = value ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    /// <summary>Fill is on (a filled rectangle or ellipse), otherwise Outline.</summary>
+    public bool Filled
+    {
+        get => _filled;
+        set
+        {
+            _filled = value;
+            _outline.IsOn = !value;
+            _fill.IsOn = value;
+        }
+    }
+
+    /// <summary>Outline (false) or Fill (true) was picked.</summary>
+    public event Action<bool>? FillPicked;
+
+    private void Pick(bool filled)
+    {
+        Filled = filled;
+        FillPicked?.Invoke(filled);
+    }
+
+    /// <summary>One choice in a trough (Thin, Outline): a small label that's lit while it's the choice.</summary>
+    private static ToggleIconButton Segment(string text, Action picked)
+    {
+        var label = new TextBlock { Text = text, FontSize = 11, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center };
+        label.SetResourceReference(TextBlock.ForegroundProperty, "IslandTextSecondaryBrush");
+        var button = new ToggleIconButton(null, label) { Width = double.NaN, Height = 20, Margin = new Thickness(1) };
+        AutomationProperties.SetName(button, text);
+        button.Click += (_, _) => picked();
+        return button;
+    }
+
+    private static Border Trough(string name, IEnumerable<ToggleIconButton> choices)
+    {
+        var row = new UniformGrid { Rows = 1, Margin = new Thickness(0) };
+        foreach (var choice in choices)
+            row.Children.Add(choice);
+        var trough = new Border { CornerRadius = new CornerRadius(4), Padding = new Thickness(1), Child = row, Height = 24 };
+        trough.SetResourceReference(Border.BackgroundProperty, "IslandHoverBrush");
+        AutomationProperties.SetName(trough, name);
+        return trough;
     }
 
     public Color Ink

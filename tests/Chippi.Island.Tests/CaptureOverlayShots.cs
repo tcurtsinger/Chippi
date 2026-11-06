@@ -126,21 +126,24 @@ public sealed class CaptureOverlayShots
 
     /// <summary>
     /// The bars on their own over a wallpaper, at 2×: the column with Rectangle lit and Undo on, the colour choice (blue,
-    /// Thick), a Text mark's bar with its size menu open and Bold on, Crop's bar, and the finish bar without Copy text and
-    /// Scan QR code (Text and QR off).
+    /// Thick, Fill for the Rectangle), a Text mark's bar with its size menu open and Bold on, Crop's bar, the finish bar
+    /// without Copy text and Scan QR code (Text and QR off) and with them, and the finish bar after a failed Copy and after
+    /// a Save that failed once Copy had worked.
     /// </summary>
     private static void Gallery(ResourceDictionary styles, string path)
     {
-        var canvas = new Canvas { Width = 760, Height = 560 };
+        var canvas = new Canvas { Width = 760, Height = 680 };
         canvas.Resources.MergedDictionaries.Add(styles);
         canvas.Background = new LinearGradientBrush(Color.FromRgb(0x2C, 0x3E, 0x57), Color.FromRgb(0x1B, 0x28, 0x38), 45);
         var tools = new MarkupTools { Tool = CaptureTool.Rectangle, Ink = CaptureBars.Inks[3].Color, CanUndo = true };
-        var ink = new InkChoice { Ink = CaptureBars.Inks[3].Color, Stroke = InkWidth.Thick };
+        var ink = new InkChoice { Ink = CaptureBars.Inks[3].Color, Stroke = InkWidth.Thick, ShowFill = true, Filled = true };
         var text = new TextMarkBar { TextSize = 24, Bold = true };
         var crop = new CropBar();
         var finish = new FinishBar { ShowCopyText = false, ShowScanQrCode = false };
         var full = new FinishBar { ShowCopyText = true, ShowScanQrCode = true };
-        foreach (var (bar, x, y) in new (FrameworkElement, double, double)[] { (tools, 24, 24), (ink, 96, 24), (text, 96, 300), (crop, 300, 300), (finish, 96, 400), (full, 96, 470) })
+        var copyFailed = new FinishBar { ShowCopyText = true, ShowScanQrCode = true, Failure = "Copy failed" };
+        var saveFailed = new FinishBar { ShowCopyText = false, ShowScanQrCode = false, Failure = "Copied. Save failed" };
+        foreach (var (bar, x, y) in new (FrameworkElement, double, double)[] { (tools, 24, 24), (ink, 96, 24), (text, 96, 330), (crop, 300, 330), (finish, 96, 420), (full, 96, 480), (copyFailed, 96, 550), (saveFailed, 96, 610) })
         {
             Canvas.SetLeft(bar, x);
             Canvas.SetTop(bar, y);
@@ -149,7 +152,7 @@ public sealed class CaptureOverlayShots
         canvas.Measure(new Size(canvas.Width, canvas.Height));
         canvas.Arrange(new Rect(0, 0, canvas.Width, canvas.Height));
         canvas.UpdateLayout();
-        var bitmap = new RenderTargetBitmap(760 * 2, 560 * 2, 192, 192, PixelFormats.Pbgra32);
+        var bitmap = new RenderTargetBitmap(760 * 2, 680 * 2, 192, 192, PixelFormats.Pbgra32);
         bitmap.Render(canvas);
         var png = new PngBitmapEncoder();
         png.Frames.Add(BitmapFrame.Create(bitmap));
