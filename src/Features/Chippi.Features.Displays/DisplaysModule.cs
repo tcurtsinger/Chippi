@@ -17,7 +17,7 @@ namespace Chippi.Features.Displays;
 /// keys, Settings › Displays and the Command bar's rows. The Displays tile and panel on the island are Lumen's and join it
 /// with the Displays design.
 /// </summary>
-public sealed class DisplaysModule : IFeatureModule, IDisplaysPageModel
+public sealed partial class DisplaysModule : IFeatureModule, IDisplaysPageModel
 {
     public const string Id = "displays";
 
@@ -33,6 +33,9 @@ public sealed class DisplaysModule : IFeatureModule, IDisplaysPageModel
     private ModuleContext? _context;
     private DisplayBrightness? _engine;
     private Action? _changedHandler;
+    private DisplaysIslandView? _view;
+
+    private DisplaysIslandView View() => _view ??= new DisplaysIslandView(this);
 
     /// <param name="createBus">The monitors' bus; the app passes the real one (DDC/CI and WMI), tests a fake.</param>
     public DisplaysModule(Func<IMonitorBus>? createBus = null, Func<IReadOnlyList<DisplayInfo>>? displays = null, Func<nint?>? underPointer = null,
@@ -78,6 +81,8 @@ public sealed class DisplaysModule : IFeatureModule, IDisplaysPageModel
             _engine = engine;
         }
         context.Ui.SetSettingsPage(_ => new DisplaysSettingsPage(this));
+        context.Ui.AddIslandTile(new IslandTileSpec(Id, "Displays", nameof(LucideIcons.Sun), Order: 65, SectionOrder: 0, () => View())
+            { CreateHeader = () => View().Header });
         context.Ui.AddCommands(Commands);
         context.Ui.AddCommandSearch(Values);
         AddSlot(context, DisplaysShortcuts.BrightnessUp, () => Settings.BrightnessUp, OnBrightness(+1));

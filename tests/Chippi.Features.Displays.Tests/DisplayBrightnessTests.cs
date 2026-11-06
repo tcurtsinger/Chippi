@@ -167,6 +167,23 @@ public sealed class DisplayBrightnessTests
     }
 
     [Fact]
+    public void All_displays_moves_contrast_and_a_queued_write_shows_as_the_level()
+    {
+        using var rig = Two();
+        rig["A"].Levels[Vcp.Contrast] = 40;
+        rig["B"].Levels[Vcp.Contrast] = 70;
+        rig.Engine.Refresh();
+        Until(() => rig.Engine.Statuses.All(s => s.ContrastLevel is not null), "contrast reads");
+        Assert.Equal(40, rig.Engine.AllLevel(Vcp.Contrast));
+        rig.Engine.BeginAll(Vcp.Contrast);
+        rig.Engine.MoveAll(50, Vcp.Contrast);
+        Until(() => rig.Engine.Statuses[0].ContrastLevel == 50 && rig.Engine.Statuses[1].ContrastLevel == 80, "contrast up");
+        rig.Engine.EndAll();
+        rig.Engine.Set("A", Vcp.Brightness, 77);
+        Assert.Equal(77, rig.Engine.Statuses[0].Brightness);
+    }
+
+    [Fact]
     public void Keys_step_the_display_under_the_pointer_and_stop_at_100()
     {
         using var rig = Two();
@@ -180,7 +197,7 @@ public sealed class DisplayBrightnessTests
             rig.Engine.Step(10, BrightnessTarget.UnderPointer);
             Until(() => rig.Engine.Statuses[1].Brightness == Math.Min(100, 70 + 10 * (i + 1)));
         }
-        Assert.Equal(100, rig["B"].Levels[Vcp.Brightness]);
+        Until(() => rig["B"].Levels[Vcp.Brightness] == 100, "monitor at 100");
     }
 
     [Fact]

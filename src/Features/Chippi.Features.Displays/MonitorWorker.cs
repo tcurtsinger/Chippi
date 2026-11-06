@@ -81,9 +81,12 @@ internal sealed class MonitorWorker : IDisposable
         get
         {
             lock (_gate)
-                return new MonitorState(_probed && !_brightness.Answers, _retrying, _brightness.Level, _contrast.Answers, _contrast.Level, _writeFailed);
+                return new MonitorState(_probed && !_brightness.Answers, _retrying, Shown(_brightness), _contrast.Answers, Shown(_contrast), _writeFailed);
         }
     }
+
+    // A level being written shows as the level, so a slider doesn't step back to the old one while the monitor catches up.
+    private static int? Shown(Axis axis) => axis.Pending ?? axis.Writing ?? axis.Level;
 
     /// <summary>Reads brightness and contrast again.</summary>
     public void Read()

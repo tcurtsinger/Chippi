@@ -6,3 +6,5 @@ SetVCPFeature
 PHYSICAL_MONITOR
 GetCursorPos
 MonitorFromPoint
+GetMonitorInfo
+MONITORINFO

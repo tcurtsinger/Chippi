@@ -147,24 +147,30 @@ internal sealed partial class DisplayBrightness : IDisposable
     /// The All displays slider's drag starts: each display's level now is its start, so a display that stops at 0 or 100
     /// stays there while the others go on.
     /// </summary>
-    public void BeginAll()
+    public void BeginAll(Vcp code = Vcp.Brightness)
     {
         lock (_gate)
         {
-            var statuses = _list.Select(d => Status(d.Info, d.Name)).Where(s => s is { Failed: false, Brightness: not null }).ToList();
-            _dragStart = statuses.ToDictionary(s => s.Id, s => s.Brightness!.Value);
-            _dragMain = AllLevel(statuses) ?? 0;
+            var statuses = _list.Select(d => Status(d.Info, d.Name)).Where(s => s is { Failed: false } && Level(s, code) is not null).ToList();
+            _dragStart = statuses.ToDictionary(s => s.Id, s => Level(s, code)!.Value);
+            _dragMain = AllLevel(statuses, code) ?? 0;
         }
     }
 
     /// <summary>The All displays slider's value: the main display's level (or the first that answers).</summary>
-    public int? AllLevel() => AllLevel(Statuses);
+    public int? AllLevel(Vcp code = Vcp.Brightness) => AllLevel(Statuses, code);
 
-    private static int? AllLevel(IReadOnlyList<DisplayStatus> statuses) =>
-        (statuses.FirstOrDefault(s => s is { IsMain: true, Failed: false, Brightness: not null }) ?? statuses.FirstOrDefault(s => s is { Failed: false, Brightness: not null }))?.Brightness;
+    private static int? Level(DisplayStatus s, Vcp code) => code == Vcp.Contrast ? s.ContrastLevel : s.Brightness;
+
+    private static int? AllLevel(IReadOnlyList<DisplayStatus> statuses, Vcp code)
+    {
+        var answering = statuses.Where(s => !s.Failed && Level(s, code) is not null).ToList();
+        var pick = answering.FirstOrDefault(s => s.IsMain) ?? answering.FirstOrDefault();
+        return pick is null ? null : Level(pick, code);
+    }
 
     /// <summary>Moves every display by what the slider moved since <see cref="BeginAll"/>.</summary>
-    public void MoveAll(int sliderValue)
+    public void MoveAll(int sliderValue, Vcp code = Vcp.Brightness)
     {
         Dictionary<string, int>? start;
         int main;
@@ -176,7 +182,7 @@ internal sealed partial class DisplayBrightness : IDisposable
         if (start is null) return;
         int delta = sliderValue - main;
         foreach (var (id, level) in start)
-            Set(id, Vcp.Brightness, Math.Clamp(level + delta, 0, 100));
+            Set(id, code, Math.Clamp(level + delta, 0, 100));
     }
 
     public void EndAll()

@@ -43,12 +43,26 @@ public sealed class DisplaysModuleTests
         public void Save<T>(T settings) where T : class => Value = (DisplaysSettings)(object)settings;
     }
 
+    private sealed class TileHandle : IIslandTile
+    {
+        public void SetStatus(string status) { }
+        public void SetPageNote(string note) { }
+        public bool OnScreen => false;
+        public void Refresh() { }
+        public event EventHandler? OnScreenChanged { add { } remove { } }
+    }
+
     private sealed class Ui : IModuleUi
     {
         public Func<IReadOnlyList<ChippiCommand>> Commands = () => [];
         public Func<string, IReadOnlyList<ChippiCommand>> Search = _ => [];
         public bool Page;
-        public IIslandTile AddIslandTile(IslandTileSpec spec) => throw new InvalidOperationException("No tile yet");
+        public IslandTileSpec? Tile;
+        public IIslandTile AddIslandTile(IslandTileSpec spec)
+        {
+            Tile = spec;
+            return new TileHandle();
+        }
         public void SetSettingsPage(Func<string?, object> createView) => Page = true;
         public void AddCommands(Func<IReadOnlyList<ChippiCommand>> commands) => Commands = commands;
         public void AddCommandSearch(Func<string, IReadOnlyList<ChippiCommand>> search) => Search = search;
@@ -95,6 +109,21 @@ public sealed class DisplaysModuleTests
         Assert.Equal(["Brightness up", "Brightness down"], rig.Ui.Commands().Select(c => c.Name));
         await rig.Module.StopAsync(default);
         Assert.Empty(rig.Shortcuts.List);
+    }
+
+    [Fact]
+    public async Task The_island_gets_a_Displays_tile_and_the_module_answers_the_panel()
+    {
+        var rig = new Rig();
+        await rig.Module.StartAsync(rig.Context, default);
+        Until(() => rig.Module.Displays is [{ Brightness: 50 }]);
+        IDisplaysPanelModel panel = rig.Module;
+        Assert.Equal(("displays", "Displays", 65), (rig.Ui.Tile!.Key, rig.Ui.Tile.Name, rig.Ui.Tile.Order));
+        Assert.NotNull(rig.Ui.Tile.CreateHeader);
+        Assert.Single(panel.PanelDisplays);
+        Assert.Equal(rig.Module.Displays[0].Id, panel.UnderPointer());
+        panel.Set(panel.PanelDisplays[0].Id, DisplayControl.Brightness, 35);
+        Until(() => rig.Bus.Monitor.Writes.Count == 1);
     }
 
     [Fact]
