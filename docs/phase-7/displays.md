@@ -54,12 +54,12 @@ The tile's tooltip names the levels ("OMEN 34c 54% · Samsung 60%").
 - **A display that doesn't answer** (DDC/CI off in the monitor's menu, a dock or adapter that doesn't pass it, VGA or DVI, a model without DDC/CI): its card shows the name and "Brightness control failed", with no slider. A first failed read is retried once after 500 ms, since DDC/CI fails now and then. Chippi can't tell the causes apart, so Settings › Displays names the likely ones under that display with Try again; the panel doesn't.
 - **A write that fails mid-drag:** the card shows "Brightness control failed" and the slider goes back to the last level read. The next drag tries again.
 - **A key press on a display that doesn't answer:** the bar shows "Brightness control failed" for 6 seconds; nothing else changes.
-- **The monitor changed by its own buttons:** Chippi learns it at the next read (panel open). A key press reads first if the last read is more than 10 seconds old, so it steps from the real level, not a stale one.
+- **The monitor changed by its own buttons:** Chippi learns it at the next read (panel open). A key press on a display whose level is stale (no read or write in the last 10 seconds) reads it first on that monitor's worker, then writes from the real level, not a stale one. Presses that arrive while that read runs add their steps, and one write sends the total once the read returns. A press while a write is in flight never reads: the level Chippi is writing is the fresh one, so it adds to the queued value as above.
 - **Monitors added, removed or rearranged while the panel is open:** the rows follow `WM_DISPLAYCHANGE`. A drag on a display that leaves ends with nothing written.
 - **Two monitors of the same model:** names come from `DisplayCatalog`; same names get " 1" and " 2" in display order.
-- **Six or more displays:** the panel shows the first four by display order plus All displays; Settings lists every display.
+- **Five or more displays:** the panel shows the first four by display order plus All displays; Settings lists every display.
 - **Sleep and resume:** monitor handles are reopened after resume (`WM_POWERBROADCAST`), then read.
-- **Stopping the feature** waits for writes in flight (at most one per monitor) and drops queued ones.
+- **Stopping the feature** waits for the read or write in flight (at most one per monitor) and drops queued ones.
 
 ## Shortcuts
 
@@ -107,7 +107,8 @@ Every string on screen. Marge runs them through Decide before the installer.
 - **CI, with a fake monitor bus** (`IMonitorBus`: open, read, write, close per monitor, with scripted delays and failures, and an injected clock):
   - latest value wins while a write is in flight; release always lands; equal values aren't sent; nothing runs on the calling thread
   - All displays keeps offsets, stops a display at 0 and 100, and takes the offsets at drag start
-  - keys step by the setting, add to a queued value, read first after 10 seconds, stop at 0 and 100, act on the display under a given point or on all
+  - keys step by the setting, add to a queued value, stop at 0 and 100, act on the display under a given point or on all
+  - a press on a stale display (no read or write for 10 seconds on the injected clock) reads first, then writes from the level read; presses during that read add up into one write; a press during a write doesn't read; the hotkey handler returns before the bus is called
   - a failed read retries once after 500 ms; a failed write puts the slider back; Try again reopens and reads only that display
   - a display removed mid-drag gets no write; handles reopen after a display change and after resume
   - same-name displays get " 1" and " 2"; four displays plus All displays fit, a fifth goes to Settings
@@ -115,7 +116,7 @@ Every string on screen. Marge runs them through Decide before the installer.
   - writes are only ever VCP 0x10 and 0x12 (the bus refuses any other code, and the test proves nothing asks for one)
 - **Offscreen shots** (`CHIPPI_ISLAND_SHOTS`, both themes) beside Lumen's boards: two displays and All displays, one display, four displays, the Contrast view, a display that doesn't answer, Settings at full and 860 width with a failing display's causes.
 - **Read-only check on Travis's PC** (a dev profile with only Displays): reads both monitors' brightness and contrast and times the reads and the panel's open. No write.
-- **Write check on Travis's PC, once, at the end:** I post a warning in the room first, run `build/fullscreen-check.ps1` and check he's idle, read both levels, then drive the panel's sliders through UI Automation (no real clicks): each monitor up 10 and back, All displays up 10 and back, two key presses through the shortcut path. The levels read at the start are written back, and read again to confirm. No Sandbox run: the Sandbox's virtual display has no DDC/CI.
+- **Write check on Travis's PC, once, at the end:** I post a warning in the room first, run `build/fullscreen-check.ps1` and check he's idle, read both levels, then drive the panel's sliders through UI Automation (no real clicks): each monitor up 10 and back, All displays up 10 and back, then key presses through the shortcut path: two fresh presses, three fast presses (the queue), and one press after 15 seconds with the panel closed (the stale read). The levels read at the start are written back, and read again to confirm. No Sandbox run: the Sandbox's virtual display has no DDC/CI.
 
 ## Done means
 
@@ -126,7 +127,10 @@ One feature PR with Lumen's screens and the engine, CI green on x64 and ARM64 an
 | Displays panel open | Opens filled from the last levels read, with no DDC call before its first frame; UI-thread work under 16.7 ms; the island's page-switch frames no worse than Audio's | Frame probe on page switch, 10 cold and 10 warm |
 | Fresh levels after open | Rows updated within 300 ms (two monitors read in parallel, about 60 ms per read) | Stopwatch from open to the last row updated |
 | Slider drag to the monitor changing | First write starts within 16.7 ms of the first drag move; each write returns within 100 ms at p95; the release value is written within 200 ms of release; UI-thread work per drag move under 2 ms | Timestamps around `SetVCPFeature` during the UI Automation drag; Travis judges the monitor's own response by eye |
-| Key to the monitor changing | Write starts within 16.7 ms of `WM_HOTKEY`; returns within 100 ms at p95 | Timestamps in the write check |
+| Key, UI thread | The hotkey handler hands the press to the monitor's worker and returns within 2 ms; no monitor I/O on the UI thread | Timestamps around the handler in the write check |
+| Key to the monitor changing, fresh level | Write starts within 16.7 ms of `WM_HOTKEY`; returns within 100 ms at p95 | Timestamps in the write check |
+| Key to the monitor changing, stale level | Read starts within 16.7 ms of `WM_HOTKEY`; write starts within 16.7 ms of the read returning; key to write returned within 200 ms at p95 (a read is 55 to 65 ms, a write up to 100 ms) | Timestamps in the write check, press after 15 s with the panel closed |
+| Key while a write is in flight | The queued value's write starts within 16.7 ms of the write in flight returning; key to its write returned within 200 ms at p95 | Timestamps in the write check, three fast presses |
 
 Screenshots of the panel, Contrast view and Settings next to the boards, and the timings report, go to the room. Travis's live check covers both monitors by eye, the keys over each monitor, and Win+P to one screen and back.
 
