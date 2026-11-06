@@ -1,0 +1,147 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) Chippi contributors
+
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
+using Chippi.Capture;
+using CaptureMode = Chippi.Capture.CaptureMode;
+
+namespace Chippi.UI.Capture;
+
+/// <summary>Where a starter came from; it decides how the overlay earns the keyboard (capture-layer.md, Foreground).</summary>
+public enum CaptureDoor
+{
+    /// <summary>A <c>RegisterHotKey</c> shortcut, Print Screen included: the overlay may take the foreground directly.</summary>
+    Shortcut,
+
+    /// <summary>A press the input hub swallowed (a Caps Lock combo, a mouse button, a Radial slice): the 0x07 tap first.</summary>
+    Swallowed,
+
+    /// <summary>A Capture panel card or Search: the island closes once the overlay holds the keyboard.</summary>
+    Island,
+}
+
+/// <summary>What a capture feature asks the layer for.</summary>
+public sealed record CaptureRequest(CaptureMode Mode)
+{
+    public CaptureDoor Door { get; init; } = CaptureDoor.Shortcut;
+
+    /// <summary>Seconds to count before the freeze: 0, or one of <see cref="Countdown.Delays"/>.</summary>
+    public int Delay { get; init; }
+
+    /// <summary>The frozen screen dims outside the selection; Color picker's pick shows it as it was.</summary>
+    public bool Dim { get; init; } = true;
+
+    /// <summary>The magnifier follows the pointer while choosing (Settings › Screen capture); always on for a pick.</summary>
+    public bool Magnifier { get; init; } = true;
+}
+
+/// <summary>Why a capture's overlay closed.</summary>
+public enum CaptureEnd
+{
+    /// <summary>The feature finished with the selection (Copy, Save, a pick).</summary>
+    Finished,
+
+    /// <summary>Esc, a right click while picking, the countdown cancelled, or the feature discarded it.</summary>
+    Cancelled,
+
+    /// <summary>The screen couldn't be read ("Capture failed").</summary>
+    Failed,
+
+    /// <summary>A lock, Ctrl+Alt+Del, a UAC prompt or a display change: nothing is kept.</summary>
+    Interrupted,
+}
+
+/// <summary>A display's part of the overlay, for a feature's own drawing over the selection.</summary>
+/// <param name="Layer">
+/// Above the frozen image and the dimming, below the selection's frame and the bars, laid out in the display's physical
+/// pixels from its top left (image pixels: no DPI to undo). Takes the mouse only while <see cref="ICaptureSession.Tooling"/>.
+/// </param>
+public sealed record CaptureSurface(string DisplayId, PixelRect Bounds, int Dpi, Canvas Layer);
+
+/// <summary>
+/// One capture, from the starter until its overlay closes. Its events are raised on the UI thread. The pixels are released
+/// when it closes; a feature that keeps an image copies it out of <see cref="Selection"/> first.
+/// </summary>
+public interface ICaptureSession
+{
+    CaptureRequest Request { get; }
+
+    /// <summary>The frozen screen; null during a delay and before the read lands.</summary>
+    Freeze? Freeze { get; }
+
+    /// <summary>The selection once released, and after each change (handles, arrows, Ctrl+A); null while choosing.</summary>
+    Selection? Selection { get; }
+
+    /// <summary>The overlay's parts, one per display, once frozen.</summary>
+    IReadOnlyList<CaptureSurface> Surfaces { get; }
+
+    /// <summary>A markup tool is on: a press inside the selection goes to <see cref="CaptureSurface.Layer"/>, not a move.</summary>
+    bool Tooling { get; set; }
+
+    /// <summary>The selection was released, or changed after release.</summary>
+    event Action<Selection>? Selected;
+
+    /// <summary>A pixel was picked (Pick a point): its point and colour (0xAARRGGBB). The overlay stays until <see cref="Close"/>.</summary>
+    event Action<PixelPoint, uint>? Picked;
+
+    /// <summary>A key the overlay doesn't act on, after release: the feature's (Esc, Enter, Ctrl+C, tool letters).</summary>
+    event Action<KeyEventArgs>? KeyDown;
+
+    /// <summary>The frozen screen first showed: a feature times key to frozen screen from here.</summary>
+    event Action? Frozen;
+
+    /// <summary>The overlay closed; raised once.</summary>
+    event Action<CaptureEnd>? Closed;
+
+    /// <summary>
+    /// The feature's bars, placed by the layer beside the selection on its release display (capture-layer.md, The bars'
+    /// placement): the tool column and the output bar under it. Null leaves one out. Sized in DIPs as WPF measures them.
+    /// </summary>
+    void SetBars(FrameworkElement? tools, FrameworkElement? output);
+
+    /// <summary>
+    /// Closes the overlay. With <paramref name="handBack"/>, the window that was in front at the starter gets the keyboard
+    /// back first, so Ctrl+V lands where Travis was.
+    /// </summary>
+    void Close(CaptureEnd end = CaptureEnd.Finished, bool handBack = true);
+}
+
+/// <summary>
+/// The shared capture layer (docs/phase-7/capture-layer.md): one freeze, one selector, the same keys for every capture
+/// feature. Call on the UI thread.
+/// </summary>
+public interface ICaptureLayer
+{
+    /// <summary>
+    /// A capture feature started: the overlay windows are made with the first use and kept hidden; disposing the last use
+    /// closes them.
+    /// </summary>
+    IDisposable Use();
+
+    /// <summary>The capture in progress, from its starter (a delay included) until its overlay closes.</summary>
+    ICaptureSession? Current { get; }
+
+    /// <summary>
+    /// Starts a capture. Null when one is already running: a starter during the delay cancels it, and any other is
+    /// ignored (after release, the feature asks itself, as Screen capture's "Discard capture?").
+    /// </summary>
+    ICaptureSession? Start(CaptureRequest request);
+
+    /// <summary>The previous released rectangle, for Last region; the feature saves it in its settings and sets it at start.</summary>
+    PixelRect? LastRegion { get; set; }
+}
+
+/// <summary>What the layer needs from the shell. The App implements it; tests pass a fake.</summary>
+public interface ICaptureShell
+{
+    /// <summary>The last window in front that wasn't the island's (the return window for a starter from the island).</summary>
+    nint IslandReturnWindow();
+
+    /// <summary>Closes the island if it's open; completes once its close has finished.</summary>
+    Task CloseIslandAsync();
+
+    /// <summary>Shows a line on the bar ("Capturing in 3", "Capture failed"), or clears the layer's line for null. A click on it runs <paramref name="click"/>.</summary>
+    void Bar(string? line, Action? click = null);
+}

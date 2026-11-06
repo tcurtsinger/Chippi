@@ -129,6 +129,7 @@ public partial class IslandWindow : Window
     private bool _holdingPause;
     private double _lineRoom; // the title's room on the bar; longer scrolls
     private string? _chipKey; // the page the bar opens
+    private Action? _chipClick; // or what a click on it does instead (IslandActivity.Clicked)
     private string? _lastPage; // the page last opened, saved once the panel has gone
     private string _lineText = "";
     private string? _shownContent; // what the bar shows, by identity: a new one arrives (Arrival)
@@ -690,7 +691,9 @@ public partial class IslandWindow : Window
     /// <summary>The bar's page: a song's opens Now Playing, an activity's its feature's page; without one it acts as the puck.</summary>
     private void OpenChip()
     {
-        if (_chipKey is { } key && !_panel.IsOpen)
+        if (_chipClick is { } click && !_panel.IsOpen)
+            click();
+        else if (_chipKey is { } key && !_panel.IsOpen)
             ShowPage(key);
         else
             Toggle();
@@ -907,6 +910,19 @@ public partial class IslandWindow : Window
     /// <summary>Closes the panel the usual way, after a page's paste was sent.</summary>
     internal void ClosePages() => CloseIsland();
 
+    /// <summary>
+    /// Closes the panel and completes once its close has left the screen (the capture layer reads the screen next), or after
+    /// a second at most.
+    /// </summary>
+    internal async Task ClosePagesAsync()
+    {
+        if (!_panel.IsVisible)
+            return;
+        CloseIsland();
+        for (int waited = 0; _panel.IsVisible && waited < 1000; waited += 8)
+            await Task.Delay(8);
+    }
+
     /// <summary>The open panel itself, for tests and snapshots.</summary>
     internal IslandPanelWindow Panel => _panel;
 
@@ -1002,6 +1018,7 @@ public partial class IslandWindow : Window
         _panel.ShowPetMood(mood);
         _chipKey = dropTile is not null ? null : feedback is not null ? feedback.OpensTile
             : _singing ? IslandPanelWindow.NowPlayingKey : top?.TileKey ?? top?.OpensTile;
+        _chipClick = dropTile is not null ? null : feedback is not null ? feedback.Clicked : _singing ? null : top?.Clicked;
         // What the bar shows, by identity rather than its values ("59 min left" after "1 hr left" is the same activity):
         // a new song or a new activity on a bar that's out and seen arrives (Arrival), the old fading where it was.
         string? content = !bar ? null

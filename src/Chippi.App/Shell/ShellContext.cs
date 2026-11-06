@@ -78,6 +78,9 @@ public sealed class ShellContext
                 Input.DropHook(Chippi.Core.Input.InputDevices.Mouse);
             }, null, TimeSpan.FromSeconds(dropAfter), Timeout.InfiniteTimeSpan);
 #endif
+        // The capture layer every capture feature shares: no window until the first one starts using it.
+        CaptureShell = new CaptureShell(this);
+        Capture = new Chippi.UI.Capture.CaptureLayer(CaptureShell);
         Registry = new ModuleRegistry(config, Island, loggerFactory, Services);
         Startup = string.IsNullOrWhiteSpace(devProfile)
             ? new StartupRegistration()
@@ -105,6 +108,12 @@ public sealed class ShellContext
 
     /// <summary>Every shortcut Chippi holds, for Settings › Shortcuts.</summary>
     public Chippi.Core.Shortcuts.ShortcutService Shortcuts { get; }
+
+    /// <summary>The shared capture layer (docs/phase-7/capture-layer.md), passed to each capture feature as it's registered.</summary>
+    public Chippi.UI.Capture.ICaptureLayer Capture { get; }
+
+    /// <summary>The capture layer's island side; the island host sets its close.</summary>
+    internal CaptureShell CaptureShell { get; }
 
     /// <summary>Windows' Print Screen setting as the shortcut service sees it: the real one only for the real profile's Chippi.exe.</summary>
     public Chippi.Core.Shortcuts.IPrintScreenSetting PrintScreen { get; }
