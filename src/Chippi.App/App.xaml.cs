@@ -260,6 +260,8 @@ public partial class App : Application
         windowLayouts.CreateArrangementDesktop = context => new ArrangementDesktop(context.Actions!,
             () => shell.Config.GetSection<AppSettings>(AppSettings.SectionName).PauseRules(), () => windowLayouts.ArrangementsLocked);
         shell.Registry.Register(windowLayouts);
+        // [Phase 7] Text and QR: on the capture layer.
+        shell.Registry.Register(new Chippi.Features.ScreenText.ScreenTextModule(shell.Capture));
         if (shell.Services.Actions is Chippi.UI.Actions.WindowsActionPc windowPc)
         {
             windowPc.SnapZones = windowLayouts.ResolveZone;

@@ -38,6 +38,7 @@
     <ProjectReference Include="..\Features\Chippi.Features.Sound\Chippi.Features.Sound.csproj" />
     <ProjectReference Include="..\Features\Chippi.Features.SystemMonitor\Chippi.Features.SystemMonitor.csproj" />
     <ProjectReference Include="..\Features\Chippi.Features.Scratchpad\Chippi.Features.Scratchpad.csproj" />
+    <ProjectReference Include="..\Features\Chippi.Features.ScreenText\Chippi.Features.ScreenText.csproj" />
     <ProjectReference Include="..\Features\Chippi.Features.Clipboard\Chippi.Features.Clipboard.csproj" />
     <ProjectReference Include="..\Features\Chippi.Features.PlainPaste\Chippi.Features.PlainPaste.csproj" />
     <ProjectReference Include="..\Features\Chippi.Features.Shelf\Chippi.Features.Shelf.csproj" />
