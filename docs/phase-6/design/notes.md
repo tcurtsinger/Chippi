@@ -92,7 +92,7 @@ Drawn from `text-snippets.md`, `snap.md` and `app-switcher.md`. The Snap menu it
 
 ## Saved app arrangements (task 439)
 
-Drawn from `arrangements.md` as Travis confirmed it (task 438). Every window, app and display is invented. Choices for Travis to check:
+Drawn from `arrangements.md` as Travis confirmed it (task 438). Every window, app and display is invented. Travis approved these boards (task 443) and said yes to 3 (task 441) and 10 (task 442); `arrangements.md` records both. The choices:
 
 1. **Arrangements is the last section of Settings › Snap,** after Gaps. The brief puts it below Layouts; Gaps stays next to the layouts it spaces.
 2. **A saved row:** up to four of its apps' icons, the name over "12 windows · 2 displays", its shortcut as caps when one is set, Launch, and More (Edit, Delete), like a layout's menu. Rows are sorted by name: the Snap menu lists them in that order.
