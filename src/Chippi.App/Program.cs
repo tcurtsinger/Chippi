@@ -42,6 +42,9 @@ public static class Program
                 catch (Exception ex) { Log.Warn("Uninstall: removing the Run entry failed", ex); }
                 try { new ExplorerRegistration().SetEnabled(false); }
                 catch (Exception ex) { Log.Warn("Uninstall: removing the Explorer entry failed", ex); }
+                // Windows' "Use the Print screen key to open screen capture", turned off while Chippi held Print Screen.
+                try { WindowsPrintScreenSetting.RestoreOnUninstall(); }
+                catch (Exception ex) { Log.Warn("Uninstall: putting back Windows' Print Screen setting failed", ex); }
                 Notifications.ClassicToastPresenter.Uninstall();
                 // A crash can leave CABLE Output as the default mic; uninstall puts the real one back.
                 // VB-CABLE itself is never removed.

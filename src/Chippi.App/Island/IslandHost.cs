@@ -74,6 +74,7 @@ public sealed class IslandHost : IDisposable
         _window.CaptureTarget = () => _shell.Clipboard.CaptureTarget();
         _shell.Services.IslandPasteTarget = () => _window.PasteTarget;
         _shell.Services.CloseIsland = _window.ClosePages;
+        _shell.CaptureShell.CloseIsland = _window.ClosePagesAsync;
         _shell.Services.CanShowIslandFeedback = () => _window.IsVisible;
         _shell.Commands.RegisterIslandHold(_window.HoldIslandOpen);
         // A second launch and a notice click open the island; with it off or hidden, ShellCommands opens Settings.

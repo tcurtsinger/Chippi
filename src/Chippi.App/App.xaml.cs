@@ -163,6 +163,13 @@ public partial class App : Application
     {
         await _modulesStarted;
         Shell.ModulesStarted(arguments);
+        // A hold on Print Screen no shortcut uses any more puts Windows' setting back.
+        Shell.Shortcuts.Started();
+#if DEBUG
+        // The capture layer's Sandbox check, before a capture feature exists (CHIPPI_CAPTURE_PROBE).
+        // Its shortcuts keep it alive.
+        Chippi.App.Shell.CaptureProbe.StartIfAsked(Shell);
+#endif
     }
 
     public ShellContext Shell { get; private set; } = null!;
@@ -307,6 +314,8 @@ public partial class App : Application
         if (_quitting)
             return;
         _quitting = true;
+        // Stopping isn't removing: a Print Screen shortcut keeps Windows' setting off for the next start.
+        Shell.Shortcuts.Closing();
         try
         {
             await Shell.Registry.StopAllAsync();

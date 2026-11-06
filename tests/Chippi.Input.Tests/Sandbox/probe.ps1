@@ -61,6 +61,7 @@ public static class Probe
 
     public static void Left(bool down) { Mouse(down ? 0x0002u : 0x0004u); }
     public static void Middle(bool down) { Mouse(down ? 0x0020u : 0x0040u); }
+    public static void Right(bool down) { Mouse(down ? 0x0008u : 0x0010u); }
     public static void Back(bool down) { Mouse(down ? 0x0080u : 0x0100u, 0, 0, 1); }
     public static void Forward(bool down) { Mouse(down ? 0x0080u : 0x0100u, 0, 0, 2); }
     /// <summary>One tilt of the side wheel: positive is right, 120 a notch.</summary>
@@ -70,6 +71,15 @@ public static class Probe
     {
         var input = new Input { Type = 1 };
         input.Data.Key = new KeyInput { Vk = vk, Flags = down ? 0u : 2u };
+        Send(input);
+    }
+
+    /// <summary>A key as a keyboard sends it, with its scan code and the extended flag (Print Screen: 0x2C, 0x37).
+    /// Windows doesn't match a bare-VK Print Screen to a registered hotkey (the capture check, 2026-11-06).</summary>
+    public static void ExtendedKey(ushort vk, ushort scan, bool down)
+    {
+        var input = new Input { Type = 1 };
+        input.Data.Key = new KeyInput { Vk = vk, Scan = scan, Flags = 1u | (down ? 0u : 2u) };
         Send(input);
     }
 
@@ -213,6 +223,11 @@ public static class Probe
 
     if ($checks -contains 'snap') {
         $found.snap = & (Join-Path $PSScriptRoot 'snap.ps1')
+        return
+    }
+
+    if ($checks -contains 'capture') {
+        $found.capture = & (Join-Path $PSScriptRoot 'capture.ps1')
         return
     }
 

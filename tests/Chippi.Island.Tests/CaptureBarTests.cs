@@ -104,6 +104,26 @@ public sealed class CaptureBarTests
         finally { window.Close(); }
     });
 
+    [Fact]
+    public void A_click_on_the_count_down_runs_its_own_click_and_opens_no_page() => WpfTestThread.Run(() =>
+    {
+        var window = new IslandWindow();
+        try
+        {
+            int cancelled = 0;
+            window.SetActivities([Line("capture", "Capturing in 3", "Region") with { Progress = 1, Clicked = () => cancelled++, OpensTile = "capture" }], PetMood.Idle);
+            window.OpenChip();
+            Assert.Equal(1, cancelled);
+            Assert.False(window.IsIslandOpen);
+
+            // Without a click of its own, the bar opens its page as before.
+            window.SetActivities([Line("capture", "Capture failed", "Region") with { NeedsAttention = true }], PetMood.Idle);
+            window.OpenChip();
+            Assert.Equal(1, cancelled);
+        }
+        finally { window.Close(); }
+    });
+
 #if DEBUG
     /// <summary>Every capture line (capture-bar-&lt;theme&gt;-*.png), when CHIPPI_ISLAND_SHOTS names a folder; the widget shows on the primary display.</summary>
     [Fact]

@@ -1,0 +1,16 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- The capture layer's engine (docs/phase-7/capture-layer.md): reading every display once, the frozen screen, the
+     selection and its region math. WPF-free; the selector overlay on top of it is Chippi.UI.Capture. -->
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <RootNamespace>Chippi.Capture</RootNamespace>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Chippi.Capture.Tests" />
+  </ItemGroup>
+
+</Project>
