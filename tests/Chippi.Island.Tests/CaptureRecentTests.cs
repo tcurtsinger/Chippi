@@ -56,7 +56,11 @@ public sealed class CaptureRecentTests
         Assert.Equal("Open folder failed", view.Status);
 
         Press(view.AnnotateButton);
-        Assert.Equal((2, 3, 1, 2), (model.Copies, model.Saves, model.Annotates, model.Folders));
+        Assert.Equal("", view.Status);
+        model.AnnotateWorks = false;
+        Press(view.AnnotateButton);
+        Assert.Equal("Annotate failed", view.Status);
+        Assert.Equal((2, 3, 2, 2), (model.Copies, model.Saves, model.Annotates, model.Folders));
     });
 
     [Fact]
@@ -314,7 +318,13 @@ public sealed class CaptureRecentTests
             return Task.FromResult(Save);
         }
 
-        public void Annotate() => Annotates++;
+        public bool AnnotateWorks { get; set; } = true;
+
+        public bool Annotate()
+        {
+            Annotates++;
+            return AnnotateWorks;
+        }
 
         public bool OpenFolder()
         {

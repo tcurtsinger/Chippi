@@ -35,6 +35,10 @@ public static class CaptureFiles
         using var stream = new MemoryStream(); encoder.Save(stream);
         return stream.ToArray();
     }
+    /// <summary>A retained capture couldn't be read: its file is missing, locked or damaged, or its index entry is unreadable.</summary>
+    internal static bool ReadFailed(Exception ex) => ex is IOException or UnauthorizedAccessException or NotSupportedException
+        or FormatException or InvalidDataException or System.Security.Cryptography.CryptographicException or Microsoft.Data.Sqlite.SqliteException;
+
     public static string DefaultFolder => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "Screenshots");
 
     /// <summary>Opens <paramref name="folder"/> in File Explorer; false when it's missing or Windows refuses, never a guessed path.</summary>

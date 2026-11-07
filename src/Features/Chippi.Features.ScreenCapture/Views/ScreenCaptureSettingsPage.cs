@@ -450,7 +450,7 @@ public sealed class ScreenCaptureSettingsPage : UserControl
         public ContextMenu Menu()
         {
             var menu = new ContextMenu();
-            menu.Items.Add(Item("Annotate", () => _page._model.Annotate(_id)));
+            menu.Items.Add(Item("Annotate", () => Say(_page._recentError, _page._model.Annotate(_id) ? null : "Annotate failed")));
             menu.Items.Add(Item("Remove from recent", () => _page._model.Remove(_id)));
             if (_capture is { SavedFile: { Length: > 0 } } capture && !_fileMissing)
                 menu.Items.Add(Item("Delete file", () => _page.Delete(_id, capture, Button)));

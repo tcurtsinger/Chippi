@@ -27,6 +27,7 @@ public sealed class CaptureRecentView : UserControl
     internal const string CopyFailed = "Copy failed";
     internal const string SaveFailed = "Save failed";
     internal const string OpenFolderFailed = "Open folder failed";
+    internal const string AnnotateFailed = "Annotate failed";
     private const double FootHeight = 28, InfoHeight = 20;
 
     private readonly ICaptureRecentModel _model;
@@ -81,7 +82,7 @@ public sealed class CaptureRecentView : UserControl
         _info.Children.Add(_fileName);
 
         _openFolder.Click += (_, _) => OpenFolder();
-        _annotate.Click += (_, _) => _model.Annotate();
+        _annotate.Click += (_, _) => Annotate();
         _saveAs.Click += async (_, _) => await SaveAs();
         _copy.Click += async (_, _) => await Copy();
         _statusFor.Tick += (_, _) => Say("");
@@ -222,6 +223,13 @@ public sealed class CaptureRecentView : UserControl
         if (_shown is null) return;
         if (_model.OpenFolder()) Say("");
         else Say(OpenFolderFailed, failed: true);
+    }
+
+    private void Annotate()
+    {
+        if (_busy || _shown is null) return;
+        if (_model.Annotate()) Say("");
+        else Say(AnnotateFailed, failed: true);
     }
 
     private void Keys(object sender, KeyEventArgs e)

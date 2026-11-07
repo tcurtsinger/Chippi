@@ -83,4 +83,48 @@ public sealed class ScreenCaptureModelTests
         thread.SetApartmentState(ApartmentState.STA); thread.Start(); thread.Join();
         if (error != null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(error).Throw();
     }
+
+    [Fact]
+    public void Annotate_with_a_missing_or_damaged_retained_image_fails_and_keeps_the_island_and_entry()
+    {
+        Exception? error = null;
+        var thread = new Thread(() =>
+        {
+            string folder = Path.Combine(Path.GetTempPath(), "chippi-model-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(folder);
+            try
+            {
+                int closes = 0;
+                var context = new ModuleContext("screen-capture", new SettingsStore(), NullLogger.Instance, null!, null!) { CloseIsland = () => closes++ };
+                using var store = new RecentCaptureStore(folder);
+                var image = BitmapSource.Create(64, 48, 96, 96, PixelFormats.Bgra32, null, new byte[64 * 48 * 4], 64 * 4);
+                var id = Guid.NewGuid();
+                store.Put(id, image, DateTimeOffset.Now, null);
+                BitmapSource? annotated = null;
+                using var model = new ScreenCaptureModel(context, store, pixels => annotated = pixels, _ => false);
+                using var result = new CaptureRecentModel(model, store, context);
+                // Removed before anything reads it: WPF's image cache would otherwise serve a decoded copy.
+                string retained = Path.Combine(folder, model.Recent[0].Image);
+                File.Delete(retained);
+                result.OpenAsync(id).GetAwaiter().GetResult();
+                Assert.NotNull(result.Result);
+                Assert.Null(result.Result.Image);
+                Assert.False(model.Annotate(id));
+                Assert.False(result.Annotate());
+                File.WriteAllText(retained, "not a png");
+                Assert.False(model.Annotate(id));
+                Assert.False(result.Annotate());
+
+                Assert.Null(annotated);
+                Assert.Equal(0, closes);
+                Assert.Single(model.Recent);
+                model.Remove(id);
+                Assert.Empty(model.Recent);
+            }
+            catch (Exception ex) { error = ex; }
+            finally { Directory.Delete(folder, true); }
+        });
+        thread.SetApartmentState(ApartmentState.STA); thread.Start(); thread.Join();
+        if (error != null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(error).Throw();
+    }
 }

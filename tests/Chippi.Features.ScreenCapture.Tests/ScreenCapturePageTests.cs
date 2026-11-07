@@ -148,6 +148,11 @@ public sealed class ScreenCapturePageTests
 
             Click(page.MenuOf(copied.Id).Items.OfType<MenuItem>().First());
             Assert.Equal([copied.Id], model.Annotated);
+            Assert.Equal(Visibility.Collapsed, page.RecentError.Visibility);
+            model.AnnotateWorks = false;
+            Click(page.MenuOf(copied.Id).Items.OfType<MenuItem>().First());
+            Assert.Equal("Annotate failed", page.RecentError.Text);
+            Assert.Equal(Visibility.Visible, page.RecentError.Visibility);
             Click(page.MenuOf(copied.Id).Items.OfType<MenuItem>().ElementAt(1));
             Assert.Equal(49, page.Tiles.Count);
         });
@@ -356,7 +361,13 @@ public sealed class ScreenCapturePageTests
 
         public bool SetMagnifier(bool on) => Save(Settings with { Magnifier = on });
 
-        public void Annotate(Guid id) => Annotated.Add(id);
+        public bool AnnotateWorks { get; set; } = true;
+
+        public bool Annotate(Guid id)
+        {
+            Annotated.Add(id);
+            return AnnotateWorks;
+        }
 
         public void Remove(Guid id) => SetRecent([.. _recent.Where(c => c.Id != id)]);
 

@@ -96,8 +96,8 @@ public interface IScreenCapturePageModel
 
     bool SetMagnifier(bool on);
 
-    /// <summary>Opens the capture's flattened pixels on the frozen screen to mark up again.</summary>
-    void Annotate(Guid id);
+    /// <summary>Opens the capture's flattened pixels on the frozen screen to mark up again. False reports Annotate failed.</summary>
+    bool Annotate(Guid id);
 
     /// <summary>Removes the entry and its own cache; a saved file stays.</summary>
     void Remove(Guid id);

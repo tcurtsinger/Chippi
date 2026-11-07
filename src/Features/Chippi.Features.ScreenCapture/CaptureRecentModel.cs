@@ -34,7 +34,7 @@ public sealed class CaptureRecentModel : ICaptureRecentModel, IDisposable
             if (!_disposed && generation == _generation && Result is { } result)
             { Result = result with { Image = image }; Changed?.Invoke(); }
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or Microsoft.Data.Sqlite.SqliteException) { }
+        catch (Exception ex) when (CaptureFiles.ReadFailed(ex)) { }
     }
     private void Refresh()
     {
@@ -61,7 +61,7 @@ public sealed class CaptureRecentModel : ICaptureRecentModel, IDisposable
             var pixels = await PixelsAsync();
             return !_disposed && pixels != null && _context.Clipboard != null && await CaptureClipboard.CopyAsync(_context.Clipboard, pixels);
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or Microsoft.Data.Sqlite.SqliteException) { return false; }
+        catch (Exception ex) when (CaptureFiles.ReadFailed(ex)) { return false; }
     }
     public async Task<CaptureSave> SaveAsAsync()
     {
@@ -75,13 +75,13 @@ public sealed class CaptureRecentModel : ICaptureRecentModel, IDisposable
             await CaptureFiles.OnWorkerAsync(() => { CaptureFiles.SaveAs(pixels, dialog.FileName, dialog.FilterIndex == 2 ? CaptureFileType.Jpeg : CaptureFileType.Png, true); return true; });
             return new(CaptureSaveOutcome.Saved, dialog.FileName);
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or Microsoft.Data.Sqlite.SqliteException) { return new(CaptureSaveOutcome.Failed); }
+        catch (Exception ex) when (CaptureFiles.ReadFailed(ex)) { return new(CaptureSaveOutcome.Failed); }
     }
-    public void Annotate()
+    public bool Annotate()
     {
-        if (_id is not { } id || Result == null || _disposed) return;
-        _context.CloseIsland();
-        _page.Annotate(id);
+        if (_id is not { } id || Result == null || _disposed) return false;
+        // Read before closing, so a failure shows on this page instead of a closed island.
+        return _page.Annotate(id, _context.CloseIsland);
     }
     public bool OpenFolder()
     {

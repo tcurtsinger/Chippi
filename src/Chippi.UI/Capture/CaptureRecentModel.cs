@@ -24,8 +24,11 @@ public interface ICaptureRecentModel
     /// </summary>
     Task<CaptureSave> SaveAsAsync();
 
-    /// <summary>Opens a new draft in the editor from the retained pixels. The host closes the island first.</summary>
-    void Annotate();
+    /// <summary>
+    /// Opens a new draft in the editor from the retained pixels. The host closes the island first. False reports Annotate
+    /// failed: the pixels couldn't be read, and the page stays.
+    /// </summary>
+    bool Annotate();
 
     /// <summary>Opens the saved file's folder, otherwise Save to. False reports Open folder failed; nothing guessed opens.</summary>
     bool OpenFolder();

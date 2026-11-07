@@ -103,7 +103,21 @@ public sealed class ScreenCaptureModel : IScreenCapturePageModel, IDisposable
         return Save(Settings with { SaveFolder = folder });
     }
 
-    public void Annotate(Guid id) => _annotate(_store.Load(id));
+    public bool Annotate(Guid id) => Annotate(id, null);
+
+    /// <summary>
+    /// Reads the retained image, then runs <paramref name="opening"/> and opens it in the editor. False, with nothing
+    /// run or opened, when the image can't be read; the entry stays in Recent for Remove.
+    /// </summary>
+    internal bool Annotate(Guid id, Action? opening)
+    {
+        BitmapSource image;
+        try { image = _store.Load(id); }
+        catch (Exception ex) when (CaptureFiles.ReadFailed(ex)) { return false; }
+        opening?.Invoke();
+        _annotate(image);
+        return true;
+    }
     public void Remove(Guid id) { _store.Remove(id); RefreshRecent(); }
     public void ClearRecent() { _store.Clear(); RefreshRecent(); }
     public bool DeleteFile(Guid id)
