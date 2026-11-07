@@ -86,8 +86,7 @@ Slots under the starter rule (README, task 482). All unassigned.
 |---|---|---|
 | Record region, Record window, Record screen, Record GIF | Global | Start the selector in record mode |
 | Stop recording | Global | With no recording, does nothing and the bar says "Not recording" |
-| Pause recording, Resume recording | Global | Same refusal with no recording |
-| Discard recording, Trim, Save, Save as, Export GIF | In context | Buttons on the recording page |
+| Pause, Resume, Discard recording, Trim, Save, Save as, Export GIF | In context | Buttons on the pill, the recording card and the recording page. No global slot: the README inventory (task 482) names only the starters and Stop |
 | Start (Enter), Cancel (Esc) | In context, fixed | The selector's own keys, never registered with `RegisterHotKey` |
 
 Settings › Recording shows the slots read-only with Edit, which opens Settings › Shortcuts in that row. Nothing is recorded on the feature's page.
