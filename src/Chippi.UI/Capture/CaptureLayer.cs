@@ -355,7 +355,7 @@ public sealed partial class CaptureLayer : ICaptureLayer
             else
             {
                 Freeze = freeze;
-                _selector = new Selector(freeze, Request.Mode, layer.LastRegion, Cursor(), DragSize(), (int)Math.Round(6 * target.Dpi / 96.0));
+                _selector = new Selector(freeze, Request.Mode, layer.LastRegion, Cursor(), DragSize(), (int)Math.Round(6 * target.Dpi / 96.0), Request.OneDisplay);
             }
             // 7. The frozen image, drawn into the overlays already on screen, then shown.
             Surfaces = [.. overlays.Select(o => new CaptureSurface(ScreenOf(o)?.DisplayId ?? "", o.Bounds, o.Dpi, o.View.Layer))];

@@ -35,6 +35,9 @@ public sealed record CaptureRequest(CaptureMode Mode)
 
     /// <summary>The magnifier follows the pointer while choosing (Settings › Screen capture); always on for a pick.</summary>
     public bool Magnifier { get; init; } = true;
+
+    /// <summary>Record mode: the selection stays on the display where the drag started (one display per recording).</summary>
+    public bool OneDisplay { get; init; }
 }
 
 /// <summary>Why a capture's overlay closed.</summary>

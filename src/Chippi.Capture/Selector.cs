@@ -39,10 +39,15 @@ public sealed class Selector
     /// <param name="pointer">Where the pointer is at the freeze.</param>
     /// <param name="drag">Windows' drag distance (<c>SM_CXDRAG</c>, <c>SM_CYDRAG</c>).</param>
     /// <param name="reach">How near a handle the pointer has to be, in physical pixels.</param>
-    public Selector(Freeze freeze, CaptureMode mode, PixelRect? last, PixelPoint pointer, PixelSize drag, int reach)
+    /// <param name="oneDisplay">
+    /// Recording's record mode: the selection stays on the display where the drag started (or the window was clicked),
+    /// stopping at its edges, and a window is cut to that display.
+    /// </param>
+    public Selector(Freeze freeze, CaptureMode mode, PixelRect? last, PixelPoint pointer, PixelSize drag, int reach, bool oneDisplay = false)
     {
         Freeze = freeze;
         Mode = mode;
+        OneDisplay = oneDisplay;
         _dragWidth = Math.Max(1, drag.Width);
         _dragHeight = Math.Max(1, drag.Height);
         _reach = Math.Max(1, reach);
@@ -82,6 +87,13 @@ public sealed class Selector
     }
 
     public Freeze Freeze { get; }
+
+    /// <summary>The selection is kept on one display (record mode).</summary>
+    public bool OneDisplay { get; }
+
+    // Where the selection may go: every display, or in record mode the one the drag started on once it has.
+    private PixelRect? _bound;
+    private IReadOnlyList<PixelRect> Area => _bound is { } d ? [d] : Freeze.Displays;
 
     /// <summary>A reopened capture: the selection can't be moved, resized or replaced.</summary>
     public bool Fixed { get; }
@@ -143,11 +155,11 @@ public sealed class Selector
         {
             if (Held != SelectionHandle.None)
             {
-                var rect = SelectionMath.Drag(Freeze.Displays, _startRect, Held, p.X - _down.X, p.Y - _down.Y);
+                var rect = SelectionMath.Drag(Area, _startRect, Held, p.X - _down.X, p.Y - _down.Y);
                 if (rect != selection.Rect)
                 {
                     Rect = rect;
-                    Selection = selection with { Rect = rect, Window = null, Display = Freeze.NearestScreen(p) };
+                    Selection = selection with { Rect = rect, Window = null, Display = OneDisplay ? selection.Display : Freeze.NearestScreen(p) };
                 }
             }
             return;
@@ -164,7 +176,7 @@ public sealed class Selector
                 {
                     IsDragging = true;
                     Hover = null;
-                    Rect = PixelRect.Spanning(_down, SelectionMath.OnDisplays(Freeze.Displays, p)).Intersect(SelectionMath.Around(Freeze.Displays));
+                    Rect = PixelRect.Spanning(_down, SelectionMath.OnDisplays(Area, p)).Intersect(SelectionMath.Around(Area));
                 }
                 break;
             case CaptureMode.Freeform:
@@ -201,6 +213,11 @@ public sealed class Selector
         }
         _pressed = true;
         _fastPath = ctrl;
+        if (OneDisplay)
+        {
+            _down = SelectionMath.OnDisplays(Freeze.Displays, p);
+            _bound = SelectionMath.DisplayAt(Freeze.Displays, _down);
+        }
         if (Mode == CaptureMode.Freeform)
         {
             _outline.Clear();
@@ -224,7 +241,7 @@ public sealed class Selector
         _pressed = false;
         bool dragged = IsDragging;
         IsDragging = false;
-        var display = Freeze.NearestScreen(p);
+        var display = OneDisplay ? Freeze.NearestScreen(_down) : Freeze.NearestScreen(p);
         switch (Mode)
         {
             case CaptureMode.Region when dragged && Rect is { IsEmpty: false } rect:
@@ -283,7 +300,7 @@ public sealed class Selector
                 return SelectorOutcome.PassToFeature;
             if (selection.Mask is not null)
                 return SelectorOutcome.None; // a freeform outline keeps its shape
-            var rect = shift ? SelectionMath.Grow(Freeze.Displays, selection.Rect, dx, dy) : SelectionMath.Move(Freeze.Displays, selection.Rect, dx, dy);
+            var rect = shift ? SelectionMath.Grow(Area, selection.Rect, dx, dy) : SelectionMath.Move(Area, selection.Rect, dx, dy);
             Rect = rect;
             Selection = selection with { Rect = rect, Window = null };
             return SelectorOutcome.None;
@@ -311,7 +328,7 @@ public sealed class Selector
     {
         if (window is null)
             return;
-        var rect = SelectionMath.WindowRect(Freeze.Displays, window);
+        var rect = SelectionMath.WindowRect(OneDisplay ? [display.Bounds] : Freeze.Displays, window);
         if (!rect.IsEmpty)
             Release(rect, null, window, false, display);
     }
@@ -319,7 +336,10 @@ public sealed class Selector
     private void Release(PixelRect rect, SelectionMask? mask, FrozenWindow? window, bool fastPath, CapturedScreen? display = null)
     {
         Hover = null;
+        display ??= Freeze.NearestScreen(Pointer);
+        if (OneDisplay)
+            _bound = display.Bounds;
         Rect = rect;
-        Selection = new Selection(rect, Freeze, Mode, mask, window, fastPath, display ?? Freeze.NearestScreen(Pointer));
+        Selection = new Selection(rect, Freeze, Mode, mask, window, fastPath, display);
     }
 }
