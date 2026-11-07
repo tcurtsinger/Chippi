@@ -17,6 +17,12 @@ public static class MediaSupport
     /// <summary>Null when MP4 recording works; otherwise what's missing.</summary>
     public static string? MissingEncoder => Missing.Value;
 
+    /// <summary>
+    /// Whether the GPU's encoders may be used (the default). <c>CHIPPI_MEDIA_SOFTWARE=1</c> keeps to Windows' software
+    /// ones: in Windows Sandbox, loading the host GPU's H.264 encoder takes the whole Sandbox down (0x80370106, 2026-11-07).
+    /// </summary>
+    public static bool Hardware { get; } = Environment.GetEnvironmentVariable("CHIPPI_MEDIA_SOFTWARE") != "1";
+
     private static string? Find()
     {
         try
@@ -41,8 +47,8 @@ public static class MediaSupport
             ? MediaPInvoke.MFMediaType_Video : MediaPInvoke.MFMediaType_Audio, guidSubtype = output };
         uint count = 0;
         IMFActivate_unmanaged** found;
-        var flags = MFT_ENUM_FLAG.MFT_ENUM_FLAG_SYNCMFT | MFT_ENUM_FLAG.MFT_ENUM_FLAG_ASYNCMFT | MFT_ENUM_FLAG.MFT_ENUM_FLAG_HARDWARE
-            | MFT_ENUM_FLAG.MFT_ENUM_FLAG_SORTANDFILTER;
+        var flags = MFT_ENUM_FLAG.MFT_ENUM_FLAG_SYNCMFT | MFT_ENUM_FLAG.MFT_ENUM_FLAG_ASYNCMFT | MFT_ENUM_FLAG.MFT_ENUM_FLAG_SORTANDFILTER
+            | (Hardware ? MFT_ENUM_FLAG.MFT_ENUM_FLAG_HARDWARE : 0);
         if (MediaPInvoke.MFTEnumEx(category, flags, null, &type, out found, &count).Failed) return 0;
         for (var i = 0; i < count; i++) found[i]->Release();
         MediaPInvoke.CoTaskMemFree(found);

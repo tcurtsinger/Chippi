@@ -138,7 +138,7 @@ public sealed class Mp4Writer : IMediaWriter
         // The transcoder starts on the thread pool: preparing it can take a moment, and writes queue meanwhile.
         await Task.Yield();
         using var output = _file.AsRandomAccessStream();
-        var transcoder = new MediaTranscoder { HardwareAccelerationEnabled = true };
+        var transcoder = new MediaTranscoder { HardwareAccelerationEnabled = MediaSupport.Hardware };
         var prepared = await transcoder.PrepareMediaStreamSourceTranscodeAsync(source, output, profile).AsTask(_abort.Token);
         if (!prepared.CanTranscode) throw new NotSupportedException($"Recording failed: {prepared.FailureReason}");
         await prepared.TranscodeAsync().AsTask(_abort.Token);
