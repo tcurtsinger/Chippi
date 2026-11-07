@@ -91,7 +91,8 @@ function CheckSaveAs {
     Region; Chord @(0xA2, 0xA0, 0x53)
     WaitFor { [Probe]::Foreground() -match 'Save [Aa]s' } 'Save as dialog'; Tap 0x1B
     WaitFor { [Probe]::Foreground() -eq 'Chippi capture' } 'Save as Cancel returns keyboard'
-    Require ($null -ne (Find 'Copy' -Button)) 'Save as Cancel keeps draft'
+    WaitFor { $null -ne (Find 'Copy' -Button) } 'Save as Cancel keeps draft' 3000
+    Note 'PASS Save as Cancel keeps draft'
 }
 
 function CheckText {

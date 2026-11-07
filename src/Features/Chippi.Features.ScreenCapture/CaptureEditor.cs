@@ -160,7 +160,7 @@ internal sealed class CaptureEditor : IDisposable
                 (int)Math.Round(_selection.Rect.Y + point.Y * _selection.Scale));
             if (_session.Freeze?.PixelAt(virtualPoint) is { } color)
                 _tools.Ink = Color.FromArgb((byte)(color >> 24), (byte)(color >> 16), (byte)(color >> 8), (byte)color);
-            _pickingInk = false; e.Handled = true; Redraw(); return;
+            _pickingInk = false; _ownsPress = true; e.Handled = true; Redraw(); return;
         }
         if (!new Rect(_draft.Crop.X, _draft.Crop.Y, _draft.Crop.Width, _draft.Crop.Height).Contains(point)) return;
         CommitText(); _ownsPress = true; e.Handled = true;

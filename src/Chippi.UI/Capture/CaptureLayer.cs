@@ -398,6 +398,10 @@ public sealed partial class CaptureLayer : ICaptureLayer
 
         private Selection? _last;
 
+        // Set by a left press the layer saw. A feature that handles the press on its bars or canvas (a Text click, the
+        // Eraser) keeps it from the layer, and its release must not read as a selection change (task 663).
+        private bool _pressed;
+
         public void OnButtonDown(OverlayWindow o, MouseButtonEventArgs e)
         {
             if (_preview != null) return;
@@ -412,6 +416,7 @@ public sealed partial class CaptureLayer : ICaptureLayer
             if (e.ChangedButton != MouseButton.Left)
                 return;
             o.CaptureMouse();
+            _pressed = true;
             _last = _selector.Selection;
             var outcome = _selector.Down(Cursor(), Keyboard.Modifiers.HasFlag(ModifierKeys.Control));
             if (outcome == SelectorOutcome.Picked && _selector.Picked is { } picked)
@@ -430,8 +435,9 @@ public sealed partial class CaptureLayer : ICaptureLayer
                     Close(CaptureEnd.Cancelled);
                 return;
             }
-            if (e.ChangedButton != MouseButton.Left)
+            if (e.ChangedButton != MouseButton.Left || !_pressed)
                 return;
+            _pressed = false;
             if (o.IsMouseCaptured)
                 o.ReleaseMouseCapture();
             bool wasReleased = _selector.IsReleased;
