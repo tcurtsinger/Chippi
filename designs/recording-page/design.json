@@ -1,0 +1,8 @@
+{
+  "title": "Recording page",
+  "for": "The page that opens after Stop: play the recording, trim it, then Save, Save as, Export GIF or Discard.",
+  "knobs": [
+    "--radius-island-card",
+    "--island-accent"
+  ]
+}
