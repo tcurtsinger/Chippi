@@ -277,6 +277,13 @@ public partial class App : Application
         // [Phase 7] Color picker: on the capture layer.
         var colorPicker = new Chippi.Features.ColorPicker.ColorPickerModule(shell.Capture);
         shell.Registry.Register(colorPicker);
+        // [Phase 7] Screen recording: the capture layer's record mode; saved recordings join Screen capture's Recent.
+        var recording = new Chippi.Features.Recording.RecordingModule(shell.Capture)
+        {
+            Recent = (file, poster, length, time) => _ = screenCapture.AddRecordingAsync(file, poster, length, time),
+        };
+        recording.RecordingChanged += on => shell.LeaveIslandOutOfCaptures(on);
+        shell.Registry.Register(recording);
         shell.CapturePanel = new Chippi.App.Island.CapturePanelHost(shell, screenCapture, screenText, colorPicker);
         if (shell.Services.Actions is Chippi.UI.Actions.WindowsActionPc windowPc)
         {

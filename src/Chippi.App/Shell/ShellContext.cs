@@ -117,6 +117,12 @@ public sealed class ShellContext
     /// <summary>The capture layer's island side; the island host sets its close.</summary>
     internal CaptureShell CaptureShell { get; }
 
+    /// <summary>
+    /// Leaves the widget and its panel out of every capture (true) or puts them back: only while a screen recording runs,
+    /// so they still show in screen shares and stills otherwise (screen-recording.md). The island host sets it.
+    /// </summary>
+    internal Action<bool> LeaveIslandOutOfCaptures { get; set; } = _ => { };
+
     /// <summary>Windows' Print Screen setting as the shortcut service sees it: the real one only for the real profile's Chippi.exe.</summary>
     public Chippi.Core.Shortcuts.IPrintScreenSetting PrintScreen { get; }
 

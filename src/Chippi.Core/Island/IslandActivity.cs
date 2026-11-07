@@ -19,16 +19,20 @@ public enum IslandActivityKind
 
     /// <summary>Background state such as Keep awake. A timed session shows its countdown.</summary>
     Status,
+
+    /// <summary>A screen recording running: above everything, media included (screen-recording.md, Bar).</summary>
+    Recording,
 }
 
 public static class IslandActivityKindExtensions
 {
     /// <summary>
-    /// Lower wins: media, then an agent waiting on you, then timer, then download or stash (equal), then status, then an
-    /// agent working (DESIGN.md §5; Travis, 2026-11-01).
+    /// Lower wins: a recording, then media, then an agent waiting on you, then timer, then download or stash (equal), then
+    /// status, then an agent working (DESIGN.md §5; Travis, 2026-11-01; screen-recording.md).
     /// </summary>
     public static int Priority(this IslandActivity activity) => activity.Kind switch
     {
+        IslandActivityKind.Recording => -1,
         IslandActivityKind.Media => 0,
         IslandActivityKind.Agent when activity.NeedsAttention => 1,
         IslandActivityKind.Timer => 2,

@@ -20,6 +20,7 @@
     <Project Path="src/Features/Chippi.Features.Sound/Chippi.Features.Sound.csproj" />
     <Project Path="src/Features/Chippi.Features.Scratchpad/Chippi.Features.Scratchpad.csproj" />
     <Project Path="src/Features/Chippi.Features.PlainPaste/Chippi.Features.PlainPaste.csproj" />
+    <Project Path="src/Features/Chippi.Features.Recording/Chippi.Features.Recording.csproj" />
     <Project Path="src/Features/Chippi.Features.ScreenCapture/Chippi.Features.ScreenCapture.csproj" />
     <Project Path="src/Features/Chippi.Features.Shelf/Chippi.Features.Shelf.csproj" />
     <Project Path="src/Features/Chippi.Features.Shortcuts/Chippi.Features.Shortcuts.csproj" />
@@ -53,6 +54,7 @@
     <Project Path="tests/Chippi.Features.Sound.Tests/Chippi.Features.Sound.Tests.csproj" />
     <Project Path="tests/Chippi.Features.Scratchpad.Tests/Chippi.Features.Scratchpad.Tests.csproj" />
     <Project Path="tests/Chippi.Features.PlainPaste.Tests/Chippi.Features.PlainPaste.Tests.csproj" />
+    <Project Path="tests/Chippi.Features.Recording.Tests/Chippi.Features.Recording.Tests.csproj" />
     <Project Path="tests/Chippi.Features.ScreenCapture.Tests/Chippi.Features.ScreenCapture.Tests.csproj" />
     <Project Path="tests/Chippi.Features.Shelf.Tests/Chippi.Features.Shelf.Tests.csproj" />
     <Project Path="tests/Chippi.Features.Shortcuts.Tests/Chippi.Features.Shortcuts.Tests.csproj" />
