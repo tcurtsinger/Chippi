@@ -132,6 +132,10 @@ public sealed class ScreenCaptureModule(ICaptureLayer capture) : IFeatureModule
         if (!context.TryOpenIslandPage("capture") && !context.SummonIslandPage("capture")) context.OpenSettings(null);
     }
     private void ShowRecent() => _context?.OpenSettings("recent");
+
+    /// <summary>A line on the island's bar for six seconds, as a capture's result shows ("Open folder failed").</summary>
+    public void Report(string title, bool failed) => Feedback(title, failed);
+
     private void Feedback(string title, bool failed)
     {
         if (_context is not { } context) return;

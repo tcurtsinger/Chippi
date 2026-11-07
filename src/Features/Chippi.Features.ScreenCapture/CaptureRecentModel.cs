@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
-using System.Diagnostics;
 using System.IO;
 using System.Windows.Media.Imaging;
 using Chippi.Core.Modules;
@@ -88,14 +87,7 @@ public sealed class CaptureRecentModel : ICaptureRecentModel, IDisposable
     {
         Refresh();
         if (Result is not { } result) return false;
-        string? folder = result.SavedFile is { } file ? Path.GetDirectoryName(file) : _page.SaveFolder;
-        try
-        {
-            if (folder == null || !Directory.Exists(folder)) return false;
-            Process.Start(new ProcessStartInfo(folder) { UseShellExecute = true });
-            return true;
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception) { return false; }
+        return CaptureFiles.OpenFolder(result.SavedFile is { } file ? Path.GetDirectoryName(file) : _page.SaveFolder);
     }
     public void Dispose() { _disposed = true; ++_generation; _page.Changed -= Refresh; Result = null; Changed?.Invoke(); }
 }

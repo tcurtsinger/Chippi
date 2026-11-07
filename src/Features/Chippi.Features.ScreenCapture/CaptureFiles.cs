@@ -37,6 +37,18 @@ public static class CaptureFiles
     }
     public static string DefaultFolder => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "Screenshots");
 
+    /// <summary>Opens <paramref name="folder"/> in File Explorer; false when it's missing or Windows refuses, never a guessed path.</summary>
+    public static bool OpenFolder(string? folder)
+    {
+        try
+        {
+            if (folder == null || !Directory.Exists(folder)) return false;
+            using var _ = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(folder) { UseShellExecute = true });
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception) { return false; }
+    }
+
     public static string Save(BitmapSource flattened, string folder, CaptureFileType type, DateTimeOffset time)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(folder);

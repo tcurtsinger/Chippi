@@ -66,8 +66,18 @@ function Invoke([string]$name, [switch]$Prefix, [switch]$Last) {
 }
 function Fixture {
     $condition = New-Object System.Windows.Automation.PropertyCondition ([System.Windows.Automation.AutomationElement]::NameProperty), 'Capture fixture'
-    $window = [System.Windows.Automation.AutomationElement]::RootElement.FindFirst([System.Windows.Automation.TreeScope]::Children, $condition)
-    if ($null -eq $window) { throw 'Capture fixture window is absent' }
+    # A UI Automation lookup right after the overlay hides can miss a window that's there: look again for 3 seconds.
+    $window = $null; $clock = [Diagnostics.Stopwatch]::StartNew()
+    while ($null -eq $window -and $clock.ElapsedMilliseconds -lt 3000) {
+        $window = [System.Windows.Automation.AutomationElement]::RootElement.FindFirst([System.Windows.Automation.TreeScope]::Children, $condition)
+        if ($null -eq $window) { Start-Sleep -Milliseconds 100 }
+    }
+    if ($null -eq $window) {
+        $names = [System.Windows.Automation.AutomationElement]::RootElement.FindAll([System.Windows.Automation.TreeScope]::Children, [System.Windows.Automation.Condition]::TrueCondition) | ForEach-Object { $_.Current.Name }
+        Note ("Fixture missing: exited=" + $fixture.HasExited + " foreground=" + [Probe]::Foreground() + " top-level=" + ($names -join ' | '))
+        throw 'Capture fixture window is absent'
+    }
+    if ($clock.ElapsedMilliseconds -gt 150) { Note ("Fixture found after " + $clock.ElapsedMilliseconds + " ms") }
     $bounds = $window.Current.BoundingRectangle
     [Probe]::MoveTo([int]($bounds.Left + $bounds.Width / 2), [int]($bounds.Top + $bounds.Height / 2))
     [Probe]::Left($true); [Probe]::Spin(40); [Probe]::Left($false)

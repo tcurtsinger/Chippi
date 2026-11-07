@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
-using System.Diagnostics;
 using System.IO;
 using System.Windows.Controls;
 using Chippi.Core.Shortcuts;
@@ -166,7 +165,7 @@ internal sealed class CapturePanelHost : ICapturePanelModel, IDisposable
     public void OpenFolder()
     {
         if (_capture.Model is not { } model) return;
-        string folder = model.Recent.FirstOrDefault(x => x.SavedFile != null)?.SavedFile is { } saved ? Path.GetDirectoryName(saved)! : model.SaveFolder;
-        if (Directory.Exists(folder)) Process.Start(new ProcessStartInfo(folder) { UseShellExecute = true });
+        string? folder = model.Recent.FirstOrDefault(x => x.SavedFile != null)?.SavedFile is { } saved ? Path.GetDirectoryName(saved) : model.SaveFolder;
+        if (!CaptureFiles.OpenFolder(folder)) _capture.Report("Open folder failed", failed: true);
     }
 }
