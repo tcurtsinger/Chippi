@@ -103,9 +103,9 @@ public sealed class ColorPickerModule : IFeatureModule, IColorPageModel
                 new ChippiCommand("color-picker/review", ReviewName, nameof(LucideIcons.Pipette), () => { Pick(review: true, CaptureDoor.Island); return Task.CompletedTask; }) { Words = "color colour eyedropper pipette review palette" },
             ]);
         }
-        // Stand-in until the Capture host takes its pages: the Color page has a tile of its own.
+        // The Color result page: opened by key, not listed on the home (the Capture tile starts the picker).
         context.Ui.AddIslandTile(new IslandTileSpec(Id, "Color", nameof(LucideIcons.Pipette), Order: 77, SectionOrder: 0, () => View())
-            { CreateHeader = () => View().Header });
+            { OnHome = false, CreateHeader = () => View().Header });
 #if DEBUG
         if (Environment.GetEnvironmentVariable("CHIPPI_RESULT_SAMPLES") == "1")
             Present("#7C5CFF", copiedAs: "HEX");

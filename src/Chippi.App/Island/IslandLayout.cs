@@ -69,7 +69,7 @@ internal sealed record IslandLayout(IslandOpensOn OpensOn, IReadOnlyList<string>
     /// <summary>Use the earliest visible legacy audio entry's position. Keep the device controls when both pages exist.</summary>
     public IReadOnlyList<IslandTool> Tools(IReadOnlyList<IslandTileGroup> groups)
     {
-        var byKey = groups.Where(g => g.Key != IslandPanelWindow.NowPlayingKey).ToDictionary(g => g.Key);
+        var byKey = groups.Where(g => g.Key != IslandPanelWindow.NowPlayingKey && g.Parts.Any(p => p.Spec.OnHome)).ToDictionary(g => g.Key);
         var order = Sorted(byKey.Keys);
         var audio = order.Where(IslandTool.IsAudioPage).ToList();
         string? audioSlot = audio.FirstOrDefault(k => !Hidden.Contains(k)) ?? audio.FirstOrDefault();

@@ -55,6 +55,9 @@ public sealed record IslandTileVolume(Func<double?> Level, Action<double> Set, F
 /// <param name="CreateSection">This module's section of the page. Must return a WPF FrameworkElement.</param>
 public sealed record IslandTileSpec(string Key, string Name, string Icon, int Order, int SectionOrder, Func<object> CreateSection)
 {
+    /// <summary>False for a page that has no home tile of its own (a result the Capture tool opens); it is reachable by key but not listed.</summary>
+    public bool OnHome { get; init; } = true;
+
     /// <summary>The home's toggle for this tile; null for a button that only opens the page.</summary>
     public IslandTileToggle? Toggle { get; init; }
 

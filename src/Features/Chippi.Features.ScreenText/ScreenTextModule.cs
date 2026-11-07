@@ -115,11 +115,11 @@ public sealed class ScreenTextModule : IFeatureModule
                 new ChippiCommand("screen-text/scan", ScanName, nameof(LucideIcons.QrCode), () => { Start(ScreenTextVerb.ScanQr, CaptureDoor.Island); return Task.CompletedTask; }) { Words = "qr code scan barcode read" },
             ]);
         }
-        // Stand-ins until the Capture host takes its pages: each result page has a tile of its own.
+        // The result pages: opened by key, not listed on the home (the Capture tile starts them).
         context.Ui.AddIslandTile(new IslandTileSpec(Id, "Text", nameof(LucideIcons.ScanText), Order: 78, SectionOrder: 0, () => TextView())
-            { CreateHeader = () => TextView().Header });
+            { OnHome = false, CreateHeader = () => TextView().Header });
         context.Ui.AddIslandTile(new IslandTileSpec(QrTileKey, "QR code", nameof(LucideIcons.QrCode), Order: 79, SectionOrder: 0, () => QrView())
-            { CreateHeader = () => QrView().Header });
+            { OnHome = false, CreateHeader = () => QrView().Header });
 #if DEBUG
         if (Environment.GetEnvironmentVariable("CHIPPI_RESULT_SAMPLES") == "1")
         {
