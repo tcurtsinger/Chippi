@@ -8,6 +8,7 @@ using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 using Chippi.Capture;
 using CaptureMode = Chippi.Capture.CaptureMode;
 using Chippi.UI.Actions;
@@ -18,22 +19,27 @@ namespace Chippi.UI.Capture;
 /// <summary>
 /// The shared capture layer (docs/phase-7/capture-layer.md): one overlay window per display, made when the first capture
 /// feature starts and kept hidden; a starter runs the freeze's steps and hands the feature a <see cref="Selection"/>.
-/// The shell builds one and passes it to every capture feature. Called on the UI thread.
+/// The shell builds one on the UI thread and passes it to every capture feature. <see cref="Use"/> and its lease
+/// may be called from any thread (modules start off the UI thread once an earlier one has awaited); the rest is
+/// called on the UI thread.
 /// </summary>
 public sealed partial class CaptureLayer : ICaptureLayer
 {
     private readonly ICaptureShell _shell;
     private readonly IScreenReader _reader;
     private readonly TimeProvider _time;
+    private readonly Dispatcher _dispatcher;
     private readonly List<OverlayWindow> _overlays = [];
     private readonly string? _timings = Environment.GetEnvironmentVariable("CHIPPI_CAPTURE_TIMINGS");
     private int _uses;
     private Session? _current;
 
     /// <param name="reader">The screen read; tests pass a fake with known pixels.</param>
-    public CaptureLayer(ICaptureShell shell, IScreenReader? reader = null, TimeProvider? time = null)
+    /// <param name="dispatcher">The UI thread's, where the overlays are made; the current thread's when null.</param>
+    public CaptureLayer(ICaptureShell shell, IScreenReader? reader = null, TimeProvider? time = null, Dispatcher? dispatcher = null)
     {
         _shell = shell;
+        _dispatcher = dispatcher ?? Dispatcher.CurrentDispatcher;
         _reader = reader ?? new ScreenReader();
         _time = time ?? TimeProvider.System;
     }
@@ -47,26 +53,56 @@ public sealed partial class CaptureLayer : ICaptureLayer
 
     private ResourceDictionary? _barStyles;
 
+    /// <summary>
+    /// The first use makes the overlays, on the UI thread; a use counts only once they're made, so a failed first use
+    /// leaves the next one to try again.
+    /// </summary>
+    /// <exception cref="Exception">Making the overlays failed; nothing is counted or kept.</exception>
     public IDisposable Use()
     {
-        if (_uses++ == 0)
+        if (!_dispatcher.CheckAccess())
+            return _dispatcher.Invoke(Use);
+        if (_uses == 0)
         {
+            try
+            {
+                Build(_reader.Monitors());
+            }
+            catch
+            {
+                Clear();
+                throw;
+            }
             DisplayChanges.Changed += OnDisplaysChanged;
-            Build(_reader.Monitors());
         }
+        _uses++;
         return new Lease(this);
     }
 
     private void Unuse()
     {
+        if (!_dispatcher.CheckAccess())
+        {
+            // A module stopping off the UI thread doesn't wait: the count is settled in order on the UI thread.
+            _dispatcher.BeginInvoke(Unuse);
+            return;
+        }
         if (--_uses > 0)
             return;
         DisplayChanges.Changed -= OnDisplaysChanged;
         _current?.Close(CaptureEnd.Interrupted, handBack: false);
+        Clear();
+    }
+
+    private void Clear()
+    {
         foreach (var o in _overlays)
             o.Dispose();
         _overlays.Clear();
     }
+
+    /// <summary>Overlays made, for tests.</summary>
+    internal int OverlayCount => _overlays.Count;
 
     private sealed class Lease(CaptureLayer layer) : IDisposable
     {
