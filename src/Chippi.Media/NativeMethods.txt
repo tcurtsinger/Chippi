@@ -46,3 +46,16 @@ IDirect3DDxgiInterfaceAccess
 MonitorFromWindow
 GetMonitorInfo
 MONITORINFOEXW
+CoCreateInstance
+CLSID_WICImagingFactory
+IWICImagingFactory
+IWICBitmapEncoder
+IWICBitmapFrameEncode
+IWICStream
+IWICPalette
+IWICFormatConverter
+IWICMetadataQueryWriter
+IWICBitmap
+GUID_ContainerFormatGif
+GUID_WICPixelFormat8bppIndexed
+GUID_WICPixelFormat32bppBGRA

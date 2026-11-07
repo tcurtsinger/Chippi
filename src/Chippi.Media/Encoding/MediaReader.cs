@@ -166,6 +166,33 @@ public sealed class MediaReader : IDisposable
         }
     }
 
+    /// <summary>Reads the next audio packet, interleaved, with its time; null at the end.</summary>
+    public float[]? ReadAudio(out TimeSpan time)
+    {
+        time = default;
+        if (!HasAudio) return null;
+        while (true)
+        {
+            _reader.ReadSample(FirstAudio, 0, out _, out var flags, out var at, out var sample);
+            if ((flags & (uint)MF_SOURCE_READER_FLAG.MF_SOURCE_READERF_ENDOFSTREAM) != 0 || flags.HasError())
+            {
+                Release(sample);
+                return null;
+            }
+            if (sample is null) continue;
+            try
+            {
+                using var locked = new Locked(sample);
+                time = TimeSpan.FromTicks(at);
+                return MemoryMarshal.Cast<byte, float>(locked.Bytes).ToArray();
+            }
+            finally
+            {
+                Release(sample);
+            }
+        }
+    }
+
     /// <summary>Reads every audio sample from here to the end, interleaved.</summary>
     public float[] ReadAllAudio()
     {

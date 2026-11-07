@@ -73,13 +73,15 @@ public sealed class Mp4Writer : IMediaWriter
     private int _failed;
 
     /// <param name="queue">Frames that may wait for the encoder before new ones are dropped.</param>
-    public Mp4Writer(string path, VideoFormat format, int queue = 20)
+    /// <param name="live">False for re-encoding a file (trim, Media tools): <see cref="WriteVideoAsync"/> waits for
+    /// the encoder instead of dropping.</param>
+    public Mp4Writer(string path, VideoFormat format, int queue = 20, bool live = true)
     {
         if (format.Width < 2 || format.Height < 2 || format.Width % 2 != 0 || format.Height % 2 != 0)
             throw new ArgumentException("H.264 needs an even width and height.", nameof(format));
         _format = format;
         _video = Channel.CreateBounded<(IEncodableFrame, TimeSpan)>(
-            new BoundedChannelOptions(queue) { FullMode = BoundedChannelFullMode.DropWrite, SingleReader = true },
+            new BoundedChannelOptions(queue) { FullMode = live ? BoundedChannelFullMode.DropWrite : BoundedChannelFullMode.Wait, SingleReader = true },
             dropped => { Interlocked.Increment(ref _dropped); dropped.Item1.Dispose(); });
 
         var video = new VideoStreamDescriptor(VideoEncodingProperties.CreateUncompressed(MediaEncodingSubtypes.Bgra8,
@@ -157,6 +159,21 @@ public sealed class Mp4Writer : IMediaWriter
             if (!_video.Writer.TryWrite((kept, at))) { kept.Dispose(); return; }
             _lastAt = at;
         }
+    }
+
+    /// <summary>Queues <paramref name="frame"/>, waiting while the encoder is behind (a writer made with live off).</summary>
+    public async ValueTask WriteVideoAsync(IEncodableFrame frame, TimeSpan at, CancellationToken cancel)
+    {
+        try
+        {
+            await _video.Writer.WriteAsync((frame, at), cancel).ConfigureAwait(false);
+        }
+        catch
+        {
+            frame.Dispose();
+            throw;
+        }
+        lock (_gate) _lastAt = at;
     }
 
     public void WriteAudio(AudioBlock block)
