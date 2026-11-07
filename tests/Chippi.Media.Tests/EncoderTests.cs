@@ -61,7 +61,7 @@ public sealed class EncoderTests(ITestOutputHelper output) : IDisposable
         if (Unsupported()) return;
         var path = Path.Combine(_folder, "tone.mp4");
         var started = DateTime.UtcNow;
-        using (var writer = new Mp4Writer(path, new VideoFormat(W, H, 30, true)))
+        using (var writer = new Mp4Writer(path, new VideoFormat(W, H, 30, true), queue: 120))
         {
             for (var i = 0; i < 60; i++)
             {

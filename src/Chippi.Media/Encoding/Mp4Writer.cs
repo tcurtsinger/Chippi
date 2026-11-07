@@ -12,6 +12,10 @@ namespace Chippi.Media.Encoding;
 /// <summary>A frame the MP4 writer can hand to Media Foundation: a GPU surface or a buffer of BGRA pixels.</summary>
 public interface IEncodableFrame : IVideoFrame
 {
+    /// <summary>The frame the writer queues: this one, or a copy when this one belongs to its source (a WGC frame
+    /// goes back to the pool once its event returns). Called on the source's thread, during its event.</summary>
+    IEncodableFrame Keep();
+
     MediaStreamSample ToSample(TimeSpan at);
 }
 
@@ -23,6 +27,8 @@ public sealed class BgraFrame(TimeSpan time, byte[] pixels, int width) : IEncoda
     public byte[] Pixels { get; } = pixels;
 
     public int Width { get; } = width;
+
+    public IEncodableFrame Keep() => this;
 
     /// <summary>Media Foundation reads an uncompressed RGB buffer bottom-up (measured: a top-down buffer came out
     /// upside down), so the rows go in reversed. GPU surfaces are top-down and need nothing.</summary>
@@ -48,12 +54,10 @@ public sealed class Mp4WriterFactory : IMediaWriterFactory
 /// H.264 and AAC in MP4 through Media Foundation (screen-recording.md, Video; architecture.md section 3): frames and
 /// mixed audio go into a <see cref="MediaStreamSource"/> that a <see cref="MediaTranscoder"/> pulls from, the pattern of
 /// Microsoft's SimpleRecorder sample (MIT). Windows picks a hardware encoder when there is one. Writes queue; a queue
-/// that backs up past two seconds of frames drops new frames rather than holding GPU memory.
+/// that backs up drops new frames rather than holding GPU memory (a 3440 x 1440 frame is 20 MB).
 /// </summary>
 public sealed class Mp4Writer : IMediaWriter
 {
-    private const int QueuedFrames = 60;
-
     private readonly Channel<(IEncodableFrame Frame, TimeSpan At)> _video;
     private readonly Channel<AudioBlock> _audio = Channel.CreateUnbounded<AudioBlock>(new() { SingleReader = true });
     private readonly CancellationTokenSource _abort = new();
@@ -68,13 +72,14 @@ public sealed class Mp4Writer : IMediaWriter
     private bool _closed;
     private int _failed;
 
-    public Mp4Writer(string path, VideoFormat format)
+    /// <param name="queue">Frames that may wait for the encoder before new ones are dropped.</param>
+    public Mp4Writer(string path, VideoFormat format, int queue = 20)
     {
         if (format.Width < 2 || format.Height < 2 || format.Width % 2 != 0 || format.Height % 2 != 0)
             throw new ArgumentException("H.264 needs an even width and height.", nameof(format));
         _format = format;
         _video = Channel.CreateBounded<(IEncodableFrame, TimeSpan)>(
-            new BoundedChannelOptions(QueuedFrames) { FullMode = BoundedChannelFullMode.DropWrite, SingleReader = true },
+            new BoundedChannelOptions(queue) { FullMode = BoundedChannelFullMode.DropWrite, SingleReader = true },
             dropped => { Interlocked.Increment(ref _dropped); dropped.Item1.Dispose(); });
 
         var video = new VideoStreamDescriptor(VideoEncodingProperties.CreateUncompressed(MediaEncodingSubtypes.Bgra8,
@@ -146,7 +151,10 @@ public sealed class Mp4Writer : IMediaWriter
         }
         lock (_gate)
         {
-            if (_closed || !_video.Writer.TryWrite((encodable, at))) { frame.Dispose(); return; }
+            if (_closed) { frame.Dispose(); return; }
+            var kept = encodable.Keep();
+            if (!ReferenceEquals(kept, encodable)) encodable.Dispose();
+            if (!_video.Writer.TryWrite((kept, at))) { kept.Dispose(); return; }
             _lastAt = at;
         }
     }
@@ -297,6 +305,7 @@ public sealed class Mp4Writer : IMediaWriter
     {
         public static readonly Repeat Instance = new();
         public TimeSpan Time => TimeSpan.Zero;
+        public IEncodableFrame Keep() => this;
         public MediaStreamSample ToSample(TimeSpan at) => throw new NotSupportedException();
         public void Dispose() { }
     }
