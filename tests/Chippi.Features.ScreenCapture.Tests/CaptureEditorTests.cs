@@ -34,13 +34,16 @@ public sealed class CaptureEditorTests
             editor.PointerAt = (_, _) => at; // The owner's mouse never participates.
             session.Release();
             void Tool(string name) => Click(Find(session.Tools!, name));
+            bool upHandled = false;
             void Drag(Point from, Point to)
             {
                 at = from;
                 session.Canvas.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Left) { RoutedEvent = UIElement.MouseLeftButtonDownEvent });
                 at = to;
                 session.Canvas.RaiseEvent(new MouseEventArgs(Mouse.PrimaryDevice, 0) { RoutedEvent = UIElement.MouseMoveEvent });
-                session.Canvas.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Left) { RoutedEvent = UIElement.MouseLeftButtonUpEvent });
+                var up = new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Left) { RoutedEvent = UIElement.MouseLeftButtonUpEvent };
+                session.Canvas.RaiseEvent(up);
+                upHandled = up.Handled;
             }
             Tool("Redact"); Drag(new(20, 20), new(80, 80));
             Assert.Single(editor.Draft!.Objects);
@@ -55,6 +58,7 @@ public sealed class CaptureEditorTests
             Tool("Eraser"); Drag(new(50, 50), new(50, 50));
             Assert.Empty(editor.Draft.Objects);
             Tool("Text"); Drag(new(15, 15), new(15, 15));
+            Assert.True(upHandled, "A text press must consume its release before the selector sees it.");
             var text = Assert.Single(session.Canvas.Children.OfType<TextBox>());
             text.Text = "Source pixels";
             Tool("Pen");

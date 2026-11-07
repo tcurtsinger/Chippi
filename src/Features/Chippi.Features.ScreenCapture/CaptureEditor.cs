@@ -37,7 +37,7 @@ internal sealed class CaptureEditor : IDisposable
     private Selection? _selection;
     private CaptureTool _tool = CaptureTool.Select;
     private readonly List<Point> _points = [];
-    private bool _drawing, _busy, _disposed, _resize, _pickingInk;
+    private bool _ownsPress, _drawing, _busy, _disposed, _resize, _pickingInk;
     private int _selected = -1;
     private MarkupObject? _original, _preview;
     private Point _down;
@@ -163,7 +163,7 @@ internal sealed class CaptureEditor : IDisposable
             _pickingInk = false; e.Handled = true; Redraw(); return;
         }
         if (!new Rect(_draft.Crop.X, _draft.Crop.Y, _draft.Crop.Width, _draft.Crop.Height).Contains(point)) return;
-        CommitText(); e.Handled = true;
+        CommitText(); _ownsPress = true; e.Handled = true;
         if (_tool == CaptureTool.Text) { BeginText(canvas, point, -1); return; }
         if (_tool == CaptureTool.Eraser)
         {
@@ -215,6 +215,7 @@ internal sealed class CaptureEditor : IDisposable
     }
     private void Up(object sender, MouseButtonEventArgs e)
     {
+        if (_ownsPress) { _ownsPress = false; e.Handled = true; }
         if (!_drawing || _draft == null) return;
         Move(sender, e);
         _drawing = false; ((Canvas)sender).ReleaseMouseCapture(); e.Handled = true;
