@@ -218,7 +218,7 @@ public sealed class WgcVideoSource : IVideoSource
     }
 
     /// <summary>Copies a WGC frame into a texture of the output size. On WGC's thread, while the frame is current.</summary>
-    private unsafe GpuFrame Copy(Direct3D11CaptureFrame frame)
+    private unsafe IEncodableFrame Copy(Direct3D11CaptureFrame frame)
     {
         var target = _spare.TryTake(out var spare) ? spare : _d3d.CreateTexture(Width, Height);
         var source = Direct3D.Texture(frame.Surface);
@@ -240,7 +240,7 @@ public sealed class WgcVideoSource : IVideoSource
         {
             Marshal.ReleaseComObject(source);
         }
-        return new GpuFrame(this, frame.SystemRelativeTime, target);
+        return _d3d.Frame(frame.SystemRelativeTime, target, Width, Height, Return);
     }
 
     private void Return(ID3D11Texture2D texture)
@@ -280,28 +280,28 @@ public sealed class WgcVideoSource : IVideoSource
 
         public void Dispose() { }
     }
+}
 
-    /// <summary>A copied frame in one of the source's textures, given back when the encoder is done with it.</summary>
-    private sealed class GpuFrame(WgcVideoSource owner, TimeSpan time, ID3D11Texture2D texture) : IEncodableFrame
+/// <summary>A copied frame in one of a source's textures, given back when the encoder is done with it.</summary>
+internal sealed class GpuFrame(Action<ID3D11Texture2D> giveBack, TimeSpan time, ID3D11Texture2D texture) : IEncodableFrame
+{
+    private IDirect3DSurface? _surface;
+    private int _disposed;
+
+    public TimeSpan Time { get; } = time;
+
+    public IEncodableFrame Keep() => this;
+
+    public MediaStreamSample ToSample(TimeSpan at)
     {
-        private IDirect3DSurface? _surface;
-        private int _disposed;
+        _surface ??= Direct3D.Surface(texture);
+        return MediaStreamSample.CreateFromDirect3D11Surface(_surface, at);
+    }
 
-        public TimeSpan Time { get; } = time;
-
-        public IEncodableFrame Keep() => this;
-
-        public MediaStreamSample ToSample(TimeSpan at)
-        {
-            _surface ??= Direct3D.Surface(texture);
-            return MediaStreamSample.CreateFromDirect3D11Surface(_surface, at);
-        }
-
-        public void Dispose()
-        {
-            if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
-            (_surface as IDisposable)?.Dispose();
-            owner.Return(texture);
-        }
+    public void Dispose()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
+        (_surface as IDisposable)?.Dispose();
+        giveBack(texture);
     }
 }

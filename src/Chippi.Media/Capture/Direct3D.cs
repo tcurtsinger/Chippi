@@ -2,6 +2,7 @@
 // Copyright (C) Chippi contributors
 
 using System.Runtime.InteropServices;
+using Chippi.Media.Encoding;
 using Windows.Graphics.DirectX.Direct3D11;
 using Windows.Win32;
 using Windows.Win32.Foundation;
@@ -73,6 +74,66 @@ internal sealed class Direct3D : IDisposable
         return texture;
     }
 
+    private ID3D11Texture2D? _staging;
+    private (int Width, int Height) _stagingSize;
+
+    /// <summary>
+    /// A frame in <paramref name="texture"/> as the encoder takes it: the texture itself when the GPU's encoders may be
+    /// used, or its pixels read back into memory for Windows' software encoder, which can't take GPU surfaces (in the
+    /// Sandbox, 2026-11-07: "no samples were processed by the sink"). <paramref name="giveBack"/> gets the texture once
+    /// the encoder, or the read, is done with it.
+    /// </summary>
+    public IEncodableFrame Frame(TimeSpan time, ID3D11Texture2D texture, int width, int height, Action<ID3D11Texture2D> giveBack)
+    {
+        if (MediaSupport.Hardware) return new GpuFrame(giveBack, time, texture);
+        try
+        {
+            return new BgraFrame(time, Read(texture, width, height), width);
+        }
+        finally
+        {
+            giveBack(texture);
+        }
+    }
+
+    /// <summary>The texture's pixels, BGRA top-down. On one thread at a time (WGC's).</summary>
+    public unsafe byte[] Read(ID3D11Texture2D texture, int width, int height)
+    {
+        if (_staging is null || _stagingSize != (width, height))
+        {
+            if (_staging is not null) Marshal.ReleaseComObject(_staging);
+            var desc = new D3D11_TEXTURE2D_DESC
+            {
+                Width = (uint)width,
+                Height = (uint)height,
+                MipLevels = 1,
+                ArraySize = 1,
+                Format = DXGI_FORMAT.DXGI_FORMAT_B8G8R8A8_UNORM,
+                SampleDesc = new DXGI_SAMPLE_DESC { Count = 1 },
+                Usage = D3D11_USAGE.D3D11_USAGE_STAGING,
+                CPUAccessFlags = D3D11_CPU_ACCESS_FLAG.D3D11_CPU_ACCESS_READ,
+            };
+            Device.CreateTexture2D(desc, null, out var staging);
+            _staging = staging;
+            _stagingSize = (width, height);
+        }
+        Context.CopyResource((ID3D11Resource)_staging, (ID3D11Resource)texture);
+        D3D11_MAPPED_SUBRESOURCE mapped;
+        Context.Map((ID3D11Resource)_staging, 0, D3D11_MAP.D3D11_MAP_READ, 0, &mapped);
+        try
+        {
+            var pixels = new byte[width * height * 4];
+            var row = width * 4;
+            for (var y = 0; y < height; y++)
+                new ReadOnlySpan<byte>((byte*)mapped.pData + (long)y * mapped.RowPitch, row).CopyTo(pixels.AsSpan(y * row, row));
+            return pixels;
+        }
+        finally
+        {
+            Context.Unmap((ID3D11Resource)_staging, 0);
+        }
+    }
+
     public static IDirect3DSurface Surface(ID3D11Texture2D texture)
     {
         MediaPInvoke.CreateDirect3D11SurfaceFromDXGISurface((IDXGISurface)texture, out var inspectable).ThrowOnFailure();
@@ -111,6 +172,7 @@ internal sealed class Direct3D : IDisposable
 
     public void Dispose()
     {
+        if (_staging is not null) Marshal.ReleaseComObject(_staging);
         (WinRT as IDisposable)?.Dispose();
         Marshal.ReleaseComObject(Context);
         Marshal.ReleaseComObject(Device);

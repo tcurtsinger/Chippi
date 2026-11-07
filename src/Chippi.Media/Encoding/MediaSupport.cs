@@ -21,7 +21,7 @@ public static class MediaSupport
     /// Whether the GPU's encoders may be used (the default). <c>CHIPPI_MEDIA_SOFTWARE=1</c> keeps to Windows' software
     /// ones: in Windows Sandbox, loading the host GPU's H.264 encoder takes the whole Sandbox down (0x80370106, 2026-11-07).
     /// </summary>
-    public static bool Hardware { get; } = Environment.GetEnvironmentVariable("CHIPPI_MEDIA_SOFTWARE") != "1";
+    public static bool Hardware { get; internal set; } = Environment.GetEnvironmentVariable("CHIPPI_MEDIA_SOFTWARE") != "1";
 
     private static string? Find()
     {
