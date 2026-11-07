@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using System.Windows.Threading;
 using Chippi.Capture;
 using Chippi.UI.Capture;
 using CaptureMode = Chippi.Capture.CaptureMode;
@@ -38,6 +39,61 @@ public sealed class CaptureLayerTests
         Assert.NotNull(layer.Start(new CaptureRequest(CaptureMode.Region) { Delay = 3, Door = CaptureDoor.Island }));
         layer.Current!.Close(CaptureEnd.Cancelled, handBack: false);
     });
+
+    [Fact]
+    public async Task Use_from_a_background_thread_makes_the_overlays_on_the_UI_thread()
+    {
+        // Modules start off the UI thread once an earlier one has awaited (ModuleRegistry, ConfigureAwait(false)).
+        CaptureLayer? layer = null;
+        Dispatcher? ui = null;
+        WpfTestThread.Run(() => { layer = new CaptureLayer(new Shell(), new OneDisplay()); ui = Dispatcher.CurrentDispatcher; });
+        // A release off the UI thread is queued there; this waits for the queue to run.
+        void Settle() => ui!.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
+
+        var lease = await Task.Run(() => layer!.Use());
+        var second = await Task.Run(() => layer!.Use());
+
+        WpfTestThread.Run(() => Assert.Equal(1, layer!.OverlayCount));
+        await Task.Run(lease.Dispose);
+        Settle();
+        WpfTestThread.Run(() => Assert.Equal(1, layer!.OverlayCount));
+        await Task.Run(second.Dispose);
+        Settle();
+        WpfTestThread.Run(() => Assert.Equal(0, layer!.OverlayCount));
+    }
+
+    [Fact]
+    public void A_first_use_that_fails_counts_nothing_and_the_next_use_builds() => WpfTestThread.Run(() =>
+    {
+        var reader = new OneDisplay { FailFirst = true };
+        var layer = new CaptureLayer(new Shell(), reader);
+
+        Assert.Throws<InvalidOperationException>(() => layer.Use());
+        Assert.Equal(0, layer.OverlayCount);
+
+        var lease = layer.Use();
+        Assert.Equal(1, layer.OverlayCount);
+        lease.Dispose();
+        Assert.Equal(0, layer.OverlayCount);
+    });
+
+    /// <summary>One display; its overlay is made with a handle but never shown.</summary>
+    private sealed class OneDisplay : IScreenReader
+    {
+        public bool FailFirst { get; set; }
+
+        public IReadOnlyList<MonitorBounds> Monitors()
+        {
+            if (FailFirst)
+            {
+                FailFirst = false;
+                throw new InvalidOperationException("No displays yet");
+            }
+            return [new MonitorBounds(1, new PixelRect(0, 0, 320, 200), 96, true)];
+        }
+
+        public byte[]? Read(PixelRect bounds) => null;
+    }
 
     private sealed class Shell : ICaptureShell
     {

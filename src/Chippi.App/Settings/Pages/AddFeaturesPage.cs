@@ -288,7 +288,7 @@ internal sealed class AddFeaturesPage : UserControl
         _search.Text = "no-such-feature-9a845";
         if (_empty.Visibility != Visibility.Visible || ((FrameworkElement)_coming.Parent).Visibility != Visibility.Collapsed)
             throw new InvalidOperationException("Feature search did not show its empty state.");
-        _search.Text = "Color picker"; // Still upcoming (Phase 7); Quick toggles shipped as Quick actions in Phase 5.5.
+        _search.Text = "Cleaner"; // Still upcoming (Phase 7); Color picker shipped in Phase 7 wave 1.
         if (!_coming.IsExpanded || _later.Where(item => item.Label.Visibility == Visibility.Visible).Count() != 1)
             throw new InvalidOperationException("Feature search did not reveal the matching upcoming feature.");
         _search.Clear();
