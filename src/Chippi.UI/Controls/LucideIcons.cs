@@ -177,6 +177,12 @@ public static class LucideIcons
     public static Geometry MoveUpRight { get; } = G("M13,5 H19 V11 M19,5 L5,19");
     public static Geometry Redo { get; } = G("M15,14 l5,-5 l-5,-5 M20,9 H9.5 A5.5,5.5 0 0 0 4,14.5 A5.5,5.5 0 0 0 9.5,20 H13");
 
+    // The Capture panel's modes and its Delay (designs/capture-panel v1).
+    public static Geometry SquareDashed { get; } = G("M5,3 a2,2 0 0 0 -2,2 M19,3 a2,2 0 0 1 2,2 M21,19 a2,2 0 0 1 -2,2 M5,21 a2,2 0 0 1 -2,-2 M9,3 h1 M9,21 h1 M14,3 h1 M14,21 h1 M3,9 v1 M21,9 v1 M3,14 v1 M21,14 v1");
+    public static Geometry Lasso { get; } = G("M3.704,14.467 a10,8 0 1 1 3.115,2.375 M7,22 a5,5 0 0 1 -2,-3.994 M7,16 a2,2 0 1 0 -4,0 a2,2 0 1 0 4,0 Z");
+    public static Geometry RotateCcwClock { get; } = G("M3,12 a9,9 0 1 0 9,-9 a9.75,9.75 0 0 0 -6.74,2.74 L3,8 M3,3 v5 h5 M12,7 v5 l4,2");
+    public static Geometry Timer { get; } = G("M10,2 h4 M12,14 l3,-3 M20,14 a8,8 0 1 0 -16,0 a8,8 0 1 0 16,0 Z");
+
     private static readonly FrozenDictionary<string, Geometry> ByKey = typeof(LucideIcons)
         .GetProperties(BindingFlags.Public | BindingFlags.Static)
         .Where(p => p.PropertyType == typeof(Geometry))
