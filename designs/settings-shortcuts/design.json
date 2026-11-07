@@ -4,5 +4,12 @@
   "knobs": [
     "--radius-card",
     "--accent"
-  ]
+  ],
+  "picked": "v2.html",
+  "built": {
+    "from": "v2.html",
+    "widths": [
+      "desktop"
+    ]
+  }
 }

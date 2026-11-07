@@ -4,5 +4,12 @@
   "knobs": [
     "--radius-island-card",
     "--island-accent"
-  ]
+  ],
+  "picked": "v3.html",
+  "built": {
+    "from": "v3.html",
+    "widths": [
+      "desktop"
+    ]
+  }
 }

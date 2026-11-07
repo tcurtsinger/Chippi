@@ -4,5 +4,6 @@
   "knobs": [
     "--radius-card",
     "--accent"
-  ]
+  ],
+  "picked": "v3.html"
 }
