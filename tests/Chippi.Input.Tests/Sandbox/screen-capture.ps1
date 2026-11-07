@@ -250,11 +250,10 @@ try {
     # The QR page shows the decoded address as the value of its Link box.
     function LinkValue {
         $a = [System.Windows.Automation.AutomationElement]
-        $condition = New-Object System.Windows.Automation.AndCondition @(
-            (New-Object System.Windows.Automation.PropertyCondition ($a::ProcessIdProperty), $chippi.Id),
-            (New-Object System.Windows.Automation.PropertyCondition ($a::NameProperty), 'Link'),
-            (New-Object System.Windows.Automation.PropertyCondition ($a::ControlTypeProperty), [System.Windows.Automation.ControlType]::Edit))
-        $link = $a::RootElement.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $condition)
+        $condition = New-Object System.Windows.Automation.PropertyCondition ($a::ProcessIdProperty), $chippi.Id
+        $link = $a::RootElement.FindAll([System.Windows.Automation.TreeScope]::Descendants, $condition) |
+            Where-Object { $_.Current.Name -eq 'Link' -and $_.Current.ControlType -eq [System.Windows.Automation.ControlType]::Edit } |
+            Select-Object -First 1
         if ($null -eq $link) { return $null }
         return $link.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern).Current.Value
     }
