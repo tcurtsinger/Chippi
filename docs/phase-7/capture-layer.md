@@ -75,9 +75,10 @@ Fixed, in context only, never registered with `RegisterHotKey` (README, task 482
 The feature supplies its bars' content (Screen capture: the 40-wide tool column and the output bar under it). The layer places them, so every feature's bars behave the same:
 
 - **Tool column:** outside the selection's right edge, 8 apart; if it doesn't fit on that display, outside the left edge; if neither fits, inside the right edge.
-- **Output bar:** under the selection, right-aligned with it; if it doesn't fit, above; if neither, inside the bottom edge.
-- **On one display:** both bars sit on the display where the drag was released, clamped to it, never across two.
-- **A selection that fills its display** (Screen mode, Ctrl+A, edge to edge) has both bars inside, as on Lumen's board 2b.
+- **Output bar:** under the selection; if it doesn't fit, above; if neither, inside the bottom edge.
+- **They meet at one corner, as an L** (Lightshot's layout, Travis 2026-11-06): the column's side and the bar's side pick the corner. With the column right and the bar under, the column's bottom is on the selection's bottom edge and it grows up; the bar's right end is on the selection's right edge and it grows left. The other corners mirror that. A column taller than the room above stops 8 from the display's top, so it can run below the corner, still clear of the bar.
+- **On one display:** both bars sit on the display where the drag was released, clamped to it, never across two. A bar clamped onto the column (a small selection in a display's corner) moves past the column's end.
+- **A selection that fills its display** (Screen mode, Ctrl+A, edge to edge) has both bars inside, 8 from its edges, still meeting at the bottom-right corner: the column ends 8 above the bar, and the bar 8 left of the column.
 - They move with the selection and away from the handle being dragged, and hide while a handle or the selection is being dragged.
 - They sit on the overlay window itself (no separate windows), so showing them costs one layout pass.
 
