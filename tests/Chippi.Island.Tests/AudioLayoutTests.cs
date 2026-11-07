@@ -13,6 +13,15 @@ public sealed class AudioLayoutTests
         [new IslandTileContribution(key, new IslandTileSpec(key, key, "Sliders", 0, 0, () => new object()))]);
 
     [Fact]
+    public void A_page_with_no_home_tile_is_left_out_of_the_tools()
+    {
+        var result = new IslandTileGroup("color-picker",
+            [new IslandTileContribution("color-picker", new IslandTileSpec("color-picker", "Color", "Pipette", 77, 0, () => new object()) { OnHome = false })]);
+        var tools = IslandLayout.Default.Tools([Tool("clipboard"), result]);
+        Assert.Equal(["clipboard"], tools.Select(t => t.Key));
+    }
+
+    [Fact]
     public void Legacy_audio_entries_become_one_tool_at_the_first_visible_entry()
     {
         var layout = new IslandLayout(IslandOpensOn.AllFeatures,

@@ -38,7 +38,7 @@ internal sealed class CapturePanelHost : ICapturePanelModel, IDisposable
     {
         _shell = shell; _capture = capture; _text = text; _color = color;
         var view = _view = new CapturePanelView(this, shell.Services.HoldIslandOpen);
-        Tile = new IslandTileContribution("capture", new IslandTileSpec("capture", "Capture", "Scan", 60, 0, () => _body)
+        Tile = new IslandTileContribution("capture", new IslandTileSpec("capture", "Capture", "Scan", 75, 0, () => _body)
         { CreateHeader = () => _header, InitialFocus = () => _showingRecent ? _recentView?.InitialFocus : view.InitialFocus, HandleBack = Back });
         ShowPanel();
         shell.Services.SharedIslandTiles = () => Visible ? [Tile] : [];
