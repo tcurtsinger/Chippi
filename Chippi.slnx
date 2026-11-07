@@ -6,6 +6,7 @@
     <Project Path="src/Chippi.Clipboard/Chippi.Clipboard.csproj" />
     <Project Path="src/Chippi.Core/Chippi.Core.csproj" />
     <Project Path="src/Chippi.Input/Chippi.Input.csproj" />
+    <Project Path="src/Chippi.Media/Chippi.Media.csproj" />
     <Project Path="src/Chippi.Rules/Chippi.Rules.csproj" />
     <Project Path="src/Chippi.UrlCleaning/Chippi.UrlCleaning.csproj" />
     <Project Path="src/Chippi.Storage/Chippi.Storage.csproj" />
@@ -19,6 +20,7 @@
     <Project Path="src/Features/Chippi.Features.Sound/Chippi.Features.Sound.csproj" />
     <Project Path="src/Features/Chippi.Features.Scratchpad/Chippi.Features.Scratchpad.csproj" />
     <Project Path="src/Features/Chippi.Features.PlainPaste/Chippi.Features.PlainPaste.csproj" />
+    <Project Path="src/Features/Chippi.Features.Recording/Chippi.Features.Recording.csproj" />
     <Project Path="src/Features/Chippi.Features.ScreenCapture/Chippi.Features.ScreenCapture.csproj" />
     <Project Path="src/Features/Chippi.Features.Shelf/Chippi.Features.Shelf.csproj" />
     <Project Path="src/Features/Chippi.Features.Shortcuts/Chippi.Features.Shortcuts.csproj" />
@@ -44,6 +46,7 @@
     <Project Path="tests/Chippi.Clipboard.Tests/Chippi.Clipboard.Tests.csproj" />
     <Project Path="tests/Chippi.Core.Tests/Chippi.Core.Tests.csproj" />
     <Project Path="tests/Chippi.Input.Tests/Chippi.Input.Tests.csproj" />
+    <Project Path="tests/Chippi.Media.Tests/Chippi.Media.Tests.csproj" />
     <Project Path="tests/Chippi.Features.Clipboard.Tests/Chippi.Features.Clipboard.Tests.csproj" />
     <Project Path="tests/Chippi.Features.Downloads.Tests/Chippi.Features.Downloads.Tests.csproj" />
     <Project Path="tests/Chippi.Features.FocusFollowsMouse.Tests/Chippi.Features.FocusFollowsMouse.Tests.csproj" />
@@ -51,6 +54,7 @@
     <Project Path="tests/Chippi.Features.Sound.Tests/Chippi.Features.Sound.Tests.csproj" />
     <Project Path="tests/Chippi.Features.Scratchpad.Tests/Chippi.Features.Scratchpad.Tests.csproj" />
     <Project Path="tests/Chippi.Features.PlainPaste.Tests/Chippi.Features.PlainPaste.Tests.csproj" />
+    <Project Path="tests/Chippi.Features.Recording.Tests/Chippi.Features.Recording.Tests.csproj" />
     <Project Path="tests/Chippi.Features.ScreenCapture.Tests/Chippi.Features.ScreenCapture.Tests.csproj" />
     <Project Path="tests/Chippi.Features.Shelf.Tests/Chippi.Features.Shelf.Tests.csproj" />
     <Project Path="tests/Chippi.Features.Shortcuts.Tests/Chippi.Features.Shortcuts.Tests.csproj" />

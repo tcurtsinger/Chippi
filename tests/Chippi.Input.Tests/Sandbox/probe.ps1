@@ -8,7 +8,9 @@ param([switch]$SnapMedium)
 
 $ErrorActionPreference = 'Stop'
 $results = 'C:\results'
-$checks = (Get-Content -LiteralPath "$results\checks.txt") -split ','
+# The host's run.ps1 closes the Sandbox when this doesn't show up in its first minutes.
+Set-Content -LiteralPath "$results\started.txt" -Value (Get-Date -Format o)
+$checks =(Get-Content -LiteralPath "$results\checks.txt") -split ','
 if (($checks -contains 'snap' -or $checks -contains 'arrangements') -and -not $SnapMedium) {
     try { & (Join-Path $PSScriptRoot 'snap-medium.ps1'); shutdown.exe /s /t 5 }
     catch {

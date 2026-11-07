@@ -2,6 +2,7 @@
 // Copyright (C) Chippi contributors
 
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Threading;
 using Chippi.App.Island.Media;
@@ -20,7 +21,7 @@ namespace Chippi.App.Island;
 /// the island settings and, with <see cref="ShellContext.DebugMode"/>, the fake-activity menu.
 /// Create and start on the UI thread from the composition root.
 /// </summary>
-public sealed class IslandHost : IDisposable
+public sealed partial class IslandHost : IDisposable
 {
     /// <summary>The Keep awake module's id; its Status activity makes ChippiPet wide awake.</summary>
     public const string KeepAwakeModuleId = "keep-awake";
@@ -75,6 +76,13 @@ public sealed class IslandHost : IDisposable
         _shell.Services.IslandPasteTarget = () => _window.PasteTarget;
         _shell.Services.CloseIsland = _window.ClosePages;
         _shell.CaptureShell.CloseIsland = _window.ClosePagesAsync;
+        _shell.LeaveIslandOutOfCaptures = leave =>
+        {
+            // WDA_EXCLUDEFROMCAPTURE while a recording runs, WDA_NONE after.
+            uint affinity = leave ? 0x11u : 0u;
+            if (!SetWindowDisplayAffinity(_window.Handle, affinity) | !SetWindowDisplayAffinity(_window.PanelHandle, affinity))
+                _logger.LogInformation("Island: leaving the widget out of captures failed ({Error})", Marshal.GetLastPInvokeError());
+        };
         _shell.Services.CanShowIslandFeedback = () => _window.IsVisible;
         _shell.Commands.RegisterIslandHold(_window.HoldIslandOpen);
         // A second launch and a notice click open the island; with it off or hidden, ShellCommands opens Settings.
@@ -537,4 +545,7 @@ public sealed class IslandHost : IDisposable
         _tracker.Dispose();
         _window.Close();
     }
+
+    [LibraryImport("user32.dll", SetLastError = true)][return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool SetWindowDisplayAffinity(nint hwnd, uint affinity);
 }

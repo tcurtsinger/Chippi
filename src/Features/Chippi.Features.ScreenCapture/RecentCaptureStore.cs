@@ -9,7 +9,8 @@ using Chippi.Clipboard.Storage;
 
 namespace Chippi.Features.ScreenCapture;
 
-public sealed record RecentCapture(Guid Id, string Image, DateTimeOffset Time, int Width, int Height, string? SavedFile, CaptureFileIdentity? SavedIdentity = null);
+/// <param name="Length">A recording's length (its <paramref name="Image"/> is the poster); null for a capture.</param>
+public sealed record RecentCapture(Guid Id, string Image, DateTimeOffset Time, int Width, int Height, string? SavedFile, CaptureFileIdentity? SavedIdentity = null, TimeSpan? Length = null);
 
 /// <summary>Single-worker store. Index and thumbnails are sealed; retained PNGs are ordinary local files.</summary>
 public sealed class RecentCaptureStore : IDisposable
@@ -89,16 +90,16 @@ public sealed class RecentCaptureStore : IDisposable
         using var cmd = _database.Connection.CreateCommand(); cmd.CommandText = "DELETE FROM captures"; cmd.ExecuteNonQuery();
         foreach (var entry in entries) File.Delete(Path.Combine(_folder, entry.Image));
     }
-    public void Put(Guid draftId, BitmapSource flattened, DateTimeOffset time, string? savedFile)
-    { lock (_gate) PutCore(draftId, flattened, time, savedFile); }
-    private void PutCore(Guid draftId, BitmapSource flattened, DateTimeOffset time, string? savedFile)
+    public void Put(Guid draftId, BitmapSource flattened, DateTimeOffset time, string? savedFile, TimeSpan? length = null)
+    { lock (_gate) PutCore(draftId, flattened, time, savedFile, length); }
+    private void PutCore(Guid draftId, BitmapSource flattened, DateTimeOffset time, string? savedFile, TimeSpan? length)
     {
         var previous = Read();
         string name = Guid.NewGuid().ToString("N") + ".png";
         // SaveAs publishes a fully encoded file before its index row can become visible.
         CaptureFiles.SaveAs(flattened, Path.Combine(_folder, name), CaptureFileType.Png, true);
         var entry = new RecentCapture(draftId, name, time, flattened.PixelWidth, flattened.PixelHeight, savedFile ?? previous.FirstOrDefault(x => x.Id == draftId)?.SavedFile,
-            savedFile != null ? CaptureSavedFile.Identity(savedFile) : previous.FirstOrDefault(x => x.Id == draftId)?.SavedIdentity);
+            savedFile != null ? CaptureSavedFile.Identity(savedFile) : previous.FirstOrDefault(x => x.Id == draftId)?.SavedIdentity, length);
         var thumbnail = CaptureFiles.Thumbnail(flattened);
         using var transaction = _database.Connection.BeginTransaction();
         foreach (var old in previous.Where(x => x.Id == draftId)) DeleteRow(old.Id, transaction);

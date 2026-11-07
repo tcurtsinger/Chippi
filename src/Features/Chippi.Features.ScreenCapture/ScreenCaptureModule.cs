@@ -126,6 +126,22 @@ public sealed class ScreenCaptureModule(ICaptureLayer capture) : IFeatureModule
 
     public void RefreshProviders() => _editor?.RefreshProviders();
 
+    /// <summary>
+    /// A saved screen recording joins Recent (screen-recording.md, Recording page): its poster as the thumbnail, its
+    /// length, and the saved file. Without a poster it isn't listed.
+    /// </summary>
+    public async Task AddRecordingAsync(string file, BitmapSource? poster, TimeSpan length, DateTimeOffset time)
+    {
+        if (_store is not { } store || Model is not { } model || poster is null) return;
+        try { await CaptureFiles.OnWorkerAsync(() => { store.Put(Guid.NewGuid(), poster, time, file, length); return true; }); }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Core.Diagnostics.Log.Info($"Screen capture: a recording couldn't join Recent ({ex.GetType().Name})");
+            return;
+        }
+        model.RefreshRecent();
+    }
+
     private void OpenCapture()
     {
         if (_context is not { } context) return;

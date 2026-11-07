@@ -1,0 +1,21 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Recording and encoding (docs/phase-7/screen-recording.md, architecture.md section 3): the recorder, its timeline
+     and audio mix, the MP4 writer over Media Foundation, and the GIF path. WPF-free; shared with Media tools. -->
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <RootNamespace>Chippi.Media</RootNamespace>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Chippi.Media.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Windows.CsWin32" PrivateAssets="all" />
+    <PackageReference Include="NAudio.Wasapi" />
+  </ItemGroup>
+
+</Project>
