@@ -120,6 +120,12 @@ public sealed class RecordingController : IDisposable
 
     public bool IsRecording => Phase is RecordingPhase.Recording or RecordingPhase.Paused or RecordingPhase.Finishing;
 
+    /// <summary>
+    /// What Quit asks first while a recording runs or counts down ("Stop recording and quit?", with Cancel and Stop);
+    /// null when it can quit without asking. Stop finishes the file and saves it (<see cref="ShutDownAsync"/>).
+    /// </summary>
+    public string? QuitQuestion => IsRecording || Phase == RecordingPhase.Counting ? "Stop recording and quit?" : null;
+
     /// <summary>A screenshot's freeze would cover the region being recorded: the panel dims those verbs.</summary>
     public bool Busy => Phase is not (RecordingPhase.Idle or RecordingPhase.Review);
 

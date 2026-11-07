@@ -362,6 +362,28 @@ public sealed class RecordingControllerTests : IDisposable
         Assert.Equal(RecordingPhase.Choosing, _r.Phase);
     }
 
+    [Fact]
+    public async Task Quit_asks_only_while_a_recording_runs_and_Stop_saves_it()
+    {
+        Assert.Null(_r.QuitQuestion);
+        Assert.True(await _r.BeginAsync(RecordingSource.Region, false, CaptureDoor.Shortcut));
+        Session.Select(new PixelRect(100, 100, 640, 360));
+        Assert.Null(_r.QuitQuestion); // nothing recording yet
+        _r.Start();
+        Assert.Equal("Stop recording and quit?", _r.QuitQuestion);
+        _time.Advance(TimeSpan.FromSeconds(3));
+        Run(2);
+        _r.Pause();
+        Assert.Equal("Stop recording and quit?", _r.QuitQuestion);
+
+        // Stop: the feature stops as Chippi quits, and the file is finished and saved.
+        await _r.ShutDownAsync();
+        var saved = Assert.Single(Directory.GetFiles(_pc.DefaultSaveFolder));
+        Assert.Equal(".mp4", Path.GetExtension(saved));
+        Assert.All(_pc.Temps, t => Assert.False(File.Exists(t)));
+        Assert.Null(_r.QuitQuestion);
+    }
+
     [Theory]
     [InlineData(0, "0:00")]
     [InlineData(42, "0:42")]

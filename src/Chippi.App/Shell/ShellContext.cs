@@ -123,6 +123,25 @@ public sealed class ShellContext
     /// </summary>
     internal Action<bool> LeaveIslandOutOfCaptures { get; set; } = _ => { };
 
+    /// <summary>
+    /// What Quit asks before stopping anything: each feature's question, or null when it has none (Screen recording's
+    /// "Stop recording and quit?").
+    /// </summary>
+    internal List<Func<string?>> QuitQuestions { get; } = [];
+
+    /// <summary>Shows a quit question with Cancel and Stop; true goes on quitting. Null quits without asking.</summary>
+    internal Func<string, Task<bool>>? ConfirmQuit { get; set; }
+
+    /// <summary>Whether Quit goes ahead: every feature's question asked in turn, the first Cancel stopping it.</summary>
+    internal async Task<bool> MayQuitAsync()
+    {
+        if (ConfirmQuit is not { } ask) return true;
+        foreach (var question in QuitQuestions)
+            if (question() is { } text && !await ask(text))
+                return false;
+        return true;
+    }
+
     /// <summary>Windows' Print Screen setting as the shortcut service sees it: the real one only for the real profile's Chippi.exe.</summary>
     public Chippi.Core.Shortcuts.IPrintScreenSetting PrintScreen { get; }
 
