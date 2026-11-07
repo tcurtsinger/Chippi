@@ -333,10 +333,12 @@ public sealed partial class CaptureLayer : ICaptureLayer
             foreach (var o in overlays)
                 o.Reveal();
             await Task.Run(DwmFlush);
+            if (_closed) // Esc or a closing feature while the overlays were coming up
+                return;
             layer.Report(string.Create(CultureInfo.InvariantCulture,
                 $"freeze door={door} mode={(image is null ? Request.Mode.ToString() : "Reopen")} displays={monitors.Count} key-to-shown={Ms(started):F1} read={readMs:F1} island-close={islandClosed} keyboard={keyboard}"));
             Frozen?.Invoke();
-            if (_selector.Selection is { } selection)
+            if (!_closed && _selector?.Selection is { } selection)
                 Released(selection);
         }
 

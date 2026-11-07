@@ -227,7 +227,7 @@ try {
     Require (Test-Path -LiteralPath $saved.FullName) 'another saved file remains'
     Invoke 'Capture, ' -Prefix; Invoke 'Remove from recent'
     Require (@(Get-ChildItem $cache -Filter '*.png').Count -eq 49) 'Remove deletes only owned cache'
-    Invoke 'Clear'; Invoke 'Clear' -Last
+    Invoke 'Clear recent captures'; Invoke 'Clear' -Last
     WaitFor { $null -ne (Find 'No recent captures') } 'Clear Recent'
     Require (@(Get-ChildItem $cache -Filter '*.png').Count -eq 0) 'Clear removes owned cache'
     Require (Test-Path -LiteralPath $saved.FullName) 'Clear preserves saved file'
@@ -247,7 +247,19 @@ try {
     WaitFor { $null -ne (Find 'Scan QR code') } 'installed provider button'
     $freezeCount = @(Get-Content "$results\screen-capture-timings.txt" | Where-Object { $_ -like 'freeze *' }).Count
     Invoke 'Scan QR code'
-    WaitFor { $null -ne (Find 'https://example.com/chippi-check') } 'QR result from composed selection'
+    # The QR page shows the decoded address as the value of its Link box.
+    function LinkValue {
+        $a = [System.Windows.Automation.AutomationElement]
+        $condition = New-Object System.Windows.Automation.AndCondition @(
+            (New-Object System.Windows.Automation.PropertyCondition ($a::ProcessIdProperty), $chippi.Id),
+            (New-Object System.Windows.Automation.PropertyCondition ($a::NameProperty), 'Link'),
+            (New-Object System.Windows.Automation.PropertyCondition ($a::ControlTypeProperty), [System.Windows.Automation.ControlType]::Edit))
+        $link = $a::RootElement.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $condition)
+        if ($null -eq $link) { return $null }
+        return $link.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern).Current.Value
+    }
+    WaitFor { (LinkValue) -eq 'https://example.com/chippi-check' } 'QR result from composed selection'
+    Note 'PASS QR result from composed selection'
     Shot 'qr-provider-result'
     Require (@(Get-Content "$results\screen-capture-timings.txt" | Where-Object { $_ -like 'freeze *' }).Count -eq $freezeCount) 'provider does not recapture'
     $found.passed = $true
