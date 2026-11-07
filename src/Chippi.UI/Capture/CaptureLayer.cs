@@ -170,6 +170,7 @@ public sealed partial class CaptureLayer : ICaptureLayer
         private Countdown? _countdown;
         private bool _closed;
         private FrameworkElement? _tools, _output;
+        private CapturePreview? _preview;
         private long _released;
 
         public CaptureRequest Request { get; } = request;
@@ -186,7 +187,7 @@ public sealed partial class CaptureLayer : ICaptureLayer
             get => _selector?.Tooling ?? false;
             set
             {
-                if (_selector is null)
+                if (_selector is null || _selector.Tooling == value)
                     return;
                 _selector.Tooling = value;
                 Render();
@@ -332,10 +333,12 @@ public sealed partial class CaptureLayer : ICaptureLayer
             foreach (var o in overlays)
                 o.Reveal();
             await Task.Run(DwmFlush);
+            if (_closed) // Esc or a closing feature while the overlays were coming up
+                return;
             layer.Report(string.Create(CultureInfo.InvariantCulture,
                 $"freeze door={door} mode={(image is null ? Request.Mode.ToString() : "Reopen")} displays={monitors.Count} key-to-shown={Ms(started):F1} read={readMs:F1} island-close={islandClosed} keyboard={keyboard}"));
             Frozen?.Invoke();
-            if (_selector.Selection is { } selection)
+            if (!_closed && _selector?.Selection is { } selection)
                 Released(selection);
         }
 
@@ -351,7 +354,8 @@ public sealed partial class CaptureLayer : ICaptureLayer
         {
             _tools = tools;
             _output = output;
-            var display = Selection?.Display.Bounds;
+            var display = _preview is { } preview && Freeze != null
+                ? Freeze.NearestScreen(new PixelPoint(preview.Bounds.Right - 1, preview.Bounds.Bottom - 1)).Bounds : Selection?.Display.Bounds;
             foreach (var o in layer._overlays)
                 if (o.Bounds == display)
                     o.View.SetBars(tools, output);
@@ -360,14 +364,20 @@ public sealed partial class CaptureLayer : ICaptureLayer
             Render();
         }
 
+        public void SetPreview(CapturePreview? preview)
+        {
+            if (Equals(_preview, preview)) return;
+            _preview = preview;
+            SetBars(_tools, _output);
+        }
         private void Render()
         {
             if (_selector is null || _closed)
                 return;
             foreach (var o in layer._overlays)
             {
-                o.View.Render(_selector, Request, ScreenOf(o));
-                o.Cursor = _selector.HandleUnderPointer switch
+                o.View.Render(_selector, Request, ScreenOf(o), _preview);
+                o.Cursor = _preview != null ? Cursors.Arrow : _selector.HandleUnderPointer switch
                 {
                     SelectionHandle.TopLeft or SelectionHandle.BottomRight => Cursors.SizeNWSE,
                     SelectionHandle.TopRight or SelectionHandle.BottomLeft => Cursors.SizeNESW,
@@ -381,6 +391,7 @@ public sealed partial class CaptureLayer : ICaptureLayer
 
         public void OnPointerMoved(OverlayWindow o)
         {
+            if (_preview != null) return;
             if (_selector is null)
                 return;
             _selector.Move(Cursor());
@@ -389,8 +400,13 @@ public sealed partial class CaptureLayer : ICaptureLayer
 
         private Selection? _last;
 
+        // Set by a left press the layer saw. A feature that handles the press on its bars or canvas (a Text click, the
+        // Eraser) keeps it from the layer, and its release must not read as a selection change (task 663).
+        private bool _pressed;
+
         public void OnButtonDown(OverlayWindow o, MouseButtonEventArgs e)
         {
+            if (_preview != null) return;
             if (_selector is null)
             {
                 // Before the read lands, or after every try for the keyboard was refused: a click earns it.
@@ -402,6 +418,7 @@ public sealed partial class CaptureLayer : ICaptureLayer
             if (e.ChangedButton != MouseButton.Left)
                 return;
             o.CaptureMouse();
+            _pressed = true;
             _last = _selector.Selection;
             var outcome = _selector.Down(Cursor(), Keyboard.Modifiers.HasFlag(ModifierKeys.Control));
             if (outcome == SelectorOutcome.Picked && _selector.Picked is { } picked)
@@ -411,6 +428,7 @@ public sealed partial class CaptureLayer : ICaptureLayer
 
         public void OnButtonUp(OverlayWindow o, MouseButtonEventArgs e)
         {
+            if (_preview != null) return;
             if (_selector is null)
                 return;
             if (e.ChangedButton == MouseButton.Right)
@@ -419,8 +437,9 @@ public sealed partial class CaptureLayer : ICaptureLayer
                     Close(CaptureEnd.Cancelled);
                 return;
             }
-            if (e.ChangedButton != MouseButton.Left)
+            if (e.ChangedButton != MouseButton.Left || !_pressed)
                 return;
+            _pressed = false;
             if (o.IsMouseCaptured)
                 o.ReleaseMouseCapture();
             bool wasReleased = _selector.IsReleased;
@@ -477,6 +496,7 @@ public sealed partial class CaptureLayer : ICaptureLayer
                 }
                 return;
             }
+            if (_preview != null) { KeyDown?.Invoke(e); return; }
             var key = (e.Key == System.Windows.Input.Key.System ? e.SystemKey : e.Key) switch
             {
                 System.Windows.Input.Key.Escape => SelectorKey.Escape,

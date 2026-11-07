@@ -54,6 +54,7 @@
     <ProjectReference Include="..\Features\Chippi.Features.Debounce\Chippi.Features.Debounce.csproj" />
     <ProjectReference Include="..\Features\Chippi.Features.Shortcuts\Chippi.Features.Shortcuts.csproj" />
     <ProjectReference Include="..\Features\Chippi.Features.Displays\Chippi.Features.Displays.csproj" />
+    <ProjectReference Include="..\Features\Chippi.Features.ScreenCapture\Chippi.Features.ScreenCapture.csproj" />
     <ProjectReference Include="..\Features\Chippi.Features.WindowLayouts\Chippi.Features.WindowLayouts.csproj" />
     <ProjectReference Include="..\Features\Chippi.Features.TextSnippets\Chippi.Features.TextSnippets.csproj" />
     <ProjectReference Include="..\Features\Chippi.Features.SmoothScrolling\Chippi.Features.SmoothScrolling.csproj" />

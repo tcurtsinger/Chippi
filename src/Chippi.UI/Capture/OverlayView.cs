@@ -199,10 +199,10 @@ public sealed class OverlayView : Grid
 
     /// <summary>Redraws this display's part of the selector's state.</summary>
     /// <param name="screen">This display's frozen pixels, for the magnifier.</param>
-    public void Render(Selector selector, CaptureRequest request, CapturedScreen? screen)
+    public void Render(Selector selector, CaptureRequest request, CapturedScreen? screen, CapturePreview? preview = null)
     {
         var local = new PixelRect(0, 0, Bounds.Width, Bounds.Height);
-        PixelRect? hole = selector.Rect ?? (selector.Hover is { } hover ? SelectionMath.WindowRect(selector.Freeze.Displays, hover) : null);
+        PixelRect? hole = preview?.Bounds ?? selector.Rect ?? (selector.Hover is { } hover ? SelectionMath.WindowRect(selector.Freeze.Displays, hover) : null);
         var cut = hole is { } h ? h.Offset(-Bounds.X, -Bounds.Y).Intersect(local) : default;
         bool picking = selector.Mode == CaptureMode.PickPoint;
 
@@ -211,7 +211,7 @@ public sealed class OverlayView : Grid
         {
             var dim = new GeometryGroup { FillRule = FillRule.EvenOdd };
             dim.Children.Add(new RectangleGeometry(new Rect(0, 0, local.Width, local.Height)));
-            if (!cut.IsEmpty && selector.Selection?.Mask is null && selector.Outline.Count == 0)
+            if (!cut.IsEmpty && (preview != null || (selector.Selection?.Mask is null && selector.Outline.Count == 0)))
                 dim.Children.Add(new RectangleGeometry(new Rect(cut.X, cut.Y, cut.Width, cut.Height)));
             else if (selector.Outline.Count > 2)
                 dim.Children.Add(Outline(selector.Outline, closed: true));
@@ -223,7 +223,7 @@ public sealed class OverlayView : Grid
 
         // The hovered window lights with a rounded mark; a selection gets a white frame with a dark edge outside it (2
         // wide when it fills the display, where the edge has no room); a freeform outline instead of a frame.
-        bool freeform = selector.Outline.Count > 0;
+        bool freeform = preview == null && selector.Outline.Count > 0;
         bool hovering = selector.Rect is null && !cut.IsEmpty && !picking;
         bool framed = !cut.IsEmpty && !freeform && !picking && !hovering;
         if (framed)
@@ -249,10 +249,10 @@ public sealed class OverlayView : Grid
         else
             _outline.Visibility = Visibility.Collapsed;
 
-        RenderHandles(selector, cut);
-        RenderPill(selector);
+        RenderHandles(selector, cut, preview != null);
+        RenderPill(selector, preview);
         RenderMagnifier(selector, request, screen);
-        RenderBars(selector);
+        RenderBars(selector, preview);
         Layer.IsHitTestVisible = selector.IsReleased && selector.Tooling;
     }
 
@@ -265,9 +265,9 @@ public sealed class OverlayView : Grid
         shape.Height = r.Height + 2 * outward;
     }
 
-    private void RenderHandles(Selector selector, PixelRect cut)
+    private void RenderHandles(Selector selector, PixelRect cut, bool cropped)
     {
-        bool show = selector.Selection is { Mask: null } && !selector.Fixed && !cut.IsEmpty && !selector.IsDragging;
+        bool show = !cropped && selector.Selection is { Mask: null } && !selector.Fixed && !cut.IsEmpty && !selector.IsDragging;
         var rect = selector.Rect?.Offset(-Bounds.X, -Bounds.Y) ?? default;
         double[] xs = [rect.X, rect.X + rect.Width / 2.0, rect.Right];
         double[] ys = [rect.Y, rect.Y + rect.Height / 2.0, rect.Bottom];
@@ -290,10 +290,10 @@ public sealed class OverlayView : Grid
     /// "1040 × 800" (with a window, "Terminal · 1040 × 800") at the selection's or hovered window's top left, above it
     /// when there's room, on the display that corner is on.
     /// </summary>
-    private void RenderPill(Selector selector)
+    private void RenderPill(Selector selector, CapturePreview? preview)
     {
         var window = selector.Selection?.Window ?? (selector.Rect is null ? selector.Hover : null);
-        PixelRect? shown = selector.Rect ?? (window is null ? null : SelectionMath.WindowRect(selector.Freeze.Displays, window));
+        PixelRect? shown = preview?.Bounds ?? selector.Rect ?? (window is null ? null : SelectionMath.WindowRect(selector.Freeze.Displays, window));
         if (shown is not { IsEmpty: false } rect || selector.Mode == CaptureMode.PickPoint
             || selector.Freeze.NearestScreen(rect.TopLeft).Bounds != Bounds)
         {
@@ -301,7 +301,7 @@ public sealed class OverlayView : Grid
             return;
         }
         // A reopened capture shown smaller still reads its own size.
-        var of = selector.Selection?.Source is { } source ? new PixelSize(source.Width, source.Height) : rect.Size;
+        var of = preview?.Size ?? (selector.Selection?.Source is { } source ? new PixelSize(source.Width, source.Height) : rect.Size);
         string pixels = string.Create(CultureInfo.InvariantCulture, $"{of.Width} × {of.Height}");
         _pillText.Text = window is { Title.Length: > 0 } ? $"{window.Title} · {pixels}" : pixels;
         _pillCopy.Visibility = selector.CopyDrag ? Visibility.Visible : Visibility.Collapsed;
@@ -358,9 +358,9 @@ public sealed class OverlayView : Grid
     }
 
     /// <summary>The feature's bars beside the released selection, on the display it was released on; hidden while dragging.</summary>
-    private void RenderBars(Selector selector)
+    private void RenderBars(Selector selector, CapturePreview? preview)
     {
-        bool here = selector.Selection is { } s && s.Display.Bounds == Bounds && !selector.IsDragging;
+        bool here = selector.Selection is { } s && (preview == null ? s.Display.Bounds : selector.Freeze.NearestScreen(new PixelPoint(preview.Bounds.Right - 1, preview.Bounds.Bottom - 1)).Bounds) == Bounds && !selector.IsDragging;
         foreach (var bar in new[] { _tools, _output })
             if (bar is not null)
                 bar.Visibility = here ? Visibility.Visible : Visibility.Collapsed;
@@ -373,7 +373,7 @@ public sealed class OverlayView : Grid
             bar.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
             return new PixelSize((int)Math.Ceiling(bar.DesiredSize.Width * Scale), (int)Math.Ceiling(bar.DesiredSize.Height * Scale));
         }
-        var (tools, output) = BarPlacement.Place(selection.Rect, Bounds, SizeOf(_tools), SizeOf(_output), (int)Math.Round(BarPlacement.Gap * Scale));
+        var (tools, output) = BarPlacement.Place(preview?.Bounds ?? selection.Rect, Bounds, SizeOf(_tools), SizeOf(_output), (int)Math.Round(BarPlacement.Gap * Scale));
         Put(_tools, tools);
         Put(_output, output);
     }

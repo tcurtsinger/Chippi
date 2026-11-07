@@ -261,7 +261,7 @@ public sealed class ColorPickerModule : IFeatureModule, IColorPageModel
             if (context is null) return (null, null);
             bool host = name == ColorPickerShortcuts.OpenCapture;
             foreach (var entry in context.Shortcuts.List)
-                if (host ? entry.Name == name && entry.Owner != Id : entry.Owner == Id && entry.Name == name)
+                if (host ? entry.Name == name && entry.Owner == "capture" : entry.Owner == Id && entry.Name == name)
                     return (entry.Shortcut, entry.Error);
             return (null, null);
         }
@@ -288,7 +288,7 @@ public sealed class ColorPickerModule : IFeatureModule, IColorPageModel
         {
             ModuleContext? context;
             lock (owner._gate) context = owner._context;
-            if (name != ColorPickerShortcuts.OpenCapture) context?.EditShortcut(name);
+            if (name == ColorPickerShortcuts.OpenCapture) context?.EditShortcutFor("capture", name); else context?.EditShortcut(name);
         }
     }
 

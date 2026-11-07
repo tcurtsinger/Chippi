@@ -272,7 +272,7 @@ public sealed class ModuleRegistry(ConfigStore config, IslandActivityHub island,
                 Tile = ActionsTile.Input,
             });
         }
-        foreach (var tile in IslandTileContribution.Group(_entries.Where(e => e.IsRunning).SelectMany(e => e.IslandTiles)))
+        foreach (var tile in IslandTileContribution.Group(_entries.Where(e => e.IsRunning).SelectMany(e => e.IslandTiles).Concat(_services.SharedIslandTiles())))
         {
             if (tile.Parts.Any(p => p.Spec.TakesKeyboard))
                 continue; // the Command bar's own page
@@ -411,6 +411,7 @@ public sealed class ModuleRegistry(ConfigStore config, IslandActivityHub island,
             Activation = new ActivationRouter.ModuleActivation(_services.Activation, id),
             OpenSettings = section => _services.OpenSettings?.Invoke(section is { Length: > 0 } ? $"module:{id}/{section}" : $"module:{id}"),
             EditShortcut = name => _services.OpenSettings?.Invoke($"{ModuleContext.ShortcutsPage}/{id}/{name}"),
+            EditShortcutFor = (owner, name) => _services.OpenSettings?.Invoke($"{ModuleContext.ShortcutsPage}/{owner}/{name}"),
             OpenIslandPage = key => _services.OpenIslandPage?.Invoke(key),
             TryOpenIslandPage = key => _services.TryOpenIslandPage?.Invoke(key) == true,
             SummonIslandPage = key => _services.SummonIslandPage?.Invoke(key) == true,

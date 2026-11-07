@@ -86,6 +86,18 @@ public sealed class ModuleServicesTests : IDisposable
         Assert.Null(module.Context!.Actions);
     }
 
+    [Fact]
+    public async Task Shortcut_links_can_open_the_owning_module_or_the_shared_capture_host()
+    {
+        string? opened = null;
+        _services.OpenSettings = page => opened = page;
+        var module = await StartAsync("screen-text");
+        module.Context!.EditShortcut("Copy text");
+        Assert.Equal("shortcuts/screen-text/Copy text", opened);
+        module.Context.EditShortcutFor("capture", "Open Capture");
+        Assert.Equal("shortcuts/capture/Open Capture", opened);
+    }
+
     // ---- Data folder
 
     [Fact]

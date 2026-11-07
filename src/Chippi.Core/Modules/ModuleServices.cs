@@ -11,6 +11,9 @@ namespace Chippi.Core.Modules;
 /// </summary>
 public sealed class ModuleServices
 {
+    /// <summary>Shell-owned shared pages, present while their providers run.</summary>
+    public Func<IReadOnlyList<IslandTileContribution>> SharedIslandTiles { get; set; } = () => [];
+
     /// <summary>%LOCALAPPDATA%\Chippi\data. Each module gets its own folder under it.</summary>
     public static string DefaultDataRoot { get; } = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Chippi", "data");

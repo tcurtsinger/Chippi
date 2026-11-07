@@ -12,6 +12,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Chippi.Core\Chippi.Core.csproj" />
+    <ProjectReference Include="../Chippi.Storage/Chippi.Storage.csproj" />
     <PackageReference Include="Microsoft.Data.Sqlite" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
   </ItemGroup>
@@ -21,3 +22,4 @@
   </ItemGroup>
 
 </Project>
+

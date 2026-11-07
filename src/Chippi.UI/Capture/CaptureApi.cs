@@ -60,6 +60,9 @@ public enum CaptureEnd
 /// </param>
 public sealed record CaptureSurface(string DisplayId, PixelRect Bounds, int Dpi, Canvas Layer);
 
+/// <summary>An editor crop, in physical desktop bounds and original image-pixel dimensions.</summary>
+public sealed record CapturePreview(PixelRect Bounds, PixelSize Size);
+
 /// <summary>
 /// One capture, from the starter until its overlay closes. Its events are raised on the UI thread. The pixels are released
 /// when it closes; a feature that keeps an image copies it out of <see cref="Selection"/> first.
@@ -100,6 +103,9 @@ public interface ICaptureSession
     /// placement): the tool column and the output bar under it. Null leaves one out. Sized in DIPs as WPF measures them.
     /// </summary>
     void SetBars(FrameworkElement? tools, FrameworkElement? output);
+
+    /// <summary>Shows an editor crop while retaining its source pixels and undo history. Null restores the selection.</summary>
+    void SetPreview(CapturePreview? preview) { }
 
     /// <summary>
     /// Closes the overlay. With <paramref name="handBack"/>, the window that was in front at the starter gets the keyboard

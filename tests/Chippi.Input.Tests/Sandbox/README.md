@@ -80,3 +80,4 @@ The completed script also uses real Settings capture and Save, checks Cancel and
 checks executable manifests and Run as administrator shortcuts without a UAC prompt. A launched fullscreen fixture is
 skipped without stopping the following row. No fixture touches the clipboard, network, Sound modules or host windows.
 Physical display changes, packaged activation and app-specific fixed/minimum sizes remain owner checks.
+Screen capture's feature check is `run.ps1 -App <self-contained folder> -Out <new temp folder> -Checks screen-capture`. It runs the real module against capture-fixture.ps1: redaction and source-resolution copy, object edits, text Escape, crop, Save as Cancel, Save, Settings Recent and Annotate. Clipboard access and disposable output files stay inside the Sandbox. Evidence is screen-capture-*.png and screen-capture-timings.txt.

@@ -399,7 +399,7 @@ public sealed class IslandHost : IDisposable
 
     /// <summary>The running features' island tiles, in grid order.</summary>
     private void RefreshPanels() =>
-        _window.SetTiles(IslandTileContribution.Group(_shell.Registry.Features.Where(f => f.IsRunning).SelectMany(f => f.IslandTiles)));
+        _window.SetTiles(IslandTileContribution.Group(_shell.Registry.Features.Where(f => f.IsRunning).SelectMany(f => f.IslandTiles).Concat(_shell.Services.SharedIslandTiles())));
 
     private void LoadSettings()
     {

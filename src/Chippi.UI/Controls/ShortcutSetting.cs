@@ -49,19 +49,31 @@ public sealed class ShortcutSetting : StackPanel
     /// <summary>Shows <paramref name="keys"/> (null: "Not set") and, under them, why they don't work.</summary>
     public void Show(KeyShortcut? keys, string? error)
     {
-        KeysText = keys?.ToString() ?? "Not set";
         if (keys is null)
         {
-            var unset = new TextBlock { Text = "Not set", VerticalAlignment = VerticalAlignment.Center };
-            unset.SetResourceReference(StyleProperty, "BodyTextStyle");
-            unset.SetResourceReference(TextBlock.ForegroundProperty, "TextSecondaryBrush");
-            _keys.Content = unset;
+            ShowText("Not set");
+            _error.Text = error ?? "";
+            _error.Visibility = error is null ? Visibility.Collapsed : Visibility.Visible;
+            return;
         }
-        else
-            _keys.Content = Keycaps.Of(Keycaps.CapsOf(keys), dim: error is not null);
+        KeysText = keys.ToString();
+        _keys.Content = Keycaps.Of(Keycaps.CapsOf(keys), dim: error is not null);
         AutomationProperties.SetName(_keys, KeysText);
         _error.Text = error ?? "";
         _error.Visibility = error is null ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    /// <summary>Shows <paramref name="text"/> in place of the keys, with no error under it: "Used by Windows" while Windows holds Print Screen.</summary>
+    public void ShowText(string text)
+    {
+        KeysText = text;
+        var line = new TextBlock { Text = text, VerticalAlignment = VerticalAlignment.Center };
+        line.SetResourceReference(StyleProperty, "BodyTextStyle");
+        line.SetResourceReference(TextBlock.ForegroundProperty, "TextSecondaryBrush");
+        _keys.Content = line;
+        AutomationProperties.SetName(_keys, text);
+        _error.Text = "";
+        _error.Visibility = Visibility.Collapsed;
     }
 }
 

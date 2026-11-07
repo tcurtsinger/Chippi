@@ -166,6 +166,22 @@ public sealed class ModuleFlowTests
     }
 
     [Fact]
+    public async Task Existing_capture_is_read_without_opening_another_selector_and_removal_stops_reads()
+    {
+        var t = await Start();
+        var image = new CapturedImage(120, 40, new byte[120 * 40 * 4]);
+        await t.Module.ReadSelectionAsync(image, ScreenTextVerb.CopyText);
+        Assert.Null(t.Layer.Last);
+        Assert.Equal(1, t.Ocr.Calls);
+        Assert.Single(t.Clip.Written);
+        await t.Module.ReadSelectionAsync(image, ScreenTextVerb.ScanQr);
+        Assert.Null(t.Layer.Last);
+        Assert.Equal(QrScanState.Read, t.Module.Qr.State);
+        await t.Module.StopAsync(default);
+        await t.Module.ReadSelectionAsync(image, ScreenTextVerb.CopyText);
+        Assert.Equal(1, t.Ocr.Calls);
+    }
+    [Fact]
     public async Task Copy_text_copies_the_text_once_and_says_how_many_words()
     {
         var t = await Start();

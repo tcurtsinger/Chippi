@@ -51,6 +51,9 @@ public sealed class ModuleContext(
     /// </summary>
     public Action<string> EditShortcut { get; init; } = _ => { };
 
+    /// <summary>Opens a shortcut owned by another module, such as the Capture host's Open Capture row.</summary>
+    public Action<string, string> EditShortcutFor { get; init; } = (_, _) => { };
+
     /// <summary>The Settings page <see cref="EditShortcut"/> opens, as <c>shortcuts/&lt;module id&gt;/&lt;name&gt;</c>.</summary>
     public const string ShortcutsPage = "shortcuts";
 
