@@ -206,9 +206,11 @@ public sealed class WgcVideoSource : IVideoSource
             using var pending = new PendingFrame(this, frame);
             FrameArrived?.Invoke(pending);
         }
-        catch (Exception ex) when (ex is COMException or InvalidOperationException or ObjectDisposedException)
+        catch (Exception ex) when (ex is not OutOfMemoryException)
         {
-            End("Recording stopped");
+            // Anything thrown here would vanish into WGC's event: the recording ends where Travis can see it instead,
+            // with the cause kept for Settings.
+            End($"Recording stopped ({ex.GetType().Name}: {ex.Message})");
         }
     }
 
@@ -264,8 +266,12 @@ public sealed class WgcVideoSource : IVideoSource
             _pool?.Dispose();
         }
         // Textures still in the encoder's queue come back through Return and are released there.
-        while (_spare.TryTake(out var texture)) Marshal.ReleaseComObject(texture);
-        if (_black is not null) Marshal.ReleaseComObject(_black);
+        Direct3D.OnMta(() =>
+        {
+            while (_spare.TryTake(out var texture)) Marshal.ReleaseComObject(texture);
+            if (_black is not null) Marshal.ReleaseComObject(_black);
+            return true;
+        });
         _d3d.Dispose();
     }
 

@@ -101,6 +101,26 @@ public sealed class GpuFrameTests(ITestOutputHelper output) : IDisposable
         }
     }
 
+    [Fact]
+    public void A_device_made_on_a_UI_thread_works_on_WGC_s_thread()
+    {
+        // Chippi starts recordings on its UI thread (an STA); WGC hands frames over on a free-threaded one.
+        Direct3D? d3d = null;
+        var ui = new Thread(() => d3d = Direct3D.Create());
+        ui.SetApartmentState(ApartmentState.STA);
+        ui.Start();
+        ui.Join();
+        var texture = Upload(d3d!, Pixels(0));
+        var pixels = d3d!.Read(texture, W, H);
+        Assert.Equal(200, pixels[((10 * W) + 10) * 4]);
+        Assert.Equal(220, pixels[((80 * W) + 40) * 4 + 1]);
+        System.Runtime.InteropServices.Marshal.ReleaseComObject(texture);
+        var dispose = new Thread(d3d.Dispose);
+        dispose.SetApartmentState(ApartmentState.STA);
+        dispose.Start();
+        dispose.Join();
+    }
+
     public void Dispose()
     {
         try { Directory.Delete(_folder, recursive: true); }

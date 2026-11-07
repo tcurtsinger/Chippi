@@ -37,7 +37,17 @@ internal sealed class Direct3D : IDisposable
     /// <summary>The device as WGC and <c>MediaStreamSample</c> take it.</summary>
     public IDirect3DDevice WinRT { get; }
 
-    public static unsafe Direct3D Create()
+    /// <summary>
+    /// The device's COM objects are made, and released, in the multithreaded apartment, whatever thread asks: WGC
+    /// copies frames on its own free-threaded thread, and D3D11 objects can't be marshalled, so a device made on the UI
+    /// thread (an STA) failed every frame there with an InvalidCastException (the Sandbox, 2026-11-07).
+    /// </summary>
+    public static Direct3D Create() => OnMta(CreateCore);
+
+    internal static T OnMta<T>(Func<T> work) =>
+        Thread.CurrentThread.GetApartmentState() == ApartmentState.MTA ? work() : Task.Run(work).GetAwaiter().GetResult();
+
+    private static unsafe Direct3D CreateCore()
     {
         ID3D11Device device;
         ID3D11DeviceContext context;
@@ -170,11 +180,12 @@ internal sealed class Direct3D : IDisposable
         }
     }
 
-    public void Dispose()
+    public void Dispose() => OnMta(() =>
     {
         if (_staging is not null) Marshal.ReleaseComObject(_staging);
         (WinRT as IDisposable)?.Dispose();
         Marshal.ReleaseComObject(Context);
         Marshal.ReleaseComObject(Device);
-    }
+        return true;
+    });
 }
