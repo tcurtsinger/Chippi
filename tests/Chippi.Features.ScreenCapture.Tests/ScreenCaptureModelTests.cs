@@ -61,10 +61,21 @@ public sealed class ScreenCaptureModelTests
                 Assert.False(model.DeleteFile(id));
                 Assert.Equal(saved, recycled!.SavedFile);
                 Assert.Single(model.Recent);
+                using var result = new CaptureRecentModel(model, store, context);
+                var opened = result.OpenAsync(id);
+                Assert.NotNull(result.Result?.Thumbnail);
+                opened.GetAwaiter().GetResult();
+                Assert.Equal(1920, ((BitmapSource)result.Result!.Image!).PixelWidth);
+                Assert.False(result.Result.FileMissing);
+                File.Move(saved, saved + ".original");
+                File.WriteAllText(saved, "replacement file");
+                Assert.True(model.SetMagnifier(false));
+                Assert.True(result.Result.FileMissing);
                 model.Remove(id);
+                Assert.Null(result.Result);
                 Assert.Empty(model.Recent);
                 Assert.Null(model.Thumbnail(id));
-                Assert.Equal("external file", File.ReadAllText(saved));
+                Assert.Equal("replacement file", File.ReadAllText(saved));
             }
             catch (Exception ex) { error = ex; }
             finally { Directory.Delete(folder, true); }

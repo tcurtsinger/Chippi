@@ -2,6 +2,7 @@
 // Copyright (C) Chippi contributors
 using System.Diagnostics;
 using System.IO;
+using System.Windows.Controls;
 using Chippi.Core.Shortcuts;
 using System.Windows.Threading;
 using Chippi.App.Shell;
@@ -24,6 +25,11 @@ internal sealed class CapturePanelHost : ICapturePanelModel, IDisposable
     private readonly ColorPickerModule _color;
     private ScreenCaptureModel? _observed;
     private readonly CapturePanelView _view;
+    private readonly ContentControl _body = new();
+    private readonly ContentControl _header = new();
+    private CaptureRecentModel? _recentModel;
+    private CaptureRecentView? _recentView;
+    private bool _showingRecent;
     private IHotkey? _open;
     private bool _refreshing;
     private bool _disposed;
@@ -33,8 +39,9 @@ internal sealed class CapturePanelHost : ICapturePanelModel, IDisposable
     {
         _shell = shell; _capture = capture; _text = text; _color = color;
         var view = _view = new CapturePanelView(this, shell.Services.HoldIslandOpen);
-        Tile = new IslandTileContribution("capture", new IslandTileSpec("capture", "Capture", "Scan", 60, 0, () => view)
-        { CreateHeader = () => view.Header, InitialFocus = () => view.InitialFocus });
+        Tile = new IslandTileContribution("capture", new IslandTileSpec("capture", "Capture", "Scan", 60, 0, () => _body)
+        { CreateHeader = () => _header, InitialFocus = () => _showingRecent ? _recentView?.InitialFocus : view.InitialFocus, HandleBack = Back });
+        ShowPanel();
         shell.Services.SharedIslandTiles = () => Visible ? [Tile] : [];
         capture.OpenDelay = OpenDelay;
         shell.Registry.Changed += RegistryChanged;
@@ -84,8 +91,16 @@ internal sealed class CapturePanelHost : ICapturePanelModel, IDisposable
             }
         finally { _refreshing = false; }
     }
+    private void ShowPanel()
+    {
+        _showingRecent = false;
+        _body.Content = _view;
+        _header.Content = _view.Header;
+    }
+    private bool Back() { if (!_showingRecent) return false; ShowPanel(); return true; }
     internal void OpenDelay()
     {
+        ShowPanel();
         Open();
         _dispatcher.BeginInvoke(() => { if (CanCapture && _view.IsVisible) _view.OpenDelayMenu(); });
     }
@@ -138,7 +153,16 @@ internal sealed class CapturePanelHost : ICapturePanelModel, IDisposable
     public IReadOnlyList<CapturePanelRecent> Recent => _capture.Model is { } model
         ? model.Recent.Select(x => new CapturePanelRecent(x.Id.ToString(), $"{x.Width} × {x.Height}", x.Time.ToLocalTime().ToString("g"), model.Thumbnail(x.Id))).ToArray() : [];
     public void Start(CaptureMode mode) { if (CanCapture) _capture.Start(mode, CaptureDoor.Island, Delay); }
-    public void OpenRecent(string id) { if (Guid.TryParse(id, out var key)) _capture.Model?.Annotate(key); }
+    public void OpenRecent(string id)
+    {
+        if (!Guid.TryParse(id, out var key) || _capture.RecentModel is not { } model) return;
+        if (!ReferenceEquals(_recentModel, model)) { _recentModel = model; _recentView = new CaptureRecentView(model); }
+        _ = model.OpenAsync(key);
+        _showingRecent = true;
+        _body.Content = _recentView;
+        _header.Content = _recentView!.Header;
+        Open();
+    }
     public void OpenFolder()
     {
         if (_capture.Model is not { } model) return;

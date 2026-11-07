@@ -78,7 +78,7 @@ public sealed class SettingsPageTests
             Theme();
             var model = new FakeModel();
             var page = new ScreenTextSettingsPage(model);
-            Assert.Equal(["Copy text from screen", "Extract text", "Scan QR code"], ScreenTextShortcuts.All);
+            Assert.Equal(["Copy text from screen", "Extract text", "Scan QR code", "Open Capture"], ScreenTextShortcuts.All);
             Assert.Equal("Not set", page.ShortcutOf(ScreenTextShortcuts.ScanQrCode).KeysText);
             var edit = page.ShortcutOf(ScreenTextShortcuts.ExtractText).EditButton;
             Assert.Equal("Edit Extract text shortcut", AutomationProperties.GetName(edit));

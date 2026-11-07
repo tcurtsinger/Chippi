@@ -76,7 +76,7 @@ try {
     $profile = Join-Path $env:APPDATA 'Chippi'
     New-Item -ItemType Directory -Path $profile -Force | Out-Null
     New-Item -ItemType Directory -Path "$results\saved" -Force | Out-Null
-    $settings = [ordered]@{ version = 1; app = @{ islandEnabled = $false }; modules = @{
+    $settings = [ordered]@{ version = 1; app = @{ islandEnabled = $true }; captureHost = @{ openCapture = @{ modifiers = 3; key = 56 } }; modules = @{
         'screen-capture' = @{ enter = 2; saveFolder = "$results\saved"; shortcuts = @{
             'Capture region' = @{ modifiers = 3; key = 49 }; 'Capture window' = @{ modifiers = 3; key = 50 };
             'Capture full screen' = @{ modifiers = 3; key = 51 }; 'Capture all displays' = @{ modifiers = 3; key = 52 };
@@ -156,6 +156,19 @@ try {
     Region; Invoke 'Save'
     WaitFor { @(Get-ChildItem "$results\saved" -Filter '*.png').Count -eq 3 } 'second saved file'
     $latestSaved = Get-ChildItem "$results\saved" -Filter '*.png' | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    Fixture; Starter 8
+    WaitFor { $null -ne (Find 'Capture region') } 'shared Capture panel'
+    Shot 'panel'
+    Invoke '401' -Prefix
+    WaitFor { $null -ne (Find 'Annotate') } 'Recent result page'
+    Shot 'recent-result'
+    $before = [CaptureCheck.Clipboard]::GetClipboardSequenceNumber()
+    Invoke 'Copy'; $copied = Copied $before
+    Require ($copied.Width -eq 401 -and $copied.Height -eq 251) 'Recent copy uses retained source pixels'
+    $copied.Dispose()
+    Invoke 'Annotate'
+    WaitFor { [Probe]::Foreground() -eq 'Chippi capture' } 'Recent result Annotate'
+    Tap 0x1B
     Fixture; Starter 9; WaitFor { $null -ne (Find 'Capture, ' -Prefix) } 'Recent in real Settings'; Shot 'settings-recent'
     Invoke 'Capture, ' -Prefix; Invoke 'Annotate'
     WaitFor { [Probe]::Foreground() -eq 'Chippi capture' } 'Annotate overlay'; Shot 'reopened'; Tap 0x1B

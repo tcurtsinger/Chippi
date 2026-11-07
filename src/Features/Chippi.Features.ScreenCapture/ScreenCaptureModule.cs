@@ -26,6 +26,7 @@ public sealed class ScreenCaptureModule(ICaptureLayer capture) : IFeatureModule
     public Action? OpenDelay { get; set; }
     public Func<bool> TextAvailable { get; init; } = () => false;
     public Func<CapturedImage, bool, Task> ReadText { get; init; } = (_, _) => Task.CompletedTask;
+    public CaptureRecentModel? RecentModel { get; private set; }
     public ScreenCaptureModel? Model { get; private set; }
     public FeatureDescriptor Descriptor { get; } = new(Id, "Screen capture", "Capture and mark up anything on screen", FeatureGroup.Capture)
     { Icon = "Scan", Presets = PresetMembership.PowerUser };
@@ -46,6 +47,7 @@ public sealed class ScreenCaptureModule(ICaptureLayer capture) : IFeatureModule
         _context = context;
         _store = new RecentCaptureStore(Path.Combine(context.DataDirectory, "recent"));
         Model = new ScreenCaptureModel(context, _store, Annotate, CaptureSavedFile.Recycle);
+        RecentModel = new CaptureRecentModel(Model, _store, context);
         context.Ui.SetSettingsPage(_ => new Views.ScreenCaptureSettingsPage(Model));
         _use = capture.Use();
         foreach (var mode in Modes) AddShortcut(mode.Name, () => Start(mode.Mode, CaptureDoor.Shortcut));
@@ -147,6 +149,7 @@ public sealed class ScreenCaptureModule(ICaptureLayer capture) : IFeatureModule
         foreach (var key in _keys) key.Dispose();
         _keys.Clear();
         _use?.Dispose(); _use = null;
+        RecentModel?.Dispose(); RecentModel = null;
         Model?.Dispose(); Model = null;
         _store?.Dispose(); _store = null;
         _context = null;
