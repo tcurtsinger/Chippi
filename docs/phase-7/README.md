@@ -58,7 +58,7 @@ Screen capture with markup, screen recording, text and QR from screen, a color p
 | Color picker (`color-picker.md`) | Herb | 1 | Lumen: Color page, bar line, Settings |
 | Text and QR (`text-and-qr.md`) | Herb | 1 | Lumen: Text and QR pages, Settings |
 | Displays and brightness (`displays.md`) | Kayla | 1 | Lumen: Displays tile and panel, Settings |
-| Screen recording (`screen-recording.md`) | Karl | 2 | Later |
+| Screen recording (`screen-recording.md`) | Herb | 2 | Later |
 | Media tools (`media-tools.md`) | Herb | 2 | Later |
 | Admin helper (`admin-helper.md`) | Kayla | 3 | None |
 | App updates, Uninstaller, Cleaner, Port manager | Karl, Kayla, Herb, Karl | 3 | Later |
