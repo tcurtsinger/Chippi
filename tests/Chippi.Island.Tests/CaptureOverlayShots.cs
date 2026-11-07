@@ -60,6 +60,15 @@ public sealed class CaptureOverlayShots
                 released.Up(new PixelPoint(1100, 700));
                 Shoot(released, request, $"capture-released{at}.png", bars: true);
 
+                // Shorter than the tool column: it grows up past the selection's top, then hits the display's top.
+                foreach (var (top, name) in new[] { (450, "short"), (20, "short-top") })
+                {
+                    var shortSel = new Selector(freeze, CaptureMode.Region, null, new PixelPoint(400, top), drag, 6);
+                    shortSel.Down(new PixelPoint(400, top), false);
+                    shortSel.Up(new PixelPoint(1100, top + 120));
+                    Shoot(shortSel, request, $"capture-released-{name}{at}.png", bars: true);
+                }
+
                 var corner = new Selector(freeze, CaptureMode.Region, null, new PixelPoint(1500, 760), drag, 6);
                 corner.Down(new PixelPoint(1500, 760), false);
                 corner.Up(new PixelPoint(1915, 1075));
