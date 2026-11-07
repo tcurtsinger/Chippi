@@ -13,7 +13,7 @@ public static class ScreenTextShortcuts
 {
     public const string CopyText = "Copy text from screen";
     public const string ExtractText = "Extract text";
-    public const string ScanQrCode = "Scan QR code";
+    public const string ScanQrCode = "Scan QR";
     public const string OpenCapture = "Open Capture";
 
     public static IReadOnlyList<string> All { get; } = [CopyText, ExtractText, ScanQrCode, OpenCapture];

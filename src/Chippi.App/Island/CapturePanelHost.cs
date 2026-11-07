@@ -142,7 +142,7 @@ internal sealed class CapturePanelHost : ICapturePanelModel, IDisposable
             List<CapturePanelTool> tools = [];
             if (Running(ScreenTextModule.Id))
             {
-                tools.Add(new("screen-text/extract", "Text", "Extract text", LucideIcons.Type, () => _text.Start(ScreenTextVerb.ExtractText, CaptureDoor.Island)) { Keys = ToolKeys(ScreenTextModule.Id, ScreenTextModule.ExtractName) });
+                tools.Add(new("screen-text/extract", "Text", "Extract text", LucideIcons.ScanText, () => _text.Start(ScreenTextVerb.ExtractText, CaptureDoor.Island)) { Keys = ToolKeys(ScreenTextModule.Id, ScreenTextModule.ExtractName) });
                 tools.Add(new("screen-text/qr", "QR code", "Scan QR", LucideIcons.QrCode, () => _text.Start(ScreenTextVerb.ScanQr, CaptureDoor.Island)) { Keys = ToolKeys(ScreenTextModule.Id, ScreenTextModule.ScanName) });
             }
             if (Running(ColorPickerModule.Id)) tools.Add(new("color-picker/pick", "Color", "Pick color", LucideIcons.Pipette, () => _color.Pick(false, CaptureDoor.Island)) { Keys = ToolKeys(ColorPickerModule.Id, ColorPickerModule.PickName) });
