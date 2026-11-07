@@ -113,3 +113,10 @@ When a step here changes, or you learn one, change this file in the same pull re
 - Screen capture is registered in the app. For a Settings-only dev run, install only `screen-capture`, set its `shortcuts` to `{ "Capture region": null }`, and disable the island. Capture reads and clipboard outputs still run only in Sandbox. The editor wiring has fixture checks; the feature is not done until Capture host/provider integration is complete and the brief's Sandbox flow is used. `run.ps1 -Checks screen-capture` checks the feature, its file actions and 50 actual captures inside Sandbox; it is separate from the shared layer's `capture` check.
 
 - Screen capture's crop preview uses `ICaptureSession.SetPreview` for the frame, dimming, pill and bars while the draft keeps its source pixels. `CaptureCropTests` renders applied crop and Undo offscreen with synthetic pixels, writing `capture-crop-applied.png` and `capture-crop-undone.png` under `CHIPPI_ISLAND_SHOTS`.
+
+## Screen recording (in progress)
+
+- `Chippi.Media` (encoder, recorder, GIF, trim) and `Chippi.Features.Recording` (the module and `RecordingController`, which every recording screen binds to). Offscreen checks: `dotnet test tests/Chippi.Media.Tests/Chippi.Media.Tests.csproj -c Release` (real Media Foundation on synthetic frames, temporary files) and `tests/Chippi.Features.Recording.Tests` (fake capture layer, sources and encoder on `ManualTime`). `OverlayTests` shows the red frame and the pill on the desktop for a moment to read their window styles.
+- Never record the owner's screen, sound or mic: WGC, loopback and mic capture run only in Windows Sandbox. Never install `screen-recording` in a dev profile that records. A Settings-only dev run is fine with its `shortcuts` left unset.
+- Record mode is `CaptureRequest.OneDisplay`: the selection stays on the display where the drag started (`RecordModeTests` in `Chippi.Capture.Tests`).
+- The widget and panel are left out of captures only while a recording runs (`ShellContext.LeaveIslandOutOfCaptures`); the frame and pill always are.

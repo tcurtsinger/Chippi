@@ -22,7 +22,10 @@ param(
     [Parameter(Mandatory)][string]$App,
     [Parameter(Mandatory)][string]$Out,
     [string[]]$Checks = @('radial', 'cost'),
-    [int]$TimeoutMinutes = 15
+    [int]$TimeoutMinutes = 15,
+    # The probe writes started.txt as its first act: without it by then, the Sandbox never ran the probe, so it's closed
+    # rather than left on the screen until TimeoutMinutes.
+    [int]$StartMinutes = 3
 )
 
 $ErrorActionPreference = 'Stop'
@@ -62,9 +65,19 @@ $wsb = Join-Path ([IO.Path]::GetTempPath()) ("chippi-input-" + [Guid]::NewGuid()
 $started = Get-Date
 Start-Process -FilePath 'WindowsSandbox.exe' -ArgumentList "`"$wsb`""
 $done = Join-Path $Out 'done.txt'
+$alive = Join-Path $Out 'started.txt'
+function Stop-Sandbox {
+    Get-Process -Name WindowsSandbox, WindowsSandboxClient, WindowsSandboxRemoteSession -ErrorAction SilentlyContinue | Stop-Process -Force
+    Remove-Item -LiteralPath $wsb -Force -ErrorAction SilentlyContinue
+}
 while (-not (Test-Path -LiteralPath $done)) {
-    if ((Get-Date) - $started -gt [TimeSpan]::FromMinutes($TimeoutMinutes)) {
-        Get-Process -Name WindowsSandbox, WindowsSandboxClient, WindowsSandboxRemoteSession -ErrorAction SilentlyContinue | Stop-Process -Force
+    $waited = (Get-Date) - $started
+    if (-not (Test-Path -LiteralPath $alive) -and $waited -gt [TimeSpan]::FromMinutes($StartMinutes)) {
+        Stop-Sandbox
+        throw "The Sandbox didn't start the probe in $StartMinutes minutes (no started.txt), so it was closed."
+    }
+    if ($waited -gt [TimeSpan]::FromMinutes($TimeoutMinutes)) {
+        Stop-Sandbox
         throw "No result after $TimeoutMinutes minutes; see $Out\probe.log"
     }
     Start-Sleep -Seconds 5

@@ -23,7 +23,9 @@ what arrived.
    powershell -ExecutionPolicy Bypass -File tests\Chippi.Input.Tests\Sandbox\run.ps1 -App $env:TEMP\chippi-sandbox\app -Out $env:TEMP\chippi-sandbox\out -Checks radial,cost
    ```
 
-   It waits for the probe (about 2 minutes, 5 with `cost`), closes the Sandbox and prints `results.json`.
+   It waits for the probe (about 2 minutes, 5 with `cost`), closes the Sandbox and prints `results.json`. The probe's
+   first act is writing `started.txt`; without it after `-StartMinutes` (3), the Sandbox never ran the probe, so the
+   runner closes it and fails rather than leaving it on the screen until `-TimeoutMinutes` (15).
 
 ## Checks
 
