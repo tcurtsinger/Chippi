@@ -11,12 +11,28 @@ public sealed class BarsAndDelayTests
     private static readonly PixelSize Output = new(200, 40);
 
     [Fact]
-    public void Tools_go_outside_the_right_edge_and_the_output_bar_under_right_aligned()
+    public void Tools_go_outside_the_right_edge_and_the_output_bar_under_meeting_at_the_corner()
     {
         var sel = new PixelRect(400, 300, 600, 400);
         var (tools, output) = BarPlacement.Place(sel, Display, Tools, Output);
-        Assert.Equal(new PixelRect(1008, 300, 40, 300), tools);
-        Assert.Equal(new PixelRect(800, 708, 200, 40), output);
+        Assert.Equal(new PixelRect(1008, 400, 40, 300), tools); // bottom on the selection's bottom
+        Assert.Equal(new PixelRect(800, 708, 200, 40), output); // right end on the selection's right
+        MeetAtCorner(tools, output);
+    }
+
+    [Fact]
+    public void A_selection_shorter_than_the_column_has_it_grow_up_past_its_top()
+    {
+        var (tools, output) = BarPlacement.Place(new PixelRect(400, 450, 700, 120), Display, Tools, Output);
+        Assert.Equal(new PixelRect(1108, 270, 40, 300), tools);
+        Assert.Equal(new PixelRect(900, 578, 200, 40), output);
+        MeetAtCorner(tools, output);
+
+        // Near the display's top the column stops a gap below it, still beside the selection and clear of the bar.
+        var (high, under) = BarPlacement.Place(new PixelRect(400, 20, 700, 120), Display, Tools, Output);
+        Assert.Equal(new PixelRect(1108, 8, 40, 300), high);
+        Assert.Equal(new PixelRect(900, 148, 200, 40), under);
+        Assert.True(high.Intersect(under).IsEmpty);
     }
 
     [Fact]
@@ -24,9 +40,10 @@ public sealed class BarsAndDelayTests
     {
         var sel = PixelRect.FromEdges(1500, 700, 1900, 1060);
         var (tools, output) = BarPlacement.Place(sel, Display, Tools, Output);
-        Assert.Equal(1500 - 8 - 40, tools.X);
-        Assert.Equal(700 - 8 - 40, output.Y);
-        Assert.Equal(1900 - 200, output.X);
+        Assert.Equal(new PixelRect(1500 - 8 - 40, 700, 40, 300), tools); // grows down from the top-left corner
+        Assert.Equal(new PixelRect(1500, 700 - 8 - 40, 200, 40), output); // grows right from it
+        Assert.Equal(output.Left - 8, tools.Right);
+        Assert.Equal(tools.Top - 8, output.Bottom);
     }
 
     [Fact]
@@ -36,23 +53,37 @@ public sealed class BarsAndDelayTests
         var (tools, output) = BarPlacement.Place(sel, Display, Tools, Output);
         Assert.Equal(1890 - 8 - 40, tools.X);
         Assert.Equal(1050 - 8 - 40, output.Y);
-        Assert.True(tools.Intersect(output).IsEmpty);
+        MeetAtCorner(tools, output);
     }
 
     [Fact]
-    public void A_selection_filling_its_display_has_both_bars_inside_and_apart()
+    public void A_selection_filling_its_display_has_both_bars_inside_meeting_at_the_corner()
     {
         var (tools, output) = BarPlacement.Place(Display, Display, Tools, Output);
         Assert.True(Display.Contains(tools) && Display.Contains(output));
-        Assert.Equal(1920 - 8 - 40, tools.X);
-        Assert.Equal(1080 - 8 - 40, output.Y);
-        Assert.True(tools.Intersect(output).IsEmpty);
-        Assert.Equal(1920 - 8 - 200, output.X);
+        Assert.Equal(new PixelRect(1920 - 8 - 40, 1080 - 8 - 40 - 8 - 300, 40, 300), tools);
+        Assert.Equal(new PixelRect(1920 - 8 - 40 - 8 - 200, 1080 - 8 - 40, 200, 40), output);
+        MeetAtCorner(tools, output);
 
-        // A tool column tall enough to reach the output bar pushes it left.
+        // A column taller than the room above the bar stops at the display's top, still clear of the bar.
         var (tall, beside) = BarPlacement.Place(Display, Display, new PixelSize(40, 1060), Output);
         Assert.True(tall.Intersect(beside).IsEmpty);
         Assert.Equal(tall.Left - 8, beside.Right);
+    }
+
+    [Fact]
+    public void A_small_selection_in_a_display_corner_keeps_the_bars_apart()
+    {
+        var (tools, output) = BarPlacement.Place(new PixelRect(10, 10, 100, 50), Display, Tools, Output);
+        Assert.True(Display.Contains(tools) && Display.Contains(output));
+        Assert.True(tools.Intersect(output).IsEmpty);
+    }
+
+    /// <summary>The column's bottom-left and the bar's top-right meet across one gap each way, as an L.</summary>
+    private static void MeetAtCorner(PixelRect tools, PixelRect output)
+    {
+        Assert.Equal(output.Right + 8, tools.Left);
+        Assert.Equal(tools.Bottom + 8, output.Top);
     }
 
     [Fact]

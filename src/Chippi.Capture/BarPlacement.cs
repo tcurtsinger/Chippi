@@ -14,11 +14,12 @@ public static class BarPlacement
 
     /// <summary>
     /// The tool column and the output bar for <paramref name="selection"/>, both on <paramref name="display"/> (the one the
-    /// drag was released on), never across two.
+    /// drag was released on), never across two. The two meet at one corner of the selection, as an L: the column grows
+    /// along the selection's side from that corner, the bar along its top or bottom.
     /// <list type="bullet">
     /// <item>Tool column: outside the right edge; else outside the left; else inside the right.</item>
-    /// <item>Output bar: under the selection, right-aligned with it; else above; else inside the bottom edge.</item>
-    /// <item>A selection that fills its display has both inside.</item>
+    /// <item>Output bar: under the selection; else above; else inside the bottom edge.</item>
+    /// <item>A selection that fills its display has both inside, still meeting at the corner.</item>
     /// </list>
     /// An empty size leaves that bar out (empty rectangle back).
     /// </summary>
@@ -29,31 +30,36 @@ public static class BarPlacement
         if (sel.IsEmpty)
             sel = new PixelRect(Math.Clamp(selection.X, display.Left, display.Right - 1), Math.Clamp(selection.Y, display.Top, display.Bottom - 1), 1, 1);
         bool fills = SelectionMath.FillsDisplay(selection, display);
+        bool hasTools = tools.Width > 0 && tools.Height > 0, hasOutput = output.Width > 0 && output.Height > 0;
+
+        // The column's side picks the corner's x, the output bar's side its y.
+        bool right = fills || sel.Right + gap + tools.Width <= display.Right - gap || sel.Left - gap - tools.Width < display.Left + gap;
+        bool toolsInside = fills || right && sel.Right + gap + tools.Width > display.Right - gap;
+        bool under = fills || sel.Bottom + gap + output.Height <= display.Bottom - gap || sel.Top - gap - output.Height < display.Top + gap;
+        bool outputInside = fills || under && sel.Bottom + gap + output.Height > display.Bottom - gap;
+
+        // The corner: the selection's own, or moved in past a bar that sits inside, so the bars still meet there. The
+        // column is a gap to one side of it and the output bar a gap below or above it.
+        int cornerX = !right ? sel.Left : !toolsInside ? sel.Right : hasTools ? sel.Right - gap - tools.Width - gap : sel.Right - gap;
+        int cornerY = !under ? sel.Top : !outputInside ? sel.Bottom : hasOutput ? sel.Bottom - gap - output.Height - gap : sel.Bottom - gap;
 
         PixelRect toolRect = default;
-        if (tools.Width > 0 && tools.Height > 0)
+        if (hasTools)
         {
-            int outsideRight = sel.Right + gap, outsideLeft = sel.Left - gap - tools.Width;
-            int x = !fills && outsideRight + tools.Width <= display.Right - gap ? outsideRight
-                : !fills && outsideLeft >= display.Left + gap ? outsideLeft
-                : sel.Right - gap - tools.Width;
-            int y = fills ? sel.Top + gap : sel.Top;
+            int x = right ? cornerX + gap : cornerX - gap - tools.Width;
+            int y = under ? cornerY - tools.Height : cornerY;
             toolRect = Clamp(new PixelRect(x, y, tools.Width, tools.Height), display, gap);
         }
 
         PixelRect outputRect = default;
-        if (output.Width > 0 && output.Height > 0)
+        if (hasOutput)
         {
-            int under = sel.Bottom + gap, above = sel.Top - gap - output.Height;
-            int y = !fills && under + output.Height <= display.Bottom - gap ? under
-                : !fills && above >= display.Top + gap ? above
-                : sel.Bottom - gap - output.Height;
-            // Right-aligned with the selection (a gap in from its edge when inside it), and clear of the tool column.
-            int right = fills ? sel.Right - gap : sel.Right;
-            var rect = Clamp(new PixelRect(right - output.Width, y, output.Width, output.Height), display, gap);
-            if (!toolRect.Intersect(rect).IsEmpty)
-                rect = Clamp(rect with { X = toolRect.Left - gap - output.Width }, display, gap);
-            outputRect = rect;
+            int x = right ? cornerX - output.Width : cornerX;
+            int y = under ? cornerY + gap : cornerY - gap - output.Height;
+            outputRect = Clamp(new PixelRect(x, y, output.Width, output.Height), display, gap);
+            // Clamped onto the column (a small selection in a display's corner): the bar goes past the column's end.
+            if (!toolRect.Intersect(outputRect).IsEmpty)
+                outputRect = Clamp(outputRect with { Y = under ? toolRect.Bottom + gap : toolRect.Top - gap - output.Height }, display, gap);
         }
         return (toolRect, outputRect);
     }
