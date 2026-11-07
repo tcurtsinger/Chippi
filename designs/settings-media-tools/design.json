@@ -1,0 +1,8 @@
+{
+  "title": "Settings › Media tools",
+  "for": "The Settings page for Media tools (Convert, Resize, Compress): where outputs go, metadata, the default level, the JPEG background and the three shortcuts.",
+  "knobs": [
+    "--radius-card",
+    "--accent"
+  ]
+}

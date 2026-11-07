@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Settings › Media tools, v1: where files go first, shortcuts last</title>
+<link rel="stylesheet" href="../tokens.css">
+<style>
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font-family:var(--font-text);font-variant-numeric:tabular-nums;background:var(--window);color:var(--text);-webkit-font-smoothing:antialiased}
+button,input{font:inherit;color:inherit;margin:0}
+svg.g{width:var(--s,16px);height:var(--s,16px);fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;flex:none;display:block}
+:focus-visible{outline:2px solid var(--focus-ring);outline-offset:1px}
+.page{padding:28px 16px 40px}
+.intro{max-width:900px;padding:0 4px}
+.intro h1{font-family:var(--font-display);font-size:20px;line-height:28px;font-weight:600;margin:0}
+.intro p{font-size:14px;line-height:20px;color:var(--text-secondary);margin:6px 0 0;max-width:80ch;text-wrap:pretty}
+.stages{display:flex;flex-wrap:wrap;gap:24px;margin-top:24px;align-items:flex-start}
+.stage{background:var(--window);color:var(--text);padding:16px;border-radius:var(--radius-card);border:1px solid var(--divider);min-width:0}
+.stage>h2{font-size:12px;line-height:16px;font-weight:600;color:var(--text-secondary);margin:0 0 12px;max-width:900px;text-wrap:pretty}
+.cap{font-size:12px;line-height:16px;color:var(--text-secondary);margin:0 0 6px;max-width:440px}
+@media (max-width:1199px){.stage.wide .zoom{zoom:.78}}
+@media (max-width:900px){.stage.wide .zoom{zoom:.6}}
+@media (max-width:640px){.page{padding:20px 8px}.stage{padding:10px}.stage.wide .zoom{zoom:.29}}
+
+.sw{width:1120px;background:var(--window);color:var(--text);font-size:14px;line-height:20px;border:1px solid var(--window-border);border-radius:var(--radius-card);overflow:hidden;display:flex;flex-direction:column;box-shadow:0 8px 32px rgba(0,0,0,.28)}
+.tbar{height:40px;display:flex;align-items:center;flex:none;font-size:12px}
+.tbar img{width:16px;height:16px;margin:0 9px 0 16px}
+.tbar .tt{flex:1}
+.tbar .cb{width:46px;height:40px;display:flex;align-items:center;justify-content:center;color:var(--text-secondary)}
+.shell{display:flex;flex:1}
+.side{width:272px;flex:none;padding:14px 12px 16px}
+.find{height:32px;margin:0 0 6px;padding:0 12px;border-radius:var(--radius-control);background:var(--input);border:1px solid var(--control-stroke);border-bottom-color:var(--input-stroke-bottom);display:flex;align-items:center;gap:10px;font-size:14px;color:var(--text-muted)}
+.gl{font-size:12px;color:var(--text-secondary);padding:12px 12px 2px;line-height:16px;font-weight:600}
+.nav{position:relative;height:32px;margin:2px 0;padding:0 12px;border-radius:var(--radius-control);display:flex;align-items:center;gap:12px;white-space:nowrap;color:var(--text)}
+.nav[aria-current="page"]{background:var(--subtle-selected);font-weight:600}
+.nav[aria-current="page"]::before{content:"";position:absolute;left:0;top:8px;width:3px;height:16px;border-radius:2px;background:var(--accent)}
+.spage{flex:1;padding:6px 40px 32px 40px;min-width:0}
+.ptitle{font-family:var(--font-display);font-size:20px;font-weight:600;line-height:28px;margin:0 0 12px}
+.sh{font-size:14px;font-weight:600;line-height:20px;margin:24px 0 8px}
+.scard{background:var(--card);border:1px solid var(--card-stroke);border-radius:var(--radius-card);margin-bottom:8px}
+.sr{min-height:49px;display:flex;align-items:center;padding:8px 16px;gap:12px;border-top:1px solid var(--divider)}
+.sr:first-child{border-top:0}
+.sr .lead{color:var(--text-secondary);flex:none;display:flex;align-items:center}
+.sr.warn .lead{color:var(--warning-text)}
+.sr .tl{flex:1;min-width:0}
+.sr.dep{padding-left:50px}
+.right{display:flex;flex-direction:column;align-items:flex-end;gap:2px}
+.right .msg{font-size:12px;line-height:16px;color:var(--warning-text)}
+.sbt{height:32px;padding:0 12px;border-radius:var(--radius-control);border:1px solid var(--control-stroke);background:var(--control);font-size:14px;color:var(--button-text);display:inline-flex;align-items:center;gap:8px;white-space:nowrap;cursor:pointer}
+.sbt:hover{background:var(--control-hover)}
+.scombo{height:32px;min-width:220px;padding:0 10px 0 11px;border-radius:var(--radius-control);border:1px solid var(--control-stroke);background:var(--control);display:inline-flex;align-items:center;justify-content:space-between;gap:12px;font-size:14px;white-space:nowrap;color:var(--button-text);cursor:pointer}
+.scombo .g{color:var(--text-secondary)}
+.scombo[aria-disabled="true"]{color:var(--text-caption);cursor:default}
+.ssw{display:flex;align-items:center;gap:12px;border:0;background:none;padding:0;cursor:pointer;color:var(--text)}
+.ssw i{width:40px;height:20px;border-radius:10px;border:1px solid var(--switch-off-stroke);position:relative;flex:none}
+.ssw i::after{content:"";position:absolute;left:4px;top:4px;width:10px;height:10px;border-radius:5px;background:var(--switch-off-knob)}
+.ssw[aria-checked="true"] i{background:var(--accent);border-color:var(--accent)}
+.ssw[aria-checked="true"] i::after{left:auto;right:3px;top:3px;width:12px;height:12px;border-radius:6px;background:var(--on-accent)}
+.skc{height:24px;min-width:24px;padding:0 7px;border-radius:var(--radius-control);border:1px solid var(--control-stroke);background:var(--chip);font-size:11px;display:inline-flex;align-items:center;justify-content:center;color:var(--text-secondary)}
+.keys{display:flex;gap:4px;align-items:center}
+.edit{color:var(--text);font-size:14px;display:inline-flex;align-items:center;gap:6px;border:0;background:none;padding:4px 0 4px 8px;cursor:pointer}
+.val{color:var(--text-caption);font-size:14px;white-space:nowrap}
+.dot{width:14px;height:14px;border-radius:7px;box-shadow:0 0 0 1px var(--control-stroke);flex:none}
+.cv{display:inline-flex;align-items:center;gap:8px}
+.sr.dense{min-height:41px;padding-top:4px;padding-bottom:4px}
+.states{display:flex;flex-direction:column;gap:16px;width:768px}
+.drop{position:relative;padding-bottom:var(--room,0)}
+.menu{position:absolute;right:16px;top:44px;z-index:2;min-width:300px;padding:4px;background:var(--flyout);border:1px solid var(--flyout-card-stroke);border-radius:var(--radius-card);box-shadow:0 8px 24px rgba(0,0,0,.28)}
+.menu div{position:relative;height:32px;padding:0 12px;display:flex;align-items:center;border-radius:var(--radius-control);white-space:nowrap;color:var(--text)}
+.menu div[aria-selected="true"]{background:var(--subtle-selected)}
+.menu div[aria-selected="true"]::before{content:"";position:absolute;left:0;top:9px;width:3px;height:14px;border-radius:2px;background:var(--accent)}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<!-- Lucide glyphs (ISC), from lucide-react 1.35.0 and Chippi's LucideIcons.cs -->
+<symbol id="i-app-window" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M10 4v4"/><path d="M2 8h20"/><path d="M6 4v4"/></symbol>
+<symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0"/></symbol>
+<symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+<symbol id="i-coffee" viewBox="0 0 24 24"><path d="M10 2v2"/><path d="M14 2v2"/><path d="M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1"/><path d="M6 2v2"/></symbol>
+<symbol id="i-droplet" viewBox="0 0 24 24"><path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/></symbol>
+<symbol id="i-images" viewBox="0 0 24 24"><path d="m22 11-1.296-1.296a2.4 2.4 0 0 0-3.408 0L11 16"/><path d="M4 8a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2"/><circle cx="13" cy="7" r="1" fill="currentColor"/><rect x="8" y="2" width="14" height="14" rx="2"/></symbol>
+<symbol id="i-info" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 1 0 0-20zM12 16v-4M12 8h.01"/></symbol>
+<symbol id="i-keyboard" viewBox="0 0 24 24"><path d="M10 8h.01"/><path d="M12 12h.01"/><path d="M14 8h.01"/><path d="M16 12h.01"/><path d="M18 8h.01"/><path d="M6 8h.01"/><path d="M7 16h10"/><path d="M8 12h.01"/><rect width="20" height="16" x="2" y="4" rx="2"/></symbol>
+<symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+<symbol id="i-music" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></symbol>
+<symbol id="i-pipette" viewBox="0 0 24 24"><path d="m12 9-8.414 8.414A2 2 0 0 0 3 18.828v1.344a2 2 0 0 1-.586 1.414A2 2 0 0 1 3.828 21h1.344a2 2 0 0 0 1.414-.586L15 12"/><path d="m18 9 .4.4a1 1 0 1 1-3 3l-3.8-3.8a1 1 0 1 1 3-3l.4.4 3.4-3.4a1 1 0 1 1 3 3z"/><path d="m2 22 .414-.414"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+<symbol id="i-scan" viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/></symbol>
+<symbol id="i-scan-text" viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 8h8"/><path d="M7 12h10"/><path d="M7 16h6"/></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></symbol>
+<symbol id="i-settings" viewBox="0 0 24 24"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/></symbol>
+<symbol id="i-shield" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></symbol>
+<symbol id="i-square" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/></symbol>
+<symbol id="i-square-arrow-out-up-right" viewBox="0 0 24 24"><path d="M21 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h6"/><path d="m21 3-9 9"/><path d="M15 3h6v6"/></symbol>
+<symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></symbol>
+<symbol id="i-triangle-alert" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></symbol>
+<symbol id="i-video" viewBox="0 0 24 24"><path d="m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5"/><rect x="2" y="6" width="14" height="12" rx="2"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+<symbol id="i-zap" viewBox="0 0 24 24"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></symbol>
+</svg>
+<main class="page">
+<header class="intro" data-id="intro"><h1 data-id="title">Settings › Media tools, v3: by tab</h1><p>Grouped like the Convert page's three tabs, with each shortcut beside its tab's settings. What every file shares comes first, then Convert with its JPEG background, Resize, and Compress with its default level. There's no separate Shortcuts section.</p><p>The Settings window at its real 1120 width, with the shipped rows, switches, keycaps and Edit links. Each shortcut is read-only here; Edit opens its row in Settings › Shortcuts. All three start unassigned. Originals are never changed: files go beside them unless you choose a folder.</p><p>Pick this one if you think in tabs. Resize has nothing but its shortcut, since its sizes are chosen on the page each time.</p></header>
+<div class="stages">
+
+<section class="stage dark wide" data-id="media-tools"><h2 data-id="media-tools-heading">Settings › Media tools</h2>
+<div class="zoom"><div class="sw" data-id="media-tools-window"><div class="tbar"><img src="../home/pet-dark.png" alt=""><span class="tt">Chippi Settings</span><span class="cb"><svg class="g" style="--s:12px" aria-hidden="true"><use href="#i-minus"/></svg></span><span class="cb"><svg class="g" style="--s:11px" aria-hidden="true"><use href="#i-square"/></svg></span><span class="cb"><svg class="g" style="--s:12px" aria-hidden="true"><use href="#i-x"/></svg></span></div><div class="shell"><nav class="side" aria-label="Settings pages" data-id="media-tools-sidebar"><div class="find"><svg class="g" aria-hidden="true"><use href="#i-search"/></svg>Find a setting</div><div class="gl">Sound</div><a class="nav"><svg class="g" aria-hidden="true"><use href="#i-music"/></svg>Now Playing</a><div class="gl">System</div><a class="nav"><svg class="g" aria-hidden="true"><use href="#i-coffee"/></svg>Keep awake</a><a class="nav"><svg class="g" aria-hidden="true"><use href="#i-sun"/></svg>Displays</a><div class="gl">Windows</div><a class="nav"><svg class="g" aria-hidden="true"><use href="#i-search"/></svg>Command bar</a><a class="nav"><svg class="g" aria-hidden="true"><use href="#i-zap"/></svg>Radial menu</a><a class="nav"><svg class="g" aria-hidden="true"><use href="#i-app-window"/></svg>App switcher</a><div class="gl">Capture</div><a class="nav"><svg class="g" aria-hidden="true"><use href="#i-scan"/></svg>Screen capture</a><a class="nav"><svg class="g" aria-hidden="true"><use href="#i-scan-text"/></svg>Text and QR</a><a class="nav"><svg class="g" aria-hidden="true"><use href="#i-pipette"/></svg>Color picker</a><a class="nav" data-id="media-nav-recording"><svg class="g" aria-hidden="true"><use href="#i-video"/></svg>Recording</a><a class="nav" aria-current="page" data-id="media-nav-media-tools"><svg class="g" aria-hidden="true"><use href="#i-images"/></svg>Media tools</a><div class="gl">Chippi</div><a class="nav"><svg class="g" aria-hidden="true"><use href="#i-settings"/></svg>General</a><a class="nav"><svg class="g" aria-hidden="true"><use href="#i-droplet"/></svg>Island &amp; pet</a><a class="nav"><svg class="g" aria-hidden="true"><use href="#i-bell"/></svg>Notifications</a><a class="nav"><svg class="g" aria-hidden="true"><use href="#i-keyboard"/></svg>Shortcuts</a><a class="nav"><svg class="g" aria-hidden="true"><use href="#i-shield"/></svg>Permissions</a><a class="nav"><svg class="g" aria-hidden="true"><use href="#i-plus"/></svg>Add features</a><a class="nav"><svg class="g" aria-hidden="true"><use href="#i-info"/></svg>About</a></nav>
+<div class="spage" data-id="media-tools-page"><h1 class="ptitle" data-id="media-tools-page-title">Media tools</h1>
+<h2 class="sh" data-id="section-every">Every file</h2>
+<div class="scard" data-id="every-card">
+<div class="sr" data-id="row-output-folder"><span class="tl">Output folder</span><span class="right"><span style="display:flex;gap:8px;align-items:center"><span class="val">Beside the original</span><button class="sbt" data-id="button-change">Change</button></span></span></div>
+<div class="sr" data-id="row-keep-metadata"><span class="tl">Keep metadata</span><button class="ssw" role="switch" aria-checked="false" aria-label="Keep metadata" data-id="switch-keep-metadata">Off<i></i></button></div>
+</div>
+<h2 class="sh" data-id="section-convert">Convert</h2>
+<div class="scard" data-id="convert-card">
+<div class="sr" data-id="row-jpeg-background"><span class="tl">JPEG background</span><button class="scombo" aria-haspopup="listbox" data-id="combo-jpeg-background"><span class="cv"><span class="dot" style="background:#FFFFFF"></span>White</span><svg class="g" style="--s:12px" aria-hidden="true"><use href="#i-chevron-down"/></svg></button></div>
+<div class="sr" data-id="shortcut-convert-media"><span class="tl">Convert media</span><span class="val">Not set</span><button class="edit" aria-label="Edit Convert media in Shortcuts" data-id="edit-convert-media">Edit <svg class="g" style="--s:14px" aria-hidden="true"><use href="#i-square-arrow-out-up-right"/></svg></button></div>
+</div>
+<h2 class="sh" data-id="section-resize">Resize</h2>
+<div class="scard" data-id="resize-card">
+<div class="sr" data-id="shortcut-resize-images"><span class="tl">Resize images</span><span class="val">Not set</span><button class="edit" aria-label="Edit Resize images in Shortcuts" data-id="edit-resize-images">Edit <svg class="g" style="--s:14px" aria-hidden="true"><use href="#i-square-arrow-out-up-right"/></svg></button></div>
+</div>
+<h2 class="sh" data-id="section-compress">Compress</h2>
+<div class="scard" data-id="compress-card">
+<div class="sr" data-id="row-default-level"><span class="tl">Default level</span><button class="scombo" aria-haspopup="listbox" data-id="combo-default-level">Balanced<svg class="g" style="--s:12px" aria-hidden="true"><use href="#i-chevron-down"/></svg></button></div>
+<div class="sr" data-id="shortcut-compress-media"><span class="tl">Compress media</span><span class="val">Not set</span><button class="edit" aria-label="Edit Compress media in Shortcuts" data-id="edit-compress-media">Edit <svg class="g" style="--s:14px" aria-hidden="true"><use href="#i-square-arrow-out-up-right"/></svg></button></div>
+</div>
+</div></div></div></div></section>
+
+<section class="stage light wide" data-id="media-tools-light" data-light-of="media-tools"><h2>Settings › Media tools · Light</h2></section>
+
+<section class="stage dark wide" data-id="states"><h2 data-id="states-heading">Rows that change</h2>
+<div class="zoom"><div class="states">
+<div><p class="cap">Output folder: the default</p><div class="scard" data-id="state-output-default"><div class="sr"><span class="tl">Output folder</span><span class="right"><span style="display:flex;gap:8px;align-items:center"><span class="val">Beside the original</span><button class="sbt">Change</button></span></span></div></div></div>
+<div><p class="cap">A folder you chose gets Reset, which puts files back beside their originals</p><div class="scard" data-id="state-output-changed"><div class="sr"><span class="tl">Output folder</span><span class="right"><span style="display:flex;gap:8px;align-items:center"><span class="val">D:\Converted</span><button class="sbt">Reset</button><button class="sbt">Change</button></span></span></div></div></div>
+<div><p class="cap">The folder is gone: each file fails with "Folder not found" until it's changed or reset</p><div class="scard" data-id="state-output-gone"><div class="sr"><span class="tl">Output folder</span><span class="right"><span style="display:flex;gap:8px;align-items:center"><span class="val">D:\Converted</span><button class="sbt">Reset</button><button class="sbt">Change</button></span><span class="msg">Folder not found</span></span></div></div></div>
+<div class="drop" style="--room:116px"><p class="cap">Default level, open: the level Compress starts on</p><div class="scard" data-id="state-level-open"><div class="sr"><span class="tl">Default level</span><button class="scombo" aria-haspopup="listbox" aria-expanded="true">Balanced<svg class="g" style="--s:12px" aria-hidden="true"><use href="#i-chevron-down"/></svg></button></div></div>
+<div class="menu" role="listbox" aria-label="Default level" style="top:66px;min-width:220px" data-id="level-list"><div role="option">Small</div><div role="option" aria-selected="true">Balanced</div><div role="option">High</div></div></div>
+<div class="drop" style="--room:116px"><p class="cap">JPEG background, open: Custom opens Windows' color picker</p><div class="scard" data-id="state-background-open"><div class="sr"><span class="tl">JPEG background</span><button class="scombo" aria-haspopup="listbox" aria-expanded="true"><span class="cv"><span class="dot" style="background:#FFFFFF"></span>White</span><svg class="g" style="--s:12px" aria-hidden="true"><use href="#i-chevron-down"/></svg></button></div></div>
+<div class="menu" role="listbox" aria-label="JPEG background" style="top:66px;min-width:220px" data-id="background-list"><div role="option" aria-selected="true"><span class="cv"><span class="dot" style="background:#FFFFFF"></span>White</span></div><div role="option"><span class="cv"><span class="dot" style="background:#000000"></span>Black</span></div><div role="option">Custom…</div></div></div>
+<div><p class="cap">A custom background picked</p><div class="scard" data-id="state-background-custom"><div class="sr"><span class="tl">JPEG background</span><button class="scombo" aria-haspopup="listbox"><span class="cv"><span class="dot" style="background:#F2EDE4"></span>#F2EDE4</span><svg class="g" style="--s:12px" aria-hidden="true"><use href="#i-chevron-down"/></svg></button></div></div></div>
+<div><p class="cap">A Windows N edition without the Media Feature Pack: it leads the page, video rows on the Convert page say the same, and images still work</p><div class="scard" data-id="state-no-encoder"><div class="sr warn"><span class="lead"><svg class="g" aria-hidden="true"><use href="#i-triangle-alert"/></svg></span><span class="tl">Video encoding unavailable</span><button class="sbt" data-id="button-optional-features">Open Optional features</button></div></div></div>
+<div><p class="cap">Shortcuts once set, one held by another app</p><div class="scard" data-id="state-shortcuts-set">
+<div class="sr"><span class="tl">Convert media</span><span class="keys"><span class="skc">Ctrl</span><span class="skc">Alt</span><span class="skc">C</span></span><button class="edit" aria-label="Edit Convert media in Shortcuts">Edit <svg class="g" style="--s:14px" aria-hidden="true"><use href="#i-square-arrow-out-up-right"/></svg></button></div>
+<div class="sr"><span class="tl">Resize images</span><span class="right"><span class="keys"><span class="skc">Ctrl</span><span class="skc">Alt</span><span class="skc">I</span></span><span class="msg">In use by another app</span></span><button class="edit" aria-label="Edit Resize images in Shortcuts">Edit <svg class="g" style="--s:14px" aria-hidden="true"><use href="#i-square-arrow-out-up-right"/></svg></button></div>
+<div class="sr"><span class="tl">Compress media</span><span class="val">Not set</span><button class="edit" aria-label="Edit Compress media in Shortcuts">Edit <svg class="g" style="--s:14px" aria-hidden="true"><use href="#i-square-arrow-out-up-right"/></svg></button></div>
+</div></div>
+</div></div></section>
+</div>
+</main>
+<script>
+document.querySelectorAll('[data-light-of]').forEach(function(s){var z=document.querySelector('[data-id="'+s.dataset.lightOf+'"] .zoom').cloneNode(true);z.querySelectorAll('[data-id]').forEach(function(e){e.removeAttribute('data-id')});z.querySelectorAll('img').forEach(function(i){i.src='../home/pet-light.png'});s.appendChild(z)});
+</script>
+</body>
+</html>

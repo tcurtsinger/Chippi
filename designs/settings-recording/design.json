@@ -1,0 +1,8 @@
+{
+  "title": "Settings › Recording",
+  "for": "The Settings page for Screen recording: where recordings go, the format, frame rate, GIF limit, sound devices, the pointer and the five shortcuts.",
+  "knobs": [
+    "--radius-card",
+    "--accent"
+  ]
+}
