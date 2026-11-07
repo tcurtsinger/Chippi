@@ -100,7 +100,7 @@ public enum QrScanState
     /// <summary>The decoder saw no code ("No QR code found").</summary>
     NotFound,
 
-    /// <summary>A code was seen but couldn't be decoded ("That code can't be read").</summary>
+    /// <summary>A code was seen but couldn't be decoded ("Unreadable QR code").</summary>
     Unreadable,
 }
 

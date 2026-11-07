@@ -43,7 +43,7 @@ Select and decode. Dragging a region decodes that region. Enter with no region, 
 - **One code:** its kind (Link, Text, Wi-Fi, Contact, Email, Phone, Message, Location, Other) and the payload in full, selectable. Copy writes the payload. Open appears only for a web link (see below).
 - **Several codes:** the header switches between them ("1 of 3"); each is listed separately with the same fields. Never merged, never ordered by guess: by position, top to bottom then left to right.
 - **Wi-Fi codes** show name, security and a password hidden behind Show. **Contacts** show the lines as text. Chippi doesn't join networks or add contacts.
-- **No code found** and **a code that can't be read** are two states: "No QR code found" when the decoder sees nothing, and "That code can't be read" when it found a pattern but couldn't decode it (damaged, too small). The second suggests selecting closer.
+- **No code found** and **a code that can't be read** are two states: "No QR code found" when the decoder sees nothing, and "Unreadable QR code" when it found a pattern but couldn't decode it (damaged, too small). The second suggests selecting closer.
 - **Open link.** Only for payloads that parse as an absolute `http` or `https` URL. The full address shows above the button with the host emphasized; a host with non-ASCII characters or an `xn--` label gets "Check the address" next to it. Open hands the exact string to the default browser, once, on Travis's click. It never follows redirects itself and never opens on its own. Every other scheme (`file:`, `ms-settings:`, `tel:`, `sms:`, `intent:`, `smb:` and the rest), payments and shell-looking text are shown as text with Copy only. A QR code can carry any URL, so showing it first is the point.
 
 ### Capture bar buttons
@@ -72,7 +72,7 @@ A screenshot's text can be a password or a code. OCR text, QR payloads and the i
 - **Clipboard write refused.** The bar line reads "Copy failed"; on the Text page the text stays on the page.
 - **HDR.** The frozen image is Windows' 8-bit version of the screen; recognition runs on that. See Not verified.
 - **A huge QR payload.** Shown in a scrollable box; Copy still writes it all.
-- **Rotated or mirrored codes.** `AutoRotate` covers 90° turns; a mirrored code may not decode and shows "That code can't be read".
+- **Rotated or mirrored codes.** `AutoRotate` covers 90° turns; a mirrored code may not decode and shows "Unreadable QR code".
 - **A display at 150%.** Regions are physical pixels, so a code is decoded at screen resolution, not 1.5× smaller.
 - **Elevated windows** may not read from a standard-user Chippi (unverified). The screen read includes them (inference).
 
@@ -115,7 +115,7 @@ Every on-screen string, for Marge's Decide pass.
 | Text page | Language, 31 words; Copy all, Reselect, Retry |
 | QR page title | QR code |
 | QR page | Link, Text, Wi-Fi, Contact, Email, Phone, Message, Location, Other; 1 of 3; Copy, Open, Show, Hide; Check the address |
-| QR page states | No QR code found; That code can't be read |
+| QR page states | No QR code found; Unreadable QR code |
 | QR bar line | QR scan failed (a decoder error, not "none found") |
 | Settings page | Text and QR |
 | Settings rows | OCR language (installed ones only), Line breaks (Keep lines, Join lines into paragraphs), the note "Reads text on this PC. Tables and reading order aren't kept." |

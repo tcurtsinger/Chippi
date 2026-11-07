@@ -21,7 +21,7 @@ namespace Chippi.Features.ScreenText.Views;
 public sealed class QrResultView : UserControl
 {
     internal const string NotFound = "No QR code found";
-    internal const string Unreadable = "That code can't be read";
+    internal const string Unreadable = "Unreadable QR code";
     internal const string CheckAddress = "Check the address";
     internal const string Hidden = "••••••••";
 
