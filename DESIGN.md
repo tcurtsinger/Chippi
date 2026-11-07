@@ -448,6 +448,15 @@ Screen and copy specification: [approved notes](docs/phase-5/design/notes.md), [
   - Uninstalling Clipboard history while history is saved asks "Uninstall and erase history?".
 - **Confirmations.** Clipboard Clear targets the unpinned entries captured when More opened. With a search, **Clear matches** applies only to matching unpinned clips, including matches outside the widget. It is disabled with no eligible clips. Ask “Clear 3 matching unpinned clips?” or, without a search, “Clear 3 unpinned clips?” with Cancel and Clear. **Erase all** asks “Erase all items and pins?” with Cancel and Erase. Scratchpad asks “Delete ‘Standup’?” with Cancel and Delete.
 
+### Capture panel (approved 2026-11-06)
+
+Screen specification: [designs/capture-panel/v1.html](designs/capture-panel/v1.html), which Travis picked; behavior is in [screen-capture.md](docs/phase-7/screen-capture.md). The Capture tile's page (`CapturePanelView`, Chippi.UI), drawn from `ICapturePanelModel`, which the Capture host implements over the installed capture features. Nothing on it scrolls.
+
+- **Header:** Back, "Capture", and Delay on the right: a 24 island button (Timer 12, the choice in 11, a chevron) whose menu lists No delay, 3, 5 and 10 seconds in the island's 30 list rows of 12, the kept one checked on the accent tint. The menu sits under Delay with its right edge on Delay's, on the solid flyout fill so the cards don't show through.
+- **Modes:** one row of six 64 cards on the body's 76 columns, as the home's tool tiles (gallery face, card edge, a lift on hover and focus): Region, Window, Screen, All displays, Freeform, Last region, each a 20 glyph in Secondary over its 12 label. The tooltip and the screen reader's name are the starter's verb, then its keys once set ("Capture region · Print Screen"); no keys while Windows holds Print Screen.
+- **Tools:** the installed features' cards on the row under, 8 below, in their order (Text, QR code, Color; wave 2 adds Record, GIF, Convert after them, so nothing moves). Six fit. With no tools the row goes, and without Screen capture only the tools show.
+- **Recent:** "Recent" (12 / 600) with Open folder (24 island button) 12 under the tools, then the newest four captures in four columns: the thumbnail 66 high, fitted whole and centered on the gallery face (hairline, 6 corners), its mode and size in 11 secondary and its age in 11 tertiary. A thumbnail opens its capture's page. With none, a 104 card with the Image glyph and "No captures yet" in tertiary, and no Open folder.
+
 ### Capture results (approved 2026-11-06)
 
 Screen specification: [designs/capture-results/v3.html](designs/capture-results/v3.html), which Travis picked; behavior is in [text-and-qr.md](docs/phase-7/text-and-qr.md) and [color-picker.md](docs/phase-7/color-picker.md). The bar's lines are in §5 Island. The pages sit on the Capture panel with Back; nothing on them scrolls but a long text or payload.
