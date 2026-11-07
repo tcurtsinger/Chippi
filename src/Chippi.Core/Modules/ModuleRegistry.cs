@@ -272,7 +272,7 @@ public sealed class ModuleRegistry(ConfigStore config, IslandActivityHub island,
                 Tile = ActionsTile.Input,
             });
         }
-        foreach (var tile in IslandTileContribution.Group(_entries.Where(e => e.IsRunning).SelectMany(e => e.IslandTiles)))
+        foreach (var tile in IslandTileContribution.Group(_entries.Where(e => e.IsRunning).SelectMany(e => e.IslandTiles).Concat(_services.SharedIslandTiles())))
         {
             if (tile.Parts.Any(p => p.Spec.TakesKeyboard))
                 continue; // the Command bar's own page

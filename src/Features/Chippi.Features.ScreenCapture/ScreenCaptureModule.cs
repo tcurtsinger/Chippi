@@ -23,6 +23,7 @@ public sealed class ScreenCaptureModule(ICaptureLayer capture) : IFeatureModule
     private readonly List<IHotkey> _keys = [];
     private CaptureEditor? _editor;
     private DispatcherTimer? _clear;
+    public Action? OpenDelay { get; set; }
     public Func<bool> TextAvailable { get; init; } = () => false;
     public Func<CapturedImage, bool, Task> ReadText { get; init; } = (_, _) => Task.CompletedTask;
     public ScreenCaptureModel? Model { get; private set; }
@@ -49,14 +50,14 @@ public sealed class ScreenCaptureModule(ICaptureLayer capture) : IFeatureModule
         _use = capture.Use();
         foreach (var mode in Modes) AddShortcut(mode.Name, () => Start(mode.Mode, CaptureDoor.Shortcut));
         // Delay's picker belongs to the approved Capture panel, which the host opens.
-        AddShortcut(ScreenCaptureShortcuts.CaptureAfterDelay, OpenCapture);
+        AddShortcut(ScreenCaptureShortcuts.CaptureAfterDelay, () => OpenDelay?.Invoke());
         AddShortcut("Open recent captures", ShowRecent);
         context.Ui.AddCommands(() =>
         [
             .. Modes.Select(mode => new ChippiCommand($"{Id}/{mode.Command}", mode.Name, "Scan",
                 () => { Start(mode.Mode, CaptureDoor.Island); return Task.CompletedTask; })),
             new ChippiCommand($"{Id}/recent", "Open recent captures", "History", () => { ShowRecent(); return Task.CompletedTask; }),
-            new ChippiCommand($"{Id}/delay", ScreenCaptureShortcuts.CaptureAfterDelay, "Timer", () => { OpenCapture(); return Task.CompletedTask; }),
+            new ChippiCommand($"{Id}/delay", ScreenCaptureShortcuts.CaptureAfterDelay, "Timer", () => { OpenDelay?.Invoke(); return Task.CompletedTask; }),
         ]);
         return Task.CompletedTask;
     }

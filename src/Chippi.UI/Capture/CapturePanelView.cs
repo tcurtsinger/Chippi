@@ -107,7 +107,7 @@ public sealed class CapturePanelView : UserControl
     public DockPanel Header { get; }
 
     /// <summary>The first mode card, for the island's keyboard focus when the page takes it.</summary>
-    public Button InitialFocus => _modeCards[CaptureMode.Region];
+    public Button InitialFocus => _model.CanCapture ? _modeCards[CaptureMode.Region] : _tools.Children.OfType<Button>().FirstOrDefault() ?? _modeCards[CaptureMode.Region];
 
     internal IReadOnlyDictionary<CaptureMode, Button> ModeCards => _modeCards;
 
@@ -189,7 +189,7 @@ public sealed class CapturePanelView : UserControl
         return new DockPanel { LastChildFill = true, Children = { _delay, _delayMenu, title } };
     }
 
-    private void OpenDelayMenu()
+    public void OpenDelayMenu()
     {
         ShowDelay();
         _delayMenu.IsOpen = true;

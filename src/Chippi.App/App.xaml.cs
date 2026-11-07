@@ -275,7 +275,9 @@ public partial class App : Application
         shell.Registry.Register(screenCapture);
         shell.Registry.Changed += (_, _) => Dispatcher.BeginInvoke(screenCapture.RefreshProviders);
         // [Phase 7] Color picker: on the capture layer.
-        shell.Registry.Register(new Chippi.Features.ColorPicker.ColorPickerModule(shell.Capture));
+        var colorPicker = new Chippi.Features.ColorPicker.ColorPickerModule(shell.Capture);
+        shell.Registry.Register(colorPicker);
+        shell.CapturePanel = new Chippi.App.Island.CapturePanelHost(shell, screenCapture, screenText, colorPicker);
         if (shell.Services.Actions is Chippi.UI.Actions.WindowsActionPc windowPc)
         {
             windowPc.SnapZones = windowLayouts.ResolveZone;
@@ -360,6 +362,7 @@ public partial class App : Application
         _toasts?.Dispose();
         Shell?.Clipboard.Dispose();
         Shell?.Input.Dispose();
+        Shell?.CapturePanel?.Dispose();
         Shell?.Hotkeys.Dispose();
         (Shell?.Services.Actions as IDisposable)?.Dispose();
         _instance?.Dispose();

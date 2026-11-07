@@ -233,7 +233,7 @@ public sealed class ScreenTextModule : IFeatureModule
             if (context is null) return (null, null);
             bool host = name == ScreenTextShortcuts.OpenCapture;
             foreach (var entry in context.Shortcuts.List)
-                if (host ? entry.Name == name && entry.Owner != Id : entry.Owner == Id && entry.Name == Map(name))
+                if (host ? entry.Name == name && entry.Owner == "capture" : entry.Owner == Id && entry.Name == Map(name))
                     return (entry.Shortcut, entry.Error);
             return (null, null);
         }
@@ -270,7 +270,7 @@ public sealed class ScreenTextModule : IFeatureModule
         {
             ModuleContext? context;
             lock (owner._gate) context = owner._context;
-            if (name != ScreenTextShortcuts.OpenCapture) context?.EditShortcut(Map(name));
+            if (name == ScreenTextShortcuts.OpenCapture) context?.EditShortcutFor("capture", name); else context?.EditShortcut(Map(name));
         }
     }
 

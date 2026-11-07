@@ -112,6 +112,7 @@ public sealed class ShellContext
 
     /// <summary>The shared capture layer (docs/phase-7/capture-layer.md), passed to each capture feature as it's registered.</summary>
     public Chippi.UI.Capture.ICaptureLayer Capture { get; }
+    internal Chippi.App.Island.CapturePanelHost? CapturePanel { get; set; }
 
     /// <summary>The capture layer's island side; the island host sets its close.</summary>
     internal CaptureShell CaptureShell { get; }
