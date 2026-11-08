@@ -79,6 +79,9 @@ internal sealed class FeatureState
 /// <summary>
 /// Knows every feature, installs and uninstalls them live, applies presets, and persists the
 /// installed set. All mutating calls are serialized; <see cref="Changed"/> fires after each.
+/// Nothing here uses ConfigureAwait(false): every module starts and stops, and Changed fires, on the
+/// caller's thread (the UI thread), even after a module before it awaited work on another thread.
+/// Modules capture their start thread as the UI thread.
 /// </summary>
 /// <param name="services">Data folders, activation verbs and notices for modules. Defaults suit tests.</param>
 public sealed class ModuleRegistry(ConfigStore config, IslandActivityHub island, ILoggerFactory loggerFactory, ModuleServices? services = null)
@@ -122,14 +125,14 @@ public sealed class ModuleRegistry(ConfigStore config, IslandActivityHub island,
     /// </summary>
     public async Task StartAsync(CancellationToken ct = default)
     {
-        await _gate.WaitAsync(ct).ConfigureAwait(false);
+        await _gate.WaitAsync(ct);
         try
         {
             _started = true;
-            await SyncFromConfigAsync(ct).ConfigureAwait(false);
+            await SyncFromConfigAsync(ct);
             // A crash or an offline settings edit can leave persistent integration behind.
             foreach (var entry in _entries.Where(e => !e.IsComingSoon && !e.IsInstalled))
-                await SetInstalledCoreAsync(entry, false, ct).ConfigureAwait(false);
+                await SetInstalledCoreAsync(entry, false, ct);
         }
         finally
         {
@@ -141,10 +144,10 @@ public sealed class ModuleRegistry(ConfigStore config, IslandActivityHub island,
     /// <summary>Re-reads the installed set after a settings import and starts or stops modules to match.</summary>
     public async Task ReloadAsync(CancellationToken ct = default)
     {
-        await _gate.WaitAsync(ct).ConfigureAwait(false);
+        await _gate.WaitAsync(ct);
         try
         {
-            await SyncFromConfigAsync(ct).ConfigureAwait(false);
+            await SyncFromConfigAsync(ct);
         }
         finally
         {
@@ -157,7 +160,7 @@ public sealed class ModuleRegistry(ConfigStore config, IslandActivityHub island,
     /// <exception cref="InvalidOperationException">The feature is a Coming-soon placeholder.</exception>
     public async Task SetInstalledAsync(string id, bool installed, CancellationToken ct = default)
     {
-        await _gate.WaitAsync(ct).ConfigureAwait(false);
+        await _gate.WaitAsync(ct);
         try
         {
             var entry = Find(id) ?? throw new ArgumentException($"No feature '{id}' is registered.", nameof(id));
@@ -165,7 +168,7 @@ public sealed class ModuleRegistry(ConfigStore config, IslandActivityHub island,
                 throw new InvalidOperationException($"'{entry.Descriptor.Name}' is coming soon and cannot be installed yet.");
 
             if (entry.IsInstalled != installed)
-                await SetInstalledCoreAsync(entry, installed, ct).ConfigureAwait(false);
+                await SetInstalledCoreAsync(entry, installed, ct);
             _state.Preset = FeaturePreset.Custom;
             SaveState();
         }
@@ -182,10 +185,10 @@ public sealed class ModuleRegistry(ConfigStore config, IslandActivityHub island,
     /// </summary>
     public async Task ApplyPresetAsync(FeaturePreset preset, CancellationToken ct = default)
     {
-        await _gate.WaitAsync(ct).ConfigureAwait(false);
+        await _gate.WaitAsync(ct);
         try
         {
-            await ApplyPresetCoreAsync(preset, ct).ConfigureAwait(false);
+            await ApplyPresetCoreAsync(preset, ct);
         }
         finally
         {
@@ -197,7 +200,7 @@ public sealed class ModuleRegistry(ConfigStore config, IslandActivityHub island,
     /// <summary>Stops every running module (app exit). The installed set is kept for next launch.</summary>
     public async Task StopAllAsync(CancellationToken ct = default)
     {
-        await _gate.WaitAsync(ct).ConfigureAwait(false);
+        await _gate.WaitAsync(ct);
         try
         {
             // Every module gets stopped even if one stop is cancelled, so exit always releases
@@ -207,7 +210,7 @@ public sealed class ModuleRegistry(ConfigStore config, IslandActivityHub island,
             {
                 try
                 {
-                    await StopModuleAsync(entry, ct).ConfigureAwait(false);
+                    await StopModuleAsync(entry, ct);
                 }
                 catch (OperationCanceledException ex)
                 {
@@ -332,7 +335,7 @@ public sealed class ModuleRegistry(ConfigStore config, IslandActivityHub island,
         if (!config.HasSection(FeatureState.SectionName))
         {
             _logger.LogInformation("First run: applying the Essentials preset");
-            await ApplyPresetCoreAsync(FeaturePreset.Essentials, ct).ConfigureAwait(false);
+            await ApplyPresetCoreAsync(FeaturePreset.Essentials, ct);
             return;
         }
 
@@ -342,7 +345,7 @@ public sealed class ModuleRegistry(ConfigStore config, IslandActivityHub island,
         {
             bool install = wanted.Contains(entry.Id);
             if (entry.IsInstalled != install || (install && !entry.IsRunning))
-                await SetInstalledCoreAsync(entry, install, ct).ConfigureAwait(false);
+                await SetInstalledCoreAsync(entry, install, ct);
         }
     }
 
@@ -355,7 +358,7 @@ public sealed class ModuleRegistry(ConfigStore config, IslandActivityHub island,
             {
                 bool install = members.Contains(entry);
                 if (entry.IsInstalled != install)
-                    await SetInstalledCoreAsync(entry, install, ct).ConfigureAwait(false);
+                    await SetInstalledCoreAsync(entry, install, ct);
             }
         }
         _state.Preset = preset;
@@ -374,20 +377,20 @@ public sealed class ModuleRegistry(ConfigStore config, IslandActivityHub island,
                     _state.CapabilitiesUsed.Add(capability.Id);
             }
             if (!entry.IsRunning)
-                await StartModuleAsync(entry, ct).ConfigureAwait(false);
+                await StartModuleAsync(entry, ct);
         }
         else
         {
             try
             {
                 if (entry.IsRunning)
-                    await StopModuleAsync(entry, ct).ConfigureAwait(false);
+                    await StopModuleAsync(entry, ct);
             }
             finally
             {
                 try
                 {
-                    await entry.Module!.UninstallAsync(CancellationToken.None).ConfigureAwait(false);
+                    await entry.Module!.UninstallAsync(CancellationToken.None);
                     if (!stateChanged) _logger.LogDebug("{Id} persistent integration cleanup completed", entry.Id);
                 }
                 catch (Exception ex) { _logger.LogError(ex, "{Id} failed to remove its persistent integration", entry.Id); }
@@ -435,7 +438,7 @@ public sealed class ModuleRegistry(ConfigStore config, IslandActivityHub island,
         {
             // Inside the isolation boundary: an unwritable data folder fails this module only.
             Directory.CreateDirectory(dataDirectory);
-            await entry.Module!.StartAsync(context, ct).ConfigureAwait(false);
+            await entry.Module!.StartAsync(context, ct);
             entry.IsRunning = true;
             entry.LastError = null;
         }
@@ -453,7 +456,7 @@ public sealed class ModuleRegistry(ConfigStore config, IslandActivityHub island,
             }
             try
             {
-                await entry.Module!.StopAsync(CancellationToken.None).ConfigureAwait(false);
+                await entry.Module!.StopAsync(CancellationToken.None);
             }
             catch (Exception stopEx)
             {
@@ -473,7 +476,7 @@ public sealed class ModuleRegistry(ConfigStore config, IslandActivityHub island,
     {
         try
         {
-            await entry.Module!.StopAsync(ct).ConfigureAwait(false);
+            await entry.Module!.StopAsync(ct);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
