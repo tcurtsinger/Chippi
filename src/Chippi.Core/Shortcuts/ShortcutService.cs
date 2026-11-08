@@ -118,6 +118,7 @@ public sealed class ShortcutService : IShortcutService
     private readonly IHotkeyRegistrar _registrar;
     private readonly IPrintScreenSetting? _printScreen;
     private readonly List<Entry> _entries = [];
+    private readonly object _gate = new();
     private int _nextId;
     private long _nextKey;
     private bool _changing;
@@ -130,7 +131,7 @@ public sealed class ShortcutService : IShortcutService
     public ShortcutService(IHotkeyRegistrar registrar, IPrintScreenSetting? printScreen = null)
     {
         _registrar = registrar;
-        _registrar.Pressed += id => _entries.FirstOrDefault(e => e.Id == id && id != 0)?.Pressed?.Invoke();
+        _registrar.Pressed += id => Snapshot().FirstOrDefault(e => e.Id == id && id != 0)?.Pressed?.Invoke();
         _printScreen = printScreen;
         if (_printScreen is not null)
             _printScreen.Changed += OnPrintScreenChanged;
@@ -148,9 +149,12 @@ public sealed class ShortcutService : IShortcutService
     /// </summary>
     public void Started() => ReleasePrintScreen();
 
+    // A feature may add or drop its shortcut while the screens read the list: read a copy.
+    private Entry[] Snapshot() { lock (_gate) return [.. _entries]; }
+
     public event Action? Changed;
 
-    public IReadOnlyList<ShortcutEntry> List => [.. _entries.Select(Listed)];
+    public IReadOnlyList<ShortcutEntry> List => [.. Snapshot().Select(Listed)];
 
     private static ShortcutEntry Listed(Entry e)
     {
@@ -171,7 +175,7 @@ public sealed class ShortcutService : IShortcutService
         ArgumentException.ThrowIfNullOrWhiteSpace(owner);
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         var entry = new Entry(this, owner, name) { Key = ++_nextKey, Edits = edits };
-        _entries.Add(entry);
+        lock (_gate) _entries.Add(entry);
         Changed?.Invoke();
         return entry;
     }
@@ -180,8 +184,8 @@ public sealed class ShortcutService : IShortcutService
     {
         if (!keys.IsBindable)
             return PickText;
-        var own = except is { } key ? _entries.FirstOrDefault(e => e.Key == key) : null;
-        if (_entries.FirstOrDefault(e => !ReferenceEquals(e, own) && Holds(e) && e.Shortcut == keys) is { } holder)
+        var own = except is { } key ? Snapshot().FirstOrDefault(e => e.Key == key) : null;
+        if (Snapshot().FirstOrDefault(e => !ReferenceEquals(e, own) && Holds(e) && e.Shortcut == keys) is { } holder)
             return $"{holder.Name} already uses this";
         if (WindowsKeys.IsReserved(keys))
             return WindowsText;
@@ -203,7 +207,7 @@ public sealed class ShortcutService : IShortcutService
 
     public string? Change(long id, KeyShortcut keys)
     {
-        if (_entries.FirstOrDefault(e => e.Key == id) is not { Edits: { } edits })
+        if (Snapshot().FirstOrDefault(e => e.Key == id) is not { Edits: { } edits })
             return NotFoundText;
         if (Check(keys, id) is { } refused)
             return refused;
@@ -226,7 +230,7 @@ public sealed class ShortcutService : IShortcutService
 
     public void Remove(long id)
     {
-        if (_entries.FirstOrDefault(e => e.Key == id) is not { Edits: { } edits })
+        if (Snapshot().FirstOrDefault(e => e.Key == id) is not { Edits: { } edits })
             return;
         try { edits.Remove(); }
         catch (Exception ex) { Diagnostics.Log.Warn("Shortcuts: removing a shortcut failed", ex); }
@@ -250,7 +254,7 @@ public sealed class ShortcutService : IShortcutService
             }
             return true;
         }
-        if (_entries.FirstOrDefault(e => !ReferenceEquals(e, entry) && Holds(e) && e.Shortcut == shortcut) is { } holder)
+        if (Snapshot().FirstOrDefault(e => !ReferenceEquals(e, entry) && Holds(e) && e.Shortcut == shortcut) is { } holder)
             return Refuse(entry, $"Used by {holder.Name}");
         // Windows' own Print Screen goes off before the key is registered: a Print Screen hotkey registered while it's on
         // fires only with Chippi's own window in front, and while it's on, Windows keeps the key only if Chippi lets go
@@ -379,7 +383,7 @@ public sealed class ShortcutService : IShortcutService
     /// <summary>No entry holds Print Screen any more: Windows' setting goes back to what Chippi found.</summary>
     private void ReleasePrintScreen()
     {
-        if (_printScreen?.Claim is not { } claim || _closing || _entries.Any(e => Holds(e) && IsPrintScreen(e.Shortcut)))
+        if (_printScreen?.Claim is not { } claim || _closing || Snapshot().Any(e => Holds(e) && IsPrintScreen(e.Shortcut)))
             return;
         try
         {
@@ -402,7 +406,7 @@ public sealed class ShortcutService : IShortcutService
             return;
         }
         bool changed = false;
-        foreach (var e in _entries.Where(e => Holds(e) && IsPrintScreen(e.Shortcut)))
+        foreach (var e in Snapshot().Where(e => Holds(e) && IsPrintScreen(e.Shortcut)))
         {
             if (WindowsHasIt(value) && !e.Yielded)
                 Yield(e);
@@ -448,7 +452,7 @@ public sealed class ShortcutService : IShortcutService
         entry.Pressed = null;
         entry.Yielded = false;
         entry.Disposed = true;
-        _entries.Remove(entry);
+        lock (_gate) _entries.Remove(entry);
         ReleasePrintScreen();
         Changed?.Invoke();
     }

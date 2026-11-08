@@ -33,6 +33,24 @@ public sealed class ShortcutServiceTests
     }
 
     [Fact]
+    public async Task Reading_the_list_while_features_add_and_drop_shortcuts_never_throws()
+    {
+        var service = new ShortcutService(new FakeRegistrar());
+        var stop = new CancellationTokenSource();
+        Exception? failed = null;
+        var reader = Task.Run(() =>
+        {
+            try { while (!stop.IsCancellationRequested) _ = service.List.Count; }
+            catch (Exception ex) { failed = ex; }
+        });
+        for (int i = 0; i < 20000 && failed is null; i++)
+            service.Add("feature", "Shortcut " + i).Dispose();
+        stop.Cancel();
+        await reader;
+        Assert.Null(failed);
+    }
+
+    [Fact]
     public void A_bindable_shortcut_may_hold_the_Windows_key_and_the_service_asks_Windows_for_it_but_a_plain_one_still_may_not()
     {
         var windows = new FakeRegistrar();
