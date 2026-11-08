@@ -176,6 +176,61 @@ public sealed class HubTests : IDisposable
         Assert.Equal((3, 2), (image.Width, image.Height));
     }
 
+    [Theory]
+    [InlineData(ClipFormat.Html, false)]
+    [InlineData(ClipFormat.Html, true)]
+    [InlineData(ClipFormat.Rtf, false)]
+    [InlineData(ClipFormat.Rtf, true)]
+    public async Task Rich_document_text_wins_over_its_bitmap_preview(string richFormat, bool oversizedPreview)
+    {
+        using var lease = Listen();
+        string text = string.Join("\r\n", Enumerable.Range(0, 200).Select(i => $"Row {i}\t{i}\tTable cell"));
+        var dib = ClipCodec.EncodeDib(Picture(3, 2));
+        if (oversizedPreview)
+        {
+            BitConverter.GetBytes(4100).CopyTo(dib, 4);
+            BitConverter.GetBytes(4100).CopyTo(dib, 8);
+        }
+        _clipboard.Copy(@"C:\Fixture\Spreadsheet.exe", (ClipFormat.UnicodeText, ClipCodec.EncodeText(text)),
+            (richFormat, [1]), (ClipFormat.Dib, dib));
+
+        var read = await _hub.ReadAsync();
+        Assert.Equal(ClipStatus.Ok, read.Status);
+        Assert.Equal(text, read.Content!.Text);
+        Assert.Null(read.Content.Image);
+        await SettleAsync();
+        Assert.Equal(text, Assert.Single(_copies).Content!.Text);
+        Assert.DoesNotContain(ClipFormat.Dib, _clipboard.Reads);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task A_rich_copy_without_usable_text_still_keeps_its_picture(bool emptyText)
+    {
+        _clipboard.Copy(null, (ClipFormat.Html, [1]), (ClipFormat.Dib, ClipCodec.EncodeDib(Picture(3, 2))));
+        if (emptyText)
+            await _clipboard.TransactAsync(s => { s.Set(ClipFormat.UnicodeText, ClipCodec.EncodeText("")); return true; });
+
+        var read = await _hub.ReadAsync();
+
+        Assert.Equal(ClipStatus.Ok, read.Status);
+        Assert.Equal((3, 2), (read.Content!.Image!.Width, read.Content.Image.Height));
+    }
+
+    [Fact]
+    public async Task An_oversized_rich_text_copy_reports_its_text_limit_without_reading_the_preview()
+    {
+        _clipboard.CopyText(new string('中', 400_000), extra:
+            [(ClipFormat.Html, [1]), (ClipFormat.Dib, ClipCodec.EncodeDib(Picture(3, 2)))]);
+
+        var read = await _hub.ReadAsync();
+
+        Assert.Equal(ClipStatus.TooLarge, read.Status);
+        Assert.Equal(ClipLimit.Text, read.Limit);
+        Assert.DoesNotContain(ClipFormat.Dib, _clipboard.Reads);
+    }
+
     [Fact]
     public async Task Limits_are_reported_without_content()
     {
@@ -190,7 +245,7 @@ public sealed class HubTests : IDisposable
         await SettleAsync();
         _clipboard.CopyText(new string('中', 400_000));
         await SettleAsync();
-        Assert.Equal([ClipLimit.Files, ClipLimit.Image, ClipLimit.Text], _copies.Select(c => c.Limit));
+        Assert.Equal([ClipLimit.Files, ClipLimit.ImagePixels, ClipLimit.Text], _copies.Select(c => c.Limit));
         Assert.All(_copies, c => Assert.Null(c.Content));
     }
 

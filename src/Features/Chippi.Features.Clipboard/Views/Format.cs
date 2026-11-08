@@ -88,6 +88,7 @@ internal static class Format
     public static string? Limit(ClipLimit limit) => limit switch
     {
         ClipLimit.Image => "Picture not saved · over 16 MiB",
+        ClipLimit.ImagePixels => "Picture not saved · over 16.6 MP",
         ClipLimit.Text => "Text not saved · over 1 MiB",
         ClipLimit.Files => "Not saved · over 100 files",
         _ => null,

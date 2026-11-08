@@ -13,6 +13,13 @@ namespace Chippi.Features.Clipboard.Tests;
 public sealed partial class ModuleTests
 {
     [Fact]
+    public void A_picture_limit_names_the_encoded_size_or_pixel_cap()
+    {
+        Assert.Equal("Picture not saved · over 16.6 MP", Format.Limit(Chippi.Core.Clipboard.ClipLimit.ImagePixels));
+        Assert.Equal("Picture not saved · over 16 MiB", Format.Limit(Chippi.Core.Clipboard.ClipLimit.Image));
+    }
+
+    [Fact]
     public async Task A_matched_line_is_visible_closed_and_open_and_copy_keeps_the_whole_clip()
     {
         await StartHistoryAsync();
