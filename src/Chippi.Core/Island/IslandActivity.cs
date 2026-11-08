@@ -71,8 +71,8 @@ public sealed record IslandActivity(string Key, IslandActivityKind Kind, string 
     public string? ProviderId { get; init; }
 
     /// <summary>
-    /// A short-lived line (6 seconds) that shows over a song, as Plain paste's feedback does: an agent's "80% used". The
-    /// publisher clears it.
+    /// A short-lived line that shows over a song, as Plain paste's feedback does: an agent's "80% used". The hub clears
+    /// it after the island notice time (6 seconds by default); publishing the same key restarts that time.
     /// </summary>
     public bool IsFeedback { get; init; }
 

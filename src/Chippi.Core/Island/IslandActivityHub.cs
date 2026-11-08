@@ -4,16 +4,18 @@
 namespace Chippi.Core.Island;
 
 /// <summary>
-/// Holds every live island activity and picks the one to show. Thread-safe; events are raised
-/// on the publishing thread, so UI subscribers marshal to their dispatcher.
+/// Holds every live island activity and picks the one to show. Thread-safe; events run on the
+/// publishing, clearing or timer thread, so UI subscribers marshal to their dispatcher.
 /// </summary>
-public sealed class IslandActivityHub
+public sealed class IslandActivityHub(TimeProvider? time = null, TimeSpan? feedbackDuration = null)
 {
+    private readonly TimeProvider _time = time ?? TimeProvider.System;
+    private readonly TimeSpan _feedbackDuration = feedbackDuration ?? TimeSpan.FromSeconds(6);
     private readonly Lock _gate = new();
     private readonly List<Entry> _entries = [];
     private long _sequence;
 
-    /// <summary>Raised after any publish or clear.</summary>
+    /// <summary>Raised after any publish, clear or feedback expiry.</summary>
     public event EventHandler? Changed;
 
     public event EventHandler<ModuleSucceededEventArgs>? Succeeded;
@@ -41,12 +43,7 @@ public sealed class IslandActivityHub
 
     /// <summary>Removes everything a module published. The registry calls this after the module stops.</summary>
     public void ClearModule(string moduleId)
-    {
-        bool removed;
-        lock (_gate) removed = _entries.RemoveAll(e => e.Activity.ModuleId == moduleId) > 0;
-        if (removed)
-            Changed?.Invoke(this, EventArgs.Empty);
-    }
+        => Remove(e => e.Activity.ModuleId == moduleId);
 
     private IEnumerable<Entry> Ordered() =>
         _entries.OrderBy(e => e.Activity.Priority()).ThenByDescending(e => e.Sequence);
@@ -58,23 +55,45 @@ public sealed class IslandActivityHub
         lock (_gate)
         {
             int i = _entries.FindIndex(e => e.Activity.ModuleId == moduleId && e.Activity.Key == activity.Key);
+            var entry = new Entry(tagged, i >= 0 ? _entries[i].Sequence : ++_sequence);
             if (i >= 0)
-                _entries[i] = _entries[i] with { Activity = tagged }; // update in place, keep its age
+            {
+                _entries[i].Timer?.Dispose();
+                _entries[i] = entry; // update in place, keep its age
+            }
             else
-                _entries.Add(new Entry(tagged, ++_sequence));
+                _entries.Add(entry);
+            if (tagged.IsFeedback)
+            {
+                entry.Timer = _time.CreateTimer(_ => Remove(e => ReferenceEquals(e, entry)), null,
+                    Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+                entry.Timer.Change(_feedbackDuration, Timeout.InfiniteTimeSpan);
+            }
         }
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
     private void Clear(string moduleId, string key)
+        => Remove(e => e.Activity.ModuleId == moduleId && e.Activity.Key == key);
+
+    private void Remove(Predicate<Entry> matches)
     {
         bool removed;
-        lock (_gate) removed = _entries.RemoveAll(e => e.Activity.ModuleId == moduleId && e.Activity.Key == key) > 0;
+        lock (_gate)
+            removed = _entries.RemoveAll(e =>
+            {
+                if (!matches(e)) return false;
+                e.Timer?.Dispose();
+                return true;
+            }) > 0;
         if (removed)
             Changed?.Invoke(this, EventArgs.Empty);
     }
 
-    private sealed record Entry(IslandActivity Activity, long Sequence);
+    private sealed record Entry(IslandActivity Activity, long Sequence)
+    {
+        public ITimer? Timer { get; set; }
+    }
 
     private sealed class Publisher(IslandActivityHub hub, string moduleId) : IIslandPublisher
     {

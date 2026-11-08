@@ -4,7 +4,6 @@
 using System.IO;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using System.Windows.Threading;
 using Chippi.Capture;
 using Chippi.Core.Island;
 using Chippi.Core.Modules;
@@ -22,7 +21,6 @@ public sealed class ScreenCaptureModule(ICaptureLayer capture) : IFeatureModule
     private IDisposable? _use;
     private readonly List<IHotkey> _keys = [];
     private CaptureEditor? _editor;
-    private DispatcherTimer? _clear;
     public Action? OpenDelay { get; set; }
     public Func<bool> TextAvailable { get; init; } = () => false;
     public Func<CapturedImage, bool, Task> ReadText { get; init; } = (_, _) => Task.CompletedTask;
@@ -139,16 +137,12 @@ public sealed class ScreenCaptureModule(ICaptureLayer capture) : IFeatureModule
     private void Feedback(string title, bool failed)
     {
         if (_context is not { } context) return;
-        _clear?.Stop();
         context.Island.Publish(new IslandActivity(Id + "/result", IslandActivityKind.Status, title, _editor?.FeedbackSource ?? "Screen capture")
         { IsFeedback = true, Picture = _editor?.FeedbackPicture, NeedsAttention = failed, Icon = failed ? "TriangleAlert" : null, Clicked = ShowRecent });
-        _clear = new DispatcherTimer { Interval = TimeSpan.FromSeconds(6) };
-        _clear.Tick += (_, _) => { _clear?.Stop(); context.Island.Clear(Id + "/result"); };
-        _clear.Start();
     }
     public Task StopAsync(CancellationToken ct)
     {
-        _clear?.Stop(); _clear = null;
+        _context?.Island.Clear(Id + "/result");
         _editor?.Cancel(); _editor?.Dispose(); _editor = null;
         foreach (var key in _keys) key.Dispose();
         _keys.Clear();

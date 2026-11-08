@@ -107,11 +107,11 @@ public sealed class PickFlowTests
         var layer = new Layer();
         var clip = new Clipboard();
         var settings = new Settings { Value = saved ?? new() };
-        var hub = new IslandActivityHub();
+        var hub = new IslandActivityHub(time);
         var ui = new Ui();
         var keys = new Keys();
         var pages = new List<string>();
-        var module = new ColorPickerModule(layer) { Time = time ?? TimeProvider.System };
+        var module = new ColorPickerModule(layer);
         module.StartAsync(new ModuleContext(ColorPickerModule.Id, settings, NullLogger.Instance, hub.CreatePublisher(ColorPickerModule.Id), ui)
         { Clipboard = clip, Shortcuts = keys, OpenIslandPage = pages.Add }, default).GetAwaiter().GetResult();
         return new Rig(module, layer, clip, settings, hub, pages, ui, keys);

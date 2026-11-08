@@ -20,19 +20,15 @@ public sealed class PlainPasteModule : IFeatureModule
 {
     public const string Id = "paste-plain-text";
     public const string FeedbackKey = "plain-paste";
-    public static readonly TimeSpan FeedbackDuration = TimeSpan.FromSeconds(6);
     private readonly Func<IHotkey>? _create;
-    private readonly TimeProvider _time;
     private readonly SemaphoreSlim _running = new(1, 1);
     private readonly Lock _feedbackGate = new();
     private ModuleContext? _context;
     private IHotkey? _hotkey;
-    private ITimer? _timer;
-    private DateTimeOffset _expires;
     private volatile bool _stopping = true, _capturing;
 
-    public PlainPasteModule(Func<IHotkey>? createHotkey = null, TimeProvider? time = null)
-    { _create = createHotkey; _time = time ?? TimeProvider.System; }
+    public PlainPasteModule(Func<IHotkey>? createHotkey = null)
+    { _create = createHotkey; }
     public FeatureDescriptor Descriptor { get; } = new(Id, "Paste as plain text", "Pastes without the source formatting", FeatureGroup.ClipboardText)
     {
         Icon = "ClipboardType", Requires = [Capability.InputHooks],
@@ -49,7 +45,6 @@ public sealed class PlainPasteModule : IFeatureModule
         ShortcutError = null;
         Settings = context.Settings.Get<PlainPasteSettings>();
         if (Settings.Shortcut is { IsBindable: false }) Settings = new();
-        _timer = _time.CreateTimer(_ => Expire(), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
         _hotkey = Create(); // listed in Settings › Shortcuts while it runs, set or not
         if (Settings.Shortcut is { } shortcut) Reserve(shortcut);
         context.Ui.SetSettingsPage(_ => new PlainPasteView(this));
@@ -126,23 +121,16 @@ public sealed class PlainPasteModule : IFeatureModule
                 if (_stopping) return;
                 if (outcome == PasteOutcome.Sent)
                 {
-                    _timer?.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
                     _context.Island.Clear(FeedbackKey);
                     return;
                 }
                 hub.Beep();
                 string title = outcome switch { PasteOutcome.Copied => "Plain text copied", PasteOutcome.NoText => "No text copied", _ => "Clipboard busy" };
-                _context.Island.Publish(new IslandActivity(FeedbackKey, IslandActivityKind.Status, title, "") { NeedsAttention = outcome != PasteOutcome.Copied });
-                _expires = _time.GetUtcNow() + FeedbackDuration;
-                _timer?.Change(FeedbackDuration, Timeout.InfiniteTimeSpan);
+                _context.Island.Publish(new IslandActivity(FeedbackKey, IslandActivityKind.Status, title, "")
+                { IsFeedback = true, NeedsAttention = outcome != PasteOutcome.Copied });
             }
         }
         finally { _running.Release(); }
-    }
-    private void Expire()
-    {
-        lock (_feedbackGate)
-            if (!_stopping && _time.GetUtcNow() >= _expires) _context?.Island.Clear(FeedbackKey);
     }
     public async Task StopAsync(CancellationToken ct)
     {
@@ -153,7 +141,6 @@ public sealed class PlainPasteModule : IFeatureModule
         {
             lock (_feedbackGate)
             {
-                _timer?.Dispose(); _timer = null;
                 _context?.Island.Clear(FeedbackKey); _context = null;
             }
         }

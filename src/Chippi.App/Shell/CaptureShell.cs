@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
-using System.Windows.Threading;
 using Chippi.Core.Island;
 using Chippi.UI.Capture;
 
@@ -17,7 +16,6 @@ internal sealed class CaptureShell(ShellContext shell) : ICaptureShell
     private const string Key = "capture/bar";
 
     private readonly IIslandPublisher _bar = shell.Island.CreatePublisher(ModuleId);
-    private DispatcherTimer? _clear;
 
     /// <summary>Closes the island and completes once it's off the screen; set by the island host.</summary>
     public Func<Task>? CloseIsland { get; set; }
@@ -28,7 +26,6 @@ internal sealed class CaptureShell(ShellContext shell) : ICaptureShell
 
     public void Bar(CaptureBarLine? line)
     {
-        _clear?.Stop();
         if (line is null)
         {
             _bar.Clear(Key);
@@ -43,15 +40,5 @@ internal sealed class CaptureShell(ShellContext shell) : ICaptureShell
             NeedsAttention = line.Failed,
             Clicked = line.Clicked,
         });
-        // The countdown stays until the layer clears it; a failure goes after 6 seconds.
-        if (!line.Failed)
-            return;
-        _clear = new DispatcherTimer { Interval = shell.Services.IslandNoticeDuration };
-        _clear.Tick += (_, _) =>
-        {
-            _clear?.Stop();
-            _bar.Clear(Key);
-        };
-        _clear.Start();
     }
 }

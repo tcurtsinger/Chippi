@@ -32,7 +32,6 @@ public sealed class RadialMenuModule : IFeatureModule, IWheelInputSink
     public const string Id = "radial-menu";
 
     /// <summary>A failure stays on the bar this long, as the Output shortcut's does.</summary>
-    public static readonly TimeSpan ErrorShown = TimeSpan.FromSeconds(4);
 
     /// <summary>Chippi grins this long as a slice runs, past the wheel's fade.</summary>
     private static readonly TimeSpan GrinHold = TimeSpan.FromMilliseconds(400);
@@ -50,7 +49,6 @@ public sealed class RadialMenuModule : IFeatureModule, IWheelInputSink
     private IWheelInput? _input;
     private IHotkey? _hotkey;
     private ModuleContext? _context;
-    private DispatcherTimer? _errorTimer;
     private bool _capturing;
 
     // The open wheel.
@@ -184,7 +182,6 @@ public sealed class RadialMenuModule : IFeatureModule, IWheelInputSink
             _input = null;
             _hotkey?.Dispose();
             _hotkey = null;
-            _errorTimer?.Stop();
             if (_pc is not null)
             {
                 _pc.AppsChanged -= OnAppsChanged;
@@ -528,7 +525,7 @@ public sealed class RadialMenuModule : IFeatureModule, IWheelInputSink
         }
     }
 
-    /// <summary>"… failed" on the bar for 4 seconds, over a song: the wheel has gone by then.</summary>
+    /// <summary>"… failed" on the bar for the island notice time, over a song: the wheel has gone by then.</summary>
     private void Report(Slice slice, string reason)
     {
         if (_context is not { } context)
@@ -538,17 +535,5 @@ public sealed class RadialMenuModule : IFeatureModule, IWheelInputSink
             NeedsAttention = true,
             IsFeedback = true,
         });
-        if (_errorTimer is null)
-        {
-            _errorTimer = new DispatcherTimer { Interval = ErrorShown };
-            _errorTimer.Tick += (_, _) =>
-            {
-                _errorTimer.Stop();
-                _context?.Island.Clear(ErrorKey);
-            };
-        }
-        // A second failure restarts the 4 seconds.
-        _errorTimer.Stop();
-        _errorTimer.Start();
     }
 }

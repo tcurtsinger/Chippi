@@ -156,11 +156,11 @@ public sealed class ModuleFlowTests
         var qr = new Qr();
         var clip = new Clipboard();
         var settings = new Settings { Value = saved ?? new() };
-        var hub = new IslandActivityHub();
+        var hub = new IslandActivityHub(time);
         var ui = new Ui();
         var keys = new Keys();
         var pages = new List<string>();
-        var module = new ScreenTextModule(layer, ocr, qr) { Time = time ?? TimeProvider.System };
+        var module = new ScreenTextModule(layer, ocr, qr);
         await module.StartAsync(new ModuleContext(ScreenTextModule.Id, settings, NullLogger.Instance, hub.CreatePublisher(ScreenTextModule.Id), ui)
         { Clipboard = clip, Shortcuts = keys, OpenIslandPage = pages.Add, TryOpenIslandPage = key => { ui.Tried.Add(key); return key == "capture"; } }, default);
         return new Rig(module, layer, ocr, qr, clip, settings, hub, pages, ui, keys);
