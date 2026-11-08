@@ -309,10 +309,10 @@ public sealed class FilterTests
     public void AModifierAloneAndAKeptRepeatCancelNothing()
     {
         Type(";go");
-        Assert.True(Down(0x20));
+        Assert.True(Down(0x09));
         _events.Clear();
         Down(0x11);
-        Assert.True(Down(0x20, wasDown: true));
+        Assert.True(Down(0x09, wasDown: true));
         Assert.Empty(_events);
     }
 
@@ -326,16 +326,29 @@ public sealed class FilterTests
     }
 
     [Fact]
-    public void ADelimiterTriggerKeepsOnlyTheKeyThatCompletesIt()
+    public void ASpaceDelimiterPassesThroughAndOnlyCompletesOneExpansion()
     {
         Type(";go");
         Assert.Empty(_expanded);
-        Assert.True(Down(0x20));
-        Assert.True(Down(0x20, wasDown: true)); // its repeat is kept too
+        Assert.False(Down(0x20));
+        Assert.False(Down(0x20, wasDown: true));
         Up(0x20);
         Assert.False(Down(0x20));
         var (_, after) = Assert.Single(_expanded);
         Assert.Equal(Delimiter.Space, after);
+    }
+
+    [Fact]
+    public void ASpaceStillReachesTheAppWhenTypingCancelsTheExpansion()
+    {
+        Type(";go");
+        bool swallowed = Down(0x20);
+        Up(0x20);
+        Type("thanks");
+
+        Assert.False(swallowed);
+        Assert.Single(_expanded);
+        Assert.Equal("cancel", _events[^1]);
     }
 
     [Fact]
@@ -458,6 +471,44 @@ public sealed class ExpanderTests
     }
 
     [Fact]
+    public async Task ASpaceExpansionDeletesTheAlreadyDeliveredSpace()
+    {
+        var sender = new RecordingSender();
+        var expander = new SnippetExpander(sender, null, () => false);
+        expander.Enqueue(Match("expanded"), Delimiter.Space);
+        await expander.IdleAsync();
+
+        Assert.Equal((4, "expanded", (Delimiter?)Delimiter.Space), Assert.Single(sender.Sent));
+    }
+
+    [Fact]
+    public async Task APasswordFieldDoesNotGetASecondSpace()
+    {
+        var sender = new RecordingSender();
+        var expander = new SnippetExpander(sender, null, () => true);
+        expander.Enqueue(Match("secret"), Delimiter.Space);
+        await expander.IdleAsync();
+
+        Assert.Empty(sender.Sent);
+    }
+
+    [Fact]
+    public async Task MoreTypingWhileASpaceExpansionWaitsNeverDeletesTheLaterText()
+    {
+        var sender = new RecordingSender();
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var read = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var expander = new SnippetExpander(sender, () => { entered.SetResult(); return read.Task; }, () => false);
+        expander.Enqueue(Match("{{clipboard}}"), Delimiter.Space);
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        expander.Cancel();
+        read.SetResult("fixture");
+        await expander.IdleAsync();
+
+        Assert.Empty(sender.Sent);
+    }
+
+    [Fact]
     public async Task InputWhileTheClipboardIsBeingReadDropsTheExpansion()
     {
         var sender = new RecordingSender();
@@ -506,15 +557,17 @@ public sealed class ExpanderTests
         Assert.Single(sender.Sent);
     }
 
-    [Fact]
-    public async Task APasswordFieldGetsNothingButItsKeyBack()
+    [Theory]
+    [InlineData(Delimiter.Tab)]
+    [InlineData(Delimiter.Enter)]
+    public async Task APasswordFieldGetsNothingButItsKeyBack(Delimiter delimiter)
     {
         var sender = new RecordingSender();
         var expander = new SnippetExpander(sender, null, () => true);
         expander.Enqueue(Match("secret"), null);
-        expander.Enqueue(Match("secret"), Delimiter.Space);
+        expander.Enqueue(Match("secret"), delimiter);
         await expander.IdleAsync();
-        Assert.Equal((0, "", (Delimiter?)Delimiter.Space), Assert.Single(sender.Sent));
+        Assert.Equal((0, "", (Delimiter?)delimiter), Assert.Single(sender.Sent));
     }
 
     [Fact]

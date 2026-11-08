@@ -228,7 +228,12 @@ public sealed class TextSnippetsModule : IFeatureModule
     /// </summary>
     private static bool FocusedFieldIsPassword()
     {
-        try { return AutomationElement.FocusedElement?.Current.IsPassword == true; }
+        try
+        {
+            var cache = new CacheRequest { TreeScope = TreeScope.Element, TreeFilter = Automation.RawViewCondition, AutomationElementMode = AutomationElementMode.None };
+            cache.Add(AutomationElement.IsPasswordProperty);
+            using (cache.Activate()) return AutomationElement.FocusedElement?.Cached.IsPassword == true;
+        }
         catch (Exception ex) when (ex is ElementNotAvailableException or InvalidOperationException or System.Runtime.InteropServices.COMException) { return false; }
     }
 }

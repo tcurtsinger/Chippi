@@ -29,9 +29,9 @@ internal sealed class WindowsKeyReader : IKeyReader
 
 /// <summary>
 /// The hub's last filter (docs/phase-6/text-snippets.md, Watching): reads typed characters into the matcher and, when a
-/// trigger completes, hands the expansion to a worker. It keeps no key from the app, except the space, Tab or Enter that
-/// completes an After-delimiter trigger: that key's text goes in after the snippet, and Tab or Enter would otherwise move
-/// focus or send the message with the trigger in it. Memory only; nothing typed is logged.
+/// trigger completes, hands the expansion to a worker. Space passes through so a cancelled expansion never drops it;
+/// the worker replaces it with the trigger. A matching Tab or Enter is kept to avoid moving focus or sending the message
+/// before expansion. Memory only; nothing typed is logged.
 /// </summary>
 internal sealed class SnippetFilter(IInputHub hub, SnippetMatcher matcher, Action<SnippetMatch, Delimiter?, long> expand, IKeyReader reader, Action? cancel = null) : IInputFilter
 {
@@ -110,9 +110,9 @@ internal sealed class SnippetFilter(IInputHub hub, SnippetMatcher matcher, Actio
             case 0x20 or 0x09 or 0x0D:
                 if (matcher.Delimiter() is not { } done)
                     return false;
-                _swallowed = vk;
+                if (vk != 0x20) _swallowed = vk;
                 expand(done, vk == 0x09 ? Delimiter.Tab : vk == 0x0D ? Delimiter.Enter : Delimiter.Space, key.Timestamp);
-                return true;
+                return vk != 0x20;
             case >= 0x21 and <= 0x28 or 0x1B or 0x2D or 0x2E: // page keys, End, Home, arrows, Esc, Insert, Delete
                 matcher.Reset();
                 return false;
