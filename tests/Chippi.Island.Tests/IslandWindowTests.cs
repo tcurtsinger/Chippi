@@ -402,6 +402,25 @@ public sealed class IslandWindowTests
     }
 
     [Fact]
+    public void The_Escape_hook_leaves_a_foreground_keyboard_panel_to_its_routed_handler()
+    {
+        WpfTestThread.Run(() => WithShownIsland(window =>
+        {
+            window.Panel.IsForegroundWindow = _ => true;
+            window.Panel.ActivateWindow = _ => { };
+            window.Panel.PreviewGotKeyboardFocus += (_, e) => e.Handled = true;
+            Click(window);
+            Settle(window.Panel);
+            window.Panel.TakeKeyboard();
+
+            window.Escape();
+            Pump(TimeSpan.Zero);
+
+            Assert.True(window.IsIslandOpen);
+        }));
+    }
+
+    [Fact]
     public void A_settings_refresh_before_close_preserves_the_pending_Audio_tab()
     {
         WpfTestThread.Run(() => WithShownIsland(window =>
