@@ -82,6 +82,27 @@ public sealed class QuickActionsTests
     private static readonly KeyShortcut Keys = new(ShortcutModifiers.Control | ShortcutModifiers.Alt, 0x44);
 
     [Fact]
+    public async Task Cleaning_uses_its_own_feature_shortcut_instead_of_a_duplicate_Quick_action()
+    {
+        var settings = new SettingsStore
+        {
+            Value = new QuickActionsSettings { Shortcuts = new() { ["cleaning"] = Keys } },
+        };
+        var shortcuts = new ShortcutService(RefusingRegistrar.Instance);
+        var module = new QuickActionsModule(() => new FakePc(), null, () => () => { });
+        await module.StartAsync(new ModuleContext(QuickActionsModule.Id, settings, NullLogger.Instance,
+            new IslandActivityHub().CreatePublisher(QuickActionsModule.Id), new Ui()) { Shortcuts = shortcuts }, default);
+        try
+        {
+            Assert.DoesNotContain(shortcuts.List, s => s.Name == "Cleaning mode");
+            Assert.Contains(shortcuts.List, s => s.Name == "Dark mode");
+            Assert.Contains(module.Offered, a => a.Id == QuickActionId.Cleaning);
+            Assert.False(module.ChangeShortcut(QuickActionId.Cleaning, Keys));
+        }
+        finally { await module.StopAsync(default); }
+    }
+
+    [Fact]
     public async Task The_home_button_is_Actions_with_no_status()
     {
         var f = new Fixture();
