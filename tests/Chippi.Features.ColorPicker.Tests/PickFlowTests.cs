@@ -102,7 +102,7 @@ public sealed class PickFlowTests
 
     private sealed record Rig(ColorPickerModule Module, Layer Layer, Clipboard Clip, Settings Settings, IslandActivityHub Hub, List<string> Pages, Ui Ui, Keys Keys);
 
-    private static Rig Start(ColorPickerSettings? saved = null)
+    private static Rig Start(ColorPickerSettings? saved = null, TimeProvider? time = null)
     {
         var layer = new Layer();
         var clip = new Clipboard();
@@ -111,7 +111,7 @@ public sealed class PickFlowTests
         var ui = new Ui();
         var keys = new Keys();
         var pages = new List<string>();
-        var module = new ColorPickerModule(layer);
+        var module = new ColorPickerModule(layer) { Time = time ?? TimeProvider.System };
         module.StartAsync(new ModuleContext(ColorPickerModule.Id, settings, NullLogger.Instance, hub.CreatePublisher(ColorPickerModule.Id), ui)
         { Clipboard = clip, Shortcuts = keys, OpenIslandPage = pages.Add }, default).GetAwaiter().GetResult();
         return new Rig(module, layer, clip, settings, hub, pages, ui, keys);
@@ -134,6 +134,24 @@ public sealed class PickFlowTests
         Assert.Equal("HEX", t.Module.CopiedAs);
         Assert.Empty(t.Pages);
         Assert.Equal(CaptureEnd.Finished, t.Layer.Last.Ended);
+    }
+
+    [Fact]
+    public void The_bar_line_clears_after_the_notice_time_and_a_new_pick_restarts_it()
+    {
+        var time = new Chippi.Capture.Tests.ManualTime();
+        var t = Start(time: time);
+        t.Module.Pick(review: false);
+        t.Layer.Last!.Pick(0xFF7C5CFF);
+        Assert.Single(t.Hub.Activities);
+        time.Advance(TimeSpan.FromSeconds(5));
+        Assert.Single(t.Hub.Activities);
+        t.Module.Pick(review: false);
+        t.Layer.Last!.Pick(0xFF112233);
+        time.Advance(TimeSpan.FromSeconds(5));
+        Assert.Single(t.Hub.Activities);
+        time.Advance(TimeSpan.FromSeconds(1));
+        Assert.Empty(t.Hub.Activities);
     }
 
     [Fact]

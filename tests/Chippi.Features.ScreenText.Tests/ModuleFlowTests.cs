@@ -113,7 +113,9 @@ public sealed class ModuleFlowTests
     private sealed class Ui : IModuleUi
     {
         public Func<IReadOnlyList<ChippiCommand>>? Commands;
-        public IIslandTile AddIslandTile(IslandTileSpec spec) => default!;
+        public List<IslandTileSpec> Specs = [];
+        public List<string> Tried = [];
+        public IIslandTile AddIslandTile(IslandTileSpec spec) { Specs.Add(spec); return default!; }
         public void SetSettingsPage(Func<string?, object> page) { }
         public void AddCommands(Func<IReadOnlyList<ChippiCommand>> commands) => Commands = commands;
     }
@@ -141,7 +143,7 @@ public sealed class ModuleFlowTests
 
     private sealed record Rig(ScreenTextModule Module, Layer Layer, Ocr Ocr, Qr Qr, Clipboard Clip, Settings Settings, IslandActivityHub Hub, List<string> Pages, Ui Ui, Keys Keys);
 
-    private static async Task<Rig> Start(ScreenTextSettings? saved = null)
+    private static async Task<Rig> Start(ScreenTextSettings? saved = null, TimeProvider? time = null)
     {
         var layer = new Layer();
         var ocr = new Ocr();
@@ -152,9 +154,9 @@ public sealed class ModuleFlowTests
         var ui = new Ui();
         var keys = new Keys();
         var pages = new List<string>();
-        var module = new ScreenTextModule(layer, ocr, qr);
+        var module = new ScreenTextModule(layer, ocr, qr) { Time = time ?? TimeProvider.System };
         await module.StartAsync(new ModuleContext(ScreenTextModule.Id, settings, NullLogger.Instance, hub.CreatePublisher(ScreenTextModule.Id), ui)
-        { Clipboard = clip, Shortcuts = keys, OpenIslandPage = pages.Add }, default);
+        { Clipboard = clip, Shortcuts = keys, OpenIslandPage = pages.Add, TryOpenIslandPage = key => { ui.Tried.Add(key); return key == "capture"; } }, default);
         return new Rig(module, layer, ocr, qr, clip, settings, hub, pages, ui, keys);
     }
 
@@ -181,6 +183,22 @@ public sealed class ModuleFlowTests
         await t.Module.ReadSelectionAsync(image, ScreenTextVerb.CopyText);
         Assert.Equal(1, t.Ocr.Calls);
     }
+    [Fact]
+    public async Task The_result_line_clears_after_the_notice_time_and_a_new_line_restarts_it()
+    {
+        var time = new Chippi.Capture.Tests.ManualTime();
+        var t = await Start(time: time);
+        await Select(t, ScreenTextVerb.CopyText);
+        Assert.Single(t.Hub.Activities);
+        time.Advance(TimeSpan.FromSeconds(5));
+        Assert.Single(t.Hub.Activities);
+        await Select(t, ScreenTextVerb.CopyText);
+        time.Advance(TimeSpan.FromSeconds(5));
+        Assert.Single(t.Hub.Activities);
+        time.Advance(TimeSpan.FromSeconds(1));
+        Assert.Empty(t.Hub.Activities);
+    }
+
     [Fact]
     public async Task Copy_text_copies_the_text_once_and_says_how_many_words()
     {
@@ -333,6 +351,29 @@ public sealed class ModuleFlowTests
         Assert.Equal(QrScanState.Read, t.Module.Qr.State);
         Assert.Equal([QrKind.Link, QrKind.WiFi], t.Module.Qr.Codes.Select(c => c.Kind));
         Assert.Empty(t.Clip.Written);
+    }
+
+    [Fact]
+    public async Task Scan_QR_gives_each_code_its_picture_from_the_capture()
+    {
+        var t = await Start();
+        t.Qr.Hits = [new QrHit("https://example.com/", new Point(10, 10), new Rect(10, 8, 40, 30)), new QrHit("plain", default)];
+        await Select(t, ScreenTextVerb.ScanQr);
+        var codes = t.Module.Qr.Codes;
+        Assert.Equal((40, 30), (codes[0].Image!.PixelWidth, codes[0].Image!.PixelHeight));
+        Assert.Equal((120, 40), (codes[1].Image!.PixelWidth, codes[1].Image!.PixelHeight));
+    }
+
+    [Fact]
+    public async Task Back_from_the_Text_and_QR_pages_returns_to_Capture()
+    {
+        var t = await Start();
+        foreach (var key in new[] { ScreenTextModule.Id, ScreenTextModule.QrTileKey })
+        {
+            t.Ui.Tried.Clear();
+            Assert.True(t.Ui.Specs.Single(s => s.Key == key).HandleBack!());
+            Assert.Equal(["capture"], t.Ui.Tried);
+        }
     }
 
     [Fact]
