@@ -143,7 +143,7 @@ public sealed class ModuleFlowTests
 
     private sealed record Rig(ScreenTextModule Module, Layer Layer, Ocr Ocr, Qr Qr, Clipboard Clip, Settings Settings, IslandActivityHub Hub, List<string> Pages, Ui Ui, Keys Keys);
 
-    private static async Task<Rig> Start(ScreenTextSettings? saved = null)
+    private static async Task<Rig> Start(ScreenTextSettings? saved = null, TimeProvider? time = null)
     {
         var layer = new Layer();
         var ocr = new Ocr();
@@ -154,7 +154,7 @@ public sealed class ModuleFlowTests
         var ui = new Ui();
         var keys = new Keys();
         var pages = new List<string>();
-        var module = new ScreenTextModule(layer, ocr, qr);
+        var module = new ScreenTextModule(layer, ocr, qr) { Time = time ?? TimeProvider.System };
         await module.StartAsync(new ModuleContext(ScreenTextModule.Id, settings, NullLogger.Instance, hub.CreatePublisher(ScreenTextModule.Id), ui)
         { Clipboard = clip, Shortcuts = keys, OpenIslandPage = pages.Add, TryOpenIslandPage = key => { ui.Tried.Add(key); return key == "capture"; } }, default);
         return new Rig(module, layer, ocr, qr, clip, settings, hub, pages, ui, keys);
@@ -183,6 +183,22 @@ public sealed class ModuleFlowTests
         await t.Module.ReadSelectionAsync(image, ScreenTextVerb.CopyText);
         Assert.Equal(1, t.Ocr.Calls);
     }
+    [Fact]
+    public async Task The_result_line_clears_after_the_notice_time_and_a_new_line_restarts_it()
+    {
+        var time = new Chippi.Capture.Tests.ManualTime();
+        var t = await Start(time: time);
+        await Select(t, ScreenTextVerb.CopyText);
+        Assert.Single(t.Hub.Activities);
+        time.Advance(TimeSpan.FromSeconds(5));
+        Assert.Single(t.Hub.Activities);
+        await Select(t, ScreenTextVerb.CopyText);
+        time.Advance(TimeSpan.FromSeconds(5));
+        Assert.Single(t.Hub.Activities);
+        time.Advance(TimeSpan.FromSeconds(1));
+        Assert.Empty(t.Hub.Activities);
+    }
+
     [Fact]
     public async Task Copy_text_copies_the_text_once_and_says_how_many_words()
     {

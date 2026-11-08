@@ -96,6 +96,7 @@ public sealed class ScreenTextModule : IFeatureModule
         lock (_gate)
         {
             _context = context;
+            _line = new FeedbackLine(context.Island, FeedbackKey, Time, NoticeDuration);
             _settings = context.Settings.Get<ScreenTextSettings>();
         }
         context.Ui.SetSettingsPage(_ => new Views.ScreenTextSettingsPage(Settings));
@@ -141,7 +142,7 @@ public sealed class ScreenTextModule : IFeatureModule
         Interlocked.Increment(ref _generation);
         _lastImage = null;
         TextReselect = TextRetry = QrReselect = null;
-        lock (_gate) _context = null;
+        lock (_gate) { _context = null; _line?.Dispose(); _line = null; }
         // What was read doesn't outlive the feature.
         Text.Clear();
         Qr.Clear();
@@ -428,8 +429,14 @@ public sealed class ScreenTextModule : IFeatureModule
         return bitmap;
     }
 
-    private static void Feedback(ModuleContext context, string title, string source, bool attention) =>
-        context.Island.Publish(new IslandActivity(FeedbackKey, IslandActivityKind.Status, title, source) { IsFeedback = true, NeedsAttention = attention });
+    private FeedbackLine? _line;
+
+    /// <summary>The clock and notice time of the bar line, which clears itself; tests hold both.</summary>
+    public TimeProvider Time { get; init; } = TimeProvider.System;
+    public TimeSpan NoticeDuration { get; init; } = TimeSpan.FromSeconds(6);
+
+    private void Feedback(ModuleContext context, string title, string source, bool attention) =>
+        _line?.Show(new IslandActivity(FeedbackKey, IslandActivityKind.Status, title, source) { IsFeedback = true, NeedsAttention = attention });
 
     // The page needs the answer now, so the hub's write is waited for (it returns in milliseconds).
     private bool Write(string text)

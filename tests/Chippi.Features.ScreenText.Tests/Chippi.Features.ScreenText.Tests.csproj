@@ -20,6 +20,7 @@
     <Using Include="System.IO" />
     <!-- The pages' tests: the app's themes and the shared WPF thread. -->
     <Compile Include="../Chippi.Island.Tests/WpfTestThread.cs" Link="WpfTestThread.cs" />
+    <Compile Include="../Chippi.Capture.Tests/ManualTime.cs" Link="ManualTime.cs" />
   </ItemGroup>
 
   <ItemGroup>
