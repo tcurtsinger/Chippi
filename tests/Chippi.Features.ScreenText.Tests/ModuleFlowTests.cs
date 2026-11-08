@@ -404,6 +404,39 @@ public sealed class ModuleFlowTests
     }
 
     [Fact]
+    public async Task Extract_text_opens_its_page_before_the_capture_screen_closes()
+    {
+        var t = await Start();
+        var gate = new TaskCompletionSource<OcrOutcome>();
+        t.Ocr.Hold = gate.Task;
+        t.Module.Start(ScreenTextVerb.ExtractText);
+        var session = t.Layer.Last!;
+        int pagesAtClose = -1;
+        session.Closed += _ => pagesAtClose = t.Pages.Count;
+        session.Release(120, 40);
+        Assert.Null(session.Ended); // still frozen while the text is read
+        gate.SetResult(new OcrOutcome(TextReadState.Read, [new OcrLine("hi", default)], "English"));
+        await t.Module.Work;
+        Assert.Equal(1, pagesAtClose);
+        Assert.Equal(CaptureEnd.Finished, session.Ended);
+        Assert.False(session.HandedBack);
+    }
+
+    [Fact]
+    public async Task Scan_QR_opens_its_page_before_the_capture_screen_closes()
+    {
+        var t = await Start();
+        t.Module.Start(ScreenTextVerb.ScanQr);
+        var session = t.Layer.Last!;
+        int pagesAtClose = -1;
+        session.Closed += _ => pagesAtClose = t.Pages.Count;
+        session.Release(120, 40);
+        await t.Module.Work;
+        Assert.Equal(1, pagesAtClose);
+        Assert.False(session.HandedBack);
+    }
+
+    [Fact]
     public async Task Scan_QR_with_no_code_or_a_decoder_error()
     {
         var t = await Start();

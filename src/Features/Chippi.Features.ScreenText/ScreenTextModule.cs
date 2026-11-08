@@ -325,9 +325,24 @@ public sealed class ScreenTextModule : IFeatureModule
             }
             taken = true;
             var image = selection.Image();
-            session.Close(CaptureEnd.Finished, handBack: verb == ScreenTextVerb.CopyText);
-            Work = verb == ScreenTextVerb.ScanQr ? ScanAsync(image) : ReadAsync(image, copy: verb == ScreenTextVerb.CopyText, show: verb == ScreenTextVerb.ExtractText);
+            if (verb == ScreenTextVerb.CopyText)
+            {
+                // No page to open: the screen closes at once and the keyboard goes back to the window it came from.
+                session.Close(CaptureEnd.Finished, handBack: true);
+                Work = ReadAsync(image, copy: true, show: false);
+                return;
+            }
+            Work = OpenPageThenClose(session, verb == ScreenTextVerb.ScanQr ? ScanAsync(image) : ReadAsync(image, copy: false, show: true));
         };
+    }
+
+    // The page opens while the frozen screen still holds the foreground, and only then does the screen close: closing first
+    // let Windows hand the foreground back to the window the capture started over, which closed the page just shown
+    // (AGENTS.md, Foreground; the same order as the capture bar's text buttons).
+    private static async Task OpenPageThenClose(ICaptureSession session, Task work)
+    {
+        try { await work; }
+        finally { session.Close(CaptureEnd.Finished, handBack: false); }
     }
 
     /// <summary>
