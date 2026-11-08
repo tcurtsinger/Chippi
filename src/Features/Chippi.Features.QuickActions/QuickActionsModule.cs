@@ -184,8 +184,8 @@ public sealed class QuickActionsModule : IFeatureModule
         // The Command bar runs each as its shortcut does: one that needs a choice or asks first opens its list or its confirm.
         context.Ui.AddCommands(() => [.. Offered.Where(a => a.Id != QuickActionId.Cleaning).Select(a =>
             new ChippiCommand($"quick-actions/{a.Key}", a.Name, LucideIcons.KeyOf(a.Icon), () => PressedAsync(a.Id)) { Words = a.Label })]);
-        // Each action is listed in Settings › Shortcuts while Quick actions runs, set or not.
-        foreach (var action in QuickAction.All)
+        // Cleaning mode owns its shortcut; the remaining actions are listed here, set or not.
+        foreach (var action in QuickAction.All.Where(a => a.Id != QuickActionId.Cleaning))
         {
             _hotkeys[action.Id] = CreateHotkey(context, action);
             if (Settings.ShortcutOf(action.Id) is { IsBindable: true } shortcut)
