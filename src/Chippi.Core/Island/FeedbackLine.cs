@@ -9,6 +9,7 @@ public sealed class FeedbackLine(IIslandPublisher island, string key, TimeProvid
     private readonly Lock _gate = new();
     private ITimer? _timer;
     private bool _disposed;
+    private int _generation;
 
     public void Show(IslandActivity line)
     {
@@ -17,7 +18,18 @@ public sealed class FeedbackLine(IIslandPublisher island, string key, TimeProvid
             if (_disposed) return;
             _timer?.Dispose();
             island.Publish(line);
-            _timer = time.CreateTimer(_ => island.Clear(key), null, after, Timeout.InfiniteTimeSpan);
+            int mine = ++_generation;
+            _timer = time.CreateTimer(_ => Expire(mine), null, after, Timeout.InfiniteTimeSpan);
+        }
+    }
+
+    // A callback already queued when its timer was replaced must not clear the newer line.
+    internal void Expire(int generation)
+    {
+        lock (_gate)
+        {
+            if (_disposed || generation != _generation) return;
+            island.Clear(key);
         }
     }
 

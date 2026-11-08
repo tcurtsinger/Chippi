@@ -142,8 +142,14 @@ public sealed class ZXingQrDecoder : IQrDecoder
         var points = result.ResultPoints;
         if (points is null || points.Length < 2)
             return default;
-        double left = points.Min(p => p.X), top = points.Min(p => p.Y), right = points.Max(p => p.X), bottom = points.Max(p => p.Y);
-        double pad = Math.Max(right - left, bottom - top) * 0.25 + 4;
+        // ZXing gives the three finder centres (corner in the middle), and an alignment pattern inside the code when it has one:
+        // infer the fourth corner from the three, since the alignment pattern sits short of it.
+        IEnumerable<ResultPoint> all = points.Length >= 3
+            ? [.. points, new ResultPoint(points[0].X + points[2].X - points[1].X, points[0].Y + points[2].Y - points[1].Y)]
+            : points;
+        double left = all.Min(p => p.X), top = all.Min(p => p.Y), right = all.Max(p => p.X), bottom = all.Max(p => p.Y);
+        // A turned code's corners reach up to sqrt(2) further along the axes.
+        double pad = Math.Max(right - left, bottom - top) * 0.36 + 4;
         left = Math.Max(0, left - pad);
         top = Math.Max(0, top - pad);
         right = Math.Min(image.Width, right + pad);
