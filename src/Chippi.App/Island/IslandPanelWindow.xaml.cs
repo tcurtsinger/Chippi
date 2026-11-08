@@ -132,7 +132,7 @@ public partial class IslandPanelWindow : Window
         PreviewMouseRightButtonDown += (_, e) => TakeKeyboard(e.OriginalSource as DependencyObject);
         PreviewKeyDown += (_, e) =>
         {
-            if (e.Key != Key.Escape)
+            if (e.Key != Key.Escape || PopupOwnsEscape(e.OriginalSource as DependencyObject))
                 return;
             e.Handled = true;
             if (!PageHandlesEscape())
@@ -158,7 +158,7 @@ public partial class IslandPanelWindow : Window
     internal event EventHandler? SettingsRequested;
 
     /// <summary>The user opened a page (a tile key) to restore next time.</summary>
-    internal event EventHandler<string>? LastPageChanged;
+    internal event EventHandler<string?>? LastPageChanged;
 
     public bool IsOpen { get; private set; }
 
@@ -196,7 +196,18 @@ public partial class IslandPanelWindow : Window
                 return true;
             }
         }
-        return IsOpen && _page is null ? _grid.CloseSearch() : PageHandles(s => s.HandleEscape, "Esc");
+        return IsOpen && _page is null ? _grid.CloseSearch() : PageHandles(s => s.HandleEscape ?? s.HandleBack, "Esc");
+    }
+
+    private static bool PopupOwnsEscape(DependencyObject? source)
+    {
+        for (var at = source; at is not null; at = LogicalTreeHelper.GetParent(at)
+            ?? (at is Visual or System.Windows.Media.Media3D.Visual3D ? VisualTreeHelper.GetParent(at) : null))
+        {
+            if (at is System.Windows.Controls.Primitives.Popup { IsOpen: true } or ComboBox { IsDropDownOpen: true }) return true;
+            if (at is ComboBoxItem item && ItemsControl.ItemsControlFromItemContainer(item) is ComboBox { IsDropDownOpen: true }) return true;
+        }
+        return false;
     }
 
     /// <summary>Lets the page use its Back arrow first (a detail page back to its overview): true when it did, and the page stays.</summary>
@@ -390,6 +401,7 @@ public partial class IslandPanelWindow : Window
             Place();
             return;
         }
+        _cameFrom = null;
         IsOpen = true;
         bool shrinking = IsVisible;
         if (!shrinking && (sourceRim ?? TryFindResource("IslandWidgetBorderBrush") as SolidColorBrush) is { } rim)
@@ -454,19 +466,35 @@ public partial class IslandPanelWindow : Window
     /// <summary>Takes the keyboard without a click (the tray icon chosen with the keyboard, or a second launch).</summary>
     internal void TakeKeyboard() => TakeKeyboard(null);
 
-    /// <summary>Shows <paramref name="key"/>'s page, or the grid for null; the new content fades in.</summary>
-    internal void ShowPage(string? key, bool remember = true)
+    private string? _cameFrom;
+
+    internal bool GoBackToPage(string key)
+    {
+        if (!IsOpen || !Exists(key)) return false;
+        ShowPage(key, remember: false, back: true);
+        return true;
+    }
+
+    private void Back()
+    {
+        if (!PageHandlesBack()) ShowPage(_cameFrom, back: true);
+    }
+
+    /// <summary>Shows <paramref name="key"/>'s page, or the grid for null; Back slides from the left.</summary>
+    internal void ShowPage(string? key, bool remember = true, bool back = false)
     {
         key = ResolvePage(key);
-        if (remember && key is not null)
+        if (remember)
             RememberPage(key);
         if (key == _page && IsOpen)
             return;
+        bool changeTab = IslandTool.IsAudioPage(_page) && IslandTool.IsAudioPage(key);
+        if (!changeTab || back)
+            _cameFrom = IsOpen && !back && key is not null ? _page : null;
         if (_page is null && key is not null)
             _returnFocusKey = IslandTool.GalleryKey(key);
         if (key is null && _page is not null)
             _returnFocusKey ??= IslandTool.GalleryKey(_page);
-        bool changeTab = IslandTool.IsAudioPage(_page) && IslandTool.IsAudioPage(key);
         bool focusTab = changeTab && _audioTabs.IsKeyboardFocusWithin;
         _page = key;
         if (!IsOpen)
@@ -483,7 +511,7 @@ public partial class IslandPanelWindow : Window
             return;
         }
         Reshape(snap: false);
-        _pageFrom = key is null ? -1 : 1;
+        _pageFrom = back || key is null ? -1 : 1;
         if (_frame is null || _morph != Morph.Open)
             Begin(Morph.Page); // a shortcut during the open reveals the requested page through the same growing outline
         if (_keyboard.Requested && IsForegroundWindow(_hwnd))
@@ -515,7 +543,7 @@ public partial class IslandPanelWindow : Window
         return IslandTool.ResolveAudioPage(key, _groups.Select(g => g.Key));
     }
 
-    private void RememberPage(string key)
+    private void RememberPage(string? key)
     {
         bool? mixer = IslandTool.IsAudioPage(key) ? key == AppVolumeModule.TileKey : AudioShowsMixer;
         string? audioPage = IslandTool.IsAudioPage(key) ? key : AudioPage;
@@ -548,7 +576,7 @@ public partial class IslandPanelWindow : Window
         {
             if (_nowPlaying is null)
             {
-                _nowPlaying = new NowPlayingView(_media, () => ShowPage(null, remember: false));
+                _nowPlaying = new NowPlayingView(_media, Back);
                 _nowPlaying.SetPetColor(_grid.Pet.PetColor);
             }
             page.Children.Add(_nowPlaying); // its own header and body
@@ -563,7 +591,7 @@ public partial class IslandPanelWindow : Window
             header.VerticalAlignment = VerticalAlignment.Center;
             // Every header gets the same 24 row and the 8 gap below it, so every body is 496 × 304; a page that asks for a
             // taller row (the Command bar's 32 field) gets it, and its body is that much shorter.
-            var back = BackButton(() => { if (!PageHandlesBack()) ShowPage(null, remember: false); });
+            var back = BackButton(Back);
             DockPanel.SetDock(back, Dock.Left);
             double height = IslandTool.IsAudioPage(key) && (IslandTool.AudioPages.Count(Exists) > 1 || key == "sound.board") ? 32
                 : Group(key)?.Parts.Max(p => p.Spec.HeaderHeight) is > 0 and var taller ? taller : IslandPage.HeaderHeight;

@@ -74,6 +74,7 @@ public sealed partial class KeepAwakeModule : IFeatureModule
             Toggle = new IslandTileToggle(() => IsOn, ToggleFromHomeAsync),
             // Esc leaves the Until picker before it closes the island.
             HandleEscape = () => _view?.CloseUntil() == true,
+            HandleBack = () => _view?.CloseUntil() == true,
         });
         UpdateTile();
         // Runs only while a timed session counts down ("45 min left"); see OnSessionChanged. The page refreshes with it

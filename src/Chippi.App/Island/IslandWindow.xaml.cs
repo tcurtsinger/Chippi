@@ -131,6 +131,7 @@ public partial class IslandWindow : Window
     private string? _chipKey; // the page the bar opens
     private Action? _chipClick; // or what a click on it does instead (IslandActivity.Clicked)
     private string? _lastPage; // the page last opened, saved once the panel has gone
+    private bool _lastPagePending;
     private string _lineText = "";
     private string? _shownContent; // what the bar shows, by identity: a new one arrives (Arrival)
     private string? _rim; // the rim's brush key, rest or hovered
@@ -176,7 +177,7 @@ public partial class IslandWindow : Window
         {
             // The panel covered the widget, so the widget never saw the pointer come or go.
             SetHover(!_panel.IsVisible && IsVisible && CoversWidget(PointerAt()));
-            if (!_panel.IsVisible && _lastPage is not null)
+            if (!_panel.IsVisible && _lastPagePending)
                 Dispatcher.BeginInvoke(DispatcherPriority.ContextIdle, () =>
                 {
                     if (!_panel.IsVisible) SaveLastPage();
@@ -217,7 +218,7 @@ public partial class IslandWindow : Window
             SettingsRequested?.Invoke(this, EventArgs.Empty);
         };
         // Saved once the panel has gone: a save writes settings.json, which mid-switch costs frames.
-        _panel.LastPageChanged += (_, key) => _lastPage = key;
+        _panel.LastPageChanged += (_, key) => { _lastPage = key; _lastPagePending = true; };
 
         // The mouse is handled here, before the button sees it: a press is a click or the start of a drag.
         // Click itself comes only from Enter, Space or UI Automation's Invoke.
@@ -297,11 +298,13 @@ public partial class IslandWindow : Window
     public event EventHandler? SettingsRequested;
 
     /// <summary>The user opened a page (a tile key): save it as AppSettings.IslandLastPage.</summary>
-    public event EventHandler<string>? LastPageChanged;
+    public event EventHandler<string?>? LastPageChanged;
 
     private void SaveLastPage()
     {
-        if (_lastPage is not { } page) return;
+        if (!_lastPagePending) return;
+        var page = _lastPage;
+        _lastPagePending = false;
         _lastPage = null;
         LastPageChanged?.Invoke(this, page);
     }
@@ -315,7 +318,7 @@ public partial class IslandWindow : Window
     public void SetLastPage(string? key, bool? audioShowsMixer = null, string? audioPage = null)
     {
         // A config write from another feature may arrive before the pending navigation is saved on close.
-        if (_lastPage is null)
+        if (!_lastPagePending)
             _panel.SetLastPage(key, audioShowsMixer, audioPage);
     }
 

@@ -66,6 +66,9 @@ public sealed class ModuleContext(
     /// </summary>
     public Func<string, bool> TryOpenIslandPage { get; init; } = _ => false;
 
+    /// <summary>Returns to an existing island page with the Back transition, without remembering it as forward navigation.</summary>
+    public Func<string, bool> TryGoBackIslandPage { get; init; } = _ => false;
+
     /// <summary>
     /// Opens the island on a tile's page with the keyboard, even over a fullscreen app or game, on the widget's screen (the
     /// Command bar's shortcut). False only while the island is off.

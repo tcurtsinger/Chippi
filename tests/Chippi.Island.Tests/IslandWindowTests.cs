@@ -445,6 +445,30 @@ public sealed class IslandWindowTests
     }
 
     [Fact]
+    public void Home_is_saved_after_close_even_if_an_unrelated_settings_refresh_arrives_first()
+    {
+        WpfTestThread.Run(() => WithShownIsland(window =>
+        {
+            window.SetTiles(IslandPanelTests.Tiles(IslandPanelTests.Part("keep-awake", "Awake", 40)));
+            Click(window);
+            Settle(window.Panel);
+            window.Panel.ShowPage("keep-awake");
+            Settle(window.Panel);
+            window.Panel.ShowPage(null);
+            Settle(window.Panel);
+            window.SetLastPage("keep-awake"); // the file still has the old page before the deferred save
+            string? saved = "not saved";
+            window.LastPageChanged += (_, page) => saved = page;
+
+            window.Escape();
+            Settle(window.Panel);
+            Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
+
+            Assert.Null(saved);
+        }));
+    }
+
+    [Fact]
     public void A_drag_lifts_the_puck_closes_the_panel_and_drops_it_where_it_is_let_go()
     {
         WpfTestThread.Run(() => WithShownIsland(window =>

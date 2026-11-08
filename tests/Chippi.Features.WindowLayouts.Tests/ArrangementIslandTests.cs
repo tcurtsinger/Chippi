@@ -88,6 +88,37 @@ public sealed class ArrangementIslandTests
 
     private static List<ArrangementRow> Coding() => ArrangementPageTests.Coding();
 
+    [Fact]
+    public void A_run_does_not_open_Actions_until_its_bar_is_clicked_and_direct_Back_leaves_the_menu()
+    {
+        WpfTestThread.Run(() =>
+        {
+            IslandTheme();
+            var f = new Fixture(Board());
+            try
+            {
+                f.Desktop.Holds = _ => true;
+                _ = f.Module.LaunchArrangementAsync("coding", Dell.Id);
+                Pump(() => f.Module.Arrangements!.IsRunning && f.Bar is not null);
+
+                Assert.False(f.Module.TakeRunAsk());
+                Assert.NotNull(f.Bar!.Clicked);
+                f.Bar.Clicked();
+                Assert.True(f.Module.TakeRunAsk());
+                var menu = new SnapMenu(f.Module, null);
+                Assert.Equal(SnapMenu.Page.Run, menu.Showing);
+                Assert.False(menu.Back());
+                menu.Show(SnapMenu.Page.List);
+                menu.Show(SnapMenu.Page.Run);
+                Assert.True(menu.Back());
+                Assert.Equal(SnapMenu.Page.List, menu.Showing);
+                Assert.False(f.Module.TakeRunAsk());
+                Assert.False(f.Module.TakeOpenRunPage());
+            }
+            finally { f.Stop(); }
+        });
+    }
+
     private static WindowLayoutsSettings Board() => new()
     {
         Arrangements =
@@ -191,6 +222,7 @@ public sealed class ArrangementIslandTests
             Assert.Equal(("5 of 12 ready", "Coding", IslandActivityKind.Timer), (f.Bar!.Title, f.Bar.Source, f.Bar.Kind));
             Assert.Equal(5 / 12.0, f.Bar.Progress!.Value, 3);
             // A click on the bar opens Actions › Snap on the run.
+            f.Bar!.Clicked!();
             Assert.True(f.Module.TakeRunAsk());
             var menu = new SnapMenu(f.Module, target);
             Assert.Equal(SnapMenu.Page.Run, menu.Showing);

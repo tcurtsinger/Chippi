@@ -41,6 +41,7 @@ internal sealed class CapturePanelHost : ICapturePanelModel, IDisposable
         Tile = new IslandTileContribution("capture", new IslandTileSpec("capture", "Capture", "Scan", 75, 0, () => _body)
         { CreateHeader = () => _header, InitialFocus = () => _showingRecent ? _recentView?.InitialFocus : view.InitialFocus, HandleBack = Back });
         ShowPanel();
+        _body.Unloaded += (_, _) => ShowPanel();
         shell.Services.SharedIslandTiles = () => Visible ? [Tile] : [];
         capture.OpenDelay = OpenDelay;
         shell.Registry.Changed += RegistryChanged;
@@ -105,6 +106,11 @@ internal sealed class CapturePanelHost : ICapturePanelModel, IDisposable
     }
     private void Open()
     {
+        ShowPanel();
+        ShowPage();
+    }
+    private void ShowPage()
+    {
         if (!_shell.Commands.TryShowPage("capture") && !_shell.Commands.SummonPage("capture")) _shell.Commands.OpenSettings("features");
     }
     private string? ChangeOpen(KeyShortcut? keys)
@@ -160,7 +166,7 @@ internal sealed class CapturePanelHost : ICapturePanelModel, IDisposable
         _showingRecent = true;
         _body.Content = _recentView;
         _header.Content = _recentView!.Header;
-        Open();
+        ShowPage();
     }
     public void OpenFolder()
     {

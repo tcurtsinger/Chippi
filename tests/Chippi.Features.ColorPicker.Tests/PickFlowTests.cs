@@ -74,7 +74,12 @@ public sealed class PickFlowTests
     private sealed class Ui : IModuleUi
     {
         public Func<IReadOnlyList<ChippiCommand>>? Commands;
-        public IIslandTile AddIslandTile(IslandTileSpec spec) => default!;
+        public List<IslandTileSpec> Tiles = [];
+        public IIslandTile AddIslandTile(IslandTileSpec spec)
+        {
+            Tiles.Add(spec);
+            return new IslandTileContribution(ColorPickerModule.Id, spec);
+        }
         public void SetSettingsPage(Func<string?, object> page) { }
         public void AddCommands(Func<IReadOnlyList<ChippiCommand>> commands) => Commands = commands;
     }
@@ -113,8 +118,23 @@ public sealed class PickFlowTests
         var pages = new List<string>();
         var module = new ColorPickerModule(layer);
         module.StartAsync(new ModuleContext(ColorPickerModule.Id, settings, NullLogger.Instance, hub.CreatePublisher(ColorPickerModule.Id), ui)
-        { Clipboard = clip, Shortcuts = keys, OpenIslandPage = pages.Add }, default).GetAwaiter().GetResult();
+        { Clipboard = clip, Shortcuts = keys, OpenIslandPage = pages.Add,
+            TryGoBackIslandPage = key => { pages.Add(key); return true; } }, default).GetAwaiter().GetResult();
         return new Rig(module, layer, clip, settings, hub, pages, ui, keys);
+    }
+
+    [Fact]
+    public async Task Back_from_Color_returns_to_Capture()
+    {
+        var t = Start();
+        try
+        {
+            var back = Assert.Single(t.Ui.Tiles).HandleBack;
+            Assert.NotNull(back);
+            Assert.True(back());
+            Assert.Equal(["capture"], t.Pages);
+        }
+        finally { await t.Module.StopAsync(default); }
     }
 
     [Fact]

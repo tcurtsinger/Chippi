@@ -155,6 +155,28 @@ public sealed class IslandPanelTests
         });
     }
 
+    [Fact]
+    public void Returning_to_a_known_page_does_not_remember_it_as_forward_navigation()
+    {
+        WpfTestThread.Run(() => WithPanel(panel =>
+        {
+            var remembered = new List<string?>();
+            panel.LastPageChanged += (_, key) => remembered.Add(key);
+            Open(panel);
+            panel.ShowPage("keep-awake");
+            IslandWindowTests.Settle(panel);
+            panel.ShowPage("sound.mixer");
+            IslandWindowTests.Settle(panel);
+
+            Assert.True(panel.GoBackToPage("keep-awake"));
+            IslandWindowTests.Settle(panel);
+            Assert.Equal("keep-awake", panel.CurrentPage);
+            Assert.Equal(["keep-awake", "sound.mixer"], remembered);
+            Assert.False(panel.GoBackToPage("missing"));
+            Assert.Equal("keep-awake", panel.CurrentPage);
+        }));
+    }
+
     private static IslandGrid Grid(IslandPanelWindow panel) =>
         Assert.IsType<IslandGrid>(((ContentControl)panel.FindName("Page")).Content);
 
