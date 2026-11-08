@@ -9,6 +9,30 @@ namespace Chippi.Features.Downloads.Tests;
 
 public sealed class HistoryAndUndoTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Shortening_retention_prunes_history_and_refreshes_the_view_immediately(bool sameSettings)
+    {
+        using var f = new Fixture();
+        long run = f.History.BeginRun(RunTrigger.Preview, f.Folder);
+        long old = f.History.Plan(run, HistoryOperationKind.Move, f.In("old.txt"), f.In("old-dest.txt"), null, null, 1);
+        f.History.MarkFailed(old, "Fixture failure");
+        f.Time.Advance(TimeSpan.FromDays(10));
+        long recent = f.History.Plan(run, HistoryOperationKind.Move, f.In("recent.txt"), f.In("recent-dest.txt"), null, null, 1);
+        f.History.MarkFailed(recent, "Fixture failure");
+        int refreshes = 0;
+        f.Engine.HistoryChanged += (_, _) => refreshes++;
+        var settings = sameSettings ? f.Settings : f.Settings.Clone();
+        settings.HistoryDays = 7;
+
+        f.Engine.Apply(settings);
+
+        Assert.Null(f.History.Get(old));
+        Assert.NotNull(f.History.Get(recent));
+        Assert.Equal(1, refreshes);
+    }
+
     private static RuleSetting MovePdfs() => new() { Extensions = ["pdf"], Action = RuleActionKind.Move, Template = "Docs" };
 
     private static async Task<long> OrganizeOne(Fixture f, string name = "a.pdf", string content = "hello")
