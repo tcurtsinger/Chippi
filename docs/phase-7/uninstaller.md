@@ -36,7 +36,7 @@ Installed apps from three places, read as a standard user (architecture section 
 
 ### Who runs the uninstaller
 
-- **An `HKLM` app:** through the admin helper as `Uninstall(registryKey)`: the helper reads the command from that key itself, because only an admin can write `HKLM`. A queue is one prompt.
+- **An `HKLM` app:** through the admin helper as `Uninstall(view, keyName)`: the helper reads the command from that key itself and returns the id of the record it keeps (admin-helper.md), because only an admin can write `HKLM`. A queue is one prompt.
 - **An `HKCU` app:** always run by Chippi as a standard user, never elevated, since any program running as Travis can write an `HKCU` entry (architecture section 6).
 - **A Store app:** `RemovePackageAsync` for the current user, no admin.
 - The wizard of a non-quiet uninstaller shows on screen and Travis finishes it. Chippi notices the entry disappear or the process end, and goes to the leftover offer.
@@ -49,13 +49,13 @@ Looked for after the app's uninstaller finishes: the former install folder, the 
 - **Check first (unticked, with the reason):** matches by name only: a publisher folder, an AppData folder named like the app.
 - **Shared (never offered):** another installed app's `InstallLocation`, install folder or uninstall key is, contains or sits inside it ("Shared with Thunderbird"). Nothing under `Windows` or `System32`, no shared Microsoft key, and no other app's folder is ever listed.
 
-The Uninstall entry is read **before** the uninstaller runs and kept for the scan, since uninstallers usually delete it. With no such record, the scan lists only Check first items and the helper deletes nothing elevated.
+The Uninstall entry is read **before** the uninstaller runs and kept for the scan, since uninstallers usually delete it. With no such record, the scan lists only Check first items and the helper deletes nothing elevated. For an `HKLM` app the helper keeps its own record for 30 days, so Remove leftovers works later too, with a new prompt; after that the admin items say "Kept: no uninstall record".
 
 ### Removing
 
 - **Files and folders** go to the Recycle Bin (`IFileOperation`, recycle on delete). A file that can't be recycled (too big, a drive without a bin) is named in the confirm as permanent.
 - **Registry keys** are exported with `reg.exe export` to a `.reg` file in Chippi's data folder first; the confirm says where it is. Travis can merge it back.
-- **Under Program Files, ProgramData and `HKLM`,** the items go to the helper as `DeleteLeftovers(app, items)`. The helper works the ownership rule out again itself and refuses anything that fails it (architecture section 6); Chippi's labels aren't trusted. Items the helper refuses because Travis could delete them himself return to Chippi's standard-user delete.
+- **Under Program Files, ProgramData and `HKLM`,** the items go to the helper as `DeleteLeftovers(recordId, items)`. The helper works the ownership rule out again itself and refuses anything that fails it (architecture section 6); Chippi's labels aren't trusted. Items the helper refuses because Travis could delete them himself return to Chippi's standard-user delete.
 - **Simulate:** the preview is the whole story. Every item with its path, kind and reason is listed before Remove; nothing is removed until Travis presses Remove.
 
 ### Left out (README task 478)
@@ -77,7 +77,7 @@ System restore points; "Remove broken entry" for an app with no working uninstal
 | Verb | Slot | Notes |
 |---|---|---|
 | Uninstall app | Global | Opens the target picker (a search list), then the same confirm as the button. It never acts on its own |
-| Scan for leftovers | Global | A picker of recently uninstalled apps whose record Chippi still holds |
+| Scan for leftovers | Global | A picker of recently uninstalled apps whose record Chippi still holds (for an `HKLM` app, while the helper's record lasts: 30 days) |
 | Uninstall selected apps, Remove leftovers, Open app install folder | In context | Act on the ticked or selected rows |
 
 All unassigned. Settings › Uninstaller shows the global slots read-only with Edit.
