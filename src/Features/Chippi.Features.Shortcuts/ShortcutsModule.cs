@@ -16,6 +16,9 @@ public interface IActionHost
 
     /// <summary>The action's target is gone: an app removed, a command whose feature isn't running.</summary>
     bool IsMissing(ChippiAction action);
+
+    /// <summary>The PC's Caps Lock toggle; hosts without a keyboard default to off.</summary>
+    bool CapsLockOn => false;
 }
 
 /// <summary>
@@ -223,6 +226,7 @@ public sealed class ShortcutsModule : IFeatureModule
 
     private sealed class RunnerHost(ActionRunner runner) : IActionHost
     {
+        public bool CapsLockOn => Console.CapsLock;
         public Task RunAsync(ChippiAction action, WindowTarget target) => runner.RunAsync(action, target);
 
         public bool IsMissing(ChippiAction action) => runner.IsMissing(action);
@@ -353,7 +357,8 @@ public sealed class ShortcutsModule : IFeatureModule
             }),
             Tapped = () => Post(() =>
             {
-                string? keys = Settings.CapsTap switch { CapsTap.Capitals => "Caps Lock", CapsTap.Escape => "Esc", CapsTap.InputLanguage => "Win+Space", _ => null };
+                string? keys = Settings.CapsHeldKey == 0x14 && host.CapsLockOn ? "Caps Lock"
+                    : Settings.CapsTap switch { CapsTap.Capitals => "Caps Lock", CapsTap.Escape => "Esc", CapsTap.InputLanguage => "Win+Space", _ => null };
                 if (keys is not null)
                     _ = RunTapAsync(host, keys);
             }),
