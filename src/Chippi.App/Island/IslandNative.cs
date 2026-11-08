@@ -99,6 +99,14 @@ internal static class IslandNative
                 SET_WINDOW_POS_FLAGS.SWP_NOMOVE | SET_WINDOW_POS_FLAGS.SWP_NOSIZE | SET_WINDOW_POS_FLAGS.SWP_NOACTIVATE | SET_WINDOW_POS_FLAGS.SWP_NOOWNERZORDER);
     }
 
+    /// <summary>Suppresses the hidden window's cached pixels until WPF presents a new frame.</summary>
+    internal static unsafe bool ClearRetainedSurface(HWND hwnd)
+    {
+        var blend = new BLENDFUNCTION { SourceConstantAlpha = 0 };
+        return PInvoke.UpdateLayeredWindow(hwnd, default, null, null, default, null, default, &blend,
+            UPDATE_LAYERED_WINDOW_FLAGS.ULW_ALPHA);
+    }
+
     /// <summary>
     /// Makes the window the foreground window. Only after the user clicked into it: the click is the
     /// last input, so Windows allows it.

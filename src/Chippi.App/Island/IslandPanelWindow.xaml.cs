@@ -1168,6 +1168,8 @@ public partial class IslandPanelWindow : Window
         _radius = OpenRadius;
         ShapeShadow.Opacity = 1;
         Hide();
+        // Hide stops WPF's render target before the final close frame is presented. Do not reuse its old pixels.
+        IslandNative.ClearRetainedSurface(_hwnd);
         Morphing?.Invoke(false, 1);
         Card.Opacity = 0;
         Root.Opacity = 1;
