@@ -49,17 +49,17 @@ internal sealed class SnippetExpander(ISnippetSender sender, Func<Task<string?>>
             if (!Valid())
             {
                 Log.Info("Text snippets: an expansion was dropped because the typing moved on");
-                return; // a key kept for the trigger is lost too: sending it now would land after what was typed since
+                return; // Space already reached the app; never delete characters typed after it.
             }
             if (SafePassword())
             {
                 // Nothing expands in a password field. A key kept for the trigger goes back as typed.
-                if (after is { } key)
+                if (after is { } key && key != Delimiter.Space)
                     await sender.SendAsync(0, "", key);
                 return;
             }
             string text = await SnippetRenderer.RenderAsync(match.Snippet.Text, _now(), clipboard);
-            if (!await sender.SendAsync(match.Typed, text, after, Valid))
+            if (!await sender.SendAsync(match.Typed + (after == Delimiter.Space ? 1 : 0), text, after, Valid))
             {
                 Log.Info("Text snippets: an expansion was dropped because the typing moved on");
                 return;
