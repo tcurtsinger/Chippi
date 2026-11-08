@@ -164,6 +164,31 @@ public sealed class SelectorTests
     }
 
     [Fact]
+    public void A_fixed_selection_has_no_handles_and_ignores_drags_arrows_and_Ctrl_A()
+    {
+        var s = New(CaptureMode.Region);
+        s.Fix(); // nothing to fix while choosing
+        Assert.False(s.Fixed);
+        s.Down(new(200, 200), false);
+        s.Up(new(399, 299)); // 200 × 100 at 200, 200
+        var rect = s.Selection!.Rect;
+        s.Fix();
+        Assert.True(s.Fixed);
+        s.Move(new(399, 250));
+        Assert.Equal(SelectionHandle.None, s.HandleUnderPointer); // the right edge
+        s.Down(new(399, 250), false);
+        Assert.False(s.IsDragging);
+        s.Move(new(449, 250));
+        s.Up(new(449, 250));
+        s.Down(new(300, 250), false);
+        s.Up(new(320, 260)); // inside
+        Assert.Equal(SelectorOutcome.None, s.Key(SelectorKey.Right, false, false));
+        Assert.Equal(SelectorOutcome.None, s.Key(SelectorKey.Right, true, false));
+        Assert.Equal(SelectorOutcome.None, s.Key(SelectorKey.A, false, true));
+        Assert.Equal(rect, s.Selection.Rect);
+    }
+
+    [Fact]
     public void Pick_a_point_picks_on_click_or_Enter_nudges_one_or_ten_and_a_right_click_cancels()
     {
         var s = New(CaptureMode.PickPoint, new(100, 100));

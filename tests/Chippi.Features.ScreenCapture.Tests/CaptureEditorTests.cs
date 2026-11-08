@@ -33,6 +33,7 @@ public sealed class CaptureEditorTests
             Point at = default;
             editor.PointerAt = (_, _) => at; // The owner's mouse never participates.
             session.Release();
+            Assert.True(session.Fixed); // Only Crop trims a released capture (the owner, 2026-11-08).
             void Tool(string name) => Click(Find(session.Tools!, name));
             bool upHandled = false;
             void Drag(Point from, Point to)
@@ -153,6 +154,8 @@ public sealed class CaptureEditorTests
         public Selection? Selection { get; private set; }
         public IReadOnlyList<CaptureSurface> Surfaces => [new("fixture", new(0, 0, 400, 300), 96, Canvas)];
         public bool Tooling { get; set; }
+        public bool Fixed;
+        public void FixSelection() => Fixed = true;
         public event Action<Selection>? Selected;
         public event Action<System.Windows.Input.KeyEventArgs>? KeyDown { add { } remove { } }
         public event Action<PixelPoint, uint>? Picked { add { } remove { } }

@@ -230,6 +230,14 @@ public sealed partial class CaptureLayer : ICaptureLayer
             }
         }
 
+        public void FixSelection()
+        {
+            if (_selector is not { IsReleased: true, Fixed: false } selector)
+                return;
+            selector.Fix();
+            Render();
+        }
+
         public event Action<Selection>? Selected;
         public event Action<PixelPoint, uint>? Picked;
         public event Action<KeyEventArgs>? KeyDown;

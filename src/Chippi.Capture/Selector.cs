@@ -83,8 +83,18 @@ public sealed class Selector
 
     public Freeze Freeze { get; }
 
-    /// <summary>A reopened capture: the selection can't be moved, resized or replaced.</summary>
-    public bool Fixed { get; }
+    /// <summary>A reopened or fixed capture: the selection can't be moved, resized or replaced.</summary>
+    public bool Fixed { get; private set; }
+
+    /// <summary>Fixes a released selection in place, as a reopened one; nothing while choosing.</summary>
+    public void Fix()
+    {
+        if (Selection is null)
+            return;
+        Fixed = true;
+        Held = SelectionHandle.None;
+        IsDragging = false;
+    }
 
     /// <summary>The mode; <see cref="CaptureMode.LastRegion"/> with none becomes <see cref="CaptureMode.Region"/>.</summary>
     public CaptureMode Mode { get; private set; }

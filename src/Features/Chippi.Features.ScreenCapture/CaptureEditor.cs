@@ -127,6 +127,7 @@ internal sealed class CaptureEditor : IDisposable
             }
         }
         _session.SetBars(selection.FastPath && _model.Settings.CtrlDragCopies ? null : _tools, selection.FastPath && _model.Settings.CtrlDragCopies ? null : _finish);
+        _session.FixSelection(); // Only Crop trims a capture once it's released (the owner, 2026-11-08).
         Redraw();
         if (selection.FastPath && _model.Settings.CtrlDragCopies) _ = Finish(EnterAction.Copy);
     }
