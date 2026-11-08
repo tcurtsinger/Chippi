@@ -88,7 +88,7 @@ public enum ClipStatus
     TooLarge,
 }
 
-public enum ClipLimit { None, Text, Image, Files }
+public enum ClipLimit { None, Text, Image, Files, ImagePixels }
 
 public enum PasteOutcome
 {
@@ -127,8 +127,8 @@ public static class ClipLimits
 public sealed record ClipImage(int Width, int Height, byte[] Bgra);
 
 /// <summary>
-/// One copy's usable content: files win over their fallback text, then a picture, then text
-/// (behavior-spec §3). Rich formats are kept as their plain text.
+/// One copy's usable content: files win over their fallback text. Rich document formats prefer their plain text;
+/// otherwise a picture wins over its fallback text (behavior-spec §3).
 /// </summary>
 public sealed record ClipContent
 {
@@ -150,7 +150,7 @@ public sealed record ClipContent
 
 /// <summary>
 /// A copy the listener delivered. Over a limit, <see cref="Content"/> is null and <see cref="Limit"/> says
-/// which ("Picture not saved · over 16 MiB").
+/// which (encoded picture bytes, decoded pixels, text bytes or file count).
 /// </summary>
 /// <param name="Sequence">The clipboard sequence number it was read at.</param>
 public sealed record ClipCopy(uint Sequence, DateTimeOffset At, ClipContent? Content, ClipPrivacy Privacy, ClipLimit Limit = ClipLimit.None);

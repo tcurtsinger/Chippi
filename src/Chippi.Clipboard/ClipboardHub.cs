@@ -308,15 +308,28 @@ public sealed class ClipboardHub : IClipboardHub, IDisposable
                 return TooLarge(ClipLimit.Files, privacy, out limit);
             return new ClipRead(ClipStatus.Ok, ClipContent.FromFiles(files), privacy);
         }
+        ClipRead? text = null;
+        // Document apps offer a bitmap preview alongside their editable text.
+        if (session.IsAvailable(ClipFormat.Html) || session.IsAvailable(ClipFormat.Rtf))
+        {
+            text = ReadText(session, privacy, out limit);
+            if (text.Status != ClipStatus.Empty) return text;
+        }
         foreach (var format in new[] { ClipFormat.DibV5, ClipFormat.Dib })
         {
             if (!session.IsAvailable(format) || session.Get(format) is not { } dib || !ClipCodec.TryDibSize(dib, out int w, out int h))
                 continue;
             if ((long)w * h > ClipLimits.ImagePixels)
-                return TooLarge(ClipLimit.Image, privacy, out limit);
+                return TooLarge(ClipLimit.ImagePixels, privacy, out limit);
             if (ClipCodec.DecodeDib(dib) is { } image)
                 return new ClipRead(ClipStatus.Ok, ClipContent.FromImage(image), privacy);
         }
+        return text ?? ReadText(session, privacy, out limit);
+    }
+
+    private static ClipRead ReadText(IClipboardSession session, ClipPrivacy privacy, out ClipLimit limit)
+    {
+        limit = ClipLimit.None;
         if (session.IsAvailable(ClipFormat.UnicodeText))
         {
             if (session.SizeOf(ClipFormat.UnicodeText) > ClipLimits.TextRawBytes)
