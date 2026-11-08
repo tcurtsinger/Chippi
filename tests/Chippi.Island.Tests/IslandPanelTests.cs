@@ -60,6 +60,101 @@ public sealed class IslandPanelTests
         IslandWindowTests.Settle(panel);
     }
 
+    [Fact]
+    public void Back_to_Home_is_remembered_as_the_last_page()
+    {
+        WpfTestThread.Run(() => WithPanel(panel =>
+        {
+            string? remembered = "unchanged";
+            panel.LastPageChanged += (_, key) => remembered = key;
+            Open(panel);
+            panel.ShowPage("keep-awake");
+            IslandWindowTests.Settle(panel);
+
+            Click(Back(panel));
+            IslandWindowTests.Settle(panel);
+
+            Assert.Null(panel.CurrentPage);
+            Assert.Null(remembered);
+        }));
+    }
+
+    [Fact]
+    public void Back_returns_to_the_page_that_opened_this_page_then_Home()
+    {
+        WpfTestThread.Run(() => WithPanel(panel =>
+        {
+            Open(panel);
+            panel.ShowPage("keep-awake");
+            IslandWindowTests.Settle(panel);
+            panel.ShowPage("sound.mixer");
+            IslandWindowTests.Settle(panel);
+
+            Click(Back(panel));
+            IslandWindowTests.Settle(panel);
+            Assert.Equal("keep-awake", panel.CurrentPage);
+            Click(Back(panel));
+            IslandWindowTests.Settle(panel);
+            Assert.Null(panel.CurrentPage);
+        }));
+    }
+
+    [Fact]
+    public void Escape_uses_the_page_Back_handler_when_it_has_no_separate_Escape_handler()
+    {
+        int backs = 0;
+        var tile = new IslandTileContribution("nested", new IslandTileSpec("nested", "Nested", "LayoutGrid", 10, 0,
+            () => new Border()) { HandleBack = () => { backs++; return true; } });
+        WpfTestThread.Run(() => WithPanel(panel =>
+        {
+            Open(panel);
+            panel.ShowPage("nested");
+
+            Assert.True(panel.PageHandlesEscape());
+            Assert.Equal(1, backs);
+            Assert.Equal("nested", panel.CurrentPage);
+        }, Tiles(tile)));
+    }
+
+    [Fact]
+    public void Escape_reaches_an_open_popup_before_the_panel_handles_it()
+    {
+        WpfTestThread.Run(() =>
+        {
+            var item = new Button { Content = "No delay" };
+            var popup = new System.Windows.Controls.Primitives.Popup { Child = new Border { Child = item }, StaysOpen = true };
+            var header = new StackPanel { Children = { popup } };
+            var tile = new IslandTileContribution("popup", new IslandTileSpec("popup", "Popup", "Timer", 10, 0,
+                () => new Border()) { CreateHeader = () => header });
+            item.PreviewKeyDown += (_, e) =>
+            {
+                if (e.Key != Key.Escape) return;
+                popup.IsOpen = false;
+                e.Handled = true;
+            };
+            WithPanel(panel =>
+            {
+                int closes = 0;
+                panel.EscapePressed += (_, _) => closes++;
+                Open(panel);
+                panel.ShowPage("popup");
+                IslandWindowTests.Settle(panel);
+                popup.PlacementTarget = header;
+                popup.IsOpen = true;
+                try
+                {
+                    item.RaiseEvent(new KeyEventArgs(Keyboard.PrimaryDevice, new UnshownSource(), 0, Key.Escape)
+                        { RoutedEvent = UIElement.PreviewKeyDownEvent });
+
+                    Assert.False(popup.IsOpen);
+                    Assert.Equal(0, closes);
+                    Assert.True(panel.IsOpen);
+                }
+                finally { popup.IsOpen = false; }
+            }, Tiles(tile));
+        });
+    }
+
     private static IslandGrid Grid(IslandPanelWindow panel) =>
         Assert.IsType<IslandGrid>(((ContentControl)panel.FindName("Page")).Content);
 
