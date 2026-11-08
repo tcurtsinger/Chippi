@@ -334,7 +334,7 @@ public sealed partial class CaptureLayer : ICaptureLayer
                 return;
             // 5 and 6. Every display, then the window list at the same moment.
             var exclude = overlays.Select(o => o.Handle).ToHashSet();
-            var ids = DisplayCatalog.Connected().ToDictionary(d => d.Handle, d => d.Id);
+            var ids = DisplayCatalog.CaptureIds(DisplayCatalog.Connected());
             var freezer = new Freezer(layer._reader, () => FrozenWindows.Read(exclude), m => ids.GetValueOrDefault(m, ""), layer._time);
             long reading = Stopwatch.GetTimestamp();
             var at = Cursor();
