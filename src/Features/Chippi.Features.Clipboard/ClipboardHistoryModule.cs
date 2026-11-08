@@ -155,7 +155,7 @@ public sealed class ClipboardHistoryModule : IFeatureModule
     }
 
     /// <summary>Uninstalling erases the saved history: the file, its log and its key (notes #56).</summary>
-    public Task UninstallAsync(CancellationToken ct)
+    public Task EraseDataAsync(CancellationToken ct)
     {
         foreach (var suffix in new[] { "", "-wal", "-shm" })
         {

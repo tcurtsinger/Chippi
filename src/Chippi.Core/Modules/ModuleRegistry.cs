@@ -132,7 +132,7 @@ public sealed class ModuleRegistry(ConfigStore config, IslandActivityHub island,
             await SyncFromConfigAsync(ct);
             // A crash or an offline settings edit can leave persistent integration behind.
             foreach (var entry in _entries.Where(e => !e.IsComingSoon && !e.IsInstalled))
-                await SetInstalledCoreAsync(entry, false, ct);
+                await SetInstalledCoreAsync(entry, false, ct, eraseData: false);
         }
         finally
         {
@@ -335,7 +335,7 @@ public sealed class ModuleRegistry(ConfigStore config, IslandActivityHub island,
         if (!config.HasSection(FeatureState.SectionName))
         {
             _logger.LogInformation("First run: applying the Essentials preset");
-            await ApplyPresetCoreAsync(FeaturePreset.Essentials, ct);
+            await ApplyPresetCoreAsync(FeaturePreset.Essentials, ct, eraseData: false);
             return;
         }
 
@@ -345,11 +345,11 @@ public sealed class ModuleRegistry(ConfigStore config, IslandActivityHub island,
         {
             bool install = wanted.Contains(entry.Id);
             if (entry.IsInstalled != install || (install && !entry.IsRunning))
-                await SetInstalledCoreAsync(entry, install, ct);
+                await SetInstalledCoreAsync(entry, install, ct, eraseData: false);
         }
     }
 
-    private async Task ApplyPresetCoreAsync(FeaturePreset preset, CancellationToken ct)
+    private async Task ApplyPresetCoreAsync(FeaturePreset preset, CancellationToken ct, bool eraseData = true)
     {
         if (preset != FeaturePreset.Custom)
         {
@@ -358,14 +358,14 @@ public sealed class ModuleRegistry(ConfigStore config, IslandActivityHub island,
             {
                 bool install = members.Contains(entry);
                 if (entry.IsInstalled != install)
-                    await SetInstalledCoreAsync(entry, install, ct);
+                    await SetInstalledCoreAsync(entry, install, ct, eraseData);
             }
         }
         _state.Preset = preset;
         SaveState();
     }
 
-    private async Task SetInstalledCoreAsync(FeatureEntry entry, bool installed, CancellationToken ct)
+    private async Task SetInstalledCoreAsync(FeatureEntry entry, bool installed, CancellationToken ct, bool eraseData = true)
     {
         bool stateChanged = entry.IsInstalled != installed;
         entry.IsInstalled = installed;
@@ -394,6 +394,11 @@ public sealed class ModuleRegistry(ConfigStore config, IslandActivityHub island,
                     if (!stateChanged) _logger.LogDebug("{Id} persistent integration cleanup completed", entry.Id);
                 }
                 catch (Exception ex) { _logger.LogError(ex, "{Id} failed to remove its persistent integration", entry.Id); }
+                if (eraseData)
+                {
+                    try { await entry.Module!.EraseDataAsync(CancellationToken.None); }
+                    catch (Exception ex) { _logger.LogError(ex, "{Id} failed to erase its saved data", entry.Id); }
+                }
             }
         }
         if (stateChanged) _logger.LogInformation("{Id} {Action}", entry.Id, installed ? "installed" : "uninstalled");

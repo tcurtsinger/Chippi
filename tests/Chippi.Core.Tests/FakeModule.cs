@@ -21,6 +21,10 @@ internal sealed class FakeModule(FeatureDescriptor descriptor) : IFeatureModule
 
     public int Stops { get; private set; }
 
+    public int Uninstalls { get; private set; }
+
+    public int DataErases { get; private set; }
+
     public ModuleContext? Context { get; private set; }
 
     public Exception? FailOnStart { get; set; }
@@ -57,6 +61,18 @@ internal sealed class FakeModule(FeatureDescriptor descriptor) : IFeatureModule
         if (FailOnStop is not null)
             throw FailOnStop;
         return StopWork?.Invoke() ?? Task.CompletedTask;
+    }
+
+    public Task UninstallAsync(CancellationToken ct)
+    {
+        Uninstalls++;
+        return Task.CompletedTask;
+    }
+
+    public Task EraseDataAsync(CancellationToken ct)
+    {
+        DataErases++;
+        return Task.CompletedTask;
     }
 
     public static FakeModule Create(string id, PresetMembership presets = PresetMembership.None, params Capability[] requires) =>
