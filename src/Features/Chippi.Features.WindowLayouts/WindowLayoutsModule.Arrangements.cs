@@ -109,7 +109,7 @@ public sealed partial class WindowLayoutsModule
     /// <summary>Whether the owner pressed Cancel, rather than a fullscreen app or a lock stopping the run.</summary>
     public bool ArrangementCancelled => _ownerCancelled;
 
-    /// <summary>Actions › Snap opens on the run once after the bar shows it; the menu's own page takes the ask when it shows the run.</summary>
+    /// <summary>Actions › Snap opens on the run once after the owner clicks its bar.</summary>
     internal bool TakeRunAsk()
     {
         bool ask = _showRun;

@@ -72,7 +72,7 @@ public sealed partial class KeepAwakeModule : IFeatureModule
         {
             // The home's button starts the last fixed length, or stops.
             Toggle = new IslandTileToggle(() => IsOn, ToggleFromHomeAsync),
-            // Esc leaves the Until picker before it closes the island.
+            // Back and Esc leave the Until picker first.
             HandleEscape = () => _view?.CloseUntil() == true,
             HandleBack = () => _view?.CloseUntil() == true,
         });

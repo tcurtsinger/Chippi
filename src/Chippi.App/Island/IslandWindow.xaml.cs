@@ -297,7 +297,7 @@ public partial class IslandWindow : Window
     /// <summary>The home's Settings button: the panel has closed; open Settings.</summary>
     public event EventHandler? SettingsRequested;
 
-    /// <summary>The user opened a page (a tile key): save it as AppSettings.IslandLastPage.</summary>
+    /// <summary>The page to save as AppSettings.IslandLastPage: a tile key, or null for Home.</summary>
     public event EventHandler<string?>? LastPageChanged;
 
     private void SaveLastPage()

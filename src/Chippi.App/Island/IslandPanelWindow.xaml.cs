@@ -157,7 +157,7 @@ public partial class IslandPanelWindow : Window
     /// <summary>The home's Settings button.</summary>
     internal event EventHandler? SettingsRequested;
 
-    /// <summary>The user opened a page (a tile key) to restore next time.</summary>
+    /// <summary>The page to restore next time: a tile key, or null for Home.</summary>
     internal event EventHandler<string?>? LastPageChanged;
 
     public bool IsOpen { get; private set; }
@@ -606,7 +606,7 @@ public partial class IslandPanelWindow : Window
         MarkOnScreen();
     }
 
-    /// <summary>The arrow every page starts with: back to the grid.</summary>
+    /// <summary>The Back arrow every page starts with.</summary>
     internal static Button BackButton(Action back)
     {
         var glyph = new LucideIcon { Data = LucideIcons.ChevronLeft, Size = 16 };
