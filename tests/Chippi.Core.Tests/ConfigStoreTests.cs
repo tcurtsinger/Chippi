@@ -233,6 +233,59 @@ public sealed class ConfigStoreTests : IDisposable
         Assert.Equal(1, root["modules"]!["uninstalled-thing"]!["a"]!.GetValue<int>());
     }
 
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void Removed_dictionary_entries_stay_removed_after_reload(bool module, bool clear)
+    {
+        var path = _dir.File("settings.json");
+        const string section = """
+            {
+              "entries": { "removed": 1, "kept": 2 },
+              "nested": { "entries": { "removed": 3, "kept": 4 }, "oldOption": true },
+              "futureOption": { "keep": true }
+            }
+            """;
+        File.WriteAllText(path, $$"""
+            {
+              "version": 1,
+              "sample": {{section}},
+              "futureSection": { "keep": true },
+              "modules": { "sample": {{section}}, "uninstalled": { "keep": true } }
+            }
+            """);
+        var store = new ConfigStore(path);
+        store.Load();
+        var entries = new Dictionary<string, int>();
+        if (!clear)
+            entries["kept"] = 5;
+        var update = new { Entries = entries, Nested = new { Entries = entries } };
+
+        if (module)
+            store.SetModuleSettings("sample", update);
+        else
+            store.SetSection("sample", update);
+
+        var reloaded = new ConfigStore(path);
+        reloaded.Load();
+        var saved = module
+            ? reloaded.GetModuleSettings<Dictionary<string, JsonNode>>("sample")
+            : reloaded.GetSection<Dictionary<string, JsonNode>>("sample");
+        var expected = new JsonObject();
+        if (!clear)
+            expected["kept"] = 5;
+        Assert.True(JsonNode.DeepEquals(expected, saved["entries"]));
+        Assert.True(JsonNode.DeepEquals(expected, saved["nested"]!["entries"]));
+        Assert.Null(saved["nested"]!["oldOption"]);
+        Assert.True(saved["futureOption"]!["keep"]!.GetValue<bool>());
+        var root = JsonNode.Parse(File.ReadAllText(path))!;
+        Assert.True(root["futureSection"]!["keep"]!.GetValue<bool>());
+        Assert.True(root["modules"]!["uninstalled"]!["keep"]!.GetValue<bool>());
+        Assert.True(JsonNode.DeepEquals(JsonNode.Parse(section), module ? root["sample"] : root["modules"]!["sample"]));
+    }
+
     [Fact]
     public void Newer_version_number_is_kept()
     {

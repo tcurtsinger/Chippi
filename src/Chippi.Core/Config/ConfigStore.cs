@@ -12,8 +12,9 @@ namespace Chippi.Core.Config;
 /// <summary>
 /// settings.json: one versioned JSON document holding named sections ("app", "features") and
 /// one section per module under "modules". The document is kept as a JSON tree, so sections
-/// and properties this build does not know about (from a newer version, or an uninstalled
-/// module) survive every save. Writes are atomic: temp file, flush, then replace.
+/// and section-level properties this build does not know about (from a newer version, or an
+/// uninstalled module) survive every save. Supplied nested objects are replaced whole.
+/// Writes are atomic: temp file, flush, then replace.
 /// </summary>
 public sealed class ConfigStore
 {
@@ -120,7 +121,7 @@ public sealed class ConfigStore
             return Read<T>(_root[name], name);
     }
 
-    /// <summary>Merges <paramref name="value"/> into a top-level section and saves. Unknown properties in the section are kept.</summary>
+    /// <summary>Saves <paramref name="value"/>, replacing supplied properties whole and keeping unknown properties at the section level.</summary>
     public void SetSection<T>(string name, T value) where T : class
     {
         lock (_gate)
@@ -313,7 +314,7 @@ public sealed class ConfigStore
         JsonSerializer.SerializeToNode(value, JsonOptions) as JsonObject
         ?? throw new ArgumentException("A settings section must serialize to a JSON object.", nameof(value));
 
-    /// <summary>Copies <paramref name="update"/> over <paramref name="existing"/>, recursing into objects, so keys only the file knows survive.</summary>
+    /// <summary>Replaces supplied properties whole, keeping unknown properties only at the section level so removed dictionary entries stay removed.</summary>
     private static JsonObject Merge(JsonObject? existing, JsonObject update)
     {
         if (existing is null)
@@ -321,9 +322,7 @@ public sealed class ConfigStore
         foreach (var (key, value) in update.ToList())
         {
             update.Remove(key);
-            existing[key] = value is JsonObject child && existing[key] is JsonObject current
-                ? Merge(current, child)
-                : value;
+            existing[key] = value;
         }
         return existing;
     }
