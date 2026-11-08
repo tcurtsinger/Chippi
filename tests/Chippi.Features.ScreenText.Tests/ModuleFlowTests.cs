@@ -38,8 +38,14 @@ public sealed class ModuleFlowTests
         public void Release(int width, int height) => Selected?.Invoke(Selection_(width, height));
         public void Cancel() => Close(CaptureEnd.Cancelled);
 
-        /// <summary>A key the layer passes to the feature once a region is released.</summary>
-        public void Press(Key key) => KeyDown?.Invoke(new KeyEventArgs(Keyboard.PrimaryDevice, new UnshownSource(), 0, key) { RoutedEvent = Keyboard.KeyDownEvent });
+        // A key the layer passes to the feature once a region is released. WPF key events need an STA thread.
+        public void Press(Key key)
+        {
+            var thread = new Thread(() => KeyDown?.Invoke(new KeyEventArgs(Keyboard.PrimaryDevice, new UnshownSource(), 0, key) { RoutedEvent = Keyboard.KeyDownEvent }));
+            thread.SetApartmentState(ApartmentState.STA);
+            thread.Start();
+            thread.Join();
+        }
 
         // The module reads the pixels from selection.Image(); a frozen screen of one flat colour stands in.
         private static Selection Selection_(int width, int height)
@@ -420,6 +426,51 @@ public sealed class ModuleFlowTests
         Assert.Equal(1, pagesAtClose);
         Assert.Equal(CaptureEnd.Finished, session.Ended);
         Assert.False(session.HandedBack);
+    }
+
+    [Fact]
+    public async Task Escape_while_the_region_is_read_closes_the_screen_and_drops_the_result()
+    {
+        var t = await Start();
+        var gate = new TaskCompletionSource<OcrOutcome>();
+        t.Ocr.Hold = gate.Task;
+        t.Module.Start(ScreenTextVerb.ExtractText);
+        var session = t.Layer.Last!;
+        session.Release(120, 40);
+        session.Press(Key.Escape);
+        Assert.Equal(CaptureEnd.Cancelled, session.Ended);
+        gate.SetResult(new OcrOutcome(TextReadState.Read, [new OcrLine("late", default)], "English"));
+        await t.Module.Work;
+        Assert.Empty(t.Pages);
+        Assert.Null(t.Module.Text.Result);
+        Assert.Equal(CaptureEnd.Cancelled, session.Ended);
+    }
+
+    [Fact]
+    public async Task A_new_request_while_the_region_is_read_replaces_it_and_only_the_new_result_opens()
+    {
+        var t = await Start();
+        var gate = new TaskCompletionSource<OcrOutcome>();
+        t.Ocr.Hold = gate.Task;
+        t.Module.Start(ScreenTextVerb.ExtractText);
+        var first = t.Layer.Last!;
+        first.Release(120, 40);
+        var firstWork = t.Module.Work;
+        t.Ocr.Hold = null;
+        t.Ocr.Next = new OcrOutcome(TextReadState.Read, [new OcrLine("second", default)], "English");
+        t.Module.Start(ScreenTextVerb.ExtractText);
+        var second = t.Layer.Last!;
+        Assert.NotSame(first, second);
+        Assert.Equal(CaptureEnd.Interrupted, first.Ended);
+        Assert.False(first.HandedBack);
+        second.Release(120, 40);
+        await t.Module.Work;
+        gate.SetResult(new OcrOutcome(TextReadState.Read, [new OcrLine("first", default)], "English"));
+        await firstWork;
+        Assert.Equal("second", t.Module.Text.Result!.Text);
+        Assert.Single(t.Pages);
+        Assert.Equal(CaptureEnd.Finished, second.Ended);
+        Assert.Equal(CaptureEnd.Interrupted, first.Ended);
     }
 
     [Fact]
