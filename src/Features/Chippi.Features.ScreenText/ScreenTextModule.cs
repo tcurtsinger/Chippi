@@ -516,6 +516,8 @@ public sealed class ScreenTextModule : IFeatureModule
 
         public void Retry() => owner.TextRetry?.Invoke();
 
+        public void OpenLanguageSettings() => owner.Settings.OpenLanguageSettings();
+
         internal void Set(TextResult result)
         {
             lock (_gate) { _result = result; _reading = false; }
