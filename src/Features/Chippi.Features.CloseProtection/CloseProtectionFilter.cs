@@ -2,6 +2,7 @@
 // Copyright (C) Chippi contributors
 
 using System.Diagnostics;
+using System.IO;
 using Chippi.Core.Input;
 
 namespace Chippi.Features.CloseProtection;
@@ -38,7 +39,7 @@ public sealed class CloseProtectionFilter(Func<CloseTarget?> target, Func<CloseM
 
     public void Configure(bool enabled, IEnumerable<string> controlW)
     {
-        var paths = controlW.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var paths = controlW.Select(path => Path.GetFileName(path)).ToHashSet(StringComparer.OrdinalIgnoreCase);
         lock (_gate)
         {
             _controlW = paths;
@@ -93,7 +94,7 @@ public sealed class CloseProtectionFilter(Func<CloseTarget?> target, Func<CloseM
             if (!_enabled || _paused || key.WasDown || current is not { Eligible: true }) return false;
             var held = modifiers();
             CloseChord? chord = vk == 0x73 && held == CloseModifiers.Alt ? CloseChord.AltF4
-                : vk == 0x57 && held == CloseModifiers.Control && _controlW.Contains(current.Path) ? CloseChord.ControlW : null;
+                : vk == 0x57 && held == CloseModifiers.Control && _controlW.Contains(Path.GetFileName(current.Path)) ? CloseChord.ControlW : null;
             if (chord is null) return false;
             int index = (int)chord.Value;
             if (_pending[index] is { } prior && _released[index] && SameWindow(prior.Target, current))
