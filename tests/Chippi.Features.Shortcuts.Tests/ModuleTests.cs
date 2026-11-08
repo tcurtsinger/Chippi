@@ -67,6 +67,58 @@ public sealed class ModuleTests
         Assert.NotNull(KeyCombo.Parse(expected));
         await rig.Module.StopAsync(default);
     }
+
+    [Theory]
+    [InlineData(CapsTap.Nothing)]
+    [InlineData(CapsTap.Escape)]
+    [InlineData(CapsTap.InputLanguage)]
+    [InlineData(CapsTap.Capitals)]
+    public async Task A_solo_Caps_tap_turns_off_Caps_Lock_that_was_already_on(CapsTap tap)
+    {
+        var rig = new Rig(new ShortcutsSettings { CapsEnabled = true, CapsTap = tap });
+        rig.Actions.CapsLockOn = true;
+        await rig.StartAsync();
+        try
+        {
+            var filter = Assert.Single(rig.Hub.Filters);
+            Assert.True(filter.Key(new KeyInput(0x14, 0, true, false, false, false, 0)));
+            Assert.True(filter.Key(new KeyInput(0x14, 0, false, false, false, false, 1)));
+
+            Assert.Equal(["Caps Lock"], rig.Actions.Values);
+        }
+        finally { await rig.Module.StopAsync(default); }
+    }
+
+    [Fact]
+    public async Task A_solo_Caps_tap_still_does_nothing_when_Caps_Lock_is_off()
+    {
+        var rig = new Rig(new ShortcutsSettings { CapsEnabled = true, CapsTap = CapsTap.Nothing });
+        await rig.StartAsync();
+        try
+        {
+            var filter = Assert.Single(rig.Hub.Filters);
+            filter.Key(new KeyInput(0x14, 0, true, false, false, false, 0));
+            filter.Key(new KeyInput(0x14, 0, false, false, false, false, 1));
+            Assert.Empty(rig.Actions.Values);
+        }
+        finally { await rig.Module.StopAsync(default); }
+    }
+
+    [Fact]
+    public async Task A_different_held_key_keeps_its_tap_action_even_when_Caps_Lock_is_on()
+    {
+        var rig = new Rig(new ShortcutsSettings { CapsEnabled = true, CapsHeldKey = 0xA3, CapsTap = CapsTap.Escape });
+        rig.Actions.CapsLockOn = true;
+        await rig.StartAsync();
+        try
+        {
+            var filter = Assert.Single(rig.Hub.Filters);
+            filter.Key(new KeyInput(0xA3, 0, true, false, false, false, 0));
+            filter.Key(new KeyInput(0xA3, 0, false, false, false, false, 1));
+            Assert.Equal(["Esc"], rig.Actions.Values);
+        }
+        finally { await rig.Module.StopAsync(default); }
+    }
     [Fact]
     public async Task Caps_starts_off_then_runs_a_binding_and_drops_its_filter_on_pause_and_stop()
     {
@@ -432,6 +484,7 @@ public sealed class ModuleTests
 
     private sealed class FakeActions : IActionHost
     {
+        public bool CapsLockOn { get; set; }
         public List<string> Values { get; } = [];
         public List<(string Name, WindowTarget Target)> Runs { get; } = [];
         public HashSet<string> Missing { get; } = [];

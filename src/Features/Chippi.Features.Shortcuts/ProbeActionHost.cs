@@ -13,6 +13,8 @@ public sealed class ProbeActionHost(string path) : IActionHost
 {
     private readonly object _gate = new();
 
+    public bool CapsLockOn => Console.CapsLock;
+
     public Task RunAsync(ChippiAction action, WindowTarget target)
     {
         lock (_gate)
