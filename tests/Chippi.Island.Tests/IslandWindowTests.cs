@@ -377,6 +377,49 @@ public sealed class IslandWindowTests
         }));
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Esc_closes_after_a_keyboard_request_when_the_panel_is_no_longer_foreground(bool activationSucceeded)
+    {
+        WpfTestThread.Run(() => WithShownIsland(window =>
+        {
+            bool foreground = activationSucceeded;
+            window.Panel.IsForegroundWindow = _ => foreground;
+            window.Panel.ActivateWindow = _ => { };
+            window.Panel.PreviewGotKeyboardFocus += (_, e) => e.Handled = true;
+            Click(window);
+            Settle(window.Panel);
+            window.Panel.TakeKeyboard();
+            foreground = false; // Alt+Tab, a toast, or a refused activation.
+
+            window.Escape();
+            Settle(window.Panel);
+
+            Assert.False(window.IsIslandOpen);
+            Assert.False(window.IsHooked);
+        }));
+    }
+
+    [Fact]
+    public void The_Escape_hook_leaves_a_foreground_keyboard_panel_to_its_routed_handler()
+    {
+        WpfTestThread.Run(() => WithShownIsland(window =>
+        {
+            window.Panel.IsForegroundWindow = _ => true;
+            window.Panel.ActivateWindow = _ => { };
+            window.Panel.PreviewGotKeyboardFocus += (_, e) => e.Handled = true;
+            Click(window);
+            Settle(window.Panel);
+            window.Panel.TakeKeyboard();
+
+            window.Escape();
+            Pump(TimeSpan.Zero);
+
+            Assert.True(window.IsIslandOpen);
+        }));
+    }
+
     [Fact]
     public void A_settings_refresh_before_close_preserves_the_pending_Audio_tab()
     {

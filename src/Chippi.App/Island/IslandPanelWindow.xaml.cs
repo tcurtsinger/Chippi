@@ -167,8 +167,8 @@ public partial class IslandPanelWindow : Window
     /// <summary>The page showing: a tile key, or null for the grid.</summary>
     internal string? CurrentPage => _page;
 
-    /// <summary>Whether the user requested the keyboard during this opening (Windows may refuse activation).</summary>
-    internal bool HasKeyboard => _keyboard.Requested;
+    /// <summary>Whether the user requested the keyboard and the panel still owns the foreground.</summary>
+    internal bool HasKeyboard => _keyboard.Requested && IsForegroundWindow(_hwnd);
 
     /// <summary>The app in front, read just before the island takes the keyboard (Phase 5 notes #62).</summary>
     internal Func<Core.Clipboard.PasteTarget?>? CaptureTarget { get; set; }
