@@ -23,6 +23,7 @@
     <InternalsVisibleTo Include="Chippi" />
     <InternalsVisibleTo Include="Chippi.Island.Tests" />
     <InternalsVisibleTo Include="Chippi.Features.CommandBar.Tests" />
+    <InternalsVisibleTo Include="Chippi.Features.Displays.Tests" />
   </ItemGroup>
 
   <!-- The control gallery is a development tool: compiled into Debug builds only. -->

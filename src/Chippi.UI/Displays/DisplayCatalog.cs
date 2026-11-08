@@ -29,6 +29,10 @@ public sealed record DisplayInfo(string Id, string Name, nint Handle, bool IsMai
 /// </summary>
 public static unsafe class DisplayCatalog
 {
+    /// <summary>One stable id per logical monitor; mirrored targets share a handle.</summary>
+    internal static IReadOnlyDictionary<nint, string> CaptureIds(IEnumerable<DisplayInfo> displays) =>
+        displays.DistinctBy(d => d.Handle).ToDictionary(d => d.Handle, d => d.Id);
+
     public static IReadOnlyList<DisplayInfo> Connected()
     {
         var byGdiName = Monitors();
