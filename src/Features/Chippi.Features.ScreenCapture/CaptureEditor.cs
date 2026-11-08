@@ -51,6 +51,8 @@ internal sealed class CaptureEditor : IDisposable
     private CaptureOutput? _output;
 
     internal CaptureDraft? Draft => _draft;
+    /// <summary>The mark with the dashed frame, or -1.</summary>
+    internal int SelectedMark => _selected;
     internal byte[]? FeedbackPicture { get; private set; }
     internal string FeedbackSource { get; private set; } = "Screen capture";
     internal Func<Canvas, MouseEventArgs, Point>? PointerAt { get; set; }
@@ -222,7 +224,7 @@ internal sealed class CaptureEditor : IDisposable
         if (_preview != null)
         {
             if (_tool == CaptureTool.Select && _selected >= 0) _draft.Replace(_selected, _preview);
-            else { _draft.Add(_preview); _selected = _draft.Objects.Count - 1; }
+            else _draft.Add(_preview); // A new mark isn't selected: only Select shows the frame (live check, 2026-11-08).
         }
         _preview = null; _original = null; InvalidateOutput();
         if (_tool == CaptureTool.Crop && _crop != null)

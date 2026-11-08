@@ -47,7 +47,9 @@ public sealed class CaptureEditorTests
             }
             Tool("Redact"); Drag(new(20, 20), new(80, 80));
             Assert.Single(editor.Draft!.Objects);
+            Assert.Equal(-1, editor.SelectedMark); // Drawing never frames the new mark (live check, 2026-11-08).
             Tool("Select"); Drag(new(40, 40), new(50, 50));
+            Assert.Equal(0, editor.SelectedMark);
             Assert.Equal(new Point(30, 30), editor.Draft.Objects[0].Points[0]);
             Drag(new(90, 90), new(120, 130));
             Assert.Equal(new Point(120, 130), editor.Draft.Objects[0].Points[1]);
