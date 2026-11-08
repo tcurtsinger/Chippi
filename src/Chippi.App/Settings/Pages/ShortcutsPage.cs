@@ -166,7 +166,10 @@ internal sealed class ShortcutsPage : UserControl
         }
     }
 
-    private FeatureDescriptor? FeatureOf(ShortcutEntry entry) => _shell.Registry.Features.FirstOrDefault(f => f.Id == entry.Owner)?.Descriptor;
+    private static readonly FeatureDescriptor Capture = new("capture", "Capture", "", FeatureGroup.Capture);
+
+    private FeatureDescriptor? FeatureOf(ShortcutEntry entry) => entry.Owner == Capture.Id
+        ? Capture : _shell.Registry.Features.FirstOrDefault(f => f.Id == entry.Owner)?.Descriptor;
 
     /// <summary>The row's second line: its feature's name, when that feature offers more than one shortcut.</summary>
     private string? FeatureLine(ShortcutEntry entry) =>
