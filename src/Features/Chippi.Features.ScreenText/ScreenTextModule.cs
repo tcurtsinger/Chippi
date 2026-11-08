@@ -303,13 +303,23 @@ public sealed class ScreenTextModule : IFeatureModule
     public void Start(ScreenTextVerb verb, CaptureDoor door = CaptureDoor.Shortcut)
     {
         if (_capture is null || _context is null) return;
+        // A frozen screen kept up while a region is read gives way to a new request, and its result is dropped.
+        if (_reading is { } older) Cancel(older, CaptureEnd.Interrupted, handBack: false);
         var session = _capture.Start(new CaptureRequest(Chippi.Capture.CaptureMode.Region) { Door = door });
         if (session is null) return;
         bool taken = false;
         // Once a region is released the layer hands every key to the feature, Esc included.
         session.KeyDown += e =>
         {
-            if (e.Key != System.Windows.Input.Key.Escape || taken) return;
+            if (e.Key != System.Windows.Input.Key.Escape) return;
+            if (taken)
+            {
+                // Escape also ends a read in progress: its result is dropped.
+                if (!ReferenceEquals(_reading, session)) return;
+                e.Handled = true;
+                Cancel(session, CaptureEnd.Cancelled, handBack: true);
+                return;
+            }
             e.Handled = true;
             session.Close(CaptureEnd.Cancelled);
         };
@@ -325,9 +335,43 @@ public sealed class ScreenTextModule : IFeatureModule
             }
             taken = true;
             var image = selection.Image();
-            session.Close(CaptureEnd.Finished, handBack: verb == ScreenTextVerb.CopyText);
-            Work = verb == ScreenTextVerb.ScanQr ? ScanAsync(image) : ReadAsync(image, copy: verb == ScreenTextVerb.CopyText, show: verb == ScreenTextVerb.ExtractText);
+            if (verb == ScreenTextVerb.CopyText)
+            {
+                // No page to open: the screen closes at once and the keyboard goes back to the window it came from.
+                session.Close(CaptureEnd.Finished, handBack: true);
+                Work = ReadAsync(image, copy: true, show: false);
+                return;
+            }
+            _reading = session;
+            Work = OpenPageThenClose(session, verb == ScreenTextVerb.ScanQr ? ScanAsync(image) : ReadAsync(image, copy: false, show: true));
         };
+    }
+
+    // The page opens while the frozen screen still holds the foreground, and only then does the screen close: closing first
+    // let Windows hand the foreground back to the window the capture started over, which closed the page just shown
+    // (AGENTS.md, Foreground; the same order as the capture bar's text buttons).
+    private ICaptureSession? _reading;
+
+    private async Task OpenPageThenClose(ICaptureSession session, Task work)
+    {
+        try { await work; }
+        finally
+        {
+            // Not when a cancel or a newer request already closed it.
+            if (ReferenceEquals(_reading, session))
+            {
+                _reading = null;
+                session.Close(CaptureEnd.Finished, handBack: false);
+            }
+        }
+    }
+
+    private void Cancel(ICaptureSession session, CaptureEnd end, bool handBack)
+    {
+        _reading = null;
+        Interlocked.Increment(ref _generation);
+        Text.SetReading(false);
+        session.Close(end, handBack);
     }
 
     /// <summary>
