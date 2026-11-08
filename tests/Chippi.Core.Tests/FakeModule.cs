@@ -33,6 +33,12 @@ internal sealed class FakeModule(FeatureDescriptor descriptor) : IFeatureModule
 
     public Exception? FailOnStop { get; set; }
 
+    /// <summary>Returned by StartAsync: work that finishes on another thread, as Audio routing's and Clipboard history's starts do.</summary>
+    public Func<Task>? StartWork { get; set; }
+
+    /// <summary>Returned by StopAsync: work that finishes on another thread, as the File organizer's stop does.</summary>
+    public Func<Task>? StopWork { get; set; }
+
     public Task StartAsync(ModuleContext context, CancellationToken ct)
     {
         Starts++;
@@ -41,7 +47,7 @@ internal sealed class FakeModule(FeatureDescriptor descriptor) : IFeatureModule
         OnStart?.Invoke(context);
         if (FailOnStart is not null)
             throw FailOnStart;
-        return Task.CompletedTask;
+        return StartWork?.Invoke() ?? Task.CompletedTask;
     }
 
     public Task StopAsync(CancellationToken ct)
@@ -50,7 +56,7 @@ internal sealed class FakeModule(FeatureDescriptor descriptor) : IFeatureModule
         HoldsResource = false;
         if (FailOnStop is not null)
             throw FailOnStop;
-        return Task.CompletedTask;
+        return StopWork?.Invoke() ?? Task.CompletedTask;
     }
 
     public static FakeModule Create(string id, PresetMembership presets = PresetMembership.None, params Capability[] requires) =>

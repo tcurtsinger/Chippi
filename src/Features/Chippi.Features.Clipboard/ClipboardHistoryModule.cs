@@ -60,7 +60,7 @@ public sealed class ClipboardHistoryModule : IFeatureModule
         string path = Path.Combine(context.DataDirectory, FileName);
         History = new ClipboardHistory(hub, () => HistoryStore.Open(path, new DpapiKeyProtector()), _features.AutoCleaned, log: context.Logger);
         History.Changed += UpdateStatus;
-        await History.LoadAsync(File.Exists(path)).ConfigureAwait(false);
+        await History.LoadAsync(File.Exists(path)); // back on the UI thread: the tile and Settings page are added below
         History.Apply(Settings.Recording, Settings.Paused, Settings.AppsToSkip);
         context.Ui.SetSettingsPage(section =>
         {

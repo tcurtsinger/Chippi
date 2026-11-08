@@ -103,7 +103,7 @@ public sealed class OrganizerHistoryPreviewTests
         registry.Register(module);
         try
         {
-            registry.StartAsync().GetAwaiter().GetResult();
+            WpfTestThread.Wait(registry.StartAsync());
             var history = module.Engine!.History;
             long id = history.BeginRun(RunTrigger.Preview, root);
             foreach (var (kind, from, to) in new[] { (HistoryOperationKind.Move, "find.pdf", "Docs/find.pdf"), (HistoryOperationKind.Rename, "old.txt", "new.txt") })
@@ -152,7 +152,7 @@ public sealed class OrganizerHistoryPreviewTests
         }
         finally
         {
-            registry.StopAllAsync().GetAwaiter().GetResult();
+            WpfTestThread.Wait(registry.StopAllAsync());
             Directory.Delete(root, recursive: true);
         }
     });

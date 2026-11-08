@@ -27,7 +27,7 @@ public sealed class ChippiPagesTests
         try
         {
             shell.Registry.Register(new FailedFeature());
-            shell.Registry.SetInstalledAsync("failed-test", true).GetAwaiter().GetResult();
+            WpfTestThread.Wait(shell.Registry.SetInstalledAsync("failed-test", true));
             KeyShortcut? saved = null;
             using var hotkey = shell.Shortcuts.Add("paste-plain-text", "Paste as plain text", new ShortcutEdits(() => saved, _ => null, () => saved = null));
             var shortcuts = new ShortcutsPage(shell);
@@ -38,7 +38,7 @@ public sealed class ChippiPagesTests
         }
         finally
         {
-            shell.Registry.StopAllAsync().GetAwaiter().GetResult();
+            WpfTestThread.Wait(shell.Registry.StopAllAsync());
             shell.Clipboard.Dispose();
             foreach (string folder in new[] { root, Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Chippi-dev", profile) })
                 if (Directory.Exists(folder)) Directory.Delete(folder, true);
@@ -83,7 +83,7 @@ public sealed class ChippiPagesTests
         }
         finally
         {
-            shell.Registry.StopAllAsync().GetAwaiter().GetResult();
+            WpfTestThread.Wait(shell.Registry.StopAllAsync());
             shell.Clipboard.Dispose();
             foreach (string folder in new[] { root, Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Chippi-dev", profile) })
                 if (Directory.Exists(folder)) Directory.Delete(folder, true);
@@ -100,7 +100,7 @@ public sealed class ChippiPagesTests
         try
         {
             shell.Registry.Register(new FailedFeature("mic-mute", unknown: true));
-            shell.Registry.SetInstalledAsync("mic-mute", true).GetAwaiter().GetResult();
+            WpfTestThread.Wait(shell.Registry.SetInstalledAsync("mic-mute", true));
             var window = new Chippi.App.Settings.SettingsWindow(shell, "general");
             try { Assert.DoesNotContain(window.NavigationPages, p => p.Id == "shortcuts"); }
             finally { window.Close(); }
@@ -109,7 +109,7 @@ public sealed class ChippiPagesTests
         }
         finally
         {
-            shell.Registry.StopAllAsync().GetAwaiter().GetResult();
+            WpfTestThread.Wait(shell.Registry.StopAllAsync());
             shell.Clipboard.Dispose();
             foreach (string folder in new[] { root, Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Chippi-dev", profile) })
                 if (Directory.Exists(folder)) Directory.Delete(folder, true);
@@ -175,7 +175,7 @@ public sealed class ChippiPagesTests
         }
         finally
         {
-            shell.Registry.StopAllAsync().GetAwaiter().GetResult();
+            WpfTestThread.Wait(shell.Registry.StopAllAsync());
             shell.Clipboard.Dispose();
             foreach (string folder in new[] { root, Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Chippi-dev", profile) })
                 if (Directory.Exists(folder)) Directory.Delete(folder, true);
@@ -257,7 +257,7 @@ public sealed class ShortcutsPageTimings
         }
         finally
         {
-            shell.Registry.StopAllAsync().GetAwaiter().GetResult();
+            WpfTestThread.Wait(shell.Registry.StopAllAsync());
             shell.Clipboard.Dispose();
             foreach (string folder in new[] { root, Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Chippi-dev", profile) })
                 if (Directory.Exists(folder)) Directory.Delete(folder, true);

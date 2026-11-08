@@ -36,4 +36,19 @@ internal static partial class WpfTestThread
     });
 
     internal static void Run(Action test) => Ui.Value.Invoke(test);
+
+    /// <summary>
+    /// Waits for <paramref name="task"/> while this UI thread keeps running, so work that comes back to it can
+    /// finish: the module registry resumes each start and stop here. Blocking with GetResult on it would hang.
+    /// </summary>
+    internal static void Wait(Task task)
+    {
+        if (!task.IsCompleted && SynchronizationContext.Current is DispatcherSynchronizationContext)
+        {
+            var frame = new DispatcherFrame();
+            task.ContinueWith(_ => frame.Continue = false, TaskScheduler.Default);
+            Dispatcher.PushFrame(frame);
+        }
+        task.GetAwaiter().GetResult();
+    }
 }

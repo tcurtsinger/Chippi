@@ -36,8 +36,8 @@ public sealed class KeyboardMergeTests
         {
             shell.Registry.Register(new DebounceModule());
             shell.Registry.Register(close);
-            shell.Registry.SetInstalledAsync("debounce", true).GetAwaiter().GetResult();
-            shell.Registry.SetInstalledAsync("close-protection", true).GetAwaiter().GetResult();
+            WpfTestThread.Wait(shell.Registry.SetInstalledAsync("debounce", true));
+            WpfTestThread.Wait(shell.Registry.SetInstalledAsync("close-protection", true));
             string path = Path.Combine(Environment.SystemDirectory, "notepad.exe");
             Chippi.UI.Controls.AppIcon.LoadAsync(path, 80).GetAwaiter().GetResult();
             close.AddApp(path);
@@ -60,7 +60,7 @@ public sealed class KeyboardMergeTests
         finally
         {
             window?.Close();
-            shell.Registry.StopAllAsync().GetAwaiter().GetResult();
+            WpfTestThread.Wait(shell.Registry.StopAllAsync());
             shell.Input.Dispose(); shell.Clipboard.Dispose();
             Directory.Delete(root, true);
             string data = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Chippi-dev", profile);
@@ -84,8 +84,8 @@ public sealed class KeyboardMergeTests
         {
             shell.Registry.Register(new DebounceModule());
             shell.Registry.Register(focus);
-            shell.Registry.SetInstalledAsync("debounce", true).GetAwaiter().GetResult();
-            shell.Registry.SetInstalledAsync("focus-follows-mouse", true).GetAwaiter().GetResult();
+            WpfTestThread.Wait(shell.Registry.SetInstalledAsync("debounce", true));
+            WpfTestThread.Wait(shell.Registry.SetInstalledAsync("focus-follows-mouse", true));
             window = new SettingsWindow(shell, "page:mouse");
             window.Width = 1040; window.Height = 840;
             window.Measure(new Size(1040, 840)); window.Arrange(new Rect(0, 0, 1040, 840)); window.UpdateLayout();
@@ -107,7 +107,7 @@ public sealed class KeyboardMergeTests
         }
         finally
         {
-            window?.Close(); shell.Registry.StopAllAsync().GetAwaiter().GetResult();
+            window?.Close(); WpfTestThread.Wait(shell.Registry.StopAllAsync());
             shell.Input.Dispose(); shell.Clipboard.Dispose();
             Directory.Delete(root, true);
             string data = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Chippi-dev", profile);

@@ -42,7 +42,7 @@ public sealed class ShelfModule : IFeatureModule
         string path = Path.Combine(context.DataDirectory, FileName);
         var shelf = Shelf = new ShelfService(hub, () => _open(path), log: context.Logger);
         shelf.Changed += UpdateStatus;
-        await shelf.LoadAsync(File.Exists(path)).ConfigureAwait(false);
+        await shelf.LoadAsync(File.Exists(path)); // back on the UI thread: the tile and Settings page are added below
         ShelfPage Page() => _page ??= new ShelfPage(shelf, context.HoldIslandOpen);
         _tile = context.Ui.AddIslandTile(new IslandTileSpec(Id, "Shelf", nameof(LucideIcons.Inbox), Order: 90, SectionOrder: 0, () => Page())
         {
