@@ -88,7 +88,7 @@ internal sealed class RegistryFixture : IDisposable
     {
         Config = new ConfigStore(_dir.File("settings.json"));
         Config.Load();
-        Registry = new ModuleRegistry(Config, Island, NullLoggerFactory.Instance);
+        Registry = new ModuleRegistry(Config, Island, NullLoggerFactory.Instance, new ModuleServices { DataRoot = _dir.File("data") });
     }
 
     public string SettingsPath => Config.FilePath;
@@ -104,7 +104,7 @@ internal sealed class RegistryFixture : IDisposable
     {
         var config = new ConfigStore(SettingsPath);
         config.Load();
-        return (config, new ModuleRegistry(config, new IslandActivityHub(), NullLoggerFactory.Instance));
+        return (config, new ModuleRegistry(config, new IslandActivityHub(), NullLoggerFactory.Instance, new ModuleServices { DataRoot = _dir.File("data") }));
     }
 
     public void Dispose() => _dir.Dispose();
