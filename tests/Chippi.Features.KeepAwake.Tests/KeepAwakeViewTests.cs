@@ -18,6 +18,36 @@ namespace Chippi.Features.KeepAwake.Tests;
 /// </summary>
 public sealed class KeepAwakeViewTests
 {
+    [Fact]
+    public async Task Back_closes_the_Until_picker_before_leaving_the_page()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"Chippi-view-{Guid.NewGuid():N}.json");
+        var module = new KeepAwakeModule(new NullNative());
+        var registry = new ModuleRegistry(new ConfigStore(path), new IslandActivityHub(), NullLoggerFactory.Instance);
+        registry.Register(module);
+        try
+        {
+            await registry.StartAsync();
+            await OnSta(() =>
+            {
+                var tile = Assert.Single(Assert.Single(registry.Features).IslandTiles);
+                var view = Assert.IsType<KeepAwakeIslandView>(tile.Spec.CreateSection());
+                Chip(view, "Until…")!.IsChecked = true;
+
+                Assert.NotNull(tile.Spec.HandleBack);
+                Assert.True(tile.Spec.HandleBack());
+                Assert.False(view.CloseUntil());
+                Assert.False(module.IsOn);
+                return Task.CompletedTask;
+            });
+        }
+        finally
+        {
+            await registry.StopAllAsync();
+            File.Delete(path);
+        }
+    }
+
     [Theory]
     [InlineData("island")]
     [InlineData("page")]

@@ -92,7 +92,10 @@ internal sealed class SnapMenu : UserControl, IActionsMenuView
         _aside = AsideButton();
         Content = stack;
         if (module.TakeOpenRunPage() && module.ArrangementRun is not null)
+        {
+            _directRun = true;
             Show(Page.Run);
+        }
     }
 
     // ---- its pages: the layouts, Arrangements, and a run (arrangements.html, sheet-arrangements-island) ----
@@ -103,6 +106,7 @@ internal sealed class SnapMenu : UserControl, IActionsMenuView
     private readonly Button _aside;
 
     internal Page Showing { get; private set; }
+    private bool _directRun;
 
     public string? Title => Showing switch
     {
@@ -118,13 +122,14 @@ internal sealed class SnapMenu : UserControl, IActionsMenuView
 
     public bool Back()
     {
-        if (Showing == Page.Layouts) return false;
+        if (Showing == Page.Layouts || Showing == Page.Run && _directRun) return false;
         Show(Showing == Page.Run ? Page.List : Page.Layouts);
         return true;
     }
 
     internal void Show(Page page)
     {
+        if (page != Page.Run) _directRun = false;
         Showing = page;
         Content = page switch
         {
@@ -132,7 +137,6 @@ internal sealed class SnapMenu : UserControl, IActionsMenuView
             Page.Run => new ArrangementRunPage(_module, () => Show(Page.List)),
             _ => _layouts,
         };
-        if (page == Page.Run) _module.TakeRunAsk();
         HeaderChanged?.Invoke();
         // The keyboard follows onto the new page's first control.
         Dispatcher.BeginInvoke(() =>

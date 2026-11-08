@@ -99,7 +99,7 @@ public sealed class SystemMonitorSmokeTests(ITestOutputHelper output)
             Assert.True(module.Sampler!.Need.HasFlag(SensorNeed.Cpu | SensorNeed.Memory));
             Assert.False(tile.OnScreen);
             Open();
-            Assert.Equal("system-monitor", panel.CurrentPage);
+            Assert.Null(panel.CurrentPage); // Returning Home is remembered for the next opening.
             panel.ShowPage(null);
             Until(() => tile.OnScreen && tile.Status == "Memory 25%");
         }

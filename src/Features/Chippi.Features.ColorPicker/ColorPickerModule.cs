@@ -105,7 +105,7 @@ public sealed class ColorPickerModule : IFeatureModule, IColorPageModel
         }
         // The Color result page: opened by key, not listed on the home (the Capture tile starts the picker).
         context.Ui.AddIslandTile(new IslandTileSpec(Id, "Color", nameof(LucideIcons.Pipette), Order: 77, SectionOrder: 0, () => View())
-            { OnHome = false, CreateHeader = () => View().Header });
+            { OnHome = false, CreateHeader = () => View().Header, HandleBack = () => context.TryGoBackIslandPage("capture") });
 #if DEBUG
         if (Environment.GetEnvironmentVariable("CHIPPI_RESULT_SAMPLES") == "1")
             Present("#7C5CFF", copiedAs: "HEX");

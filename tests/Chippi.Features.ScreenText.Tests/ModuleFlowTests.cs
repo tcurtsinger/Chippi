@@ -162,7 +162,7 @@ public sealed class ModuleFlowTests
         var pages = new List<string>();
         var module = new ScreenTextModule(layer, ocr, qr);
         await module.StartAsync(new ModuleContext(ScreenTextModule.Id, settings, NullLogger.Instance, hub.CreatePublisher(ScreenTextModule.Id), ui)
-        { Clipboard = clip, Shortcuts = keys, OpenIslandPage = pages.Add, TryOpenIslandPage = key => { ui.Tried.Add(key); return key == "capture"; } }, default);
+        { Clipboard = clip, Shortcuts = keys, OpenIslandPage = pages.Add, TryGoBackIslandPage = key => { ui.Tried.Add(key); return key == "capture"; } }, default);
         return new Rig(module, layer, ocr, qr, clip, settings, hub, pages, ui, keys);
     }
 

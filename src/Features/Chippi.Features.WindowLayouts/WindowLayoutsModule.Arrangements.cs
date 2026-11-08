@@ -36,6 +36,7 @@ public sealed partial class WindowLayoutsModule
     {
         if (Arrangements?.IsRunning == true || ArrangementsPreparing) return;
         ArrangementDismissed = true;
+        _showRun = _openRunPage = false;
         OnArrangementsChanged();
     }
     private readonly Dictionary<string, (string Name, IHotkey Key)> _arrangementKeys = [];
@@ -68,6 +69,7 @@ public sealed partial class WindowLayoutsModule
         Arrangements = null;
         _arrangementDesktop = null;
         _arrangementPause = null;
+        _showRun = _openRunPage = false;
     }
 
     private void ArrangementSessionSwitch(object? sender, SessionSwitchEventArgs e) => _ui?.BeginInvoke(() =>
@@ -107,7 +109,7 @@ public sealed partial class WindowLayoutsModule
     /// <summary>Whether the owner pressed Cancel, rather than a fullscreen app or a lock stopping the run.</summary>
     public bool ArrangementCancelled => _ownerCancelled;
 
-    /// <summary>Actions › Snap opens on the run once after the bar shows it; the menu's own page takes the ask when it shows the run.</summary>
+    /// <summary>Actions › Snap opens on the run once after the owner clicks its bar.</summary>
     internal bool TakeRunAsk()
     {
         bool ask = _showRun;
@@ -117,6 +119,13 @@ public sealed partial class WindowLayoutsModule
     }
 
     private bool _openRunPage;
+
+    private void OpenRun()
+    {
+        if (_context is not { } context) return;
+        _showRun = true;
+        context.OpenIslandPage(ActionsTileKey);
+    }
 
     /// <summary>The Snap menu this ask opened starts on the run, once.</summary>
     internal bool TakeOpenRunPage()
@@ -138,12 +147,12 @@ public sealed partial class WindowLayoutsModule
     {
         if (_context is not { } context) return;
         var run = ArrangementRun;
-        if (run is null) { context.Island.Clear(RunKey); return; }
+        if (run is null) { _showRun = _openRunPage = false; context.Island.Clear(RunKey); return; }
         if (ArrangementRefused is { } refused)
         {
             if (context.CanShowIslandFeedback())
                 context.Island.Publish(new IslandActivity(RunKey, IslandActivityKind.Status, "Not launched", $"{run.Name} · {refused}")
-                { IsFeedback = true, NeedsAttention = true, Icon = "TriangleAlert", OpensTile = ActionsTileKey });
+                { IsFeedback = true, NeedsAttention = true, Icon = "TriangleAlert", OpensTile = ActionsTileKey, Clicked = OpenRun });
             else
             {
                 context.Island.Clear(RunKey);
@@ -158,25 +167,20 @@ public sealed partial class WindowLayoutsModule
         if (summary.Running)
         {
             ArrangementDismissed = false;
-            if (!_showRunArmed) { _showRun = true; _showRunArmed = true; }
             context.Island.Publish(new IslandActivity(RunKey, IslandActivityKind.Timer, $"{summary.Ready} of {summary.Total} ready", run.Name)
-            { Progress = summary.Total == 0 ? 0 : (double)summary.Ready / summary.Total, OpensTile = ActionsTileKey });
+            { Progress = summary.Total == 0 ? 0 : (double)summary.Ready / summary.Total, OpensTile = ActionsTileKey, Clicked = OpenRun });
             return;
         }
-        _showRunArmed = false;
         if (ArrangementDismissed || summary.Clean)
         {
             ArrangementDismissed = true;
-            _showRun = false;
+            _showRun = _openRunPage = false;
             context.Island.Clear(RunKey);
             return;
         }
-        if (!_summaryArmed) { _showRun = true; _summaryArmed = true; }
         context.Island.Publish(new IslandActivity(RunKey, IslandActivityKind.Status, summary.Headline, $"{run.Name} · {summary.Note}")
-        { NeedsAttention = summary.Attention, Icon = summary.Attention ? "TriangleAlert" : "LayoutGrid", OpensTile = ActionsTileKey });
+        { NeedsAttention = summary.Attention, Icon = summary.Attention ? "TriangleAlert" : "LayoutGrid", OpensTile = ActionsTileKey, Clicked = OpenRun });
     }
-
-    private bool _showRunArmed, _summaryArmed;
 
     public async Task<ArrangementCapture> CaptureArrangementAsync()
     {
@@ -200,7 +204,8 @@ public sealed partial class WindowLayoutsModule
         ArrangementRun = saved;
         ArrangementRefused = null;
         ArrangementDismissed = false;
-        _ownerCancelled = _summaryArmed = false;
+        _ownerCancelled = false;
+        _showRun = _openRunPage = false;
         string display = invocationDisplay ?? PointerDisplayId?.Invoke() ?? Displays.FirstOrDefault(d => d.IsMain)?.Id ?? "";
         if (originalWindow == 0) originalWindow = _context?.Actions?.WindowInFront() ?? 0;
         if (originalWindow == 0) originalWindow = _context?.IslandPasteTarget()?.Window ?? _context?.SettingsPasteTarget()?.Window ?? 0;
@@ -252,7 +257,8 @@ public sealed partial class WindowLayoutsModule
     {
         if (Arrangements is not { } runner) return Task.CompletedTask;
         ArrangementDismissed = false;
-        _ownerCancelled = _summaryArmed = false;
+        _ownerCancelled = false;
+        _showRun = _openRunPage = false;
         var retry = runner.RetryAsync();
         _arrangementTask = retry;
         _ = AfterRetry();

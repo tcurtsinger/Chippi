@@ -74,6 +74,7 @@ public sealed class IslandHost : IDisposable
         _window.CaptureTarget = () => _shell.Clipboard.CaptureTarget();
         _shell.Services.IslandPasteTarget = () => _window.PasteTarget;
         _shell.Services.CloseIsland = _window.ClosePages;
+        _shell.Services.TryGoBackIslandPage = key => !_disposed && _window.Panel.GoBackToPage(key);
         _shell.CaptureShell.CloseIsland = _window.ClosePagesAsync;
         _shell.Services.CanShowIslandFeedback = () => _window.IsVisible;
         _shell.Commands.RegisterIslandHold(_window.HoldIslandOpen);

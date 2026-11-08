@@ -40,6 +40,9 @@ public sealed class ModuleServices
     /// <summary>Opens the island on a tile key's page, without falling back to Settings: false when the island can't show. Set by the shell; null in tests.</summary>
     public Func<string, bool>? TryOpenIslandPage { get; set; }
 
+    /// <summary>Returns to an existing island page with the Back transition; false when the page or open panel is absent.</summary>
+    public Func<string, bool>? TryGoBackIslandPage { get; set; }
+
     /// <summary>
     /// Opens the island on a tile key's page with the keyboard, over a fullscreen app too, on the widget's screen: false
     /// only while the island is off. Set by the shell; null in tests.

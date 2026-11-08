@@ -444,7 +444,7 @@ public sealed class ScreenTextModule : IFeatureModule
     // The capture's overlay still covers the screen when a result asks for its page, so the island may be hidden as for a
     // fullscreen app and refuse; then it's shown over it (Settings opens only when the island is off).
     // The result pages are reached from the Capture panel, so Back returns there; the home only when it isn't on the island.
-    private static bool BackToCapture(ModuleContext context) => context.TryOpenIslandPage("capture");
+    private static bool BackToCapture(ModuleContext context) => context.TryGoBackIslandPage("capture");
 
     private static void ShowPage(ModuleContext context, string key)
     {

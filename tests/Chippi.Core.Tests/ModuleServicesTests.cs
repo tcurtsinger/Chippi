@@ -31,6 +31,17 @@ public sealed class ModuleServicesTests : IDisposable
 
     public void Dispose() => _dir.Dispose();
 
+    [Fact]
+    public async Task A_page_can_return_through_the_shells_Back_navigation()
+    {
+        var module = await StartAsync("capture-provider");
+        Assert.False(module.Context!.TryGoBackIslandPage("capture"));
+        _services.TryGoBackIslandPage = key => key == "capture";
+
+        Assert.True(module.Context.TryGoBackIslandPage("capture"));
+        Assert.False(module.Context.TryGoBackIslandPage("missing"));
+    }
+
     private static readonly NoticeKind[] Kinds =
     [
         new("organized", "Organized", NoticePlaces.Island),
