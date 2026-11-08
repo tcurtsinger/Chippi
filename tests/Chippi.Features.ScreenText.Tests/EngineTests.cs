@@ -138,6 +138,30 @@ public sealed class EngineTests(Xunit.Abstractions.ITestOutputHelper output)
     }
 
     [Fact]
+    public void A_code_turned_45_degrees_has_its_whole_box_in_the_crop()
+    {
+        var code = Draw("https://example.com/hello", 6);
+        var flat = Canvas(code.Size, code.Size, (code, 0, 0));
+        int n = code.Size * 2;
+        double c = code.Size / 2.0, k = Math.Sqrt(0.5);
+        var pixels = new byte[n * n * 4];
+        Array.Fill(pixels, (byte)255);
+        for (int y = 0; y < n; y++)
+            for (int x = 0; x < n; x++)
+            {
+                double dx = x - n / 2.0, dy = y - n / 2.0;
+                int sx = (int)Math.Round(c + (dx + dy) * k), sy = (int)Math.Round(c + (dy - dx) * k);
+                if (sx >= 0 && sy >= 0 && sx < code.Size && sy < code.Size && flat.Pixels[(sy * code.Size + sx) * 4] == 0)
+                    pixels[(y * n + x) * 4] = pixels[(y * n + x) * 4 + 1] = pixels[(y * n + x) * 4 + 2] = 0;
+            }
+        var hit = Assert.Single(new ZXingQrDecoder().Decode(new CapturedImage(n, n, pixels)));
+        // The code's real corners, turned 45 degrees about the centre, the symbol alone: Draw adds a quiet zone of 4 modules each side beyond the writer's own.
+        double half = (code.Size - 16 * 6) / 2.0 * Math.Sqrt(2);
+        Assert.True(hit.Box.Top <= n / 2.0 - half + 1 && hit.Box.Bottom >= n / 2.0 + half - 1, $"{hit.Box}");
+        Assert.True(hit.Box.Left <= n / 2.0 - half + 1 && hit.Box.Right >= n / 2.0 + half - 1, $"{hit.Box}");
+    }
+
+    [Fact]
     public void ZXing_reads_one_code_at_several_sizes_and_turns()
     {
         var decoder = new ZXingQrDecoder();

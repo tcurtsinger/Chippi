@@ -3,6 +3,7 @@
 
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Chippi.Capture;
@@ -95,6 +96,7 @@ public sealed class ScreenTextModule : IFeatureModule
         lock (_gate)
         {
             _context = context;
+            _line = new FeedbackLine(context.Island, FeedbackKey, Time, NoticeDuration);
             _settings = context.Settings.Get<ScreenTextSettings>();
         }
         context.Ui.SetSettingsPage(_ => new Views.ScreenTextSettingsPage(Settings));
@@ -117,9 +119,9 @@ public sealed class ScreenTextModule : IFeatureModule
         }
         // The result pages: opened by key, not listed on the home (the Capture tile starts them).
         context.Ui.AddIslandTile(new IslandTileSpec(Id, "Text", nameof(LucideIcons.ScanText), Order: 78, SectionOrder: 0, () => TextView())
-            { OnHome = false, CreateHeader = () => TextView().Header });
+            { OnHome = false, CreateHeader = () => TextView().Header, HandleBack = () => BackToCapture(context) });
         context.Ui.AddIslandTile(new IslandTileSpec(QrTileKey, "QR code", nameof(LucideIcons.QrCode), Order: 79, SectionOrder: 0, () => QrView())
-            { OnHome = false, CreateHeader = () => QrView().Header });
+            { OnHome = false, CreateHeader = () => QrView().Header, HandleBack = () => BackToCapture(context) });
 #if DEBUG
         if (Environment.GetEnvironmentVariable("CHIPPI_RESULT_SAMPLES") == "1")
         {
@@ -140,7 +142,7 @@ public sealed class ScreenTextModule : IFeatureModule
         Interlocked.Increment(ref _generation);
         _lastImage = null;
         TextReselect = TextRetry = QrReselect = null;
-        lock (_gate) _context = null;
+        lock (_gate) { _context = null; _line?.Dispose(); _line = null; }
         // What was read doesn't outlive the feature.
         Text.Clear();
         Qr.Clear();
@@ -390,7 +392,7 @@ public sealed class ScreenTextModule : IFeatureModule
         catch (Exception ex) when (ex is not OperationCanceledException) { failed = true; }
         if (generation != Interlocked.Read(ref _generation) || _context is not { } context) return;
 
-        var codes = hits.Select(h => QrPayload.Parse(h.Text)).ToList();
+        var codes = hits.Select(h => QrPayload.Parse(h.Text, Bitmap(image, h.Box))).ToList();
         ShowCodes(codes, failed || damaged ? QrScanState.Unreadable : codes.Count == 0 ? QrScanState.NotFound : QrScanState.Read);
         if (failed) Feedback(context, "QR scan failed", "QR code", true);
         ShowPage(context, QrTileKey);
@@ -398,10 +400,23 @@ public sealed class ScreenTextModule : IFeatureModule
 
     // The capture's overlay still covers the screen when a result asks for its page, so the island may be hidden as for a
     // fullscreen app and refuse; then it's shown over it (Settings opens only when the island is off).
+    // The result pages are reached from the Capture panel, so Back returns there; the home only when it isn't on the island.
+    private static bool BackToCapture(ModuleContext context) => context.TryOpenIslandPage("capture");
+
     private static void ShowPage(ModuleContext context, string key)
     {
         if (!context.TryOpenIslandPage(key) && !context.SummonIslandPage(key))
             context.OpenIslandPage(key);
+    }
+
+    // The code as it was in the capture: its box, or the whole region when the decoder gave none.
+    private static BitmapSource Bitmap(CapturedImage image, Rect box)
+    {
+        int x = (int)box.X, y = (int)box.Y, w = Math.Min((int)Math.Ceiling(box.Width), image.Width - x), h = Math.Min((int)Math.Ceiling(box.Height), image.Height - y);
+        if (box.IsEmpty || w <= 0 || h <= 0 || x < 0 || y < 0) return Bitmap(image);
+        var cut = new CroppedBitmap(Bitmap(image), new Int32Rect(x, y, w, h));
+        cut.Freeze();
+        return cut;
     }
 
     private static BitmapSource Bitmap(CapturedImage image)
@@ -422,8 +437,14 @@ public sealed class ScreenTextModule : IFeatureModule
             Feedback(context, "Copy failed", "Text", true);
     }
 
-    private static void Feedback(ModuleContext context, string title, string source, bool attention) =>
-        context.Island.Publish(new IslandActivity(FeedbackKey, IslandActivityKind.Status, title, source) { IsFeedback = true, NeedsAttention = attention });
+    private FeedbackLine? _line;
+
+    /// <summary>The clock and notice time of the bar line, which clears itself; tests hold both.</summary>
+    public TimeProvider Time { get; init; } = TimeProvider.System;
+    public TimeSpan NoticeDuration { get; init; } = TimeSpan.FromSeconds(6);
+
+    private void Feedback(ModuleContext context, string title, string source, bool attention) =>
+        _line?.Show(new IslandActivity(FeedbackKey, IslandActivityKind.Status, title, source) { IsFeedback = true, NeedsAttention = attention });
 
     // The page needs the answer now, so the hub's write is waited for (it returns in milliseconds).
     private bool Write(string text)

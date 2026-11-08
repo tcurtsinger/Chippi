@@ -32,7 +32,7 @@ public interface IOcr
 }
 
 /// <summary>One decoded code and where it sits in the region.</summary>
-public sealed record QrHit(string Text, Point At);
+public sealed record QrHit(string Text, Point At, Rect Box = default);
 
 /// <summary>QR decoding behind a small interface.</summary>
 public interface IQrDecoder
@@ -119,7 +119,7 @@ public sealed class ZXingQrDecoder : IQrDecoder
         var found = reader.DecodeMultiple(source) ?? [];
         return [.. found
             .Where(r => !string.IsNullOrEmpty(r.Text))
-            .Select(r => new QrHit(r.Text, At(r)))
+            .Select(r => new QrHit(r.Text, At(r), Box(r, image)))
             .OrderBy(h => Math.Round(h.At.Y / 20)).ThenBy(h => h.At.X)];
     }
 
@@ -134,6 +134,27 @@ public sealed class ZXingQrDecoder : IQrDecoder
             return matrix is not null && new ZXing.QrCode.Internal.Detector(matrix).detect() is not null;
         }
         catch (ReaderException) { return false; }
+    }
+
+    // The finder centres sit 3.5 modules inside the code's edge: a quarter of their span, plus a few pixels, reaches it.
+    private static Rect Box(Result result, CapturedImage image)
+    {
+        var points = result.ResultPoints;
+        if (points is null || points.Length < 2)
+            return default;
+        // ZXing gives the three finder centres (corner in the middle), and an alignment pattern inside the code when it has one:
+        // infer the fourth corner from the three, since the alignment pattern sits short of it.
+        IEnumerable<ResultPoint> all = points.Length >= 3
+            ? [.. points, new ResultPoint(points[0].X + points[2].X - points[1].X, points[0].Y + points[2].Y - points[1].Y)]
+            : points;
+        double left = all.Min(p => p.X), top = all.Min(p => p.Y), right = all.Max(p => p.X), bottom = all.Max(p => p.Y);
+        // A turned code's corners reach up to sqrt(2) further along the axes.
+        double pad = Math.Max(right - left, bottom - top) * 0.36 + 4;
+        left = Math.Max(0, left - pad);
+        top = Math.Max(0, top - pad);
+        right = Math.Min(image.Width, right + pad);
+        bottom = Math.Min(image.Height, bottom + pad);
+        return right > left && bottom > top ? new Rect(left, top, right - left, bottom - top) : default;
     }
 
     private static Point At(Result result)
