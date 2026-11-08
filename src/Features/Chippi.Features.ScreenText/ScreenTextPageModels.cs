@@ -56,6 +56,9 @@ public interface ITextPageModel
 
     /// <summary>Reads the same region again, in the language set now.</summary>
     void Retry();
+
+    /// <summary>Opens Windows Settings to add an OCR language.</summary>
+    void OpenLanguageSettings();
 }
 
 /// <summary>What a QR code holds, by its payload's form.</summary>

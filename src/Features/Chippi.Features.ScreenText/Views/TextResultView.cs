@@ -152,7 +152,7 @@ public sealed class TextResultView : UserControl
         _message.Content = state switch
         {
             TextReadState.NoText => Bits.Message(LucideIcons.ScanText, NoText),
-            TextReadState.NoLanguage => Bits.Message(LucideIcons.TriangleAlert, NoLanguage, caution: true),
+            TextReadState.NoLanguage => LanguageHelp(),
             TextReadState.Failed => Bits.Message(LucideIcons.TriangleAlert, Failed, caution: true),
             _ => _model.Reading ? Bits.Message(LucideIcons.ScanText, Reading) : null,
         };
@@ -161,6 +161,19 @@ public sealed class TextResultView : UserControl
         _retry.Visibility = result is null ? Visibility.Collapsed : Visibility.Visible;
         ShowStatus();
         Mark();
+    }
+
+    private StackPanel LanguageHelp()
+    {
+        var message = Bits.Message(LucideIcons.TriangleAlert, NoLanguage,
+            "Add a language in Windows Settings > Time & language > Language & region.", caution: true);
+        message.MaxWidth = IslandPage.BodyWidth - Bits.CaptureWidth - 28;
+        var add = Bits.Button("Add language");
+        add.HorizontalAlignment = HorizontalAlignment.Center;
+        add.Margin = new Thickness(0, 8, 0, 0);
+        add.Click += (_, _) => _model.OpenLanguageSettings();
+        message.Children.Add(add);
+        return message;
     }
 
     private void Copy()

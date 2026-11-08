@@ -3,6 +3,7 @@
 
 using System.Windows;
 using System.Windows.Automation;
+using System.Windows.Controls;
 using Chippi.Features.ScreenText.Views;
 using Chippi.Island.Tests;
 using static Chippi.Features.ScreenText.Tests.Shots;
@@ -73,7 +74,12 @@ public sealed class TextPageTests
             Assert.Equal(Visibility.Visible, view.RetryButton.Visibility);
 
             model.Set(Document() with { State = TextReadState.NoLanguage, Text = "", Lines = [] });
-            Assert.Equal([TextResultView.NoLanguage], Texts(view.Message));
+            Assert.Contains(TextResultView.NoLanguage, Texts(view.Message));
+            Assert.Contains("Add a language in Windows Settings > Time & language > Language & region.", Texts(view.Message));
+            var addLanguage = Assert.Single(Find<Button>(view.Message), b => Equals(b.Content, "Add language"));
+            Click(addLanguage);
+            Assert.Equal(["language-settings"], model.Calls);
+            model.Calls.Clear();
             model.Set(Document() with { State = TextReadState.Failed, Text = "", Lines = [] });
             Assert.Equal([TextResultView.Failed], Texts(view.Message));
 
@@ -165,5 +171,7 @@ public sealed class TextPageTests
         public void Reselect() => Calls.Add("reselect");
 
         public void Retry() => Calls.Add("retry");
+
+        public void OpenLanguageSettings() => Calls.Add("language-settings");
     }
 }
