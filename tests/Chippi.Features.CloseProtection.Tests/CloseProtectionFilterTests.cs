@@ -7,6 +7,24 @@ namespace Chippi.Features.CloseProtection.Tests;
 
 public sealed class CloseProtectionFilterTests
 {
+    [Theory]
+    [InlineData(@"C:\Apps\Discord\app-1.0\Discord.exe", @"C:\Apps\Discord\app-2.0\DISCORD.EXE")]
+    [InlineData(@"C:\Apps\Slack\app-4.0\slack.exe", @"C:\Apps\Slack\app-5.0\slack.exe")]
+    [InlineData("discord.exe", @"C:\Apps\Discord\app-2.0\Discord.exe")]
+    public void ControlW_protection_survives_an_app_install_path_change(string saved, string updated)
+    {
+        var scene = new Scene(controlW: true);
+        scene.Filter.Configure(true, [saved]);
+        scene.Target = scene.Target with { Path = updated };
+        Assert.True(scene.Key(true, 0));
+        Assert.True(scene.Key(false, 1));
+        Assert.False(scene.Key(true, 2));
+
+        scene.Filter.Reset();
+        scene.Target = scene.Target with { Path = @"C:\Apps\Discord\app-2.0\unrelated.exe" };
+        Assert.False(scene.Key(true, 3));
+    }
+
     [Fact]
     public void TimerReadingAheadOfQueuedKeyDoesNotClearPendingPress()
     {
