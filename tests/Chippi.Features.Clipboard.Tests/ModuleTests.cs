@@ -8,6 +8,7 @@ using System.Windows.Controls;
 using Chippi.Core.Island;
 using Chippi.Core.Clipboard;
 using Chippi.Core.Modules;
+using Chippi.Core.Config;
 using Chippi.Features.Clipboard.Views;
 using Chippi.Island.Tests;
 using Chippi.UI.Controls;
@@ -75,6 +76,46 @@ public sealed partial class ModuleTests : IDisposable
     }
 
     [Fact]
+    public async Task Import_without_clipboard_keeps_saved_history_through_restart_and_reinstall()
+    {
+        string settingsPath = Path.Combine(_folder.Path, "settings.json");
+        string modulePath = Path.Combine(_folder.Path, ClipboardHistoryModule.Id);
+        var config = new ConfigStore(settingsPath);
+        config.Load();
+        var services = new ModuleServices { DataRoot = _folder.Path, Clipboard = _hub };
+        var module = new ClipboardHistoryModule(new ClipboardFeatures(), modulePath);
+        var registry = new ModuleRegistry(config, new IslandActivityHub(), NullLoggerFactory.Instance, services);
+        registry.Register(module);
+        await registry.StartAsync();
+        module.SetRecording(true);
+        _hub.CopyText("saved before import");
+        await module.History!.IdleAsync();
+        Assert.Single(module.History.Entries);
+
+        string importPath = Path.Combine(_folder.Path, "import.json");
+        File.WriteAllText(importPath, """{ "version": 1, "features": { "preset": "custom", "installed": [] } }""");
+        config.Import(importPath);
+        await registry.ReloadAsync();
+        Assert.False(registry.Find(ClipboardHistoryModule.Id)!.IsInstalled);
+        Assert.Null(module.History);
+        Assert.True(File.Exists(Path.Combine(modulePath, "history.db")));
+
+        var restarted = new ModuleRegistry(config, new IslandActivityHub(), NullLoggerFactory.Instance, services);
+        var restored = new ClipboardHistoryModule(new ClipboardFeatures(), modulePath);
+        restarted.Register(restored);
+        await restarted.StartAsync();
+        Assert.True(File.Exists(Path.Combine(modulePath, "history.db")));
+        try
+        {
+            await restarted.SetInstalledAsync(ClipboardHistoryModule.Id, true);
+            Assert.Equal("saved before import", Assert.Single(restored.History!.Entries).Text);
+            await restarted.SetInstalledAsync(ClipboardHistoryModule.Id, false);
+            Assert.False(File.Exists(Path.Combine(modulePath, "history.db")));
+        }
+        finally { await restarted.StopAllAsync(); }
+    }
+
+    [Fact]
     public async Task Uninstalling_erases_saved_history()
     {
         await StartHistoryAsync();
@@ -84,7 +125,7 @@ public sealed partial class ModuleTests : IDisposable
         Assert.True(_history.HasHistory);
         await _history.StopAsync(default);
         Assert.True(_history.HasHistory);
-        await _history.UninstallAsync(default);
+        await _history.EraseDataAsync(default);
         Assert.False(_history.HasHistory);
         Assert.Empty(Directory.GetFiles(_folder.Path, "history.db*"));
     }

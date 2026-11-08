@@ -21,6 +21,10 @@ internal sealed class FakeModule(FeatureDescriptor descriptor) : IFeatureModule
 
     public int Stops { get; private set; }
 
+    public int Uninstalls { get; private set; }
+
+    public int DataErases { get; private set; }
+
     public ModuleContext? Context { get; private set; }
 
     public Exception? FailOnStart { get; set; }
@@ -59,6 +63,18 @@ internal sealed class FakeModule(FeatureDescriptor descriptor) : IFeatureModule
         return StopWork?.Invoke() ?? Task.CompletedTask;
     }
 
+    public Task UninstallAsync(CancellationToken ct)
+    {
+        Uninstalls++;
+        return Task.CompletedTask;
+    }
+
+    public Task EraseDataAsync(CancellationToken ct)
+    {
+        DataErases++;
+        return Task.CompletedTask;
+    }
+
     public static FakeModule Create(string id, PresetMembership presets = PresetMembership.None, params Capability[] requires) =>
         new(new FeatureDescriptor(id, id, "Test feature", FeatureGroup.System) { Presets = presets, Requires = requires });
 }
@@ -72,7 +88,7 @@ internal sealed class RegistryFixture : IDisposable
     {
         Config = new ConfigStore(_dir.File("settings.json"));
         Config.Load();
-        Registry = new ModuleRegistry(Config, Island, NullLoggerFactory.Instance);
+        Registry = new ModuleRegistry(Config, Island, NullLoggerFactory.Instance, new ModuleServices { DataRoot = _dir.File("data") });
     }
 
     public string SettingsPath => Config.FilePath;
@@ -88,7 +104,7 @@ internal sealed class RegistryFixture : IDisposable
     {
         var config = new ConfigStore(SettingsPath);
         config.Load();
-        return (config, new ModuleRegistry(config, new IslandActivityHub(), NullLoggerFactory.Instance));
+        return (config, new ModuleRegistry(config, new IslandActivityHub(), NullLoggerFactory.Instance, new ModuleServices { DataRoot = _dir.File("data") }));
     }
 
     public void Dispose() => _dir.Dispose();

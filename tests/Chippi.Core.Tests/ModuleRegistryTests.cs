@@ -362,6 +362,53 @@ public sealed class ModuleRegistryTests : IDisposable
     }
 
     [Fact]
+    public async Task Startup_cleans_uninstalled_integrations_without_erasing_data()
+    {
+        var module = FakeModule.Create("m");
+        _f.Registry.Register(module);
+
+        await _f.Registry.StartAsync();
+
+        Assert.Equal(1, module.Uninstalls);
+        Assert.Equal(0, module.DataErases);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Explicit_uninstall_and_preset_change_still_erase_data(bool preset)
+    {
+        var module = FakeModule.Create("m", PresetMembership.Essentials);
+        _f.Registry.Register(module);
+        await _f.Registry.StartAsync();
+
+        if (preset) await _f.Registry.ApplyPresetAsync(FeaturePreset.Audio);
+        else await _f.Registry.SetInstalledAsync("m", false);
+
+        Assert.Equal(1, module.Stops);
+        Assert.Equal(1, module.Uninstalls);
+        Assert.Equal(1, module.DataErases);
+    }
+
+    [Fact]
+    public async Task Import_without_feature_section_applies_Essentials_without_erasing_data()
+    {
+        var module = FakeModule.Create("m");
+        _f.Registry.Register(module);
+        await _f.Registry.SetInstalledAsync("m", true);
+        string import = Path.Combine(Path.GetDirectoryName(_f.SettingsPath)!, "import.json");
+        File.WriteAllText(import, """{ "version": 1 }""");
+        _f.Config.Import(import);
+
+        await _f.Registry.ReloadAsync();
+
+        Assert.False(_f.Registry.Find("m")!.IsInstalled);
+        Assert.Equal(1, module.Stops);
+        Assert.Equal(1, module.Uninstalls);
+        Assert.Equal(0, module.DataErases);
+    }
+
+    [Fact]
     public async Task Reload_after_import_starts_and_stops_to_match()
     {
         var a = FakeModule.Create("a", PresetMembership.Essentials);
@@ -383,6 +430,8 @@ public sealed class ModuleRegistryTests : IDisposable
         Assert.Equal(FeaturePreset.Custom, _f.Registry.Preset);
         Assert.True(_f.Registry.Find("b")!.IsRunning);
         Assert.False(_f.Registry.Find("a")!.IsRunning);
+        Assert.Equal(2, a.Uninstalls); // explicit uninstall and import cleanup
+        Assert.Equal(1, a.DataErases); // the earlier explicit uninstall only
     }
 
     [Fact]

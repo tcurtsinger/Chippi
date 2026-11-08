@@ -30,7 +30,13 @@ public interface IFeatureModule
     Task UninstallAsync(CancellationToken ct) => Task.CompletedTask;
 
     /// <summary>
-    /// What Add features asks before uninstalling ("Uninstall and erase history?"), with Cancel and
+    /// Erase saved user data after an explicit uninstall (including a preset change). Import and
+    /// startup cleanup call only UninstallAsync, so changing settings never erases saved data.
+    /// </summary>
+    Task EraseDataAsync(CancellationToken ct) => Task.CompletedTask;
+
+    /// <summary>
+    /// What Add features asks before uninstalling and erasing data ("Uninstall and erase history?"), with Cancel and
     /// Uninstall; null uninstalls at once. Cancel leaves the module and its data alone.
     /// </summary>
     string? UninstallQuestion() => null;
