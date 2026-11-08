@@ -83,6 +83,12 @@ public interface ICaptureSession
     /// <summary>A markup tool is on: a press inside the selection goes to <see cref="CaptureSurface.Layer"/>, not a move.</summary>
     bool Tooling { get; set; }
 
+    /// <summary>
+    /// Fixes the released selection in place, as a reopened capture's: no handles, moves, arrows or Ctrl+A. Screen capture
+    /// calls it on release, so only its Crop tool trims a capture (the owner, 2026-11-08).
+    /// </summary>
+    void FixSelection() { }
+
     /// <summary>The selection was released, or changed after release.</summary>
     event Action<Selection>? Selected;
 

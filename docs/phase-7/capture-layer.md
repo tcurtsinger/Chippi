@@ -49,7 +49,7 @@ Everything after that reads the frozen image and the snapshot list, never the li
 
 Recording (wave 2) asks for Region or Window with the selection kept on the display where the drag started (surfaces §4, one display per recording). Screenshots may span displays.
 
-**After release** the selection keeps its eight handles: drag them to resize, drag inside to move. Arrow keys move it a pixel and Shift+arrows resize from the right and bottom edges (Flameshot). Ctrl+A selects the whole display under the pointer (Lightshot). Each change redraws the bars' place and the size pill.
+**After release** the selection keeps its eight handles unless the feature fixes it (`ICaptureSession.FixSelection`; Screen capture does at once, so only its Crop tool trims a capture: Travis, 2026-11-08): drag them to resize, drag inside to move. Arrow keys move it a pixel and Shift+arrows resize from the right and bottom edges (Flameshot). Ctrl+A selects the whole display under the pointer (Lightshot). Each change redraws the bars' place and the size pill.
 
 **The magnifier** follows the pointer from hover on, while choosing (fine aim starts before the press; Lumen, Frozen screen v1): 8× over the frozen pixels around the pointer, with the pixel grid, the pointer's physical coordinates and the pixel's HEX. It flips to stay on the display. Settings › Screen capture can hide it, except for Pick a point. **The size pill** shows "1040 × 800" in physical pixels at the selection's corner, outside it when there's room; over a window, its title first ("Terminal · 1040 × 800").
 

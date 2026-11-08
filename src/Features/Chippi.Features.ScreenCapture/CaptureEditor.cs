@@ -51,6 +51,8 @@ internal sealed class CaptureEditor : IDisposable
     private CaptureOutput? _output;
 
     internal CaptureDraft? Draft => _draft;
+    /// <summary>The mark with the dashed frame, or -1.</summary>
+    internal int SelectedMark => _selected;
     internal byte[]? FeedbackPicture { get; private set; }
     internal string FeedbackSource { get; private set; } = "Screen capture";
     internal Func<Canvas, MouseEventArgs, Point>? PointerAt { get; set; }
@@ -125,6 +127,7 @@ internal sealed class CaptureEditor : IDisposable
             }
         }
         _session.SetBars(selection.FastPath && _model.Settings.CtrlDragCopies ? null : _tools, selection.FastPath && _model.Settings.CtrlDragCopies ? null : _finish);
+        _session.FixSelection(); // Only Crop trims a capture once it's released (the owner, 2026-11-08).
         Redraw();
         if (selection.FastPath && _model.Settings.CtrlDragCopies) _ = Finish(EnterAction.Copy);
     }
@@ -222,7 +225,7 @@ internal sealed class CaptureEditor : IDisposable
         if (_preview != null)
         {
             if (_tool == CaptureTool.Select && _selected >= 0) _draft.Replace(_selected, _preview);
-            else { _draft.Add(_preview); _selected = _draft.Objects.Count - 1; }
+            else _draft.Add(_preview); // A new mark isn't selected: only Select shows the frame (live check, 2026-11-08).
         }
         _preview = null; _original = null; InvalidateOutput();
         if (_tool == CaptureTool.Crop && _crop != null)
@@ -368,8 +371,13 @@ internal sealed class CaptureEditor : IDisposable
         var pixels = new byte[checked(bitmap.PixelWidth * bitmap.PixelHeight * 4)];
         bitmap.CopyPixels(pixels, bitmap.PixelWidth * 4, 0);
         var image = new CapturedImage(bitmap.PixelWidth, bitmap.PixelHeight, pixels);
-        _session.Close(CaptureEnd.Finished, handBack: !qr);
-        await _readText(image, qr);
+        // Copy text and Scan QR each open their page. It opens while the frozen screen still holds the foreground, and
+        // only then does the frozen screen close: closing first let Windows hand the foreground back (to the browser the
+        // capture started over), which closed the page just summoned (live check, 2026-11-08; AGENTS.md, Foreground).
+        _busy = true;
+        try { await _readText(image, qr); }
+        finally { _busy = false; }
+        _session.Close(CaptureEnd.Finished, handBack: false);
     }
     private async Task Finish(EnterAction action, bool retry = false)
     {

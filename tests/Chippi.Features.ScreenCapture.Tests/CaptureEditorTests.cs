@@ -33,6 +33,7 @@ public sealed class CaptureEditorTests
             Point at = default;
             editor.PointerAt = (_, _) => at; // The owner's mouse never participates.
             session.Release();
+            Assert.True(session.Fixed); // Only Crop trims a released capture (the owner, 2026-11-08).
             void Tool(string name) => Click(Find(session.Tools!, name));
             bool upHandled = false;
             void Drag(Point from, Point to)
@@ -47,7 +48,9 @@ public sealed class CaptureEditorTests
             }
             Tool("Redact"); Drag(new(20, 20), new(80, 80));
             Assert.Single(editor.Draft!.Objects);
+            Assert.Equal(-1, editor.SelectedMark); // Drawing never frames the new mark (live check, 2026-11-08).
             Tool("Select"); Drag(new(40, 40), new(50, 50));
+            Assert.Equal(0, editor.SelectedMark);
             Assert.Equal(new Point(30, 30), editor.Draft.Objects[0].Points[0]);
             Drag(new(90, 90), new(120, 130));
             Assert.Equal(new Point(120, 130), editor.Draft.Objects[0].Points[1]);
@@ -105,6 +108,30 @@ public sealed class CaptureEditorTests
         finally { Directory.Delete(folder, true); }
     });
 
+    [Theory]
+    [InlineData("Copy text", false)]
+    [InlineData("Scan QR code", true)]
+    public void Each_reading_button_opens_its_page_before_the_frozen_screen_closes(string button, bool qr) => WpfTestThread.Run(() =>
+    {
+        string folder = Path.Combine(Path.GetTempPath(), "chippi-read-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(folder);
+        try
+        {
+            using var store = new RecentCaptureStore(folder);
+            var context = new ModuleContext("screen-capture", new SettingsStore(), NullLogger.Instance, null!, null!);
+            using var model = new ScreenCaptureModel(context, store, _ => { }, _ => false);
+            var session = new Session();
+            var reads = new List<(bool Qr, int ClosesBefore, int Width)>();
+            using var editor = new CaptureEditor(session, context, model, store, (_, _) => { }, () => true,
+                (image, scan) => { reads.Add((scan, session.Closes.Count, image.Width)); return Task.CompletedTask; });
+            session.Release();
+            Click(Find(session.Output!, button));
+            Assert.Equal([(qr, 0, 400)], reads); // the page is asked for while the frozen screen still holds the foreground
+            Assert.Equal([(CaptureEnd.Finished, false)], session.Closes); // then it closes, never handing the keyboard back
+        }
+        finally { Directory.Delete(folder, true); }
+    });
+
     private sealed class BusyClipboard : IClipboardHub
     {
         public int Writes;
@@ -151,13 +178,16 @@ public sealed class CaptureEditorTests
         public Selection? Selection { get; private set; }
         public IReadOnlyList<CaptureSurface> Surfaces => [new("fixture", new(0, 0, 400, 300), 96, Canvas)];
         public bool Tooling { get; set; }
+        public bool Fixed;
+        public void FixSelection() => Fixed = true;
         public event Action<Selection>? Selected;
         public event Action<System.Windows.Input.KeyEventArgs>? KeyDown { add { } remove { } }
         public event Action<PixelPoint, uint>? Picked { add { } remove { } }
         public event Action? Frozen { add { } remove { } }
         public event Action<CaptureEnd>? Closed { add { } remove { } }
         public void SetBars(FrameworkElement? tools, FrameworkElement? output) { Tools = tools; Output = output; }
-        public void Close(CaptureEnd end = CaptureEnd.Finished, bool handBack = true) { }
+        public List<(CaptureEnd End, bool HandBack)> Closes { get; } = [];
+        public void Close(CaptureEnd end = CaptureEnd.Finished, bool handBack = true) => Closes.Add((end, handBack));
         public void Release()
         {
             var bytes = new byte[400 * 300 * 4];
