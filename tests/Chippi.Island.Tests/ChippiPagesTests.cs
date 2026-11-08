@@ -61,6 +61,7 @@ public sealed class ChippiPagesTests
             ShortcutEdits Unset() => new(() => null, _ => null, () => { });
             // Added in the order features start, which isn't the list's.
             using var loose = shell.Shortcuts.Add("test-gone", "Loose", Unset());
+            using var capture = shell.Shortcuts.Add("capture", "Open Capture", Unset());
             using var region = shell.Shortcuts.Add("test-capture", "Capture region", Unset());
             using var command = shell.Shortcuts.Add("test-command", "Command bar", Unset());
             using var up = shell.Shortcuts.Add("test-displays", "Brightness up", Unset());
@@ -72,7 +73,7 @@ public sealed class ChippiPagesTests
             Assert.Equal(
                 ["System", "Brightness up", "Displays", "Brightness down", "Displays",
                  "Windows", "App switcher", "Command bar",
-                 "Capture", "Capture region",
+                 "Capture", "Open Capture", "Capture region",
                  "Chippi", "Loose"],
                 lines);
 
