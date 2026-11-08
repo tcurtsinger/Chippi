@@ -14,7 +14,7 @@ Let one UAC prompt cover a job Travis asked for, and let the helper refuse anyth
 
 | Door | What happens |
 |---|---|
-| A feature's button that needs admin | Update, Update all, Uninstall, Uninstall several, Remove leftovers, Clean, Free port, Stop service. Chippi's own confirm comes first ("Update 5 apps?"); the UAC prompt comes after Update, never before the question. |
+| A feature's button that needs admin | Update, Update all, Uninstall, Uninstall several, Remove leftovers, Clean, Free port, Stop service. Chippi's own confirm comes first ("Update 5 apps?"); the UAC prompt comes after Update, never before the question. The one exception is the Cleaner's Clean, whose question needs a size only the helper can read: the prompt comes first, the helper measures (read-only), then the question, and Cancel ends the session with nothing deleted (MeasureCategory below). |
 | Shortcuts, Search, Radial, Actions | Reach the same buttons through the feature's own verb, so they show the same confirm, then the prompt. The helper has no verbs of its own anywhere. |
 | UAC prompt | Windows' own. Chippi is unsigned, so it names the file, `Chippi.Elevated.exe`, with an unknown publisher. |
 | Bar | Nothing of its own. The feature's line ("Updating 2 of 5") covers the session. |
@@ -23,13 +23,13 @@ Let one UAC prompt cover a job Travis asked for, and let the helper refuse anyth
 
 ## How it starts
 
-- **Only from a button.** `ShellExecuteEx` with the `runas` verb and `SEE_MASK_NOCLOSEPROCESS`, run right after Travis answers the feature's confirm. Never at startup, from a timer, as a service or as a scheduled task, and never to read: a check for updates, the leftover scan and the Cleaner's measure run as Travis, and rows they can't read say "Needs admin".
+- **Only from a button.** `ShellExecuteEx` with the `runas` verb and `SEE_MASK_NOCLOSEPROCESS`, run right after Travis answers the feature's confirm (the Cleaner: right after Clean, as above). Never at startup, from a timer, as a service or as a scheduled task, and never to read: a check for updates, the leftover scan and the Cleaner's measure run as Travis, and rows they can't read say "Needs admin".
 - **One session at a time.** While a helper runs, the next admin job goes to it, with no second prompt. A job asked for while none runs starts one.
 - **Its manifest asks for admin** (`requireAdministrator`), so it can't run unelevated by accident. It checks `TokenElevation` first anyway, and exits if it isn't elevated.
 - **Same account only.** The helper must run as the same user as Chippi. If Windows asks for another account's password (an over-the-shoulder prompt), the pipe's DACL refuses that account and the helper exits; Chippi shows "Needs admin". Travis's account is an administrator, so his prompt is a Yes.
 - **Prompt declined:** `ShellExecuteEx` fails with `ERROR_CANCELLED`. The feature shows "Needs admin" on the rows that needed it and does nothing to them; rows that didn't need admin go ahead as Travis.
 - **File missing or won't start:** "Admin helper failed", logged with the Windows error.
-- **Exit:** when the pipe closes, when Chippi sends `Done`, or after 60 s with no job running. After `Uninstall`, it waits up to 10 minutes for that app's `DeleteLeftovers` or `Done`, since the review happens in between. A Chippi exit or crash closes the pipe, so the helper never outlives it by more than the job in flight.
+- **Exit:** when the pipe closes, when Chippi sends `Done`, or after 60 s with no job running. A leftover review that outlasts the session needs nothing from it: the app's identity is in the helper's stored record (Uninstall below), and a later Remove leftovers starts a new session with one prompt. A Chippi exit or crash closes the pipe, so the helper never outlives it by more than the job in flight.
 
 ## How it talks
 
@@ -44,12 +44,14 @@ Each verb names what to act on; the helper looks up the details itself and refus
 
 | Verb | Used by | Chippi sends | The helper checks again |
 |---|---|---|---|
-| `UpdatePackage` | App updates | winget package id | Id pattern; winget's own path |
-| `Uninstall` | Uninstaller | `HKLM` Uninstall key name and registry view | The key, its uninstaller's file |
-| `DeleteLeftovers` | Uninstaller | Items found by the scan, each with the class it was shown in and whether Travis ticked it | Every rule under Leftovers below |
-| `MeasureCategory`, `CleanCategory` | Cleaner | A category name | The name is in the helper's own list |
-| `CloseProcess`, `EndProcess` | Port manager | PID, process start time, port | The process still holds that port, isn't protected |
-| `StopService` | Port manager | Service name, port | The service's process holds that port, isn't protected |
+| `UpdatePackage(id)` | App updates | winget package id | Id pattern; winget's own path |
+| `Uninstall(view, keyName)` | Uninstaller | `HKLM` Uninstall key name and registry view; gets back a record id | The key; the uninstaller's file (execution check) |
+| `DeleteLeftovers(recordId, items)` | Uninstaller | The record id, and items found by the scan, each with the class it was shown in and whether Travis ticked it | The helper's stored record; every rule under DeleteLeftovers below |
+| `MeasureCategory(name)`, `CleanCategory(name)` | Cleaner | A category name | The name is in the helper's own list |
+| `CloseProcess(endpoint)`, `EndProcess(endpoint)` | Port manager | The confirmed row's endpoint (below) | The endpoint still belongs to that process, which isn't protected |
+| `StopService(name, endpoint)` | Port manager | Service name and the confirmed row's endpoint | The endpoint is attributed to that service, not only to its process |
+
+An **endpoint** is the row Travis confirmed: protocol (TCP or UDP), IPv4 or IPv6, local address, local port, owning PID and that process's start time.
 
 ### UpdatePackage(id)
 
@@ -59,7 +61,7 @@ Each verb names what to act on; the helper looks up the details itself and refus
   - Neither declared: the installed package's `InstalledScope` metadata; machine goes to the helper, anything else to Chippi. (**Inference:** the exact value it reads for machine is checked in the first Sandbox run.)
 - **Pattern:** dot-separated segments of letters, digits, `+`, `_` and `-`, 128 characters at most, not starting with `-`, so an id can never read as an option.
 - **Command:** `winget upgrade --id <id> --exact --source winget --silent --accept-package-agreements --accept-source-agreements --disable-interactivity` [winget upgrade], the id one argument. `upgrade` acts only on a package that's installed. Store apps (`msstore`) aren't sent: they update through the Store as Travis.
-- **Which winget (changes §6).** Not the `winget.exe` alias in `%LOCALAPPDATA%\Microsoft\WindowsApps`: Travis's own account can write that folder, so another program running as him could swap the alias and the helper would run it elevated. The helper finds App Installer's package with `GetPackagesByPackageFamily` (`Microsoft.DesktopAppInstaller_8wekyb3d8bbwe`) and `GetPackagePathByFullName`, and runs `winget.exe` from that folder under `Program Files\WindowsApps`, which only Windows can write. **Inference:** running winget from its package folder works elevated, as admin scripts do for SYSTEM; the first Sandbox run checks it.
+- **Which winget (changes §6).** Not the `winget.exe` alias in `%LOCALAPPDATA%\Microsoft\WindowsApps`: Travis's own account can write that folder, so another program running as him could swap the alias and the helper would run it elevated. The helper finds App Installer's package with `GetPackagesByPackageFamily` (`Microsoft.DesktopAppInstaller_8wekyb3d8bbwe`) and `GetPackagePathByFullName`, and runs `winget.exe` from that folder under `Program Files\WindowsApps`, which only Windows can write, after the execution check below. **Inference:** running winget from its package folder works elevated, as admin scripts do for SYSTEM; the first Sandbox run checks it.
 - **Several updates** are one session, one at a time, with `Progress` per package. A failure goes back with winget's exit code and doesn't stop the rest.
 - winget's command line, not its COM API, inside the helper: COM activation from an elevated unpackaged process has an open crash report [winget#4377], and NativeAOT has no built-in COM.
 
@@ -67,23 +69,38 @@ Each verb names what to act on; the helper looks up the details itself and refus
 
 - **The key:** opened under `HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall` in the named view (`KEY_WOW64_64KEY` or `KEY_WOW64_32KEY`), refused if it's a registry link, a `SystemComponent` entry or an update with a `ParentKeyName`. An `HKCU` entry is never run elevated: any program running as Travis can write one, so Chippi runs it as him.
 - **The command:** a Windows Installer entry (`WindowsInstaller` 1 and a product-code key name) runs `%SystemRoot%\System32\msiexec.exe /x <product code> /passive /norestart`, built by the helper. Any other entry runs its `QuietUninstallString` if it has one, else its `UninstallString` with the app's own wizard, which Travis clicks through.
-- **The file it runs** must be an absolute path that exists, and must pass the path rules below. Neither it nor any folder above it may be writable by Travis's standard token (the writable check below): an uninstaller in a folder Travis can write could have been swapped. An unquoted path with spaces is resolved by the helper, trying each `.exe` boundary from the left, and passed to `CreateProcess` as the application name, never left for Windows to guess.
-- **Before it runs,** the helper keeps the key's values (name, `DisplayName`, `Publisher`, `InstallLocation`, product code, the uninstaller's folder) for `DeleteLeftovers` in this session, since the uninstaller usually deletes the key.
+- **The file it runs** must be an absolute path that exists, pass the path rules below, and pass the execution check (Two file checks, below): nobody but an admin can change its bytes, replace it, plant a DLL beside it or rename a folder above it. An unquoted path with spaces is resolved by the helper, trying each `.exe` boundary from the left, and passed to `CreateProcess` as the application name, never left for Windows to guess.
+- **Before it runs,** the helper writes the app's **record**: the key's values (name, view, `DisplayName`, `Publisher`, `InstallLocation`, product code, the uninstaller's folder) and the time, under a new random id, in `HKLM\Software\Chippi\Elevated\UninstallRecords\<id>` (64-bit view). It returns the id to Chippi, which keeps it with its own copy of the entry. The uninstaller usually deletes the key, so the record is the only trusted identity left.
+  - **Why `HKLM`:** standard users can't create or write keys under `HKLM\Software`, so no program running as Travis can plant or edit a record, and none can create `Chippi\Elevated` first. The helper creates that key with a protected DACL (Administrators and SYSTEM full control, nobody else) and refuses to use it if it's a registry link, or if Travis's standard token could write it.
+  - **Lifetime:** a record lasts 30 days, until every leftover it names is removed, or until Chippi asks to drop it (the app's leftovers dismissed). The helper deletes expired records each time it starts. At most 50 records; the oldest goes first. The Uninstaller's "recently uninstalled" list is the apps whose record still exists.
+  - **Never from Chippi:** a record is written only by `Uninstall` from the key itself. There's no verb that takes a record's contents from Chippi.
 - **Waiting:** the uninstaller runs in a job object, and the helper waits until the job has no processes, so an uninstaller that copies itself to Temp and restarts is still waited for. The result carries the exit code (3010 means "Restart to finish") and whether the key is gone.
 
-### DeleteLeftovers(app, items)
+### DeleteLeftovers(recordId, items)
 
-As architecture §6, with the precise checks:
+As architecture §6, with the precise checks (this changes §6's "in the same session" to the stored record):
 
-- **The app's identity is the helper's own:** the key values kept by `Uninstall` for that app in this session. Without them, nothing is deleted elevated.
-- **Class checked again.** A "Safe" item must sit inside the kept `InstallLocation`, or be a key or folder named by the kept uninstall data. A "Check first" item is accepted only if the request says Travis ticked it after the review. An item whose class the helper's own check doesn't match is refused.
+- **The app's identity is the helper's own:** the record `Uninstall` wrote under that id, read back from `HKLM` with the same link and DACL checks. In the same session or days later, it's the same record. With no record (expired, dropped or never written), nothing is deleted elevated: each item comes back "Kept: no uninstall record" and Chippi's review says those items need a new uninstall to remove.
+- **Class checked again.** A "Safe" item must sit inside the record's `InstallLocation`, or be a key or folder named by the record's uninstall data. A "Check first" item is accepted only if the request says Travis ticked it after the review. An item whose class the helper's own check doesn't match is refused.
 - **Never another app's.** The helper reads every installed app's Uninstall entry (both `HKLM` views and Travis's `HKCU`) and refuses an item that is, contains or sits inside another app's `InstallLocation`, install folder or uninstall key. Removing Firefox with Thunderbird installed refuses `Program Files\Mozilla Thunderbird` and the shared `Mozilla` folder above it.
 - **Fixed deny list:** `Windows`, `System32`, the `Program Files`, `Common Files` and `ProgramData` roots, user profile roots, and Chippi's own folders.
 - **Path rules** (also used for `Uninstall`'s file): canonical before any check. Refused: relative paths, `.` and `..` segments, `\\?\` and `\\.\` prefixes, UNC and network paths, alternate data streams, 8.3 short names. Containment compares whole segments, case-insensitively: `C:\Program Files\App` doesn't contain `C:\Program Files\AppData`.
 - **No reparse points on the way.** The item and each folder above it are opened with `FILE_FLAG_OPEN_REPARSE_POINT`; any reparse point, or a `GetFinalPathNameByHandle` path that isn't the requested one, is refused [reparse points]. The folders above stay open without `FILE_SHARE_DELETE` until the item is gone, so none can be renamed or swapped for a junction in between. The item itself could still be renamed by someone who could already delete that name; what gets recycled is then only a name in a locked folder, never a link's target, because nothing is followed (below).
-- **Only what Travis can't delete himself.** The writable check: the helper takes Travis's standard token (`TokenLinkedToken` from its own elevated token) and asks `AccessCheck` whether that token could delete the item (`DELETE` on it, or `FILE_DELETE_CHILD` on its folder). If it could, the item is refused and goes back to Chippi's standard-user delete. An item owned by anyone but Administrators, SYSTEM or TrustedInstaller is refused outright: an admin-only leftover that a standard user owns was planted.
-- **Registry keys:** only under `HKLM\Software`, each view named, only keys named by the kept uninstall data, refused if the key or any key under it is a link, or if Travis's standard token could delete it (then it's the standard path's). Exported first with `%SystemRoot%\System32\reg.exe export` to a `.reg` file in Chippi's data folder, then deleted with `RegDeleteTree`.
+- **Only what Travis can't delete himself:** the deletion check (Two file checks, below). An item his standard token could delete is refused and goes back to Chippi's standard-user delete. An item owned by anyone but Administrators, SYSTEM or TrustedInstaller is refused outright: an admin-only leftover that a standard user owns was planted.
+- **Registry keys:** only under `HKLM\Software`, each view named, only keys named by the record's uninstall data, refused if the key or any key under it is a link, or if Travis's standard token could delete it (then it's the standard path's). Exported first with `%SystemRoot%\System32\reg.exe export` to a `.reg` file in Chippi's data folder, then deleted with `RegDeleteTree`.
 - **Files and folders** go to Travis's Recycle Bin with `SHFileOperation`, `FOF_ALLOWUNDO` and `FOF_WANTNUKEWARNING` (no COM). Same user, so the same bin. A reparse point inside a deleted folder goes as a link; its target is never touched.
+
+### Two file checks
+
+Both ask Windows, not the helper's guess: the helper takes Travis's standard token (`TokenLinkedToken` from its own elevated token) and calls `AccessCheck` with it against each object's security descriptor. Write and delete are separate rights in Windows [file rights], so each check names the rights it refuses.
+
+- **Execution check,** for any file the helper runs elevated (an uninstaller; `winget.exe` from its package folder). Refused if the standard token is granted:
+  - on the file: `FILE_WRITE_DATA`, `FILE_APPEND_DATA`, `WRITE_DAC`, `WRITE_OWNER` or `DELETE` (rewrite it, take it over, or swap it);
+  - on its folder: `FILE_ADD_FILE`, `FILE_ADD_SUBDIRECTORY`, `FILE_DELETE_CHILD`, `WRITE_DAC`, `WRITE_OWNER` or `DELETE` (plant a DLL the uninstaller loads from its own folder, or swap the file);
+  - on each folder above, to the volume root: `FILE_DELETE_CHILD`, `WRITE_DAC`, `WRITE_OWNER` or `DELETE` (rename or replace a folder on the way). Adding new folders isn't refused there: Windows lets every user add folders to `C:\`, and a new folder can't take an existing name.
+
+  The file and each folder must also be owned by Administrators, SYSTEM or TrustedInstaller (an owner can always rewrite the DACL), and none may be a reparse point. The helper then holds the file open (share read only, no write or delete) and the folders open without `FILE_SHARE_DELETE` until `CreateProcess` has started it, so nothing changes between the check and the run.
+- **Deletion check,** for a leftover: whether the standard token could delete it (`DELETE` on it, or `FILE_DELETE_CHILD` on its folder). It answers only "could Travis remove this himself", never "is this safe to run".
 
 ### MeasureCategory(name), CleanCategory(name)
 
@@ -97,15 +114,16 @@ As architecture §6, with the precise checks:
 | `SystemCrashDumps` | `%SystemRoot%\Minidump`, `%SystemRoot%\MEMORY.DMP`, `ProgramData\Microsoft\Windows\WER\ReportArchive` and `ReportQueue` | Yes |
 
 - **Rule:** files not written for over a day; a file in use is skipped and counted; no reparse point is followed (a link inside is removed as a link); deleted for good, as decided in task 485.
-- **Measuring needs the helper** for the folders Travis can't list. Chippi never prompts only to measure: those rows show "Needs admin" with no size. **Recommend** for the Cleaner's brief: Clean with such a row ticked starts the helper, which measures, then the confirm shows the full size ("Clean 1.4 GB for good?"), then Clean. One prompt, and the question's size is real.
+- **Measuring needs the helper** for the folders Travis can't list. Chippi never prompts only to measure: on the page's own measure those rows show "Needs admin" with no size.
+- **Clean, in order** (settled with `cleaner.md`): Travis presses Clean with an admin category ticked; the UAC prompt; the helper runs `MeasureCategory` for each ticked admin category (read-only); Chippi's question shows the full size ("Clean 1.4 GB for good?"); Clean runs `CleanCategory` in the same session, Cancel sends `Done` and nothing is deleted. One prompt, and the question's size is real. With no admin category ticked, the question comes first and no helper starts. A declined prompt skips the admin categories ("Needs admin") and the question covers the rest.
 - The helper doesn't stop Windows Update or Delivery Optimization to clean their caches; files they hold are skipped.
 
-### CloseProcess, EndProcess(pid, startTime, port) and StopService(name, port)
+### CloseProcess(endpoint), EndProcess(endpoint) and StopService(name, endpoint)
 
-- **The row is read again** in the helper (`GetExtendedTcpTable`, `GetExtendedUdpTable`): the PID must hold that port now, and its start time (`GetProcessTimes`) must match, so a reused PID is refused.
+- **The row is read again** in the helper, in the `OWNER_MODULE` forms Port manager uses (`TCP_TABLE_OWNER_MODULE_ALL`, `UDP_TABLE_OWNER_MODULE`): the confirmed endpoint (protocol, address family, local address and port) must still exist and belong to the same PID, and that PID's start time (`GetProcessTimes`) must match, so a reused PID or a port handed to another process is refused ("Kept: changed since the scan").
 - **Never:** PID 0 or 4, `csrss`, `smss`, `wininit`, `winlogon`, `lsass`, `services`, `svchost` (a service is stopped instead), Microsoft Defender's processes, protected processes, Chippi, or the helper.
 - **`CloseProcess`** posts `WM_CLOSE` to the process's top-level windows; Chippi can't do this for an elevated app, since Windows blocks it across integrity levels. `EndProcess` is `TerminateProcess`, Port manager's separate Force end.
-- **`StopService`:** the service's process (`QueryServiceStatusEx`) must hold that port, it must be a service process (not a driver), accept Stop, and not be on a fixed list of Windows' core services (`RpcSs`, `RpcEptMapper`, `DcomLaunch`, `LSM`, `SamSs`, `BFE`, `mpssvc`, `WinDefend`, `EventLog`, `Dhcp`, `Dnscache`, `nsi`, `PlugPlay`, `Power`, `BrokerInfrastructure`, `Winmgmt`, `CryptSvc`, `Schedule`, `ProfSvc`, `gpsvc`). A service others depend on fails with Windows' own `ERROR_DEPENDENT_SERVICES_RUNNING`; the helper doesn't stop the dependents.
+- **`StopService` stops only the service that owns the endpoint** (port-manager.md's attribution rule, rechecked). The helper reads the endpoint's owner with `GetOwnerModuleFromTcpEntry` or `GetOwnerModuleFromUdpEntry`, which the elevated helper can read where a standard user gets empty names, and the module name must be the requested service. Failing that, the PID must host exactly one running service (`EnumServicesStatusEx`, process id from `SERVICE_STATUS_PROCESS`) and it must be the requested one. Anything else is ambiguous and refused ("Kept: shared Windows service"), even when the requested service does run in that PID: with services A and B in one `svchost` and only A on port 3000, `StopService(B, 3000)` is refused. **Inference:** that the owner module's name is the service name for a service endpoint (how `netstat -b` names services); the Sandbox run checks it with a throwaway service. The service must also be a service process (not a driver), accept Stop, and not be on a fixed list of Windows' core services (`RpcSs`, `RpcEptMapper`, `DcomLaunch`, `LSM`, `SamSs`, `BFE`, `mpssvc`, `WinDefend`, `EventLog`, `Dhcp`, `Dnscache`, `nsi`, `PlugPlay`, `Power`, `BrokerInfrastructure`, `Winmgmt`, `CryptSvc`, `Schedule`, `ProfSvc`, `gpsvc`). A service others depend on fails with Windows' own `ERROR_DEPENDENT_SERVICES_RUNNING`; the helper doesn't stop the dependents.
 
 ## The risk
 
@@ -125,6 +143,7 @@ The full fix (signing, installing under Program Files) stays out of scope. Power
 - **Installing a new Chippi while a helper runs:** the installer closes Chippi, so the helper exits after the job in flight. Until it does, its file is in use. **Not verified:** whether Velopack's installer waits for it or fails and needs running again.
 - **A job longer than the idle timer** (a big installer): the 60 s idle counts only while no job runs.
 - **Two features want admin at once** (an update batch running, then Free port): the second job queues in the same session.
+- **A leftover review left open past the session, or reopened days later:** Remove leftovers starts a new session with one prompt and uses the stored record. After 30 days the record is gone and the admin items say "Kept: no uninstall record".
 - **The prompt sits unanswered:** Chippi's row shows "Waiting for admin" until Windows answers; there's no timeout of Chippi's own.
 
 ## Shortcuts
@@ -146,7 +165,7 @@ Every string, all in features' screens. Marge runs them through Decide before th
 - Needs admin (a row or verb that needed the helper and didn't get it).
 - Waiting for admin (a row while the prompt is open).
 - Admin helper failed (couldn't start, or ended mid-job).
-- Refusals, on the row of the item kept: "Kept: shared with <app>", "Kept: protected folder", "Kept: changed since the scan". Each feature's own errors ("Update failed", "Uninstall failed") are in its brief.
+- Refusals, on the row of the item kept: "Kept: shared with <app>", "Kept: protected folder", "Kept: changed since the scan", "Kept: no uninstall record", "Kept: shared Windows service". Each feature's own errors ("Update failed", "Uninstall failed") are in its brief.
 
 ## Shared code
 
@@ -162,16 +181,16 @@ Every string, all in features' screens. Marge runs them through Decide before th
   - the protocol: a malformed message, an oversized one, an unknown verb or field, and a command line other than `--pipe <name>` each end the session; a client or server that isn't the expected process is refused; a declined prompt (`ERROR_CANCELLED`) gives "Needs admin" and runs nothing
   - routing: each `Scope` and `ElevationRequirement` pair, and `InstalledScope` when neither is declared, goes the right way; `msstore` is never sent
   - ids: good ids pass; `-x`, `a b`, `a;b`, a 129-character id and an empty one are refused
-  - `Uninstall`: links, `SystemComponent`, `ParentKeyName` and `HKCU` keys refused; MSI entries build the `msiexec` line; quoted, unquoted-with-spaces and environment-variable paths resolve; a file in a folder the fake standard token can write is refused
-  - `DeleteLeftovers`: every case in architecture §6 (Firefox with Thunderbird, a Safe item outside `InstallLocation`, no kept record, `..`, 8.3, `\\?\`, UNC, a data stream, `App` against `AppData`, a registry link, a key outside `HKLM\Software`), plus a Check first item not ticked, and an item the fake standard token could delete
+  - `Uninstall`: links, `SystemComponent`, `ParentKeyName` and `HKCU` keys refused; MSI entries build the `msiexec` line; quoted, unquoted-with-spaces and environment-variable paths resolve; the execution check refuses a file granting the standard token write-data but not delete, append-data, `WRITE_DAC` or `WRITE_OWNER`, a file owned by a standard user, its folder granting add-file (a planted DLL), add-subdirectory or delete-child, a folder above granting delete-child or `DELETE`, and passes a folder above that grants only add-subdirectory (as `C:` does); `Uninstall` writes a record and returns its id
+  - `DeleteLeftovers`: every case in architecture §6 (Firefox with Thunderbird, a Safe item outside `InstallLocation`, no kept record, `..`, 8.3, `\\?\`, UNC, a data stream, `App` against `AppData`, a registry link, a key outside `HKLM\Software`), plus a Check first item not ticked, an item the fake standard token could delete, and records: an expired record (31 days on the injected clock), a dropped one and an unknown id each refuse every item ("Kept: no uninstall record"); a record read in a new session after the first one ended removes its items; the 51st record drops the oldest; a records key that is a link, or that the standard token could write, is refused
   - categories: an unknown name refused; the day rule and in-use skips on a temp tree
-  - processes: PID 0 and 4, each protected name, a reused PID (start time differs), a PID no longer on the port, a core service and a driver are refused
-  - lifetime: idle 60 s, the 10-minute wait after `Uninstall`, a long job not timed out, exit on pipe close, a second job reusing the session (injected clock)
+  - processes: PID 0 and 4, each protected name, a reused PID (start time differs), an endpoint now owned by another PID, an endpoint gone, a core service and a driver are refused; with services A and B in one PID and the endpoint owned by A, `StopService(A)` passes and `StopService(B)` is refused; with no owner-module name and two services in the PID, both are refused; with one service in the PID, it passes
+  - lifetime: idle 60 s, a long job not timed out, exit on pipe close, a second job reusing the session (injected clock)
 - **CI, real file system, no admin:** junction and path checks on temp trees (junctions need no admin): a junction as the item, above it, and pointing at a fixture "System32"; the held folders block a rename; a junction inside a recycled and a deleted folder is removed as a link with its target intact. The CI runner is an admin without UAC, so nothing there may depend on running unelevated.
 - **Windows Sandbox, the real helper,** once, at the end (`run.ps1 -Checks admin-helper`, a self-contained build with the NativeAOT helper):
   - a throwaway standard user made by the run, whose token (`LogonUser`) stands in for Travis's standard token in the writable and owner checks, plus symbolic links and a folder planted by that user
-  - `Uninstall` and `DeleteLeftovers` on test apps the run registers under `HKLM` (a stand-in uninstaller exe, its folders and keys, one that relaunches itself from Temp, and a sharing "Thunderbird")
-  - categories against folders the run fills; `CloseProcess`, `EndProcess` and `StopService` on a listener and a throwaway service the run creates on `127.0.0.1`
+  - `Uninstall` and `DeleteLeftovers` on test apps the run registers under `HKLM` (a stand-in uninstaller exe, its folders and keys, one that relaunches itself from Temp, and a sharing "Thunderbird"), with Remove leftovers in a second session after the first has exited; an uninstaller the throwaway user can write-data but not delete, refused
+  - categories against folders the run fills; `CloseProcess`, `EndProcess` and `StopService` on a listener and a throwaway service the run creates on `127.0.0.1`, reading the service name from the owner module (the inference above)
   - `UpdatePackage` in the separate networked `.wsb` with winget installed (architecture §14), on a small package the run installs first
   - first, two questions: whether the Sandbox's account gets a UAC prompt at all, and whether `runas` with a declined prompt can be driven there. Where it can't, the prompt and Decline are Travis's live check.
 - **Travis's live check:** one real prompt, Yes and No; an update batch and an uninstall of throwaway apps he picks; Free port on a throwaway listener. Never his real apps.
@@ -203,4 +222,4 @@ The timings and a list of every refusal the run hit go to the room.
 Read 2026-11-07, besides architecture §6's.
 
 - [winget IDL](https://github.com/microsoft/winget-cli/blob/master/src/Microsoft.Management.Deployment/PackageManager.idl) (`PackageInstallerInfo.Scope`, `ElevationRequirement`, `PackageVersionMetadataField.InstalledScope`), [winget errors](https://github.com/microsoft/winget-cli/blob/master/src/AppInstallerSharedLib/Public/AppInstallerErrors.h) (`0x8A150056`, installer prohibits elevation), [winget upgrade](https://learn.microsoft.com/en-us/windows/package-manager/winget/upgrade), [winget#4377](https://github.com/microsoft/winget-cli/issues/4377)
-- [pipe security](https://learn.microsoft.com/en-us/windows/win32/ipc/named-pipe-security-and-access-rights), [reparse points](https://learn.microsoft.com/en-us/windows/win32/fileio/reparse-points), [DLL security](https://learn.microsoft.com/en-us/windows/win32/dlls/dynamic-link-library-security), [MSRC criteria](https://www.microsoft.com/en-us/msrc/windows-security-servicing-criteria), [PowerToys admin](https://learn.microsoft.com/en-us/windows/powertoys/administrator)
+- [pipe security](https://learn.microsoft.com/en-us/windows/win32/ipc/named-pipe-security-and-access-rights), [file rights](https://learn.microsoft.com/en-us/windows/win32/fileio/file-security-and-access-rights), [GetOwnerModuleFromTcpEntry](https://learn.microsoft.com/en-us/windows/win32/api/iphlpapi/nf-iphlpapi-getownermodulefromtcpentry), [reparse points](https://learn.microsoft.com/en-us/windows/win32/fileio/reparse-points), [DLL security](https://learn.microsoft.com/en-us/windows/win32/dlls/dynamic-link-library-security), [MSRC criteria](https://www.microsoft.com/en-us/msrc/windows-security-servicing-criteria), [PowerToys admin](https://learn.microsoft.com/en-us/windows/powertoys/administrator)

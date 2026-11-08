@@ -22,7 +22,7 @@ Show how much space temp files and caches take, and clear them in one step, with
 
 ### Measure first
 
-Opening the list measures the categories (read-only, off the UI thread) and fills in sizes as each finishes. Nothing is deleted by measuring. A category that needs admin is measured only when a helper-free measure is possible; otherwise it shows "Needs admin" and no size until Travis cleans.
+Opening the list measures the categories (read-only, off the UI thread) and fills in sizes as each finishes. Nothing is deleted by measuring. A category that needs admin is measured only when a helper-free measure is possible; otherwise it shows "Needs admin" and no size until Travis cleans: Clean with one ticked brings up the UAC prompt first, the helper measures it (read-only), then the question shows the full size, and Cancel deletes nothing (admin-helper.md, Clean, in order).
 
 ### Categories in the first build
 
@@ -102,7 +102,7 @@ Unassigned. Settings › Cleaner shows them read-only with Edit.
 ## Shared code
 
 - **New:** `Chippi.Features.Cleaner` and `.Tests`, in `Chippi.slnx` (names to Marge first). Module id `cleaner`, already in the catalog **without** `Capability.Admin`; the PR adds it and the "Admin for some categories" badge, as App updates has. Shared Core code, called out in the PR.
-- **The helper:** `CleanCategory(name)` is `admin-helper.md`'s verb; its category list must match this table.
+- **The helper:** `MeasureCategory(name)` and `CleanCategory(name)` are `admin-helper.md`'s verbs; its category list matches this table (`WindowsTemp`, `WindowsUpdateDownloads`, `DeliveryOptimization`, `SystemCrashDumps`).
 - **Shared with the other Apps briefs:** the Apps menu in Actions.
 - **Settings pages:** Lumen's. Verbs through `IModuleUi.AddCommands`; slots through `ModuleContext.Shortcuts`.
 - **Not changed:** the shortcut service.

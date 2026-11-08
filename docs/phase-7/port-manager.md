@@ -34,10 +34,10 @@ Protocol, local address and port, remote address and port, state, and the proces
 |---|---|---|
 | Your own process | Free | "End node.exe to free port 3000?" with Cancel and End |
 | A service (its row says "Service") | Stop, with the UAC shield | "Stop service Print Spooler to free port 9100?" with Cancel and Stop. Only a service whose ownership of this endpoint is attributed is offered Stop, and only that service stops, never its `svchost` host, which may run others. An ambiguous row has no Stop (next list) |
-| An admin, SYSTEM or another user's process | Free, with the UAC shield | "End postgres.exe to free port 5432?" with Cancel and End; it goes through the admin helper as `EndProcess(pid, startTime)`, one prompt |
+| An admin, SYSTEM or another user's process | Free, with the UAC shield | "End postgres.exe to free port 5432?" with Cancel and End; it goes through the admin helper as `EndProcess(endpoint)` (the confirmed row: protocol, address, port, PID and start time), one prompt |
 | System (PID 4) or a closing connection (PID 0, TIME_WAIT) | None | The row says why ("Windows"); Enter opens Settings › Ports at the row |
 
-- **Ambiguous shared host:** when the PID's `svchost` hosts several services and the endpoint can't be attributed to one, the row says "Shared Windows service" with no verb, Stop is withheld, and Enter opens Settings › Ports at the row. Nothing ends the host or guesses a service from the PID. `StopService(name)` takes a name only from an attributed row, and the helper refuses a name whose service isn't running in the endpoint's PID.
+- **Ambiguous shared host:** when the PID's `svchost` hosts several services and the endpoint can't be attributed to one, the row says "Shared Windows service" with no verb, Stop is withheld, and Enter opens Settings › Ports at the row. Nothing ends the host or guesses a service from the PID. `StopService(name, endpoint)` takes a name only from an attributed row, and the helper attributes the endpoint again itself: it refuses a name that isn't the endpoint's owning service, even if that service runs in the same PID (admin-helper.md).
 - **Read again before anything runs.** After Travis confirms, the row's PID and start time are checked once more. If the process changed or has gone, nothing ends and the row updates ("Already closed" or "Changed, check again").
 - **Ask the app to close first** for a process with a window (a normal close request, then 3 s). If it's still there, a second step offers "Force end". A listener with no window ends at once on confirm.
 - **Never ended:** PID 0 and 4, `csrss`, `wininit`, `lsass`, `services`, `smss`, and Chippi itself. The helper refuses them too.
@@ -92,7 +92,7 @@ Unassigned. Settings › Ports shows the global slots read-only with Edit.
 - **New:** `Chippi.Features.PortManager` and `.Tests`, in `Chippi.slnx` (names to Marge first). Module id `port-manager`, already in the catalog (group System); the PR adds `Capability.Admin` and its badge, as App updates has. Shared Core code, called out in the PR.
 - **Search value rows:** follows the existing "volume 40" pattern; no new mechanism, unless the pattern needs a verb on the row (the Free button), which is called out in the PR.
 - **IP Helper P/Invoke:** pattern from `SystemMonitor/Sensors/Platform/NetworkSource.cs`. Ending a process reuses `WindowsQuickSystem`'s.
-- **The helper:** `EndProcess(pid, startTime)` and `StopService(name)` are `admin-helper.md`'s verbs.
+- **The helper:** `CloseProcess(endpoint)`, `EndProcess(endpoint)` and `StopService(name, endpoint)` are `admin-helper.md`'s verbs; `CloseProcess` is the close request for an elevated app, which Chippi can't send across integrity levels.
 - **Settings page:** Lumen's. Verbs through `IModuleUi.AddCommands`; slots through `ModuleContext.Shortcuts`.
 
 ## Tests
