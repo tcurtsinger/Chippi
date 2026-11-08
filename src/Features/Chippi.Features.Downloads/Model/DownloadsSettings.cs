@@ -112,7 +112,7 @@ public sealed class DownloadsSettings
 
     public List<RuleSetting> Rules { get; set; } = [];
 
-    /// <summary>History older than this is pruned at start (brief §2: 90 days).</summary>
+    /// <summary>History older than this is pruned at start and when the retention changes (brief §2: 90 days).</summary>
     public int HistoryDays { get; set; } = 90;
 
     public bool OrganizeInExplorer { get; set; } = true;

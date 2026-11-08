@@ -35,6 +35,7 @@ public sealed class DownloadsEngine : IDisposable
     private readonly Dictionary<string, (DateTime Stamp, IReadOnlyList<string> Patterns)> _ignore = new(StringComparer.OrdinalIgnoreCase);
     private readonly CancellationTokenSource _stop = new();
     private DownloadsSettings _settings = new();
+    private int _historyDays;
     private IReadOnlyList<Rule> _rules = [];
     private readonly HashSet<string> _sweeps = new(StringComparer.Ordinal); // rules saved or switched on, waiting for the loop
     private readonly Dictionary<string, (string RuleId, DateTimeOffset Next)> _waiting = new(StringComparer.OrdinalIgnoreCase); // files a sweep found busy or settling
@@ -73,9 +74,6 @@ public sealed class DownloadsEngine : IDisposable
         int settled = _executor.Reconcile();
         if (settled > 0)
             _logger.LogInformation("Reconciled {Count} interrupted operations", settled);
-        int pruned = _history.ClearBefore(_time.GetUtcNow() - TimeSpan.FromDays(Math.Max(1, settings.HistoryDays)));
-        if (pruned > 0)
-            _logger.LogInformation("Pruned {Count} history entries older than {Days} days", pruned, settings.HistoryDays);
         Apply(settings);
         if (runLoop)
             _loop = Task.Run(() => LoopAsync(_stop.Token));
@@ -87,8 +85,15 @@ public sealed class DownloadsEngine : IDisposable
         ArgumentNullException.ThrowIfNull(settings);
         var rules = ValidRules(settings.Rules);
         var watched = settings.Folders.Where(f => f.Mode != FolderMode.Paused && Directory.Exists(f.Path)).ToList();
+        int pruned = 0;
         lock (_gate)
         {
+            int days = Math.Max(1, settings.HistoryDays);
+            if (_historyDays != days)
+            {
+                pruned = _history.ClearBefore(_time.GetUtcNow() - TimeSpan.FromDays(days));
+                _historyDays = days;
+            }
             _settings = settings;
             _rules = rules;
             foreach (var path in _watchers.Keys.Where(k => !watched.Any(f => Same(f.Path, k))).ToList())
@@ -108,6 +113,11 @@ public sealed class DownloadsEngine : IDisposable
                     _watchers[folder.Path] = Watch(folder.Path);
             }
             Rescan(folder.Path);
+        }
+        if (pruned > 0)
+        {
+            _logger.LogInformation("Pruned {Count} history entries older than {Days} days", pruned, settings.HistoryDays);
+            HistoryChanged?.Invoke(this, EventArgs.Empty);
         }
         PendingChanged?.Invoke(this, EventArgs.Empty);
     }
