@@ -1,0 +1,8 @@
+{
+  "knobs": [
+    "--radius-card",
+    "--accent"
+  ],
+  "for": "Settings › Apps › App updates: the unknown-version switch, skipped updates with Restore, the last 50 runs, and the two shortcuts read-only.",
+  "title": "Settings › App updates"
+}
