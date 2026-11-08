@@ -181,6 +181,33 @@ public sealed class ModuleFlowTests
         await t.Module.ReadSelectionAsync(image, ScreenTextVerb.CopyText);
         Assert.Equal(1, t.Ocr.Calls);
     }
+    // Travis's live check, 2026-11-08: the capture bar's Copy text copies and opens the Text page.
+    [Fact]
+    public async Task Copy_text_from_a_capture_copies_and_opens_the_Text_page()
+    {
+        var t = await Start();
+        var image = new CapturedImage(120, 40, new byte[120 * 40 * 4]);
+        await t.Module.ReadSelectionAsync(image, ScreenTextVerb.CopyText);
+        Assert.Equal(["Hello world\nfrom the screen"], t.Clip.Written);
+        var line = Assert.Single(t.Hub.Activities);
+        Assert.Equal(("Copied text", "5 words"), (line.Title, line.Source));
+        Assert.Equal([ScreenTextModule.Id], t.Pages);
+        Assert.Equal("Hello world\nfrom the screen", t.Module.Text.Result!.Text);
+        Assert.False(t.Module.Text.Reading);
+    }
+
+    [Fact]
+    public async Task Copy_text_from_a_capture_with_nothing_read_leaves_the_clipboard_and_opens_the_page()
+    {
+        var t = await Start();
+        t.Ocr.Next = new OcrOutcome(TextReadState.NoText, [], "English");
+        await t.Module.ReadSelectionAsync(new CapturedImage(120, 40, new byte[120 * 40 * 4]), ScreenTextVerb.CopyText);
+        Assert.Empty(t.Clip.Written);
+        Assert.Empty(t.Hub.Activities);
+        Assert.Equal([ScreenTextModule.Id], t.Pages);
+        Assert.Equal(TextReadState.NoText, t.Module.Text.Result!.State);
+    }
+
     [Fact]
     public async Task Copy_text_copies_the_text_once_and_says_how_many_words()
     {

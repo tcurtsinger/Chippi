@@ -324,26 +324,29 @@ public sealed class ScreenTextModule : IFeatureModule
             taken = true;
             var image = selection.Image();
             session.Close(CaptureEnd.Finished, handBack: verb == ScreenTextVerb.CopyText);
-            Work = verb == ScreenTextVerb.ScanQr ? ScanAsync(image) : ReadAsync(image, copy: verb == ScreenTextVerb.CopyText);
+            Work = verb == ScreenTextVerb.ScanQr ? ScanAsync(image) : ReadAsync(image, copy: verb == ScreenTextVerb.CopyText, show: verb == ScreenTextVerb.ExtractText);
         };
     }
 
-    /// <summary>Consumes Screen capture's composed selection without starting another capture.</summary>
+    /// <summary>
+    /// Consumes Screen capture's composed selection without starting another capture. Copy text there copies and opens the
+    /// Text page too (Travis's live check, 2026-11-08); Extract text only opens it.
+    /// </summary>
     public Task ReadSelectionAsync(CapturedImage image, ScreenTextVerb verb)
     {
         if (_context == null) return Task.CompletedTask;
-        return Work = verb == ScreenTextVerb.ScanQr ? ScanAsync(image) : ReadAsync(image, copy: verb == ScreenTextVerb.CopyText);
+        return Work = verb == ScreenTextVerb.ScanQr ? ScanAsync(image) : ReadAsync(image, copy: verb == ScreenTextVerb.CopyText, show: true);
     }
     private void Retry()
     {
-        if (_lastImage is { } image) Work = ReadAsync(image, copy: false);
+        if (_lastImage is { } image) Work = ReadAsync(image, copy: false, show: true);
     }
 
-    private async Task ReadAsync(CapturedImage image, bool copy)
+    private async Task ReadAsync(CapturedImage image, bool copy, bool show)
     {
         long generation = Interlocked.Increment(ref _generation);
         _lastImage = image;
-        if (!copy) Text.SetReading(true);
+        if (show) Text.SetReading(true);
         string? language = _settings.Language;
         bool join = _settings.JoinLines;
         OcrOutcome outcome;
@@ -354,21 +357,17 @@ public sealed class ScreenTextModule : IFeatureModule
         var (text, starts) = TextJoin.Apply([.. outcome.Lines.Select(l => l.Text)], join);
         var lines = outcome.Lines.Select((l, i) => new TextLine(starts[i], l.Text.Length, l.Box)).ToList();
         var result = new TextResult(Bitmap(image), text, lines, outcome.Language) { State = outcome.State };
-        if (!copy)
+        if (show)
         {
+            // The page says why nothing was read; a copy still gets its bar line, so a failed write isn't silent.
+            if (copy && outcome.State == TextReadState.Read) Copy(context, text);
             ShowText(result);
             ShowPage(context, Id);
             return;
         }
         switch (outcome.State)
         {
-            case TextReadState.Read:
-                int words = TextJoin.WordCount(text);
-                if (Write(text))
-                    Feedback(context, "Copied text", words == 1 ? "1 word" : $"{words} words", false);
-                else
-                    Feedback(context, "Copy failed", "Text", true);
-                break;
+            case TextReadState.Read: Copy(context, text); break;
             case TextReadState.NoText: Feedback(context, "No text found", "Text", true); break;
             case TextReadState.NoLanguage: Feedback(context, "No OCR language installed", "Text", true); break;
             default: Feedback(context, "Text recognition failed", "Text", true); break;
@@ -412,6 +411,15 @@ public sealed class ScreenTextModule : IFeatureModule
         var bitmap = BitmapSource.Create(image.Width, image.Height, 96, 96, PixelFormats.Bgra32, null, image.Pixels, image.Stride);
         bitmap.Freeze();
         return bitmap;
+    }
+
+    private void Copy(ModuleContext context, string text)
+    {
+        int words = TextJoin.WordCount(text);
+        if (Write(text))
+            Feedback(context, "Copied text", words == 1 ? "1 word" : $"{words} words", false);
+        else
+            Feedback(context, "Copy failed", "Text", true);
     }
 
     private static void Feedback(ModuleContext context, string title, string source, bool attention) =>

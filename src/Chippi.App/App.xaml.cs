@@ -270,7 +270,7 @@ public partial class App : Application
         var screenCapture = new Chippi.Features.ScreenCapture.ScreenCaptureModule(shell.Capture)
         {
             TextAvailable = () => shell.Registry.Find("screen-text")?.IsRunning == true,
-            ReadText = (image, qr) => screenText.ReadSelectionAsync(image, qr ? Chippi.Features.ScreenText.ScreenTextVerb.ScanQr : Chippi.Features.ScreenText.ScreenTextVerb.ExtractText),
+            ReadText = (image, qr) => screenText.ReadSelectionAsync(image, qr ? Chippi.Features.ScreenText.ScreenTextVerb.ScanQr : Chippi.Features.ScreenText.ScreenTextVerb.CopyText),
         };
         shell.Registry.Register(screenCapture);
         shell.Registry.Changed += (_, _) => Dispatcher.BeginInvoke(screenCapture.RefreshProviders);

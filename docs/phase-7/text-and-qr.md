@@ -48,7 +48,7 @@ Select and decode. Dragging a region decodes that region. Enter with no region, 
 
 ### Capture bar buttons
 
-On a capture's selection, Extract text and Scan QR read that same selection, markup included, without a second drag. Each opens its page (Text, QR code) while the capture screen still holds the foreground, then the capture screen closes (Travis's live check, 2026-11-08: Copy text there copied without a page, and closing first let the browser take the foreground and close the page).
+On a capture's selection, Copy text and Scan QR read that same selection, markup included, without a second drag. Copy text copies the text (with its bar line) and opens the Text page; Scan QR opens the QR code page. Each page opens while the capture screen still holds the foreground, then the capture screen closes (Travis's call from his live check, 2026-11-08: Copy text there copied without a page, and closing first let the browser take the foreground and close the page).
 
 ### Recognition
 

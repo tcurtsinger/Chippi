@@ -109,7 +109,7 @@ public sealed class CaptureEditorTests
     });
 
     [Theory]
-    [InlineData("Extract text", false)]
+    [InlineData("Copy text", false)]
     [InlineData("Scan QR code", true)]
     public void Each_reading_button_opens_its_page_before_the_frozen_screen_closes(string button, bool qr) => WpfTestThread.Run(() =>
     {

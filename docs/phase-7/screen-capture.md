@@ -15,7 +15,7 @@ Press Print Screen, select, mark up beside the selection, then Copy or Save. No 
 - Bar: success or failure line for six seconds, using the existing bar lifecycle. It never opens a result page automatically over a fullscreen app.
 - Settings > Capture > Screen capture: output preference, Save to, file type, Ctrl-drag, magnifier, Recent, and read-only shortcut rows with Edit. Edit opens Settings > Shortcuts in that row. Full history lives here; Open recent captures lands on it.
 
-Capture panel registration is shared by the installed providers, with one stable page identity and one panel command. Opening Text, QR code or Color delegates to that provider. Extract text and Scan QR in the screenshot toolbar pass the current selection to Herb's implementation without capturing again. Their result pages and strings belong to his briefs. Removing a provider cancels its pending work and removes its controls.
+Capture panel registration is shared by the installed providers, with one stable page identity and one panel command. Opening Text, QR code or Color delegates to that provider. Copy text and Scan QR in the screenshot toolbar pass the current selection to Herb's implementation without capturing again. Their result pages and strings belong to his briefs. Removing a provider cancels its pending work and removes its controls.
 
 ## What we took
 
@@ -106,7 +106,7 @@ In context only: all markup verbs in the table; Copy, Save, Save as, Finish (Ent
 These are the feature's visible strings and accessible names. Tool names and starter labels are exactly those in the tables above. Dynamic values use localized numbers and dates. Windows supplies folder/file dialog and overwrite-confirmation text.
 
 - Panel: Capture; Region; Window; Screen; All displays; Freeform; Last region; Delay; No delay; 3 seconds; 5 seconds; 10 seconds; Recent; No captures yet; Open folder; Text; QR code; Color. Future installed-provider labels: Record; GIF; Convert.
-- Editor: Select; Pen; Highlighter; Line; Arrow; Rectangle; Ellipse; Text; Redact; Eraser; Crop; Color; Width; Size; Outline; Fill; Undo; Redo; Extract text; Scan QR; Copy; Save; Save as; Cancel; Retry. Size pill: `<width> x <height>`.
+- Editor: Select; Pen; Highlighter; Line; Arrow; Rectangle; Ellipse; Text; Redact; Eraser; Crop; Color; Width; Size; Outline; Fill; Undo; Redo; Copy text; Scan QR; Copy; Save; Save as; Cancel; Retry. Size pill: `<width> x <height>`.
 - Settings: Screen capture; After capture; Copy; Save; Copy and save; Save to; Choose; File type; PNG; JPEG; Ctrl-drag to copy; Magnifier; Recent captures; Shortcuts; Edit.
 - Recent: Annotate; Remove recent capture; Clear recent captures; Delete capture file; File missing; `<width> x <height>`; `<time>`.
 - Confirms: Discard capture? (Cancel, Discard); Clear recent captures? (Cancel, Clear); Delete <filename>? (Cancel, Delete).
