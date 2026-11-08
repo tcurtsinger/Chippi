@@ -61,6 +61,6 @@ Screen capture with markup, screen recording, text and QR from screen, a color p
 | Screen recording (`screen-recording.md`) | Herb | 2 | Later |
 | Media tools (`media-tools.md`) | Herb | 2 | Later |
 | Admin helper (`admin-helper.md`) | Kayla | 3 | None |
-| App updates, Uninstaller, Cleaner, Port manager | Karl, Kayla, Herb, Karl | 3 | Later |
+| App updates (`app-updates.md`), Uninstaller (`uninstaller.md`), Cleaner (`cleaner.md`), Port manager (`port-manager.md`) | Herb | 3 | Later |
 
 Each brief is confirmed by Travis, and each new surface's mockup is approved, before it's built.
