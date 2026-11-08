@@ -48,7 +48,7 @@ Select and decode. Dragging a region decodes that region. Enter with no region, 
 
 ### Capture bar buttons
 
-On a capture's selection, Copy text and Scan QR read that same selection from the frozen image without a second drag. They behave like the verbs above: Copy text copies and shows the bar line; Scan QR opens the QR code page, closing the capture screen first.
+On a capture's selection, Extract text and Scan QR read that same selection, markup included, without a second drag. Each opens its page (Text, QR code) while the capture screen still holds the foreground, then the capture screen closes (Travis's live check, 2026-11-08: Copy text there copied without a page, and closing first let the browser take the foreground and close the page).
 
 ### Recognition
 

@@ -107,7 +107,7 @@ public sealed class CaptureBarsTests
             Assert.Null(bar.Failure);
             Assert.Same(bar.Copy, bar.Main);
             shown = buttons.Where(b => b.Visibility == Visibility.Visible).Select(AutomationProperties.GetName).ToArray();
-            Assert.Equal(["Copy text", "Scan QR code", "Save as", "Save", "Copy", "Cancel"], shown);
+            Assert.Equal(["Extract text", "Scan QR code", "Save as", "Save", "Copy", "Cancel"], shown);
         });
     }
 

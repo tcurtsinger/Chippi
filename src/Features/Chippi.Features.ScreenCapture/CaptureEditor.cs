@@ -371,8 +371,13 @@ internal sealed class CaptureEditor : IDisposable
         var pixels = new byte[checked(bitmap.PixelWidth * bitmap.PixelHeight * 4)];
         bitmap.CopyPixels(pixels, bitmap.PixelWidth * 4, 0);
         var image = new CapturedImage(bitmap.PixelWidth, bitmap.PixelHeight, pixels);
-        _session.Close(CaptureEnd.Finished, handBack: !qr);
-        await _readText(image, qr);
+        // Extract text and Scan QR each open their page. It opens while the frozen screen still holds the foreground, and
+        // only then does the frozen screen close: closing first let Windows hand the foreground back (to the browser the
+        // capture started over), which closed the page just summoned (live check, 2026-11-08; AGENTS.md, Foreground).
+        _busy = true;
+        try { await _readText(image, qr); }
+        finally { _busy = false; }
+        _session.Close(CaptureEnd.Finished, handBack: false);
     }
     private async Task Finish(EnterAction action, bool retry = false)
     {

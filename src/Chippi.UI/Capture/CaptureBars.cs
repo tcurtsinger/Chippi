@@ -306,9 +306,9 @@ public sealed class MarkupTools : Border
 public enum FinishAction { CopyText, ScanQrCode, SaveAs, Save, Copy, Cancel, Retry }
 
 /// <summary>
-/// The finish bar under the selection (Frozen screen v1, released-action-bar): Copy text and Scan QR code (each only when
+/// The finish bar under the selection (Frozen screen v1, released-action-bar): Extract text and Scan QR code (each only when
 /// its feature is on), Save as, Save, Copy (the main verb), and Cancel. 40 high. After a failed output the feature sets
-/// <see cref="Failure"/>: the line ("Copy failed", "Copied. Save failed") and Retry take the place of Copy text and Scan
+/// <see cref="Failure"/>: the line ("Copy failed", "Copied. Save failed") and Retry take the place of Extract text and Scan
 /// QR code, and Retry becomes the main verb.
 /// </summary>
 public sealed class FinishBar : Border
@@ -338,7 +338,7 @@ public sealed class FinishBar : Border
         _retry.Click += (_, _) => Picked?.Invoke(FinishAction.Retry);
         row.Children.Add(_failure);
         row.Children.Add(_retry);
-        _copyText = CaptureBars.IconButton(LucideIcons.ScanText, "Copy text", 32, 28);
+        _copyText = CaptureBars.IconButton(LucideIcons.ScanText, "Extract text", 32, 28);
         _scan = CaptureBars.IconButton(LucideIcons.QrCode, "Scan QR code", 32, 28);
         _scan.Margin = new Thickness(6, 0, 0, 0);
         _lead = CaptureBars.Rule(vertical: true);
@@ -368,7 +368,7 @@ public sealed class FinishBar : Border
         _copy = copy;
     }
 
-    /// <summary>Copy text shows while Text and QR is on (and no failure is shown).</summary>
+    /// <summary>Extract text shows while Text and QR is on (and no failure is shown).</summary>
     public bool ShowCopyText { get => _showCopyText; set { _showCopyText = value; Lead(); } }
 
     /// <summary>Scan QR code shows while Text and QR is on (and no failure is shown).</summary>
@@ -385,7 +385,7 @@ public sealed class FinishBar : Border
 
     /// <summary>
     /// The failed output's line ("Copy failed", "Save failed", "Copied. Save failed"), or null. Setting it shows the line
-    /// and Retry (accented, focused when the bar is on screen); null puts Copy text, Scan QR code and Copy's accent back.
+    /// and Retry (accented, focused when the bar is on screen); null puts Extract text, Scan QR code and Copy's accent back.
     /// The feature clears it once Retry, or any other output, succeeds.
     /// </summary>
     public string? Failure

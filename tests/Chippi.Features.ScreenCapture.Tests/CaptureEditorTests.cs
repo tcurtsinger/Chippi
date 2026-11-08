@@ -108,6 +108,30 @@ public sealed class CaptureEditorTests
         finally { Directory.Delete(folder, true); }
     });
 
+    [Theory]
+    [InlineData("Extract text", false)]
+    [InlineData("Scan QR code", true)]
+    public void Each_reading_button_opens_its_page_before_the_frozen_screen_closes(string button, bool qr) => WpfTestThread.Run(() =>
+    {
+        string folder = Path.Combine(Path.GetTempPath(), "chippi-read-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(folder);
+        try
+        {
+            using var store = new RecentCaptureStore(folder);
+            var context = new ModuleContext("screen-capture", new SettingsStore(), NullLogger.Instance, null!, null!);
+            using var model = new ScreenCaptureModel(context, store, _ => { }, _ => false);
+            var session = new Session();
+            var reads = new List<(bool Qr, int ClosesBefore, int Width)>();
+            using var editor = new CaptureEditor(session, context, model, store, (_, _) => { }, () => true,
+                (image, scan) => { reads.Add((scan, session.Closes.Count, image.Width)); return Task.CompletedTask; });
+            session.Release();
+            Click(Find(session.Output!, button));
+            Assert.Equal([(qr, 0, 400)], reads); // the page is asked for while the frozen screen still holds the foreground
+            Assert.Equal([(CaptureEnd.Finished, false)], session.Closes); // then it closes, never handing the keyboard back
+        }
+        finally { Directory.Delete(folder, true); }
+    });
+
     private sealed class BusyClipboard : IClipboardHub
     {
         public int Writes;
@@ -162,7 +186,8 @@ public sealed class CaptureEditorTests
         public event Action? Frozen { add { } remove { } }
         public event Action<CaptureEnd>? Closed { add { } remove { } }
         public void SetBars(FrameworkElement? tools, FrameworkElement? output) { Tools = tools; Output = output; }
-        public void Close(CaptureEnd end = CaptureEnd.Finished, bool handBack = true) { }
+        public List<(CaptureEnd End, bool HandBack)> Closes { get; } = [];
+        public void Close(CaptureEnd end = CaptureEnd.Finished, bool handBack = true) => Closes.Add((end, handBack));
         public void Release()
         {
             var bytes = new byte[400 * 300 * 4];
