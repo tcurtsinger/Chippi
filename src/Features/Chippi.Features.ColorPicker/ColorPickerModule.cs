@@ -85,7 +85,6 @@ public sealed class ColorPickerModule : IFeatureModule, IColorPageModel
         lock (_gate)
         {
             _context = context;
-            _line = new FeedbackLine(context.Island, FeedbackKey, Time, NoticeDuration);
             _settings = context.Settings.Get<ColorPickerSettings>();
             _recent = [.. Validated(_settings.Recent)];
             if (!Array.Exists(FormatNames, n => n == _settings.CopyFormat)) _settings = _settings with { CopyFormat = "HEX" };
@@ -123,7 +122,6 @@ public sealed class ColorPickerModule : IFeatureModule, IColorPageModel
         lock (_gate)
         {
             _context = null;
-            _line?.Dispose(); _line = null;
             _color = null;
             _copiedAs = null;
         }
@@ -296,13 +294,11 @@ public sealed class ColorPickerModule : IFeatureModule, IColorPageModel
 
     private const string FeedbackKey = "color-picker.pick";
 
-    private FeedbackLine? _line;
-
-    /// <summary>The clock and notice time of the bar line, which clears itself; tests hold both.</summary>
-    public TimeProvider Time { get; init; } = TimeProvider.System;
-    public TimeSpan NoticeDuration { get; init; } = TimeSpan.FromSeconds(6);
-
-    private void Feedback(ModuleContext context, IslandActivity line) => _line?.Show(line);
+    private void Feedback(ModuleContext context, IslandActivity line)
+    {
+        lock (_gate)
+            if (ReferenceEquals(_context, context)) context.Island.Publish(line);
+    }
 
     public void PickAgain() => PickRequested?.Invoke();
 

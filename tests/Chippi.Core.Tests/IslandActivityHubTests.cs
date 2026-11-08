@@ -9,6 +9,89 @@ public sealed class IslandActivityHubTests
 {
     private readonly IslandActivityHub _hub = new();
 
+    [Theory]
+    [InlineData("Brightness control failed")]
+    [InlineData("Not launched")]
+    public void Feedback_expires_without_a_publisher_timer(string title)
+    {
+        var time = new ModuleServicesHardeningTests.ManualTime();
+        var hub = new IslandActivityHub(time, TimeSpan.FromSeconds(3));
+        var publisher = hub.CreatePublisher("module");
+        publisher.Publish(new IslandActivity("media", IslandActivityKind.Media, "Song", "Player"));
+        publisher.Publish(new IslandActivity("feedback", IslandActivityKind.Status, title, "Module") { IsFeedback = true });
+        var timer = Assert.Single(time.Timers);
+        Assert.Equal(TimeSpan.FromSeconds(3), timer.DueTime);
+        int changed = 0;
+        hub.Changed += (_, _) => changed++;
+
+        timer.Fire();
+
+        Assert.Equal("Song", Assert.Single(hub.Activities).Title);
+        Assert.Equal(1, changed);
+        Assert.True(timer.Disposed);
+    }
+
+    [Fact]
+    public void Republishing_feedback_restarts_its_time_and_an_old_callback_cannot_clear_it()
+    {
+        var time = new ModuleServicesHardeningTests.ManualTime();
+        var hub = new IslandActivityHub(time);
+        var publisher = hub.CreatePublisher("module");
+        var line = new IslandActivity("feedback", IslandActivityKind.Status, "Failed", "Module") { IsFeedback = true };
+        publisher.Publish(line);
+        var old = Assert.Single(time.Timers);
+        publisher.Publish(line); // even the same activity instance has a new expiry
+        Assert.True(old.Disposed);
+        Assert.Equal(TimeSpan.FromSeconds(6), time.Timers[^1].DueTime);
+
+        old.Fire(); // already queued before disposal
+        Assert.Single(hub.Activities);
+        time.Timers[^1].Fire();
+        Assert.Empty(hub.Activities);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Clearing_feedback_cancels_its_timer_and_a_new_lifetime_survives_the_old_callback(bool module)
+    {
+        var time = new ModuleServicesHardeningTests.ManualTime();
+        var hub = new IslandActivityHub(time);
+        var publisher = hub.CreatePublisher("module");
+        var line = new IslandActivity("feedback", IslandActivityKind.Status, "Failed", "Module") { IsFeedback = true };
+        publisher.Publish(line);
+        var old = Assert.Single(time.Timers);
+        if (module) hub.ClearModule("module"); else publisher.Clear(line.Key);
+        Assert.True(old.Disposed);
+        publisher.Publish(line);
+        hub.CreatePublisher("other").Publish(line);
+
+        old.Fire();
+        Assert.Equal(2, hub.Activities.Count);
+        time.Timers[^1].Fire();
+        Assert.Equal("module", Assert.Single(hub.Activities).ModuleId);
+    }
+
+    [Fact]
+    public void Persistent_activity_replacing_feedback_cancels_expiry_and_does_not_start_a_timer()
+    {
+        var time = new ModuleServicesHardeningTests.ManualTime();
+        var hub = new IslandActivityHub(time);
+        var publisher = hub.CreatePublisher("module");
+        var line = new IslandActivity("status", IslandActivityKind.Status, "Keeping awake", "Until stopped");
+        publisher.Publish(line);
+        Assert.Empty(time.Timers);
+        publisher.Publish(line with { IsFeedback = true });
+        var timer = Assert.Single(time.Timers);
+        publisher.Publish(line);
+
+        timer.Fire();
+
+        Assert.True(timer.Disposed);
+        Assert.False(Assert.Single(hub.Activities).IsFeedback);
+        Assert.Single(time.Timers);
+    }
+
     [Fact]
     public void Resting_when_nothing_is_published() => Assert.Null(_hub.Current);
 

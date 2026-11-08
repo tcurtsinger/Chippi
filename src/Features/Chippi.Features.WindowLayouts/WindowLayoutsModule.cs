@@ -18,7 +18,6 @@ public sealed partial class WindowLayoutsModule(Func<IReadOnlyList<SnapDisplay>>
     private WindowsSnapDrag? _nativeDrag;
     private IZoneOverlay? _overlay;
     private Dispatcher? _ui;
-    private DispatcherTimer? _failureTimer;
     public Func<IZoneOverlay>? CreateOverlay { get; set; }
     public IReadOnlyList<SnapDisplay> Displays => displays?.Invoke() ?? [];
     public event Action? DisplaysChanged;
@@ -54,8 +53,6 @@ public sealed partial class WindowLayoutsModule(Func<IReadOnlyList<SnapDisplay>>
         StopDrag();
         StopArrangements();
         if (Layouts is { } layouts) layouts.Changed -= LayoutsChanged;
-        _failureTimer?.Stop();
-        _failureTimer = null;
         _context?.Island.Clear("snap-failed");
         Layouts = null;
         _runner = null;
@@ -105,17 +102,6 @@ public sealed partial class WindowLayoutsModule(Func<IReadOnlyList<SnapDisplay>>
         if (!context.CanShowIslandFeedback()) return;
         context.Island.Publish(new IslandActivity("snap-failed", IslandActivityKind.Status, "Snap failed", app)
         { IsFeedback = true, NeedsAttention = true, Icon = "LayoutGrid" });
-        if (_failureTimer is null)
-        {
-            _failureTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(6) };
-            _failureTimer.Tick += (_, _) =>
-            {
-                _failureTimer.Stop();
-                _context?.Island.Clear("snap-failed");
-            };
-        }
-        _failureTimer.Stop();
-        _failureTimer.Start();
     }
 
     private void StopDrag()

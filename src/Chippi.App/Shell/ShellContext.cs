@@ -26,13 +26,13 @@ public sealed class ShellContext
         Config = config;
         LoggerFactory = loggerFactory;
         DebugMode = debugMode;
-        Island = new IslandActivityHub();
         Services = new ModuleServices
         {
             DataRoot = string.IsNullOrWhiteSpace(devProfile)
                 ? ModuleServices.DefaultDataRoot
                 : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Chippi-dev", devProfile, "data"),
         };
+        Island = new IslandActivityHub(Services.Time, Services.IslandNoticeDuration);
         Services.OpenSettings = page => Commands.OpenSettings(page);
         Services.OpenIslandPage = key => Commands.ShowPage(key);
         Services.TryOpenIslandPage = key => Commands.TryShowPage(key);

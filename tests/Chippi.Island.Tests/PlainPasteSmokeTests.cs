@@ -29,8 +29,8 @@ public sealed class PlainPasteSmokeTests
     public void Standalone_shortcut_drives_and_releases_the_real_tab_glyph(PasteOutcome outcome, string? name, bool caution) => WpfTestThread.Run(() =>
     {
         var clock = new ManualTime(); var hub = new Hub(outcome); var key = new Hotkey(); var ui = new Ui();
-        var activities = new IslandActivityHub(); var window = new IslandWindow(); int registrations = 0;
-        var module = new PlainPasteModule(() => { registrations++; return key; }, clock);
+        var activities = new IslandActivityHub(clock); var window = new IslandWindow(); int registrations = 0;
+        var module = new PlainPasteModule(() => { registrations++; return key; });
         void Refresh(object? sender, EventArgs args) => window.SetActivities(activities.Activities, PetMood.Idle);
         activities.Changed += Refresh;
         try
