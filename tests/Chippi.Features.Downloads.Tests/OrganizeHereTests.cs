@@ -215,7 +215,7 @@ public sealed class OrganizeHereTests : IDisposable
         Window? window = null;
         try
         {
-            registry.StartAsync().GetAwaiter().GetResult();
+            WpfTestThread.Wait(registry.StartAsync());
             var spec = Assert.Single(registry.Find("downloads-organizer")!.IslandTiles).Spec;
             var view = Assert.IsType<TidyView>(spec.CreateSection());
             window = new Window { Content = view, Width = 496, Height = 304, Left = -20000, Top = 0, ShowActivated = false, ShowInTaskbar = false, WindowStyle = WindowStyle.None };
@@ -225,7 +225,7 @@ public sealed class OrganizeHereTests : IDisposable
         finally
         {
             window?.Close();
-            registry.StopAllAsync().GetAwaiter().GetResult();
+            WpfTestThread.Wait(registry.StopAllAsync());
             registration.SetEnabled(false);
         }
     }

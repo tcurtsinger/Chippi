@@ -27,7 +27,7 @@ public sealed class CaptureHostTests
         shell.Registry.Register(new Provider());
         try
         {
-            shell.Registry.StartAsync().GetAwaiter().GetResult();
+            WpfTestThread.Wait(shell.Registry.StartAsync());
             // Same synchronous notification that caused the original startup stack overflow.
             shell.Shortcuts.Changed += host.Refresh;
             host.Refresh();
@@ -38,7 +38,7 @@ public sealed class CaptureHostTests
             Assert.Single(shell.Registry.Commands(), x => x.Key == "page/capture");
             host.Refresh();
             Assert.Single(shell.Shortcuts.List, x => x.Owner == "capture");
-            shell.Registry.SetInstalledAsync(ScreenTextModule.Id, false).GetAwaiter().GetResult();
+            WpfTestThread.Wait(shell.Registry.SetInstalledAsync(ScreenTextModule.Id, false));
             host.Refresh();
             Assert.False(host.Visible);
             Assert.DoesNotContain(shell.Shortcuts.List, x => x.Owner == "capture");
@@ -47,7 +47,7 @@ public sealed class CaptureHostTests
         }
         finally
         {
-            shell.Registry.StopAllAsync().GetAwaiter().GetResult();
+            WpfTestThread.Wait(shell.Registry.StopAllAsync());
             host.Dispose();
             shell.Clipboard.Dispose(); shell.Input.Dispose(); shell.Hotkeys.Dispose();
             Directory.Delete(root, true);

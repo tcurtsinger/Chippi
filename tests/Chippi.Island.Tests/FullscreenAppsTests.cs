@@ -62,7 +62,7 @@ public sealed class FullscreenAppsTests
         var page = new GeneralPage(shell);
         Assert.Equal(Visibility.Collapsed, page.FullscreenApps.Visibility);
 
-        shell.Registry.SetInstalledAsync("pause-test", true).GetAwaiter().GetResult();
+        WpfTestThread.Wait(shell.Registry.SetInstalledAsync("pause-test", true));
         page.FullscreenApps.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));
 
         Assert.Equal(Visibility.Visible, page.FullscreenApps.Visibility);

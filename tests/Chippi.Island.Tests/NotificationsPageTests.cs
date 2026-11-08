@@ -67,7 +67,7 @@ public sealed class NotificationsPageTests
         try
         {
             shell.Registry.Register(module);
-            shell.Registry.SetInstalledAsync("hardware-test", true).GetAwaiter().GetResult();
+            WpfTestThread.Wait(shell.Registry.SetInstalledAsync("hardware-test", true));
             var notifier = shell.Registry.Find("hardware-test")!.Notifier!;
             notifier.SetPlaces("low-battery", NoticePlaces.Windows);
             var page = new NotificationsPage(shell);
@@ -93,7 +93,7 @@ public sealed class NotificationsPageTests
         finally
         {
             module.Gate.Set();
-            shell.Registry.StopAllAsync().GetAwaiter().GetResult();
+            WpfTestThread.Wait(shell.Registry.StopAllAsync());
             shell.Clipboard.Dispose();
             foreach (string folder in new[] { root, Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Chippi-dev", profile) })
                 if (Directory.Exists(folder)) Directory.Delete(folder, true);

@@ -199,7 +199,7 @@ public sealed class SettingsShellTests
 
         foreach (bool on in new[] { true, false })
         {
-            scene.Shell.Registry.SetInstalledAsync("shelf", on).GetAwaiter().GetResult();
+            WpfTestThread.Wait(scene.Shell.Registry.SetInstalledAsync("shelf", on));
             System.Windows.Threading.Dispatcher.CurrentDispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.ContextIdle);
             window.UpdateLayout();
             Assert.Equal(offset, window.Scroller.VerticalOffset);
@@ -329,7 +329,7 @@ public sealed class SettingsShellTests
             foreach (var feature in features)
             {
                 Shell.Registry.Register(feature);
-                Shell.Registry.SetInstalledAsync(feature.Id, true).GetAwaiter().GetResult();
+                WpfTestThread.Wait(Shell.Registry.SetInstalledAsync(feature.Id, true));
             }
         }
 
@@ -349,7 +349,7 @@ public sealed class SettingsShellTests
         {
             foreach (var window in _windows)
                 window.Close();
-            Shell.Registry.StopAllAsync().GetAwaiter().GetResult();
+            WpfTestThread.Wait(Shell.Registry.StopAllAsync());
             Shell.Clipboard.Dispose();
             foreach (string folder in new[] { _root, Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Chippi-dev", _profile) })
                 if (Directory.Exists(folder))

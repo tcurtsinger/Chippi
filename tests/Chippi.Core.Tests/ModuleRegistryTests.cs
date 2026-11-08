@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using System.Collections.Concurrent;
 using Chippi.Core.Island;
 using Chippi.Core.Modules;
 
@@ -78,6 +79,79 @@ public sealed class ModuleRegistryTests : IDisposable
         await _f.Registry.SetInstalledAsync("m", true);
         Assert.Equal(42, module.Context!.Settings.Get<FakeSettings>().Value);
         Assert.Equal(2, module.Starts);
+    }
+
+    [Fact]
+    public async Task Modules_after_one_that_awaited_real_work_still_start_on_the_callers_thread()
+    {
+        // Audio routing and Clipboard history await work on other threads while they start. Snap, Shortcuts
+        // and the App switcher, registered after them, capture their start thread as the UI thread.
+        var slow = FakeModule.Create("slow", PresetMembership.Essentials);
+        slow.StartWork = () => Task.Run(() => Thread.Sleep(20));
+        var late = FakeModule.Create("late", PresetMembership.Essentials);
+        int? startedOn = null, changedOn = null;
+        late.OnStart = _ => startedOn = Environment.CurrentManagedThreadId;
+        _f.Registry.Register(slow);
+        _f.Registry.Register(late);
+        _f.Registry.Changed += (_, _) => changedOn = Environment.CurrentManagedThreadId;
+        using var ui = new UiThread();
+
+        await ui.Run(() => _f.Registry.StartAsync());
+
+        Assert.Equal(ui.Id, startedOn);
+        Assert.Equal(ui.Id, changedOn);
+    }
+
+    [Fact]
+    public async Task An_uninstall_whose_stop_awaited_real_work_finishes_on_the_callers_thread()
+    {
+        var slow = FakeModule.Create("slow", PresetMembership.Essentials);
+        slow.StopWork = () => Task.Run(() => Thread.Sleep(20));
+        _f.Registry.Register(slow);
+        using var ui = new UiThread();
+        await ui.Run(() => _f.Registry.StartAsync());
+        int? changedOn = null;
+        _f.Registry.Changed += (_, _) => changedOn = Environment.CurrentManagedThreadId;
+
+        await ui.Run(() => _f.Registry.SetInstalledAsync("slow", false));
+
+        Assert.Equal(ui.Id, changedOn);
+    }
+
+    /// <summary>One thread that runs everything posted to it, as the app's UI thread does.</summary>
+    private sealed class UiThread : SynchronizationContext, IDisposable
+    {
+        private readonly BlockingCollection<Action> _work = [];
+        private readonly Thread _thread;
+
+        public UiThread()
+        {
+            _thread = new Thread(() =>
+            {
+                SetSynchronizationContext(this);
+                foreach (var work in _work.GetConsumingEnumerable())
+                    work();
+            }) { IsBackground = true };
+            _thread.Start();
+        }
+
+        public int Id => _thread.ManagedThreadId;
+
+        public override void Post(SendOrPostCallback d, object? state) => _work.Add(() => d(state));
+
+        /// <summary>Starts <paramref name="work"/> on this thread; the task ends when it does.</summary>
+        public Task Run(Func<Task> work)
+        {
+            var done = new TaskCompletionSource();
+            Post(_ => work().ContinueWith(t =>
+            {
+                if (t.Exception is { } ex) done.SetException(ex.InnerExceptions);
+                else done.SetResult();
+            }, TaskScheduler.Default), null);
+            return done.Task;
+        }
+
+        public void Dispose() => _work.CompleteAdding();
     }
 
     [Fact]

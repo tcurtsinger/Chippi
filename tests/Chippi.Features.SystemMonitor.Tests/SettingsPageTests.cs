@@ -137,8 +137,8 @@ public sealed class SettingsPageTests
         SystemMonitorSettingsPage? page = null;
         try
         {
-            registry.StartAsync().GetAwaiter().GetResult();
-            registry.SetInstalledAsync("system-monitor", true).GetAwaiter().GetResult();
+            WpfTestThread.Wait(registry.StartAsync());
+            WpfTestThread.Wait(registry.SetInstalledAsync("system-monitor", true));
             page = new SystemMonitorSettingsPage(module);
             var frame = new System.Windows.Threading.DispatcherFrame();
             var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(10) };
@@ -165,7 +165,7 @@ public sealed class SettingsPageTests
         finally
         {
             page?.RaiseEvent(new RoutedEventArgs(FrameworkElement.UnloadedEvent));
-            registry.StopAllAsync().GetAwaiter().GetResult();
+            WpfTestThread.Wait(registry.StopAllAsync());
             if (System.IO.Directory.Exists(root)) System.IO.Directory.Delete(root, true);
         }
     });

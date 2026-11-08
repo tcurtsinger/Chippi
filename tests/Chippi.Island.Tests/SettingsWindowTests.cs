@@ -48,7 +48,7 @@ public sealed class SettingsWindowTests
             SettingsWindow? window = null;
             try
             {
-                shell.Registry.SetInstalledAsync("downloads-organizer", true).GetAwaiter().GetResult();
+                WpfTestThread.Wait(shell.Registry.SetInstalledAsync("downloads-organizer", true));
                 var history = module.Engine!.History;
                 long run = history.BeginRun(RunTrigger.Preview, root);
                 for (int i = 0; i < 11; i++)
@@ -96,7 +96,7 @@ public sealed class SettingsWindowTests
             finally
             {
                 window?.Close();
-                shell.Registry.StopAllAsync().GetAwaiter().GetResult();
+                WpfTestThread.Wait(shell.Registry.StopAllAsync());
                 foreach (string folder in new[] { root, Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Chippi-dev", profile) })
                     if (Directory.Exists(folder)) Directory.Delete(folder, true);
             }
@@ -124,7 +124,7 @@ public sealed class SettingsWindowTests
             SettingsWindow? window = null;
             try
             {
-                shell.Registry.SetInstalledAsync("downloads-organizer", true).GetAwaiter().GetResult();
+                WpfTestThread.Wait(shell.Registry.SetInstalledAsync("downloads-organizer", true));
                 var history = module.Engine!.History;
                 foreach (int files in new[] { 2, 11 })
                 {
@@ -150,7 +150,7 @@ public sealed class SettingsWindowTests
             finally
             {
                 window?.Close();
-                shell.Registry.StopAllAsync().GetAwaiter().GetResult();
+                WpfTestThread.Wait(shell.Registry.StopAllAsync());
                 foreach (string folder in new[] { root, Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Chippi-dev", profile) })
                     if (Directory.Exists(folder)) Directory.Delete(folder, true);
             }
@@ -173,7 +173,7 @@ public sealed class SettingsWindowTests
             SettingsWindow? window = null;
             try
             {
-                shell.Registry.SetInstalledAsync("failing-page", true).GetAwaiter().GetResult();
+                WpfTestThread.Wait(shell.Registry.SetInstalledAsync("failing-page", true));
                 window = new SettingsWindow(shell, "general");
                 window.Navigate("module:missing/rules");
                 Assert.Contains(logs.Messages, m => m.Contains("module:missing/rules") && m.Contains("unavailable"));
@@ -186,7 +186,7 @@ public sealed class SettingsWindowTests
             finally
             {
                 window?.Close();
-                shell.Registry.StopAllAsync().GetAwaiter().GetResult();
+                WpfTestThread.Wait(shell.Registry.StopAllAsync());
                 foreach (string folder in new[] { root, Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Chippi-dev", profile) })
                     if (Directory.Exists(folder)) Directory.Delete(folder, true);
             }
