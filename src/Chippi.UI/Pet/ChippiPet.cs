@@ -263,9 +263,6 @@ public class ChippiPet : UserControl
         figure.Children.Add(_headphones);
         foreach (var face in Faces)
             figure.Children.Add(face.Root);
-        var camera = new Image { Width = 60, Height = 51.875, Source = new BitmapImage(new Uri("pack://application:,,,/Chippi.UI;component/Pet/Assets/HandCamcorder.png")), IsHitTestVisible = false };
-        Canvas.SetLeft(camera, -15); Canvas.SetTop(camera, 75); _camcorder.Children.Add(camera);
-        Canvas.SetLeft(_cameraTally, 10.95); Canvas.SetTop(_cameraTally, 85.5); _camcorder.Children.Add(_cameraTally);
         figure.Children.Add(_camcorder);
 
         var canvas = new Canvas { Width = 120, Height = 120, RenderTransform = new TranslateTransform(0, -BodyLift) };
@@ -968,6 +965,12 @@ public class ChippiPet : UserControl
     private void UpdateCamcorder(bool animate)
     {
         bool on = Recording != PetRecordingState.None;
+        if (on && _camcorder.Children.Count == 0)
+        {
+            var camera = new Image { Width = 60, Height = 51.875, Source = new BitmapImage(new Uri("pack://application:,,,/Chippi.UI;component/Pet/Assets/HandCamcorder.png")), IsHitTestVisible = false };
+            Canvas.SetLeft(camera, -15); Canvas.SetTop(camera, 75); _camcorder.Children.Add(camera);
+            Canvas.SetLeft(_cameraTally, 10.95); Canvas.SetTop(_cameraTally, 85.5); _camcorder.Children.Add(_cameraTally);
+        }
         bool entering = on && _camcorder.Visibility != Visibility.Visible;
         _camcorder.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
         _cameraTally.BeginAnimation(OpacityProperty, null);
