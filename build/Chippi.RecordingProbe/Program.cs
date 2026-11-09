@@ -15,6 +15,8 @@ using Windows.Graphics.Capture;
 using Windows.Graphics.DirectX;
 using Windows.Graphics.Imaging;
 using System.Runtime.InteropServices.WindowsRuntime;
+using NAudio.CoreAudioApi;
+using NAudio.Wave;
 
 namespace Chippi.RecordingProbe;
 
@@ -130,25 +132,70 @@ internal static class Program
                     using (var graphics = new RecordingGraphics(640, 360))
                     using (var writer = new RecordingWriter(file, graphics, new RecordingOptions(), audio: true))
                     {
-                    var sound = new byte[1600 * 4];
+                    var sound = new byte[1600 * 4]; var mix = new float[1600 * 2];
+                    var micTimeline = new AudioTimeline(); var systemTimeline = new AudioTimeline();
+                    var mic = new RecordingAudioPackets(new WaveFormat(44_100, 16, 1), 480, micTimeline);
+                    var system = new RecordingAudioPackets(WaveFormat.CreateIeeeFloatWaveFormat(48_000, 2), 480, systemTimeline);
+                    int micPosition = 0, systemPosition = 0, packet = 0;
+                    void Feed(RecordingAudioPackets input, bool microphone, ref int position, int target)
+                    {
+                        int rate = microphone ? 44_100 : 48_000;
+                        while (position < target)
+                        {
+                            int count = Math.Min(new[] { 127, 480, 311 }[packet % 3], target - position);
+                            byte[] bytes = new byte[count * (microphone ? 2 : 8)];
+                            for (int frame = 0; frame < count; frame++)
+                            {
+                                double value = .9 * Math.Sin(2 * Math.PI * 440 * (position + frame) / rate);
+                                if (microphone) { short sample = (short)(value * 32767); bytes[frame * 2] = (byte)sample; bytes[frame * 2 + 1] = (byte)(sample >> 8); }
+                                else { BitConverter.TryWriteBytes(bytes.AsSpan(frame * 8), (float)value); BitConverter.TryWriteBytes(bytes.AsSpan(frame * 8 + 4), (float)value); }
+                            }
+                            var timestamp = TimeSpan.FromSeconds(position / (double)rate + (packet % 2 == 0 ? 1 : -1) / 48_000d);
+                            bool uncertain = packet % 11 == 5;
+                            var pin = GCHandle.Alloc(bytes, GCHandleType.Pinned);
+                            try { input.Write(pin.AddrOfPinnedObject(), count, uncertain ? AudioClientBufferFlags.TimestampError : 0, uncertain ? 0 : position, uncertain ? null : timestamp, timestamp + TimeSpan.FromSeconds(count / (double)rate)); }
+                            finally { pin.Free(); }
+                            position += count; packet++;
+                        }
+                        if (target == rate * 3) input.Flush();
+                    }
                     for (int i = 0; i < 90; i++)
                     {
                         var surface = graphics.FixtureFrame(i);
                         if (surface != null) { writer.Video(surface, TimeSpan.FromSeconds(i / 30d)); written++; }
-                        for (int sample = 0; sample < 1600; sample++)
-                        {
-                            short value = (short)(6000 * Math.Sin(2 * Math.PI * 440 * (i * 1600L + sample) / 48_000));
-                            sound[sample * 4] = sound[sample * 4 + 2] = (byte)value;
-                            sound[sample * 4 + 1] = sound[sample * 4 + 3] = (byte)(value >> 8);
-                        }
+                        Feed(mic, true, ref micPosition, Math.Min(3 * 44_100, (i + 2) * 1470));
+                        Feed(system, false, ref systemPosition, Math.Min(3 * 48_000, (i + 2) * 1600));
+                        Array.Clear(mix); micTimeline.Mix(i * 1600L, mix); systemTimeline.Mix(i * 1600L, mix);
+                        RecordingAudio.ToPcm(mix, sound, 2);
                         writer.Audio(sound, i * 1600L);
                         Thread.Sleep(33);
                     }
                     writer.Finish(); encoder = writer.Encoder;
+                    log.WriteLine($"Synthetic inputs: mic {mic.Description}; system {system.Description}");
                     }
                     var clip = MediaClip.CreateFromFileAsync(StorageFile.GetFileFromPathAsync(file).GetAwaiter().GetResult()).GetAwaiter().GetResult();
                     if (clip.OriginalDuration < TimeSpan.FromSeconds(2.9)) throw new InvalidOperationException("Synthetic file too short");
                     log.WriteLine($"PASS synthetic GPU frames={written}; encoder={encoder}; duration={clip.OriginalDuration}; bytes={new FileInfo(file).Length}; file={file}");
+                    using (var reader = new MediaFoundationReader(file))
+                    {
+                        if (reader.WaveFormat.SampleRate != 48_000 || reader.WaveFormat.Channels != 2 || reader.WaveFormat.BitsPerSample != 16) throw new InvalidDataException("Unexpected decoded audio format");
+                        using var decoded = new MemoryStream(); byte[] pcm = new byte[48000 * 4]; int count;
+                        while ((count = reader.Read(pcm, 0, pcm.Length)) > 0) decoded.Write(pcm, 0, count);
+                        byte[] data = decoded.ToArray();
+                        double power = 0, sine = 0, cosine = 0, ss = 0, cc = 0, sc = 0, maximumStep = 0, peak = 0;
+                        for (int frame = 4800; frame < 124800; frame++)
+                        {
+                            if (frame * 4 + 1 >= data.Length) throw new InvalidDataException("Decoded audio too short");
+                            double value = BitConverter.ToInt16(data, frame * 4) / 32768d, angle = 2 * Math.PI * 440 * frame / 48000;
+                            maximumStep = Math.Max(maximumStep, Math.Abs(value - BitConverter.ToInt16(data, (frame - 1) * 4) / 32768d)); peak = Math.Max(peak, Math.Abs(value));
+                            double s = Math.Sin(angle), c = Math.Cos(angle); power += value * value; sine += value * s; cosine += value * c; ss += s * s; cc += c * c; sc += s * c;
+                        }
+                        double tone = ((sine * cc - cosine * sc) * sine + (cosine * ss - sine * sc) * cosine) / (ss * cc - sc * sc);
+                        double residual = Math.Sqrt(Math.Max(0, power - tone) / power);
+                        log.WriteLine($"Decoded loud mic + system AAC: residual={residual:P3}; maximum sample step={maximumStep:F4}; peak={peak:F4}; samples={data.Length / 4}");
+                        if (!double.IsFinite(residual) || residual > .02 || maximumStep > .1 || peak > .99) throw new InvalidDataException("Decoded audio contains packet gaps or clipping distortion");
+                        log.WriteLine("PASS continuous resampling and two-source headroom through AAC encode/decode; no playback");
+                    }
                     var info = RecordingExports.InspectAsync(file).GetAwaiter().GetResult();
                     if (info.Width != 640 || info.Poster.Length == 0) throw new InvalidDataException("Poster or dimensions missing");
                     string trimmed = file + ".trim.mp4", gif = file + ".gif";

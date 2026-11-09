@@ -144,6 +144,7 @@ public sealed class RecordingModel : IDisposable
         try
         {
             var result = await session.Completion;
+            if (result.AudioDiagnostics != null) _context.Logger.LogInformation("Recording audio: {Audio}", result.AudioDiagnostics);
             _context.Logger.LogInformation("Recording finished: {Encoder}; {Width}x{Height}; {Frames} frames; {Dropped} dropped; {Duration}", result.Encoder, result.Width, result.Height, result.Frames, result.DroppedFrames, result.Duration);
             if (!string.Equals(Path.GetFullPath(result.Path), Path.GetFullPath(partial), StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("Unexpected recording output path");
             if (_discard) { File.Delete(partial); Message = "Recording discarded"; return; }

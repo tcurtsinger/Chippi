@@ -30,7 +30,10 @@ public sealed record RecordingOptions
     }
 }
 
-public sealed record RecordingResult(string Path, TimeSpan Duration, int Width, int Height, long Frames, long DroppedFrames, string Encoder, string? Warning);
+public sealed record RecordingResult(string Path, TimeSpan Duration, int Width, int Height, long Frames, long DroppedFrames, string Encoder, string? Warning)
+{
+    public string? AudioDiagnostics { get; init; }
+}
 public sealed record RecordingDeviceNames(string? Output, string? Input);
 
 public interface IRecordingSession : IAsyncDisposable

@@ -208,7 +208,7 @@ public sealed class WindowsRecordingBackend : IRecordingBackend
                         }
                         if (audio != null)
                         {
-                            long available = Math.Max(0, (now - TimeSpan.FromMilliseconds(80)).Ticks) * 48_000 / TimeSpan.TicksPerSecond;
+                            long available = Math.Max(0, (now - RecordingAudio.BufferDelay).Ticks) * 48_000 / TimeSpan.TicksPerSecond;
                             while (audioFrame + 960 <= available)
                             { audio.Read(audioFrame, 960, (bytes, at) => writer.Audio(bytes.Span, at)); audioFrame += 960; }
                         }
@@ -219,6 +219,7 @@ public sealed class WindowsRecordingBackend : IRecordingBackend
                 { Report("Recording stopped before completion"); }
                 finally { CloseCapture(); }
                 var duration = _clock.Elapsed;
+                audio?.Complete();
                 if (lastWritten >= TimeSpan.Zero && duration - lastWritten > TimeSpan.FromSeconds(3)) duration = lastWritten + frameDuration;
                 try
                 {
@@ -235,7 +236,7 @@ public sealed class WindowsRecordingBackend : IRecordingBackend
                 finally { last?.Return(); }
                 if (frames == 0) throw new InvalidOperationException("No video frames were captured. Try a visible window or another display.");
                 var output = options.OutputSize(width, height);
-                return new(path, duration, output.Width, output.Height, frames, Interlocked.Read(ref _dropped), writer.Encoder, _warning);
+                return new(path, duration, output.Width, output.Height, frames, Interlocked.Read(ref _dropped), writer.Encoder, _warning) { AudioDiagnostics = audio?.Diagnostics };
             }
             finally { item.Closed -= OnClosed; }
         }

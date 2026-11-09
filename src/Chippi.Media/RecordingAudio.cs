@@ -15,6 +15,7 @@ internal sealed class AudioTimeline
     private readonly long[] _positions = Enumerable.Repeat(-1L, Capacity).ToArray();
     private readonly object _gate = new();
     private long _read;
+    public long LateFrames { get; private set; }
 
     public void Write(long start, ReadOnlySpan<float> samples)
     {
@@ -23,7 +24,8 @@ internal sealed class AudioTimeline
             for (int i = 0; i < samples.Length / 2; i++)
             {
                 long frame = start + i;
-                if (frame < _read || frame >= _read + Capacity) continue;
+                if (frame < _read) { LateFrames++; continue; }
+                if (frame >= _read + Capacity) continue;
                 int slot = (int)(frame % Capacity);
                 _samples[slot * 2] = samples[i * 2]; _samples[slot * 2 + 1] = samples[i * 2 + 1]; _positions[slot] = frame;
             }
@@ -48,10 +50,12 @@ internal sealed class AudioTimeline
 
 internal sealed class RecordingAudio : IDisposable
 {
+    internal static readonly TimeSpan BufferDelay = TimeSpan.FromMilliseconds(250);
     private readonly List<Input> _inputs = [];
     private readonly float[] _mixed = new float[960 * 2];
     private readonly byte[] _pcm = new byte[960 * 4];
     public event Action<string>? Warning;
+    public string Diagnostics => string.Join("; ", _inputs.Select(x => x.Description));
 
     public RecordingAudio(RecordingClock clock, RecordingOptions options)
     {
@@ -78,15 +82,23 @@ internal sealed class RecordingAudio : IDisposable
     {
         var mixed = _mixed.AsSpan(0, count * 2); mixed.Clear();
         foreach (var input in _inputs) input.Timeline.Mix(startFrame, mixed);
-        for (int i = 0; i < mixed.Length; i++)
-        {
-            short value = (short)Math.Clamp((int)(mixed[i] * 32767), short.MinValue, short.MaxValue);
-            _pcm[i * 2] = (byte)value; _pcm[i * 2 + 1] = (byte)(value >> 8);
-        }
+        ToPcm(mixed, _pcm, _inputs.Count);
         write(_pcm.AsMemory(0, count * 4), startFrame);
     }
     public void Dispose() { foreach (var input in _inputs) input.Dispose(); _inputs.Clear(); }
+    public void Complete() { foreach (var input in _inputs) input.Dispose(); }
     public void SetPaused(bool paused) { foreach (var input in _inputs) input.SetPaused(paused); }
+
+    internal static void ToPcm(ReadOnlySpan<float> mixed, Span<byte> pcm, int sources)
+    {
+        float gain = 1f / Math.Max(1, sources);
+        for (int i = 0; i < mixed.Length; i++)
+        {
+            float sample = mixed[i] * gain;
+            short value = (short)(Math.Clamp(float.IsNaN(sample) ? 0 : sample, -1, 1) * 32767);
+            pcm[i * 2] = (byte)value; pcm[i * 2 + 1] = (byte)(value >> 8);
+        }
+    }
 
     private sealed class Input : IDisposable
     {
@@ -95,11 +107,16 @@ internal sealed class RecordingAudio : IDisposable
         private readonly TaskCompletionSource _ready = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly AutoResetEvent _control = new(false);
         private volatile bool _paused;
+        private int _disposed;
+        private RecordingAudioPackets? _packets;
+        private readonly bool _loopback;
+        public string Description => (_loopback ? "System: " : "Mic: ") + _packets?.Description;
         public void SetPaused(bool paused) { if (_paused == paused) return; _paused = paused; _control.Set(); }
         public AudioTimeline Timeline { get; } = new();
 
         public Input(RecordingClock clock, bool loopback, Action<string> warning)
         {
+            _loopback = loopback;
             _thread = new Thread(() => Run(clock, loopback, warning)) { IsBackground = true, Name = loopback ? "Chippi recording sound" : "Chippi recording mic" };
             _thread.Start();
             try { _ready.Task.GetAwaiter().GetResult(); } catch { Dispose(); throw; }
@@ -113,19 +130,30 @@ internal sealed class RecordingAudio : IDisposable
                 using var device = enumerator.GetDefaultAudioEndpoint(loopback ? DataFlow.Render : DataFlow.Capture, Role.Multimedia);
                 using var client = device.AudioClient;
                 var format = client.MixFormat;
-                nint formatPointer = WaveFormat.MarshalToPtr(format);
-                int channelMask;
-                try { channelMask = format is WaveFormatExtensible ? Marshal.ReadInt32(formatPointer, 20) : format.Channels switch { 2 => 3, 4 => 0x33, 6 => 0x3f, 8 => 0x63f, _ => 0 }; }
-                finally { Marshal.FreeHGlobal(formatPointer); }
-                bool floating = format.Encoding == WaveFormatEncoding.IeeeFloat || format is WaveFormatExtensible ext && ext.SubFormat == new Guid("00000003-0000-0010-8000-00aa00389b71");
-                if ((!floating && format.BitsPerSample is not (16 or 24 or 32)) || floating && format.BitsPerSample != 32)
-                    throw new NotSupportedException("The selected audio device format cannot be recorded.");
                 client.Initialize(AudioClientShareMode.Shared, AudioClientStreamFlags.EventCallback | (loopback ? AudioClientStreamFlags.Loopback : AudioClientStreamFlags.None), 2_000_000, 0, format, Guid.Empty);
                 using var arrived = new AutoResetEvent(false);
                 client.SetEventHandle(arrived.SafeWaitHandle.DangerousGetHandle());
                 var handles = new[] { _stop.Token.WaitHandle, arrived, _control };
-                var converted = new float[checked((int)((long)client.BufferSize * 48_000 / format.SampleRate + 2) * 2)];
+                var packets = _packets = new RecordingAudioPackets(format, client.BufferSize, Timeline);
                 using var capture = client.AudioCaptureClient;
+                void Drain(bool finishing = false)
+                {
+                    while ((finishing || !_stop.IsCancellationRequested && !_paused) && capture.GetNextPacketSize() > 0)
+                    {
+                        nint buffer = capture.GetBuffer(out int frames, out var flags, out long position, out long qpc);
+                        try
+                        {
+                            var received = clock.ActiveElapsed;
+                            if (received == null && !finishing) continue;
+                            bool uncertain = (flags & AudioClientBufferFlags.TimestampError) != 0;
+                            if (uncertain && clock.IsPaused) continue;
+                            var packet = uncertain ? null : clock.AudioPacket(TimeSpan.FromTicks(qpc), frames, format.SampleRate);
+                            if (!uncertain && packet == null) continue;
+                            packets.Write(buffer, packet?.Frames ?? frames, flags, position, packet?.Time, received ?? clock.Elapsed);
+                        }
+                        finally { capture.ReleaseBuffer(frames); }
+                    }
+                }
                 bool running = true;
                 client.Start(); _ready.TrySetResult();
                 try
@@ -134,39 +162,15 @@ internal sealed class RecordingAudio : IDisposable
                     {
                         if (_paused)
                         {
-                            if (running) { client.Stop(); client.Reset(); running = false; }
+                            if (running) { client.Stop(); Drain(finishing: true); packets.Flush(); client.Reset(); packets.Reset(); running = false; }
                             WaitHandle.WaitAny(handles, 100); continue;
                         }
                         if (!running) { client.Start(); running = true; }
-                        while (capture.GetNextPacketSize() > 0)
-                        {
-                            nint buffer = capture.GetBuffer(out int frames, out var flags, out _, out long qpc);
-                            try
-                            {
-                                if ((flags & AudioClientBufferFlags.TimestampError) != 0) continue;
-                                bool silent = (flags & AudioClientBufferFlags.Silent) != 0;
-                                var at = clock.AtSystemTime(TimeSpan.FromTicks(qpc));
-                                if (at == null) continue;
-                                long first = at.Value.Ticks * 48_000 / TimeSpan.TicksPerSecond;
-                                int output = (int)((long)frames * 48_000 / format.SampleRate);
-                                for (int i = 0; i < output; i++)
-                                {
-                                    double position = i * (double)format.SampleRate / 48_000;
-                                    int a = Math.Min((int)position, frames - 1), b = Math.Min(a + 1, frames - 1);
-                                    float fraction = (float)(position - a);
-                                    var av = silent ? (0f, 0f) : Stereo((byte*)buffer + a * format.BlockAlign, format, floating, channelMask);
-                                    var bv = silent ? (0f, 0f) : Stereo((byte*)buffer + b * format.BlockAlign, format, floating, channelMask);
-                                    converted[i * 2] = av.Item1 + (bv.Item1 - av.Item1) * fraction;
-                                    converted[i * 2 + 1] = av.Item2 + (bv.Item2 - av.Item2) * fraction;
-                                }
-                                Timeline.Write(first, converted.AsSpan(0, output * 2));
-                            }
-                            finally { capture.ReleaseBuffer(frames); }
-                        }
+                        Drain();
                         WaitHandle.WaitAny(handles, 100);
                     }
                 }
-                finally { if (running) client.Stop(); }
+                finally { if (running) { client.Stop(); Drain(finishing: true); packets.Flush(); } }
             }
             catch (Exception ex)
             {
@@ -175,34 +179,9 @@ internal sealed class RecordingAudio : IDisposable
             }
         }
 
-        private static unsafe (float, float) Stereo(byte* frame, WaveFormat format, bool floating, int mask)
-        {
-            float Sample(int channel)
-            {
-                byte* value = frame + channel * (format.BitsPerSample / 8);
-                if (floating) return float.IsFinite(*(float*)value) ? *(float*)value : 0;
-                return format.BitsPerSample switch
-                {
-                    16 => *(short*)value / 32768f,
-                    24 => ((value[0] | value[1] << 8 | value[2] << 16) << 8 >> 8) / 8388608f,
-                    _ => *(int*)value / 2147483648f,
-                };
-            }
-            if (format.Channels == 1) { float mono = Sample(0); return (mono, mono); }
-            float left = 0, right = 0;
-            int speaker = 1;
-            for (int channel = 0; channel < format.Channels; channel++)
-            {
-                while (mask != 0 && speaker > 0 && (mask & speaker) == 0) speaker <<= 1;
-                var gain = ChannelGain(mask == 0 ? 0 : speaker, channel);
-                float value = Sample(channel); left += value * gain.Left; right += value * gain.Right;
-                if (speaker > 0) speaker <<= 1;
-            }
-            return (Math.Clamp(left, -1, 1), Math.Clamp(right, -1, 1));
-        }
-
         public void Dispose()
         {
+            if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
             _stop.Cancel();
             if (Thread.CurrentThread != _thread) _thread.Join();
             _stop.Dispose();

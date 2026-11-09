@@ -201,6 +201,8 @@ Targets, none measured yet.
 
 ## Implementation evidence (2026-11-09)
 
+- Audio follow-up: preserve one resampler and continuous sample position per input; timestamp-error flags no longer discard valid audio. Smooth slow clock drift, allow capture-buffer delivery headroom, and drain/filter-flush captured audio before finalization. Normalize surround downmix and two-source mixing to leave headroom. Log source formats, timing errors, discontinuities, and late frames with the finished recording. Synthetic tests cover uneven packets, 16/44.1/48/96 kHz sources, integer PCM, drift, buffered delivery, pause, genuine gaps, and loud mixing; the native fixture decodes its AAC output to check distortion and packet-edge jumps without playback.
+
 - Native NVIDIA H.264 hardware transform verified with synthetic GPU surfaces and synthesized PCM written only to a file. The file reopened through Windows Media APIs with video dimensions and a poster.
 - End-to-end recording of an owned offscreen window on the host passed: native WGC, hardware encoding, pause/resume, Stop, playable MP4. No desktop or microphone capture and no playback.
 - Unpackaged Sandbox WGC returned the expected blue/red owned-window pixels. Borderless access returned Allowed. This establishes the API result, not visual proof that the border disappears.

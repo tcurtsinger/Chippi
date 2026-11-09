@@ -30,10 +30,20 @@ public sealed class RecordingTests
         Assert.Equal(TimeSpan.FromSeconds(2), clock.Elapsed);
         clock.Pause(); long beforePause = now; now += Stopwatch.Frequency * 20;
         Assert.Null(clock.At(now)); Assert.Equal(TimeSpan.FromSeconds(2), clock.Elapsed);
+        Assert.Null(clock.ActiveElapsed); Assert.Equal(TimeSpan.FromSeconds(2), clock.At(beforePause));
         clock.Resume(); Assert.Null(clock.At(beforePause)); now += Stopwatch.Frequency;
         Assert.Equal(TimeSpan.FromSeconds(3), clock.Elapsed);
         clock.Pause(); now += Stopwatch.Frequency * 9; clock.Resume(); now += Stopwatch.Frequency;
         Assert.Equal(TimeSpan.FromSeconds(4), clock.Elapsed);
+    }
+    [Fact]
+    public void Pause_drain_keeps_only_audio_samples_captured_before_the_pause()
+    {
+        long now = Stopwatch.Frequency; var clock = new RecordingClock(() => now); clock.Start();
+        now += Stopwatch.Frequency / 1000 * 5; clock.Pause();
+        var packet = clock.AudioPacket(TimeSpan.FromSeconds(1), 480, 48_000);
+        Assert.NotNull(packet); Assert.InRange(packet.Value.Frames, 239, 240);
+        Assert.Null(clock.AudioPacket(TimeSpan.FromSeconds(1.006), 480, 48_000));
     }
     [Fact]
     public void Audio_ring_bounds_backlog_mixes_sources_and_does_not_replay_stale_samples()
