@@ -19,6 +19,35 @@ namespace Chippi.Features.ScreenCapture.Tests;
 public sealed class CaptureEditorTests
 {
     [Fact]
+    public void Initial_selection_remains_movable_and_resizable_and_rebuilds_the_draft() => WpfTestThread.Run(() =>
+    {
+        string folder = Path.Combine(Path.GetTempPath(), "chippi-adjust-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(folder);
+        try
+        {
+            using var store = new RecentCaptureStore(folder);
+            var context = new ModuleContext("screen-capture", new SettingsStore(), NullLogger.Instance, null!, null!);
+            using var model = new ScreenCaptureModel(context, store, _ => { }, _ => false);
+            var session = new Session();
+            using var editor = new CaptureEditor(session, context, model, store, (_, _) => { });
+            session.Release(new(50, 40, 200, 150));
+            Assert.False(session.Fixed);
+            Assert.False(session.Tooling); // The overlay, rather than the markup canvas, receives an initial drag.
+
+            session.Adjust(new(150, 100), new(170, 110));
+            Assert.Equal(new PixelRect(70, 50, 200, 150), session.Selection!.Rect);
+            Assert.Equal(new Int32Rect(0, 0, 200, 150), editor.Draft!.Crop);
+
+            session.Adjust(new(270, 125), new(320, 125));
+            Assert.Equal(new PixelRect(70, 50, 250, 150), session.Selection.Rect);
+            Assert.Equal(250, editor.Draft!.Flatten().PixelWidth);
+            Assert.Equal(150, editor.Draft.Flatten().PixelHeight);
+            Assert.False(session.Fixed);
+        }
+        finally { Directory.Delete(folder, true); }
+    });
+
+    [Fact]
     public void Real_tool_events_move_resize_erase_crop_and_commit_text_in_source_pixels() => WpfTestThread.Run(() =>
     {
         string folder = Path.Combine(Path.GetTempPath(), "chippi-editor-" + Guid.NewGuid().ToString("N"));
@@ -33,7 +62,7 @@ public sealed class CaptureEditorTests
             Point at = default;
             editor.PointerAt = (_, _) => at; // The owner's mouse never participates.
             session.Release();
-            Assert.True(session.Fixed); // Only Crop trims a released capture (the owner, 2026-11-08).
+            Assert.False(session.Fixed);
             void Tool(string name) => Click(Find(session.Tools!, name));
             bool upHandled = false;
             void Drag(Point from, Point to)
@@ -177,9 +206,10 @@ public sealed class CaptureEditorTests
         public Freeze? Freeze { get; private set; }
         public Selection? Selection { get; private set; }
         public IReadOnlyList<CaptureSurface> Surfaces => [new("fixture", new(0, 0, 400, 300), 96, Canvas)];
-        public bool Tooling { get; set; }
-        public bool Fixed;
-        public void FixSelection() => Fixed = true;
+        private Selector? _selector;
+        public bool Tooling { get => _selector?.Tooling ?? false; set { if (_selector != null) _selector.Tooling = value; } }
+        public bool Fixed => _selector?.Fixed ?? false;
+        public void FixSelection() => _selector?.Fix();
         public event Action<Selection>? Selected;
         public event Action<System.Windows.Input.KeyEventArgs>? KeyDown { add { } remove { } }
         public event Action<PixelPoint, uint>? Picked { add { } remove { } }
@@ -188,14 +218,28 @@ public sealed class CaptureEditorTests
         public void SetBars(FrameworkElement? tools, FrameworkElement? output) { Tools = tools; Output = output; }
         public List<(CaptureEnd End, bool HandBack)> Closes { get; } = [];
         public void Close(CaptureEnd end = CaptureEnd.Finished, bool handBack = true) => Closes.Add((end, handBack));
-        public void Release()
+        public void Release(PixelRect? rect = null)
         {
             var bytes = new byte[400 * 300 * 4];
             for (int i = 0; i < bytes.Length; i += 4) { bytes[i + 2] = 255; bytes[i + 3] = 255; }
             var screen = new CapturedScreen("fixture", 0, new(0, 0, 400, 300), 96, bytes);
             Freeze = new Freeze([screen], [], DateTimeOffset.Now);
-            Selection = new(new(0, 0, 400, 300), Freeze, Chippi.Capture.CaptureMode.Region, null, null, false, screen);
-            Selected?.Invoke(Selection);
+            var bounds = rect ?? screen.Bounds;
+            _selector = new Selector(Freeze, Chippi.Capture.CaptureMode.Region, null, new(bounds.X, bounds.Y), new(4, 4), 6);
+            _selector.Down(new(bounds.X, bounds.Y), false);
+            _selector.Up(new(bounds.Right - 1, bounds.Bottom - 1));
+            Selection = _selector.Selection;
+            Selected?.Invoke(Selection!);
+        }
+        public void Adjust(PixelPoint from, PixelPoint to)
+        {
+            var before = _selector!.Selection;
+            _selector.Down(from, false);
+            _selector.Move(to);
+            _selector.Up(to);
+            Selection = _selector.Selection;
+            if (Selection is { } selection && !ReferenceEquals(before, selection))
+                Selected?.Invoke(selection);
         }
     }
 }

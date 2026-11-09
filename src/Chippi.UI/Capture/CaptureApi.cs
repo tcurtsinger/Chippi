@@ -84,8 +84,7 @@ public interface ICaptureSession
     bool Tooling { get; set; }
 
     /// <summary>
-    /// Fixes the released selection in place, as a reopened capture's: no handles, moves, arrows or Ctrl+A. Screen capture
-    /// calls it on release, so only its Crop tool trims a capture (the owner, 2026-11-08).
+    /// Fixes the released selection in place, as a reopened capture's: no handles, moves, arrows or Ctrl+A.
     /// </summary>
     void FixSelection() { }
 
