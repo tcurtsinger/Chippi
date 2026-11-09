@@ -277,7 +277,12 @@ public partial class App : Application
         // [Phase 7] Color picker: on the capture layer.
         var colorPicker = new Chippi.Features.ColorPicker.ColorPickerModule(shell.Capture);
         shell.Registry.Register(colorPicker);
-        shell.CapturePanel = new Chippi.App.Island.CapturePanelHost(shell, screenCapture, screenText, colorPicker);
+        var recording = shell.Recording = new Chippi.Features.Recording.RecordingModule();
+        recording.CanStart = () => shell.Capture.Current == null;
+        shell.Registry.Register(recording);
+        if (shell.Capture is Chippi.UI.Capture.CaptureLayer layer)
+            layer.CanStart = () => recording.Model?.Active != true;
+        shell.CapturePanel = new Chippi.App.Island.CapturePanelHost(shell, screenCapture, screenText, colorPicker, recording);
         if (shell.Services.Actions is Chippi.UI.Actions.WindowsActionPc windowPc)
         {
             windowPc.SnapZones = windowLayouts.ResolveZone;
@@ -330,6 +335,8 @@ public partial class App : Application
     private async Task QuitAsync()
     {
         if (_quitting)
+            return;
+        if (Shell.Recording?.Model?.Active == true && System.Windows.MessageBox.Show("Stop and save the recording, then quit Chippi?", "Chippi", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
             return;
         _quitting = true;
         // Stopping isn't removing: a Print Screen shortcut keeps Windows' setting off for the next start.

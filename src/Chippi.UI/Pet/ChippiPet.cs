@@ -17,6 +17,8 @@ using Chippi.UI.Themes;
 
 namespace Chippi.UI.Pet;
 
+public enum PetRecordingState { None, Recording, Paused }
+
 public enum PetMood
 {
     Idle,
@@ -168,6 +170,11 @@ public class ChippiPet : UserControl
     private readonly Path _happyEyes;
     private readonly Path _sleepyEyes;
     private readonly Canvas _headphones;
+    private readonly Canvas _camcorder = new() { Width = 120, Height = 120, Visibility = Visibility.Collapsed };
+    private readonly Ellipse _cameraTally = new() { Width = 3.45, Height = 3.45, Fill = new SolidColorBrush(Color.FromRgb(255, 84, 91)) };
+    public static readonly DependencyProperty RecordingProperty = DependencyProperty.Register(nameof(Recording), typeof(PetRecordingState), typeof(ChippiPet),
+        new PropertyMetadata(PetRecordingState.None, (d, _) => ((ChippiPet)d).UpdateCamcorder(true)));
+    public PetRecordingState Recording { get => (PetRecordingState)GetValue(RecordingProperty); set => SetValue(RecordingProperty, value); }
     private readonly Path _sparks;
     private readonly Path _steam;
     private readonly Canvas _zs;
@@ -256,6 +263,10 @@ public class ChippiPet : UserControl
         figure.Children.Add(_headphones);
         foreach (var face in Faces)
             figure.Children.Add(face.Root);
+        var camera = new Image { Width = 60, Height = 51.875, Source = new BitmapImage(new Uri("pack://application:,,,/Chippi.UI;component/Pet/Assets/HandCamcorder.png")), IsHitTestVisible = false };
+        Canvas.SetLeft(camera, -15); Canvas.SetTop(camera, 75); _camcorder.Children.Add(camera);
+        Canvas.SetLeft(_cameraTally, 10.95); Canvas.SetTop(_cameraTally, 85.5); _camcorder.Children.Add(_cameraTally);
+        figure.Children.Add(_camcorder);
 
         var canvas = new Canvas { Width = 120, Height = 120, RenderTransform = new TranslateTransform(0, -BodyLift) };
         canvas.Children.Add(_shadow);
@@ -291,15 +302,18 @@ public class ChippiPet : UserControl
             Motion.Changed += OnMotionChanged;
             UpdateBlinkTimer();
             UpdateBreathing();
+            UpdateCamcorder(false);
         };
         Unloaded += (_, _) =>
         {
             Motion.Changed -= OnMotionChanged;
             _blinkTimer.Stop();
             SetBreathing(false);
+            _cameraTally.BeginAnimation(OpacityProperty, null);
         };
         IsVisibleChanged += (_, _) =>
         {
+            UpdateCamcorder(false);
             UpdateBlinkTimer();
             UpdateBreathing();
         };
@@ -949,7 +963,24 @@ public class ChippiPet : UserControl
     }
 
     // Shown, with motion, and seen: locked or with the display off, nobody watches him breathe all night.
-    private bool CanBreathe => IsLoaded && IsVisible && !Motion.IsReduced && !Motion.IsUnseen && _shown == PetMood.Sleepy;
+    private bool CanBreathe => IsLoaded && IsVisible && !Motion.IsReduced && !Motion.IsUnseen && (_shown == PetMood.Sleepy || Recording == PetRecordingState.Recording);
+
+    private void UpdateCamcorder(bool animate)
+    {
+        bool on = Recording != PetRecordingState.None;
+        bool entering = on && _camcorder.Visibility != Visibility.Visible;
+        _camcorder.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
+        _cameraTally.BeginAnimation(OpacityProperty, null);
+        _cameraTally.Fill = new SolidColorBrush(Recording == PetRecordingState.Paused ? Color.FromRgb(244, 187, 94) : Color.FromRgb(255, 84, 91));
+        _camcorder.RenderTransform = new TranslateTransform();
+        if (on && IsLoaded && IsVisible && !Motion.IsReduced && !Motion.IsUnseen && Recording != PetRecordingState.Paused)
+        {
+            var pulse = new DoubleAnimation(.45, 1, TimeSpan.FromSeconds(1)) { AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever };
+            Timeline.SetDesiredFrameRate(pulse, 10); _cameraTally.BeginAnimation(OpacityProperty, pulse);
+            if (entering && animate) ((TranslateTransform)_camcorder.RenderTransform).BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(8, 0, TimeSpan.FromMilliseconds(180)));
+        }
+        UpdateBreathing();
+    }
 
     private void UpdateBreathing(bool settle = false) => SetBreathing(CanBreathe, settle);
 
@@ -1048,6 +1079,7 @@ public class ChippiPet : UserControl
                 ApplyMood(_shown, animate: false); // snap any running tween to its end state, and stop breathing
             UpdateBlinkTimer();
             UpdateBreathing();
+            UpdateCamcorder(false);
         });
 
     // The small form has one face for every mood, and blinks only in the moods whose eyes are open.

@@ -150,6 +150,25 @@
                     <Button x:Name="ActivityButton" Height="50" Style="{StaticResource IslandWidgetTargetStyle}"
                             Visibility="Collapsed" />
                 </Canvas>
+                <Grid x:Name="RecordingLayer" Height="50" Visibility="Collapsed" ClipToBounds="True"
+                        Opacity="{Binding ElementName=BarLayer, Path=Opacity}">
+                    <Canvas x:Name="RecordingCanvas" Width="256" Height="50" HorizontalAlignment="Right" Opacity="{Binding ElementName=Bar, Path=Opacity}">
+                    <Grid x:Name="RecordingSpace" Width="206" Height="50">
+                        <StackPanel x:Name="RecordingStrip" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="10,0,0,0">
+                            <StackPanel x:Name="RecordingTimeGroup" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,8,0" IsHitTestVisible="False">
+                                <Ellipse x:Name="RecordingDot" Width="10" Height="10" Fill="#FF777D" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                <TextBlock x:Name="RecordingTime" FontFamily="{StaticResource UiFont}" FontSize="20" FontWeight="SemiBold" Foreground="{DynamicResource IslandTextBrush}" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <Button x:Name="RecordingPause" Width="30" Height="32" MinWidth="0" Padding="0" Margin="0,0,2,0" Style="{StaticResource IslandTransportButtonStyle}" AutomationProperties.Name="Pause recording" ToolTip="Pause">
+                                <c:LucideIcon x:Name="RecordingPauseGlyph" Data="{x:Static c:LucideIcons.Pause}" Size="14" Brush="{DynamicResource IslandTextBrush}" />
+                            </Button>
+                            <Button x:Name="RecordingStop" Width="30" Height="32" MinWidth="0" Padding="0" Style="{StaticResource IslandTransportButtonStyle}" AutomationProperties.Name="Stop recording" ToolTip="Stop">
+                                <Rectangle Width="13" Height="13" RadiusX="2" RadiusY="2" Fill="#FF777D" />
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+                    </Canvas>
+                </Grid>
             </Grid>
         </Grid>
 

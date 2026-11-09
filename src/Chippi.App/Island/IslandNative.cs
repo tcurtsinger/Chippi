@@ -22,6 +22,13 @@ internal readonly record struct MonitorArea(HMONITOR Handle, Rect Monitor, Rect 
 /// </summary>
 internal static class IslandNative
 {
+    internal static void ExcludeFromCapture(HWND window, bool exclude)
+    {
+        if (window != default) SetWindowDisplayAffinity(window, exclude ? 0x11u : 0u);
+    }
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetWindowDisplayAffinity(HWND window, uint affinity);
     private const int WS_EX_TOOLWINDOW = 0x00000080;
     private const int WS_EX_APPWINDOW = 0x00040000;
     private const int WS_EX_NOACTIVATE = 0x08000000;

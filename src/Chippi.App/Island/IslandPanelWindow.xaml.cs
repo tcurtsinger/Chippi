@@ -341,6 +341,7 @@ public partial class IslandPanelWindow : Window
 
     /// <summary>The footer's Chippi wears the widget's mood (listening, wide awake…), so the two match where one becomes the other.</summary>
     internal void ShowPetMood(PetMood mood) => _grid.Pet.ShowMood(mood);
+    internal void ShowPetRecording(PetRecordingState state) => _grid.Pet.Recording = state;
 
     /// <summary>A beat in the music: every Chippi in the panel that's listening bobs to it (each checks for itself).</summary>
     internal void Beat(double strength)
