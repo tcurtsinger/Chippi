@@ -2,6 +2,7 @@
 // Copyright (C) Chippi contributors
 
 using Chippi.Audio.Processing;
+using NAudio.Dmo;
 using NAudio.Wave;
 using NAudio.Wave.SampleProviders;
 
@@ -50,7 +51,7 @@ internal sealed class WasapiSoundboardPlayback : ISoundboardPlayback
                         source = new FrontChannelsSampleProvider(source, format.Channels);
                     else if (source.WaveFormat.Channels != format.Channels)
                         throw new AudioFailure("Playback channel count unsupported");
-                    _source = source.ToWaveProvider();
+                    _source = new MixFormatWaveProvider(source, format);
                     _transport.Stopped += stopped;
                 }
                 catch { _transport.Dispose(); throw; }
@@ -120,6 +121,25 @@ internal sealed class WasapiSoundboardPlayback : ISoundboardPlayback
     }
 }
 
+/// <summary>Keeps the device's native floating-point channel layout after NAudio's sample-to-byte adapter.</summary>
+internal sealed class MixFormatWaveProvider : IWaveProvider
+{
+    private readonly IWaveProvider _source;
+
+    public MixFormatWaveProvider(ISampleProvider source, WaveFormat mix)
+    {
+        _source = source.ToWaveProvider();
+        var samples = _source.WaveFormat;
+        // Surround endpoints can reject a plain float format, or a reconstructed mask, despite matching channel counts.
+        WaveFormat = mix is WaveFormatExtensible extended && mix.BitsPerSample == 32
+            && extended.SubFormat == AudioMediaSubtypes.MEDIASUBTYPE_IEEE_FLOAT
+            && mix.SampleRate == samples.SampleRate && mix.Channels == samples.Channels ? mix : samples;
+    }
+
+    public WaveFormat WaveFormat { get; }
+    public int Read(byte[] buffer, int offset, int count) => _source.Read(buffer, offset, count);
+}
+
 /// <summary>Routes mono/stereo clips to front left/right without filling a surround device's other channels.</summary>
 internal sealed class FrontChannelsSampleProvider : ISampleProvider
 {
@@ -150,7 +170,8 @@ internal sealed class FrontChannelsSampleProvider : ISampleProvider
             int read = _source.Read(_buffer, 0, wanted);
             int available = read / sourceChannels;
             if (available == 0) break;
-            Array.Clear(buffer, offset + written, available * channels);
+            // NAudio can alias a byte array as float[]; Array.Clear would count bytes instead of samples.
+            buffer.AsSpan(offset + written, available * channels).Clear();
             for (int frame = 0; frame < available; frame++)
             {
                 int from = frame * sourceChannels;
