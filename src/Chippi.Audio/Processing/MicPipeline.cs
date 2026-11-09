@@ -235,7 +235,7 @@ internal sealed class VoiceMuteProvider(ISampleProvider source, MicSettings sett
     {
         int read = source.Read(buffer, offset, count);
         if (settings.VoiceMuted)
-            Array.Clear(buffer, offset, read);
+            buffer.AsSpan(offset, read).Clear();
         return read;
     }
 }

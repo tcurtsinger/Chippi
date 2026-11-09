@@ -3,6 +3,7 @@
 
 using Chippi.Audio.Processing;
 using Chippi.Audio.Soundboard;
+using System.Runtime.InteropServices;
 using NAudio.Wave;
 using static Chippi.Audio.Tests.FakeDeviceSystem;
 
@@ -420,6 +421,44 @@ public sealed class SoundboardTests
         Assert.Equal(0, output.Read(samples, 0, samples.Length));
     }
 
+    [Theory]
+    [InlineData(6, 0x3f)]
+    [InlineData(8, 0x63f)]
+    public void Surround_byte_stream_preserves_the_native_mix_format_mask_and_front_channel_samples(int channels, int mask)
+    {
+        var pointer = WaveFormat.MarshalToPtr(new WaveFormatExtensible(48000, 32, channels));
+        WaveFormat mix;
+        try
+        {
+            Marshal.WriteInt32(pointer, 20, mask); // WAVEFORMATEXTENSIBLE.dwChannelMask, including the earbuds' 7.1 layout.
+            mix = WaveFormat.MarshalFromPtr(pointer);
+        }
+        finally { Marshal.FreeHGlobal(pointer); }
+        var source = new FrontChannelsSampleProvider(new FiniteSamples(2, [.25f, .75f]), channels);
+        var output = new MixFormatWaveProvider(source, mix);
+        Assert.Same(mix, output.WaveFormat);
+        Assert.Equal(WaveFormatEncoding.Extensible, output.WaveFormat.Encoding);
+        var bytes = Enumerable.Repeat((byte)0xcd, channels * 4 + 12).ToArray();
+        Assert.Equal(channels * 4, output.Read(bytes, 4, channels * 4));
+        Assert.Equal(.25f, BitConverter.ToSingle(bytes, 4));
+        Assert.Equal(.75f, BitConverter.ToSingle(bytes, 8));
+        Assert.All(bytes[12..(4 + channels * 4)], value => Assert.Equal((byte)0, value));
+        Assert.All(bytes[..4], value => Assert.Equal((byte)0xcd, value));
+        Assert.All(bytes[(4 + channels * 4)..], value => Assert.Equal((byte)0xcd, value));
+        Assert.Equal(0, output.Read(bytes, 0, channels * 4));
+    }
+
+    [Theory]
+    [InlineData(16, 48000, 2)]
+    [InlineData(32, 44100, 2)]
+    [InlineData(32, 48000, 6)]
+    public void Mix_format_adapter_does_not_relabel_samples_with_a_different_encoding_rate_or_channel_count(int bits, int rate, int channels)
+    {
+        var source = new ConstantSamples();
+        var output = new MixFormatWaveProvider(source, new WaveFormatExtensible(rate, bits, channels));
+        Assert.Same(source.WaveFormat, output.WaveFormat);
+    }
+
     [Fact]
     public void Surround_mapping_streams_large_reads_with_bounded_scratch_space_and_stops_at_source_end()
     {
@@ -441,6 +480,17 @@ public sealed class SoundboardTests
         Assert.Equal(960, clip.Read(samples, 0, samples.Length));
         Assert.Equal(0, clip.Read(samples, 0, samples.Length));
         Assert.Equal(TimeSpan.FromMilliseconds(10), clip.Position);
+    }
+
+    [Fact]
+    public void Voice_gate_silences_the_complete_byte_stream_without_touching_surrounding_bytes()
+    {
+        var voice = new VoiceMuteProvider(new ConstantSamples(), new MicSettings { VoiceMuted = true }).ToWaveProvider();
+        var bytes = Enumerable.Repeat((byte)0xcd, 44).ToArray();
+        Assert.Equal(32, voice.Read(bytes, 4, 32));
+        Assert.All(bytes[4..36], value => Assert.Equal((byte)0, value));
+        Assert.All(bytes[..4], value => Assert.Equal((byte)0xcd, value));
+        Assert.All(bytes[36..], value => Assert.Equal((byte)0xcd, value));
     }
 
     [Fact]

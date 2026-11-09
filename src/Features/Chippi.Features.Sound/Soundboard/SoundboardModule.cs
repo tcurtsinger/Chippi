@@ -421,7 +421,11 @@ public sealed class SoundboardModule : IFeatureModule, ISoundboardController
         try { RequireRunning(); _error = null; await action(_player!); }
         catch (Exception ex)
         {
-            if (ex is not OperationCanceledException) _error = ex is SoundboardException or AudioFailure ? ex.Message : "Playback failed";
+            if (ex is not OperationCanceledException)
+            {
+                _error = ex is SoundboardException or AudioFailure ? ex.Message : "Playback failed";
+                _context?.Logger.LogWarning(ex, "Soundboard playback failed");
+            }
             throw;
         }
         finally { Changed?.Invoke(); }
