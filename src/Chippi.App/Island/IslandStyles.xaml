@@ -43,14 +43,29 @@
     <!-- The muted mic's badge: Windows' red in both themes. -->
     <SolidColorBrush x:Key="IslandBadgeBrush" Color="#C42B1C" />
 
-    <!-- The widget, puck or bar: only its content draws, so transparent pixels click through. A Button for Enter,
-         Space and UI Automation's Invoke; the window handles the mouse itself. -->
-    <Style x:Key="IslandPuckButtonStyle" TargetType="{x:Type Button}">
+    <!-- The widget clips these independent targets to its silhouette. Mouse drag is handled by the parent. -->
+    <Style x:Key="IslandWidgetTargetStyle" TargetType="{x:Type Button}">
         <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="Background" Value="Transparent" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type Button}">
-                    <ContentPresenter />
+                    <Grid>
+                        <Border x:Name="Wash" i:FillFade.To="Transparent" />
+                        <Border x:Name="Focus" Margin="3" CornerRadius="22" BorderThickness="2"
+                                BorderBrush="{DynamicResource IslandTextBrush}" Visibility="Collapsed" />
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Wash" Property="i:FillFade.To" Value="{DynamicResource IslandButtonHoverBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Wash" Property="i:FillFade.To" Value="{DynamicResource IslandPressedBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="Focus" Property="Visibility" Value="Visible" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>

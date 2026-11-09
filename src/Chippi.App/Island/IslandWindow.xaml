@@ -26,14 +26,14 @@
     <Canvas x:Name="Root" Width="536" Height="124">
         <!-- The widget: the puck, or the bar it unfolds into. Canvas.Left or Canvas.Right, the puck's outer side, is set
              in code, so the bar grows in either direction from the same local pet center. The grip is its transform origin. -->
-        <Button x:Name="PuckButton" Canvas.Top="37" Width="50" Height="50" Style="{StaticResource IslandPuckButtonStyle}"
+        <Grid x:Name="PuckButton" Canvas.Top="37" Width="50" Height="50"
                 AutomationProperties.Name="Chippi" RenderTransformOrigin="0.5,0.5">
-            <Button.RenderTransform>
+            <Grid.RenderTransform>
                 <TransformGroup>
                     <ScaleTransform x:Name="PuckScale" />
                     <RotateTransform x:Name="PuckTilt" />
                 </TransformGroup>
-            </Button.RenderTransform>
+            </Grid.RenderTransform>
             <Grid>
                 <island:PuckSurface x:Name="BodyShadow" IsHitTestVisible="False" CornerRadius="25" Background="{DynamicResource IslandBrush}" Effect="{DynamicResource IslandPuckShadow}" />
                 <island:PuckSurface x:Name="Body" CornerRadius="25" Background="{DynamicResource IslandBrush}" BorderBrush="{DynamicResource IslandWidgetBorderBrush}" BorderThickness="1" />
@@ -143,8 +143,15 @@
                         <c:LucideIcon Data="{x:Static c:LucideIcons.Coffee}" Size="11" Thickness="2" Brush="{DynamicResource IslandOnAccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Grid>
                 </Canvas>
+                <!-- Separate Invoke targets; the parent handles mouse presses so both remain draggable. -->
+                <Canvas x:Name="ClickTargets" Opacity="{Binding ElementName=Body, Path=Opacity}">
+                    <Button x:Name="HomeButton" Height="50" Style="{StaticResource IslandWidgetTargetStyle}"
+                            AutomationProperties.Name="Chippi" ToolTip="Open Chippi" />
+                    <Button x:Name="ActivityButton" Height="50" Style="{StaticResource IslandWidgetTargetStyle}"
+                            Visibility="Collapsed" />
+                </Canvas>
             </Grid>
-        </Button>
+        </Grid>
 
         <Popup x:Name="Menu" AllowsTransparency="True" StaysOpen="False" Placement="Top" VerticalOffset="-8"
                PlacementTarget="{Binding ElementName=PuckEnd}" PopupAnimation="None">

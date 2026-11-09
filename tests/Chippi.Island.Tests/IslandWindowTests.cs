@@ -321,7 +321,7 @@ public sealed class IslandWindowTests
             Pump(TimeSpan.FromMilliseconds(400)); // the unfold
             var bar = window.WidgetRect;
             Assert.Equal(IslandGeometry.BarRect(window.PuckRect, window.OpensLeft, window.CurrentArea!.Value.Scale), bar);
-            Click(window);
+            Click(window, activity: true);
             Settle(window.Panel);
             Assert.Equal(IslandPanelWindow.NowPlayingKey, window.Panel.CurrentPage); // the song's bar opens Now Playing
             Assert.Equal(0, window.BarLayer.Opacity);
@@ -358,7 +358,8 @@ public sealed class IslandWindowTests
             window.SetMedia(new IslandPanelTests.FakeMedia { Sessions = [Track("Creep")] });
             window.SetActivities([Playing], Chippi.UI.Pet.PetMood.Idle);
             window.SetLastPage(null);
-            Click(window);
+            PumpUntil(() => window.ActivityButton.ActualWidth > 20);
+            Click(window, activity: true);
             Assert.True(window.IsIslandOpen);
             Assert.Equal(IslandPanelWindow.NowPlayingKey, window.Panel.CurrentPage);
         }));
@@ -662,11 +663,13 @@ public sealed class IslandWindowTests
         Raise(window, new MouseEventArgs(Mouse.PrimaryDevice, 0) { RoutedEvent = routed });
 
     /// <summary>A press and release without movement: the pointer stays where it was.</summary>
-    private static void Click(IslandWindow window)
+    private static void Click(IslandWindow window, bool activity = false)
     {
-        // The pointer holds still from the press to the release, whatever the real one does: moved 4 between them, it's a drag.
+        window.UpdateLayout();
+        FrameworkElement target = activity ? window.ActivityButton : window.HomeButton;
+        // Hold a known point in the chosen target, independent of the user's pointer.
         var was = window.PointerAt;
-        var at = was();
+        var at = target.PointToScreen(new Point(target.ActualWidth / 2, target.ActualHeight / 2));
         window.PointerAt = () => at;
         Raise(window, new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Left) { RoutedEvent = UIElement.PreviewMouseLeftButtonDownEvent });
         Raise(window, new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Left) { RoutedEvent = UIElement.PreviewMouseLeftButtonUpEvent });
