@@ -8,6 +8,20 @@ namespace Chippi.Media.Tests;
 public sealed class RecordingTests
 {
     [Fact]
+    public async Task Cancelling_save_copy_preserves_the_original_and_existing_destination()
+    {
+        string folder = Path.Combine(Path.GetTempPath(), "chippi-copy-test-" + Guid.NewGuid()); Directory.CreateDirectory(folder);
+        string source = Path.Combine(folder, "source.mp4"), destination = Path.Combine(folder, "destination.mp4");
+        File.WriteAllText(source, "original"); File.WriteAllText(destination, "existing destination");
+        try
+        {
+            using var cancel = new CancellationTokenSource(); cancel.Cancel();
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => RecordingExports.CopyAsync(source, destination, null, cancel.Token));
+            Assert.Equal("original", File.ReadAllText(source)); Assert.Equal("existing destination", File.ReadAllText(destination)); Assert.Equal(2, Directory.GetFiles(folder).Length);
+        }
+        finally { Directory.Delete(folder, true); }
+    }
+    [Fact]
     public void Paused_clock_rejects_stale_packets_and_removes_multiple_pauses()
     {
         long now = Stopwatch.Frequency;

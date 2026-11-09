@@ -18,6 +18,26 @@ namespace Chippi.Features.Recording.Tests;
 public sealed class RecordingModelTests
 {
     [Fact]
+    public void Recent_survives_reopening_seals_metadata_and_prunes_only_the_index()
+    {
+        string folder = Path.Combine(Path.GetTempPath(), "chippi-record-store-" + Guid.NewGuid()); Directory.CreateDirectory(folder);
+        string first = Path.Combine(folder, "first.mp4"); File.WriteAllText(first, "owned fixture");
+        try
+        {
+            var entry = new RecordingEntry(Guid.NewGuid(), first, "Private fixture title", DateTimeOffset.Now, TimeSpan.FromSeconds(2), 640, 360, new FileInfo(first).Length, File.GetLastWriteTimeUtc(first));
+            using (var store = new RecordingStore(folder)) store.Add(entry, [1, 2, 3]);
+            using (var store = new RecordingStore(folder))
+            {
+                Assert.Equal(entry, Assert.Single(store.Read())); Assert.Equal(new byte[] { 1, 2, 3 }, store.Poster(entry.Id));
+                for (int i = 0; i < 50; i++) store.Add(entry with { Id = Guid.NewGuid() }, []);
+                Assert.Equal(50, store.Read().Count); Assert.DoesNotContain(store.Read(), x => x.Id == entry.Id); Assert.True(File.Exists(first));
+            }
+            foreach (string file in Directory.GetFiles(folder).Where(x => Path.GetFileName(x) != "first.mp4"))
+                Assert.DoesNotContain("Private fixture title", System.Text.Encoding.UTF8.GetString(File.ReadAllBytes(file)));
+        }
+        finally { Directory.Delete(folder, true); }
+    }
+    [Fact]
     public void Menu_and_preview_fit_the_island_and_trim_handles_support_keyboard_and_automation() => WithModel((model, backend, _, _) =>
     {
         var context = new ModuleContext(RecordingModule.Id, new Settings(), NullLogger.Instance, null!, null!);
