@@ -472,7 +472,7 @@ public partial class IslandPanelWindow : Window
     internal bool GoBackToPage(string key)
     {
         if (!IsOpen || !Exists(key)) return false;
-        ShowPage(key, remember: false, back: true);
+        ShowPage(key, back: true);
         return true;
     }
 
