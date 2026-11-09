@@ -27,16 +27,21 @@ public sealed class PuckSurface : Border
         InvalidateVisual();
     }
 
-    internal bool ContainsLocal(Point point)
+    internal Geometry OutlineGeometry
     {
-        if (_outer is null || _size != RenderSize || _radius != CornerRadius.TopLeft)
+        get
         {
-            _size = RenderSize;
-            _radius = CornerRadius.TopLeft;
-            _outer = Outline(0);
+            if (_outer is null || _size != RenderSize || _radius != CornerRadius.TopLeft)
+            {
+                _size = RenderSize;
+                _radius = CornerRadius.TopLeft;
+                _outer = Outline(0);
+            }
+            return _outer;
         }
-        return _outer.FillContains(point);
     }
+
+    internal bool ContainsLocal(Point point) => OutlineGeometry.FillContains(point);
 
     protected override HitTestResult? HitTestCore(PointHitTestParameters hitTestParameters) =>
         ContainsLocal(hitTestParameters.HitPoint) ? new PointHitTestResult(this, hitTestParameters.HitPoint) : null;

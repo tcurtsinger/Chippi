@@ -108,6 +108,7 @@ public partial class IslandWindow : Window
     private double? _heldWidth; // freezes a press for its click, or the compact puck for its landing slide
     private bool _resumeBar; // a fold, unfold or content fade was interrupted by the press
     private bool _pressedBar;
+    private bool _pressedActivity;
     private bool _dragging;
     private MonitorArea? _dragArea; // reuse the work area for pointer moves on the same display
     private EventHandler? _slideFrame;
@@ -159,6 +160,7 @@ public partial class IslandWindow : Window
 
         PuckButton.MouseEnter += (_, _) => SetHover(true);
         PuckButton.MouseLeave += (_, _) => SetHover(false);
+        Body.SizeChanged += (_, _) => LayoutClickTargets();
         // Hidden (a fullscreen app in front), the song stops scrolling; shown again, it starts over.
         IsVisibleChanged += (_, _) =>
         {
@@ -233,13 +235,8 @@ public partial class IslandWindow : Window
             Menu.IsOpen = true;
             e.Handled = true;
         };
-        PuckButton.Click += (_, _) =>
-        {
-            if (_barShown)
-                OpenChip();
-            else
-                Toggle();
-        };
+        HomeButton.Click += (_, _) => Toggle();
+        ActivityButton.Click += (_, _) => OpenChip();
         // A drag from another app over the closed puck (Phase 5 notes #48). The puck never takes the drop itself.
         PuckButton.AllowDrop = true;
         PuckButton.DragEnter += OnPuckDrag;
@@ -1130,6 +1127,14 @@ public partial class IslandWindow : Window
             help.Add($"{puckProvider?.Name() ?? "Agent"} {(puckAgent.NeedsAttention ? "waiting on you" : "working")}");
         AutomationProperties.SetHelpText(PuckButton, string.Join(". ", help));
         AutomationProperties.SetLiveSetting(PuckButton, AutomationLiveSetting.Polite);
+        AutomationProperties.SetHelpText(HomeButton, string.Join(". ", help));
+        AutomationProperties.SetLiveSetting(HomeButton, AutomationLiveSetting.Polite);
+        string? destination = _chipKey == IslandPanelWindow.NowPlayingKey ? "Now Playing"
+            : _tiles.FirstOrDefault(t => t.Key == _chipKey)?.Name;
+        ActivityButton.ToolTip = _chipClick is not null ? _chipText : destination is not null ? $"Open {destination}" : "Open Chippi";
+        AutomationProperties.SetName(ActivityButton, destination is not null ? $"{destination}, {_chipText}" : _chipText);
+        AutomationProperties.SetHelpText(ActivityButton, ActivityButton.ToolTip.ToString());
+        LayoutClickTargets();
     }
 
     private static Visibility Shown(bool shown) => shown ? Visibility.Visible : Visibility.Collapsed;
@@ -1190,6 +1195,21 @@ public partial class IslandWindow : Window
         Body.SetTab(_tabExtension, _left);
         BodyShadow.SetTab(_tabExtension, _left);
         Bar.ColumnDefinitions[_left ? 6 : 0].Width = new GridLength(PetColumnWidth);
+        LayoutClickTargets();
+    }
+
+    private void LayoutClickTargets()
+    {
+        double width = Body.RenderSize.Width;
+        bool split = _barShown && width > IslandGeometry.Puck;
+        double activityWidth = split ? width - IslandGeometry.Puck : 0;
+        HomeButton.Width = width - activityWidth;
+        Canvas.SetLeft(HomeButton, _left ? activityWidth : 0);
+        ActivityButton.Width = activityWidth;
+        Canvas.SetLeft(ActivityButton, _left ? 0 : IslandGeometry.Puck);
+        ActivityButton.Visibility = Shown(split);
+        // Share the actual tab/rounded outline, including during unfolding, for both ink and input.
+        ClickTargets.Clip = Body.OutlineGeometry;
     }
 
     /// <summary>
@@ -1633,6 +1653,9 @@ public partial class IslandWindow : Window
         var pointer = PointerAt();
         _pressAt = pointer;
         _pressedBar = _barShown;
+        var local = PuckButton.PointFromScreen(pointer);
+        _pressedActivity = ActivityButton.Visibility == Visibility.Visible && Body.ContainsLocal(local)
+            && (local.X >= Canvas.GetLeft(ActivityButton) && local.X < Canvas.GetLeft(ActivityButton) + ActivityButton.Width);
         double width = HoldBarMotion();
         _heldWidth = width;
         double scale = Area?.Scale ?? 1;
@@ -1706,7 +1729,7 @@ public partial class IslandWindow : Window
         }
         // Open from the shape and action at the press, before delayed activity changes take over.
         ResumeSlide();
-        if (_pressedBar) OpenChip();
+        if (_pressedActivity) OpenChip();
         else Toggle();
         _heldWidth = null;
         RefreshPuck();
