@@ -10,6 +10,8 @@ using Chippi.Core.Modules;
 using Chippi.Features.ScreenCapture;
 using Chippi.Features.ScreenText;
 using Chippi.Features.ColorPicker;
+using Chippi.Features.Recording;
+using Chippi.Media;
 using Chippi.UI.Capture;
 using Chippi.UI.Controls;
 
@@ -22,6 +24,7 @@ internal sealed class CapturePanelHost : ICapturePanelModel, IDisposable
     private readonly ScreenCaptureModule _capture;
     private readonly ScreenTextModule _text;
     private readonly ColorPickerModule _color;
+    private readonly RecordingModule? _recording;
     private ScreenCaptureModel? _observed;
     private readonly CapturePanelView _view;
     private readonly ContentControl _body = new();
@@ -34,9 +37,11 @@ internal sealed class CapturePanelHost : ICapturePanelModel, IDisposable
     private bool _disposed;
     public sealed record HostSettings { public KeyShortcut? OpenCapture { get; init; } }
     private readonly Dispatcher _dispatcher = Dispatcher.CurrentDispatcher;
-    public CapturePanelHost(ShellContext shell, ScreenCaptureModule capture, ScreenTextModule text, ColorPickerModule color)
+    public CapturePanelHost(ShellContext shell, ScreenCaptureModule capture, ScreenTextModule text, ColorPickerModule color, RecordingModule? recording = null)
     {
         _shell = shell; _capture = capture; _text = text; _color = color;
+        _recording = recording;
+        if (recording != null) recording.Changed += QueueRefresh;
         var view = _view = new CapturePanelView(this, shell.Services.HoldIslandOpen);
         Tile = new IslandTileContribution("capture", new IslandTileSpec("capture", "Capture", "Scan", 75, 0, () => _body)
         { CreateHeader = () => _header, InitialFocus = () => _showingRecent ? _recentView?.InitialFocus : view.InitialFocus, HandleBack = Back });
@@ -54,6 +59,7 @@ internal sealed class CapturePanelHost : ICapturePanelModel, IDisposable
         _disposed = true;
         _shell.Registry.Changed -= RegistryChanged;
         _shell.Shortcuts.Changed -= QueueRefresh;
+        if (_recording != null) _recording.Changed -= QueueRefresh;
         if (_observed != null) _observed.Changed -= Refresh;
         _open?.Dispose(); _open = null;
         _capture.OpenDelay = null;
@@ -61,8 +67,10 @@ internal sealed class CapturePanelHost : ICapturePanelModel, IDisposable
     }
     public IslandTileContribution Tile { get; }
     private bool Running(string id) => _shell.Registry.Find(id)?.IsRunning == true;
-    public bool Visible => CanCapture || Running(ScreenTextModule.Id) || Running(ColorPickerModule.Id);
+    public bool Visible => CanCapture || Running(ScreenTextModule.Id) || Running(ColorPickerModule.Id) || Running(RecordingModule.Id);
     public bool CanCapture => Running(ScreenCaptureModule.Id);
+    public bool IsRecording => _recording?.Model?.Active == true;
+    public bool HasRecent => CanCapture || Running(RecordingModule.Id);
     public int Delay { get; set; }
     public event Action? Changed;
     internal void Refresh()
@@ -146,20 +154,24 @@ internal sealed class CapturePanelHost : ICapturePanelModel, IDisposable
         get
         {
             List<CapturePanelTool> tools = [];
+            if (Running(RecordingModule.Id)) tools.Add(new("recording/start", IsRecording ? "Recording" : "Record", IsRecording ? "Recording controls" : "Record screen", LucideIcons.Video, () => { if (IsRecording) _recording?.OpenControls(); else _recording?.Setup(RecordingTarget.Screen); }));
             if (Running(ScreenTextModule.Id))
             {
                 tools.Add(new("screen-text/extract", "Text", "Extract text", LucideIcons.ScanText, () => _text.Start(ScreenTextVerb.ExtractText, CaptureDoor.Island)) { Keys = ToolKeys(ScreenTextModule.Id, ScreenTextModule.ExtractName) });
                 tools.Add(new("screen-text/qr", "QR code", "Scan QR", LucideIcons.QrCode, () => _text.Start(ScreenTextVerb.ScanQr, CaptureDoor.Island)) { Keys = ToolKeys(ScreenTextModule.Id, ScreenTextModule.ScanName) });
             }
             if (Running(ColorPickerModule.Id)) tools.Add(new("color-picker/pick", "Color", "Pick color", LucideIcons.Pipette, () => _color.Pick(false, CaptureDoor.Island)) { Keys = ToolKeys(ColorPickerModule.Id, ColorPickerModule.PickName) });
-            return tools;
+            return tools.Select(t => t with { Enabled = !IsRecording || t.Id == "recording/start" }).ToArray();
         }
     }
-    public IReadOnlyList<CapturePanelRecent> Recent => _capture.Model is { } model
-        ? model.Recent.Select(x => new CapturePanelRecent(x.Id.ToString(), $"{x.Width} × {x.Height}", x.Time.ToLocalTime().ToString("g"), model.Thumbnail(x.Id))).ToArray() : [];
+    public IReadOnlyList<CapturePanelRecent> Recent => (_capture.Model?.Recent.Select(x => (x.Time, Item: new CapturePanelRecent(x.Id.ToString(), $"{x.Width} × {x.Height}", x.Time.ToLocalTime().ToString("g"), _capture.Model.Thumbnail(x.Id)))) ?? [])
+        .Concat(_recording?.Model?.Recent.Select(x => (Time: x.Created, Item: new CapturePanelRecent("recording/" + x.Id, $"Video · {RecordingModule.FormatTime(x.Duration)}", x.Created.ToLocalTime().ToString("g"), _recording.Model.Poster(x)))) ?? [])
+        .OrderByDescending(x => x.Time).Select(x => x.Item).ToArray();
     public void Start(CaptureMode mode) { if (CanCapture) _capture.Start(mode, CaptureDoor.Island, Delay); }
     public void OpenRecent(string id)
     {
+        if (id.StartsWith("recording/", StringComparison.Ordinal) && Guid.TryParse(id[10..], out var video) && _recording?.Model?.Recent.FirstOrDefault(x => x.Id == video) is { } entry)
+        { _recording.Open(entry); return; }
         if (!Guid.TryParse(id, out var key) || _capture.RecentModel is not { } model) return;
         if (!ReferenceEquals(_recentModel, model)) { _recentModel = model; _recentView = new CaptureRecentView(model); }
         _ = model.OpenAsync(key);
@@ -170,7 +182,11 @@ internal sealed class CapturePanelHost : ICapturePanelModel, IDisposable
     }
     public void OpenFolder()
     {
-        if (_capture.Model is not { } model) return;
+        if (_capture.Model is not { } model)
+        {
+            if (_recording?.Model is { } recording && !CaptureFiles.OpenFolder(recording.SaveFolder)) recording.Report("Open folder failed");
+            return;
+        }
         string? folder = model.Recent.FirstOrDefault(x => x.SavedFile != null)?.SavedFile is { } saved ? Path.GetDirectoryName(saved) : model.SaveFolder;
         if (!CaptureFiles.OpenFolder(folder)) _capture.Report("Open folder failed", failed: true);
     }

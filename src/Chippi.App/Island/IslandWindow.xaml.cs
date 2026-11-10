@@ -109,6 +109,9 @@ public partial class IslandWindow : Window
     private bool _resumeBar; // a fold, unfold or content fade was interrupted by the press
     private bool _pressedBar;
     private bool _pressedActivity;
+    private Action? _pressedRecordingAction;
+    internal Func<UIElement, bool> CapturePointer { get; set; } = element => element.CaptureMouse();
+    private IslandActivity? _recordingActivity;
     private bool _dragging;
     private MonitorArea? _dragArea; // reuse the work area for pointer moves on the same display
     private EventHandler? _slideFrame;
@@ -160,7 +163,11 @@ public partial class IslandWindow : Window
 
         PuckButton.MouseEnter += (_, _) => SetHover(true);
         PuckButton.MouseLeave += (_, _) => SetHover(false);
-        Body.SizeChanged += (_, _) => LayoutClickTargets();
+        Body.SizeChanged += (_, _) =>
+        {
+            LayoutClickTargets();
+            if (!_panel.IsVisible) Body.BorderThickness = new Thickness(WidgetHasRim ? 1 : 0);
+        };
         // Hidden (a fullscreen app in front), the song stops scrolling; shown again, it starts over.
         IsVisibleChanged += (_, _) =>
         {
@@ -198,7 +205,7 @@ public partial class IslandWindow : Window
             // as soon as it separates. A second circular stroke inside the new surface reads as a puck.
             double edge = Fade(0.04);
             Body.Opacity = surface;
-            Body.BorderThickness = new Thickness(edge);
+            Body.BorderThickness = new Thickness(WidgetHasRim ? edge : 0);
             BodyShadow.Opacity = edge;
             Body.Visibility = BodyShadow.Visibility = surface > 0 ? Visibility.Visible : Visibility.Hidden;
             bool handOver = _panel.PetMeetsPuck && !Motion.IsReduced;
@@ -237,6 +244,8 @@ public partial class IslandWindow : Window
         };
         HomeButton.Click += (_, _) => Toggle();
         ActivityButton.Click += (_, _) => OpenChip();
+        RecordingPause.Click += (_, _) => _recordingActivity?.Recording?.TogglePause();
+        RecordingStop.Click += (_, _) => _recordingActivity?.Recording?.Stop();
         // A drag from another app over the closed puck (Phase 5 notes #48). The puck never takes the drop itself.
         PuckButton.AllowDrop = true;
         PuckButton.DragEnter += OnPuckDrag;
@@ -429,6 +438,10 @@ public partial class IslandWindow : Window
     public void SetActivities(IReadOnlyList<IslandActivity> activities, PetMood mood)
     {
         _activities = activities;
+        bool recording = activities.Any(a => a.Kind == IslandActivityKind.Recording);
+        _panel.ShowPetRecording(recording ? activities.First(a => a.Kind == IslandActivityKind.Recording).Recording?.Paused == true ? PetRecordingState.Paused : PetRecordingState.Recording : PetRecordingState.None);
+        IslandNative.ExcludeFromCapture(_hwnd, recording);
+        IslandNative.ExcludeFromCapture(_panel.Handle, recording);
         _mood = mood;
         UpdateAgentPeek(activities.FirstOrDefault(a => a.Kind == IslandActivityKind.Agent));
         RefreshPuck();
@@ -569,6 +582,9 @@ public partial class IslandWindow : Window
         Canvas.SetLeft(PuckButton, left ? double.NaN : outer);
         Canvas.SetRight(PuckButton, left ? outer : double.NaN);
         Bar.HorizontalAlignment = PuckEnd.HorizontalAlignment = left ? HorizontalAlignment.Right : HorizontalAlignment.Left;
+        RecordingCanvas.HorizontalAlignment = left ? HorizontalAlignment.Right : HorizontalAlignment.Left;
+        Canvas.SetLeft(RecordingSpace, left ? 0 : 50);
+        RecordingStrip.Margin = left ? new Thickness(10, 0, 0, 0) : new Thickness(0, 0, 10, 0);
         LayOutBar(left);
         LayoutBadgeTab();
     }
@@ -772,7 +788,8 @@ public partial class IslandWindow : Window
             return;
         if (!_heldWidth.HasValue && !_panel.IsVisible)
             HoldBarMotion(); // summoned without a press: keep an interrupted unfold at its visible width too
-        var sourceRim = Body.BorderBrush as SolidColorBrush ?? TryFindResource(_rim ?? "IslandWidgetBorderBrush") as SolidColorBrush;
+        var sourceRim = Body.BorderThickness.Left == 0 ? Brushes.Transparent
+            : Body.BorderBrush as SolidColorBrush ?? TryFindResource(_rim ?? "IslandWidgetBorderBrush") as SolidColorBrush;
         _panel.Open(_puck, RenderedWidgetRect(), area, sourceRim, Body.TabExtension, _left);
         IslandNative.Raise(_hwnd); // Chippi and the bar's content stay above the shape the widget became, fading
         Hook();
@@ -967,6 +984,15 @@ public partial class IslandWindow : Window
             StayAwake(engaged: true);
             return; // keep the captured or closing shape and its ink until release, handoff, or a reopen
         }
+        _recordingActivity = _activities.FirstOrDefault(a => a.Kind == IslandActivityKind.Recording);
+        if (_recordingActivity is { } recording)
+        {
+            ShowRecording(recording);
+            return;
+        }
+        RecordingLayer.Visibility = Visibility.Collapsed;
+        Bar.Visibility = Visibility.Visible;
+        if (Pet.Recording != PetRecordingState.None) { Pet.Recording = PetRecordingState.None; Pet.Boop(); }
         ShowBadge(MicBadge, mic is not null);
 
         var current = _media?.Current;
@@ -1139,6 +1165,32 @@ public partial class IslandWindow : Window
 
     private static Visibility Shown(bool shown) => shown ? Visibility.Visible : Visibility.Collapsed;
 
+    private void ShowRecording(IslandActivity activity)
+    {
+        bool transport = activity.Recording != null;
+        _singing = false; StopLevel(); StayAwake(true);
+        ShowBadge(MicBadge, false); ShowBadge(AgentMark, false); ShowBadge(AwakeBadge, false); LayoutBadgeTab();
+        _chipKey = activity.OpensTile; _chipClick = activity.Clicked; _chipText = activity.Title;
+        _shownContent = "recording"; ShowBar(!_lifted);
+        Bar.Visibility = transport ? Visibility.Collapsed : Visibility.Visible;
+        RecordingLayer.Visibility = transport && !_lifted ? Visibility.Visible : Visibility.Collapsed;
+        if (!transport) { ShowKindGlyph(activity with { Kind = IslandActivityKind.Timer }); ShowLine(activity.Key, activity.Title, "Click to cancel"); }
+        RecordingTime.Text = activity.Title;
+        var controls = activity.Recording;
+        RecordingPause.IsEnabled = controls?.CanPause == true;
+        RecordingStop.IsEnabled = controls?.CanPause == true;
+        RecordingPauseGlyph.Data = controls?.Paused == true ? LucideIcons.Play : LucideIcons.Pause;
+        string pause = controls?.Paused == true ? "Resume" : "Pause";
+        RecordingPause.ToolTip = pause; AutomationProperties.SetName(RecordingPause, pause + " recording");
+        RecordingDot.Fill = new SolidColorBrush(controls?.Paused == true ? Color.FromRgb(244, 187, 94) : Color.FromRgb(255, 119, 125));
+        Pet.ShowMood(PetMood.Idle);
+        _panel.ShowPetMood(PetMood.Idle);
+        Pet.Recording = controls?.Paused == true ? PetRecordingState.Paused : PetRecordingState.Recording;
+        AutomationProperties.SetName(PuckButton, "Chippi, " + (controls?.Paused == true ? "paused, " : "recording, ") + activity.Title);
+        AutomationProperties.SetName(ActivityButton, "Screen recording, " + activity.Title);
+        LayoutClickTargets();
+    }
+
     // Arm once when the last interaction ends. A quiet first launch starts asleep.
     private bool StayAwake(bool engaged)
     {
@@ -1210,6 +1262,7 @@ public partial class IslandWindow : Window
         ActivityButton.Visibility = Shown(split);
         // Share the actual tab/rounded outline, including during unfolding, for both ink and input.
         ClickTargets.Clip = Body.OutlineGeometry;
+        RecordingLayer.Clip = Body.OutlineGeometry;
     }
 
     /// <summary>
@@ -1353,6 +1406,7 @@ public partial class IslandWindow : Window
         bool fadeBar = _barShown != shown || _resumeBar;
         _resumeBar = false;
         _barShown = shown;
+        Body.BorderThickness = new Thickness(WidgetHasRim ? 1 : 0);
         _widthTarget = width;
         if (Motion.IsReduced || !IsVisible || _lifted || _panel.IsVisible)
         {
@@ -1373,6 +1427,8 @@ public partial class IslandWindow : Window
             : new DoubleAnimation(0, FoldTime / 2);
         Bar.BeginAnimation(OpacityProperty, fade, HandoffBehavior.SnapshotAndReplace);
     }
+
+    private bool WidgetHasRim => !_barShown && PuckButton.Width <= _compactWidth + 0.5;
 
     /// <summary>The puck's size and tilt, eased over <paramref name="time"/> (120ms; 83ms for a press), at once under reduced motion or while hidden.</summary>
     private void Grow(double scale, double tilt, TimeSpan? time = null)
@@ -1656,6 +1712,9 @@ public partial class IslandWindow : Window
         var local = PuckButton.PointFromScreen(pointer);
         _pressedActivity = ActivityButton.Visibility == Visibility.Visible && Body.ContainsLocal(local)
             && (local.X >= Canvas.GetLeft(ActivityButton) && local.X < Canvas.GetLeft(ActivityButton) + ActivityButton.Width);
+        bool Hits(FrameworkElement element) => element.IsVisible && element.IsEnabled && new Rect(element.RenderSize).Contains(element.PointFromScreen(pointer));
+        _pressedRecordingAction = Hits(RecordingPause) ? _recordingActivity?.Recording?.TogglePause
+            : Hits(RecordingStop) ? _recordingActivity?.Recording?.Stop : null;
         double width = HoldBarMotion();
         _heldWidth = width;
         double scale = Area?.Scale ?? 1;
@@ -1665,7 +1724,7 @@ public partial class IslandWindow : Window
         if (_slideFrame is not null)
             CompositionTarget.Rendering -= _slideFrame; // stop at the picked-up frame, even before the drag threshold
         PuckButton.RenderTransformOrigin = new Point(Math.Clamp(_grab.X / width, 0, 1), Math.Clamp(_grab.Y / IslandGeometry.Puck, 0, 1));
-        if (!((UIElement)sender).CaptureMouse())
+        if (!CapturePointer((UIElement)sender))
         {
             _pressAt = null;
             _heldWidth = null;
@@ -1729,7 +1788,8 @@ public partial class IslandWindow : Window
         }
         // Open from the shape and action at the press, before delayed activity changes take over.
         ResumeSlide();
-        if (_pressedActivity) OpenChip();
+        if (_pressedRecordingAction is { } action) { _pressedRecordingAction = null; action(); }
+        else if (_pressedActivity) OpenChip();
         else Toggle();
         _heldWidth = null;
         RefreshPuck();

@@ -162,6 +162,7 @@ public sealed class WidgetSplitTests
             IslandWindowTests.WithShownIsland(window =>
             {
                 window.SetPlacement(opensLeft ? 0.8 : 0.2, 0.8);
+                window.CapturePointer = _ => true;
                 Assert.Equal(opensLeft, window.OpensLeft);
                 window.Panel.ActivateWindow = _ => { };
                 window.Panel.PreviewGotKeyboardFocus += (_, e) => e.Handled = true;

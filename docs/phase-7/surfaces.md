@@ -17,7 +17,7 @@ Each verb has one home, and every verb is also reachable from everywhere else.
 | **Search, Radial, shortcuts** | Every verb, whatever its home | Search lists it as a Run row; a Radial slice of kind Action can hold it; Settings › Shortcuts lists its slot |
 | **Settings page** | Everything the island does for that feature, plus long lists, history and options | Under the feature's catalog group (Capture, Apps, System) |
 | **The bar** | Ambient state (a recording, a delay, updates running) and 6-second result lines (Copied, Saved) | A click opens the feature's page, as today |
-| **Overlays** | The frozen screen, the recording frame and its pill | Only while a capture or recording runs. Never a place to go |
+| **Overlays** | The frozen screen and any recording highlight; recording controls live in the expanded puck | Only while a capture or recording runs. Never a place to go |
 
 Shortcuts are set only in Settings › Shortcuts. A feature's page shows its keys read-only with Edit (Travis, 2026-11-05). The island never shows key captions on screen. A card's tooltip names its verb and key ("Capture window · Ctrl+Shift+W").
 
@@ -47,7 +47,7 @@ Shots: `design/fit/p7-home-12-capture-displays-{dark,light}.png` and `design/fit
 | Feature | Home | Actions | Search | Radial | Starter shortcut slots | Bar | Settings |
 |---|---|---|---|---|---|---|---|
 | Screen capture | **Capture** tile: modes row, Delay, Recent | none | Each verb as Run; "Capture" opens the panel; "Recent captures" | Any verb | Capture region (Print Screen if Travis opts in), Capture window, full screen, all displays, freeform, last region, after delay; Open recent captures | Copied, Saved, Copy failed, "Capturing in 2" | Capture › Screen capture |
-| Screen recording | Capture panel: Record and GIF; a recording card while it runs; the preview page | none | Record region, window, screen, GIF; Stop recording | Any verb | Record region, Record window, Record screen, Record GIF, Stop recording, Pause/Resume recording | "0:42 · Recording · Region" as the top activity | Capture › Recording |
+| Screen recording | Capture panel: Record; a recording card while it runs; saved-result preview | none | Record window, Record screen, Pause/Resume, Stop recording | The same shared recording actions | Record window, Record screen, Pause/Resume recording, Stop recording | Expanded puck: large red dot/time, icon-only Pause/Resume and Stop, pet at his usual end | Capture › Recording |
 | Text and QR | Capture panel: Text, QR code; the result pages | none | Copy text from screen, Extract text, Scan QR | Any verb | Copy text from screen, Extract text, Scan QR | Copied text, No text found | Capture › Text and QR |
 | Color picker | Capture panel: Color; the review page | none | Pick color, Pick and review color | Any verb | Pick color, Pick and review color | "#7C5CFF · Copied as HEX" with the swatch | Capture › Color picker |
 | Media tools | Capture panel: Convert page (no tile) | none | Convert media, Resize images, Compress media | Any verb | Convert media, Resize images, Compress media (each opens Convert with a file picker) | "3 of 4 converted" while running | Capture › Media tools |
@@ -67,9 +67,9 @@ Every feature has at least three doors, and each verb has exactly one home.
 
 - **Header:** Back, "Capture", and on the right a Delay picker ("No delay", 3, 5 or 10 seconds). The delay applies to the next mode picked. This is how the spec's "Capture after delay" sits on the panel without a seventh mode.
 - **Modes row,** 64-tall cards: Region (the accent fill, because it's the main task), Window, Screen, All displays, Freeform, Last region. A click closes the island first, so the panel is never in the capture, then freezes the screen.
-- **Tools row:** Record, GIF, Text, QR code, Color, Convert.
+- **Tools row:** Record, Text, QR code, Color, Convert. The revised recording menu offers Window/Screen; GIF is exported from a saved recording.
 - **Recent:** the last four captures as 118 × 66 thumbnails with type, size and age, plus "Open folder". A recording shows its length. A click opens it on its result page with Copy, Save as, Annotate and Open folder. "No captures yet" when there are none. The full history is in Settings.
-- **While recording:** a recording card takes the modes row (red dot, elapsed time, the source, Discard, Pause, Stop). Record shows as on, and the other tools are dimmed until Stop, because a freeze would cover the region being recorded. Convert stays usable.
+- **While recording:** a recording card takes the modes row (red dot, elapsed time, the source, Discard, Pause, Stop). Record shows as on, and the screenshot tools are dimmed until Stop because their frozen-screen overlays would cover the recorded content. Convert stays usable. The expanded puck provides the primary icon-only controls.
 
 ### The frozen screen (board `sheet-overlay`)
 
@@ -82,13 +82,15 @@ This is Lightshot's flow on Snipping Tool's feature list.
 
 The bars use island surfaces (fill, rim, shadow, 4-radius controls), so they read as Chippi in both themes. The dimming and handles stay neutral so they work over any screen.
 
-### Recording (boards `sheet-overlay` 3 and 4, `sheet-bar`)
+### Recording (implementation authorized by Travis, 2026-11-09)
 
-- **One display per recording:** the first build records one display per session (architecture §3). The selector keeps a recording region to the display where the drag started, so the selection stops at that display's edge. Record window and Record screen record the display the window or screen is on. Screenshots can still span displays (§2). A region over two displays is a later build, listed in Step 2 as a cost.
-- **Before Start:** the same selector, then a bar under the region with MP4 or GIF, System sound (Off by default), Mic (Off by default), Start and Cancel. Nothing records until Start.
-- **While recording:** a 2px red frame around the region and a pill just outside it (elapsed time, Pause, Stop). The pill is its own top-level window, not part of the frame, and both are left out of the video. The puck is left out only while a recording runs, so it still shows in screen shares and stills. The pill is needed because the widget can sit on another display, and it hides while a fullscreen app is in front of its display (DESIGN.md §5). The bar shows "0:42 · Recording · Region" as the highest activity, and a click opens the Capture panel's recording card. Stop recording has its own shortcut.
-- **Stopped:** the Capture panel opens on the recording page with the poster, play, a trim bar, Discard, Export GIF, Save as and Save. Nothing plays on its own. Trim re-encodes, so the page has a progress state while it runs.
-- **Stopped over a fullscreen app:** the panel can't open while a fullscreen app holds the widget's display, and summoning it over a game that's still running would be the worse surprise. So Stop saves the recording to Settings › Recording's Save to folder and adds it to Recent. The bar shows "Recording saved" with its length and source ("0:42 · Region") once the widget is back, and a click opens the recording page, where Trim, Export GIF and Discard still work. The page never opens by itself later (board `sheet-bar`).
+- **Targets:** Window and Screen only; no region recording or background replay. Screen chooses one display; skip the picker when only one exists. Screenshot modes remain unchanged.
+- **Before Start:** the recording menu shows source, Include system audio (on), Include mic audio (off), Original/1080p, and 30/60 fps. Audio uses the current default output/input resolved at Start, without app-audio or recording-device pickers. Start begins a cancellable 3-second countdown. Output is MP4; GIF remains a result export.
+- **While recording:** use the expanded Chippi puck, not a separate pill. A larger red dot and timer share one vertically centered row; omit the visible "Recording" label. Pause/Resume and Stop are icon-only with hover labels, accessible names, and independent hit targets. The pet still opens the regular panel; preserve mirrored layouts and dragging. Recording takes priority over ordinary activity and Now Playing. Exclude the puck from the output only during recording.
+- **Chosen animation (2026-11-09):** Chippi holds a small camcorder beside/below his face, with gentle motion and a pulsing camera tally light; the timer's dot is steady. Pause and finish have distinct poses. Center the tightly spaced dot/time/control group together in the space beside Chippi. See the recording brief for the chosen motion direction; the production puck now uses the approved camcorder artwork.
+- **Fullscreen:** validate puck reachability without disturbing the game. Do not promise an exclusive-fullscreen overlay or silently change the widget's ordinary fullscreen visibility. Stop shortcuts and Radial actions provide alternate controls.
+- **Stopped:** always save to the recording folder and add Recent before opening preview. The result page offers Play, Trim, Export GIF, Save as, and Open folder; nothing plays on its own. Trim/export preserve the original.
+- **Stopped over a fullscreen app:** save quietly and show brief Saved feedback when the puck is visible again. No automatic preview opens later. See [screen-recording.md](screen-recording.md) for the current plan; the early region/pill boards are superseded for recording.
 
 ### Results (board `sheet-results`)
 
@@ -147,7 +149,7 @@ Each feature gets one page in its catalog group's section of the sidebar (board 
 | Group | Page | What's there beyond the island |
 |---|---|---|
 | Capture | Screen capture | After capture (Copy, Save, or both), Save to, file type, Ctrl+drag, magnifier, recent captures and how many to keep, Print Screen, Shortcuts (read-only with Edit) |
-| Capture | Recording | Format, frame rate, GIF limit, system sound and mic defaults, cursor and clicks, Save to, Shortcuts |
+| Capture | Recording | Save to, cursor and click rings, Shortcuts; audio switches and quality are in the recording menu |
 | Capture | Text and QR | OCR language (installed ones only), line breaks, Shortcuts |
 | Capture | Color picker | Copy format, palette, Clear, Shortcuts |
 | Capture | Media tools | Presets, output folder, metadata, Shortcuts |
@@ -178,13 +180,13 @@ Each feature gets one page in its catalog group's section of the sidebar (board 
 2. **Apps menu in Actions:** Update apps, Clean junk files and Uninstall in one new menu (recommended), taking Actions to 19 of 20 places.
 3. **Port manager without a tile or menu:** Search's "port 3000" and Settings › Ports (recommended).
 4. **Media tools inside Capture:** the Convert page on the Capture panel rather than a tile (recommended).
-5. **The recording pill:** a small pill beside the recorded region as well as the bar (recommended, because the widget hides over fullscreen apps).
-6. **A recording region over two displays:** one display per recording in the first build (recommended). Recording across two needs two sessions composed into one picture, an M of work on its own.
+5. **Recording controls (revised 2026-11-09):** the expanded puck owns icon-only Pause/Resume and Stop; the separate-pill proposal is superseded. Fullscreen control access remains a technical check.
+6. **Recording targets (revised 2026-11-09):** Window or one Screen. Region and combined multi-display recording are not in this plan.
 
 ## 10. Feasibility (Kayla's review of #280)
 
-- **Frame and pill out of the video:** feasible with `WDA_EXCLUDEFROMCAPTURE`, which works on Chippi's transparent windows. The pill must be its own top-level window. The puck is excluded only while a recording runs.
-- **Click takes a window, drag draws a region:** feasible from architecture §2's snapshot list, with Windows' drag threshold telling them apart. Chippi's own puck and pill are left out of the list.
+- **Recording controls out of the video:** the capture-exclusion approach must be checked on the expanded puck. There is no separate pill in the revised plan. The puck is excluded only while a recording runs.
+- **Click takes a window, drag draws a region:** still applies to screenshots. Recording now offers Window/Screen only; exclude Chippi's own windows from source selection.
 - **Bars never span two displays:** each display has its own overlay, so a bar is clamped to the display where the drag was released.
 - **Recent thumbnails:** small thumbnails are saved into the history index when a capture is kept (a poster frame for a recording), so the panel's open decodes nothing. Kayla adds this to the capture brief.
 - **"port N" per keystroke:** the port table reads in about 2 ms; process names and services are read once per query, and the row is read again before Free.

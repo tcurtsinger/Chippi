@@ -45,6 +45,7 @@ public sealed partial class CaptureLayer : ICaptureLayer
     }
 
     public ICaptureSession? Current => _current;
+    public Func<bool> CanStart { get; set; } = () => true;
 
     public PixelRect? LastRegion { get; set; }
 
@@ -120,6 +121,7 @@ public sealed partial class CaptureLayer : ICaptureLayer
 
     public ICaptureSession? Start(CaptureRequest request)
     {
+        if (!CanStart()) return null;
         if (_current is { } running)
         {
             running.CancelCountdown(); // the same starter again cancels a delay; anything else is ignored
@@ -133,6 +135,7 @@ public sealed partial class CaptureLayer : ICaptureLayer
 
     public ICaptureSession? Reopen(CapturedImage image, CaptureDoor door)
     {
+        if (!CanStart()) return null;
         ArgumentNullException.ThrowIfNull(image);
         if (image.Width <= 0 || image.Height <= 0)
             throw new ArgumentException("The image is empty.", nameof(image));

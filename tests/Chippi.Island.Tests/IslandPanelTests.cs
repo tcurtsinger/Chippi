@@ -156,7 +156,7 @@ public sealed class IslandPanelTests
     }
 
     [Fact]
-    public void Returning_to_a_known_page_does_not_remember_it_as_forward_navigation()
+    public void Returning_to_a_known_page_remembers_the_destination_without_forward_navigation()
     {
         WpfTestThread.Run(() => WithPanel(panel =>
         {
@@ -171,10 +171,38 @@ public sealed class IslandPanelTests
             Assert.True(panel.GoBackToPage("keep-awake"));
             IslandWindowTests.Settle(panel);
             Assert.Equal("keep-awake", panel.CurrentPage);
-            Assert.Equal(["keep-awake", "sound.mixer"], remembered);
+            Assert.Equal(["keep-awake", "sound.mixer", "keep-awake"], remembered);
             Assert.False(panel.GoBackToPage("missing"));
             Assert.Equal("keep-awake", panel.CurrentPage);
+            Click(Back(panel));
+            IslandWindowTests.Settle(panel);
+            Assert.Null(panel.CurrentPage);
         }));
+    }
+
+    [Fact]
+    public void Leaving_Recording_with_Back_remembers_Capture_when_the_panel_is_closed_and_reopened()
+    {
+        WpfTestThread.Run(() =>
+        {
+            IslandPanelWindow? current = null;
+            var recording = new IslandTileContribution("screen-recording", new IslandTileSpec("recording", "Screen recording", "Video", 76, 0, () => new Border { Height = 120 })
+            { OnHome = false, HandleBack = () => current!.GoBackToPage("capture") });
+            WithPanel(panel =>
+            {
+                current = panel;
+                panel.SetLayout(IslandLayout.Default with { OpensOn = IslandOpensOn.LastPage });
+                Open(panel); panel.ShowPage("capture"); IslandWindowTests.Settle(panel);
+                panel.ShowPage("recording"); IslandWindowTests.Settle(panel);
+                panel.CloseIsland(immediate: true); Open(panel);
+                Assert.Equal("recording", panel.CurrentPage);
+
+                Click(Back(panel)); IslandWindowTests.Settle(panel);
+                Assert.Equal("capture", panel.CurrentPage);
+                panel.CloseIsland(immediate: true); Open(panel);
+                Assert.Equal("capture", panel.CurrentPage);
+            }, Tiles(Part("capture", "Capture", 75), recording));
+        });
     }
 
     private static IslandGrid Grid(IslandPanelWindow panel) =>
