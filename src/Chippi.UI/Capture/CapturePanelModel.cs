@@ -16,6 +16,8 @@ public interface ICapturePanelModel
 {
     /// <summary>Screen capture is installed: the modes, Delay and Recent show. Without it the panel shows only the tools.</summary>
     bool CanCapture { get; }
+    bool IsRecording => false;
+    bool HasRecent => CanCapture;
 
     /// <summary>Seconds the next mode waits: 0, or one of <see cref="Chippi.Capture.Countdown.Delays"/>. The host keeps it.</summary>
     int Delay { get; set; }
@@ -56,6 +58,7 @@ public interface ICapturePanelModel
 /// <param name="Start">Starts it from the island, on the UI thread.</param>
 public sealed record CapturePanelTool(string Id, string Name, string Verb, Geometry Icon, Action Start)
 {
+    public bool Enabled { get; init; } = true;
     /// <summary>Its keys once set, for the tooltip; null for none.</summary>
     public string? Keys { get; init; }
 }

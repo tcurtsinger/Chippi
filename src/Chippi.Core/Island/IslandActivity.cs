@@ -19,6 +19,9 @@ public enum IslandActivityKind
 
     /// <summary>Background state such as Keep awake. A timed session shows its countdown.</summary>
     Status,
+
+    /// <summary>Manual screen recording owns the puck transport ahead of media and other activities.</summary>
+    Recording,
 }
 
 public static class IslandActivityKindExtensions
@@ -29,6 +32,7 @@ public static class IslandActivityKindExtensions
     /// </summary>
     public static int Priority(this IslandActivity activity) => activity.Kind switch
     {
+        IslandActivityKind.Recording => -1,
         IslandActivityKind.Media => 0,
         IslandActivityKind.Agent when activity.NeedsAttention => 1,
         IslandActivityKind.Timer => 2,
@@ -46,6 +50,7 @@ public static class IslandActivityKindExtensions
 /// <param name="Source">Tertiary line, e.g. "Spotify".</param>
 public sealed record IslandActivity(string Key, IslandActivityKind Kind, string Title, string Source)
 {
+    public IslandRecordingControls? Recording { get; init; }
     /// <summary>0..1 for the gradient progress bar, or null for none. On feedback, the ring that counts down ("Capturing in 3").</summary>
     public double? Progress { get; init; }
 
@@ -97,6 +102,9 @@ public sealed record IslandActivity(string Key, IslandActivityKind Kind, string 
     /// <summary>Set by the hub to the publishing module's id.</summary>
     public string ModuleId { get; init; } = "";
 }
+
+/// <summary>The recording transport, shared with the puck without coupling Core to media capture.</summary>
+public sealed record IslandRecordingControls(bool Paused, bool CanPause, Action TogglePause, Action Stop);
 
 /// <summary>A module reported that it finished something for the user; the shell makes Chippi celebrate.</summary>
 public sealed class ModuleSucceededEventArgs(string moduleId, string? message) : EventArgs

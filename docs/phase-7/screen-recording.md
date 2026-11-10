@@ -1,72 +1,91 @@
 # Screen recording: brief
 
-Wave 2. Owner: Herb. For Travis to confirm. Decisions: [README](README.md) (task 487: MP4, silent unless switched on for that recording, cursor shown, one display per recording). Research: [behavior-spec-a.md](behavior-spec-a.md) (Screen recording), [architecture.md](architecture.md) section 3 (Encoders), [surfaces.md](surfaces.md) section 4 (Recording). The shared selector and freeze: [capture-layer.md](capture-layer.md). The panel and Recent: [screen-capture.md](screen-capture.md). Mockup: Lumen's boards `sheet-overlay` 3 and 4, `sheet-bar`, and the recording page (not yet drawn; she draws it before this is built). DESIGN.md wins where it speaks.
+Wave 2. Travis authorized implementation on 2026-11-09 ("Ok let's build away"). These recording decisions supersede the older region, separate-pill, and silent-system-audio proposals in the research and early boards. Research: [behavior-spec-a.md](behavior-spec-a.md), [architecture.md](architecture.md) section 3, and [surfaces.md](surfaces.md). Shared capture infrastructure: [capture-layer.md](capture-layer.md). Capture panel and Recent: [screen-capture.md](screen-capture.md).
+
+## Confirmed direction (2026-11-09)
+
+- Serve quick clips for Discord and bug reports, narrated walkthroughs, and longer gameplay recordings.
+- **Performance priority (Travis, 2026-11-09):** keep the impact on the rest of the computer as low as possible, especially gameplay. Recording quality and animation must fit a measured resource budget; no FPS/CPU claim is verified yet. See the performance requirements below.
+- Manual Start and Stop only. No background replay or "save the last moments" buffer.
+- Two targets: **Window** and **Screen**. No recording-region mode. One display per screen recording.
+- The recording menu has **Include system audio** (on by default) and **Include mic audio** (off by default). No selected-app audio chooser or separate recording-device picker.
+- Resolve the current default output and input devices when Start is pressed. The mic toggle captures the current input device; the menu names the current devices. Do not automatically switch devices mid-take initially.
+- Use the **expanded Chippi puck** for recording controls. No separate floating control pill. Pause/Resume and Stop are icon-only, with tooltips and accessible names.
+- The puck shows a larger red dot and elapsed time on one line, centered vertically in its 50-DIP height. Keep Pause/Stop close to the timer and center the visible dot/time/control group together in the space beside Chippi. No visible "Recording" label or second status line. The current mockup uses a 10-DIP dot and 20-DIP timer; these dimensions are implemented.
+- Chippi remains at his usual end and opens the regular panel. Recording controls remain independently clickable, and the layout mirrors when the pet changes sides.
+- **Chosen pet animation: handheld camcorder.** Travis selected the camcorder concept over the head-mounted camera on 2026-11-09. Chippi holds the little camcorder beside and below his face so his expression stays visible. The mockup's motion direction is a small eager lift at Start, quiet breathing and a soft camera tally-light pulse while recording, a relaxed pose/amber tally light on Pause, and a satisfied nod as the camera disappears on Stop. The timer's red dot stays steady. Reduced motion uses still poses and state changes. The approved camcorder artwork and animation are implemented; sustained performance remains unverified.
+- Stop saves automatically to the recording folder and adds the result to Recent. Open preview normally; a fullscreen app is not interrupted or given a delayed automatic preview.
+- MP4 is the primary output. The menu offers Original or 1080p resolution and 30 fps (default) or 60 fps. Cursor inclusion starts on. Sustained performance still needs proof.
+
+Implementation now includes the approved puck, handheld camcorder, Window/Screen menu, system audio and optional mic, countdown, pause/resume, autosave, Recent, explicit-play preview, trim handles, Save as, and GIF export. Default output is up to 1080p at 30 fps. Nothing is installed or merged by this implementation alone. Remaining hardware and gameplay checks are listed below.
 
 ## Job
 
-Record a region, a window or a whole display as an MP4 or a GIF with one key, stop with one key, and have the file saved and in Recent, with nothing of Chippi's own in the picture.
+Record a window or one whole display, with optional system and mic audio; stop from the puck, a shortcut, or the Radial menu; save a playable MP4 into Recent with Chippi's controls excluded from the picture. Trim and GIF export use the saved result.
 
 ## Doors
 
 | Door | What it does |
 |---|---|
-| **Capture panel: Record and GIF** | Start the selector in record mode. The panel closes first |
+| **Capture panel: Record** | Open the recording menu: Window or Screen, source, audio switches, resolution, frame rate, Start |
 | **Capture panel: recording card** | While recording, it takes the modes row: red dot, elapsed time, source, Discard, Pause, Stop |
-| **Recording page** | Opens after Stop: poster, play, trim bar, Discard, Export GIF, Save as, Save |
-| **Shortcuts** | Record region, Record window, Record screen, Record GIF, Stop recording (below) |
-| **Search / Radial menu** | Each starter verb as Run |
+| **Recording page** | Preview the saved file: poster, play, trim bar, Export GIF, Save as, Open folder |
+| **Shortcuts** | Record window, Record screen, Pause/Resume recording, Stop recording |
+| **Search / Radial menu** | The same shared start, pause/resume, and stop actions, reflecting current session state |
 | **Actions** | None |
-| **Bar** | "0:42 · Recording · Region" as the top activity while it runs. "Recording saved" with length and source after a Stop over a fullscreen app |
-| **The pill** | A small window beside the recorded region: time, Pause, Stop |
+| **Expanded puck** | Vertically centered red dot and large timer, icon-only Pause/Resume and Stop, Chippi at his usual end. No separate pill |
 | **Settings** | Capture › Recording |
 
 ## Behavior
 
 ### Start
 
-Record region, Record window and Record screen use the shared selector in record mode (capture-layer.md): the selection stays on the display where the drag started, so a region never spans two displays in this build (README, one display per recording). Record window and Record screen record the display the window or screen is on. Record GIF is the same flow with GIF chosen.
+Record window chooses a specific window. Record screen chooses one display; with only one display, omit the redundant picker. Use existing capture infrastructure where it fits, without exposing Region, Freeform, or All displays recording modes. Capture the chosen window itself rather than treating it as an arbitrary rectangle of its monitor.
 
-After the selection, a bar under the region shows MP4 or GIF, System sound (off), Mic (off), Start and Cancel. Nothing records until Start. A 3-second countdown can be cancelled with Esc. The toggles start off each time: sound is never on unless switched on for that recording (Travis, task 487). The cursor is shown; Settings can hide it, and can show click rings.
+The recording menu shows Window/Screen, the selected source, Include system audio (on), Include mic audio (off), Original/1080p resolution, and 30/60 fps. The output is MP4. Audio switches show the current default device names; there is no separate device picker or app-versus-system audio choice. System audio means all applications playing through the selected default output, not every physical output at once. Reset the audio switches to these defaults for each new recording. Nothing records until Start; a 3-second countdown can be cancelled. The cursor is shown; Settings can hide it and optionally show click rings.
 
 ### While recording
 
-- **Frame and pill.** A 2 px red frame around the region and the pill just outside it. Both are their own top-level windows with `WDA_EXCLUDEFROMCAPTURE`, so they are not in the video. The pill is needed because the widget can sit on another display and hides while a fullscreen app is in front. The puck is left out of the video only while a recording runs.
+- **Puck controls.** The expanded puck takes priority over Now Playing and other activities while a recording runs. The larger red dot and elapsed time share one vertically centered row. There is no visible "Recording" text. Pause/Resume and Stop use icons only, with separate hit targets, hover feedback, keyboard focus, tooltips, and screen reader names. Pausing holds the timer, changes Pause to Resume, and uses an amber state indicator. The accessible state still names Recording or Paused.
+- **Pet and dragging.** Chippi opens the regular panel using the existing Home/Last page preference. Pressing either recording control must not also open a page or trigger another control. Preserve the puck's drag behavior and mirrored layouts. Opening the regular panel does not stop the session; the Capture recording card and shared shortcuts remain available.
+- **Capture exclusion and fullscreen.** Exclude the puck and any recording highlight from the output while the session runs. No additional floating control window is planned. Fullscreen games may hide or cover the normal puck: retain the Stop shortcut and Radial actions, and validate whether the puck can remain reachable without disturbing the game. This is an open technical check, not a promise of an exclusive-fullscreen overlay or an approved change to ordinary widget visibility.
 - **Pause and Resume.** Frames and audio stop and the video has no gap: the timeline continues from the last frame written.
-- **Stop.** Finalizes a playable MP4 and opens the recording page. Over a fullscreen app on the widget's display, nothing opens: the recording is saved to the Save to folder and added to Recent, and the bar says "Recording saved" (surfaces.md, Stopped over a fullscreen app).
+- **Stop.** Finalizes a playable MP4, saves to the Save to folder, and adds it to Recent every time. Open preview normally. Over a fullscreen app on the widget's display, save quietly; never open preview automatically later. Brief saved feedback may replace the timer once the puck is visible again.
 - **Discard.** "Discard recording?" with Cancel and Discard. Deletes the temporary file only.
 - **One recording at a time.** Starting a second shows "Already recording" on the bar and does nothing else.
 
 ### Recording page
 
-Poster frame, a Play button (nothing plays on its own), a trim bar with two handles, and the buttons Discard, Export GIF, Save as, Save. Trim re-encodes, with a progress state and Cancel; a cancelled trim removes only its partial file. Save writes to the Save to folder without asking, Save as asks. Recent keeps the recording with a poster thumbnail and its length.
+Poster frame, a Play button (nothing plays on its own), a trim bar with two handles, and Export GIF, Save as, and Open folder. The original recording is already saved before preview opens. Trim re-encodes, with progress and Cancel; cancellation removes only its partial output. Preserve the original when trimming or exporting. Recent keeps the recording with a poster thumbnail and its length. Discard while capturing removes a temporary recording after confirmation; deleting an already saved result is a separate confirmed action.
 
 ### GIF
 
-Frames are recorded as a temporary MP4 (memory stays flat; a raw 3440 × 1440 frame is 20 MB) and turned into a GIF on Stop or from Export GIF, at 15 fps, with no audio and a 60 second limit (behavior spec A). A longer recording exports its first 60 seconds, or the trimmed 60, and says so before it starts. The palette is WIC's with frame differencing first, compared against a ScreenToGif GIF of the same clip on fixtures; Chippi's own quantizer is built only if WIC's gradients band visibly (architecture section 3). Progress and Cancel while encoding.
+GIF exports from the saved MP4, at 15 fps, with no audio and a 60-second limit (behavior spec A). There is no separate GIF recording mode in the confirmed menu. Keep frames on disk rather than accumulating raw frames in memory. A longer clip needs an explicit range within the limit; do not silently truncate it. Start with WIC's palette and frame differencing and compare fixture output before deciding whether a custom quantizer is needed. Export has progress and Cancel and preserves the MP4.
 
 ### Video
 
-H.264 in MP4 through Media Foundation: WGC frames go to a `MediaStreamSource` and `MediaTranscoder` (Microsoft's SimpleRecorder sample, MIT, is the pattern), 30 fps, a hardware encoder when present and the software one otherwise. A region is cropped on the GPU from the display's frames before encoding. System sound is WASAPI loopback and the mic is WASAPI capture, lined up with the video on the performance counter (WGC `SystemRelativeTime`). They go to AAC as two tracks mixed into one. A Windows N edition without the Media Feature Pack gets "Recording failed" with the cause in Settings.
+Implemented pipeline: Windows Graphics Capture to bounded D3D11 surfaces, Media Foundation sink writer, H.264 plus optional AAC in fragmented MP4. The selected video encoder is inspected for its hardware-transform identity; production refuses an unverified or software encoder. There is no silent CPU fallback. System sound uses WASAPI loopback from the default output chosen at Start; optional mic capture uses the default input chosen at Start. One pause-aware QPC clock aligns video and audio. Native endpoint formats are normalized to stereo 48 kHz PCM, mixed, then encoded as AAC. Interrupted nonempty partial files are retained; long-session recovery still needs validation.
 
 ### Edge cases
 
 - **Disk full, device loss, sleep or encoder failure:** keep the playable part where the file allows, show "Recording stopped" with what was kept, and add it to Recent.
+- **Mic disappears:** keep video running and show "Microphone disconnected". Do not silently follow another input device mid-take. A default-device change alone does not replace a still-working device selected at Start. Validate output-device loss and speaker/earbud switching explicitly; surface a clear audio status rather than silently accepting missing sound.
 - **Window moves or resizes during Record window:** the frame follows the window; the output size is fixed at the start, with the window padded or cropped to it.
 - **Window closes:** the recording stops and is kept.
 - **Secure desktop (UAC, lock screen) or protected content:** refused or blank by Windows. Chippi shows "Can't record this window" rather than saving a blank file as a success where it can tell, and says what it can't tell in Settings.
 - **Display change** (unplugged, resolution): stops and keeps what was written.
 - **Elevated window:** a standard-user Chippi may not capture it as a window; Record screen includes it (unverified, README hard limits).
-- **A capture started during a recording:** the screenshot verbs are dimmed on the panel, since a freeze would cover the region. Convert stays usable.
+- **A capture started during a recording:** the screenshot verbs are dimmed on the panel, since the frozen-screen overlays would cover the recorded content. Convert stays usable.
 - **Quitting Chippi while recording:** asks "Stop recording and quit?" with Cancel and Stop. Stopping finalizes the file.
 
 ## The WGC border check (first, before any recording code)
 
-Kayla left this for wave 2 (capture-layer.md, spike results). The yellow border `IsBorderRequired = false` should remove is not verified off. Nothing below depends on the answer, but the frame and pill are positioned by it.
+Kayla left this for wave 2 (capture-layer.md, spike results). Borderless capture remains unverified for the unpackaged app. The plan uses the expanded puck, not the old frame-and-pill layout.
 
 1. In Sandbox, call `GraphicsCaptureAccess.RequestAccessAsync(GraphicsCaptureAccessKind.Borderless)` from an unpackaged build and record what comes back: allowed, a prompt, or refused.
 2. Run a 10-second WGC session on a display with `IsBorderRequired = false`, and another with it left on, in the same Sandbox.
 3. Judge by what the guest displays, not by a capture taken inside the session: a screenshot of the Sandbox window taken on the host, and Travis's eyes in his live check. A `BitBlt` inside the session proves nothing (capture-layer.md).
-4. **If the border shows,** Chippi leaves it: Windows draws it around the recorded display or window. The frame and pill sit just inside it, and Settings › Recording says Windows draws the border. No workaround.
+4. **If the border shows,** Chippi leaves it: Windows draws it around the recorded display or window. Place any optional recording highlight inside it; do not add a separate control pill or bypass the Windows border.
 
 ## Scrolling capture trial (task 480)
 
@@ -80,58 +99,84 @@ A short trial at the start of this wave, in its own spike with no PR, before rec
 
 ## Shortcuts
 
-Slots under the starter rule (README, task 482). All unassigned.
+Shared actions power Shortcuts, Search, and the Radial menu. Recording's Pause/Resume slot is explicitly included by the 2026-11-09 direction; result/editor verbs stay contextual. All global slots start unassigned.
 
 | Verb | Slot | Notes |
 |---|---|---|
-| Record region, Record window, Record screen, Record GIF | Global | Start the selector in record mode |
+| Record window, Record screen | Global | Choose the source, then show the recording setup; a single display needs no picker |
+| Pause/Resume recording | Global | Acts on the active session; Radial and puck show the appropriate state |
 | Stop recording | Global | With no recording, does nothing and the bar says "Not recording" |
-| Pause, Resume, Discard recording, Trim, Save, Save as, Export GIF | In context | Buttons on the pill, the recording card and the recording page. No global slot: the README inventory (task 482) names only the starters and Stop |
+| Discard recording, Trim, Save as, Open folder, Export GIF | In context | Recording card and saved-result page |
 | Start (Enter), Cancel (Esc) | In context, fixed | The selector's own keys, never registered with `RegisterHotKey` |
 
 Settings › Recording shows the slots read-only with Edit, which opens Settings › Shortcuts in that row. Nothing is recorded on the feature's page.
 
 ## What we took
 
-- **Snipping Tool:** region first, a deliberate Start, and a result preview. Left out: the Clipchamp hand-off; Chippi never launches another editor to save.
+- **Snipping Tool:** a deliberate Start and a result preview. Chippi offers Window and Screen only; it never launches another editor to save.
 - **ScreenToGif:** preview and trim before GIF export. Left out: its frame-by-frame editor.
-- **ShareX:** separate Record video and Record GIF verbs, independent of any upload. Left out: its workflow graph.
-- **Xbox Game Bar:** a stop shortcut and an unmistakable recording state (the pill). Left out: background replay recording.
+- **ShareX:** local recording and GIF export independent of upload. Left out: its workflow graph.
+- **Xbox Game Bar:** a stop shortcut and unmistakable recording state, shown on Chippi's puck. Left out: background replay recording.
 
 ## Copy
 
-For Marge's Decide pass.
+Current recording copy. Tooltips and accessible names remain descriptive even where visible controls have no text.
 
 | Where | Text |
 |---|---|
-| Panel tools | Record, GIF |
-| Start bar | MP4, GIF, System sound, Mic, Start, Cancel |
-| Bar while recording | 0:42 · Recording · Region |
-| Pill | 0:42, Pause, Resume, Stop |
+| Panel tool | Record |
+| Recording menu | Window, Screen, Include system audio, Include mic audio, Resolution, Frame rate, Start recording |
+| Expanded puck | Red dot and large elapsed time only; no visible Recording label |
+| Puck controls | Pause/Resume and Stop icons; tooltips Pause recording, Resume recording, Stop and save |
 | Recording card | Discard, Pause, Stop |
 | Discard confirm | Discard recording? with Cancel and Discard |
 | Quit confirm | Stop recording and quit? with Cancel and Stop |
-| Page buttons | Discard, Export GIF, Save as, Save |
+| Page buttons | Play, Trim, Export GIF, Save as, Open folder |
 | Trim states | Trimming, Cancel |
 | GIF over the limit | GIF is limited to 60 seconds |
-| After a Stop over a fullscreen app | Recording saved · 0:42 · Region |
+| Saved feedback | Saved; duration available in Recent and result preview |
+| Mic loss | Microphone disconnected |
 | Refusals | Already recording; Not recording; Can't record this window; Recording stopped; Recording failed |
 | Settings title | Recording |
-| Settings rows | Format, Frame rate, GIF limit, System sound, Mic, Cursor, Click rings, Save to, Shortcuts |
+| Settings rows | Save to, Cursor, Click rings, Shortcuts; recording menu holds the audio switches and quality controls |
 
 ## Shared code
 
 - **New:** `Chippi.Features.Recording` and `Chippi.Features.Recording.Tests`, both in `Chippi.slnx`. The recorder, the encoder pipeline and the GIF path live in a `Chippi.Media` library shared with Media tools (media-tools.md), also in the slnx. Names to Marge first. Module id `screen-recording`, `Capability.ScreenCapture`.
-- **Capture layer:** the selector's record mode (display-bound selection) is Kayla's; this brief asks for it and follows her API. Frame and pill windows use the zone overlay pattern (`WindowLayouts/Views/ZoneOverlay.cs`).
-- **Core / shell:** the bar's ambient state (a recording is the highest activity) and the puck hiding itself from capture while recording. Both are shared code (island, App), called out in the PR.
+- **Capture layer:** reuse source selection and capture infrastructure for Window and Screen. No recorder-specific region selector or separate floating pill.
+- **Core / shell:** extend the existing puck with recording controls, priority, mirrored layout, capture exclusion, and accessible state. Preserve the pet's normal panel destination and existing drag behavior. Fullscreen reachability is a spike/check item.
 - **Settings:** one page (Lumen). The slots go through `ModuleContext.Shortcuts` with `ShortcutEdits`.
 - **Package:** none new. Windows' own encoders only (README, task 484).
 
 ## Tests
 
-- **CI, unit.** The recorder against fake frame and audio sources and a fake encoder: pause leaves no gap in timestamps, discard removes only the temp file, a second start is refused, a stop with no recording does nothing. GIF: frame differencing on fixture frames, the 60-second cut, 15 fps timing. Trim arithmetic. Timeline mixing of two audio tracks on a fake clock.
-- **Offscreen shots** (`CHIPPI_ISLAND_SHOTS`): the Start bar, the pill, the recording card, the recording page (dark and light, with and without a trim), Settings.
-- **Sandbox, once at the end of the wave.** A fixture window of known motion and a known tone; record region, window and screen; check the file by decoding it: frame count, dimensions, a known pixel at the start and end, Chippi's frame and pill absent from every sampled frame, audio present only when switched on and the tone found in it. Pause and resume (duration, no frozen gap), Stop over a fullscreen fixture, disk-full on a small volume, the window closing mid-recording, GIF export size and loop count. The border check above. Sandbox only; never the real clipboard or the owner's screen.
+- **CI, unit.** Fake frame/audio sources and encoder: pause leaves no timestamp gap; discard touches only the temporary session; refuse a second start; stop without a session is harmless. Check both audio defaults, default-device selection at Start, mic loss while video continues, and no silent mid-take device replacement. Test puck controls independently from pet clicks and dragging, both mirrored layouts, and shared shortcut/Radial actions. GIF range limits, timing, trim arithmetic, and mixing use fixtures and a fake clock.
+- **Offscreen shots:** recording menu, expanded recording/paused/saved puck (large centered dot/time and icon-only controls), recording card, preview/trim, and Settings, in both themes. No separate pill.
+- **Sandbox and owned fixtures:** record a known window and display with known motion and tone; decode output to verify dimensions, duration, frame timing, audio toggles/sync, and exclusion of Chippi's controls. Cover pause/resume, Stop over fullscreen, display/window loss, disk-full, forced interruption/recovery, GIF export, and the border check. Use test-owned content, not the owner's desktop or microphone. Hardware checks separately cover longer gameplay, actual GPU encoders, and speakers/earbuds with Travis.
+
+## Performance requirements (2026-11-09)
+
+Travis wants the least practical impact on his computer. Recording still needs GPU work, some CPU/audio work, memory, and disk bandwidth. Hardware encoder availability alone does not prove a cheap end-to-end path, particularly when a game is already GPU-bound.
+
+- **Verify hardware encoding actually runs.** Prefer the GPU's H.264 encoder through a compatible Windows pipeline. Record the active encoder/adapter in diagnostics. A hardware-acceleration request is not proof that hardware was selected. Do not silently switch to CPU encoding, including mid-recording; decide the fallback behavior before implementation.
+- **Keep frames on the GPU where possible.** Reuse capture surfaces and buffers, perform necessary scaling/color conversion on the GPU, and avoid per-frame CPU readback, screenshot/PNG conversion, full-frame managed allocations, or unnecessary transfers between adapters. Validate the actual pipeline rather than claiming zero-copy in advance.
+- **Pace capture to the chosen output.** Use capture-side rate limiting where available and skip unnecessary frame work otherwise. A 165 Hz display does not require encoding 165 frames for a 30 fps file. Use bounded queues; release stale frames rather than accumulating latency and memory. Under overload, dropping a recording frame is preferable to growing an unbounded backlog. Preserve audio/timeline synchronization and report dropped frames.
+- **Write encoded output incrementally.** Keep memory bounded as recording duration grows, batch ordinary file writes, and validate that recovery/finalization does not introduce sustained stalls. No raw-frame history, background replay buffer, live video preview, concurrent trim, or GIF conversion while capturing.
+- **Keep the puck cheap.** Reuse small cached camcorder artwork and animate transforms/opacity rather than generating new bitmap frames. Do not tie pet animation to capture frame arrival or the display's refresh rate. Avoid rendering work while hidden and stop continuous recording motion when paused. Measure animation enabled versus disabled.
+- **Recommended low-impact setting:** 1080p at 30 fps with hardware H.264. Original resolution and 60 fps remain options. This is the implemented default following authorization to build. Lower encoded resolution reduces downstream work; capturing the source at native size may still carry a cost.
+- **No invented performance promise.** Do not claim zero impact, a fixed CPU percentage, or parity with another recorder until measured. Record CPU, GPU 3D/copy/video-encode utilization, RAM/VRAM, disk writes, output frame loss, and audio drift.
+
+Before release, compare repeatable baseline runs with recording off against 1080p30, 1080p60, and native-resolution recording at the same game settings. Include a GPU-heavy workload, a CPU-heavy workload, ordinary desktop motion, audio switch combinations, longer sessions, and the puck animation on/off. Use repeated paired runs after warm-up; report average FPS, frame-time distribution and 1% lows as well as recorder resource use and output quality. A healthy average FPS must not hide new frame-time spikes. The initial fixture checks establish the pipeline; real-game/hardware measurements happen later with Travis, not as part of this planning work. Choose a numerical release budget from those measurements before declaring performance acceptable.
+
+Implementation references: [Windows GPU capture frames](https://learn.microsoft.com/en-us/windows/uwp/audio-video-camera/screen-capture), [Media Foundation hardware transforms](https://learn.microsoft.com/en-us/windows/win32/medfound/hardware-mfts), and [NVIDIA's dedicated encoder architecture](https://developer.nvidia.com/video-codec-sdk). These document capabilities, not Chippi benchmark results.
+
+## Build order
+
+1. Prove capture, audio synchronization, hardware encoding, recoverable storage, border behavior, and fullscreen control access with owned fixtures.
+2. Build Window/Screen setup, countdown, manual recording, pause/resume, stop/autosave, Recent, and shared actions.
+3. Add the expanded puck controls and recording menu, preserving pet clicks and dragging.
+4. Add result preview, trim, and GIF export without replacing the saved original.
+5. Validate longer sessions, memory growth, dropped frames, audio drift, device changes, x64/ARM64, and installer behavior before release.
 
 ## Done means, and timings to set
 
@@ -149,5 +194,18 @@ Targets, none measured yet.
 - Whether the WGC border turns off for an unpackaged Chippi (the check above).
 - A physical 165 Hz display and a second monitor; the Sandbox has one.
 - Hardware encoder behavior on Travis's NVIDIA and AMD adapters, and the ARM64 path.
+- Sustained 60 fps, longer-session stability, and recovery after an interrupted write.
+- Puck access over real fullscreen games, and speaker/earbud/default-device changes during a recording.
 - HDR display recording.
 - Scrolling capture, until its trial reports.
+
+## Implementation evidence (2026-11-09)
+
+- Audio follow-up: preserve one resampler and continuous sample position per input; timestamp-error flags no longer discard valid audio. Smooth slow clock drift, allow capture-buffer delivery headroom, and drain/filter-flush captured audio before finalization. Normalize surround downmix and two-source mixing to leave headroom. Log source formats, timing errors, discontinuities, and late frames with the finished recording. Synthetic tests cover uneven packets, 16/44.1/48/96 kHz sources, integer PCM, drift, buffered delivery, pause, genuine gaps, and loud mixing; the native fixture decodes its AAC output to check distortion and packet-edge jumps without playback.
+
+- Native NVIDIA H.264 hardware transform verified with synthetic GPU surfaces and synthesized PCM written only to a file. The file reopened through Windows Media APIs with video dimensions and a poster.
+- End-to-end recording of an owned offscreen window on the host passed: native WGC, hardware encoding, pause/resume, Stop, playable MP4. No desktop or microphone capture and no playback.
+- Unpackaged Sandbox WGC returned the expected blue/red owned-window pixels. Borderless access returned Allowed. This establishes the API result, not visual proof that the border disappears.
+- Native trim produced a playable one-second copy; GIF export decoded to six frames for a 0.4-second, 15-fps range. Original MP4 remained intact.
+- Unit coverage includes bounded audio buffers, pause timestamps, surround mapping, size calculation, original-file protection, countdown cancellation, single-session ownership, Stop, Discard, and partial-file retention. Puck tests cover both sides, distinct controls, and priority over Now Playing.
+- Still required with real use: longer sessions, game frame-time/resource measurements, actual input/output disconnects, exclusive fullscreen, multi-monitor/HDR, and ARM64 hardware execution. Click rings are deferred; cursor inclusion is implemented.

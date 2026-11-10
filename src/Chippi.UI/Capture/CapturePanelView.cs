@@ -235,6 +235,7 @@ public sealed class CapturePanelView : UserControl
         bool capture = _model.CanCapture;
         var mode = capture ? Visibility.Visible : Visibility.Collapsed;
         _modes.Visibility = mode;
+        _modes.IsEnabled = _delay.IsEnabled = !_model.IsRecording;
         _delay.Visibility = mode;
         if (!capture) _delayMenu.IsOpen = false;
         ShowDelay();
@@ -250,6 +251,7 @@ public sealed class CapturePanelView : UserControl
             {
                 var tool = tools[i];
                 var card = Card(tool.Name, tool.Verb, tool.Icon);
+                card.IsEnabled = tool.Enabled;
                 card.Click += (_, _) => tool.Start();
                 Tip(card, tool.Verb, tool.Keys);
                 Place(_tools, card, i);
@@ -259,7 +261,7 @@ public sealed class CapturePanelView : UserControl
         // Without the modes the tools lead the page.
         _tools.Margin = new Thickness(0, capture ? IslandPage.Gap : 0, 0, 0);
 
-        var recent = capture ? _model.Recent.Take(RecentShown).ToList() : [];
+        var recent = _model.HasRecent ? _model.Recent.Take(RecentShown).ToList() : [];
         if (!recent.SequenceEqual(_shownRecent))
         {
             _shownRecent = recent;
@@ -271,10 +273,10 @@ public sealed class CapturePanelView : UserControl
                 _recent.Children.Add(thumb);
             }
         }
-        _recentHeading.Visibility = mode;
+        _recentHeading.Visibility = _model.HasRecent ? Visibility.Visible : Visibility.Collapsed;
         _openFolder.Visibility = recent.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         _recent.Visibility = recent.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
-        _empty.Visibility = capture && recent.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        _empty.Visibility = _model.HasRecent && recent.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
     }
 
     /// <summary>A mode or tool card, as the home's tool tiles: the glyph over its label, a lift on hover and focus.</summary>

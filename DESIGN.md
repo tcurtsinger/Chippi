@@ -165,6 +165,8 @@ Dark: Window `#202020` · Card `#2B2B2B` · Flyout `#2C2C2C` · Flyout footer `#
 
 **Island** (revised 2026-10-29): the widget and its panel follow the app theme on a solid surface, `#28282C` in dark and `#F5F5F6` in light, both at 96% (Windows shows its own acrylic this way on this PC, with transparency effects off). Its accent is the pet's violet, not the Accent setting: `#B79CFF` dark, `#7444F0` light, and what's on or primary takes the accent fill, a violet-to-blue gradient (`#B78FFF` → `#82AEFF` dark with `#170F2E` text, `#8F5CFF` → `#5B86FF` light with white text). The exact keys are the `Island*` brushes in `Dark.xaml` and `Light.xaml`.
 
+**Expanded widget rim (Travis, 2026-11-09):** the large activity/Now Playing/recording puck has no decorative outer border, at rest or on hover. Keep that border absent while it folds or opens the panel. The compact puck keeps its existing rim; keyboard focus remains visible on the separate click targets.
+
 ### Text
 Dark: Text `#FFFFFF` · Secondary `#C5C5C5` (values, inactive tab and segment labels, icon buttons) · Caption `#ABABAB` · Muted `#9D9D9D` (nav group labels, placeholders, glyphs of features that are off). Light: `#1A1A1A` · `#404040` · `#5D5D5D` · `#616161`.
 

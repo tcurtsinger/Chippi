@@ -77,7 +77,7 @@ public static class FeatureCatalog
             Requires = [Capability.ScreenCapture],
             Presets = PowerUser,
         },
-        new("screen-recording", "Screen recording", "Record a region or window to video or GIF", FeatureGroup.Capture)
+        new("screen-recording", "Screen recording", "Record a window or screen with sound", FeatureGroup.Capture)
         {
             Icon = "Video",
             Requires = [Capability.ScreenCapture],

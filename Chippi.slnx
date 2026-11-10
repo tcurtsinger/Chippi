@@ -2,6 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/Chippi.App/Chippi.App.csproj" />
     <Project Path="src/Chippi.Audio/Chippi.Audio.csproj" />
+    <Project Path="src/Chippi.Media/Chippi.Media.csproj" />
     <Project Path="src/Chippi.Capture/Chippi.Capture.csproj" />
     <Project Path="src/Chippi.Clipboard/Chippi.Clipboard.csproj" />
     <Project Path="src/Chippi.Core/Chippi.Core.csproj" />
@@ -20,6 +21,7 @@
     <Project Path="src/Features/Chippi.Features.Scratchpad/Chippi.Features.Scratchpad.csproj" />
     <Project Path="src/Features/Chippi.Features.PlainPaste/Chippi.Features.PlainPaste.csproj" />
     <Project Path="src/Features/Chippi.Features.ScreenCapture/Chippi.Features.ScreenCapture.csproj" />
+    <Project Path="src/Features/Chippi.Features.Recording/Chippi.Features.Recording.csproj" />
     <Project Path="src/Features/Chippi.Features.Shelf/Chippi.Features.Shelf.csproj" />
     <Project Path="src/Features/Chippi.Features.Shortcuts/Chippi.Features.Shortcuts.csproj" />
     <Project Path="src/Features/Chippi.Features.WindowLayouts/Chippi.Features.WindowLayouts.csproj" />
@@ -39,6 +41,8 @@
     <Project Path="src/Features/Chippi.Features.AppSwitcher/Chippi.Features.AppSwitcher.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/Chippi.Media.Tests/Chippi.Media.Tests.csproj" />
+    <Project Path="tests/Chippi.Features.Recording.Tests/Chippi.Features.Recording.Tests.csproj" />
     <Project Path="tests/Chippi.Audio.Tests/Chippi.Audio.Tests.csproj" />
     <Project Path="tests/Chippi.Capture.Tests/Chippi.Capture.Tests.csproj" />
     <Project Path="tests/Chippi.Clipboard.Tests/Chippi.Clipboard.Tests.csproj" />
