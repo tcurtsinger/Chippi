@@ -43,7 +43,7 @@ internal sealed class IslandPlacementEventArgs(double x, double y, HMONITOR moni
 /// there is something to show (the song, or the highest activity), with the red badge for a muted mic.
 /// Status icons extend the compact puck into a side tab. Every window here never activates (WS_EX_NOACTIVATE
 /// plus WM_MOUSEACTIVATE) and never shows in Alt+Tab or the taskbar, and is placed in physical pixels on
-/// the monitor it is given. Hovering brightens the rim and wakes the blob; a click becomes the panel,
+/// the monitor it is given. Hovering wakes the blob; a click becomes the panel,
 /// which stays open until a click outside it or Esc. Moving 4 DIPs picks up only the compact puck.
 /// Its tab turns inward while held and it lands inside the work area. The tray icon opens
 /// Settings. <see cref="IslandHost"/> feeds it activities, the mood, the monitor, the saved place and
@@ -138,7 +138,6 @@ public partial class IslandWindow : Window
     private bool _lastPagePending;
     private string _lineText = "";
     private string? _shownContent; // what the bar shows, by identity: a new one arrives (Arrival)
-    private string? _rim; // the rim's brush key, rest or hovered
     private string _chipText = ""; // the line as plain text, for the chip's name
     private string _lineState = "";
     private TabLevel? _level;
@@ -163,11 +162,7 @@ public partial class IslandWindow : Window
 
         PuckButton.MouseEnter += (_, _) => SetHover(true);
         PuckButton.MouseLeave += (_, _) => SetHover(false);
-        Body.SizeChanged += (_, _) =>
-        {
-            LayoutClickTargets();
-            if (!_panel.IsVisible) Body.BorderThickness = new Thickness(WidgetHasRim ? 1 : 0);
-        };
+        Body.SizeChanged += (_, _) => LayoutClickTargets();
         // Hidden (a fullscreen app in front), the song stops scrolling; shown again, it starts over.
         IsVisibleChanged += (_, _) =>
         {
@@ -201,11 +196,10 @@ public partial class IslandWindow : Window
             double Fade(double until) => Motion.IsReduced ? 1 - phase : 1 - IslandPanelWindow.SmoothStep(phase / until);
             bool hadBarInk = BarLayer.Opacity > 0;
             double surface = Fade(0.11);
-            // Carry the fill across native presents, but let the moving outline own the rim and shadow
-            // as soon as it separates. A second circular stroke inside the new surface reads as a puck.
+            // Carry the fill across native presents, but let the moving outline own the shadow
+            // as soon as it separates.
             double edge = Fade(0.04);
             Body.Opacity = surface;
-            Body.BorderThickness = new Thickness(WidgetHasRim ? edge : 0);
             BodyShadow.Opacity = edge;
             Body.Visibility = BodyShadow.Visibility = surface > 0 ? Visibility.Visible : Visibility.Hidden;
             bool handOver = _panel.PetMeetsPuck && !Motion.IsReduced;
@@ -788,9 +782,7 @@ public partial class IslandWindow : Window
             return;
         if (!_heldWidth.HasValue && !_panel.IsVisible)
             HoldBarMotion(); // summoned without a press: keep an interrupted unfold at its visible width too
-        var sourceRim = Body.BorderThickness.Left == 0 ? Brushes.Transparent
-            : Body.BorderBrush as SolidColorBrush ?? TryFindResource(_rim ?? "IslandWidgetBorderBrush") as SolidColorBrush;
-        _panel.Open(_puck, RenderedWidgetRect(), area, sourceRim, Body.TabExtension, _left);
+        _panel.Open(_puck, RenderedWidgetRect(), area, Brushes.Transparent, Body.TabExtension, _left);
         IslandNative.Raise(_hwnd); // Chippi and the bar's content stay above the shape the widget became, fading
         Hook();
     }
@@ -955,8 +947,8 @@ public partial class IslandWindow : Window
     // ----- The puck and the bar -----
 
     /// <summary>
-    /// The widget: the blob sleeps at rest and wakes on hover or while anything is live; hover brightens the
-    /// rim, never the size, and the puck lifts while dragged. The widget is the bar while there is something
+    /// The widget: the blob sleeps at rest and wakes on hover or while anything is live; hover never changes
+    /// the size, and the puck lifts while dragged. The widget is the bar while there is something
     /// to show, in order: a drag from another app (the page it opens), a pending close command, Plain paste's feedback, the song
     /// playing (or paused, for <see cref="PauseHold"/>), or the highest activity. Otherwise it is the puck.
     /// During a drag only the compact puck and its status icons follow the pointer.
@@ -975,7 +967,6 @@ public partial class IslandWindow : Window
         // A long bar lifts by its shadow alone. A tilt about its center would move the end out of the hand.
         bool heldBar = _heldWidth is { } held && (_pressedBar || held > IslandGeometry.Puck + Body.TabExtension);
         Grow(heldBar ? 1 : _lifted ? LiftScale : pressed ? PressScale : 1, _lifted && !heldBar ? LiftTilt : 0, pressed ? FillFade.Time : GrowTime);
-        ShowRim(_hovered && !_lifted ? "IslandWidgetHoverBorderBrush" : "IslandWidgetBorderBrush");
         bool keepSource = _panel.IsVisible && (!_panel.IsOpen || (_panel.IsMorphing && BarLayer.Opacity > 0));
         if (_heldWidth is not null || keepSource)
         {
@@ -1212,19 +1203,6 @@ public partial class IslandWindow : Window
         return engaged || _windingDown;
     }
 
-    /// <summary>The rim brightens on hover and dims after, over 83ms, like Windows' own controls.</summary>
-    private void ShowRim(string key)
-    {
-        if (key == _rim)
-            return;
-        bool first = _rim is null;
-        _rim = key;
-        if (first)
-            Body.SetResourceReference(Border.BorderBrushProperty, key);
-        else
-            FillFade.Blend(Body, Border.BorderBrushProperty, Body.BorderBrush, (Brush)FindResource(key), () => Body.SetResourceReference(Border.BorderBrushProperty, key));
-    }
-
     // Slots grow from Chippi toward the middle of the display. Keep a fading slot until its ink is gone.
     private void LayoutBadgeTab()
     {
@@ -1406,7 +1384,6 @@ public partial class IslandWindow : Window
         bool fadeBar = _barShown != shown || _resumeBar;
         _resumeBar = false;
         _barShown = shown;
-        Body.BorderThickness = new Thickness(WidgetHasRim ? 1 : 0);
         _widthTarget = width;
         if (Motion.IsReduced || !IsVisible || _lifted || _panel.IsVisible)
         {
@@ -1427,8 +1404,6 @@ public partial class IslandWindow : Window
             : new DoubleAnimation(0, FoldTime / 2);
         Bar.BeginAnimation(OpacityProperty, fade, HandoffBehavior.SnapshotAndReplace);
     }
-
-    private bool WidgetHasRim => !_barShown && PuckButton.Width <= _compactWidth + 0.5;
 
     /// <summary>The puck's size and tilt, eased over <paramref name="time"/> (120ms; 83ms for a press), at once under reduced motion or while hidden.</summary>
     private void Grow(double scale, double tilt, TimeSpan? time = null)

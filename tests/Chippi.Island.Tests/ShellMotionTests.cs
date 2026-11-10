@@ -185,7 +185,7 @@ public sealed class ShellMotionTests
     [Fact]
     public void A_fill_going_back_to_clear_fades_out_rather_than_snapping() => WpfTestThread.Run(() => WithMotion(false, () => IslandWindowTests.WithShownIsland(window =>
     {
-        // The rim blends the same way the controls' fills do (FillFade.Blend). The blend's clock moves only when the
+        // The blend's clock moves only when the
         // test moves it, so a slow runner's late frames can't leave it unstarted.
         var wall = FillFade.Clock;
         long now = Stopwatch.GetTimestamp();
@@ -206,19 +206,17 @@ public sealed class ShellMotionTests
         CompositionTarget.Rendering += counted;
         try
         {
-            window.PuckButton.RaiseEvent(new MouseEventArgs(Mouse.PrimaryDevice, 0) { RoutedEvent = Mouse.MouseEnterEvent });
-            Frame(); // the fade starts on the first frame
-            Advance(100);
-            Assert.Same(window.FindResource("IslandWidgetHoverBorderBrush"), window.Body.BorderBrush);
-            window.PuckButton.RaiseEvent(new MouseEventArgs(Mouse.PrimaryDevice, 0) { RoutedEvent = Mouse.MouseLeaveEvent });
-            var blend = Assert.IsType<DrawingBrush>(window.Body.BorderBrush);
+            window.Body.Background = Brushes.White;
+            FillFade.Blend(window.Body, Border.BackgroundProperty, Brushes.White, Brushes.Transparent,
+                () => window.Body.Background = Brushes.Transparent);
+            var blend = Assert.IsType<DrawingBrush>(window.Body.Background);
             var layers = ((DrawingGroup)blend.Drawing).Children.Cast<DrawingGroup>().ToList();
             Frame();
             Advance(40); // about half of the 83ms
             Assert.Equal(1 - 40 / 83.0, layers[0].Opacity, 3); // the old one fading out
             Assert.Equal(40 / 83.0, layers[1].Opacity, 3); // as the new one fades in
             Advance(60);
-            Assert.Same(window.FindResource("IslandWidgetBorderBrush"), window.Body.BorderBrush);
+            Assert.Same(Brushes.Transparent, window.Body.Background);
         }
         finally
         {

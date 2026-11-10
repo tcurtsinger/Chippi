@@ -78,50 +78,21 @@ public sealed class IslandWindowTests
     }
 
     [Fact]
-    public void Hovering_brightens_the_rim_and_wakes_the_blob_but_never_grows_the_widget()
+    public void Hovering_wakes_the_blob_without_a_rim_or_growing_the_widget()
     {
         WpfTestThread.Run(() => WithShownIsland(window =>
         {
-            var wall = FillFade.Clock;
-            long now = Stopwatch.GetTimestamp();
-            int frames = 0;
-            EventHandler counted = (_, _) => frames++;
-            void Frame()
-            {
-                int at = frames;
-                PumpUntil(() => frames > at);
-            }
-            void Advance(double ms)
-            {
-                now += (long)(ms * Stopwatch.Frequency / 1000);
-                Frame();
-            }
-
-            FillFade.Clock = () => now;
-            CompositionTarget.Rendering += counted;
-            try
-            {
-                Assert.Equal(1, window.PuckScaleTarget);
-                Assert.Equal(Chippi.UI.Pet.PetMood.Sleepy, window.Pet.Mood);
-                Hover(window, Mouse.MouseEnterEvent);
-                Assert.Equal(1, window.PuckScaleTarget);
-                Assert.Equal(50, window.PuckButton.Width);
-                Assert.IsType<DrawingBrush>(window.Body.BorderBrush); // the rim blends over 83ms, like Windows' own controls
-                Frame(); // the fade starts on its first rendered frame, however late the runner draws it
-                Advance(100);
-                Assert.Same(window.FindResource("IslandWidgetHoverBorderBrush"), window.Body.BorderBrush);
-                Assert.Equal(Chippi.UI.Pet.PetMood.Idle, window.Pet.Mood);
-                Hover(window, Mouse.MouseLeaveEvent);
-                Frame();
-                Advance(100);
-                Assert.Same(window.FindResource("IslandWidgetBorderBrush"), window.Body.BorderBrush);
-                Assert.Equal(Chippi.UI.Pet.PetMood.Idle, window.Pet.Mood); // his eyes stay open for the quiet minute
-            }
-            finally
-            {
-                CompositionTarget.Rendering -= counted;
-                FillFade.Clock = wall;
-            }
+            Assert.Equal(1, window.PuckScaleTarget);
+            Assert.Equal(new Thickness(0), window.Body.BorderThickness);
+            Assert.Equal(Chippi.UI.Pet.PetMood.Sleepy, window.Pet.Mood);
+            Hover(window, Mouse.MouseEnterEvent);
+            Assert.Equal(1, window.PuckScaleTarget);
+            Assert.Equal(50, window.PuckButton.Width);
+            Assert.Equal(new Thickness(0), window.Body.BorderThickness);
+            Assert.Equal(Chippi.UI.Pet.PetMood.Idle, window.Pet.Mood);
+            Hover(window, Mouse.MouseLeaveEvent);
+            Assert.Equal(new Thickness(0), window.Body.BorderThickness);
+            Assert.Equal(Chippi.UI.Pet.PetMood.Idle, window.Pet.Mood); // his eyes stay open for the quiet minute
         }));
     }
 
