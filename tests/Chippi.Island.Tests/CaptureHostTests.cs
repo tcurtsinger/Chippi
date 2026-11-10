@@ -9,6 +9,7 @@ using Chippi.Core.Config;
 using Chippi.Core.Island;
 using Chippi.Core.Modules;
 using Chippi.Features.ColorPicker;
+using Chippi.Features.MediaTools;
 using Chippi.Features.ScreenCapture;
 using Chippi.Features.ScreenText;
 using Chippi.UI.Capture;
@@ -18,6 +19,30 @@ namespace Chippi.Island.Tests;
 
 public sealed class CaptureHostTests
 {
+    [Fact]
+    public void Media_tools_can_supply_Capture_without_screen_capture_permissions() => WpfTestThread.Run(() =>
+    {
+        string root = Path.Combine(Path.GetTempPath(), "chippi-media-host-" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(root);
+        var config = new ConfigStore(Path.Combine(root, "settings.json"));
+        config.SetSection("features", new { preset = FeaturePreset.Custom, installed = new[] { MediaToolsModule.Id }, capabilitiesUsed = Array.Empty<string>() });
+        var shell = new ShellContext(config, NullLoggerFactory.Instance, false, "media-host-test-" + Guid.NewGuid().ToString("N"));
+        var media = new MediaToolsModule();
+        var host = new CapturePanelHost(shell, new ScreenCaptureModule(shell.Capture), new ScreenTextModule(shell.Capture), new ColorPickerModule(shell.Capture), mediaTools: media);
+        shell.Registry.Register(media);
+        try
+        {
+            WpfTestThread.Wait(shell.Registry.StartAsync()); host.Refresh();
+            Assert.True(host.Visible); Assert.False(host.CanCapture);
+            var tool = Assert.Single(host.Tools); Assert.Equal("media-tools/convert", tool.Id); Assert.True(tool.Enabled);
+            WpfTestThread.Wait(shell.Registry.SetInstalledAsync(MediaToolsModule.Id, false)); host.Refresh(); Assert.False(host.Visible);
+        }
+        finally
+        {
+            WpfTestThread.Wait(shell.Registry.StopAllAsync()); host.Dispose();
+            shell.Clipboard.Dispose(); shell.Input.Dispose(); shell.Hotkeys.Dispose(); Directory.Delete(root, true);
+        }
+    });
+
     [Fact]
     public void Leaving_Capture_resets_its_Recent_page() => WpfTestThread.Run(() =>
     {

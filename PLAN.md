@@ -136,6 +136,7 @@ cleaner, port manager, displays and brightness. Displays and brightness is in th
 Essentials preset, the only one of its features not built yet. Capture gets its own home tile and panel, Displays the 12th tile; the Apps trio goes in an Actions menu.
 - **Wave 1:** the capture layer and selector, Screen capture with markup, Color picker, Text and QR, Displays and brightness.
 - **Wave 2:** Screen recording, Media tools, and a scrolling capture trial.
+- **Media tools (2026-11-10):** approved Convert v1, options above the list; implemented Convert, Resize and Compress with native Windows encoders, batch progress, retry, cancellation and image comparison. [Brief and verification](docs/phase-7/media-tools.md). Hardware/performance checks remain listed there.
 - **Wave 3:** the admin helper, App updates, Uninstaller, Cleaner, Port manager.
 
 ## Open items

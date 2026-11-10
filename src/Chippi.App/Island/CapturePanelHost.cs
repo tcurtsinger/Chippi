@@ -11,6 +11,7 @@ using Chippi.Features.ScreenCapture;
 using Chippi.Features.ScreenText;
 using Chippi.Features.ColorPicker;
 using Chippi.Features.Recording;
+using Chippi.Features.MediaTools;
 using Chippi.Media;
 using Chippi.UI.Capture;
 using Chippi.UI.Controls;
@@ -25,6 +26,7 @@ internal sealed class CapturePanelHost : ICapturePanelModel, IDisposable
     private readonly ScreenTextModule _text;
     private readonly ColorPickerModule _color;
     private readonly RecordingModule? _recording;
+    private readonly MediaToolsModule? _mediaTools;
     private ScreenCaptureModel? _observed;
     private readonly CapturePanelView _view;
     private readonly ContentControl _body = new();
@@ -37,10 +39,11 @@ internal sealed class CapturePanelHost : ICapturePanelModel, IDisposable
     private bool _disposed;
     public sealed record HostSettings { public KeyShortcut? OpenCapture { get; init; } }
     private readonly Dispatcher _dispatcher = Dispatcher.CurrentDispatcher;
-    public CapturePanelHost(ShellContext shell, ScreenCaptureModule capture, ScreenTextModule text, ColorPickerModule color, RecordingModule? recording = null)
+    public CapturePanelHost(ShellContext shell, ScreenCaptureModule capture, ScreenTextModule text, ColorPickerModule color, RecordingModule? recording = null, MediaToolsModule? mediaTools = null)
     {
         _shell = shell; _capture = capture; _text = text; _color = color;
         _recording = recording;
+        _mediaTools = mediaTools;
         if (recording != null) recording.Changed += QueueRefresh;
         var view = _view = new CapturePanelView(this, shell.Services.HoldIslandOpen);
         Tile = new IslandTileContribution("capture", new IslandTileSpec("capture", "Capture", "Scan", 75, 0, () => _body)
@@ -67,7 +70,7 @@ internal sealed class CapturePanelHost : ICapturePanelModel, IDisposable
     }
     public IslandTileContribution Tile { get; }
     private bool Running(string id) => _shell.Registry.Find(id)?.IsRunning == true;
-    public bool Visible => CanCapture || Running(ScreenTextModule.Id) || Running(ColorPickerModule.Id) || Running(RecordingModule.Id);
+    public bool Visible => CanCapture || Running(ScreenTextModule.Id) || Running(ColorPickerModule.Id) || Running(RecordingModule.Id) || Running(MediaToolsModule.Id);
     public bool CanCapture => Running(ScreenCaptureModule.Id);
     public bool IsRecording => _recording?.Model?.Active == true;
     public bool HasRecent => CanCapture || Running(RecordingModule.Id);
@@ -161,7 +164,8 @@ internal sealed class CapturePanelHost : ICapturePanelModel, IDisposable
                 tools.Add(new("screen-text/qr", "QR code", "Scan QR", LucideIcons.QrCode, () => _text.Start(ScreenTextVerb.ScanQr, CaptureDoor.Island)) { Keys = ToolKeys(ScreenTextModule.Id, ScreenTextModule.ScanName) });
             }
             if (Running(ColorPickerModule.Id)) tools.Add(new("color-picker/pick", "Color", "Pick color", LucideIcons.Pipette, () => _color.Pick(false, CaptureDoor.Island)) { Keys = ToolKeys(ColorPickerModule.Id, ColorPickerModule.PickName) });
-            return tools.Select(t => t with { Enabled = !IsRecording || t.Id == "recording/start" }).ToArray();
+            if (Running(MediaToolsModule.Id)) tools.Add(new("media-tools/convert", "Convert", "Convert media", LucideIcons.Video, () => _mediaTools?.Open()) { Keys = ToolKeys(MediaToolsModule.Id, MediaToolsModule.ShortcutNames[0]) });
+            return tools.Select(t => t with { Enabled = !IsRecording || t.Id is "recording/start" or "media-tools/convert" }).ToArray();
         }
     }
     public IReadOnlyList<CapturePanelRecent> Recent => (_capture.Model?.Recent.Select(x => (x.Time, Item: new CapturePanelRecent(x.Id.ToString(), $"{x.Width} × {x.Height}", x.Time.ToLocalTime().ToString("g"), _capture.Model.Thumbnail(x.Id)))) ?? [])

@@ -1,128 +1,76 @@
-# Media tools: brief
+# Media tools
 
-Wave 2. Owner: Herb. For Travis to confirm. Decisions: [README](README.md) (task 478 scope, task 484 libraries, task 486 call 4: Convert is a page on the Capture panel, not a tile). Research: [behavior-spec-a.md](behavior-spec-a.md) (Media tools), [architecture.md](architecture.md) section 3 (Encoders), [surfaces.md](surfaces.md) section 4 (Convert). Shared encoder code: [screen-recording.md](screen-recording.md) (`Chippi.Media`). Mockup: Lumen's Convert page in `wave-1.html` for the layout; she adds the Resize and Compress states and Settings before this is built. DESIGN.md wins where it speaks.
+Wave 2 implementation, 2026-11-10. Travis selected [Convert v1: options above the list](design/reference/convert/v1.html) and authorized the build: “I like the options above the list. Let's use that layout. Go ahead and build”. The native WPF implementation follows the existing Chippi system in `DESIGN.md`. Verification and remaining hardware checks are recorded in [media-tools-verification.md](media-tools-verification.md).
+
+Related decisions: [README](README.md), [surfaces.md](surfaces.md) section 4, [architecture.md](architecture.md) section 3, and the shared `Chippi.Media` library introduced by [Screen recording](screen-recording.md).
 
 ## Job
 
-Convert, resize and compress images and short videos on the PC, in a batch, without leaving the originals changed and without uploading anything.
+Convert, resize and compress batches of images and videos locally, preserving the originals. Files are neither uploaded nor played automatically.
+
+## Direction contract
+
+**THESIS:** One compact batch workbench keeps the active options above the files, so the owner can check a whole batch before Run.
+
+**OWN-WORLD:** Inherit Chippi's neutral dark and light surfaces, Segoe text, existing violet accent, rounded native controls, and Lucide icons. Settings uses the existing Card and SettingRow components.
+
+**STORY:** Add or drop files, choose the operation and its settings, check row refusals, then Run. Progress stays with each file; finished images offer Compare and exports offer Open.
+
+**FIRST VIEWPORT:** A 520 × 360 island page places the title and Convert/Resize/Compress controls in the header, options above a five-row list, the destination below, and Add files left with Run or Cancel right. Larger batches page in groups of five.
+
+**FORM:** The first supplied layout, `convert/v1.html`, was explicitly selected. No seed round applies to this precise existing reference; seed: none (unavailable).
+
+**FINISH:** unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance.
 
 ## Doors
 
-| Door | What it does |
+| Door | Behavior |
 |---|---|
-| **Capture panel: Convert** | Opens the Convert page. Convert stays usable while a recording runs |
-| **Convert page** | Header switches Convert, Resize, Compress. Files, two option dropdowns, Add files, Run |
-| **Shortcuts** | Convert media, Resize images, Compress media: each opens the page on that tab with a file picker (below) |
-| **Search / Radial menu** | Each verb as Run |
-| **Actions** | None |
-| **Bar** | "3 of 4 converted" while a batch runs; "Converted 4 · 12.4 MB saved" for 6 seconds after |
-| **Settings** | Capture › Media tools |
+| Capture › Convert | Opens the page on its last selected tab while Media tools is installed; remains available during recording |
+| Page header | Switches Convert, Resize, Compress |
+| Search / Radial menu | Shared Convert media, Resize images, Compress media commands |
+| Global shortcuts | The same three commands, initially unassigned; open the selected tab and a file picker |
+| Activity puck | Batch count while running; completion count, failures or bytes saved afterward |
+| Settings › Capture › Media tools | Output folder, Keep metadata, Default level, JPEG background, and three read-only shortcuts with Edit |
 
-Dropping files on the page adds them. There is no Explorer menu (README, left for later).
+There is no separate home tile, Actions entry, or Explorer context menu. Media tools does not require screen-capture permission merely to process files.
 
-## Behavior
-
-### What it does
+## Operations
 
 | Tab | Images | Video |
 |---|---|---|
-| **Convert** | To PNG or JPEG | To MP4 (H.264), or to GIF from a clip |
-| **Resize** | A width, a height, or a percent, with Fit, Fill (crop) or Stretch | A target height: 1080p, 720p, 480p |
-| **Compress** | JPEG quality (a preset: Small, Balanced, High) | A lower bitrate with the same size (the same three presets) |
+| Convert | PNG or JPEG; animated GIF can also become MP4 | MP4/H.264, or GIF for clips up to 60 seconds |
+| Resize | PNG at a percentage or width/height; Fit, centered Fill crop, or Stretch | MP4 at a percentage or target height, preserving aspect ratio |
+| Compress | JPEG with Small, Balanced or High quality | MP4 with the same dimensions and a lower target bitrate |
 
-Inputs are what the PC can decode: images through WIC (PNG, JPEG, BMP, GIF, TIFF, and HEIF, AVIF or WebP where a decoder is installed), video through Media Foundation (MP4 and MOV, HEVC, VP9 and AV1 where the Store extension is present). Chippi lists what the PC can decode by asking Windows (`CodecQuery`, as the spike did) rather than a fixed list. Outputs are the first-build contract: PNG, JPEG, MP4 and GIF. WebP, AVIF and HEIF output, WebM, AVI and extra codecs are left out (README task 478; architecture section 3). No ffmpeg: if a job here needs something Windows can't do, this brief lists it in Not verified and Marge offers it to Travis; none is expected.
+- Defaults are JPEG, Balanced, white JPEG background, Keep metadata off, and output beside the originals. Resize starts at 50% with Fit.
+- Image size presets are 50%, 75%, 100%, 150%, 200%, 1920 × 1080, 1280 × 720 and 640 × 480, plus custom dimensions. The Scale field accepts 1–400%; dimensions accept 1–16384 pixels. Video uses the preset/custom height and retains its own aspect ratio.
+- PNG shows Lossless instead of an inactive quality choice. GIF export uses the existing 15 fps exporter. Quality applies to JPEG and MP4.
+- Windows' installed WIC decoders determine recognized image extensions. Video is checked by attempting a Media Foundation decode. Store codecs remain dependent on the PC; no codec package, ffmpeg, or other dependency is added.
+- Output formats are PNG, JPEG, MP4 and GIF. WebP/AVIF/HEIF output, WebM and extra transcode controls remain out of scope.
 
-### The page
+## Page behavior
 
-- **Empty:** a drop zone with Add files.
-- **With files:** a list with the name, current size and format, the estimated output size where known, and a status per file. More than five files page like Actions lists. A file's row has Remove.
-- **Options:** two dropdowns that change with the tab, for example Convert shows Format and Quality, Resize shows Size and Fit. Run is the verb. A summary line states the destination.
-- **Run:** processes files in order. A file's row shows progress; after it, the actual bytes and the saving. Cancel stops between files and removes only the partial file of the one running. Retry per failed row.
-- **Nothing plays on its own.** A before and after comparison (side by side, one image at a time) is on a row's Compare for images.
+- Add files or drop paths onto the empty page or existing list. Duplicate paths appear once. The list shows source name, size, format and state; full paths and errors have tooltips.
+- Five files fit on a page; Previous and Next appear for larger batches. Remove drops a row from the queue without deleting its source or export.
+- Run processes files sequentially away from the UI thread. Running rows show percentages; completed rows show output bytes and percentage change. A smaller export is not guaranteed for every input.
+- Cancel interrupts the current export, removes its private partial, retains completed exports, and marks remaining waiting rows cancelled. Retry runs an individual failed row. Disk full stops the batch; other row failures allow later files to continue.
+- Compare shows an original/export image pair without playback; Back returns to the queue. Open launches an export only after an explicit click.
+- Options and file editing are disabled during a run. Changing options prepares retained source rows for another run. Settings persists options and shortcuts, never the file list.
 
-### Rules
+## File and encoder rules
 
-- **Originals are never overwritten.** Output goes beside the original, or to Settings' Output folder when one is set. A name that exists gets a number (`photo (2).png`).
-- **Aspect ratio is kept** unless Stretch is chosen. Never enlarge unless the size dropdown is set above the original and the row says "Enlarge".
-- **Transparency to JPEG:** a background color is asked for once in the options (white by default), shown before Run.
-- **Metadata:** private metadata (location, camera serial, owner) is removed from new exports by default; Settings has Keep metadata. Orientation is applied to the pixels first, so a rotated phone photo comes out upright.
-- **Unsupported input** is refused before Run, on its row, with the format named. A file that fails to decode mid-batch fails that row only; the batch goes on and the summary counts it.
-- **Large files:** a video over 4 GB or an image over 100 megapixels is refused with "Too large". Several files run one at a time, so the batch's memory is flat.
-- **Encoder:** H.264 through `MediaTranscoder` with a hardware encoder when present, the software one otherwise, the same code as recording's trim. Resize interpolation is Fant, compared with high-quality cubic on a fixture set (architecture section 3); the better one wins and the brief's PR says which.
-- **Windows N edition** without the Media Feature Pack: video rows read "Video encoding unavailable"; images still work.
-- **Storage:** presets and the last tab are in Chippi's settings JSON. No file list is kept between runs.
-
-### Edge cases
-
-- **A source file on a removed drive or deleted mid-batch:** that row fails with "File not found".
-- **Output folder unwritable or disk full:** the row fails, the partial file is removed, and the batch stops after the first disk-full failure with "Disk full".
-- **Same file added twice:** shown once.
-- **Animated GIF input:** converted to PNG or JPEG gives its first frame, and the row says so; to MP4 it keeps the animation.
-- **Cancel during a video:** the partial output is removed.
-
-## Shortcuts
-
-Slots under the starter rule (README, task 482). All unassigned. A global slot never acts on a stale selection: each opens the page and a file picker.
-
-| Verb | Slot | Notes |
-|---|---|---|
-| Convert media, Resize images, Compress media | Global | Opens the page on that tab with the file picker |
-| Add media files, Run media jobs, Cancel media job, Retry media job, Open media output | In context | Buttons on the page |
-
-Settings › Media tools shows the three slots read-only with Edit, which opens Settings › Shortcuts in that row.
-
-## What we took
-
-- **PowerToys Image Resizer:** batch inputs and reusable size presets, originals kept. Left out: its Explorer right-click entry.
-- **HandBrake queue:** named presets, per-file progress and per-file failure. Left out: its full transcode settings.
-- **Squoosh:** before and after size and an image comparison, all local. Left out: formats Windows can't encode.
-
-## Copy
-
-For Marge's Decide pass.
-
-| Where | Text |
-|---|---|
-| Panel tool | Convert |
-| Page tabs | Convert, Resize, Compress |
-| Empty | Drop files here, with Add files |
-| Buttons | Add files, Run, Cancel, Retry, Remove, Compare |
-| Convert options | Format (PNG, JPEG, MP4, GIF), Quality |
-| Resize options | Size, Fit (Fit, Fill, Stretch) |
-| Compress options | Level (Small, Balanced, High) |
-| Row states | Waiting, Converting, Done · 2.1 MB → 640 KB, Failed, Cancelled |
-| Refusals | Unsupported format; Too large; File not found; Disk full; Video encoding unavailable |
-| Bar | 3 of 4 converted; Converted 4 · 12.4 MB saved |
-| Settings title | Media tools |
-| Settings rows | Output folder, Keep metadata, Default level, JPEG background, Shortcuts |
+- Originals and existing output names are never overwritten. An export is written to a private `.chippi-<id>` partial beside its destination, then published through a non-overwriting move. Collisions receive `photo (2).png`, `photo (3).png`, and so on.
+- Output goes beside its source unless an Output folder is configured. A missing source fails its row. An unwritable destination reports an access/file error.
+- An input over 4 GiB or an image over 100 megapixels is refused. Resizes also reject target or intermediate images over 100 megapixels. MP4 requires at least 48 × 48 pixels; dimensions are rounded down to even values for H.264.
+- Image EXIF orientation is applied to pixels before resize/crop. JPEG transparency is flattened against the visible six-digit background color, white by default. PNG retains transparency. Fant interpolation is retained after a synthetic fine-detail comparison against cubic.
+- New image exports start without private source metadata. MP4 exports explicitly clear known private Windows shell fields because MediaTranscoder otherwise carries them forward. Keep metadata copies supported author/title/copyright/date/camera/location fields where the destination supports them; it is not a byte-for-byte metadata archive.
+- Animated GIF to PNG/JPEG uses its first frame and says First frame before Run. GIF to MP4 preserves frame timing, logical canvas, transparency/background composition and disposal behavior.
+- MP4 encoding prefers hardware and retries with software when preparation or encoding fails. GIF output reuses recording's bounded 60-second exporter. Unsupported codecs or encoding failures stay on their row.
+- Stopping the module cancels and drains active inspection, export and GIF sample requests before disposing its UI and shortcut registrations.
 
 ## Shared code
 
-- **New:** `Chippi.Features.MediaTools` and `Chippi.Features.MediaTools.Tests`, both in `Chippi.slnx`, using the `Chippi.Media` library (encoder pipeline, GIF path, codec query) that screen-recording.md introduces. Module id `media-tools`, `Capability.ScreenCapture` for the panel (the catalog entry is added with the module). Names to Marge first.
-- **Build order:** recording's `Chippi.Media` lands first; Media tools builds on it, so the two PRs are not stacked: Media tools starts after the recording PR merges.
-- **Shell:** the Convert tool appears on the Capture panel only while this module is installed (screen-capture.md already provides the slot). Shared code touched is the panel's list and the bar's ambient state, called out in the PR.
-- **Settings:** one page (Lumen). Slots through `ModuleContext.Shortcuts` with `ShortcutEdits`.
-- **Package:** none new.
+`Chippi.Features.MediaTools` and `Chippi.Features.MediaTools.Tests` are in `Chippi.slnx`. Module id is `media-tools`; its result page is hidden from the home gallery. App registration and `CapturePanelHost` provide the Convert entry. Search and Radial use shared commands; shortcuts use `ModuleContext.Shortcuts` and the central editor. Settings uses the existing components, while media inspection/export/batch code lives in `Chippi.Media`. No new packages or shipping raster assets are introduced.
 
-## Tests
-
-- **CI, unit.** The job queue against fake codecs: order, cancel between files, a failed file not stopping the batch, retry, unique names (`(2)`, `(3)`), originals untouched (hash before and after), refusal of unsupported, too-large and missing files. Resize math: Fit, Fill and Stretch for landscape and portrait, never enlarging by default, 1 px edge cases. Orientation applied before the resize. Transparency to JPEG on the chosen background. Metadata removed from output and kept when the setting says so. Codec query against a fake source.
-- **Real encoders, CI where the runner has them:** a fixture PNG, JPEG, GIF and a 2-second MP4 converted both ways and decoded again, checking dimensions and a known pixel. Tests accept a missing hardware encoder and use the software one.
-- **Offscreen shots** (`CHIPPI_ISLAND_SHOTS`): the Convert page empty, with five and with twelve files, running, with a failed row, Resize and Compress tabs, Settings; dark and light.
-- **Sandbox, once at the end of the wave.** A batch of 100 disposable images of mixed formats and sizes and three videos, never the owner's files: run each tab, check every output by decoding it (dimensions, format, pixels, orientation, no metadata), originals' hashes unchanged, cancel mid-batch, a locked output folder. Sandbox only.
-
-## Done means, and timings to set
-
-Targets, none measured yet.
-
-- **Page open:** under 100 ms, already filled.
-- **Batch of 100 images** (about 3 MP each) to JPEG: total time and per-file median reported; the page stays responsive (no UI-thread decode), counted by DWM present while the batch runs.
-- **Video:** a 1-minute 1080p clip to MP4 at 720p and compressed: time, output size, and the ratio to real time.
-- **Proof:** the Sandbox results above, shots dark and light next to Lumen's mockup, and the timings.
-
-## Not verified
-
-- Which Store decoders Travis's PC has beyond what the spike read (HEVC, VP9, AV1, HEIF were present).
-- Fant against cubic on real photographs: decided on fixtures in the PR.
-- ARM64 encoders and the hardware paths on his adapters.
-- Whether any job needs ffmpeg. None is expected; this is for Marge to raise with Travis only if the build finds one.
+The finish review accepted the final options-above-list implementation after fixes to fifth-row fit, light-theme Remove icons, custom percentages, inactive quality options, GIF composition and encoder fallback. Root `DESIGN.md` and its global sidecar remain unchanged because this is an extension of the incumbent system.
