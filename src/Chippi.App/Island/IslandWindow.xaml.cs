@@ -163,7 +163,11 @@ public partial class IslandWindow : Window
 
         PuckButton.MouseEnter += (_, _) => SetHover(true);
         PuckButton.MouseLeave += (_, _) => SetHover(false);
-        Body.SizeChanged += (_, _) => LayoutClickTargets();
+        Body.SizeChanged += (_, _) =>
+        {
+            LayoutClickTargets();
+            if (!_panel.IsVisible) Body.BorderThickness = new Thickness(WidgetHasRim ? 1 : 0);
+        };
         // Hidden (a fullscreen app in front), the song stops scrolling; shown again, it starts over.
         IsVisibleChanged += (_, _) =>
         {
@@ -201,7 +205,7 @@ public partial class IslandWindow : Window
             // as soon as it separates. A second circular stroke inside the new surface reads as a puck.
             double edge = Fade(0.04);
             Body.Opacity = surface;
-            Body.BorderThickness = new Thickness(edge);
+            Body.BorderThickness = new Thickness(WidgetHasRim ? edge : 0);
             BodyShadow.Opacity = edge;
             Body.Visibility = BodyShadow.Visibility = surface > 0 ? Visibility.Visible : Visibility.Hidden;
             bool handOver = _panel.PetMeetsPuck && !Motion.IsReduced;
@@ -784,7 +788,8 @@ public partial class IslandWindow : Window
             return;
         if (!_heldWidth.HasValue && !_panel.IsVisible)
             HoldBarMotion(); // summoned without a press: keep an interrupted unfold at its visible width too
-        var sourceRim = Body.BorderBrush as SolidColorBrush ?? TryFindResource(_rim ?? "IslandWidgetBorderBrush") as SolidColorBrush;
+        var sourceRim = Body.BorderThickness.Left == 0 ? Brushes.Transparent
+            : Body.BorderBrush as SolidColorBrush ?? TryFindResource(_rim ?? "IslandWidgetBorderBrush") as SolidColorBrush;
         _panel.Open(_puck, RenderedWidgetRect(), area, sourceRim, Body.TabExtension, _left);
         IslandNative.Raise(_hwnd); // Chippi and the bar's content stay above the shape the widget became, fading
         Hook();
@@ -1401,6 +1406,7 @@ public partial class IslandWindow : Window
         bool fadeBar = _barShown != shown || _resumeBar;
         _resumeBar = false;
         _barShown = shown;
+        Body.BorderThickness = new Thickness(WidgetHasRim ? 1 : 0);
         _widthTarget = width;
         if (Motion.IsReduced || !IsVisible || _lifted || _panel.IsVisible)
         {
@@ -1421,6 +1427,8 @@ public partial class IslandWindow : Window
             : new DoubleAnimation(0, FoldTime / 2);
         Bar.BeginAnimation(OpacityProperty, fade, HandoffBehavior.SnapshotAndReplace);
     }
+
+    private bool WidgetHasRim => !_barShown && PuckButton.Width <= _compactWidth + 0.5;
 
     /// <summary>The puck's size and tilt, eased over <paramref name="time"/> (120ms; 83ms for a press), at once under reduced motion or while hidden.</summary>
     private void Grow(double scale, double tilt, TimeSpan? time = null)

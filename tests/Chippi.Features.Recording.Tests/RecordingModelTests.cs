@@ -18,6 +18,28 @@ namespace Chippi.Features.Recording.Tests;
 public sealed class RecordingModelTests
 {
     [Fact]
+    public void Panel_opened_during_countdown_enables_transport_when_recording_starts() => WithModel((model, _, _, _) =>
+    {
+        var countdown = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        model.Delay = (_, token) => countdown.Task.WaitAsync(token);
+        var context = new ModuleContext(RecordingModule.Id, new Settings(), NullLogger.Instance, null!, null!);
+        var start = model.StartAsync();
+        var view = new RecordingView(model, context);
+        view.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));
+        Button Control(string name) => ((StackPanel)((DockPanel)view.Content).Children[1]).Children.OfType<StackPanel>()
+            .SelectMany(row => row.Children.OfType<Button>()).Single(button => Equals(button.Content, name));
+        try
+        {
+            Assert.Equal(RecordingPhase.Countdown, model.Phase);
+            Assert.False(Control("Pause").IsEnabled); Assert.True(Control("Cancel").IsEnabled);
+            countdown.SetResult(); WpfTestThread.Wait(start);
+            Assert.Equal(RecordingPhase.Recording, model.Phase);
+            Assert.True(Control("Pause").IsEnabled); Assert.True(Control("Stop").IsEnabled);
+            WpfTestThread.Wait(model.StopAsync());
+        }
+        finally { view.RaiseEvent(new RoutedEventArgs(FrameworkElement.UnloadedEvent)); }
+    });
+    [Fact]
     public void Recent_survives_reopening_seals_metadata_and_prunes_only_the_index()
     {
         string folder = Path.Combine(Path.GetTempPath(), "chippi-record-store-" + Guid.NewGuid()); Directory.CreateDirectory(folder);

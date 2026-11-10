@@ -27,6 +27,7 @@ public sealed class RecordingView : UserControl
     private string? _screen;
     private Guid? _selected;
     private bool _paused;
+    private RecordingPhase _phase;
     public RecordingView(RecordingModel model, ModuleContext context)
     {
         _model = model; _context = context;
@@ -41,8 +42,9 @@ public sealed class RecordingView : UserControl
         string screen = _model.Active ? "active" : _model.Selected != null ? "result" : "setup";
         _message.Text = _model.Exporting ? $"Exporting {_model.ExportProgress:0}%" : _model.Message ?? "";
         _activeTime.Text = _model.Phase switch { RecordingPhase.Countdown => $"Starting in {_model.Countdown}", RecordingPhase.Starting => "Starting…", RecordingPhase.Stopping => "Saving…", _ => RecordingModule.FormatTime(_model.Elapsed) };
-        if (_screen == screen && _selected == _model.Selected?.Id && _paused == _model.IsPaused) return;
+        if (_screen == screen && _selected == _model.Selected?.Id && _paused == _model.IsPaused && _phase == _model.Phase) return;
         _paused = _model.IsPaused;
+        _phase = _model.Phase;
         _player?.Close(); _player = null; _screen = screen; _selected = _model.Selected?.Id; _content.Children.Clear();
         if (screen == "setup") Setup(); else if (screen == "active") Active(); else Result();
     }
