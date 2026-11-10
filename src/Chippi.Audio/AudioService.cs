@@ -10,7 +10,7 @@ namespace Chippi.Audio;
 
 public sealed class AudioServiceOptions
 {
-    /// <summary>Device and default-role notifications restart this wait, so a Bluetooth burst reconciles once (Hopper's 400 ms).</summary>
+    /// <summary>Device-list notifications restart this wait, so a Bluetooth burst reconciles once. Default-only changes are immediate.</summary>
     public TimeSpan Debounce { get; init; } = TimeSpan.FromMilliseconds(400);
 
     public TimeSpan MeterInterval { get; init; } = TimeSpan.FromMilliseconds(50);
@@ -111,7 +111,7 @@ public sealed class AudioService
         Run(e =>
         {
             e.Arbiter.Claim(owner, flow, roles, target, preserveExternalChoice);
-            e.Reconcile();
+            e.ReconcileRoles();
             return true;
         });
 
@@ -123,7 +123,7 @@ public sealed class AudioService
         Run(e =>
         {
             e.Arbiter.Release(owner, flow, restore, e.Catalog, e.System);
-            e.Reconcile();
+            e.ReconcileRoles();
             return true;
         });
 
@@ -131,6 +131,13 @@ public sealed class AudioService
     public Task RefreshAsync() => Run(e =>
     {
         e.Reconcile();
+        return true;
+    });
+
+    /// <summary>Waits for the engine's initial snapshot, reusing it when another Sound module already started the service.</summary>
+    public Task ReadyAsync() => Run(e =>
+    {
+        e.EnsureReady();
         return true;
     });
 
@@ -221,7 +228,8 @@ public sealed class AudioService
         Run(e =>
         {
             e.Processing.Set(request);
-            e.Reconcile();
+            if (request is null) e.ReconcileRoles();
+            else e.Reconcile(); // validate the devices before opening a new processing stream
             return e.Processing.Status;
         });
 
@@ -232,7 +240,7 @@ public sealed class AudioService
     public Task<ProcessingStatus> SetSoundboardVoiceAsync(RoleTarget? source) => Run(e =>
     {
         e.Processing.SetSoundboardVoice(source);
-        e.Reconcile();
+        e.ReconcileRoles();
         return e.Processing.VoiceStatus;
     });
 
@@ -353,6 +361,9 @@ public sealed class AudioService
         private IDeviceSystem? _system;
         private volatile Exception? _startError;
         private int _lightQueued;
+        private int _defaultsQueued;
+        private int _devicesChanged = 1;
+        private bool _ready;
         private int _meterQueued;
         private long _version;
 
@@ -366,7 +377,7 @@ public sealed class AudioService
             Sessions = new SessionCatalog(service._options.OwnProcessId);
             _debounce = service._options.Time.CreateTimer(_ => Enqueue(Reconcile), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
             _meterTimer = service._options.Time.CreateTimer(_ => OnMeterTick(), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
-            _backoffTimer = service._options.Time.CreateTimer(_ => Enqueue(Reconcile), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+            _backoffTimer = service._options.Time.CreateTimer(_ => Enqueue(ReconcileRoles), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
             _thread = new Thread(Loop) { IsBackground = true, Name = "Chippi.Audio" };
             _thread.SetApartmentState(ApartmentState.MTA);
         }
@@ -456,11 +467,40 @@ public sealed class AudioService
             return done.Task;
         }
 
+        public void EnsureReady()
+        {
+            _ = System;
+            if (!_ready || Volatile.Read(ref _devicesChanged) != 0)
+                Reconcile();
+        }
+
         /// <summary>Re-reads devices, enforces role claims, then publishes. Device events land here after the debounce.</summary>
-        public void Reconcile()
+        public void Reconcile() => Reconcile(refreshDevices: true);
+
+        /// <summary>Existing devices can change roles without re-enumerating their properties and callbacks.</summary>
+        public void ReconcileRoles() => Reconcile(refreshDevices: false);
+
+        private void Reconcile(bool refreshDevices)
         {
             var system = System;
-            Catalog.Refresh(system);
+            bool changed = Interlocked.Exchange(ref _devicesChanged, 0) != 0;
+            try
+            {
+                if (refreshDevices || changed)
+                    Catalog.Refresh(system);
+                else
+                {
+                    Catalog.RefreshDefaults(system);
+                    // Windows can announce a new default before announcing its endpoint.
+                    if (Catalog.Defaults.Any(d => !Catalog.Active(d.Key.Flow).Any(e => PriorityPolicy.Eq(e.Id, d.Value))))
+                        Catalog.Refresh(system);
+                }
+            }
+            catch
+            {
+                Volatile.Write(ref _devicesChanged, 1);
+                throw;
+            }
             Microphones.Refresh(system, Catalog);
             Processing.Update(Arbiter, Catalog, system);
             var changes = Arbiter.Enforce(Catalog, system);
@@ -469,6 +509,7 @@ public sealed class AudioService
             ScheduleBackoffRecheck();
             Read();
             Publish(changes);
+            _ready = true;
         }
 
         /// <summary>Re-reads volumes, mutes and sessions only. Level and session events land here.</summary>
@@ -549,10 +590,22 @@ public sealed class AudioService
         // Core Audio callbacks arrive on COM threads: they only schedule work.
         private void OnChanged(DeviceChange change)
         {
-            if (change is DeviceChange.Devices or DeviceChange.Defaults)
+            if (change == DeviceChange.Devices)
             {
+                Volatile.Write(ref _devicesChanged, 1);
                 try { _debounce.Change(_service._options.Debounce, Timeout.InfiniteTimeSpan); }
                 catch (ObjectDisposedException) { }
+            }
+            else if (change == DeviceChange.Defaults)
+            {
+                if (Interlocked.Exchange(ref _defaultsQueued, 1) == 0)
+                    Enqueue(() =>
+                    {
+                        Volatile.Write(ref _defaultsQueued, 0);
+                        // A plug/unplug burst still waits for its device list to settle.
+                        if (Volatile.Read(ref _devicesChanged) == 0)
+                            ReconcileRoles();
+                    });
             }
             else if (Interlocked.Exchange(ref _lightQueued, 1) == 0)
             {

@@ -37,7 +37,7 @@ public sealed class AudioServiceTests : IAsyncDisposable
     private async Task StartAsync()
     {
         _lease = _service.Acquire();
-        await _service.RefreshAsync();
+        await _service.ReadyAsync();
     }
 
     private static RoleTarget List(params string[] ids) =>
@@ -116,20 +116,113 @@ public sealed class AudioServiceTests : IAsyncDisposable
     [Fact]
     public async Task A_bluetooth_burst_reconciles_once_after_the_debounce()
     {
+        var time = new HeldTimers();
+        var service = new AudioService(() => _sys, null, options: new() { Time = time });
         _sys.With(Speaker("B")).WithDefault("B");
-        await StartAsync();
-        await _service.ClaimRolesAsync(RoleOwner.Routing, AudioFlow.Render, All, List("A", "B"));
+        await using var lease = service.Acquire();
+        await service.ClaimRolesAsync(RoleOwner.Routing, AudioFlow.Render, All, List("A", "B"));
         var before = _sys.Enumerations;
 
         _sys.Connect(Speaker("A"));
         for (var i = 0; i < 20; i++)
             _sys.Raise(DeviceChange.Devices);
+        _sys.Raise(DeviceChange.Defaults);
+        await service.InvokeAsync(_ => true);
+        Assert.Equal(before, _sys.Enumerations);
+        Assert.Equal("B", service.Snapshot.Default(AudioFlow.Render, AudioRole.Multimedia));
 
-        await WaitUntil(() => _changes.Any(c => c.Kind == RoleChangeKind.Switch));
-        await Task.Delay(100);
-        // A reconcile reads both flows: one for the burst, one for the echo of our three writes.
-        Assert.Equal(4, _sys.Enumerations - before);
+        time.Timers[0].Tick();
+        await service.InvokeAsync(_ => true);
+        await service.InvokeAsync(_ => true); // include the echo of the default writes
+        Assert.Equal(2, _sys.Enumerations - before); // both flows, once; no re-scan for the echoes
+        Assert.Equal("A", service.Snapshot.Default(AudioFlow.Render, AudioRole.Multimedia));
+    }
+
+    [Fact]
+    public async Task Sound_modules_share_the_initial_scan_and_role_picks_reuse_it()
+    {
+        _sys.With(Speaker("A"), Speaker("B"), Mic("M1"), Mic("M2")).WithDefault("A").WithDefault("M1");
+        await StartAsync();
+        await using var second = _service.Acquire();
+        await _service.ReadyAsync();
+        await _service.SetProcessingAsync(null);
+        await _service.SetSoundboardVoiceAsync(null);
+        Assert.Equal(2, _sys.Enumerations);
+
+        await _service.ClaimRolesAsync(RoleOwner.Routing, AudioFlow.Render, All, List("B"));
+        await _service.ClaimRolesAsync(RoleOwner.Routing, AudioFlow.Capture, All, List("M2"));
+        Assert.Equal("B", _service.Snapshot.Default(AudioFlow.Render, AudioRole.Multimedia));
+        Assert.Equal("M2", _service.Snapshot.Default(AudioFlow.Capture, AudioRole.Multimedia));
+        await _service.ReleaseRolesAsync(RoleOwner.Routing, AudioFlow.Render);
+        await _service.ReleaseRolesAsync(RoleOwner.Routing, AudioFlow.Capture);
+        await _service.InvokeAsync(_ => true);
+        Assert.Equal(2, _sys.Enumerations);
+    }
+
+    [Fact]
+    public async Task Default_changes_publish_without_waiting_for_the_device_debounce_or_scanning()
+    {
+        var time = new HeldTimers();
+        var service = new AudioService(() => _sys, null, options: new() { Time = time });
+        _sys.With(Speaker("A"), Speaker("B")).WithDefault("A");
+        await using var lease = service.Acquire();
+        await service.ReadyAsync();
+        long before = service.Snapshot.Version;
+        await service.InvokeAsync(_ =>
+        {
+            _sys.ChangeDefault("B");
+            for (int i = 0; i < 20; i++) _sys.Raise(DeviceChange.Defaults);
+            return true;
+        });
+        await service.InvokeAsync(_ => true);
+
+        Assert.Equal("B", service.Snapshot.Default(AudioFlow.Render, AudioRole.Multimedia));
+        Assert.Equal(before + 1, service.Snapshot.Version);
+        Assert.Equal(2, _sys.Enumerations);
+        Assert.False(time.Timers[0].Active);
+    }
+
+    [Fact]
+    public async Task A_pick_refreshes_pending_device_changes_and_readiness_retries_a_failed_scan()
+    {
+        var service = new AudioService(() => _sys, null, options: new() { Time = new HeldTimers() });
+        _sys.With(Speaker("A")).WithDefault("A");
+        await using var lease = service.Acquire();
+        await service.ReadyAsync();
+        _sys.Connect(Speaker("B"));
+        _sys.ReadsBeforeFailure = 0;
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.ClaimRolesAsync(RoleOwner.Routing, AudioFlow.Render, All, List("B")));
+        await service.ReadyAsync();
+        Assert.Equal("B", service.Snapshot.Default(AudioFlow.Render, AudioRole.Multimedia));
+        Assert.NotNull(service.Snapshot.Find("B"));
+    }
+
+    [Fact]
+    public async Task A_default_announced_before_its_device_refreshes_the_catalog()
+    {
+        _sys.With(Speaker("A")).WithDefault("A");
+        await StartAsync();
+        _sys.With(Speaker("New")).ChangeDefault("New");
+        await _service.InvokeAsync(_ => true);
+        Assert.NotNull(_service.Snapshot.Find("New"));
+        Assert.Equal("New", _service.Snapshot.Default(AudioFlow.Render, AudioRole.Multimedia));
+        Assert.Equal(4, _sys.Enumerations);
+    }
+
+    [Fact]
+    public async Task Readiness_retries_when_the_unknown_default_rescan_failed()
+    {
+        _sys.With(Speaker("A")).WithDefault("A");
+        await StartAsync();
+        _sys.With(Speaker("New"));
+        _sys.ReadsBeforeFailure = 6; // defaults succeed; the fallback endpoint scan fails
+        _sys.ChangeDefault("New");
+        await _service.InvokeAsync(_ => true);
         Assert.Equal("A", _service.Snapshot.Default(AudioFlow.Render, AudioRole.Multimedia));
+
+        await _service.ReadyAsync();
+        Assert.Equal("New", _service.Snapshot.Default(AudioFlow.Render, AudioRole.Multimedia));
+        Assert.NotNull(_service.Snapshot.Find("New"));
     }
 
     [Fact]
@@ -210,7 +303,7 @@ public sealed class AudioServiceTests : IAsyncDisposable
         _sys.With(Speaker("A"));
         var lease = service.Acquire();
 
-        var error = await Assert.ThrowsAnyAsync<InvalidOperationException>(service.RefreshAsync);
+        var error = await Assert.ThrowsAnyAsync<InvalidOperationException>(service.ReadyAsync);
         Assert.Equal("Core Audio unavailable", error.InnerException?.Message);
         Assert.False(service.IsRunning);
 
@@ -367,5 +460,26 @@ public sealed class AudioServiceTests : IAsyncDisposable
             while (_posts.TryDequeue(out var post))
                 post.Item1(post.Item2);
         }
+    }
+
+    private sealed class HeldTimers : TimeProvider
+    {
+        public List<HeldTimer> Timers { get; } = [];
+        public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
+        {
+            var timer = new HeldTimer(callback, state);
+            timer.Change(dueTime, period);
+            Timers.Add(timer);
+            return timer;
+        }
+    }
+
+    private sealed class HeldTimer(TimerCallback callback, object? state) : ITimer
+    {
+        public bool Active { get; private set; }
+        public bool Change(TimeSpan dueTime, TimeSpan period) { Active = dueTime != System.Threading.Timeout.InfiniteTimeSpan; return true; }
+        public void Tick() { if (!Active) return; Active = false; callback(state); }
+        public void Dispose() => Active = false;
+        public ValueTask DisposeAsync() { Dispose(); return ValueTask.CompletedTask; }
     }
 }

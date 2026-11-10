@@ -23,6 +23,29 @@ public sealed class RoutingTests
         Assert.True(f.Module.Settings.Output.Seeded);
         Assert.Empty(f.Notices.Sent);
         Assert.Equal([SoundTile.Key, SoundTile.Key], f.Ui.Tiles.Select(t => t.Spec.Key));
+        Assert.Equal(2, f.System.Enumerations); // one shared scan of both flows
+    }
+
+    [Theory]
+    [InlineData(AudioFlow.Render, true)]
+    [InlineData(AudioFlow.Render, false)]
+    [InlineData(AudioFlow.Capture, true)]
+    [InlineData(AudioFlow.Capture, false)]
+    public async Task Picks_publish_the_confirmed_selection_without_rescanning_connected_devices(AudioFlow flow, bool priority)
+    {
+        await using var f = new RoutingFixture();
+        f.System.With([.. Enumerable.Range(1, 12).Select(i => Speaker($"S{i}")), .. Enumerable.Range(1, 9).Select(i => Mic($"M{i}"))])
+            .WithDefault("S1").WithDefault("M1");
+        await f.Start();
+        if (!priority) await f.Module.SetEnabledAsync(flow, false);
+        int before = f.System.Enumerations;
+        string wanted = flow == AudioFlow.Render ? "S12" : "M9";
+        await f.Module.UseAsync(flow, wanted);
+
+        Assert.Equal(wanted, f.Module.InUse(flow));
+        Assert.Equal(wanted, f.Audio.Snapshot.Default(flow, AudioRole.Multimedia));
+        Assert.Equal(priority, f.Module.Settings.For(flow).Enabled);
+        Assert.Equal(before, f.System.Enumerations);
     }
 
     [Fact]

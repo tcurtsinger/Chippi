@@ -86,7 +86,7 @@ public sealed class AppVolumeModule(AudioService? audio = null) : IFeatureModule
             if (Settings.Outputs is null) Settings = Settings with { Outputs = [] };
             _audio ??= SoundAudio.Get(context.Logger);
             _lease = _audio.Acquire();
-            await _audio.RefreshAsync();
+            await _audio.ReadyAsync();
             await RefreshOutputsAsync();
             (_outputsRead, _outputsReadAt) = (OutputsShape(Snapshot), Environment.TickCount64);
             _tile = context.Ui.AddIslandTile(new(TileKey, "Volume", "Sliders", 20, 0, () => new VolumeView(this, VolumeSurface.Island)));
