@@ -1,0 +1,8 @@
+{
+  "knobs": [
+    "--radius-island",
+    "--island-accent"
+  ],
+  "for": "Actions › Apps › Clean junk files: the categories measured on open, then Clean asks first and deletes for good.",
+  "title": "Clean junk files"
+}

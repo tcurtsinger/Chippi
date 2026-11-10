@@ -1,0 +1,15 @@
+{
+  "title": "Capture results",
+  "for": "What a capture says back: the bar's lines, and the Text, QR code and Color results.",
+  "knobs": [
+    "--radius-island-card",
+    "--island-accent"
+  ],
+  "picked": "v3.html",
+  "built": {
+    "from": "v3.html",
+    "widths": [
+      "desktop"
+    ]
+  }
+}

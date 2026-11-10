@@ -1,0 +1,8 @@
+{
+  "title": "Recording",
+  "for": "Record a region, window or display: the setup bar before Start, the frame and pill while it runs, and the Capture panel's recording card.",
+  "knobs": [
+    "--radius-card",
+    "--island-accent"
+  ]
+}

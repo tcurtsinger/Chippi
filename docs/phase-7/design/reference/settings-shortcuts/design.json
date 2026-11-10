@@ -1,0 +1,15 @@
+{
+  "title": "Settings › Shortcuts",
+  "for": "The one place every shortcut is set: each feature's keys, Record, and the ones Travis adds.",
+  "knobs": [
+    "--radius-card",
+    "--accent"
+  ],
+  "picked": "v2.html",
+  "built": {
+    "from": "v2.html",
+    "widths": [
+      "desktop"
+    ]
+  }
+}

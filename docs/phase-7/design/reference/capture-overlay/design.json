@@ -1,0 +1,15 @@
+{
+  "title": "Frozen screen",
+  "for": "The screen after Print Screen: pick a window or drag a region, mark it up, then Copy or Save.",
+  "knobs": [
+    "--radius-card",
+    "--island-accent"
+  ],
+  "picked": "v1.html",
+  "built": {
+    "from": "v1.html",
+    "widths": [
+      "desktop"
+    ]
+  }
+}

@@ -1,5 +1,7 @@
 # Phase 7 mockups: notes
 
+The later alternatives and future feature concepts from PR #287 are preserved in the [design reference library](reference/README.md). Its pages and recorded choices are historical; see its index before using them for new work.
+
 ## Wave 1 (task 493, 2026-11-06)
 
 `wave-1.html` draws wave 1's screens against the approved map ([surfaces.md](../surfaces.md)) and Travis's decisions ([README.md](../README.md)). Sizes are real DIPs. Glyphs are Lucide's own, copied into `wave-1/lucide.js` (ISC); Screens is Chippi's. Every window, file and number is invented, except Travis's two monitors' names, which Settings › Snap already shows.
