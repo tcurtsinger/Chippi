@@ -117,6 +117,7 @@ public sealed class WidgetSplitTests
 
     private static void AssertTargets(IslandWindow window)
     {
+        Assert.Equal(new Thickness(0), window.Body.BorderThickness);
         // No dead strip or overlapping target, and no clickable ink outside the curved outline.
         for (double x = 0.5; x < window.Body.ActualWidth; x += 3)
         for (double y = 0.5; y < 50; y += 3)

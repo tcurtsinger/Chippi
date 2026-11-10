@@ -277,9 +277,9 @@ public partial class IslandPanelWindow : Window
     {
         foreach (var (key, island) in SharedKeys)
             Resources[key] = Application.Current?.TryFindResource(island);
-        if (TryFindResource("IslandWidgetBorderBrush") is SolidColorBrush widget && TryFindResource("IslandBorderBrush") is SolidColorBrush panel)
+        if (TryFindResource("IslandBorderBrush") is SolidColorBrush panel)
         {
-            _widgetEdge = widget.Color;
+            _widgetEdge = Colors.Transparent;
             _panelEdge = panel.Color;
             _rim.Color = IsVisible ? _panelEdge : _widgetEdge;
             ShapeFill.BorderBrush = _rim;
@@ -405,8 +405,8 @@ public partial class IslandPanelWindow : Window
         _cameFrom = null;
         IsOpen = true;
         bool shrinking = IsVisible;
-        if (!shrinking && (sourceRim ?? TryFindResource("IslandWidgetBorderBrush") as SolidColorBrush) is { } rim)
-            _widgetEdge = rim.Color;
+        if (!shrinking)
+            _widgetEdge = (sourceRim ?? Brushes.Transparent).Color;
         if (ResolvePage(_openOn) is { } requested)
             _page = requested;
         else if (shrinking)

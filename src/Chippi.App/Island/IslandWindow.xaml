@@ -36,7 +36,7 @@
             </Grid.RenderTransform>
             <Grid>
                 <island:PuckSurface x:Name="BodyShadow" IsHitTestVisible="False" CornerRadius="25" Background="{DynamicResource IslandBrush}" Effect="{DynamicResource IslandPuckShadow}" />
-                <island:PuckSurface x:Name="Body" CornerRadius="25" Background="{DynamicResource IslandBrush}" BorderBrush="{DynamicResource IslandWidgetBorderBrush}" BorderThickness="1" />
+                <island:PuckSurface x:Name="Body" CornerRadius="25" Background="{DynamicResource IslandBrush}" />
                 <!-- The bar's content, laid out on the full 256 from the puck's end and clipped while the bar unfolds:
                      the lead (cover or glyph) in the far round end, the two lines, then the bars or the pause mark by
                      Chippi. IslandWindow.LayOutBar mirrors the columns when Chippi is on the left. -->
@@ -112,7 +112,7 @@
                         <pet:ChippiPet x:Name="Pet" Size="{x:Static pet:PetSize.Puck}" Mood="Sleepy" IsDecorative="True" IsHitTestVisible="False" />
                     </Grid>
                 </Grid>
-                <!-- The badges share the widget's surface, shadow and outer rim. -->
+                <!-- The badges share the widget's surface and shadow. -->
                 <Canvas x:Name="BadgeLayer" IsHitTestVisible="False" ClipToBounds="True">
                     <Grid x:Name="AgentMark" Width="22" Height="22" Canvas.Top="14"
                           Visibility="Collapsed">
