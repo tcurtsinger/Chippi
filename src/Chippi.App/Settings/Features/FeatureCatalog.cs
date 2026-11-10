@@ -95,11 +95,6 @@ public static class FeatureCatalog
             Requires = [Capability.ScreenCapture],
             Presets = PowerUser,
         },
-        new("media-tools", "Media tools", "Quick convert, resize and compress for images and video", FeatureGroup.Capture)
-        {
-            Icon = "Video",
-        },
-
         // Phase 7: Apps
         new("app-updates", "App updates", "Finds and installs app updates through winget", FeatureGroup.Apps)
         {

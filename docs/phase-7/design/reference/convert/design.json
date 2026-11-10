@@ -1,6 +1,10 @@
 {
   "title": "Convert",
   "for": "Convert, resize and compress images and short videos in a batch, from the Capture panel; originals are kept.",
+  "selected": "v1.html",
+  "selectionLabel": "Options above the list",
+  "approvedOn": "2026-11-10",
+  "implementation": "Native WPF Media tools page; see ../../../media-tools.md",
   "knobs": [
     "--radius-island-card",
     "--island-accent"

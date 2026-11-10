@@ -280,9 +280,11 @@ public partial class App : Application
         var recording = shell.Recording = new Chippi.Features.Recording.RecordingModule();
         recording.CanStart = () => shell.Capture.Current == null;
         shell.Registry.Register(recording);
+        var mediaTools = new Chippi.Features.MediaTools.MediaToolsModule();
+        shell.Registry.Register(mediaTools);
         if (shell.Capture is Chippi.UI.Capture.CaptureLayer layer)
             layer.CanStart = () => recording.Model?.Active != true;
-        shell.CapturePanel = new Chippi.App.Island.CapturePanelHost(shell, screenCapture, screenText, colorPicker, recording);
+        shell.CapturePanel = new Chippi.App.Island.CapturePanelHost(shell, screenCapture, screenText, colorPicker, recording, mediaTools);
         if (shell.Services.Actions is Chippi.UI.Actions.WindowsActionPc windowPc)
         {
             windowPc.SnapZones = windowLayouts.ResolveZone;
