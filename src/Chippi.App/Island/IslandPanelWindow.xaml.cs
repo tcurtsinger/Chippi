@@ -59,7 +59,7 @@ public partial class IslandPanelWindow : Window
     private IslandLayout _layout = IslandLayout.Default;
     private IReadOnlyList<IslandTileGroup> _groups = [];
     private IReadOnlyList<IslandTool> _tools = [];
-    private readonly IslandAudioTabs _audioTabs = new();
+    private readonly IslandTabs _audioTabs = new();
     private IReadOnlyList<string> _audioPageKeys = [];
     private bool _syncAudioTabs;
     internal bool? AudioShowsMixer { get; private set; }

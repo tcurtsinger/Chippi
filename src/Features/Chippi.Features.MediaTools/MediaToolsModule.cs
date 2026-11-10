@@ -43,7 +43,7 @@ public sealed class MediaToolsModule : IFeatureModule
         var batch = Batch = new MediaBatch(_codec); batch.Changed += Publish;
         context.Ui.SetSettingsPage(_ => new MediaToolsSettingsView(this, context));
         context.Ui.AddIslandTile(new IslandTileSpec(Page, "Convert", "Video", 79, 0, View)
-        { OnHome = false, CreateHeader = () => View().Header, InitialFocus = () => View().InitialFocus, HandleBack = () => View().Back() || context.TryGoBackIslandPage("capture") });
+        { OnHome = false, HeaderHeight = 32, CreateHeader = () => View().Header, InitialFocus = () => View().InitialFocus, HandleBack = () => View().Back() || context.TryGoBackIslandPage("capture") });
         Action[] actions = [() => Open(MediaTool.Convert, true), () => Open(MediaTool.Resize, true), () => Open(MediaTool.Compress, true)];
         for (int i = 0; i < actions.Length; i++) AddShortcut(ShortcutNames[i], actions[i]);
         context.Ui.AddCommands(() => actions.Select((action, i) => new ChippiCommand(Id + "/" + new[] { "convert", "resize", "compress" }[i], ShortcutNames[i], "Video", () => { action(); return Task.CompletedTask; }) { Words = "media image video convert resize compress" }).ToArray());

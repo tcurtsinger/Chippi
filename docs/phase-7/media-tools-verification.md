@@ -16,7 +16,7 @@ Implementation and accepted layout: [media-tools.md](media-tools.md), [Convert v
 - A fine checkerboard downsample compares mean error against the source's average for Fant and cubic. Fant's error is no greater in this fixture, so Fant remains the default. This is not a general photographic quality measurement.
 - A generated batch of 100 mixed PNG/JPEG inputs at 320 × 240: all outputs decoded, source SHA-256 hashes stayed unchanged, and no private partials remained. Native mid-video cancellation also removed its partial and preserved the source hash.
 
-`Chippi.Features.MediaTools.Tests` passed 12 tests: page/command/shortcut registration, settings write failure, unchanged-options preservation, five-file pagination from twelve files, row/control fit, custom percentage selection, six-digit background validation, applicable format options, and offscreen story rendering. The test project loads the real Chippi themes; it does not open a window.
+`Chippi.Features.MediaTools.Tests` passed 13 tests: page/command/shortcut registration, settings write failure, unchanged-options preservation, five-file pagination from twelve files, row/control fit, custom percentage selection, six-digit background validation, applicable format options, and offscreen story rendering. The test project loads the real Chippi themes; it does not open a window.
 
 ## Visual evidence and verdict
 
@@ -35,3 +35,5 @@ The screenshots are temporary review evidence, not shipping assets. No new raste
 - Fant versus cubic on real photographs.
 
 Build/CI and installer verification are reported by the feature PR and release artifact manifest; this document does not claim an unobserved hardware or live-desktop result.
+
+Tab consistency follow-up (2026-11-10): Convert and Audio now share `IslandTabs` and `IslandAudioTabsStyle`, including the focus-independent pointer selection behavior. Convert uses the same 32-DIP header; its 296-DIP body still fits five rows. Thirteen Media tools tests and three windowless shared-tab tests passed; dark/light renders were checked again. The conversion backend is unchanged.
