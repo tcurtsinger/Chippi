@@ -4,8 +4,8 @@
 namespace Chippi.Audio;
 
 /// <summary>
-/// The engine thread's view of endpoints and default roles, re-read from the device system on
-/// every reconcile. Hopper's AudioDeviceWatcher, minus the notifications (the service owns those).
+/// The engine thread's view of endpoints and default roles. Endpoint changes refresh the list;
+/// role-only changes refresh defaults. The service owns notifications and invalidation.
 /// </summary>
 internal sealed class DeviceCatalog
 {

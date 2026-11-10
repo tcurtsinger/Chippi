@@ -128,7 +128,7 @@ public sealed class MicMuteModule : IFeatureModule
         _lease = _audio.Acquire();
         try
         {
-            await _audio.RefreshAsync();
+            await _audio.ReadyAsync();
             ct.ThrowIfCancellationRequested();
             _hotkey = CreateHotkey(context);
             ShortcutError = Settings.Shortcut is null || _hotkey.Register(Settings.Shortcut, OnHotkey) ? null : _hotkey.Error ?? ShortcutService.InUse;

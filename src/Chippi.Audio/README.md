@@ -22,9 +22,17 @@ await service.ClaimRolesAsync(RoleOwner.Routing, AudioFlow.Render, roles,
 | `SessionCatalog` (internal) | Render sessions on every active output, grouped by `AppKey` (exe path with Squirrel's `app-x.y.z` folder dropped, else display name, else system sounds). Chippi's own sessions are left out. |
 | `IDeviceSystem` | The seam. `CoreAudioDeviceSystem` is the real one (NAudio and `IPolicyConfig`); tests use `FakeDeviceSystem` in `tests/Chippi.Audio.Tests/AudioFakes.cs`. |
 
-Notifications: device and default changes are debounced 400 ms and then reconcile (re-read,
-enforce claims, publish). Volume, mute and session changes only re-read levels and sessions.
-Our own default writes echo back as a notification; the reconcile it causes finds nothing to do.
+Sound modules await `ReadyAsync` after acquiring a lease. It waits for the initial complete snapshot,
+reusing the running engine's snapshot instead of repeating a full device scan. `RefreshAsync` still
+forces a full scan, for explicit refreshes and driver setup/recovery.
+
+Notifications: device-list changes (including state and names) are debounced 400 ms, then rescan
+endpoints, enforce claims and publish. Default-only changes are coalesced on the engine queue and
+reconcile immediately, reusing the endpoint list. Role claims/releases use the same path; a pending
+device change or an unknown default forces a rescan first. Explicit processing-on requests still
+validate devices before opening a stream. Volume, mute and session changes only reread levels and
+sessions. Default-write echoes do not rescan endpoint properties. No selection is reported before
+the engine reads Windows' confirmed default.
 
 ## Mic processing (`Chippi.Audio.Processing`)
 

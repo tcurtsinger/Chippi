@@ -97,7 +97,7 @@ public sealed partial class AudioRoutingModule : IFeatureModule
             catch (ArgumentException) { Settings = new(); }
             _audio ??= SoundAudio.Get(context.Logger);
             _lease = _audio.Acquire();
-            await _audio.RefreshAsync();
+            await _audio.ReadyAsync();
             ct.ThrowIfCancellationRequested();
             Settings = RefreshLists(Settings, Snapshot);
             context.Settings.Save(Settings);
