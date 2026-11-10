@@ -1,0 +1,8 @@
+{
+  "knobs": [
+    "--radius-island",
+    "--island-accent"
+  ],
+  "for": "Actions › Apps › Update apps: which installed apps have an update, and updating one or all of them, plus the Apps menu and the bar while a batch runs.",
+  "title": "Update apps"
+}

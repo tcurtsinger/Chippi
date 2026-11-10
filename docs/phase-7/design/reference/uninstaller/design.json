@@ -1,0 +1,8 @@
+{
+  "knobs": [
+    "--radius-card",
+    "--accent"
+  ],
+  "for": "Settings › Apps › Uninstaller: find an installed app, run its own uninstaller, then review and remove only what it left behind.",
+  "title": "Settings › Uninstaller"
+}

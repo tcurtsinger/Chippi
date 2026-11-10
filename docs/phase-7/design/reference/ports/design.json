@@ -1,0 +1,8 @@
+{
+  "knobs": [
+    "--radius-card",
+    "--accent"
+  ],
+  "for": "Settings › System › Ports: who holds each port, and freeing it after a question that names what ends. Plus the \"port 3000\" row in Search.",
+  "title": "Settings › Ports and port Search"
+}

@@ -1,0 +1,8 @@
+{
+  "knobs": [
+    "--radius-card",
+    "--accent"
+  ],
+  "for": "Settings › Apps › Cleaner: each category, where it cleans and what it never touches, and the two shortcuts read-only.",
+  "title": "Settings › Cleaner"
+}

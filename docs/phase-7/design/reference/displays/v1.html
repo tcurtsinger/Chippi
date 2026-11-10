@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Displays, v1: a slider row per display</title>
+<link rel="stylesheet" href="../tokens.css">
+<style>
+:root{--wall-1:#2C3E57;--wall-2:#1B2838;--ink-red:#E5484D;--ink-yellow:#FFC53D;--ink-green:#30A46C;--ink-blue:#0090FF;--ink-violet:#7444F0;--ink-black:#1A1A1A;--ink-white:#FFFFFF;--ink-gray:#8B8D98;--sample:#7C5CFF}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font-family:var(--font-text);font-variant-numeric:tabular-nums;background:var(--window);color:var(--text);-webkit-font-smoothing:antialiased}
+button,input{font:inherit;color:inherit;margin:0}
+svg.g{width:var(--s,16px);height:var(--s,16px);fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;flex:none;display:block}
+:focus-visible{outline:2px solid var(--focus-ring);outline-offset:1px}
+.page{padding:28px 16px 40px}
+.pic-doc{background:linear-gradient(180deg,var(--window) 0 18%,var(--card) 18%)}
+.pic-term{background:linear-gradient(90deg,var(--window) 0 30%,var(--card) 30%)}
+.pic-desk{background:linear-gradient(135deg,var(--wall-1),var(--wall-2))}
+.pic-site{background:linear-gradient(180deg,var(--ink-violet) 0 40%,var(--card) 40%)}
+.intro{max-width:900px;padding:0 4px}
+.intro h1{font-family:var(--font-display);font-size:20px;line-height:28px;font-weight:600;margin:0}
+.intro p{font-size:14px;line-height:20px;color:var(--text-secondary);margin:6px 0 0;max-width:80ch;text-wrap:pretty}
+.stages{display:flex;flex-wrap:wrap;gap:24px;margin-top:24px;align-items:flex-start}
+.stage{background:var(--window);color:var(--island-text);padding:16px;border-radius:var(--radius-card);border:1px solid var(--divider);min-width:0}
+.stage>h2{font-size:12px;line-height:16px;font-weight:600;color:var(--text-secondary);margin:0 0 12px;max-width:560px;text-wrap:pretty}
+.stage.wide>h2{max-width:900px}
+.row{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start}
+.cap{font-size:12px;line-height:16px;color:var(--text-secondary);margin:0 0 6px;max-width:440px}
+@media (max-width:1199px){.stage.wide .zoom{zoom:.78}}
+@media (max-width:900px){.stage.wide .zoom{zoom:.6}}
+@media (max-width:640px){.page{padding:20px 8px}.stage{padding:10px}.stage .izoom{zoom:.62}.stage.wide .zoom{zoom:.29}}
+
+.panel{position:relative;width:520px;height:360px;padding:12px;background:var(--island);border:1px solid var(--island-border);border-radius:var(--radius-island);box-shadow:0 16px 40px rgba(0,0,0,.32);color:var(--island-text);font-size:12px;line-height:16px;overflow:hidden}
+.phdr{display:flex;align-items:center;height:24px;margin-bottom:8px;gap:6px}
+.phdr h3{flex:1;margin:0;font-size:13px;font-weight:600;line-height:20px;white-space:nowrap}
+.ib{width:28px;height:24px;display:inline-flex;align-items:center;justify-content:center;border:0;padding:0;border-radius:var(--radius-control);background:transparent;color:var(--island-text-secondary);flex:none;cursor:pointer}
+.ib:hover{background:var(--island-hover)}
+.ib.back{margin:0 0 0 -4px}
+.pbody{position:relative;width:494px;height:302px}
+.ibtn{height:28px;padding:0 10px;border-radius:var(--radius-control);border:1px solid var(--island-control-border);background:var(--island-button);font-size:12px;color:var(--island-text);white-space:nowrap;display:inline-flex;align-items:center;gap:6px;min-width:64px;justify-content:center;flex:none;cursor:pointer}
+.ibtn:hover{background:var(--island-button-hover)}
+.ibtn .g{color:var(--island-text-secondary)}
+.ibtn.acc{background:var(--island-accent-fill);border-color:transparent;color:var(--island-on-accent);font-weight:600}
+.ibtn.acc .g{color:var(--island-on-accent)}
+.ibtn.sm{height:24px;min-width:0;padding:0 8px;font-size:11px}
+.seg{display:inline-flex;height:24px;border-radius:var(--radius-control);background:var(--island-hover);padding:2px;gap:2px;font-size:11px}
+.seg button{border:0;background:transparent;padding:0 8px;border-radius:3px;display:flex;align-items:center;color:var(--island-text-secondary);cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--island-button);color:var(--island-text);font-weight:600;box-shadow:0 0 0 1px var(--island-control-border)}
+.combo{height:24px;padding:0 6px 0 8px;border-radius:var(--radius-control);border:1px solid var(--island-control-border);background:var(--island-button);display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--island-text);white-space:nowrap;cursor:pointer}
+.combo[aria-expanded="true"]{border-color:var(--island-accent)}
+.menu{position:absolute;z-index:3;padding:4px;border-radius:var(--radius-card);background:var(--flyout);box-shadow:0 0 0 1px var(--island-border),0 8px 24px rgba(0,0,0,.35);font-size:12px;min-width:132px;color:var(--island-text)}
+.menu div{height:30px;display:flex;align-items:center;gap:8px;padding:0 10px;border-radius:var(--radius-control);white-space:nowrap}
+.menu div[aria-selected="true"]{background:var(--island-accent-tint)}
+.menu .ck{width:14px;color:var(--island-accent)}
+.tip{position:absolute;z-index:3;padding:6px 8px;border-radius:var(--radius-control);background:var(--flyout);box-shadow:0 0 0 1px var(--island-border),0 4px 12px rgba(0,0,0,.3);font-size:12px;white-space:nowrap;color:var(--island-text)}
+.card{border:1px solid var(--island-card-border);border-radius:var(--radius-island-card);background:var(--island-gallery-face)}
+.sub{display:flex;align-items:center;height:28px;margin-top:12px}
+.sub h4{flex:1;margin:0;font-size:12px;font-weight:600}
+.foot{position:absolute;left:0;right:0;bottom:0;display:flex;gap:8px;justify-content:flex-end;align-items:center}
+.foot .l{margin-right:auto;display:flex;gap:6px;align-items:center}
+.t2{color:var(--island-text-secondary)}
+.t3{color:var(--island-text-tertiary);font-size:11px}
+.cau{color:var(--island-caution)}
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:var(--island-text-tertiary);font-size:12px}
+.kc{height:20px;min-width:20px;padding:0 6px;border-radius:var(--radius-control);border:1px solid var(--island-control-border);font-size:11px;display:inline-flex;align-items:center;justify-content:center;color:var(--island-text-secondary);white-space:nowrap}
+.th{min-width:0}
+.th .img{height:66px;border-radius:var(--radius-island-card);border:1px solid var(--island-hair);overflow:hidden}
+.th .n{font-size:11px;line-height:14px;color:var(--island-text-secondary);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.th .m{font-size:11px;line-height:14px;color:var(--island-text-tertiary)}
+
+.slider{flex:1;height:18px;position:relative}
+.slider::before{content:"";position:absolute;left:0;right:0;top:7px;height:4px;border-radius:2px;background:var(--island-track)}
+.slider i{position:absolute;left:0;top:7px;height:4px;border-radius:2px;background:var(--island-accent-fill)}
+.slider b,.vslider b{position:absolute;width:18px;height:18px;border-radius:9px;background:radial-gradient(circle,var(--island-accent) 0 5px,var(--island-thumb) 5.5px);box-shadow:0 0 0 1px var(--island-control-border),0 1px 3px rgba(0,0,0,.3)}
+.slider b{top:0;margin-left:-9px}
+.vslider{position:relative;width:18px}
+.vslider::before{content:"";position:absolute;left:7px;top:0;bottom:0;width:4px;border-radius:2px;background:var(--island-track)}
+.vslider i{position:absolute;left:7px;bottom:0;width:4px;border-radius:2px;background:var(--island-accent-fill)}
+.vslider b{left:0;margin-bottom:-9px}
+/* the bar, 256 x 50 */
+.desk{background:linear-gradient(135deg,var(--wall-1),var(--wall-2));padding:16px 20px;border-radius:2px}
+.bar{width:256px;height:50px;border-radius:25px;background:var(--island);box-shadow:0 0 0 1px var(--island-widget-border),0 6px 16px rgba(0,0,0,.35);display:flex;align-items:center;color:var(--island-text);padding:0 0 0 8px;gap:10px}
+.bar .lead{width:34px;height:34px;border-radius:17px;background:var(--island-accent-tint);color:var(--island-accent);display:flex;align-items:center;justify-content:center;flex:none;overflow:hidden}
+.bar .lead.cau{background:color-mix(in srgb,var(--island-caution) 16%,transparent);color:var(--island-caution)}
+.bar .lines{flex:1;min-width:0;display:flex;flex-direction:column}
+.bar .bt{font-size:13px;font-weight:600;line-height:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar .bt.cau{color:var(--island-caution)}
+.bar .ba{font-size:12px;line-height:15px;color:var(--island-text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar img{width:34px;height:34px;margin-right:8px;flex:none}
+
+
+.sheet{display:flex;flex-wrap:wrap;gap:16px}
+.drow{height:44px;display:flex;align-items:center;gap:10px;padding:0 10px;margin-bottom:8px;color:var(--island-text-secondary)}
+.drow .nm{width:150px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--island-text)}
+.drow .pc{width:34px;text-align:right}
+.drow.all{background:var(--island-panel)}
+/* v2: a mixer */
+.mix{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;height:302px}
+.ch{display:flex;flex-direction:column;align-items:center;padding:12px 8px 10px;gap:8px;min-width:0}
+.ch .pc{font-size:15px;font-weight:600;line-height:20px;color:var(--island-text)}
+.ch .nm{font-size:12px;line-height:16px;color:var(--island-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;text-align:center}
+.ch .tag{font-size:11px;line-height:14px;color:var(--island-text-tertiary)}
+.ch .g{color:var(--island-text-secondary)}
+.ch.all{background:var(--island-panel)}
+.ch .na{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center;font-size:11px;line-height:14px;padding:0 6px}
+/* v3: the arrangement */
+.map{position:relative;height:132px;border-radius:var(--radius-island-card);background:var(--island-panel);border:1px solid var(--island-card-border)}
+.mon{position:absolute;border:1px solid var(--island-control-border);border-radius:4px;background:var(--island-gallery-face);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:12px;color:var(--island-text);cursor:pointer;padding:0}
+.mon small{font-size:11px;color:var(--island-text-secondary)}
+.mon[aria-pressed="true"]{border:2px solid var(--island-accent);background:var(--island-accent-tint)}
+.mon.na{border-style:dashed}
+.ctl{display:grid;grid-template-columns:24px 76px 1fr 40px;align-items:center;gap:8px;height:40px;padding:0 10px;color:var(--island-text-secondary)}
+.ctl .pc{text-align:right;color:var(--island-text)}
+.ctl span:nth-child(2){color:var(--island-text)}
+.sel{display:flex;align-items:center;gap:8px;height:28px;margin:10px 0 4px;padding:0 2px}
+.sel b{font-size:13px}
+.ibtn[aria-pressed="true"]{background:var(--island-accent-tint);border-color:var(--island-accent);color:var(--island-text)}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<!-- Lucide glyphs (ISC), from lucide-react 1.35.0 and Chippi's LucideIcons.cs -->
+<symbol id="i-chevron-left" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+<symbol id="i-monitor" viewBox="0 0 24 24"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></symbol>
+<symbol id="i-screens" viewBox="0 0 24 24"><path d="M8,3 h12 a2,2 0 0 1 2,2 v8 a2,2 0 0 1 -2,2 h-2 M4,7 h10 a2,2 0 0 1 2,2 v7 a2,2 0 0 1 -2,2 H4 a2,2 0 0 1 -2,-2 V9 a2,2 0 0 1 2,-2 Z M6,22 h6 M9,18 v4"/></symbol>
+</svg>
+<main class="page">
+<header class="intro" data-id="intro"><h1 data-id="title">Displays, v1: a slider row per display</h1><p>The wave 1 board, moved in. All displays first, then each monitor with its own slider and level. Brightness and Contrast switch in the header, so one view shows one control at a time.</p><p>The island panel at 520 × 360; nothing scrolls. Travis's two monitors as Settings › Snap names them; the levels are invented. Brightness moves only monitors that answer DDC/CI.</p><p>My pick: it reads like Audio's device rows, takes a fifth or sixth monitor without changing, and the All displays row is where your eye starts.</p></header>
+<div class="stages">
+<section class="stage dark" data-id="main"><h2 data-id="main-heading">Brightness: All displays moves both by the same amount</h2>
+<div class="izoom"><div class="panel" role="dialog" aria-label="Displays" data-id="main-panel"><div class="phdr" data-id="main-header"><button class="ib back" aria-label="Back" title="Back" data-id="main-back"><svg class="g" style="--s:16px" aria-hidden="true"><use href="#i-chevron-left"/></svg></button><h3 data-id="main-page-title">Displays</h3><span class="seg" role="group" aria-label="Show" data-id="main-view"><button aria-pressed="true" data-id="main-view-brightness">Brightness</button><button aria-pressed="false" data-id="main-view-contrast">Contrast</button></span></div><div class="pbody"><div class="card drow all" data-id="main-display-all-displays"><svg class="g" style="--s:16px" aria-hidden="true"><use href="#i-screens"/></svg><span class="nm">All displays</span><span class="slider" role="slider" aria-label="All displays brightness" aria-valuenow="57" aria-valuemin="0" aria-valuemax="100"><i style="width:57%"></i><b style="left:57%"></b></span><span class="pc">57%</span></div><div class="card drow" data-id="main-display-omen-34c"><svg class="g" style="--s:16px" aria-hidden="true"><use href="#i-monitor"/></svg><span class="nm">OMEN 34c <span class="t3">· Main</span></span><span class="slider" role="slider" aria-label="OMEN 34c brightness" aria-valuenow="54" aria-valuemin="0" aria-valuemax="100"><i style="width:54%"></i><b style="left:54%"></b></span><span class="pc">54%</span></div><div class="card drow" data-id="main-display-ls27d36xg"><svg class="g" style="--s:16px" aria-hidden="true"><use href="#i-monitor"/></svg><span class="nm">LS27D36xG</span><span class="slider" role="slider" aria-label="LS27D36xG brightness" aria-valuenow="60" aria-valuemin="0" aria-valuemax="100"><i style="width:60%"></i><b style="left:60%"></b></span><span class="pc">60%</span></div></div></div></div></section>
+
+<section class="stage light" data-id="main-light"><h2>Brightness: All displays moves both by the same amount · Light</h2>
+<div class="izoom"><div class="panel" role="dialog" aria-label="Displays"><div class="phdr"><button class="ib back" aria-label="Back" title="Back"><svg class="g" style="--s:16px" aria-hidden="true"><use href="#i-chevron-left"/></svg></button><h3>Displays</h3><span class="seg" role="group" aria-label="Show"><button aria-pressed="true">Brightness</button><button aria-pressed="false">Contrast</button></span></div><div class="pbody"><div class="card drow all"><svg class="g" style="--s:16px" aria-hidden="true"><use href="#i-screens"/></svg><span class="nm">All displays</span><span class="slider" role="slider" aria-label="All displays brightness" aria-valuenow="57" aria-valuemin="0" aria-valuemax="100"><i style="width:57%"></i><b style="left:57%"></b></span><span class="pc">57%</span></div><div class="card drow"><svg class="g" style="--s:16px" aria-hidden="true"><use href="#i-monitor"/></svg><span class="nm">OMEN 34c <span class="t3">· Main</span></span><span class="slider" role="slider" aria-label="OMEN 34c brightness" aria-valuenow="54" aria-valuemin="0" aria-valuemax="100"><i style="width:54%"></i><b style="left:54%"></b></span><span class="pc">54%</span></div><div class="card drow"><svg class="g" style="--s:16px" aria-hidden="true"><use href="#i-monitor"/></svg><span class="nm">LS27D36xG</span><span class="slider" role="slider" aria-label="LS27D36xG brightness" aria-valuenow="60" aria-valuemin="0" aria-valuemax="100"><i style="width:60%"></i><b style="left:60%"></b></span><span class="pc">60%</span></div></div></div></div></section>
+
+<section class="stage dark" data-id="second"><h2 data-id="second-heading">Contrast</h2>
+<div class="izoom"><div class="panel" role="dialog" aria-label="Displays" data-id="second-panel"><div class="phdr" data-id="second-header"><button class="ib back" aria-label="Back" title="Back" data-id="second-back"><svg class="g" style="--s:16px" aria-hidden="true"><use href="#i-chevron-left"/></svg></button><h3 data-id="second-page-title">Displays</h3><span class="seg" role="group" aria-label="Show" data-id="second-view"><button aria-pressed="false" data-id="second-view-brightness">Brightness</button><button aria-pressed="true" data-id="second-view-contrast">Contrast</button></span></div><div class="pbody"><div class="card drow all" data-id="second-display-all-displays"><svg class="g" style="--s:16px" aria-hidden="true"><use href="#i-screens"/></svg><span class="nm">All displays</span><span class="slider" role="slider" aria-label="All displays contrast" aria-valuenow="88" aria-valuemin="0" aria-valuemax="100"><i style="width:88%"></i><b style="left:88%"></b></span><span class="pc">88%</span></div><div class="card drow" data-id="second-display-omen-34c"><svg class="g" style="--s:16px" aria-hidden="true"><use href="#i-monitor"/></svg><span class="nm">OMEN 34c <span class="t3">· Main</span></span><span class="slider" role="slider" aria-label="OMEN 34c contrast" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100"><i style="width:100%"></i><b style="left:100%"></b></span><span class="pc">100%</span></div><div class="card drow" data-id="second-display-ls27d36xg"><svg class="g" style="--s:16px" aria-hidden="true"><use href="#i-monitor"/></svg><span class="nm">LS27D36xG</span><span class="slider" role="slider" aria-label="LS27D36xG contrast" aria-valuenow="75" aria-valuemin="0" aria-valuemax="100"><i style="width:75%"></i><b style="left:75%"></b></span><span class="pc">75%</span></div></div></div></div></section>
+
+<section class="stage dark" data-id="failed"><h2 data-id="failed-heading">A display that doesn't answer; why, and Try again, are in Settings › Displays</h2>
+<div class="izoom"><div class="panel" role="dialog" aria-label="Displays" data-id="failed-panel"><div class="phdr" data-id="failed-header"><button class="ib back" aria-label="Back" title="Back" data-id="failed-back"><svg class="g" style="--s:16px" aria-hidden="true"><use href="#i-chevron-left"/></svg></button><h3 data-id="failed-page-title">Displays</h3><span class="seg" role="group" aria-label="Show" data-id="failed-view"><button aria-pressed="true" data-id="failed-view-brightness">Brightness</button><button aria-pressed="false" data-id="failed-view-contrast">Contrast</button></span></div><div class="pbody"><div class="card drow all" data-id="failed-display-all-displays"><svg class="g" style="--s:16px" aria-hidden="true"><use href="#i-screens"/></svg><span class="nm">All displays</span><span class="slider" role="slider" aria-label="All displays brightness" aria-valuenow="54" aria-valuemin="0" aria-valuemax="100"><i style="width:54%"></i><b style="left:54%"></b></span><span class="pc">54%</span></div><div class="card drow" data-id="failed-display-omen-34c"><svg class="g" style="--s:16px" aria-hidden="true"><use href="#i-monitor"/></svg><span class="nm">OMEN 34c <span class="t3">· Main</span></span><span class="slider" role="slider" aria-label="OMEN 34c brightness" aria-valuenow="54" aria-valuemin="0" aria-valuemax="100"><i style="width:54%"></i><b style="left:54%"></b></span><span class="pc">54%</span></div><div class="card drow" data-id="failed-display-ls27d36xg"><svg class="g" style="--s:16px" aria-hidden="true"><use href="#i-monitor"/></svg><span class="nm">LS27D36xG</span><span style="flex:1"></span><span class="cau" style="font-size:11px">Brightness control failed</span></div></div></div></div></section>
+</div>
+</main>
+</body>
+
+</html>
