@@ -20,6 +20,7 @@ public sealed class MediaToolsView : ContentControl, IDisposable
     private readonly MediaToolsModule _module;
     private readonly ModuleContext _context;
     private readonly Grid _header = new();
+    private readonly IslandTabs _tabs = new() { HorizontalAlignment = HorizontalAlignment.Right };
     private readonly Grid _body = new();
     private readonly StackPanel _options = new() { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
     private readonly StackPanel _extra = new() { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
@@ -42,6 +43,15 @@ public sealed class MediaToolsView : ContentControl, IDisposable
     public MediaToolsView(MediaToolsModule module, ModuleContext context)
     {
         _module = module; _context = context;
+        _tabs.SetResourceReference(StyleProperty, "IslandAudioTabsStyle");
+        AutomationProperties.SetName(_tabs, "Media tool");
+        foreach (var tool in Enum.GetValues<MediaTool>()) _tabs.Items.Add(tool.ToString());
+        _tabs.SelectionChanged += (_, _) =>
+        {
+            if (_tabs.SelectedIndex >= 0 && _tabs.SelectedIndex != (int)_module.Settings.Options.Tool
+                && !_module.SaveOptions(_module.Settings.Options with { Tool = (MediaTool)_tabs.SelectedIndex }))
+                _tabs.SelectedIndex = (int)_module.Settings.Options.Tool;
+        };
         Content = _content; _content.Content = _body;
         foreach (var height in new[] { GridLength.Auto, GridLength.Auto, new GridLength(1, GridUnitType.Star), GridLength.Auto, GridLength.Auto, new GridLength(28) }) _body.RowDefinitions.Add(new() { Height = height });
         _options.MinHeight = 30; _extra.Margin = new(0, 0, 0, 6);
@@ -131,18 +141,13 @@ public sealed class MediaToolsView : ContentControl, IDisposable
     }
     private void MakeHeader()
     {
-        _header.Children.Clear(); _header.ColumnDefinitions.Clear(); _header.ColumnDefinitions.Add(new()); _header.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
-        var title = Label("Convert"); title.FontSize = 13; title.FontWeight = FontWeights.SemiBold; _header.Children.Add(title);
-        var tabs = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
-        foreach (var tool in Enum.GetValues<MediaTool>())
+        if (!_header.Children.Contains(_tabs))
         {
-            var button = Button(tool.ToString(), () => _module.SaveOptions(_module.Settings.Options with { Tool = tool }));
-            button.Height = 24; button.MinWidth = 0; button.FontSize = 11; button.Padding = new(8, 0, 8, 0); button.Margin = new(0);
-            button.IsEnabled = CanEdit; button.FontWeight = _module.Settings.Options.Tool == tool ? FontWeights.SemiBold : FontWeights.Normal;
-            if (_module.Settings.Options.Tool == tool) button.SetResourceReference(BackgroundProperty, "IslandButtonBrush");
-            tabs.Children.Add(button);
+            _header.Children.Clear(); _header.ColumnDefinitions.Clear(); _header.ColumnDefinitions.Add(new()); _header.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
+            var title = Label("Convert"); title.FontSize = 13; title.FontWeight = FontWeights.SemiBold; _header.Children.Add(title);
+            Grid.SetColumn(_tabs, 1); _header.Children.Add(_tabs);
         }
-        Grid.SetColumn(tabs, 1); _header.Children.Add(tabs);
+        _tabs.IsEnabled = CanEdit; _tabs.SelectedIndex = (int)_module.Settings.Options.Tool;
     }
     private void MakeOptions()
     {

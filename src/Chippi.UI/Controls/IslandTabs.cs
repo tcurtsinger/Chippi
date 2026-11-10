@@ -4,14 +4,12 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using Chippi.UI.Controls;
+namespace Chippi.UI.Controls;
 
-namespace Chippi.App.Island;
-
-/// <summary>Audio's tabs remain clickable when a fullscreen app keeps the keyboard.</summary>
-internal sealed class IslandAudioTabs : SegmentedControl
+/// <summary>Island tabs remain clickable when a fullscreen app keeps the keyboard.</summary>
+public sealed class IslandTabs : SegmentedControl
 {
-    public IslandAudioTabs() => AddHandler(MouseLeftButtonDownEvent,
+    public IslandTabs() => AddHandler(MouseLeftButtonDownEvent,
         new MouseButtonEventHandler(SelectPressedTab), handledEventsToo: true);
 
     private void SelectPressedTab(object sender, MouseButtonEventArgs e)

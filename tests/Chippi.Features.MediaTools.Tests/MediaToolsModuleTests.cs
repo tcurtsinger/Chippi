@@ -12,6 +12,7 @@ using Chippi.Core.Modules;
 using Chippi.Features.MediaTools;
 using Chippi.Island.Tests;
 using Chippi.Media;
+using Chippi.UI.Controls;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Chippi.Features.MediaTools.Tests;
@@ -46,15 +47,31 @@ public sealed class MediaToolsModuleTests
         module.Open(tool);
         WpfTestThread.Wait(module.AddAsync(Enumerable.Range(1, 12).Select(i => Path.Combine(Path.GetTempPath(), $"fixture-{i}.png"))));
         var view = Assert.IsType<MediaToolsView>(ui.Tile!.Spec.CreateSection());
-        Arrange(view, new(496, 304)); Arrange(view.Header, new(496, 24));
+        Arrange(view, new(496, 296)); Arrange(view.Header, new(496, 32));
         Assert.Equal(5, Descendants<Button>(view).Count(b => AutomationProperties.GetName(b).StartsWith("Remove ", StringComparison.Ordinal)));
         Assert.Contains(Descendants<Button>(view), b => Equals(b.Content, "Next"));
         Assert.All(Descendants<ComboBox>(view), combo => Assert.True(combo.ActualWidth >= 70));
-        Assert.True(view.DesiredSize.Height <= 304);
+        Assert.True(view.DesiredSize.Height <= 296);
         foreach (var button in Descendants<Button>(view).Where(b => AutomationProperties.GetName(b).StartsWith("Remove ", StringComparison.Ordinal)))
             Assert.True(button.TransformToAncestor(view).TransformBounds(new Rect(button.RenderSize)).Bottom <= view.ActualHeight);
         var next = Descendants<Button>(view).Single(b => Equals(b.Content, "Next")); next.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         Assert.Contains(Descendants<TextBlock>(view), text => text.Text == " 2 / 3 ");
+    });
+
+    [Fact]
+    public void Tabs_share_Audio_style_and_keep_the_control_when_selection_changes() => WithModule((module, _, ui, settings) =>
+    {
+        var view = Assert.IsType<MediaToolsView>(ui.Tile!.Spec.CreateSection());
+        view.Header.Resources.MergedDictionaries.Add(new() { Source = new Uri("pack://application:,,,/Chippi;component/Island/IslandStyles.xaml") });
+        Arrange(view.Header, new(496, 32));
+        var tabs = Assert.Single(Descendants<IslandTabs>(view.Header));
+        Assert.Same(view.Header.FindResource("IslandAudioTabsStyle"), tabs.Style);
+        Assert.Equal(32, ui.Tile.Spec.HeaderHeight);
+        tabs.SelectedIndex = 1; Assert.Equal(MediaTool.Resize, module.Settings.Options.Tool);
+        Assert.Same(tabs, Assert.Single(Descendants<IslandTabs>(view.Header)));
+        tabs.SelectedIndex = 2; Assert.Equal(MediaTool.Compress, module.Settings.Options.Tool);
+        settings.Fail = true; tabs.SelectedIndex = 0;
+        Assert.Equal(2, tabs.SelectedIndex); Assert.Equal(MediaTool.Compress, module.Settings.Options.Tool);
     });
 
     [Theory]
@@ -127,7 +144,7 @@ public sealed class MediaToolsModuleTests
                     var view = Assert.IsType<MediaToolsView>(ui.Tile!.Spec.CreateSection());
                     var shell = new Grid { Width = 520, Height = 360 };
                     shell.SetResourceReference(Panel.BackgroundProperty, "IslandBrush");
-                    var content = new Grid { Margin = new(12) }; content.RowDefinitions.Add(new() { Height = new(24) }); content.RowDefinitions.Add(new() { Height = new(8) }); content.RowDefinitions.Add(new());
+                    var content = new Grid { Margin = new(12) }; content.RowDefinitions.Add(new() { Height = new(ui.Tile!.Spec.HeaderHeight) }); content.RowDefinitions.Add(new() { Height = new(8) }); content.RowDefinitions.Add(new());
                     var header = view.Header; if (VisualTreeHelper.GetParent(header) is Panel oldHeader) oldHeader.Children.Remove(header);
                     if (VisualTreeHelper.GetParent(view) is Panel oldView) oldView.Children.Remove(view);
                     content.Children.Add(header); Grid.SetRow(view, 2); content.Children.Add(view); shell.Children.Add(content);

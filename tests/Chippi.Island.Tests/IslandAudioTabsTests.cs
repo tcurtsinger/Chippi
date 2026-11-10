@@ -4,7 +4,6 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using Chippi.App.Island;
 using Chippi.UI.Controls;
 
 namespace Chippi.Island.Tests;
@@ -43,7 +42,7 @@ public sealed class IslandAudioTabsTests
     [Fact]
     public void Audio_tabs_select_both_directions_even_when_focus_is_unavailable() => WpfTestThread.Run(() =>
     {
-        var (tabs, devices, apps) = Create<IslandAudioTabs>();
+        var (tabs, devices, apps) = Create<IslandTabs>();
         int changes = 0;
         tabs.SelectionChanged += (_, _) => changes++;
 
@@ -62,7 +61,7 @@ public sealed class IslandAudioTabsTests
     [Fact]
     public void Disabled_tabs_and_non_left_presses_do_not_change_the_page() => WpfTestThread.Run(() =>
     {
-        var (tabs, devices, _) = Create<IslandAudioTabs>();
+        var (tabs, devices, _) = Create<IslandTabs>();
         devices.IsEnabled = false;
         Press(devices);
         Assert.Equal(1, tabs.SelectedIndex);
