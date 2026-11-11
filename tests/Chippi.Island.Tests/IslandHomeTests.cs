@@ -279,7 +279,7 @@ public sealed class IslandHomeTests
                 names.AddRange(["Open keep-awake", "Open shelf", "Keep awake", "Mute system volume", "System volume"]);
             else
                 names.Add("Open settings");
-            names.AddRange(petRight ? ["Now Playing", "Settings", "Chippi"] : ["Chippi", "Settings", "Now Playing"]);
+            names.AddRange(petRight ? ["Now Playing", "Settings", "Close Chippi"] : ["Close Chippi", "Settings", "Now Playing"]);
             Control Visit(Control from, FocusNavigationDirection direction, string name)
             {
                 target = null;
@@ -298,17 +298,15 @@ public sealed class IslandHomeTests
     });
 
     [Fact]
-    public void The_footer_chippi_is_a_button_that_boops_him_and_sits_where_the_pucks_does() => WpfTestThread.Run(() =>
+    public void The_footer_chippi_requests_close_and_sits_where_the_pucks_does() => WpfTestThread.Run(() =>
     {
         var grid = Laid(_ => { });
-        var boop = Find<Button>(grid, b => AutomationProperties.GetName(b) == "Chippi");
-        Assert.Same(grid.Pet, boop.Content);
-        Assert.False(grid.Pet.Squish.HasAnimatedProperties);
-        if (!Chippi.UI.Themes.Motion.IsReduced)
-        {
-            Click(boop);
-            Assert.True(grid.Pet.Squish.HasAnimatedProperties); // a squish and a grin
-        }
+        var close = Find<Button>(grid, b => AutomationProperties.GetName(b) == "Close Chippi");
+        Assert.Same(grid.Pet, close.Content); Assert.Equal("Close Chippi", close.ToolTip);
+        int requested = 0; grid.CloseRequested += (_, _) => requested++;
+        Assert.True(grid.IsCloseTarget(close)); Assert.True(grid.IsCloseTarget(grid.Pet));
+        Assert.False(grid.IsCloseTarget(null)); Assert.False(grid.IsCloseTarget(new System.Windows.Documents.Run("Other")));
+        Click(close); Assert.Equal(1, requested);
 
         // Chippi meets the puck at either outer edge. Settings stays beside him.
         var settings = Find<Button>(grid, b => AutomationProperties.GetName(b) == "Settings");
@@ -317,7 +315,7 @@ public sealed class IslandHomeTests
         {
             grid.SetPetSide(right);
             grid.UpdateLayout();
-            var footer = (FrameworkElement)System.Windows.Media.VisualTreeHelper.GetParent(boop);
+            var footer = (FrameworkElement)System.Windows.Media.VisualTreeHelper.GetParent(close);
             var center = grid.Pet.TranslatePoint(new Point(grid.Pet.ActualWidth / 2, grid.Pet.ActualHeight / 2), footer);
             Assert.Equal(IslandGrid.FooterPet, Math.Round(right ? footer.ActualWidth - center.X : center.X, 3));
             Assert.Equal(IslandGrid.FooterPet, Math.Round(footer.ActualHeight - center.Y, 3));

@@ -110,6 +110,7 @@ public partial class IslandPanelWindow : Window
         _grid.TileToggled += (_, key) => Toggle(key);
         _grid.SearchRequested += (_, _) => TakeKeyboard();
         _grid.SettingsRequested += (_, _) => SettingsRequested?.Invoke(this, EventArgs.Empty);
+        _grid.CloseRequested += (_, _) => CloseRequested?.Invoke(this, EventArgs.Empty);
         _failedTimer.Tick += (_, _) =>
         {
             long now = Stopwatch.GetTimestamp();
@@ -128,7 +129,15 @@ public partial class IslandPanelWindow : Window
 
         // A press in the panel is the user clicking into it: from then on it takes the keyboard.
         // (The puck's window sits above this one, so a press on the puck is the puck's.)
-        PreviewMouseLeftButtonDown += (_, e) => TakeKeyboard(e.OriginalSource as DependencyObject);
+        PreviewMouseLeftButtonDown += (_, e) =>
+        {
+            if (_grid.IsCloseTarget(e.OriginalSource as DependencyObject))
+            {
+                e.Handled = true; // Closing needs no foreground handoff, including over a fullscreen app.
+                CloseRequested?.Invoke(this, EventArgs.Empty);
+            }
+            else TakeKeyboard(e.OriginalSource as DependencyObject);
+        };
         PreviewMouseRightButtonDown += (_, e) => TakeKeyboard(e.OriginalSource as DependencyObject);
         PreviewKeyDown += (_, e) =>
         {
@@ -156,6 +165,8 @@ public partial class IslandPanelWindow : Window
 
     /// <summary>The home's Settings button.</summary>
     internal event EventHandler? SettingsRequested;
+
+    internal event EventHandler? CloseRequested;
 
     /// <summary>The page to restore next time: a tile key, or null for Home.</summary>
     internal event EventHandler<string?>? LastPageChanged;

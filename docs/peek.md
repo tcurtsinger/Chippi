@@ -8,7 +8,7 @@ Approved 2026-11-11. Peek is a shell setting under **Island & pet**, not another
 - **Default panel:** Home, Now Playing, Audio, or an installed feature page, including shared Capture and hidden result pages. Home is the default. A removed concrete page falls back to Home; its saved choice remains so reinstalling restores it. Audio's generic alias resolves an installed Audio view.
 - **Hold:** open while the shortcut is down; release the trigger key or its required modifiers to collapse. Releasing one Ctrl while the other remains down keeps the chord held. A release that reaches the UI before its press cannot leave Peek stuck open.
 - If an owned file picker or dialog is open, the collapse waits for its last open-hold lease to end, keeping that dialog usable. Opening a fresh Peek visit cancels an older pending collapse.
-- **Toggle:** press once to open, again to collapse. Click-away leaves it open. Esc and the puck can close it. Typing-page selection does not automatically take the foreground; a deliberate click can.
+- **Toggle:** press once to open, again to collapse. Click-away leaves it open. Esc, the puck and the small Chippi in the home footer can close it. Typing-page selection does not automatically take the foreground; a deliberate click can.
 - Peek uses the widget's screen, including over fullscreen apps, and respects Island off. Locking or turning off the display closes it. The ordinary puck destination and remembered Audio view remain unchanged by Peek navigation.
 - Navigation to a subpage stays inside the Peek visit. Rebinding/removing the shortcut, changing Peek's mode/target, disabling the island, or stopping the host ends the visit.
 
@@ -40,7 +40,7 @@ Completion evidence, 2026-11-11 (`b2da53b`): local checks passed 9 controller, 6
 
 1. In Settings > Island & pet > Peek, choose System (or another installed page). Select Edit and record an unused chord in Shortcuts; Save.
 2. Choose Hold. From another app, hold that chord: Chippi should show the chosen page without taking focus. Release: it collapses. Open the puck normally: its previous destination remains.
-3. Choose Toggle. Press once, click another app, and confirm Peek stays open. Press again to close. Repeat and close with Esc.
+3. Choose Toggle. Press once, click another app, and confirm Peek stays open. Press again to close. Repeat and close with Esc. Select Home as the Peek panel and confirm the small footer Chippi also closes it.
 4. Navigate to a subpage during Peek; it remains a Peek visit. Try while a fullscreen app is in front and check that the app stays fullscreen.
 
 Live key delivery, fullscreen/game behavior, DWM frame timing, Windows Sandbox and native ARM64 execution remain owner/isolated-session checks. Offscreen fixtures do not establish those results.
