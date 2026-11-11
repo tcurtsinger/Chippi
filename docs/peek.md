@@ -34,6 +34,8 @@ Approved 2026-11-11. Peek is a shell setting under **Island & pet**, not another
 - Windowless controller fixtures cover hold/release, short taps, stale release, modifiers/reset, toggle, config changes, rebind/refusal, failed saves and observer failure. Settings fixtures cover choices, central Edit, persistence, removed targets and failure recovery. Dark/light settings render at 800 and 460 DIPs with `CHIPPI_ISLAND_SHOTS`.
 - CI-only `PeekWindowTests` exercise native panel routing, click-away/Esc, remembered normal/Audio destinations, removed pages, fullscreen/passive Search, modal holds and a queued old click-away. These tests show windows and are not run locally while the owner is at the PC.
 
+Completion evidence, 2026-11-11 (`b2da53b`): local checks passed 9 controller, 6 Peek settings, 4 Island & pet page and 188 Core tests. Release application builds passed for x64 and ARM64 with no warnings or errors. Four native offscreen Settings renders cover dark/light at 800 and 460 DIPs; the three-row section retains the existing Settings cards, ComboBox, segmented control and read-only shortcut component, so root `DESIGN.md` and the global sidecar are unchanged. Review resolved subpage dismissal, concrete Audio fallback and transactional recovery after release-tracking failure; the final modal deferred-close and queued-click review found no material issues. The 8 native window tests remain CI-only; this evidence establishes no live fullscreen, hardware, DWM timing or Sandbox result.
+
 ## Owner check
 
 1. In Settings > Island & pet > Peek, choose System (or another installed page). Select Edit and record an unused chord in Shortcuts; Save.
