@@ -140,6 +140,7 @@ Essentials preset, the only one of its features not built yet. Capture gets its 
 - **Wave 3:** the admin helper, App updates, Uninstaller, Cleaner, Port manager.
 
 ## Open items
+- **Peek (2026-11-11):** shortcut-controlled Hold/Toggle opening on a separate default panel, configured in Island & pet. [Behavior and checks](docs/peek.md).
 - **Updates:** Velopack builds the installers, but no update feed is set and the app never checks for updates (the update check in Architecture, auto-update in Decisions).
 - **Signing:** the installers are unsigned.
 - **First release:** nothing is on GitHub releases yet.

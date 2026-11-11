@@ -99,6 +99,8 @@ A Windows 11 tray app for the owner's own PC (C#, .NET 10, WPF): a widget on the
 
 ## Phase 7 safety
 
+- **Peek:** Settings is under Island & pet; shortcut owner/name is `peek`/`Peek` in the central editor. `PeekControllerTests` and `PeekSettingsTests` are windowless filters in `Chippi.Island.Tests`; `CHIPPI_ISLAND_SHOTS` renders its Settings section. `PeekWindowTests` shows the real widget and belongs in CI or an owner-approved away session. Hold release goes through the shared input hub; Toggle adds no release observer. Peek must keep its temporary navigation separate from normal puck/Audio history.
+
 - Competitors are researched from public documentation; do not install tools on the owner's PC for research.
 - Capture, OCR, QR and color-picker checks that copy run only in Windows Sandbox. Never touch the owner's real clipboard.
 - Uninstall, cleanup and process-ending checks use Sandbox or throwaway fixtures, never the owner's real apps, files or processes, except in the owner's own live check with throwaway installs.

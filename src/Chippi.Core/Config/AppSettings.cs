@@ -57,6 +57,8 @@ public enum IslandOpensOn
     AllFeatures,
 }
 
+public enum PeekMode { Hold, Toggle }
+
 /// <summary>Shell settings, the "app" section of settings.json.</summary>
 public sealed class AppSettings
 {
@@ -74,6 +76,14 @@ public sealed class AppSettings
 
     /// <summary>Settings › Island &amp; pet: no tray icon while the island shows. It comes back while the island is off or hidden for a fullscreen app.</summary>
     public bool HideTrayIcon { get; set; }
+
+    /// <summary>Peek's global shortcut, edited centrally in Settings › Shortcuts. Unassigned by default.</summary>
+    public Shortcuts.KeyShortcut? PeekShortcut { get; set; }
+
+    /// <summary>Peek's temporary destination. Null selects Home independently of the normal puck destination.</summary>
+    public string? PeekPage { get; set; }
+
+    public PeekMode PeekMode { get; set; } = PeekMode.Hold;
 
     /// <summary>
     /// Where the widget sits on its display, 0 to 1 across the room it has in the work area (0 is flush

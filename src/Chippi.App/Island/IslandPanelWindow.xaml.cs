@@ -316,6 +316,19 @@ public partial class IslandPanelWindow : Window
     /// <summary>The page the next open shows instead of the usual one (a notice click); null for the usual.</summary>
     internal void OpenOn(string? key) => _openOn = key;
 
+    private bool _peeking;
+    private string? _peekPage;
+    internal void BeginPeek(string? key)
+    {
+        _peeking = true; _peekPage = key;
+        if (IsOpen) ShowPage(ResolvePeekPage(key), remember: false);
+    }
+    internal void EndPeek()
+    {
+        _peeking = false; _peekPage = null;
+        if (!IsOpen) _page = _layout.OpensOn == IslandOpensOn.LastPage ? ResolvePage(_lastPage) : null;
+    }
+
     /// <summary>Settings › Island &amp; pet: where it opens, the tiles' order and which show.</summary>
     internal void SetLayout(IslandLayout layout)
     {
@@ -369,7 +382,7 @@ public partial class IslandPanelWindow : Window
         if (!IsOpen)
             return;
         if (_page is not null && !Exists(_page))
-            ShowPage(ResolvePage(_page), remember: false);
+            ShowPage(_peeking && _peekPage != IslandTool.Audio ? ResolvePeekPage(_page) : ResolvePage(_page), remember: false);
         else if (_page is not null)
             Attach(_page);
         Reshape(snap: _frame is null);
@@ -407,7 +420,9 @@ public partial class IslandPanelWindow : Window
         bool shrinking = IsVisible;
         if (!shrinking)
             _widgetEdge = (sourceRim ?? Brushes.Transparent).Color;
-        if (ResolvePage(_openOn) is { } requested)
+        if (_peeking)
+            _page = ResolvePeekPage(_peekPage);
+        else if (ResolvePage(_openOn) is { } requested)
             _page = requested;
         else if (shrinking)
             _page = ResolvePage(_page); // a module may have stopped while the widget was folding
@@ -484,7 +499,7 @@ public partial class IslandPanelWindow : Window
     /// <summary>Shows <paramref name="key"/>'s page, or the grid for null; Back slides from the left.</summary>
     internal void ShowPage(string? key, bool remember = true, bool back = false)
     {
-        key = ResolvePage(key);
+        key = _peeking ? ResolvePeekPage(key) : ResolvePage(key);
         if (remember)
             RememberPage(key);
         if (key == _page && IsOpen)
@@ -526,7 +541,7 @@ public partial class IslandPanelWindow : Window
     }
 
     /// <summary>Whether showing <paramref name="key"/>'s page takes the keyboard at once (the Command bar).</summary>
-    private bool TakesKeyboard(string? key) => Group(key)?.Parts.Any(p => p.Spec.TakesKeyboard) == true;
+    private bool TakesKeyboard(string? key) => !_peeking && Group(key)?.Parts.Any(p => p.Spec.TakesKeyboard) == true;
 
     // ----- Pages -----
 
@@ -534,6 +549,8 @@ public partial class IslandPanelWindow : Window
     internal IReadOnlyList<string> PageKeys() => [NowPlayingKey, .. _groups.Where(g => g.Key != NowPlayingKey).Select(g => g.Key)];
 
     private bool Exists(string key) => key == NowPlayingKey || _groups.Any(g => g.Key == key);
+
+    private string? ResolvePeekPage(string? key) => key == IslandTool.Audio ? ResolvePage(key) : key is not null && Exists(key) ? key : null;
 
     private string? ResolvePage(string? key)
     {
@@ -546,6 +563,7 @@ public partial class IslandPanelWindow : Window
 
     private void RememberPage(string? key)
     {
+        if (_peeking) return;
         bool? mixer = IslandTool.IsAudioPage(key) ? key == AppVolumeModule.TileKey : AudioShowsMixer;
         string? audioPage = IslandTool.IsAudioPage(key) ? key : AudioPage;
         if (_lastPage == key && AudioPage == audioPage && AudioShowsMixer == mixer) return;
