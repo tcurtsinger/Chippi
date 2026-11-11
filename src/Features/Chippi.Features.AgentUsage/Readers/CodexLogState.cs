@@ -41,7 +41,7 @@ internal sealed partial class CodexLogs
                 && !line.Contains("\"turn_aborted\"", StringComparison.Ordinal)
                 && !line.Contains("\"rate_limits\"", StringComparison.Ordinal)
                 && !line.Contains("request_user_input", StringComparison.Ordinal)
-                && !(_questions.Count != 0 && (line.Contains(ReplyTag, StringComparison.Ordinal)
+                && !(_questions.Count != 0 && (line.Contains("\"message\"", StringComparison.Ordinal)
                     || line.Contains("\"function_call_output\"", StringComparison.Ordinal))))
                 return;
             try
@@ -132,8 +132,15 @@ internal sealed partial class CodexLogs
                     continue;
                 const string open = "<" + ReplyTag + ">", close = "</" + ReplyTag + ">";
                 string envelope = text.Trim();
-                if (!envelope.StartsWith(open, StringComparison.Ordinal) || !envelope.EndsWith(close, StringComparison.Ordinal))
+                if (envelope.Length == 0 || envelope.StartsWith("<environment_context>", StringComparison.Ordinal)
+                    || envelope.StartsWith("# AGENTS.md instructions for ", StringComparison.Ordinal))
                     continue;
+                if (!envelope.StartsWith(open, StringComparison.Ordinal) || !envelope.EndsWith(close, StringComparison.Ordinal))
+                {
+                    // A freeform answer or new instruction supersedes the old questions.
+                    _questions.Clear();
+                    return;
+                }
                 using var replies = JsonDocument.Parse(envelope[open.Length..^close.Length]);
                 if (replies.RootElement.ValueKind != JsonValueKind.Array) continue;
                 foreach (var reply in replies.RootElement.EnumerateArray())

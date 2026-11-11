@@ -315,6 +315,43 @@ public sealed class CodexLogsTests
     }
 
     [Fact]
+    public void A_new_instruction_clears_an_old_question_for_cached_and_fresh_readers()
+    {
+        using var home = new TempFolder();
+        string log = home.Write($"sessions/2026/11/01/rollout-x-{Thread}.jsonl", Log(
+            Line("2026-11-01T23:26:00Z", """{"type":"task_started"}"""), Ask("old", true),
+            Output("old", """{"accepted":true}"""),
+            Line("2026-11-01T23:28:00Z", """{"type":"task_complete"}""")));
+        var logs = new CodexLogs(home.Path);
+        Assert.Equal(AgentSessionState.NeedsInput, logs.LastTurn(log)!.Status);
+
+        File.AppendAllText(log, Line("2026-11-01T23:29:00Z", """{"type":"task_started"}""") + "\n"
+            + Item("""{"type":"message","role":"user","content":[{"type":"input_text","text":"Let's worry about that later. Merge the fix."}]}""") + "\n");
+        Assert.Equal(AgentSessionState.Working, logs.LastTurn(log)!.Status);
+        Assert.Equal(logs.LastTurn(log), new CodexLogs(home.Path).LastTurn(log));
+        File.AppendAllText(log, Line("2026-11-01T23:30:00Z", """{"type":"task_complete"}""") + "\n");
+        Assert.Equal(AgentSessionState.Idle, logs.LastTurn(log)!.Status);
+        Assert.Equal(logs.LastTurn(log), new CodexLogs(home.Path).LastTurn(log));
+
+        File.AppendAllText(log, Ask("new", true) + "\n" + Output("new", """{"accepted":true}""") + "\n");
+        Assert.Equal(AgentSessionState.NeedsInput, logs.LastTurn(log)!.Status);
+    }
+
+    [Theory]
+    [InlineData("<environment_context>Updated workspace</environment_context>")]
+    [InlineData("# AGENTS.md instructions for C:/work\n<INSTRUCTIONS>Updated rules</INSTRUCTIONS>")]
+    public void Automatic_workspace_context_does_not_answer_a_question(string text)
+    {
+        using var home = new TempFolder();
+        string log = home.Write($"sessions/2026/11/01/rollout-x-{Thread}.jsonl", Log(
+            Line("2026-11-01T23:26:00Z", """{"type":"task_started"}"""), Ask("pending", true, 2),
+            Output("pending", """{"accepted":true}"""),
+            Item(JsonSerializer.Serialize(new { type = "message", role = "user", content = new[] { new { type = "input_text", text } } })),
+            Reply("pending", 0)));
+        Assert.Equal(AgentSessionState.NeedsInput, new CodexLogs(home.Path).LastTurn(log)!.Status);
+    }
+
+    [Fact]
     public void Only_an_unanswered_blocking_question_needs_input_and_aborting_clears_pending_requests()
     {
         using var home = new TempFolder();
