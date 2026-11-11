@@ -215,6 +215,7 @@ public partial class IslandWindow : Window
         // Clicked into, the panel comes to the front; the widget, faded out over it, stays above it for the close.
         _panel.Activated += (_, _) => IslandNative.Raise(_hwnd);
         _panel.EscapePressed += (_, _) => CloseIsland();
+        _panel.CloseRequested += (_, _) => CloseIsland();
         _panel.SettingsRequested += (_, _) =>
         {
             CloseIsland(immediate: true);

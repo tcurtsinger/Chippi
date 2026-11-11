@@ -293,10 +293,10 @@ public sealed class IslandPanelTests
             Assert.Equal(new Size(390, 270), shape.Size); // 75% scale, with 8 DIPs each side of the short dimension
             Assert.False(panel.PetMeetsPuck);
             var root = (FrameworkElement)panel.FindName("Root");
-            var boop = Descendants(Grid(panel)).OfType<Button>().Single(b => AutomationProperties.GetName(b) == "Chippi");
-            var center = boop.TranslatePoint(new Point(boop.ActualWidth / 2, boop.ActualHeight / 2), root);
+            var close = Descendants(Grid(panel)).OfType<Button>().Single(b => AutomationProperties.GetName(b) == "Close Chippi");
+            var center = close.TranslatePoint(new Point(close.ActualWidth / 2, close.ActualHeight / 2), root);
             var hit = Assert.IsAssignableFrom<DependencyObject>(root.InputHitTest(center));
-            Assert.True(ReferenceEquals(boop, hit) || boop.IsAncestorOf(hit));
+            Assert.True(ReferenceEquals(close, hit) || close.IsAncestorOf(hit));
             Assert.True(shape.Contains(center));
 
             panel.ShowPage("keep-awake", remember: false);

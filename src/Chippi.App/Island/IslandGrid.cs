@@ -49,7 +49,7 @@ internal sealed class IslandGrid : UserControl
     private readonly LucideIcon _speakerGlyph = new() { Data = LucideIcons.Volume, Size = 15 };
     private readonly Button _speaker = new();
     private readonly Button _settings = IconButton(LucideIcons.Settings, "Settings");
-    private readonly Button _boop = new() { Width = 32, Height = 32, Padding = new Thickness(0), VerticalAlignment = VerticalAlignment.Bottom };
+    private readonly Button _petButton = new() { Width = 32, Height = 32, Padding = new Thickness(0), VerticalAlignment = VerticalAlignment.Bottom };
     private readonly DispatcherTimer _volumeFailed = new() { Interval = TimeSpan.FromSeconds(4) };
     private IReadOnlyList<IslandTileView> _shown = [];
     private IslandTileVolume? _volumeSource;
@@ -101,6 +101,7 @@ internal sealed class IslandGrid : UserControl
     public event EventHandler<string>? TileOpened;
     public event EventHandler<string>? TileToggled;
     public event EventHandler? SettingsRequested;
+    internal event EventHandler? CloseRequested;
     internal event EventHandler? SearchRequested;
     internal bool IsSearching => _search.Visibility == Visibility.Visible;
     // The card sizes to the unfiltered tool set so typing a query doesn't move the widget or its controls.
@@ -108,6 +109,9 @@ internal sealed class IslandGrid : UserControl
         + TileRowHeight * _tiles.Rows + (_quickRow.Visibility == Visibility.Visible ? QuickHeight : 0));
 
     internal void SetMedia(IMediaSessions? media) => _media.SetMedia(media);
+
+    internal bool IsCloseTarget(DependencyObject? source) => ReferenceEquals(source, _petButton)
+        || source is Visual && _petButton.IsAncestorOf(source);
 
     private static Button IconButton(Geometry icon, string name)
     {
@@ -179,14 +183,15 @@ internal sealed class IslandGrid : UserControl
         _settings.Width = _settings.Height = 32;
         _settings.VerticalAlignment = VerticalAlignment.Bottom;
         _settings.Click += (_, _) => SettingsRequested?.Invoke(this, EventArgs.Empty);
-        _boop.Content = Pet;
-        _boop.SetResourceReference(StyleProperty, "IslandIconButtonStyle");
-        AutomationProperties.SetName(_boop, "Chippi");
-        _boop.Click += (_, _) => Pet.Boop();
+        _petButton.Content = Pet;
+        _petButton.SetResourceReference(StyleProperty, "IslandIconButtonStyle");
+        _petButton.ToolTip = "Close Chippi";
+        AutomationProperties.SetName(_petButton, "Close Chippi");
+        _petButton.Click += (_, _) => CloseRequested?.Invoke(this, EventArgs.Empty);
         _media.VerticalAlignment = VerticalAlignment.Bottom;
         _media.OpenRequested += (_, _) => TileOpened?.Invoke(this, IslandPanelWindow.NowPlayingKey);
         var footer = new Border { BorderThickness = new Thickness(0, 1, 0, 0), Margin = new Thickness(-12, 0, -12, 0),
-            Child = new Grid { Children = { _media, _settings, _boop } } };
+            Child = new Grid { Children = { _media, _settings, _petButton } } };
         footer.SetResourceReference(Border.BackgroundProperty, "IslandFooterBrush");
         footer.SetResourceReference(Border.BorderBrushProperty, "IslandHairBrush");
         KeyboardNavigation.SetTabNavigation(footer, KeyboardNavigationMode.Local);
@@ -196,12 +201,12 @@ internal sealed class IslandGrid : UserControl
 
     internal void SetPetSide(bool right)
     {
-        double inset = FooterPet - _boop.Width / 2;
-        _boop.HorizontalAlignment = _settings.HorizontalAlignment = right ? HorizontalAlignment.Right : HorizontalAlignment.Left;
-        _boop.Margin = new Thickness(inset, 0, inset, inset);
+        double inset = FooterPet - _petButton.Width / 2;
+        _petButton.HorizontalAlignment = _settings.HorizontalAlignment = right ? HorizontalAlignment.Right : HorizontalAlignment.Left;
+        _petButton.Margin = new Thickness(inset, 0, inset, inset);
         _settings.Margin = new Thickness(inset + 36, 0, inset + 36, inset);
         _media.Margin = right ? new Thickness(8, 0, 82, inset) : new Thickness(82, 0, 8, inset);
-        _boop.TabIndex = right ? 2 : 0;
+        _petButton.TabIndex = right ? 2 : 0;
         _settings.TabIndex = 1;
         _media.TabIndex = right ? 0 : 2;
         // WPF uses the Button inside the media control as a tab stop. The wrapper is its local order group.
