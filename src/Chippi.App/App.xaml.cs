@@ -20,6 +20,7 @@ namespace Chippi.App;
 /// </summary>
 public partial class App : Application
 {
+    private Island.IslandHost? _islandHost;
     private SingleInstance? _instance;
     internal Notifications.ToastStartup? NotificationStartup { get; init; }
     private Notifications.ClassicToastPresenter? _toasts;
@@ -299,7 +300,7 @@ public partial class App : Application
         _modulesStarted = StartModulesAsync(shell);
 
         // [WS3] Island: create the island host here.
-        new Island.IslandHost(shell).Start();
+        (_islandHost = new Island.IslandHost(shell)).Start();
 
         // [WS2] Settings: create the settings controller and call shell.Commands.RegisterSettings(...).
         Settings.SettingsController.Compose(shell);
@@ -368,6 +369,7 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        _islandHost?.Dispose();
         _toasts?.Dispose();
         Shell?.Clipboard.Dispose();
         Shell?.Input.Dispose();

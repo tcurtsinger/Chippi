@@ -37,6 +37,7 @@ public sealed class IslandHost : IDisposable
     private bool _refreshPending;
     private bool _disposed;
     private bool _locked, _displayOff; // nobody can see the screen: Chippi and the bar rest (Motion.IsUnseen)
+    private PeekController? _peek;
 
     public IslandHost(ShellContext shell)
     {
@@ -81,6 +82,8 @@ public sealed class IslandHost : IDisposable
         // A second launch and a notice click open the island; with it off or hidden, ShellCommands opens Settings.
         _shell.Commands.RegisterPages(_window.ShowPages, _window.ShowPage);
         _shell.Commands.RegisterSummon(_window.SummonPage);
+        _peek = new PeekController(_shell.Config, _shell.Shortcuts, _shell.Input, action => _dispatcher.BeginInvoke(action), _window.OpenPeek, _window.ClosePeek);
+        _window.PeekClosed += _peek.Dismissed;
         _window.IsVisibleChanged += (_, _) => _shell.Commands.SetIslandShowing(_window.IsVisible);
         StartMedia();
         _tracker.Changed += (_, _) =>
@@ -518,6 +521,7 @@ public sealed class IslandHost : IDisposable
     private void Rest()
     {
         bool unseen = _locked || _displayOff;
+        if (unseen) _peek?.Cancel();
         if (unseen == Motion.IsUnseen)
             return;
         Motion.IsUnseen = unseen;
@@ -532,6 +536,7 @@ public sealed class IslandHost : IDisposable
         if (_disposed)
             return;
         _disposed = true;
+        _peek?.Dispose();
         _shell.Config.SectionChanged -= OnSectionChanged;
         Microsoft.Win32.SystemEvents.SessionSwitch -= OnSessionSwitch;
         _media?.Dispose();

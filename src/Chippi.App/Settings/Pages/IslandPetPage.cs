@@ -26,6 +26,7 @@ internal sealed class IslandPetPage : UserControl
     private const double RowHeight = 48;
 
     private readonly ShellContext _shell;
+    private readonly PeekSettingsSection _peek;
     private readonly Card _tiles = new();
     private readonly DecorativeHost _preview = new() { HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(16) };
     private string _tileKeys = "";
@@ -37,6 +38,11 @@ internal sealed class IslandPetPage : UserControl
         var page = new StackPanel();
         page.Children.Add(SettingsUi.Header("Island & pet", ""));
         page.Children.Add(SettingsUi.Group([.. DoorRows(app), OpensOnRow(app), PositionRow(), DisplayRow(app)]));
+
+        _peek = new PeekSettingsSection(shell.Config, shell.Shortcuts,
+            () => IslandTileContribution.Group(shell.Registry.Features.Where(f => f.IsRunning).SelectMany(f => f.IslandTiles).Concat(shell.Services.SharedIslandTiles())),
+            () => shell.Commands.OpenSettings($"{ModuleContext.ShortcutsPage}/peek/Peek"));
+        page.Children.Add(_peek);
 
         page.Children.Add(SettingsUi.Section("Tiles"));
         var tiles = new Grid { ColumnDefinitions = { new(), new() { Width = new GridLength(8) }, new() { Width = GridLength.Auto } } };
@@ -59,7 +65,7 @@ internal sealed class IslandPetPage : UserControl
         Unloaded += (_, _) => _shell.Registry.Changed -= OnRegistryChanged;
     }
 
-    private void OnRegistryChanged(object? sender, EventArgs e) => Dispatcher.BeginInvoke(RefreshTiles);
+    private void OnRegistryChanged(object? sender, EventArgs e) => Dispatcher.BeginInvoke(() => { RefreshTiles(); _peek.Refresh(); });
 
     private void Save(Action<AppSettings> change)
     {

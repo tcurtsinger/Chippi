@@ -300,6 +300,27 @@ public partial class IslandWindow : Window
     /// <summary>The page to save as AppSettings.IslandLastPage: a tile key, or null for Home.</summary>
     public event EventHandler<string?>? LastPageChanged;
 
+    private bool _peeking;
+    private bool _peekClosePending;
+    internal event Action? PeekClosed;
+
+    internal bool OpenPeek(string? key)
+    {
+        if (!_enabled || _dragging) return false;
+        _peekClosePending = false; _peeking = true; _panel.BeginPeek(key);
+        _summoned = true; ApplyVisibility();
+        OpenIsland();
+        if (!_panel.IsOpen) { EndPeek(); _summoned = false; ApplyVisibility(); }
+        return _panel.IsOpen;
+    }
+
+    internal void ClosePeek() { if (_peeking) CloseIsland(); }
+    private void EndPeek()
+    {
+        if (!_peeking) return;
+        _peekClosePending = false; _peeking = false; _panel.EndPeek(); PeekClosed?.Invoke();
+    }
+
     private void SaveLastPage()
     {
         if (!_lastPagePending) return;
@@ -647,6 +668,7 @@ public partial class IslandWindow : Window
             return;
         Dispatcher.BeginInvoke(() =>
         {
+            if (_peeking) { CloseIsland(); return; }
             if (_panel.HasKeyboard || _panel.PageHandlesEscape())
                 return;
             CloseIsland();
@@ -682,10 +704,10 @@ public partial class IslandWindow : Window
     /// </summary>
     internal void PressedAt(Point physical)
     {
-        if (!_panel.IsOpen || _panel.Covers(physical) || (IsVisible && CoversWidget(physical))
+        if (_peeking || !_panel.IsOpen || _panel.Covers(physical) || (IsVisible && CoversWidget(physical))
             || Menu.IsOpen || Mouse.Captured is not null)
             return;
-        Dispatcher.BeginInvoke(() => CloseIsland());
+        Dispatcher.BeginInvoke(() => { if (!_peeking) CloseIsland(); });
     }
 
     // ----- Open and close -----
@@ -718,6 +740,7 @@ public partial class IslandWindow : Window
     /// </summary>
     internal bool ShowPages(bool keyboard)
     {
+        EndPeek();
         if (!_panel.IsOpen)
             OpenIsland();
         if (keyboard && _panel.IsOpen)
@@ -801,7 +824,7 @@ public partial class IslandWindow : Window
     /// <summary>Folds the panel back into the widget, the puck or the bar; <paramref name="immediate"/> hides it at once.</summary>
     private void CloseIsland(bool immediate = false)
     {
-        if (!immediate && _openHolds.IsHeld) return;
+        if (!immediate && _openHolds.IsHeld) { if (_peeking) _peekClosePending = true; return; }
         _escapeHook?.Dispose(); // unhooks
         _escapeHook = null;
         _clickHook?.Dispose();
@@ -809,11 +832,15 @@ public partial class IslandWindow : Window
         _openedByDrag = false;
         DragCloseTimer.Stop();
         if (!_panel.IsOpen && !(immediate && _panel.IsVisible))
+        {
+            EndPeek();
             return;
+        }
         // A reversal can still have a half-unfolded bar underneath it. Land there first;
         // the remaining unfold or a change of activity takes over after the panel hides.
         var widget = _resumeBar || _heldWidth.HasValue ? RenderedWidgetRect() : WidgetRect;
         _panel.CloseIsland(immediate, widget, Body.TabExtension, _left);
+        EndPeek();
         RefreshPuck();
         if (_summoned)
         {
@@ -909,7 +936,17 @@ public partial class IslandWindow : Window
     }
 
     private readonly IslandOpenHold _openHolds = new();
-    internal IDisposable HoldIslandOpen() => _openHolds.Hold();
+    internal IDisposable HoldIslandOpen() => new OpenLease(_openHolds.Hold(), () =>
+    {
+        void Released() { if (_peekClosePending && !_openHolds.IsHeld) CloseIsland(); }
+        if (Dispatcher.CheckAccess()) Released(); else Dispatcher.BeginInvoke(Released);
+    });
+
+    private sealed class OpenLease(IDisposable hold, Action released) : IDisposable
+    {
+        private IDisposable? _hold = hold;
+        public void Dispose() { if (Interlocked.Exchange(ref _hold, null) is { } held) { held.Dispose(); released(); } }
+    }
 
     internal bool IsIslandOpen => _panel.IsOpen;
 
