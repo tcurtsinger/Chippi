@@ -24,6 +24,10 @@ The script restores the pinned local tool, publishes each RID to fresh staging, 
 
 The workflow builds both RIDs, runs every test project on x64, and publishes using each profile. It takes the SDK from global.json. It requests read-only repository access and has no secrets, release or upload step. It has not run on GitHub locally.
 
+## Admin helper publishing
+
+Application publishing compiles `Chippi.Elevated` with NativeAOT for the selected runtime and includes only its native `Chippi.Elevated.exe` beside `Chippi.exe`. `pack.ps1` refuses a missing helper. Ordinary app builds and windowless helper tests do not launch it or require the C++ linker. Publishing requires Visual Studio's C++ tools for that runtime; ARM64's tools are absent on the owner's PC, so that native publish is checked in CI rather than installing them automatically. No managed-helper fallback is shipped. The isolated update check is described in `tests/Chippi.Elevated.Tests/Sandbox/README.md`.
+
 ## Validation (2026-10-21)
 
 - App Release builds for win-x64 and win-arm64: zero warnings/errors. Use the App project with `-r`; a solution-level RID build is unsupported.

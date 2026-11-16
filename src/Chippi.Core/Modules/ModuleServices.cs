@@ -11,6 +11,7 @@ namespace Chippi.Core.Modules;
 /// </summary>
 public sealed class ModuleServices
 {
+    public Admin.IAdminHelper? Admin { get; set; }
     /// <summary>Shell-owned shared pages, present while their providers run.</summary>
     public Func<IReadOnlyList<IslandTileContribution>> SharedIslandTiles { get; set; } = () => [];
 

@@ -90,6 +90,9 @@ public sealed class ModuleContext(
     /// <summary>The shared keyboard and mouse hooks; no module hooks input itself. Null when the shell has none (tests pass fakes).</summary>
     public Input.IInputHub? Input { get; init; }
 
+    /// <summary>Explicitly confirmed admin batches; never called for discovery or at startup.</summary>
+    public Admin.IAdminHelper? Admin { get; init; }
+
     /// <summary>The shell's one list of shortcuts; no module registers a hotkey itself. Without a shell, every shortcut is refused.</summary>
     public Chippi.Core.Shortcuts.IShortcutService Shortcuts { get; init; } = new Chippi.Core.Shortcuts.ShortcutService(Chippi.Core.Shortcuts.RefusingRegistrar.Instance);
 

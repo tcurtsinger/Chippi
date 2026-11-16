@@ -32,6 +32,8 @@ public sealed class ShellContext
                 ? ModuleServices.DefaultDataRoot
                 : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Chippi-dev", devProfile, "data"),
         };
+        Services.Admin = Admin = new Chippi.UI.Admin.AdminHelper(
+            new Chippi.UI.Admin.WindowsAdminSession(string.IsNullOrWhiteSpace(devProfile)), loggerFactory.CreateLogger("Admin"));
         Island = new IslandActivityHub(Services.Time, Services.IslandNoticeDuration);
         Services.OpenSettings = page => Commands.OpenSettings(page);
         Services.OpenIslandPage = key => Commands.ShowPage(key);
@@ -106,6 +108,8 @@ public sealed class ShellContext
 
     /// <summary>The shared keyboard and mouse hooks. Disposed at exit, after the modules stop.</summary>
     public InputHub Input { get; }
+
+    public Chippi.UI.Admin.AdminHelper Admin { get; }
 
     /// <summary>Every shortcut Chippi holds, for Settings › Shortcuts.</summary>
     public Chippi.Core.Shortcuts.ShortcutService Shortcuts { get; }
