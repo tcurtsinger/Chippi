@@ -13,10 +13,20 @@
 
 The full independent follow-up review found no material issues. A focused review of the root-specific behavior fix also found none. Fifty-five windowless helper tests passed, including ten real security-descriptor cases covering root `DELETE`, ordinary ancestors, child-deletion, ACL control and immediate-folder creation.
 
+## Completed upgrade check
+
+The owner approved the remaining run on 2026-11-16. The fullscreen gate was clear, and the corrected native x64 helper passed the complete [Sandbox flow](../../tests/Chippi.Elevated.Tests/Sandbox/README.md):
+
+- The caller reported `elevated=false` and `administrator=false`; the native connect/Done exchange passed in 111.3 ms, including broker polling and process startup.
+- The missing-package guard check reached winget and returned `Failed` with exit code `-1978335212`, rather than a path-trust refusal.
+- A machine-scope 7-Zip fixture advanced from `26.05.00.0` to `26.06.00.0`. The helper returned `Done` with exit code 0, then `Failed` with exit code `-1978335212` for the deliberately nonexistent second package. The two-item batch took 124.4 s, including winget's download and installation work.
+- The restricted probe exited with code 0. A separate guest observer found zero remaining `Chippi.Elevated` processes after the batch probe exited. This establishes exit, not a measured subsecond exit duration.
+- The runner stopped its own Sandbox UUID; the host's Sandbox list was empty afterwards. No host package installation or update was performed.
+
+The `winget list` output also reported an unavailable `msstore` source; its winget-source 7-Zip rows still established the version change. The helper's update commands explicitly selected `--source winget`.
+
 ## Remaining validation
 
-The fixture installation succeeded inside the guest, but the helper did not upgrade it: the earlier guard correctly refused before starting winget. The final real-upgrade rerun with the corrected root check was blocked by the owner's fullscreen game. It remains pending; do not report the update as passed.
-
-Run the prepared [Sandbox flow](../../tests/Chippi.Elevated.Tests/Sandbox/README.md) when the owner is away and the fullscreen/Zoom gate is clear. It must prove the version advances, a nonexistent package fails without a retry, and the helper exits. Owner UAC Yes/No interaction remains a separate live check; Sandbox's elevated broker cannot establish it. ARM64 hardware execution remains unverified.
+Owner UAC Yes/No interaction remains a separate live check; Sandbox's elevated broker cannot establish it. ARM64 hardware execution remains unverified. The guest timing above does not establish the ten-run, real-consent latency target or a precise helper-exit duration.
 
 Runtime logs and generated probes are temporary session evidence, not archived assets.

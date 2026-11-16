@@ -16,7 +16,7 @@ Travis approved the foundation and package-update support first, then green CI a
 
 The remaining sections describe the eventual full helper; they do not enable those future operations in the first slice.
 
-Runtime follow-up, 2026-11-16: restricted-token checks and real native connect/Done exchanges passed. The session found a current-process access bug and a drive-root `DELETE` false positive; both have fixes and regression coverage. The final actual upgrade rerun remains pending because a fullscreen game blocked it. [Evidence and remaining checks](admin-helper-validation.md).
+Runtime follow-up, 2026-11-16: restricted-token checks and real native connect/Done exchanges passed. The session found a current-process access bug and a drive-root `DELETE` false positive; both have fixes and regression coverage. The final native x64 Sandbox run upgraded a machine-scope 7-Zip fixture from 26.05 to 26.06, returned the expected failure for a nonexistent second package, and left no helper process running. Owner UAC consent/decline remains separate. [Evidence and remaining checks](admin-helper-validation.md).
 
 [Decisions](README.md) override the research. References: [architecture §6](architecture.md#6-the-admin-helper) and [§11](architecture.md#11-standard-user-or-admin), [behavior spec B](behavior-spec-b.md) (the "Needs admin" column, Leftover ownership), the wave 3 briefs (`app-updates.md`, `uninstaller.md`, `cleaner.md`, `port-manager.md`, Herb).
 
@@ -226,7 +226,7 @@ The timings and a list of every refusal the run hit go to the room.
 
 ## Not verified
 
-- winget run elevated from its package folder, and the `InstalledScope` value for a machine install (Sandbox, networked).
+- The `InstalledScope` metadata value for a machine install. Elevated winget execution from its protected package folder and a machine-scope upgrade passed in the networked Sandbox; see the runtime report above.
 - Whether the Sandbox's account sees a UAC prompt, so whether Decline can be tested there.
 - `TokenLinkedToken` and `AccessCheck` as the "could Travis delete it" test on a split-token admin like Travis's: the Sandbox uses a separate standard user's token instead, and his live check is the first split-token run.
 - The job object catching every self-relaunching uninstaller (one that breaks away from its job isn't waited for).
