@@ -12,6 +12,37 @@ namespace Chippi.Elevated.Tests;
 public sealed class TrustTests
 {
     [Theory]
+    [InlineData(@"C:\", false, 0x10000, false)]
+    [InlineData(@"D:\", false, 0x10000, false)]
+    [InlineData(@"C:\folder", false, 0x10000, true)]
+    [InlineData(@"C:\mount", false, 0x10000, true)]
+    [InlineData(@"C:\", false, 0x40, true)]
+    [InlineData(@"C:\", false, 0x40000, true)]
+    [InlineData(@"C:\", false, 0x80000, true)]
+    [InlineData(@"C:\", true, 2, true)]
+    [InlineData(@"C:\", true, 4, true)]
+    [InlineData(@"C:\", false, 4, false)]
+    public void Only_object_delete_at_a_drive_root_is_exempt(string path, bool immediate, int granted, bool refused)
+    {
+        using var identity = WindowsIdentity.GetCurrent();
+        Assert.True(DuplicateToken(identity.AccessToken, 2, out var token));
+        using (token)
+        {
+            var descriptor = new RawSecurityDescriptor($"O:SYG:SYD:(A;;0x{granted:X};;;WD)");
+            var bytes = new byte[descriptor.BinaryLength]; descriptor.GetBinaryForm(bytes, 0);
+            var memory = Marshal.AllocHGlobal(bytes.Length);
+            try
+            {
+                Marshal.Copy(bytes, 0, memory, bytes.Length);
+                uint denied = TrustedExecutable.DirectoryDeniedRights(path, immediate);
+                if (refused) Assert.Throws<UnauthorizedAccessException>(() => TrustedExecutable.CheckStandardAccess(memory, token, denied));
+                else TrustedExecutable.CheckStandardAccess(memory, token, denied);
+            }
+            finally { Marshal.FreeHGlobal(memory); }
+        }
+    }
+
+    [Theory]
     [InlineData("O:SYG:SYD:(A;;FA;;;SY)", false)]
     [InlineData("O:SYG:SYD:(A;;FR;;;WD)", false)]
     [InlineData("O:SYG:SYD:(A;;FA;;;WD)", true)]

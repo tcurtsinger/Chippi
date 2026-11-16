@@ -16,6 +16,8 @@ Travis approved the foundation and package-update support first, then green CI a
 
 The remaining sections describe the eventual full helper; they do not enable those future operations in the first slice.
 
+Runtime follow-up, 2026-11-16: restricted-token checks and real native connect/Done exchanges passed. The session found a current-process access bug and a drive-root `DELETE` false positive; both have fixes and regression coverage. The final actual upgrade rerun remains pending because a fullscreen game blocked it. [Evidence and remaining checks](admin-helper-validation.md).
+
 [Decisions](README.md) override the research. References: [architecture §6](architecture.md#6-the-admin-helper) and [§11](architecture.md#11-standard-user-or-admin), [behavior spec B](behavior-spec-b.md) (the "Needs admin" column, Leftover ownership), the wave 3 briefs (`app-updates.md`, `uninstaller.md`, `cleaner.md`, `port-manager.md`, Herb).
 
 Decided (Travis, task 483, 2026-11-06): the helper is built, narrow, with the risk accepted as stated in architecture §6. A separate program, started with one UAC prompt only when Travis presses a button that needs it, a closed list of jobs each checked again inside the helper, and it exits when done. It covers batched updates and uninstalls, leftovers in Program Files and `HKLM`, Windows' own temp and update caches, and stopping a service or an admin process holding a port. Left for later (task 478): closing a single connection, finding large folders, emptying the Recycle Bin.

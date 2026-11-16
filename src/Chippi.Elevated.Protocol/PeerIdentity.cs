@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 using System.ComponentModel;
-using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Security.Principal;
 using System.Text;
@@ -19,7 +18,7 @@ public sealed class PeerIdentity : IDisposable
 
     public static PeerIdentity Open(uint pid, string expectedPath, bool elevated)
     {
-        var process = OpenProcess(0x101000, false, pid);
+        var process = OpenProcess(0x1000, false, pid);
         try
         {
             if (process.IsInvalid) throw new Win32Exception();
@@ -46,8 +45,8 @@ public sealed class PeerIdentity : IDisposable
 
     public static bool CurrentIsElevated()
     {
-        using var process = Process.GetCurrentProcess();
-        if (!OpenProcessToken(process.SafeHandle, 8, out var token)) throw new Win32Exception();
+        // A filtered child can query its token even when its process DACL denies PROCESS_ALL_ACCESS.
+        if (!OpenCurrentProcessToken(GetCurrentProcess(), 8, out var token)) throw new Win32Exception();
         using (token) return Elevated(token);
     }
     private static bool Elevated(SafeAccessTokenHandle token)
@@ -60,6 +59,9 @@ public sealed class PeerIdentity : IDisposable
 
     [DllImport("advapi32.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool OpenProcessToken(SafeProcessHandle process, uint access, out SafeAccessTokenHandle token);
+    [DllImport("advapi32.dll", EntryPoint = "OpenProcessToken", SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool OpenCurrentProcessToken(nint process, uint access, out SafeAccessTokenHandle token);
+    [DllImport("kernel32.dll")] private static extern nint GetCurrentProcess();
     [DllImport("advapi32.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool GetTokenInformation(SafeAccessTokenHandle token, int information, out int value, int length, out int returned);
     [DllImport("advapi32.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)]

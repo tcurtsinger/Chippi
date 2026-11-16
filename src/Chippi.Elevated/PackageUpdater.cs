@@ -41,7 +41,7 @@ public sealed class PackageUpdater(SafeAccessTokenHandle standardToken) : IPacka
                 return new(request.Id, code == 0 ? "Done" : "Failed", request.PackageId, code, code == 0 ? null : "Package update failed");
             }
         }
-        catch (UnauthorizedAccessException) { return new(request.Id, "Refused", request.PackageId, Reason: "Untrusted winget executable"); }
+        catch (UnauthorizedAccessException error) { return new(request.Id, "Refused", request.PackageId, Reason: "Untrusted winget executable: " + error.Message); }
         catch (Exception ex) when (ex is IOException or Win32Exception or InvalidOperationException)
         { return new(request.Id, "Failed", request.PackageId, Reason: "Package update failed"); }
     }
