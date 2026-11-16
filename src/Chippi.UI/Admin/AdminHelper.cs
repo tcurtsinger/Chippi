@@ -53,7 +53,9 @@ public sealed class AdminHelper(IAdminSessionFactory factory, ILogger logger) : 
                     if (reply.Id != request.Id || reply.PackageId != id || reply.State is not ("Progress" or "Done" or "Failed" or "Refused"))
                         throw new InvalidDataException("Invalid helper result.");
                 } while (reply.State == "Progress");
-                results.Add(new(id, reply.State, reply.ExitCode, reply.Reason));
+                var result = new AdminUpdateResult(id, reply.State, reply.ExitCode, reply.Reason);
+                results.Add(result);
+                progress?.Report(new(id, results.Count, ids.Length, result));
                 logger.LogInformation("Admin update {Package}: {State}, exit {ExitCode}", id, reply.State, reply.ExitCode);
             }
             var done = new AdminRequest(Guid.NewGuid(), "Done");

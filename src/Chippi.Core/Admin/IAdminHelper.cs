@@ -3,7 +3,7 @@
 namespace Chippi.Core.Admin;
 
 public sealed record AdminUpdateResult(string PackageId, string State, int? ExitCode = null, string? Reason = null);
-public sealed record AdminUpdateProgress(string PackageId, int Index, int Count);
+public sealed record AdminUpdateProgress(string PackageId, int Index, int Count, AdminUpdateResult? Result = null);
 
 /// <summary>Run only after the caller has confirmed the exact batch. Cancellation skips pending packages, never kills an installer.</summary>
 public interface IAdminHelper

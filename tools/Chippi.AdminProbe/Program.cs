@@ -7,8 +7,9 @@ using Chippi.UI.Admin;
 using Chippi.Elevated.Protocol;
 using Microsoft.Extensions.Logging;
 using System.Security.Principal;
+using Chippi.Features.AppUpdates;
 
-if (Environment.UserName != "WDAGUtilityAccount" || args.Length != 1 || args[0] is not ("--sandbox" or "--preflight" or "--handshake" or "--guard")) return 2;
+if (Environment.UserName != "WDAGUtilityAccount" || args.Length != 1 || args[0] is not ("--sandbox" or "--preflight" or "--handshake" or "--guard" or "--app-updates")) return 2;
 string report = @"C:\results\helper.json";
 try
 {
@@ -40,6 +41,30 @@ try
         return 0;
     }
     using var helper = new AdminHelper(BrokerFactory.Create(), new ProbeLogger());
+    if (args[0] == "--app-updates")
+    {
+        var source = new SandboxUpdatesSource();
+        var stateGate = new object();
+        var engine = new AppUpdatesEngine(source, helper, new JsonAppUpdatesStore(@"C:\results\updates-data"),
+            dispatch: action => { lock (stateGate) action(); });
+        var discovery = Stopwatch.StartNew();
+        await engine.CheckAsync();
+        double checkMs = discovery.Elapsed.TotalMilliseconds;
+        if (engine.Updates.Count != 3 || source.Fixture?.Scope != UpdateScope.Machine || source.UserFixture?.Scope != UpdateScope.User || BrokerFactory.LaunchCount != 0)
+            throw new InvalidOperationException("Read-only app discovery or machine scope failed: " + engine.Error);
+        var confirmed = engine.CaptureBatch();
+        var elapsed = Stopwatch.StartNew();
+        await engine.RunAsync(confirmed);
+        bool appPassed = confirmed.Packages.Count == 3 && BrokerFactory.LaunchCount == 1 &&
+            engine.Rows.Single(r => r.Package.Id == "7zip.7zip").State == UpdateState.Updated &&
+            engine.Rows.Single(r => r.Package.Id == "SumatraPDF.SumatraPDF").State == UpdateState.Updated &&
+            engine.Rows.Single(r => r.Package.Id == "Chippi.AdminHelperMissingFixture").State == UpdateState.Failed &&
+            engine.Preferences.History.Count == 3;
+        File.WriteAllText(report, JsonSerializer.Serialize(new { passed = appPassed, checkMs, milliseconds = elapsed.Elapsed.TotalMilliseconds,
+            scope = source.Fixture.Scope.ToString(), userScope = source.UserFixture.Scope.ToString(), userVersion = source.UserFixture.AvailableVersion, helperLaunches = BrokerFactory.LaunchCount,
+            rows = engine.Rows, historyCount = engine.Preferences.History.Count }));
+        return appPassed ? 0 : 1;
+    }
     if (args[0] == "--guard")
     {
         var check = await helper.UpdatePackagesAsync(["Chippi.AdminHelperMissingFixture"]);
@@ -65,10 +90,12 @@ sealed class ProbeLogger : ILogger
 
 static class BrokerFactory
 {
+    public static int LaunchCount;
     public static WindowsAdminSession Create() => new(true, async (executable, name) =>
     {
         if (Environment.UserName != "WDAGUtilityAccount" || executable != @"C:\chippi\Chippi.Elevated.exe" || !Messages.PipeNameAllowed(name))
             throw new InvalidOperationException("Sandbox broker only.");
+        Interlocked.Increment(ref LaunchCount);
         string response = @"C:\results\" + name + ".pid";
         string request = @"C:\results\broker-" + name;
         File.WriteAllText(request + ".tmp", name);
@@ -78,4 +105,24 @@ static class BrokerFactory
         int pid = int.Parse(File.ReadAllText(response));
         return Process.GetProcessById(pid);
     });
+}
+
+sealed class SandboxUpdatesSource : IPackageSource
+{
+    private readonly WindowsPackageSource _source = new();
+    public PackageUpdate? Fixture { get; private set; }
+    public PackageUpdate? UserFixture { get; private set; }
+    public async Task<IReadOnlyList<PackageUpdate>> CheckAsync(bool includeUnknown, CancellationToken ct = default)
+    {
+        var found = await _source.CheckAsync(includeUnknown, ct);
+        Fixture = found.SingleOrDefault(p => p.Id.Equals("7zip.7zip", StringComparison.OrdinalIgnoreCase))
+            ?? throw new InvalidOperationException("Installed 7-Zip fixture upgrade missing from COM discovery.");
+        UserFixture = found.SingleOrDefault(p => p.Id.Equals("SumatraPDF.SumatraPDF", StringComparison.OrdinalIgnoreCase))
+            ?? throw new InvalidOperationException("Installed user-scope SumatraPDF fixture upgrade missing from COM discovery.");
+        return [Fixture, UserFixture, new("Chippi.AdminHelperMissingFixture", "Missing fixture", "1", "2", "winget", UpdateScope.Machine)];
+    }
+    public Task<PackageInstallResult> UpdateAsync(PackageUpdate package, IProgress<PackageInstallProgress>? progress = null, CancellationToken ct = default) =>
+        package.Id == "SumatraPDF.SumatraPDF" && package.Scope == UpdateScope.User
+            ? _source.UpdateAsync(package, progress, ct)
+            : throw new InvalidOperationException("Only the disposable SumatraPDF user fixture may use COM installation.");
 }

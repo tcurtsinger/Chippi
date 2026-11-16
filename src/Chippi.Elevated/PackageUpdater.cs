@@ -14,7 +14,7 @@ public sealed class PackageUpdater(SafeAccessTokenHandle standardToken) : IPacka
     public static IReadOnlyList<string> Arguments(string id)
     {
         if (!Messages.PackageIdAllowed(id)) throw new ArgumentException("Invalid package id.", nameof(id));
-        return ["upgrade", "--id", id, "--exact", "--source", "winget", "--scope", "machine", "--silent",
+        return ["upgrade", "--id", id, "--exact", "--source", "winget", "--scope", "machine", "--silent", "--include-unknown",
             "--accept-package-agreements", "--accept-source-agreements", "--disable-interactivity"];
     }
 

@@ -283,6 +283,8 @@ public partial class App : Application
         shell.Registry.Register(recording);
         var mediaTools = new Chippi.Features.MediaTools.MediaToolsModule();
         shell.Registry.Register(mediaTools);
+        shell.AppUpdates = new Chippi.Features.AppUpdates.AppUpdatesModule();
+        shell.Registry.Register(shell.AppUpdates);
         if (shell.Capture is Chippi.UI.Capture.CaptureLayer layer)
             layer.CanStart = () => recording.Model?.Active != true;
         shell.CapturePanel = new Chippi.App.Island.CapturePanelHost(shell, screenCapture, screenText, colorPicker, recording, mediaTools);
@@ -340,6 +342,8 @@ public partial class App : Application
         if (_quitting)
             return;
         if (Shell.Recording?.Model?.Active == true && System.Windows.MessageBox.Show("Stop and save the recording, then quit Chippi?", "Chippi", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+            return;
+        if (Shell.AppUpdates?.Engine?.IsRunning == true && System.Windows.MessageBox.Show("Stop updating and quit?", "Chippi", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
             return;
         _quitting = true;
         // Stopping isn't removing: a Print Screen shortcut keeps Windows' setting off for the next start.

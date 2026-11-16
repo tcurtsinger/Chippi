@@ -16,9 +16,15 @@ public sealed class SessionTests
     {
         await using var factory = new Factory(r => Task.FromResult(new AdminReply(r.Id, r.PackageId == "a.b" ? "Failed" : "Done", r.PackageId, 0)));
         using var helper = new AdminHelper(factory, NullLogger.Instance);
-        var results = await helper.UpdatePackagesAsync(["a.b", "c.d", "A.B"]);
+        var observed = new List<AdminUpdateProgress>();
+        var results = await helper.UpdatePackagesAsync(["a.b", "c.d", "A.B"], new Reports(observed));
         Assert.Equal(new[] { "Failed", "Done" }, results.Select(r => r.State));
         Assert.Equal(1, factory.Opens); Assert.Equal(new[] { "a.b", "c.d" }, factory.Requests);
+        Assert.Equal(new[] { 1, 1, 2, 2 }, observed.Select(p => p.Index));
+        Assert.Null(observed[0].Result);
+        Assert.Equal("Failed", observed[1].Result!.State);
+        Assert.Null(observed[2].Result);
+        Assert.Equal("Done", observed[3].Result!.State);
         await factory.Finished.WaitAsync(TimeSpan.FromSeconds(5));
     }
 
@@ -88,6 +94,8 @@ public sealed class SessionTests
         public int Opens;
         public Task<IAdminConnection> OpenAsync(CancellationToken ct) { Opens++; return Task.FromException<IAdminConnection>(error); }
     }
+    private sealed class Reports(List<AdminUpdateProgress> target) : IProgress<AdminUpdateProgress>
+    { public void Report(AdminUpdateProgress value) => target.Add(value); }
     private sealed class Updater(Func<AdminRequest, Task<AdminReply>> run) : IPackageUpdater
     { public Task<AdminReply> UpdateAsync(AdminRequest request) => run(request); }
     private sealed class Factory(Func<AdminRequest, Task<AdminReply>> update) : IAdminSessionFactory, IAsyncDisposable

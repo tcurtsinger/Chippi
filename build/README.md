@@ -28,6 +28,10 @@ The workflow builds both RIDs, runs every test project on x64, and publishes usi
 
 Application publishing compiles `Chippi.Elevated` with NativeAOT for the selected runtime and includes only its native `Chippi.Elevated.exe` beside `Chippi.exe`. `pack.ps1` refuses a missing helper. Ordinary app builds and windowless helper tests do not launch it or require the C++ linker. Publishing requires Visual Studio's C++ tools for that runtime; ARM64's tools are absent on the owner's PC, so that native publish is checked in CI rather than installing them automatically. No managed-helper fallback is shipped. The isolated update check is described in `tests/Chippi.Elevated.Tests/Sandbox/README.md`.
 
+## App updates publishing
+
+App updates additionally ships the approved ComInterop package's RID-specific static `Microsoft.Management.Deployment.dll`, `Microsoft.Management.Deployment.winmd` and complete `licenses/WinGet-NOTICE.txt`. They remain external to the single-file executable so registration-free activation and metadata resolution work. Packaging refuses missing files or a factory whose PE architecture differs from the selected runtime. App and its referencing test projects compile against SDK 26100 for this projection; their declared runtime minimum remains 19041.
+
 ## Validation (2026-10-21)
 
 - App Release builds for win-x64 and win-arm64: zero warnings/errors. Use the App project with `-r`; a solution-level RID build is unsupported.

@@ -16,6 +16,7 @@
     <PackageVersion Include="Velopack" Version="1.2.161" />
     <PackageVersion Include="NAudio.Wasapi" Version="2.2.1" />
     <PackageVersion Include="ZXing.Net" Version="0.16.11" />
+    <PackageVersion Include="Microsoft.WindowsPackageManager.ComInterop" Version="1.29.380" />
   </ItemGroup>
 </Project>
 
