@@ -8,6 +8,17 @@ namespace Chippi.Elevated.Tests;
 public sealed class LifetimeTests
 {
     [Fact]
+    public async Task A_peer_that_does_not_drain_responses_cannot_keep_the_helper_alive()
+    {
+        var clock = new Clock(); var updater = new Updater();
+        using var blocked = new BlockedWriter();
+        var run = new HelperSession(updater, clock).RunAsync(blocked);
+        clock.Fire();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => run.WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.Equal(0, updater.Count);
+    }
+
+    [Fact]
     public async Task Idle_exits_on_an_injected_clock_and_disconnect_runs_nothing()
     {
         await using var pair = await Pair.Open();
@@ -48,11 +59,19 @@ public sealed class LifetimeTests
         public Task<AdminReply>? Next;
         public Task<AdminReply> UpdateAsync(AdminRequest request) { Count++; return Next ?? Task.FromResult(new AdminReply(request.Id, "Done", request.PackageId, 0)); }
     }
+    private sealed class BlockedWriter : MemoryStream
+    {
+        public override async ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken ct = default) =>
+            await Task.Delay(Timeout.InfiniteTimeSpan, ct);
+    }
     private sealed class Clock : TimeProvider
     {
-        private Timer? _timer;
-        public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period) => _timer = new Timer(callback, state);
-        public void Fire() => _timer?.Fire();
+        private readonly List<Timer> _timers = [];
+        public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
+        {
+            var timer = new Timer(callback, state); _timers.Add(timer); return timer;
+        }
+        public void Fire() { foreach (var timer in _timers.ToArray()) timer.Fire(); }
         private sealed class Timer(TimerCallback callback, object? state) : ITimer
         {
             private bool _disposed;

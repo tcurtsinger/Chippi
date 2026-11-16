@@ -3,6 +3,7 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Security.Principal;
+using System.Security.AccessControl;
 using Chippi.Elevated.Protocol;
 using Microsoft.Win32.SafeHandles;
 
@@ -10,6 +11,29 @@ namespace Chippi.Elevated.Tests;
 
 public sealed class TrustTests
 {
+    [Theory]
+    [InlineData("O:SYG:SYD:(A;;FA;;;SY)", false)]
+    [InlineData("O:SYG:SYD:(A;;FR;;;WD)", false)]
+    [InlineData("O:SYG:SYD:(A;;FA;;;WD)", true)]
+    public void Real_access_checks_distinguish_no_access_read_only_and_writable(string sddl, bool writable)
+    {
+        using var identity = WindowsIdentity.GetCurrent();
+        Assert.True(DuplicateToken(identity.AccessToken, 2, out var token));
+        using (token)
+        {
+            var descriptor = new RawSecurityDescriptor(sddl);
+            var bytes = new byte[descriptor.BinaryLength]; descriptor.GetBinaryForm(bytes, 0);
+            var memory = Marshal.AllocHGlobal(bytes.Length);
+            try
+            {
+                Marshal.Copy(bytes, 0, memory, bytes.Length);
+                if (writable) Assert.Throws<UnauthorizedAccessException>(() => TrustedExecutable.CheckStandardAccess(memory, token, 2 | 4 | 0x10000 | 0x40000 | 0x80000));
+                else TrustedExecutable.CheckStandardAccess(memory, token, 2 | 4 | 0x10000 | 0x40000 | 0x80000);
+            }
+            finally { Marshal.FreeHGlobal(memory); }
+        }
+    }
+
     [Fact]
     public void Peer_path_and_elevation_must_match_the_process()
     {

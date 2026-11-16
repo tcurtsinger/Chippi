@@ -57,18 +57,23 @@ public sealed class TrustedExecutable : IDisposable
             string sid = new SecurityIdentifier(owner).Value;
             if (sid is not ("S-1-5-18" or "S-1-5-32-544" or TrustedInstaller))
                 throw new UnauthorizedAccessException("Untrusted file owner.");
-            var mapping = new GenericMapping { Read = 0x120089, Write = 0x120116, Execute = 0x1200A0, All = 0x1F01FF };
-            uint size = 4096;
-            var privileges = Marshal.AllocHGlobal((int)size);
-            try
-            {
-                if (!AccessCheck(descriptor, token, 0x02000000, ref mapping, privileges, ref size, out uint granted, out bool allowed))
-                    throw new Win32Exception();
-                if (!allowed || (granted & deniedRights) != 0) throw new UnauthorizedAccessException("Executable writable by standard user.");
-            }
-            finally { Marshal.FreeHGlobal(privileges); }
+            CheckStandardAccess(descriptor, token, deniedRights);
         }
         finally { LocalFree(descriptor); }
+    }
+    internal static void CheckStandardAccess(nint descriptor, SafeAccessTokenHandle token, uint deniedRights)
+    {
+        var mapping = new GenericMapping { Read = 0x120089, Write = 0x120116, Execute = 0x1200A0, All = 0x1F01FF };
+        uint size = 4096;
+        var privileges = Marshal.AllocHGlobal((int)size);
+        try
+        {
+            if (!AccessCheck(descriptor, token, 0x02000000, ref mapping, privileges, ref size, out uint granted, out _))
+                throw new Win32Exception();
+            // MAXIMUM_ALLOWED may successfully grant zero rights on a protected ancestor.
+            if ((granted & deniedRights) != 0) throw new UnauthorizedAccessException("Executable writable by standard user.");
+        }
+        finally { Marshal.FreeHGlobal(privileges); }
     }
     public void Dispose() { foreach (var handle in _handles) handle.Dispose(); _handles.Clear(); }
     [StructLayout(LayoutKind.Sequential)] private struct GenericMapping { public uint Read, Write, Execute, All; }
