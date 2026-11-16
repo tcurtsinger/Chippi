@@ -1,6 +1,8 @@
 # App updates: brief
 
-Wave 3. For Travis to confirm. Decisions: [README](README.md) (scope task 478, shortcuts 471 and 482, admin helper 483, libraries 484, where things live 486, defaults 487). Research: [behavior-spec-b.md](behavior-spec-b.md) section 1, [architecture.md](architecture.md) sections 6, 7 and 11, [surfaces.md](surfaces.md) sections 3, 6 and 7. The helper: `admin-helper.md` (Kayla). Mockup: later; Lumen draws it before this is built. DESIGN.md wins where it speaks.
+Wave 3. Mockup approved and implementation authorized by Travis, 2026-11-16. Decisions: [README](README.md) (scope task 478, shortcuts 471 and 482, admin helper 483, libraries 484, where things live 486, defaults 487). Research: [behavior-spec-b.md](behavior-spec-b.md) section 1, [architecture.md](architecture.md) sections 6, 7 and 11, [surfaces.md](surfaces.md) sections 3, 6 and 7. The helper: `admin-helper.md`. Approved [mockup](design/app-updates.html), implemented [design notes](app-updates-design.md). DESIGN.md wins where it speaks.
+
+The confirmation and running page omit the two explanatory sentences Travis removed from the mockup. Update confirmations retain the exact reviewed app set; unknown versions are shown inline. The helper uses the approved fixed machine-scope upgrade arguments, including `--include-unknown`; only deliberately shown/confirmed unknown-version apps reach it. Native COM uses the official static factory and external WinMD/NOTICE content. The projection requires compile SDK 26100, while runtime support remains at 19041. Some machine installers' reboot requests are normalized to CLI exit 0 by winget, so that path cannot always expose a reboot flag; COM's explicit reboot flag and known CLI error codes are handled without guessing.
 
 ## Job
 

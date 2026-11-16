@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) Chippi contributors
+param([switch]$AppUpdates)
 $ErrorActionPreference='Stop'
 if ($env:USERNAME -ne 'WDAGUtilityAccount' -or !(Test-Path 'C:\source-app\Chippi.Elevated.exe')) { throw 'Windows Sandbox only.' }
 Start-Transcript C:\results-out\guest.log
@@ -31,13 +32,27 @@ try {
     if ($versions.Count -lt 2) { throw 'Need two published 7-Zip versions for the upgrade fixture.' }
     & $winget install --id 7zip.7zip --exact --source winget --scope machine --version $versions[1] --silent --accept-source-agreements --accept-package-agreements --disable-interactivity
     if ($LASTEXITCODE -ne 0) { throw 'Fixture installation failed.' }
-    $before=(& $winget list --id 7zip.7zip --exact --scope machine --accept-source-agreements --disable-interactivity | Out-String)
-    & C:\probe\medium.ps1 -Mode '--sandbox'
+    $before=(& $winget list --id 7zip.7zip --exact --source winget --scope machine --accept-source-agreements --disable-interactivity | Out-String)
+    $userBefore=$null; $userAfter=$null
+    if ($AppUpdates) {
+        & $winget install --id SumatraPDF.SumatraPDF --exact --source winget --version 3.6 --scope user --installer-type exe --architecture x64 --silent --accept-source-agreements --accept-package-agreements --disable-interactivity
+        if ($LASTEXITCODE -ne 0) { throw 'User fixture installation failed.' }
+        $userBefore=(& $winget list --id SumatraPDF.SumatraPDF --exact --source winget --scope user --accept-source-agreements --disable-interactivity | Out-String)
+    }
+    if ($AppUpdates) { & C:\probe\medium.ps1 -Mode '--app-updates' }
+    else { & C:\probe\medium.ps1 -Mode '--sandbox' }
     $report=Get-Content C:\results\helper.json -Raw | ConvertFrom-Json
     if (!$report.passed) { throw ('Helper check failed: '+($report | ConvertTo-Json -Depth 8 -Compress)) }
-    $after=(& $winget list --id 7zip.7zip --exact --scope machine --accept-source-agreements --disable-interactivity | Out-String)
+    $exitDeadline=(Get-Date).AddSeconds(10)
+    while (@(Get-Process -Name 'Chippi.Elevated' -ErrorAction SilentlyContinue).Count -gt 0 -and (Get-Date) -lt $exitDeadline) { Start-Sleep -Milliseconds 25 }
+    if (@(Get-Process -Name 'Chippi.Elevated' -ErrorAction SilentlyContinue).Count -gt 0) { throw 'Helper did not exit after the completed batch.' }
+    $after=(& $winget list --id 7zip.7zip --exact --source winget --scope machine --accept-source-agreements --disable-interactivity | Out-String)
     if ($before -notmatch [regex]::Escape($versions[1]) -or $after -notmatch [regex]::Escape($versions[0])) { throw 'Installed version did not advance as expected.' }
-    @{passed=$true;helper=$report;before=$before;after=$after;prompt='Sandbox UAC behavior is not proof of owner consent/decline'} |
+    if ($AppUpdates) {
+        $userAfter=(& $winget list --id SumatraPDF.SumatraPDF --exact --source winget --scope user --accept-source-agreements --disable-interactivity | Out-String)
+        if ($userBefore -notmatch '3\.6' -or $userAfter -notmatch [regex]::Escape($report.userVersion) -or $userBefore -eq $userAfter) { throw 'User fixture version did not advance as expected.' }
+    }
+    @{passed=$true;helper=$report;before=$before;after=$after;userBefore=$userBefore;userAfter=$userAfter;prompt='Sandbox UAC behavior is not proof of owner consent/decline'} |
         ConvertTo-Json -Depth 10 | Set-Content C:\results\results.json
 }
 catch { @{passed=$false;error=$_.Exception.ToString();nativeError=$_.Exception.InnerException.NativeErrorCode} | ConvertTo-Json -Depth 5 | Set-Content C:\results\results.json }

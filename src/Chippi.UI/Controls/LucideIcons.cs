@@ -14,6 +14,8 @@ namespace Chippi.UI.Controls;
 /// </summary>
 public static class LucideIcons
 {
+    // Lucide package.svg (ISC): the shared Apps menu.
+    public static Geometry Package { get; } = G("M11,21.73 a2,2 0 0 0 2,0 l7,-4 A2,2 0 0 0 21,16 V8 a2,2 0 0 0 -1,-1.73 l-7,-4 a2,2 0 0 0 -2,0 l-7,4 A2,2 0 0 0 3,8 v8 a2,2 0 0 0 1,1.73 Z M12,22 V12 M3.29,7 L12,12 L20.71,7 M7.5,4.27 l9,5.15");
     private static Geometry G(string data)
     {
         var g = Geometry.Parse(data);

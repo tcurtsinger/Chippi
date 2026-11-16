@@ -61,6 +61,8 @@ The Command bar adds:
 
 - System.Data.OleDb 10.0.13, MIT licensed, copyright Microsoft Corporation (no further packages on .NET 10). It asks Windows Search for files and folders.
 
+App updates adds Microsoft.WindowsPackageManager.ComInterop 1.29.380, MIT licensed, copyright Microsoft Corporation. Its CsWinRT projection, WinMD and architecture-specific static native activation factory are shipped. The factory connects typed objects to the installed App Installer's out-of-process COM server; it does not embed the package manager engine or install App Installer. Source: https://github.com/microsoft/winget-cli, package https://www.nuget.org/packages/Microsoft.WindowsPackageManager.ComInterop/1.29.380. The package's complete third-party NOTICE is shipped under `licenses/WinGet-NOTICE.txt`; the Microsoft MIT license is reproduced below.
+
 Velopack 1.2.161 also ships (MIT), copyright 2021 Caelan Sayler and 2024 Velopack Ltd. The net10.0 library has no additional NuGet dependencies. Its native updater, portable launcher stub, and Setup bootstrapper are supplied by vpk 1.2.161. Source: https://github.com/velopack/velopack/tree/92d6a1c91716729d449034df5c50307dcce39493. The complete Velopack license is reproduced below.
 
 Source: https://github.com/dotnet/dotnet (package nuspec repository commit b0f34d51fccc69fd334253924abd8d6853fad7aa).

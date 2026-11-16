@@ -61,7 +61,7 @@ public sealed class ProtocolTests
     public void Upgrade_is_exact_machine_scope_and_never_install_or_a_shell()
     {
         var args = PackageUpdater.Arguments("7zip.7zip");
-        Assert.Equal(new[] { "upgrade", "--id", "7zip.7zip", "--exact", "--source", "winget", "--scope", "machine", "--silent",
+        Assert.Equal(new[] { "upgrade", "--id", "7zip.7zip", "--exact", "--source", "winget", "--scope", "machine", "--silent", "--include-unknown",
             "--accept-package-agreements", "--accept-source-agreements", "--disable-interactivity" }, args);
         Assert.Throws<ArgumentException>(() => PackageUpdater.Arguments("--all"));
     }

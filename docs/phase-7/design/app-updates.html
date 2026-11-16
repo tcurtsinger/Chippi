@@ -1,0 +1,282 @@
+<div id="chippi-app-updates-preview">
+  <div class="viz-controls" aria-label="App updates mockup preview">
+    <label class="form-label">Preview
+      <select class="form-select" id="chippi-updates-scene">
+        <option value="ready">Available updates</option>
+        <option value="confirm">Confirm a batch</option>
+        <option value="running">Updating</option>
+        <option value="done">Finished, with a failure</option>
+        <option value="empty">Everything up to date</option>
+        <option value="error">Check failed</option>
+        <option value="admin">Waiting for admin</option>
+        <option value="declined">Admin declined</option>
+        <option value="many">More apps</option>
+        <option value="settings">Settings</option>
+      </select>
+    </label>
+    <label class="form-label">Appearance
+      <select class="form-select" id="chippi-updates-theme">
+        <option value="auto">Follow appearance</option>
+        <option value="dark">Dark</option>
+        <option value="light">Light</option>
+      </select>
+    </label>
+    <span class="text-small text-muted">Planning mockup · sample apps and versions</span>
+  </div>
+  <div class="viz-dotted-background cu-stage">
+    <div class="cu-product" id="chippi-updates-product" aria-label="Chippi App updates mockup">
+      <div id="chippi-updates-screen"></div>
+    </div>
+  </div>
+  <style>
+    #chippi-app-updates-preview .cu-stage { padding:32px 12px; display:flex; justify-content:center; min-height:428px; margin-top:14px; }
+    #chippi-app-updates-preview .cu-product {
+      --cu-window:light-dark(#F3F3F3,#202020); --cu-island:light-dark(#F5F5F6,#28282C);
+      --cu-card:light-dark(#FBFBFB,#2B2B2B); --cu-text:light-dark(#1A1A1A,#FFFFFF);
+      --cu-secondary:light-dark(#5C5C5C,#C9C9C9); --cu-caption:light-dark(#616161,#ACACB2);
+      --cu-control:light-dark(#FFFFFF,#38383C); --cu-hover:light-dark(#E9E9ED,#404045);
+      --cu-line:light-dark(rgba(0,0,0,.08),rgba(255,255,255,.08));
+      --cu-rim:light-dark(rgba(0,0,0,.08),rgba(255,255,255,.09));
+      --cu-tint:light-dark(#EDE7FC,#3B334D); --cu-accent:light-dark(#7444F0,#B79CFF);
+      --cu-fill:light-dark(linear-gradient(135deg,#8F5CFF,#5B86FF),linear-gradient(135deg,#B78FFF,#82AEFF));
+      --cu-ink:light-dark(#FFFFFF,#170F2E); --cu-success:light-dark(#0F7B0F,#81CE75);
+      --cu-caution:light-dark(#9D5D00,#FCE100); --cu-shadow:light-dark(0 12px 30px #0000001f,0 12px 30px #00000050);
+      font-family:'Segoe UI Variable Text','Segoe UI',sans-serif; font-size:13px; line-height:20px; color:var(--cu-text);
+      font-variant-numeric:tabular-nums; width:520px; max-width:100%; align-self:flex-start;
+    }
+    #chippi-app-updates-preview .cu-product[data-theme=dark] { color-scheme:dark; }
+    #chippi-app-updates-preview .cu-product[data-theme=light] { color-scheme:light; }
+    #chippi-app-updates-preview .cu-product *, #chippi-app-updates-preview .cu-product *::before, #chippi-app-updates-preview .cu-product *::after { box-sizing:border-box; }
+    #chippi-app-updates-preview .cu-product button, #chippi-app-updates-preview .cu-product input { font:inherit; }
+    #chippi-app-updates-preview .cu-product button { touch-action:manipulation; }
+    #chippi-app-updates-preview .cu-product button:focus-visible { outline:2px solid var(--cu-accent); outline-offset:2px; }
+    #chippi-app-updates-preview .cu-panel { height:360px; padding:12px; position:relative; background:var(--cu-island); border:1px solid var(--cu-rim); border-radius:8px; box-shadow:var(--cu-shadow); display:flex; flex-direction:column; }
+    #chippi-app-updates-preview .cu-header { display:flex; align-items:center; gap:6px; min-height:28px; margin-bottom:8px; flex:none; }
+    #chippi-app-updates-preview .cu-title { font-size:13px; font-weight:600; flex:1; white-space:nowrap; margin:0; }
+    #chippi-app-updates-preview .cu-product svg { width:16px; height:16px; flex:none; stroke-width:1.7; }
+    #chippi-app-updates-preview .cu-button { min-height:28px; padding:2px 10px; color:var(--cu-text); background:var(--cu-control); border:1px solid var(--cu-rim); border-radius:4px; font-size:12px; line-height:20px; white-space:nowrap; display:inline-flex; align-items:center; justify-content:center; gap:6px; }
+    #chippi-app-updates-preview .cu-button:hover { background:var(--cu-hover); }
+    #chippi-app-updates-preview .cu-primary, #chippi-app-updates-preview .cu-primary:hover { color:var(--cu-ink); background:var(--cu-fill); border-color:transparent; }
+    #chippi-app-updates-preview .cu-icon-button { background:transparent; padding:3px; border:0; min-width:28px; min-height:28px; border-radius:4px; display:inline-flex; align-items:center; justify-content:center; color:var(--cu-secondary); flex:none; }
+    #chippi-app-updates-preview .cu-icon-button:hover { background:var(--cu-hover); }
+    #chippi-app-updates-preview .cu-body { min-height:0; flex:1; display:flex; flex-direction:column; position:relative; }
+    #chippi-app-updates-preview .cu-meta { color:var(--cu-caption); font-size:12px; display:flex; align-items:center; gap:6px; min-height:24px; margin-bottom:4px; }
+    #chippi-app-updates-preview .cu-meta strong { font-weight:400; color:var(--cu-text); }
+    #chippi-app-updates-preview .cu-push { margin-left:auto; }
+    #chippi-app-updates-preview .cu-list { display:flex; flex-direction:column; }
+    #chippi-app-updates-preview .cu-row { display:flex; align-items:center; gap:10px; min-height:46px; padding:4px 5px; border-radius:4px; position:relative; }
+    #chippi-app-updates-preview .cu-row:hover { background:var(--cu-line); }
+    #chippi-app-updates-preview .cu-app-icon { width:26px; height:26px; border-radius:6px; background:var(--cu-tint); color:var(--cu-accent); font-size:11px; font-weight:600; display:inline-flex; align-items:center; justify-content:center; flex:none; }
+    #chippi-app-updates-preview .cu-app-copy { flex:1; min-width:0; }
+    #chippi-app-updates-preview .cu-app-name { font-size:12px; line-height:18px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    #chippi-app-updates-preview .cu-detail { color:var(--cu-caption); font-size:11px; line-height:16px; }
+    #chippi-app-updates-preview .cu-version { display:flex; align-items:center; gap:5px; }
+    #chippi-app-updates-preview .cu-version svg { width:11px; height:11px; }
+    #chippi-app-updates-preview .cu-source { margin-left:4px; }
+    #chippi-app-updates-preview .cu-row-action { display:flex; align-items:center; gap:3px; min-width:94px; justify-content:flex-end; }
+    #chippi-app-updates-preview .cu-row-action .cu-button { min-height:25px; padding:1px 9px; font-size:11px; }
+    #chippi-app-updates-preview .cu-row-action .cu-icon-button { min-width:24px; min-height:26px; }
+    #chippi-app-updates-preview .cu-state { display:flex; align-items:center; justify-content:flex-end; gap:5px; font-size:11px; white-space:nowrap; min-width:84px; }
+    #chippi-app-updates-preview .cu-good { color:var(--cu-success); }
+    #chippi-app-updates-preview .cu-warning { color:var(--cu-caution); }
+    #chippi-app-updates-preview .cu-progress { height:3px; background:var(--cu-line); border-radius:2px; margin-top:4px; width:100%; max-width:180px; }
+    #chippi-app-updates-preview .cu-progress span { display:block; height:100%; width:62%; border-radius:inherit; background:var(--cu-fill); }
+    #chippi-app-updates-preview .cu-bottom { margin-top:auto; padding-top:6px; display:flex; align-items:center; gap:6px; min-height:26px; color:var(--cu-caption); font-size:11px; }
+    #chippi-app-updates-preview .cu-text-button { background:transparent; padding:0; border:0; font-size:11px; color:var(--cu-accent); border-radius:2px; }
+    #chippi-app-updates-preview .cu-text-button:hover { text-decoration:underline; }
+    #chippi-app-updates-preview .cu-center { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; text-align:center; padding:12px; }
+    #chippi-app-updates-preview .cu-center > svg { width:28px; height:28px; color:var(--cu-secondary); margin-bottom:3px; }
+    #chippi-app-updates-preview .cu-center-title { font-size:14px; font-weight:600; }
+    #chippi-app-updates-preview .cu-question { padding:8px 12px 0; display:flex; flex:1; flex-direction:column; }
+    #chippi-app-updates-preview .cu-question h2 { font-size:16px; line-height:24px; font-weight:600; margin:0 0 10px; }
+    #chippi-app-updates-preview .cu-confirm-list { background:var(--cu-line); border-radius:6px; padding:4px 10px; }
+    #chippi-app-updates-preview .cu-confirm-row { display:flex; align-items:center; gap:8px; min-height:29px; font-size:12px; }
+    #chippi-app-updates-preview .cu-confirm-row .cu-app-icon { width:20px; height:20px; border-radius:4px; font-size:10px; }
+    #chippi-app-updates-preview .cu-confirm-row .cu-detail { margin-left:auto; }
+    #chippi-app-updates-preview .cu-question-note { color:var(--cu-secondary); font-size:12px; margin-top:10px; }
+    #chippi-app-updates-preview .cu-confirm-buttons { display:flex; gap:8px; justify-content:flex-end; margin-top:auto; padding-top:10px; }
+    #chippi-app-updates-preview .cu-confirm-buttons .cu-button { min-width:80px; }
+    #chippi-app-updates-preview .cu-menu { position:absolute; right:5px; top:44px; z-index:5; width:178px; padding:4px; background:var(--cu-card); border:1px solid var(--cu-rim); border-radius:6px; box-shadow:var(--cu-shadow); }
+    #chippi-app-updates-preview .cu-menu button { display:block; width:100%; text-align:left; padding:6px 10px; border:0; color:var(--cu-text); background:transparent; border-radius:3px; font-size:12px; }
+    #chippi-app-updates-preview .cu-menu button:hover { background:var(--cu-hover); }
+    #chippi-app-updates-preview .cu-row:nth-last-child(-n+2) .cu-menu { top:auto; bottom:30px; }
+    #chippi-app-updates-preview .cu-product[data-versions=inline] .cu-app-copy { display:flex; align-items:center; gap:8px; }
+    #chippi-app-updates-preview .cu-product[data-versions=inline] .cu-app-name { flex:1; }
+    #chippi-app-updates-preview .cu-product[data-versions=inline] .cu-version { flex:none; }
+    #chippi-app-updates-preview .cu-product[data-versions=inline] .cu-source { display:none; }
+    #chippi-app-updates-preview .cu-product.cu-settings-view { width:960px; }
+    #chippi-app-updates-preview .cu-settings { background:var(--cu-window); border:1px solid var(--cu-rim); border-radius:8px; box-shadow:var(--cu-shadow); overflow:hidden; }
+    #chippi-app-updates-preview .cu-windowbar { height:40px; display:flex; align-items:center; gap:10px; padding:0 14px; font-size:12px; }
+    #chippi-app-updates-preview .cu-window-controls { display:flex; gap:20px; margin-left:auto; color:var(--cu-caption); }
+    #chippi-app-updates-preview .cu-window-controls svg { width:12px; height:12px; }
+    #chippi-app-updates-preview .cu-settings-layout { display:grid; grid-template-columns:48px minmax(0,1fr); min-height:560px; }
+    #chippi-app-updates-preview .cu-nav { padding:8px 6px; display:flex; flex-direction:column; gap:6px; }
+    #chippi-app-updates-preview .cu-nav .cu-icon-button { min-height:36px; }
+    #chippi-app-updates-preview .cu-nav .cu-nav-selected { background:var(--cu-line); color:var(--cu-accent); position:relative; }
+    #chippi-app-updates-preview .cu-nav-selected::before { content:''; position:absolute; left:0; height:16px; width:3px; border-radius:2px; background:var(--cu-accent); }
+    #chippi-app-updates-preview .cu-settings-content { padding:4px 40px 28px; min-width:0; }
+    #chippi-app-updates-preview .cu-breadcrumb { display:flex; align-items:center; gap:7px; color:var(--cu-caption); font-size:12px; margin-bottom:4px; }
+    #chippi-app-updates-preview .cu-breadcrumb svg { width:12px; height:12px; }
+    #chippi-app-updates-preview .cu-settings h1 { font-size:20px; line-height:28px; font-weight:600; margin:0 0 20px; }
+    #chippi-app-updates-preview .cu-settings h2 { font-size:14px; line-height:20px; font-weight:600; margin:20px 0 8px; }
+    #chippi-app-updates-preview .cu-settings-card { background:var(--cu-card); border:1px solid var(--cu-line); border-radius:8px; }
+    #chippi-app-updates-preview .cu-settings-row { display:flex; align-items:center; gap:14px; padding:10px 16px; min-height:60px; }
+    #chippi-app-updates-preview .cu-settings-row + .cu-settings-row { border-top:1px solid var(--cu-line); }
+    #chippi-app-updates-preview .cu-settings-row > svg { color:var(--cu-secondary); width:20px; height:20px; flex:none; }
+    #chippi-app-updates-preview .cu-settings .cu-detail { font-size:12px; line-height:17px; }
+    #chippi-app-updates-preview .cu-settings .cu-app-name { font-size:14px; line-height:20px; }
+    #chippi-app-updates-preview .cu-settings .cu-button { min-width:68px; }
+    #chippi-app-updates-preview .cu-switch { display:flex; align-items:center; gap:9px; margin:0; flex:none; font-size:12px; }
+    #chippi-app-updates-preview .cu-switch input { appearance:none; width:40px; height:20px; background:transparent; border:1px solid var(--cu-caption); border-radius:10px; position:relative; margin:0; }
+    #chippi-app-updates-preview .cu-switch input::after { content:''; position:absolute; left:4px; top:4px; width:10px; height:10px; background:var(--cu-secondary); border-radius:50%; }
+    #chippi-app-updates-preview .cu-switch input:checked { background:var(--cu-accent); border-color:var(--cu-accent); }
+    #chippi-app-updates-preview .cu-switch input:checked::after { left:24px; background:var(--cu-ink); }
+    #chippi-app-updates-preview .cu-history-status { min-width:94px; text-align:right; font-size:12px; }
+    #chippi-app-updates-preview .cu-shortcut-key { color:var(--cu-caption); font-size:12px; flex:none; }
+    #chippi-app-updates-preview .cu-shortcut-notice { color:var(--cu-secondary); font-size:12px; padding:10px 16px; border-top:1px solid var(--cu-line); }
+    @media (max-width:560px) {
+      #chippi-app-updates-preview .cu-stage { padding:20px 0; }
+      #chippi-app-updates-preview .cu-settings-content { padding-left:16px; padding-right:16px; }
+      #chippi-app-updates-preview .cu-settings-row { gap:9px; padding:10px; flex-wrap:wrap; }
+      #chippi-app-updates-preview .cu-settings-row .cu-app-copy { min-width:100px; }
+      #chippi-app-updates-preview .cu-settings .cu-app-name { white-space:normal; }
+      #chippi-app-updates-preview .cu-source { display:none; }
+      #chippi-app-updates-preview .cu-product[data-versions=inline] .cu-app-copy { display:block; }
+      #chippi-app-updates-preview .cu-header > .cu-button { padding-left:7px; padding-right:7px; }
+      #chippi-app-updates-preview .cu-header { gap:3px; }
+      #chippi-app-updates-preview .cu-row { gap:7px; padding-left:2px; padding-right:2px; }
+      #chippi-app-updates-preview .cu-history-status { min-width:0; }
+      #chippi-app-updates-preview .cu-question { padding-left:4px; padding-right:4px; }
+    }
+  </style>
+  <script>
+  (() => {
+    const root = document.getElementById('chippi-app-updates-preview');
+    const product = document.getElementById('chippi-updates-product');
+    const screen = document.getElementById('chippi-updates-screen');
+    const scenePicker = document.getElementById('chippi-updates-scene');
+    const themePicker = document.getElementById('chippi-updates-theme');
+    const defaults = { scene:'ready', theme:'auto', versions:'below' };
+    const saved = window.openai?.widgetState?.modelContent?.appUpdatesMockup;
+    const state = {...defaults};
+    const scenes = ['ready','confirm','running','done','empty','error','admin','declined','many','settings','apps'];
+    if (saved && scenes.includes(saved.scene)) state.scene = saved.scene;
+    if (saved && ['auto','dark','light'].includes(saved.theme)) state.theme = saved.theme;
+    if (saved && ['below','inline'].includes(saved.versions)) state.versions = saved.versions;
+    let page = 0, confirmPage = 0, menu = -1, confirmIds = [], batchIds = [0,1,2,3,4], unknown = false, shortcutNotice = false;
+    const skipped = [{name:'VLC media player',mono:'V',detail:'3.0.21 · This version'}, {name:'Node.js LTS',mono:'N',detail:'Always skipped'}];
+    const apps = [
+      {name:'Visual Studio Code',mono:'VS',from:'1.95.1',to:'1.95.3'},
+      {name:'Firefox',mono:'F',from:'132.0',to:'132.0.1'},
+      {name:'Discord',mono:'D',from:'1.0.9171',to:'1.0.9172'},
+      {name:'Git',mono:'G',from:'2.47.0',to:'2.47.1'},
+      {name:'7-Zip',mono:'7z',from:'26.05',to:'26.06'},
+      {name:'PowerToys',mono:'PT',from:'0.85.0',to:'0.85.1'},
+      {name:'OBS Studio',mono:'OBS',from:'30.2.2',to:'30.2.3'},
+      {name:'Notepad++',mono:'N+',from:'8.7',to:'8.7.1'},
+      {name:'ShareX',mono:'SX',from:'16.1.0',to:'16.1.1'},
+      {name:'Spotify',mono:'S',from:'1.2.49',to:'1.2.50'},
+      {name:'Steam',mono:'ST',from:'2.10.91',to:'2.10.92'},
+      {name:'Microsoft Terminal',mono:'T',from:'1.21.2',to:'1.21.3'}
+    ];
+    let hidden = new Set();
+    const icon = name => `<i data-lucide="${name}" aria-hidden="true"></i>`;
+    const iconButton = (name,label,action) => `<button type="button" class="cu-icon-button cursor-interaction" aria-label="${label}" data-tooltip="${label}" data-action="${action}">${icon(name)}</button>`;
+    const button = (label,action,primary=false) => `<button type="button" class="cu-button cursor-interaction${primary?' cu-primary':''}" data-action="${action}">${label}</button>`;
+    const appIcon = app => `<span class="cu-app-icon" aria-hidden="true">${app.mono}</span>`;
+    const versions = app => `<div class="cu-detail cu-version"><span>${app.from}</span>${icon('arrow-right')}<span>${app.to}</span><span class="cu-source">· winget</span></div>`;
+    const shell = body => `<div class="cu-panel">${body}</div>`;
+    function header(title,actions='') { return `<div class="cu-header">${iconButton('chevron-left','Back','back')}<h1 class="cu-title">${title}</h1>${actions}</div>`; }
+    function row(app,index,position=index) {
+      const running = state.scene === 'running', done = state.scene === 'done';
+      let detail = versions(app), action = `${button('Update',`update:${index}`)}${iconButton('ellipsis',`More options for ${app.name}`,`menu:${index}`)}`;
+      const current = Math.min(2,batchIds.length-1);
+      if (running && position < current || done && index !== 2) action = `<span class="cu-state cu-good">${icon('check')}Updated</span>`;
+      if (running && position === current) { detail = `<div class="cu-detail">Installing · 62%</div><div class="cu-progress" role="progressbar" aria-label="${app.name} installation" aria-valuemin="0" aria-valuemax="100" aria-valuenow="62"><span></span></div>`; action = `<span class="cu-state">Updating</span>`; }
+      if (running && position > current) action = `<span class="cu-state cu-detail">Queued</span>`;
+      if (done && index === 2) { detail = `<div class="cu-detail cu-warning">Update failed · Download interrupted</div>`; action = button('Retry',`update:${index}`); }
+      if (state.scene === 'declined') { detail = `<div class="cu-detail cu-warning">Needs admin · ${app.from} → ${app.to}</div>`; }
+      return `<div class="cu-row">${appIcon(app)}<div class="cu-app-copy"><div class="cu-app-name" data-tooltip="${app.name}">${app.name}</div>${detail}</div><div class="cu-row-action">${action}</div>${menu===index?`<div class="cu-menu" role="group" aria-label="Skip ${app.name}"><button type="button" class="cursor-interaction" data-action="skip:${index}">Skip this version</button><button type="button" class="cursor-interaction" data-action="always:${index}">Always skip</button></div>`:''}</div>`;
+    }
+    function list() {
+      const many = state.scene === 'many', running = state.scene === 'running', done = state.scene === 'done';
+      const visible = running ? batchIds.map(i=>({a:apps[i],i})) : (many?apps:apps.slice(0,5)).map((a,i)=>({a,i})).filter(x=>!hidden.has(x.i));
+      const paginated = many || running && visible.length>5;
+      const activePage = paginated?Math.min(page,Math.max(0,Math.ceil(visible.length/5)-1)):0, shown = visible.slice(activePage*5,activePage*5+5);
+      let actions = `${iconButton('refresh-cw','Check again','check')}${button('Update all','all',true)}`;
+      if (running) actions = `<span class="cu-detail">Batch in progress</span>`;
+      if (done) actions = button('Check again','check');
+      if (!visible.length) actions = button('Check again','check');
+      const current = Math.min(2,batchIds.length-1);
+      const meta = running?`<strong>${current} of ${batchIds.length} updated</strong> · Updating ${apps[batchIds[current]].name}`:done?`<strong>4 of 5 updated</strong> · <span class="cu-warning">1 failed</span>`:`<strong>${visible.length} updates</strong> · Checked 2 min ago`;
+      const paging = paginated?`<span>${activePage*5+1}–${Math.min(activePage*5+5,visible.length)} of ${visible.length}</span><span class="cu-push"></span>${iconButton('chevron-left','Previous apps','prev')}${iconButton('chevron-right','Next apps','next')}`:running?``:`<button type="button" class="cu-text-button cursor-interaction" data-action="settings">Skipped (${skipped.length})</button><span class="cu-push"></span>${iconButton('settings-2','App updates settings','settings')}`;
+      return shell(`${header('Update apps',actions)}<div class="cu-body"><div class="cu-meta">${meta}</div>${visible.length?`<div class="cu-list">${shown.map((x,p)=>row(x.a,x.i,p+activePage*5)).join('')}</div>`:'<div class="cu-center"><div class="cu-center-title">No updates to show</div><div class="cu-detail">Skipped updates are in Settings.</div></div>'}<div class="cu-bottom">${paging}</div></div>`);
+    }
+    function confirmation() {
+      const ids = confirmIds.length ? confirmIds : [0,1,2,3,4];
+      const question = ids.length === 1?`Update ${apps[ids[0]].name}?`:`Update ${ids.length} apps?`;
+      const range=ids.length>5?`<div class="cu-meta"><span>${confirmPage*5+1}–${Math.min(confirmPage*5+5,ids.length)} of ${ids.length}</span><span class="cu-push"></span>${iconButton('chevron-left','Previous apps in batch','confirm-prev')}${iconButton('chevron-right','Next apps in batch','confirm-next')}</div>`:'';
+      return shell(`${header('Update apps')}<div class="cu-body"><div class="cu-question"><h2>${question}</h2><div class="cu-confirm-list">${ids.slice(confirmPage*5,confirmPage*5+5).map(i=>`<div class="cu-confirm-row">${appIcon(apps[i])}<span>${apps[i].name}</span><span class="cu-detail">${apps[i].to}</span></div>`).join('')}</div>${range}<div class="cu-confirm-buttons">${button('Cancel','cancel')}${button('Update','start',true)}</div></div></div>`);
+    }
+    function center(scene) {
+      const empty = scene === 'empty', admin = scene === 'admin';
+      const title = empty?'Everything is up to date':admin?'Waiting for admin':'Check failed';
+      const detail = empty?'Checked just now':admin?'Continue in the Windows permission prompt.':'Couldn’t reach the update source.';
+      const actions = empty?button('Check again','check'):'';
+      return shell(`${header('Update apps',actions)}<div class="cu-body"><div class="cu-center">${icon(empty?'check':admin?'shield':'circle-alert')}<div class="cu-center-title${!empty&&!admin?' cu-warning':''}">${title}</div><div class="cu-detail">${detail}</div>${!admin&&!empty?button('Check again','check',true):''}</div></div>`);
+    }
+    function settings() {
+      const srow = (glyph,name,detail,trailing) => `<div class="cu-settings-row">${icon(glyph)}<div class="cu-app-copy"><div class="cu-app-name">${name}</div>${detail?`<div class="cu-detail">${detail}</div>`:''}</div>${trailing}</div>`;
+      return `<div class="cu-settings"><div class="cu-windowbar">${iconButton('chevron-left','Back to update list','ready')}<span>Chippi</span><span class="cu-window-controls" aria-hidden="true">${icon('minus')}${icon('square')}${icon('x')}</span></div><div class="cu-settings-layout"><nav class="cu-nav" aria-label="Settings navigation">${iconButton('settings','General','settings')}${iconButton('circle','Island and pet','settings')}${iconButton('keyboard','Shortcuts','shortcuts')}<button class="cu-icon-button cu-nav-selected cursor-interaction" type="button" aria-label="Apps" data-tooltip="Apps" data-action="settings">${icon('package')}</button></nav><div class="cu-settings-content"><div class="cu-breadcrumb">Apps ${icon('chevron-right')}</div><h1>App updates</h1><div class="cu-settings-card">${srow('circle-help','Show apps with an unknown version','Include apps whose installed version can’t be read.',`<label class="cu-switch"><span>${unknown?'On':'Off'}</span><input type="checkbox" aria-label="Show apps with an unknown version" id="cu-unknown-toggle" ${unknown?'checked':''}></label>`)}</div><h2>Skipped</h2><div class="cu-settings-card">${skipped.length?skipped.map((a,i)=>`<div class="cu-settings-row">${appIcon(a)}<div class="cu-app-copy"><div class="cu-app-name">${a.name}</div><div class="cu-detail">${a.detail}</div></div>${button('Restore',`restore:${i}`)}</div>`).join(''):srow('check','No skipped apps','','')}</div><h2>History</h2><div class="cu-settings-card">${srow('check','7-Zip','26.05 → 26.06 · Today, 2:14 PM','<span class="cu-history-status cu-good">Updated</span>')}${srow('circle-alert','Discord','1.0.9171 → 1.0.9172 · Today, 2:13 PM','<span class="cu-history-status cu-warning">Update failed</span>')}${srow('check','Git','2.47.0 → 2.47.1 · Yesterday','<span class="cu-history-status cu-good">Updated</span>')}</div><h2>Shortcuts</h2><div class="cu-settings-card">${srow('keyboard','Check app updates','',`<span class="cu-shortcut-key">Not set</span>${button('Edit','shortcuts')}`)}${srow('keyboard','Update all apps','',`<span class="cu-shortcut-key">Not set</span>${button('Edit','shortcuts')}`)}${shortcutNotice?'<div class="cu-shortcut-notice" role="status">These shortcuts are assigned in Settings › Shortcuts.</div>':''}</div></div></div></div>`;
+    }
+    function appsMenu() { return shell(`${header('Apps')}<div class="cu-body"><div class="cu-row">${icon('refresh-cw')}<div class="cu-app-copy">Update apps</div><span class="cu-detail">5 updates</span>${iconButton('chevron-right','Open app updates','ready')}</div></div>`); }
+    function render() {
+      product.dataset.theme = state.theme; product.dataset.versions = state.versions;
+      product.classList.toggle('cu-settings-view',state.scene==='settings');
+      scenePicker.value = state.scene==='apps'?'ready':state.scene; themePicker.value = state.theme;
+      screen.innerHTML = state.scene==='settings'?settings():state.scene==='confirm'?confirmation():['empty','error','admin'].includes(state.scene)?center(state.scene):state.scene==='apps'?appsMenu():list();
+      if (globalThis.lucide) lucide.createIcons({attrs:{width:16,height:16}});
+    }
+    function remember() {
+      const save = window.openai?.setWidgetState;
+      if (save) window.openai.setWidgetState({modelContent:{appUpdatesMockup:{...state}},privateContent:null}).catch(()=>{});
+    }
+    function go(scene) { state.scene=scene; menu=-1; render(); remember(); }
+    scenePicker.addEventListener('change',()=>{confirmIds=[];batchIds=[0,1,2,3,4];page=0;confirmPage=0;hidden=new Set();go(scenePicker.value);});
+    themePicker.addEventListener('change',()=>{state.theme=themePicker.value;render();remember();});
+    screen.addEventListener('change',event=>{if(event.target.id==='cu-unknown-toggle'){unknown=event.target.checked;render();}});
+    screen.addEventListener('click',event=>{
+      const control=event.target.closest('[data-action]'); if(!control)return;
+      const [action,value]=control.dataset.action.split(':'); const index=Number(value);
+      if(action==='back'){go(state.scene==='apps'?'ready':'apps');return;}
+      if(action==='ready'||action==='cancel'){go('ready');return;}
+      if(action==='settings'){go('settings');return;}
+      if(action==='shortcuts'){shortcutNotice=!shortcutNotice;go('settings');return;}
+      if(action==='check'){hidden=new Set();go('ready');return;}
+      if(action==='menu'){menu=menu===index?-1:index;render();return;}
+      if(action==='skip'||action==='always') {skipped.push({...apps[index],index,detail:action==='always'?'Always skipped':`${apps[index].to} · This version`});hidden.add(index);menu=-1;render();return;}
+      if(action==='restore'){if(Number.isInteger(skipped[index].index))hidden.delete(skipped[index].index);skipped.splice(index,1);render();return;}
+      if(action==='update'){confirmIds=[index];confirmPage=0;go('confirm');return;}
+      if(action==='all'){confirmIds=(state.scene==='many'?apps:apps.slice(0,5)).map((_,i)=>i).filter(i=>!hidden.has(i));confirmPage=0;go('confirm');return;}
+      if(action==='start'){batchIds=confirmIds.length?[...confirmIds]:[0,1,2,3,4];page=0;go('running');return;}
+      if(action==='confirm-next'||action==='confirm-prev'){const count=confirmIds.length||5;confirmPage=action==='confirm-next'?Math.min(confirmPage+1,Math.ceil(count/5)-1):Math.max(confirmPage-1,0);render();return;}
+      if(action==='decline'){go('declined');return;}
+      if(action==='next'||action==='prev'){page=action==='next'?Math.min(page+1,2):Math.max(page-1,0);menu=-1;render();return;}
+    });
+    root.addEventListener('keydown',event=>{if(event.key==='Escape'&&menu!==-1){menu=-1;render();}});
+    window.addEventListener('openai:set_globals',event=>{
+      const incoming=event.detail?.globals?.widgetState?.modelContent?.appUpdatesMockup;
+      if(!incoming)return;
+      if(scenes.includes(incoming.scene))state.scene=incoming.scene;
+      if(['auto','dark','light'].includes(incoming.theme))state.theme=incoming.theme;
+      if(['below','inline'].includes(incoming.versions))state.versions=incoming.versions;
+      render();
+    });
+    render();
+    if(globalThis.Tweak){
+      const tweak=new Tweak({container:product,onChange:()=>{render();remember();}});
+      tweak.addSelect(state,'versions',{label:'Versions',options:[{label:'Under the app name',value:'below'},{label:'On the right',value:'inline'}]});
+    }
+  })();
+  </script>
+</div>

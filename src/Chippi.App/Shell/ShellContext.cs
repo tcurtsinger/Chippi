@@ -118,6 +118,7 @@ public sealed class ShellContext
     public Chippi.UI.Capture.ICaptureLayer Capture { get; }
     internal Chippi.App.Island.CapturePanelHost? CapturePanel { get; set; }
     internal Chippi.Features.Recording.RecordingModule? Recording { get; set; }
+    internal Chippi.Features.AppUpdates.AppUpdatesModule? AppUpdates { get; set; }
 
     /// <summary>The capture layer's island side; the island host sets its close.</summary>
     internal CaptureShell CaptureShell { get; }

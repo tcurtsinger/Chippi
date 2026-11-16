@@ -3,7 +3,8 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <TargetFramework>net10.0-windows10.0.26100.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
     <UseWPF>true</UseWPF>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AssemblyName>Chippi</AssemblyName>
@@ -57,6 +58,7 @@
     <ProjectReference Include="..\Features\Chippi.Features.ScreenCapture\Chippi.Features.ScreenCapture.csproj" />
     <ProjectReference Include="..\Features\Chippi.Features.Recording\Chippi.Features.Recording.csproj" />
     <ProjectReference Include="..\Features\Chippi.Features.MediaTools\Chippi.Features.MediaTools.csproj" />
+    <ProjectReference Include="..\Features\Chippi.Features.AppUpdates\Chippi.Features.AppUpdates.csproj" />
     <ProjectReference Include="..\Features\Chippi.Features.WindowLayouts\Chippi.Features.WindowLayouts.csproj" />
     <ProjectReference Include="..\Features\Chippi.Features.TextSnippets\Chippi.Features.TextSnippets.csproj" />
     <ProjectReference Include="..\Features\Chippi.Features.SmoothScrolling\Chippi.Features.SmoothScrolling.csproj" />

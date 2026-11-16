@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) Chippi contributors
-param([ValidateSet('--preflight','--handshake','--guard','--sandbox')][string]$Mode)
+param([ValidateSet('--preflight','--handshake','--guard','--sandbox','--app-updates')][string]$Mode)
 if ($env:USERNAME -ne 'WDAGUtilityAccount' -or !(Test-Path 'C:\chippi\Chippi.exe')) { throw 'Windows Sandbox only.' }
 Add-Type @'
 using System;
@@ -29,7 +29,7 @@ public static class AdminMedium {
     static extern bool CreateProcessAsUser(IntPtr token,string app,StringBuilder line,IntPtr pa,IntPtr ta,bool inherit,uint flags,IntPtr env,string directory,ref Startup startup,out ProcessInfo process);
     static void Check(bool success,string step) { if(!success) { int code=Marshal.GetLastWin32Error(); throw new Win32Exception(code,step+" ("+code+")"); } }
     public static void Run(string mode) {
-        if(mode!="--preflight" && mode!="--handshake" && mode!="--guard" && mode!="--sandbox")throw new ArgumentException("Invalid probe mode");
+        if(mode!="--preflight" && mode!="--handshake" && mode!="--guard" && mode!="--sandbox" && mode!="--app-updates")throw new ArgumentException("Invalid probe mode");
         IntPtr original=IntPtr.Zero,token=IntPtr.Zero,sid=IntPtr.Zero;
         var helpers=new System.Collections.Generic.List<System.Diagnostics.Process>();
         try {

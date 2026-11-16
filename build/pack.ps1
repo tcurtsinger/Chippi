@@ -35,6 +35,16 @@ try {
         if ($LASTEXITCODE -ne 0) { throw "Publish failed for $rid." }
         Copy-Item -LiteralPath $vbZip -Destination (Join-Path $staging "vendor/vb-cable/$($pin.file)")
         if (!(Test-Path -LiteralPath (Join-Path $staging 'Chippi.Elevated.exe'))) { throw 'Missing native admin helper.' }
+        foreach ($required in 'Microsoft.Management.Deployment.dll', 'Microsoft.Management.Deployment.winmd', 'licenses/WinGet-NOTICE.txt') {
+            if (!(Test-Path -LiteralPath (Join-Path $staging $required))) { throw "Missing WinGet deployment file: $required" }
+        }
+        $factoryBytes = [System.IO.File]::ReadAllBytes((Join-Path $staging 'Microsoft.Management.Deployment.dll'))
+        if ($factoryBytes.Length -lt 64) { throw 'Invalid WinGet activation factory.' }
+        $peOffset = [BitConverter]::ToInt32($factoryBytes, 60)
+        $expectedMachine = if ($rid -eq 'win-arm64') { 0xAA64 } else { 0x8664 }
+        if ($peOffset -lt 0 -or $peOffset + 6 -gt $factoryBytes.Length -or [BitConverter]::ToUInt32($factoryBytes, $peOffset) -ne 0x4550 -or [BitConverter]::ToUInt16($factoryBytes, $peOffset + 4) -ne $expectedMachine) {
+            throw "WinGet activation factory architecture does not match $rid."
+        }
         foreach ($required in 'Chippi.exe', 'LICENSE', 'THIRD-PARTY-NOTICES.md', 'vendor/vb-cable/vb-cable.json', "vendor/vb-cable/$($pin.file)", 'runtimes/win-x64/native/rnnoise.dll', 'runtimes/win-arm64/native/rnnoise.dll', 'vendor/soundboard/yt-dlp.exe', 'vendor/soundboard/node.exe', 'vendor/soundboard/tools.json', 'vendor/soundboard/licenses/Node-LICENSE.txt', 'vendor/soundboard/licenses/yt-dlp-LICENSE.txt', 'vendor/soundboard/licenses/yt-dlp-THIRD-PARTY-LICENSES.txt') {
             if (!(Test-Path -LiteralPath (Join-Path $staging $required))) { throw "Missing published file: $required" }
         }

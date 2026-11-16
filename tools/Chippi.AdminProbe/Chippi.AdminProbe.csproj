@@ -1,9 +1,9 @@
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net10.0-windows</TargetFramework><OutputType>Exe</OutputType><AssemblyName>Chippi</AssemblyName>
+    <TargetFramework>net10.0-windows10.0.26100.0</TargetFramework><SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion><OutputType>Exe</OutputType><AssemblyName>Chippi</AssemblyName>
     <UseWPF>true</UseWPF><PublishSingleFile>true</PublishSingleFile><SelfContained>true</SelfContained>
     <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == ''">$(NETCoreSdkRuntimeIdentifier)</RuntimeIdentifier>
   </PropertyGroup>
-  <ItemGroup><ProjectReference Include="../../src/Chippi.UI/Chippi.UI.csproj" /></ItemGroup>
+  <ItemGroup><ProjectReference Include="../../src/Chippi.UI/Chippi.UI.csproj" /><ProjectReference Include="../../src/Features/Chippi.Features.AppUpdates/Chippi.Features.AppUpdates.csproj" /></ItemGroup>
 </Project>
