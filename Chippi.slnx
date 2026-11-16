@@ -6,6 +6,8 @@
     <Project Path="src/Chippi.Capture/Chippi.Capture.csproj" />
     <Project Path="src/Chippi.Clipboard/Chippi.Clipboard.csproj" />
     <Project Path="src/Chippi.Core/Chippi.Core.csproj" />
+    <Project Path="src/Chippi.Elevated.Protocol/Chippi.Elevated.Protocol.csproj" />
+    <Project Path="src/Chippi.Elevated/Chippi.Elevated.csproj" />
     <Project Path="src/Chippi.Input/Chippi.Input.csproj" />
     <Project Path="src/Chippi.Rules/Chippi.Rules.csproj" />
     <Project Path="src/Chippi.UrlCleaning/Chippi.UrlCleaning.csproj" />
@@ -42,6 +44,7 @@
     <Project Path="src/Features/Chippi.Features.AppSwitcher/Chippi.Features.AppSwitcher.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/Chippi.Elevated.Tests/Chippi.Elevated.Tests.csproj" />
     <Project Path="tests/Chippi.Media.Tests/Chippi.Media.Tests.csproj" />
     <Project Path="tests/Chippi.Features.Recording.Tests/Chippi.Features.Recording.Tests.csproj" />
     <Project Path="tests/Chippi.Features.MediaTools.Tests/Chippi.Features.MediaTools.Tests.csproj" />
@@ -82,6 +85,7 @@
     <Project Path="tests/Chippi.UiSmoke/Chippi.UiSmoke.csproj" />
     <Project Path="tests/Chippi.SoundSmoke/Chippi.SoundSmoke.csproj" />
   </Folder>
+  <Folder Name="/tools/"><Project Path="tools/Chippi.AdminProbe/Chippi.AdminProbe.csproj" /></Folder>
   <Folder Name="/Solution Items/">
     <File Path=".editorconfig" />
     <File Path="Directory.Build.props" />

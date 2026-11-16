@@ -373,6 +373,7 @@ public partial class App : Application
         _toasts?.Dispose();
         Shell?.Clipboard.Dispose();
         Shell?.Input.Dispose();
+        Shell?.Admin.Dispose();
         Shell?.CapturePanel?.Dispose();
         Shell?.Hotkeys.Dispose();
         (Shell?.Services.Actions as IDisposable)?.Dispose();

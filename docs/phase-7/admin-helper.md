@@ -1,6 +1,20 @@
 # Admin helper: brief
 
-Wave 3, built first in the wave. Owner: Kayla (the helper, its client in Chippi, the Sandbox runner). Screens: none of its own; the four wave 3 features show its results on theirs. Reviewer: Karl, full review (Chippi's first elevated code). Task 811. Status: for Travis's confirmation with the wave 3 briefs. Nothing is built yet.
+Wave 3, built first in the wave. Screens: none of its own; the four wave 3 features show its results on theirs. Full independent review is required for this first elevated code.
+
+## Approved first slice (2026-11-16)
+
+Travis approved the foundation and package-update support first, then green CI and a merge. This overrides the original all-verbs-at-once scope below. This slice implements only `UpdatePackage` and session `Done`; unknown and future verbs close the session. Uninstall, leftovers, Cleaner and Port manager handlers are added with those features. No App updates screens or commands are introduced yet.
+
+- One explicitly confirmed batch per session, at most 256 unique package IDs, processed sequentially. One helper launch/UAC prompt covers that batch. Separate batches start separate sessions; there is no standing session across features in this slice.
+- Chippi creates a local, first-instance pipe restricted to its logon SID. Both ends verify the other process, path, account, session and elevation. The helper derives the standard access-check token from the verified, non-elevated Chippi process, so it does not assume the helper has a linked token. The process handles stay open throughout the session.
+- Only package IDs cross the boundary. The helper resolves App Installer through Windows package APIs, checks its file/ancestors for ownership, writable access and links while retaining handles, then invokes `winget upgrade --id <id> --exact --source winget --scope machine --silent --accept-package-agreements --accept-source-agreements --disable-interactivity`. It cannot install a new package, update a user-scope package or choose an arbitrary executable through this API.
+- Cancellation stops unsent requests and allows a started installer to finish. A lost connection ends the queue after the current installer. Invalid frames, unknown/duplicate fields, repeated request IDs and unexpected peers end the session. No automatic retry.
+- Core exposes `ModuleContext.Admin`; the shell owns one lazy client and closes its connection at exit. Dev profiles refuse real elevation before a pipe or process is created. Ordinary startup, discovery and tests never launch the helper.
+- NativeAOT builds `Chippi.Elevated.exe`; application publishing includes it beside `Chippi.exe`, and packaging requires its presence. Local native compilation is x64; ARM64 NativeAOT is verified in CI because this PC lacks the ARM64 C++ tools. No toolchain is installed by this change.
+- `Chippi.Elevated.Tests` covers protocol, lifecycle, batches, cancellation, refusal, peer identity and throwaway path/junction checks without windows, prompts or updates. The real native package-upgrade check is [Sandbox/README.md](../../tests/Chippi.Elevated.Tests/Sandbox/README.md). Sandbox and owner consent/decline results must be reported separately; a native build or fixture test is not elevation proof.
+
+The remaining sections describe the eventual full helper; they do not enable those future operations in the first slice.
 
 [Decisions](README.md) override the research. References: [architecture §6](architecture.md#6-the-admin-helper) and [§11](architecture.md#11-standard-user-or-admin), [behavior spec B](behavior-spec-b.md) (the "Needs admin" column, Leftover ownership), the wave 3 briefs (`app-updates.md`, `uninstaller.md`, `cleaner.md`, `port-manager.md`, Herb).
 

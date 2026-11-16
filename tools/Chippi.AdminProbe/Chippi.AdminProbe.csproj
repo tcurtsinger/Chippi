@@ -1,0 +1,9 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework><OutputType>Exe</OutputType><AssemblyName>Chippi</AssemblyName>
+    <UseWPF>true</UseWPF><PublishSingleFile>true</PublishSingleFile><SelfContained>true</SelfContained>
+    <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == ''">$(NETCoreSdkRuntimeIdentifier)</RuntimeIdentifier>
+  </PropertyGroup>
+  <ItemGroup><ProjectReference Include="../../src/Chippi.UI/Chippi.UI.csproj" /></ItemGroup>
+</Project>

@@ -79,6 +79,18 @@
     <Content Include="..\..\build\vendor\vb-cable.json" Link="vendor\vb-cable\vb-cable.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
   </ItemGroup>
 
+  <Target Name="PublishAdminHelper" AfterTargets="ComputeResolvedFilesToPublishList"
+          Condition="'$(RuntimeIdentifier)' == 'win-x64' Or '$(RuntimeIdentifier)' == 'win-arm64'">
+    <PropertyGroup><_AdminOutput>$(MSBuildProjectDirectory)\..\..\build\artifacts\elevated\$(RuntimeIdentifier)</_AdminOutput></PropertyGroup>
+    <Exec Command="dotnet publish &quot;$(MSBuildProjectDirectory)\..\Chippi.Elevated\Chippi.Elevated.csproj&quot; -c $(Configuration) -r $(RuntimeIdentifier) -p:Version=$(Version) -o &quot;$(_AdminOutput)&quot;" />
+    <Error Condition="!Exists('$(_AdminOutput)\Chippi.Elevated.exe')" Text="Admin helper publish failed." />
+    <ItemGroup>
+      <ResolvedFileToPublish Include="$(_AdminOutput)\Chippi.Elevated.exe">
+        <RelativePath>Chippi.Elevated.exe</RelativePath><CopyToPublishDirectory>Always</CopyToPublishDirectory><ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+      </ResolvedFileToPublish>
+    </ItemGroup>
+  </Target>
+
   <!-- Link imports use pinned native helpers. Build/test never invokes them; publish verifies and
        includes each runtime's tools and complete upstream licenses. No global installation. -->
   <Target Name="PublishSoundboardTools" AfterTargets="ComputeResolvedFilesToPublishList"
