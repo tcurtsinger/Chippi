@@ -29,7 +29,7 @@ public sealed class TrustedExecutable : IDisposable
             bool immediate = true;
             while (!string.IsNullOrEmpty(folder))
             {
-                guard.Check(folder, (immediate ? 2u | 4u : 0) | 0x40 | 0x10000 | 0x40000 | 0x80000, standardToken, file: false);
+                guard.Check(folder, DirectoryDeniedRights(folder, immediate), standardToken, file: false);
                 immediate = false;
                 folder = Directory.GetParent(folder)?.FullName;
             }
@@ -40,6 +40,8 @@ public sealed class TrustedExecutable : IDisposable
 
     private void Check(string path, uint deniedRights, SafeAccessTokenHandle token, bool file)
     {
+        string label = Path.GetFileName(path);
+        if (label.Length == 0) label = "volume root";
         var handle = CreateFile(path, 0x20080, file ? 1u : 3u, 0, 3, 0x02200000, 0);
         if (handle.IsInvalid) { handle.Dispose(); throw new Win32Exception(); }
         _handles.Add(handle);
@@ -56,10 +58,18 @@ public sealed class TrustedExecutable : IDisposable
         {
             string sid = new SecurityIdentifier(owner).Value;
             if (sid is not ("S-1-5-18" or "S-1-5-32-544" or TrustedInstaller))
-                throw new UnauthorizedAccessException("Untrusted file owner.");
-            CheckStandardAccess(descriptor, token, deniedRights);
+                throw new UnauthorizedAccessException("Untrusted file owner (" + label + ").");
+            try { CheckStandardAccess(descriptor, token, deniedRights); }
+            catch (UnauthorizedAccessException refusal) { throw new UnauthorizedAccessException(refusal.Message + " (" + label + ")", refusal); }
         }
         finally { LocalFree(descriptor); }
+    }
+    internal static uint DirectoryDeniedRights(string path, bool immediate)
+    {
+        // A verified drive-volume root cannot be renamed; DELETE there cannot replace an ancestor.
+        // Owner, reparse/final-path, DELETE_CHILD and ACL-control checks still apply to that root.
+        bool volumeRoot = path.Length == 3 && char.IsAsciiLetter(path[0]) && path[1] == ':' && path[2] == '\\';
+        return (immediate ? 2u | 4u : 0) | 0x40 | (volumeRoot ? 0 : 0x10000u) | 0x40000 | 0x80000;
     }
     internal static void CheckStandardAccess(nint descriptor, SafeAccessTokenHandle token, uint deniedRights)
     {
@@ -71,7 +81,7 @@ public sealed class TrustedExecutable : IDisposable
             if (!AccessCheck(descriptor, token, 0x02000000, ref mapping, privileges, ref size, out uint granted, out _))
                 throw new Win32Exception();
             // MAXIMUM_ALLOWED may successfully grant zero rights on a protected ancestor.
-            if ((granted & deniedRights) != 0) throw new UnauthorizedAccessException("Executable writable by standard user.");
+            if ((granted & deniedRights) != 0) throw new UnauthorizedAccessException($"Executable writable by standard user (rights 0x{granted & deniedRights:X}).");
         }
         finally { Marshal.FreeHGlobal(privileges); }
     }
