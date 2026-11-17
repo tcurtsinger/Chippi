@@ -428,6 +428,12 @@ internal sealed class HubCore(IHookSource hooks, IInputSender sender, IInputSyst
                 // A button already owned lost its up: the newest kept down is the one whose up is coming.
                 if (_buttonOwner[(int)button] is null)
                     _ownedButtons++;
+                else if (_buttonOwner[(int)button] is { Alive: true } previous && !ReferenceEquals(previous, entry))
+                {
+                    // The old keeper's up will go to the new one: close its gesture now.
+                    var closing = new MouseInput(MouseKind.Up, button, x, y, 0, injected, now);
+                    previous.Filter.Mouse(in closing);
+                }
                 _buttonOwner[(int)button] = entry;
             }
             return true;

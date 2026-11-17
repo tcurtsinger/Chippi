@@ -182,9 +182,8 @@ public sealed partial class WindowsActionPc : IActionPc
         var until = DateTime.UtcNow + HeldKeysTimeout;
         while (AnyHeld() && DateTime.UtcNow < until)
             await Task.Delay(15);
-        // Still down after the wait: sending now would mix the action's keys with the shortcut's.
-        if (AnyHeld())
-            throw new ActionFailure("Keys held");
+        // Still down after the wait: go on. The hub holds Caps modifiers itself, so a held key here isn't always a stuck
+        // shortcut, and refusing would stop a Caps combo's action from ever running.
 
         static bool AnyHeld() => Held(0x11) || Held(0x12) || Held(0x10) || Held(0x5B) || Held(0x5C);
 

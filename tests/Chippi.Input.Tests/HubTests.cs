@@ -173,10 +173,11 @@ public class HubTests
 
         Assert.True(hub.Mouse(TestHub.WmMButtonDown)); // first keeps it; its up is lost
         firstKeeps = false;
-        Assert.True(hub.Mouse(TestHub.WmMButtonDown)); // second keeps the next down
+        Assert.True(hub.Mouse(TestHub.WmMButtonDown)); // second keeps the next down; first is told its gesture is over
+        Assert.Equal(1, first.Heard.Count(h => h == "first Up Middle"));
         Assert.True(hub.Mouse(TestHub.WmMButtonUp));
         Assert.Contains("second Up Middle", second.Heard);
-        Assert.DoesNotContain("first Up Middle", first.Heard);
+        Assert.Equal(1, first.Heard.Count(h => h == "first Up Middle")); // the real up is not sent to it again
         Assert.False(hub.Mouse(TestHub.WmMButtonUp)); // nobody owns it any more: the app's
     }
 

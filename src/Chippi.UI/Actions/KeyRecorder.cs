@@ -67,7 +67,7 @@ public sealed class KeyRecorder(Func<IInputHub> hub) : IKeyRecorder
                         if (modifier != KeyModifiers.None)
                             _modifiers |= modifier;
                         else
-                            Finish(vk == 0x1B && _modifiers == KeyModifiers.None ? null : new KeyCombo(_modifiers, vk));
+                            Finish(vk == 0x1B && !PressedModifier() ? null : new KeyCombo(_modifiers, vk));
                     }
                     return true;
                 }
@@ -81,6 +81,15 @@ public sealed class KeyRecorder(Func<IInputHub> hub) : IKeyRecorder
                 _modifiers &= ~KeyCombo.ModifierOf(vk);
                 return true;
             }
+        }
+
+        // Esc cancels unless the user pressed a modifier after recording began (one held from before doesn't count).
+        private bool PressedModifier()
+        {
+            foreach (uint down in _down)
+                if (KeyCombo.ModifierOf(down) != KeyModifiers.None)
+                    return true;
+            return false;
         }
 
         private void Finish(KeyCombo? keys)
