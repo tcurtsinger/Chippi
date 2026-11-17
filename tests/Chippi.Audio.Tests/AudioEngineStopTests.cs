@@ -65,4 +65,43 @@ public sealed class AudioEngineStopTests
         var error = await Assert.ThrowsAsync<InvalidOperationException>(() => command!);
         Assert.Equal("The audio service is stopping.", error.Message);
     }
+
+    [Fact]
+    public async Task A_lease_taken_while_the_old_engine_stops_starts_its_engine_after_the_old_one_is_gone()
+    {
+        var first = new FakeDeviceSystem();
+        var second = new FakeDeviceSystem();
+        using var entered = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        var calls = 0;
+        bool? firstGoneWhenSecondCreated = null;
+        var service = new AudioService(() =>
+        {
+            if (Interlocked.Increment(ref calls) == 1)
+            {
+                // The first engine's thread is busy, so its stop is still queued behind this.
+                entered.Set();
+                if (!release.Wait(Timeout)) throw new TimeoutException("Blocked start was not released");
+                return first;
+            }
+            firstGoneWhenSecondCreated = first.IsDisposed;
+            return second;
+        }, null);
+
+        var lease1 = service.Acquire();
+        Assert.True(entered.Wait(Timeout));
+        var releasing = lease1.DisposeAsync().AsTask();
+        var lease2 = service.Acquire();
+        Assert.False(releasing.IsCompleted);
+
+        release.Set();
+        await releasing.WaitAsync(Timeout);
+        await service.ReadyAsync().WaitAsync(Timeout);
+
+        Assert.Equal(true, firstGoneWhenSecondCreated);
+        Assert.True(first.IsDisposed);
+        Assert.False(second.IsDisposed);
+        await lease2.DisposeAsync();
+        Assert.True(second.IsDisposed);
+    }
 }

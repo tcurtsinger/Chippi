@@ -28,11 +28,19 @@ public sealed class SoundboardStore
     public string Root { get; }
     public string? RecoveryNotice { get; private set; }
 
+    /// <summary>Clips the last <see cref="Load"/> left out because their entry was invalid. Their files stay on disk.</summary>
+    public IReadOnlyList<SoundClip?> SkippedClips { get; private set; } = [];
+
+    /// <summary>Tells the user how many clips Load skipped; null when none.</summary>
+    public string? SkippedNotice => SkippedClips.Count == 0 ? null
+        : SkippedClips.Count == 1 ? "1 sound skipped. Its file is kept" : $"{SkippedClips.Count} sounds skipped. Their files are kept";
+
     public SoundboardLibrary Load()
     {
         lock (_gate)
         {
             RecoveryNotice = null;
+            SkippedClips = [];
             if (!File.Exists(_file) && !File.Exists(_file + ".bak")) return new();
             try { return Read(_file); }
             catch (Exception ex) when (ex is JsonException or IOException or SoundboardException)
@@ -52,12 +60,23 @@ public sealed class SoundboardStore
         }
     }
 
-    private static SoundboardLibrary Read(string file)
+    private SoundboardLibrary Read(string file)
     {
         if (new FileInfo(file).Length > MaxLibraryBytes)
             throw new SoundboardException("Library is too large");
-        return Normalize(JsonSerializer.Deserialize<SoundboardLibrary>(File.ReadAllBytes(file), Json)
-            ?? throw new SoundboardException("Library is empty"));
+        var skipped = new List<SoundClip?>();
+        var library = Normalize(JsonSerializer.Deserialize<SoundboardLibrary>(File.ReadAllBytes(file), Json)
+            ?? throw new SoundboardException("Library is empty"), skipped);
+        SkippedClips = skipped;
+        if (skipped.Count > 0) Quarantine(skipped);
+        return library;
+    }
+
+    // The skipped entries leave the library the next time it saves; keep them, so a fixed entry can be put back by hand.
+    private void Quarantine(List<SoundClip?> skipped)
+    {
+        try { File.WriteAllBytes(Path.Combine(Root, "library.skipped.json"), JsonSerializer.SerializeToUtf8Bytes(skipped, Json)); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException) { }
     }
 
     public void Save(SoundboardLibrary library)
@@ -203,7 +222,11 @@ public sealed class SoundboardStore
             throw new SoundboardException("Choose a valid start and end time");
     }
 
-    public static SoundboardLibrary Normalize(SoundboardLibrary library)
+    /// <summary>
+    /// Checks and cleans a library. An invalid clip throws, unless <paramref name="skipped"/> is given:
+    /// then it is left out and added there, so one bad entry can't lock up the others.
+    /// </summary>
+    public static SoundboardLibrary Normalize(SoundboardLibrary library, List<SoundClip?>? skipped = null)
     {
         if (library.Version != 1 || library.Collections is null || library.Clips is null)
             throw new SoundboardException("Library format is not supported");
@@ -217,10 +240,18 @@ public sealed class SoundboardStore
         var clips = new List<SoundClip>();
         foreach (var clip in library.Clips.DistinctBy(c => c?.Id))
         {
-            if (clip is null || string.IsNullOrWhiteSpace(clip.Id) || !IsOwnedName(clip.AudioFile, ".wav")
-                || (clip.ImageFile is not null && !IsOwnedName(clip.ImageFile, ".png")))
-                throw new SoundboardException("Invalid sound entry");
-            ValidateRange(clip.DurationSeconds, clip.StartSeconds, clip.EndSeconds);
+            try
+            {
+                if (clip is null || string.IsNullOrWhiteSpace(clip.Id) || !IsOwnedName(clip.AudioFile, ".wav")
+                    || (clip.ImageFile is not null && !IsOwnedName(clip.ImageFile, ".png")))
+                    throw new SoundboardException("Invalid sound entry");
+                ValidateRange(clip.DurationSeconds, clip.StartSeconds, clip.EndSeconds);
+            }
+            catch (SoundboardException) when (skipped is not null)
+            {
+                skipped.Add(clip);
+                continue;
+            }
             clips.Add(clip with { Name = CleanName(clip.Name), CollectionId = ids.Contains(clip.CollectionId) ? clip.CollectionId : collections[0].Id,
                 Waveform = CleanWaveform(clip.Waveform) });
         }

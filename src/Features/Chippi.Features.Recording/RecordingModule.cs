@@ -69,7 +69,7 @@ public sealed class RecordingModule : IFeatureModule
     }
     private void SessionSwitch(object sender, SessionSwitchEventArgs e) { if (e.Reason == SessionSwitchReason.SessionLock) Model?.Interrupt("Recording stopped because the computer was locked"); }
     private void PowerChanged(object sender, PowerModeChangedEventArgs e) { if (e.Mode == PowerModes.Suspend) Model?.Interrupt("Recording stopped because the computer is going to sleep"); }
-    private void DisplayChanged(object? sender, EventArgs e) => Model?.Interrupt("Recording stopped because the display configuration changed");
+    private void DisplayChanged(object? sender, EventArgs e) => Model?.DisplayChanged("Recording stopped because its display changed");
     private void Publish()
     {
         if (Model is not { } model || _context is not { } context) return;

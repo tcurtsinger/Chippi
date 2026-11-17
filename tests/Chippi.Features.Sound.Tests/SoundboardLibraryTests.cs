@@ -53,6 +53,30 @@ public sealed class SoundboardLibraryTests : IDisposable
     }
 
     [Fact]
+    public void An_invalid_clip_is_skipped_and_kept_aside_while_the_rest_load()
+    {
+        var store = new SoundboardStore(_root);
+        var good = new SoundClip { Name = "Good", AudioFile = Guid.NewGuid().ToString("N") + ".wav", DurationSeconds = 3, EndSeconds = 3 };
+        var badName = good with { Id = "bad-name", AudioFile = "../evil.wav" };
+        var badRange = good with { Id = "bad-range", AudioFile = Guid.NewGuid().ToString("N") + ".wav", StartSeconds = 5, EndSeconds = 1 };
+        Directory.CreateDirectory(_root);
+        File.WriteAllText(Path.Combine(_root, "library.json"),
+            System.Text.Json.JsonSerializer.Serialize(new SoundboardLibrary { Clips = [good, badName, badRange] }));
+
+        var loaded = store.Load();
+
+        Assert.Equal(good.Id, Assert.Single(loaded.Clips).Id);
+        Assert.Equal(2, store.SkippedClips.Count);
+        Assert.Equal("2 sounds skipped. Their files are kept", store.SkippedNotice);
+        string kept = File.ReadAllText(Path.Combine(_root, "library.skipped.json"));
+        Assert.Contains("bad-name", kept);
+        Assert.Contains("bad-range", kept);
+        store.Save(loaded); // later saves work
+        Assert.Single(store.Load().Clips);
+        Assert.Throws<SoundboardException>(() => SoundboardStore.Normalize(new SoundboardLibrary { Clips = [badName] }));
+    }
+
+    [Fact]
     public void Corrupt_primary_recovers_backup_without_destroying_it_on_next_save()
     {
         var store = new SoundboardStore(_root);
