@@ -53,6 +53,8 @@ public static class Program
             })
             .Run();
 
+        App.LeaveInstallFolder();
+
         var startup = Notifications.ToastStartup.Prepare(Environment.GetCommandLineArgs()[1..]);
         if (startup.Exit) return startup.ExitCode;
         var app = new App { NotificationStartup = startup };

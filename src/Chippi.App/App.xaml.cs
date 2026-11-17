@@ -371,6 +371,27 @@ public partial class App : Application
         Environment.SetEnvironmentVariable("WINDIR", windowsDirectory);
     }
 
+    /// <summary>
+    /// Velopack starts Chippi in its install folder, and every program Chippi starts without a working folder of its own
+    /// inherits it. One that outlives Chippi (a restarted Explorer, an app opened from it) keeps the folder open, and
+    /// Setup can't replace it (2026-11-17). Chippi resolves its own files from <see cref="AppContext.BaseDirectory"/>.
+    /// </summary>
+    internal static void LeaveInstallFolder()
+    {
+        try { Environment.CurrentDirectory = NeutralWorkingFolder(); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            Log.Warn("Startup: leaving the install folder failed", ex);
+        }
+    }
+
+    /// <summary>The user's profile, as Actions use for the commands they run; System32 when it's missing.</summary>
+    internal static string NeutralWorkingFolder()
+    {
+        var profile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        return !string.IsNullOrEmpty(profile) && Directory.Exists(profile) ? profile : Environment.SystemDirectory;
+    }
+
     protected override void OnExit(ExitEventArgs e)
     {
         _islandHost?.Dispose();

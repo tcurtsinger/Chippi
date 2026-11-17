@@ -72,9 +72,17 @@ internal static class ExplorerShell
         Start();
     }
 
-    private static void Start()
-    {
-        string explorer = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "explorer.exe");
-        Process.Start(new ProcessStartInfo(explorer) { UseShellExecute = false })?.Dispose();
-    }
+    private static void Start() => Process.Start(StartInfo())?.Dispose();
+
+    /// <summary>
+    /// The shell starts in System32, as it does at sign-in. Without a working folder it took Chippi's, and so did every app
+    /// started from the taskbar or Start until the next sign-in, which kept the install folder open and failed Setup's
+    /// "Failed to remove existing application directory" (2026-11-17).
+    /// </summary>
+    internal static ProcessStartInfo StartInfo() =>
+        new(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "explorer.exe"))
+        {
+            UseShellExecute = false,
+            WorkingDirectory = Environment.SystemDirectory,
+        };
 }
