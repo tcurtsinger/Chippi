@@ -29,6 +29,16 @@ public sealed class ArrangementEngineTests
     }
 
     [Fact]
+    public async Task An_unexpected_fault_reading_windows_fails_the_rows_instead_of_stranding_them()
+    {
+        var desktop = new Desktop { ReadFault = new ArgumentException("matcher") };
+        var runner = new ArrangementRunner(desktop);
+        await runner.LaunchAsync(Arrangement(Row("a"), Row("b")), "saved");
+        Assert.All(runner.Results, r => Assert.Equal(ArrangementRowState.Failed, r.State));
+        Assert.False(runner.IsRunning);
+    }
+
+    [Fact]
     public async Task Needs_admin_does_not_stop_the_remaining_rows()
     {
         var desktop = new Desktop();
@@ -192,7 +202,8 @@ public sealed class ArrangementEngineTests
         public nint LastMonitor;
         public IReadOnlyList<SnapDisplay> Connected = [new("saved", "Display", 1, true,
             new(0, 0, 1920, 1080), new(0, 0, 1920, 1040))];
-        public IReadOnlyList<ArrangementLiveWindow> Windows() => Live.ToArray();
+        public Exception? ReadFault;
+        public IReadOnlyList<ArrangementLiveWindow> Windows() => ReadFault is { } fault ? throw fault : Live.ToArray();
         public IReadOnlyList<SnapDisplay> Displays() => Connected;
         public string? StopReason(IReadOnlySet<ArrangementProcess> launched) => null;
         public ArrangementProcess? Launch(ArrangementRow row)

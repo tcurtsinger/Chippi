@@ -51,6 +51,23 @@ public sealed class ModuleTests
             { Input = Hub, Shortcuts = Service }, default);
     }
 
+    [Fact]
+    public async Task A_failed_settings_write_is_refused_and_leaves_the_bindings_and_held_keys_alone()
+    {
+        var rig = new Rig();
+        await rig.StartAsync();
+        var first = Key(CtrlAlt, 0x31);
+        Assert.True(rig.Module.Add(first).Ok);
+        rig.Settings.FailSaving = true;
+        Assert.Equal("Save failed", rig.Module.Add(Key(CtrlAlt, 0x32, "Snap right")).Error);
+        Assert.Equal("Save failed", rig.Module.Change(first with { Action = first.Action with { Name = "Other" } }).Error);
+        rig.Module.Remove(first.Id); // void: it doesn't throw
+        rig.Module.SetMouseEnabled(true);
+        Assert.Equal([first], rig.Module.Settings.Bindings);
+        Assert.Equal(BindingState.Active, rig.Module.StatusOf(first.Id).State);
+        await rig.Module.StopAsync(default);
+    }
+
     [Theory]
     [InlineData(CapsTap.Capitals, "Caps Lock")]
     [InlineData(CapsTap.Escape, "Esc")]
@@ -552,7 +569,14 @@ public sealed class ModuleTests
     {
         public ShortcutsSettings Value { get; set; } = new();
         public T Get<T>() where T : class, new() => (T)(object)Value;
-        public void Save<T>(T settings) where T : class => Value = (ShortcutsSettings)(object)settings;
+        public bool FailSaving;
+
+        public void Save<T>(T settings) where T : class
+        {
+            if (FailSaving)
+                throw new IOException("Disk full");
+            Value = (ShortcutsSettings)(object)settings;
+        }
     }
 
     private sealed class Ui : IModuleUi

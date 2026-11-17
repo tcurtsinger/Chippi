@@ -2,6 +2,7 @@
 // Copyright (C) Chippi contributors
 
 using System.IO;
+using Chippi.Core.Diagnostics;
 using Chippi.Core.Modules;
 using Chippi.Core.Shortcuts;
 using Chippi.Features.AppSwitcher.Windows;
@@ -111,7 +112,7 @@ public sealed class AppSwitcherModule : IFeatureModule
 
     public Task StopAsync(CancellationToken ct)
     {
-        _switcher?.Dismiss();
+        _switcher?.Release();
         Microsoft.Win32.SystemEvents.SessionSwitch -= OnSessionSwitch;
         if (_context?.Input is { } hub && _pauseListener is not null)
             hub.PauseChanged -= _pauseListener;
@@ -161,7 +162,15 @@ public sealed class AppSwitcherModule : IFeatureModule
         if (_context is not { } context)
             return;
         var next = change(Settings);
-        context.Settings.Save(next);
+        try
+        {
+            context.Settings.Save(next);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            Log.Warn("App switcher: saving settings failed", ex);
+            return;
+        }
         Settings = next;
         Changed?.Invoke();
     }

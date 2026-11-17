@@ -89,6 +89,15 @@ public sealed partial class SwitcherOverlay : Window, ISwitcherView
         settings.Previews && !settings.NoPreview.Any(p =>
             string.Equals(System.IO.Path.GetFileName(p), System.IO.Path.GetFileName(window.Path), StringComparison.OrdinalIgnoreCase));
 
+    void ISwitcherView.Release()
+    {
+        if (_session is not null)
+            _session.Changed -= Draw;
+        _session = null;
+        ClearPreviews();
+        Close();
+    }
+
     public void ShowFailed(SwitcherWindow window) => _board.Failed(window);
 
     void ISwitcherView.Hide()
@@ -202,7 +211,7 @@ public sealed partial class SwitcherOverlay : Window, ISwitcherView
     {
         var info = new MonitorInfo { Size = Marshal.SizeOf<MonitorInfo>() };
         if (monitor == 0 || !GetMonitorInfo(monitor, ref info)) return SwitcherBoard.Widest;
-        double scale = _hwnd != 0 ? GetDpiForWindow(_hwnd) / 96.0 : 1;
+        double scale = ScaleOf(monitor);
         return (info.Work.Right - info.Work.Left) / scale - 48;
     }
 
@@ -214,12 +223,20 @@ public sealed partial class SwitcherOverlay : Window, ISwitcherView
         var info = new MonitorInfo { Size = Marshal.SizeOf<MonitorInfo>() };
         if (monitor == 0 || !GetMonitorInfo(monitor, ref info))
             return;
-        double scale = GetDpiForWindow(_hwnd) / 96.0;
+        double scale = ScaleOf(monitor);
         int width = (int)(Width * scale), height = (int)(Height * scale);
         int full = (int)(SwitcherBoard.HeightFor(SwitcherBoard.MaxRows) * scale);
         int left = info.Work.Left + (info.Work.Right - info.Work.Left - width) / 2;
         int top = info.Work.Top + (info.Work.Bottom - info.Work.Top - full) / 2;
         SetWindowPos(_hwnd, 0, left, top, width, height, SwpNoZOrder | SwpNoActivate);
+    }
+
+    // The target display's scale, not the one the hidden window last sat on: a mixed-DPI setup would size the first frame wrong.
+    private double ScaleOf(nint monitor)
+    {
+        if (monitor != 0 && GetDpiForMonitor(monitor, 0, out uint dpiX, out _) == 0 && dpiX > 0)
+            return dpiX / 96.0;
+        return _hwnd != 0 ? GetDpiForWindow(_hwnd) / 96.0 : 1;
     }
 
     private const int GwlExStyle = -20, WsExToolWindow = 0x80;
@@ -235,6 +252,7 @@ public sealed partial class SwitcherOverlay : Window, ISwitcherView
     [LibraryImport("user32.dll", EntryPoint = "GetWindowLongW")] private static partial int GetWindowLong(nint hwnd, int index);
     [LibraryImport("user32.dll", EntryPoint = "SetWindowLongW")] private static partial int SetWindowLong(nint hwnd, int index, int value);
     [LibraryImport("user32.dll", EntryPoint = "GetMonitorInfoW")] [return: MarshalAs(UnmanagedType.Bool)] private static partial bool GetMonitorInfo(nint monitor, ref MonitorInfo info);
+    [LibraryImport("shcore.dll")] private static partial int GetDpiForMonitor(nint monitor, int type, out uint dpiX, out uint dpiY);
     [LibraryImport("user32.dll")] private static partial uint GetDpiForWindow(nint hwnd);
     [LibraryImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] private static partial bool SetWindowPos(nint hwnd, nint after, int x, int y, int cx, int cy, uint flags);
     [LibraryImport("dwmapi.dll")] private static partial int DwmSetWindowAttribute(nint hwnd, int attribute, ref int value, int size);

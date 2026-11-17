@@ -250,6 +250,29 @@ public sealed class AppSwitcherModuleTests : IAsyncLifetime
     }
 
     [Fact]
+    public void A_failed_settings_write_keeps_the_settings_and_does_not_throw()
+    {
+        bool changed = false;
+        _module.Changed += () => changed = true;
+        _settings.FailSaving = true;
+        _module.ShowCurrentDisplayOnly(true);
+        Assert.False(_settings.Value.CurrentDisplayOnly);
+        Assert.False(_module.Settings.CurrentDisplayOnly);
+        Assert.False(changed);
+        _settings.FailSaving = false;
+        _module.ShowCurrentDisplayOnly(true);
+        Assert.True(_module.Settings.CurrentDisplayOnly);
+    }
+
+    [Fact]
+    public async Task Stopping_releases_the_overlay_window()
+    {
+        await Command.Run();
+        await _module.StopAsync(default);
+        Assert.True(_view.Released);
+    }
+
+    [Fact]
     public async Task From_a_tile_or_Search_it_goes_back_to_the_window_before_the_island_and_closes_the_island()
     {
         _islandTarget = 3;

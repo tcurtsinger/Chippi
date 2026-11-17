@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using System.IO;
 using Chippi.Core.Actions;
 using Chippi.Core.Shortcuts;
 using System.Windows;
@@ -144,7 +145,8 @@ public sealed class RadialMenuModule : IFeatureModule, IWheelInputSink
             Log.Warn("Radial menu: hooking the mouse failed", ex);
             throw;
         }
-        if (Settings.Shortcut is { } shortcut && !ShortcutStandsAside)
+        _aside = Settings.Shortcut is not null && ShortcutStandsAside;
+        if (Settings.Shortcut is { } shortcut && !_aside)
             TryRegister(shortcut);
         context.Ui.SetSettingsPage(_ => new RadialMenuSettingsPage(this));
         _pc.RefreshApps();
@@ -182,6 +184,7 @@ public sealed class RadialMenuModule : IFeatureModule, IWheelInputSink
             _input = null;
             _hotkey?.Dispose();
             _hotkey = null;
+            _aside = false;
             if (_pc is not null)
             {
                 _pc.AppsChanged -= OnAppsChanged;
@@ -218,7 +221,8 @@ public sealed class RadialMenuModule : IFeatureModule, IWheelInputSink
             MouseButton.Forward => Settings with { HoldForward = on },
             _ => Settings,
         };
-        Save(settings);
+        if (!Save(settings))
+            return;
         try { _input?.Watch(settings.HoldMiddle, settings.HoldBack, settings.HoldForward); }
         catch (Exception ex) { Log.Warn("Radial menu: hooking the mouse failed", ex); }
         Prepare();
@@ -227,11 +231,14 @@ public sealed class RadialMenuModule : IFeatureModule, IWheelInputSink
     /// <summary>Settings › Radial menu › Open over fullscreen apps.</summary>
     public void SetOpenOverFullscreen(bool on)
     {
-        Save(Settings with { OpenOverFullscreen = on });
+        if (!Save(Settings with { OpenOverFullscreen = on }))
+            return;
         if (_input is not null)
             _input.OpenOverFullscreen = on;
         ApplyShortcutGate();
     }
+
+    private bool _aside;
 
     /// <summary>Off over fullscreen apps while one is in front: the shortcut is let go, so the game gets its keys.</summary>
     private bool ShortcutStandsAside => !Settings.OpenOverFullscreen && _context?.Input?.FullscreenInFront == true;
@@ -245,11 +252,16 @@ public sealed class RadialMenuModule : IFeatureModule, IWheelInputSink
             return;
         if (ShortcutStandsAside)
         {
-            _hotkey?.Dispose();
-            _hotkey = null;
+            // Let go of the keys but stay listed in Settings › Shortcuts, so another feature can't claim the chord meanwhile.
+            if (!_aside)
+            {
+                _hotkey?.Unregister();
+                _aside = true;
+            }
         }
-        else if (_hotkey is null)
+        else if (_aside)
         {
+            _aside = false;
             TryRegister(shortcut);
             Changed?.Invoke();
         }
@@ -258,15 +270,26 @@ public sealed class RadialMenuModule : IFeatureModule, IWheelInputSink
     /// <summary>The wheel's slices, as the editor leaves them.</summary>
     public void SetSlices(List<Slice> slices)
     {
-        Save((Settings with { Slices = slices }).Checked());
-        WarmIcons();
+        if (Save((Settings with { Slices = slices }).Checked()))
+            WarmIcons();
     }
 
-    private void Save(RadialMenuSettings settings)
+    /// <summary>Saves, then adopts the settings; false (and "Save failed" for the shortcut's row) when the write failed.</summary>
+    private bool Save(RadialMenuSettings settings)
     {
-        _context?.Settings.Save(settings);
+        try
+        {
+            _context?.Settings.Save(settings);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            Log.Warn("Radial menu: saving settings failed", ex);
+            Changed?.Invoke();
+            return false;
+        }
         Settings = settings;
         Changed?.Invoke();
+        return true;
     }
 
     /// <summary>The app's or file's own icon, 24 at the wheel's scale, once read; null until then or when there's none.</summary>
@@ -332,7 +355,18 @@ public sealed class RadialMenuModule : IFeatureModule, IWheelInputSink
             Changed?.Invoke();
             return false;
         }
-        Save(Settings with { Shortcut = shortcut });
+        var previous = Settings.Shortcut;
+        if (!Save(Settings with { Shortcut = shortcut }))
+        {
+            // The new chord was registered to find clashes; an unsaved one must not stay active.
+            if (previous is null || _aside || !TryRegister(previous))
+                _hotkey?.Unregister();
+            ShortcutError = "Save failed";
+            Changed?.Invoke();
+            return false;
+        }
+        _aside = false;
+        ApplyShortcutGate(); // a chord registered over a fullscreen app stands aside again
         Prepare();
         return true;
     }
@@ -344,9 +378,14 @@ public sealed class RadialMenuModule : IFeatureModule, IWheelInputSink
     {
         if (_context is null)
             return;
+        if (!Save(Settings with { Shortcut = null }))
+        {
+            ShortcutError = "Save failed";
+            Changed?.Invoke();
+            return;
+        }
         _hotkey?.Unregister(); // still listed in Settings › Shortcuts, unset
         ShortcutError = null;
-        Save(Settings with { Shortcut = null });
     }
 
     /// <summary>While Settings records a shortcut, pressing ours doesn't open the wheel.</summary>
