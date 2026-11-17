@@ -100,8 +100,11 @@ public sealed class ConfigStore
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                // Held by another program, not damaged: leave the file where it is and start on defaults.
-                _logger.LogError(ex, "Settings at {Path} could not be read; starting on defaults", FilePath);
+                // Held by another program, not damaged: leave the file where it is, keep a copy in case the
+                // next save replaces it, and start on defaults.
+                var copy = AsidePath("locked");
+                _logger.LogError(ex, "Settings at {Path} could not be read; starting on defaults (copy kept at {Copy})", FilePath, copy);
+                TryCopy(FilePath, copy);
                 _root = NewRoot();
             }
         }

@@ -530,5 +530,22 @@ public sealed class ConfigStoreTests : IDisposable
         Assert.Equal(AppSettings.DefaultIslandDisplay, store.GetSection<AppSettings>(AppSettings.SectionName).IslandDisplay);
     }
 
+    [Fact]
+    public void A_settings_file_held_by_another_program_starts_on_defaults_and_stays_put()
+    {
+        var path = _dir.File("settings.json");
+        File.WriteAllText(path, """{ "version": 1, "app": { "theme": "dark" } }""");
 
+        ConfigStore store;
+        using (new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+        {
+            store = new ConfigStore(path);
+            store.Load();
+        }
+
+        Assert.Equal(ThemePreference.System, store.GetSection<AppSettings>(AppSettings.SectionName).Theme);
+        Assert.True(File.Exists(path)); // not moved aside
+        Assert.Contains("dark", File.ReadAllText(path));
+        Assert.Empty(Directory.GetFiles(_dir.Path, "settings.corrupt-*.json"));
+    }
 }

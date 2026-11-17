@@ -205,10 +205,18 @@ public sealed class ModuleRegistry(ConfigStore config, IslandActivityHub island,
         {
             await ApplyPresetCoreAsync(preset, ct);
         }
-        finally
+        catch (OperationCanceledException)
         {
             _gate.Release();
+            RaiseChanged(); // what was installed before the cancel stays; the screens must show it
+            throw;
         }
+        catch
+        {
+            _gate.Release();
+            throw;
+        }
+        _gate.Release();
         RaiseChanged();
     }
 
@@ -380,6 +388,8 @@ public sealed class ModuleRegistry(ConfigStore config, IslandActivityHub island,
             }
             catch (OperationCanceledException)
             {
+                _state.Preset = FeaturePreset.Custom; // a partly applied preset is no longer that preset
+                _state.Preset = FeaturePreset.Custom; // a partly applied preset is no longer that preset
                 SaveState(); // the features already changed stay changed in the file too
                 throw;
             }
