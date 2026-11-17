@@ -27,7 +27,8 @@ public sealed class DiscoveryTests
             milliseconds = watch.Elapsed.TotalMilliseconds, count = packages.Count,
             user = packages.Count(p => p.Scope == UpdateScope.User), machine = packages.Count(p => p.Scope == UpdateScope.Machine),
             unknownScope = packages.Count(p => p.Scope == UpdateScope.Unknown), unknownVersion = packages.Count(p => p.UnknownVersion),
-            winget = packages.Count(p => p.Source == "winget"), store = packages.Count(p => p.IsStore), sourceWarning = source.Warning is not null
+            winget = packages.Count(p => p.Source == "winget"), store = packages.Count(p => p.IsStore), sourceWarning = source.Warning is not null,
+            sourceErrors = source.SourceErrors
         };
         await File.WriteAllTextAsync(Path.GetFullPath(report), JsonSerializer.Serialize(output));
         Assert.True(output.count >= 0);

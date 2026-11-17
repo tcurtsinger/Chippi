@@ -12,12 +12,14 @@ public sealed class WindowsPackageSource(bool allowUpdates = true) : IPackageSou
 {
     public string? Warning { get; private set; }
 
+    public IReadOnlyList<string> SourceErrors { get; private set; } = [];
+
     public Task<IReadOnlyList<PackageUpdate>> CheckAsync(bool includeUnknown, CancellationToken ct = default) => Task.Run(async () =>
     {
         ct.ThrowIfCancellationRequested();
         var manager = WingetObjects.Manager();
         var updates = new List<PackageUpdate>();
-        var failed = new List<string>(); int connected = 0;
+        var failed = new List<string>(); var errors = new List<string>(); int connected = 0;
         foreach (string source in new[] { "winget", "msstore" })
         {
             ct.ThrowIfCancellationRequested();
@@ -51,9 +53,13 @@ public sealed class WindowsPackageSource(bool allowUpdates = true) : IPackageSou
                 }
             }
             catch (Exception ex) when (ex is COMException or InvalidOperationException or UnauthorizedAccessException)
-            { failed.Add(source == "msstore" ? "Microsoft Store" : "winget"); }
+            {
+                failed.Add(source == "msstore" ? "Microsoft Store" : "winget");
+                errors.Add($"{source}: {ex.GetType().Name} 0x{ex.HResult:X8} {ex.Message}");
+            }
         }
         Warning = failed.Count == 0 ? null : "Check failed · " + string.Join(", ", failed);
+        SourceErrors = errors.AsReadOnly();
         if (connected == 0) throw new InvalidOperationException("Package check failed.");
         return (IReadOnlyList<PackageUpdate>)Array.AsReadOnly(updates.ToArray());
     }, ct);
@@ -112,13 +118,15 @@ public sealed class WindowsPackageSource(bool allowUpdates = true) : IPackageSou
         var reference = manager.GetPackageCatalogByName(source);
         if (reference is null) return null;
         reference.AuthenticationArguments = WingetObjects.SilentAuthentication();
-        // Check never silently accepts new source terms or starts interactive authentication.
-        reference.AcceptSourceAgreements = false;
+        // The owner chose to accept source terms (the Microsoft Store's needs them once per account, 2026-11-17);
+        // without them msstore refuses to connect. Authentication stays silent.
+        reference.AcceptSourceAgreements = true;
         var options = WingetObjects.Composite(); options.Catalogs.Add(reference);
         options.CompositeSearchBehavior = CompositeSearchBehavior.LocalCatalogs;
         var composite = manager.CreateCompositePackageCatalog(options);
         var connected = await composite.ConnectAsync().AsTask(ct).ConfigureAwait(false);
-        if (connected.Status != ConnectResultStatus.Ok || connected.PackageCatalog is null) throw new InvalidOperationException("Package source unavailable.");
+        if (connected.Status != ConnectResultStatus.Ok || connected.PackageCatalog is null)
+            throw new InvalidOperationException($"Package source unavailable ({connected.Status}, 0x{connected.ExtendedErrorCode?.HResult ?? 0:X8}).");
         return connected.PackageCatalog;
     }
 

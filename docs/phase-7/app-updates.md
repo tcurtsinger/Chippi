@@ -42,7 +42,7 @@ A running app is never ended by force. If it doesn't close, the row says "Close 
 
 ### Who installs
 
-- **Per-user and Store apps:** Chippi (standard user) calls winget's COM API (`Microsoft.WindowsPackageManager.ComInterop`, README task 484) with the package, scope and silent options the list gave.
+- **Per-user and Store apps:** Chippi (standard user) calls winget's COM API (`Microsoft.WindowsPackageManager.ComInterop`, README task 484) with the package, scope and silent options the list gave. Checks and updates accept the source's terms (`AcceptSourceAgreements`, the owner's call, 2026-11-17): the `msstore` source refuses to connect until its terms are accepted once per account.
 - **Machine-wide apps:** a batch of these goes to the admin helper as `UpdatePackage(id)` once each, under one UAC prompt. The helper runs `winget upgrade --id <id> --exact --silent` itself (architecture section 6); it doesn't use COM. A single machine-wide update outside a batch also goes through the helper, so the prompt names Chippi, not each installer.
 - How Chippi knows an update is machine-wide before it starts: the package's installed scope from winget. **Not verified**, see below. If the scope can't be told, Chippi treats it as machine-wide and uses the helper.
 - **No prompt in a check.** A UAC prompt appears only right after Travis confirms an Update.

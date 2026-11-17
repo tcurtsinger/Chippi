@@ -41,7 +41,12 @@ public interface IPackageSource
     Task<PackageInstallResult> UpdateAsync(PackageUpdate package, IProgress<PackageInstallProgress>? progress = null, CancellationToken ct = default);
 }
 
-public interface IPackageSourceStatus { string? Warning { get; } }
+public interface IPackageSourceStatus
+{
+    string? Warning { get; }
+    /// <summary>Why each failed source failed on the last check, for the log: the warning names only the source.</summary>
+    IReadOnlyList<string> SourceErrors => [];
+}
 
 public interface IAppUpdatesStore
 {
