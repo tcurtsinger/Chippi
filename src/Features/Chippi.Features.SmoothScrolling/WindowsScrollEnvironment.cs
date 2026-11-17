@@ -27,7 +27,10 @@ internal sealed unsafe class WindowsScrollEnvironment : IScrollEnvironment, IDis
 
     public WindowsScrollEnvironment()
     {
-        int hz = GetDeviceCaps(GetDC(0), 116 /* VREFRESH */);
+        nint screen = GetDC(0);
+        int hz = screen == 0 ? 0 : GetDeviceCaps(screen, 116 /* VREFRESH */);
+        if (screen != 0)
+            ReleaseDC(0, screen);
         _frameMs = hz is > 1 ? Math.Clamp(1000 / hz, 4, 16) : 16;
         _timer = CreateWaitableTimerExW(0, null, 2 /* HIGH_RESOLUTION */, 0x1F0003);
         _thread = new Thread(Run) { IsBackground = true, Name = "Smooth scrolling frames" };
@@ -47,15 +50,24 @@ internal sealed unsafe class WindowsScrollEnvironment : IScrollEnvironment, IDis
 
     private void Run()
     {
-        while (!_stop)
+        // The thread owns the timer: Dispose may give up waiting for it, so the handle closes only once nothing can use it.
+        try
         {
-            _wake.Wait();
-            while (!_stop && _tick is { } tick && tick(Stopwatch.GetTimestamp()))
-                Frame();
-            _awake = false;
-            // A notch that arrived after the last tick found _awake still true: look once more before sleeping.
-            if (!_stop && _tick is { } again && again(Stopwatch.GetTimestamp()))
-                Wake();
+            while (!_stop)
+            {
+                _wake.Wait();
+                while (!_stop && _tick is { } tick && tick(Stopwatch.GetTimestamp()))
+                    Frame();
+                _awake = false;
+                // A notch that arrived after the last tick found _awake still true: look once more before sleeping.
+                if (!_stop && _tick is { } again && again(Stopwatch.GetTimestamp()))
+                    Wake();
+            }
+        }
+        finally
+        {
+            if (_timer != 0)
+                CloseHandle(_timer);
         }
     }
 
@@ -144,6 +156,8 @@ internal sealed unsafe class WindowsScrollEnvironment : IScrollEnvironment, IDis
 
     public void Send(bool horizontal, int delta)
     {
+        if (_stop)
+            return;
         var input = new Input
         {
             Type = 0, // INPUT_MOUSE
@@ -157,8 +171,6 @@ internal sealed unsafe class WindowsScrollEnvironment : IScrollEnvironment, IDis
         _stop = true;
         _wake.Release();
         _thread.Join(500);
-        if (_timer != 0)
-            CloseHandle(_timer);
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -186,6 +198,7 @@ internal sealed unsafe class WindowsScrollEnvironment : IScrollEnvironment, IDis
     [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(nint window, out uint process);
     [DllImport("user32.dll")] private static extern uint SendInput(uint count, Input* inputs, int size);
     [DllImport("user32.dll")] private static extern nint GetDC(nint window);
+    [DllImport("user32.dll")] private static extern int ReleaseDC(nint window, nint dc);
     [DllImport("gdi32.dll")] private static extern int GetDeviceCaps(nint dc, int index);
     [DllImport("kernel32.dll")] private static extern nint OpenProcess(uint access, bool inherit, uint process);
     [DllImport("kernel32.dll")] private static extern bool CloseHandle(nint handle);

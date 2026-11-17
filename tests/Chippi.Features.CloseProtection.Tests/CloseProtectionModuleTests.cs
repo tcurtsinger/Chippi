@@ -100,6 +100,20 @@ public sealed class CloseProtectionModuleTests
     }
 
     [Fact]
+    public async Task FailedStartAfterTheDesktopReleasesItAndItsSubscriptions()
+    {
+        var desktop = new Desktop();
+        var module = new CloseProtectionModule(() => desktop, new Clock());
+        var store = new Store();
+        var ui = new Ui();
+        var context = new ModuleContext(CloseProtectionModule.Id, store, NullLogger.Instance,
+            new IslandActivityHub().CreatePublisher(CloseProtectionModule.Id), ui) { Input = null };
+        await Assert.ThrowsAsync<InvalidOperationException>(() => module.StartAsync(context, default));
+        Assert.True(desktop.Disposed);
+        Assert.Null(ui.Page);
+    }
+
+    [Fact]
     public async Task SharedPauseClearsPendingAndResumeNeedsANewFirstPress()
     {
         var f = new Fixture(true);

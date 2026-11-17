@@ -59,33 +59,42 @@ public sealed class CloseProtectionModule(Func<ICloseDesktop> createDesktop, Tim
         long run = Interlocked.Increment(ref _run);
         Settings = context.Settings.Get<CloseProtectionSettings>();
         _announced.Clear();
-        _desktop = createDesktop();
-        _filter = new CloseProtectionFilter(() => _desktop.Current, _desktop.Modifiers, MaskAlt);
-        _filter.Feedback += pending =>
+        // The filter's callbacks run on the hub thread, and StopAsync clears the fields: they hold their own references.
+        var desktop = _desktop = createDesktop();
+        var filter = _filter = new CloseProtectionFilter(() => desktop.Current, desktop.Modifiers, MaskAlt);
+        filter.Feedback += pending =>
         {
             Volatile.Write(ref _latest, pending);
-            _desktop?.Post(() => Feedback(run, pending));
+            desktop.Post(() => Feedback(run, pending));
         };
-        _desktop.ForegroundChanged += Reset;
-        _desktop.DesktopChanged += DesktopReset;
-        try { _desktop.Start(); }
-        catch { StopAsync(default).GetAwaiter().GetResult(); throw; }
-        _filter.Configure(false, Settings.ControlWApps);
-        var input = context.Input ?? throw new InvalidOperationException("Input unavailable");
-        input.PauseChanged += OnPauseChanged;
-        OnPauseChanged();
-        _registration = input.Add(_filter);
-        _filter.Configure(Settings.Enabled, Settings.ControlWApps);
-        _registration.Refresh();
-        _timer = _clock.CreateTimer(_ => _filter?.Advance(_clock.GetTimestamp()), null,
-            Settings.Enabled ? TimeSpan.FromMilliseconds(50) : Timeout.InfiniteTimeSpan, TimeSpan.FromMilliseconds(50));
-        context.Ui.SetSettingsPage(_ => new CloseProtectionRows(this));
-        context.Ui.AddCommands(() => [new ChippiCommand("close-protection/toggle", "Close protection", nameof(LucideIcons.ShieldX), () =>
+        desktop.ForegroundChanged += Reset;
+        desktop.DesktopChanged += DesktopReset;
+        try
         {
-            SetEnabled(!Settings.Enabled);
-            if (Error is { } error) throw new InvalidOperationException(error);
-            return Task.CompletedTask;
-        }) { IsOn = Settings.Enabled, Tile = ActionsTile.Input }]);
+            desktop.Start();
+            filter.Configure(false, Settings.ControlWApps);
+            var input = context.Input ?? throw new InvalidOperationException("Input unavailable");
+            input.PauseChanged += OnPauseChanged;
+            OnPauseChanged();
+            _registration = input.Add(filter);
+            filter.Configure(Settings.Enabled, Settings.ControlWApps);
+            _registration.Refresh();
+            _timer = _clock.CreateTimer(_ => filter.Advance(_clock.GetTimestamp()), null,
+                Settings.Enabled ? TimeSpan.FromMilliseconds(50) : Timeout.InfiniteTimeSpan, TimeSpan.FromMilliseconds(50));
+            context.Ui.SetSettingsPage(_ => new CloseProtectionRows(this));
+            context.Ui.AddCommands(() => [new ChippiCommand("close-protection/toggle", "Close protection", nameof(LucideIcons.ShieldX), () =>
+            {
+                SetEnabled(!Settings.Enabled);
+                if (Error is { } error) throw new InvalidOperationException(error);
+                return Task.CompletedTask;
+            }) { IsOn = Settings.Enabled, Tile = ActionsTile.Input }]);
+        }
+        catch
+        {
+            // Nothing stays hooked or subscribed when start fails.
+            StopAsync(default).GetAwaiter().GetResult();
+            throw;
+        }
         return Task.CompletedTask;
     }
 

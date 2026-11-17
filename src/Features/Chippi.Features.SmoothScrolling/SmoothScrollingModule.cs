@@ -118,9 +118,20 @@ public sealed class SmoothScrollingModule : IFeatureModule
             if (_context is null)
                 return;
             var next = Normalize(change(Settings));
-            _context.Settings.Save(next);
+            bool saveFailed = false;
+            try
+            {
+                _context.Settings.Save(next);
+            }
+            catch (Exception ex)
+            {
+                saveFailed = true;
+                Log.Warn("Smooth scrolling: changing settings failed", ex);
+            }
             Settings = next;
             Apply();
+            if (saveFailed && Error is null)
+                Error = "Smooth scrolling failed";
         }
         Changed?.Invoke();
     }

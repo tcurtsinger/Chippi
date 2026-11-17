@@ -46,6 +46,26 @@ public sealed class ModuleTests
     }
 
     [Fact]
+    public async Task A_failed_save_is_reported_and_still_tells_the_rows()
+    {
+        var module = new SmoothScrollingModule();
+        var store = new Store();
+        await module.StartAsync(Context(new FakeHub(), store, new Ui()), default);
+        int changed = 0;
+        module.Changed += () => changed++;
+        store.Fail = true;
+
+        module.Update(s => s with { SmoothEnabled = true });
+
+        Assert.Equal("Smooth scrolling failed", module.Error);
+        Assert.Equal(1, changed);
+        store.Fail = false;
+        module.Update(s => s with { SmoothEnabled = false });
+        Assert.Null(module.Error);
+        await module.StopAsync(default);
+    }
+
+    [Fact]
     public async Task Settings_are_clamped_apps_are_matched_once_and_a_refused_hook_says_so()
     {
         var hub = new FakeHub { Refuse = true };
@@ -158,7 +178,12 @@ public sealed class ModuleTests
     {
         public SmoothScrollingSettings Value { get; set; } = new();
         public T Get<T>() where T : class, new() => (T)(object)Value;
-        public void Save<T>(T settings) where T : class => Value = (SmoothScrollingSettings)(object)settings;
+        public bool Fail { get; set; }
+        public void Save<T>(T settings) where T : class
+        {
+            if (Fail) throw new InvalidOperationException("Injected save failure");
+            Value = (SmoothScrollingSettings)(object)settings;
+        }
     }
 
     private sealed class Ui : IModuleUi
