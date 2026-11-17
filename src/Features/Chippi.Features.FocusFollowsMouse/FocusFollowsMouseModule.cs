@@ -18,7 +18,7 @@ public sealed class FocusFollowsMouseModule(Func<FocusTrackingEngine> createEngi
 {
     public const string Id = "focus-follows-mouse";
     private readonly object _gate = new();
-    private readonly Action<Action> _post = post ?? (work => Application.Current.Dispatcher.BeginInvoke(work));
+    private readonly Action<Action> _post = post ?? (work => Application.Current?.Dispatcher.BeginInvoke(work));
     private ModuleContext? _context;
     private FocusTrackingEngine? _engine;
     public FocusTrackingSettings Settings { get; private set; } = new();

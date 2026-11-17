@@ -81,4 +81,29 @@ public sealed class KeyboardLockTests
 
         Assert.Equal([new LockedKey(0x1B, true, 10_000), new LockedKey(0x1B, false, 10_200), new LockedKey(0xA2, true, 0)], heard);
     }
+
+    [Fact]
+    public void A_hub_reset_forgets_swallowed_keys_so_their_ups_pass_and_three_escapes_free_the_keyboard_on_the_hook_thread()
+    {
+        var hub = new FakeHub();
+        WpfTestThread.Run(() =>
+        {
+            new KeyboardLock(() => hub).Lock(_ => { });
+            var filter = hub.Filter!;
+            Assert.True(filter.Key(Key(0x41, down: true)));
+            filter.InputReset(InputDevices.Mouse);
+            Assert.True(filter.Key(Key(0x41, down: false))); // a mouse reset forgets nothing
+            Assert.True(filter.Key(Key(0x42, down: true)));
+            filter.InputReset(InputDevices.Keyboard);
+            Assert.False(filter.Key(Key(0x42, down: false)));
+
+            Assert.True(filter.Key(Key(0x1B, down: true, ms: 100)));
+            Assert.True(filter.Key(Key(0x1B, down: false, ms: 150)));
+            Assert.True(filter.Key(Key(0x1B, down: true, ms: 300)));
+            Assert.True(filter.Key(Key(0x1B, down: false, ms: 350)));
+            Assert.True(filter.Key(Key(0x1B, down: true, ms: 500)));
+            Assert.False(filter.Key(Key(0x1B, down: false, ms: 550))); // no matter that the UI thread is busy
+            Assert.False(filter.Key(Key(0x41, down: true, ms: 600)));
+        });
+    }
 }

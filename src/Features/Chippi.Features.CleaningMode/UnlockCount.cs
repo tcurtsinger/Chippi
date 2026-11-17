@@ -53,6 +53,9 @@ internal sealed class KeyFilter
 {
     private readonly HashSet<uint> _swallowed = [];
 
+    /// <summary>The hub forgot what it owned (a desktop switch, a lost hook): so does the lock.</summary>
+    public void Clear() => _swallowed.Clear();
+
     /// <param name="heldBefore">For a key going down: Windows' own state already has it down, so it went down before the lock.</param>
     public bool Swallow(uint vk, bool down, bool heldBefore = false)
     {

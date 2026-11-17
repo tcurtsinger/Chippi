@@ -29,6 +29,8 @@ internal sealed class KeyboardLock(Func<IInputHub> hub) : IKeyboardLock
     private sealed class Filter : IInputFilter, IDisposable
     {
         private readonly KeyFilter _filter = new();
+        // The unlock is counted here too, on the hook thread: if the UI thread stalls, three Esc still let the keyboard go.
+        private readonly UnlockCount _escapes = new();
         private readonly Dispatcher _dispatcher = Dispatcher.CurrentDispatcher;
         private readonly Action<LockedKey> _key;
         private readonly IInputRegistration _registration;
@@ -50,12 +52,22 @@ internal sealed class KeyboardLock(Func<IInputHub> hub) : IKeyboardLock
 
         public bool Key(in KeyInput key)
         {
+            uint time = unchecked((uint)(key.Timestamp * 1000 / Stopwatch.Frequency));
+            bool wasUnlocked = _escapes.Unlocked;
+            _escapes.Key(key.Vk, key.Down, time);
+            if (wasUnlocked)
+                return false;
             // Windows' own state still has the key down when it was down before the lock (its repeat comes here).
             if (!_filter.Swallow(key.Vk, key.Down, key.WasDown))
                 return false;
-            uint time = unchecked((uint)(key.Timestamp * 1000 / Stopwatch.Frequency));
             _dispatcher.BeginInvoke(_key, new LockedKey(key.Vk, key.Down, time));
             return true;
+        }
+
+        public void InputReset(InputDevices devices)
+        {
+            if ((devices & InputDevices.Keyboard) != 0)
+                _filter.Clear();
         }
 
         public void Dispose() => _registration.Dispose();
