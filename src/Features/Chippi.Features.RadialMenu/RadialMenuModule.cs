@@ -284,7 +284,6 @@ public sealed class RadialMenuModule : IFeatureModule, IWheelInputSink
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
             Log.Warn("Radial menu: saving settings failed", ex);
-            ShortcutError = "Save failed";
             Changed?.Invoke();
             return false;
         }
@@ -360,13 +359,14 @@ public sealed class RadialMenuModule : IFeatureModule, IWheelInputSink
         if (!Save(Settings with { Shortcut = shortcut }))
         {
             // The new chord was registered to find clashes; an unsaved one must not stay active.
-            if (previous is null || !TryRegister(previous))
+            if (previous is null || _aside || !TryRegister(previous))
                 _hotkey?.Unregister();
             ShortcutError = "Save failed";
             Changed?.Invoke();
             return false;
         }
         _aside = false;
+        ApplyShortcutGate(); // a chord registered over a fullscreen app stands aside again
         Prepare();
         return true;
     }
@@ -379,7 +379,11 @@ public sealed class RadialMenuModule : IFeatureModule, IWheelInputSink
         if (_context is null)
             return;
         if (!Save(Settings with { Shortcut = null }))
+        {
+            ShortcutError = "Save failed";
+            Changed?.Invoke();
             return;
+        }
         _hotkey?.Unregister(); // still listed in Settings › Shortcuts, unset
         ShortcutError = null;
     }

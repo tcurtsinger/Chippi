@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using Chippi.Core.Diagnostics;
 using System.IO;
 using Chippi.Core.Actions;
 using Chippi.Core.Island;
@@ -328,6 +329,7 @@ public sealed partial class WindowLayoutsModule
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {
             // An async void: nothing here may escape to the UI thread's handler.
+            Log.Warn("Arrangements: launching failed", ex);
             ArrangementError = ex is ActionFailure ? ex.Message
                 : ex is System.Runtime.InteropServices.COMException or InvalidOperationException or IOException or UnauthorizedAccessException
                     ? "App discovery unavailable" : "Launching failed";
