@@ -3,7 +3,7 @@
 
 using Chippi.App.Shell;
 
-namespace Chippi.Island.Tests;
+namespace Chippi.Notifications.Tests;
 
 /// <summary>How the shell fails while starting and how it stops (windowless).</summary>
 public sealed class ShellLifetimeTests
