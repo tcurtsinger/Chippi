@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using System.IO;
 using Chippi.Core.Actions;
 using Chippi.Core.Shortcuts;
 using System.Windows;

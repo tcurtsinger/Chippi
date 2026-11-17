@@ -2,6 +2,7 @@
 // Copyright (C) Chippi contributors
 
 using System.IO;
+using Chippi.Core.Diagnostics;
 using Chippi.Core.Modules;
 using Chippi.Core.Shortcuts;
 using Chippi.Features.AppSwitcher.Windows;
