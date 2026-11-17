@@ -45,13 +45,20 @@ internal static class ExplorerShell
         }
         using var process = PInvoke.OpenProcess_SafeHandle(PROCESS_ACCESS_RIGHTS.PROCESS_TERMINATE | PROCESS_ACCESS_RIGHTS.PROCESS_SYNCHRONIZE, false, pid);
         if (process.IsInvalid)
-            return;
+            throw new InvalidOperationException("The shell's process couldn't be opened");
         var taskbar = Win32Windows.Taskbar;
         bool exited = !taskbar.IsNull && PInvoke.PostMessage(taskbar, ExitExplorer, default, default)
             && PInvoke.WaitForSingleObject(process, (uint)ExitWait.TotalMilliseconds) == WAIT_EVENT.WAIT_OBJECT_0;
         if (exited)
         {
-            // Windows doesn't restart a shell that exited cleanly: it's Chippi's to start.
+            // Windows doesn't restart a shell that exited cleanly: it's Chippi's to start, unless
+            // something else already has (a second explorer.exe would open a folder window instead).
+            for (int i = 0; i < 10; i++)
+            {
+                if (!PInvoke.GetShellWindow().IsNull)
+                    return;
+                Thread.Sleep(100);
+            }
             Start();
             return;
         }

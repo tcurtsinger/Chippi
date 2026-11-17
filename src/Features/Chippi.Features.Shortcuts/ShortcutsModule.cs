@@ -131,7 +131,8 @@ public sealed class ShortcutsModule : IFeatureModule
         {
             if (Check(binding, except: null) is { } error)
                 return new BindingResult(error);
-            Save(Settings with { Bindings = [.. Settings.Bindings, binding] });
+            if (!Save(Settings with { Bindings = [.. Settings.Bindings, binding] }))
+                return new BindingResult(SaveFailed);
         }
         return new BindingResult(null);
     }
@@ -148,7 +149,8 @@ public sealed class ShortcutsModule : IFeatureModule
                 return new BindingResult(error);
             var list = Settings.Bindings.ToList();
             list[at] = binding;
-            Save(Settings with { Bindings = list });
+            if (!Save(Settings with { Bindings = list }))
+                return new BindingResult(SaveFailed);
         }
         return new BindingResult(null);
     }
@@ -232,15 +234,27 @@ public sealed class ShortcutsModule : IFeatureModule
         public bool IsMissing(ChippiAction action) => runner.IsMissing(action);
     }
 
-    private void Save(ShortcutsSettings next)
+    internal const string SaveFailed = "Save failed";
+
+    // A failed write leaves the saved settings and the held keys as they were; Add and Change tell the editor.
+    private bool Save(ShortcutsSettings next)
     {
         if (_context is null)
-            return;
+            return false;
         next = Normalize(next);
-        _context.Settings.Save(next);
+        try
+        {
+            _context.Settings.Save(next);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            Log.Warn("Shortcuts: saving settings failed", ex);
+            return false;
+        }
         Settings = next;
         Rebuild();
         Post(() => Changed?.Invoke());
+        return true;
     }
 
     private static ShortcutsSettings Normalize(ShortcutsSettings s) => s with

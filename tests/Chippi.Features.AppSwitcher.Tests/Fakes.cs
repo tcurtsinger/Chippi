@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using System.IO;
 using Chippi.Core.Actions;
 using Chippi.Core.Input;
 using Chippi.Core.Modules;
@@ -86,6 +87,10 @@ internal sealed class FakeView(FakePc pc) : ISwitcherView
 
     public void ShowFailed(SwitcherWindow window) => Failed = window;
 
+    public bool Released;
+
+    public void Release() => Released = true;
+
     public void Hide()
     {
         Shown = null;
@@ -110,7 +115,14 @@ internal sealed class SettingsStore : IModuleSettings
 
     public T Get<T>() where T : class, new() => (T)(object)Value;
 
-    public void Save<T>(T value) where T : class => Value = (AppSwitcherSettings)(object)value;
+    public bool FailSaving;
+
+    public void Save<T>(T value) where T : class
+    {
+        if (FailSaving)
+            throw new IOException("Disk full");
+        Value = (AppSwitcherSettings)(object)value;
+    }
 }
 
 internal sealed class Ui : IModuleUi

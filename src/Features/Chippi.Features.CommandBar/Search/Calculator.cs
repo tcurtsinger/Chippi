@@ -90,11 +90,17 @@ public static partial class Calculator
     [GeneratedRegex(@"^[\d\s.,+\-*/x×÷^()%]+$", RegexOptions.CultureInvariant)]
     private static partial Regex SumOnly();
 
+    /// <summary>Longer text is never a sum or conversion worth answering: no result, and no deep parse.</summary>
+    internal const int MaxLength = 200;
+
+    /// <summary>How many brackets and minus signs may nest; deeper input shows no result instead of overflowing the stack.</summary>
+    internal const int MaxDepth = 64;
+
     /// <summary>The answer to <paramref name="text"/>, or null when it's neither a sum nor a conversion.</summary>
     public static Answer? Solve(string text)
     {
         text = text.Trim();
-        if (text.Length == 0)
+        if (text.Length == 0 || text.Length > MaxLength)
             return null;
         if (Conversion().Match(text) is { Success: true } m && Convert(m) is { } converted)
             return converted;
@@ -145,6 +151,7 @@ public static partial class Calculator
     private sealed class Sum(string text)
     {
         private int _at;
+        private int _depth;
         private readonly StringBuilder _shown = new();
 
         /// <summary>The sum as the detail shows it: "12 × 7".</summary>
@@ -193,7 +200,10 @@ public static partial class Calculator
             {
                 _at++;
                 _shown.Append('−');
-                return -Unary();
+                Enter();
+                double negated = -Unary();
+                _depth--;
+                return negated;
             }
             return Power();
         }
@@ -206,7 +216,10 @@ public static partial class Calculator
             {
                 _at++;
                 _shown.Append('^');
-                return Math.Pow(value, Unary());
+                Enter();
+                double power = Math.Pow(value, Unary());
+                _depth--;
+                return power;
             }
             return value;
         }
@@ -229,7 +242,9 @@ public static partial class Calculator
             {
                 _at++;
                 _shown.Append('(');
+                Enter();
                 double inner = Add();
+                _depth--;
                 if (Next() != ')')
                     throw new FormatException();
                 _at++;
@@ -245,6 +260,12 @@ public static partial class Calculator
                 throw new FormatException();
             _shown.Append(Format(value));
             return value;
+        }
+
+        private void Enter()
+        {
+            if (++_depth > MaxDepth)
+                throw new FormatException();
         }
 
         private char? Next()

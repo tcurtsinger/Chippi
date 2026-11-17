@@ -325,9 +325,12 @@ public sealed partial class WindowLayoutsModule
     private async void FireArrangement(string id)
     {
         try { await LaunchArrangementAsync(id); }
-        catch (Exception ex) when (ex is ActionFailure or System.Runtime.InteropServices.COMException or InvalidOperationException or IOException or UnauthorizedAccessException)
+        catch (Exception ex) when (ex is not OutOfMemoryException)
         {
-            ArrangementError = ex is ActionFailure ? ex.Message : "App discovery unavailable";
+            // An async void: nothing here may escape to the UI thread's handler.
+            ArrangementError = ex is ActionFailure ? ex.Message
+                : ex is System.Runtime.InteropServices.COMException or InvalidOperationException or IOException or UnauthorizedAccessException
+                    ? "App discovery unavailable" : "Launching failed";
             ArrangementFailed?.Invoke("Launching failed");
             ArrangementProgressRequested?.Invoke();
             OnArrangementsChanged();

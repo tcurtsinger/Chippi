@@ -58,6 +58,9 @@ public interface ISwitcherView
     void ShowFailed(SwitcherWindow window);
 
     void Hide();
+
+    /// <summary>The module stopped: the overlay's window closes for good (a fake has nothing to close).</summary>
+    void Release() { }
 }
 
 public enum SwitchOutcome
@@ -150,6 +153,14 @@ public sealed class Switcher(ISwitcherPc pc, RecentWindows recent, Func<Switcher
 
     /// <summary>Closes without moving the foreground: the overlay lost it (a click elsewhere), the PC locked, or the shared pause began.</summary>
     public void Dismiss() => Close();
+
+    /// <summary>Closes the overlay and lets go of its window, as the module stops; a later open makes a new one.</summary>
+    public void Release()
+    {
+        Close();
+        _view?.Release();
+        _view = null;
+    }
 
     /// <summary>A window closed while the overlay is open.</summary>
     public void Closed(nint hwnd) => Session?.Remove(hwnd);

@@ -53,6 +53,17 @@ public sealed class CommandBarTests
     public void Text_that_isnt_a_sum_has_no_answer(string text) => Assert.Null(Calculator.Solve(text));
 
     [Fact]
+    public void Deeply_nested_or_overlong_input_shows_no_result_instead_of_crashing()
+    {
+        Assert.NotNull(Calculator.Solve("1+" + new string('(', 20) + "2" + new string(')', 20)));
+        Assert.Null(Calculator.Solve("1+" + new string('(', 5000) + "2" + new string(')', 5000)));
+        Assert.Null(Calculator.Solve("1+" + new string('-', 5000) + "2"));
+        Assert.Null(Calculator.Solve("1+" + new string('(', Calculator.MaxDepth + 1) + "2" + new string(')', Calculator.MaxDepth + 1)));
+        Assert.Null(Calculator.Solve(string.Join("+", Enumerable.Repeat("1", Calculator.MaxLength))));
+        Assert.Null(Calculator.Solve(new string('1', 100_000) + " km in mi"));
+    }
+
+    [Fact]
     public void Copy_copies_the_number_without_its_grouping() => Assert.Equal("1024", Calculator.Solve("2^10")!.Copy);
 
     // ----- The lists -----
@@ -203,6 +214,23 @@ public sealed class CommandBarTests
         Assert.Equal("https://duckduckgo.com/?q=chippi", f.Pc.Opened[^1]);
         await f.Search.Find("pull", f.Pc.OpenWindows, []).First(r => r.Kind == ResultKind.Window).Run();
         Assert.Equal(42, f.Pc.Switched);
+    }
+
+    [Fact]
+    public void A_malformed_uses_file_with_a_null_entry_loads_the_rest()
+    {
+        string dir = Path.Combine(Path.GetTempPath(), "chippi-tests", "command-bar-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(dir);
+            string path = Path.Combine(dir, "uses.json");
+            File.WriteAllText(path, "{\"Total\":{\"app:Chrome\":3},\"Typed\":{\"a\":null,\"chr\":{\"app:Chrome\":3}}}");
+            var uses = new Uses(path);
+            Assert.Equal(3, uses.For("chr", "app:Chrome"));
+            Assert.Equal(3, uses.Total("app:Chrome"));
+            Assert.Equal(0, uses.For("a", "app:Chrome"));
+        }
+        finally { if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true); }
     }
 
     [Fact]

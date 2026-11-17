@@ -37,7 +37,8 @@ public sealed class Uses
             foreach (var (key, count) in saved?.Total ?? [])
                 _total[key] = count;
             foreach (var (text, picks) in saved?.Typed ?? [])
-                _typed[text] = new Dictionary<string, int>(picks, StringComparer.Ordinal);
+                if (picks is not null)
+                    _typed[text] = new Dictionary<string, int>(picks, StringComparer.Ordinal);
         }
         catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
         {

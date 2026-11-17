@@ -181,8 +181,14 @@ internal sealed class FakeHotkey : IHotkey
         return true;
     }
 
+    public bool Disposed;
+
     public void Unregister() => Pressed = null;
-    public void Dispose() => Pressed = null;
+    public void Dispose()
+    {
+        Disposed = true;
+        Pressed = null;
+    }
 }
 
 /// <summary>The input hub's pause, set by hand: whether a fullscreen app is in front.</summary>
@@ -251,7 +257,14 @@ internal sealed class FakeSettings : IModuleSettings
 {
     public RadialMenuSettings Value = new();
     public T Get<T>() where T : class, new() => (T)(object)Value;
-    public void Save<T>(T value) where T : class => Value = (RadialMenuSettings)(object)value;
+    public bool FailSaving;
+
+    public void Save<T>(T value) where T : class
+    {
+        if (FailSaving)
+            throw new System.IO.IOException("Disk full");
+        Value = (RadialMenuSettings)(object)value;
+    }
 }
 
 internal sealed class FakeUi : IModuleUi

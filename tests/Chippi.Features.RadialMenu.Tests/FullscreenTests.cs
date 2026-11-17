@@ -42,6 +42,7 @@ public sealed class FullscreenTests
         Assert.False(f.Settings.Value.OpenOverFullscreen);
         Assert.False(f.Input.OpenOverFullscreen);
         Assert.Null(f.Hotkey.Pressed); // the game gets Ctrl+Alt+R
+        Assert.False(f.Hotkey.Disposed); // still listed in Settings › Shortcuts
 
         f.InputHub.FullscreenInFront = false;
         f.InputHub.Raise();

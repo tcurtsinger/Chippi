@@ -182,6 +182,21 @@ public sealed class RadialMenuTests
     });
 
     [Fact]
+    public void A_failed_save_of_a_new_shortcut_leaves_no_unsaved_chord_active() => WpfTestThread.Run(() =>
+    {
+        var f = new Fixture { Slices = [Slice(MediaAction.PlayPause)] };
+        f.StartAsync().GetAwaiter().GetResult();
+        f.Settings.FailSaving = true;
+        Assert.False(f.Module.ChangeShortcut(new KeyShortcut(ShortcutModifiers.Control | ShortcutModifiers.Alt, 0x52)));
+        Assert.Null(f.Hotkey.Pressed);
+        Assert.Equal("Save failed", f.Module.ShortcutError);
+        Assert.Null(f.Module.Settings.Shortcut);
+        f.Module.SetSlices([]); // a failed write in a click handler doesn't throw either
+        Assert.Single(f.Module.Settings.Slices);
+        Stop(f);
+    });
+
+    [Fact]
     public void The_shortcut_opens_it_for_a_click_and_closes_it_again() => WpfTestThread.Run(() =>
     {
         var f = new Fixture { Slices = [Slice(MediaAction.PlayPause), Slice(MediaAction.Next)] };

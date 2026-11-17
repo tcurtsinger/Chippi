@@ -2,6 +2,7 @@
 // Copyright (C) Chippi contributors
 
 using Chippi.Core.Actions;
+using Chippi.Core.Diagnostics;
 
 namespace Chippi.Features.WindowLayouts;
 
@@ -136,6 +137,14 @@ public sealed class ArrangementRunner(IArrangementDesktop desktop, TimeProvider?
             foreach (int i in selected.Where(i => Results[i].State is ArrangementRowState.Waiting
                 or ArrangementRowState.Opening or ArrangementRowState.Placing))
                 Update(i, Results[i] with { State = ArrangementRowState.Cancelled, Reason = "Cancelled" });
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            // Reading the windows or displays failed: no row may stay Waiting, Opening or Placing for ever.
+            Log.Warn("Arrangements: running failed", ex);
+            foreach (int i in selected.Where(i => Results[i].State is ArrangementRowState.Waiting
+                or ArrangementRowState.Opening or ArrangementRowState.Placing))
+                Update(i, Results[i] with { State = ArrangementRowState.Failed, Reason = "Launching failed" });
         }
         finally { Changed?.Invoke(); }
     }
