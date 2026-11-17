@@ -162,6 +162,26 @@ public class HubTests
     }
 
     [Fact]
+    public void A_kept_down_on_an_owned_button_hands_the_up_to_the_newest_keeper()
+    {
+        var hub = new TestHub();
+        bool firstKeeps = true;
+        var first = new TestFilter("first", InputOrder.Triggers) { KeepMouse = m => firstKeeps && m.Kind == MouseKind.Down };
+        var second = new TestFilter("second", InputOrder.SmoothScrolling) { KeepMouse = m => m.Kind == MouseKind.Down };
+        hub.Core.Add(first);
+        hub.Core.Add(second);
+
+        Assert.True(hub.Mouse(TestHub.WmMButtonDown)); // first keeps it; its up is lost
+        firstKeeps = false;
+        Assert.True(hub.Mouse(TestHub.WmMButtonDown)); // second keeps the next down
+        Assert.True(hub.Mouse(TestHub.WmMButtonUp));
+        Assert.False(hub.Mouse(TestHub.WmMButtonUp)); // nobody owns it any more: the app's
+
+        Assert.Contains("second Up Middle", second.Heard);
+        Assert.DoesNotContain("first Up Middle", first.Heard);
+    }
+
+    [Fact]
     public void A_kept_button_keeps_its_up_and_moves_go_to_the_first_filter_that_keeps_them()
     {
         var hub = new TestHub();

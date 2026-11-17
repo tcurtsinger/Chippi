@@ -144,8 +144,13 @@ public sealed class InputHub : IInputHub, IDisposable
 
         public void Dispose()
         {
-            if (!hub._disposed)
-                hub.Invoke(core => core.Remove(entry));
+            // The hub can be disposed between the check and the call, on another thread: nothing is left to remove.
+            try
+            {
+                if (!hub._disposed)
+                    hub.Invoke(core => core.Remove(entry));
+            }
+            catch (ObjectDisposedException) { }
         }
     }
 

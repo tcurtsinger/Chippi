@@ -90,6 +90,11 @@ public static class DisplayChanges
         s_settle?.Stop();
         Action? changed;
         lock (Gate) changed = s_changed;
-        changed?.Invoke();
+        if (changed is null) return;
+        foreach (Action handler in changed.GetInvocationList())
+        {
+            try { handler(); }
+            catch (Exception ex) { Chippi.Core.Diagnostics.Log.Warn($"A display change handler failed: {ex.Message}"); }
+        }
     }
 }

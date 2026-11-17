@@ -21,28 +21,49 @@ public sealed partial class WindowsActionPc : IDisposable
     private (ActionWindow Target, Placement Baseline)? _dragBaseline;
     private readonly Dictionary<nint, long> _lifetimes = [];
     private long _nextLifetime;
+    private readonly object _snapGate = new();
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> _appNames = new(StringComparer.OrdinalIgnoreCase);
+    private readonly System.Windows.Threading.Dispatcher _ui = System.Windows.Threading.Dispatcher.CurrentDispatcher;
     private nint _destroyHook;
     private WindowEvent? _destroyCallback;
 
-    // WinEvent callbacks return to the registering UI thread. A handle reused by the same process/thread/class
+    // WinEvent callbacks return to the registering thread, so the hook is always put in on the UI thread, whichever
+    // thread calls first; the collections are shared with those callers and guarded by _snapGate. A handle reused by the same process/thread/class
     // receives a new lifetime as well. No state is written into another application's window.
     private long Lifetime(nint window)
+    {
+        if (_destroyHook == 0)
+        {
+            if (!_ui.CheckAccess())
+                _ui.Invoke(EnsureDestroyHook);
+            else
+                EnsureDestroyHook();
+        }
+        lock (_snapGate)
+        {
+            if (!_lifetimes.TryGetValue(window, out long lifetime))
+                _lifetimes[window] = lifetime = ++_nextLifetime;
+            return lifetime;
+        }
+    }
+
+    private void EnsureDestroyHook()
     {
         if (_destroyHook == 0)
         {
             _destroyCallback = (_, _, hwnd, objectId, childId, _, _) =>
             {
                 if (objectId != 0 || childId != 0) return;
-                _lifetimes.Remove(hwnd);
-                _snapHistory.Remove(hwnd);
-                if (_dragBaseline?.Target.Handle == hwnd) _dragBaseline = null;
+                lock (_snapGate)
+                {
+                    _lifetimes.Remove(hwnd);
+                    _snapHistory.Remove(hwnd);
+                    if (_dragBaseline?.Target.Handle == hwnd) _dragBaseline = null;
+                }
             };
             _destroyHook = SetWinEventHook(0x8001, 0x8001, 0, _destroyCallback, 0, 0, 0);
             if (_destroyHook == 0) throw new Win32Exception(Marshal.GetLastWin32Error());
         }
-        if (!_lifetimes.TryGetValue(window, out long lifetime))
-            _lifetimes[window] = lifetime = ++_nextLifetime;
-        return lifetime;
     }
 
     public void Dispose()
@@ -50,9 +71,12 @@ public sealed partial class WindowsActionPc : IDisposable
         if (_destroyHook != 0) UnhookWinEvent(_destroyHook);
         _destroyHook = 0;
         _destroyCallback = null;
-        _lifetimes.Clear();
-        _snapHistory.Clear();
-        _dragBaseline = null;
+        lock (_snapGate)
+        {
+            _lifetimes.Clear();
+            _snapHistory.Clear();
+            _dragBaseline = null;
+        }
     }
 
     public void BeginWindowDrag(ActionWindow target)
@@ -90,8 +114,9 @@ public sealed partial class WindowsActionPc : IDisposable
             string exe = path.ToString();
             var title = new StringBuilder(1024);
             GetWindowText(window, title, title.Capacity);
-            string app = FileVersionInfo.GetVersionInfo(exe).FileDescription is { Length: > 0 } description
-                ? description : System.IO.Path.GetFileNameWithoutExtension(exe);
+            // The version info is a file read: once per executable, since a snap validates the same window several times.
+            string app = _appNames.GetOrAdd(exe, static path => FileVersionInfo.GetVersionInfo(path).FileDescription is { Length: > 0 } description
+                ? description : System.IO.Path.GetFileNameWithoutExtension(path));
             return new(window, pid, thread, process.StartTime.ToUniversalTime().Ticks, Native.ClassOf(window),
                 exe, app, title.ToString(), IsElevated(handle), Lifetime(window));
         }
@@ -145,13 +170,15 @@ public sealed partial class WindowsActionPc : IDisposable
 
     private SnapHistory? History(ActionWindow target)
     {
-        if (!_snapHistory.TryGetValue(target.Handle, out var history)) return null;
+        SnapHistory? history;
+        lock (_snapGate)
+            if (!_snapHistory.TryGetValue(target.Handle, out history)) return null;
         if (history.Target.Lifetime != target.Lifetime || history.Target.ProcessId != target.ProcessId || history.Target.ProcessStarted != target.ProcessStarted
             || history.Target.ThreadId != target.ThreadId || history.Target.ClassName != target.ClassName
             || !Native.GetWindowRect(target.Handle, out var current) || !Same(current, history.Expected)
             || Native.IsZoomed(target.Handle) != history.Maximized)
         {
-            _snapHistory.Remove(target.Handle);
+            lock (_snapGate) _snapHistory.Remove(target.Handle);
             return null;
         }
         return history;
@@ -173,9 +200,13 @@ public sealed partial class WindowsActionPc : IDisposable
     {
         if (!Native.GetWindowRect(target.Handle, out var rect)) throw new ActionFailure("Snap failed");
         // Bound history on a long-running tray process. Only the latest 256 windows retain Restore.
-        if (_snapHistory.Count >= 256 && !_snapHistory.ContainsKey(target.Handle))
-            _snapHistory.Remove(_snapHistory.Keys.First());
-        _snapHistory[target.Handle] = new(target, baseline, rect, Native.IsZoomed(target.Handle));
+        var entry = new SnapHistory(target, baseline, rect, Native.IsZoomed(target.Handle));
+        lock (_snapGate)
+        {
+            if (_snapHistory.Count >= 256 && !_snapHistory.ContainsKey(target.Handle))
+                _snapHistory.Remove(_snapHistory.Keys.First());
+            _snapHistory[target.Handle] = entry;
+        }
     }
 
     private void SnapWindow(ActionWindow target, WindowAction action)

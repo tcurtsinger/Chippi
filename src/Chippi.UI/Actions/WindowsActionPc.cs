@@ -180,8 +180,13 @@ public sealed partial class WindowsActionPc : IActionPc
     private static async Task HeldKeysReleasedAsync()
     {
         var until = DateTime.UtcNow + HeldKeysTimeout;
-        while ((Held(0x11) || Held(0x12) || Held(0x10) || Held(0x5B) || Held(0x5C)) && DateTime.UtcNow < until)
+        while (AnyHeld() && DateTime.UtcNow < until)
             await Task.Delay(15);
+        // Still down after the wait: sending now would mix the action's keys with the shortcut's.
+        if (AnyHeld())
+            throw new ActionFailure("Keys held");
+
+        static bool AnyHeld() => Held(0x11) || Held(0x12) || Held(0x10) || Held(0x5B) || Held(0x5C);
 
         static bool Held(int vk) => (Native.GetAsyncKeyState(vk) & 0x8000) != 0;
     }

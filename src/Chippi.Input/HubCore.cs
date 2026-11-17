@@ -423,10 +423,12 @@ internal sealed class HubCore(IHookSource hooks, IInputSender sender, IInputSyst
         {
             if (!entry.Hears(InputDevices.Mouse, _paused) || !entry.Filter.Mouse(in input))
                 continue;
-            if (kind == MouseKind.Down && _buttonOwner[(int)button] is null)
+            if (kind == MouseKind.Down)
             {
+                // A button already owned lost its up: the newest kept down is the one whose up is coming.
+                if (_buttonOwner[(int)button] is null)
+                    _ownedButtons++;
                 _buttonOwner[(int)button] = entry;
-                _ownedButtons++;
             }
             return true;
         }

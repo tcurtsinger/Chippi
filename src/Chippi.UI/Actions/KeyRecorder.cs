@@ -23,6 +23,7 @@ public sealed class KeyRecorder(Func<IInputHub> hub) : IKeyRecorder
         private readonly Dispatcher _ui = Dispatcher.CurrentDispatcher;
         private readonly Action<KeyCombo?> _recorded;
         private readonly HashSet<uint> _down = [];
+        private readonly HashSet<uint> _heldBefore = [];
         private readonly IInputRegistration _registration;
         private readonly Timer _limit;
         private KeyModifiers _modifiers;
@@ -50,9 +51,15 @@ public sealed class KeyRecorder(Func<IInputHub> hub) : IKeyRecorder
             {
                 if (key.Down)
                 {
-                    // A key held from before (a repeat) is the app's.
+                    // A key held from before (a repeat) is the app's. A modifier held from before still counts
+                    // toward the combo, but its up stays the app's too.
                     if (key.WasDown && !_down.Contains(vk))
+                    {
+                        var held = KeyCombo.ModifierOf(vk);
+                        if (held != KeyModifiers.None && !_done && _heldBefore.Add(vk))
+                            _modifiers |= held;
                         return false;
+                    }
                     _down.Add(vk);
                     if (!_done)
                     {
@@ -63,6 +70,11 @@ public sealed class KeyRecorder(Func<IInputHub> hub) : IKeyRecorder
                             Finish(vk == 0x1B && _modifiers == KeyModifiers.None ? null : new KeyCombo(_modifiers, vk));
                     }
                     return true;
+                }
+                if (_heldBefore.Remove(vk))
+                {
+                    _modifiers &= ~KeyCombo.ModifierOf(vk);
+                    return false;
                 }
                 if (!_down.Remove(vk))
                     return false;
@@ -80,7 +92,9 @@ public sealed class KeyRecorder(Func<IInputHub> hub) : IKeyRecorder
                 _done = true;
             }
             // Out of the hub: the ups of the keys still down stay kept, so Windows never sees an up without its down.
-            _registration.Dispose();
+            // This can run on the timer's pool thread, where the hub may already be gone: nothing to leave then.
+            try { _registration.Dispose(); }
+            catch (ObjectDisposedException) { }
             _limit?.Dispose();
             _ui.BeginInvoke(() => _recorded(keys));
         }
@@ -90,7 +104,8 @@ public sealed class KeyRecorder(Func<IInputHub> hub) : IKeyRecorder
             _limit.Dispose();
             lock (_down)
                 _done = true;
-            _registration.Dispose();
+            try { _registration.Dispose(); }
+            catch (ObjectDisposedException) { }
         }
     }
 }

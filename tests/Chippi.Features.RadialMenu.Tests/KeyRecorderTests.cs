@@ -18,6 +18,8 @@ public sealed class KeyRecorderTests
 
         public int Removed { get; private set; }
 
+        public bool HubGone { get; set; }
+
         public bool Paused { get; set; }
 
         public bool FullscreenInFront { get; set; }
@@ -38,7 +40,11 @@ public sealed class KeyRecorderTests
 
             public void Mask() { }
 
-            public void Dispose() => hub.Removed++;
+            public void Dispose()
+            {
+                if (hub.HubGone) throw new ObjectDisposedException("hub");
+                hub.Removed++;
+            }
         }
     }
 
@@ -92,5 +98,39 @@ public sealed class KeyRecorderTests
         WpfTestThread.Run(() => new RadialKeyRecorder(() => hub).Record(_ => { }).Dispose());
 
         Assert.Equal(1, hub.Removed);
+    }
+
+    [Fact]
+    public void A_modifier_held_before_recording_counts_toward_the_combo_and_its_up_stays_the_apps()
+    {
+        var hub = new FakeHub();
+        var recorded = new List<KeyCombo?>();
+        WpfTestThread.Run(() =>
+        {
+            new RadialKeyRecorder(() => hub).Record(recorded.Add);
+            var filter = hub.Filter!;
+            Assert.False(filter.Key(Key(0xA2, down: true, wasDown: true))); // Ctrl was down already: the app's
+            Assert.True(filter.Key(Key(0x43, down: true)));
+            Assert.False(filter.Key(Key(0xA2, down: false)));
+        });
+        Drain();
+
+        Assert.Equal([new KeyCombo(KeyModifiers.Ctrl, 0x43)], recorded);
+    }
+
+    [Fact]
+    public void A_hub_that_is_already_gone_does_not_break_finishing_or_stopping()
+    {
+        var hub = new FakeHub { HubGone = true };
+        var recorded = new List<KeyCombo?>();
+        WpfTestThread.Run(() =>
+        {
+            var recording = new RadialKeyRecorder(() => hub).Record(recorded.Add);
+            Assert.True(hub.Filter!.Key(Key(0x1B, down: true)));
+            recording.Dispose();
+        });
+        Drain();
+
+        Assert.Equal([null], recorded);
     }
 }
