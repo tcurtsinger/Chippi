@@ -49,8 +49,11 @@ public sealed class EngineTests
         await engine.CheckAsync();
         Assert.Equal("Check failed · Microsoft Store", engine.Error); Assert.Single(engine.Updates);
         Assert.Contains("SourceAgreementsNotAccepted", Assert.Single(logged));
+        source.SourceErrors = ["winget: InvalidOperationException 0x80131509 Package check failed.", "msstore: COMException 0x8A15000F Source unavailable."];
         source.Error = new InvalidOperationException("Package check failed."); await engine.CheckAsync();
-        Assert.Equal("Check failed", engine.Error); Assert.Equal(2, logged.Count);
+        Assert.Equal("Check failed", engine.Error); Assert.Equal(3, logged.Count); Assert.StartsWith("winget:", logged[1]);
+        source.SourceErrors = []; source.Error = new WingetUnavailableException("Unavailable"); await engine.CheckAsync();
+        Assert.Equal(3, logged.Count);
     }
 
     [Fact]
@@ -379,7 +382,7 @@ public sealed class EngineTests
     {
         public IReadOnlyList<PackageUpdate> Packages = []; public Exception? Error;
         public string? Warning { get; init; }
-        public IReadOnlyList<string> SourceErrors { get; init; } = [];
+        public IReadOnlyList<string> SourceErrors { get; set; } = [];
         public Task<IReadOnlyList<PackageUpdate>> CheckAsync(bool includeUnknown, CancellationToken ct = default)
             => Error is not null ? throw Error : Task.FromResult(Packages);
         public Task<PackageInstallResult> UpdateAsync(PackageUpdate package, IProgress<PackageInstallProgress>? progress = null, CancellationToken ct = default)

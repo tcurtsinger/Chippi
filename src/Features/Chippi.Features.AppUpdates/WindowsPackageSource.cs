@@ -16,6 +16,8 @@ public sealed class WindowsPackageSource(bool allowUpdates = true) : IPackageSou
 
     public Task<IReadOnlyList<PackageUpdate>> CheckAsync(bool includeUnknown, CancellationToken ct = default) => Task.Run(async () =>
     {
+        // A check that fails before reaching a source reports nothing from the previous one.
+        Warning = null; SourceErrors = [];
         ct.ThrowIfCancellationRequested();
         var manager = WingetObjects.Manager();
         var updates = new List<PackageUpdate>();
