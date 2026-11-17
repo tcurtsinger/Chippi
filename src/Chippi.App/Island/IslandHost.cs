@@ -494,7 +494,7 @@ public sealed class IslandHost : IDisposable
         {
             _shell.Config.SetSection(AppSettings.SectionName, settings);
         }
-        catch (IOException ex)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             _logger.LogWarning(ex, "Debug settings change not saved");
         }
