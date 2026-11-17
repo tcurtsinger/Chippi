@@ -119,7 +119,14 @@ public sealed class WindowsClipboardSystem : IClipboardSystem
     private void Run(Action action)
     {
         EnsureThread();
-        _work.Add(action);
+        try
+        {
+            _work.Add(action);
+        }
+        catch (InvalidOperationException)
+        {
+            return; // disposed since: nothing left to run it
+        }
         PostMessageW(_hwnd, WmWake, 0, 0);
     }
 
@@ -147,7 +154,16 @@ public sealed class WindowsClipboardSystem : IClipboardSystem
         {
             DispatchMessageW(ref msg);
             while (_work.TryTake(out var action))
-                action();
+            {
+                try
+                {
+                    action();
+                }
+                catch (Exception ex) when (ex is not OutOfMemoryException)
+                {
+                    // One failed job must not end the clipboard thread, and with it the app.
+                }
+            }
         }
     }
 
@@ -193,8 +209,15 @@ public sealed class WindowsClipboardSystem : IClipboardSystem
     {
         if (!_delayed.Remove(format, out var offer))
             return;
-        SetClipboardData(format, ToGlobal(offer.Render()));
-        offer.Requested?.Invoke();
+        try
+        {
+            SetClipboardData(format, ToGlobal(offer.Render()));
+            offer.Requested?.Invoke();
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            // Runs inside a native callback: a throw here would end the app. The format is left unset.
+        }
     }
 
     private sealed class Session(WindowsClipboardSystem owner) : IClipboardSession

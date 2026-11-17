@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
 
+using System.Security.Cryptography;
 using Chippi.Core.Clipboard;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -16,6 +17,7 @@ public sealed class ClipboardHistory : IDisposable
 {
     private readonly IClipboardHub _hub;
     private readonly Func<HistoryStore> _open;
+    private readonly Action? _reset;
     private readonly Func<string, string?> _autoClean;
     private readonly TimeProvider _time;
     private readonly ILogger _log;
@@ -32,10 +34,12 @@ public sealed class ClipboardHistory : IDisposable
 
     /// <param name="open">Opens the store; called on first need, so nothing is created while recording has never been on.</param>
     /// <param name="autoClean">The cleaned link when automatic cleaning will rewrite this text, else null (notes #28).</param>
-    public ClipboardHistory(IClipboardHub hub, Func<HistoryStore> open, Func<string, string?>? autoClean = null, TimeProvider? time = null, ILogger? log = null)
+    /// <param name="reset">Deletes the store's file without opening it, for Erase all when the store can't be read (its key can't be unwrapped).</param>
+    public ClipboardHistory(IClipboardHub hub, Func<HistoryStore> open, Func<string, string?>? autoClean = null, TimeProvider? time = null, ILogger? log = null, Action? reset = null)
     {
         _hub = hub;
         _open = open;
+        _reset = reset;
         _autoClean = autoClean ?? (_ => null);
         _time = time ?? TimeProvider.System;
         _log = log ?? NullLogger.Instance;
@@ -130,7 +134,7 @@ public sealed class ClipboardHistory : IDisposable
     public Task EraseAllAsync()
     {
         Interlocked.Increment(ref _generation);
-        return RunAsync(store =>
+        return RunAsync<bool>(store =>
         {
             store.EraseAll();
             lock (_gate)
@@ -139,8 +143,12 @@ public sealed class ClipboardHistory : IDisposable
                 _limit = ClipLimit.None;
             }
             Publish(store);
-        });
+            return true;
+        }, erasing: true);
     }
+
+    /// <summary>True while the saved history can't be opened (a key that can't be unwrapped): only Erase all gets out.</summary>
+    public bool Unreadable { get; private set; }
 
     /// <summary>Whether anything is saved (the uninstall question, notes #56).</summary>
     public bool Any() => Entries.Count > 0;
@@ -287,7 +295,27 @@ public sealed class ClipboardHistory : IDisposable
         return true;
     });
 
-    private async Task<T?> RunAsync<T>(Func<HistoryStore, T> work)
+    private HistoryStore OpenStore(bool erasing)
+    {
+        try
+        {
+            var store = _open();
+            Unreadable = false;
+            return store;
+        }
+        catch (CryptographicException) when (_reset is not null)
+        {
+            Unreadable = true;
+            if (!erasing)
+                throw;
+            _reset(); // start over: the old content can't be read anyway
+            var store = _open();
+            Unreadable = false;
+            return store;
+        }
+    }
+
+    private async Task<T?> RunAsync<T>(Func<HistoryStore, T> work, bool erasing = false)
     {
         await _worker.WaitAsync().ConfigureAwait(false);
         try
@@ -297,7 +325,7 @@ public sealed class ClipboardHistory : IDisposable
                 if (_disposed)
                     return default;
             }
-            return await Task.Run(() => work(_store ??= _open())).ConfigureAwait(false);
+            return await Task.Run(() => work(_store ??= OpenStore(erasing))).ConfigureAwait(false);
         }
         catch (Exception ex)
         {

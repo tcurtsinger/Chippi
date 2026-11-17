@@ -104,7 +104,7 @@ public sealed class DownloadsModule : IFeatureModule
         { context.Logger.LogWarning(ex, "Explorer registration could not be refreshed"); }
 
         context.Activation.Register(DownloadsNotices.OrganizeVerb, args =>
-            Raise(new DownloadsRequest(DownloadsRequestKind.Organize, Folder: args.FirstOrDefault(), FromExplorer: true)));
+            Raise(new DownloadsRequest(DownloadsRequestKind.Organize, Folder: ExplorerFolder(args.FirstOrDefault()), FromExplorer: true)));
         context.Activation.Register(DownloadsNotices.RunVerb, args =>
             Raise(new DownloadsRequest(DownloadsRequestKind.Run, RunId: long.TryParse(args.FirstOrDefault(), NumberStyles.None, CultureInfo.InvariantCulture, out long id) ? id : null)));
         context.Activation.Register(DownloadsNotices.ReviewVerb, _ => Raise(new DownloadsRequest(DownloadsRequestKind.Review)));
@@ -122,6 +122,17 @@ public sealed class DownloadsModule : IFeatureModule
         Engine.PendingChanged += OnPendingChanged;
         UpdateTile();
         return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// The folder Explorer's menu passed. For a drive root it substitutes <c>D:\</c> into <c>"%V"</c>, and the
+    /// closing <c>\"</c> reaches us as a quote inside the argument (<c>D:"</c> and what follows): the root is meant.
+    /// </summary>
+    internal static string? ExplorerFolder(string? argument)
+    {
+        if (argument is { Length: >= 3 } && char.IsAsciiLetter(argument[0]) && argument[1] == ':' && argument[2] == '"')
+            return argument[..2] + @"\";
+        return argument;
     }
 
     /// <summary>

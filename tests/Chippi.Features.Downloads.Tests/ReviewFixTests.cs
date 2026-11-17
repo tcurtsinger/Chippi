@@ -33,6 +33,64 @@ public sealed class ReviewFixTests
     }
 
     [Fact]
+    public async Task A_copy_and_its_undo_both_keep_the_Mark_of_the_Web()
+    {
+        using var f = new Fixture(FolderMode.Manual, options: new EngineOptions { ForceCopy = true });
+        f.AddRule(MovePdfs());
+        string source = f.Write("w.pdf", "source");
+        const string zone = "[ZoneTransfer]\r\nZoneId=3\r\n";
+        try
+        {
+            File.WriteAllText(source + ":Zone.Identifier", zone);
+        }
+        catch (Exception ex) when (ex is IOException or NotSupportedException)
+        {
+            return; // a volume without named streams has nothing to keep
+        }
+
+        var preview = await f.Engine.CreatePreviewAsync(f.Folder);
+        var applied = await f.Engine.ApproveAsync(preview.Id, [1]);
+        string moved = f.In("Docs", "w.pdf");
+        Assert.Equal(zone, File.ReadAllText(moved + ":Zone.Identifier"));
+
+        long id = f.History.RunOperations(applied.RunId).Single().Id;
+        Assert.True((await f.Engine.UndoAsync(id)).Succeeded);
+        Assert.Equal(zone, File.ReadAllText(f.In("w.pdf") + ":Zone.Identifier"));
+    }
+
+    [Fact]
+    public void A_failure_that_is_not_an_IO_error_fails_that_file_and_not_the_batch()
+    {
+        using var f = new Fixture(FolderMode.Manual);
+        string a = f.Write("a.pdf", "one");
+        string b = f.Write("b.pdf", "two");
+        bool first = true;
+        using var history = new HookedHistory(f.History)
+        {
+            OnStarted = () =>
+            {
+                if (!first)
+                    return;
+                first = false;
+                throw new ArgumentException("bad name");
+            },
+        };
+        var executor = new Executor(history, new EngineOptions());
+        long run = history.BeginRun(RunTrigger.Silent, f.Folder);
+        ExecutionRequest Request(string source, string name) => new(
+            HistoryOperationKind.Move, source, f.In("Docs", name), null, null,
+            new FileInfo(source).Length, new DateTimeOffset(File.GetLastWriteTimeUtc(source), TimeSpan.Zero), AllowRenumber: false);
+
+        var failed = executor.Execute(run, Request(a, "a.pdf"));
+        var moved = executor.Execute(run, Request(b, "b.pdf"));
+
+        Assert.False(failed.Succeeded);
+        Assert.True(moved.Succeeded);
+        Assert.True(File.Exists(a));
+        Assert.True(File.Exists(f.In("Docs", "b.pdf")));
+    }
+
+    [Fact]
     public async Task Stopping_waits_for_an_approval_that_is_moving_a_file()
     {
         using var f = new Fixture(FolderMode.Manual);

@@ -30,6 +30,13 @@ public interface IClipboardHub
     Task<ClipStatus> WriteAsync(ClipContent content, CancellationToken cancel = default);
 
     /// <summary>
+    /// Like <see cref="WriteAsync"/>, but only while the clipboard still holds the copy read at
+    /// <paramref name="sequence"/>: a newer copy is left alone and <see cref="ClipStatus.Empty"/> says nothing was written.
+    /// </summary>
+    Task<ClipStatus> WriteIfCurrentAsync(ClipContent content, uint sequence, CancellationToken cancel = default) =>
+        WriteAsync(content, cancel);
+
+    /// <summary>
     /// The window in front right now, captured before the island takes the keyboard. Null when there is
     /// none or it's Chippi's own.
     /// </summary>

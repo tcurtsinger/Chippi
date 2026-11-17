@@ -67,8 +67,10 @@ public sealed class HistoryStore : IDisposable
                     entries.Add(Decode(id, (EntryKind)reader.GetInt32(1), reader.GetInt64(2), reader.GetInt64(3),
                         reader.GetInt64(4), (byte[])reader[5]) with { ContentHash = reader.GetInt64(6) });
                 }
-                catch (System.Security.Cryptography.CryptographicException)
+                catch (Exception ex) when (ex is System.Security.Cryptography.CryptographicException or ArgumentException or FormatException
+                    or InvalidDataException or InvalidCastException or IndexOutOfRangeException or OverflowException)
                 {
+                    // A body that opens but is short or garbled is as lost as one that won't open: dropped, not fatal.
                     broken.Add(id);
                 }
             }

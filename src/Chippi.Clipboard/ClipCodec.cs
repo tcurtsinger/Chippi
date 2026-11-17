@@ -125,10 +125,14 @@ public static class ClipCodec
         {
             return null;
         }
-        pixelsAt += colors * 4;
-        int stride = (width * bits + 31) / 32 * 4;
-        if ((long)stride * height > data.Length - pixelsAt)
+        // A crafted or buggy header: a negative or huge palette count, or sizes that overflow.
+        if (colors < 0 || (long)pixelsAt + (long)colors * 4 > data.Length)
             return null;
+        pixelsAt += colors * 4;
+        long rowBytes = ((long)width * bits + 31) / 32 * 4;
+        if (rowBytes * height > data.Length - pixelsAt || (long)width * height * 4 > Array.MaxLength)
+            return null;
+        int stride = (int)rowBytes;
         var bgra = new byte[(long)width * height * 4];
         bool anyAlpha = false;
         for (int y = 0; y < height; y++)

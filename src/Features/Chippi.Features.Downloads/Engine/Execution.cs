@@ -184,13 +184,21 @@ internal sealed class Executor(IHistoryStore history, EngineOptions options)
                 Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
                 bool moved = !options.ForceCopy && FileHandles.TryRename(source, destination);
                 if (!moved)
-                    CopyAcross(id, source, destination, modified, sha);
+                    CopyAcross(id, request.Source, source, destination, modified, sha);
                 history.MarkCompleted(id, destination, sha, new DateTimeOffset(File.GetLastWriteTimeUtc(destination), TimeSpan.Zero));
                 return new ExecutionResult(true, id, request.Source, destination, null);
             }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            catch (Exception ex) when (ex is not (OperationCanceledException or OutOfMemoryException))
             {
-                history.MarkFailed(id, ex.Message);
+                // Any failure of this one file (a bad name, a history write) fails it alone: the batch goes on.
+                try
+                {
+                    history.MarkFailed(id, ex.Message);
+                }
+                catch (Exception markFailed) when (markFailed is not OutOfMemoryException)
+                {
+                    // Still planned or started in history: the next reconcile settles it.
+                }
                 return new ExecutionResult(false, id, request.Source, destination, ex.Message);
             }
         }
@@ -200,7 +208,7 @@ internal sealed class Executor(IHistoryStore history, EngineOptions options)
     /// Another volume: copy to a new partial file this operation creates and records, verify it,
     /// rename it into place by its handle, then delete the original by its handle.
     /// </summary>
-    private void CopyAcross(long id, SafeFileHandle source, string destination, DateTime modified, string sha)
+    private void CopyAcross(long id, string sourcePath, SafeFileHandle source, string destination, DateTime modified, string sha)
     {
         string path = PartialPath(destination, id);
         using var partial = FileHandles.CreateExclusive(path); // fails if anything is already there
@@ -209,6 +217,7 @@ internal sealed class Executor(IHistoryStore history, EngineOptions options)
         try
         {
             FileHandles.Copy(source, partial);
+            FileHandles.CopyAlternateStreams(sourcePath, path); // the Mark of the Web goes with the file
             File.SetLastWriteTimeUtc(partial, modified);
             if (!string.Equals(FileHandles.Sha256(partial), sha, StringComparison.Ordinal))
                 throw new IOException("Copy didn't match");

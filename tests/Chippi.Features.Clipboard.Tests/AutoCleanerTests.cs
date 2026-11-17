@@ -34,6 +34,15 @@ public sealed class AutoCleanerTests : IDisposable
     }
 
     [Fact]
+    public async Task A_newer_copy_made_while_cleaning_is_never_overwritten()
+    {
+        _cleaner.Apply(true, []);
+        _hub.NewerSequence = 999; // the clipboard has moved on from the copy that was read
+        await CopyAsync(ClipContent.FromText("https://youtu.be/abc?si=share&t=30"));
+        Assert.Empty(_hub.Written);
+    }
+
+    [Fact]
     public async Task A_copied_link_with_trackers_becomes_its_clean_link()
     {
         _cleaner.Apply(true, []);

@@ -274,4 +274,27 @@ public sealed class PipelineTests
         Assert.Equal(modified, File.GetLastWriteTimeUtc(moved));
         Assert.Equal(OperationState.Completed, Assert.Single(f.History.Query(new HistoryQuery())).State);
     }
+
+    [Fact]
+    public void Forced_copy_keeps_the_Mark_of_the_Web_and_undo_keeps_it_too()
+    {
+        using var f = new Fixture(options: new EngineOptions { ForceCopy = true });
+        f.AddRule(MovePdfs());
+        string source = f.Write("web.pdf", "content");
+        const string zone = "[ZoneTransfer]\r\nZoneId=3\r\n";
+        try
+        {
+            File.WriteAllText(source + ":Zone.Identifier", zone);
+        }
+        catch (Exception ex) when (ex is IOException or NotSupportedException)
+        {
+            return; // a volume without named streams has nothing to keep
+        }
+
+        f.Settle();
+
+        string moved = f.In("Docs", "web.pdf");
+        Assert.True(File.Exists(moved));
+        Assert.Equal(zone, File.ReadAllText(moved + ":Zone.Identifier"));
+    }
 }

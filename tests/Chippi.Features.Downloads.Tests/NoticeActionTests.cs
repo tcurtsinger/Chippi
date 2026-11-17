@@ -30,6 +30,17 @@ public sealed class NoticeActionTests : IDisposable
 
     private static RuleSetting MovePdfs() => new() { Extensions = ["pdf"], Action = RuleActionKind.Move, Template = "Docs" };
 
+    [Theory]
+    [InlineData("D:\"", "D:\\")] // Explorer's "%V" on a drive root: D:\" reads as an escaped quote
+    [InlineData("D:\" --dev-profile test", "D:\\")]
+    [InlineData("C:\\Users\\me\\Downloads", "C:\\Users\\me\\Downloads")]
+    [InlineData("D:\\", "D:\\")]
+    public void An_Explorer_folder_on_a_drive_root_is_read_back_as_the_root(string argument, string expected) =>
+        Assert.Equal(expected, DownloadsModule.ExplorerFolder(argument));
+
+    [Fact]
+    public void No_Explorer_folder_stays_none() => Assert.Null(DownloadsModule.ExplorerFolder(null));
+
     private static IEnumerable<(string Label, string Activation)> Buttons(Notice notice) => notice.Actions.Select(a => (a.Label, a.Activation));
 
     [Fact]

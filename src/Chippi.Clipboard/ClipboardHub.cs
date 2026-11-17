@@ -29,6 +29,10 @@ public sealed class ClipboardHub : IClipboardHub, IDisposable
     /// <summary>How long a copy of the selection may take to arrive after Ctrl+C, looked for this often.</summary>
     public static readonly TimeSpan SelectionTimeout = TimeSpan.FromMilliseconds(500);
     private static readonly TimeSpan SelectionPoll = TimeSpan.FromMilliseconds(15);
+    private static readonly TimeSpan RestoreRetry = TimeSpan.FromMilliseconds(100);
+
+    /// <summary>How long after giving up on a selection the hub still watches for a slow app's late copy.</summary>
+    private static readonly TimeSpan LateCopyGrace = TimeSpan.FromMilliseconds(750); // short: a copy the owner makes himself soon after must not be mistaken for it
 
     private readonly IClipboardSystem _clipboard;
     private readonly IForeground _foreground;
@@ -46,6 +50,11 @@ public sealed class ClipboardHub : IClipboardHub, IDisposable
 
     /// <summary>The latest copy being read (tests wait on it).</summary>
     internal Task Processing => _processing;
+
+    private Task _lateCopy = Task.CompletedTask;
+
+    /// <summary>The latest watch for a selection's late copy (tests wait on it).</summary>
+    internal Task LateCopy => _lateCopy;
 
     public ClipboardHub(IClipboardSystem clipboard, IForeground foreground, TimeProvider? time = null, ILogger? log = null)
     {
@@ -104,6 +113,26 @@ public sealed class ClipboardHub : IClipboardHub, IDisposable
         }
     }
 
+    public async Task<ClipStatus> WriteIfCurrentAsync(ClipContent content, uint sequence, CancellationToken cancel = default)
+    {
+        try
+        {
+            var (written, _) = await WriteOwnAsync(session =>
+            {
+                if (session.Sequence != sequence)
+                    return false; // the owner copied something newer since
+                session.Empty();
+                Put(session, content);
+                return true;
+            }, cancel).ConfigureAwait(false);
+            return written ? ClipStatus.Ok : ClipStatus.Empty;
+        }
+        catch (ClipboardBusyException)
+        {
+            return ClipStatus.Busy;
+        }
+    }
+
     public PasteTarget? CaptureTarget() => _foreground.Current();
 
     public Task<PasteOutcome> PasteAsync(ClipContent content, PasteTarget target, CancellationToken cancel = default) =>
@@ -132,11 +161,23 @@ public sealed class ClipboardHub : IClipboardHub, IDisposable
             await _foreground.WaitForModifiersReleasedAsync(ModifiersTimeout, cancel).ConfigureAwait(false);
             _foreground.SendCopy();
             var until = _time.GetUtcNow() + SelectionTimeout;
-            while (_clipboard.Sequence == before)
+            try
             {
-                if (_time.GetUtcNow() >= until)
-                    return null; // nothing was selected, or the app doesn't copy on Ctrl+C
-                await Task.Delay(SelectionPoll, _time, cancel).ConfigureAwait(false);
+                while (_clipboard.Sequence == before)
+                {
+                    if (_time.GetUtcNow() >= until)
+                    {
+                        // Nothing was selected, or the app doesn't copy on Ctrl+C: or it is only slow.
+                        WatchForLateCopy(saved, before);
+                        return null;
+                    }
+                    await Task.Delay(SelectionPoll, _time, cancel).ConfigureAwait(false);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                WatchForLateCopy(saved, before); // Ctrl+C is already sent
+                throw;
             }
             // From here the copy is the selection's: no listener gets it, even if reading it or putting the previous
             // copy back fails (another app holding the clipboard).
@@ -169,6 +210,42 @@ public sealed class ClipboardHub : IClipboardHub, IDisposable
                 _borrowing--;
             _pasting.Release();
         }
+    }
+
+    /// <summary>
+    /// Ctrl+C went out but no copy came in time. For a little longer, a copy that arrives is still the
+    /// selection's: no listener gets it, and the previous copy goes back.
+    /// </summary>
+    private void WatchForLateCopy(Saved saved, uint before)
+    {
+        lock (_gate)
+            _borrowing++;
+        _lateCopy = Task.Run(async () =>
+        {
+            try
+            {
+                var until = _time.GetUtcNow() + LateCopyGrace;
+                while (_clipboard.Sequence == before && _time.GetUtcNow() < until)
+                    await Task.Delay(SelectionPoll, _time).ConfigureAwait(false);
+                for (int attempt = 0; attempt < 3 && _clipboard.Sequence != before; attempt++)
+                {
+                    uint arrived = _clipboard.Sequence;
+                    NoteOwn(arrived);
+                    if (await RestoreAsync(saved, arrived, CancellationToken.None).ConfigureAwait(false))
+                        break;
+                    before = arrived; // the app was still writing: look again
+                }
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException)
+            {
+                _log.LogInformation(ex, "Late selection copy not handled");
+            }
+            finally
+            {
+                lock (_gate)
+                    _borrowing--;
+            }
+        });
     }
 
     public void Dispose()
@@ -488,19 +565,28 @@ public sealed class ClipboardHub : IClipboardHub, IDisposable
                 return PasteOutcome.NoText;
             if (!canSend)
                 return PasteOutcome.Copied;
-            if (!await _foreground.BringToFrontAsync(target, FrontTimeout, cancel).ConfigureAwait(false))
+            try
             {
-                // The target is gone or wouldn't come forward: leave the content as the copy, without the temporary marker.
-                await LeaveAsCopyAsync(content, ours, markers, cancel).ConfigureAwait(false);
-                return PasteOutcome.Copied;
+                if (!await _foreground.BringToFrontAsync(target, FrontTimeout, cancel).ConfigureAwait(false))
+                {
+                    // The target is gone or wouldn't come forward: leave the content as the copy, without the temporary marker.
+                    await LeaveAsCopyAsync(content, ours, markers, cancel).ConfigureAwait(false);
+                    return PasteOutcome.Copied;
+                }
+                await _foreground.WaitForModifiersReleasedAsync(ModifiersTimeout, cancel).ConfigureAwait(false);
+                _foreground.SendPaste();
+                // Restore timing is a heuristic: the first data request may come from another reader, and
+                // a slow target can read after the restore (architecture section 5).
+                var waitForRequest = Task.Delay(RestoreWithoutRequest, _time, cancel);
+                if (await Task.WhenAny(requested.Task, waitForRequest).ConfigureAwait(false) == requested.Task)
+                    await Task.Delay(RestoreAfterRequest, _time, cancel).ConfigureAwait(false);
             }
-            await _foreground.WaitForModifiersReleasedAsync(ModifiersTimeout, cancel).ConfigureAwait(false);
-            _foreground.SendPaste();
-            // Restore timing is a heuristic: the first data request may come from another reader, and
-            // a slow target can read after the restore (architecture §5).
-            var waitForRequest = Task.Delay(RestoreWithoutRequest, _time, cancel);
-            if (await Task.WhenAny(requested.Task, waitForRequest).ConfigureAwait(false) == requested.Task)
-                await Task.Delay(RestoreAfterRequest, _time, cancel).ConfigureAwait(false);
+            catch (Exception)
+            {
+                // A cancel or a failure after the swap: the previous copy still goes back, whatever the token says.
+                await RestoreWithRetryAsync(saved, ours).ConfigureAwait(false);
+                throw;
+            }
             await RestoreAsync(saved, ours, cancel).ConfigureAwait(false);
             return PasteOutcome.Sent;
         }
@@ -554,11 +640,12 @@ public sealed class ClipboardHub : IClipboardHub, IDisposable
     }
 
     /// <summary>Puts the previous copy back, comparing and writing in one open block so a newer copy is never overwritten.</summary>
-    private async Task RestoreAsync(Saved saved, uint ours, CancellationToken cancel)
+    /// <returns>False when a newer copy was there (left alone) or the clipboard stayed busy.</returns>
+    private async Task<bool> RestoreAsync(Saved saved, uint ours, CancellationToken cancel)
     {
         try
         {
-            await WriteOwnAsync(session =>
+            var (restored, _) = await WriteOwnAsync(session =>
             {
                 if (session.Sequence != ours)
                     return false;
@@ -567,10 +654,30 @@ public sealed class ClipboardHub : IClipboardHub, IDisposable
                     session.Set(format, data);
                 return true;
             }, cancel).ConfigureAwait(false);
+            return restored;
         }
         catch (ClipboardBusyException)
         {
             _log.LogInformation("Clipboard busy; previous copy not restored");
+            return false;
+        }
+    }
+
+    /// <summary>The restore after a failed paste: not cancellable, and once more if the clipboard was busy.</summary>
+    private async Task RestoreWithRetryAsync(Saved saved, uint ours)
+    {
+        try
+        {
+            if (await RestoreAsync(saved, ours, CancellationToken.None).ConfigureAwait(false))
+                return;
+            if (_clipboard.Sequence != ours)
+                return; // a newer copy: not ours to replace
+            await Task.Delay(RestoreRetry, _time).ConfigureAwait(false);
+            await RestoreAsync(saved, ours, CancellationToken.None).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            _log.LogInformation(ex, "Previous copy not restored after a failed paste");
         }
     }
 }
