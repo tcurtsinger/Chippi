@@ -211,25 +211,43 @@ internal sealed class Executor(IHistoryStore history, EngineOptions options)
     private void CopyAcross(long id, string sourcePath, SafeFileHandle source, string destination, DateTime modified, string sha)
     {
         string path = PartialPath(destination, id);
-        using var partial = FileHandles.CreateExclusive(path); // fails if anything is already there
+        var partial = FileHandles.CreateExclusive(path); // fails if anything is already there
         history.MarkPartial(id, path); // proof for a restart that this file is ours
         bool placed = false;
+        bool renamed = false;
         try
         {
             FileHandles.Copy(source, partial);
-            FileHandles.CopyAlternateStreams(sourcePath, path); // the Mark of the Web goes with the file
             File.SetLastWriteTimeUtc(partial, modified);
             if (!string.Equals(FileHandles.Sha256(partial), sha, StringComparison.Ordinal))
                 throw new IOException("Copy didn't match");
             if (!FileHandles.TryRename(partial, destination))
                 throw new IOException("Copy couldn't be placed");
+            renamed = true;
+            // The exclusive handle keeps every other open of the file out, named streams included, so it is
+            // let go before the Mark of the Web and the other named streams are carried over.
+            partial.Dispose();
+            FileHandles.CopyAlternateStreams(sourcePath, destination);
             placed = true;
             history.MarkPartial(id, null);
             FileHandles.DeleteOnClose(source); // the validated original, gone when the handle closes
         }
         finally
         {
-            if (!placed)
+            if (renamed && !placed)
+            {
+                // Placed without its streams: never left looking like a clean copy. The original is still there.
+                try
+                {
+                    File.Delete(destination);
+                    history.MarkPartial(id, null);
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    // Still recorded, so the next reconcile removes it.
+                }
+            }
+            else if (!placed)
             {
                 try
                 {
@@ -241,6 +259,7 @@ internal sealed class Executor(IHistoryStore history, EngineOptions options)
                     // Still recorded, so the next reconcile removes it.
                 }
             }
+            partial.Dispose();
         }
     }
 

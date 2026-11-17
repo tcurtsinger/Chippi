@@ -599,8 +599,8 @@ public sealed class ExpanderTests
     public async Task AFailedRenderGivesTheSwallowedKeyBack()
     {
         var sender = new RecordingSender();
-        var expander = new SnippetExpander(sender, () => throw new InvalidOperationException("clipboard"), () => false);
-        expander.Enqueue(Match("{{clipboard}}"), Delimiter.Tab);
+        var expander = new SnippetExpander(sender, null, () => false, now: () => throw new InvalidOperationException("clock"));
+        expander.Enqueue(Match("one"), Delimiter.Tab);
         await expander.IdleAsync();
         Assert.Equal((0, "", (Delimiter?)Delimiter.Tab), Assert.Single(sender.Sent));
     }
