@@ -59,23 +59,41 @@ internal sealed class PerAppDevicePolicy(ILogger logger) : IDisposable
     public bool Set(int pid, string? endpoint)
     {
         if (!Ensure()) return false;
+        var previous = new Dictionary<AudioRole, string?>();
+        var written = new List<AudioRole>();
         try
         {
             // Probe every role before any write, and verify each write by reading it back.
-            foreach (var role in Enum.GetValues<AudioRole>()) _ = Read(pid, role);
-            var set = Marshal.GetDelegateForFunctionPointer<SetEndpoint>(Slot(25));
+            foreach (var role in Enum.GetValues<AudioRole>()) previous[role] = Read(pid, role);
             foreach (var role in Enum.GetValues<AudioRole>())
             {
-                var text = endpoint is null ? IntPtr.Zero : HString(Prefix + endpoint + Suffix);
-                try { Marshal.ThrowExceptionForHR(set(_factory, (uint)pid, 0, (int)role, text)); }
-                finally { if (text != IntPtr.Zero) WindowsDeleteString(text); }
+                written.Add(role);
+                Write(pid, role, endpoint);
                 if (!string.Equals(Read(pid, role), endpoint, StringComparison.OrdinalIgnoreCase))
                     throw new InvalidOperationException("App output readback differs");
             }
             _writes.Succeeded();
             return true;
         }
-        catch (Exception ex) { Fail(ex, _writes, pid, "write"); return false; }
+        catch (Exception ex)
+        {
+            // Roles already written must not stay on the new device while the rest keep the old one.
+            foreach (var role in written)
+            {
+                try { Write(pid, role, previous[role]); }
+                catch (Exception restore) { logger.LogWarning(restore, "Per-app output restore of {Role} failed", role); }
+            }
+            Fail(ex, _writes, pid, "write");
+            return false;
+        }
+    }
+
+    private void Write(int pid, AudioRole role, string? endpoint)
+    {
+        var set = Marshal.GetDelegateForFunctionPointer<SetEndpoint>(Slot(25));
+        var text = endpoint is null ? IntPtr.Zero : HString(Prefix + endpoint + Suffix);
+        try { Marshal.ThrowExceptionForHR(set(_factory, (uint)pid, 0, (int)role, text)); }
+        finally { if (text != IntPtr.Zero) WindowsDeleteString(text); }
     }
 
     private void Fail(Exception ex, FailedProcesses failures, int pid, string call)

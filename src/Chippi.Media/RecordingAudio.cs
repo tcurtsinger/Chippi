@@ -179,11 +179,15 @@ internal sealed class RecordingAudio : IDisposable
             }
         }
 
+        internal static readonly TimeSpan JoinTimeout = TimeSpan.FromSeconds(3);
+
         public void Dispose()
         {
             if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
             _stop.Cancel();
-            if (Thread.CurrentThread != _thread) _thread.Join();
+            // A wedged driver can block its Stop or Flush for good; the saved file must not wait on it. The thread is
+            // a background thread, and it still owns the handles then, so they are left for it.
+            if (Thread.CurrentThread != _thread && !_thread.Join(JoinTimeout)) return;
             _stop.Dispose();
             _control.Dispose();
         }

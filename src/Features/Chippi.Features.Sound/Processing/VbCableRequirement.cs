@@ -38,10 +38,26 @@ public sealed class VbCableRequirement : IFeatureRequirement
         _setup = setup;
         _openSoundSettings = openSoundSettings;
         _lease = audio.Acquire();
-        try { audio.RefreshAsync().GetAwaiter().GetResult(); } // State is current as soon as it exists
-        catch (InvalidOperationException) { } // audio didn't start: reads as Missing
-        audio.SnapshotChanged += OnSnapshot;
-        State = Compute();
+        try
+        {
+            audio.SnapshotChanged += OnSnapshot;
+            State = Compute();
+        }
+        catch
+        {
+            audio.SnapshotChanged -= OnSnapshot;
+            _ = _lease.DisposeAsync().AsTask();
+            throw;
+        }
+        _ = RefreshFirstAsync(); // the first full scan can take a while; State follows when it lands
+    }
+
+    private async Task RefreshFirstAsync()
+    {
+        try { await _audio.RefreshAsync(); }
+        catch (InvalidOperationException) { return; } // audio didn't start (an AudioFailure too): reads as Missing
+        if (!_disposed)
+            Update();
     }
 
     public RequirementState State { get; private set; }
@@ -55,6 +71,12 @@ public sealed class VbCableRequirement : IFeatureRequirement
     {
         if (State != RequirementState.Missing || _installing)
             return;
+        // Missing may only mean the first scan hasn't landed; never start setup on a stale read.
+        try { await _audio.RefreshAsync(); }
+        catch (InvalidOperationException) { } // audio didn't start: still Missing
+        Update();
+        if (State != RequirementState.Missing || _installing)
+            return;
         _installing = true;
         Update();
         try
@@ -63,6 +85,7 @@ public sealed class VbCableRequirement : IFeatureRequirement
             int? exit;
             try { exit = await _setup.RunAsync(setup, ct); }
             catch (Win32Exception ex) { throw new AudioFailure("Driver setup failed", ex); }
+            finally { VbCablePackage.Release(setup); }
             if (exit is not null)
             {
                 // The exit code is logged by the caller, not trusted: the devices decide.

@@ -68,6 +68,21 @@ public sealed class ProcessingTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task A_marker_that_cannot_be_saved_leaves_the_default_mic_alone_and_stops_with_a_reason()
+    {
+        _sys.With(Mic("Real"), CableInput(), CableOutput()).WithDefault("Real");
+        var request = Request() with { SaveMarker = _ => throw new IOException("disk full") };
+
+        var status = await _service.SetProcessingAsync(request);
+
+        Assert.Equal(ProcessingState.Stopped, status.State);
+        Assert.Equal(StopReason.Failed, status.Reason);
+        Assert.Equal("Saving the recovery file failed", status.Error);
+        Assert.All(All, r => Assert.Equal("Real", DefaultMic(r)));
+        Assert.All(_pipelines.Created, p => Assert.True(p.Disposed));
+    }
+
+    [Fact]
     public async Task The_cable_is_never_the_source_even_as_the_only_or_first_mic()
     {
         _sys.With(CableOutput(), CableInput(), Mic("Real"));

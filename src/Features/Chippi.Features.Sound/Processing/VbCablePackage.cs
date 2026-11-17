@@ -52,12 +52,62 @@ public static class VbCablePackage
         // extraction is never trusted, only the zip just checked.
         var folder = Path.Combine(extractRoot, pin.Sha256);
         var setup = Path.Combine(folder, pin.Setup);
+        Release(setup); // an earlier run's hold would block the fresh extraction
         if (Directory.Exists(folder))
             Directory.Delete(folder, recursive: true);
         ZipFile.ExtractToDirectory(zip, folder);
-        if (!File.Exists(setup) || !HashIs(setup, pin.SetupSha256) || !SignedBy(setup, pin.SignerThumbprint))
+        if (!File.Exists(setup))
             throw new DriverPackageException("Driver package damaged");
+        // The folder is writable by any process of this user. Hold the setup open, denying writes and renames,
+        // before it is checked, and keep holding it until <see cref="Release"/>: what was checked is what runs.
+        FileStream held;
+        try { held = new FileStream(setup, FileMode.Open, FileAccess.Read, FileShare.Read); }
+        catch (IOException) { throw new DriverPackageException("Driver package damaged"); }
+        try
+        {
+            if (!HashIs(held, pin.SetupSha256) || !SignedBy(setup, pin.SignerThumbprint))
+                throw new DriverPackageException("Driver package damaged");
+        }
+        catch
+        {
+            held.Dispose();
+            throw;
+        }
+        lock (Holds)
+            Holds[setup] = held;
         return setup;
+    }
+
+    private static readonly Dictionary<string, FileStream> Holds = new(StringComparer.OrdinalIgnoreCase);
+
+    internal static void ReleaseAll()
+    {
+        FileStream[] all;
+        lock (Holds)
+        {
+            all = [.. Holds.Values];
+            Holds.Clear();
+        }
+        foreach (var held in all)
+            held.Dispose();
+    }
+
+    /// <summary>Lets go of the setup <see cref="Prepare"/> returned, once it has run or been given up.</summary>
+    public static void Release(string setupPath)
+    {
+        FileStream? held;
+        lock (Holds)
+        {
+            if (!Holds.Remove(setupPath, out held))
+                return;
+        }
+        held.Dispose();
+    }
+
+    private static bool HashIs(Stream stream, string sha256)
+    {
+        stream.Position = 0;
+        return Convert.ToHexString(SHA256.HashData(stream)).Equals(sha256, StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool HashIs(string path, string sha256)

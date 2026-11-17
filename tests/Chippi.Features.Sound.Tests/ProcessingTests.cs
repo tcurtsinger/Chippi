@@ -292,7 +292,7 @@ public sealed class VbCableRequirementTests : IDisposable
     private VbCableRequirement Create() => new(_audio, _data, () => { _prepared++; return @"C:\fake\VBCABLE_Setup_x64.exe"; }, _setup, () => { });
 
     [Fact]
-    public void No_cable_is_missing_and_a_ready_pair_is_ready()
+    public async Task No_cable_is_missing_and_a_ready_pair_is_ready()
     {
         _sys.With(Mic("Real"));
         using (var missing = Create())
@@ -300,15 +300,15 @@ public sealed class VbCableRequirementTests : IDisposable
 
         _sys.With(CableInput(), CableOutput());
         using var ready = Create();
-        Assert.Equal(RequirementState.Ready, ready.State);
+        await Until(() => ready.State == RequirementState.Ready); // the first scan lands after the constructor returns
     }
 
     [Fact]
-    public void Present_but_disabled_is_driver_disabled_never_install_again()
+    public async Task Present_but_disabled_is_driver_disabled_never_install_again()
     {
         _sys.With(CableInput() with { State = EndpointState.Disabled }, CableOutput() with { State = EndpointState.Disabled });
         using var requirement = Create();
-        Assert.Equal(RequirementState.Disabled, requirement.State);
+        await Until(() => requirement.State == RequirementState.Disabled);
     }
 
     [Fact]
@@ -384,7 +384,26 @@ public sealed class VbCablePackageTests : IDisposable
 
     public void Dispose()
     {
+        VbCablePackage.ReleaseAll();
         try { Directory.Delete(_root, true); } catch (DirectoryNotFoundException) { }
+    }
+
+    [Fact]
+    public void The_checked_setup_is_held_against_a_swap_until_released()
+    {
+        var signed = File.ReadAllBytes(typeof(object).Assembly.Location);
+#pragma warning disable SYSLIB0057
+        var thumbprint = new X509Certificate2(X509Certificate.CreateFromSignedFile(typeof(object).Assembly.Location)).Thumbprint;
+#pragma warning restore SYSLIB0057
+        var vendor = Vendor(Zip(("setup.exe", signed)), setupSha: Convert.ToHexString(SHA256.HashData(signed)), signer: thumbprint);
+        var setup = VbCablePackage.Prepare(vendor, Path.Combine(_root, "x"));
+
+        Assert.Throws<IOException>(() => File.WriteAllBytes(setup, [1]));
+        Assert.Throws<IOException>(() => File.Move(setup, setup + ".old"));
+        Assert.Equal(signed.Length, new FileInfo(setup).Length);
+
+        VbCablePackage.Release(setup);
+        File.WriteAllBytes(setup, [1]); // free again
     }
 
     private string Vendor(byte[] zip, string? sha = null, long? bytes = null, string? setupSha = null, string? signer = null)
