@@ -70,6 +70,8 @@ public sealed class FakeClipboard : IClipboardSystem
 
     public Task<T> TransactAsync<T>(Func<IClipboardSession, T> work, CancellationToken cancel = default)
     {
+        if (cancel.IsCancellationRequested)
+            return Task.FromCanceled<T>(cancel); // like the real clipboard thread: a cancelled call never runs
         try
         {
             return Task.FromResult(Transact(work, out _));
@@ -82,6 +84,8 @@ public sealed class FakeClipboard : IClipboardSystem
 
     public Task<(T Result, uint Sequence)> WriteAsync<T>(Func<IClipboardSession, T> work, CancellationToken cancel = default)
     {
+        if (cancel.IsCancellationRequested)
+            return Task.FromCanceled<(T, uint)>(cancel);
         try
         {
             T result = Transact(work, out uint sequence);

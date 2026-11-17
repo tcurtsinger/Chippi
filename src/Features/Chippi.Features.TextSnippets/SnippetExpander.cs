@@ -44,6 +44,7 @@ internal sealed class SnippetExpander(ISnippetSender sender, Func<Task<string?>>
     {
         // Still the trigger's moment: no input since, and the same window in front.
         bool Valid() => Volatile.Read(ref _generation) == generation && (foreground is null || foreground() == window);
+        bool typed = false;
         try
         {
             if (!Valid())
@@ -54,8 +55,8 @@ internal sealed class SnippetExpander(ISnippetSender sender, Func<Task<string?>>
             if (SafePassword())
             {
                 // Nothing expands in a password field. A key kept for the trigger goes back as typed.
-                if (after is { } key && key != Delimiter.Space)
-                    await sender.SendAsync(0, "", key);
+                typed = true; // handled here, so the finally doesn't send it twice
+                await ReplayAsync(after, window, Valid);
                 return;
             }
             string text = await SnippetRenderer.RenderAsync(match.Snippet.Text, _now(), clipboard);
@@ -64,6 +65,7 @@ internal sealed class SnippetExpander(ISnippetSender sender, Func<Task<string?>>
                 Log.Info("Text snippets: an expansion was dropped because the typing moved on");
                 return;
             }
+            typed = true;
             expanded?.Invoke();
             if (startedAt != 0) // lengths and times only: what was typed is never logged
                 Log.Info($"Text snippets: {text.Length} characters typed {System.Diagnostics.Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds:F1} ms after the last trigger key");
@@ -71,6 +73,34 @@ internal sealed class SnippetExpander(ISnippetSender sender, Func<Task<string?>>
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {
             Log.Warn("Text snippets: typing a snippet failed", ex);
+        }
+        finally
+        {
+            // Tab and Enter were swallowed for the expansion. Whenever nothing was typed, they go back.
+            if (!typed)
+                await ReplayAsync(after, window, Valid);
+        }
+    }
+
+    /// <summary>
+    /// Types back a Tab or Enter the filter kept for an expansion that did not happen, as Chippi's
+    /// own input (the sender marks it). Never into another window than the trigger's.
+    /// </summary>
+    private async Task ReplayAsync(Delimiter? after, nint window, Func<bool> valid)
+    {
+        if (after is not { } key || key == Delimiter.Space)
+            return;
+        if (foreground is not null && foreground() != window)
+            return;
+        if (!valid())
+            return; // the hand typed since: the key would land after those characters
+        try
+        {
+            await sender.SendAsync(0, "", key);
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            Log.Warn("Text snippets: giving a key back failed", ex);
         }
     }
 

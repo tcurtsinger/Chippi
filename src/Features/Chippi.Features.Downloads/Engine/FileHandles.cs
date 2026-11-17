@@ -20,6 +20,7 @@ internal static class FileHandles
     private const uint Delete = 0x00010000;
     private const uint OpenExisting = 3;
     private const uint CreateNew = 1;
+    private const uint CreateAlways = 2;
     private const uint SequentialScan = 0x08000000;
     private const int FileRenameInfoClass = 3;
     private const int FileDispositionInfoClass = 4;
@@ -88,6 +89,94 @@ internal static class FileHandles
         RandomAccess.FlushToDisk(to);
     }
 
+    /// <summary>
+    /// Copies every named data stream (Zone.Identifier, the Mark of the Web, and the rest) from one
+    /// file to another by path. The default stream is not touched. A same-volume rename keeps them;
+    /// a copy across volumes has to carry them over itself.
+    /// </summary>
+    public static void CopyAlternateStreams(string from, string to)
+    {
+        from = Path.GetFullPath(from);
+        to = Path.GetFullPath(to);
+        foreach (string name in StreamNames(from))
+        {
+            using var reader = OpenStream(from + name, GenericRead, FileShare.ReadWrite | FileShare.Delete, OpenExisting);
+            // A destination that holds no named streams (FAT, exFAT, most USB sticks and network shares) is not a
+            // failure: the file moves without them, as it did before they were carried over.
+            using var writer = OpenStream(to + name, GenericWrite, FileShare.None, CreateAlways, out int unsupported);
+            if (writer is null)
+                return;
+            var buffer = new byte[1 << 16];
+            long offset = 0;
+            int read;
+            while ((read = RandomAccess.Read(reader, buffer, offset)) > 0)
+            {
+                RandomAccess.Write(writer, buffer.AsSpan(0, read), offset);
+                offset += read;
+            }
+        }
+    }
+
+    /// <summary>The named streams of a file as ":name:$DATA" suffixes, without the default stream.</summary>
+    internal static List<string> StreamNames(string path)
+    {
+        var names = new List<string>();
+        var data = new Win32FindStreamData();
+        IntPtr find = FindFirstStreamW(Path.GetFullPath(path), 0, ref data, 0);
+        if (find == new IntPtr(-1))
+        {
+            int error = Marshal.GetLastPInvokeError();
+            if (error is 38 or 2 or 3 or 1) // no streams found, or the volume has none
+                return names;
+            throw Failure(error, path);
+        }
+        try
+        {
+            do
+            {
+                if (!string.Equals(data.StreamName, "::$DATA", StringComparison.Ordinal))
+                    names.Add(data.StreamName);
+            }
+            while (FindNextStreamW(find, ref data));
+        }
+        finally
+        {
+            FindClose(find);
+        }
+        return names;
+    }
+
+    private static SafeFileHandle OpenStream(string path, uint access, FileShare share, uint disposition)
+    {
+        var handle = CreateFileW(path, access, share, IntPtr.Zero, disposition, SequentialScan, IntPtr.Zero);
+        if (handle.IsInvalid)
+        {
+            int error = Marshal.GetLastPInvokeError();
+            handle.Dispose();
+            throw Failure(error, path);
+        }
+        return handle;
+    }
+
+    /// <summary>Like <see cref="OpenStream(string, uint, FileShare, uint)"/>, but null when the volume holds no named streams.</summary>
+    private static SafeFileHandle? OpenStream(string path, uint access, FileShare share, uint disposition, out int unsupported)
+    {
+        unsupported = 0;
+        var handle = CreateFileW(path, access, share, IntPtr.Zero, disposition, SequentialScan, IntPtr.Zero);
+        if (handle.IsInvalid)
+        {
+            int error = Marshal.GetLastPInvokeError();
+            handle.Dispose();
+            if (error is 123 or 50 or 1 or 87) // invalid name, not supported, incorrect function, invalid parameter
+            {
+                unsupported = error;
+                return null;
+            }
+            throw Failure(error, path);
+        }
+        return handle;
+    }
+
     private static SafeFileHandle Open(string path, uint access, FileShare share, uint disposition)
     {
         var handle = CreateFileW(Path.GetFullPath(path), access, share, IntPtr.Zero, disposition, SequentialScan, IntPtr.Zero);
@@ -114,6 +203,29 @@ internal static class FileHandles
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
     private static extern SafeFileHandle CreateFileW(string name, uint access, FileShare share, IntPtr security, uint disposition, uint flags, IntPtr template);
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    private struct Win32FindStreamData
+    {
+        public long StreamSize;
+
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 296)]
+        public string StreamName;
+    }
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+    private static extern IntPtr FindFirstStreamW(string fileName, int infoLevel, ref Win32FindStreamData data, uint flags);
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool FindNextStreamW(IntPtr find, ref Win32FindStreamData data);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool FindClose(IntPtr find);
 
     [DllImport("kernel32.dll", SetLastError = true)]
     [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]

@@ -570,6 +570,41 @@ public sealed class ExpanderTests
         Assert.Equal((0, "", (Delimiter?)delimiter), Assert.Single(sender.Sent));
     }
 
+    [Theory]
+    [InlineData(Delimiter.Tab)]
+    [InlineData(Delimiter.Enter)]
+    public async Task AnExpansionDroppedForLaterTypingDoesNotReplayTheKeyAfterIt(Delimiter delimiter)
+    {
+        var sender = new RecordingSender();
+        var read = new TaskCompletionSource<string?>();
+        var expander = new SnippetExpander(sender, () => read.Task, () => false);
+        expander.Enqueue(Match("{{clipboard}}"), delimiter);
+        expander.Cancel(); // the hand typed during the clipboard read
+        read.SetResult("COPY");
+        await expander.IdleAsync();
+        Assert.Empty(sender.Sent); // it would land after the characters typed since
+    }
+
+    [Fact]
+    public async Task AFailedSendGivesTheSwallowedKeyBack()
+    {
+        var sender = new RecordingSender { FailFirst = true };
+        var expander = new SnippetExpander(sender, null, () => false);
+        expander.Enqueue(Match("one"), Delimiter.Enter);
+        await expander.IdleAsync();
+        Assert.Equal((0, "", (Delimiter?)Delimiter.Enter), Assert.Single(sender.Sent));
+    }
+
+    [Fact]
+    public async Task AFailedRenderGivesTheSwallowedKeyBack()
+    {
+        var sender = new RecordingSender();
+        var expander = new SnippetExpander(sender, null, () => false, now: () => throw new InvalidOperationException("clock"));
+        expander.Enqueue(Match("one"), Delimiter.Tab);
+        await expander.IdleAsync();
+        Assert.Equal((0, "", (Delimiter?)Delimiter.Tab), Assert.Single(sender.Sent));
+    }
+
     [Fact]
     public async Task ExpansionsGoInOrderAndOneFailureDoesNotStopTheNext()
     {

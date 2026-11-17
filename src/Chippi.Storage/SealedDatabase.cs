@@ -82,9 +82,26 @@ public sealed class SealedDatabase : IDisposable
     public void Erase()
     {
         Close();
+        try
+        {
+            Delete(_path);
+        }
+        finally
+        {
+            // A delete that failed (another process holding the file) leaves the old file in place:
+            // open it again so this object stays usable instead of holding a disposed connection.
+            (_connection, _aes, _hashKey) = Load();
+        }
+    }
+
+    /// <summary>
+    /// Deletes the file with its log without opening it: the way out when its key can't be unwrapped
+    /// (another Windows profile, a reset password) and <see cref="Open"/> throws every time.
+    /// </summary>
+    public static void Delete(string path)
+    {
         foreach (var suffix in new[] { "", "-wal", "-shm" })
-            File.Delete(_path + suffix);
-        (_connection, _aes, _hashKey) = Load();
+            File.Delete(path + suffix);
     }
 
     public void Dispose() => Close();

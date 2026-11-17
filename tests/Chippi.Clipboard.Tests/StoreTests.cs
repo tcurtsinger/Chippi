@@ -113,6 +113,31 @@ public sealed class StoreTests : IDisposable
     }
 
     [Fact]
+    public void Erase_that_cannot_delete_leaves_the_store_usable()
+    {
+        using var db = SealedDatabase.Open(File(), new XorProtector(6));
+        Exec(db, "CREATE TABLE note (id INTEGER PRIMARY KEY, body BLOB)");
+        db.Hash("x"u8);
+        // Another process (a scanner) reading the file without allowing its deletion.
+        using (new FileStream(File(), FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            Assert.ThrowsAny<IOException>(db.Erase);
+        Exec(db, "INSERT INTO note VALUES (1, x'00')");
+        var sealedBytes = db.Seal("still works"u8, "note", 1);
+        Assert.Equal("still works", Encoding.UTF8.GetString(db.Unseal(sealedBytes, "note", 1)));
+    }
+
+    [Fact]
+    public void Delete_removes_a_store_whose_key_cannot_be_unwrapped_without_opening_it()
+    {
+        using (var db = SealedDatabase.Open(File(), new XorProtector(7)))
+            Exec(db, "CREATE TABLE note (id INTEGER PRIMARY KEY)");
+        Assert.ThrowsAny<CryptographicException>(() => SealedDatabase.Open(File(), new XorProtector(8)));
+        SealedDatabase.Delete(File());
+        Assert.False(System.IO.File.Exists(File()));
+        using var fresh = SealedDatabase.Open(File(), new XorProtector(8)); // starts over
+    }
+
+    [Fact]
     public void Dpapi_wraps_and_unwraps_for_the_current_user()
     {
         var key = RandomNumberGenerator.GetBytes(64);

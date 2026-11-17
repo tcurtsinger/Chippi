@@ -80,12 +80,14 @@ public sealed class AutoCleaner : IDisposable
     {
         if (copy.Privacy != ClipPrivacy.None || copy.Content is not { Text: { } text, Files: null, Image: null } || Cleaned(text) is not { } clean)
             return;
-        Rewriting = RewriteAsync(clean);
+        Rewriting = RewriteAsync(clean, copy.Sequence);
     }
 
-    private async Task RewriteAsync(string clean)
+    private async Task RewriteAsync(string clean, uint sequence)
     {
-        if (await _hub.WriteAsync(ClipContent.FromText(clean)).ConfigureAwait(false) != ClipStatus.Ok)
+        // Only over the copy that was cleaned: a newer copy made meanwhile stays.
+        var status = await _hub.WriteIfCurrentAsync(ClipContent.FromText(clean), sequence).ConfigureAwait(false);
+        if (status == ClipStatus.Busy)
             _log.LogInformation("Clean URL: clipboard busy, copy left as it was");
     }
 }

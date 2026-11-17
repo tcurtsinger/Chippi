@@ -60,6 +60,26 @@ public sealed class CodecTests
         Assert.Equal(new byte[] { 5, 6, 7, 255 }, image.Bgra);
     }
 
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(int.MinValue)]
+    [InlineData(int.MaxValue)]
+    [InlineData(0x40000000)]
+    public void A_dib_with_a_bad_palette_count_is_refused_not_thrown(int colors)
+    {
+        var dib = ClipCodec.EncodeDib(new ClipImage(2, 2, new byte[16]));
+        BinaryPrimitives.WriteInt32LittleEndian(dib.AsSpan(32), colors);
+        Assert.Null(ClipCodec.DecodeDib(dib));
+    }
+
+    [Fact]
+    public void A_dib_whose_row_size_overflows_is_refused_not_thrown()
+    {
+        var dib = ClipCodec.EncodeDib(new ClipImage(2, 2, new byte[16]));
+        BinaryPrimitives.WriteInt32LittleEndian(dib.AsSpan(4), int.MaxValue);
+        Assert.Null(ClipCodec.DecodeDib(dib));
+    }
+
     [Fact]
     public void Unsupported_or_short_dibs_are_refused()
     {

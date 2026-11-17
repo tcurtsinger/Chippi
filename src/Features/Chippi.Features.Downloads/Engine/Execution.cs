@@ -184,13 +184,21 @@ internal sealed class Executor(IHistoryStore history, EngineOptions options)
                 Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
                 bool moved = !options.ForceCopy && FileHandles.TryRename(source, destination);
                 if (!moved)
-                    CopyAcross(id, source, destination, modified, sha);
+                    CopyAcross(id, request.Source, source, destination, modified, sha);
                 history.MarkCompleted(id, destination, sha, new DateTimeOffset(File.GetLastWriteTimeUtc(destination), TimeSpan.Zero));
                 return new ExecutionResult(true, id, request.Source, destination, null);
             }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            catch (Exception ex) when (ex is not (OperationCanceledException or OutOfMemoryException))
             {
-                history.MarkFailed(id, ex.Message);
+                // Any failure of this one file (a bad name, a history write) fails it alone: the batch goes on.
+                try
+                {
+                    history.MarkFailed(id, ex.Message);
+                }
+                catch (Exception markFailed) when (markFailed is not OutOfMemoryException)
+                {
+                    // Still planned or started in history: the next reconcile settles it.
+                }
                 return new ExecutionResult(false, id, request.Source, destination, ex.Message);
             }
         }
@@ -200,12 +208,13 @@ internal sealed class Executor(IHistoryStore history, EngineOptions options)
     /// Another volume: copy to a new partial file this operation creates and records, verify it,
     /// rename it into place by its handle, then delete the original by its handle.
     /// </summary>
-    private void CopyAcross(long id, SafeFileHandle source, string destination, DateTime modified, string sha)
+    private void CopyAcross(long id, string sourcePath, SafeFileHandle source, string destination, DateTime modified, string sha)
     {
         string path = PartialPath(destination, id);
-        using var partial = FileHandles.CreateExclusive(path); // fails if anything is already there
+        var partial = FileHandles.CreateExclusive(path); // fails if anything is already there
         history.MarkPartial(id, path); // proof for a restart that this file is ours
         bool placed = false;
+        bool renamed = false;
         try
         {
             FileHandles.Copy(source, partial);
@@ -214,13 +223,31 @@ internal sealed class Executor(IHistoryStore history, EngineOptions options)
                 throw new IOException("Copy didn't match");
             if (!FileHandles.TryRename(partial, destination))
                 throw new IOException("Copy couldn't be placed");
+            renamed = true;
+            // The exclusive handle keeps every other open of the file out, named streams included, so it is
+            // let go before the Mark of the Web and the other named streams are carried over.
+            partial.Dispose();
+            FileHandles.CopyAlternateStreams(sourcePath, destination);
             placed = true;
             history.MarkPartial(id, null);
             FileHandles.DeleteOnClose(source); // the validated original, gone when the handle closes
         }
         finally
         {
-            if (!placed)
+            if (renamed && !placed)
+            {
+                // Placed without its streams: never left looking like a clean copy. The original is still there.
+                try
+                {
+                    File.Delete(destination);
+                    history.MarkPartial(id, null);
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    // Still recorded, so the next reconcile removes it.
+                }
+            }
+            else if (!placed)
             {
                 try
                 {
@@ -232,6 +259,7 @@ internal sealed class Executor(IHistoryStore history, EngineOptions options)
                     // Still recorded, so the next reconcile removes it.
                 }
             }
+            partial.Dispose();
         }
     }
 

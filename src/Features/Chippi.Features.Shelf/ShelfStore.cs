@@ -50,7 +50,8 @@ public sealed class ShelfStore : IDisposable
                 {
                     items.Add(Decode(id, (ShelfKind)reader.GetInt32(1), reader.GetInt64(2), reader.GetInt64(3) != 0, reader.GetInt64(4), (byte[])reader[5]));
                 }
-                catch (System.Security.Cryptography.CryptographicException)
+                catch (Exception ex) when (ex is System.Security.Cryptography.CryptographicException or ArgumentException or FormatException
+                    or InvalidDataException or InvalidCastException or IndexOutOfRangeException or OverflowException)
                 {
                     broken.Add(id);
                 }

@@ -603,6 +603,77 @@ public sealed class HubTests : IDisposable
     }
 
     [Fact]
+    public async Task A_guarded_write_replaces_only_the_copy_it_was_made_from()
+    {
+        _clipboard.CopyText("https://example.com/?utm_source=x");
+        uint seen = _clipboard.Sequence;
+        Assert.Equal(ClipStatus.Ok, await _hub.WriteIfCurrentAsync(ClipContent.FromText("https://example.com/"), seen));
+        Assert.Equal("https://example.com/", _clipboard.Text);
+
+        _clipboard.CopyText("older");
+        uint older = _clipboard.Sequence;
+        _clipboard.CopyText("newer");
+        Assert.Equal(ClipStatus.Empty, await _hub.WriteIfCurrentAsync(ClipContent.FromText("cleaned older"), older));
+        Assert.Equal("newer", _clipboard.Text);
+    }
+
+    [Fact]
+    public async Task A_paste_cancelled_after_the_swap_still_puts_the_previous_copy_back()
+    {
+        CopyRich("before");
+        using var cts = new CancellationTokenSource();
+        _foreground.OnPaste = () => cts.Cancel();
+        // The wait for the target's read ends at once on the cancel without throwing; the swap is undone either way.
+        Assert.Equal(PasteOutcome.Sent, await _hub.PasteAsync(ClipContent.FromText("temporary"), FakeForeground.Editor, cts.Token));
+        Assert.Equal("before", _clipboard.Text);
+        Assert.False(_clipboard.Snapshot().ContainsKey(ClipFormat.Exclude));
+    }
+
+    [Fact]
+    public async Task A_late_selection_copy_is_never_heard_and_the_previous_copy_goes_back()
+    {
+        using var lease = Listen();
+        CopyRich("before");
+        await SettleAsync();
+        _copies.Clear();
+        var copy = _hub.CopySelectionAsync();
+        for (int i = 0; i < 200 && !copy.IsCompleted; i++)
+        {
+            _time.Advance(TimeSpan.FromMilliseconds(15));
+            await Task.Delay(1);
+        }
+        Assert.Null(await copy); // gave up at the timeout
+        _clipboard.CopyText("Ashen Gate", @"C:\Apps\Browser.exe"); // the app answers Ctrl+C late
+        for (int i = 0; i < 400 && !_hub.LateCopy.IsCompleted; i++)
+        {
+            _time.Advance(TimeSpan.FromMilliseconds(15));
+            await Task.Delay(1);
+        }
+        await _hub.LateCopy;
+        Assert.Equal("before", _clipboard.Text);
+        await SettleAsync();
+        Assert.Empty(_copies);
+    }
+
+    [Fact]
+    public async Task A_selection_cancelled_while_waiting_still_puts_the_previous_copy_back_if_the_copy_lands()
+    {
+        CopyRich("before");
+        using var cts = new CancellationTokenSource();
+        _foreground.OnCopy = () => cts.Cancel(); // cancelled right after Ctrl+C went out
+        var copy = _hub.CopySelectionAsync(cts.Token);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => copy);
+        _clipboard.CopyText("Ashen Gate", @"C:\Apps\Browser.exe");
+        for (int i = 0; i < 400 && !_hub.LateCopy.IsCompleted; i++)
+        {
+            _time.Advance(TimeSpan.FromMilliseconds(15));
+            await Task.Delay(1);
+        }
+        await _hub.LateCopy;
+        Assert.Equal("before", _clipboard.Text);
+    }
+
+    [Fact]
     public async Task An_elevated_window_gets_no_Ctrl_C()
     {
         _foreground.CanSend = false;

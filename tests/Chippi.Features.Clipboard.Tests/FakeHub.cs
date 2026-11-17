@@ -23,6 +23,12 @@ internal sealed class FakeHub : IClipboardHub
 
     public List<ClipContent> Written { get; } = [];
 
+    /// <summary>Set to make the clipboard move on before a guarded write: the write is then skipped.</summary>
+    public uint? NewerSequence { get; set; }
+
+    public Task<ClipStatus> WriteIfCurrentAsync(ClipContent content, uint sequence, CancellationToken cancel = default) =>
+        NewerSequence is { } newer && newer != sequence ? Task.FromResult(ClipStatus.Empty) : WriteAsync(content, cancel);
+
     public List<(ClipContent Content, PasteTarget Target)> Pasted { get; } = [];
 
     /// <summary>Another app copies: every lease that doesn't skip <paramref name="owner"/> gets it.</summary>
