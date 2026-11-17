@@ -41,7 +41,15 @@ public sealed class HotkeyWindow(Dispatcher dispatcher) : IHotkeyRegistrar, IDis
         if (msg == 0x0312) // WM_HOTKEY
         {
             handled = true;
-            Pressed?.Invoke(wParam.ToInt32());
+            if (Pressed is { } pressed)
+            {
+                int id = wParam.ToInt32();
+                foreach (Action<int> handler in pressed.GetInvocationList())
+                {
+                    try { handler(id); }
+                    catch (Exception ex) { Chippi.Core.Diagnostics.Log.Warn($"A shortcut handler failed: {ex.Message}"); }
+                }
+            }
         }
         return IntPtr.Zero;
     }

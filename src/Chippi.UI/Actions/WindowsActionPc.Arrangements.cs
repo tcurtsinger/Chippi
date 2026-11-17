@@ -103,6 +103,7 @@ public sealed partial class WindowsActionPc
         if (saved.Maximized)
         {
             // SW_SHOWMAXIMIZED activates the target. Apply its state and work-area geometry with SWP_NOACTIVATE instead.
+            // Deliberate: setting WS_MAXIMIZE maximizes another app's window without taking the foreground (checked in the Sandbox).
             nint style = Native.GetWindowLongPtr(hwnd, -16);
             if (SetArrangementStyle(hwnd, -16, style | 0x01000000) == 0 && Marshal.GetLastWin32Error() != 0)
                 throw new ActionFailure("Placement failed");
