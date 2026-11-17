@@ -12,6 +12,7 @@ A Windows 11 tray app for the owner's own PC (C#, .NET 10, WPF): a widget on the
 - Build like CI, once per runtime: `dotnet build src/Chippi.App/Chippi.App.csproj -c Release -r win-x64 --no-incremental`, then `win-arm64`. The SDK rejects `-r` on `Chippi.slnx`.
 - Warnings are errors.
 - From PowerShell 5.1, run dotnet through `cmd /c`, so its stderr isn't turned into errors.
+- `build/pack.ps1` publishes the admin helper with NativeAOT, which finds the linker through `vswhere.exe`: prepend `C:\Program Files (x86)\Microsoft Visual Studio\Installer` too, or the publish fails with "'vswhere.exe' is not recognized".
 
 ## Test
 
