@@ -31,6 +31,7 @@ public sealed class RecordingModel : IDisposable
     private IRecordingSession? _session;
     private Task _completion = Task.CompletedTask, _starting = Task.CompletedTask, _exporting = Task.CompletedTask;
     private string? _partial;
+    private RecordingSource? _recorded;
     private bool _discard, _disposed;
     private readonly Dictionary<Guid, BitmapSource?> _posters = [];
     internal Func<TimeSpan, CancellationToken, Task> Delay { get; set; } = Task.Delay;
@@ -98,6 +99,17 @@ public sealed class RecordingModel : IDisposable
     }
     public void Report(string message) { Message = message; Changed?.Invoke(); }
     public void Interrupt(string message) => _dispatcher.BeginInvoke(() => { if (Active) { Report(message); _ = StopAsync(); } });
+    /// <summary>
+    /// A display setting changed: stops the recording only when what it records is affected, that is a
+    /// screen that is gone or changed size. A window, or a screen that kept its mode, records on.
+    /// </summary>
+    public void DisplayChanged(string message) => _dispatcher.BeginInvoke(() => { if (Active && SourceAffected()) { Report(message); _ = StopAsync(); } });
+    internal bool SourceAffected()
+    {
+        if (_recorded is not { Target: RecordingTarget.Screen } screen) return false; // a window follows itself; the backend ends the session if it closes
+        try { return !_backend.Sources(RecordingTarget.Screen).Any(x => x.Handle == screen.Handle && x.Width == screen.Width && x.Height == screen.Height); }
+        catch (Exception ex) when (ex is IOException or System.Runtime.InteropServices.COMException or InvalidOperationException) { return false; } // can't tell; the backend still ends a broken session
+    }
     public Task StartAsync()
     {
         if (Active || Exporting) { Report("Already recording or exporting"); return Task.CompletedTask; }
@@ -108,11 +120,12 @@ public sealed class RecordingModel : IDisposable
     private async Task StartCoreAsync(RecordingSource source)
     {
         using var cancellation = new CancellationTokenSource(); _start = cancellation;
-        _discard = false; _partial = null; Message = null;
+        _discard = false; _partial = null; Message = null; _recorded = source;
         Selected = null;
         try
         {
             Directory.CreateDirectory(SaveFolder);
+            SweepEmptyPartials();
             _partial = Path.Combine(SaveFolder, ".chippi-recording-" + Guid.NewGuid().ToString("N") + ".partial.mp4");
             Phase = RecordingPhase.Countdown; Starting?.Invoke();
             for (int seconds = 3; seconds > 0; seconds--)
@@ -237,6 +250,20 @@ public sealed class RecordingModel : IDisposable
         try { if (_partial != null && File.Exists(_partial) && new FileInfo(_partial).Length == 0) File.Delete(_partial); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { _context.Logger.LogWarning(ex, "Empty recording cleanup failed"); }
         _partial = null;
+    }
+    // A cancelled start can't always delete its empty file: the backend is still closing it. Take the leftovers
+    // on the next start; only zero-byte files with our own name, never a partial with video in it.
+    internal void SweepEmptyPartials()
+    {
+        try
+        {
+            foreach (string file in Directory.EnumerateFiles(SaveFolder, ".chippi-recording-*.partial.mp4"))
+            {
+                try { if (new FileInfo(file).Length == 0) File.Delete(file); }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { _context.Logger.LogWarning(ex, "Empty recording cleanup failed"); }
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { _context.Logger.LogWarning(ex, "Empty recording cleanup failed"); }
     }
     public async Task ShutdownAsync() { CancelExport(); if (Active) await StopAsync(); await _exporting; }
     public void Dispose() { if (_disposed) return; _disposed = true; _timer.Stop(); _start?.Cancel(); _export?.Cancel(); }

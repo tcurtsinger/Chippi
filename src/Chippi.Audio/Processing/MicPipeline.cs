@@ -117,41 +117,57 @@ public sealed class MicPipeline : IMicPipeline
     public MicPipeline(string sourceId, IMicTransport transport, MicSettings settings)
     {
         _transport = transport;
-        _captureDevice = _enumerator.GetDevice(sourceId);
-        _capture = new WasapiCapture(_captureDevice);
-        _captureBuffer = new BufferedWaveProvider(_capture.WaveFormat)
+        if (transport.MixFormat.Channels > 2)
         {
-            BufferDuration = TimeSpan.FromMilliseconds(500), // headroom; standing latency is trimmed in OnData
-            DiscardOnBufferOverflow = true,
-        };
-        _bridgeTargetBytes = (int)(BridgeTargetSeconds * _capture.WaveFormat.AverageBytesPerSecond);
-        _capture.DataAvailable += OnData;
-        _capture.RecordingStopped += OnCaptureStopped;
-        _transport.Stopped += OnTransportStopped;
+            _enumerator.Dispose();
+            throw new AudioFailure($"Unsupported channel count ({transport.MixFormat.Channels})");
+        }
+        try
+        {
+            _captureDevice = _enumerator.GetDevice(sourceId);
+            _capture = new WasapiCapture(_captureDevice);
+            _captureBuffer = new BufferedWaveProvider(_capture.WaveFormat)
+            {
+                BufferDuration = TimeSpan.FromMilliseconds(500), // headroom; standing latency is trimmed in OnData
+                DiscardOnBufferOverflow = true,
+            };
+            _bridgeTargetBytes = (int)(BridgeTargetSeconds * _capture.WaveFormat.AverageBytesPerSecond);
+            _capture.DataAvailable += OnData;
+            _capture.RecordingStopped += OnCaptureStopped;
+            _transport.Stopped += OnTransportStopped;
 
-        ISampleProvider chain = _captureBuffer.ToSampleProvider();
-        if (chain.WaveFormat.Channels == 2)
-            chain = new StereoToMonoSampleProvider(chain) { LeftVolume = 0.5f, RightVolume = 0.5f };
-        else if (chain.WaveFormat.Channels > 2)
-            chain = new MultiplexingSampleProvider([chain], 1);
-        if (chain.WaveFormat.SampleRate != DspRate)
-            chain = new WdlResamplingSampleProvider(chain, DspRate);
+            ISampleProvider chain = _captureBuffer.ToSampleProvider();
+            if (chain.WaveFormat.Channels == 2)
+                chain = new StereoToMonoSampleProvider(chain) { LeftVolume = 0.5f, RightVolume = 0.5f };
+            else if (chain.WaveFormat.Channels > 2)
+                chain = new MultiplexingSampleProvider([chain], 1);
+            if (chain.WaveFormat.SampleRate != DspRate)
+                chain = new WdlResamplingSampleProvider(chain, DspRate);
 
-        chain = _inputMeter = new MeterTap(chain);
-        _suppressor = new RnnoiseSuppressor(chain, settings);
-        chain = new NoiseGate(_suppressor, settings);
-        chain = new AutoGain(chain, settings);
-        chain = new VoiceMuteProvider(chain, settings);
-        chain = _outputMeter = new MeterTap(chain);
+            chain = _inputMeter = new MeterTap(chain);
+            _suppressor = new RnnoiseSuppressor(chain, settings);
+            chain = new NoiseGate(_suppressor, settings);
+            chain = new AutoGain(chain, settings);
+            chain = new VoiceMuteProvider(chain, settings);
+            chain = _outputMeter = new MeterTap(chain);
 
-        var mix = transport.MixFormat;
-        if (chain.WaveFormat.SampleRate != mix.SampleRate)
-            chain = new WdlResamplingSampleProvider(chain, mix.SampleRate);
-        if (mix.Channels == 2)
-            chain = new MonoToStereoSampleProvider(chain);
-        else if (mix.Channels > 2)
-            throw new AudioFailure($"Unsupported channel count ({mix.Channels})");
-        _processed = chain.ToWaveProvider();
+            var mix = transport.MixFormat;
+            if (chain.WaveFormat.SampleRate != mix.SampleRate)
+                chain = new WdlResamplingSampleProvider(chain, mix.SampleRate);
+            if (mix.Channels == 2)
+                chain = new MonoToStereoSampleProvider(chain);
+            _processed = chain.ToWaveProvider();
+        }
+        catch
+        {
+            // Nothing else owns what the constructor made before it failed.
+            _transport.Stopped -= OnTransportStopped;
+            _suppressor?.Dispose();
+            _capture?.Dispose();
+            _captureDevice?.Dispose();
+            _enumerator.Dispose();
+            throw;
+        }
     }
 
     /// <summary>The real thing: VB-CABLE's CABLE Input as the transport.</summary>
@@ -218,11 +234,20 @@ public sealed class MicPipeline : IMicPipeline
         _capture.DataAvailable -= OnData;
         _capture.RecordingStopped -= OnCaptureStopped;
         _transport.Stopped -= OnTransportStopped;
-        _transport.Dispose();
-        _suppressor.Dispose(); // after the transport: its render thread has stopped pulling
-        _capture.Dispose();
-        _captureDevice.Dispose();
-        _enumerator.Dispose();
+        try { _transport.Dispose(); }
+        finally
+        {
+            try { _suppressor.Dispose(); } // after the transport: its render thread has stopped pulling
+            finally
+            {
+                try { _capture.Dispose(); }
+                finally
+                {
+                    _captureDevice.Dispose();
+                    _enumerator.Dispose();
+                }
+            }
+        }
     }
 }
 

@@ -135,10 +135,19 @@ public sealed class SoundboardLinkDownloader : ISoundboardLinkDownloader, IDispo
         return new(files[0], title, Host(url, "soundcloud.com") ? "SoundCloud" : "YouTube");
     }
 
+    // Tools that passed the check, by path, with the size and write time they had; the hash is paid once per
+    // process unless the file changes. A swap that keeps both is not caught: the install folder is as trusted as the app.
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, (long Length, DateTime Written)> Verified = new(StringComparer.OrdinalIgnoreCase);
+
     private string ResolveTool(string name)
     {
         if (_toolResolver is not null) return _toolResolver(name);
         string path = Path.Combine(_toolRoot, name);
+        if (Verified.TryGetValue(path, out var known) && File.Exists(path))
+        {
+            var info = new FileInfo(path);
+            if (info.Length == known.Length && info.LastWriteTimeUtc == known.Written) return path;
+        }
         string manifest = Path.Combine(_toolRoot, "tools.json");
         if (!File.Exists(path) || !File.Exists(manifest))
             throw new SoundboardException("Link import tools are missing. Reinstall Chippi or choose a file.");
@@ -150,7 +159,11 @@ public sealed class SoundboardLinkDownloader : ISoundboardLinkDownloader, IDispo
             using var stream = File.OpenRead(path);
             if (stream.Length == tool.GetProperty("bytes").GetInt64()
                 && Convert.ToHexString(SHA256.HashData(stream)).Equals(tool.GetProperty("sha256").GetString(), StringComparison.OrdinalIgnoreCase))
+            {
+                var info = new FileInfo(path);
+                Verified[path] = (info.Length, info.LastWriteTimeUtc);
                 return path;
+            }
         }
         catch (Exception ex) when (ex is JsonException or IOException or KeyNotFoundException or InvalidOperationException or FormatException)
         {

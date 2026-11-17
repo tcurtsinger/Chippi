@@ -86,7 +86,9 @@ public sealed class SoundboardModule : IFeatureModule, ISoundboardController
         {
             _library = await Task.Run(_store.Load, ct);
             _importer ??= new SoundboardImporter(_directory);
-            _error = _store.RecoveryNotice;
+            _error = _store.RecoveryNotice ?? _store.SkippedNotice;
+            if (_store.SkippedClips.Count > 0)
+                context.Logger.LogWarning("Soundboard skipped {Count} invalid clip(s); they are kept in library.skipped.*.json: {Ids}", _store.SkippedClips.Count, string.Join(", ", _store.SkippedClips.Select(c => c?.Id ?? "(empty)")));
             _context = context;
             _stopping = false;
             _lifetime = new();

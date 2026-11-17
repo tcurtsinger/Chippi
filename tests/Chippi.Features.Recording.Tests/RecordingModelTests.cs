@@ -123,6 +123,38 @@ public sealed class RecordingModelTests
         Assert.True(model.SystemAudio); Assert.False(model.MicAudio);
         model.CanStart = () => false; WpfTestThread.Wait(model.StartAsync()); Assert.Equal(0, backend.Starts); Assert.Contains("capture", model.Message);
     });
+    [Fact]
+    public void A_display_change_stops_only_a_recording_whose_screen_changed() => WithModel((model, backend, _, _) =>
+    {
+        model.Setup(RecordingTarget.Screen); WpfTestThread.Wait(model.StartAsync());
+        try
+        {
+            Assert.False(model.SourceAffected()); // the same screen, same size: another monitor waking changes nothing here
+            backend.Listing = t => [new(t, 123, "Fixture", 1280, 720)];
+            Assert.True(model.SourceAffected()); // its mode changed
+            backend.Listing = t => [new(t, 456, "Other", 640, 360)];
+            Assert.True(model.SourceAffected()); // its monitor is gone
+            backend.Listing = t => throw new InvalidOperationException("fixture");
+            Assert.False(model.SourceAffected()); // can't tell: leave it to the backend
+        }
+        finally { WpfTestThread.Wait(model.StopAsync()); }
+    });
+    [Fact]
+    public void A_window_recording_ignores_display_changes() => WithModel((model, backend, _, _) =>
+    {
+        WpfTestThread.Wait(model.StartAsync()); // WithModel sets up a window recording
+        try { backend.Listing = _ => []; Assert.False(model.SourceAffected()); }
+        finally { WpfTestThread.Wait(model.StopAsync()); }
+    });
+    [Fact]
+    public void Starting_sweeps_empty_partials_and_keeps_partials_with_video() => WithModel((model, backend, _, folder) =>
+    {
+        string empty = Path.Combine(folder, ".chippi-recording-aaa.partial.mp4"), kept = Path.Combine(folder, ".chippi-recording-bbb.partial.mp4"), other = Path.Combine(folder, "notes.mp4");
+        File.WriteAllBytes(empty, []); File.WriteAllText(kept, "video"); File.WriteAllBytes(other, []);
+        WpfTestThread.Wait(model.StartAsync());
+        try { Assert.False(File.Exists(empty)); Assert.True(File.Exists(kept)); Assert.True(File.Exists(other)); }
+        finally { WpfTestThread.Wait(model.StopAsync()); }
+    });
     private static void WithModel(Action<RecordingModel, Backend, Store, string> test) => WpfTestThread.Run(() =>
     {
         string folder = Path.Combine(Path.GetTempPath(), "chippi-record-model-" + Guid.NewGuid()); Directory.CreateDirectory(folder);
@@ -150,7 +182,8 @@ public sealed class RecordingModelTests
     private sealed class Backend : IRecordingBackend
     {
         public int Starts;
-        public IReadOnlyList<RecordingSource> Sources(RecordingTarget target) => [new(target, 123, "Fixture", 640, 360)];
+        public Func<RecordingTarget, IReadOnlyList<RecordingSource>>? Listing;
+        public IReadOnlyList<RecordingSource> Sources(RecordingTarget target) => Listing?.Invoke(target) ?? [new(target, 123, "Fixture", 640, 360)];
         public RecordingDeviceNames Devices() => new("Fixture output", "Fixture input");
         public Task<IRecordingSession> StartAsync(RecordingSource source, RecordingOptions options, string partialPath, CancellationToken cancellationToken)
         { Starts++; File.WriteAllText(partialPath, "fixture bytes"); return Task.FromResult<IRecordingSession>(new Session(partialPath)); }

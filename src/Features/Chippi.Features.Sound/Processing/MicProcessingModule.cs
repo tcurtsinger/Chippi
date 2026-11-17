@@ -34,6 +34,7 @@ public sealed class MicProcessingModule : IFeatureModule
     private ModuleContext? _context;
     private IIslandTile? _tile;
     private Timer? _saveTimer;
+    private readonly object _saveGate = new(); // the timer's thread and the gate's holders both write settings
     private ProcessingState _lastState = ProcessingState.Off;
     private volatile bool _stopping;
 
@@ -108,7 +109,7 @@ public sealed class MicProcessingModule : IFeatureModule
         await _gate.WaitAsync(CancellationToken.None);
         try
         {
-            FlushSave();
+            FlushSave(stop: true);
             await ReleaseAsync();
             _context = null;
             _tile = null;
@@ -232,26 +233,24 @@ public sealed class MicProcessingModule : IFeatureModule
         return new ProcessingRequest(pick, _live, Settings.SetDefault, SaveMarker);
     }
 
-    // Engine thread. Written before the capture roles change, deleted when they're given back.
+    // Engine thread. Written before the capture roles change, deleted when they're given back. A write that
+    // fails throws, so the host doesn't take the roles without a way back; a delete that fails only logs.
     private void SaveMarker(ProcessingMarker? marker)
     {
         var path = Path.Combine(_dataDirectory, MarkerFile);
-        try
+        if (marker is null)
         {
-            if (marker is null)
+            try { File.Delete(path); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                File.Delete(path);
-                return;
+                _context?.Logger.LogWarning(ex, "Removing the mic processing recovery marker failed");
             }
-            Directory.CreateDirectory(_dataDirectory);
-            var temp = path + ".tmp";
-            File.WriteAllText(temp, JsonSerializer.Serialize(marker));
-            File.Move(temp, path, overwrite: true);
+            return;
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            _context?.Logger.LogWarning(ex, "Writing the mic processing recovery marker failed");
-        }
+        Directory.CreateDirectory(_dataDirectory);
+        var temp = path + ".tmp";
+        File.WriteAllText(temp, JsonSerializer.Serialize(marker));
+        File.Move(temp, path, overwrite: true);
     }
 
     /// <summary>A marker left by a crash: put back the defaults it recorded, then drop it (architecture §3).</summary>
@@ -338,14 +337,25 @@ public sealed class MicProcessingModule : IFeatureModule
 
     private void ScheduleSave()
     {
-        _saveTimer ??= new Timer(_ => FlushSave());
-        _saveTimer.Change(SaveDelay, Timeout.InfiniteTimeSpan);
+        lock (_saveGate)
+        {
+            _saveTimer ??= new Timer(_ => FlushSave());
+            _saveTimer.Change(SaveDelay, Timeout.InfiniteTimeSpan);
+        }
     }
 
-    private void FlushSave()
+    private void FlushSave(bool stop = false)
     {
-        _saveTimer?.Change(Timeout.Infinite, Timeout.Infinite);
-        _context?.Settings.Save(Settings);
+        lock (_saveGate)
+        {
+            _saveTimer?.Change(Timeout.Infinite, Timeout.Infinite);
+            if (stop)
+            {
+                _saveTimer?.Dispose();
+                _saveTimer = null;
+            }
+            _context?.Settings.Save(Settings);
+        }
     }
 
     private async Task ReleaseAsync()

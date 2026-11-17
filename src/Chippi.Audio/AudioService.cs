@@ -48,6 +48,7 @@ public sealed class AudioService
     private readonly Lock _gate = new();
     private int _leases;
     private Engine? _engine;
+    private Task _lastStop = Task.CompletedTask; // the newest stopping engine; the next one starts after it
     private volatile AudioSnapshot _snapshot = AudioSnapshot.Empty;
 
     /// <param name="createSystem">Called on the engine thread each time the engine starts.</param>
@@ -90,7 +91,7 @@ public sealed class AudioService
             if (_leases++ == 0)
             {
                 _engine = new Engine(this);
-                _engine.Start();
+                _engine.Start(_lastStop);
             }
             else
             {
@@ -289,26 +290,28 @@ public sealed class AudioService
     {
         if (_engine is not { Failed: true } failed)
             return _engine;
+        var stopped = failed.StopAsync();
+        _lastStop = stopped;
         _engine = new Engine(this);
-        _engine.Start();
-        _ = failed.StopAsync();
+        _engine.Start(stopped);
         return _engine;
     }
 
     private async ValueTask ReleaseAsync()
     {
-        Engine? stopping = null;
+        Task? stopped = null;
         lock (_gate)
         {
-            if (--_leases == 0)
+            if (--_leases == 0 && _engine is { } stopping)
             {
-                stopping = _engine;
                 _engine = null;
+                // A lease taken before this stop finishes starts its engine after it (Start waits on _lastStop).
+                _lastStop = stopped = stopping.StopAsync();
             }
         }
-        if (stopping is not null)
+        if (stopped is not null)
         {
-            await stopping.StopAsync().ConfigureAwait(false);
+            await stopped.ConfigureAwait(false);
             lock (_gate)
             {
                 if (_engine is not null)
@@ -401,11 +404,17 @@ public sealed class AudioService
 
         private ILogger Log => _service._logger;
 
-        public void Start()
+        /// <summary>Starts the engine thread. <paramref name="after"/> is the previous engine's stop; this one touches devices only once it's done.</summary>
+        public void Start(Task? after = null)
         {
             _thread.Start();
             Enqueue(() =>
             {
+                // The previous engine restores defaults and unmutes on its own thread; two engines must never write at once.
+                // Its stop task never faults, and its thread doesn't wait on this one.
+                if (after is { IsCompleted: false })
+                    if (!after.Wait(TimeSpan.FromSeconds(5))) // a wedged old engine must not block every later one
+                        Log.LogWarning("The previous audio engine has not stopped after 5 s; starting the next one anyway");
                 try
                 {
                     _system = _service._createSystem();
