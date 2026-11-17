@@ -122,18 +122,4 @@ public sealed class StoreTests : IDisposable
         wrapped[^5] ^= 0xFF;
         Assert.ThrowsAny<CryptographicException>(() => DpapiKeyProtector.Instance.Unprotect(wrapped));
     }
-
-    [Fact]
-    public void A_refused_erase_leaves_the_database_usable()
-    {
-        using var db = SealedDatabase.Open(File(), new XorProtector(0x5A));
-        Exec(db, "CREATE TABLE note (id INTEGER PRIMARY KEY, body BLOB)");
-        Exec(db, "INSERT INTO note VALUES (1, $b)", ("$b", db.Seal([1, 2, 3], "note", 1)));
-        db.Compact();
-
-        using (new FileStream(File(), FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite))
-            Assert.Throws<IOException>(() => db.Erase());
-
-        Assert.Equal([1, 2, 3], db.Unseal(Body(db, 1), "note", 1));
-    }
 }

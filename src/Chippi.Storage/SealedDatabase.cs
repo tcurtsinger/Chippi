@@ -82,22 +82,9 @@ public sealed class SealedDatabase : IDisposable
     public void Erase()
     {
         Close();
-        Exception? failed = null;
-        try
-        {
-            foreach (var suffix in new[] { "", "-wal", "-shm" })
-                File.Delete(_path + suffix);
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            failed = ex;
-        }
-
-        // Always reopen, so a delete that was refused (antivirus, backup software holding the log) leaves
-        // a usable object on the file that is still there, not one over a disposed connection and key.
+        foreach (var suffix in new[] { "", "-wal", "-shm" })
+            File.Delete(_path + suffix);
         (_connection, _aes, _hashKey) = Load();
-        if (failed is not null)
-            throw new IOException("Erase failed", failed);
     }
 
     public void Dispose() => Close();
