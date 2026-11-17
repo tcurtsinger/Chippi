@@ -573,7 +573,7 @@ public sealed class ExpanderTests
     [Theory]
     [InlineData(Delimiter.Tab)]
     [InlineData(Delimiter.Enter)]
-    public async Task ADroppedExpansionGivesTheSwallowedKeyBack(Delimiter delimiter)
+    public async Task AnExpansionDroppedForLaterTypingDoesNotReplayTheKeyAfterIt(Delimiter delimiter)
     {
         var sender = new RecordingSender();
         var read = new TaskCompletionSource<string?>();
@@ -582,7 +582,7 @@ public sealed class ExpanderTests
         expander.Cancel(); // the hand typed during the clipboard read
         read.SetResult("COPY");
         await expander.IdleAsync();
-        Assert.Equal((0, "", (Delimiter?)delimiter), Assert.Single(sender.Sent));
+        Assert.Empty(sender.Sent); // it would land after the characters typed since
     }
 
     [Fact]

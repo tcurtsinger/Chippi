@@ -101,7 +101,11 @@ internal static class FileHandles
         foreach (string name in StreamNames(from))
         {
             using var reader = OpenStream(from + name, GenericRead, FileShare.ReadWrite | FileShare.Delete, OpenExisting);
-            using var writer = OpenStream(to + name, GenericWrite, FileShare.None, CreateAlways);
+            // A destination that holds no named streams (FAT, exFAT, most USB sticks and network shares) is not a
+            // failure: the file moves without them, as it did before they were carried over.
+            using var writer = OpenStream(to + name, GenericWrite, FileShare.None, CreateAlways, out int unsupported);
+            if (writer is null)
+                return;
             var buffer = new byte[1 << 16];
             long offset = 0;
             int read;
@@ -149,6 +153,25 @@ internal static class FileHandles
         {
             int error = Marshal.GetLastPInvokeError();
             handle.Dispose();
+            throw Failure(error, path);
+        }
+        return handle;
+    }
+
+    /// <summary>Like <see cref="OpenStream(string, uint, FileShare, uint)"/>, but null when the volume holds no named streams.</summary>
+    private static SafeFileHandle? OpenStream(string path, uint access, FileShare share, uint disposition, out int unsupported)
+    {
+        unsupported = 0;
+        var handle = CreateFileW(path, access, share, IntPtr.Zero, disposition, SequentialScan, IntPtr.Zero);
+        if (handle.IsInvalid)
+        {
+            int error = Marshal.GetLastPInvokeError();
+            handle.Dispose();
+            if (error is 123 or 50 or 1 or 87) // invalid name, not supported, incorrect function, invalid parameter
+            {
+                unsupported = error;
+                return null;
+            }
             throw Failure(error, path);
         }
         return handle;

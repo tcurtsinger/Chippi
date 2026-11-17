@@ -587,7 +587,8 @@ public sealed class ClipboardHub : IClipboardHub, IDisposable
                 await RestoreWithRetryAsync(saved, ours).ConfigureAwait(false);
                 throw;
             }
-            await RestoreAsync(saved, ours, cancel).ConfigureAwait(false);
+            // A cancel during the wait above doesn't throw, so this restore must not take the token either.
+            await RestoreWithRetryAsync(saved, ours).ConfigureAwait(false);
             return PasteOutcome.Sent;
         }
         finally

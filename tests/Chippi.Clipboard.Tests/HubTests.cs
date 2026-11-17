@@ -623,14 +623,8 @@ public sealed class HubTests : IDisposable
         CopyRich("before");
         using var cts = new CancellationTokenSource();
         _foreground.OnPaste = () => cts.Cancel();
-        try
-        {
-            // The wait for the target's read ends at once on the cancel; the swap is undone either way.
-            await _hub.PasteAsync(ClipContent.FromText("temporary"), FakeForeground.Editor, cts.Token);
-        }
-        catch (OperationCanceledException)
-        {
-        }
+        // The wait for the target's read ends at once on the cancel without throwing; the swap is undone either way.
+        Assert.Equal(PasteOutcome.Sent, await _hub.PasteAsync(ClipContent.FromText("temporary"), FakeForeground.Editor, cts.Token));
         Assert.Equal("before", _clipboard.Text);
         Assert.False(_clipboard.Snapshot().ContainsKey(ClipFormat.Exclude));
     }

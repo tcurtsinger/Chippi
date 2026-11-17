@@ -56,7 +56,7 @@ internal sealed class SnippetExpander(ISnippetSender sender, Func<Task<string?>>
             {
                 // Nothing expands in a password field. A key kept for the trigger goes back as typed.
                 typed = true; // handled here, so the finally doesn't send it twice
-                await ReplayAsync(after, window);
+                await ReplayAsync(after, window, Valid);
                 return;
             }
             string text = await SnippetRenderer.RenderAsync(match.Snippet.Text, _now(), clipboard);
@@ -78,7 +78,7 @@ internal sealed class SnippetExpander(ISnippetSender sender, Func<Task<string?>>
         {
             // Tab and Enter were swallowed for the expansion. Whenever nothing was typed, they go back.
             if (!typed)
-                await ReplayAsync(after, window);
+                await ReplayAsync(after, window, Valid);
         }
     }
 
@@ -86,12 +86,14 @@ internal sealed class SnippetExpander(ISnippetSender sender, Func<Task<string?>>
     /// Types back a Tab or Enter the filter kept for an expansion that did not happen, as Chippi's
     /// own input (the sender marks it). Never into another window than the trigger's.
     /// </summary>
-    private async Task ReplayAsync(Delimiter? after, nint window)
+    private async Task ReplayAsync(Delimiter? after, nint window, Func<bool> valid)
     {
         if (after is not { } key || key == Delimiter.Space)
             return;
         if (foreground is not null && foreground() != window)
             return;
+        if (!valid())
+            return; // the hand typed since: the key would land after those characters
         try
         {
             await sender.SendAsync(0, "", key);
