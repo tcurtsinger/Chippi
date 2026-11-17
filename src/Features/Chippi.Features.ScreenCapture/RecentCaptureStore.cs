@@ -43,11 +43,26 @@ public sealed class RecentCaptureStore : IDisposable
         cmd.ExecuteNonQuery();
         // Authenticate every entry before attempting recovery. Unreadable entries or an index set aside leave files untouched.
         var live = Read().Select(x => x.Image).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        if (HasUnreadable || Directory.EnumerateFiles(_folder, "recent.unreadable-*").Any()) return;
+        if (_keyLost || _skipped > 0) return;
+        // Images from before an earlier set-aside belong to that old index and stay; later orphans (a Put that failed) are swept.
+        DateTime cutoff = NewestSetAside();
         foreach (string file in Directory.EnumerateFiles(_folder, "*.png"))
-            if (Guid.TryParseExact(Path.GetFileNameWithoutExtension(file), "N", out _) && !live.Contains(Path.GetFileName(file))) File.Delete(file);
+            if (Guid.TryParseExact(Path.GetFileNameWithoutExtension(file), "N", out _) && !live.Contains(Path.GetFileName(file)) && File.GetLastWriteTimeUtc(file) > cutoff) File.Delete(file);
     }
 
+    private DateTime NewestSetAside()
+    {
+        const string prefix = "recent.unreadable-";
+        DateTime newest = DateTime.MinValue;
+        foreach (string file in Directory.EnumerateFiles(_folder, prefix + "*"))
+        {
+            string name = Path.GetFileName(file);
+            if (name.Length < prefix.Length + 17) return DateTime.MaxValue;
+            if (DateTime.TryParseExact(name.Substring(prefix.Length, 17), "yyyyMMddHHmmssfff", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal, out var stamp)) { if (stamp > newest) newest = stamp; }
+            else return DateTime.MaxValue;
+        }
+        return newest;
+    }
     private void SetAside(string path)
     {
         string stamp = DateTime.UtcNow.ToString("yyyyMMddHHmmssfff", System.Globalization.CultureInfo.InvariantCulture);

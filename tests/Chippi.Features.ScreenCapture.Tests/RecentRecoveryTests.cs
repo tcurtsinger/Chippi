@@ -97,6 +97,27 @@ public sealed class RecentRecoveryTests
         finally { Directory.Delete(folder, true); }
     });
 
+    [Fact]
+    public void Later_starts_sweep_new_orphans_but_not_images_from_before_the_set_aside() => Sta(() =>
+    {
+        string folder = Folder();
+        try
+        {
+            using (var store = new RecentCaptureStore(folder, new Protector()))
+                store.Put(Guid.NewGuid(), Pixels(), DateTimeOffset.Now, null);
+            string old = Directory.GetFiles(folder, "*.png").Single();
+            File.SetLastWriteTimeUtc(old, DateTime.UtcNow.AddMinutes(-5));
+            using (new RecentCaptureStore(folder, new Protector(canOpen: false))) { }
+            string orphan = Path.Combine(folder, Guid.NewGuid().ToString("N") + ".png");
+            File.WriteAllBytes(orphan, [1, 2, 3]);
+            File.SetLastWriteTimeUtc(orphan, DateTime.UtcNow.AddMinutes(5));
+            using (new RecentCaptureStore(folder, new Protector())) { }
+            Assert.True(File.Exists(old));
+            Assert.False(File.Exists(orphan));
+        }
+        finally { Directory.Delete(folder, true); }
+    });
+
     [Theory]
     [InlineData("shot.png", 2, CaptureFileType.Png)]
     [InlineData("shot.PNG", 2, CaptureFileType.Png)]
