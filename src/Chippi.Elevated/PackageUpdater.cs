@@ -11,14 +11,27 @@ namespace Chippi.Elevated;
 
 public sealed class PackageUpdater(SafeAccessTokenHandle standardToken) : IPackageUpdater
 {
-    public static IReadOnlyList<string> Arguments(string id)
+    /// <summary>Winget exit code for "no package found", which with a pinned --version means the reviewed version is gone.</summary>
+    internal const int NoPackageFound = unchecked((int)0x8A150014);
+
+    public static IReadOnlyList<string> Arguments(string id, string version, bool includeUnknown)
     {
         if (!Messages.PackageIdAllowed(id)) throw new ArgumentException("Invalid package id.", nameof(id));
-        return ["upgrade", "--id", id, "--exact", "--source", "winget", "--scope", "machine", "--silent", "--include-unknown",
-            "--accept-package-agreements", "--accept-source-agreements", "--disable-interactivity"];
+        if (!Messages.VersionAllowed(version)) throw new ArgumentException("Invalid package version.", nameof(version));
+        var args = new List<string> { "upgrade", "--id", id, "--version", version, "--exact", "--source", "winget", "--scope", "machine", "--silent" };
+        if (includeUnknown) args.Add("--include-unknown");
+        args.AddRange(["--accept-package-agreements", "--accept-source-agreements", "--disable-interactivity"]);
+        return args;
     }
 
-    public async Task<AdminReply> UpdateAsync(AdminRequest request)
+    internal static AdminReply Result(AdminRequest request, int code) => code switch
+    {
+        0 => new(request.Id, "Done", request.PackageId, 0),
+        NoPackageFound => new(request.Id, "Failed", request.PackageId, code, "Version changed"),
+        _ => new(request.Id, "Failed", request.PackageId, code, "Package update failed"),
+    };
+
+    public async Task<AdminReply> UpdateAsync(AdminRequest request, CancellationToken ceiling)
     {
         if (!Messages.RequestAllowed(request) || request.Verb != "UpdatePackage")
             return new(request.Id, "Refused", request.PackageId, Reason: "Invalid package id");
@@ -26,7 +39,7 @@ public sealed class PackageUpdater(SafeAccessTokenHandle standardToken) : IPacka
         {
             string executable = FindWinget();
             var start = new ProcessStartInfo(executable) { UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = Path.GetDirectoryName(executable)! };
-            foreach (var arg in Arguments(request.PackageId!)) start.ArgumentList.Add(arg);
+            foreach (var arg in Arguments(request.PackageId!, request.ExpectedVersion!, request.IncludeUnknown)) start.ArgumentList.Add(arg);
             foreach (string key in start.Environment.Keys.Where(k => k.StartsWith("DOTNET_", StringComparison.OrdinalIgnoreCase)
                 || k.StartsWith("COR_", StringComparison.OrdinalIgnoreCase) || k.StartsWith("COMPLUS_", StringComparison.OrdinalIgnoreCase)
                 || k.Equals("__COMPAT_LAYER", StringComparison.OrdinalIgnoreCase)).ToArray()) start.Environment.Remove(key);
@@ -36,15 +49,30 @@ public sealed class PackageUpdater(SafeAccessTokenHandle standardToken) : IPacka
                 process = Process.Start(start) ?? throw new InvalidOperationException("winget did not start.");
             using (process)
             {
-                await process.WaitForExitAsync().ConfigureAwait(false);
-                int code = process.ExitCode;
-                return new(request.Id, code == 0 ? "Done" : "Failed", request.PackageId, code, code == 0 ? null : "Package update failed");
+                try { await process.WaitForExitAsync(ceiling).ConfigureAwait(false); }
+                catch (OperationCanceledException)
+                {
+                    // Only the helper's ceiling cancels this wait: a hung winget is stopped with its installer children.
+                    try { process.Kill(entireProcessTree: true); } catch (Exception ex) when (ex is InvalidOperationException or Win32Exception) { }
+                    return new(request.Id, "Failed", request.PackageId, Reason: "Package update timed out");
+                }
+                return Result(request, process.ExitCode);
             }
         }
         catch (UnauthorizedAccessException error) { return new(request.Id, "Refused", request.PackageId, Reason: "Untrusted winget executable: " + error.Message); }
         catch (Exception ex) when (ex is IOException or Win32Exception or InvalidOperationException)
         { return new(request.Id, "Failed", request.PackageId, Reason: "Package update failed"); }
     }
+
+    /// <summary>Reads Microsoft.DesktopAppInstaller_1.24.2511.0_x64__8wekyb3d8bbwe; versions compare as numbers, never as text.</summary>
+    public static (Version Version, string Architecture)? ParseFullName(string fullName)
+    {
+        var parts = fullName.Split('_');
+        return parts.Length >= 5 && Version.TryParse(parts[1], out var version) ? (version, parts[2]) : null;
+    }
+
+    public static bool ArchitectureMatches(string architecture) => architecture.Equals("neutral", StringComparison.OrdinalIgnoreCase)
+        || architecture.Equals(System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture.ToString(), StringComparison.OrdinalIgnoreCase);
 
     internal static string FindWinget()
     {
@@ -58,7 +86,7 @@ public sealed class PackageUpdater(SafeAccessTokenHandle standardToken) : IPacka
         {
             result = GetPackagesByPackageFamily(family, ref count, pointers, ref length, buffer);
             if (result != 0) throw new Win32Exception(result);
-            var candidates = new List<string>();
+            var candidates = new List<(string Name, string Exe)>();
             for (int i = 0; i < count; i++)
             {
                 string name = Marshal.PtrToStringUni(Marshal.ReadIntPtr(pointers, i * nint.Size))!;
@@ -68,9 +96,10 @@ public sealed class PackageUpdater(SafeAccessTokenHandle standardToken) : IPacka
                 if (GetPackagePathByFullName(name, ref size, path) != 0) continue;
                 string exe = Path.Combine(path.ToString(), "winget.exe");
                 string root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "WindowsApps") + Path.DirectorySeparatorChar;
-                if (exe.StartsWith(root, StringComparison.OrdinalIgnoreCase) && File.Exists(exe)) candidates.Add(exe);
+                if (exe.StartsWith(root, StringComparison.OrdinalIgnoreCase) && File.Exists(exe)) candidates.Add((name, exe));
             }
-            return candidates.OrderDescending(StringComparer.OrdinalIgnoreCase).FirstOrDefault()
+            return candidates.Select(c => (Path: c.Exe, Parsed: ParseFullName(c.Name))).Where(c => c.Parsed is not null && ArchitectureMatches(c.Parsed.Value.Architecture))
+                .OrderByDescending(c => c.Parsed!.Value.Version).Select(c => c.Path).FirstOrDefault()
                 ?? throw new InvalidOperationException("Protected App Installer unavailable.");
         }
         finally { Marshal.FreeHGlobal(pointers); Marshal.FreeHGlobal(buffer); }

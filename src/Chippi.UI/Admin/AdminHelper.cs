@@ -13,18 +13,23 @@ public interface IAdminConnection : IAsyncDisposable { Stream Stream { get; } }
 public interface IAdminSessionFactory { Task<IAdminConnection> OpenAsync(CancellationToken ct); }
 
 /// <summary>One explicitly confirmed batch per helper session. Constructing this service never launches anything.</summary>
-public sealed class AdminHelper(IAdminSessionFactory factory, ILogger logger) : IAdminHelper, IDisposable
+public sealed class AdminHelper(IAdminSessionFactory factory, ILogger logger, TimeSpan? replyCeiling = null) : IAdminHelper, IDisposable
 {
+    /// <summary>How long one package may stay silent: the helper's own ceiling, plus slack for it to answer.</summary>
+    public static readonly TimeSpan DefaultReplyCeiling = Messages.PackageCeiling + TimeSpan.FromMinutes(2);
+    private readonly TimeSpan _replyCeiling = replyCeiling ?? DefaultReplyCeiling;
     private readonly SemaphoreSlim _gate = new(1);
     private IAdminConnection? _active;
     private volatile bool _disposed;
 
-    public async Task<IReadOnlyList<AdminUpdateResult>> UpdatePackagesAsync(IReadOnlyList<string> packageIds,
+    public async Task<IReadOnlyList<AdminUpdateResult>> UpdatePackagesAsync(IReadOnlyList<AdminUpdateItem> items,
         IProgress<AdminUpdateProgress>? progress = null, CancellationToken ct = default)
     {
-        ArgumentNullException.ThrowIfNull(packageIds);
-        var ids = packageIds.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-        if (ids.Length > 256 || ids.Any(id => !Messages.PackageIdAllowed(id))) throw new ArgumentException("Invalid package batch.", nameof(packageIds));
+        ArgumentNullException.ThrowIfNull(items);
+        var batch = items.DistinctBy(i => i.PackageId, StringComparer.OrdinalIgnoreCase).ToArray();
+        if (batch.Length > 256 || batch.Any(i => !Messages.PackageIdAllowed(i.PackageId) || !Messages.VersionAllowed(i.ExpectedVersion)))
+            throw new ArgumentException("Invalid package batch.", nameof(items));
+        var ids = batch.Select(i => i.PackageId).ToArray();
         if (ids.Length == 0) return [];
         await _gate.WaitAsync(ct).ConfigureAwait(false);
         var results = new List<AdminUpdateResult>();
@@ -40,16 +45,20 @@ public sealed class AdminHelper(IAdminSessionFactory factory, ILogger logger) : 
             var ready = await Messages.ReadReplyAsync(pipe, hello.Token).ConfigureAwait(false);
             if (ready is not { Id: var readyId, State: "Ready", PackageId: null, ExitCode: null, Reason: null } || readyId != Guid.Empty)
                 throw new InvalidDataException("Invalid helper greeting.");
-            foreach (string id in ids)
+            foreach (var item in batch)
             {
+                string id = item.PackageId;
                 if (ct.IsCancellationRequested) { results.Add(new(id, "Cancelled")); continue; }
-                var request = new AdminRequest(Guid.NewGuid(), "UpdatePackage", id);
-                await Messages.WriteAsync(pipe, request).ConfigureAwait(false);
+                var request = new AdminRequest(Guid.NewGuid(), "UpdatePackage", id, item.ExpectedVersion, item.IncludeUnknown);
+                // Cancel never reaches a running installer; a silent helper is cut off by the ceiling so the gate is released.
+                using (var send = new CancellationTokenSource(TimeSpan.FromSeconds(30)))
+                    await Messages.WriteAsync(pipe, request, send.Token).ConfigureAwait(false);
                 progress?.Report(new(id, results.Count + 1, ids.Length));
                 AdminReply reply;
                 do
                 {
-                    reply = await Messages.ReadReplyAsync(pipe).ConfigureAwait(false) ?? throw new EndOfStreamException();
+                    using var wait = new CancellationTokenSource(_replyCeiling);
+                    reply = await Messages.ReadReplyAsync(pipe, wait.Token).ConfigureAwait(false) ?? throw new EndOfStreamException();
                     if (reply.Id != request.Id || reply.PackageId != id || reply.State is not ("Progress" or "Done" or "Failed" or "Refused"))
                         throw new InvalidDataException("Invalid helper result.");
                 } while (reply.State == "Progress");
@@ -72,7 +81,7 @@ public sealed class AdminHelper(IAdminSessionFactory factory, ILogger logger) : 
         catch (Exception ex) when (ex is IOException or InvalidDataException or Win32Exception or UnauthorizedAccessException or JsonException or InvalidOperationException or OperationCanceledException)
         {
             logger.LogWarning(ex, "Admin helper failed; no automatic retry");
-            foreach (string id in ids.Skip(results.Count)) results.Add(new(id, ct.IsCancellationRequested ? "Cancelled" : "Failed", Reason: "Admin helper failed"));
+            foreach (string id in ids.Skip(results.Count)) results.Add(new(id, ct.IsCancellationRequested && ex is OperationCanceledException ? "Cancelled" : "Failed", Reason: "Admin helper failed"));
         }
         finally { _active = null; _gate.Release(); }
         return results;

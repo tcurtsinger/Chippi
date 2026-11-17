@@ -21,12 +21,14 @@ public sealed class AppUpdatesEngine
     private IReadOnlyList<PackageUpdate> _all = [];
     private readonly HashSet<VersionIdentity> _completedVersions = [];
     private readonly HashSet<string> _finishedBatch = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Action<Exception>? _onError;
     private bool _loadFailed;
     private int _batchRevision;
 
     public AppUpdatesEngine(IPackageSource source, IAdminHelper? admin, IAppUpdatesStore store,
-        Action<Action>? dispatch = null, TimeProvider? time = null)
+        Action<Action>? dispatch = null, TimeProvider? time = null, Action<Exception>? onError = null)
     {
+        _onError = onError;
         _source = source; _admin = admin; _store = store;
         _dispatch = dispatch ?? (action => action()); _time = time ?? TimeProvider.System;
         try { Preferences = Normalize(store.Load()); }
@@ -149,6 +151,13 @@ public sealed class AppUpdatesEngine
                 foreach (var package in supported) Finish(package, new(UpdateState.NeedsAdmin, "Needs admin"), revision);
                 return;
             }
+            // Ids and versions the helper protocol would refuse fail here, one row each, instead of sinking the batch.
+            foreach (var package in supported.Where(p => !AdminCanRun(p)).ToArray())
+            {
+                Finish(package, new(UpdateState.Failed, "Version not supported for admin updates"), revision);
+                supported.Remove(package);
+            }
+            if (supported.Count == 0) return;
             var byId = supported.ToDictionary(p => p.Id, StringComparer.OrdinalIgnoreCase);
             var adminProgress = new CallbackProgress<AdminUpdateProgress>(p =>
             {
@@ -156,7 +165,7 @@ public sealed class AppUpdatesEngine
                 if (p.Result is { } result) Finish(package, MapAdminResult(result), revision);
                 else SetRow(package, UpdateState.Updating, revision);
             });
-            var results = await _admin.UpdatePackagesAsync(supported.Select(p => p.Id).ToArray(), adminProgress, ct).ConfigureAwait(false);
+            var results = await _admin.UpdatePackagesAsync(supported.Select(p => new AdminUpdateItem(p.Id, p.AvailableVersion, p.UnknownVersion)).ToArray(), adminProgress, ct).ConfigureAwait(false);
             foreach (var package in supported)
             {
                 var result = results.FirstOrDefault(r => r.PackageId.Equals(package.Id, StringComparison.OrdinalIgnoreCase));
@@ -165,8 +174,11 @@ public sealed class AppUpdatesEngine
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         { FinishUnresolved(UpdateState.Cancelled, null, revision); }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or Win32Exception)
-        { FinishUnresolved(UpdateState.Failed, "Admin helper failed", revision); }
+        catch (Exception ex)
+        {
+            try { _onError?.Invoke(ex); } catch { }
+            FinishUnresolved(UpdateState.Failed, "Admin helper failed", revision);
+        }
         finally { Change(() => IsRunning = false); }
     }
 
@@ -260,6 +272,9 @@ public sealed class AppUpdatesEngine
         && first.InstalledVersion == second.InstalledVersion && first.AvailableVersion == second.AvailableVersion && first.Scope == second.Scope && first.Channel == second.Channel;
     internal static bool IsChippi(PackageUpdate package) => package.Id.Equals("Chippi", StringComparison.OrdinalIgnoreCase)
         || package.Id.Equals("ChippiApp", StringComparison.OrdinalIgnoreCase) || package.Id.Equals("tcurtsinger.Chippi", StringComparison.OrdinalIgnoreCase);
+    internal static bool AdminCanRun(PackageUpdate package) => Chippi.Elevated.Protocol.Messages.PackageIdAllowed(package.Id)
+        && Chippi.Elevated.Protocol.Messages.VersionAllowed(package.AvailableVersion);
+
     internal static PackageInstallResult MapAdminResult(AdminUpdateResult result) => result.State switch
     {
         "Done" => new(UpdateState.Updated, Code: result.ExitCode),
@@ -271,7 +286,9 @@ public sealed class AppUpdatesEngine
         _ => new(UpdateState.Failed, AdminFailureReason(result), result.ExitCode)
     };
 
-    private static string AdminFailureReason(AdminUpdateResult result) => result.ExitCode switch
+    private static string AdminFailureReason(AdminUpdateResult result) => result.Reason is "Version changed" or "Package update timed out" ? result.Reason : AdminExitReason(result);
+
+    private static string AdminExitReason(AdminUpdateResult result) => result.ExitCode switch
     {
         unchecked((int)0x8A150008) => "Download failed",
         unchecked((int)0x8A150011) => "Installer verification failed",

@@ -62,7 +62,8 @@ public sealed class AppUpdatesModule : IFeatureModule
         _settings = context.Settings.Get<SettingsData>();
         _settings = _settings with { Shortcuts = _settings.Shortcuts ?? [] };
         _source = _createSource();
-        Engine = new AppUpdatesEngine(_source, context.Admin, new JsonAppUpdatesStore(context.DataDirectory), Dispatch);
+        Engine = new AppUpdatesEngine(_source, context.Admin, new JsonAppUpdatesStore(context.DataDirectory), Dispatch,
+            onError: ex => context.Logger.LogWarning(ex, "Admin update batch failed"));
         Engine.Changed += Publish;
         context.Ui.SetSettingsPage(section => new AppUpdatesSettingsView(Engine, context, section));
         context.Ui.AddIslandTile(new IslandTileSpec(Page, "Update apps", "RefreshCw", 90, 0, View)

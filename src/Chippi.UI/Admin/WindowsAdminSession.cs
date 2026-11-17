@@ -31,12 +31,16 @@ public sealed class WindowsAdminSession : IAdminSessionFactory
         if (!File.Exists(executable)) throw new FileNotFoundException("Admin helper missing.", executable);
         string name = "chippi-admin-" + Guid.NewGuid().ToString("N");
         var pipe = LocalPipe.Create(name);
+        IDisposable? hold = null;
         Process? process = null;
         PeerIdentity? peer = null;
         try
         {
+            // No other process can write, rename or delete the helper from here until it has started.
+            hold = LaunchGuard.Hold(executable);
             // The UAC prompt can stay open indefinitely, without blocking WPF's dispatcher.
             process = await _launch(executable, name).ConfigureAwait(false) ?? throw new Win32Exception("Admin helper did not start.");
+            hold.Dispose(); hold = null;
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
             timeout.CancelAfter(TimeSpan.FromSeconds(10));
             await pipe.WaitForConnectionAsync(timeout.Token).ConfigureAwait(false);
@@ -48,6 +52,7 @@ public sealed class WindowsAdminSession : IAdminSessionFactory
         {
             int? exit = null;
             try { if (process is { HasExited: true }) exit = process.ExitCode; } catch (Win32Exception) { }
+            hold?.Dispose();
             pipe.Dispose(); peer?.Dispose(); process?.Dispose();
             if (exit is { } code) throw new InvalidOperationException($"Admin helper exited during startup (exit {code}).", error);
             throw;

@@ -67,13 +67,13 @@ try
     }
     if (args[0] == "--guard")
     {
-        var check = await helper.UpdatePackagesAsync(["Chippi.AdminHelperMissingFixture"]);
+        var check = await helper.UpdatePackagesAsync([new("Chippi.AdminHelperMissingFixture", "1.0.0")]);
         bool accepted = check.Single() is { State: "Failed", ExitCode: not null };
         File.WriteAllText(@"C:\results\guard.json", JsonSerializer.Serialize(new { passed = accepted, results = check }));
         return accepted ? 0 : 1;
     }
     var watch = Stopwatch.StartNew();
-    var results = await helper.UpdatePackagesAsync(["7zip.7zip", "Chippi.AdminHelperMissingFixture"]);
+    var results = await helper.UpdatePackagesAsync([new("7zip.7zip", Environment.GetEnvironmentVariable("CHIPPI_PROBE_7ZIP_VERSION") ?? "24.09"), new("Chippi.AdminHelperMissingFixture", "1.0.0")]);
     bool passed = results.Count == 2 && results[0].State == "Done" && results[1].State == "Failed";
     File.WriteAllText(report, JsonSerializer.Serialize(new { passed, milliseconds = watch.Elapsed.TotalMilliseconds, results }));
     return passed ? 0 : 1;

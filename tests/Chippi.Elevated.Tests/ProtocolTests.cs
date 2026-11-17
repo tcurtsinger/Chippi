@@ -49,7 +49,7 @@ public sealed class ProtocolTests
     public async Task Round_trip_eof_and_truncated_frames()
     {
         using var stream = new MemoryStream();
-        var request = new AdminRequest(Guid.NewGuid(), "UpdatePackage", "Microsoft.PowerToys");
+        var request = new AdminRequest(Guid.NewGuid(), "UpdatePackage", "Microsoft.PowerToys", "1.2.3");
         await Messages.WriteAsync(stream, request); stream.Position = 0;
         Assert.Equal(request, await Messages.ReadRequestAsync(stream));
         Assert.Null(await Messages.ReadRequestAsync(stream));
@@ -60,10 +60,53 @@ public sealed class ProtocolTests
     [Fact]
     public void Upgrade_is_exact_machine_scope_and_never_install_or_a_shell()
     {
-        var args = PackageUpdater.Arguments("7zip.7zip");
-        Assert.Equal(new[] { "upgrade", "--id", "7zip.7zip", "--exact", "--source", "winget", "--scope", "machine", "--silent", "--include-unknown",
+        var args = PackageUpdater.Arguments("7zip.7zip", "24.09", false);
+        Assert.Equal(new[] { "upgrade", "--id", "7zip.7zip", "--version", "24.09", "--exact", "--source", "winget", "--scope", "machine", "--silent",
             "--accept-package-agreements", "--accept-source-agreements", "--disable-interactivity" }, args);
-        Assert.Throws<ArgumentException>(() => PackageUpdater.Arguments("--all"));
+        Assert.Throws<ArgumentException>(() => PackageUpdater.Arguments("--all", "1.0", false));
+        Assert.Throws<ArgumentException>(() => PackageUpdater.Arguments("a.b", "--all", false));
+    }
+
+    [Fact]
+    public void Unknown_installed_versions_alone_get_include_unknown()
+    {
+        Assert.Contains("--include-unknown", PackageUpdater.Arguments("a.b", "2.0", true));
+        Assert.DoesNotContain("--include-unknown", PackageUpdater.Arguments("a.b", "2.0", false));
+    }
+
+    [Theory] [InlineData("1.2.3", true)] [InlineData("2024.1.0-beta+7", true)] [InlineData("", false)] [InlineData("-x", false)]
+    [InlineData("1 2", false)] [InlineData("1.0 --all", false)]
+    public void Pinned_versions_are_plain_tokens(string version, bool allowed) => Assert.Equal(allowed, Messages.VersionAllowed(version));
+
+    [Fact]
+    public void An_update_request_needs_its_reviewed_version_and_done_carries_none()
+    {
+        Assert.False(Messages.RequestAllowed(new(Guid.NewGuid(), "UpdatePackage", "a.b")));
+        Assert.True(Messages.RequestAllowed(new(Guid.NewGuid(), "UpdatePackage", "a.b", "1.0")));
+        Assert.False(Messages.RequestAllowed(new(Guid.NewGuid(), "Done", null, "1.0")));
+        Assert.False(Messages.RequestAllowed(new(Guid.NewGuid(), "Done", null, null, true)));
+    }
+
+    [Fact]
+    public void A_version_that_is_gone_reads_as_version_changed()
+    {
+        var request = new AdminRequest(Guid.NewGuid(), "UpdatePackage", "a.b", "2.0");
+        Assert.Equal("Done", PackageUpdater.Result(request, 0).State);
+        var changed = PackageUpdater.Result(request, PackageUpdater.NoPackageFound);
+        Assert.Equal(("Failed", "Version changed"), (changed.State, changed.Reason));
+        Assert.Equal("Package update failed", PackageUpdater.Result(request, 1).Reason);
+    }
+
+    [Fact]
+    public void The_newest_app_installer_wins_by_version_not_by_text()
+    {
+        var old = PackageUpdater.ParseFullName("Microsoft.DesktopAppInstaller_1.9.100.0_x64__8wekyb3d8bbwe")!.Value;
+        var newer = PackageUpdater.ParseFullName("Microsoft.DesktopAppInstaller_1.10.5.0_x64__8wekyb3d8bbwe")!.Value;
+        Assert.True(newer.Version > old.Version);
+        Assert.Equal("x64", newer.Architecture);
+        Assert.Null(PackageUpdater.ParseFullName("garbage"));
+        Assert.True(PackageUpdater.ArchitectureMatches("neutral"));
+        Assert.False(PackageUpdater.ArchitectureMatches("mips"));
     }
 
     [Fact]
