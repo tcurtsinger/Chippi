@@ -56,7 +56,7 @@ public sealed class ScreenCaptureSettingsPage : UserControl
     private readonly Card _recent;
     private readonly Dictionary<Guid, Tile> _tiles = [];
     private readonly Dictionary<string, ShortcutSetting> _shortcuts = [];
-    private readonly TextBlock _afterError = Error(), _recentError = Error(), _selectingError = Error();
+    private readonly TextBlock _afterError = Error(), _recentError = Error(), _selectingError = Error(), _unreadable = Error();
     private bool _updating, _listening;
 
     public ScreenCaptureSettingsPage(IScreenCapturePageModel model)
@@ -118,7 +118,7 @@ public sealed class ScreenCaptureSettingsPage : UserControl
             {
                 SettingsLayout.Section("After a capture", first: true),
                 SettingsLayout.Card(SettingsLayout.Row("Enter key", _enter), folderRow, SettingsLayout.Row("File type", _fileType)), _afterError,
-                SettingsLayout.Section("Recent captures"), _recent, _recentError,
+                SettingsLayout.Section("Recent captures"), _recent, _recentError, _unreadable,
                 SettingsLayout.Section("Selecting"),
                 SettingsLayout.Card(SettingsLayout.Row("Ctrl+drag to copy", _ctrlDrag), SettingsLayout.Row("Magnifier", _magnifier)), _selectingError,
                 SettingsLayout.Section("Shortcuts"), shortcuts,
@@ -166,6 +166,8 @@ public sealed class ScreenCaptureSettingsPage : UserControl
     internal IReadOnlyList<Button> Tiles => [.. _grid.Children.OfType<Button>()];
 
     internal TextBlock RecentError => _recentError;
+
+    internal TextBlock Unreadable => _unreadable;
 
     internal TextBlock AfterError => _afterError;
 
@@ -239,6 +241,7 @@ public sealed class ScreenCaptureSettingsPage : UserControl
             else _shortcuts[name].Show(keys, error);
         }
         RefreshRecent(settings.History, _model.Recent);
+        Say(_unreadable, _model.RecentUnreadable ? "Older captures couldn't be read" : null);
     }
 
     private void RefreshRecent(bool history, IReadOnlyList<RecentCapture> recent)

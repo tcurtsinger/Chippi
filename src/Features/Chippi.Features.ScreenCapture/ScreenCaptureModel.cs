@@ -35,11 +35,18 @@ public sealed class ScreenCaptureModel : IScreenCapturePageModel, IDisposable
     public bool SaveFolderMissing => Settings.SaveFolder != null && !Directory.Exists(SaveFolder);
     public string? SettingsError { get; private set; }
     public IReadOnlyList<RecentCapture> Recent { get; private set; } = [];
+    public bool RecentUnreadable => _store.HasUnreadable;
     public event Action? Changed;
 
     public void RefreshRecent()
     {
-        var recent = _store.Read();
+        IReadOnlyList<RecentCapture> recent;
+        try { recent = _store.Read(); }
+        catch (Exception ex) when (CaptureFiles.ReadFailed(ex))
+        {
+            Chippi.Core.Diagnostics.Log.Warn("Screen capture: reading recent captures failed", ex);
+            recent = [];
+        }
         var thumbnails = new Dictionary<Guid, ImageSource>();
         foreach (var capture in recent)
         {
@@ -48,11 +55,15 @@ public sealed class ScreenCaptureModel : IScreenCapturePageModel, IDisposable
                 thumbnails[capture.Id] = existing;
                 continue;
             }
-            using var stream = new MemoryStream(_store.Thumbnail(capture.Id));
-            var image = new BitmapImage();
-            image.BeginInit(); image.CacheOption = BitmapCacheOption.OnLoad;
-            image.StreamSource = stream; image.EndInit(); image.Freeze();
-            thumbnails[capture.Id] = image;
+            try
+            {
+                using var stream = new MemoryStream(_store.Thumbnail(capture.Id));
+                var image = new BitmapImage();
+                image.BeginInit(); image.CacheOption = BitmapCacheOption.OnLoad;
+                image.StreamSource = stream; image.EndInit(); image.Freeze();
+                thumbnails[capture.Id] = image;
+            }
+            catch (Exception ex) when (CaptureFiles.ReadFailed(ex)) { } // The entry stays, without a thumbnail.
         }
         _thumbnails.Clear();
         foreach (var item in thumbnails) _thumbnails.Add(item.Key, item.Value);

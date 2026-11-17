@@ -72,7 +72,7 @@ public sealed class CaptureRecentModel : ICaptureRecentModel, IDisposable
         {
             var pixels = await PixelsAsync();
             if (_disposed || pixels == null) return new(CaptureSaveOutcome.Failed);
-            await CaptureFiles.OnWorkerAsync(() => { CaptureFiles.SaveAs(pixels, dialog.FileName, dialog.FilterIndex == 2 ? CaptureFileType.Jpeg : CaptureFileType.Png, true); return true; });
+            await CaptureFiles.OnWorkerAsync(() => { CaptureFiles.SaveAs(pixels, dialog.FileName, CaptureFiles.TypeFor(dialog.FileName, dialog.FilterIndex), true); return true; });
             return new(CaptureSaveOutcome.Saved, dialog.FileName);
         }
         catch (Exception ex) when (CaptureFiles.ReadFailed(ex)) { return new(CaptureSaveOutcome.Failed); }

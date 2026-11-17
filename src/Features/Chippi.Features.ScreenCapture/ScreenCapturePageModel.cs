@@ -71,6 +71,9 @@ public interface IScreenCapturePageModel
     /// <summary>Recent captures, newest first, up to 50.</summary>
     IReadOnlyList<RecentCapture> Recent { get; }
 
+    /// <summary>Older captures couldn't be read (their index was unreadable); the page says so. Their files stay on disk.</summary>
+    bool RecentUnreadable => false;
+
     /// <summary>Raised on any thread when the settings, the recent captures, a saved file or a shortcut change.</summary>
     event Action? Changed;
 

@@ -80,7 +80,7 @@ internal sealed class CaptureEditor : IDisposable
             choice.PickAsked += () => { popup.IsOpen = false; _pickingInk = true; _session.Tooling = true; };
             popup.IsOpen = true;
         };
-        _finish.Picked += async action =>
+        _finish.Picked += async action => await Guarded(async () =>
         {
             if (action == FinishAction.Retry && _retry != null) await _retry();
             else if (action is FinishAction.CopyText or FinishAction.ScanQrCode) await ReadText(action == FinishAction.ScanQrCode);
@@ -88,7 +88,7 @@ internal sealed class CaptureEditor : IDisposable
             else if (action == FinishAction.SaveAs) await SaveAs();
             else if (action == FinishAction.Copy) await Finish(EnterAction.Copy);
             else if (action == FinishAction.Save) await Finish(EnterAction.Save);
-        };
+        });
     }
 
     private static BitmapSource Bitmap(CapturedImage image)
@@ -339,7 +339,19 @@ internal sealed class CaptureEditor : IDisposable
             dc.Pop(); dc.Pop();
         }
     }
-    private async void Key(KeyEventArgs e)
+    /// <summary>Runs an async handler so nothing it throws reaches the dispatcher: the frozen screen reports "Capture failed" and stays usable.</summary>
+    private async Task Guarded(Func<Task> run)
+    {
+        try { await run(); }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            Chippi.Core.Diagnostics.Log.Warn("Screen capture: an action failed", ex);
+            if (!_disposed) _feedback("Capture failed", true);
+        }
+    }
+    private async void Key(KeyEventArgs e) => await Guarded(() => KeyAsync(e));
+    private async Task KeyAsync(KeyEventArgs e)
     {
         if (_text != null) return;
         bool ctrl = Keyboard.Modifiers.HasFlag(ModifierKeys.Control);
@@ -422,7 +434,7 @@ internal sealed class CaptureEditor : IDisposable
             }
         }
         catch (OperationCanceledException) { }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { _feedback("Capture failed", true); }
+        catch (Exception ex) when (CaptureFiles.ReadFailed(ex)) { _feedback("Capture failed", true); }
         finally { _busy = false; }
     }
     private async Task SaveAs()
@@ -432,7 +444,7 @@ internal sealed class CaptureEditor : IDisposable
         var dialog = new SaveFileDialog { Filter = "PNG image|*.png|JPEG image|*.jpg", FileName = "Screenshot.png", OverwritePrompt = true, AddExtension = true };
         var owner = Window.GetWindow(_finish);
         if ((owner == null ? dialog.ShowDialog() : dialog.ShowDialog(owner)) != true) return;
-        await SaveAsTo(dialog.FileName, dialog.FilterIndex == 2 ? CaptureFileType.Jpeg : CaptureFileType.Png);
+        await SaveAsTo(dialog.FileName, CaptureFiles.TypeFor(dialog.FileName, dialog.FilterIndex));
     }
     private async Task SaveAsTo(string path, CaptureFileType type)
     {
@@ -455,7 +467,7 @@ internal sealed class CaptureEditor : IDisposable
                 }
                 if (!_disposed) _feedback("Saved", false);
             }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or Microsoft.Data.Sqlite.SqliteException)
+            catch (Exception ex) when (CaptureFiles.ReadFailed(ex))
             { if (!_disposed) _feedback("Recent capture failed", true); }
             if (!_disposed) _session.Close();
         }
