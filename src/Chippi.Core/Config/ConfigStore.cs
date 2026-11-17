@@ -75,7 +75,7 @@ public sealed class ConfigStore
 
             try
             {
-                var root = Parse(File.ReadAllText(FilePath));
+                var root = Parse(ReadWithRetry(FilePath));
 
                 // A shell section this build cannot read (hand-edited, or a bad value) would make
                 // every reader throw. Keep a copy of the file, drop only that section so it falls
@@ -97,6 +97,29 @@ public sealed class ConfigStore
                 _logger.LogError(ex, "Settings unreadable; moved to {Aside} and starting on defaults", aside);
                 TryMove(FilePath, aside);
                 _root = NewRoot();
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // Held by another program, not damaged: leave the file where it is and start on defaults.
+                _logger.LogError(ex, "Settings at {Path} could not be read; starting on defaults", FilePath);
+                _root = NewRoot();
+            }
+        }
+    }
+
+    // Antivirus or a sync client may hold the file for a moment at start: retry briefly, as WriteAtomic does.
+    private static string ReadWithRetry(string path)
+    {
+        const int attempts = 6;
+        for (int attempt = 1; ; attempt++)
+        {
+            try
+            {
+                return File.ReadAllText(path);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException && attempt < attempts)
+            {
+                Thread.Sleep(20 * attempt);
             }
         }
     }

@@ -529,4 +529,6 @@ public sealed class ConfigStoreTests : IDisposable
 
         Assert.Equal(AppSettings.DefaultIslandDisplay, store.GetSection<AppSettings>(AppSettings.SectionName).IslandDisplay);
     }
+
+
 }

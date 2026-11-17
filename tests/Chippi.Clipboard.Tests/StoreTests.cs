@@ -122,4 +122,6 @@ public sealed class StoreTests : IDisposable
         wrapped[^5] ^= 0xFF;
         Assert.ThrowsAny<CryptographicException>(() => DpapiKeyProtector.Instance.Unprotect(wrapped));
     }
+
+
 }

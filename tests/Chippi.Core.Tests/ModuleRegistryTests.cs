@@ -461,4 +461,6 @@ public sealed class ModuleRegistryTests : IDisposable
     }
 
     private string[] Installed() => [.. _f.Registry.Features.Where(e => e.IsInstalled).Select(e => e.Id)];
+
+
 }
