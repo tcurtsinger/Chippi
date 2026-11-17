@@ -4,11 +4,14 @@ using Chippi.Elevated.Protocol;
 
 namespace Chippi.Elevated;
 
-public interface IPackageUpdater { Task<AdminReply> UpdateAsync(AdminRequest request); }
+/// <summary>The token fires when the per-package ceiling passes; the updater then stops its installer tool.</summary>
+public interface IPackageUpdater { Task<AdminReply> UpdateAsync(AdminRequest request, CancellationToken ceiling); }
 
 public sealed class HelperSession(IPackageUpdater updater, TimeProvider? time = null)
 {
     public static readonly TimeSpan IdleTimeout = TimeSpan.FromSeconds(60);
+    /// <summary>How long a package may keep running after its ceiling fires before the session answers for it.</summary>
+    public static readonly TimeSpan CeilingGrace = TimeSpan.FromSeconds(15);
     public async Task RunAsync(Stream pipe, CancellationToken stop = default)
     {
         await WriteReply(pipe, new AdminReply(Guid.Empty, "Ready"), stop).ConfigureAwait(false);
@@ -29,9 +32,21 @@ public sealed class HelperSession(IPackageUpdater updater, TimeProvider? time = 
             }
             await WriteReply(pipe, new AdminReply(request.Id, "Progress", request.PackageId), stop).ConfigureAwait(false);
             // Once started, an installer finishes even if Chippi cancels or disconnects.
-            var result = await updater.UpdateAsync(request).ConfigureAwait(false);
+            var result = await RunPackage(request).ConfigureAwait(false);
             await WriteReply(pipe, result, stop).ConfigureAwait(false);
         }
+    }
+
+    private async Task<AdminReply> RunPackage(AdminRequest request)
+    {
+        var clock = time ?? TimeProvider.System;
+        using var ceiling = new CancellationTokenSource(Messages.PackageCeiling, clock);
+        var run = updater.UpdateAsync(request, ceiling.Token);
+        var expired = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var registration = ceiling.Token.Register(() => expired.TrySetResult());
+        if (await Task.WhenAny(run, expired.Task).ConfigureAwait(false) == run) return await run.ConfigureAwait(false);
+        try { return await run.WaitAsync(CeilingGrace, clock).ConfigureAwait(false); }
+        catch (TimeoutException) { return new(request.Id, "Failed", request.PackageId, Reason: "Package update timed out"); }
     }
 
     private async Task WriteReply(Stream pipe, AdminReply reply, CancellationToken stop)

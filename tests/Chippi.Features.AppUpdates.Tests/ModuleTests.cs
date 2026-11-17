@@ -134,8 +134,8 @@ public sealed class ModuleTests
     private sealed class Admin : IAdminHelper
     {
         public int Calls;
-        public Task<IReadOnlyList<AdminUpdateResult>> UpdatePackagesAsync(IReadOnlyList<string> packageIds, IProgress<AdminUpdateProgress>? progress = null, CancellationToken ct = default)
-        { Calls++; return Task.FromResult<IReadOnlyList<AdminUpdateResult>>(packageIds.Select(id => new AdminUpdateResult(id, "Done", 0)).ToArray()); }
+        public Task<IReadOnlyList<AdminUpdateResult>> UpdatePackagesAsync(IReadOnlyList<AdminUpdateItem> items, IProgress<AdminUpdateProgress>? progress = null, CancellationToken ct = default)
+        { Calls++; return Task.FromResult<IReadOnlyList<AdminUpdateResult>>(items.Select(i => new AdminUpdateResult(i.PackageId, "Done", 0)).ToArray()); }
     }
     private sealed class Settings : IModuleSettings
     { public T Get<T>() where T : class, new() => new(); public void Save<T>(T value) where T : class { } }

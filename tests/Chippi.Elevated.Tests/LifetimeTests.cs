@@ -42,7 +42,7 @@ public sealed class LifetimeTests
         var updater = new Updater { Next = complete.Task };
         var run = new HelperSession(updater, clock).RunAsync(pair.Helper);
         await Messages.ReadReplyAsync(pair.Client);
-        var request = new AdminRequest(Guid.NewGuid(), "UpdatePackage", "a.b");
+        var request = new AdminRequest(Guid.NewGuid(), "UpdatePackage", "a.b", "1.0");
         await Messages.WriteAsync(pair.Client, request);
         Assert.Equal("Progress", (await Messages.ReadReplyAsync(pair.Client))!.State);
         clock.Fire(); Assert.False(run.IsCompleted);
@@ -53,11 +53,30 @@ public sealed class LifetimeTests
         Assert.Equal(1, updater.Count);
     }
 
+    [Fact]
+    public async Task A_package_that_outlives_its_ceiling_is_stopped_and_reported_as_failed()
+    {
+        await using var pair = await Pair.Open(); var clock = new Clock();
+        var updater = new Updater { Next = new TaskCompletionSource<AdminReply>().Task };
+        var run = new HelperSession(updater, clock).RunAsync(pair.Helper);
+        await Messages.ReadReplyAsync(pair.Client);
+        var request = new AdminRequest(Guid.NewGuid(), "UpdatePackage", "a.b", "1.0");
+        await Messages.WriteAsync(pair.Client, request);
+        Assert.Equal("Progress", (await Messages.ReadReplyAsync(pair.Client))!.State);
+        var reply = Messages.ReadReplyAsync(pair.Client);
+        for (int i = 0; i < 100 && !reply.IsCompleted; i++) { clock.Fire(); await Task.Delay(20); }
+        var result = (await reply.WaitAsync(TimeSpan.FromSeconds(5)))!;
+        Assert.Equal(("Failed", "Package update timed out"), (result.State, result.Reason));
+        Assert.True(updater.Ceiling.IsCancellationRequested);
+        pair.Client.Dispose(); await run.WaitAsync(TimeSpan.FromSeconds(5));
+    }
+
     private sealed class Updater : IPackageUpdater
     {
         public int Count;
+        public CancellationToken Ceiling;
         public Task<AdminReply>? Next;
-        public Task<AdminReply> UpdateAsync(AdminRequest request) { Count++; return Next ?? Task.FromResult(new AdminReply(request.Id, "Done", request.PackageId, 0)); }
+        public Task<AdminReply> UpdateAsync(AdminRequest request, CancellationToken ceiling) { Count++; Ceiling = ceiling; return Next ?? Task.FromResult(new AdminReply(request.Id, "Done", request.PackageId, 0)); }
     }
     private sealed class BlockedWriter : MemoryStream
     {

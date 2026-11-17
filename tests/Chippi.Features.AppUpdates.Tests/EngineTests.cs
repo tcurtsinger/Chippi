@@ -197,6 +197,40 @@ public sealed class EngineTests
     }
 
     [Fact]
+    public async Task Machine_updates_send_the_reviewed_version_and_flag_only_unknown_installed_versions()
+    {
+        var known = App("Known", UpdateScope.Machine) with { AvailableVersion = "5.1" };
+        var unknown = App("Unknown", UpdateScope.Machine) with { InstalledVersion = "Unknown", AvailableVersion = "6.0" };
+        var source = new Source { Packages = [known, unknown] }; var admin = new Admin();
+        var engine = new AppUpdatesEngine(source, admin, new Store()); engine.SetShowUnknownVersions(true); await engine.CheckAsync();
+        await engine.RunAsync(engine.CaptureBatch());
+        Assert.Equal(new[] { ("Known", "5.1", false), ("Unknown", "6.0", true) }, admin.Items.Single().Select(i => (i.PackageId, i.ExpectedVersion, i.IncludeUnknown)));
+    }
+
+    [Fact]
+    public async Task A_helper_that_throws_anything_fails_every_machine_row_instead_of_leaving_them_queued()
+    {
+        var a = App("A", UpdateScope.Machine); var b = App("B", UpdateScope.Machine);
+        var source = new Source { Packages = [a, b] };
+        var admin = new Admin { Run = (_, _, _) => throw new ArgumentException("Invalid package batch.") };
+        var engine = new AppUpdatesEngine(source, admin, new Store()); await engine.CheckAsync();
+        await engine.RunAsync(engine.CaptureBatch());
+        Assert.False(engine.IsRunning); Assert.All(engine.Rows, r => Assert.Equal(UpdateState.Failed, r.State));
+    }
+
+    [Fact]
+    public async Task An_id_the_helper_would_refuse_fails_its_own_row_and_the_rest_still_run()
+    {
+        var odd = App("Bad Id!", UpdateScope.Machine); var fine = App("Fine", UpdateScope.Machine);
+        var source = new Source { Packages = [odd, fine] }; var admin = new Admin();
+        var engine = new AppUpdatesEngine(source, admin, new Store()); await engine.CheckAsync();
+        await engine.RunAsync(engine.CaptureBatch());
+        Assert.Equal(new[] { "Fine" }, admin.Batches.Single());
+        Assert.Equal(UpdateState.Failed, engine.Rows.Single(r => r.Package.Id == "Bad Id!").State);
+        Assert.Equal(UpdateState.Updated, engine.Rows.Single(r => r.Package.Id == "Fine").State);
+    }
+
+    [Fact]
     public async Task One_machine_session_covers_the_whole_group_and_store_stays_out_of_the_helper()
     {
         var user = App("User"); var store = App("Store", UpdateScope.Unknown) with { Source = "msstore" };
@@ -327,8 +361,9 @@ public sealed class EngineTests
     private sealed class Admin : IAdminHelper
     {
         public List<IReadOnlyList<string>> Batches { get; } = [];
+        public List<IReadOnlyList<AdminUpdateItem>> Items { get; } = [];
         public Func<IReadOnlyList<string>, IProgress<AdminUpdateProgress>?, CancellationToken, Task<IReadOnlyList<AdminUpdateResult>>>? Run;
-        public Task<IReadOnlyList<AdminUpdateResult>> UpdatePackagesAsync(IReadOnlyList<string> ids, IProgress<AdminUpdateProgress>? progress = null, CancellationToken ct = default)
-        { Batches.Add(ids); return Run?.Invoke(ids, progress, ct) ?? Task.FromResult<IReadOnlyList<AdminUpdateResult>>(ids.Select(id => new AdminUpdateResult(id, "Done", 0)).ToArray()); }
+        public Task<IReadOnlyList<AdminUpdateResult>> UpdatePackagesAsync(IReadOnlyList<AdminUpdateItem> items, IProgress<AdminUpdateProgress>? progress = null, CancellationToken ct = default)
+        { var ids = items.Select(i => i.PackageId).ToArray(); Items.Add(items); Batches.Add(ids); return Run?.Invoke(ids, progress, ct) ?? Task.FromResult<IReadOnlyList<AdminUpdateResult>>(ids.Select(id => new AdminUpdateResult(id, "Done", 0)).ToArray()); }
     }
 }

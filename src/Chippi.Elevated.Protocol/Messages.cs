@@ -6,7 +6,8 @@ using System.Text.Json.Serialization;
 
 namespace Chippi.Elevated.Protocol;
 
-public sealed record AdminRequest(Guid Id, string Verb, string? PackageId = null);
+/// <summary>UpdatePackage carries the version the owner reviewed; IncludeUnknown is set only when the snapshot had no installed version.</summary>
+public sealed record AdminRequest(Guid Id, string Verb, string? PackageId = null, string? ExpectedVersion = null, bool IncludeUnknown = false);
 public sealed record AdminReply(Guid Id, string State, string? PackageId = null, int? ExitCode = null, string? Reason = null);
 
 [JsonSourceGenerationOptions(UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow)]
@@ -17,6 +18,10 @@ public partial class AdminJson : JsonSerializerContext;
 public static class Messages
 {
     public const int MaxBytes = 64 * 1024;
+    /// <summary>The helper kills a winget that runs longer than this for one package.</summary>
+    public static readonly TimeSpan PackageCeiling = TimeSpan.FromMinutes(30);
+    public static bool VersionAllowed(string? version) => version is { Length: > 0 and <= 64 }
+        && version[0] != '-' && version.All(c => char.IsAsciiLetterOrDigit(c) || c is '.' or '+' or '_' or '-' or '~');
     public static bool PackageIdAllowed(string? id) => id is { Length: > 0 and <= 128 }
         && id[0] != '-' && !id.StartsWith('.') && !id.EndsWith('.') && !id.Contains("..", StringComparison.Ordinal)
         && id.All(c => char.IsAsciiLetterOrDigit(c) || c is '.' or '+' or '_' or '-');
@@ -26,8 +31,8 @@ public static class Messages
 
     public static bool RequestAllowed(AdminRequest r) => r.Id != Guid.Empty && r.Verb switch
     {
-        "UpdatePackage" => PackageIdAllowed(r.PackageId),
-        "Done" => r.PackageId is null,
+        "UpdatePackage" => PackageIdAllowed(r.PackageId) && VersionAllowed(r.ExpectedVersion),
+        "Done" => r.PackageId is null && r.ExpectedVersion is null && !r.IncludeUnknown,
         _ => false,
     };
 
