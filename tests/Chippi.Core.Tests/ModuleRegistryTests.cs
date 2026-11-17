@@ -2,6 +2,7 @@
 // Copyright (C) Chippi contributors
 
 using System.Collections.Concurrent;
+using Chippi.Core.Config;
 using Chippi.Core.Island;
 using Chippi.Core.Modules;
 
@@ -461,4 +462,46 @@ public sealed class ModuleRegistryTests : IDisposable
     }
 
     private string[] Installed() => [.. _f.Registry.Features.Where(e => e.IsInstalled).Select(e => e.Id)];
+
+    [Fact]
+    public async Task A_cancelled_install_is_not_left_installed_in_memory_or_the_file()
+    {
+        var module = FakeModule.Create("slow");
+        module.FailOnStart = new OperationCanceledException();
+        _f.Registry.Register(module);
+        await _f.Registry.StartAsync();
+        int changed = 0;
+        _f.Registry.Changed += (_, _) => changed++;
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => _f.Registry.SetInstalledAsync("slow", true));
+
+        Assert.False(_f.Registry.Find("slow")!.IsInstalled);
+        Assert.DoesNotContain("slow", Installed());
+        Assert.Equal(FeaturePreset.Custom, _f.Registry.Preset);
+        Assert.True(changed >= 1);
+        var reloaded = new ConfigStore(_f.Config.FilePath);
+        reloaded.Load();
+        Assert.DoesNotContain("slow", reloaded.GetSection<FeatureState>(FeatureState.SectionName).Installed);
+    }
+
+    [Fact]
+    public async Task A_cancelled_preset_is_saved_as_Custom_and_raises_Changed()
+    {
+        var first = FakeModule.Create("first", PresetMembership.Essentials);
+        var second = FakeModule.Create("second");
+        second.FailOnStart = new OperationCanceledException();
+        _f.Registry.Register(first);
+        _f.Registry.Register(second);
+        await _f.Registry.StartAsync(); // first run: Essentials is just "first"
+        int changed = 0;
+        _f.Registry.Changed += (_, _) => changed++;
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => _f.Registry.ApplyPresetAsync(FeaturePreset.Everything));
+
+        Assert.Equal(FeaturePreset.Custom, _f.Registry.Preset);
+        Assert.True(changed >= 1);
+        var reloaded = new ConfigStore(_f.Config.FilePath);
+        reloaded.Load();
+        Assert.Equal(FeaturePreset.Custom, reloaded.GetSection<FeatureState>(FeatureState.SectionName).Preset);
+    }
 }

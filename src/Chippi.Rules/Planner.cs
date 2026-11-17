@@ -9,8 +9,19 @@ public static class Planner
 {
     public static PlannedOperation Plan(FileFacts file, IReadOnlyList<Rule> rules, PlanContext context)
     {
+        ValidateRules(rules);
+        return PlanValidated(file, rules, context);
+    }
+
+    private static void ValidateRules(IReadOnlyList<Rule> rules)
+    {
         var errors = RuleValidator.Validate(rules);
         if (errors.Count > 0) throw new ArgumentException(string.Join("; ", errors.Select(e => $"{e.RuleId}: {e.Field}: {e.Message}")), nameof(rules));
+    }
+
+    // The rules were validated by the caller: a batch checks them once, not once per file.
+    private static PlannedOperation PlanValidated(FileFacts file, IReadOnlyList<Rule> rules, PlanContext context)
+    {
         ArgumentNullException.ThrowIfNull(context.TimeZone);
         ArgumentOutOfRangeException.ThrowIfNegative(file.Bytes);
         var warnings = new List<PlanWarning>();
@@ -92,6 +103,7 @@ public static class Planner
     public static IReadOnlyList<PlannedOperation> PlanBatch(IEnumerable<FileFacts> files, IReadOnlyList<Rule> rules, PlanContext context)
     {
         var input = files.ToArray();
+        if (input.Length > 0) ValidateRules(rules);
         var occupied = new HashSet<string>(context.OccupiedPaths, StringComparer.OrdinalIgnoreCase);
         var sources = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var file in input)
@@ -105,7 +117,7 @@ public static class Planner
         var result = new List<PlannedOperation>();
         foreach (var file in input)
         {
-            var plan = Plan(file, rules, context with { OccupiedPaths = occupied });
+            var plan = PlanValidated(file, rules, context with { OccupiedPaths = occupied });
             result.Add(plan);
             if (plan.Destination is { } destination) occupied.Add(destination);
         }

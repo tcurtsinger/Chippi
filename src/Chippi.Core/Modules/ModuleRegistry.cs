@@ -161,20 +161,35 @@ public sealed class ModuleRegistry(ConfigStore config, IslandActivityHub island,
     public async Task SetInstalledAsync(string id, bool installed, CancellationToken ct = default)
     {
         await _gate.WaitAsync(ct);
+        bool gateHeld = true;
         try
         {
             var entry = Find(id) ?? throw new ArgumentException($"No feature '{id}' is registered.", nameof(id));
             if (entry.IsComingSoon && installed)
                 throw new InvalidOperationException($"'{entry.Descriptor.Name}' is coming soon and cannot be installed yet.");
 
-            if (entry.IsInstalled != installed)
-                await SetInstalledCoreAsync(entry, installed, ct);
+            try
+            {
+                if (entry.IsInstalled != installed)
+                    await SetInstalledCoreAsync(entry, installed, ct);
+            }
+            catch (OperationCanceledException)
+            {
+                // What really happened (a cancelled start was rolled back, a cancelled stop still removed the
+                // feature) goes to the file too, so the screens and settings.json agree.
+                _state.Preset = FeaturePreset.Custom;
+                SaveState();
+                _gate.Release();
+                gateHeld = false;
+                RaiseChanged();
+                throw;
+            }
             _state.Preset = FeaturePreset.Custom;
             SaveState();
         }
         finally
         {
-            _gate.Release();
+            if (gateHeld) _gate.Release();
         }
         RaiseChanged();
     }
@@ -190,10 +205,18 @@ public sealed class ModuleRegistry(ConfigStore config, IslandActivityHub island,
         {
             await ApplyPresetCoreAsync(preset, ct);
         }
-        finally
+        catch (OperationCanceledException)
         {
             _gate.Release();
+            RaiseChanged(); // what was installed before the cancel stays; the screens must show it
+            throw;
         }
+        catch
+        {
+            _gate.Release();
+            throw;
+        }
+        _gate.Release();
         RaiseChanged();
     }
 
@@ -354,11 +377,21 @@ public sealed class ModuleRegistry(ConfigStore config, IslandActivityHub island,
         if (preset != FeaturePreset.Custom)
         {
             var members = PresetMembers(preset).ToHashSet();
-            foreach (var entry in _entries.Where(e => !e.IsComingSoon))
+            try
             {
-                bool install = members.Contains(entry);
-                if (entry.IsInstalled != install)
-                    await SetInstalledCoreAsync(entry, install, ct, eraseData);
+                foreach (var entry in _entries.Where(e => !e.IsComingSoon))
+                {
+                    bool install = members.Contains(entry);
+                    if (entry.IsInstalled != install)
+                        await SetInstalledCoreAsync(entry, install, ct, eraseData);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                _state.Preset = FeaturePreset.Custom; // a partly applied preset is no longer that preset
+                _state.Preset = FeaturePreset.Custom; // a partly applied preset is no longer that preset
+                SaveState(); // the features already changed stay changed in the file too
+                throw;
             }
         }
         _state.Preset = preset;
@@ -377,7 +410,17 @@ public sealed class ModuleRegistry(ConfigStore config, IslandActivityHub island,
                     _state.CapabilitiesUsed.Add(capability.Id);
             }
             if (!entry.IsRunning)
-                await StartModuleAsync(entry, ct);
+            {
+                try
+                {
+                    await StartModuleAsync(entry, ct);
+                }
+                catch (OperationCanceledException)
+                {
+                    entry.IsInstalled = !installed; // the start was cancelled and cleaned up: not installed after all
+                    throw;
+                }
+            }
         }
         else
         {

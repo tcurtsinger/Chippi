@@ -237,4 +237,13 @@ public sealed class PlannerTests
             Assert.Equal(WarningKind.IgnoreMatch, Assert.Single(plan.Warnings).Kind);
         }
     }
+
+    [Fact]
+    public void A_batch_with_an_invalid_rule_is_refused_once_for_the_whole_batch()
+    {
+        var invalid = Rule(id: "");
+
+        Assert.Throws<ArgumentException>(() => Planner.PlanBatch([File("a.txt"), File("b.txt")], [invalid], Context()));
+        Assert.Empty(Planner.PlanBatch([], [invalid], Context()));
+    }
 }
