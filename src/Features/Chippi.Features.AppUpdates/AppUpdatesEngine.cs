@@ -21,12 +21,14 @@ public sealed class AppUpdatesEngine
     private IReadOnlyList<PackageUpdate> _all = [];
     private readonly HashSet<VersionIdentity> _completedVersions = [];
     private readonly HashSet<string> _finishedBatch = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Action<Exception>? _onError;
     private bool _loadFailed;
     private int _batchRevision;
 
     public AppUpdatesEngine(IPackageSource source, IAdminHelper? admin, IAppUpdatesStore store,
-        Action<Action>? dispatch = null, TimeProvider? time = null)
+        Action<Action>? dispatch = null, TimeProvider? time = null, Action<Exception>? onError = null)
     {
+        _onError = onError;
         _source = source; _admin = admin; _store = store;
         _dispatch = dispatch ?? (action => action()); _time = time ?? TimeProvider.System;
         try { Preferences = Normalize(store.Load()); }
@@ -152,7 +154,7 @@ public sealed class AppUpdatesEngine
             // Ids and versions the helper protocol would refuse fail here, one row each, instead of sinking the batch.
             foreach (var package in supported.Where(p => !AdminCanRun(p)).ToArray())
             {
-                Finish(package, new(UpdateState.Failed, "Update failed"), revision);
+                Finish(package, new(UpdateState.Failed, "Version not supported for admin updates"), revision);
                 supported.Remove(package);
             }
             if (supported.Count == 0) return;
@@ -172,8 +174,11 @@ public sealed class AppUpdatesEngine
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         { FinishUnresolved(UpdateState.Cancelled, null, revision); }
-        catch (Exception)
-        { FinishUnresolved(UpdateState.Failed, "Admin helper failed", revision); }
+        catch (Exception ex)
+        {
+            try { _onError?.Invoke(ex); } catch { }
+            FinishUnresolved(UpdateState.Failed, "Admin helper failed", revision);
+        }
         finally { Change(() => IsRunning = false); }
     }
 

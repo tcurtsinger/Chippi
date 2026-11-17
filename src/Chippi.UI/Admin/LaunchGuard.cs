@@ -16,9 +16,9 @@ public static class LaunchGuard
         var stream = new FileStream(executable, FileMode.Open, FileAccess.Read, FileShare.Read, 1, FileOptions.None);
         try
         {
-            string? folder = Path.GetDirectoryName(executable);
-            if (HasReparsePoint(executable) || (folder is not null && HasReparsePoint(folder)))
-                throw new UnauthorizedAccessException("Reparse point refused.");
+            if (HasReparsePoint(executable)) throw new UnauthorizedAccessException("Reparse point refused.");
+            for (string? folder = Path.GetDirectoryName(executable); !string.IsNullOrEmpty(folder); folder = Path.GetDirectoryName(folder))
+                if (Path.GetPathRoot(folder) != folder && HasReparsePoint(folder)) throw new UnauthorizedAccessException("Reparse point refused.");
             return stream;
         }
         catch { stream.Dispose(); throw; }

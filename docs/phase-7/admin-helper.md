@@ -149,7 +149,7 @@ As architecture §6, accepted in task 483: Chippi is unsigned and installed in `
 - One NativeAOT executable, no managed DLLs beside it, and DLLs load from System32 only (`SetDefaultDllDirectories` with `LOAD_LIBRARY_SEARCH_SYSTEM32`) [DLL security].
 - Nothing it runs comes from a place Travis's account can write: winget from its package folder, uninstallers only from folders his standard token can't write, `msiexec` and `reg.exe` from System32.
 - No standing elevation: no service, task or startup entry.
-- Chippi holds `Chippi.Elevated.exe` open with no write or delete sharing, and refuses a reparse point on the file or its folder, from just before the prompt until the helper process has started (`LaunchGuard`). That closes the swap-between-check-and-launch gap only.
+- Chippi holds `Chippi.Elevated.exe` open with no write or delete sharing, and refuses a reparse point on the file or any folder above it, from just before the prompt until the helper process has started (`LaunchGuard`). That closes the swap-between-check-and-launch gap only.
 
 **What remains, same user.** A program already running as Travis can still replace the helper before Chippi opens it, or after the launch hold ends; and it can ask for elevation of any executable itself. UAC shows an unknown publisher for an unsigned helper, so the prompt is the only gate. Moving the install is out of scope (2026-11-17 decision); signing or a Program Files install would close it.
 
