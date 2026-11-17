@@ -36,20 +36,30 @@ public partial class App : Application
 
     public ConfigStore Config { get; private set; } = null!;
 
-    /// <summary>True when launched by the Run-at-startup entry: start quietly in the tray.</summary>
-    public bool StartedAtLogin { get; private set; }
+    // True once the tray exists. Before then a failure ends the app; after, a transient UI exception doesn't.
+    private bool _trayComposed;
+    private bool _modulesStopAttempted;
+    private bool _sessionEnding;
 
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
 
         // Log any unhandled failure so a silent crash is never a mystery, and keep the tray app
-        // alive through a transient UI exception rather than vanishing.
+        // alive through a transient UI exception rather than vanishing. A failure while starting, before
+        // the tray exists, ends the app instead: otherwise an invisible process keeps the single-instance
+        // lock and every later launch hands itself to it.
         DispatcherUnhandledException += (_, args) =>
         {
             Log.Error("Dispatcher unhandled exception", args.Exception);
             args.Handled = true;
+            if (ShellLifetime.ExitOnUnhandled(_trayComposed))
+            {
+                Log.Error("Chippi failed to start; exiting");
+                Shutdown(1);
+            }
         };
+        SessionEnding += (_, _) => _sessionEnding = true;
         AppDomain.CurrentDomain.UnhandledException += (_, args) =>
             Log.Error("AppDomain unhandled exception", args.ExceptionObject as Exception);
         TaskScheduler.UnobservedTaskException += (_, args) =>
@@ -103,7 +113,6 @@ public partial class App : Application
         _instance.ActivationRequested += (_, args) =>
             Dispatcher.BeginInvoke(() => ActivationRequested?.Invoke(this, args));
 
-        StartedAtLogin = e.Args.Any(a => string.Equals(a, StartupRegistration.StartupArgument, StringComparison.OrdinalIgnoreCase));
         Log.Info($"Starting Chippi {typeof(App).Assembly.GetName().Version} ({System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture})");
 
         bool debugMode = e.Args.Contains("--debug", StringComparer.OrdinalIgnoreCase)
@@ -153,6 +162,7 @@ public partial class App : Application
             Shutdown();
             return;
         }
+        _trayComposed = true;
         _ = RouteLaunchAsync(NotificationStartup?.Arguments ?? e.Args);
     }
 
@@ -340,7 +350,11 @@ public partial class App : Application
     private async Task QuitAsync()
     {
         if (_quitting)
+        {
+            // A second Quit while the first waits on a slow module: stop waiting.
+            Shutdown();
             return;
+        }
         if (Shell.Recording?.Model?.Active == true && System.Windows.MessageBox.Show("Stop and save the recording, then quit Chippi?", "Chippi", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
             return;
         if (Shell.AppUpdates?.Engine?.IsRunning == true && System.Windows.MessageBox.Show("Stop updating and quit?", "Chippi", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
@@ -348,14 +362,8 @@ public partial class App : Application
         _quitting = true;
         // Stopping isn't removing: a Print Screen shortcut keeps Windows' setting off for the next start.
         Shell.Shortcuts.Closing();
-        try
-        {
-            await Shell.Registry.StopAllAsync();
-        }
-        catch (Exception ex)
-        {
-            Log.Error("Stopping modules on quit failed", ex);
-        }
+        _modulesStopAttempted = true;
+        await ShellLifetime.StopWithinAsync(Shell.Registry.StopAllAsync, ShellLifetime.QuitLimit);
         Shutdown();
     }
 
@@ -410,6 +418,14 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        // Logoff, shutdown and the other ways out skip Quit: stop the modules here so what they changed
+        // on the PC (mic routing, execution state) is put back.
+        if (!_modulesStopAttempted && _trayComposed && Shell is not null)
+        {
+            _modulesStopAttempted = true;
+            Shell.Shortcuts.Closing();
+            ShellLifetime.StopWithin(Dispatcher, Shell.Registry.StopAllAsync, _sessionEnding ? ShellLifetime.SessionEndLimit : ShellLifetime.QuitLimit);
+        }
         _islandHost?.Dispose();
         _toasts?.Dispose();
         Shell?.Clipboard.Dispose();

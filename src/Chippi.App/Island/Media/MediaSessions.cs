@@ -71,7 +71,9 @@ public sealed class SystemMediaSessions : IMediaSessions
 {
     private readonly Dispatcher _dispatcher = Dispatcher.CurrentDispatcher;
     private readonly Dictionary<string, (string Key, ImageSource? Image, bool Sent)> _art = new(StringComparer.OrdinalIgnoreCase);
-    private readonly HashSet<GlobalSystemMediaTransportControlsSession> _watched = [];
+    // Each watched session with what detaches its handlers, so a session that goes (or Dispose) leaves none behind.
+    private readonly Dictionary<GlobalSystemMediaTransportControlsSession, Action> _watched = [];
+    private Action? _detachManager;
     private GlobalSystemMediaTransportControlsSessionManager? _manager;
     private IReadOnlyList<MediaTrack> _sessions = [];
     private string? _selected;
@@ -100,8 +102,16 @@ public sealed class SystemMediaSessions : IMediaSessions
         }
         if (_disposed)
             return;
-        _manager.SessionsChanged += (_, _) => Schedule();
-        _manager.CurrentSessionChanged += (_, _) => Schedule();
+        var manager = _manager;
+        Windows.Foundation.TypedEventHandler<GlobalSystemMediaTransportControlsSessionManager, SessionsChangedEventArgs> sessionsChanged = (_, _) => Schedule();
+        Windows.Foundation.TypedEventHandler<GlobalSystemMediaTransportControlsSessionManager, CurrentSessionChangedEventArgs> currentChanged = (_, _) => Schedule();
+        manager.SessionsChanged += sessionsChanged;
+        manager.CurrentSessionChanged += currentChanged;
+        _detachManager = () =>
+        {
+            manager.SessionsChanged -= sessionsChanged;
+            manager.CurrentSessionChanged -= currentChanged;
+        };
         Schedule();
     }
 
@@ -182,13 +192,16 @@ public sealed class SystemMediaSessions : IMediaSessions
             // A newer refresh may start while this one awaits; only the newest one's result counts.
             int version = ++_version;
             var sessions = _manager.GetSessions();
-            foreach (var session in sessions.Where(_watched.Add))
+            foreach (var session in sessions)
             {
-                session.MediaPropertiesChanged += (_, _) => Schedule();
-                session.PlaybackInfoChanged += (_, _) => Schedule();
-                session.TimelinePropertiesChanged += (_, _) => Schedule();
+                if (!_watched.ContainsKey(session))
+                    _watched[session] = Watch(session);
             }
-            _watched.IntersectWith(sessions);
+            foreach (var gone in _watched.Keys.Where(s => !sessions.Contains(s)).ToList())
+            {
+                Detach(_watched[gone]);
+                _watched.Remove(gone);
+            }
             _windowsCurrent = _manager.GetCurrentSession()?.SourceAppUserModelId;
             var tracks = new List<MediaTrack>();
             foreach (var session in sessions)
@@ -207,6 +220,35 @@ public sealed class SystemMediaSessions : IMediaSessions
         catch (Exception ex)
         {
             Log.Warn("Now Playing: reading media sessions failed", ex);
+        }
+    }
+
+    private Action Watch(GlobalSystemMediaTransportControlsSession session)
+    {
+        Windows.Foundation.TypedEventHandler<GlobalSystemMediaTransportControlsSession, MediaPropertiesChangedEventArgs> properties = (_, _) => Schedule();
+        Windows.Foundation.TypedEventHandler<GlobalSystemMediaTransportControlsSession, PlaybackInfoChangedEventArgs> playback = (_, _) => Schedule();
+        Windows.Foundation.TypedEventHandler<GlobalSystemMediaTransportControlsSession, TimelinePropertiesChangedEventArgs> timeline = (_, _) => Schedule();
+        session.MediaPropertiesChanged += properties;
+        session.PlaybackInfoChanged += playback;
+        session.TimelinePropertiesChanged += timeline;
+        return () =>
+        {
+            session.MediaPropertiesChanged -= properties;
+            session.PlaybackInfoChanged -= playback;
+            session.TimelinePropertiesChanged -= timeline;
+        };
+    }
+
+    // A session that has already closed can refuse the unsubscribe; there is nothing left to release then.
+    private static void Detach(Action detach)
+    {
+        try
+        {
+            detach();
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("Now Playing: detaching a media session failed", ex);
         }
     }
 
@@ -298,7 +340,12 @@ public sealed class SystemMediaSessions : IMediaSessions
     public void Dispose()
     {
         _disposed = true;
+        foreach (var detach in _watched.Values)
+            Detach(detach);
         _watched.Clear();
+        if (_detachManager is { } detachManager)
+            Detach(detachManager);
+        _detachManager = null;
         _manager = null;
     }
 }
