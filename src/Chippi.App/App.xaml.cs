@@ -375,14 +375,30 @@ public partial class App : Application
     /// Velopack starts Chippi in its install folder, and every program Chippi starts without a working folder of its own
     /// inherits it. One that outlives Chippi (a restarted Explorer, an app opened from it) keeps the folder open, and
     /// Setup can't replace it (2026-11-17). Chippi resolves its own files from <see cref="AppContext.BaseDirectory"/>.
+    /// A run started anywhere else (a terminal, <c>dotnet run</c>) keeps its folder, so relative arguments such as
+    /// <c>--settings-snapshot shots</c> still land there.
     /// </summary>
     internal static void LeaveInstallFolder()
     {
-        try { Environment.CurrentDirectory = NeutralWorkingFolder(); }
+        try
+        {
+            if (InInstallFolder(Environment.CurrentDirectory, AppContext.BaseDirectory))
+                Environment.CurrentDirectory = NeutralWorkingFolder();
+        }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
         {
             Log.Warn("Startup: leaving the install folder failed", ex);
         }
+    }
+
+    /// <summary>Whether <paramref name="workingFolder"/> is the exe's folder's parent (Velopack's root) or inside it.</summary>
+    internal static bool InInstallFolder(string workingFolder, string baseDirectory)
+    {
+        var exeFolder = Path.TrimEndingDirectorySeparator(Path.GetFullPath(baseDirectory));
+        var root = Path.GetDirectoryName(exeFolder) ?? exeFolder;
+        var folder = Path.TrimEndingDirectorySeparator(Path.GetFullPath(workingFolder));
+        return folder.Equals(root, StringComparison.OrdinalIgnoreCase)
+            || folder.StartsWith(Path.TrimEndingDirectorySeparator(root) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>The user's profile, as Actions use for the commands they run; System32 when it's missing.</summary>
