@@ -75,7 +75,7 @@ public sealed class SoundboardStore
     // The skipped entries leave the library the next time it saves; keep them, so a fixed entry can be put back by hand.
     private void Quarantine(List<SoundClip?> skipped)
     {
-        try { File.WriteAllBytes(Path.Combine(Root, "library.skipped.json"), JsonSerializer.SerializeToUtf8Bytes(skipped, Json)); }
+        try { File.WriteAllBytes(Path.Combine(Root, $"library.skipped.{DateTime.UtcNow:yyyyMMddHHmmssfff}.json"), JsonSerializer.SerializeToUtf8Bytes(skipped, Json)); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException) { }
     }
 

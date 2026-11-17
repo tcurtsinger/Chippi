@@ -413,7 +413,8 @@ public sealed class AudioService
                 // The previous engine restores defaults and unmutes on its own thread; two engines must never write at once.
                 // Its stop task never faults, and its thread doesn't wait on this one.
                 if (after is { IsCompleted: false })
-                    after.Wait();
+                    if (!after.Wait(TimeSpan.FromSeconds(5))) // a wedged old engine must not block every later one
+                        Log.LogWarning("The previous audio engine has not stopped after 5 s; starting the next one anyway");
                 try
                 {
                     _system = _service._createSystem();

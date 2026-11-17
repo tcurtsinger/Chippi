@@ -68,7 +68,7 @@ public sealed class SoundboardLibraryTests : IDisposable
         Assert.Equal(good.Id, Assert.Single(loaded.Clips).Id);
         Assert.Equal(2, store.SkippedClips.Count);
         Assert.Equal("2 sounds skipped. Their files are kept", store.SkippedNotice);
-        string kept = File.ReadAllText(Path.Combine(_root, "library.skipped.json"));
+        string kept = File.ReadAllText(Assert.Single(Directory.GetFiles(_root, "library.skipped.*.json")));
         Assert.Contains("bad-name", kept);
         Assert.Contains("bad-range", kept);
         store.Save(loaded); // later saves work
