@@ -531,19 +531,19 @@ public sealed class ConfigStoreTests : IDisposable
     }
 
     [Fact]
-    public void A_settings_file_held_by_another_program_starts_on_defaults_and_stays_put()
+    public void A_settings_file_held_by_another_program_fails_the_load_and_stays_put()
     {
         var path = _dir.File("settings.json");
         File.WriteAllText(path, """{ "version": 1, "app": { "theme": "dark" } }""");
 
-        ConfigStore store;
+        // Starting on defaults would let the next save replace the owner's settings.
         using (new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
         {
-            store = new ConfigStore(path);
-            store.Load();
+            var store = new ConfigStore(path);
+            var error = Assert.Throws<IOException>(store.Load);
+            Assert.StartsWith("Reading settings failed", error.Message);
         }
 
-        Assert.Equal(ThemePreference.System, store.GetSection<AppSettings>(AppSettings.SectionName).Theme);
         Assert.True(File.Exists(path)); // not moved aside
         Assert.Contains("dark", File.ReadAllText(path));
         Assert.Empty(Directory.GetFiles(_dir.Path, "settings.corrupt-*.json"));

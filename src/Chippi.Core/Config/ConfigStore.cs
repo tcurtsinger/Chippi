@@ -60,7 +60,8 @@ public sealed class ConfigStore
 
     /// <summary>
     /// Reads settings.json. A missing file starts empty. An unreadable one is moved aside to
-    /// settings.corrupt-&lt;timestamp&gt;.json and the app starts on defaults instead of crashing.
+    /// settings.corrupt-&lt;timestamp&gt;.json and the app starts on defaults instead of crashing. One held by
+    /// another program past a short retry throws, so defaults never replace settings that couldn't be read.
     /// </summary>
     public void Load()
     {
@@ -100,20 +101,19 @@ public sealed class ConfigStore
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                // Held by another program, not damaged: leave the file where it is, keep a copy in case the
-                // next save replaces it, and start on defaults.
-                var copy = AsidePath("locked");
-                _logger.LogError(ex, "Settings at {Path} could not be read; starting on defaults (copy kept at {Copy})", FilePath, copy);
-                TryCopy(FilePath, copy);
-                _root = NewRoot();
+                // Held by another program, not damaged. Starting on defaults would let the next save replace
+                // the owner's settings (and an exclusive lock blocks even a copy), so the load fails instead:
+                // the app exits before the tray and the next launch reads them.
+                _logger.LogError(ex, "Settings at {Path} could not be read", FilePath);
+                throw new IOException($"Reading settings failed: {FilePath} is held by another program.", ex);
             }
         }
     }
 
-    // Antivirus or a sync client may hold the file for a moment at start: retry briefly, as WriteAtomic does.
+    // Antivirus or a sync client may hold the file for a moment at start: retry for about two seconds.
     private static string ReadWithRetry(string path)
     {
-        const int attempts = 6;
+        const int attempts = 10;
         for (int attempt = 1; ; attempt++)
         {
             try
@@ -122,7 +122,7 @@ public sealed class ConfigStore
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException && attempt < attempts)
             {
-                Thread.Sleep(20 * attempt);
+                Thread.Sleep(40 * attempt);
             }
         }
     }
