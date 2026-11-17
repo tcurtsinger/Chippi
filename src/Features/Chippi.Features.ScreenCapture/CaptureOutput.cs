@@ -72,7 +72,7 @@ public sealed class CaptureOutput(
             if ((_copied || _saved) && !_retained)
             {
                 try { await retain(flattened, _savedFile); _retained = !wantsSave || _saved; }
-                catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException or Microsoft.Data.Sqlite.SqliteException)
+                catch (Exception ex) when (CaptureFiles.ReadFailed(ex))
                 { recentFailed = true; }
             }
             return new(_copied, _saved, wantsCopy && !_copied, wantsSave && !_saved, recentFailed) { SavedFile = _savedFile };

@@ -186,10 +186,27 @@ public sealed class ColorPickerModule : IFeatureModule, IColorPageModel
         {
             if (!k.IsBindable) return "Shortcut unavailable";
             if (!hotkey!.Register(k, pressed)) return hotkey.Error ?? ShortcutService.InUse;
-            set(k); Save();
+            var old = saved();
+            set(k);
+            if (!TrySave())
+            {
+                // Nothing was persisted: put the previous chord back so memory, the hotkey and the file agree.
+                set(old);
+                if (old is { IsBindable: true }) hotkey.Register(old, pressed); else hotkey.Unregister();
+                return "Save failed";
+            }
             return null;
         }
-        hotkey = context.Shortcuts.Add(Id, name, new ShortcutEdits(saved, Change, () => { hotkey!.Unregister(); set(null); Save(); }) { Icon = nameof(LucideIcons.Pipette) });
+        void Remove()
+        {
+            var old = saved();
+            hotkey!.Unregister(); set(null);
+            if (TrySave()) return;
+            set(old);
+            if (old is { IsBindable: true }) hotkey.Register(old, pressed);
+            throw new System.IO.IOException("Saving the shortcut failed");
+        }
+        hotkey = context.Shortcuts.Add(Id, name, new ShortcutEdits(saved, Change, Remove) { Icon = nameof(LucideIcons.Pipette) });
         if (saved() is { IsBindable: true } keys && !hotkey.Register(keys, pressed))
             _errors[name] = hotkey.Error ?? ShortcutService.InUse;
         return hotkey;
@@ -307,7 +324,17 @@ public sealed class ColorPickerModule : IFeatureModule, IColorPageModel
         _recent.Remove(hex);
         _recent.Insert(0, hex);
         if (_recent.Count > MaxRecent) _recent.RemoveRange(MaxRecent, _recent.Count - MaxRecent);
-        Save();
+        TrySave(); // The palette is cosmetic: a failed write keeps it in memory and never stops a pick reporting its copy.
+    }
+
+    private bool TrySave()
+    {
+        try { Save(); return true; }
+        catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException)
+        {
+            Chippi.Core.Diagnostics.Log.Warn("Color picker: saving settings failed", ex);
+            return false;
+        }
     }
 
     private void Save()

@@ -113,7 +113,8 @@ public sealed class ModuleFlowTests
     {
         public ScreenTextSettings Value = new();
         public T Get<T>() where T : class, new() => (T)(object)Value;
-        public void Save<T>(T value) where T : class => Value = (ScreenTextSettings)(object)value;
+        public bool Fail;
+        public void Save<T>(T value) where T : class { if (Fail) throw new IOException("disk full"); Value = (ScreenTextSettings)(object)value; }
     }
 
     private sealed class Ui : IModuleUi
@@ -173,6 +174,29 @@ public sealed class ModuleFlowTests
         await t.Module.Work;
     }
 
+    [Fact]
+    public async Task A_failed_settings_save_restores_the_previous_shortcut_and_reports_it()
+    {
+        var t = await Start();
+        var key = t.Keys.Added[ScreenTextModule.CopyName];
+        var before = key.Edits.Saved();
+        t.Settings.Fail = true;
+        string? refused = key.Edits.Change(new KeyShortcut(ShortcutModifiers.Control | ShortcutModifiers.Alt, 0x78u));
+        Assert.Equal("Save failed", refused);
+        Assert.Equal(before, key.Edits.Saved());
+        Assert.Throws<IOException>(() => key.Edits.Remove());
+        Assert.Equal(before, key.Edits.Saved());
+    }
+
+    [Fact]
+    public async Task Starting_a_scan_clears_a_read_still_showing()
+    {
+        var t = await Start();
+        t.Module.Text.SetReading(true);
+        Assert.True(t.Module.Text.Reading);
+        t.Module.Text.SetReading(false);
+        Assert.False(t.Module.Text.Reading);
+    }
     [Fact]
     public async Task Existing_capture_is_read_without_opening_another_selector_and_removal_stops_reads()
     {

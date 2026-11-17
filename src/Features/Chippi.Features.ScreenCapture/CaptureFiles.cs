@@ -39,6 +39,14 @@ public static class CaptureFiles
     internal static bool ReadFailed(Exception ex) => ex is IOException or UnauthorizedAccessException or NotSupportedException
         or FormatException or InvalidDataException or System.Security.Cryptography.CryptographicException or Microsoft.Data.Sqlite.SqliteException;
 
+    /// <summary>The type Save As writes: the typed extension wins, so "shot.png" never holds JPEG data; the dialog's filter decides otherwise.</summary>
+    internal static CaptureFileType TypeFor(string path, int filterIndex) => Path.GetExtension(path).ToLowerInvariant() switch
+    {
+        ".png" => CaptureFileType.Png,
+        ".jpg" or ".jpeg" => CaptureFileType.Jpeg,
+        _ => filterIndex == 2 ? CaptureFileType.Jpeg : CaptureFileType.Png,
+    };
+
     public static string DefaultFolder => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "Screenshots");
 
     /// <summary>Opens <paramref name="folder"/> in File Explorer; false when it's missing or Windows refuses, never a guessed path.</summary>

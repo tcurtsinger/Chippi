@@ -197,6 +197,16 @@ public sealed class ScreenTextModule : IFeatureModule
 
     public void SetJoinLines(bool join) => Update(_settings with { JoinLines = join });
 
+    private bool TryUpdate()
+    {
+        try { Update(_settings); return true; }
+        catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException)
+        {
+            Chippi.Core.Diagnostics.Log.Warn("Screen text: saving settings failed", ex);
+            return false;
+        }
+    }
+
     private void Update(ScreenTextSettings settings)
     {
         _settings = settings;
@@ -282,10 +292,27 @@ public sealed class ScreenTextModule : IFeatureModule
         {
             if (!k.IsBindable) return "Shortcut unavailable";
             if (!hotkey!.Register(k, () => Start(verb))) return hotkey.Error ?? ShortcutService.InUse;
-            set(k); Update(_settings);
+            var old = saved();
+            set(k);
+            if (!TryUpdate())
+            {
+                // Nothing was persisted: put the previous chord back so memory, the hotkey and the file agree.
+                set(old);
+                if (old is { IsBindable: true }) hotkey.Register(old, () => Start(verb)); else hotkey.Unregister();
+                return "Save failed";
+            }
             return null;
         }
-        hotkey = context.Shortcuts.Add(Id, name, new ShortcutEdits(saved, Change, () => { hotkey!.Unregister(); set(null); Update(_settings); })
+        void Remove()
+        {
+            var old = saved();
+            hotkey!.Unregister(); set(null);
+            if (TryUpdate()) return;
+            set(old);
+            if (old is { IsBindable: true }) hotkey.Register(old, () => Start(verb));
+            throw new System.IO.IOException("Saving the shortcut failed");
+        }
+        hotkey = context.Shortcuts.Add(Id, name, new ShortcutEdits(saved, Change, Remove)
             { Icon = verb == ScreenTextVerb.ScanQr ? nameof(LucideIcons.QrCode) : nameof(LucideIcons.ScanText) });
         if (saved() is { IsBindable: true } keys)
             hotkey.Register(keys, () => Start(verb));
@@ -391,7 +418,8 @@ public sealed class ScreenTextModule : IFeatureModule
     {
         long generation = Interlocked.Increment(ref _generation);
         _lastImage = image;
-        if (show) Text.SetReading(true);
+        // A read that supersedes a showing one must clear its spinner: that older read returns without touching it.
+        Text.SetReading(show);
         string? language = _settings.Language;
         bool join = _settings.JoinLines;
         OcrOutcome outcome;
@@ -422,6 +450,7 @@ public sealed class ScreenTextModule : IFeatureModule
     private async Task ScanAsync(CapturedImage image)
     {
         long generation = Interlocked.Increment(ref _generation);
+        Text.SetReading(false); // This scan supersedes a read still showing "Reading" on the Text page.
         IReadOnlyList<QrHit> hits = [];
         bool failed = false, damaged = false;
         try
@@ -532,7 +561,11 @@ public sealed class ScreenTextModule : IFeatureModule
 
         internal void SetReading(bool reading)
         {
-            lock (_gate) _reading = reading;
+            lock (_gate)
+            {
+                if (_reading == reading) return;
+                _reading = reading;
+            }
             Changed?.Invoke();
         }
     }
