@@ -1,6 +1,6 @@
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
 <!-- Displays and brightness (docs/phase-7/displays.md). For now its Settings page and the page model the
-     feature's module implements; the DDC/CI and WMI engine joins it on this branch. -->
+     feature's module implements; the DDC/CI engine joins it on this branch. -->
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>

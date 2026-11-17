@@ -50,7 +50,7 @@ internal sealed class MonitorWorker : IDisposable
     private readonly object _gate = new();
     private readonly Axis _brightness = new(Vcp.Brightness);
     private readonly Axis _contrast = new(Vcp.Contrast);
-    private readonly DisplayInfo _display;
+    private DisplayInfo _display; // the handle changes with the display layout; read and set under _gate
     private readonly IMonitorBus _bus;
     private readonly Func<long> _nowMs;
     private readonly Action<TimeSpan> _sleep;
@@ -69,6 +69,25 @@ internal sealed class MonitorWorker : IDisposable
     }
 
     public string Id => _display.Id;
+
+    /// <summary>
+    /// The display's current info: its HMONITOR isn't stable across a display change or a resume, so the next open uses the new
+    /// one. True when the handle changed (the monitor then needs reopening).
+    /// </summary>
+    public bool UpdateDisplay(DisplayInfo display)
+    {
+        lock (_gate)
+        {
+            bool changed = display.Handle != _display.Handle;
+            _display = display;
+            return changed;
+        }
+    }
+
+    private DisplayInfo Display
+    {
+        get { lock (_gate) return _display; }
+    }
 
     /// <summary>Something about the monitor changed. Raised on the worker's thread.</summary>
     public event Action? Changed;
@@ -160,7 +179,10 @@ internal sealed class MonitorWorker : IDisposable
     }
 
     /// <summary>Waits for the worker to end, at most 5 seconds. A call still running then ends it and closes the handle later.</summary>
-    public void Join() => _thread.Join(TimeSpan.FromSeconds(5));
+    public void Join() => Join(TimeSpan.FromSeconds(5));
+
+    /// <summary>Waits for the worker to end, at most <paramref name="timeout"/>.</summary>
+    public void Join(TimeSpan timeout) => _thread.Join(timeout < TimeSpan.Zero ? TimeSpan.Zero : timeout);
 
     public void Dispose()
     {
@@ -240,7 +262,7 @@ internal sealed class MonitorWorker : IDisposable
         percent = 0;
         try
         {
-            _monitor ??= _bus.Open(_display);
+            _monitor ??= _bus.Open(Display);
             if (_monitor is null || !_monitor.TryRead(axis.Code, out int current, out int max) || max <= 0) return false;
             axis.Max = max;
             percent = (int)Math.Round(current * 100.0 / max);
@@ -327,7 +349,7 @@ internal sealed class MonitorWorker : IDisposable
         {
             try
             {
-                _monitor ??= _bus.Open(_display);
+                _monitor ??= _bus.Open(Display);
                 ok = _monitor is not null && _monitor.TryWrite(axis.Code, (int)Math.Round(percent * axis.Max / 100.0));
             }
             catch (Exception ex)

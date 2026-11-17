@@ -22,9 +22,12 @@ public interface IMonitor : IDisposable
     bool TryWrite(Vcp code, int raw);
 }
 
-/// <summary>Opens monitors: DDC/CI for an external one, WMI for a laptop's panel. Tests pass a fake.</summary>
+/// <summary>Opens monitors: DDC/CI for an external one. Tests pass a fake.</summary>
 public interface IMonitorBus
 {
     /// <summary>The display's monitor, or null when it can't be opened.</summary>
     IMonitor? Open(DisplayInfo display);
+
+    /// <summary>False for a display this bus has no way to control (a laptop's own panel): it shows "Not supported", not a failure.</summary>
+    bool Supports(DisplayInfo display) => true;
 }

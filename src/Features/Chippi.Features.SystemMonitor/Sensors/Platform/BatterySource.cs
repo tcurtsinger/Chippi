@@ -40,7 +40,7 @@ internal sealed class BatterySource : IBatterySource
             int? milliwatts = PowerBattery.AggregateBattery.GetReport().ChargeRateInMilliwatts;
             return milliwatts is { } mw and not 0 ? mw / 1000.0 : null;
         }
-        catch (Exception ex) when (ex is COMException or UnauthorizedAccessException)
+        catch (Exception ex) when (ex is not OutOfMemoryException) // only the optional charge rate is lost, never the whole reading
         {
             return null;
         }

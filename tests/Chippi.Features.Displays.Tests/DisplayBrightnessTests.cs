@@ -82,9 +82,13 @@ public sealed class DisplayBrightnessTests
     {
         public readonly Dictionary<string, FakeMonitor> Monitors = [];
         public int Opens;
+        public readonly System.Collections.Concurrent.ConcurrentQueue<nint> OpenedHandles = new();
+        public readonly HashSet<string> Unsupported = [];
+        public bool Supports(DisplayInfo display) => !Unsupported.Contains(display.Id);
         public IMonitor? Open(DisplayInfo display)
         {
             Interlocked.Increment(ref Opens);
+            OpenedHandles.Enqueue(display.Handle);
             return Monitors.TryGetValue(display.Id, out var m) ? m : null;
         }
     }

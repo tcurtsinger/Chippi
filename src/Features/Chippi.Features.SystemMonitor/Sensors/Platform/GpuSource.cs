@@ -80,10 +80,13 @@ internal sealed class GpuSource : IGpuSource
         long now = Environment.TickCount64;
         if (_refreshed != long.MinValue && now - _refreshed < RefreshAfter.TotalMilliseconds)
             return;
-        foreach (var adapter in _adapters)
-            GpuNative.Close(adapter);
-        _adapters = GpuNative.Open();
+        // Open the new list first: if that throws, the adapters held stay open and valid, and nothing is closed twice.
+        var opened = GpuNative.Open();
+        var previous = _adapters;
+        _adapters = opened;
         _refreshed = now;
+        foreach (var adapter in previous)
+            GpuNative.Close(adapter);
 
         var nvidia = _adapters.Where(a => a.IsNvidia).ToList();
         if (nvidia.Count > 0 && !_nvmlTried)
