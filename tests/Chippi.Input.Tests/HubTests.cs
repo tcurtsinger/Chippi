@@ -175,10 +175,9 @@ public class HubTests
         firstKeeps = false;
         Assert.True(hub.Mouse(TestHub.WmMButtonDown)); // second keeps the next down
         Assert.True(hub.Mouse(TestHub.WmMButtonUp));
-        Assert.False(hub.Mouse(TestHub.WmMButtonUp)); // nobody owns it any more: the app's
-
         Assert.Contains("second Up Middle", second.Heard);
         Assert.DoesNotContain("first Up Middle", first.Heard);
+        Assert.False(hub.Mouse(TestHub.WmMButtonUp)); // nobody owns it any more: the app's
     }
 
     [Fact]
