@@ -160,14 +160,14 @@ public sealed class DisplaysIslandView : UserControl
     private void Refresh()
     {
         var displays = _model.PanelDisplays;
-        var answering = displays.Where(d => !d.Failed).ToList();
+        var answering = displays.Where(d => !d.Failed && !d.NotSupported).ToList();
         bool any = displays.Count > 0;
         _body.Visibility = any ? Visibility.Visible : Visibility.Collapsed;
         _none.Visibility = any ? Visibility.Collapsed : Visibility.Visible;
         _all.Visibility = answering.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
         if (answering.Count < 2) _allPicked = false;
         if (_pick is null || displays.All(d => d.Id != _pick))
-            _pick = (displays.FirstOrDefault(d => d.IsMain) ?? displays.FirstOrDefault())?.Id;
+            _pick = (answering.FirstOrDefault(d => d.IsMain) ?? answering.FirstOrDefault() ?? displays.FirstOrDefault(d => d.IsMain) ?? displays.FirstOrDefault())?.Id;
         _all.IsChecked = _allPicked;
         DrawMap(displays);
         if (!any) return;
@@ -187,13 +187,13 @@ public sealed class DisplaysIslandView : UserControl
         var picked = displays.First(d => d.Id == _pick);
         _pickedGlyph.Data = LucideIcons.Monitor;
         _pickedName.Text = picked.Name;
-        _pickedNote.Text = picked.IsMain ? "· Main" : "";
+        _pickedNote.Text = picked.NotSupported ? "· Not supported" : picked.IsMain ? "· Main" : "";
         _pickedError.Visibility = picked.WriteFailed && !picked.Failed ? Visibility.Visible : Visibility.Collapsed;
         _failed.Visibility = picked.Failed ? Visibility.Visible : Visibility.Collapsed;
         _tryAgain.IsEnabled = !picked.Retrying;
         AutomationProperties.SetName(_tryAgain, $"Try again on {picked.Name}");
-        _brightness.Show(picked.Name, picked.Brightness, visible: !picked.Failed);
-        _contrast.Show(picked.Name, picked.ContrastLevel, visible: !picked.Failed && picked.Contrast);
+        _brightness.Show(picked.Name, picked.Brightness, visible: !picked.Failed && !picked.NotSupported);
+        _contrast.Show(picked.Name, picked.ContrastLevel, visible: !picked.Failed && !picked.NotSupported && picked.Contrast);
     }
 
     /// <summary>Each display as a tile where Windows puts it, scaled to fit the map with the arrangement centered.</summary>
@@ -232,9 +232,10 @@ public sealed class DisplaysIslandView : UserControl
             tile.Tile.Height = Math.Max(24, r.Height * scale - 2 * TileGap);
             Canvas.SetLeft(tile.Tile, left + (r.X - all.X) * scale + TileGap);
             Canvas.SetTop(tile.Tile, top + (r.Y - all.Y) * scale + TileGap);
-            tile.Tile.IsChecked = _allPicked ? !d.Failed : d.Id == _pick;
+            tile.Tile.IsChecked = _allPicked ? !d.Failed && !d.NotSupported : d.Id == _pick;
             tile.Name.Text = d.Name;
             string line = d.Failed ? DisplaysSettingsPage.FailedText
+                : d.NotSupported ? DisplaysSettingsPage.NotSupportedText
                 : d.Brightness is { } level ? (d.IsMain ? "Main · " : "") + Percent(level)
                 : d.IsMain ? "Main" : "";
             tile.Line.Text = line;

@@ -25,7 +25,7 @@ The tile's tooltip names the levels ("OMEN 34c 54% · Samsung 60%").
 
 ## Behavior
 
-**Reading.** External monitors use DDC/CI through `dxva2`: `GetPhysicalMonitorsFromHMONITOR`, then `GetVCPFeatureAndVCPFeatureReply` for VCP 0x10 (brightness) and 0x12 (contrast). The level shown is `current × 100 / max`, using the maximum the monitor reports. A laptop panel uses WMI (`root\wmi`, `WmiMonitorBrightness` to read, `WmiMonitorBrightnessMethods.WmiSetBrightness` to write) through CsWin32's WMI COM interfaces, with no new package. A laptop panel has no Contrast.
+**Reading.** External monitors use DDC/CI through `dxva2`: `GetPhysicalMonitorsFromHMONITOR`, then `GetVCPFeatureAndVCPFeatureReply` for VCP 0x10 (brightness) and 0x12 (contrast). The level shown is `current × 100 / max`, using the maximum the monitor reports. A laptop's built-in panel is not supported yet: it is listed with "Not supported" (no Try again, no slider) rather than as a failure. WMI (`root\wmi`, `WmiMonitorBrightness`) is the likely route when it is built.
 
 - **Support is a read that answers.** A display supports brightness when a read of 0x10 succeeds, and contrast when a read of 0x12 does. The capabilities string isn't read at all: it took 1.3 to 6.6 s on Travis's monitors, and a direct read answers the same question in about 60 ms. This replaces architecture §8's cached capabilities.
 - **One worker per monitor.** Every DDC call for a monitor runs on its own background worker, never the UI thread. The two monitors are read in parallel.
@@ -82,7 +82,7 @@ The feature adds the three slots to `ModuleContext.Shortcuts` when it starts and
 | Twinkle Tray | One click to a slider per monitor; hotkeys that step by an amount (its Offset); the list of causes for a monitor that doesn't answer | Time-of-day schedules, idle dimming, a command line, normalizing different panels |
 | Monitorian | All displays moving together, keeping each display's offset; plain causes ("Turn on DDC/CI in the monitor's menu") | Input source, color temperature |
 | ClickMonitorDDC | Nothing: its documentation couldn't be confirmed (spec B) | |
-| Windows' own slider (laptops) | The same WMI path, so a laptop panel works like a monitor | |
+| Windows' own slider (laptops) | Not supported yet: the built-in panel shows "Not supported" | |
 
 ## Copy
 
@@ -138,6 +138,6 @@ Screenshots of the panel, Contrast view and Settings next to the boards, and the
 
 - DDC writes on Travis's monitors, and how fast each monitor visibly responds (reads only so far: 55 to 65 ms).
 - That a read of 0x10 or 0x12 is a reliable support test on every monitor; some monitors answer reads and ignore writes (inference from Twinkle Tray's notes).
-- The laptop WMI path from a standard user: no laptop here, so it's tested only with the fake.
+- Laptop panels (WMI) are not built: no laptop here to test it on. The built-in panel shows "Not supported".
 - Whether brightness 0 is dark enough on some panels to be hard to read; Brightness up is the way back.
 - Displays behind docks and adapters: Travis's monitors are connected directly.

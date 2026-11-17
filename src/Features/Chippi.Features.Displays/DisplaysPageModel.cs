@@ -42,6 +42,9 @@ public sealed record DisplayStatus(string Id, string Name, bool IsMain, int? Bri
 
     /// <summary>The last write didn't go through; <see cref="Brightness"/> is the last level that did.</summary>
     public bool WriteFailed { get; init; }
+
+    /// <summary>Chippi can't control this display (a laptop's own panel): "Not supported", not a failure, and no Try again.</summary>
+    public bool NotSupported { get; init; }
 }
 
 /// <summary>The feature's three global slots, in the page's order.</summary>

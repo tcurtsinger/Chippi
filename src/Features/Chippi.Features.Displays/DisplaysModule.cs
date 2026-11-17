@@ -37,7 +37,7 @@ public sealed partial class DisplaysModule : IFeatureModule, IDisplaysPageModel
 
     private DisplaysIslandView View() => _view ??= new DisplaysIslandView(this);
 
-    /// <param name="createBus">The monitors' bus; the app passes the real one (DDC/CI and WMI), tests a fake.</param>
+    /// <param name="createBus">The monitors' bus; the app passes the real one (DDC/CI), tests a fake.</param>
     public DisplaysModule(Func<IMonitorBus>? createBus = null, Func<IReadOnlyList<DisplayInfo>>? displays = null, Func<nint?>? underPointer = null,
         Func<long>? nowMs = null, Action<TimeSpan>? sleep = null, Func<string, IHotkey>? createHotkey = null)
     {

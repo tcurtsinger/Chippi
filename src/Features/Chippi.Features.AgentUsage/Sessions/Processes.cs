@@ -194,14 +194,17 @@ internal sealed class WindowsProcesses : IProcesses
     }
 
     [StructLayout(LayoutKind.Sequential)]
-    private struct RmUniqueProcess
+    internal struct RmUniqueProcess
     {
         public uint ProcessId;
-        public long StartTime;
+
+        // A FILETIME: two DWORDs. A long would pad the struct to 16 bytes and the array stride would no longer match Windows'.
+        public uint StartTimeLow;
+        public uint StartTimeHigh;
     }
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
-    private struct RmProcessInfo
+    internal struct RmProcessInfo
     {
         public RmUniqueProcess Process;
         [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 256)] public string AppName;

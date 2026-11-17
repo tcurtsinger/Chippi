@@ -17,7 +17,7 @@ public sealed record DisplayInfo(string Id, string Name, nint Handle, bool IsMai
     /// <summary>The monitor's own name, without its size or "main" ("OMEN 34c"); "Built-in display" or "Display 2" when it has none.</summary>
     public string Friendly { get; init; } = "";
 
-    /// <summary>A laptop's own panel, which brightness reaches through WMI rather than DDC/CI.</summary>
+    /// <summary>A laptop's own panel, which DDC/CI doesn't reach; Displays shows it as not supported.</summary>
     public bool IsInternal { get; init; }
 }
 

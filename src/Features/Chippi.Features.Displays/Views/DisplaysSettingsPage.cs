@@ -18,6 +18,7 @@ public sealed class DisplaysSettingsPage : UserControl
 {
     internal const string Causes = "Turn on DDC/CI in the monitor's menu, or connect it without a dock";
     internal const string FailedText = "Brightness control failed";
+    internal const string NotSupportedText = "Not supported";
 
     internal static readonly IReadOnlyList<(BrightnessTarget Target, string Name)> Targets =
     [
@@ -189,7 +190,7 @@ public sealed class DisplaysSettingsPage : UserControl
         public void Show(DisplayStatus display)
         {
             Row.Header = display.Name;
-            string what = display.Failed ? Causes : display.Contrast ? "Brightness and contrast" : "Brightness";
+            string what = display.Failed ? Causes : display.NotSupported ? "Built-in panel" : display.Contrast ? "Brightness and contrast" : "Brightness";
             Row.Description = display.IsMain ? $"Main display · {what}" : what;
             if (display.Failed)
             {
@@ -200,8 +201,8 @@ public sealed class DisplaysSettingsPage : UserControl
             }
             else
             {
-                _level.Text = display.Brightness is { } level ? $"{level}%" : "";
-                AutomationProperties.SetName(_level, display.Brightness is { } l ? $"Brightness {l}%" : "Brightness");
+                _level.Text = display.NotSupported ? NotSupportedText : display.Brightness is { } level ? $"{level}%" : "";
+                AutomationProperties.SetName(_level, display.NotSupported ? $"Brightness {NotSupportedText}" : display.Brightness is { } l ? $"Brightness {l}%" : "Brightness");
                 Row.Content = _level;
             }
         }

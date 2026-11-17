@@ -12,11 +12,13 @@ namespace Chippi.Features.Displays;
 
 /// <summary>
 /// The real monitors (docs/phase-7/displays.md, Reading): DDC/CI through <c>dxva2</c> for an external one. A laptop's own panel
-/// goes through WMI (<see cref="WmiPanel"/>). Only VCP 0x10 and 0x12 are ever read or written.
+/// isn't supported yet and shows "Not supported". Only VCP 0x10 and 0x12 are ever read or written.
 /// </summary>
 internal sealed class WindowsMonitorBus : IMonitorBus
 {
-    public IMonitor? Open(DisplayInfo display) => display.IsInternal ? WmiPanel.Open() : Ddc.Open(display);
+    public IMonitor? Open(DisplayInfo display) => Supports(display) ? Ddc.Open(display) : null;
+
+    public bool Supports(DisplayInfo display) => !display.IsInternal;
 
     /// <summary>The display the pointer is on, or null when it can't be read.</summary>
     public static unsafe nint? UnderPointer()
@@ -71,10 +73,4 @@ internal sealed class WindowsMonitorBus : IMonitorBus
             catch (Exception ex) { Log.Warn("Displays: closing a monitor failed", ex); }
         }
     }
-}
-
-/// <summary>A laptop's own panel, through WMI (<c>root\wmi</c>, <c>WmiMonitorBrightness</c>).</summary>
-internal static class WmiPanel
-{
-    public static IMonitor? Open() => null;
 }

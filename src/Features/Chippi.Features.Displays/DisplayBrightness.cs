@@ -54,6 +54,7 @@ internal sealed partial class DisplayBrightness : IDisposable
 
     private DisplayStatus Status(DisplayInfo info, string name)
     {
+        if (!_bus.Supports(info)) return new DisplayStatus(info.Id, name, info.IsMain, null, false) { NotSupported = true };
         var state = _workers.TryGetValue(info.Id, out var worker) ? worker.State : new MonitorState(false, false, null, false, null, false);
         return new DisplayStatus(info.Id, name, info.IsMain, state.Brightness, state.HasContrast, state.Failed, state.Retrying)
         {
@@ -84,9 +85,15 @@ internal sealed partial class DisplayBrightness : IDisposable
             }
             foreach (var info in current)
             {
+                if (!_bus.Supports(info))
+                {
+                    if (_workers.Remove(info.Id, out var unsupported)) removed.Add(unsupported);
+                    continue;
+                }
                 if (_workers.TryGetValue(info.Id, out var worker))
                 {
-                    if (reopen) worker.Reopen();
+                    // The HMONITOR isn't stable across a display change: a worker that kept the old one would never reopen.
+                    if (worker.UpdateDisplay(info) || reopen) worker.Reopen();
                     else worker.Read();
                     continue;
                 }
@@ -248,6 +255,8 @@ internal sealed partial class DisplayBrightness : IDisposable
             worker.Changed -= OnChanged;
             worker.Stop();
         }
-        foreach (var worker in workers) worker.Join();
+        // One shared deadline: a monitor stuck in a DDC/CI call is left to close its own handle, not waited on N times.
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(1);
+        foreach (var worker in workers) worker.Join(deadline - DateTime.UtcNow);
     }
 }
