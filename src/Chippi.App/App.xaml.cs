@@ -39,6 +39,7 @@ public partial class App : Application
     // True once the tray exists. Before then a failure ends the app; after, a transient UI exception doesn't.
     private bool _trayComposed;
     private bool _modulesStopAttempted;
+    private bool _modulesStartRequested;
     private bool _sessionEnding;
 
     protected override void OnStartup(StartupEventArgs e)
@@ -309,6 +310,7 @@ public partial class App : Application
         Settings.Features.FeatureCatalog.RegisterPlaceholders(shell.Registry);
 
         // Start installed modules before any surface reads the registry.
+        _modulesStartRequested = true;
         _modulesStarted = StartModulesAsync(shell);
 
         // [WS3] Island: create the island host here.
@@ -420,7 +422,8 @@ public partial class App : Application
     {
         // Logoff, shutdown and the other ways out skip Quit: stop the modules here so what they changed
         // on the PC (mic routing, execution state) is put back.
-        if (!_modulesStopAttempted && _trayComposed && Shell is not null)
+        // Modules start inside ComposeShell, before the tray exists, so a failed start must stop them too.
+        if (!_modulesStopAttempted && _modulesStartRequested && Shell is not null)
         {
             _modulesStopAttempted = true;
             Shell.Shortcuts.Closing();

@@ -32,6 +32,7 @@ internal static class ShellLifetime
     public static async Task<bool> StopWithinAsync(Func<CancellationToken, Task> stop, TimeSpan limit)
     {
         using var timeout = new CancellationTokenSource(limit);
+        using var delayCts = new CancellationTokenSource();
         Task task;
         try
         {
@@ -42,7 +43,10 @@ internal static class ShellLifetime
             Log.Error("Stopping modules failed", ex);
             return true;
         }
-        if (await Task.WhenAny(task, Task.Delay(limit)) != task)
+        var delay = Task.Delay(limit, delayCts.Token);
+        var first = await Task.WhenAny(task, delay);
+        delayCts.Cancel();
+        if (first != task)
         {
             Log.Warn($"Stopping modules took longer than {limit.TotalSeconds:0} s; exiting anyway");
             // Nobody awaits it now: observe a later failure so it isn't reported as unobserved.
@@ -73,7 +77,34 @@ internal static class ShellLifetime
     {
         var frame = new DispatcherFrame();
         var work = StopWithinAsync(stop, limit);
-        _ = work.ContinueWith(_ => dispatcher.BeginInvoke(() => frame.Continue = false), TaskScheduler.Default);
-        Dispatcher.PushFrame(frame);
+        void Release()
+        {
+            try
+            {
+                dispatcher.BeginInvoke(() => frame.Continue = false);
+            }
+            catch (Exception)
+            {
+                frame.Continue = false;
+            }
+        }
+        _ = work.ContinueWith(_ => Release(), TaskScheduler.Default);
+        // Backstop that doesn't depend on the work: the frame never outlives the limit by more than a margin.
+        using var backstop = new CancellationTokenSource();
+        _ = Task.Delay(limit + TimeSpan.FromSeconds(2), backstop.Token)
+            .ContinueWith(_ => frame.Continue = false, TaskContinuationOptions.OnlyOnRanToCompletion);
+        try
+        {
+            Dispatcher.PushFrame(frame);
+        }
+        catch (InvalidOperationException ex)
+        {
+            // The dispatcher has already shut down: there is nothing to pump, so stop without waiting.
+            Log.Warn("Stopping modules: the dispatcher was not available to wait on", ex);
+        }
+        finally
+        {
+            backstop.Cancel();
+        }
     }
 }
