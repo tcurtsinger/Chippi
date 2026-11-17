@@ -167,7 +167,7 @@ public sealed class DisplaysIslandView : UserControl
         _all.Visibility = answering.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
         if (answering.Count < 2) _allPicked = false;
         if (_pick is null || displays.All(d => d.Id != _pick))
-            _pick = (displays.FirstOrDefault(d => d.IsMain) ?? displays.FirstOrDefault())?.Id;
+            _pick = (answering.FirstOrDefault(d => d.IsMain) ?? answering.FirstOrDefault() ?? displays.FirstOrDefault(d => d.IsMain) ?? displays.FirstOrDefault())?.Id;
         _all.IsChecked = _allPicked;
         DrawMap(displays);
         if (!any) return;
