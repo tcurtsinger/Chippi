@@ -50,3 +50,15 @@ The later alternatives and future feature concepts from PR #287 are preserved in
 - **Results:** Text · 31 words · Reselect · Copy all · QR code · Link · Text · Copy · Open link · "1 2 of 2" · Color · Copied · HEX · RGB · HSL · Pick again
 - **Displays:** Displays · Brightness · Contrast · All displays · Main · Brightness control failed
 - **Settings:** Shortcuts · Saving · Save folder · Change · Reset · Folder not found · File type · When a capture finishes · Do what I press · Selecting · Ctrl+drag copies on release · Magnifier · Recent captures · Keep recent captures · The last 50 you copied or saved · Clear · Copying · Copy as · Recent colors · Text · Language · Languages installed in Windows · Keep line breaks · Brightness keys · Act on · Display under the pointer · Step · Try again · "Turn on DDC/CI in the monitor's menu, or connect it without a dock" · Not set · Edit · Record · Add shortcut
+
+## Wave 3: Port manager, Cleaner, Uninstaller (2026-11-17)
+
+`port-manager.html`, `cleaner.html` and `uninstaller.html` draw the three tools from their briefs, for Travis's approval before they're built. Each board opens as `<page>.html?board=<name>&theme=dark|light`; every window, app, port and size is invented. The renders live in the session's temp folder, not here.
+
+Shared rules, from DESIGN.md: failures, warnings, "Kept: …" refusals, "Check first" and "Needs admin" after a declined prompt are Caution; outcomes where nothing went wrong ("Already closed", "Changed, check again") are neutral; Critical fills only the verb inside a confirm that ends, deletes or uninstalls, with the UAC shield when it needs admin, and Cancel keeps focus. No new color tokens.
+
+### Calls made in the mockups
+
+- **Port manager:** Free, Stop and the shield only on listening TCP and bound UDP rows; connections, Time wait and ended rows have no verb. The question says when a whole app ends ("ends the whole app, 2 open connections"). One process on two addresses keeps Free with "+1"; two processes on one port get Open (Settings filtered to the port). Chippi, System and the never-ended Windows processes show with no verb and never in the picker. At 860 the Settings rail leaves the columns in place; if width runs out, tag text goes first, then Remote, then State.
+- **Cleaner:** a trailing "+" marks a size that's only a lower bound, and the header says "At least …" while one is ticked. The admin question shows "was X" beside a row that grew after the prompt. Clean is off with nothing ticked. Settings' switches are the list's remembered ticks. Kept rows appear only in a run and its results.
+- **Uninstaller:** "Kept" is the short status on the right and the full "Kept: reason" sits on the row's second line. A file too big for the Recycle Bin is tagged "No Recycle Bin" and named in the question as removed for good. Shared items are dimmed with a lock and no checkbox. With no uninstall record, admin items are kept as "Kept: no uninstall record". The Radial menu reuses Search's verb rows.

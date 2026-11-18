@@ -138,7 +138,7 @@ Essentials preset, the only one of its features not built yet. Capture gets its 
 - **Wave 2:** Screen recording, Media tools, and a scrolling capture trial.
 - **Media tools (2026-11-10):** approved Convert v1, options above the list; implemented Convert, Resize and Compress with native Windows encoders, batch progress, retry, cancellation and image comparison. [Brief and verification](docs/phase-7/media-tools.md). Hardware/performance checks remain listed there.
 - **Wave 3:** the admin helper, App updates, Uninstaller, Cleaner, Port manager.
-- **Admin helper (2026-11-16):** first slice approved: private elevated session foundation plus machine-scope package updates. Feature screens and the uninstall/cleanup/port handlers follow separately. [Contract and checks](docs/phase-7/admin-helper.md).
+- **Admin helper (2026-11-16):** first slice approved: private elevated session foundation plus machine-scope package updates. Feature screens and the uninstall/cleanup/port handlers follow separately. **2026-11-17:** the uninstall, cleanup and port verbs approved as specified, each added with its feature; mockups first. [Contract and checks](docs/phase-7/admin-helper.md).
 
 ## Open items
 - **Peek (2026-11-11):** shortcut-controlled Hold/Toggle opening on a separate default panel, configured in Island & pet. [Behavior and checks](docs/peek.md).
