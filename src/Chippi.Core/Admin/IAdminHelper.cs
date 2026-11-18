@@ -36,6 +36,36 @@ public interface IAdminHelper
         Task.FromResult<IReadOnlyList<AdminCategoryResult>>([.. names.Select(n => new AdminCategoryResult(n, AdminCategoryState.NeedsAdmin))]);
 
     /// <summary>
+    /// Runs each HKLM app's uninstaller, one at a time, in one helper session (one prompt for the whole queue). Chippi's own confirm comes first.
+    /// The helper reads the entry itself; Chippi sends only the view and key name. Cancel skips the apps not yet started and never stops a running
+    /// uninstaller. A declined prompt answers NeedsAdmin for every item and runs nothing. The session stays open briefly for the leftover step
+    /// and ends with <see cref="EndSessionAsync"/>.
+    /// </summary>
+    Task<IReadOnlyList<AdminUninstallResult>> UninstallAsync(IReadOnlyList<AdminUninstallItem> items, IProgress<AdminUninstallProgress>? progress = null,
+        CancellationToken ct = default) =>
+        Task.FromResult<IReadOnlyList<AdminUninstallResult>>([.. items.Select(i => new AdminUninstallResult(i, AdminUninstallState.NeedsAdmin))]);
+
+    /// <summary>
+    /// Removes the admin-only leftovers of an app the helper uninstalled, by the id its record gave (days later is fine, in a new session; one prompt).
+    /// Files and folders go to the owner's Recycle Bin, registry keys are exported then deleted. The helper decides from its own record, never from
+    /// the class or path alone: each item comes back Removed, Kept (with its words), InUse, Failed, or Yours (Chippi deletes it as the owner).
+    /// More than 200 items go in batches in the same session. A declined prompt answers NeedsAdmin for every item. The session stays open briefly;
+    /// the flow ends it with <see cref="EndSessionAsync"/>.
+    /// </summary>
+    Task<IReadOnlyList<AdminLeftoverResult>> DeleteLeftoversAsync(Guid recordId, IReadOnlyList<AdminLeftoverItem> items, CancellationToken ct = default) =>
+        Task.FromResult<IReadOnlyList<AdminLeftoverResult>>([.. items.Select(i => new AdminLeftoverResult(i, AdminLeftoverState.NeedsAdmin))]);
+
+    /// <summary>
+    /// Deletes the helper's record of an app (its leftovers dismissed, or all removed). True when the helper answered Dropped, also when it had no
+    /// such record. False when the prompt was declined or the helper failed.
+    /// </summary>
+    Task<bool> DropRecordAsync(Guid recordId, CancellationToken ct = default) => Task.FromResult(false);
+
+    /// <summary>One app: <see cref="UninstallAsync(IReadOnlyList{AdminUninstallItem}, IProgress{AdminUninstallProgress}?, CancellationToken)"/> with a queue of one.</summary>
+    async Task<AdminUninstallResult> UninstallAsync(AdminRegistryView view, string keyName, string? appName = null, CancellationToken ct = default) =>
+        (await UninstallAsync([new AdminUninstallItem(view, keyName, appName)], null, ct).ConfigureAwait(false))[0];
+
+    /// <summary>
     /// A port action or a category measure leaves the helper session open for the next job (Close, then End; measure, then clean: one prompt).
     /// The flow that asked calls this when it finishes or is cancelled, and on stop; the session also ends on its own after about 50 seconds
     /// idle. Safe with no session open.

@@ -301,6 +301,8 @@ public partial class App : Application
         shell.Registry.Register(shell.PortManager);
         shell.Cleaner = new Chippi.Features.Cleaner.CleanerModule();
         shell.Registry.Register(shell.Cleaner);
+        shell.Uninstaller = new Chippi.Features.Uninstaller.UninstallerModule();
+        shell.Registry.Register(shell.Uninstaller);
         if (shell.Capture is Chippi.UI.Capture.CaptureLayer layer)
             layer.CanStart = () => recording.Model?.Active != true;
         shell.CapturePanel = new Chippi.App.Island.CapturePanelHost(shell, screenCapture, screenText, colorPicker, recording, mediaTools);
@@ -370,6 +372,12 @@ public partial class App : Application
         {
             bool? quit = await cleaner.AskQuitAsync();
             quit ??= System.Windows.MessageBox.Show("Stop cleaning and quit?", "Chippi", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes;
+            if (quit != true) return;
+        }
+        if (Shell.Uninstaller is { Engine.IsRunning: true } uninstaller)
+        {
+            bool? quit = await uninstaller.AskQuitAsync();
+            quit ??= System.Windows.MessageBox.Show("Stop uninstalling and quit?", "Chippi", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes;
             if (quit != true) return;
         }
         _quitting = true;

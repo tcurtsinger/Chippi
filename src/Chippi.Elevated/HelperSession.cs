@@ -7,7 +7,8 @@ namespace Chippi.Elevated;
 /// <summary>The token fires when the per-package ceiling passes; the updater then stops its installer tool.</summary>
 public interface IPackageUpdater { Task<AdminReply> UpdateAsync(AdminRequest request, CancellationToken ceiling); }
 
-public sealed class HelperSession(IPackageUpdater updater, TimeProvider? time = null, IPortActions? ports = null, ICategoryActions? categories = null)
+public sealed class HelperSession(IPackageUpdater updater, TimeProvider? time = null, IPortActions? ports = null, ICategoryActions? categories = null,
+    IUninstallActions? uninstalls = null, ILeftoverActions? leftovers = null)
 {
     public static readonly TimeSpan IdleTimeout = TimeSpan.FromSeconds(60);
     /// <summary>How long a package may keep running after its ceiling fires before the session answers for it.</summary>
@@ -46,6 +47,22 @@ public sealed class HelperSession(IPackageUpdater updater, TimeProvider? time = 
             {
                 // One quick, bounded action; it runs to its answer even if Chippi disconnects, like a package.
                 var answer = ports is null ? new AdminReply(request.Id, Messages.PortFailed, Reason: "Port actions unavailable") : await ports.RunAsync(request, CancellationToken.None).ConfigureAwait(false);
+                await WriteReply(pipe, answer, stop).ConfigureAwait(false);
+                continue;
+            }
+            if (Messages.IsUninstallVerb(request.Verb))
+            {
+                // An uninstaller finishes even if Chippi cancels or disconnects, like a package; the helper answers when its job has no processes left.
+                var answer = uninstalls is null ? new AdminReply(request.Id, Messages.UninstallFailed, Reason: "Uninstall unavailable")
+                    : await uninstalls.RunAsync(request, CancellationToken.None).ConfigureAwait(false);
+                await WriteReply(pipe, answer, stop).ConfigureAwait(false);
+                continue;
+            }
+            if (Messages.IsLeftoverVerb(request.Verb))
+            {
+                // Like an uninstall, a leftover batch runs to its answer even if Chippi disconnects: the records and the Recycle Bin are the only state.
+                var answer = leftovers is null ? new AdminReply(request.Id, Messages.LeftoversFailed, Reason: "Leftovers unavailable")
+                    : await leftovers.RunAsync(request, CancellationToken.None).ConfigureAwait(false);
                 await WriteReply(pipe, answer, stop).ConfigureAwait(false);
                 continue;
             }

@@ -17,6 +17,7 @@
   <Folder Name="/src/Features/">
     <Project Path="src/Features/Chippi.Features.AppUpdates/Chippi.Features.AppUpdates.csproj" />
     <Project Path="src/Features/Chippi.Features.Cleaner/Chippi.Features.Cleaner.csproj" />
+    <Project Path="src/Features/Chippi.Features.Uninstaller/Chippi.Features.Uninstaller.csproj" />
     <Project Path="src/Features/Chippi.Features.PortManager/Chippi.Features.PortManager.csproj" />
     <Project Path="src/Features/Chippi.Features.Clipboard/Chippi.Features.Clipboard.csproj" />
     <Project Path="src/Features/Chippi.Features.Downloads/Chippi.Features.Downloads.csproj" />
@@ -49,6 +50,7 @@
   <Folder Name="/tests/">
     <Project Path="tests/Chippi.Features.AppUpdates.Tests/Chippi.Features.AppUpdates.Tests.csproj" />
     <Project Path="tests/Chippi.Features.Cleaner.Tests/Chippi.Features.Cleaner.Tests.csproj" />
+    <Project Path="tests/Chippi.Features.Uninstaller.Tests/Chippi.Features.Uninstaller.Tests.csproj" />
     <Project Path="tests/Chippi.Features.PortManager.Tests/Chippi.Features.PortManager.Tests.csproj" />
     <Project Path="tests/Chippi.Elevated.Tests/Chippi.Elevated.Tests.csproj" />
     <Project Path="tests/Chippi.Media.Tests/Chippi.Media.Tests.csproj" />

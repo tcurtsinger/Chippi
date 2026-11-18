@@ -61,6 +61,7 @@
     <ProjectReference Include="..\Features\Chippi.Features.AppUpdates\Chippi.Features.AppUpdates.csproj" />
     <ProjectReference Include="..\Features\Chippi.Features.PortManager\Chippi.Features.PortManager.csproj" />
     <ProjectReference Include="..\Features\Chippi.Features.Cleaner\Chippi.Features.Cleaner.csproj" />
+    <ProjectReference Include="..\Features\Chippi.Features.Uninstaller\Chippi.Features.Uninstaller.csproj" />
     <ProjectReference Include="..\Features\Chippi.Features.WindowLayouts\Chippi.Features.WindowLayouts.csproj" />
     <ProjectReference Include="..\Features\Chippi.Features.TextSnippets\Chippi.Features.TextSnippets.csproj" />
     <ProjectReference Include="..\Features\Chippi.Features.SmoothScrolling\Chippi.Features.SmoothScrolling.csproj" />

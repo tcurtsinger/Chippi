@@ -1,0 +1,17 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Uninstaller (Phase 7, wave 3): the installed-app list, the queue that runs each app's own uninstaller, and the leftover scan and removal.
+     Everything here runs as the standard user; HKLM apps and admin-only leftovers go through the admin helper's closed verbs. -->
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows10.0.26100.0</TargetFramework><SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
+    <UseWPF>true</UseWPF>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <RootNamespace>Chippi.Features.Uninstaller</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../Chippi.Core/Chippi.Core.csproj" />
+    <ProjectReference Include="../../Chippi.UI/Chippi.UI.csproj" />
+    <InternalsVisibleTo Include="Chippi.Features.Uninstaller.Tests" />
+    <InternalsVisibleTo Include="Chippi.Island.Tests" />
+  </ItemGroup>
+</Project>

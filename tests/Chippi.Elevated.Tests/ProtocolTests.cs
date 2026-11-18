@@ -37,7 +37,7 @@ public sealed class ProtocolTests
         Assert.True(error is InvalidDataException or JsonException, error?.ToString());
     }
 
-    [Theory] [InlineData(-1)] [InlineData(0)] [InlineData(65537)]
+    [Theory] [InlineData(-1)] [InlineData(0)] [InlineData(262145)]
     public async Task Frame_length_is_bounded_before_allocating(int length)
     {
         var bytes = new byte[4]; BinaryPrimitives.WriteInt32LittleEndian(bytes, length);
