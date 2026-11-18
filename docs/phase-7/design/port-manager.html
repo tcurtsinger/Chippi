@@ -28,7 +28,7 @@ svg.g{fill:none;stroke:currentColor;stroke-linecap:round;stroke-linejoin:round;f
 .sheet.lt{background:#D9D9D9;color:#1A1A1A}
 .srow{display:flex;gap:28px;align-items:flex-start}
 .cap{font-size:13px;line-height:18px;font-weight:600;margin:0 0 8px;width:576px}
-.cap small{display:block;font-weight:400;font-size:12px;opacity:.7}
+.cap small{display:none;font-weight:400;font-size:12px;opacity:.7}
 .stage{background:#1F1F1F;padding:24px 32px 32px;border-radius:2px;width:576px}
 .lt .stage{background:#C8CBD2}
 
@@ -60,7 +60,9 @@ svg.g{fill:none;stroke:currentColor;stroke-linecap:round;stroke-linejoin:round;f
 .isr .dt{font-size:11px;line-height:14px;color:var(--tx2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .isr.sel .dt{color:var(--tx);opacity:.82}
 .isr .dt.cau{color:var(--cau);opacity:1}
-.isr .vb{margin-left:auto;font-size:11px;font-weight:600;display:flex;align-items:center;gap:4px;white-space:nowrap;flex:none}
+.adm{width:16px;display:flex;justify-content:center;flex:none}
+.prow .ibtn.sm{min-width:44px}
+.isr .vb{font-size:11px;font-weight:600;display:flex;align-items:center;gap:4px;white-space:nowrap;flex:none}
 .sline{height:24px;display:flex;align-items:center;padding:0 10px;font-size:11px;color:var(--tx2)}
 .plus{display:inline-block;margin-left:6px;height:16px;padding:0 5px;border-radius:4px;background:var(--btn);font-size:11px;font-weight:600;color:var(--tx2);line-height:16px;vertical-align:1px}
 
@@ -221,57 +223,57 @@ const ico=(k,s=20)=>{const p=P[k];
  return `<span class="mono" style="width:${s}px;height:${s}px;background:${p.c};font-size:${Math.round(s*.55)}px">${p.l}</span>`;};
 
 /* ---------- Search (island) ---------- */
-const vb=(v,shield)=>`<span class="vb">${shield?sh(12):''}${v==='Open'?g('square-arrow-out-up-right',12):''}${v}</span>`;
+const vb=(v,shield)=>`<span class="adm">${shield?sh(12):''}</span><span class="vb">${v==='Open'?g('square-arrow-out-up-right',12):''}${v}</span>`;
 const isr=(lead,nm,dt,o={})=>`<div class="isr${o.sel?' sel':''}${o.dim?' dim':''}"><span class="ld">${lead}</span><span class="tx"><div class="nm">${nm}</div>${dt!=null?`<div class="dt${o.cau?' cau':''}">${dt}</div>`:''}</span>${o.sel&&o.verb?vb(o.verb,o.sh):''}</div>`;
 const settingsRow=(o={})=>isr(g('network',16),'Ports','Settings › System',{sel:o.sel,verb:'Open'});
 const search=(query,rows,o={})=>`<div class="panel"><div class="hdr s"><button class="ib back" aria-label="Back">${g('chevron-left',16)}</button><span class="sfield">${query}<span class="caret"></span></span></div><div style="position:relative;height:296px">${rows}${o.line?`<div class="sline">${o.line}</div>`:''}</div></div>`;
 const qpanel=html=>`<div class="panel"><div class="q">${html}</div></div>`;
 
 const R={
- own:o=>isr(ico('node'),'Port 3000 · node.exe','PID 4120 · Listening on 127.0.0.1',{sel:1,verb:'Free',...o}),
- svc:o=>isr(ico('spool'),'Port 9100 · Print Spooler','Service · PID 2880 · Listening on 0.0.0.0',{sel:1,verb:'Stop',sh:1,...o}),
- adm:o=>isr(ico('pg'),'Port 5432 · postgres.exe','PID 3340 · Listening on 0.0.0.0',{sel:1,verb:'Free',sh:1,...o}),
- sys:o=>isr(ico('sys'),'Port 445 · System','Windows · PID 4 · Listening on 0.0.0.0',{sel:1,verb:'Open',...o}),
- tw:o=>isr(ico('sys'),'Port 445 · Closing','Windows · PID 0 · Time wait to 192.168.1.20',o),
- amb:o=>isr(ico('svc'),'Port 135 · svchost.exe','Shared Windows service · PID 1124 · Listening on 0.0.0.0',{sel:1,verb:'Open',...o}),
- multi:o=>isr(ico('node'),'Port 3000 · node.exe<span class="plus">+1</span>','PID 4120 · Listening on 127.0.0.1 and ::1',{sel:1,verb:'Free',...o}),
- multi2:o=>isr(ico('java'),'Port 8080 · java.exe<span class="plus">+1</span>','2 processes share it · PID 9012 and 9188',{sel:1,verb:'Open',...o}),
- chp:o=>isr(ico('chippi'),'Port 47100 · Chippi','Chippi · PID 6204 · Listening on 127.0.0.1',{sel:1,verb:'Open',...o})
+ own:o=>isr(ico('node'),'Port 3000 · node.exe','PID 4120',{sel:1,verb:'Free',...o}),
+ svc:o=>isr(ico('spool'),'Port 9100 · Print Spooler','Service · PID 2880',{sel:1,verb:'Stop',sh:1,...o}),
+ adm:o=>isr(ico('pg'),'Port 5432 · postgres.exe','PID 3340',{sel:1,verb:'Free',sh:1,...o}),
+ sys:o=>isr(ico('sys'),'Port 445 · System','Windows · PID 4',{sel:1,verb:'Open',...o}),
+ tw:o=>isr(ico('sys'),'Port 445','Time wait',o),
+ amb:o=>isr(ico('svc'),'Port 135 · svchost.exe','Shared service · PID 1124',{sel:1,verb:'Open',...o}),
+ multi:o=>isr(ico('node'),'Port 3000 · node.exe','IPv4, IPv6 · PID 4120',{sel:1,verb:'Free',...o}),
+ multi2:o=>isr(ico('java'),'Port 8080 · 2 processes','PID 9012, 9188',{sel:1,verb:'Open',...o}),
+ chp:o=>isr(ico('chippi'),'Port 47100 · Chippi','PID 6204',{sel:1,verb:'Open',...o})
 };
 
 /* ---------- the question and its steps (island) ---------- */
 const Q=(who,title,dt,btns)=>qpanel(`${ico(who,40)}<div class="qt">${title}</div>${dt?`<div class="qd">${dt}</div>`:''}<div class="qb">${btns}</div>`);
 const cancel=ib('Cancel',{foc:1});
-const qEnd=Q('node','End node.exe to free port 3000?','PID 4120 · started 09:41 · ends the whole app, 2 open connections',cancel+ib('End',{crit:1}));
-const qMulti=Q('chrome','End chrome.exe to free port 5353?','PID 14220 · started 09:12 · ends the whole app, and its 2 other ports',cancel+ib('End',{crit:1}));
-const qStop=Q('spool','Stop service Print Spooler to free port 9100?','PID 2880',cancel+ib('Stop',{crit:1,sh:1}));
-const qAdmin=Q('pg','End postgres.exe to free port 5432?','PID 3340 · started 08:02',cancel+ib('End',{crit:1,sh:1}));
-const qAsking=qpanel(`${ico('node',40)}<div class="qt">Asking node.exe to close</div><div class="trk"><i style="width:62%"></i></div><div class="qb">${cancel}</div>`);
-const qForce=Q('node','Force end node.exe?','node.exe is still running',cancel+ib('Force end',{crit:1}));
-const qForceAdm=Q('pg','Force end postgres.exe?','postgres.exe is still running',cancel+ib('Force end',{crit:1,sh:1}));
-const qWait=qpanel(`${ico('pg',40)}<div class="qt">Waiting for admin</div><div class="qd">postgres.exe</div>`);
+const qEnd=Q('node','End node.exe?','Port 3000 · PID 4120',cancel+ib('End',{crit:1}));
+const qMulti=Q('chrome','End chrome.exe?','3 ports · PID 14220',cancel+ib('End',{crit:1}));
+const qStop=Q('spool','Stop Print Spooler?','Port 9100',cancel+ib('Stop',{crit:1,sh:1}));
+const qAdmin=Q('pg','End postgres.exe?','Port 5432 · PID 3340',cancel+ib('End',{crit:1,sh:1}));
+const qAsking=qpanel(`${ico('node',40)}<div class="qt">Closing node.exe</div><div class="trk"><i style="width:62%"></i></div><div class="qb">${cancel}</div>`);
+const qForce=Q('node','Force end node.exe?','',cancel+ib('Force end',{crit:1}));
+const qForceAdm=Q('pg','Force end postgres.exe?','',cancel+ib('Force end',{crit:1,sh:1}));
+const qWait=qpanel(`${ico('pg',40)}<div class="qt">Waiting for admin</div>`);
 
 /* ---------- results, as updated rows ---------- */
 const okR=(a,b)=>isr(`<span class="ok">${g('circle-check',18)}</span>`,a,b);
 const badR=(a,b)=>isr(`<span class="cau">${g('triangle-alert',18)}</span>`,a,b,{sel:1,verb:'Retry'});
 const res={
- freed:search('port 3000',okR('Port 3000 is free','node.exe ended')+settingsRow()),
- stopped:search('port 9100',okR('Port 9100 is free','Print Spooler stopped')+settingsRow()),
- respawn:search('port 3000',isr(ico('node'),'Port 3000 · node.exe','PID 5012 · Listening on 127.0.0.1',{sel:1,verb:'Free'})+settingsRow()),
- endFail:search('port 3000',badR('End failed','node.exe · Port 3000')+settingsRow()),
- stopFail:search('port 9100',badR('Stop failed','Print Spooler · Port 9100')+settingsRow()),
- needs:search('port 5432',badR('Needs admin','postgres.exe was not ended')+settingsRow()),
+ freed:search('port 3000',okR('Port 3000 freed',null)+settingsRow()),
+ stopped:search('port 9100',okR('Port 9100 freed',null)+settingsRow()),
+ respawn:search('port 3000',isr(ico('node'),'Port 3000 · node.exe','PID 5012',{sel:1,verb:'Free'})+settingsRow()),
+ endFail:search('port 3000',badR('End failed','node.exe')+settingsRow()),
+ stopFail:search('port 9100',badR('Stop failed','Print Spooler')+settingsRow()),
+ needs:search('port 5432',badR('Needs admin','postgres.exe')+settingsRow()),
  closed:search('port 3000',isr(ico('node'),'Port 3000 · node.exe','Already closed',{dim:1})+settingsRow()),
- changed:search('port 3000',isr(ico('node'),'Port 3000 · node.exe','Changed, check again',{sel:1,verb:'Free'})+settingsRow()),
- keptShared:search('port 135',isr(ico('svc'),'Port 135 · svchost.exe','Kept: shared Windows service',{sel:1,verb:'Open',cau:1})+settingsRow()),
- keptChanged:search('port 5432',isr(ico('pg'),'Port 5432 · postgres.exe','Kept: changed since the scan',{sel:1,verb:'Free',sh:1,cau:1})+settingsRow())
+ changed:search('port 3000',isr(ico('node'),'Port 3000 · node.exe','Changed',{sel:1,verb:'Free'})+settingsRow()),
+ keptShared:search('port 135',isr(ico('svc'),'Port 135 · svchost.exe','Kept',{sel:1,verb:'Open',cau:1})+settingsRow()),
+ keptChanged:search('port 5432',isr(ico('pg'),'Port 5432 · postgres.exe','Kept',{sel:1,verb:'Free',sh:1,cau:1})+settingsRow())
 };
 
 /* ---------- the Free port picker (island page) ---------- */
 const PICK=[
- ['node','3000','PID 4120','Free'],['vite','5173','PID 7788','Free'],['chrome','5353 · UDP · +2 ports','PID 14220','Free'],['pg','5432','PID 3340','Free',1],['redis','6379','PID 5520','Free'],
- ['java','8080','PID 9012','Free'],['spool','9100','Service · PID 2880','Stop',1],['edge','9222','PID 10312','Free'],['mongo','27017','PID 4408','Free',1]];
-const prow=(r,sel)=>`<div class="prow${sel?' sel':''}">${ico(r[0],28)}<span class="tx"><div class="nm">${r[0]==='spool'?'Print Spooler':P[r[0]].n}</div><div class="dt">Port ${r[1]} · ${r[2]}</div></span>${ib(r[3],{sm:1,sh:r[4]})}</div>`;
+ ['node','3000','PID 4120','Free'],['vite','5173','PID 7788','Free'],['chrome','5353 +2','PID 14220','Free'],['pg','5432','PID 3340','Free',1],['redis','6379','PID 5520','Free'],
+ ['java','8080','PID 9012','Free'],['spool','9100','Service','Stop',1],['edge','9222','PID 10312','Free'],['mongo','27017','PID 4408','Free',1]];
+const prow=(r,sel)=>`<div class="prow${sel?' sel':''}">${ico(r[0],28)}<span class="tx"><div class="nm">${r[0]==='spool'?'Print Spooler':P[r[0]].n}</div><div class="dt">Port ${r[1]} · ${r[2]}</div></span><span class="adm">${r[4]?sh(14):''}</span>${ib(r[3],{sm:1})}</div>`;
 const picker=(page,selIdx)=>{const rows=PICK.slice(page*5,page*5+5);const first=page*5+1,last=page*5+rows.length;
  return `<div class="panel"><div class="hdr"><button class="ib back" aria-label="Back">${g('chevron-left',16)}</button><span class="ttl">Free port</span></div><div class="body">${rows.map((r,i)=>prow(r,i===selIdx)).join('')}<div class="pfoot"><span>${first}–${last} of ${PICK.length}</span><span class="sp"></span><button class="ib" style="${page===0?'opacity:.4':''}" aria-label="Previous">${g('chevron-left',16)}</button><button class="ib" style="${page===1?'opacity:.4':''}" aria-label="Next">${g('chevron-right',16)}</button></div></div></div>`;};
 const pickerEmpty=`<div class="panel"><div class="hdr"><button class="ib back" aria-label="Back">${g('chevron-left',16)}</button><span class="ttl">Free port</span></div><div class="body"><div class="empty" style="height:270px">${g('network',24)}No ports to free</div></div></div>`;
@@ -333,17 +335,17 @@ const ALL=[
  ['TCP','127.0.0.1:27017','0.0.0.0:0','Listening','mongo',4408,'adm'],
  ['TCP','127.0.0.1:47100','0.0.0.0:0','Listening','chippi',6204,'chp']
 ];
-const COLS_L='54px 138px 86px minmax(0,1fr) 52px 70px 22px';
-const COLS_A='46px 128px 136px 78px minmax(0,1fr) 42px 52px 20px';
-const tag={svc:'Service',win:'Windows',amb:'Shared service',chp:'Chippi',tw:'Windows'};
+const COLS_L='54px 138px 86px minmax(0,1fr) 52px 16px 40px 22px';
+const COLS_A='46px 128px 136px 78px minmax(0,1fr) 42px 16px 40px 20px';
+const tag={svc:'Service',win:'Windows',amb:'Shared service'};
 /* a verb only on the holder of a port: a listening TCP row or a bound UDP endpoint; never an established or closing connection, never an ended row */
 const verbOf=(k,r)=>{if(r[7]==='end'||!(r[3]==='Listening'||r[0]==='UDP'))return null;return k==='own'?['Free',0]:k==='adm'?['Free',1]:k==='svc'?['Stop',1]:null;};
 const trow=(r,all,o={})=>{const [pr,lo,re,st,k,pid,kind,flag]=r;const v=verbOf(kind,r);
  const name=kind==='tw'?'Closing connection':P[k].n;
  const dimRe=['0.0.0.0:0','[::]:0','*:*'].includes(re);
- const cells=`<span class="c">${pr}</span><span class="c">${lo}</span>${all?`<span class="c${dimRe?' mut':''}">${re}</span>`:''}<span class="c${st==='—'?' mut':''}">${st}</span><span class="pr">${ico(k,16)}<b>${name}</b>${tag[kind]&&kind!=='tw'?`<em class="tag">· ${tag[kind]}</em>`:''}</span><span class="c mut">${pid}</span><span class="vbn">${v?(v[1]?sh(13):'')+v[0]:''}</span><span class="mn">${o.menu?g('ellipsis',16):''}</span>`;
+ const cells=`<span class="c">${pr}</span><span class="c">${lo}</span>${all?`<span class="c${dimRe?' mut':''}">${re}</span>`:''}<span class="c${st==='—'?' mut':''}">${st}</span><span class="pr">${ico(k,16)}<b>${name}</b>${tag[kind]&&kind!=='tw'?`<em class="tag">· ${tag[kind]}</em>`:''}</span><span class="c mut">${pid}</span><span class="adm">${v&&v[1]?sh(13):''}</span><span class="vbn">${v?v[0]:''}</span><span class="mn">${o.menu?g('ellipsis',16):''}</span>`;
  return `<div class="tr${flag?' '+flag:''}${o.hov?' hov':''}${o.land?' land':''}" style="--cols:${all?COLS_A:COLS_L}">${cells}</div>`;};
-const thead=all=>`<div class="tr h" style="--cols:${all?COLS_A:COLS_L}"><span>Protocol</span><span>Local</span>${all?'<span>Remote</span>':''}<span>State</span><span>Process</span><span>PID</span><span></span><span></span></div>`;
+const thead=all=>`<div class="tr h" style="--cols:${all?COLS_A:COLS_L}"><span>Protocol</span><span>Local</span>${all?'<span>Remote</span>':''}<span>State</span><span>Process</span><span>PID</span><span></span><span></span><span></span></div>`;
 const table=(rows,all,hovIdx)=>`<div class="tbl">${thead(all)}${rows.map((r,i)=>trow(r,all,{hov:i===hovIdx,menu:i===hovIdx})).join('')}</div>`;
 const toolbar=(o={})=>`<div class="tools"><span class="sseg"><span${o.all?'':' class="on"'}>Listening</span><span${o.all?' class="on"':''}>All connections</span></span><span class="sfind${o.q?' on':''}">${g('search',14)}${o.q||'Port or name'}</span><span class="sp"></span><span class="pz">Pause<span class="ssw${o.paused?' on':''}"></span></span>${btn('Refresh',{g:'refresh-cw'})}</div>`;
 const shortcutsSec=sec('Shortcuts')+card(krow('Find port','','search')+krow('Free port','','network'));
@@ -355,8 +357,8 @@ const ex=(rows,all,o={})=>`<div class="scard"><div class="tbl">${thead(all)}${ro
 const around=i=>[LISTEN[i-1]||LISTEN[0],LISTEN[i],LISTEN[i+1]||LISTEN[0]];
 const strip=(inner,cls='')=>`<div class="strip ${cls}">${inner}</div>`;
 const sEnd=(who,t,vbl,shield,pid)=>strip(`${ico(who,16)}<span class="m">${t}${pid?`<small>${pid}</small>`:''}</span>${btn('Cancel',{sm:1,foc:1})}${btn(vbl,{sm:1,crit:1,sh:shield})}`);
-const stripAsk=strip(`${ico('node',16)}<span class="m">Asking node.exe to close</span><span class="trk"><i style="width:62%"></i></span>${btn('Cancel',{sm:1,foc:1})}`);
-const stripWait=strip(`${ico('pg',16)}<span class="m">Waiting for admin<small>postgres.exe</small></span>`);
+const stripAsk=strip(`${ico('node',16)}<span class="m">Closing node.exe</span><span class="trk"><i style="width:62%"></i></span>${btn('Cancel',{sm:1,foc:1})}`);
+const stripWait=strip(`${ico('pg',16)}<span class="m">Waiting for admin</span>`);
 const stripOk=(a,b)=>strip(`<span class="ok">${g('circle-check',16)}</span><span class="m">${a}<small>${b}</small></span>`,'okS');
 const stripBad=(a,b,v)=>strip(`<span class="cau">${g('triangle-alert',16)}</span><span class="m">${a}<small>${b}</small></span>${v?btn(v,{sm:1}):''}`,'cauS');
 const stripNeu=(a,b)=>strip(`<span style="color:var(--st3)">${g('info',16)}</span><span class="m">${a}${b?`<small>${b}</small>`:''}</span>`,'neuS');
@@ -369,46 +371,46 @@ const W=h=>`<div class="win">${h}</div>`;
 
 /* ---------- boards ---------- */
 const B={
- 'sheet-search-holders':()=>`<div class="srow">${L('"port 3000": your own process. Free, then the question',stage(search('port 3000',R.own()+settingsRow())),'Search value row. The verb sits at the right in 11 semibold, as Run and Open do; no new control')}${L('A service: Stop, with Windows\' shield',stage(search('port 9100',R.svc()+settingsRow())),'Only that service stops, never its svchost host')}</div>
- <div class="srow">${L('An admin, SYSTEM or another user\'s process: Free, with the shield',stage(search('port 5432',R.adm()+settingsRow())))}${L('Windows\' own rows have no verb to run, so Enter opens Settings › Ports at the row',stage(search('port 445',R.sys()+R.tw({})+settingsRow())),'The second row (PID 0, closing) just lists')}</div>
- <div class="srow">${L('A shared svchost with no attributed service: no Stop',stage(search('port 135',R.amb()+settingsRow())),'Nothing ends the host or guesses a service from the PID')}${L('Chippi itself: the same row as Windows\' own, no verb to run',stage(search('port 47100',R.chp()+settingsRow())),'Chippi, csrss, wininit, services and smss are never ended and are never offered an End. They show with this treatment; the Settings row is tagged Chippi or Windows')}</div>
- <div class="srow">${L('One process on two addresses (IPv4 and ::1): Free, with +1',stage(search('port 3000',R.multi()+settingsRow())),'Same PID and start time, so Free asks the ordinary question, which names the one process')}${L('Different processes on one port: Open, never a guess',stage(search('port 8080',R.multi2()+settingsRow())),'Enter opens Settings › Ports filtered to the port, where each holder has its own row and verb')}</div>`,
- 'sheet-search-states':()=>`<div class="srow">${L('Find port: Search opens with "port " ready',stage(search('port ',settingsRow({sel:1}),{line:'Type a port number'})))}${L('"ports": the Settings page',stage(search('ports',settingsRow({sel:1}))),'Enter opens Settings › System › Ports')}</div>
- <div class="srow">${L('Nothing on the port',stage(search('port 3001',isr(g('network',16),'Nothing is using port 3001',null)+settingsRow())))}${L('Above 65535',stage(search('port 70000',isr(g('network',16),'Ports go up to 65535',null)+settingsRow())))}</div>
- <div class="srow">${L('Not a number: an ordinary search',stage(search('port abc',isr(g('globe',16),'Search the web for "port abc"','Web',{sel:1,verb:'Search'}),{line:'No results'})))}${L('A process that restarts itself: Free ended it once; the next read shows the new holder (PID 5012)',stage(res.respawn),'Chippi never loops')}</div>`,
- 'sheet-confirm':()=>`<div class="srow">${L('Free, your own process: the question names it',stage(qEnd),'Cancel has the focus. The row is read again (PID and start time) after End')}${L('Stop, a service: the shield means one UAC prompt after Stop',stage(qStop))}</div>
- <div class="srow">${L('Free, an admin or another user\'s process',stage(qAdmin),'Goes through the admin helper')}${L('A process with a window gets a close request first, for 3 seconds',stage(qAsking),'A listener with no window ends at once on End')}</div>
- <div class="srow">${L('Still there: a second question, Force end',stage(qForce))}${L('The same step for an admin\'s process',stage(qForceAdm))}</div>
- <div class="srow">${L('Waiting for admin: Windows\' own prompt is open',stage(qWait),'Nothing to press here')}${L('A process that holds several ports: the question says the whole app ends',stage(qMulti),'The Free port picker shows it as +2 ports on the row')}</div>`,
- 'sheet-results':()=>`<div class="srow">${L('Freed: the row says so',stage(res.freed))}${L('A service stopped',stage(res.stopped))}</div>
+ 'sheet-search-holders':()=>`<div class="srow">${L('Your own process',stage(search('port 3000',R.own()+settingsRow())),'Search value row. The verb sits at the right in 11 semibold, as Run and Open do; no new control')}${L('A service',stage(search('port 9100',R.svc()+settingsRow())),'Only that service stops, never its svchost host')}</div>
+ <div class="srow">${L('An admin, SYSTEM or other user\'s process',stage(search('port 5432',R.adm()+settingsRow())))}${L('Windows\' own rows: Open',stage(search('port 445',R.sys()+R.tw({})+settingsRow())),'The second row (PID 0, closing) just lists')}</div>
+ <div class="srow">${L('Shared svchost, no attributed service',stage(search('port 135',R.amb()+settingsRow())),'Nothing ends the host or guesses a service from the PID')}${L('Chippi itself',stage(search('port 47100',R.chp()+settingsRow())),'Chippi, csrss, wininit, services and smss are never ended and are never offered an End. They show with this treatment; the Settings row is tagged Chippi or Windows')}</div>
+ <div class="srow">${L('One process on IPv4 and IPv6',stage(search('port 3000',R.multi()+settingsRow())),'Same PID and start time, so Free asks the ordinary question, which names the one process')}${L('Two processes on one port',stage(search('port 8080',R.multi2()+settingsRow())),'Enter opens Settings › Ports filtered to the port, where each holder has its own row and verb')}</div>`,
+ 'sheet-search-states':()=>`<div class="srow">${L('Find port shortcut',stage(search('port ',settingsRow({sel:1}),{})))}${L('"ports": the Settings page',stage(search('ports',settingsRow({sel:1}))),'Enter opens Settings › System › Ports')}</div>
+ <div class="srow">${L('Nothing on the port',stage(search('port 3001',isr(g('network',16),'Port 3001 not in use',null)+settingsRow())))}${L('Above 65535',stage(search('port 70000',isr(g('network',16),'Invalid port',null)+settingsRow())))}</div>
+ <div class="srow">${L('Not a number: an ordinary search',stage(search('port abc',isr(g('globe',16),'Search the web','Web',{sel:1,verb:'Search'}),{line:'No results'})))}${L('A process that restarts itself',stage(res.respawn),'Chippi never loops')}</div>`,
+ 'sheet-confirm':()=>`<div class="srow">${L('Free, own process; Cancel has focus',stage(qEnd),'Cancel has the focus. The row is read again (PID and start time) after End')}${L('Stop, a service',stage(qStop))}</div>
+ <div class="srow">${L('Free, admin process',stage(qAdmin),'Goes through the admin helper')}${L('Close request, up to 3 s',stage(qAsking),'A listener with no window ends at once on End')}</div>
+ <div class="srow">${L('Still running',stage(qForce))}${L('Still running, admin process',stage(qForceAdm))}</div>
+ <div class="srow">${L('Waiting on the UAC prompt',stage(qWait),'Nothing to press here')}${L('A process on several ports',stage(qMulti),'The Free port picker shows it as +2 ports on the row')}</div>`,
+ 'sheet-results':()=>`<div class="srow">${L('Freed',stage(res.freed))}${L('A service stopped',stage(res.stopped))}</div>
  <div class="srow">${L('End failed',stage(res.endFail))}${L('Stop failed',stage(res.stopFail))}</div>
- <div class="srow">${L('UAC declined: nothing ends',stage(res.needs))}${L('The process closed by itself before the answer',stage(res.closed))}</div>
- <div class="srow">${L('The PID or its start time changed: nothing ends',stage(res.changed))}${L('The helper refuses a shared service',stage(res.keptShared))}</div>
- <div class="srow">${L('The helper reads the row again and it changed',stage(res.keptChanged))}</div>`,
- 'sheet-picker':()=>`<div class="srow">${L('Free port with none chosen: the ports you can free',stage(picker(0,0)),'Five 46-DIP rows a page, as App updates. Windows\' own rows and Chippi are left out. A process on several ports has a row per port, with +N ports. Enter or Free asks the question')}${L('Page 2: a service shows Stop, with the shield',stage(picker(1,1)))}</div>
+ <div class="srow">${L('UAC declined',stage(res.needs))}${L('Closed before the answer',stage(res.closed))}</div>
+ <div class="srow">${L('Process changed',stage(res.changed))}${L('Helper refused: shared service',stage(res.keptShared))}</div>
+ <div class="srow">${L('Helper refused: changed',stage(res.keptChanged))}</div>`,
+ 'sheet-picker':()=>`<div class="srow">${L('Free port picker',stage(picker(0,0)),'Five 46-DIP rows a page, as App updates. Windows\' own rows and Chippi are left out. A process on several ports has a row per port, with +N ports. Enter or Free asks the question')}${L('Page 2',stage(picker(1,1)))}</div>
  <div class="srow">${L('Nothing to free',stage(pickerEmpty))}</div>`,
  'settings-ports':()=>frame('ports',portsPage({hov:2})),
  'settings-ports-all':()=>frame('ports',portsPage({all:1,hov:3})),
  'settings-ports-860':()=>frame('ports',portsPage({hov:2}),1),
  'settings-ports-all-860':()=>frame('ports',portsPage({all:1,hov:3}),1),
- 'settings-ports-strip-860':()=>frame('ports',portsPage({rep:[2,sEnd('node','End node.exe to free port 3000?','End',0,'PID 4120 · 2 open connections end too')],hov:-1}),1),
+ 'settings-ports-strip-860':()=>frame('ports',portsPage({rep:[2,sEnd('node','End node.exe?','End',0,'PID 4120')],hov:-1}),1),
  'sheet-settings-ports-states':()=>{
   const s=[];
   s.push(L('Search "3000": both address families',W(toolbar({q:'3000'})+ex([LISTEN[2],LISTEN[3]],false))));
-  s.push(L('Nothing matches',W(toolbar({q:'3001'})+`<div class="scard"><div class="nores">${g('network',24)}Nothing is using port 3001</div></div>`)));
-  s.push(L('Enter on a Search row lands here: the row is lit',W(toolbar()+ex(around(7),false,{land:1}))));
-  s.push(L('A row\'s menu: Copy writes its port, address or PID',W(`<div style="position:relative">${toolbar()}${ex(around(2),false,{hov:1})}<div class="smenu" style="right:12px;top:128px"><div class="on">Copy port<small>3000</small></div><div>Copy address<small>127.0.0.1:3000</small></div><div>Copy PID<small>4120</small></div></div></div>`)));
-  s.push(L('Pointing at a process: its path',W(`<div style="position:relative">${toolbar()}${ex(around(2),false,{hov:1})}<div class="stip" style="top:140px;left:300px">${P.node.path}</div></div>`)));
-  s.push(L('Paused: the list holds still; Refresh reads once',W(toolbar({paused:1})+ex(around(2),false)+`<div style="font-size:12px;color:var(--st3);padding:0 4px">Paused</div>`)));
-  s.push(L('A process whose path can\'t be read: its name and a generic icon, no error',W(ex([LISTEN[13],LISTEN[14],LISTEN[0]],false))));
-  s.push(L('Free, your own process: the row becomes the question',W(run(2,sEnd('node','End node.exe to free port 3000?','End',0,'PID 4120 · 2 open connections end too')))));
-  s.push(L('Stop, a service: the shield on Stop',W(run(9,sEnd('spool','Stop service Print Spooler to free port 9100?','Stop',1,'PID 2880')))));
-  s.push(L('An admin\'s process: the shield on End',W(run(6,sEnd('pg','End postgres.exe to free port 5432?','End',1,'PID 3340')))));
-  s.push(L('Asking the app to close, then the second question',W(run(2,stripAsk)+`<div class="gap8"></div>`+run(2,sEnd('node','Force end node.exe?','Force end')))));
-  s.push(L('Waiting for admin, then freed',W(run(6,stripWait)+`<div class="gap8"></div>`+run(6,stripOk('Port 5432 is free','postgres.exe ended')))));
-  s.push(L('Failures: End failed, Stop failed, Needs admin',W(run(2,stripBad('End failed','node.exe · Port 3000','Retry'))+`<div class="gap8"></div>`+run(9,stripBad('Stop failed','Print Spooler · Port 9100','Retry'))+`<div class="gap8"></div>`+run(6,stripBad('Needs admin','postgres.exe was not ended','Retry')))));
-  s.push(L('Read again after the answer, and the helper\'s refusals',W(run(2,stripNeu('Already closed','node.exe is no longer on port 3000'))+`<div class="gap8"></div>`+run(2,stripNeu('Changed, check again','The process on port 3000 changed'))+`<div class="gap8"></div>`+run(0,stripKept('svc','Kept: shared Windows service'))+`<div class="gap8"></div>`+run(6,stripKept('pg','Kept: changed since the scan')))));
-  s.push(L('Settings › Shortcuts lists the two global slots under Ports (the Ports page shows the same two, read-only, with Edit)',W(shortcutsExcerpt)));
+  s.push(L('Nothing matches',W(toolbar({q:'3001'})+`<div class="scard"><div class="nores">${g('network',24)}Port 3001 not in use</div></div>`)));
+  s.push(L('Opened from Search',W(toolbar()+ex(around(7),false,{land:1}))));
+  s.push(L('Row menu',W(`<div style="position:relative">${toolbar()}${ex(around(2),false,{hov:1})}<div class="smenu" style="right:12px;top:128px"><div class="on">Copy port<small>3000</small></div><div>Copy address<small>127.0.0.1:3000</small></div><div>Copy PID<small>4120</small></div></div></div>`)));
+  s.push(L('Process tooltip',W(`<div style="position:relative">${toolbar()}${ex(around(2),false,{hov:1})}<div class="stip" style="top:140px;left:300px">${P.node.path}</div></div>`)));
+  s.push(L('Paused',W(toolbar({paused:1})+ex(around(2),false)+`<div style="font-size:12px;color:var(--st3);padding:0 4px">Paused</div>`)));
+  s.push(L('Unreadable process path',W(ex([LISTEN[13],LISTEN[14],LISTEN[0]],false))));
+  s.push(L('Free, own process',W(run(2,sEnd('node','End node.exe?','End',0,'PID 4120')))));
+  s.push(L('Stop, a service',W(run(9,sEnd('spool','Stop Print Spooler?','Stop',1,'')))));
+  s.push(L('Free, admin process',W(run(6,sEnd('pg','End postgres.exe?','End',1,'PID 3340')))));
+  s.push(L('Closing, then still running',W(run(2,stripAsk)+`<div class="gap8"></div>`+run(2,sEnd('node','Force end node.exe?','Force end')))));
+  s.push(L('Waiting for admin, then freed',W(run(6,stripWait)+`<div class="gap8"></div>`+run(6,stripOk('Port 5432 freed','')))));
+  s.push(L('Failures: End failed, Stop failed, Needs admin',W(run(2,stripBad('End failed','','Retry'))+`<div class="gap8"></div>`+run(9,stripBad('Stop failed','','Retry'))+`<div class="gap8"></div>`+run(6,stripBad('Needs admin','','Retry')))));
+  s.push(L('Already closed, changed, kept',W(run(2,stripNeu('Already closed',''))+`<div class="gap8"></div>`+run(2,stripNeu('Changed',''))+`<div class="gap8"></div>`+run(0,stripKept('svc','Kept'))+`<div class="gap8"></div>`+run(6,stripKept('pg','Kept')))));
+  s.push(L('Settings › Shortcuts',W(shortcutsExcerpt)));
   const rows=[];for(let i=0;i<s.length;i+=2)rows.push(`<div class="srow">${s[i]}${s[i+1]||''}</div>`);return rows.join('');}
 };
 document.body.className=theme;

@@ -190,8 +190,10 @@ svg.g{fill:none;stroke:currentColor;stroke-linecap:round;stroke-linejoin:round;f
 .crow .cnm{font-size:12px;line-height:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .crow .cd{font-size:11px;line-height:15px;color:var(--tx2);white-space:nowrap}
 .crow .cd.cau{color:var(--cau)}
-.crow .tg{width:92px;display:flex;justify-content:flex-end;flex:none}
-.crow .cs{width:70px;text-align:right;color:var(--tx2);flex:none;white-space:nowrap}
+.crow .tg{width:80px;display:flex;justify-content:flex-end;flex:none}
+.crow .adm{width:16px;display:flex;justify-content:center;flex:none}
+.crow .cs{width:76px;text-align:right;color:var(--tx2);flex:none;white-space:nowrap}
+.sr .adm{width:20px;display:flex;justify-content:center;flex:none}
 .crow .cs.na{color:var(--tx3)}
 .crow .cs.cau{color:var(--cau)}
 .crow.dim .cs,.crow.dim .cnm{color:var(--tx3)}
@@ -253,68 +255,67 @@ const stage=h=>`<div class="stage">${h}</div>`;
 const panel=(title,body,o={})=>`<div class="panel"><div class="hdr"><button class="ib back" aria-label="Back">${g('chevron-left',16)}</button><span class="ttl">${title}</span>${o.aside||''}</div><div class="body">${body}</div></div>`;
 const ib=(t,o={})=>`<button class="ibtn${o.acc?' acc':''}${o.crit?' crit':''}${o.sm?' sm':''}${o.dis?' dis':''}${o.foc?' foc':''}">${o.uac?uac(14):''}${t}</button>`;
 const chk=(on,dis)=>`<span class="chk${on?' on':''}${dis?' dis':''}">${on?g('check',12):''}</span>`;
-const tag=t=>t==='Safe'?`<span class="badge">Safe</span>`:t==='Check first'?`<span class="badge cau">Check first</span>`:`<span class="badge">${g('shield',11)}Needs admin</span>`;
+const tag=t=>t==='Check first'?`<span class="badge cau">Check first</span>`:'';
 
 /* ---------- the categories (brief: Categories in the first build) ---------- */
 const CATS=[
- {id:'temp',n:'User temp files',t:'Safe',s:'820 MB',on:1},
- {id:'thumb',n:'Thumbnail and icon caches',t:'Safe',s:'210 MB',on:1},
+ {id:'temp',n:'User temp files',s:'820 MB',on:1},
+ {id:'thumb',n:'Thumbnail and icon caches',s:'210 MB',on:1},
  {id:'app',n:'App caches',t:'Check first',s:'1.2 GB'},
- {id:'wtemp',n:'Windows temp',t:'Needs admin',s:null},
- {id:'wu',n:'Windows Update cache',t:'Needs admin',s:'1.6 GB+'},
- {id:'do',n:'Delivery Optimization cache',t:'Needs admin',s:null},
- {id:'dump',n:'Crash dumps and logs',t:'Needs admin',s:'190 MB+'}
+ {id:'wtemp',n:'Windows temp',adm:1,s:null},
+ {id:'wu',n:'Windows Update cache',adm:1,s:'1.6 GB+'},
+ {id:'do',n:'Delivery Optimization cache',adm:1,s:null},
+ {id:'dump',n:'Crash dumps and logs',adm:1,s:'190 MB+'}
 ];
-// o[id] = {on, s, detail, cau, dim, dis, lead, notag, right, rightCls, action, prog}
+// o[id] = {on, s, dim, dis, lead, notag, right, rightCls, action, prog}
+// Columns: lead | name | tag or action | admin shield | size or status
 const crow=(c,o={})=>{
  const x=Object.assign({on:c.on,s:c.s},o[c.id]||{});
  const lead=x.lead!==undefined?x.lead:chk(x.on,x.dis);
  const size=x.right!==undefined?x.right:(x.s?x.s:'—');
  const sc=x.rightCls||(x.s||x.right!==undefined?'':'na');
- return `<div class="crow${x.detail||x.prog?' two':''}${x.dim?' dim':''}"><span class="lead">${lead}</span><span class="cn"><span class="cnm">${c.n}</span>${x.detail?`<span class="cd${x.cau?' cau':''}">${x.detail}</span>`:''}${x.prog?`<span class="prog"><i style="width:${x.prog}%"></i></span>`:''}</span><span class="tg">${x.notag?'':(x.action||tag(c.t))}</span><span class="cs ${sc}">${size}</span></div>`;
+ return `<div class="crow${x.prog?' two':''}${x.dim?' dim':''}"><span class="lead">${lead}</span><span class="cn"><span class="cnm">${c.n}</span>${x.prog?`<span class="prog"><i style="width:${x.prog}%"></i></span>`:''}</span><span class="tg">${x.action||(x.notag?'':tag(c.t))}</span><span class="adm">${c.adm?uac(14):''}</span><span class="cs ${sc}">${size}</span></div>`;
 };
 const rows=(o={},only)=>CATS.filter(c=>!only||only.includes(c.id)).map(c=>crow(c,o)).join('');
 const meta=(a,b,spin)=>`<div class="meta">${spin?g('loader-circle',12,' style="color:var(--acc)"'):''}<b>${a}</b>${b?`<span>· ${b}</span>`:''}</div>`;
-const headBtns=(o={})=>ib('Scan again',{dis:o.scanDis})+ib('Clean',{acc:1,uac:o.uac,dis:o.cleanDis});
+const headBtns=(o={})=>ib('Scan',{dis:o.scanDis})+ib('Clean',{acc:1,uac:o.uac,dis:o.cleanDis});
 const list=(m,o,h={})=>panel('Clean junk files',m+rows(o),{aside:headBtns(h)});
 
 /* ---------- island: the list ---------- */
 const skel='<span class="skel"></span>';
-const listMain=list(meta('1.0 GB found','Measured 2 min ago'),{});
-const listOpening=list(meta('1.0 GB found','From earlier, measuring',1),{temp:{dim:1},thumb:{dim:1},app:{dim:1},wu:{dim:1},dump:{dim:1}},{cleanDis:1});
-const listMeasuring=list(meta('Measuring 2 of 7','',1),{app:{right:skel},wtemp:{right:skel},wu:{right:skel},do:{right:skel},dump:{right:skel}},{cleanDis:1,scanDis:1});
-const listNone=list(meta('Nothing ticked',''),{temp:{on:0},thumb:{on:0}},{cleanDis:1});
-const listAdmin=list(meta('At least 2.6 GB found','Windows temp counts after admin'),{wtemp:{on:1},wu:{on:1}},{uac:1});
-const listAppOpen=list(meta('1.0 GB found','Measured just now'),{app:{on:1,detail:'Close Chrome to clean this',cau:1}});
-const listNA=list(meta('1.0 GB found','Measured just now'),{do:{right:'Not available',rightCls:'cau',dis:1,on:0}});
-const listEmpty=panel('Clean junk files',`<div class="cen">${g('circle-check',28)}<span class="ct">Nothing to clean</span><span class="t3">Measured just now</span></div>`,{aside:ib('Scan again')});
+const listMain=list(meta('1.0 GB'),{});
+const listOpening=list(meta('1.0 GB','',1),{temp:{dim:1},thumb:{dim:1},app:{dim:1},wu:{dim:1},dump:{dim:1}},{cleanDis:1});
+const listMeasuring=list(meta('Measuring','',1),{app:{right:skel},wtemp:{right:skel},wu:{right:skel},do:{right:skel},dump:{right:skel}},{cleanDis:1,scanDis:1});
+const listNone=list(meta('0 B'),{temp:{on:0},thumb:{on:0}},{cleanDis:1});
+const listAdmin=list(meta('2.6 GB+'),{wtemp:{on:1},wu:{on:1}},{uac:1});
+const listAppOpen=list(meta('1.0 GB'),{app:{on:1,right:'In use',rightCls:'cau'}});
+const listNA=list(meta('1.0 GB'),{do:{right:'Unavailable',rightCls:'na',dis:1,on:0}});
+const listEmpty=panel('Clean junk files',`<div class="cen">${g('circle-check',28)}<span class="ct">Nothing to clean</span></div>`,{aside:ib('Scan')});
 
 /* ---------- island: asking, waiting, running ---------- */
-const nm=(n,s,was)=>`<div class="qrow"><span class="nm">${n}</span>${was?`<span class="t3">was ${was}</span>`:''}<span class="sz">${s}</span></div>`;
-const NOTE="Deleted, not recycled. This can't be undone.";
-const confirm=(t,items,uacOn)=>panel('Clean junk files',`<div class="qwrap"><h2>${t}</h2><div class="qlist">${items}</div><p class="qnote">${NOTE}</p></div><div class="foot">${ib('Cancel',{foc:1})}${ib('Clean',{crit:1,uac:uacOn})}</div>`);
-const confStd=confirm('Clean 1.0 GB for good?',nm('User temp files','820 MB')+nm('Thumbnail and icon caches','210 MB'));
-const confAdmin=confirm('Clean 3.9 GB for good?',nm('User temp files','820 MB')+nm('Windows temp','1.4 GB')+nm('Windows Update cache','1.7 GB','1.6 GB+'),1);
-const waitAdmin=panel('Clean junk files',`<div class="cen">${g('shield',28)}<span class="ct">Waiting for admin</span><span class="t3">Continue in the Windows permission prompt.</span></div>`);
-const shortMeasuring=panel('Clean junk files',`<div class="cen">${g('loader-circle',28,' style="color:var(--acc)"')}<span class="ct">Measuring</span><span class="t3">2 of 3 done</span></div>`);
+const nm=(n,s)=>`<div class="qrow"><span class="nm">${n}</span><span class="sz">${s}</span></div>`;
+const confirm=(t,items,uacOn)=>panel('Clean junk files',`<div class="qwrap"><h2>${t}</h2><div class="qlist">${items}</div></div><div class="foot">${ib('Cancel',{foc:1})}${ib('Clean',{crit:1,uac:uacOn})}</div>`);
+const confStd=confirm('Clean 1.0 GB?',nm('User temp files','820 MB')+nm('Thumbnail and icon caches','210 MB'));
+const confAdmin=confirm('Clean 3.9 GB?',nm('User temp files','820 MB')+nm('Windows temp','1.4 GB')+nm('Windows Update cache','1.7 GB'),1);
+const waitAdmin=panel('Clean junk files',`<div class="cen">${g('shield',28)}<span class="ct">Waiting for admin</span></div>`);
+const shortMeasuring=panel('Clean junk files',`<div class="cen">${g('loader-circle',28,' style="color:var(--acc)"')}<span class="ct">Measuring</span></div>`);
 const okLead=g('check',14,' style="color:var(--ok)"'), spinLead=g('loader-circle',14,' style="color:var(--acc)"'), cauLead=g('circle-alert',14,' style="color:var(--cau)"'), idleLead='<span style="width:8px;height:8px;border-radius:4px;border:1px solid var(--tx3)"></span>';
-const keptLead=g('shield',14,' style="color:var(--cau)"');
-const kept=d=>({lead:keptLead,detail:d,cau:1,right:' ',notag:1});
-const running=panel('Clean junk files',meta('1.1 GB freed','Cleaning Windows Update cache',1)+rows({
- temp:{lead:okLead,right:'802 MB',notag:1},thumb:{lead:okLead,right:'206 MB',notag:1},wtemp:kept('Kept: protected folder'),
- wu:{lead:spinLead,right:'62%',prog:62,notag:1},dump:{lead:idleLead,right:'Queued',notag:1}},['temp','thumb','wtemp','wu','dump']),{aside:`<span class="t3" style="font-size:12px">Cleaning</span>`});
-const quit=panel('Clean junk files',`<div class="qctr"><span class="qt">Stop cleaning and quit?</span><span class="t3" style="margin-bottom:10px">Files already deleted stay deleted.</span><span style="display:flex;gap:8px">${ib('Cancel',{foc:1})}${ib('Quit',{crit:1})}</span></div>`);
+const kept={lead:cauLead,right:'Kept',rightCls:'cau',notag:1};
+const running=panel('Clean junk files',meta('1.1 GB freed','',1)+rows({
+ temp:{lead:okLead,right:'802 MB',notag:1},thumb:{lead:okLead,right:'206 MB',notag:1},wtemp:kept,
+ wu:{lead:spinLead,right:'62%',prog:62,notag:1},dump:{lead:idleLead,right:'Queued',rightCls:'na',notag:1}},['temp','thumb','wtemp','wu','dump']));
+const quit=panel('Clean junk files',`<div class="qctr"><span class="qt" style="margin-bottom:10px">Stop cleaning and quit?</span><span style="display:flex;gap:8px">${ib('Cancel',{foc:1})}${ib('Quit',{crit:1})}</span></div>`);
 
 /* ---------- island: results ---------- */
-const res=(m,o,only)=>panel('Clean junk files',m+rows(o,only),{aside:ib('Scan again')});
-const RD={temp:{lead:okLead,right:'802 MB',detail:'9 files in use',notag:1},thumb:{lead:okLead,right:'206 MB',detail:'3 files in use',notag:1}};
-const resOk=res(meta('Cleaned 1.0 GB','12 files in use'),Object.assign({},RD,{wu:{lead:okLead,right:'1.5 GB',notag:1},dump:{lead:okLead,right:'184 MB',notag:1}}),['temp','thumb','wu','dump']);
-const bad=(d,act)=>({lead:cauLead,detail:d,cau:1,right:'—',action:act});
-const needs=act=>({lead:g('shield',14,' style="color:var(--cau)"'),detail:'Needs admin',cau:1,right:' ',action:act});
-const resFail=res(meta('Cleaned 1.0 GB','1 failed · 1 kept'),Object.assign({},RD,{wu:bad('Clean failed',ib('Retry',{sm:1})),wtemp:kept('Kept: protected folder')}),['temp','thumb','wu','wtemp']);
-const resDeclined=res(meta('Cleaned 1.0 GB','Needs admin for 2'),Object.assign({},RD,{wu:needs(ib('Clean',{sm:1,uac:1})),wtemp:needs(ib('Clean',{sm:1,uac:1}))}),['temp','thumb','wu','wtemp']);
-const resHelper=res(meta('Cleaned 1.0 GB','Admin helper failed'),Object.assign({},RD,{wu:bad('Admin helper failed',ib('Retry',{sm:1,uac:1})),dump:bad('Admin helper failed',ib('Retry',{sm:1,uac:1}))}),['temp','thumb','wu','dump']);
-const resAppOpen=res(meta('Cleaned 1.0 GB','12 files in use'),Object.assign({},RD,{app:{lead:cauLead,detail:'Close Chrome to clean this',cau:1,right:'Skipped',notag:1}}),['temp','thumb','app']);
+const res=(m,o,only)=>panel('Clean junk files',m+rows(o,only),{aside:ib('Scan')});
+const RD={temp:{lead:okLead,right:'802 MB',notag:1},thumb:{lead:okLead,right:'206 MB',notag:1}};
+const resOk=res(meta('1.0 GB freed'),Object.assign({},RD,{wu:{lead:okLead,right:'1.5 GB',notag:1},dump:{lead:okLead,right:'184 MB',notag:1}}),['temp','thumb','wu','dump']);
+const bad=act=>({lead:cauLead,right:'Failed',rightCls:'cau',action:act});
+const needs=act=>({lead:cauLead,right:'Needs admin',rightCls:'cau',action:act});
+const resFail=res(meta('1.0 GB freed','1 failed'),Object.assign({},RD,{wu:bad(ib('Retry',{sm:1})),wtemp:kept}),['temp','thumb','wu','wtemp']);
+const resDeclined=res(meta('1.0 GB freed'),Object.assign({},RD,{wu:needs(ib('Clean',{sm:1})),wtemp:needs(ib('Clean',{sm:1}))}),['temp','thumb','wu','wtemp']);
+const resHelper=res(meta('1.0 GB freed','Admin helper failed'),Object.assign({},RD,{wu:bad(ib('Retry',{sm:1})),dump:bad(ib('Retry',{sm:1}))}),['temp','thumb','wu','dump']);
+const resAppOpen=res(meta('1.0 GB freed'),Object.assign({},RD,{app:{lead:cauLead,right:'In use',rightCls:'cau',notag:1}}),['temp','thumb','app']);
 
 /* ---------- Actions > Apps, Search, the bar ---------- */
 const mrow=(glyph,n,right,o={})=>`<div class="lrow${o.hov?' hov':''}">${g(glyph,16)}<span class="nm">${n}</span>${right}${g(o.open?'square-arrow-out-up-right':'chevron-right',12)}</div>`;
@@ -338,48 +339,46 @@ const kc=k=>k.split('+').map(x=>`<span class="kc">${x}</span>`).join('');
 const editLink=`<span class="edit">Edit ${g('square-arrow-out-up-right',14)}</span>`;
 const krow=(n,k,gl)=>`<div class="sr"><span class="lead">${g(gl,20)}</span><span class="tl">${n}</span>${k?`<span style="display:flex;gap:4px;margin-right:12px">${kc(k)}</span>`:`<span class="path" style="margin-right:12px">Not set</span>`}${editLink}</div>`;
 const swc=on=>`<span class="onl">${on?'On':'Off'}</span><span class="ssw${on?' on':''}"></span>`;
-const sbadge=adm=>adm==='chk'?`<span class="sbadge cau">Check first</span>`:adm?`<span class="sbadge">${g('shield',12)}Needs admin</span>`:'';
-const crowS=(n,d,nv,adm,on)=>`<div class="sr cat"><span class="tl">${n}<small>${d}</small><small class="nv"><u>Never touches</u> ${nv}</small></span>${sbadge(adm)}${swc(on)}</div>`;
+const crowS=(n,adm,on)=>`<div class="sr"><span class="tl">${n}</span>${adm==='chk'?`<span class="sbadge cau">Check first</span>`:''}<span class="adm">${adm===1?uac(16):''}</span>${swc(on)}</div>`;
 const sec=t=>`<div class="sh">${t}</div>`;
 const card=r=>`<div class="scard">${r}</div>`;
 const cleanerPage=k=>`<div class="ptitle">Cleaner</div>
- ${sec('Shortcuts')}${card(krow('Scan for junk files',k?'Ctrl+Alt+J':'','search')+krow('Clean junk files','','trash-2'))}
- ${sec('Ticked in the list')}${card(
-  crowS('User temp files','Files in your temp folder that haven\'t been touched for over a day.','files used in the last day, or in use.',0,1)+
-  crowS('Thumbnail and icon caches','Explorer\'s picture and icon previews. Windows builds them again.','your pictures or any other file.',0,1)+
-  crowS('App caches','Caches of Chrome, Edge, Brave, Firefox, Discord, Slack and Teams.','cookies, saved passwords, history, autofill or sign-ins.','chk',0)+
-  crowS('Windows temp','Files in C:\\Windows\\Temp that haven\'t been touched for over a day.','files used in the last day, or in use.',1,0)+
-  crowS('Windows Update cache','Update files Windows has already downloaded.','installed updates, your update history, or files used in the last day.',1,0)+
-  crowS('Delivery Optimization cache','Update pieces Windows keeps to share with other PCs.','installed updates, your downloads, or files used in the last day.',1,0)+
-  crowS('Crash dumps and logs','Crash dumps and error reports, yours and Windows\', older than a day.','files used in the last day, or in use.',1,0))}
- ${sec('Never touched')}${card(`<div class="sr big1"><span class="lead">${g('shield-check',20)}</span><span class="tl" style="line-height:20px">Cookies, saved passwords, history, autofill, the registry, System Restore points, the Recycle Bin, and anything in Documents, Desktop, Pictures or Downloads.</span></div>`)}`;
+ ${sec('Categories')}${card(
+  crowS('User temp files',0,1)+
+  crowS('Thumbnail and icon caches',0,1)+
+  crowS('App caches','chk',0)+
+  crowS('Windows temp',1,0)+
+  crowS('Windows Update cache',1,0)+
+  crowS('Delivery Optimization cache',1,0)+
+  crowS('Crash dumps and logs',1,0))}
+ ${sec('Shortcuts')}${card(krow('Scan for junk files',k?'Ctrl+Alt+J':'','search')+krow('Clean junk files','','trash-2'))}`;
 
 const one=(c,h)=>L(c,stage(h));
 const B={
- 'island-list':()=>one('Actions › Apps › Clean junk files, measured: two safe categories ticked from last time, and the header counts them. Windows temp and Delivery Optimization can\'t be listed without admin, so they show no size',listMain),
- 'island-list-opening':()=>one('Opening: last sizes show first, dimmed, while fresh ones fill in behind; Clean waits for the ticked rows',listOpening),
- 'island-list-measuring':()=>one('First measure with nothing remembered: each size appears as its category finishes; Clean waits, the page stays live',listMeasuring),
- 'island-list-admin':()=>one('An admin category ticked: Clean carries the UAC shield, and the count says Windows temp has no size yet',listAdmin),
- 'island-list-app-open':()=>one('App caches ticked while Chrome runs: that row is skipped and says why, and the count leaves it out',listAppOpen),
- 'island-list-unavailable':()=>one('A folder missing or unreadable: only that row reads Not available, its box off',listNA),
+ 'island-list':()=>one('Actions › Apps › Clean junk files: last ticks remembered; admin rows have no size until cleaned',listMain),
+ 'island-list-opening':()=>one('Opening: last sizes dimmed while measuring',listOpening),
+ 'island-list-measuring':()=>one('First measure',listMeasuring),
+ 'island-list-admin':()=>one('An admin category ticked; + marks a partial size',listAdmin),
+ 'island-list-app-open':()=>one('App caches ticked while Chrome runs',listAppOpen),
+ 'island-list-unavailable':()=>one('A folder missing or unreadable',listNA),
  'island-empty':()=>one('Nothing to clean',listEmpty),
- 'island-measuring-shortcut':()=>one('The Clean junk files shortcut measures the remembered ticks first, then asks (the Scan shortcut opens the list instead)',shortMeasuring),
- 'island-confirm':()=>one('Clean in the header: the question with the ticked categories and sizes; Cancel has the focus',confStd),
- 'island-waiting-admin':()=>one('An admin category ticked and Clean pressed: Windows\' prompt comes first, then the helper measures',waitAdmin),
- 'island-confirm-admin':()=>one('After the prompt: the question shows the full size, admin categories included; Cancel deletes nothing',confAdmin),
- 'island-running':()=>one('Cleaning: the freed size is the real number and counts up as each row finishes',running),
+ 'island-measuring-shortcut':()=>one('Clean junk files shortcut: measures, then asks',shortMeasuring),
+ 'island-confirm':()=>one('Confirm; Cancel has focus',confStd),
+ 'island-waiting-admin':()=>one('Waiting on the UAC prompt',waitAdmin),
+ 'island-confirm-admin':()=>one('Confirm after the prompt, admin categories measured',confAdmin),
+ 'island-running':()=>one('Cleaning',running),
  'island-quit':()=>one('Quitting Chippi mid-clean',quit),
- 'island-result':()=>one('Result: size freed and files in use, per category',resOk),
- 'island-result-app-open':()=>one('Result with a running browser: its cache was skipped',resAppOpen),
- 'island-result-failed':()=>one('Failures read "… failed" with Retry; a folder the helper refuses reads "Kept: …" and is left alone',resFail),
- 'island-result-declined':()=>one('Windows\' prompt declined: standard categories ran; the admin ones read Needs admin, and Clean (shield) asks again',resDeclined),
- 'island-result-helper':()=>one('The admin helper couldn\'t start or ended mid-job',resHelper),
+ 'island-result':()=>one('Result',resOk),
+ 'island-result-app-open':()=>one('Result with Chrome running',resAppOpen),
+ 'island-result-failed':()=>one('One failed, one kept by the helper',resFail),
+ 'island-result-declined':()=>one('UAC prompt declined',resDeclined),
+ 'island-result-helper':()=>one('Admin helper failed',resHelper),
  'island-actions-apps':()=>one('Actions › Apps: Clean junk files shows the last size',appsMenu),
  'island-search':()=>`${one('Search: each verb is a row, Run',sNo)}${one('With an admin category ticked, Clean junk files\' Run carries the shield',sAdmin)}`,
- 'island-bar':()=>`${L('Cleaned, 6 seconds',bar(g('trash-2'),'Cleaned 1.0 GB','12 files in use'))}${L('Admin declined',bar(g('shield'),'Cleaned 1.0 GB','Needs admin for 2',{cau:1}))}${L('Clean failed',bar(g('triangle-alert'),'Clean failed','Windows Update cache',{cau:1}))}`,
+ 'island-bar':()=>`${L('Cleaned, 6 seconds',bar(g('trash-2'),'1.0 GB freed','Cleaner'))}${L('Admin declined',bar(g('shield'),'1.0 GB freed','2 need admin',{cau:1}))}${L('Clean failed',bar(g('triangle-alert'),'Clean failed','Windows Update cache',{cau:1}))}`,
  'settings-cleaner':()=>L('Settings › Apps › Cleaner',frame(cleanerPage(0))),
  'settings-cleaner-narrow':()=>L('Settings › Apps › Cleaner at 860 wide',frame(cleanerPage(0),860)),
- 'island-list-none':()=>one('Nothing ticked: the count says so and Clean is off; the rows stay live',listNone),
+ 'island-list-none':()=>one('Nothing ticked',listNone),
  'settings-cleaner-keys':()=>L('Settings › Apps › Cleaner, with Scan for junk files set',frame(cleanerPage(1)))
 };
 document.body.className=theme;
