@@ -127,7 +127,13 @@ public sealed class UninstallerEngine : IDisposable
     public bool IsRunning => _running;
 
     /// <summary>The app being uninstalled now; null between apps and outside a queue.</summary>
-    public string? CurrentName { get; private set; }
+    public AppEntry? CurrentApp { get; private set; }
+
+    /// <summary>The name of <see cref="CurrentApp"/>.</summary>
+    public string? CurrentName => CurrentApp?.Name;
+
+    /// <summary>The helper's prompt is open: the queue's machine apps wait for the Windows prompt to be answered ("Waiting for admin").</summary>
+    public bool WaitsForAdmin { get; private set; }
 
     /// <summary>1-based position in the queue and its length, while one runs.</summary>
     public int Index { get; private set; }
@@ -191,7 +197,7 @@ public sealed class UninstallerEngine : IDisposable
                 if (app.IsMachine) continue;
                 if (ct.IsCancellationRequested) { Set(app, AppRunState.Cancelled); outcomes.Add(new(app, new AppStatus(AppRunState.Cancelled, app.Name))); continue; }
                 Index = q + 1;
-                CurrentName = app.Name;
+                CurrentApp = app;
                 Set(app, AppRunState.Uninstalling);
                 _log?.LogInformation("Uninstalling {App}", app.Name);
                 var outcome = app.IsStore ? await RunStoreAsync(app, record, ct) : await RunUserAsync(app, record, ct);
@@ -203,7 +209,8 @@ public sealed class UninstallerEngine : IDisposable
         finally
         {
             _running = false;
-            CurrentName = null;
+            CurrentApp = null;
+            WaitsForAdmin = false;
             Index = Count = 0;
             Changed?.Invoke();
         }
@@ -222,13 +229,19 @@ public sealed class UninstallerEngine : IDisposable
             if (p.Result is null && !StatusOf(entry.Id).IsFinal)   // a start posted late must not undo the result
             {
                 Index = p.Index;
-                CurrentName = entry.Name;
+                WaitsForAdmin = false;
+                CurrentApp = entry;
                 _log?.LogInformation("Uninstalling {App}", entry.Name);
                 Set(entry, AppRunState.Uninstalling);
             }
         });
+        WaitsForAdmin = true;
+        CurrentApp = machine[0].App;
+        Index = 1;
+        Changed?.Invoke();
         try { return await _admin.UninstallAsync(items, progress, ct).ConfigureAwait(true); }
         catch (OperationCanceledException) { return [.. items.Select(i => new AdminUninstallResult(i, AdminUninstallState.Cancelled))]; }
+        finally { WaitsForAdmin = false; }
     }
 
     private async Task<AppOutcome> FinishMachineAsync(AppEntry app, AppRecord record, AdminUninstallResult result)
@@ -291,6 +304,22 @@ public sealed class UninstallerEngine : IDisposable
     private bool IsGone(AppEntry app) => app.IsStore
         ? !_system.Packages.List().Any(p => string.Equals(p.FullName, app.Key, StringComparison.OrdinalIgnoreCase))
         : _system.Registry.ReadOne(app.Source, app.Key) is null;
+
+    private readonly Dictionary<string, (long At, bool Open)> _open = [];
+
+    /// <summary>
+    /// The app is open now ("Running"): the answer Search rows show. Read from the running programs and kept for five seconds, since a Search
+    /// asks again on every keystroke. Never ends anything.
+    /// </summary>
+    public bool IsOpen(AppEntry app)
+    {
+        if (_disposed || Folders(app).Count == 0) return false;
+        long now = _time.GetTimestamp();
+        if (_open.TryGetValue(app.Id, out var known) && _time.GetElapsedTime(known.At, now) < TimeSpan.FromSeconds(5)) return known.Open;
+        bool open = _system.Processes.RunningIn(Folders(app)).Count > 0;
+        _open[app.Id] = (now, open);
+        return open;
+    }
 
     private static IReadOnlyList<string> Folders(AppEntry app) => app.InstallLocation is { Length: > 3 } location ? [location] : [];
 

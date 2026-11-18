@@ -9,5 +9,7 @@
     <Using Include="Xunit" />
     <Compile Include="../Chippi.Island.Tests/WpfTestThread.cs" Link="WpfTestThread.cs" />
     <ProjectReference Include="../../src/Features/Chippi.Features.Uninstaller/Chippi.Features.Uninstaller.csproj" />
+    <!-- The island's styles live in the app; the offscreen shots load them. -->
+    <ProjectReference Include="../../src/Chippi.App/Chippi.App.csproj" />
   </ItemGroup>
 </Project>

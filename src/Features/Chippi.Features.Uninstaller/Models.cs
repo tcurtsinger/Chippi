@@ -40,6 +40,9 @@ public sealed record AppEntry(string Id, string Name, string Publisher, string V
     /// <summary>The row has a command to run. A Store app always does (its package); a registry app needs a quiet or normal string, or to be an MSI.</summary>
     public bool HasCommand => IsStore || IsMsi || !string.IsNullOrWhiteSpace(QuietUninstallString) || !string.IsNullOrWhiteSpace(UninstallString);
 
+    /// <summary>The uninstaller runs without a window (a Store package, an MSI, a quiet string); otherwise its wizard shows and the person finishes it.</summary>
+    public bool IsQuiet => IsStore || IsMsi || !string.IsNullOrWhiteSpace(QuietUninstallString);
+
     /// <summary>The row gets Uninstall: not a component, not Chippi, not NoRemove, and it has a command to run.</summary>
     public bool CanUninstall => Kind == AppKind.App && !NoRemove && HasCommand;
 

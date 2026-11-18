@@ -99,11 +99,17 @@ public sealed class UninstallerSettingsView : ContentControl, IDisposable
         if (section is null) return;
         if (section == UninstallerModule.RecentSection) { _settingTab = true; _tabs.SelectedIndex = 1; _settingTab = false; return; }
         if (section.StartsWith(UninstallerModule.SearchSection + ":", StringComparison.Ordinal)) _apps.SetSearch(section[(UninstallerModule.SearchSection.Length + 1)..]);
+        else if (section.StartsWith(UninstallerModule.ScanSection + ":", StringComparison.Ordinal) && Guid.TryParse(section[(UninstallerModule.ScanSection.Length + 1)..], out var id))
+        {
+            // A Scan from the island: the review of that app. A record that is gone leaves the Uninstalled list.
+            if (_engine.Recent.FirstOrDefault(r => r.Id == id) is { Restart: false } record) OpenReview(record);
+            else { _settingTab = true; _tabs.SelectedIndex = 1; _settingTab = false; }
+        }
     }
 
     private void ShowTab()
     {
-        if (_disposed) return;
+        if (_disposed || _review is not null) return;
         _apps.ClosePopover();
         switch (_tabs.SelectedIndex)
         {

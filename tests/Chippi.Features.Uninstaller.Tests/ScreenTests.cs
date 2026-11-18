@@ -55,6 +55,23 @@ public sealed class ScreenTests
         ("Microsoft Visual C++ 2015-2022 Redistributable (x64)", "Microsoft Corporation", "14.40.33810", 20, "20260202", "comp"),
     ];
 
+    /// <summary>The mockup's apps in a fixture PC (the island page's shots): machine apps, the user's own and Store packages.</summary>
+    internal static void SeedMock(Fixture f)
+    {
+        foreach (var (name, publisher, version, mb, installed, kind) in Mock)
+        {
+            if (kind == "store")
+            {
+                f.Packages.Packages.Add(new RawPackage("Full_" + name, "Family_" + name, name, name, publisher, version, @"C:\WindowsApps\" + name, DateTime.ParseExact(installed, "yyyyMMdd", CultureInfo.InvariantCulture), false, false, false));
+                continue;
+            }
+            var source = kind == "hkcu" ? AppSource.User : AppSource.Machine64;
+            string folder = source == AppSource.User ? f.Local("Programs", name) : f.ProgramFiles(name);
+            string? command = name == "Zoom Workplace" ? null : "\"" + Path.Combine(folder, "unins000.exe") + "\"";
+            f.Registry.Add(source, name, name, publisher, version, folder, command, null, [("EstimatedSize", (int)(mb * 1024)), ("InstallDate", installed)]);
+        }
+    }
+
     // ---- fakes ----
 
     private sealed class Ui : IModuleUi
@@ -570,6 +587,20 @@ public sealed class ScreenTests
         var again = Review(engine, record, back: back.Add);
         WpfTestThread.Wait(again.ScanAsync());
         Assert.Equal([false, false], back);
+    });
+
+    [Fact]
+    public void A_Scan_from_the_island_opens_the_review_of_that_app_and_a_record_that_is_gone_opens_the_Uninstalled_list() => WpfTestThread.Run(() =>
+    {
+        using var rig = new Rig().Seed(apps: false);
+        var record = new AppRecord(Guid.NewGuid(), "Firefox", "Mozilla", "132.0", AppSource.User, "Firefox", null, null, [], null, rig.F.Now.UtcDateTime);
+        rig.F.Records().Put(record);
+        rig.Make();
+        var view = rig.View(UninstallerModule.ScanSectionFor(record.Id));
+        Assert.NotNull(view.Review);
+        var gone = rig.View(UninstallerModule.ScanSectionFor(Guid.NewGuid()));
+        Assert.Null(gone.Review);
+        Assert.Equal(1, gone.SelectedTab);
     });
 
     // ---- the boards ----

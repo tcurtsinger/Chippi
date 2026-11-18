@@ -86,6 +86,9 @@ public sealed class ModuleTests : IDisposable
         var rig = new Rig(_f);
         Assert.Equal(["Uninstaller", "Uninstall app", "Scan for leftovers", "Uninstall"], rig.Commands.Select(c => c.Name));
         Assert.Equal(ChippiCommandKind.Page, rig.Commands[0].Kind);
+        // Search "uninstall": Uninstall app · Settings · Open, Scan for leftovers · Uninstaller, Uninstaller · Settings.
+        Assert.Equal([("Uninstaller", "Settings", ChippiCommandKind.Page), ("Uninstall app", "Settings", ChippiCommandKind.Page), ("Scan for leftovers", "Uninstaller", ChippiCommandKind.Run)],
+            rig.Commands.Take(3).Select(c => (c.Name, c.Detail, c.Kind)));
         var row = rig.Commands[3];
         Assert.Equal("apps", row.Tile!.Key);
         Assert.True(row.Tile.Menu);
@@ -109,6 +112,7 @@ public sealed class ModuleTests : IDisposable
         rig.Module.Pick = () => { picked = true; return Task.CompletedTask; };
         await rig.Commands[2].Run();
         Assert.True(picked);
+        Assert.Equal(["search", "search", "uninstalled"], rig.Opened);
         Assert.Empty(_f.Admin.Calls);
     }
 
@@ -121,10 +125,10 @@ public sealed class ModuleTests : IDisposable
         var rows = rig.Search("uninstall note");
         var row = Assert.Single(rows);
         Assert.Equal("Uninstall Notepad++", row.Name);
-        Assert.Equal(("Uninstall", true, "Notepad++ Team"), (row.Verb, row.NeedsAdmin, row.Detail));
+        Assert.Equal(("Run", true, ""), (row.Verb, row.NeedsAdmin, row.Detail));   // no size in the entry: the second line is empty
         Assert.Equal(ChippiCommandKind.Value, row.Kind);
 
-        await row.Run();   // no confirm wired: Settings opens at the app
+        await row.Run();   // the island is off: Settings opens at the app
         Assert.Equal(["search:Notepad++"], rig.Opened);
         Assert.Empty(_f.Admin.Calls);
 
@@ -162,7 +166,7 @@ public sealed class ModuleTests : IDisposable
         var notion = engine.Apps.Single(a => a.Name == "Notion");
         _f.User.Run = (_, _) => { _f.Registry.Remove(AppSource.User, "Notion"); return 0; };
         await engine.UninstallAsync([notion]);
-        Assert.Contains(rig.Island.Published, a => a.Title == "Uninstalling Notion" && a.Source == "Uninstaller");
+        Assert.Contains(rig.Island.Published, a => a is { Title: "Uninstalling", Source: "Notion", Icon: "AppWindow" });   // a wizard-only uninstaller: the window glyph
         var done = rig.Island.Published.Last();
         Assert.Equal(("Uninstalled", "Notion", false), (done.Title, done.Source, done.NeedsAttention));
         Assert.Contains("uninstaller/run", rig.Island.Cleared);
