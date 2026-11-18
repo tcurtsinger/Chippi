@@ -75,6 +75,9 @@ public sealed class ModuleContext(
     /// </summary>
     public Func<string, bool> SummonIslandPage { get; init; } = _ => false;
 
+    /// <summary>Summons Search with this text already typed. False while the island is off or Search isn't installed.</summary>
+    public Func<string, bool> SummonSearch { get; init; } = _ => false;
+
     /// <summary>Everything Chippi does, from every running feature, with the island's pages and Settings (the Command bar).</summary>
     public Func<IReadOnlyList<ChippiCommand>> Commands { get; init; } = () => [];
 

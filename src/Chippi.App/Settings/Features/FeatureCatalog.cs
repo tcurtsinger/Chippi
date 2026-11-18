@@ -42,9 +42,11 @@ public static class FeatureCatalog
             Requires = [Capability.Admin],
             Badges = [FeatureBadge.Needs("Admin for fans")],
         },
-        new("port-manager", "Port manager", "Shows which app holds a network port and frees it", FeatureGroup.System)
+        new("port-manager", "Ports", "Shows which app holds a network port and frees it", FeatureGroup.System)
         {
-            Icon = "Monitor",
+            Icon = "Network",
+            Requires = [Capability.Admin],
+            Badges = [FeatureBadge.Needs("Admin for some ports")],
             Presets = PowerUser,
         },
 

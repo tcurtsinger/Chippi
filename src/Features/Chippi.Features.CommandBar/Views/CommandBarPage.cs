@@ -102,6 +102,16 @@ internal sealed class CommandBarPage : UserControl
     /// <summary>The modifier keys down; tests stand in for the real keyboard.</summary>
     internal Func<ModifierKeys> Modifiers { get; set; } = () => Keyboard.Modifiers;
 
+    /// <summary>True between an open and the page hiding.</summary>
+    internal bool IsOpen => _active;
+
+    /// <summary>Puts <paramref name="text"/> in the field with the caret at its end, as if typed.</summary>
+    internal void Type(string text)
+    {
+        Field.Text = text;
+        Field.CaretIndex = text.Length;
+    }
+
     /// <summary>The first Esc clears the field; true when it did, and the island stays open.</summary>
     public bool Escape()
     {
@@ -133,8 +143,12 @@ internal sealed class CommandBarPage : UserControl
             _windows = [];
         }
         _module.Pc?.RefreshApps();
-        if (Field.Text.Length > 0)
-            Field.Text = ""; // refreshes
+        string start = _module.TakePendingQuery() ?? "";
+        if (Field.Text != start)
+        {
+            Field.Text = start; // refreshes
+            Field.CaretIndex = start.Length;
+        }
         else
             Refresh(keepSelection: false);
     }
@@ -324,7 +338,7 @@ internal sealed class CommandBarPage : UserControl
     /// <summary>Runs <paramref name="result"/>: the panel closes after, unless the row moved the island to another page.</summary>
     internal async void Run(Result result)
     {
-        if (!_active || _running is not null)
+        if (!_active || _running is not null || result.TextOnly)
             return;
         long visit = _visit;
         long queryVersion = _queryVersion;
@@ -501,7 +515,7 @@ internal sealed class CommandBarPage : UserControl
     {
         string help = _running is not null ? "Working. Wait for this action to finish."
             : _selected < _shown.Count
-            ? $"{AccessibleName(_shown[_selected])}, {_selected + 1} of {_shown.Count}. Up and Down to choose; Enter to {_shown[_selected].Verb.ToLowerInvariant()}."
+            ? $"{AccessibleName(_shown[_selected])}, {_selected + 1} of {_shown.Count}. Up and Down to choose" + (_shown[_selected].TextOnly ? "." : $"; Enter to {_shown[_selected].Verb.ToLowerInvariant()}.")
             : _statusText.Text;
         bool changed = AutomationProperties.GetHelpText(Field) != help;
         AutomationProperties.SetHelpText(Field, help);
@@ -530,10 +544,12 @@ internal sealed class CommandBarPage : UserControl
         }
         var name = Ui.Text(result.Name, 12);
         var detail = Ui.Text(result.Detail, 11, "IslandTextSecondaryBrush");
+        if (result.Detail.Length == 0) detail.Visibility = Visibility.Collapsed;
         var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Children = { name, detail } };
         var line = new Grid();
         line.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         line.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        line.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         line.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         line.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         var lead = Lead(result);
@@ -549,8 +565,16 @@ internal sealed class CommandBarPage : UserControl
         }
         var verb = Ui.Text(result.Verb, 11);
         verb.FontWeight = FontWeights.SemiBold;
-        Grid.SetColumn(verb, 3);
+        Grid.SetColumn(verb, 4);
         line.Children.Add(verb);
+        UIElement? shield = null;
+        if (result.NeedsAdmin)
+        {
+            // The shield has a column of its own left of the verb, and shows with it (the selected row's).
+            shield = new UacShield(12) { Margin = new Thickness(10, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center, Visibility = Visibility.Collapsed };
+            Grid.SetColumn(shield, 3);
+            line.Children.Add(shield);
+        }
         var button = new SearchResultButton(_rows, Choose, Execute)
         {
             Content = line, Height = RowHeight, Padding = new Thickness(10, 0, 10, 0), Focusable = false,
@@ -570,7 +594,7 @@ internal sealed class CommandBarPage : UserControl
             Choose();
         };
         if (!result.CanHide)
-            return new RowView(result, button, button, detail, verb, null);
+            return new RowView(result, button, button, detail, verb, null, shield);
         var hide = Ui.Icon(LucideIcons.EyeOff, $"Hide {result.Name}", "Hide");
         hide.HorizontalAlignment = HorizontalAlignment.Right;
         hide.VerticalAlignment = VerticalAlignment.Center;
@@ -580,7 +604,7 @@ internal sealed class CommandBarPage : UserControl
             if (_active && visit == _visit && queryVersion == _queryVersion && renderVersion == _renderVersion) Hide(result);
         };
         button.HideAction = hide;
-        return new RowView(result, new Grid { Children = { button, hide } }, button, detail, verb, hide);
+        return new RowView(result, new Grid { Children = { button, hide } }, button, detail, verb, hide, shield);
     }
 
     private void UpdateRow(RowView row, int index)
@@ -592,7 +616,8 @@ internal sealed class CommandBarPage : UserControl
         row.Detail.Opacity = selected ? 0.82 : 1;
         row.Verb.Text = running ? "Working…" : row.Result.Verb;
         row.Verb.Visibility = selected && (_running is null || running) ? Visibility.Visible : Visibility.Collapsed;
-        row.Verb.Margin = new Thickness(10, 0, hide ? 28 : 0, 0);
+        row.Verb.Margin = new Thickness(row.Shield is null ? 10 : 6, 0, hide ? 28 : 0, 0);
+        if (row.Shield is not null) row.Shield.Visibility = row.Verb.Visibility == Visibility.Visible && row.Verb.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
         if (row.Hide is not null)
         {
             var visibility = hide ? Visibility.Visible : Visibility.Collapsed;
@@ -611,7 +636,7 @@ internal sealed class CommandBarPage : UserControl
             AutomationProperties.SetHelpText(row.Button, _running is null ? "Shift+Delete to hide. Undo is available after hiding." : "");
     }
 
-    private sealed record RowView(Result Result, UIElement Root, SearchResultButton Button, TextBlock Detail, TextBlock Verb, Button? Hide);
+    private sealed record RowView(Result Result, UIElement Root, SearchResultButton Button, TextBlock Detail, TextBlock Verb, Button? Hide, UIElement? Shield = null);
 
     private FrameworkElement Lead(Result result)
     {
@@ -621,6 +646,12 @@ internal sealed class CommandBarPage : UserControl
             return AppMark(result.Name, (pc, pixels) => pc.AppIconAsync(new StartApp(result.Name, parsing), pixels));
         if (result.Window is { } window)
             return AppMark(window.App, (pc, pixels) => pc.WindowIconAsync(window, pixels));
+        if (result.IconPath is { } iconPath)
+        {
+            // A program's own icon, its letters until it's read: "Port 3000 · node.exe" is node.exe's.
+            string who = result.Name.Contains(" · ", StringComparison.Ordinal) ? result.Name[(result.Name.IndexOf(" · ", StringComparison.Ordinal) + 3)..] : result.Name;
+            return AppIcon.View(iconPath, 20, Ui.Monogram(who));
+        }
         var box = new Grid { Width = 20, Height = 20, VerticalAlignment = VerticalAlignment.Center };
         box.Children.Add(Ui.Glyph(LucideIcons.Get(result.Icon), 16, "IslandTextSecondaryBrush"));
         return box;

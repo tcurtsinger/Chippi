@@ -177,6 +177,29 @@ public sealed class CommandBarModule : IFeatureModule
         _context?.SummonIslandPage(TileKey);
     }
 
+    /// <summary>Text the next open starts with instead of an empty field; taken once.</summary>
+    private string? _pendingQuery;
+
+    internal string? TakePendingQuery() { string? text = _pendingQuery; _pendingQuery = null; return text; }
+
+    /// <summary>Summons Search with <paramref name="text"/> typed (another feature's shortcut, such as Find port).</summary>
+    public bool SummonWith(string text)
+    {
+        if (_context is null || _capturing)
+            return false;
+        if (_page is { IsOpen: true } open)
+        {
+            // Already showing (Find port picked from Search itself): the field changes in place.
+            open.Type(text);
+            return _context.SummonIslandPage(TileKey);
+        }
+        _pendingQuery = text;
+        if (_context.SummonIslandPage(TileKey))
+            return true;
+        _pendingQuery = null;
+        return false;
+    }
+
     public bool ChangeShortcut(KeyShortcut shortcut)
     {
         if (_context is null)

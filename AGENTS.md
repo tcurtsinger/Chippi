@@ -132,3 +132,8 @@ When a step here changes, or you learn one, change this file in the same pull re
 
 - Screen capture's Recent skips and logs an unreadable index row. A changed DPAPI key sets `recent.db` aside as `recent.unreadable-*.db` and starts empty without deleting images; later starts sweep only orphan PNGs newer than the newest set-aside stamp.
 - Screen capture's crop preview uses `ICaptureSession.SetPreview` for the frame, dimming, pill and bars while the draft keeps its source pixels. `CaptureCropTests` renders applied crop and Undo offscreen with synthetic pixels, writing `capture-crop-applied.png` and `capture-crop-undone.png` under `CHIPPI_ISLAND_SHOTS`.
+
+## Port manager screens
+
+- `ScreenTests` in `Chippi.Features.PortManager.Tests` renders Settings › Ports, the Free port picker, the question and every result offscreen on fakes (`CHIPPI_ISLAND_SHOTS`, `CHIPPI_SHOTS_THEME=light`, `CHIPPI_PORT_MANAGER_TIMINGS`); it never shows a window, reads a port or ends a process. Views re-draw on `Redraw()` there: raising Loaded starts the engine's loop. The Search rows (verb, shield, icon) render only in `CommandBarShots` (Island.Tests, shows windows: CI or an away session).
+- Port manager's native actions (End, Close, Stop service, through the helper and as a standard user) are checked only in the Sandbox, against a stand-in listener and service; tests use fakes plus one child listener on 127.0.0.1 that the test itself starts and ends. Find port opens Search with "port " typed through `ModuleContext.SummonSearch`.
