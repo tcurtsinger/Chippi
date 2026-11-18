@@ -119,6 +119,9 @@ public sealed class CategoryActions(IReadOnlyDictionary<string, IReadOnlyList<Ca
     private bool Walk(DirectoryInfo dir, bool clean, DateTime cutoff, Tally tally, int depth, CancellationToken ct)
     {
         if (depth > MaxDepth) return true;
+        // The folder stays held, without FILE_SHARE_DELETE, for the whole visit: it can't be swapped for a link between listing and delete.
+        using var held = SafeFs.OpenFolder(dir.FullName);
+        if (held is null) return true;
         IEnumerable<FileSystemInfo> entries;
         try { entries = dir.EnumerateFileSystemInfos("*", All).ToArray(); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return true; }
@@ -150,23 +153,16 @@ public sealed class CategoryActions(IReadOnlyDictionary<string, IReadOnlyList<Ca
             if (!link) { tally.Bytes += size; tally.Files++; }
             return;
         }
-        try
+        switch (SafeFs.DeleteEntry(entry.FullName))
         {
-            if (entry.Attributes.HasFlag(FileAttributes.Directory)) Directory.Delete(entry.FullName, recursive: false);   // RemoveDirectory on the link itself
-            else
-            {
-                if (entry.Attributes.HasFlag(FileAttributes.ReadOnly)) File.SetAttributes(entry.FullName, entry.Attributes & ~FileAttributes.ReadOnly);
-                File.Delete(entry.FullName);
-            }
-            tally.Removed++;
-            if (!link) { tally.Bytes += size; tally.Files++; }
-        }
-        catch (FileNotFoundException) { }
-        catch (DirectoryNotFoundException) { }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            // Held open (sharing violation) or access denied: skipped and counted, never forced.
-            if (!link) tally.InUse++;
+            case DeleteOutcome.Deleted:
+                tally.Removed++;
+                if (!link) { tally.Bytes += size; tally.Files++; }
+                break;
+            case DeleteOutcome.InUse:
+                // Held open (any other handle) or access denied: skipped and counted, never forced.
+                if (!link) tally.InUse++;
+                break;
         }
     }
 
@@ -182,7 +178,7 @@ public sealed class CategoryActions(IReadOnlyDictionary<string, IReadOnlyList<Ca
         try
         {
             if (dir.EnumerateFileSystemInfos("*", All).Any()) return;
-            Directory.Delete(dir.FullName, recursive: false);
+            SafeFs.DeleteEntry(dir.FullName);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
     }

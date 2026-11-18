@@ -341,6 +341,49 @@ public sealed class EngineTests : IDisposable
         Assert.True(File.Exists(a));
         Assert.Equal(CleanerRowState.Cancelled, Row(e, "temp").State);
         Assert.False(e.IsCleaning);
+        Assert.Equal(0, result.FreedBytes);   // a category that never started freed nothing, however big it measured
+        Assert.Equal(0, Row(e, "temp").Bytes);
+    }
+
+    [Fact]
+    public async Task While_a_question_is_open_no_measure_or_second_plan_starts_until_it_is_answered()
+    {
+        _f.File(_f.Temp("a.tmp"), 100);
+        using var e = _f.Engine();
+        var plan = (await e.PrepareCleanAsync())!;
+        Assert.Null(await e.PrepareCleanAsync());   // a second Clean shortcut asks nothing
+        await e.MeasureAsync();
+        Assert.False(e.IsMeasuring);
+        Assert.Equal(CleanerRowState.Measured, Row(e, "temp").State);
+        await e.CancelPlanAsync();
+        Assert.NotNull(await e.PrepareCleanAsync());
+        var again = (await e.PrepareCleanAsync());   // pending again
+        Assert.Null(again);
+        await e.CleanAsync(plan);
+        await e.MeasureAsync();   // answered: measuring works again
+        Assert.Equal(CleanerRowState.Measured, Row(e, "temp").State);
+    }
+
+    private sealed class Clock(DateTime now) : TimeProvider { public override DateTimeOffset GetUtcNow() => new(now, TimeSpan.Zero); }
+
+    [Fact]
+    public async Task A_read_only_file_link_is_removed_without_changing_its_targets_attributes()
+    {
+        string target = _f.File(_f.Outside("target.dat"), 10);
+        System.IO.File.SetAttributes(target, FileAttributes.ReadOnly | FileAttributes.Archive);
+        string link = _f.Temp("link.dat");
+        Directory.CreateDirectory(_f.Temp());
+        try { System.IO.File.CreateSymbolicLink(link, target); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { System.IO.File.SetAttributes(target, FileAttributes.Normal); return; }   // symlinks need Developer Mode
+        try
+        {
+            using var e = new CleanerEngine(_f.Roots, null, null, null, () => _f.Running, new Clock(DateTime.UtcNow + TimeSpan.FromDays(3)));
+            var plan = (await e.PrepareCleanAsync(["temp"]))!;
+            await e.CleanAsync(plan);
+            Assert.True(System.IO.File.Exists(target));
+            Assert.Equal(FileAttributes.ReadOnly | FileAttributes.Archive, System.IO.File.GetAttributes(target));
+        }
+        finally { System.IO.File.SetAttributes(target, FileAttributes.Normal); }
     }
 
     [Fact]

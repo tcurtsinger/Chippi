@@ -247,6 +247,55 @@ public sealed class ScreenTests
     });
 
     [Fact]
+    public void On_a_page_that_is_already_open_the_question_gives_Cancel_the_keyboard_and_a_redraw_keeps_the_focused_row() => WpfTestThread.Run(() =>
+    {
+        using var rig = new Rig();
+        rig.F.File(rig.F.Temp("a.tmp"), 2_000_000);
+        rig.Start();
+        var view = rig.View;
+        view.Redraw();
+        // A row pressed with the keyboard: the page rebuilds its buttons, and the new row button is the one that takes focus back.
+        view.FocusedKeyOverride = "row:thumb";
+        var before = Descendants<Button>(view).First(b => AutomationProperties.GetName(b) == "Thumbnail and icon caches");
+        before.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        var after = Descendants<Button>(view).First(b => AutomationProperties.GetName(b) == "Thumbnail and icon caches");
+        Assert.NotSame(before, after);
+        Assert.Same(after, view.FocusTarget);
+        view.FocusedKeyOverride = null;
+        // The question arrives on the open page: Cancel is the target, not the old Scan button.
+        var asked = rig.Module.RequestCleanAsync();
+        WpfTestThread.Wait(Until(() => view.Question is not null));
+        var cancel = Descendants<Button>(view).First(x => AutomationProperties.GetName(x) == "Cancel");
+        Assert.Same(cancel, view.FocusTarget);
+        cancel.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        WpfTestThread.Wait(asked);
+        // The quit question too.
+        _ = view.AskQuitAsync();
+        Assert.Same(Descendants<Button>(view).First(x => AutomationProperties.GetName(x) == "Cancel"), view.FocusTarget);
+    });
+
+    [Fact]
+    public void Scanning_from_the_module_leaves_an_earlier_result_and_the_empty_state_behind() => WpfTestThread.Run(() =>
+    {
+        using var rig = new Rig();
+        rig.F.File(rig.F.Temp("a.tmp"), 2_000_000);
+        rig.Start();
+        var view = rig.View;
+        var asked = rig.Module.RequestCleanAsync();
+        WpfTestThread.Wait(Until(() => view.Question is not null));
+        Descendants<Button>(view).First(x => AutomationProperties.GetName(x).StartsWith("Clean ", StringComparison.Ordinal)).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        WpfTestThread.Wait(asked);
+        Assert.NotNull(view.Result);
+        WpfTestThread.Wait(rig.Module.ScanAsync());
+        Assert.Null(view.Result);
+        Assert.Equal(["Scan", "Clean"], Descendants<Button>(view.Header).Select(x => AutomationProperties.GetName(x)));
+        view.ShowEmpty();
+        Assert.True(view.Empty);
+        WpfTestThread.Wait(rig.Module.ScanAsync());
+        Assert.False(view.Empty);
+    });
+
+    [Fact]
     public void A_declined_prompt_marks_the_rows_Needs_admin_with_a_small_Clean_and_the_bar_says_how_many() => WpfTestThread.Run(() =>
     {
         using var rig = new Rig();

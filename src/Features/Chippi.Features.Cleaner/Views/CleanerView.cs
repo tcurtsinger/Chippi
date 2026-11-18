@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Threading;
 using Chippi.UI.Controls;
 using static Chippi.Features.Cleaner.Views.CleanerUi;
 
@@ -27,6 +28,10 @@ public sealed class CleanerView : ContentControl, IDisposable
     private CleanerRunResult? _result;
     private bool _empty, _following, _disposed;
     private Button? _initial;
+    private readonly Dictionary<string, Button> _keyed = [];
+    private string? _focusKey;
+    /// <summary>The tests' stand-in for the control that has the keyboard (the page is never shown there).</summary>
+    internal string? FocusedKeyOverride { get; set; }
 
     /// <param name="engine">The engine the page draws and drives.</param>
     /// <param name="request">Clean junk files for the given categories (all ticked when null): measure, then ask. The module's verb.</param>
@@ -63,7 +68,12 @@ public sealed class CleanerView : ContentControl, IDisposable
             _ = ScanAsync();
     }
 
-    private void OnUnloaded(object sender, RoutedEventArgs e) => Follow(false);
+    private void OnUnloaded(object sender, RoutedEventArgs e)
+    {
+        Follow(false);
+        // A page opened again shows the list, measuring: not the result or the empty state of an earlier visit.
+        if (_question is null && _quit is null && !_engine.IsCleaning && !_engine.IsPreparing) { _result = null; _empty = false; }
+    }
 
     private void Follow(bool enabled)
     {
@@ -88,6 +98,15 @@ public sealed class CleanerView : ContentControl, IDisposable
 
     /// <summary>Shows the list again, measuring.</summary>
     public void Scan() => _ = ScanAsync();
+
+    /// <summary>The list, not an earlier result or the empty state: the module calls it before it measures on its own.</summary>
+    public void ShowList()
+    {
+        if (_disposed || _question is not null || _quit is not null) return;
+        _result = null;
+        _empty = false;
+        Render();
+    }
 
     /// <summary>The confirm: "Clean 1.0 GB?" with each category. Completes when it was answered (Cancel) or the clean it asked for finished.</summary>
     public Task AskAsync(CleanerPlan plan)
@@ -175,7 +194,9 @@ public sealed class CleanerView : ContentControl, IDisposable
     private void Render()
     {
         if (_disposed) return;
+        string? key = FocusedKeyOverride ?? CurrentFocusKey();
         _initial = null;
+        _keyed.Clear();
         _body.Children.Clear();
         var title = Text("Clean junk files", 13);
         title.FontWeight = FontWeights.SemiBold;
@@ -192,6 +213,32 @@ public sealed class CleanerView : ContentControl, IDisposable
         else if (_result is { } result) RenderRun(result);
         else if (_empty) RenderEmpty();
         else RenderList();
+        // Every redraw builds new buttons: the one that had the keyboard gets it back, and a question or the quit question gives it to Cancel.
+        bool asking = _question is not null || _quit is not null;
+        _focusKey = key is not null && _keyed.ContainsKey(key) ? key : asking ? "cancel" : null;
+        if (_focusKey is not null) Dispatcher.BeginInvoke(DispatcherPriority.Input, RestoreFocus);
+    }
+
+    /// <summary>The control a redraw leaves with the keyboard, by key; null when none.</summary>
+    internal Button? FocusTarget => _focusKey is not null && _keyed.TryGetValue(_focusKey, out var button) ? button : null;
+
+    private string? CurrentFocusKey()
+    {
+        if (!_body.IsKeyboardFocusWithin && !_header.IsKeyboardFocusWithin) return null;
+        return (Keyboard.FocusedElement as FrameworkElement)?.Tag as string;
+    }
+
+    private void RestoreFocus()
+    {
+        if (_disposed || !IsLoaded || FocusTarget is not { IsVisible: true, IsEnabled: true } target || target.IsKeyboardFocusWithin) return;
+        target.Focus();
+    }
+
+    private Button Keyed(Button button, string key)
+    {
+        button.Tag = key;
+        _keyed[key] = button;
+        return button;
     }
 
     private void HeaderButtons(params Button[] buttons)
@@ -216,7 +263,7 @@ public sealed class CleanerView : ContentControl, IDisposable
 
     private void RenderEmpty()
     {
-        HeaderButtons(IslandButton("Scan", Scan));
+        HeaderButtons(Keyed(IslandButton("Scan", Scan), "scan"));
         RenderCentered(Glyph(LucideIcons.CircleCheck, 28), "Nothing to clean");
     }
 
@@ -227,8 +274,8 @@ public sealed class CleanerView : ContentControl, IDisposable
         label.FontWeight = FontWeights.SemiBold;
         label.HorizontalAlignment = HorizontalAlignment.Center;
         column.Children.Add(label);
-        var cancel = IslandButton("Cancel", () => AnswerQuit(false));
-        var quit = IslandButton("Quit", () => AnswerQuit(true), critical: true);
+        var cancel = Keyed(IslandButton("Cancel", () => AnswerQuit(false)), "cancel");
+        var quit = Keyed(IslandButton("Quit", () => AnswerQuit(true), critical: true), "quit");
         var strip = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 10, 0, 0) };
         quit.Margin = new Thickness(8, 0, 0, 0);
         strip.Children.Add(cancel);
@@ -260,8 +307,8 @@ public sealed class CleanerView : ContentControl, IDisposable
         card.SetResourceReference(Border.BorderBrushProperty, "IslandCardBorderBrush");
         column.Children.Add(card);
         _body.Children.Add(column);
-        var cancel = IslandButton("Cancel", Cancel);
-        var clean = IslandButton("Clean", Confirm, critical: true, shield: plan.NeedsAdmin);
+        var cancel = Keyed(IslandButton("Cancel", Cancel), "cancel");
+        var clean = Keyed(IslandButton("Clean", Confirm, critical: true, shield: plan.NeedsAdmin), "confirm");
         AutomationProperties.SetName(clean, plan.Question.TrimEnd('?'));
         var foot = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom };
         clean.Margin = new Thickness(8, 0, 0, 0);
@@ -303,9 +350,9 @@ public sealed class CleanerView : ContentControl, IDisposable
     {
         var rows = _engine.Rows;
         bool measuring = _engine.IsMeasuring;
-        var scan = IslandButton("Scan", Scan);
+        var scan = Keyed(IslandButton("Scan", Scan), "scan");
         scan.IsEnabled = !(measuring && !_engine.HasSizes);
-        var clean = IslandButton("Clean", () => _ = _request(null), shield: _engine.AnyAdminTicked, accent: true);
+        var clean = Keyed(IslandButton("Clean", () => _ = _request(null), shield: _engine.AnyAdminTicked, accent: true), "clean");
         clean.IsEnabled = rows.Any(r => r.Ticked) && !measuring && !_engine.IsCleaning;
         HeaderButtons(scan, clean);
         _initial = clean.IsEnabled ? clean : scan;
@@ -325,6 +372,7 @@ public sealed class CleanerView : ContentControl, IDisposable
         var grid = RowGrid(lead, row.Category.Name, tag, row.Category.NeedsAdmin, row, skeleton, dim);
         var button = new Button { Content = grid, Height = 36, Padding = new Thickness(8, 0, 8, 0), IsEnabled = !unavailable };
         button.SetResourceReference(StyleProperty, "IslandListRowStyle");
+        Keyed(button, "row:" + row.Category.Id);
         AutomationProperties.SetName(button, row.Category.Name);
         AutomationProperties.SetItemStatus(button, row.Ticked ? "Ticked" : "Not ticked");
         button.Click += (_, _) => { _engine.SetTicked(row.Category.Id, !row.Ticked); Render(); };
@@ -398,7 +446,7 @@ public sealed class CleanerView : ContentControl, IDisposable
         string meta;
         string? rest = null;
         if (result is null) meta = CleanerText.Size(rows.Where(r => r.State == CleanerRowState.Cleaned).Sum(r => r.Bytes ?? 0), false) + " freed";
-        else { meta = result.Freed; rest = result.Meta; HeaderButtons(IslandButton("Scan", Scan)); }
+        else { meta = result.Freed; rest = result.Meta; HeaderButtons(Keyed(IslandButton("Scan", Scan), "scan")); }
         var list = new StackPanel { VerticalAlignment = VerticalAlignment.Top };
         double fraction = Fraction(rows);
         foreach (var row in rows) list.Children.Add(RunRow(row, result is null, fraction));

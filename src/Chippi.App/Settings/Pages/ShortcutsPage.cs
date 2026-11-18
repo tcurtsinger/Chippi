@@ -499,7 +499,7 @@ internal sealed class ShortcutsPage : UserControl
         var picker = new ActionPicker(new ActionPickerSource
         {
             Apps = () => [.. _pc.Apps.Select(a => (a.ParsingName, a.Name))],
-            Commands = () => [.. _shell.Registry.Commands().Where(c => c.Kind != ChippiCommandKind.Paste)],
+            Commands = () => [.. _shell.Registry.Commands().Where(c => c.Kind != ChippiCommandKind.Paste && !c.MenuOnly)],
             SettingsPages = [.. SettingsPages.All.Select(p => (p.Uri, p.Name))],
             Recorder = Recorder,
         });
@@ -519,7 +519,7 @@ internal sealed class ShortcutsPage : UserControl
             items.Add(new("Media", name, glyph, new ChippiAction { Kind = ActionKind.Media, Value = action.ToString(), Name = name }));
         foreach (var (action, name, glyph) in ActionCatalog.Selection)
             items.Add(new("Selected text", name, glyph, new ChippiAction { Kind = ActionKind.Selection, Value = action.ToString(), Name = name }));
-        foreach (var c in _shell.Registry.Commands().Where(c => c.Kind != ChippiCommandKind.Paste))
+        foreach (var c in _shell.Registry.Commands().Where(c => c.Kind != ChippiCommandKind.Paste && !c.MenuOnly))
             items.Add(new("Chippi", c.Name, c.Icon, new ChippiAction { Kind = ActionKind.Chippi, Value = c.Key, Name = c.Name }));
         foreach (var p in SettingsPages.All)
             items.Add(new("Settings page", p.Name, "Settings", new ChippiAction { Kind = ActionKind.SettingsPage, Value = p.Uri, Name = p.Name }));

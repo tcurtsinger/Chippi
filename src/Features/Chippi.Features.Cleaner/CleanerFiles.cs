@@ -120,7 +120,7 @@ internal static class CleanerFiles
             if (entry.Attributes.HasFlag(FileAttributes.Directory)) Directory.Delete(entry.FullName, recursive: false);   // the link itself, never its target
             else
             {
-                if (entry.Attributes.HasFlag(FileAttributes.ReadOnly)) File.SetAttributes(entry.FullName, entry.Attributes & ~FileAttributes.ReadOnly);
+                if (!link && entry.Attributes.HasFlag(FileAttributes.ReadOnly)) File.SetAttributes(entry.FullName, entry.Attributes & ~FileAttributes.ReadOnly);   // never through a link: it would change the target
                 File.Delete(entry.FullName);
             }
             tally.Removed++;

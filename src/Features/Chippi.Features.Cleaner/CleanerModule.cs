@@ -108,7 +108,7 @@ public sealed class CleanerModule : IFeatureModule
     public async Task ScanAsync()
     {
         if (Engine is not { } engine || _lifetime is not { } lifetime) return;
-        Open();
+        if (Open()) View().ShowList();
         try { await engine.MeasureAsync(lifetime.Token); }
         catch (OperationCanceledException) { }
     }

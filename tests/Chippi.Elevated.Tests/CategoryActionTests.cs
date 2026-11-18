@@ -102,6 +102,35 @@ public sealed class CategoryActionTests : IDisposable
     }
 
     [Fact]
+    public void A_file_another_process_holds_open_with_share_delete_is_still_in_use_not_deleted_from_under_it()
+    {
+        string root = Dir("temp");
+        string held = File_(root, "held.tmp", 500, Old);
+        using var hold = new FileStream(held, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+        var reply = Run(Actions(Messages.WindowsTemp, _now + TimeSpan.FromHours(1), T(root)), Messages.CleanCategory);
+        Assert.Equal((0L, 0, 1), (reply.Bytes, reply.Files, reply.InUse));
+        Assert.True(File.Exists(held));
+    }
+
+    [Fact]
+    public void A_folder_being_walked_is_held_so_it_cannot_be_swapped_for_a_junction_and_a_junction_is_never_opened_as_a_folder()
+    {
+        string root = Dir("temp"), outside = Dir("outside");
+        string sub = Dir(@"temp\sub"), moved = Path.Combine(_base, "moved");
+        using (var held = SafeFs.OpenFolder(sub))
+        {
+            Assert.NotNull(held);
+            Assert.ThrowsAny<IOException>(() => Directory.Move(sub, moved));   // the swap a junction needs: rename or remove the folder
+            Assert.ThrowsAny<IOException>(() => Directory.Delete(sub));
+        }
+        Directory.Move(sub, moved);   // released with the walk
+        Junction(@"temp\link", outside);
+        Assert.Null(SafeFs.OpenFolder(Path.Combine(root, "link")));
+        Assert.Null(SafeFs.OpenFolder(Path.Combine(root, "missing")));
+        Assert.Equal(DeleteOutcome.Missing, SafeFs.DeleteEntry(Path.Combine(root, "missing")));
+    }
+
+    [Fact]
     public void A_read_only_file_is_cleaned()
     {
         string root = Dir("temp");

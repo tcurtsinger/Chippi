@@ -41,6 +41,8 @@ public sealed class CleanerEngine : IDisposable
     private SynchronizationContext? _ui;
     private Task? _measure;
     private bool _preparing, _cleaning, _disposed;
+    /// <summary>A plan came back and its question isn't answered yet: no measure and no second plan until Clean or Cancel.</summary>
+    private volatile bool _planPending;
     private int _runId;
     private CleanerRow[] _rows = [];
 
@@ -143,7 +145,7 @@ public sealed class CleanerEngine : IDisposable
     /// </summary>
     public Task MeasureAsync(CancellationToken ct = default)
     {
-        if (_disposed || _cleaning) return Task.CompletedTask;
+        if (_disposed || _cleaning || _planPending) return Task.CompletedTask;
         if (_measure is { IsCompleted: false } running) return running;
         return _measure = MeasureCoreAsync(ct);
     }
@@ -191,6 +193,7 @@ public sealed class CleanerEngine : IDisposable
     {
         lock (_gate)
         {
+            if (_cleaning) return;   // a clean owns the rows now; a late measure result must not put them back to Measured
             var d = _data[category.Id];
             d.FromEarlier = false;
             d.Files = t.Files; d.InUse = 0; d.Skipped = t.SkippedApps.Count > 0 ? [.. t.SkippedApps] : null;
@@ -219,7 +222,7 @@ public sealed class CleanerEngine : IDisposable
     /// </summary>
     public async Task<CleanerPlan?> PrepareCleanAsync(IReadOnlyList<string>? only = null, CancellationToken ct = default)
     {
-        if (_disposed || _cleaning || _preparing) return null;
+        if (_disposed || _cleaning || _preparing || _planPending) return null;
         var ticked = CleanerCatalog.All.Where(c => only is null ? IsTicked(c.Id) : only.Contains(c.Id)).ToList();
         if (ticked.Count == 0) return null;
         _preparing = true;
@@ -240,6 +243,7 @@ public sealed class CleanerEngine : IDisposable
             }
             Meta = helperFailed ? "Admin helper failed" : null;
             if (admin.Count > 0 && !items.Any(i => i.Category.NeedsAdmin)) await EndSessionAsync();   // nothing for the open session to do
+            _planPending = true;
             return new CleanerPlan(items, declined, helperFailed, [.. ticked.Select(c => c.Id)]);
         }
         catch (OperationCanceledException)
@@ -303,6 +307,7 @@ public sealed class CleanerEngine : IDisposable
     {
         if (_disposed || _cleaning) return new CleanerRunResult([], 0, 0, false, false);
         _ui = SynchronizationContext.Current;
+        _planPending = false;
         _cleaning = true;
         int run = ++_runId;
         bool helperFailed = false, cancelled = false;
@@ -438,11 +443,15 @@ public sealed class CleanerEngine : IDisposable
 
     private void MarkCancelled(string id)
     {
-        lock (_gate) { var d = _data[id]; d.State = CleanerRowState.Cancelled; d.Bytes ??= 0; }
+        lock (_gate) { var d = _data[id]; d.State = CleanerRowState.Cancelled; d.Bytes = 0; d.Files = 0; }   // never started: nothing was freed
     }
 
     /// <summary>The confirm was cancelled, or its page closed: the helper session the measure left open ends, with nothing deleted.</summary>
-    public async Task CancelPlanAsync() => await EndSessionAsync();
+    public async Task CancelPlanAsync()
+    {
+        _planPending = false;
+        await EndSessionAsync();
+    }
 
     private async Task EndSessionAsync()
     {

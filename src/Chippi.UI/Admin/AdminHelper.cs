@@ -304,8 +304,9 @@ public sealed class AdminHelper(IAdminSessionFactory factory, ILogger logger, Ti
     {
         var pipe = session.Connection.Stream;
         using var wait = new CancellationTokenSource(_categoryReplyCeiling, _time);
-        Task? doneSent = null;
-        using var registration = ct.Register(() => doneSent = SendDoneAsync(pipe));
+        // Exactly one Done is written, whichever of Cancel or the reply's own reason asks first.
+        var doneSent = new Lazy<Task>(() => SendDoneAsync(pipe), LazyThreadSafetyMode.ExecutionAndPublication);
+        using var registration = ct.Register(() => _ = doneSent.Value);
         var reply = await Messages.ReadReplyAsync(pipe, wait.Token).ConfigureAwait(false) ?? throw new EndOfStreamException();
         if (reply.Id != request.Id || reply.Category != request.Category || reply.PackageId is not null || reply.ExitCode is not null
             || !Messages.CategoryStateAllowed(reply.State) || reply.Bytes is < 0 || reply.Files is < 0 || reply.InUse is < 0
@@ -313,10 +314,10 @@ public sealed class AdminHelper(IAdminSessionFactory factory, ILogger logger, Ti
             || (reply.State == Messages.CategoryCleaned && request.Verb != Messages.CleanCategory))
             throw new InvalidDataException("Invalid helper result.");
         bool stopped = ct.IsCancellationRequested || reply.Reason == Messages.CancelledReason;
-        if (stopped && doneSent is null) doneSent = SendDoneAsync(pipe);
-        if (doneSent is not null)
+        if (stopped) _ = doneSent.Value;
+        if (doneSent.IsValueCreated)
         {
-            await doneSent.ConfigureAwait(false);
+            await doneSent.Value.ConfigureAwait(false);
             // The Done's own answer follows the category's. The session is over either way, and the connection is closed.
             try
             {
