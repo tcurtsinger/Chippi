@@ -84,6 +84,17 @@ public sealed class CommandBarTests
     // ----- Finding -----
 
     [Fact]
+    public async Task Summoning_with_text_opens_Search_and_hands_the_text_to_one_open_only()
+    {
+        var f = new Fixture();
+        await f.StartAsync();
+        Assert.True(f.Module.SummonWith("port "));
+        Assert.Equal([CommandBarModule.TileKey], f.Summoned);
+        Assert.Equal("port ", f.Module.TakePendingQuery());
+        Assert.Null(f.Module.TakePendingQuery());
+    }
+
+    [Fact]
     public void Matches_rank_by_names_that_start_with_the_text_then_by_kind_with_the_web_last()
     {
         var f = new Fixture();
@@ -463,5 +474,21 @@ public sealed class CommandBarTests
 
         public void Unregister() => Pressed = null;
         public void Dispose() => Pressed = null;
+    }
+
+    [Fact]
+    public void A_command_with_its_own_verb_shield_and_icon_keeps_them_and_a_text_row_has_no_verb()
+    {
+        var command = new Chippi.Core.Modules.ChippiCommand("port-manager/port", "Port 3000 · node.exe", "Network", () => Task.CompletedTask)
+        { Kind = Chippi.Core.Modules.ChippiCommandKind.Value, Verb = "Free", NeedsAdmin = true, IconPath = @"C:pps
+ode.exe" };
+        var text = command with { Verb = "", NeedsAdmin = false, IconPath = null };
+        var from = typeof(Chippi.Features.CommandBar.Search.CommandSearch).GetMethod("From", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)!;
+        var row = (Chippi.Features.CommandBar.Search.Result)from.Invoke(null, [command])!;
+        var none = (Chippi.Features.CommandBar.Search.Result)from.Invoke(null, [text])!;
+        Assert.Equal(("Free", true, @"C:pps
+ode.exe", false), (row.Verb, row.NeedsAdmin, row.IconPath, row.TextOnly));
+        Assert.True(none.TextOnly);
+        Assert.Equal("", none.Verb);
     }
 }

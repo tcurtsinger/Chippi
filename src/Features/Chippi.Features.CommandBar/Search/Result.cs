@@ -46,8 +46,20 @@ public sealed record Result(string Key, ResultKind Kind, string Name, string Det
     /// <summary>A saved app arrangement: Launch, not Run.</summary>
     public bool Launches { get; init; }
 
+    /// <summary>The row's own verb when the kind's usual one doesn't say it (Port manager's "Free", "Stop"); empty for a row that is only text.</summary>
+    public string? VerbText { get; init; }
+
+    /// <summary>The verb asks Windows for admin: the UAC shield sits in its own column left of the verb.</summary>
+    public bool NeedsAdmin { get; init; }
+
+    /// <summary>A program whose own icon is the lead, in place of the glyph (Port manager's holder).</summary>
+    public string? IconPath { get; init; }
+
+    /// <summary>A row that only says something ("Port 3001 not in use"): no verb, and Enter does nothing.</summary>
+    public bool TextOnly => VerbText is { Length: 0 };
+
     /// <summary>What the selected row says at its right.</summary>
-    public string Verb => Kind switch
+    public string Verb => VerbText ?? Kind switch
     {
         ResultKind.Value => "Run",
         ResultKind.Chippi => Opens ? "Open" : Inserts ? "Insert" : Launches ? "Launch" : "Run",

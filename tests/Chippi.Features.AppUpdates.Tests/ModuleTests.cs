@@ -134,6 +134,9 @@ public sealed class ModuleTests
     private sealed class Admin : IAdminHelper
     {
         public int Calls;
+        public Task<AdminPortResult> CloseProcessAsync(AdminEndpoint endpoint, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<AdminPortResult> EndProcessAsync(AdminEndpoint endpoint, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<AdminPortResult> StopServiceAsync(string serviceName, AdminEndpoint endpoint, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<IReadOnlyList<AdminUpdateResult>> UpdatePackagesAsync(IReadOnlyList<AdminUpdateItem> items, IProgress<AdminUpdateProgress>? progress = null, CancellationToken ct = default)
         { Calls++; return Task.FromResult<IReadOnlyList<AdminUpdateResult>>(items.Select(i => new AdminUpdateResult(i.PackageId, "Done", 0)).ToArray()); }
     }

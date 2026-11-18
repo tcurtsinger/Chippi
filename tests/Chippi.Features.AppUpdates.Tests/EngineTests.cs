@@ -393,6 +393,9 @@ public sealed class EngineTests
         public List<IReadOnlyList<string>> Batches { get; } = [];
         public List<IReadOnlyList<AdminUpdateItem>> Items { get; } = [];
         public Func<IReadOnlyList<string>, IProgress<AdminUpdateProgress>?, CancellationToken, Task<IReadOnlyList<AdminUpdateResult>>>? Run;
+        public Task<AdminPortResult> CloseProcessAsync(AdminEndpoint endpoint, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<AdminPortResult> EndProcessAsync(AdminEndpoint endpoint, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<AdminPortResult> StopServiceAsync(string serviceName, AdminEndpoint endpoint, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<IReadOnlyList<AdminUpdateResult>> UpdatePackagesAsync(IReadOnlyList<AdminUpdateItem> items, IProgress<AdminUpdateProgress>? progress = null, CancellationToken ct = default)
         { var ids = items.Select(i => i.PackageId).ToArray(); Items.Add(items); Batches.Add(ids); return Run?.Invoke(ids, progress, ct) ?? Task.FromResult<IReadOnlyList<AdminUpdateResult>>(ids.Select(id => new AdminUpdateResult(id, "Done", 0)).ToArray()); }
     }

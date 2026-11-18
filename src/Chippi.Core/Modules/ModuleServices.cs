@@ -50,6 +50,9 @@ public sealed class ModuleServices
     /// </summary>
     public Func<string, bool>? SummonIslandPage { get; set; }
 
+    /// <summary>Summons Search with this text already typed (Port manager's Find port). Set by the shell; null in tests.</summary>
+    public Func<string, bool>? SummonSearch { get; set; }
+
     /// <summary>Chippi's colour, as Settings › Island &amp; pet picked it. Set by the shell; null in tests.</summary>
     public Func<Config.PetColor>? ChippiColor { get; set; }
 

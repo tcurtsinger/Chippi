@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) Chippi contributors
-using System.ComponentModel;
 using System.IO.Pipes;
-using System.Text.Json;
 using Chippi.Elevated.Protocol;
 
 namespace Chippi.Elevated;
@@ -22,13 +20,16 @@ internal static class Program
             using var connect = new CancellationTokenSource(TimeSpan.FromSeconds(10));
             await pipe.ConnectAsync(connect.Token).ConfigureAwait(false);
             failedStage = 5;
-            using var peer = PeerIdentity.Open(LocalPipe.ServerId(pipe.SafePipeHandle), Path.Combine(AppContext.BaseDirectory, "Chippi.exe"), elevated: false);
+            uint peerPid = LocalPipe.ServerId(pipe.SafePipeHandle);
+            string chippiPath = Path.Combine(AppContext.BaseDirectory, "Chippi.exe");
+            using var peer = PeerIdentity.Open(peerPid, chippiPath, elevated: false);
             failedStage = 6;
             var runner = new PackageUpdater(peer.StandardToken);
-            await new HelperSession(runner).RunAsync(pipe).ConfigureAwait(false);
+            var ports = new PortActions(new NativePortSystem(), [Environment.ProcessId, (int)peerPid], Path.GetFullPath(chippiPath));
+            await new HelperSession(runner, ports: ports).RunAsync(pipe).ConfigureAwait(false);
             return 0;
         }
-        catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException or Win32Exception or InvalidOperationException or JsonException or OperationCanceledException)
+        catch (Exception)
         { return failedStage; }
     }
 }

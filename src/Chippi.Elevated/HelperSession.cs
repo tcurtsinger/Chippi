@@ -7,7 +7,7 @@ namespace Chippi.Elevated;
 /// <summary>The token fires when the per-package ceiling passes; the updater then stops its installer tool.</summary>
 public interface IPackageUpdater { Task<AdminReply> UpdateAsync(AdminRequest request, CancellationToken ceiling); }
 
-public sealed class HelperSession(IPackageUpdater updater, TimeProvider? time = null)
+public sealed class HelperSession(IPackageUpdater updater, TimeProvider? time = null, IPortActions? ports = null)
 {
     public static readonly TimeSpan IdleTimeout = TimeSpan.FromSeconds(60);
     /// <summary>How long a package may keep running after its ceiling fires before the session answers for it.</summary>
@@ -29,6 +29,13 @@ public sealed class HelperSession(IPackageUpdater updater, TimeProvider? time = 
             {
                 await WriteReply(pipe, new AdminReply(request.Id, "Done"), stop).ConfigureAwait(false);
                 return;
+            }
+            if (Messages.IsPortVerb(request.Verb))
+            {
+                // One quick, bounded action; it runs to its answer even if Chippi disconnects, like a package.
+                var answer = ports is null ? new AdminReply(request.Id, Messages.PortFailed, Reason: "Port actions unavailable") : await ports.RunAsync(request, CancellationToken.None).ConfigureAwait(false);
+                await WriteReply(pipe, answer, stop).ConfigureAwait(false);
+                continue;
             }
             await WriteReply(pipe, new AdminReply(request.Id, "Progress", request.PackageId), stop).ConfigureAwait(false);
             // Once started, an installer finishes even if Chippi cancels or disconnects.

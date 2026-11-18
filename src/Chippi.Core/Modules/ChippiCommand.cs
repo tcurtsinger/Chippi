@@ -58,6 +58,15 @@ public sealed record ChippiCommand(string Key, string Name, string Icon, Func<Ta
 
     /// <summary>A window command's one shared action. Other doors supply their own captured target.</summary>
     public Chippi.Core.Actions.ChippiAction? WindowAction { get; init; }
+
+    /// <summary>The row's own verb when the kind's usual one doesn't say it ("Free", "Stop"); empty for a row that is only text; null for the kind's.</summary>
+    public string? Verb { get; init; }
+
+    /// <summary>The verb asks Windows for admin: the row shows the UAC shield beside it.</summary>
+    public bool NeedsAdmin { get; init; }
+
+    /// <summary>A program whose own icon the row shows in place of <see cref="Icon"/> (Port manager's holder); null for the glyph.</summary>
+    public string? IconPath { get; init; }
 }
 
 /// <summary>

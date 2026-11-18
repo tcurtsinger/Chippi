@@ -222,6 +222,7 @@ public partial class App : Application
         shell.Registry.Register(new Chippi.Features.QuickActions.QuickActionsModule(() => cleaning.Installed ? cleaning.Start : null));
         var commandBar = new Chippi.Features.CommandBar.CommandBarModule();
         shell.Registry.Register(commandBar);
+        shell.Services.SummonSearch = text => commandBar.SummonWith(text);
         // [Phase 5.5] The Radial menu: closed during Cleaning mode, wide awake with Keep awake, searching where the Command bar does.
         var radial = new Chippi.Features.RadialMenu.RadialMenuModule(() => cleaning.IsOn, () => keepAwake.IsOn, () => commandBar.Settings.WebSearch);
         shell.Registry.Register(radial);
@@ -296,6 +297,8 @@ public partial class App : Application
         shell.Registry.Register(mediaTools);
         shell.AppUpdates = new Chippi.Features.AppUpdates.AppUpdatesModule();
         shell.Registry.Register(shell.AppUpdates);
+        shell.PortManager = new Chippi.Features.PortManager.PortManagerModule();
+        shell.Registry.Register(shell.PortManager);
         if (shell.Capture is Chippi.UI.Capture.CaptureLayer layer)
             layer.CanStart = () => recording.Model?.Active != true;
         shell.CapturePanel = new Chippi.App.Island.CapturePanelHost(shell, screenCapture, screenText, colorPicker, recording, mediaTools);
